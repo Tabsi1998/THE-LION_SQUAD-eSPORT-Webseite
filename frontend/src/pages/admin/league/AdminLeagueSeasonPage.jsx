@@ -23,6 +23,7 @@ import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
+import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
   ACTIVE_STATUS_OPTIONS,
@@ -573,6 +574,7 @@ export default function AdminLeagueSeasonPage() {
             {can("applications") ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
 
             {can("roster") ? <SeasonRosterPanel seasonId={seasonId} /> : null}
+            {canSeason ? <SeasonScheduleRulesPanel seasonId={seasonId} /> : null}
 
             {canSeason ? (
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"

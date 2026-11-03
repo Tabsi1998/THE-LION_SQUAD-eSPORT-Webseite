@@ -22,7 +22,10 @@ INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_
                            # Liga (#1650): der Doppel-Einsatz-Index besteht aus Konto-Kennungen.
                            "lineup_user_ids",
                            # Teilnehmerliste (#2204): Konto-Kennungen und der interne Fall bei der Leitung.
-                           "lineups", "lineup_overdue_at"})
+                           "lineups", "lineup_overdue_at",
+                           # Liga-Termine (#2194): Anträge und Historie mit Gründen und Konten, die Fälle der Leitung -
+                           # Beteiligte bekommen sie mit Namen im Block ``schedule_block`` der Matchseite.
+                           "reschedule_requests", "schedule_history", "result_reminded_at", "result_overdue_at"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 # Liga (#1650): öffentlich je Map nur der Schnappschuss, Sieger und Punkte - Aufstellungen (Konto-Kennungen) bekommen

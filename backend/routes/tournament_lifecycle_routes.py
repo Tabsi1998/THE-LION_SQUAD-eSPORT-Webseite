@@ -422,6 +422,9 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             pause_unset = {**pause_unset, "check_in_closed_at": ""}
         if pause_unset:
             change["$unset"] = pause_unset
+        if status != "live" and "running_past_end" in t:
+            # Läuft länger (#2194): nicht mehr „live“ - das Merkmal fällt sofort weg, nicht erst im nächsten Lauf.
+            change["$unset"] = {**change.get("$unset", {}), "running_past_end": ""}
         await db.tournaments.update_one({"id": tid}, change)
         reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
         await _audit_tournament_action(

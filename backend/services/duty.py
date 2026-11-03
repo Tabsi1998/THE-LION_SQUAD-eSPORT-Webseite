@@ -159,4 +159,40 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         "series": await captain_series(db, user),
         "moderation": moderation,
         "lead_today": await lead_today_rows(db, now) if is_confirmed_tournament_lead(user) else [],
+        # Nach dem Ende noch „Live“ (#2194) und überfällige Liga-Spiele (Nr. 28): Hinweise für die Leitung.
+        "ended_live": await ended_live_rows(db, user, now=now),
+        "overdue_matches": await overdue_match_rows(db, user),
     }
+
+
+async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[dict]:
+    from services.tournament_overrun import ended_live_rows as rows
+
+    return await rows(db, user, now=now)
+
+
+async def overdue_match_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    """Überfällige Liga-Spiele (#2194, Nr. 28) für die Liga-Leitung mit „Spiele betreuen“ oder „Ergebnisse korrigieren“."""
+    from services.league_permissions import can, staffel_access
+    from services.league_schedule import overdue_query
+
+    query = (await staffel_access(db, user)).query()
+    if query is None:
+        return []
+    staffeln = await db.tournaments.find({**query, "status": {"$nin": ["draft", "archived", "cancelled"]}},
+                                         {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
+    allowed = {}
+    for row in staffeln:
+        if await can(user, ("matches", "results"), row["league_context"].get("league_id"), db=db):
+            allowed[row["id"]] = row
+    if not allowed:
+        return []
+    matches = await db.matches_v2.find(overdue_query(sorted(allowed)), {
+        "_id": 0, "id": 1, "tournament_id": 1, "scheduled_at": 1, "result_overdue_at": 1, "round_name": 1,
+        "matchday_label": 1, "matchday_number": 1, "round": 1}).sort("scheduled_at", 1).to_list(limit)
+    return [{
+        "match_id": row["id"], "tournament_id": row["tournament_id"], "title": allowed[row["tournament_id"]].get("title"),
+        "label": row.get("matchday_label") or row.get("round_name") or (f"Spieltag {row.get('matchday_number') or row.get('round')}"
+                                                                         if row.get("matchday_number") or row.get("round") else "Spiel"),
+        "scheduled_at": row.get("scheduled_at"), "overdue_since": row.get("result_overdue_at"), "url": f"/matches/{row['id']}",
+    } for row in matches]

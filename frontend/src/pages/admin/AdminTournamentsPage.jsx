@@ -18,6 +18,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { endText, liveAfterEnd } from "@/lib/endedLive";
 
 const EVENT_MODE_LABELS = {
   hybrid: "Hybrid",
@@ -274,7 +275,16 @@ export default function AdminTournamentsPage() {
                 <td className="px-4 py-3">
                   <RulePills tournament={t} />
                 </td>
-                <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={t.status} />
+                  {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
+                  {leadsRow(t) && liveAfterEnd(t) ? (
+                    <Link to={`/admin/tournaments/${t.id}`} data-testid={`admin-tr-ended-live-${t.slug}`} title={`Ende war am ${endText(t.end_date)}`}
+                      className="mt-1 block max-w-[14rem] text-[11px] leading-snug text-warn hover:text-white">
+                      Läuft laut Stand noch, Ende war am {endText(t.end_date)} – beenden?
+                    </Link>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">

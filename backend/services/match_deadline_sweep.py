@@ -247,4 +247,14 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
             if info and info["due_at"] <= now and not match.get("no_show_proposal"):
                 proposed += await _propose_no_show(db, tournament, match, info, now)
     overdue = await sweep_overdue_lineups(db, now=now)
-    return {"proposed": proposed, "confirmed": confirmed, "overdue_lineups": overdue}
+    # Liga-Termine (#2194): 72-h-Regel, abgelaufene Verschiebungen, überfällige Spiele - dieselben laufenden Turniere.
+    from services import league_schedule_sweep, tournament_overrun
+
+    schedule = await league_schedule_sweep.sweep(db, tournaments, now=now)
+    # Turnier nach dem Ende noch „Live“ (#2194): für alle Turniere, eine Abfrage je laufendem Turnier nach dem Ende.
+    try:
+        overrun = await tournament_overrun.refresh(db, now=now)
+    except Exception:  # noqa: BLE001 - die Anzeige holt es im nächsten Lauf
+        logger.warning("Stand „läuft länger“ nicht aktualisiert", exc_info=True)
+        overrun = {}
+    return {"proposed": proposed, "confirmed": confirmed, "overdue_lineups": overdue, "schedule": schedule, "overrun": overrun}
