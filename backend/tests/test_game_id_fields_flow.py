@@ -229,3 +229,94 @@ async def test_anonymized_accounts_never_count_and_odd_keys_still_work(flow):
     assert one.status_code == 200
     none = await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": []})
     assert none.status_code == 200
+
+
+# Codex-Nachprüfung: der echte Weg - das Profil speichert per HTTP unter dem Slug der effektiven ID-Quelle, die Anmeldung liest
+# über ``_profile_player_ids``. Ein neuer Name ändert die Adresse (den Slug) nicht mehr von selbst; ein ausdrücklich geänderter Slug,
+# unter dem schon IDs stehen, braucht eine Bestätigung. Gezählt wird nur, was danach unter keinem lesbaren Pfad mehr liegt.
+async def read_ids(flow, user_id: str, game_id: str) -> dict:
+    from routes.tournament_common import _enrich_game_identity, _profile_player_ids
+
+    user = await flow.db.users.find_one({"id": user_id}, {"_id": 0})
+    game = await _enrich_game_identity(flow.db, await flow.db.games.find_one({"id": game_id}, {"_id": 0}))
+    return _profile_player_ids(user, game)
+
+
+async def save_profile_ids(flow, user: dict, game_ids: dict) -> None:
+    flow.act_as(user)
+    saved = await flow.patch("/api/users/me", json={"game_ids": game_ids})
+    assert saved.status_code == 200, saved.text
+
+
+@pytest.mark.asyncio
+async def test_real_path_a_source_change_keeps_quiet_when_the_value_is_readable_afterwards(flow):
+    admin_user = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin_user)
+    world = await shooter_world(flow)
+    main, other = world["main"], world["other"]
+    plain = (await flow.post("/api/games", json={"name": "Probe Shooter 6", "kind": "edition", "parent_game_id": main["id"],
+                                                 "identity_source_game_id": main["id"]})).json()
+    player = await flow.add_user(role="user", name="Probe Beide")
+    await save_profile_ids(flow, player, {main["slug"]: {"activision_id": "probe#1"}, other["slug"]: {"activision_id": "probe#1"}})
+    assert (await read_ids(flow, player["id"], plain["id"]))["activision_id"] == "probe#1"
+
+    flow.act_as(admin_user)
+    moved = await flow.patch(f"/api/games/{plain['id']}", json={"identity_source_game_id": other["id"]})
+    assert moved.status_code == 200, moved.text
+    assert (await read_ids(flow, player["id"], plain["id"]))["activision_id"] == "probe#1"
+    assert await flow.db.audit_logs.count_documents({"action": "game.player_id_fields.remove"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_real_path_a_new_name_keeps_the_slug_and_the_ids(flow):
+    admin_user = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin_user)
+    world = await shooter_world(flow)
+    main, version = world["main"], world["version"]
+    player = await flow.add_user(role="user", name="Probe Spieler")
+    await save_profile_ids(flow, player, {main["slug"]: {"activision_id": "probe#2", "plattform": "PC"}})
+    assert await read_ids(flow, player["id"], version["id"]) == {"activision_id": "probe#2", "plattform": "PC"}
+
+    flow.act_as(admin_user)
+    # So schickt das Formular „Allgemein“: neuer Name, die Adresse unverändert - und einmal nur der Name.
+    for body in ({"name": "Probe Shooter Neu", "slug": main["slug"]}, {"name": "Probe Shooter Neuer"}):
+        renamed = await flow.patch(f"/api/games/{main['id']}", json=body)
+        assert renamed.status_code == 200, renamed.text
+        assert renamed.json()["slug"] == main["slug"]
+    assert await read_ids(flow, player["id"], version["id"]) == {"activision_id": "probe#2", "plattform": "PC"}
+
+
+@pytest.mark.asyncio
+async def test_real_path_an_explicit_slug_change_with_stored_ids_needs_a_confirmation(flow):
+    admin_user = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin_user)
+    world = await shooter_world(flow)
+    main, version = world["main"], world["version"]
+    player = await flow.add_user(role="user", name="Probe Spieler")
+    await save_profile_ids(flow, player, {main["slug"]: {"activision_id": "probe#3", "plattform": "Konsole"}})
+
+    flow.act_as(admin_user)
+    refused = await flow.patch(f"/api/games/{main['id']}", json={"slug": "probe-shooter-neu"})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"]["keys"] == {"activision_id": 1, "plattform": 1}
+    assert (await flow.get(f"/api/games/{main['id']}")).json()["slug"] == main["slug"]
+    done = await flow.patch(f"/api/games/{main['id']}", json={"slug": "probe-shooter-neu", "confirm_removed_keys": ["activision_id", "plattform"]})
+    assert done.status_code == 200, done.text
+    assert done.json()["slug"] == "probe-shooter-neu"
+    assert await read_ids(flow, player["id"], version["id"]) == {}, "genau das hat die Rückfrage angekündigt"
+    log = await flow.db.audit_logs.find_one({"action": "game.player_id_fields.remove", "target_id": main["id"]}, {"_id": 0})
+    assert log["data"] == {"keys": {"activision_id": 1, "plattform": 1}}
+    # Ohne gespeicherte IDs unter der Adresse geht ein Slugwechsel ohne Frage.
+    other = world["other"]
+    quiet = await flow.patch(f"/api/games/{other['id']}", json={"slug": "probe-anderes-neu"})
+    assert quiet.status_code == 200, quiet.text
+
+
+@pytest.mark.asyncio
+async def test_a_legacy_slug_survives_the_form_sending_it_back_normalized(flow):
+    await admin(flow)
+    await flow.db.games.insert_one({"id": "legacy", "slug": "Probe_Alt", "name": "Probe Alt", "player_id_fields": [field("probe")]})
+    await player_with(flow, "Probe Alt", {"Probe_Alt": {"probe": "alt#1"}})
+    saved = await flow.patch("/api/games/legacy", json={"name": "Probe Alt Neu", "slug": "probe-alt"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["slug"] == "Probe_Alt"

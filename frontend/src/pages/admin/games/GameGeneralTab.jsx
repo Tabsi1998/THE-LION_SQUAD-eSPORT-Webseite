@@ -74,7 +74,7 @@ export function GameGeneralTab({ gameId, form, onChange, games, servers }) {
             hint="Für enge Stellen wie Tabellen und die Discord-Rolle." testId="game-edit-short" />
           <SelectField label="Art" value={form.kind} onChange={(value) => set("kind", value)} options={GAME_KIND_OPTIONS} hint={KIND_HINTS[form.kind]} testId="game-edit-kind" />
           <TextField label="Adresse" required maxLength={80} value={form.slug} onChange={(value) => set("slug", slugFrom(value))}
-            hint="Steht in Links. Eine geänderte Adresse leitet alte Links weiter." testId="game-edit-slug" />
+            hint="Steht in Links und bleibt beim Umbenennen gleich. Unter ihr stehen die Spieler-IDs – ändert ihr sie, leiten alte Links weiter, und hängen schon IDs daran, fragt die Seite nach." testId="game-edit-slug" />
         </FormGrid>
         {isEdition && (
           <div className="space-y-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-3">

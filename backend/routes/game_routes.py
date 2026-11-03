@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
 from services import game_id_keys, game_maps, game_modes, game_usage
-from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slugify, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/games", tags=["games"])
@@ -193,7 +193,7 @@ async def _refuse_used_removal(db, current: dict, modes: list[dict] | None) -> N
             raise HTTPException(status_code=409, detail=game_usage.mode_in_use_text(mode["label"], counts))
 
 
-ID_SOURCE_FIELDS = ("player_id_fields", "identity_source_game_id", "parent_game_id", "inherit_player_ids", "kind")
+ID_SOURCE_FIELDS = ("player_id_fields", "identity_source_game_id", "parent_game_id", "inherit_player_ids", "kind", "slug")
 
 
 async def _lost_id_keys(db, current: dict, updates: dict, confirmed: set[str]) -> dict[str, int]:
@@ -244,9 +244,12 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_id_fields(updates.get("player_id_fields"), current.get("player_id_fields"))
-    slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
-    if slug_source is not None:
-        updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")
+    # Die Adresse folgt dem Namen nicht mehr (#2249): Unter dem Slug stehen die Spieler-IDs (``users.game_ids.<slug>``), ein
+    # neuer Name darf sie nicht unbemerkt unlesbar machen. Nur ein ausdrücklich anderer Slug ändert sie - mit Rückfrage, wenn
+    # darunter schon IDs stehen (``_lost_id_keys``).
+    updates.pop("slug", None)
+    if raw.get("slug") and slugify(raw["slug"], "spiel") != slugify(current.get("slug"), "spiel"):
+        updates["slug"] = await unique_slug(db.games, raw["slug"], current_id=game_id, fallback="spiel")
         apply_slug_history(current, updates)
     if updates.get("parent_game_id"):
         if updates["parent_game_id"] == game_id:

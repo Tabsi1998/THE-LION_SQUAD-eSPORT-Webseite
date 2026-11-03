@@ -139,6 +139,15 @@ describe("Allgemein", () => {
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Allgemein gespeichert."));
   });
 
+  // Codex-Nachprüfung #2249: Unter der Adresse stehen die Spieler-IDs - ein neuer Name lässt sie, wie sie ist.
+  test("ein neuer Name ändert die Adresse nicht", async () => {
+    renderPage();
+    fireEvent.change(await screen.findByTestId("game-edit-name"), { target: { value: "Mario Kart Welt" } });
+    expect(screen.getByTestId("game-edit-slug")).toHaveValue("mario-kart-8");
+    fireEvent.click(screen.getByTestId("game-save-allgemein"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ name: "Mario Kart Welt", slug: "mario-kart-8" })));
+  });
+
   test("ohne Namen wird nicht gespeichert", async () => {
     renderPage();
     fireEvent.change(await screen.findByTestId("game-edit-name"), { target: { value: "  " } });

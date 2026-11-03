@@ -93,27 +93,29 @@ async def people_with(db, key: str, slugs, game_ids=()) -> set[str]:
 
 
 async def lost_keys(db, before: dict, after: dict, by_id: dict[str, dict] | None = None) -> dict[str, int]:
-    """Je Schlüssel, wie viele Personen ihre ID für dieses Spiel verlieren, wenn ``before`` zu ``after`` wird."""
+    """Je Schlüssel, wie viele Personen ihre ID verlieren, wenn ``before`` zu ``after`` wird - für das Spiel selbst und für jedes
+    Spiel, das seine IDs von ihm nimmt. Ein Spiel liest unter dem Slug seiner Quelle und seinem eigenen. Fällt ein Schlüssel aus
+    den effektiven Feldern, zählt jeder Wert dort und im Kader; bleibt er, aber die lesbaren Pfade ändern sich (andere Quelle,
+    anderer Slug), zählt nur, wer den Wert danach unter keinem lesbaren Pfad mehr hat."""
     by_id = dict(by_id or await games_by_id(db))
     by_id[before["id"]] = before
     after_by_id = {**by_id, after["id"]: after}
-    source_before, source_after = source_of(before, by_id), source_of(after, after_by_id)
-    keys_after = set(effective_keys(after, after_by_id))
-    reading = readers(before, by_id)
-    result: dict[str, int] = {}
-    for key in effective_keys(before, by_id):
-        if key not in keys_after:
-            people = await people_with(db, key, [source_before.get("slug"), before.get("slug"), *[row.get("slug") for row in reading]],
-                                       [before["id"], *[row["id"] for row in reading]])
-        elif source_before.get("slug") != source_after.get("slug") and source_before.get("slug") != before.get("slug"):
-            people = (await people_with(db, key, [source_before.get("slug")])
-                      - await people_with(db, key, [source_after.get("slug"), after.get("slug")]))
-        else:
-            continue
-        if people:
-            result[key] = len(people)
-    return result
-
+    lost: dict[str, set[str]] = {}
+    for game in [before, *readers(before, by_id)]:
+        game_after = after_by_id[game["id"]]
+        paths_before = [source_of(game, by_id).get("slug"), game.get("slug")]
+        paths_after = [source_of(game_after, after_by_id).get("slug"), game_after.get("slug")]
+        keys_after = set(effective_keys(game_after, after_by_id))
+        for key in effective_keys(game, by_id):
+            if key not in keys_after:
+                people = await people_with(db, key, paths_before, [game["id"]])
+            elif set(filter(None, paths_before)) != set(filter(None, paths_after)):
+                people = await people_with(db, key, paths_before) - await people_with(db, key, paths_after)
+            else:
+                continue
+            if people:
+                lost.setdefault(key, set()).update(people)
+    return {key: len(people) for key, people in lost.items()}
 
 async def usage_by_key(db, game: dict) -> dict[str, int]:
     """Je eigenem Schlüssel die Personen mit einer ID - für die Rückfrage beim Entfernen eines Felds."""
