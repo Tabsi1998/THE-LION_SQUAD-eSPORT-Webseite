@@ -105,7 +105,9 @@ async def test_a_key_with_stored_ids_needs_a_confirmation_to_go_and_is_logged(fl
     renamed = [field("psn_id", "PSN-ID")]
     refused = await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": renamed})
     assert refused.status_code == 409
-    assert "„PSN-ID“" in refused.json()["detail"] and "1 Person" in refused.json()["detail"]
+    detail = refused.json()["detail"]
+    assert detail["code"] == "id_keys_in_use" and detail["keys"] == {"PSN-ID": 1}
+    assert "„PSN-ID“" in detail["message"] and "1 Person" in detail["message"]
     removed = await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": []})
     assert removed.status_code == 409, "Löschen ist dasselbe wie Wechseln"
     assert (await flow.get(f"/api/games/{game['id']}")).json()["player_id_fields"] == [field("PSN-ID", "PSN-ID")]
@@ -129,6 +131,29 @@ async def test_a_key_without_stored_ids_goes_without_question(flow):
     assert await flow.db.audit_logs.count_documents({"action": "game.player_id_fields.remove"}) == 0
 
 
+# Codex-Prüfung zu fix/2249-id-schluessel: Das Profil speichert alle Felder einer Version unter dem Slug ihrer effektiven ID-Quelle
+# (ProfilePage gruppiert nach identity_game_slug) - genau so ist es beim echten Aufbau „Call Of Duty: Modern Warfare 4“ mit
+# ID-Quelle „Call Of Duty“.
+async def shooter_world(flow) -> dict:
+    main = (await flow.post("/api/games", json={"name": "Probe Shooter", "player_id_fields": [field("activision_id", "Activision ID")]})).json()
+    other = (await flow.post("/api/games", json={"name": "Probe Anderes", "player_id_fields": [field("activision_id", "Activision ID")]})).json()
+    version = (await flow.post("/api/games", json={"name": "Probe Shooter 4", "kind": "edition", "parent_game_id": main["id"],
+                                                   "identity_source_game_id": main["id"], "player_id_fields": [field("plattform", "Plattform")]})).json()
+    return {"main": main, "other": other, "version": version}
+
+
+@pytest.mark.asyncio
+async def test_a_version_field_stored_under_its_id_source_counts(flow):
+    await admin(flow)
+    world = await shooter_world(flow)
+    main, version = world["main"], world["version"]
+    await player_with(flow, "Probe Quelle", {main["slug"]: {"activision_id": "probe#1", "plattform": "PC"}})
+    assert (await flow.get(f"/api/games/{version['id']}/usage")).json()["id_fields"] == {"plattform": 1}
+    refused = await flow.patch(f"/api/games/{version['id']}", json={"player_id_fields": []})
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["keys"] == {"plattform": 1}
+
+
 @pytest.mark.asyncio
 async def test_inherited_profiles_and_league_rosters_count_once_per_person(flow):
     await admin(flow)
@@ -136,7 +161,8 @@ async def test_inherited_profiles_and_league_rosters_count_once_per_person(flow)
     edition = (await flow.post("/api/games", json={"name": "Probe Konsole 2", "kind": "edition", "parent_game_id": game["id"]})).json()
     own = (await flow.post("/api/games", json={"name": "Probe Konsole 3", "kind": "edition", "parent_game_id": game["id"],
                                                "inherit_player_ids": False})).json()
-    first = await player_with(flow, "Probe Erbe", {edition["slug"]: {"PSN-ID": "erbe"}})
+    # Wer über die Version eingetragen hat, steht unter dem Slug der Quelle - die Version ohne Erbe speichert unter ihrem eigenen.
+    first = await player_with(flow, "Probe Erbe", {game["slug"]: {"PSN-ID": "erbe"}})
     await player_with(flow, "Probe Eigen", {own["slug"]: {"PSN-ID": "eigen"}})
     second = await flow.add_user(role="user", name="Probe Kader")
     await flow.db.league_rosters.insert_many([
@@ -145,4 +171,58 @@ async def test_inherited_profiles_and_league_rosters_count_once_per_person(flow)
     ])
     refused = await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": []})
     assert refused.status_code == 409
-    assert "2 Personen" in refused.json()["detail"], "die Version ohne Erbe zählt nicht, Erbe und Kader je Person einmal"
+    assert refused.json()["detail"]["keys"] == {"PSN-ID": 2}, "die Version ohne Erbe zählt nicht, Erbe und Kader je Person einmal"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", [
+    {"identity_source_game_id": "other"},
+    {"inherit_player_ids": False, "identity_source_game_id": None},
+    {"kind": "standalone", "parent_game_id": None, "identity_source_game_id": None},
+])
+async def test_changing_the_id_source_asks_before_ids_get_lost(flow, change):
+    await admin(flow)
+    world = await shooter_world(flow)
+    main, version = world["main"], world["version"]
+    await player_with(flow, "Probe Quelle", {main["slug"]: {"activision_id": "probe#1", "plattform": "PC"}})
+    body = {key: (world["other"]["id"] if value == "other" else value) for key, value in change.items()}
+    refused = await flow.patch(f"/api/games/{version['id']}", json=body)
+    assert refused.status_code == 409, refused.text
+    keys = refused.json()["detail"]["keys"]
+    assert keys["plattform"] == 1 and set(keys) <= {"plattform", "activision_id"}
+    assert (await flow.get(f"/api/games/{version['id']}")).json()["identity_source_game_id"] == main["id"]
+    done = await flow.patch(f"/api/games/{version['id']}", json={**body, "confirm_removed_keys": list(keys)})
+    assert done.status_code == 200, done.text
+    log = await flow.db.audit_logs.find_one({"action": "game.player_id_fields.remove", "target_id": version["id"]}, {"_id": 0})
+    assert log["data"] == {"keys": keys}
+
+
+@pytest.mark.asyncio
+async def test_a_version_whose_ids_live_under_its_source_or_in_a_roster_is_not_deleted(flow):
+    await admin(flow)
+    world = await shooter_world(flow)
+    main, version = world["main"], world["version"]
+    await player_with(flow, "Probe Quelle", {main["slug"]: {"plattform": "PC"}})
+    refused = await flow.delete(f"/api/games/{version['id']}")
+    assert refused.status_code == 409
+    assert "Person mit Spieler-ID" in refused.json()["detail"]
+
+    empty = (await flow.post("/api/games", json={"name": "Probe Shooter 5", "kind": "edition", "parent_game_id": main["id"]})).json()
+    member = await flow.add_user(role="user", name="Probe Kader 5")
+    await flow.db.league_rosters.insert_one({"id": "r5", "season_id": "s5", "user_id": member["id"], "game_id": empty["id"],
+                                             "player_ids": {"activision_id": "probe#5"}})
+    assert (await flow.delete(f"/api/games/{empty['id']}")).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_anonymized_accounts_never_count_and_odd_keys_still_work(flow):
+    await admin(flow)
+    created = await flow.post("/api/games", json={"name": "Probe Alt", "player_id_fields": [field("probe"), field("alt.id", "Alt")]})
+    game = created.json()
+    gone = await player_with(flow, "Probe Weg", {game["slug"]: {"probe": "weg"}})
+    await flow.db.users.update_one({"id": gone["id"]}, {"$set": {"anonymized_at": "2026-11-01T10:00:00+00:00"}})
+    await flow.db.league_rosters.insert_one({"id": "rx", "season_id": "sx", "user_id": gone["id"], "game_id": game["id"],
+                                             "player_ids": {"probe": "weg"}})
+    assert (await flow.get(f"/api/games/{game['id']}/usage")).json()["id_fields"] == {"probe": 0, "alt.id": 0}
+    assert (await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": [field("probe")]})).status_code == 200
+    assert (await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": []})).status_code == 200

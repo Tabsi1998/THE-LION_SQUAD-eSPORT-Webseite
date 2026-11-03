@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
-from services import game_maps, game_modes, game_usage
+from services import game_id_keys, game_maps, game_modes, game_usage
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
@@ -193,23 +193,25 @@ async def _refuse_used_removal(db, current: dict, modes: list[dict] | None) -> N
             raise HTTPException(status_code=409, detail=game_usage.mode_in_use_text(mode["label"], counts))
 
 
-async def _removed_id_keys(db, current: dict, fields: list | None, confirmed: set[str]) -> dict[str, int]:
-    """Fällt ein Schlüssel weg, unter dem schon Spieler-IDs stehen (#2249)? Ohne Bestätigung 409 mit der Zahl der Personen;
-    bestätigt: die Zählung fürs Protokoll. Ein Schlüssel ohne gespeicherte IDs fällt einfach weg. Verglichen wird genau,
-    so ist ein Wechsel von „PSN-ID“ zu „psn_id“ dasselbe wie Löschen und Neuanlegen."""
-    if fields is None:
+ID_SOURCE_FIELDS = ("player_id_fields", "identity_source_game_id", "parent_game_id", "inherit_player_ids", "kind")
+
+
+async def _lost_id_keys(db, current: dict, updates: dict, confirmed: set[str]) -> dict[str, int]:
+    """Verliert das Spiel einen Schlüssel, unter dem schon Spieler-IDs stehen (#2249)? Verglichen werden die effektiven Felder und
+    die effektive ID-Quelle vor und nach dem Speichern - ein entferntes Feld, ein anderer Schlüssel („PSN-ID“ zu „psn_id“), eine
+    andere ID-Quelle, ein anderes Hauptspiel oder Erben aus. Ohne Bestätigung 409 mit der Zahl der Personen; bestätigt: die
+    Zählung fürs Protokoll. Ohne gespeicherte IDs fällt ein Schlüssel einfach weg."""
+    if not any(key in updates for key in ID_SOURCE_FIELDS):
         return {}
-    kept = {str(item.get("key") or "") for item in fields if isinstance(item, dict)}
-    gone = [str(item.get("key") or "") for item in current.get("player_id_fields") or [] if isinstance(item, dict)]
-    gone = [key for key in dict.fromkeys(gone) if key and key not in kept]
-    if not gone:
-        return {}
-    used = {key: count for key, count in (await game_usage.id_key_usage(db, current, gone)).items() if count}
+    by_id = await game_id_keys.games_by_id(db)
+    after = {**current, **{key: updates[key] for key in ID_SOURCE_FIELDS if key in updates}}
+    used = await game_id_keys.lost_keys(db, current, after, by_id)
     open_keys = {key: count for key, count in used.items() if key not in confirmed}
     if open_keys:
-        raise HTTPException(status_code=409, detail=game_usage.id_keys_in_use_text(current.get("player_id_fields"), open_keys))
+        source = game_id_keys.source_of(current, {**by_id, current["id"]: current})
+        fields = [*(current.get("player_id_fields") or []), *(source.get("player_id_fields") or [])]
+        raise HTTPException(status_code=409, detail=game_id_keys.in_use_detail(fields, open_keys))
     return used
-
 
 @router.put("/{game_id}")
 @router.patch("/{game_id}")
@@ -242,7 +244,6 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_id_fields(updates.get("player_id_fields"), current.get("player_id_fields"))
-    lost_keys = await _removed_id_keys(db, current, updates.get("player_id_fields"), confirmed)
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")
@@ -260,6 +261,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     for key in ("parent_game_id", "identity_source_game_id"):
         if await game_usage.chosen_is_archived(db, updates.get(key), current.get(key)):
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
+    lost_keys = await _lost_id_keys(db, current, updates, confirmed)
     await _check_discord_guild(db, updates, current)
     status = updates.get("status")
     if status and status != (current.get("status") or "active"):
