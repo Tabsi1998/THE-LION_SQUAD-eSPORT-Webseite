@@ -41,6 +41,7 @@ from routes.friend_routes import router as friend_router
 from routes.moderation_routes import router as moderation_router
 from routes.game_routes import router as game_router
 from routes.game_map_routes import router as game_map_router
+from routes.game_equipment_routes import router as game_equipment_router
 from routes.map_pool_routes import router as map_pool_router
 from routes.league_routes import admin_router as league_admin_router, router as league_router
 from routes.league_roster_routes import admin_router as league_roster_admin_router, me_router as league_roster_me_router
@@ -48,6 +49,7 @@ from routes.league_application_routes import admin_router as league_application_
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
 from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
+from routes.league_loadout_routes import router as league_loadout_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
@@ -351,6 +353,7 @@ app.include_router(friend_router)
 app.include_router(moderation_router)
 app.include_router(game_router)
 app.include_router(game_map_router)  # Map-Bibliothek je Spiel (#1616)
+app.include_router(game_equipment_router)  # Ausrüstung je Spiel (#2218)
 app.include_router(map_pool_router)  # Map-Pools je Wettbewerb (#1616)
 app.include_router(league_admin_router)  # Liga verwalten (docs/LIGA.md, #1622)
 app.include_router(league_router)  # Liga lesen nach Sichtbarkeit der Season (#1622)
@@ -363,6 +366,7 @@ app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(league_result_rule_admin_router)  # Ergebnisregeln der Season (docs/LIGA.md, C.3, #1617)
 app.include_router(league_schedule_admin_router)  # Terminregeln je Season (#2194)
+app.include_router(league_loadout_router)  # Sperrliste je Season (#2218)
 app.include_router(league_schedule_router)  # Verschiebung am Spiel (#2194)
 app.include_router(game_server_router)
 app.include_router(access_link_router)

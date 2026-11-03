@@ -247,6 +247,8 @@ CLUB_CONTENT = frozenset({
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",
+    # Ausrüstung je Spiel und Sperrlisten der Season (#2218) - nur die Kennung, wer angelegt bzw. gespeichert hat.
+    "game_equipment", "game_equipment_categories", "loadout_bans",
     # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
     "leagues", "league_seasons", "league_divisions", "league_rules",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die

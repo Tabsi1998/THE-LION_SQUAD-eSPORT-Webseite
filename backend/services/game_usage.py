@@ -21,6 +21,7 @@ USAGE_LABELS = (
     ("leagues", "Liga", "Ligen"),
     ("maps", "Map", "Maps"),
     ("pools", "Map-Pool", "Map-Pools"),
+    ("equipment", "Ausrüstungs-Eintrag", "Ausrüstungs-Einträge"),
     ("editions", "Spielversion", "Spielversionen"),
     ("identity_sources", "Spiel mit dieser ID-Quelle", "Spiele mit dieser ID-Quelle"),
     ("teams", "Co-Team", "Co-Teams"),
@@ -69,6 +70,8 @@ async def usage(db, game: dict) -> dict:
         "leagues": len(leagues),
         "maps": await db.game_maps.count_documents({"game_id": game_id}),
         "pools": len(pools),
+        # Ausrüstung (#2218): wie Maps - erst sie entfernen, dann das Spiel.
+        "equipment": await db.game_equipment.count_documents({"game_id": game_id}),
         "editions": await db.games.count_documents({"parent_game_id": game_id}),
         "identity_sources": await db.games.count_documents({"identity_source_game_id": game_id}),
         "teams": await db.team_squads.count_documents({"game_id": game_id}),

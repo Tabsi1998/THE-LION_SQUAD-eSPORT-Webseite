@@ -45,6 +45,12 @@ function GameMapsLegacyRedirect() {
   return <Navigate to={gamePageUrl(gameId, "maps")} replace />;
 }
 
+// Ausrüstung (#2218): die vorläufige eigene Adresse führt auf den Reiter der Spielseite.
+function GameEquipmentLegacyRedirect() {
+  const { gameId } = useParams();
+  return <Navigate to={gamePageUrl(gameId, "ausruestung")} replace />;
+}
+
 function FastLapLegacyRedirect() {
   const { slug } = useParams();
   return <Navigate to={slug ? `/fastlap/${slug}` : "/fastlap"} replace />;
@@ -394,6 +400,8 @@ function App() {
           <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
           <Route path="/admin/games/:gameId" element={<ProtectedRoute requireArea="tournaments"><AdminGamePage /></ProtectedRoute>} />
           <Route path="/admin/games/:gameId/maps" element={<GameMapsLegacyRedirect />} />
+          {/* Ausrüstung (#2218): Reiter der Spielseite, die alte Adresse leitet weiter. */}
+          <Route path="/admin/games/:gameId/equipment" element={<GameEquipmentLegacyRedirect />} />
           <Route path="/admin/leagues" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeaguesPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueSeasonPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueRulesPage /></ProtectedRoute>} />
