@@ -759,6 +759,8 @@ Zeilen. Ein Klick klappt die Zeile auf: Name, Zustand, Minuten und dazu:
 Werte eines bestimmten Titels sind nicht eingebaut; ihr tragt sie je Spiel selbst ein. Passt etwas nicht (Ziel fehlt,
 Rundenlimit kleiner als das Ziel, `1:75` als Zeit …), sagt es die Seite vor dem Speichern.
 
+<img src="../assets/turniere/spiel-modus-einstellungen.png" alt="Reiter Modi, eine Modus-Zeile aufgeklappt (Testdaten): Symbol mit Ändern, Medien wählen und Entfernen, Zeitlimit 1:30 und Zeit je Runde 1:45, drei Einstellungen mit Gruppe, Bezeichnung, Einheit und Wert, darunter Eigene Regeln" width="560">
+
 **In der Liga-Season:** Unter **Ergebnisregeln** der Season steht je Modus zusätzlich **Einstellungen und eigene Regeln** –
 die Kopie aus dem Spiel. Weicht ein Wert ab, steht an der Zeile **weicht vom Spiel ab**; **Einstellungen vom Spiel
 übernehmen** holt die Werte des Spiels. Bestehende Staffeln bekommen Änderungen mit **Vorgaben auf Staffeln übertragen**
