@@ -294,3 +294,53 @@ async def test_a_published_version_freezes_the_icon_in_the_media_library(flow):
     preview = await flow.post(f"{url}/preview", json={"title": "Regeln", "body_md": "# Modi\n[[baustein:mode_settings]]", "annexes": []})
     assert preview.status_code == 200, preview.text
     assert f"![Modus-Symbol]({icon}) **Suche**" in str(preview.json()["sections"])
+
+# ---------------------------------------------------------------- Zeichen des Zwischenformats (Prüfung Codex)
+
+PROTECTED = "\ue000\ue005\ue00f"
+
+
+@pytest.mark.asyncio
+async def test_protected_marks_are_removed_when_saving_a_mode(flow):
+    flow.act_as(await flow.add_staff())
+    created = await flow.post("/api/games", json={"name": "Probe", "match_modes": [{"label": "A", "rules_text": f"Regel{PROTECTED} gilt",
+        "settings": [{"label": f"Uhr{PROTECTED}", "value": f"kurz{PROTECTED}", "group": f"Lob{PROTECTED}by"}]}]})
+
+    assert created.status_code == 200, created.text
+    stored = (await flow.db.games.find_one({"id": created.json()["id"]}, {"_id": 0}))["match_modes"][0]
+    assert stored["settings"][0] == {"key": "uhr", "label": "Uhr", "value": "kurz", "group": "Lobby"}
+    assert stored["rules_text"] == "Regel gilt"
+
+
+@pytest.mark.asyncio
+async def test_protected_marks_are_removed_when_saving_season_settings(flow):
+    _game, _league, season = await setup(flow)
+    url = f"{ADMIN}/seasons/{season['id']}/result-rules"
+
+    saved = await flow.put(url, json={"scores_required": True, "rules": season["result_rules"], "settings": {"suche": {
+        "settings": [{"key": "uhr", "label": f"Uhr{PROTECTED}", "value": f"x{PROTECTED}", "group": f"G{PROTECTED}"}],
+        "rules_text": f"Text{PROTECTED}"}}})
+
+    assert saved.status_code == 200, saved.text
+    stored = (await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0}))["mode_settings"]["suche"]
+    assert stored == {"settings": [{"key": "uhr", "label": "Uhr", "value": "x", "group": "G"}], "rules_text": "Text"}
+
+
+@pytest.mark.asyncio
+async def test_old_data_with_protected_marks_is_cleaned_when_read(flow):
+    game, league, season = await setup(flow)
+    dirty = {"settings": [{"key": "uhr", "label": f"Uhr{PROTECTED}", "value": f"x{PROTECTED}", "group": f"G{PROTECTED}"}], "rules_text": f"T{PROTECTED}"}
+    await flow.db.games.update_one({"id": game["id"]}, {"$set": {"match_modes.0.settings": dirty["settings"], "match_modes.0.rules_text": dirty["rules_text"]}})
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"mode_settings.suche": dirty}})
+
+    listed = next(row for row in (await flow.get("/api/games")).json() if row["id"] == game["id"])
+    overview = {row["mode"]: row for row in (await flow.get(f"{ADMIN}/seasons/{season['id']}/result-rules")).json()["rules"]}
+    stored_league = await flow.db.leagues.find_one({"id": league["id"]}, {"_id": 0})
+    stored_season = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
+    block = (await league_rule_blocks.resolve(flow.db, ["mode_settings"], stored_league, stored_season))["mode_settings"]
+
+    clean = {"settings": [{"key": "uhr", "label": "Uhr", "value": "x", "group": "G"}], "rules_text": "T"}
+    assert listed["match_modes"][0]["settings"] == clean["settings"] and listed["match_modes"][0]["rules_text"] == "T"
+    assert overview["suche"]["season_settings"] == clean and overview["suche"]["game_settings"] == clean
+    for text in (str(listed), str(overview), str(block["data"])):
+        assert not any("\ue000" <= char <= "\ue00f" for char in text)

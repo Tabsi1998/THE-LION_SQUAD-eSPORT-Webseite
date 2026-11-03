@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
-from services import game_maps, game_modes, game_usage, mode_icons
+from services import game_maps, game_modes, game_usage, league_result_rules, mode_icons
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, normalize_rule, now_utc, new_id
 
@@ -41,12 +41,28 @@ def _game_display_name(game: dict, parent: dict | None = None) -> str:
     return f"{parent_name}: {name}"
 
 
+def _readable_mode(mode):
+    """Ein Modus im heutigen Vertrag: Zeitlimit in Sekunden, Einstellungen und Regeltext ohne Zeichen des Zwischenformats der Bausteine
+    (Altbestand, #2271) - beim Lesen, ohne Migration."""
+    if not isinstance(mode, dict):
+        return mode
+    out = dict(mode)
+    if isinstance(out.get("result_rule"), dict):
+        out["result_rule"] = normalize_rule(out["result_rule"])
+    if "settings" in out or "rules_text" in out:
+        entry = league_result_rules.settings_entry(out) or {}
+        if "settings" in out:
+            out["settings"] = entry.get("settings") or []
+        if "rules_text" in out:
+            out["rules_text"] = entry.get("rules_text")
+    return out
+
+
 def _readable_modes(game: dict) -> None:
-    """Altbestand beim Lesen umrechnen (#2271): das Zeitlimit der Ergebnisregel in Sekunden statt Minuten - keine Migration."""
+    """Altbestand beim Lesen umrechnen (#2271), siehe ``_readable_mode``."""
     modes = game.get("match_modes")
     if isinstance(modes, list):
-        game["match_modes"] = [{**mode, "result_rule": normalize_rule(mode["result_rule"])}
-                               if isinstance(mode, dict) and isinstance(mode.get("result_rule"), dict) else mode for mode in modes]
+        game["match_modes"] = [_readable_mode(mode) for mode in modes]
 
 
 async def _check_icons(db, modes: list | None, me: dict, current: dict | None = None) -> None:

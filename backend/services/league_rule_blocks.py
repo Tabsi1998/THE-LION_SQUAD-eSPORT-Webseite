@@ -124,8 +124,9 @@ def mode_settings_data(game: dict | None, season: dict) -> dict:
     time_limit_seconds, round_time_seconds, settings, rules_text}``. Aus der Kopie der Season, bei älteren Seasons ohne Kopie aus dem Spiel."""
     from services import league_result_rules
 
-    held = season.get("mode_settings")
-    entries = held if isinstance(held, dict) else league_result_rules.settings_of_game(game)
+    # Bereinigt gelesen (Zeichen des Zwischenformats fallen weg, auch im Altbestand).
+    held = league_result_rules.held_settings(season)
+    entries = held if held is not None else league_result_rules.settings_of_game(game)
     rules = season.get("result_rules") if isinstance(season.get("result_rules"), dict) else league_result_rules.rules_of_game(game)
     labels = {row["mode"]: row["label"] for row in game_maps.game_modes(game)}
     rows: list[dict] = []

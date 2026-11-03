@@ -10,6 +10,8 @@ from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
 # Der Passwortvertrag (#1033) steht in services/password_policy.py.
 from services.password_policy import NewPassword
 from services.usernames import username_problem
+# Zeichen des Zwischenformats der Regelwerk-Bausteine (#2218) fallen aus eingegebenem Text weg (Prüfung Codex zu #2271).
+from services.markdown_text import strip_protected
 
 
 def now_utc():
@@ -453,12 +455,12 @@ class GameModeSetting(BaseModel):
     @field_validator("label", mode="before")
     @classmethod
     def _label(cls, value):
-        return " ".join(str(value or "").split())
+        return " ".join(strip_protected(value).split())
 
     @field_validator("group", mode="before")
     @classmethod
     def _group(cls, value):
-        return (" ".join(str(value).split()) or None) if value is not None else None
+        return (" ".join(strip_protected(value).split()) or None) if value is not None else None
 
     @model_validator(mode="after")
     def _fits(self):
@@ -481,7 +483,7 @@ class GameModeSetting(BaseModel):
         else:
             if isinstance(value, bool) or value is None or isinstance(value, (dict, list)):
                 raise ValueError(f"Einstellung „{name}“: bitte einen Wert angeben.")
-            text = " ".join(str(value).split())
+            text = " ".join(strip_protected(value).split())
             if not text:
                 raise ValueError(f"Einstellung „{name}“: bitte einen Wert angeben.")
             if len(text) > SETTING_TEXT_MAX:
@@ -552,7 +554,7 @@ class GameMatchMode(BaseModel):
     @field_validator("rules_text", mode="before")
     @classmethod
     def _rules_text(cls, value):
-        return (str(value).strip() or None) if value is not None else None
+        return (strip_protected(value).strip() or None) if value is not None else None
 
     @field_validator("settings", mode="after")
     @classmethod

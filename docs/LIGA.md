@@ -1068,7 +1068,9 @@ Season-Regeln, der Block `league` der Matchseite und die C.3-Prüfung lesen beid
 | `value` | je Einheit | `seconds` ganze Zahl ≥ 0, `minutes`/`points` Zahl (±1 000 000), `toggle` bool, sonst Text 1–120 Zeichen |
 | `group` | str ≤ 40 | Gruppe, etwa „Lobby“ – freiwillig |
 
-Reihenfolge wie gespeichert. Was nicht passt, lehnt der Server mit 422 und deutschem Satz ab.
+Reihenfolge wie gespeichert. Was nicht passt, lehnt der Server mit 422 und deutschem Satz ab. Zeichen des Zwischenformats der Bausteine
+(U+E000–U+E00F, `markdown_text.strip_protected`) fallen aus Bezeichnung, Gruppe, Textwert und Regeltext weg – beim Speichern am Modus und
+an der Season und beim Lesen von Altbestand (`GET /api/games`, Übersicht der Season-Regeln, Baustein `mode_settings`).
 
 **Symbol (#2266, `services/mode_icons.py`):** `icon_url` ist eine Adresse aus dem eigenen Upload (`/api/static/uploads/<name>` mit
 PNG, JPG, WebP oder SVG, optional `?v=`), die einen Eintrag in `media_uploads` hat (`filename` oder `raster_filename`). Ohne Medienrolle

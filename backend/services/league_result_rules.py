@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 from models import normalize_rule, rule_time_limit_seconds
+from services.markdown_text import strip_protected
 
 SCORE, ROUNDS, HIGHEST = "score", "rounds", "highest"
 REQUIRED_DETAIL = "{label}: bitte die Punkte beider Seiten eintragen – in dieser Liga sind sie Pflicht."
@@ -51,13 +52,33 @@ def rules_of_game(game: dict | None) -> dict[str, dict]:
     return {mode["mode"]: dict(normalize_rule(mode["result_rule"])) for mode in _modes(game) if isinstance(mode.get("result_rule"), dict)}
 
 
+def _clean_setting(row: dict) -> dict:
+    """Eine gespeicherte Einstellung ohne Zeichen des Zwischenformats der Bausteine (Altbestand, Prüfung Codex) - beim Lesen bereinigt."""
+    out = dict(row)
+    for key in ("label", "group"):
+        if isinstance(out.get(key), str):
+            out[key] = strip_protected(out[key])
+    if isinstance(out.get("value"), str):
+        out["value"] = strip_protected(out["value"])
+    return out
+
+
 def settings_entry(mode: dict | None) -> dict | None:
-    """Einstellungen und Regeltext eines Modus (#2271) als ``{settings, rules_text}`` - ``None``, wenn er keines von beiden hat."""
-    settings = [dict(row) for row in (mode or {}).get("settings") or [] if isinstance(row, dict)]
-    text = str((mode or {}).get("rules_text") or "").strip()
+    """Einstellungen und Regeltext eines Modus (#2271) als ``{settings, rules_text}`` - ``None``, wenn er keines von beiden hat. Gelesen
+    ohne Zeichen des Zwischenformats (``markdown_text.strip_protected``), auch aus Altbestand."""
+    settings = [_clean_setting(row) for row in (mode or {}).get("settings") or [] if isinstance(row, dict)]
+    text = strip_protected((mode or {}).get("rules_text") or "").strip()
     if not settings and not text:
         return None
     return {"settings": settings, **({"rules_text": text} if text else {})}
+
+
+def held_settings(season: dict | None) -> dict[str, dict] | None:
+    """Die Kopie der Season (``mode_settings``) bereinigt wie ``settings_entry`` - ``None``: die Season hat keine (ältere Seasons)."""
+    held = (season or {}).get("mode_settings")
+    if not isinstance(held, dict):
+        return None
+    return {key: entry for key, value in held.items() if (entry := settings_entry(value if isinstance(value, dict) else None))}
 
 
 def settings_of_game(game: dict | None) -> dict[str, dict]:
@@ -134,7 +155,7 @@ def clean_settings_entry(raw, label: str) -> dict | None:
     except (ValidationError, ValueError) as error:
         text = _settings_problem_text(error) if isinstance(error, ValidationError) else str(error)
         raise RuleProblem(f"Modus „{label}“: {text}") from None
-    text = str(raw.get("rules_text") or "").strip()
+    text = strip_protected(raw.get("rules_text") or "").strip()
     if len(text) > MODE_RULES_TEXT_MAX:
         raise RuleProblem(f"Modus „{label}“: Regeltext höchstens {MODE_RULES_TEXT_MAX} Zeichen.")
     return settings_entry({"settings": [row.model_dump() for row in settings], "rules_text": text})
@@ -162,7 +183,7 @@ def overview(season: dict, game: dict | None) -> list[dict]:
     die Season kennt. Dazu Einstellungen und Regeltext (#2271): ``season_settings`` (``None``: die Season hat sie nie übernommen,
     ältere Seasons) neben ``game_settings`` und ``settings_differ``."""
     season_rules = season.get("result_rules") or {}
-    held = season.get("mode_settings") if isinstance(season.get("mode_settings"), dict) else None
+    held = held_settings(season)
     game_rules = rules_of_game(game)
     game_settings = settings_of_game(game)
     rows = []
