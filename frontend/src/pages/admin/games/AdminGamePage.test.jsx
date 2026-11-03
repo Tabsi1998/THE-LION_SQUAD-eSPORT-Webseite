@@ -242,6 +242,60 @@ describe("Spiel-IDs", () => {
     ] }));
   });
 
+  // Codex-Nachprüfung: Ein Feld mit gespeicherten IDs entfernen fragt mit der Zahl der Personen; bestätigt geht der Schlüssel
+  // als `confirm_removed_keys` mit. Ein neues Feld mit derselben Bezeichnung bekommt den alten Schlüssel zurück.
+  test("Feld mit gespeicherten IDs entfernen: Rückfrage mit Zahl, Abbrechen behält es, Bestätigen schickt die Bestätigung", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }, { key: "leer", label: "Leer" }] };
+    usage = { modes: {}, id_fields: { "PSN-ID": 3, leer: 0 } };
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ids");
+    fireEvent.click(await screen.findByTestId("game-id-field-remove-0"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "„PSN-ID“ entfernen?", description: expect.stringContaining("IDs von 3 Personen"),
+    })));
+    expect(screen.getByTestId("game-id-field-label-0")).toHaveValue("PSN-ID");
+    // Ohne gespeicherte IDs keine Frage.
+    confirmMock.mockClear();
+    fireEvent.click(screen.getByTestId("game-id-field-remove-1"));
+    await waitFor(() => expect(screen.queryByTestId("game-id-field-1")).toBeNull());
+    expect(confirmMock).not.toHaveBeenCalled();
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-id-field-remove-0"));
+    await waitFor(() => expect(screen.getByTestId("game-ids-removed")).toHaveTextContent("„PSN-ID“ (IDs von 3 Personen)"));
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", { player_id_fields: [], confirm_removed_keys: ["leer", "PSN-ID"] }));
+  });
+
+  test("gelöscht und mit derselben Bezeichnung neu angelegt: der alte Schlüssel kommt zurück, nichts wird entfernt", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }] };
+    usage = { modes: {}, id_fields: { "PSN-ID": 3 } };
+    renderPage("/admin/games/g1#ids");
+    fireEvent.click(await screen.findByTestId("game-id-field-remove-0"));
+    await screen.findByTestId("game-ids-empty");
+    fireEvent.click(screen.getByTestId("game-id-field-add"));
+    fireEvent.change(screen.getByTestId("game-id-field-label-0"), { target: { value: "psn-id " } });
+    expect(screen.getByTestId("game-id-field-key-0")).toHaveValue("PSN-ID");
+    expect(screen.getByTestId("game-id-field-key-0")).toBeDisabled();
+    expect(screen.queryByTestId("game-ids-removed")).toBeNull();
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", {
+      player_id_fields: [{ key: "PSN-ID", label: "psn-id", help_text: "", required: true }],
+    }));
+  });
+
+  // Codex-Nachprüfung, Punkt 2: Altbestand mit leerem Schlüssel bleibt leer und hält das Speichern nicht auf.
+  test("gespeichertes Feld mit leerem Schlüssel: bleibt leer, Speichern geht", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "", label: "Altfeld", required: true }] };
+    renderPage("/admin/games/g1#ids");
+    expect(await screen.findByTestId("game-id-field-key-0")).toHaveValue("");
+    fireEvent.change(screen.getByTestId("game-id-field-help-0"), { target: { value: "Steht im Profil" } });
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", {
+      player_id_fields: [{ key: "", label: "Altfeld", help_text: "Steht im Profil", required: true }],
+    }));
+    expect(toastMock.error).not.toHaveBeenCalled();
+  });
+
   // Codex-Prüfung, Fund 1: Unter „PSN-ID“ stehen die IDs der Spieler - Speichern darf daraus nie „psn_id“ machen.
   test("ein nicht kanonischer Altschlüssel geht unverändert zurück und lässt sich nicht verstellen", async () => {
     game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }] };

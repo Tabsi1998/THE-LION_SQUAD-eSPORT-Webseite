@@ -209,6 +209,7 @@ export default function AdminGamePage() {
         setMapsKey((value) => value + 1);
       } else {
         await finish(key, key === "allgemein" ? "Allgemein gespeichert." : "Spiel-IDs gespeichert.");
+        if (key === "ids") loadUsage(game.id);
         if (key === "allgemein") loadGames();
       }
     } catch (err) {
@@ -219,7 +220,7 @@ export default function AdminGamePage() {
 
   const PANELS = game ? {
     allgemein: () => <GameGeneralTab gameId={game.id} form={formOf("allgemein")} onChange={setForm("allgemein")} games={games} servers={servers} />,
-    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} />,
+    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} usage={usage} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
   } : {};
