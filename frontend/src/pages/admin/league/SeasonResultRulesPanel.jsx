@@ -83,6 +83,9 @@ function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
   const missing = settingsMissing(own || {}, row.game_settings || {});
   const textDiffers = String(own?.rules_text || "") !== String(row.game_settings?.rules_text || "");
   const differs = Object.keys(diff).length > 0 || missing.length > 0 || textDiffers;
+  // Offen, sobald etwas abweicht - und offen, bis man es selbst schließt: „Vom Spiel übernehmen“ klappt die Werte nicht weg.
+  const [open, setOpen] = useState(differs);
+  useEffect(() => { if (differs) setOpen(true); }, [differs]);
   if (!canEdit) {
     if (!own) return null;
     return (
@@ -95,7 +98,8 @@ function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
     );
   }
   return (
-    <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" open={differs || undefined} data-testid={`${id}-settings`}>
+    <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}
+      data-testid={`${id}-settings-box`}>
       <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-white/65 [&::-webkit-details-marker]:hidden">
         Einstellungen und eigene Regeln
         <span className="normal-case tracking-normal font-semibold text-white/45">{(own?.settings || []).length} Einstellungen</span>

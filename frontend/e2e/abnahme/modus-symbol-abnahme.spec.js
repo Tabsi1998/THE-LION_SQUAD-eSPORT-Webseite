@@ -120,8 +120,11 @@ test.describe("Abnahme: Symbol und Einstellungen je Modus gegen den echten Serve
       await page.reload();
       const rules = page.getByTestId(`result-rules-${key}`);
       await expect(rules.getByTestId(`result-rules-${key}-icon`)).toHaveAttribute("data-icon", "image");
-      await expect(page.getByTestId(`result-rules-${key}-settings-differs`)).toBeVisible();
-      await page.getByTestId(`result-rules-${key}-settings-adopt`).click();
+      // Eine Season mit Kopie kennt den neuen Modus noch nicht (weicht ab, übernehmen); eine ältere ohne Kopie zeigt die Werte des Spiels.
+      const adopt = page.getByTestId(`result-rules-${key}-settings-adopt`);
+      if (await adopt.isVisible()) await adopt.click();
+      else await page.getByTestId(`result-rules-${key}-settings-box`).locator("summary").click();
+      await expect(page.getByTestId(`result-rules-${key}-settings-value-0`)).toHaveValue("45");
       await page.getByTestId(`result-rules-${key}-settings-value-0`).fill("0:40");
       await expect(page.getByTestId(`result-rules-${key}-settings-diff-0`)).toHaveText("weicht vom Spiel ab");
       await noSideScroll(page);

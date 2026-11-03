@@ -84,6 +84,8 @@ test("Einstellungen der Season: Abweichung je Wert, vom Spiel übernehmen, Zeite
   fireEvent.click(screen.getByTestId("result-rules-zone-settings-adopt"));
   expect(screen.getByTestId("result-rules-zone-settings-value-0")).toHaveValue("45");
   expect(screen.queryByTestId("result-rules-zone-settings-differs")).not.toBeInTheDocument();
+  // Übernehmen klappt die Werte nicht weg (Abnahme #2271).
+  expect(screen.getByTestId("result-rules-zone-settings-box")).toHaveAttribute("open");
   fireEvent.change(screen.getByTestId("result-rules-zone-time"), { target: { value: "1:30" } });
   fireEvent.click(screen.getByTestId("result-rules-save"));
 
