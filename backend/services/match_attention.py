@@ -100,9 +100,10 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
             candidates = [item for item in candidates if item in set(proposal["missing_registration_ids"])]
         # Mit einer Meldung gilt der Vorschlag nicht mehr (Bestätigen gäbe 409) - sie darf „Ergebnis fehlt“ nicht verdecken.
         if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and not match.get("reports") and candidates:
+            # Liga-Check-in (D.2): die Leitung kann die fehlende Seite auch nachtragen - das steht in der Karte mit.
+            action = "kampflos werten, Seite nachtragen oder verlängern" if proposal.get("rule") == "check_in" else no_show_action(match)
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
-                          "detail": f"{no_show_due_text(match, proposal)} – "
-                                    f"{no_show_action(match)}.",
+                          "detail": f"{no_show_due_text(match, proposal)} – {action}.",
                           "action": "no_show", "since": proposal.get("due_at"),
                           "participants": [{"registration_id": registration_id,
                                             "name": registration_name(regs_by_id.get(registration_id))}
