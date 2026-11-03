@@ -1340,6 +1340,8 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
 class SquadAssignBody(BaseModel):
     team_id: str = Field(min_length=1, max_length=64)
     squad_id: str = Field(min_length=1, max_length=64)
+    # Nur für die Notausnahme des Superadmins, wenn das Zuteilen den Antrag des eigenen Teams annimmt (#2245).
+    conflict_reason: str | None = Field(default=None, max_length=500)
 
 
 @router.get("/{tid}/squad-candidates")
@@ -1387,9 +1389,11 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     season_resource = squad_registration.season_lock_resource(tournament)
     try:
         async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
+            # Sonderweg (#2205): Liegt ein offener Antrag des Co-Teams vor, gilt er damit als angenommen - über das eigene Team
+            # entscheidet dann eine zweite Person (#2245). Ohne Antrag gibt es hier keine Befangenheit.
+            override = await league_applications.admin_assignment_conflict(db, tournament, body.squad_id, me, body.conflict_reason)
             reg = await _insert_squad_registration(db, tournament, body, me)
-            # Sonderweg (#2205): Liegt ein offener Antrag des Co-Teams vor, gilt er damit als angenommen.
-            await league_applications.link_admin_assignment(db, tournament, reg, me.get("id"))
+            await league_applications.link_admin_assignment(db, tournament, reg, me, override)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
     reg.pop("_id", None)

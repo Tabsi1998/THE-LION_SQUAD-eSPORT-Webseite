@@ -196,6 +196,8 @@ Hat sich der Kader seit dem Einreichen geändert, sagt das die Anmeldung, und An
 
 Teilst du ein Co-Team mit offener Anmeldung über 2.5 direkt zu, gilt die Anmeldung als angenommen. Nimmst du die Zuteilung zurück, bleibt sie angenommen und hält ihren Platz, bis du neu zuteilst oder ablehnst. Zugeteilte zieht niemand per Klick zurück: Den Austritt trägst du in der Teilnehmerliste ein.
 
+**Eigenes Team:** Über die Anmeldung deines eigenen Teams entscheidet eine andere Person. Eigenes Team heißt: Du stehst im Kader des Co-Teams, bist Captain oder Vertreter, leitest das Hauptteam mit oder hast den Antrag eingereicht. Dann stehen bei dieser Anmeldung keine Knöpfe, sondern der Satz „Über dein eigenes Team entscheidet eine andere Person.“ Die Anmeldungen der anderen Teams entscheidest du wie gewohnt. Dasselbe gilt für **Co-Team zuteilen** (2.5), wenn das Co-Team eine offene Anmeldung hat. Nur der **Superadmin** darf als Notausnahme: Er trägt bei der Anmeldung einen **Grund für die Notausnahme** ein (mindestens fünf Zeichen), erst dann gehen die Knöpfe. Der Grund steht im Verlauf der Anmeldung und im Protokoll.
+
 ### 2.6 Spielplan und Start
 
 Oben in der Turnierverwaltung der Staffel: **Liga starten**. Damit wird der Spielplan fest (Season 1 mit acht Teams:
