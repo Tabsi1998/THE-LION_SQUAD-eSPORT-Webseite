@@ -1166,7 +1166,8 @@ Schreibt `status: "forfeit"`, `double_forfeit: true`, `results` beide mit `rank:
 beim Forfeit (mindestens fünf Zeichen) und je Seite den Eintrag „nicht erschienen“. Protokoll `match.forfeit.double`. Danach
 dieselben Folgen wie beim kampflos (`league_table.after_change`): Station und Aufruf frei, Discord-Baum vorgemerkt,
 Anzeige-Ereignis, Stand der Wettbewerbsstruktur; beim Neu ansetzen ebenso (ohne Station).
-**Neu ansetzen:** `DELETE` auf dieselbe Adresse `{reason}` setzt das Spiel zurück (ohne Ergebnis, Stand `scheduled` mit Termin,
+**Neu ansetzen:** `DELETE` auf dieselbe Adresse `{reason, conflict_reason?}` (Befangenheit wie beim Werten, Notausnahme
+`double_no_show_undo` im Protokoll) setzt das Spiel zurück (ohne Ergebnis, Stand `scheduled` mit Termin,
 sonst `ready`), Protokoll `match.forfeit.double.undo`; den Termin setzt die Leitung danach wie gewohnt.
 
 **Antworten (nur zusätzlich, die App bleibt ohne Build lauffähig):** Jede Zeile einer Staffel-Tabelle trägt dazu `tiebreak`

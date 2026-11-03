@@ -185,7 +185,7 @@ async def admin_undo_double_no_show(tournament_id: str, match_id: str, body: Tab
     db = get_db()
     match = await _match(db, tournament_id, match_id)
     await league_permissions.require_no_conflict(db, me, match, action="double_no_show_undo",
-                                                 conflict_reason=None, record=False)
+                                                 conflict_reason=body.conflict_reason, record=False)
     try:
         reason = league_table.reason_text(body.reason)
         async with mutation_lock(db, tournament_write_resource(tournament_id)):
@@ -193,6 +193,9 @@ async def admin_undo_double_no_show(tournament_id: str, match_id: str, body: Tab
             match = await _match(db, tournament_id, match_id)
             if not (match.get("double_forfeit") and match.get("status") == "forfeit"):
                 raise league_table.TableProblem("Das Spiel ist nicht als „beide nicht erschienen“ gewertet.", 409)
+            # Notausnahme des Superadmins mit Grund - jetzt mit Protokoll (Codex zu E.1).
+            await league_permissions.require_no_conflict(db, me, match, action="double_no_show_undo",
+                                                         conflict_reason=body.conflict_reason)
             sides = [row.get("registration_id") for row in match.get("results") or [] if row.get("registration_id")]
             await db.matches_v2.update_one({"id": match_id}, {
                 "$set": league_table.undo_fields(match, now_utc().isoformat()),

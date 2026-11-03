@@ -296,3 +296,23 @@ async def test_removing_a_decision_respects_the_conflict(flow):
     assert allowed.status_code == 200, allowed.text
     overrides = [row["data"]["action"] for row in await flow.db.audit_logs.find({"action": "league.conflict.override"}, {"_id": 0}).to_list(50)]
     assert "table_decision_remove" in overrides
+
+
+@pytest.mark.asyncio
+async def test_setting_a_game_again_respects_the_conflict(flow):
+    """Codex zu E.1: Neu ansetzen nimmt den Grund der Notausnahme an und schreibt ihn ins Protokoll."""
+    admin, _league, staffel = await setup(flow)
+    match = (await matches_of(flow, staffel, 1))[0]
+    own = await flow.db.tournament_registrations.find_one({"id": match["slots"][0]["registration_id"]}, {"_id": 0})
+    await flow.db.teams.update_one({"id": own["team_id"]}, {"$set": {"leader_id": admin["id"]}})
+    winners = [own["id"]]
+    match = next(row for row in await matches_of(flow, staffel)
+                 if winners[0] in [slot["registration_id"] for slot in row["slots"]] and row["status"] != "completed")
+    url = f"{TABLE}/{staffel['id']}/matches/{match['id']}/double-no-show"
+    assert (await flow.post(url, json=NOTE)).status_code == 403
+    assert (await flow.post(url, json={**NOTE, "conflict_reason": "Keine zweite Person erreichbar"})).status_code == 200
+    assert (await flow.client.request("DELETE", url, json={"reason": "Neuer Termin"})).status_code == 403
+    undone = await flow.client.request("DELETE", url, json={"reason": "Neuer Termin", "conflict_reason": "Keine zweite Person erreichbar"})
+    assert undone.status_code == 200, undone.text
+    overrides = [row["data"]["action"] for row in await flow.db.audit_logs.find({"action": "league.conflict.override"}, {"_id": 0}).to_list(50)]
+    assert {"double_no_show", "double_no_show_undo"} <= set(overrides)
