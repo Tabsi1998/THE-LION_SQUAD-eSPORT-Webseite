@@ -133,6 +133,8 @@ test("Details: Beschreibung, Spieler je Seite, Format und Ergebnisregel, die Zei
   expect(screen.queryByTestId("game-edit-mode-details-0")).toBeNull();
   fireEvent.click(more);
   expect(more).toHaveAttribute("aria-expanded", "true");
+  // Seit C.3 (#1617) prüft die Season damit - der Hinweis sagt nicht mehr „noch nicht“.
+  expect(screen.getByTestId("game-edit-mode-rule-note-0")).toHaveTextContent("Eine neue Liga-Season übernimmt die Regel");
   fireEvent.change(screen.getByTestId("game-edit-mode-players-0"), { target: { value: "4" } });
   fireEvent.change(screen.getByTestId("game-edit-mode-rule-kind-0"), { target: { value: "rounds" } });
   expect(screen.getByTestId("game-edit-mode-rule-limit-0")).toBeInTheDocument();

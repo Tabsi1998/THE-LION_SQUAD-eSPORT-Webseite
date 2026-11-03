@@ -114,7 +114,11 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
             </div>
           </>
         )}
-        <p className="text-xs text-white/45">Die Regel wird gespeichert und hier angezeigt. Gemeldete Endstände prüft die Seite damit noch nicht.</p>
+        {/* Seit C.3 (#1617): Die Season übernimmt die Regel als Kopie und prüft damit - der Hinweis sagt das (docs/handbuch/turniere.md 3.12). */}
+        <p className="text-xs text-white/45" data-testid={`${testPrefix}-mode-rule-note-${index}`}>
+          Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand. Spätere Änderungen hier
+          erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts.
+        </p>
       </fieldset>
     </>
   );
