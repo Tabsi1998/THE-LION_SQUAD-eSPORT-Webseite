@@ -22,7 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 TESTS = ROOT / "backend" / "tests"
 # Zum Gebiet gehören auch die Abläufe rund ums Ergebnis, die Fristen und die Aufgaben, die nicht so heißen.
 AREA = re.compile(r"league|squad|match|map|flow_harness|result_confirm|result_auto_confirm|result_contract|deadline_races"
-                  r"|tournament_flows|dashboard_tasks|game_default_pool|platform_links")
+                  r"|tournament_flows|dashboard_tasks|game_default_pool|platform_links|game_mode")
 USES_HARNESS = re.compile(r"\bmake_flow\b")
 
 
