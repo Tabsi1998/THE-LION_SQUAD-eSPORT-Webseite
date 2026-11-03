@@ -203,8 +203,8 @@ function LeadEntry({ block, matchId, busy, run, onChanged }) {
     }, "Eintragen hat nicht geklappt.");
   };
   return (
-    <form onSubmit={submit} className="mt-5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4" data-testid="checkin-lead" noValidate>
-      <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#FFD700]"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Für eine Seite eintragen (Liga-Leitung)</h3>
+    <form onSubmit={submit} className="mt-5 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid="checkin-lead" noValidate>
+      <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-honor"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Für eine Seite eintragen (Liga-Leitung)</h3>
       <p className="mt-1 text-xs text-white/60">Notfall, etwa Captain ohne Netz – geht auch nach dem Fenster, mit Grund im Protokoll. Die Regelwerks-Zustimmung der Seite bleibt Pflicht.</p>
       {needsConflictReason ? <p className="mt-2 text-xs text-warn" data-testid="checkin-lead-conflict">Du bist an diesem Spiel selbst beteiligt – als Superadmin nur als Notausnahme mit Grund.</p> : null}
       <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Seite">
