@@ -32,20 +32,48 @@ async def _live_past_end(db, now: datetime) -> list[dict]:
     return [row for row in rows if (parse_dt(row.get("end_date")) or now) < now]
 
 
+async def _has_open(db, tournament_id: str) -> bool:
+    return bool(await db.matches_v2.find_one(_open_filter(tournament_id), {"_id": 1}))
+
+
+async def settle(db, tournament_id: str | None) -> bool:
+    """Gleich nach einem Ergebnis oder Statuswechsel: Ist nichts mehr offen oder das Turnier nicht mehr „live“, fällt das Merkmal
+    sofort weg - nicht erst im nächsten Lauf. Gibt zurück, ob es entfernt wurde."""
+    if not tournament_id:
+        return False
+    flagged = await db.tournaments.find_one({"id": tournament_id, FLAG: {"$exists": True}}, {"_id": 0, "status": 1})
+    if not flagged:
+        return False
+    if flagged.get("status") == "live" and await _has_open(db, tournament_id):
+        return False
+    done = await db.tournaments.update_one({"id": tournament_id, FLAG: {"$exists": True}}, {"$unset": {FLAG: ""}})
+    return bool(done.modified_count)
+
+
+async def _mark(db, tournament_id: str) -> int:
+    """Merkmal setzen - nur, solange der Stand „live“ ist; danach noch einmal prüfen: Endete das letzte Spiel zwischen Prüfen und
+    Schreiben, nimmt ``settle`` das Merkmal sofort wieder weg (kein veraltetes ``True``)."""
+    done = await db.tournaments.update_one({"id": tournament_id, "status": "live", FLAG: {"$ne": True}}, {"$set": {FLAG: True}})
+    if done.modified_count and await settle(db, tournament_id):
+        return 0
+    return int(bool(done.modified_count))
+
+
 async def refresh(db, *, now: datetime | None = None) -> dict:
-    """Das Feld ``running_past_end`` an allen Turnieren auf den Stand bringen. Geschrieben wird nur, was sich ändert."""
+    """Das Feld ``running_past_end`` an allen Turnieren auf den Stand bringen. Geschrieben wird nur, was sich ändert, und je
+    Turnier mit Bedingung auf den geprüften Stand."""
     now = now or now_utc()
     counts = {"set": 0, "cleared": 0}
     past = await _live_past_end(db, now)
     running_ids = set()
     for tournament in past:
-        if await db.matches_v2.find_one(_open_filter(tournament["id"]), {"_id": 1}):
+        if await _has_open(db, tournament["id"]):
             running_ids.add(tournament["id"])
-    if running_ids:
-        done = await db.tournaments.update_many({"id": {"$in": sorted(running_ids)}, FLAG: {"$ne": True}}, {"$set": {FLAG: True}})
-        counts["set"] = done.modified_count
+            counts["set"] += await _mark(db, tournament["id"])
+        elif await settle(db, tournament["id"]):
+            counts["cleared"] += 1
     done = await db.tournaments.update_many({FLAG: {"$exists": True}, "id": {"$nin": sorted(running_ids)}}, {"$unset": {FLAG: ""}})
-    counts["cleared"] = done.modified_count
+    counts["cleared"] += done.modified_count
     return counts
 
 

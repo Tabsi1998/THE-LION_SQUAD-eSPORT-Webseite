@@ -100,3 +100,48 @@ async def test_the_deadline_job_keeps_the_flag(flow):
     result = await match_deadline_sweep.sweep(flow.db)
     assert result["overrun"]["set"] == 1
     assert (await stored(flow, tournament))["running_past_end"] is True
+
+
+# ---------------------------------------------------------------- Codex-Prüfung (#2194)
+
+@pytest.mark.asyncio
+async def test_a_completion_during_the_check_does_not_leave_a_stale_flag(flow, monkeypatch):
+    """Der Lauf sieht noch ein offenes Spiel, währenddessen endet das letzte - am Ende darf das Merkmal nicht stehen bleiben."""
+    from services import v2_result_submission
+
+    tournament = await cup(flow)
+    match = await flow.db.matches_v2.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    real = tournament_overrun._has_open
+    calls = {"n": 0}
+
+    async def overlapping(db, tournament_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            seen = await real(db, tournament_id)
+            await db.matches_v2.update_one({"id": match["id"]}, {"$set": {"status": "completed"}})
+            await v2_result_submission._finish_result_side_effects(db, {**match, "status": "completed"}, False)
+            return seen
+        return await real(db, tournament_id)
+
+    monkeypatch.setattr(tournament_overrun, "_has_open", overlapping)
+    await tournament_overrun.refresh(flow.db)
+    assert "running_past_end" not in await stored(flow, tournament)
+
+
+@pytest.mark.asyncio
+async def test_the_last_result_and_the_status_change_clear_the_flag_at_once(flow):
+    from services import v2_result_submission
+
+    tournament = await cup(flow)
+    await tournament_overrun.refresh(flow.db)
+    match = await flow.db.matches_v2.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"status": "completed"}})
+    await v2_result_submission._finish_result_side_effects(flow.db, {**match, "status": "completed"}, False)
+    assert "running_past_end" not in await stored(flow, tournament), "ohne auf den nächsten Lauf zu warten"
+
+    other = await cup(flow)
+    await tournament_overrun.refresh(flow.db)
+    flow.act_as(await flow.add_staff())
+    answer = await flow.post(f"/api/tournaments/{other['id']}/status", json={"status": "completed"})
+    assert answer.status_code == 200, answer.text
+    assert "running_past_end" not in await stored(flow, other)
