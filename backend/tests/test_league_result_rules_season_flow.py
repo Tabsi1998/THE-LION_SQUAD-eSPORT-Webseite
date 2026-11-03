@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
-SCORE = {"kind": "score", "target": 250, "time_limit_minutes": 10, "draw_allowed": False, "overtime": False}
+SCORE = {"kind": "score", "target": 250, "time_limit_seconds": 600, "draw_allowed": False, "overtime": False}
 ROUNDS = {"kind": "rounds", "target": 6, "round_limit": 11, "draw_allowed": False, "overtime": False}
 GAME = {"name": "Regel Shooter", "slug": "regel-shooter", "match_modes": [
     {"mode": "stellung", "label": "Stellung", "result_rule": SCORE},
@@ -63,7 +63,7 @@ async def test_a_new_season_keeps_a_copy_of_the_mode_rules_and_requires_scores(f
     assert rows["stellung"]["differs"] is True and rows["stellung"]["game_rule"]["target"] == 300
     assert rows["snd"]["differs"] is False
     assert rows["frei"] == {"mode": "frei", "label": "Frei", "status": "active", "season_rule": None, "game_rule": None,
-                            "differs": False}
+                            "differs": False, "season_settings": None, "game_settings": None, "settings_differ": False}
 
 
 @pytest.mark.asyncio
@@ -113,12 +113,12 @@ async def test_the_staffel_carries_the_rules_and_takes_changes_while_running(flo
 @pytest.mark.asyncio
 async def test_an_older_season_without_the_fields_changes_nothing(flow):
     _game, season, division = await setup(flow)
-    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$unset": {"result_rules": "", "scores_required": ""}})
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$unset": {"result_rules": "", "scores_required": "", "mode_settings": ""}})
 
     created = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     staffel = await flow.db.tournaments.find_one({"id": created["tournament_id"]}, {"_id": 0})
 
-    assert "result_rules" not in staffel and "scores_required" not in staffel
+    assert "result_rules" not in staffel and "scores_required" not in staffel and "mode_settings" not in staffel
     overview = (await flow.get(f"{ADMIN}/seasons/{season['id']}/result-rules")).json()
     assert overview["scores_required"] is False
     assert all(row["season_rule"] is None for row in overview["rules"])

@@ -19,7 +19,7 @@ from services import match_duration  # noqa: E402
 
 MODES = [{"mode": "stellung", "label": "Stellung", "minutes": 12, "per_game": False},
          {"mode": "suchen", "label": "Suchen & Zerstören", "minutes": None, "per_game": False}]
-RULE = {"kind": "rounds", "target": 4, "round_limit": 7, "time_limit_minutes": 2, "draw_allowed": False, "overtime": True}
+RULE = {"kind": "rounds", "target": 4, "round_limit": 7, "time_limit_seconds": 120, "draw_allowed": False, "overtime": True}
 
 
 @pytest_asyncio.fixture

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, ChevronDown, IdCard, Trophy } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { viennaDateTime } from "@/lib/vienna";
 import { LineupPicker, ParticipantsPicker } from "./LeagueReportForm";
 import { followLineups, gamesProblem, isSeries, lineupAmendClosed, participantsProblem, personIds } from "./leagueGames";
@@ -33,7 +34,11 @@ export function LeagueGamesView({ league }) {
                 <LazyImg src={game.map_image_url} alt="" sizes="(min-width: 768px) 360px, 92vw" className="h-full w-full object-cover opacity-60" />
               ) : <span className="block h-full bg-white/5" />}
               <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 to-transparent px-3 py-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/65">Map {game.position}{game.mode_label ? ` · ${game.mode_label}` : ""}</span>
+                <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/65">
+                  {/* Modus-Symbol (#2266): Schnappschuss am Spiel, ohne Bild das neutrale Symbol. */}
+                  {game.mode ? <ModeIcon src={game.mode_icon_url} size="xs" testId={`league-games-${game.position}-mode`} /> : null}
+                  <span className="truncate">Map {game.position}{game.mode_label ? ` · ${game.mode_label}` : ""}</span>
+                </span>
                 <span className="truncate font-heading text-lg font-black text-white">{game.map_name || "Map"}</span>
               </div>
             </div>

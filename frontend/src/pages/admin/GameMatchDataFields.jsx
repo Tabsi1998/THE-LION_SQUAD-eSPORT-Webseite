@@ -7,11 +7,17 @@ import { useState } from "react";
 import { ChevronDown, Lock, Plus, Trash2 } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { ImageUpload } from "@/components/tls/ImageUpload";
+import { ModeIcon } from "@/components/tls/ModeIcon";
+import { useOptionalAuth } from "@/context/AuthContext";
 import {
   MODES_MAX, MODE_DESCRIPTION_MAX, MODE_FORMAT_MAX, MODE_STATUS_OPTIONS, RESULT_RULE_KINDS, STATION_DEVICE_OPTIONS,
   emptyMode, modeInUse, parsePointsTable, resultRuleText,
 } from "@/lib/gameMatchData";
+import { hasMediaRole, mediaPropsFor } from "@/lib/mediaAccess";
+import { parseDuration } from "@/lib/modeSettings";
 import { formatDeviceType } from "@/lib/tournamentLabels";
+import { ModeSettingsEditor } from "./ModeSettingsEditor";
 
 const STATUS_HINTS = {
   inactive: "Inaktiv: steht für neue Map-Pools, „Modus je Map“ und Turniere nicht mehr zur Wahl. Laufende Spiele, gespeicherte Pools und alte Ergebnisse zeigen ihn weiter.",
@@ -32,9 +38,24 @@ const TARGET_LABELS = { score: "Ziel (Punkte)", rounds: "Runden zum Sieg" };
 
 function ruleOf(mode) {
   return resultRuleText({
-    kind: mode.rule_kind, target: mode.rule_target, round_limit: mode.rule_round_limit, time_limit_minutes: mode.rule_time_limit,
-    draw_allowed: mode.rule_draw, overtime: mode.rule_overtime,
+    kind: mode.rule_kind, target: mode.rule_target, round_limit: mode.rule_round_limit, time_limit_seconds: parseDuration(mode.rule_time_limit),
+    round_time_seconds: parseDuration(mode.rule_round_time), draw_allowed: mode.rule_draw, overtime: mode.rule_overtime,
   });
+}
+
+// Symbol des Modus (#2266): quadratisch, Hochladen, aus der Bibliothek wählen oder entfernen. Ohne Medienrolle eigene Bilder (wie im
+// Regelwerk, #2230), mit Medienrolle auch SVG über die Logo-Route.
+function ModeIconField({ mode, index, setMode, testPrefix }) {
+  const user = useOptionalAuth()?.user;
+  const media = hasMediaRole(user);
+  return (
+    <div className="min-w-0">
+      <ImageUpload value={mode.icon_url} onChange={(value) => setMode(index, { icon_url: value || "" })} label="Symbol (quadratisch)"
+        variant="square" crop="square" allowLibrary logo={media} logoPreview={false} endpoint={media ? "/uploads/logo" : "/uploads/image"}
+        testId={`${testPrefix}-mode-icon-${index}`} {...mediaPropsFor(user)} />
+      <p className="mt-1 text-xs text-white/45">Erscheint vor dem Namen auf Match- und Ligaseite, im Map-Pool und im Regelwerk. Ohne Bild steht ein neutrales Symbol.</p>
+    </div>
+  );
 }
 
 const playersOf = (mode) => (String(mode.players_per_side || "").trim() ? `${mode.players_per_side} je Seite` : "");
@@ -104,9 +125,13 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
                   onChange={(value) => setMode(index, { rule_round_limit: value })} placeholder="z. B. 11" hint="Höchstens so viele Runden. Leer: offen."
                   testId={`${testPrefix}-mode-rule-limit-${index}`} />
               )}
-              <TextField label="Zeitlimit Min." type="number" min="1" max="600" value={mode.rule_time_limit}
-                onChange={(value) => setMode(index, { rule_time_limit: value })} placeholder="z. B. 10" hint="Je Map. Leer: ohne Zeitlimit."
-                testId={`${testPrefix}-mode-rule-time-${index}`} />
+              <TextField label="Zeitlimit je Map" value={mode.rule_time_limit}
+                onChange={(value) => setMode(index, { rule_time_limit: value })} placeholder="z. B. 10 oder 1:30"
+                hint="Minuten, 1:30 oder 90 s. Leer: ohne Zeitlimit." testId={`${testPrefix}-mode-rule-time-${index}`} />
+            </FormGrid>
+            <FormGrid cols={2}>
+              <TextField label="Zeit je Runde" value={mode.rule_round_time} onChange={(value) => setMode(index, { rule_round_time: value })}
+                placeholder="z. B. 1:45" hint="Etwa bei Runden-Modi. Nur Angabe für Regelwerk und Anzeige." testId={`${testPrefix}-mode-rule-round-time-${index}`} />
             </FormGrid>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <CheckField label="Remis erlaubt" checked={mode.rule_draw} onChange={(value) => setMode(index, { rule_draw: value })} testId={`${testPrefix}-mode-rule-draw-${index}`} />
@@ -120,6 +145,9 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
           erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts.
         </p>
       </fieldset>
+      {/* Freie Einstellungen und Regeltext (#2271): die Season übernimmt sie mit der Regel als Kopie. */}
+      <ModeSettingsEditor value={{ settings: mode.settings || [], rules_text: mode.rules_text || "" }}
+        onChange={(next) => setMode(index, { settings: next.settings, rules_text: next.rules_text })} testPrefix={`${testPrefix}-mode-settings-${index}`} />
     </>
   );
 }
@@ -144,8 +172,11 @@ function ModeRow({ mode, index, open, onToggle, setMode, usage, onRemove, isFirs
           className={`${ROW_GRID} min-w-0 flex-1 px-3 py-2.5 text-left rounded-sm hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]`}
         >
           <ChevronDown className={`w-4 h-4 text-[#29B6E8] transition-transform duration-fast ease-tls ${open ? "rotate-180" : ""}`} aria-hidden="true" />
-          <span className="min-w-0 truncate font-semibold text-white" data-testid={`${testPrefix}-mode-name-${index}`}>
-            {String(mode.label || "").trim() || <span className="font-normal text-white/45">Neuer Modus</span>}
+          <span className="flex min-w-0 items-center gap-2">
+            <ModeIcon src={mode.icon_url} size="sm" testId={`${testPrefix}-mode-icon-thumb-${index}`} />
+            <span className="min-w-0 truncate font-semibold text-white" data-testid={`${testPrefix}-mode-name-${index}`}>
+              {String(mode.label || "").trim() || <span className="font-normal text-white/45">Neuer Modus</span>}
+            </span>
           </span>
           <span className="col-start-2 md:col-start-auto">
             <span className={`inline-block rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${chipClass}`} data-testid={`${testPrefix}-mode-chip-${index}`}>{chip}</span>
@@ -174,6 +205,7 @@ function ModeRow({ mode, index, open, onToggle, setMode, usage, onRemove, isFirs
           {STATUS_HINTS[status] && (
             <p className="text-xs text-warn/90" data-testid={`${testPrefix}-mode-status-hint-${index}`}>{STATUS_HINTS[status]}</p>
           )}
+          <ModeIconField mode={mode} index={index} setMode={setMode} testPrefix={testPrefix} />
           <fieldset className="space-y-2">
             <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Dauer für die Turnierplanung</legend>
             <div className="grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center">

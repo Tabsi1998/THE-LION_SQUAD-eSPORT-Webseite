@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Check, ClipboardCheck, IdCard, Users, X } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { REPORT_STATE_TEXT } from "@/lib/matchReport";
 import { blockedPlayers } from "@/lib/leagueIds";
 import {
@@ -10,6 +11,7 @@ import {
   gamesProblem,
   isSeries,
   mapsFor,
+  modeIcon,
   modeLabel,
   participantsProblem,
   personIds,
@@ -107,7 +109,9 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
   const set = (patch) => onChange({ ...game, ...patch });
   return (
     <fieldset className="min-w-0 space-y-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 sm:p-4" data-testid={`league-game-${game.position}`}>
-      <legend className="px-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">
+      <legend className="inline-flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">
+        {/* Modus-Symbol (#2266) aus dem Pool - ohne Bild das neutrale Symbol. */}
+        {game.mode && fixedMode ? <ModeIcon src={modeIcon(league.pool, game.mode)} size="xs" testId={`league-game-${game.position}-mode-icon`} /> : null}
         Map {game.position}{game.mode && fixedMode ? ` · ${modeLabel(league.pool, game.mode)}` : ""}
       </legend>
       {rule ? <p className="text-xs text-white/60" data-testid={`league-game-${game.position}-rule`}>Gewertet: {rule}</p> : null}
@@ -116,6 +120,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           {modes.map((group) => (
             <button key={group.mode} type="button" aria-pressed={game.mode === group.mode} onClick={() => set({ mode: group.mode, map_id: "" })}
               className={chip(game.mode === group.mode)} data-testid={`league-game-${game.position}-mode-${group.mode}`}>
+              <ModeIcon src={group.icon_url} size="xs" />
               {group.label || group.mode}
             </button>
           ))}

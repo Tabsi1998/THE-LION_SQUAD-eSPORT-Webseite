@@ -86,6 +86,11 @@ export function modeLabel(pool, mode) {
   return (pool?.modes || []).find((row) => row.mode === mode)?.label || mode || "";
 }
 
+/** Das Symbol des Modus aus dem Pool (#2266) - leer ohne Symbol. */
+export function modeIcon(pool, mode) {
+  return (pool?.modes || []).find((row) => row.mode === mode)?.icon_url || "";
+}
+
 export function emptyGame(position, league) {
   return { position, mode: modeFor(position, league), map_id: "", winner: "", scores: {}, lineup: [] };
 }

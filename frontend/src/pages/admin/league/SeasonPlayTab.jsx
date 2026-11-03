@@ -3,9 +3,10 @@
 // die Serie: Best of, Teamgröße, „Modus je Map“ als einfache Auswahl, Map-Wiederholung und die Fristen nach dem Spiel. Passen Pool und
 // Reihenfolge nicht zusammen, steht das direkt an der Reihenfolge.
 //
-// Platz für #2266/#2271: `SeasonModeLabel` nimmt das Modus-Symbol (ModeIcon) auf, die Einstellungen je Modus kommen mit
-// SeasonResultRulesPanel - beide ohne Umbau dieses Reiters.
+// Modus-Symbol (#2266): der Map-Pool-Editor setzt es vor jeden Modus (Haken und Gruppe), „Modus je Map“ neben jede Auswahl. Die
+// Einstellungen je Modus (#2271) stehen in SeasonResultRulesPanel.
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
 import { PoolMapLock } from "@/pages/admin/maps/PoolMapLock";
@@ -16,7 +17,7 @@ import { SeasonPoolMinimum } from "./SeasonReadinessPanel";
 import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
-/** Name eines Modus - hier kommt mit #2266 das Modus-Symbol davor. */
+/** Name eines Modus - das Symbol davor setzt der Map-Pool-Editor selbst (#2266). */
 export function SeasonModeLabel({ label }) {
   return <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>;
 }
@@ -40,10 +41,19 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "", 
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modus je Map</legend>
       <p className="text-xs text-white/50">Welcher Modus auf welcher Map der Serie gespielt wird. Entweder alle frei oder jede Map belegt.</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Array.from({ length: count }, (_, index) => (
-          <SelectField key={index} label={`Map ${index + 1}`} value={value[index] || ""} onChange={(mode) => set(index, mode)}
-            options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
-        ))}
+        {Array.from({ length: count }, (_, index) => {
+          const chosen = choices.find((mode) => mode.mode === value[index]);
+          return (
+            <div key={index} className="flex min-w-0 items-end gap-2">
+              {/* Modus-Symbol (#2266): ohne Wahl nichts, ohne Bild das neutrale Symbol. */}
+              <span className="mb-2 inline-flex h-7 w-7 shrink-0 items-center justify-center">
+                {chosen ? <ModeIcon src={chosen.icon_url} size="md" testId={`mode-order-${index}-icon`} /> : null}
+              </span>
+              <SelectField label={`Map ${index + 1}`} value={value[index] || ""} onChange={(mode) => set(index, mode)} className="flex-1"
+                options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
+            </div>
+          );
+        })}
       </div>
       {note ? <p className="text-xs text-warn" data-testid="season-mode-order-note">{note}</p> : (
         <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>

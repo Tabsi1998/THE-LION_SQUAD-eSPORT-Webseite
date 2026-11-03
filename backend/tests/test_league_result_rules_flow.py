@@ -16,7 +16,7 @@ from flow_harness import make_flow  # noqa: E402
 from league_match_world import ids, world  # noqa: E402
 
 RULES = {
-    "stellung": {"kind": "score", "target": 250, "time_limit_minutes": 10, "draw_allowed": False, "overtime": False},
+    "stellung": {"kind": "score", "target": 250, "time_limit_seconds": 600, "draw_allowed": False, "overtime": False},
     "suchen": {"kind": "rounds", "target": 6, "round_limit": 11, "draw_allowed": False, "overtime": False},
 }
 

@@ -26,6 +26,8 @@ admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 class ResultRulesBody(BaseModel):
     scores_required: bool = False
     rules: Dict[str, Optional[Dict[str, Any]]] = {}
+    # Einstellungen und Regeltext je Modus (#2271): fehlt das Feld, bleibt die Kopie der Season, wie sie ist.
+    settings: Optional[Dict[str, Optional[Dict[str, Any]]]] = None
 
 
 async def _season_and_game(db, season_id: str) -> tuple[dict, dict | None]:
@@ -40,7 +42,9 @@ async def _season_and_game(db, season_id: str) -> tuple[dict, dict | None]:
 async def _view(db, season: dict, game: dict | None) -> dict:
     staffeln = await db.tournaments.count_documents({"league_context.season_id": season["id"], **ONLY_LEAGUE})
     return {"scores_required": bool(season.get("scores_required")), "rules": league_result_rules.overview(season, game),
-            "staffeln": staffeln}
+            "staffeln": staffeln,
+            # Hat die Season Einstellungen je Modus übernommen (#2271)? Ältere Seasons nicht - dort gelten die des Spiels.
+            "settings_held": isinstance(season.get("mode_settings"), dict)}
 
 
 @admin_router.get("/seasons/{season_id}/result-rules")
@@ -56,19 +60,27 @@ async def save_season_result_rules(season_id: str, body: ResultRulesBody,
     db = get_db()
     season, game = await _season_and_game(db, season_id)
     before = season.get("result_rules") or {}
+    held = season.get("mode_settings") if isinstance(season.get("mode_settings"), dict) else None
     try:
         rules = league_result_rules.clean_rules(body.rules, game, before)
+        settings = league_result_rules.clean_settings(body.settings, game, held) if body.settings is not None else held
     except league_result_rules.RuleProblem as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
     modes = sorted(key for key in set(before) | set(rules) if before.get(key) != rules.get(key))
+    setting_modes = sorted(key for key in set(held or {}) | set(settings or {}) if (held or {}).get(key) != (settings or {}).get(key)) \
+        if body.settings is not None else []
     changed = bool(modes) or "result_rules" not in season or bool(season.get("scores_required")) != body.scores_required \
-        or "scores_required" not in season
+        or "scores_required" not in season or bool(setting_modes) or (body.settings is not None and held is None)
     if changed:
-        await db.league_seasons.update_one({"id": season_id}, {"$set": {
-            "result_rules": rules, "scores_required": body.scores_required, "updated_at": now_utc().isoformat()}})
+        fields = {"result_rules": rules, "scores_required": body.scores_required, "updated_at": now_utc().isoformat()}
+        if body.settings is not None:
+            fields["mode_settings"] = settings
+        await db.league_seasons.update_one({"id": season_id}, {"$set": fields})
         # Protokoll: welche Modi und ob Punkte Pflicht sind - nicht die Werte.
         await db.audit_logs.insert_one({"id": new_id(), "action": "league.season.result_rules", "actor_id": me.get("id"),
-                                        "target_id": season_id, "data": {"modes": modes, "scores_required": body.scores_required},
+                                        "target_id": season_id, "data": {"modes": modes, "scores_required": body.scores_required,
+                                                                         **({"settings_modes": setting_modes} if setting_modes else {})},
                                         "created_at": now_utc().isoformat()})
-    view = await _view(db, {**season, "result_rules": rules, "scores_required": body.scores_required}, game)
+    view = await _view(db, {**season, "result_rules": rules, "scores_required": body.scores_required,
+                            **({"mode_settings": settings} if settings is not None else {})}, game)
     return {**view, "changed": changed, "staffeln_to_sync": view["staffeln"] if changed else 0}
