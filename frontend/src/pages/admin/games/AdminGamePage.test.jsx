@@ -222,6 +222,18 @@ describe("Spiel-IDs", () => {
     expect(screen.getByTestId("game-id-field-key-0")).toHaveValue("epic");
   });
 
+  // Codex-Prüfung, Fund 1: Unter „PSN-ID“ stehen die IDs der Spieler - Speichern darf daraus nie „psn_id“ machen.
+  test("ein nicht kanonischer Altschlüssel geht unverändert zurück und lässt sich nicht verstellen", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }] };
+    renderPage("/admin/games/g1#ids");
+    expect(await screen.findByTestId("game-id-field-key-0")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("game-id-field-label-0"), { target: { value: "PlayStation-Konto" } });
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", {
+      player_id_fields: [{ key: "PSN-ID", label: "PlayStation-Konto", help_text: "", required: true }],
+    }));
+  });
+
   test("Spielversion: ID-Quelle und Erben stehen hier und gehen mit", async () => {
     game = { ...GAME, kind: "edition", parent_game_id: "p1", inherit_player_ids: true };
     renderPage("/admin/games/g1#ids");

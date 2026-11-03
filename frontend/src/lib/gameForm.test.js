@@ -59,6 +59,21 @@ test("Spiel-IDs schicken nur die ID-Felder, bei Spielversionen dazu ID-Quelle un
   expect(fields).toEqual([{ key: "plattform", label: "Plattform", help_text: "", required: true, options: ["PC", "PS5", "Xbox"] }]);
 });
 
+// Codex-Prüfung #2249, Fund 1: An einem gespeicherten Schlüssel hängen die IDs der Spieler (users.game_ids.<spiel>.<schlüssel>).
+// Ein Schlüssel aus der Zeit vor der Verwaltung („PSN-ID“, „RiotID“, nichtlateinisch) darf beim Speichern nie umgeschrieben werden.
+test("gespeicherte Schlüssel bleiben genau so, wie sie sind - auch nicht kanonische", () => {
+  const saved = idsToForm({ player_id_fields: [
+    { key: "PSN-ID", label: "PSN-ID", required: true },
+    { key: "RiotID", label: "Riot ID" },
+    { key: "ゲームID", label: "ゲームID", required: false },
+  ] });
+  const renamed = { ...saved, player_id_fields: saved.player_id_fields.map((field, index) => (index === 1 ? { ...field, label: "Riot-Konto" } : field)) };
+  expect(idsPayload(renamed, "standalone").player_id_fields.map((field) => field.key)).toEqual(["PSN-ID", "RiotID", "ゲームID"]);
+  // Ein neues Feld bekommt seinen Schlüssel aus der Bezeichnung.
+  const added = { player_id_fields: [...saved.player_id_fields, { key: "", label: "Epic Konto", _new: true }] };
+  expect(idsPayload(added, "standalone").player_id_fields.map((field) => field.key)).toEqual(["PSN-ID", "RiotID", "ゲームID", "epic_konto"]);
+});
+
 test("Neues Spiel: Name und Art genügen, die Adresse entsteht aus dem Namen", () => {
   expect(newGamePayload({ name: " Straßen Rennen ", kind: "standalone", parent_game_id: "g1" }))
     .toEqual({ name: "Straßen Rennen", slug: "strassen-rennen", kind: "standalone", parent_game_id: null });

@@ -94,10 +94,21 @@ function optionList(value) {
   return rows.map((row) => String(row).trim()).filter(Boolean);
 }
 
+/**
+ * Der Schlüssel eines ID-Felds. An einem gespeicherten hängen die IDs der Spieler (users.game_ids.<spiel>.<schlüssel>) - er
+ * geht unverändert zurück, auch wenn er nicht kanonisch ist („PSN-ID“, nichtlateinisch). Nur ein neues Feld (`_new`) oder
+ * eines ganz ohne Schlüssel bekommt einen aus der Bezeichnung.
+ */
+export function idFieldKey(field) {
+  const key = String(field?.key ?? "");
+  if (!field?._new && key.trim()) return key;
+  return fieldKeyFrom(key || field?.label || "");
+}
+
 export function normalizePlayerIdFields(fields = []) {
   return (fields || [])
     .map((field) => ({
-      key: fieldKeyFrom(field.key || field.label || ""),
+      key: idFieldKey(field),
       label: text(field.label || field.key).trim(),
       help_text: field.help_text || "",
       required: field.required !== false,

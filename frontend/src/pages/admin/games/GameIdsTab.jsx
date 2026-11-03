@@ -20,10 +20,12 @@ function IdFieldCard({ field, index, onChange, onRemove }) {
       </div>
       <FormGrid cols={3}>
         <TextField label="Bezeichnung" required value={field.label} placeholder="z. B. Activision ID"
-          onChange={(value) => update({ label: value, key: field._new ? fieldKeyFrom(value) : field.key || fieldKeyFrom(value) })} testId={`game-id-field-label-${index}`} />
-        {/* Neu angelegt folgt der Schlüssel der Bezeichnung, bis man ihn selbst ändert; ein gespeicherter bleibt - an ihm hängen die IDs. */}
-        <TextField label="Schlüssel" value={field.key} placeholder="entsteht aus der Bezeichnung" onChange={(value) => update({ key: fieldKeyFrom(value), _new: false })}
-          hint="Bleibt gleich, auch wenn die Bezeichnung sich ändert." testId={`game-id-field-key-${index}`} />
+          onChange={(value) => update({ label: value, ...(field._new && !field._keyTouched ? { key: fieldKeyFrom(value) } : {}) })} testId={`game-id-field-label-${index}`} />
+        {/* Neu angelegt folgt der Schlüssel der Bezeichnung, bis man ihn selbst ändert. Ein gespeicherter ist fest: an ihm hängen
+            die IDs der Spieler - auch wenn er nicht so aussieht, wie ein neuer heute entstünde (Codex-Prüfung #2249). */}
+        <TextField label="Schlüssel" value={field.key} placeholder="entsteht aus der Bezeichnung" disabled={!field._new}
+          onChange={(value) => update({ key: fieldKeyFrom(value), _keyTouched: true })}
+          hint={field._new ? "Entsteht aus der Bezeichnung; nach dem Speichern fest." : "Fest – daran hängen die IDs der Spieler."} testId={`game-id-field-key-${index}`} />
         <TextField label="Hinweis für Spieler" value={field.help_text} placeholder="z. B. steht im Profil unter …" onChange={(value) => update({ help_text: value })}
           testId={`game-id-field-help-${index}`} />
       </FormGrid>
