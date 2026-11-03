@@ -141,7 +141,7 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     await shot(page, "ausruestung-bibliothek-abnahme.png");
 
     // 2. Sperrliste der Season im Browser: Waffe nur in „Stellung“, an ihr der neue Aufsatz; speichern und übertragen.
-    await page.goto(`/admin/leagues/seasons/${seasonId}`);
+    await page.goto(`/admin/leagues/seasons/${seasonId}#sperrliste`);
     const panel = page.getByTestId("season-bans");
     await panel.getByTestId("season-bans-search").fill(stamp);
     await panel.getByTestId(`season-bans-toggle-${weapon.id}`).check();
@@ -178,7 +178,7 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     expect(second.requires_consent).toBe(true);
     expect(JSON.stringify(second.frozen)).toContain(PERK);
     expect(JSON.stringify(first.frozen)).not.toContain(PERK);
-    await page.goto(`/admin/leagues/seasons/${seasonId}`);
+    await page.goto(`/admin/leagues/seasons/${seasonId}#sperrliste`);
     await expect(page.getByTestId("season-bans-rules-ok")).toBeVisible();
     expect(problems).toEqual([]);
     await context.close();

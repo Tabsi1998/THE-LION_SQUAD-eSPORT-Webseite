@@ -92,7 +92,7 @@ test.describe("Abnahme: Maps und Pools gegen den echten Server", () => {
       expect(stored.status).toBe("inactive");
 
       // 2. Auf der Season-Seite in einem Schritt sperren: neue Version, auf die Staffel übertragen, mit Grund.
-      await page.goto(`/admin/leagues/seasons/${seasonId}`);
+      await page.goto(`/admin/leagues/seasons/${seasonId}#modi`);
       const lock = page.getByTestId("season-pool-lock");
       await lock.locator("summary").click();
       await page.getByTestId("season-pool-lock-map").selectOption(map.id);
@@ -124,7 +124,7 @@ test.describe("Abnahme: Maps und Pools gegen den echten Server", () => {
       await noSideScroll(page);
       await shot(page, `maps-pruefung-probleme-${width}.png`);
       await page.getByTestId("season-form-visibility").selectOption("members");
-      await page.getByTestId("season-save").click();
+      await page.getByTestId("season-save-ueberblick").click();
       await expect(page.getByText("Veröffentlichen geht noch nicht", { exact: false }).first()).toBeVisible();
       expect((await ok(page, "GET", `/api/admin/leagues/seasons/${fresh.id}`)).season.visibility).toBe("off");
 
@@ -142,8 +142,8 @@ test.describe("Abnahme: Maps und Pools gegen den echten Server", () => {
       await page.getByTestId("season-readiness-reload").click();
       await expect(page.getByTestId("season-readiness-state")).toContainText("Bereit zur Veröffentlichung");
       await page.getByTestId("season-form-visibility").selectOption("members");
-      await page.getByTestId("season-save").click();
-      await expect(page.getByText("Season gespeichert.").first()).toBeVisible();
+      await page.getByTestId("season-save-ueberblick").click();
+      await expect(page.getByText("Überblick gespeichert.").first()).toBeVisible();
       expect((await ok(page, "GET", `/api/admin/leagues/seasons/${fresh.id}`)).season.visibility).toBe("members");
       await noSideScroll(page);
       await shot(page, `maps-pruefung-bereit-${width}.png`);

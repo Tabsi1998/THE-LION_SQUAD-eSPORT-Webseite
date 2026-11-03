@@ -55,7 +55,7 @@ test.describe("Abnahme: Liga-Termine gegen den echten Server", () => {
 
   test("Leitung: Terminregeln der Season speichern und die Staffel starten", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
-    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}`);
+    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}#terminregeln`);
     const panel = lead.page.getByTestId("season-schedule-rules");
     await expect(panel).toBeVisible();
     await expect(lead.page.getByTestId("schedule-rules-max")).toHaveValue("2");

@@ -98,7 +98,7 @@ test.describe("Abnahme: Tabelle der Liga-Staffel gegen den echten Server", () =>
     const rows = await standings(lead.page);
     expect(rows.filter((row) => winners.includes(row.registration_id)).map((row) => row.rank)).toEqual([1, 1]);
 
-    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}`);
+    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}#tabelle`);
     const panel = lead.page.getByTestId("season-table-panel");
     const tie = panel.getByTestId(`season-tie-${tid}-1`);
     await expect(tie).toBeVisible();
