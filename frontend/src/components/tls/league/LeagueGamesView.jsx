@@ -16,6 +16,12 @@ function until(value) {
   }
 }
 
+/** „Map 4 und 5 nicht gespielt – …“: die Positionen nach dem Serienende (C.3, `not_played`). */
+function notPlayedText(positions) {
+  const list = positions.length > 1 ? `${positions.slice(0, -1).join(", ")} und ${positions.at(-1)}` : String(positions[0]);
+  return `Map ${list} nicht gespielt – die Serie war entschieden.`;
+}
+
 export function LeagueGamesView({ league }) {
   const games = league?.games || [];
   if (!games.length) return null;
@@ -58,10 +64,20 @@ export function LeagueGamesView({ league }) {
                   </div>
                 );
               })}
+              {/* Zusatzfelder (C.3, #1617): wiederholt mit Grund, von der Leitung zugesprochen. */}
+              {game.status === "replayed" ? (
+                <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>Wiederholt: {game.replay_reason}</p>
+              ) : null}
+              {game.decision === "awarded" ? (
+                <p className="text-xs text-warn" data-testid={`league-games-${game.position}-awarded`}>Zugesprochen von der Liga-Leitung</p>
+              ) : null}
             </div>
           </li>
         ))}
       </ol>
+      {(league.not_played || []).length ? (
+        <p className="text-xs text-white/50" data-testid="league-games-not-played">{notPlayedText(league.not_played)}</p>
+      ) : null}
       {series ? <ParticipantsView league={league} missing={missing} /> : null}
     </div>
   );
