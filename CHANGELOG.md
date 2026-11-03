@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.64.0 (03.11.2026)
+
+### Neu
+
+* Aufsätze ohne Waffe passen zu keiner – Hinweis und Zuordnung in einem Schritt (#2218)
+* Ausrüstungs-Bibliothek je Spiel mit Kategorien, Bild, Zustand und Import aus einer anderen Spielversion (#2218)
+* Baustein „Sperrliste“ im Regelwerk – mit Bildern im Web, als Liste im PDF, Hinweis auf eine neue Version (#2218)
+* Ligaseite zeigt die Sperrliste der Season (#2218)
+* Sperrliste der Season je Modus und je Waffe mit unveränderlichen Versionen für Staffel und Spiel (#2218)
+* Spielseite mit Reiter „Ausrüstung“ (#2218)
+
+### Fehlerbehebungen
+
+* Namen in Bausteinen des Regelwerks werden nie zu Link oder Formatierung, auch im PDF (#2218)
+* Übertragen nennt auch Terminregeln und Ergebnisregeln (#2218)
+
 ## 1.63.0 (03.11.2026)
 
 ### Neu
