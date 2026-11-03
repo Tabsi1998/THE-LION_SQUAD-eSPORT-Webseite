@@ -171,12 +171,15 @@ async def test_the_third_reschedule_goes_to_the_lead(flow):
 
 
 @pytest.mark.asyncio
-async def test_notice_and_week_limits(flow):
+async def test_notice_limit(flow):
     world = await live_world(flow)
     await agree(flow, world, 20)
     late = await request(flow, world, "Kapitaen", 30)
     assert late.status_code == 409 and "24 Stunden" in late.json()["detail"]
 
+
+@pytest.mark.asyncio
+async def test_week_limit_and_its_switch(flow):
     other = await live_world(flow)
     await agree(flow, other, 72)
     outside = await request(flow, other, "Kapitaen", 24 * 8)
@@ -271,13 +274,16 @@ async def test_home_rule_applies_once_and_tells_both_sides(flow):
 
 
 @pytest.mark.asyncio
-async def test_home_rule_off_or_away_offer_keeps_the_default(flow):
+async def test_home_rule_off_keeps_the_default(flow):
     world = await live_world(flow, rules={**DEFAULTS, "home_rule": False})
     flow.act_as(world["users"]["Kapitaen"])
     await flow.post(f"/api/matches/{mid(world)}/schedule-proposals", json={"scheduled_at": at(100)})
     counts = await league_schedule_sweep.sweep(flow.db, [await tournament_of(flow, world)], now=now_utc() + timedelta(hours=73))
     assert counts["home_rule"] == 0
 
+
+@pytest.mark.asyncio
+async def test_an_away_offer_never_counts_by_silence(flow):
     other = await live_world(flow)
     flow.act_as(other["users"]["Falke1"])
     await flow.post(f"/api/matches/{mid(other)}/schedule-proposals", json={"scheduled_at": at(100)})
