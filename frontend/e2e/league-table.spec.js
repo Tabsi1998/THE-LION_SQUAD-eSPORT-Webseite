@@ -116,7 +116,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       sent = route.request().postDataJSON();
       return route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "d1", ...sent }) });
     });
-    await page.goto("/admin/leagues/seasons/s1");
+    // Reiter Tabelle (#2267): Punkte, Gleichstand und Ausscheiden über den Gleichständen der Staffeln.
+    await page.goto("/admin/leagues/seasons/s1#tabelle");
     const panel = page.getByTestId("season-table-panel");
     await expect(panel.getByTestId("season-tie-t1-4")).toContainText("Platz 4: Wüstenfüchse · Füchse A, Steinböcke · Steinböcke 2");
     await expect(panel.getByTestId("season-decision-d0")).toContainText("Gilt nicht mehr");
