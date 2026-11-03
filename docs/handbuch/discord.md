@@ -8,7 +8,7 @@ Discord selbst einrichtet: Hauptserver, Unterserver, Kanäle, Rollen und die Rec
 - **Admin → Verbindungen → Discord** (`/admin/integrations/discord`) mit sechs Reitern:
   **Meldungen** · **Einbettungen & Termine** · **Gestaltung** · **Willkommen** · **Bot & Aktivität** · **Server**
 - **Admin → Verbindungen → Konten verknüpfen** – die Discord-Anmeldung für Mitglieder
-- **Admin → Spiele → Spiel bearbeiten → Discord-Server** – welcher Server zu welchem Spiel gehört
+- **Admin → Spiele → Zahnrad → Allgemein → Discord-Server** – welcher Server zu welchem Spiel gehört
 
 Technische Details für die Entwicklung: [docs/DISCORD.md](../DISCORD.md).
 
@@ -125,7 +125,7 @@ selbst oder mit Discords eigenem „Onboarding“.
 Team-Kader eines Spiels steht, bekommt dessen Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels
 und am Hauptserver.
 
-- Der Name steht im Spielformular (Admin → Spiele → „Discord-Rolle“); leer heißt „<Kurzname>-Spieler“.
+- Der Name steht im Spielformular (Admin → Spiele → Zahnrad → Allgemein → „Discord-Rolle“); leer heißt „<Kurzname>-Spieler“.
   Editionen zählen für ihr Hauptspiel – es gibt eine Rolle je Hauptspiel.
 - Vergeben wird nur, was es im Discord gibt: Legt die Rolle mit genau diesem Namen an, oder hakt beim
   Server **„Fehlende Rollen anlegen“** an (Reiter „Server“, Vorgabe aus). Dann legt der Bot fehlende
@@ -299,7 +299,7 @@ Server mit eigener Kanal-Liste:
   Spiel – sie stehen nur am Hauptserver.
 - Der **Erfolg der Woche** gilt für den ganzen Verein und bleibt am Hauptserver.
 - Ist dem Server noch kein Spiel zugeordnet, postet der Bot nichts und sagt es: „Diesem Server ist noch
-  kein Spiel zugeordnet“ (Spiele → Spiel bearbeiten → Discord-Server).
+  kein Spiel zugeordnet“ (Spiele → Spiel → Allgemein → Discord-Server).
 - Der Hauptserver zeigt weiter alles.
 
 ### 4.4 Stream-Meldungen je Stream
@@ -473,7 +473,7 @@ Ein Bot kann auf beliebig vielen Servern sein – **ein zweiter Bot ist nie nöt
    - **Notiz** – wofür der Server ist.
 3. **„Prüfen“:** Bot da? Welche Rechte fehlen – in Worten mit Klickweg.
 4. **„Test“:** schreibt in den Systemkanal des Servers – öffentlich, darum mit Rückfrage.
-5. **Spiele zuordnen:** **Admin → Spiele → Spiel bearbeiten → „Discord-Server“.** Leer heißt
+5. **Spiele zuordnen:** **Admin → Spiele → Zahnrad → Allgemein → „Discord-Server“.** Leer heißt
    *erben*: eine Spielversion nimmt den Server ihres Hauptspiels, ohne alles gilt der Hauptserver.
    Der Reiter „Server“ zeigt je Server, welche Spiele dort sind.
 
@@ -581,7 +581,7 @@ schicken – immer an dasselbe Ziel. Klappt es wieder nicht, steht der Grund in 
 | Kanal in der Auswahl ausgegraut | Bot darf dort nicht schreiben | Kanal → Bearbeiten → Berechtigungen → Rolle des Bots: Kanal ansehen, Nachrichten senden, Links einbetten |
 | Privater Kanal fehlt in der Auswahl | Bot sieht den Kanal nicht | Rolle des Bots dem Kanal hinzufügen (2.4) |
 | Turnier-Meldungen stehen einzeln im Kanal statt im Thread | Thread-Rechte fehlen | „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“ |
-| Einbettung am Spielserver: „Diesem Server ist noch kein Spiel zugeordnet“ | kein Spiel zeigt auf diesen Server | Spiele → Spiel bearbeiten → „Discord-Server“ |
+| Einbettung am Spielserver: „Diesem Server ist noch kein Spiel zugeordnet“ | kein Spiel zeigt auf diesen Server | Spiele → Zahnrad → Allgemein → „Discord-Server“ |
 | Kein Termin am Spielserver | Recht „Events verwalten“ fehlt dort, oder der Server ist aus | Reiter „Server“ → „Prüfen“; Haken „an“ |
 | Rollen werden nicht vergeben | Bot-Rolle steht unter den Rollen / Rollenname weicht ab / Person nicht verknüpft / Unterserver aus | Bot-Rolle nach oben ziehen; Namen im Reiter „Bot & Aktivität“ angleichen; Person verknüpft ihr Konto; Reiter „Server“: Haken „an“ und der Stand unter „Rollen“ |
 | Spiel-Rolle fehlt | keine Rolle mit dem Namen im Discord / Person hat Spiel-Rollen ausgeschaltet | Rolle anlegen oder „Fehlende Rollen anlegen“; Name unter Admin → Spiele |
