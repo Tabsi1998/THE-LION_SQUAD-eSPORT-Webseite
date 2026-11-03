@@ -83,7 +83,7 @@ Indizes: `id` eindeutig, (`league_id`, `number`) eindeutig, (`league_id`, `slug`
 | `league_id`, `season_id` | str | ja | |
 | `level` | int ≥ 1 | ja | „Liga N“; (`league_id`, `level`) ist die dauerhafte Stufe über Seasons |
 | `nickname` | str ≤ 40 | nein | Beiname: Anzeige „Liga 1 · Elite“ |
-| `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours` |
+| `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours`, dazu die Plattform `allowed_platforms`, `crossplay`, `input_device` (#2270, B.3) |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 | `prizes` | `[{place, text, image_url}]` | nein | eigene Gewinne (#2107); fehlt = die der Season |
 
@@ -243,6 +243,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Ergebnisregel je Modus, Punkte je Map Pflicht (C.3) | Season (`result_rules`, `scores_required`) | Kopie der Modi · an (nur neue Seasons) |
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
 | Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
+| Plattform: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (#2270, B.3) | Season (Feld), Liga N überschreibt den Rest | keines · alle · keine Angabe · keine Angabe |
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
@@ -838,6 +839,46 @@ neuen Felder nicht und prüfen nichts Neues.
 
 Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern` oder `options` passen. Fehlen beide, gibt es keine Prüfung.
 
+**Plattform je Season (#2270).** Das Spiel kennzeichnet kein Feld als Plattform, darum wählt die Season das Feld. Einstellungen an `league_seasons`,
+gepflegt im eigenen Kasten „Plattform und Eingabegerät“ (`GET|PUT /api/admin/leagues/seasons/{id}/platform`, Lesen jede Zuständigkeit, Speichern
+Zuständigkeit `season`, Protokoll `league.season.platform` mit vorher und nachher). Sie wirken sofort, ohne Übertragen; Logik in `services/league_platform.py`:
+
+| Feld | Typ | Vorgabe neu | Fehlt | Bedeutung |
+| --- | --- | --- | --- | --- |
+| `platform_field` | str | keiner | keine Prüfung | `key` des ID-Felds mit `options` (auch vom Hauptspiel geerbt), in dem die Plattform steht |
+| `allowed_platforms` | `[str]`, höchstens 30 | `[]` | `[]` | Erlaubte Plattformen aus den `options` des Felds. Leer: alle, keine Prüfung. Alle angehakt: jede erlaubt, die Angabe ist aber Pflicht |
+| `crossplay` | bool \| `null` | `null` | keine Angabe | Plattformübergreifend an oder aus. Nur Angabe für Regelwerk und Ligaseite, nicht geprüft |
+| `input_device` | `controller` \| `mouse_keyboard` \| `both` \| `null` | `null` | keine Angabe | Eingabegerät Controller, Maus und Tastatur oder beides. Nur Angabe, nicht prüfbar |
+
+Liga N weicht über `overrides` ab: `allowed_platforms`, `crossplay`, `input_device` (das Feld gilt für die ganze Season). Fehlt der Schlüssel, gilt die Season;
+`allowed_platforms: []` heißt in Liga N „alle erlaubt“, auch wenn die Season eingrenzt. Gepflegt im Liga-N-Blatt.
+
+Beim Speichern (422 mit Satz): Das Feld muss am Spiel ein Feld mit Auswahl sein. Erlaubt sind nur Werte aus seinen `options`; was die Season oder Liga N schon
+gespeichert hat, bleibt wählbar, auch wenn das Spiel den Wert nicht mehr anbietet. Erlaubte Plattformen (Season oder Liga N) brauchen das Feld. Die Season lässt
+das Feld nicht leeren oder wechseln, solange eine Liga N eigene Plattformen trägt, die zum neuen Feld nicht passen. Gibt es das gewählte Feld am Spiel nicht mehr,
+prüft die Season nichts, und der Kasten sagt das.
+
+**Die Plattform einer Person** ist der festgehaltene Wert in `league_rosters.player_ids` (nur, wenn das Feld Pflicht ist, wird er mit der ID festgehalten und
+gilt die ganze Season), sonst der Wert im Profil. Stand in `league_eligibility.status`, nach `age_not_met` und vor `waiting`:
+
+| Stand | Wann | Meldung |
+| --- | --- | --- |
+| `platform_not_allowed` | Wert steht nicht unter den erlaubten | „Diese Season ist nur für PC – angegeben ist PlayStation.“ Grenzt Liga N selbst ein: „Liga 2 ist nur für …“ |
+| `platform_missing` | kein Wert, und der ID-Stand passt sonst (ist das Feld Pflicht, sagt es schon `missing`) | „Plattform fehlt im Profil.“ (Name des Felds) |
+
+**Welche Regel gilt:** In einer Staffel Season plus ihre Liga N. Wo die Liga noch nicht feststeht (Prüfung der Selbstanmeldung, B.4), die weiteste aller aktiven
+Liga N: die Vereinigung ihrer erlaubten Plattformen, eine Liga N ohne Grenze hebt die Prüfung auf (wie beim Mindestkader). Die Kaderübersicht prüft je Co-Team mit der Liga N seiner Staffel.
+
+**Wirkung:** Selbstanmeldung (B.4): Wer auf einer nicht erlaubten Plattform spielt oder keine angibt, zählt nicht als spielberechtigt, steht als Warnung da, und unter
+dem Mindestkader hält es die Anmeldung auf. Zuteilen (auch aus einem Antrag): Sind ohne die Spieler mit `platform_not_allowed` weniger als der Mindestkader der Staffel
+übrig, 400 mit Namen und Plattform; sonst steht im Dialog ein Hinweis (`squad-candidates`: `notes` je Co-Team). Teilnehmerliste, Aufstellung je Map und später der
+Check-in lesen `status`. Die Aufnahme in einen Kader prüft die Plattform nicht. Normale Turniere kennen die Einstellung nicht.
+
+**Antworten:** `GET /api/leagues/{liga}/{season}` trägt `platform` (`null` ohne jede Angabe): `{field_label, allowed, crossplay, input_device, input_device_label,
+values, divisions: [{id, label, …, differs}]}`. `values` sind die Texte für das Regelwerk (#2269): `platforms` („PC“, „PC und PlayStation“, „alle Plattformen“),
+`crossplay` („an“, „aus“ oder `null`), `input_device` (Wort oder `null`). Dasselbe ohne `divisions` steht in `GET …/application` und unter `rules.platform` der
+Team-Seite und der Kaderübersicht. **Seasons ohne die Felder prüfen nichts Neues.**
+
 **Felder an `league_rosters`:**
 
 | Feld | Bedeutung |
@@ -852,7 +893,7 @@ Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern
 (eindeutiger Teilindex). Löschen des Kontos löscht die Zeilen, die Auskunft enthält sie.
 
 **Stand einer Person** (`league_eligibility.status`, Vorrang in dieser Reihenfolge): `banned`, `other_team`, `age_missing`, `age_not_met`,
-`waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
+`platform_not_allowed`, `platform_missing` (#2270, nur bei passendem ID-Stand), `waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
 `age`: `null` (keine Regel), `met` oder `missing`. Für das Unterschreiten gibt es außerhalb der Person selbst nur den Stand `age_not_met` ohne Zahl.
 
 **Regeln je Einstellung:**
@@ -905,7 +946,8 @@ Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `p
 
 **Datenschutz:** Die Liga-Prüfung und ihre Antworten nennen nie ein Datum oder Alter der Person, weder Stand, Team-Seite, Kaderübersicht, Fehlertext, Nachricht, Mail noch Protokoll. Gelesen wird `users.birth_date` dafür an einer Stelle (`league_eligibility._ages`), heraus kommen nur `met`, `missing` oder der Stand `age_not_met` (Wächter: `test_league_birth_date_guard_unit.py`). Das öffentliche Profil kann das Feld nach der freiwilligen Sichtbarkeits-Einstellung der Person selbst zeigen (`user_routes._visible_field`); das ist kein Liga-Weg und von dieser Regel nicht berührt. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber. Die Auskunft enthält `league_rosters`, `league_transfers` und `league_appearances` (Spiele, in denen die Person auf einer Teilnehmerliste, in `games[].lineups` oder einer offenen Meldung steht, auch ohne `lineup_user_ids`, nur die eigene Seite). Das Löschen des Kontos löscht Kadereinträge und Anträge; `matches_v2` bleibt als Sportdaten, das Konto heißt dort „Gelöschter User“.
 
-**Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`.
+**Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`,
+`league.season.platform` (#2270).
 
 **Noch nicht gebaut, liest diese Prüfung später:** Check-in (D.2 ruft `check_participants`), Strafen (E.3 ergänzt den Stand).
 
