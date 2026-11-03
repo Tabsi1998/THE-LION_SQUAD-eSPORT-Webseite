@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.60.0 (03.11.2026)
+
+### Neu
+
+* Die Kennung eines Spielmodus bleibt beim Umbenennen gleich, auch über die API (#2206)
+* Inaktive Spielmodi stehen für neue Map-Pools, Modus je Map, Turniere und Phasen nicht mehr zur Wahl (#2206)
+* Liga: „Co-Team zuteilen“ verweist den Superadmin für die Notausnahme in den Eingang (#2245)
+* Liga: Anmeldefenster, Startplätze, Warteliste, Zulassung und Datenschutz-Hinweis je Season einstellbar (#2205)
+* Liga: Co-Teams melden sich selbst auf der Ligaseite an, geführt in vier Schritten (#2205)
+* Liga: Eingang für die Leitung mit Prüfen, Annehmen, Ablehnen mit Grund, Warteliste und Zuteilung zu Liga und Staffel (#2205)
+* Liga: Eingang zeigt beim eigenen Team keine Knöpfe, der Superadmin entscheidet nur mit Grund (#2245)
+* Liga: Ligaseite zeigt Anmeldefenster und freie Startplätze für alle, Stand und Zurückziehen für das eigene Co-Team (#2205)
+* Liga: Nachricht und Mail bei eingereicht, angenommen, abgelehnt, Warteliste und zurückgezogen (#2205)
+* Liga: Prüfung im Klartext vor dem Einreichen, Zustimmung zu Regeln und Datenschutz wird nachweisbar gespeichert (#2205)
+* Liga: Schalter je Season für zwei Co-Teams eines Hauptteams in derselben Staffel (#2205)
+* Liga: Team-Seite zeigt den Stand der Anmeldung je Co-Team (#2205)
+* Liga: Über die Anmeldung des eigenen Teams entscheidet eine zweite Person (#2245)
+* Spielmodi haben Zustand (aktiv, inaktiv, archiviert), Beschreibung, Spieler je Seite, Format und Ergebnisregel (#2206)
+* Verwendete Spielmodi lassen sich nur deaktivieren oder archivieren, nicht entfernen (#2206)
+
+### Fehlerbehebungen
+
+* Datenschutz: Auskunft und Kontolöschung kennen die Liga-Anmeldungen (#2205)
+
+### Dokumentation
+
+* Handbuch für Leitung und Captains zur Selbstanmeldung (#2205)
+
 ## 1.59.1 (02.11.2026)
 
 ### Fehlerbehebungen
