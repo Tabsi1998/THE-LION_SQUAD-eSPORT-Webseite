@@ -22,9 +22,15 @@ const WORST = {
   default_best_of: 9,
 };
 
-function Harness({ game }) {
+// `usage`: null = Zählung unbekannt (der Server prüft), undefined = lädt noch, sonst die Antwort von /games/{id}/usage.
+function Harness({ game, onValue, ...rest }) {
+  const usage = "usage" in rest ? rest.usage : null;
   const [value, setValue] = useState(gameMatchDataToForm(game));
-  return <GameMatchDataFields value={value} onChange={setValue} />;
+  const change = (next) => {
+    setValue(next);
+    onValue?.(next);
+  };
+  return <GameMatchDataFields value={value} onChange={change} usage={usage} />;
 }
 
 test("20 Modi: „+ Modus“ ist gesperrt und sagt warum", () => {
@@ -62,4 +68,65 @@ test("ein Modus ohne Namen: der Löschen-Knopf bleibt erreichbar", () => {
   render(<Harness game={{ match_modes: [{ mode: "x", label: "", minutes: 5 }] }} />);
   fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
   expect(screen.getByTestId("game-edit-modes-empty")).toBeInTheDocument();
+});
+
+// Spielmodi mit Zustand und Ergebnisregel (#2206, C.1).
+const TWO = { match_modes: [{ mode: "zonen", label: "Zonen" }, { mode: "jagd", label: "Jagd", status: "inactive" }] };
+const USAGE = { modes: { zonen: { in_use: true }, jagd: { in_use: false } } };
+
+test("verwendete Modi: kein Entfernen, nur der Hinweis zum Deaktivieren", () => {
+  render(<Harness game={TWO} usage={USAGE} />);
+  expect(screen.queryByTestId("game-edit-mode-remove-0")).toBeNull();
+  expect(screen.getByTestId("game-edit-mode-locked-0")).toBeInTheDocument();
+  expect(screen.getByTestId("game-edit-mode-used-0")).toHaveTextContent("nur deaktivieren oder archivieren");
+  expect(screen.getByTestId("game-edit-mode-remove-1")).toBeEnabled();
+  expect(screen.queryByTestId("game-edit-mode-used-1")).toBeNull();
+});
+
+test("solange die Zählung lädt, wartet der Knopf; neue Zeilen lassen sich immer entfernen", () => {
+  render(<Harness game={TWO} usage={undefined} />);
+  expect(screen.getByTestId("game-edit-mode-remove-0")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("game-edit-mode-add"));
+  expect(screen.getByTestId("game-edit-mode-remove-2")).toBeEnabled();
+});
+
+test("Zustand als Auswahl mit Erklärung", () => {
+  let last = null;
+  render(<Harness game={TWO} usage={USAGE} onValue={(value) => { last = value; }} />);
+  expect(screen.getByTestId("game-edit-mode-status-0")).toHaveValue("active");
+  expect(screen.getByTestId("game-edit-mode-status-1")).toHaveValue("inactive");
+  expect(screen.getByTestId("game-edit-mode-status-hint-1")).toHaveTextContent("nicht mehr zur Wahl");
+  fireEvent.change(screen.getByTestId("game-edit-mode-status-0"), { target: { value: "archived" } });
+  expect(last.match_modes[0].status).toBe("archived");
+  expect(screen.getByTestId("game-edit-mode-status-hint-0")).toHaveTextContent("Archiviert");
+});
+
+test("Details: Beschreibung, Spieler je Seite, Format und Ergebnisregel, mit Zusammenfassung", () => {
+  let last = null;
+  render(<Harness game={TWO} usage={USAGE} onValue={(value) => { last = value; }} />);
+  const more = screen.getByTestId("game-edit-mode-more-0");
+  expect(more).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("game-edit-mode-details-0")).toBeNull();
+  fireEvent.click(more);
+  expect(more).toHaveAttribute("aria-expanded", "true");
+  fireEvent.change(screen.getByTestId("game-edit-mode-players-0"), { target: { value: "4" } });
+  fireEvent.change(screen.getByTestId("game-edit-mode-rule-kind-0"), { target: { value: "rounds" } });
+  expect(screen.getByTestId("game-edit-mode-rule-limit-0")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("game-edit-mode-rule-target-0"), { target: { value: "6" } });
+  fireEvent.click(screen.getByTestId("game-edit-mode-rule-overtime-0"));
+  expect(last.match_modes[0]).toMatchObject({ players_per_side: "4", rule_kind: "rounds", rule_target: "6", rule_overtime: true });
+  expect(more).toHaveTextContent("4 je Seite · Runden gewinnen: 6 Siege · Verlängerung");
+  fireEvent.change(screen.getByTestId("game-edit-mode-rule-kind-0"), { target: { value: "highest" } });
+  expect(screen.queryByTestId("game-edit-mode-rule-target-0")).toBeNull();
+  expect(screen.queryByTestId("game-edit-mode-rule-limit-0")).toBeNull();
+});
+
+test("schlimmster Fall: lange Beschreibung wird an der Grenze abgeschnitten, nichts „undefined“", () => {
+  let last = null;
+  render(<Harness game={TWO} usage={USAGE} onValue={(value) => { last = value; }} />);
+  fireEvent.click(screen.getByTestId("game-edit-mode-more-1"));
+  fireEvent.change(screen.getByTestId("game-edit-mode-description-1"), { target: { value: "x".repeat(700) } });
+  expect(last.match_modes[1].description).toHaveLength(500);
+  expect(screen.getByTestId("game-edit-match-data")).toHaveTextContent("500 / 500 Zeichen");
+  expect(screen.getByTestId("game-edit-match-data")).not.toHaveTextContent("undefined");
 });

@@ -299,7 +299,18 @@ function gamePayload(form) {
 function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
+  // Wo die Modi verwendet werden (#2206): Entfernen nur bei unbenutzten. undefined = lädt, null = unbekannt.
+  const [usage, setUsage] = useState(undefined);
   const confirm = useConfirm();
+  useEffect(() => {
+    let alive = true;
+    if (!game.id) {
+      setUsage(null);
+      return undefined;
+    }
+    api.get(`/games/${game.id}/usage`).then(({ data }) => { if (alive) setUsage(data || null); }).catch(() => { if (alive) setUsage(null); });
+    return () => { alive = false; };
+  }, [game.id]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const parentOptions = selectableGames(games, form.parent_game_id).filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameOptionLabel(g)]);
   const identityOptions = selectableGames(games, form.identity_source_game_id).filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameOptionLabel(g)}`]);
@@ -355,7 +366,7 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
       </FormGrid>
       <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
-      <GameMatchDataFields value={form.match_data} onChange={(v) => set("match_data", v)} />
+      <GameMatchDataFields value={form.match_data} onChange={(v) => set("match_data", v)} usage={usage} />
     </AdminSheet>
   );
 }
