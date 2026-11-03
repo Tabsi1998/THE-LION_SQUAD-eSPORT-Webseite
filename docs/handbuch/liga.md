@@ -104,6 +104,46 @@ blendet sie zusätzlich aus. Vor beidem fragt die Verwaltung nach und nennt die 
 steht – das ist nur ein Hinweis, gesperrt wird nichts. Soll eine kaputte Map wirklich aus einer laufenden Season raus, geht
 das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
 
+### 2.1a Ausrüstung und Sperrliste
+
+Grundsatz: **Alles ist erlaubt außer dem, was auf der Sperrliste der Season steht.** Die Website prüft nicht, was im Spiel benutzt
+wird – ein Verstoß läuft über Einspruch und Strafe.
+
+1. **Bibliothek:** **Admin → eSports → Spiele → Zahnrad → Reiter Ausrüstung** (`/admin/games/<Spiel>#ausruestung`), auch aus der Season
+   über **Sperrliste → Bibliothek pflegen**. Der Reiter speichert je Eintrag sofort – es gibt nichts „Ungespeichertes“. Zuerst **Kategorien**: Ohne Kategorien gibt es einen Vorschlag (Waffen, Aufsätze, Perks, Ausrüstung, Abschussserien), den
+   du anpasst und speicherst. Die **Art** entscheidet: An einer *Waffe* lassen sich einzelne Aufsätze sperren, ein *Aufsatz* passt zu Waffen,
+   alles andere ist *sonstige Ausrüstung*. Hat eine Kategorie Einträge, bleibt ihre Art und sie lässt sich nicht entfernen.
+2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek; ohne Medienrechte nur eigene Bilder), bei Aufsätzen
+   **Passt zu**: Ein Aufsatz passt nur zu den gewählten Waffen, **ohne Wahl zu keiner**. Aufsätze ohne Waffe nennt oben ein gelber Hinweis;
+   dort Waffen anhaken und **Allen … Aufsätzen zuordnen** (wie „Maps ohne Modus“). Suche und Kategorie-Knöpfe helfen bei vielen Einträgen.
+   **Aus Spiel übernehmen** holt Einträge einer anderen Spielversion, fehlende Kategorien kommen mit, Aufsätze finden ihre Waffen über den
+   Namen (Waffen also mit übernehmen, sonst kommen sie ohne Waffe).
+3. **Zustand:** *Deaktivieren* (Ein/Aus-Symbol): kommt auf keine neue Sperrliste, wo er steht, bleibt er. *Archivieren*: zusätzlich
+   ausgeblendet. Was auf einer gespeicherten Sperrliste steht, lässt sich nicht löschen, nur archivieren.
+4. **Sperrliste der Season:** auf der Season-Seite, Abschnitt **Sperrliste**. Haken bei **sperren**, darunter **Gilt in**: allen Modi oder
+   einzelnen. Bei einer Waffe öffnet **Aufsätze einzeln sperren** die passenden Aufsätze – die Waffe bleibt erlaubt, nur diese Aufsätze nicht.
+   Ein Aufsatz in seiner eigenen Kategorie gesperrt gilt an jeder Waffe. **Nur gesperrte** zeigt, was schon auf der Liste steht.
+5. **Speichern** legt eine neue **Version** an. Bestehende Staffeln bekommen sie mit **Jetzt übertragen** (auch gesperrte und laufende),
+   neue Staffeln gleich beim Anlegen. Ein Spiel hält die Version fest, die bei seinem Ergebnis galt. **Versionen vergleichen** zeigt neu
+   gesperrt, geändert und wieder erlaubt.
+6. **Regelwerk:** Steht der Baustein **Sperrliste** im Regelwerk, sagt der Abschnitt, ob die letzte Fassung noch den alten Stand zeigt.
+   **Neue Version vorbereiten** führt ins Regelwerk; dort sind die Unterschiede markiert, du gibst frei und wählst, ob neu zugestimmt werden
+   muss (2.11). Jede Fassung friert ihre Liste ein.
+
+Öffentlich steht die Liste auf der Ligaseite unter dem Map-Pool, nur wenn die Season sichtbar ist. Rechte: Bibliothek wie Maps (Bereich
+Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständigkeit der Liga).
+
+<table>
+<tr>
+<td><img src="../assets/liga/ausruestung-bibliothek.png" alt="Bibliothek Ausrüstung: Kategorie-Knöpfe, Suche, je Kategorie Einträge mit Bild, Zustand und „auf N Sperrlisten“" width="560"></td>
+<td><img src="../assets/liga/ausruestung-bibliothek-handy.png" alt="Dieselbe Bibliothek am Handy mit 390 px, lange Namen brechen um" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season: Hinweis aufs Regelwerk, gesperrte Waffe mit Modus, Aufsätze an einer Waffe" width="560"></td>
+<td><img src="../assets/liga/sperrliste-ligaseite-handy.png" alt="Ligaseite am Handy: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen" width="220"></td>
+</tr>
+</table>
+
 ### 2.2 Liga und Season anlegen
 
 1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“) und Spiel.
@@ -431,8 +471,9 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
 1. **Neuen Entwurf beginnen.** Titel und Text in Markdown. Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch
    der Link über alle Versionen gleich.
 2. **Anlagen** bekommen ihren Buchstaben aus der Reihenfolge (Anlage A, B, C …) und stehen eigens im Inhaltsverzeichnis.
-3. **Bausteine:** Die Knöpfe **Map-Pool** und **Modusfolge** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt kommt aus den
-   Daten der Season. Tippe die Listen also nicht ab.
+3. **Bausteine:** Die Knöpfe **Map-Pool**, **Modusfolge** und **Sperrliste** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt
+   kommt aus den Daten der Season. Tippe die Listen also nicht ab. Die **Sperrliste** (`[[baustein:loadout_bans]]`, gedacht für Anlage A) zeigt im
+   Web Bilder, im PDF eine schlichte Liste (2.1a).
 4. **Vorschau** zeigt die Seite mit den Daten von heute und den Änderungen zur letzten Version.
 5. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
    die Version nicht mehr ändern. Die Bausteine werden eingefroren: alte Versionen zeigen ihre Listen von damals, im Web und im PDF.
@@ -776,6 +817,7 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] **Best of 3**, **Teamgröße 4**, Mindestkader, **Modus je Map** laut Regelwerk, Punkte 3/1/0 – 2.2
 - [ ] **Regelwerk** veröffentlicht, Bausteine für Map-Pool und Modusfolge gesetzt – 2.11
 - [ ] **Map-Pool der Season** gespeichert – 2.2
+- [ ] **Ausrüstung** in der Bibliothek, **Sperrliste der Season** gespeichert und als Baustein im Regelwerk – 2.1a
 - [ ] **Prüfung vor der Veröffentlichung** ohne Probleme – 2.8
 - [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
 - [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4

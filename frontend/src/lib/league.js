@@ -23,9 +23,13 @@ export const ACTIVE_STATUS_OPTIONS = [["active", "Aktiv"], ["archived", "Archivi
 export const SYNC_GROUP_TEXT = {
   always: "Sichtbarkeit und Regeltext",
   running: "Antwortfrist auf Terminvorschläge",
+  // Wie SYNC_GROUP_LABELS im Server (league_service.py): Terminregeln (#2194), Ergebnisregeln (#1617), Sperrliste (#2218).
+  schedule: "Terminregeln",
+  result_rules: "Ergebnisregeln und Punktepflicht",
   before_start: "Termine und Kalender",
   before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
   map_pool: "Map-Pool",
+  loadout_bans: "Sperrliste",
 };
 
 const number = (value) => (value === "" || value == null ? null : Number(value));

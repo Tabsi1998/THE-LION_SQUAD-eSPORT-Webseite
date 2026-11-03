@@ -22,6 +22,7 @@ import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
 import { PoolMapLock } from "@/pages/admin/maps/PoolMapLock";
 import { PoolVersionCompare } from "@/pages/admin/maps/PoolVersionCompare";
 import { SeasonReadinessPanel } from "./SeasonReadinessPanel";
+import { SeasonLoadoutBansPanel } from "./SeasonLoadoutBansPanel";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
@@ -514,6 +515,8 @@ export default function AdminLeagueSeasonPage() {
               <PoolMapLock endpoint={`/admin/leagues/seasons/${seasonId}/map-pool/remove-map`} pool={data.map_pool} onDone={reload} testId="season-pool-lock" />
             ) : null}
             <PoolVersionCompare baseUrl={`/admin/leagues/seasons/${seasonId}/map-pool`} version={data.map_pool?.version} testId="season-pool-compare" />
+            {/* C.4 (#2218): Sperrliste der Ausrüstung - eigenständig, lädt sich selbst; Staffeln bekommen sie beim Übertragen. */}
+            <SeasonLoadoutBansPanel seasonId={seasonId} canEdit={canSeason} onSaved={(count) => setPendingSync(count)} />
             <SeasonReadinessPanel seasonId={seasonId} version={`${season.updated_at}-${data.map_pool?.version ?? 0}-${data.divisions.length}-${staffelCount}`}
               visibility={season.visibility} canEdit={canSeason} overrideReason={overrideReason} onOverrideReason={canSeason ? setOverrideReason : undefined}
               onSaved={reload} />

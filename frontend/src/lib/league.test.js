@@ -96,6 +96,12 @@ test("Antwortfrist auf Terminvorschläge: Season-Wert, leer bleibt leer, Liga N 
   expect(syncSummary({ applied: ["running"], changed: ["match_schedule_response_hours"] }).applied).toEqual(["Antwortfrist auf Terminvorschläge"]);
 });
 
+// Jede Gruppe, die der Server beim Übertragen meldet (SYNC_GROUP_LABELS), hat ihren Namen - auch Terminregeln, Ergebnisregeln, Sperrliste.
+test("Übertragen nennt Terminregeln, Ergebnisregeln und Sperrliste", () => {
+  expect(syncSummary({ applied: ["schedule", "result_rules", "loadout_bans"], changed: [] }).applied)
+    .toEqual(["Terminregeln", "Ergebnisregeln und Punktepflicht", "Sperrliste"]);
+});
+
 test("Löschen: was mitgeht, je Gruppe - leere Gruppen fallen weg", () => {
   expect(deletionGroups(null)).toEqual([]);
   expect(deletionGroups({ seasons: [{ name: "Season 1" }], divisions: [{ label: "Season 1 · Liga 1" }], staffeln: [{ staffel: "A" }] })).toEqual([

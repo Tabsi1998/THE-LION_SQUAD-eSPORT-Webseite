@@ -564,6 +564,7 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | Modus-Felder | C.1 | Status, Ergebnisregel | `games.match_modes[]`, Dauerplanung bleibt |
 | `season_readiness` | C.2 | Vorab-Prüfung vor der Veröffentlichung | `map_pools`, `game_mode_order` |
 | Ergebnisregeln | C.3 | Prüfung in `normalize_games`, nur mit gesetzter Regel | `games[]` |
+| `game_equipment`, `loadout_bans` | C.4 | Bibliothek je Spiel, Sperrliste in Versionen, Baustein `loadout_bans` | `game_maps`, `map_pools`, `league_rule_blocks` |
 | `matches_v2.flow`, `match_flow.py` | D.2 | Stand abgeleitet, kein neuer globaler `status`; setzt `started_at` | `no_show_deadline`, `call_view` |
 | `matches_v2.veto`, `planned_games[]` | D.3 | Zustandsautomat auf dem Server, gleiche Schlüssel wie `games[]` | `map_pools.allowed`, `map_pool_id` |
 | `matches_v2.incidents[]` | D.5 | Abbruch, Pause, Rehost, Wiederholung, Entscheidung | `games[]` |
@@ -644,6 +645,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `PUT …/seasons/{id}/result-rules` (C.3) | `season` | – | – |
 | `POST …/seasons/{id}/map-pool/remove-map` (#2207) | `season` | – | – |
 | `GET …/seasons/{id}/map-pool/versions`, `…/map-pool/compare`, `…/readiness` (#2207) | jede Zuständigkeit der Liga | – | – |
+| `PUT`, `DELETE …/seasons/{id}/loadout-bans` (#2218) | `season` | – | – |
+| `GET …/seasons/{id}/loadout-bans`, `…/loadout-bans/compare` (#2218) | jede Zuständigkeit der Liga | – | – |
 | `POST …/seasons/{id}/divisions`, `PATCH`, `DELETE …/divisions/{id}`, `GET …/delete-plan` | `season` | – | – |
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
@@ -682,7 +685,7 @@ seiner Liga. Die Liga-Leitung bearbeitet aus der Kaderübersicht der Season („
 abgeben geht weiter. Alle anderen Teams und Co-Teams, auch nach dem Ende der Staffel, bleiben wie bisher.
 
 **Bewusst unverändert:** Die übrige Team-Verwaltung (`team_routes.py`, Team-Admin-Rollen) bleibt ein eigener Rechtebereich.
-Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
+Jahreswertung, Spiele, Map-Bibliothek und Ausrüstungs-Bibliothek (#2218) bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
 
 **Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die
 Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); `matches-v2` einer Staffel für die Leitung `viewer_involved` und `viewer_override`; die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
@@ -725,8 +728,8 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 `anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
 
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
-`game_mode_order` mit den Namen der Modi). Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
-`league_rule_blocks.BLOCKS` (für #2218 die Waffenliste). Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
+`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` (Sperrliste, C.4). Unbekannte lehnt das Veröffentlichen mit 422
+ab. Neue Bausteine stehen in `league_rule_blocks.BLOCKS`. Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
 Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
 
@@ -1272,6 +1275,120 @@ die Punktefelder ohne „freiwillig“ und prüfen vorab mit denselben Sätzen (
 Der Block `league` der Matchseite trägt dazu `result_rules` (nur Modi des Pools) und `scores_required`.
 
 **Map-Wiederholung** (Nr. 15) gibt es seit #2096 (`map_repeat` an Season und Staffel, Vorgabe `other_mode`); C.3 baut nichts dazu.
+
+### C.4 Ausrüstung (#2218)
+
+Waffen, Aufsätze und übrige Ausrüstung stehen einmal je Spiel in einer Bibliothek (Muster `game_maps`), die Season wählt daraus eine
+**Sperrliste** in unveränderlichen Versionen (Muster `map_pools`). Alles ist erlaubt außer dem, was auf der Sperrliste steht. Logik in
+`services/game_equipment.py` (Kategorien, Bibliothek, Import) und `services/loadout_bans.py` (Versionen, Vergleich, Staffel und Spiel,
+Baustein). Routen in `routes/game_equipment_routes.py` und `routes/league_loadout_routes.py`. Kein Wert eines Titels steht im Code.
+Verwaltung: Reiter **Ausrüstung** der Spielseite (`/admin/games/<Spiel>#ausruestung`, #2249; `…/equipment` leitet dorthin) und Abschnitt
+„Sperrliste“ der Season.
+**Migration: keine.** Ohne Sperrliste verhält sich alles wie vorher.
+
+**Grenze:** Das System prüft nicht, was im Spiel benutzt wird. Verstöße laufen über Protest und Strafe.
+
+**Kategorien je Spiel** (`game_equipment_categories`, eine Zeile je Spiel: `{game_id, categories[], updated_at, updated_by}`):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Kennung aus dem Namen beim Anlegen, ändert sich nie |
+| `label` | str 1–40 | Name, je Spiel nur einmal (ohne Groß und klein) |
+| `role` | `weapon` \| `attachment` \| `item` | Waffe (kann Aufsätze haben), Aufsatz (passt zu Waffen), sonstige Ausrüstung |
+
+Höchstens 20 Kategorien. Ohne Kategorien bietet die Verwaltung einen Vorschlag an (Waffen, Aufsätze, Perks, Ausrüstung,
+Abschussserien); gespeichert wird er erst auf Knopfdruck. Eine Kategorie mit Einträgen lässt sich nicht entfernen und ihre Rolle nicht
+ändern (409), umbenennen geht.
+
+**Einträge** (`game_equipment`):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `id`, `game_id` | str | Kennung, Spiel |
+| `category` | str | Kennung einer Kategorie des Spiels |
+| `name` | str 1–80 | je Spiel und Kategorie nur einmal (ohne Groß und klein, Leerraum zusammengefasst; 409) |
+| `image_url` | str \| `null` | nur eigener Upload (`game_maps.IMAGE_URL`) mit Eintrag in `media_uploads`; ohne Medienrolle (`ADMIN_MEDIA_ROLES`) nur eigene mit `media_scope: "user"` – wie im Regelwerk (#2230), auch beim Import; ein Bild, das der Eintrag schon trägt oder aus der Quelle mitbringt, braucht nur den Eintrag. Sonst 422. Frühere stehen in `image_history` |
+| `note` | str ≤ 500 | nur für die Verwaltung |
+| `weapon_ids` | [str] | nur Rolle `attachment`: Waffen dieses Spiels, zu denen der Aufsatz passt. **Leer = passt zu keiner Waffe** (Obmann, 03.11.): Speichern geht, an einer Waffe sperren lässt er sich erst mit Zuordnung. `GET …/equipment` nennt sie in `attachments_without_weapon`, `POST …/equipment/assign-weapons {weapon_ids}` ordnet allen nicht archivierten auf einmal Waffen zu (Protokoll `game.equipment.assign_weapons`) |
+| `status` | `active` \| `inactive` \| `archived` | Zustand wie bei Maps (C.2), fehlt = aktiv |
+| `archived_at`, `created_at`, `created_by`, `updated_at`, `updated_by` | | |
+
+Höchstens 1000 Einträge je Spiel, archivierte zählen mit. Indizes: `id` eindeutig; (`game_id`, `category`, `name_key`) eindeutig.
+
+| Zustand | Neu auf eine Sperrliste | Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` | ja | sichtbar | – |
+| `inactive` | nein. Steht er in der geltenden Version derselben Season (gleiche Art, bei Aufsätzen an derselben Waffe), bleibt er beim nächsten Speichern erlaubt | sichtbar mit „inaktiv“ | bleibt gültig |
+| `archived` | nein, auch nicht in derselben Liste | nur mit „Archivierte zeigen“; der Editor nimmt ihn mit Hinweis heraus | bleibt gültig |
+
+**Löschen** nur, wenn der Eintrag in keiner Version einer Sperrliste steht (auch nicht als Aufsatz), sonst 409 „… bitte archivieren
+statt löschen“. Wird eine unbenutzte Waffe gelöscht, fällt sie aus den `weapon_ids` der Aufsätze.
+
+**Aus einer anderen Spielversion übernehmen:** wie bei Maps. Die Kategorie passt über Kennung oder Namen; fehlt sie im Ziel, wird sie
+mit Name und Rolle angelegt (wenn noch Platz ist). Aufsätze bekommen die Waffen des Ziels mit gleichem Namen; gibt es keine davon, kommen sie
+ohne Zuordnung (passen dann zu keiner, Hinweis in der Bibliothek). Das Bild wird mitverwendet. Was schon da ist oder nicht passt, steht mit
+Grund in `skipped`.
+
+**Sperrliste** (`loadout_bans`): jedes Speichern legt eine neue, unveränderliche Version an. `scope` `league_season` (Vorlage) oder
+`tournament` (Kopie der Staffel). Felder: `id`, `scope`, `scope_id`, `tournament_id`, `game_id`, `version`, `cleared`, `note`,
+`created_at`, `created_by`, `entries[]`. Index (`scope`, `scope_id`, `version`) eindeutig wie bei Pools: gleichzeitiges Speichern wird 409.
+
+| Feld je Eintrag | Inhalt |
+| --- | --- |
+| `kind` | `item`: der Eintrag ist gesperrt. `attachments`: nur bei Waffen – die Waffe bleibt erlaubt, die genannten Aufsätze sind an ihr gesperrt |
+| `item_id`, `name`, `category`, `category_label`, `role`, `image_url` | Schnappschuss des Eintrags von damals |
+| `modes`, `mode_labels` | Modi, in denen die Sperre gilt; leer = alle Modi |
+| `attachments[]` | nur bei `attachments`: `{item_id, name, image_url}`, mindestens einer |
+
+Je Eintrag höchstens eine Zeile je Art, höchstens 500 Zeilen. Prüfung beim Speichern (422 mit deutschem Satz): Eintrag gehört zum Spiel,
+Zustand wie oben, Modi des Spiels (`game_modes.choice_problem`, ein schon gesetzter inaktiver Modus bleibt), `attachments` nur an Waffen,
+jeder Aufsatz ist der Waffe zugeordnet (`weapon_ids` mit der Waffe; leer: „keiner Waffe zugeordnet“), keine Aufsatz-Zeile an einer Waffe, die in allen Modi ganz gesperrt
+ist. Leere Liste: 422 „… oder die Sperrliste entfernen“. `expected_version` schützt wie beim Pool (0 = bisher keine).
+
+**Season → Staffel → Spiel:** Eine neue Staffel bekommt die geltende Version als eigene (`copy_version`, unter der Pool-Sperre der
+Season). „Vorgaben auf Staffeln übertragen“ überträgt sie immer, auch auf gesperrte und laufende Staffeln (eigene Gruppe `loadout_bans`
+„Sperrliste“). Hat die Season keine mehr, fällt die Kopie der Staffel nur vor dem ersten Ergebnis und nicht gesperrt weg. Das Spiel hält
+seine Version fest: `matches_v2.loadout_ban_id` (optional) setzt das erste Festschreiben eines Ergebnisses einer Staffel, zusammen mit
+`rule_version_id` – die Kennung der geltenden Version oder ausdrücklich `null` für „keine Liste“. Eine Korrektur lässt es stehen,
+„Rückgängig“ nimmt es mit. Ein Fehler beim Ermitteln wird nicht verschluckt. Gilt für ein Spiel: Vermerk vorhanden → diese Version bzw.
+keine; ohne Vermerk und fertig (`completed`, `forfeit`, Altbestand vor C.4) → keine; sonst die Version der Staffel → keine. Andere Formate
+schreiben das Feld nie.
+
+**Regelwerk:** Baustein `[[baustein:loadout_bans]]` „Sperrliste“ (für Anlage A gedacht, steht überall). Je Kategorie eine Tabelle mit
+Bild, Name und „Gilt in“, danach die Aufsätze an erlaubten Waffen. Ohne Sperrliste: „Für diese Season ist keine Sperrliste hinterlegt –
+alles ist erlaubt.“ Der Baustein liefert zwei Fassungen: `markdown` mit Bildern (Web, Vorschau, Hinweis „Daten geändert“) und `text`
+ohne Bilder (PDF, Wort-Vergleich). Beide werden beim Veröffentlichen eingefroren; ältere eingefrorene Bausteine ohne `text` nehmen
+`markdown`. Namen aus Bibliothek und Modus sind Text: `markdown_text.text_cell` ersetzt jedes Steuerzeichen (`` \`*_[]()!~+ ``,
+„|“ wird „/“) durch ein Zeichen aus dem privaten Unicode-Bereich (`U+E000`…), das keine Markdown-Regel trifft – in allen Bausteinen, auch
+Map-Pool und Modusfolge. Erst die Darstellung setzt das echte Zeichen ein: Web (`markdownLite` mit `blockText`), PDF (`pdf_rules_inline`),
+Wort-Vergleich (`markdown_text.plain`). Ein Name wird so nie Link oder Formatierung, und der frei geschriebene Regeltext bleibt unberührt,
+auch ein Backslash darin. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
+Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
+Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
+
+**Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
+
+| Route | Recht | Zweck |
+| --- | --- | --- |
+| `GET /api/games/{id}/equipment` | Bereich `tournaments` (wie Maps) | Spiel mit Modi, Kategorien, Einträge mit `in_lists`, `limit`, `suggested_categories` |
+| `PUT /api/games/{id}/equipment/categories` | ebenso | `{categories: [{key?, label, role}]}`; Protokoll `game.equipment.categories` |
+| `POST`, `PATCH`, `DELETE /api/games/{id}/equipment[/{item}]` | ebenso | Eintrag anlegen, ändern (auch `status`), löschen; `game.equipment.create/.update/.delete` |
+| `GET …/equipment/import-sources[/{source}]`, `POST …/equipment/import` | ebenso | aus anderer Spielversion; `game.equipment.import` |
+| `GET /api/admin/leagues/seasons/{id}/loadout-bans` | jede Zuständigkeit der Liga | Spiel, Kategorien, Bibliothek (aktiv und inaktiv), geltende Version mit `stale` und `outdated_item_ids`, Versionen, Stand im Regelwerk |
+| `PUT …/loadout-bans` | `season` | neue Version; Antwort mit `staffeln_to_sync`; `league.season.loadout_bans.save` |
+| `DELETE …/loadout-bans` | `season` | entfernen (Version mit `cleared`); `league.season.loadout_bans.clear` |
+| `GET …/loadout-bans/compare?base=<Nr>&target=<Nr>` | jede Zuständigkeit der Liga | `{base, target, added[], removed[], changed[], same}` je Zeile (`kind`, `item_id`) |
+
+**Öffentlich** nur, was die Season zeigt: `GET /api/leagues/{liga}/{season}` trägt `loadout_bans` (Lesevertrag `{id, version, saved_at,
+entries[]}` ohne `note` und Autor, `null` ohne Liste), die Regelseite den Baustein. Die Bibliothek selbst ist nie öffentlich.
+
+**Datenschutz:** Alle drei Sammlungen sind Vereinsinhalt (`personal_data.CLUB_CONTENT`), nur die Kennung, wer angelegt oder gespeichert
+hat. Bilder: `game_equipment.image_url` und `.image_history`, `loadout_bans.entries.image_url` und `.entries.attachments.image_url`
+stehen in den Verwendungsstellen der Mediathek (`media_audit`); die Kontolöschung behält sie, solange sie dort stehen. Jede Version einer
+Sperrliste ist unveränderlich (`media_audit.FROZEN_COLLECTIONS`): Ein Bild darin lässt sich nicht drehen und nicht löschen (409), Duplikat-
+Ersetzen und Bild-Migration schreiben sie nicht um. In der Bibliothek darf sich ein Bild ändern.
+
+**App:** liest nichts davon, Antworten bekommen nur Felder dazu.
 
 ### E.1 Tabelle (#1625)
 
