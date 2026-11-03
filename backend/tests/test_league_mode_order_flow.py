@@ -57,8 +57,12 @@ async def real_season(flow, w, *, order=("stellung", "suchen"), with_result=True
 
 
 async def remove_suchen(flow) -> None:
-    removed = await flow.patch(f"/api/games/{GAME_ID}", json={"match_modes": MODES[:1]})
-    assert removed.status_code == 200, removed.text
+    """Altbestand von vor #2206: „Suchen“ wurde dem Spiel entfernt, obwohl Season und Pool ihn nutzen. Heute lehnt die API
+    das ab (409, nur noch deaktivieren) - der Zustand kann aus alten Daten aber noch da sein und muss weiter tragen."""
+    refused = await flow.patch(f"/api/games/{GAME_ID}", json={"match_modes": MODES[:1]})
+    assert refused.status_code == 409, refused.text
+    await flow.db.games.update_one({"id": GAME_ID}, {"$set": {"match_modes": MODES[:1]}})
+    await flow.db.game_maps.update_many({"game_id": GAME_ID, "modes": "suchen"}, {"$pull": {"modes": "suchen"}})
 
 
 async def sync(flow, season_id: str) -> dict:

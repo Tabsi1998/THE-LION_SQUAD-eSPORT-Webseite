@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
-from services import game_maps, game_usage
+from services import game_maps, game_modes, game_usage
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
@@ -175,6 +175,20 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     return doc
 
 
+async def _refuse_used_removal(db, current: dict, modes: list[dict] | None) -> None:
+    """Ein verwendeter Modus lässt sich nur deaktivieren oder archivieren, nicht entfernen (#2206) - 409 mit Zählung,
+    auch direkt über die API und bei ``match_modes: null``."""
+    kept = {mode.get("mode") for mode in modes or []}
+    gone = [mode for mode in game_maps.game_modes(current) if mode["mode"] not in kept]
+    if not gone:
+        return
+    used = await game_usage.mode_usage(db, current, [mode["mode"] for mode in gone])
+    for mode in gone:
+        counts = used.get(mode["mode"]) or {}
+        if counts.get("in_use"):
+            raise HTTPException(status_code=409, detail=game_usage.mode_in_use_text(mode["label"], counts))
+
+
 @router.put("/{game_id}")
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
@@ -188,6 +202,14 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
                        "match_modes", "players_per_run_local", "players_per_run_online", "station_devices", "setup_minutes",
                        "points_table", "default_best_of"}
     raw = body.model_dump(exclude_unset=True)
+    if raw.get("match_modes"):
+        # Kennung bleibt (#2206): ein Eintrag ohne Kennung mit dem Namen eines bestehenden Modus behält dessen Kennung.
+        raw["match_modes"] = game_modes.adopt_keys(raw["match_modes"], [mode._key_given for mode in body.match_modes], current)
+        keys = [mode["mode"] for mode in raw["match_modes"]]
+        if len(keys) != len(set(keys)):
+            raise HTTPException(status_code=422, detail="Jeder Modus braucht einen eigenen Namen.")
+    if "match_modes" in raw:
+        await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_id_fields(updates.get("player_id_fields"))
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")

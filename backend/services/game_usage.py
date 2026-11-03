@@ -88,6 +88,7 @@ async def usage(db, game: dict) -> dict:
     tournaments = await db.tournaments.find({"game_id": game_id}, {"_id": 0, "id": 1, "game_mode": 1}).to_list(None)
     stages = await db.tournament_stages.find({"tournament_id": {"$in": [row["id"] for row in tournaments]}},
                                              {"_id": 0, "settings.game_mode": 1}).to_list(None)
+    lasting = await mode_usage(db, game)
     modes = {
         mode["mode"]: {
             "label": mode["label"],
@@ -96,10 +97,107 @@ async def usage(db, game: dict) -> dict:
             "seasons": sum(1 for season in seasons if mode["mode"] in (season.get("game_mode_order") or [])),
             "tournaments": sum(1 for row in tournaments if row.get("game_mode") == mode["mode"]),
             "stages": sum(1 for stage in stages if (stage.get("settings") or {}).get("game_mode") == mode["mode"]),
+            **{key: lasting[mode["mode"]][key] for key in ("pool_versions", "staffeln", "matches", "references", "in_use")},
         }
         for mode in game_modes(game)
     }
     return {"counts": counts, "total": sum(counts.values()), "text": usage_text(counts), "modes": modes}
+
+
+# Was einen Modus „verwendet“ (#2206, C.1): Dann lässt er sich nur noch deaktivieren oder archivieren, nicht entfernen.
+# Die Zuordnung an Maps zählt nicht - sie ist Bibliothek, kein Wettbewerb, und wird beim Entfernen bereinigt.
+MODE_USE_LABELS = (
+    ("pool_versions", "Map-Pool-Version", "Map-Pool-Versionen"),
+    ("seasons", "Season", "Seasons"),
+    ("staffeln", "Staffel", "Staffeln"),
+    ("tournaments", "Turnier", "Turniere"),
+    ("stages", "Phase", "Phasen"),
+    ("matches", "Spiel", "Spiele"),
+    ("references", "Ergebnisblatt", "Ergebnisblätter"),
+)
+
+
+def _count_in(keys: set[str], found: dict[str, int], values) -> None:
+    for key in {value for value in values if value in keys}:
+        found[key] += 1
+
+
+def _game_modes_of(rows) -> list:
+    """Die Modi in ``games[]`` - Liste von Spielen mit ``mode``."""
+    return [game.get("mode") for game in rows or [] if isinstance(game, dict)]
+
+
+async def mode_usage(db, game: dict, keys=None) -> dict[str, dict]:
+    """Je Modus (Vorgabe: alle des Spiels), wo er verwendet wird, und ``in_use``. Gezählt werden: jede Version eines
+    Map-Pools des Spiels (außer dem Standard-Pool), ``game_mode_order`` von Seasons und Staffeln, ``game_mode`` von
+    Turnieren, ``settings.game_mode`` von Phasen, ``games[]``, Meldungen und gehaltene Ergebnisse von Spielen und die
+    Ergebnisblätter der Referenz-Serien des Spiels (auch Entwurf und alte Stände)."""
+    game_id = game["id"]
+    wanted = sorted({str(key) for key in (keys if keys is not None else [mode["mode"] for mode in game_modes(game)]) if key})
+    found = {key: {name: 0 for name, _one, _many in MODE_USE_LABELS} for key in wanted}
+    if not wanted:
+        return {}
+    keys_set = set(wanted)
+
+    def bump(name: str, values) -> None:
+        counter = {key: 0 for key in wanted}
+        _count_in(keys_set, counter, values)
+        for key, count in counter.items():
+            found[key][name] += count
+
+    async for pool in db.map_pools.find({"game_id": game_id, "scope": {"$ne": DEFAULT_POOL_SCOPE}, "modes.mode": {"$in": wanted}},
+                                        {"_id": 0, "modes.mode": 1}):
+        bump("pool_versions", [group.get("mode") for group in pool.get("modes") or []])
+    leagues = [row["id"] for row in await db.leagues.find({"game_id": game_id}, {"_id": 0, "id": 1}).to_list(None)]
+    if leagues:
+        async for season in db.league_seasons.find({"league_id": {"$in": leagues}, "game_mode_order": {"$in": wanted}},
+                                                   {"_id": 0, "game_mode_order": 1}):
+            bump("seasons", season.get("game_mode_order") or [])
+    tournaments = await db.tournaments.find({"game_id": game_id}, {"_id": 0, "id": 1, "game_mode": 1, "game_mode_order": 1}).to_list(None)
+    for row in tournaments:
+        bump("staffeln", row.get("game_mode_order") or [])
+        bump("tournaments", [row.get("game_mode")])
+    tournament_ids = [row["id"] for row in tournaments if row.get("id")]
+    if tournament_ids:
+        async for stage in db.tournament_stages.find({"tournament_id": {"$in": tournament_ids}, "settings.game_mode": {"$in": wanted}},
+                                                     {"_id": 0, "settings.game_mode": 1}):
+            bump("stages", [(stage.get("settings") or {}).get("game_mode")])
+        query = {"tournament_id": {"$in": tournament_ids},
+                 "$or": [{"games.mode": {"$in": wanted}}, {"reports.games.mode": {"$in": wanted}},
+                         {"pending_result.games.mode": {"$in": wanted}}]}
+        async for match in db.matches_v2.find(query, {"_id": 0, "games.mode": 1, "reports.games.mode": 1, "pending_result.games.mode": 1}):
+            values = _game_modes_of(match.get("games"))
+            for report in match.get("reports") or []:
+                values += _game_modes_of((report or {}).get("games"))
+            values += _game_modes_of((match.get("pending_result") or {}).get("games"))
+            bump("matches", values)
+    lineages = [row["id"] for row in await db.reference_lineages.find({"game_id": game_id}, {"_id": 0, "id": 1}).to_list(None)]
+    series = [row["id"] for row in await db.reference_series.find({"lineage_id": {"$in": lineages}}, {"_id": 0, "id": 1}).to_list(None)] if lineages else []
+    if series:
+        sheet_query = {"series_id": {"$in": series},
+                       "$or": [{"matches.maps.mode": {"$in": wanted}}, {"pending_draft.matches.maps.mode": {"$in": wanted}}]}
+        async for sheet in db.reference_round_results.find(sheet_query, {"_id": 0, "matches.maps.mode": 1, "pending_draft.matches.maps.mode": 1}):
+            values = [item.get("mode") for content in (sheet, sheet.get("pending_draft") or {})
+                      for match in content.get("matches") or [] for item in (match or {}).get("maps") or []]
+            bump("references", values)
+        async for revision in db.reference_round_result_revisions.find(
+                {"series_id": {"$in": series}, "content.matches.maps.mode": {"$in": wanted}}, {"_id": 0, "content.matches.maps.mode": 1}):
+            bump("references", [item.get("mode") for match in (revision.get("content") or {}).get("matches") or []
+                                for item in (match or {}).get("maps") or []])
+    for counts in found.values():
+        counts["in_use"] = any(counts[name] for name, _one, _many in MODE_USE_LABELS)
+    return found
+
+
+def mode_in_use_text(label: str, counts: dict) -> str:
+    """409 beim Entfernen eines verwendeten Modus - mit Zählung und dem Weg, der bleibt."""
+    parts = []
+    for key, one, many in MODE_USE_LABELS:
+        count = counts.get(key) or 0
+        if count:
+            parts.append(f"{count} {one if count == 1 else many}")
+    return (f"Der Modus „{label}“ wird verwendet ({', '.join(parts)}). Entfernen geht nicht – stell ihn auf "
+            "„inaktiv“ oder „archiviert“.")
 
 
 def usage_text(counts: dict) -> str:
