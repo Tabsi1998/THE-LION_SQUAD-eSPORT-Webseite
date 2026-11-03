@@ -316,3 +316,35 @@ async def test_setting_a_game_again_respects_the_conflict(flow):
     assert undone.status_code == 200, undone.text
     overrides = [row["data"]["action"] for row in await flow.db.audit_logs.find({"action": "league.conflict.override"}, {"_id": 0}).to_list(50)]
     assert {"double_no_show", "double_no_show_undo"} <= set(overrides)
+
+
+@pytest.mark.asyncio
+async def test_without_draws_no_draw_can_be_entered(flow):
+    """Codex zu E.1: ``allow_draws: false`` gilt auch beim Eintragen - für die Leitung (/result) wie für jede Meldung
+    (gemeinsamer Eingang ``checked_results``)."""
+    from services.match_v2_results import MatchV2ResultError, checked_results
+
+    _admin, _league, staffel = await setup(flow)
+    match = (await matches_of(flow, staffel, 1))[0]
+    home, away = [slot["registration_id"] for slot in match["slots"]]
+    draw = [{"registration_id": home, "rank": 1}, {"registration_id": away, "rank": 1}]
+    response = await flow.post(f"/api/matches/{match['id']}/result", json={"results": draw})
+    assert response.status_code == 422
+    assert "Gleichstand" in response.json()["detail"]
+    with pytest.raises(MatchV2ResultError):
+        await checked_results(flow.db, match, draw)
+    stored = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    assert not stored.get("results")
+    # Ein Sieger bleibt eintragbar.
+    assert (await flow.post(f"/api/matches/{match['id']}/result", json={"results": [
+        {"registration_id": home, "rank": 1}, {"registration_id": away, "rank": 2}]})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_season_with_draws_still_takes_a_draw(flow):
+    _admin, _league, staffel = await setup(flow, season={"scoring_rules": {"allow_draws": True}})
+    match = (await matches_of(flow, staffel, 1))[0]
+    home, away = [slot["registration_id"] for slot in match["slots"]]
+    response = await flow.post(f"/api/matches/{match['id']}/result", json={"results": [
+        {"registration_id": home, "rank": 1}, {"registration_id": away, "rank": 1}]})
+    assert response.status_code == 200, response.text
