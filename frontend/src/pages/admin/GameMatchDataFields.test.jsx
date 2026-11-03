@@ -1,11 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { GameMatchDataFields } from "./GameMatchDataFields";
-import { gameMatchDataToForm } from "@/lib/gameMatchData";
+import { GameModesEditor, GameTournamentPresets, modeSummary } from "./GameMatchDataFields";
+import { emptyMode, gameMatchDataToForm } from "@/lib/gameMatchData";
 
 // Schlimmster Fall für die Spiel-Daten (#1554, break-ui): lange Modusnamen bis zur Grenze (60), 20 Modi, eine
 // Punktetabelle mit 64 Plätzen, ein Gerät, das die Liste nicht kennt, Best-of außerhalb der Auswahl, 600 Minuten.
-// Bleibt als Rückfall-Test liegen.
+// Seit #2249 im Reiter „Modi“ der Spielseite: je Modus eine Zeile mit Name, Zustand, Spieler je Seite, Ergebnisregel und
+// Dauer, aufklappbar für alle Felder.
 
 const WORST = {
   match_modes: Array.from({ length: 20 }, (_, index) => ({
@@ -30,15 +31,22 @@ function Harness({ game, onValue, ...rest }) {
     setValue(next);
     onValue?.(next);
   };
-  return <GameMatchDataFields value={value} onChange={change} usage={usage} />;
+  return (
+    <>
+      <GameModesEditor modes={value.match_modes} onChange={(modes) => change({ ...value, match_modes: modes })} usage={usage} />
+      <GameTournamentPresets value={value} onChange={change} />
+    </>
+  );
 }
 
-test("20 Modi: „+ Modus“ ist gesperrt und sagt warum", () => {
+test("20 Modi: „Modus hinzufügen“ ist gesperrt und sagt warum; die Zeile zeigt Name und Dauer", () => {
   render(<Harness game={WORST} />);
   expect(WORST.match_modes[0].label).toHaveLength(60);
-  expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue(WORST.match_modes[0].label);
+  expect(screen.getByTestId("game-edit-mode-name-0")).toHaveTextContent(WORST.match_modes[0].label);
   expect(screen.getByTestId("game-edit-mode-add")).toBeDisabled();
   expect(screen.getByTestId("game-edit-modes-full")).toHaveTextContent("Höchstens 20 Modi");
+  expect(screen.getByTestId("game-edit-mode-more-1")).toHaveTextContent("600 Min. je Spiel");
+  fireEvent.click(screen.getByTestId("game-edit-mode-more-1"));
   expect(screen.getByTestId("game-edit-mode-minutes-1")).toHaveValue(600);
 });
 
@@ -62,12 +70,24 @@ test("ein Platz und leere Werte: Einzahl, keine „undefined“", () => {
   expect(screen.getByTestId("game-edit-points-preview")).toHaveTextContent("1 Platz: 1. 1");
   expect(screen.getByTestId("game-edit-match-data")).not.toHaveTextContent("undefined");
   expect(screen.getByTestId("game-edit-match-data")).not.toHaveTextContent("NaN");
+  expect(screen.getByTestId("game-edit-modes-empty")).toHaveTextContent("Noch kein Modus");
 });
 
-test("ein Modus ohne Namen: der Löschen-Knopf bleibt erreichbar", () => {
+test("ein Modus ohne Namen: als „Neuer Modus“ lesbar, der Löschen-Knopf bleibt erreichbar", () => {
   render(<Harness game={{ match_modes: [{ mode: "x", label: "", minutes: 5 }] }} />);
+  expect(screen.getByTestId("game-edit-mode-name-0")).toHaveTextContent("Neuer Modus");
   fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
   expect(screen.getByTestId("game-edit-modes-empty")).toBeInTheDocument();
+});
+
+test("ein neuer Modus kommt aufgeklappt, damit man gleich den Namen tippt", () => {
+  let last = null;
+  render(<Harness game={{}} onValue={(value) => { last = value; }} />);
+  fireEvent.click(screen.getByTestId("game-edit-mode-add"));
+  expect(screen.getByTestId("game-edit-mode-more-0")).toHaveAttribute("aria-expanded", "true");
+  fireEvent.change(screen.getByTestId("game-edit-mode-label-0"), { target: { value: "Stellung" } });
+  expect(screen.getByTestId("game-edit-mode-name-0")).toHaveTextContent("Stellung");
+  expect(last.match_modes).toEqual([{ ...emptyMode(), label: "Stellung" }]);
 });
 
 // Spielmodi mit Zustand und Ergebnisregel (#2206, C.1).
@@ -90,18 +110,22 @@ test("solange die Zählung lädt, wartet der Knopf; neue Zeilen lassen sich imme
   expect(screen.getByTestId("game-edit-mode-remove-2")).toBeEnabled();
 });
 
-test("Zustand als Auswahl mit Erklärung", () => {
+test("Zustand steht in der Zeile; aufgeklappt als Auswahl mit Erklärung", () => {
   let last = null;
   render(<Harness game={TWO} usage={USAGE} onValue={(value) => { last = value; }} />);
-  expect(screen.getByTestId("game-edit-mode-status-0")).toHaveValue("active");
+  expect(screen.getByTestId("game-edit-mode-chip-0")).toHaveTextContent("Aktiv");
+  expect(screen.getByTestId("game-edit-mode-chip-1")).toHaveTextContent("Inaktiv");
+  fireEvent.click(screen.getByTestId("game-edit-mode-more-1"));
   expect(screen.getByTestId("game-edit-mode-status-1")).toHaveValue("inactive");
   expect(screen.getByTestId("game-edit-mode-status-hint-1")).toHaveTextContent("nicht mehr zur Wahl");
+  fireEvent.click(screen.getByTestId("game-edit-mode-more-0"));
   fireEvent.change(screen.getByTestId("game-edit-mode-status-0"), { target: { value: "archived" } });
   expect(last.match_modes[0].status).toBe("archived");
   expect(screen.getByTestId("game-edit-mode-status-hint-0")).toHaveTextContent("Archiviert");
+  expect(screen.getByTestId("game-edit-mode-chip-0")).toHaveTextContent("Archiviert");
 });
 
-test("Details: Beschreibung, Spieler je Seite, Format und Ergebnisregel, mit Zusammenfassung", () => {
+test("Details: Beschreibung, Spieler je Seite, Format und Ergebnisregel, die Zeile fasst sie zusammen", () => {
   let last = null;
   render(<Harness game={TWO} usage={USAGE} onValue={(value) => { last = value; }} />);
   const more = screen.getByTestId("game-edit-mode-more-0");
@@ -115,10 +139,17 @@ test("Details: Beschreibung, Spieler je Seite, Format und Ergebnisregel, mit Zus
   fireEvent.change(screen.getByTestId("game-edit-mode-rule-target-0"), { target: { value: "6" } });
   fireEvent.click(screen.getByTestId("game-edit-mode-rule-overtime-0"));
   expect(last.match_modes[0]).toMatchObject({ players_per_side: "4", rule_kind: "rounds", rule_target: "6", rule_overtime: true });
-  expect(more).toHaveTextContent("4 je Seite · Runden gewinnen: 6 Siege · Verlängerung");
+  expect(screen.getByTestId("game-edit-mode-summary-0")).toHaveTextContent("4 je Seite · Runden gewinnen: 6 Siege · Verlängerung");
+  expect(more).toHaveTextContent("4 je Seite");
+  expect(more).toHaveTextContent("Runden gewinnen: 6 Siege · Verlängerung");
   fireEvent.change(screen.getByTestId("game-edit-mode-rule-kind-0"), { target: { value: "highest" } });
   expect(screen.queryByTestId("game-edit-mode-rule-target-0")).toBeNull();
   expect(screen.queryByTestId("game-edit-mode-rule-limit-0")).toBeNull();
+});
+
+test("Zusammenfassung ohne Angaben sagt, was sich aufklappen lässt", () => {
+  expect(modeSummary({ label: "Zonen" })).toContain("aufklappen");
+  expect(modeSummary({ label: "GP", minutes: "12", per_game: true, format: "  150cc " })).toBe("150cc · 12 Min. je Spiel");
 });
 
 test("schlimmster Fall: lange Beschreibung wird an der Grenze abgeschnitten, nichts „undefined“", () => {
@@ -127,6 +158,6 @@ test("schlimmster Fall: lange Beschreibung wird an der Grenze abgeschnitten, nic
   fireEvent.click(screen.getByTestId("game-edit-mode-more-1"));
   fireEvent.change(screen.getByTestId("game-edit-mode-description-1"), { target: { value: "x".repeat(700) } });
   expect(last.match_modes[1].description).toHaveLength(500);
-  expect(screen.getByTestId("game-edit-match-data")).toHaveTextContent("500 / 500 Zeichen");
-  expect(screen.getByTestId("game-edit-match-data")).not.toHaveTextContent("undefined");
+  expect(screen.getByTestId("game-edit-modes")).toHaveTextContent("500 / 500 Zeichen");
+  expect(screen.getByTestId("game-edit-modes")).not.toHaveTextContent("undefined");
 });
