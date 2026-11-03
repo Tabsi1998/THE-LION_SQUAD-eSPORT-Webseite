@@ -175,7 +175,21 @@ export default function AdminGamePage() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirtyLabels.length]);
 
-  const selectTab = (key) => navigate({ pathname: location.pathname, search: location.search, hash: key === GAME_TABS[0].key ? "" : `#${key}` }, { replace: true });
+  // Ein offenes Ausrüstungs-Blatt (#2218) hängt am Reiter: Ein anderer Reiter verwirft es - darum dieselbe Rückfrage wie beim Verlassen.
+  // Die Formulare der übrigen Reiter bleiben dagegen beim Wechsel erhalten.
+  const selectTab = async (key) => {
+    if (key !== tab && tab === "ausruestung" && equipmentDirty) {
+      const leave = await confirm({
+        title: "Nicht gespeicherte Änderungen",
+        description: "In Ausrüstung ist noch etwas nicht gespeichert. Wechselst du den Reiter, geht es verloren.",
+        confirmLabel: "Verwerfen und weiter",
+        cancelLabel: "Zurück zum Blatt",
+        tone: "danger",
+      });
+      if (!leave) return;
+    }
+    navigate({ pathname: location.pathname, search: location.search, hash: key === GAME_TABS[0].key ? "" : `#${key}` }, { replace: true });
+  };
 
   const finish = async (key, text) => {
     await load();

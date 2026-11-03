@@ -39,8 +39,7 @@ function serve() {
     if (url === "/games") return { data: [game, { id: "p1", name: "Call of Duty", slug: "cod", kind: "series" }] };
     if (url === "/games/g1/usage") return { data: usage };
     if (url === "/games/g1/maps") return { data: MAPS };
-    if (url === "/games/g1/equipment") return { data: EQUIPMENT };
-    if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
+    if (url === "/games/g1/equipment") return { data: EQUIPMENT };    if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
     throw Object.assign(new Error("nicht da"), { response: { status: 404 } });
   });
 }
@@ -133,6 +132,25 @@ describe("Reiter", () => {
     fireEvent.click(screen.getByTestId("game-page-back"));
     expect(await screen.findByTestId("games-list")).toBeInTheDocument();
     expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  // Folge-Review C.4: Auch ein anderer Reiter verwirft das offene Blatt - darum dieselbe Rückfrage.
+  test("Reiterwechsel mit geändertem Blatt fragt nach; „Zurück“ bleibt beim Blatt, „Verwerfen“ wechselt", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe neu" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-tab-allgemein"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Ausrüstung") })));
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("equipment-name")).toHaveValue("Probewaffe neu");
+
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-tab-allgemein"));
+    await waitFor(() => expect(screen.getByTestId("game-tab-allgemein")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    expect(confirmMock).toHaveBeenCalledTimes(2);
   });
 
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {
