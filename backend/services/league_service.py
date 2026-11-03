@@ -22,7 +22,8 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, game_modes, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
+from services import (game_maps, game_modes, game_usage, league_games, league_look, league_pool_check, map_pools, pricing,
+                      staffel_guard)
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
@@ -30,7 +31,8 @@ from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.log_safe import log_safe
-from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock, tournament_write_resource
+from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
+                                    mutation_lock, tournament_write_resource)
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
@@ -87,7 +89,11 @@ APPLICATION_TEXTS = ("application_waitlist_note", "application_privacy_text")
 APPLICATION_OPTIONAL = (*APPLICATION_TIMES, *APPLICATION_TEXTS, "application_slots", "application_waitlist_limit")
 NEW_SEASON_MIN_SQUAD = 3
 SERIES = "series"
-SEASON_FIELDS = tuple(SEASON_DEFAULTS) + tuple(SEASON_RULE_DEFAULTS) + APPLICATION_OPTIONAL + ("name", "slug", "number", "start_date")
+# Mindestgröße je Modus (#2207, C.2): nur an der Season, fehlt = abgeleitet (``league_pool_check``).
+POOL_MIN_MAPS = "pool_min_maps"
+POOL_MIN_MAPS_MAX = 50
+SEASON_FIELDS = (tuple(SEASON_DEFAULTS) + tuple(SEASON_RULE_DEFAULTS) + APPLICATION_OPTIONAL
+                 + ("name", "slug", "number", "start_date", POOL_MIN_MAPS))
 OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size", "scoring_rules",
                    "match_schedule_response_hours")
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
@@ -239,6 +245,35 @@ def _mode_order(game: dict | None, order, saved=None) -> list[str]:
     return order
 
 
+def _pool_min_maps(game: dict | None, rows, saved=None) -> list[dict] | None:
+    """Die überschriebene Mindestgröße je Modus (#2207): je Modus höchstens einmal, nur Modi des Spiels (oder schon gesetzte),
+    ``mode: null`` nur bei Spielen ohne Modi. Leer = abgeleitet."""
+    if rows is None:
+        return None
+    known = {mode["mode"] for mode in game_maps.game_modes(game)}
+    before = {row.get("mode") for row in saved or [] if isinstance(row, dict)}
+    out: list[dict] = []
+    seen: set = set()
+    for row in rows:
+        item = row.model_dump() if hasattr(row, "model_dump") else dict(row)
+        mode = str(item.get("mode") or "").strip() or None
+        if mode is None and known:
+            raise LeagueProblem("Mindestgröße im Pool: Bitte je Modus angeben.")
+        if mode is not None and mode not in known and mode not in before:
+            raise LeagueProblem("Mindestgröße im Pool: Unbekannter Modus.")
+        if mode in seen:
+            raise LeagueProblem("Mindestgröße im Pool: Jeder Modus nur einmal.")
+        try:
+            count = int(item.get("min_maps"))
+        except (TypeError, ValueError):
+            raise LeagueProblem("Mindestgröße im Pool: Bitte eine Zahl angeben.") from None
+        if not 1 <= count <= POOL_MIN_MAPS_MAX:
+            raise LeagueProblem(f"Mindestgröße im Pool: zwischen 1 und {POOL_MIN_MAPS_MAX} Maps.")
+        seen.add(mode)
+        out.append({"mode": mode, "min_maps": count})
+    return out
+
+
 def _blocked_periods(periods) -> list[dict]:
     out = []
     for period in periods or []:
@@ -311,6 +346,8 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
             value = _scoring(value)
         elif key == "transfer_windows":
             value = _transfer_windows(value)
+        elif key == POOL_MIN_MAPS:
+            value = _pool_min_maps(game, value, (existing or {}).get(POOL_MIN_MAPS))
         out[key] = value
     mode = out.get("lineup_mode") or (existing or {}).get("lineup_mode")
     if mode != SERIES and out.get("team_size") and out.get("min_squad_size") is None and existing and \
@@ -649,9 +686,22 @@ async def _season_unique(db, league_id: str, season_id: str | None, number: int 
         raise LeagueProblem("Diese Kurzadresse der Season ist schon vergeben.", 409)
 
 
-async def create_season(db, league: dict, body: dict, user: dict) -> dict:
+def order_length_check(season: dict, divisions: list[dict], warnings: list | None) -> None:
+    """Länge von „Modus je Map“ gegen die längste Serie (#2207): im Entwurf 422, in einer laufenden Season nur Warnung."""
+    problem = league_pool_check.order_length_problem(season.get("game_mode_order"),
+                                                     league_pool_check.max_maps(season, divisions))
+    if not problem:
+        return
+    if not league_pool_check.season_running(season):
+        raise LeagueProblem(problem)
+    if warnings is not None:
+        warnings.append(f"{problem} {league_pool_check.ORDER_RUNNING_HINT}")
+
+
+async def create_season(db, league: dict, body: dict, user: dict, *, before_write=None) -> dict:
     game = await _game(db, league.get("game_id"))
     fields = clean_season({key: value for key, value in body.items() if value is not None}, None, game)
+    order_length_check({**SEASON_DEFAULTS, **fields}, [], None)
     number = fields.pop("number", None)
     if number is None:
         newest = await db.league_seasons.find_one({"league_id": league["id"]}, {"_id": 0, "number": 1},
@@ -670,6 +720,9 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     doc.setdefault("schedule_rules", dict(SCHEDULE_RULE_DEFAULTS))
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
+    if before_write:
+        # Prüfung vor der Veröffentlichung (#2207): eine neue Season mit Sichtbarkeit wird damit veröffentlicht.
+        await before_write(doc)
     try:
         await db.league_seasons.insert_one(dict(doc))
     except DuplicateKeyError:
@@ -677,10 +730,17 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     return doc
 
 
-async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
+async def update_season(db, season: dict, body: dict, *, before_write=None,
+                        warnings: list | None = None) -> tuple[dict, list[str]]:
+    """Eine Season ändern. ``before_write(neuer Stand)`` läuft nach allen Prüfungen und vor dem Schreiben (Prüfung vor der
+    Veröffentlichung, #2207); ``warnings`` sammelt Hinweise, die das Speichern nicht aufhalten."""
     league = await get_league(db, season["league_id"])
     game = await _game(db, league.get("game_id"))
     fields = clean_season(body, season, game)
+    merged = {**SEASON_DEFAULTS, **season, **{key: value for key, value in fields.items() if value is not None}}
+    if ("game_mode_order" in fields and list(fields["game_mode_order"] or []) != list(season.get("game_mode_order") or [])) or \
+            ("best_of" in fields and fields["best_of"] is not None and fields["best_of"] != season.get("best_of")):
+        order_length_check(merged, await league_pool_check.divisions_of(db, season["id"]), warnings)
     for key in ("name", "slug", "number", "start_date", "weeks_total", "matchday_days", "default_match_weekday",
                 "default_match_time", "round_robin_legs", "max_staffel_size", "best_of", "team_size",
                 "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat",
@@ -693,6 +753,8 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
     # Gestaltung (#2107): wirkt sofort, braucht kein Übertragen - das Banner geht gleich auf die Staffeln (App).
     fields.update(await _look(db, body, league_look.SEASON_FIELDS))
     changed = sorted(key for key, value in fields.items() if season.get(key) != value)
+    if before_write:
+        await before_write({**season, **fields})
     if changed:
         fields["updated_at"] = _now()
         try:
@@ -707,7 +769,18 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
 
 # ---------------------------------------------------------------- Liga N
 
-async def create_division(db, season: dict, body: dict, user: dict) -> dict:
+async def _division_order_check(db, season: dict, division: dict, before: dict | None, warnings: list | None) -> None:
+    """Ein eigenes Best of der Liga N kann die längste Serie ändern - dann muss „Modus je Map“ noch passen (#2207)."""
+    old = ((before or {}).get("overrides") or {}).get("best_of")
+    new = (division.get("overrides") or {}).get("best_of")
+    reactivated = (division.get("status") or "active") == "active" and ((before or {}).get("status") or "active") != "active"
+    if before is not None and old == new and not reactivated:
+        return  # Archivieren hält nichts auf - es macht die längste Serie höchstens kürzer
+    others = [row for row in await league_pool_check.divisions_of(db, season["id"]) if row.get("id") != division.get("id")]
+    order_length_check({**SEASON_DEFAULTS, **season}, [*others, division], warnings)
+
+
+async def create_division(db, season: dict, body: dict, user: dict, *, warnings: list | None = None) -> dict:
     level = body.get("level")
     if level is None:
         newest = await db.league_divisions.find_one({"season_id": season["id"]}, {"_id": 0, "level": 1},
@@ -722,6 +795,8 @@ async def create_division(db, season: dict, body: dict, user: dict) -> dict:
         **await _look(db, {key: value for key, value in body.items() if value is not None}, (league_look.PRIZES,)),
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
     }
+    if (doc["overrides"] or {}).get("best_of"):
+        await _division_order_check(db, season, doc, None, warnings)
     try:
         await db.league_divisions.insert_one(dict(doc))
     except DuplicateKeyError:
@@ -729,7 +804,7 @@ async def create_division(db, season: dict, body: dict, user: dict) -> dict:
     return doc
 
 
-async def update_division(db, division: dict, body: dict) -> tuple[dict, list[str]]:
+async def update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
     season = await get_season(db, division["season_id"])
     updates: dict = {}
     if "nickname" in body:
@@ -739,6 +814,8 @@ async def update_division(db, division: dict, body: dict) -> tuple[dict, list[st
     if body.get("status"):
         updates["status"] = body["status"]
     updates.update(await _look(db, body, (league_look.PRIZES,)))
+    if "overrides" in updates or "status" in updates:
+        await _division_order_check(db, season, {**division, **updates}, division, warnings)
     changed = sorted(key for key, value in updates.items() if division.get(key) != value)
     if changed:
         updates["updated_at"] = _now()
@@ -926,9 +1003,23 @@ async def _next_letter(db, division_id: str) -> str:
     raise LeagueProblem("Alle Buchstaben sind vergeben.", 409)
 
 
+STAFFEL_POOL_BUSY = "Der Map-Pool der Season wird gerade geändert – bitte die Staffel gleich noch einmal anlegen."
+
+
 async def create_staffel(db, division: dict, staffel: str | None, user: dict) -> dict:
     """Legt das Staffel-Turnier an (Status ``draft``) mit allen Vorgaben aus Season und Liga N, dem Map-Pool der Season
-    als eigener Version im Scope ``tournament`` und der Prüfung „Runden ≤ aktive Wochen“."""
+    als eigener Version im Scope ``tournament`` und der Prüfung „Runden ≤ aktive Wochen“.
+
+    Unter der Pool-Sperre der Season (#2207): So liest eine neue Staffel nie einen Pool, den „Map aus dem Pool nehmen“ gerade ersetzt.
+    Die Staffel ist neu und hat noch keine Turnier-Sperre - die Reihenfolge „erst Turniere, dann Pool“ bleibt gewahrt."""
+    try:
+        async with mutation_lock(db, league_season_pool_resource(division["season_id"])):
+            return await _create_staffel(db, division, staffel, user)
+    except MutationLockBusy:
+        raise LeagueProblem(STAFFEL_POOL_BUSY, 409) from None
+
+
+async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -> dict:
     season = await get_season(db, division["season_id"])
     league = await get_league(db, division["league_id"])
     game = await _game(db, league.get("game_id"))
@@ -1075,6 +1166,16 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
 
 
+async def transfer_pool(db, tournament: dict, season: dict, user: dict, *, pool: dict, locked: bool, applied: list,
+                        skipped: list, changed: list) -> None:
+    """Genau die Version ``pool`` der Season auf eine Staffel übertragen (#2207, „Map aus dem Pool nehmen“) - derselbe Weg wie beim
+    Übertragen: Spiele mit festgehaltenem Pool behalten ihren. Hat die Staffel schon dieselben Maps, entsteht keine neue Version."""
+    has_result = await _has_result(db, tournament["id"])
+    await _sync_pool(db, tournament, season, user, locked=locked, has_result=has_result, applied=applied, skipped=skipped,
+                     changed=changed, pool=pool)
+    await _note_mode_order(db, tournament, {}, skipped)
+
+
 async def _note_mode_order(db, tournament: dict, updates: dict, skipped: list) -> None:
     """Sagt ehrlich, wenn „Modus je Map“ der Staffel nach dem Übertragen nicht mehr gilt (#2129): Der Pool geht immer über,
     die Reihenfolge nur vor dem ersten Ergebnis."""
@@ -1087,11 +1188,11 @@ async def _note_mode_order(db, tournament: dict, updates: dict, skipped: list) -
 
 
 async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: bool, has_result: bool,
-                     applied: list, skipped: list, changed: list) -> None:
+                     applied: list, skipped: list, changed: list, pool: dict | None = None) -> None:
     """Map-Pool der Season → Staffel. Ein neuer Pool geht immer (Spiele mit festgehaltenem Pool behalten ihren). Hat die
     Season keinen Pool mehr, wird die Kopie der Staffel entfernt - nur vor dem ersten Ergebnis und nicht gesperrt, sonst
-    steht der Grund im Ergebnis."""
-    pool = await map_pools.current(db, "league_season", season["id"])
+    steht der Grund im Ergebnis. ``pool``: genau diese Version übertragen statt der gerade geltenden (#2207, „Map sperren“)."""
+    pool = pool if pool is not None else await map_pools.current(db, "league_season", season["id"])
     own = await map_pools.current(db, "tournament", tournament["id"])
     if pool and pool.get("game_id") == tournament.get("game_id"):
         if _pool_maps(pool) != _pool_maps(own):

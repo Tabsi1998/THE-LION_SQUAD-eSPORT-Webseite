@@ -48,7 +48,8 @@ async def setup(flow):
     game = (await flow.post("/api/games", json={"name": "Probe Shooter", "slug": "probe-shooter"})).json()
     league = (await flow.post(ADMIN, json={"name": "Probe-Liga", "game_id": game["id"]})).json()
     season = (await flow.post(f"{ADMIN}/{league['id']}/seasons", json={
-        "start_date": "2026-11-10T00:00:00", "visibility": "public"})).json()
+        "start_date": "2026-11-10T00:00:00", "visibility": "public",
+        "readiness_override_reason": "Testaufbau ohne Prüfung"})).json()
     division = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={})).json()
     await uploaded(flow, EMBLEM_LEAGUE, EMBLEM_SEASON, BANNER_LEAGUE, BANNER_SEASON, PRIZE_IMAGE)
     return admin, league, season, division

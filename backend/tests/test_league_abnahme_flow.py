@@ -55,6 +55,8 @@ SEASON_ONE = {
     "rules_text": "## Regeln\nPlatzhalter für den Regeltext der Season.",
     "registration_deadline": "2026-11-06",
     "visibility": "admins",
+    # Veröffentlichen prüft seit #2207 Pool, Regelwerk und Staffeln - der Aufbau kommt erst danach.
+    "readiness_override_reason": "Testaufbau ohne Prüfung",
 }
 # Acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im Kader).
 TEAMS = [("Nebelwölfe", "Rudel"), ("Sturmvögel", "Schwarm"), ("Glutfüchse", "Bau"), ("Frostluchse", "Pfote"),
@@ -286,7 +288,9 @@ async def test_from_the_league_to_a_started_schedule_with_the_christmas_break(fl
 
     # Am 10.11. stellt der Obmann auf „Öffentlich“: Ligaseite und Staffel sind für alle da.
     flow.act_as(world["lead"])
-    saved = ok(await flow.patch(f"{ADMIN}/seasons/{world['season']['id']}", json={"visibility": "public"}))
+    # Die Welt hat nur den Regeltext, kein Regelwerk: Veröffentlichen geht mit der Notausnahme des Superadmins (#2207).
+    saved = ok(await flow.patch(f"{ADMIN}/seasons/{world['season']['id']}",
+                                json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Regelwerk"}))
     assert saved["visibility_applied"] == 1
     flow.act_as(None)
     assert ok(await flow.get(season_page(world)))["season"]["name"] == "Season 1"

@@ -12,8 +12,10 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDate } from "@/lib/vienna";
 import { modeStatusOf, selectableModes } from "@/lib/gameMatchData";
 import {
+  choosableMaps,
   defaultSelection,
   eligibleMaps,
+  mapStatusOf,
   mapsWithoutMode,
   moveMap,
   outdatedGroups,
@@ -52,8 +54,9 @@ function Thumb({ item }) {
   );
 }
 
-function ModeGroup({ mode, label, library, selected, onToggle, onMove, disabled, testId }) {
-  const choices = eligibleMaps(library, mode);
+function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove, disabled, testId }) {
+  // Inaktive Maps (#2207) nur, wo der gespeicherte Pool sie in diesem Modus schon hat.
+  const choices = choosableMaps(library, mode, kept);
   const byId = Object.fromEntries(choices.map((item) => [item.id, item]));
   const ordered = [...selected.filter((id) => byId[id]).map((id) => byId[id]), ...choices.filter((item) => !selected.includes(item.id))];
   const name = label || "Alle Maps";
@@ -77,6 +80,9 @@ function ModeGroup({ mode, label, library, selected, onToggle, onMove, disabled,
                   <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(mode, item.id)} aria-label={`${item.name} in ${name}`} className="accent-[#29B6E8]" />
                   <Thumb item={item} />
                   <span className="truncate">{item.name}</span>
+                  {mapStatusOf(item) === "inactive" ? (
+                    <span className="shrink-0 rounded-sm bg-white/5 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/55" data-testid={`${testId}-inactive-${item.id}`}>inaktiv</span>
+                  ) : null}
                 </label>
                 {on ? (
                   <span className="flex shrink-0 items-center">
@@ -228,6 +234,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
           <div className="grid gap-3 lg:grid-cols-2">
             {groups.map(({ mode, label }) => (
               <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} library={library} selected={selection[keyOf(mode)] || []}
+                kept={baseline[keyOf(mode)] || []}
                 onToggle={(m, id) => setSelection((current) => toggleMap(current, m, id))}
                 onMove={(m, id, delta) => setSelection((current) => moveMap(current, m, id, delta))}
                 disabled={disabled} testId={testId} />

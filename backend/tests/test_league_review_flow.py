@@ -102,7 +102,7 @@ async def test_league_context_queries_carry_the_partial_index_condition(flow, mo
 
 @pytest.mark.asyncio
 async def test_switching_the_season_off_hides_every_staffel_at_once_even_locked_ones(flow):
-    admin, season, division, staffel = await setup_staffel(flow, season={"visibility": "public"})
+    admin, season, division, staffel = await setup_staffel(flow, season={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     second = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     await flow.db.tournaments.update_many({}, {"$set": {"status": "live", "visibility": "public", "is_public": True}})
     await flow.db.tournaments.update_one({"id": second["tournament_id"]},
@@ -260,7 +260,7 @@ async def test_a_season_listing_only_staffeln_does_not_fall_back_to_every_tourna
 
 @pytest.mark.asyncio
 async def test_the_public_season_lists_only_staffeln_the_person_could_open(flow):
-    admin, season, division, draft = await setup_staffel(flow, season={"visibility": "public"})
+    admin, season, division, draft = await setup_staffel(flow, season={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     running = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     hidden = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     await flow.db.tournaments.update_one({"id": running["tournament_id"]}, {"$set": {"status": "live"}})

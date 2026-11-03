@@ -2541,6 +2541,13 @@ class LeagueTransferWindow(BaseModel):
     _days = field_validator("start_date", "end_date", mode="before")(_calendar_day)
 
 
+class LeaguePoolMinimum(BaseModel):
+    """Mindestens so viele Maps braucht der Pool in diesem Modus (#2207)."""
+    model_config = ConfigDict(extra="forbid")
+    mode: Optional[str] = Field(default=None, max_length=40)
+    min_maps: int = Field(ge=1, le=50)
+
+
 class LeagueSeasonFields(LeagueLookFields):
     """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern. Dazu die
     Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, ``prizes`` sind die Gewinne der Season."""
@@ -2590,7 +2597,13 @@ class LeagueSeasonFields(LeagueLookFields):
     visibility: Optional[LeagueVisibility] = None
     status: Optional[LeagueSeasonStatus] = None
 
+    # Mindestgröße je Modus im Map-Pool (#2207, C.2): überschreibt die Ableitung; ``mode: null`` bei Spielen ohne Modi.
+    pool_min_maps: Optional[List[LeaguePoolMinimum]] = Field(default=None, max_length=GAME_MODES_MAX)
+    # Notausnahme des Superadmins beim Veröffentlichen trotz Problemen (#2207) - kein Feld der Season, nur fürs Protokoll.
+    readiness_override_reason: Optional[str] = Field(default=None, max_length=500)
+
     _deadline = field_validator("registration_deadline", mode="before")(_calendar_day)
+
 
 
 class LeagueSeasonCreate(LeagueSeasonFields):
@@ -2600,6 +2613,15 @@ class LeagueSeasonCreate(LeagueSeasonFields):
 
 class LeagueSeasonUpdate(LeagueSeasonFields):
     number: Optional[int] = Field(default=None, ge=1, le=999)
+
+
+class LeagueMapRemove(BaseModel):
+    """Map in einem Schritt aus dem Pool der Season nehmen und übertragen (#2207). Ohne ``mode``: aus allen Modi."""
+    model_config = ConfigDict(extra="forbid")
+    map_id: str = Field(min_length=1, max_length=80)
+    mode: Optional[str] = Field(default=None, max_length=40)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    expected_version: Optional[int] = Field(default=None, ge=0)
 
 
 class LeagueDivisionOverrides(BaseModel):

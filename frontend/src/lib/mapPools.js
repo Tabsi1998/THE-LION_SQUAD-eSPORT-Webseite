@@ -17,17 +17,31 @@ export function eligibleMaps(library, mode) {
   return maps.filter((item) => (item.modes || []).includes(mode));
 }
 
+/** Zustand einer Map (#2207): fehlt er, ist sie aktiv. */
+export function mapStatusOf(item) {
+  const value = item?.status;
+  return value === "inactive" || value === "archived" ? value : "active";
+}
+
+/**
+ * Was der Editor in einem Modus anbietet (#2207): die aktiven Maps, dazu inaktive nur, wenn der gespeicherte Pool sie in genau
+ * diesem Modus schon hat (`kept`). Neu aufnehmen lässt der Server eine inaktive Map nicht.
+ */
+export function choosableMaps(library, mode, kept = []) {
+  return eligibleMaps(library, mode).filter((item) => mapStatusOf(item) === "active" || (mapStatusOf(item) === "inactive" && kept.includes(item.id)));
+}
+
 /** Vorgabe des Spiels: je Modus alle aktiven Maps, die dort freigegeben sind, in der Reihenfolge der Bibliothek. */
 export function defaultSelection(library, modes) {
   const list = Array.isArray(modes) && modes.length ? modes : [{ mode: null }];
-  return Object.fromEntries(list.map(({ mode }) => [keyOf(mode), eligibleMaps(library, mode).map((item) => item.id)]));
+  return Object.fromEntries(list.map(({ mode }) => [keyOf(mode), choosableMaps(library, mode).map((item) => item.id)]));
 }
 
 /** Aktive Maps, die in keinem Modus des Spiels zur Wahl stehen - der Hinweis „noch keinen Modus“ (#2129, SP2). Ohne Modi: keine. */
 export function mapsWithoutMode(library, modes) {
   const known = (Array.isArray(modes) ? modes : []).map(({ mode }) => mode).filter(Boolean);
   if (!known.length) return [];
-  return (Array.isArray(library) ? library : []).filter((item) => (item.status || "active") === "active"
+  return (Array.isArray(library) ? library : []).filter((item) => mapStatusOf(item) === "active"
     && !known.some((mode) => (item.modes || []).includes(mode)));
 }
 

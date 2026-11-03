@@ -8,7 +8,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(d
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
-const toastMock = { success: vi.fn(), error: vi.fn() };
+const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: "superadmin" } }) }));
 
@@ -36,9 +36,13 @@ const BODY = {
   }],
 };
 
+// Prüfung vor der Veröffentlichung (#2207): eigener Abruf der Seite.
+const READINESS = { ok: false, superadmin: true, max_maps: 3, total: null, requirements: [], warnings: [],
+  problems: [{ code: "pool_missing", text: "Die Season hat keinen Map-Pool." }] };
+
 beforeEach(() => {
   for (const fn of [...Object.values(apiMock), ...Object.values(toastMock)]) fn.mockReset();
-  apiMock.get.mockResolvedValue({ data: BODY });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : BODY }));
   apiMock.patch.mockResolvedValue({ data: { ...SEASON, changed: ["weeks_total"], staffeln_to_sync: 1 } });
   apiMock.post.mockResolvedValue({ data: {} });
 });
@@ -58,6 +62,47 @@ function renderPage() {
 function withPlan(plan) {
   apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/delete-plan") ? plan : BODY }));
 }
+
+test("die Prüfung steht auf der Seite, der Grund der Notausnahme geht mit dem Veröffentlichen mit (#2207)", async () => {
+  renderPage();
+  expect(await screen.findByTestId("season-readiness-problems")).toHaveTextContent("keinen Map-Pool");
+  fireEvent.change(screen.getByTestId("season-readiness-override"), { target: { value: "Saisonstart trotz Lücke" } });
+  fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "members" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ visibility: "members", readiness_override_reason: "Saisonstart trotz Lücke" });
+});
+
+test("eine laufende Season mit alter, zu kurzer Reihenfolge lässt sich speichern - unverändert, mit Warnung (#2207)", async () => {
+  const running = { ...SEASON, status: "active", game_mode_order: ["snd", "stellung"] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : { ...BODY, season: running } }));
+  apiMock.patch.mockResolvedValue({ data: { ...running, changed: ["name"], staffeln_to_sync: 0, warnings: ["Modus je Map: Die Reihenfolge hat 2 Einträge."] } });
+  renderPage();
+  expect(await screen.findByTestId("season-mode-order-note")).toHaveTextContent("2 Einträge");
+  fireEvent.change(screen.getByTestId("season-form-name"), { target: { value: "Season Eins" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1].game_mode_order).toEqual(["snd", "stellung"]);
+  expect(toastMock.error).not.toHaveBeenCalled();
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith("Modus je Map: Die Reihenfolge hat 2 Einträge."));
+});
+
+test("in einem Entwurf hält eine geänderte, halb gesetzte Reihenfolge das Speichern auf (#2207)", async () => {
+  renderPage();
+  fireEvent.change(await screen.findByTestId("mode-order-0"), { target: { value: "snd" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("„Modus je Map“ ist so lang wie die längste Serie einer Liga N (#2207)", async () => {
+  const body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { best_of: 5 } }] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : body }));
+  renderPage();
+  expect(await screen.findByTestId("mode-order-4")).toBeInTheDocument();
+});
 
 test("zeigt Kopf, Kalender mit Sperrwochen und die Staffel mit Weg zur Turnierverwaltung", async () => {
   renderPage();
