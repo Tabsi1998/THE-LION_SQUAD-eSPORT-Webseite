@@ -5,7 +5,7 @@ import io
 from fastapi import HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from database import get_db
-from models import now_utc
+from models import GROUP_LIMIT, now_utc
 from auth import get_current_user, get_optional_user
 from services import onsite_access
 from services.access_links import touch_access_link, validate_access_link
@@ -327,7 +327,7 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
         r["user"] = {"id": u.get("id"), "username": u.get("username"), "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
     groups = []
     if t.get("format") == "groups":
-        groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
+        groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(GROUP_LIMIT)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="standings")
     rows = public_standings(

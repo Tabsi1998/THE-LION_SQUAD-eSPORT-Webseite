@@ -10,7 +10,7 @@ Einzelturnier ``user_id``.
 """
 from __future__ import annotations
 
-from models import new_id, now_utc
+from models import GROUP_LIMIT, new_id, now_utc
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placements_for_structure, registration_match_summary, standings_for_structure
 from services.league_scope import NOT_LEAGUE, is_league_staffel
@@ -119,7 +119,7 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
     if not placements and matches:
         groups = []
         if tournament.get("format") == "groups":
-            groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)
+            groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(GROUP_LIMIT)
         rows = standings_for_structure(tournament, snapshot, regs, groups=groups)
         if tournament.get("format") == "groups":
             rows = [row for group in rows for row in group.get("standings") or []]

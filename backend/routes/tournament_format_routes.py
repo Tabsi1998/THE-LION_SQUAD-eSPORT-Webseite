@@ -15,7 +15,7 @@ from services.graph_swiss import (
 )
 from services.competition_versions import persist_competition_versions
 from services import tournament_guard
-from models import now_utc, new_id
+from models import GROUP_LIMIT, now_utc, new_id
 from routes.tournament_common import (
     require_lead_of,
     _audit_tournament_action,
@@ -266,4 +266,4 @@ async def list_groups(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _get_visible_tournament(tid, user)
-    return await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
+    return await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(GROUP_LIMIT)

@@ -15,7 +15,7 @@ from services.competition_read import load_competition_read_model, observe_struc
 from services.competition_standings import standings_for_structure
 from services.private_fields import private_projection
 from services.league_scope import NOT_LEAGUE, league_tournament_ids
-from models import now_utc, new_id
+from models import GROUP_LIMIT, now_utc, new_id
 
 season_router = APIRouter(prefix="/api/seasons", tags=["seasons"])
 
@@ -390,7 +390,7 @@ async def season_standings(slug_or_id: str):
         if tournament.get("format") == "groups":
             groups = await db.tournament_groups.find(
                 {"tournament_id": tid}, {"_id": 0}
-            ).sort("order_index", 1).to_list(100)
+            ).sort("order_index", 1).to_list(GROUP_LIMIT)
         standings = standings_for_structure(tournament, snapshot, regs, groups=groups)
         rows = [
             group_row

@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from database import get_db
+from models import GROUP_LIMIT
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placements_for_structure, standings_for_structure
 from services.league_scope import is_league_staffel, league_label
@@ -154,7 +155,7 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "format": 1, "scoring_rules": 1}) or {}
     groups = []
     if tournament.get("format") == "groups":
-        groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)
+        groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(GROUP_LIMIT)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="profile_references")
     placements = placements_for_structure(structure, regs, tournament=tournament)
