@@ -44,14 +44,17 @@ function TransferWindows({ value = [], onChange }) {
   );
 }
 
-export function SeasonEligibilitySection({ form, set }) {
+export function SeasonEligibilitySection({ form, set, id }) {
   const series = form.lineup_mode === "series";
   return (
-    <FormSection title="Spielberechtigung" testId="season-eligibility"
-      hint="Wer in dieser Season spielen darf. Leer lassen heißt: Die Regel bleibt, wie sie ist. Eine 0 schaltet Mindestalter und Wartezeit aus.">
-      <FormGrid cols={3}>
+    <FormSection title="Kader und Spielberechtigung" testId="season-eligibility" className="scroll-mt-24" id={id}
+      hint="Wie groß ein Kader sein darf und wer in dieser Season spielen darf. Leer lassen heißt: Die Regel bleibt, wie sie ist. Eine 0 schaltet Mindestalter und Wartezeit aus.">
+      {/* Mindest- und Höchstkader stehen seit #2267 zusammen hier; die Teamgröße je Map im Reiter Spielbetrieb. */}
+      <FormGrid cols={4}>
+        <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)}
+          hint={`mindestens die Teamgröße (${form.team_size || "–"})`} testId="season-form-min-squad" />
         <TextField label="Höchstkader" type="number" min={1} max={200} value={form.max_squad_size} onChange={(value) => set("max_squad_size", value)}
-          hint="Mindestkader steht bei „Spiel und Wertung“" testId="season-form-max-squad" />
+          hint="leer: wie bisher" testId="season-form-max-squad" />
         <TextField label="Mindestalter (Jahre)" type="number" min={0} max={99} value={form.min_age} onChange={(value) => set("min_age", value)}
           hint="Selbstauskunft: Geburtsdatum im Profil" testId="season-form-min-age" />
         <TextField label="Wartezeit neuer Spieler (Tage)" type="number" min={0} max={60} value={form.new_player_wait_days} onChange={(value) => set("new_player_wait_days", value)}
