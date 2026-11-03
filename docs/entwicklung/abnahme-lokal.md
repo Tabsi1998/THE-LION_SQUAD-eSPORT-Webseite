@@ -115,6 +115,10 @@ Bestätigen, Tabelle und Ligaseite als Gast, Einspruch, Entscheidung und Korrekt
 und 1440 px Text, Markierung, Vergleich und PDF, ein Captain stimmt zu.
 `liga-anmeldung-abnahme.spec.js` (gleiche Stand-Datei, #2205) schreibt in der eigenen Liga „Liga-Anmeldung“, je Seed eine neue Season mit Regelwerk: Die Leitung setzt Fenster und Startplätze, Captains reichen bei 390 und 1440 px ein und ziehen zurück,
 zwei Anträge gehen gleichzeitig auf den letzten Platz, die Leitung nimmt an, setzt auf die Warteliste, lehnt ab und teilt zu.
+`spielmodi-abnahme.spec.js` (gleiche Stand-Datei, #2206) legt je Breite (390 und 1440 px) im Spiel „Call of Duty“ einen eigenen Modus
+mit Ergebnisregel an, verwendet ihn im Pool der Season „Liga-Anmeldung“ und überträgt ihn auf die Staffel. Entfernen wird abgelehnt
+(Schloss, 409), nach dem Deaktivieren steht er in keinem neuen Pool zur Wahl (422), Staffel und Ligaseite zeigen ihn weiter. Die
+Seed-Modi bleiben unberührt; jeder Lauf legt zwei Modi dazu, ab 19 Modi überspringt die Spec (Stand neu aufsetzen).
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem
