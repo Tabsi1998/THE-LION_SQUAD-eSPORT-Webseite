@@ -182,6 +182,95 @@ async def test_an_unconflicted_superadmin_needs_no_reason(flow):
     assert await flow.db.audit_logs.count_documents({"action": "league.conflict.override"}) == 0
 
 
+# ---------------------------------------------------------------- Prüfung unter der Sperre (Codex zu #2245)
+
+async def join_squad(flow, side: dict, person: dict) -> None:
+    await flow.db.teams.update_one({"id": side["team"]["id"]}, {"$addToSet": {"member_ids": person["id"]}})
+    await flow.db.team_squads.update_one({"id": side["squad"]["id"]}, {"$addToSet": {"member_ids": person["id"]}})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ACTIONS)
+async def test_joining_the_squad_after_the_first_check_still_refuses(flow, monkeypatch, action):
+    """Zwischen Vorabprüfung und Neuladen unter der Season-Sperre kommt die Person in den Kader: Die zweite Prüfung hält sie auf."""
+    from services import league_applications
+
+    w = await application_world(flow, teams=1, application_waitlist=True)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    if action == "assign":
+        application = await accepted_without_staffel(flow, w, application)
+    before = await stored(flow, application)
+    person = await with_right(flow, w, await flow.add_user(name="Bald im Kader"), "staff")
+    original, calls = league_applications._load, []
+
+    async def load_and_join(db, season_id, application_id):
+        calls.append(application_id)
+        if len(calls) == 2:
+            await join_squad(flow, side, person)
+        return await original(db, season_id, application_id)
+
+    monkeypatch.setattr(league_applications, "_load", load_and_join)
+    answer = await decide(flow, w, application, action, actor=person, **body_for(w, action))
+
+    assert answer.status_code == 403, answer.text
+    assert len(calls) >= 2
+    assert await stored(flow, application) == before
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": w["tid"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_joining_the_squad_during_the_admin_way_still_refuses(flow, monkeypatch):
+    from services import league_applications
+
+    w = await application_world(flow, teams=1)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    before = await stored(flow, application)
+    person = await with_right(flow, w, await flow.add_user(name="Bald im Kader"), "staff")
+    original, calls = league_applications._open_for_admin_way, []
+
+    async def open_and_join(db, tournament, squad_id):
+        calls.append(squad_id)
+        if len(calls) == 2:
+            await join_squad(flow, side, person)
+        return await original(db, tournament, squad_id)
+
+    monkeypatch.setattr(league_applications, "_open_for_admin_way", open_and_join)
+    flow.act_as(person)
+    answer = await flow.post(squad_url(w), json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
+
+    assert answer.status_code == 403, answer.text
+    assert await stored(flow, application) == before
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": w["tid"]}) == 0
+
+
+# ---------------------------------------------------------------- Datenschutz: der Grund der Notausnahme
+
+@pytest.mark.asyncio
+async def test_the_override_reason_stays_out_of_the_leads_export_and_loses_the_person_on_erasure(flow):
+    """Auskunft der Liga-Leitung wie im Adminprotokoll: der Vorgang ohne Inhalt. Bei der Kontolöschung bleibt der Grund im Verlauf, ohne Person."""
+    from routes.dsgvo_routes import _user_data_sections
+    from services import account_erasure
+
+    w = await application_world(flow, teams=1)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    boss = {**side["lead"], "role": "superadmin"}
+    ok(await decide(flow, w, application, "reject", actor=boss, reason="Geheim bleibender Grund", conflict_reason=REASON))
+
+    _kind, produce = dict(await _user_data_sections(flow.db, boss["id"]))["league_applications"]
+    rows = [row async for row in produce()]
+    assert [row["id"] for row in rows] == [application["id"]]
+    assert REASON not in str(rows) and "conflict_reason" not in str(rows)
+
+    await account_erasure.erase_related(flow.db, boss, now_utc().isoformat())
+
+    stored_row = await stored(flow, application)
+    assert stored_row["history"][-1]["conflict_reason"] == REASON and stored_row["history"][-1]["by"] is None
+    assert boss["id"] not in str(stored_row)
+
+
 # ---------------------------------------------------------------- Eingang: was die Person sieht
 
 @pytest.mark.asyncio

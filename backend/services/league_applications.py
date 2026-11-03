@@ -252,9 +252,14 @@ async def _audit_decision(db, action: str, application: dict, actor: dict, overr
 
 async def _no_conflict(db, season: dict, application_id: str, actor: dict, conflict_reason: str | None) -> str | None:
     """Über die Anmeldung des eigenen Teams entscheidet eine zweite Person (B.4, Entscheidung Nr. 73) - geprüft vor allem anderen, damit
-    die befangene Person nicht mehr erfährt als „nicht du“. Hauptteam, Co-Team und Einreichende ändern sich am Antrag nie, darum genügt
-    die Prüfung vor der Sperre. Gibt den Grund einer Notausnahme zurück."""
-    application = await _load(db, season["id"], application_id)
+    die befangene Person schnell 403 bekommt und nicht mehr erfährt als „nicht du“. Unter der Sperre prüft ``_recheck`` noch einmal. Gibt den Grund einer
+    Notausnahme zurück."""
+    return await _recheck(db, await _load(db, season["id"], application_id), actor, conflict_reason)
+
+
+async def _recheck(db, application: dict, actor: dict, conflict_reason: str | None) -> str | None:
+    """Dieselbe Prüfung mit dem unter der Season-Sperre frisch geladenen Antrag, direkt vor dem Schreiben: Wer seit der Vorabprüfung in den Kader kam,
+    wird hier aufgehalten. Kaderänderungen selbst laufen nicht unter dieser Sperre (bekannte Grenze, #2245)."""
     return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason)
 
 
@@ -363,6 +368,7 @@ async def review(db, league: dict, season: dict, application_id: str, actor: dic
     override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     async with _season_lock(db, season["id"]):
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] != SUBMITTED:
             raise LeagueProblem(DECIDED, 409)
         done = await _move(db, application, IN_REVIEW, actor["id"], override=override)
@@ -377,6 +383,7 @@ async def reject(db, league: dict, season: dict, application_id: str, reason: st
         raise LeagueProblem(f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Das Team liest ihn.")
     async with _season_lock(db, season["id"]):
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] not in OPEN_STATUSES:
             raise LeagueProblem(DECIDED, 409)
         if application.get("assignment") or await _left_over(db, application):
@@ -395,6 +402,7 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
     async with _season_lock(db, season["id"]):
         fresh = await league_service.get_season(db, season["id"])
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] not in (SUBMITTED, IN_REVIEW, ACCEPTED):
             raise LeagueProblem(DECIDED, 409)
         if application.get("assignment") or await _left_over(db, application):
@@ -517,6 +525,7 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
@@ -548,6 +557,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] != ACCEPTED:
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
@@ -593,6 +603,12 @@ async def link_admin_assignment(db, tournament: dict, registration: dict, actor:
     application = await _open_for_admin_way(db, tournament, registration.get("squad_id"))
     if not application:
         return
+    try:
+        # Noch einmal direkt vor dem Schreiben (wie ``_recheck``); ``override`` ist der schon geprüfte Grund. Bei 403 fällt die neue Anmeldung wieder weg.
+        override = await require_no_side_conflict(db, actor, side_of(application), conflict_reason=override, superadmin_detail=ADMIN_WAY_OVERRIDE)
+    except Exception:
+        await db.tournament_registrations.delete_one({"id": registration["id"]})
+        raise
     actor_id = actor.get("id")
     now = now_utc().isoformat()
     fields = {"assignment": await _assignment(db, tournament, registration, actor_id), "decided_by": actor_id, "decided_at": now}
