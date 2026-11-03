@@ -289,11 +289,16 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
         deadline = amend_deadline_for(tournaments.get(match.get("tournament_id")), match)
         if deadline and deadline >= now:
             tasks.append(("lineup", match, deadline.isoformat()))
+    # Jetzt einchecken (#1652, D.2): das Fenster ist offen, die eigene Seite fehlt noch.
+    from services.match_flow import open_checkin_tasks
+
+    for match, until in await open_checkin_tasks(db, acting, sides, now=now):
+        tasks.append(("checkin", match, until))
     if not tasks:
         return []
     summaries = await compact_match_overviews(db, [match for _task, match, _when in tasks], acting)
     return [
-        {"task": task, "match_id": match.get("id"), "until": when if task == "lineup" else None,
+        {"task": task, "match_id": match.get("id"), "until": when if task in {"lineup", "checkin"} else None,
          # Teilnehmerliste einmal je Spiel (#2204): Der Text der Aufgabe sagt, was fehlt.
          "series": (tournaments.get(match.get("tournament_id")) or {}).get("lineup_mode") == "series",
          "proposed_at": when if task in {"schedule", "reschedule"} else None,

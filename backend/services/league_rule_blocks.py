@@ -45,6 +45,28 @@ async def _mode_order(db, league: dict, season: dict) -> dict:
     return {"markdown": "\n".join(lines), "source": {"game_mode_order": order}}
 
 
+async def _checkin(db, league: dict, season: dict) -> dict:
+    """Check-in der Season (D.2, #1652): Fenster und Mindestzahl als Text - die Werte stehen an der Season, nicht hier."""
+    from services import match_flow
+
+    raw = season.get("checkin_rules")
+    if not isinstance(raw, dict):
+        return {"markdown": "*In dieser Season gibt es keinen Check-in.*", "source": {"checkin_rules": None}}
+    try:
+        rules = match_flow.normalize({key: value for key, value in raw.items() if key in match_flow.DEFAULTS})
+    except match_flow.FlowProblem:
+        rules = dict(match_flow.DEFAULTS)
+    lines = [
+        f"- Der Check-in öffnet {rules['opens_minutes_before']} Minuten vor dem Termin und schließt "
+        f"{rules['closes_minutes_after']} Minuten danach.",
+        f"- Gültig ist er mit mindestens {rules['min_present']} anwesenden, spielberechtigten Spielern je Team; bis zum Ende des "
+        "Fensters lässt sich ergänzen.",
+        "- Sobald beide Teams eingecheckt sind, kann das Spiel beginnen - auch vor dem Termin.",
+        "- Fehlt ein Team nach dem Fenster, entscheidet die Liga-Leitung; eine Wertung gibt es nie von selbst.",
+    ]
+    return {"markdown": "\n".join(lines), "source": {"checkin_rules": rules}}
+
+
 @dataclass(frozen=True)
 class Block:
     key: str
@@ -60,6 +82,7 @@ class Block:
 BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("map_pool", "Map-Pool", "Die Maps je Modus aus dem Map-Pool der Season.", _map_pool),
     Block("mode_order", "Modusfolge", "Die Modi je Map aus den Vorgaben der Season.", _mode_order),
+    Block("checkin", "Check-in", "Fenster und Mindestzahl des Check-ins aus den Vorgaben der Season (D.2).", _checkin),
 )}
 
 

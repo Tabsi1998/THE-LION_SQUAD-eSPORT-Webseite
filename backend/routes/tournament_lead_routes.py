@@ -11,6 +11,7 @@ Lauf mit mehr als zwei Spielern (#1823) wird nur die gewählte Person markiert; 
 """
 from datetime import datetime, timedelta, timezone
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -139,8 +140,15 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     if not same_pairing or not still_valid:
         raise HTTPException(status_code=409, detail=STALE_PROPOSAL_DETAIL)
     minutes = int(proposal.get("minutes") or 0)
-    note = f"Nicht erschienen – Frist von {minutes} Minuten abgelaufen" if minutes else \
-        "Nicht erschienen – von der Turnierleitung festgestellt"
+    if proposal.get("rule") == "check_in":
+        # Liga-Check-in (D.2, #1652): die Seite hat bis zum Ende des Fensters nicht eingecheckt - die Leitung entscheidet.
+        until = _parse(proposal.get("due_at"))
+        clock = until.astimezone(ZoneInfo("Europe/Vienna")).strftime("%H:%M") if until else ""
+        note = f"Nicht erschienen – Check-in bis {clock} nicht erfolgt" if clock else "Nicht erschienen – Check-in nicht erfolgt"
+    elif minutes:
+        note = f"Nicht erschienen – Frist von {minutes} Minuten abgelaufen"
+    else:
+        note = "Nicht erschienen – von der Turnierleitung festgestellt"
     per_person = no_show_keeps_heat_open(match)
     try:
         ensure_no_hold(match)

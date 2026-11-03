@@ -92,8 +92,12 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
         proposal = match.get("no_show_proposal")
         # Je Person (#1823): im Lauf bleibt der Fall offen für alle, die noch nicht als nicht erschienen markiert sind.
         candidates = no_show_candidates(match)
-        # Liga-Staffel (#2201): kein Vorschlag ohne Check-in - ein alter zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
-        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and not is_league_staffel(tournament)
+        # Liga-Staffel: ein Vorschlag nur aus dem Check-in (D.2, #1652: Regel ``check_in``, Teilnehmer = die fehlenden Seiten);
+        # ein alter ohne Check-in (#2201) zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
+        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and (
+            not is_league_staffel(tournament) or proposal.get("rule") == "check_in")
+        if open_proposal and proposal.get("missing_registration_ids"):
+            candidates = [item for item in candidates if item in set(proposal["missing_registration_ids"])]
         # Mit einer Meldung gilt der Vorschlag nicht mehr (Bestätigen gäbe 409) - sie darf „Ergebnis fehlt“ nicht verdecken.
         if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and not match.get("reports") and candidates:
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",

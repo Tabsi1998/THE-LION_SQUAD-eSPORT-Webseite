@@ -66,6 +66,9 @@ ROUTES = [
     # Ergebnisregeln (C.3, #1617)
     route("GET", "/api/admin/leagues/seasons/{season}/result-rules", ANY),
     route("PUT", "/api/admin/leagues/seasons/{season}/result-rules", "season", {"scores_required": True, "rules": {}}),
+    # Check-in (D.2, #1652): Regeln je Season
+    route("GET", "/api/admin/leagues/seasons/{season}/checkin-rules", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/checkin-rules", "season", {"min_present": 2}),
     route("POST", "/api/admin/leagues/seasons/{season}/divisions", "season", {"level": 7}),
     route("PATCH", "/api/admin/leagues/divisions/{division}", "season", {"nickname": "Neu"}),
     route("GET", "/api/admin/leagues/divisions/{division}/delete-plan", "season"),
@@ -136,6 +139,9 @@ ROUTES = [
     route("POST", "/api/tournaments/{tid}/live-queue/start", "matches", {"station_id": "s", "match_id": "m"}),
     route("GET", "/api/team-day/{tid}/lineups", "matches"),
     route("PATCH", "/api/matches/{match}", "matches", {"admin_note": "Hinweis"}),
+    # Check-in (D.2, #1652): für eine Seite eintragen und starten als Leitung - Captains handeln als Seite, nicht hier.
+    route("POST", "/api/matches/{match}/checkin", "matches", {"present": [], "registration_id": "{reg}", "reason": "Grund genug"}),
+    route("POST", "/api/matches/{match}/checkin/start", "matches", {}),
     # Staffel: lesen
     route("GET", "/api/tournaments/{tid}/staff", READ),
     route("GET", "/api/tournaments/{tid}/lead", READ),

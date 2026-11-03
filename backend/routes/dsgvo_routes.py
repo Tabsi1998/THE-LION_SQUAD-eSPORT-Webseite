@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from database import get_db
 from auth import require_super, get_current_user
-from services import account_erasure, league_applications, league_schedule
+from services import account_erasure, league_applications, league_schedule, match_flow
 from services.competition_privacy import league_appearance_snapshot, registration_match_snapshot
 from models import now_utc, new_id
 
@@ -189,6 +189,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("league_appearances", _value(league_appearances)),
         # Liga-Termine (#2194): eigene Verschiebungsanträge mit Grund, eigene Antworten; als Leitung nur der Vorgang.
         ("league_schedule", _value(lambda: league_schedule.export_snapshot(db, user_id))),
+        # Liga-Check-in (#1652): eigene Check-ins, eigene Anwesenheit, eigener Start; als Leitung nur der Vorgang.
+        ("league_checkin", _value(lambda: match_flow.export_snapshot(db, user_id))),
         # Regelwerk (#1646): welcher Fassung die Person für welches Co-Team zugestimmt hat.
         ("league_rule_consents", _rows(db.league_rule_consents, me)),
         ("competition_matches", _value(matches)),

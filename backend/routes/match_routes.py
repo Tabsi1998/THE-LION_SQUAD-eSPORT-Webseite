@@ -77,6 +77,7 @@ from services.v2_result_submission import submit_v2_result
 from services import league_games
 from services import league_result_rules
 from services import league_schedule
+from services import match_flow
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -701,6 +702,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
         # Befangen (auch der Superadmin): das Feld fehlt hier - die Notausnahme mit Grund geht über den Matchplan.
         can_lead_set=plans_as_lead and not conflict, proposals=proposals)
+    # Liga-Check-in (#1652, D.2): Stand, Fenster, Anwesende, Hinweise - nur Beteiligte und Leitung; die Leitung trägt im Notfall
+    # für eine Seite ein (befangen nur der Superadmin mit Grund).
+    checkin_block = await match_flow.page_block(
+        db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
+        can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None)
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
@@ -790,6 +796,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "matchday_label": matchday_label,
         "league": league_block,
         "schedule_block": schedule_block,
+        "checkin": checkin_block,
     }
 
 
