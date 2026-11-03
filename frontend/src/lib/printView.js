@@ -455,6 +455,8 @@ export const STANDINGS = { tableHead: 8, sectionHead: 9, row: 7 };
  * Die Tabelle (bzw. Rangliste) für Papier: je Gruppe ein Abschnitt mit Namen, sonst einer ohne Kopf. Spalten wie auf der
  * Website (lib/standingsTable), ohne die Form. `heats`: das Turnier spielt in Läufen (FFA).
  */
+const EXIT_SUFFIX = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
+
 export function standingsSections(standings, { heats = false } = {}) {
   return standingSections(standings)
     .filter((section) => section.rows.length)
@@ -467,7 +469,8 @@ export function standingsSections(standings, { heats = false } = {}) {
         rows: section.rows.map((row, index) => ({
           id: row.registration_id || `${section.key}-${index}`,
           rank: row.rank ?? "",
-          name: row.display_name || "Teilnehmer",
+          // Tabellenende der Liga-Staffel (E.1, #1625): wer ausschied, steht mit dem Grund da.
+          name: `${row.display_name || "Teilnehmer"}${EXIT_SUFFIX[row.exit?.kind] ? ` (${EXIT_SUFFIX[row.exit.kind]})` : ""}`,
           cells: columns.map((column) => String(standingCell(column, row))),
         })),
       };

@@ -119,6 +119,10 @@ zwei Anträge gehen gleichzeitig auf den letzten Platz, die Leitung nimmt an, se
 mit Ergebnisregel an, verwendet ihn im Pool der Season „Liga-Anmeldung“ und überträgt ihn auf die Staffel. Entfernen wird abgelehnt
 (Schloss, 409), nach dem Deaktivieren steht er in keinem neuen Pool zur Wahl (422), Staffel und Ligaseite zeigen ihn weiter. Die
 Seed-Modi bleiben unberührt; jeder Lauf legt zwei Modi dazu, ab 19 Modi überspringt die Spec (Stand neu aufsetzen).
+`liga-tabelle-abnahme.spec.js` (gleiche Stand-Datei, #1625) startet die Staffel der „Liga-Probelauf“, trägt Spieltag 1 so ein, dass
+zwei Sieger gleich stehen, legt in der Season-Verwaltung die Reihenfolge mit Grund fest, trägt einen Austritt ein (alle Spiele für
+die Gegner, Tabellenende) und wertet ein Spiel „beide nicht erschienen“ samt „Neu ansetzen“; die Ligaseite liest ein Gast bei 390
+und 1440 px. Sie braucht wie `liga-ablauf-abnahme` eine Staffel im Entwurf, also einen frischen Seed davor.
 `spielseite-abnahme.spec.js` (gleiche Stand-Datei, #2249) öffnet je Breite die Spielseite über das Zahnrad, legt im Reiter Modi
 einen Modus an, im Reiter Maps eine Map und gibt sie per Häkchen in zwei Modi frei, deaktiviert den Modus und prüft die
 Weiterleitung der alten Map-Adresse; Map und Modus räumt sie danach wieder weg.
