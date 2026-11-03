@@ -102,7 +102,7 @@ def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[
         stage = stages_by_id[stage_id]
         stage_matches = [match for match in matches if match.get("stage_id") == stage_id]
         kind = str(stage.get("stage_type") or "")
-        rows = swiss_standings(stage_matches, registrations) if kind == "swiss" else round_robin_standings(stage_matches, registrations, rules) if kind in ("round_robin_groups", "round_robin", "league") else stage_standings(stage_matches, registrations)
+        rows = swiss_standings(stage_matches, registrations) if kind == "swiss" else round_robin_standings(stage_matches, registrations, rules, tournament=tournament) if kind in ("round_robin_groups", "round_robin", "league") else stage_standings(stage_matches, registrations)
         lines = []
         for index, row in enumerate(rows[:TOP_TABLE], start=1):
             points = row.get("points", 0)

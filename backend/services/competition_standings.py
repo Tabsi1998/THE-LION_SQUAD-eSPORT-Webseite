@@ -306,12 +306,305 @@ def _round_robin_rows(matches: list[dict], registrations: list[dict], rules: dic
     return rows
 
 
-def round_robin_standings(matches: list[dict], registrations: list[dict], rules: dict | None = None) -> list[dict]:
+def round_robin_standings(matches: list[dict], registrations: list[dict], rules: dict | None = None, *,
+                          tournament: dict | None = None) -> list[dict]:
     """Liga, Round Robin und jede Gruppe: Punkte, Differenz, Form und Bewegung seit dem letzten Spieltag. ``rules``
-    (``table_rules(tournament)``): Punkte je Sieg/Remis/Niederlage und Gleichstand einer Liga - ohne wie bisher."""
-    def compute(rows_matches, rows_registrations):
-        return _round_robin_rows(rows_matches, rows_registrations, rules)
-    return _with_form_and_movement(compute, matches, registrations)
+    (``table_rules(tournament)``): Punkte je Sieg/Remis/Niederlage und Gleichstand einer Liga - ohne wie bisher. Mit
+    ``rules`` rechnet die Tabelle der Liga-Staffel (E.1, ``_league_rows``); ``tournament`` liefert dazu Best of,
+    Punktabzüge und Entscheide der Leitung."""
+    if rules is None:
+        def compute(rows_matches, rows_registrations):
+            return _round_robin_rows(rows_matches, rows_registrations, rules)
+        return _with_form_and_movement(compute, matches, registrations)
+    context = tournament or {}
+    effective = _league_matches(matches, registrations, rules, context.get("best_of"))
+
+    def league_compute(rows_matches, rows_registrations):
+        return _league_rows(rows_matches, rows_registrations, rules, context)
+    return _with_form_and_movement(league_compute, effective, registrations)
+
+
+# ---------------------------------------------------------------- Liga-Staffel (E.1, #1625, docs/LIGA.md)
+
+EXIT_STATUSES = ("withdrawn", "disqualified")
+
+
+def exit_of(registration: dict) -> dict | None:
+    """Ist die Anmeldung ausgeschieden (Austritt, Auflösung als Austritt, Disqualifikation)? ``{kind, at}`` oder ``None``.
+    ``removal_at`` setzt die öffentliche Tabelle, weil die Projektion der Anmeldung ``removal`` nicht mitgibt."""
+    status = registration.get("status")
+    if status not in EXIT_STATUSES:
+        return None
+    return {"kind": status, "at": registration.get("removal_at") or (registration.get("removal") or {}).get("at")}
+
+
+def default_win_maps(match: dict, best_of_default=None) -> int:
+    """Die Maps eines Default-Wins (Nr. 26): so viele, wie der Sieger eines Best of braucht - BO5 3, BO3 2, BO1 1."""
+    best_of = _safe_int(match.get("best_of"), 0) or _safe_int(best_of_default, 0) or 1
+    return best_of // 2 + 1
+
+
+def _rewritten(match: dict, results: list[dict], **flags) -> dict:
+    return {**match, "results": results, **flags}
+
+
+def _league_matches(matches: list[dict], registrations: list[dict], rules: dict, best_of=None) -> list[dict]:
+    """Die Spiele, wie die Tabelle einer Liga-Staffel sie zählt - als Kopien, das Spiel selbst bleibt unverändert:
+
+    - Beide nicht erschienen (beide Seiten ``forfeit``): beide verlieren, keine Maps (Nr. 27).
+    - Kampflos (Stand ``forfeit``): mit ``forfeit_score: best_of`` bekommt der Sieger die Maps des Best of (Nr. 26).
+    - ``exit_rule: all_for_opponents``: jedes Spiel eines ausgeschiedenen Teams zählt wie ein Default-Win für den Gegner,
+      ein Spiel zweier ausgeschiedener Teams für keinen (Nr. 48).
+    """
+    exits = {row["id"]: exit_of(row) for row in registrations if row.get("id")}
+    for_opponents = rules.get("exit_rule") == "all_for_opponents"
+    best_of_maps = rules.get("forfeit_score") == "best_of"
+    out: list[dict] = []
+    for match in matches:
+        slot_a, slot_b, result_a, result_b = _duel_entries(match)
+        side_a = (slot_a or {}).get("registration_id")
+        side_b = (slot_b or {}).get("registration_id")
+        if match.get("status") not in TERMINAL_MATCH_STATUSES or not side_a or not side_b:
+            out.append(match)
+            continue
+        maps = default_win_maps(match, best_of)
+        gone_a = for_opponents and bool(exits.get(side_a))
+        gone_b = for_opponents and bool(exits.get(side_b))
+        if gone_a and gone_b:
+            continue
+        if gone_a or gone_b:
+            loser, winner = (side_a, side_b) if gone_a else (side_b, side_a)
+            score = maps if best_of_maps else None
+            out.append(_rewritten(match, [
+                {"registration_id": winner, "rank": 1, "outcome": "winner", "score": score},
+                {"registration_id": loser, "rank": 2, "outcome": "loser", "forfeit": True, "score": 0 if score else None},
+            ], table_forfeit=loser, table_exit=loser))
+            continue
+        if (result_a or {}).get("forfeit") and (result_b or {}).get("forfeit"):
+            out.append(_rewritten(match, [
+                {"registration_id": side_a, "rank": 2, "outcome": "loser", "forfeit": True, "score": None},
+                {"registration_id": side_b, "rank": 2, "outcome": "loser", "forfeit": True, "score": None},
+            ], table_double_loss=True))
+            continue
+        winner = _sole_winner(match)
+        if match.get("status") == "forfeit" and winner in (side_a, side_b):
+            loser = side_b if winner == side_a else side_a
+            if best_of_maps:
+                out.append(_rewritten(match, [
+                    {"registration_id": winner, "rank": 1, "outcome": "winner", "score": maps},
+                    {"registration_id": loser, "rank": 2, "outcome": "loser", "forfeit": True, "score": 0},
+                ], table_forfeit=loser))
+            else:
+                out.append({**match, "table_forfeit": loser})
+            continue
+        out.append(match)
+    return out
+
+
+def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, context: dict) -> list[dict]:
+    """Die Tabelle einer Liga-Staffel auf den Spielen aus ``_league_matches``: Zählung wie ``_round_robin_rows``, dazu
+    kampflos, Punktabzug, Ausscheiden und die Reihenfolge nach ``table_tiebreakers`` (``_rank_league``)."""
+    points = rules.get("match_points") or {"win": 3, "draw": 1, "loss": 0}
+    win_points, draw_points, loss_points = points.get("win", 3), points.get("draw", 1), points.get("loss", 0)
+    stats = {}
+    for registration in registrations:
+        if not registration.get("id"):
+            continue
+        stats[registration["id"]] = {
+            "registration_id": registration["id"],
+            "user_id": registration.get("user_id"),
+            "team_id": registration.get("team_id"),
+            "display_name": _display_name(registration),
+            "played": 0, "won": 0, "lost": 0, "drawn": 0, "score_for": 0, "score_against": 0, "points": 0,
+            "forfeit_won": 0, "forfeit_lost": 0, "deducted_points": 0,
+            "exit": exit_of(registration), "tiebreak": None, "lead_decision": None,
+        }
+
+    def lose(registration_id: str | None) -> None:
+        if registration_id in stats:
+            stats[registration_id]["lost"] += 1
+            stats[registration_id]["points"] += loss_points
+
+    for match in matches:
+        if match.get("status") not in TERMINAL_MATCH_STATUSES:
+            continue
+        slot_a, slot_b, result_a, result_b = _duel_entries(match)
+        registration_a = (slot_a or {}).get("registration_id")
+        registration_b = (slot_b or {}).get("registration_id")
+        score_a = (result_a or {}).get("score")
+        score_b = (result_b or {}).get("score")
+        score_a = score_a if isinstance(score_a, (int, float)) else 0
+        score_b = score_b if isinstance(score_b, (int, float)) else 0
+        for own, own_score, other_score in ((registration_a, score_a, score_b), (registration_b, score_b, score_a)):
+            if own in stats:
+                stats[own]["played"] += 1
+                stats[own]["score_for"] += own_score
+                stats[own]["score_against"] += other_score
+        if match.get("table_double_loss"):
+            for own in (registration_a, registration_b):
+                lose(own)
+                if own in stats:
+                    stats[own]["forfeit_lost"] += 1
+            continue
+        forfeit_loser = match.get("table_forfeit")
+        winner_id = _sole_winner(match)
+        if winner_id == registration_a and registration_a in stats:
+            stats[registration_a]["won"] += 1
+            stats[registration_a]["points"] += win_points
+            lose(registration_b)
+        elif winner_id == registration_b and registration_b in stats:
+            stats[registration_b]["won"] += 1
+            stats[registration_b]["points"] += win_points
+            lose(registration_a)
+        else:
+            for own in (registration_a, registration_b):
+                if own in stats:
+                    stats[own]["drawn"] += 1
+                    stats[own]["points"] += draw_points
+            continue
+        if forfeit_loser:
+            if forfeit_loser in stats:
+                stats[forfeit_loser]["forfeit_lost"] += 1
+            if winner_id in stats and winner_id != forfeit_loser:
+                stats[winner_id]["forfeit_won"] += 1
+    for deduction in context.get("point_deductions") or []:
+        row = stats.get((deduction or {}).get("registration_id"))
+        amount = (deduction or {}).get("points")
+        if row is not None and isinstance(amount, (int, float)) and not isinstance(amount, bool) and amount > 0:
+            row["deducted_points"] += amount
+    rows = list(stats.values())
+    for row in rows:
+        row["points"] -= row["deducted_points"]
+        row["score_diff"] = row["score_for"] - row["score_against"]
+    _rank_league(rows, matches, rules, context.get("table_decisions") or [])
+    return rows
+
+
+TIEBREAK_FIELDS = {"wins": "won", "score_diff": "score_diff", "score_for": "score_for"}
+
+
+def _partition(rows: list[dict], key) -> list[list[dict]]:
+    """Gruppen gleicher Werte, größter Wert zuerst; innerhalb bleibt die Reihenfolge (stabil wie ``rank_with_ties``)."""
+    groups: list[list[dict]] = []
+    for row in sorted(rows, key=key, reverse=True):
+        if groups and key(groups[-1][0]) == key(row):
+            groups[-1].append(row)
+        else:
+            groups.append([row])
+    return groups
+
+
+def _mini_table(group: list[dict], matches: list[dict], rules: dict) -> dict[str, tuple]:
+    """Mini-Tabelle (Nr. 42): nur die Spiele der Gruppe untereinander, sortiert nach ``head_to_head_criteria``."""
+    ids = {row["registration_id"] for row in group}
+    points = rules.get("match_points") or {"win": 3, "draw": 1, "loss": 0}
+    mini = {registration_id: {"points": 0, "score_for": 0, "score_against": 0} for registration_id in ids}
+    for match in matches:
+        if match.get("status") not in TERMINAL_MATCH_STATUSES:
+            continue
+        slot_a, slot_b, result_a, result_b = _duel_entries(match)
+        side_a = (slot_a or {}).get("registration_id")
+        side_b = (slot_b or {}).get("registration_id")
+        if side_a not in ids or side_b not in ids or side_a == side_b:
+            continue
+        for own, own_result, other_result in ((side_a, result_a, result_b), (side_b, result_b, result_a)):
+            own_score = (own_result or {}).get("score")
+            other_score = (other_result or {}).get("score")
+            mini[own]["score_for"] += own_score if isinstance(own_score, (int, float)) else 0
+            mini[own]["score_against"] += other_score if isinstance(other_score, (int, float)) else 0
+        if match.get("table_double_loss"):
+            mini[side_a]["points"] += points.get("loss", 0)
+            mini[side_b]["points"] += points.get("loss", 0)
+            continue
+        winner_id = _sole_winner(match)
+        if winner_id in (side_a, side_b):
+            loser = side_b if winner_id == side_a else side_a
+            mini[winner_id]["points"] += points.get("win", 3)
+            mini[loser]["points"] += points.get("loss", 0)
+        else:
+            mini[side_a]["points"] += points.get("draw", 1)
+            mini[side_b]["points"] += points.get("draw", 1)
+    criteria = rules.get("head_to_head_criteria") or ["points", "score_diff", "score_for"]
+
+    def value(entry: dict, name: str):
+        return entry["score_for"] - entry["score_against"] if name == "score_diff" else entry[name]
+    return {registration_id: tuple(value(entry, name) for name in criteria) for registration_id, entry in mini.items()}
+
+
+def _decision_for(group: list[dict], decisions: list[dict]) -> dict | None:
+    """Der Entscheid der Leitung für genau diese Gruppe - der jüngste, wenn es mehrere gäbe."""
+    ids = {row["registration_id"] for row in group}
+    matching = [decision for decision in decisions
+                if isinstance(decision, dict) and set(decision.get("registration_ids") or []) == ids]
+    return max(matching, key=lambda decision: str(decision.get("decided_at") or "")) if matching else None
+
+
+def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: list[dict]) -> None:
+    """Reihenfolge der Liga-Staffel: Punkte, dann ``table_tiebreakers`` der Reihe nach (Nr. 25, 42). Ausgeschiedene mit
+    ``all_for_opponents`` stehen unten (Nr. 43). Sortiert ``rows`` an Ort und Stelle und setzt ``rank`` (1, 2, 2, 4)."""
+    criteria = list(rules.get("table_tiebreakers") or [])
+
+    def separated(part: list[dict], criterion: str) -> None:
+        if len(part) == 1 and part[0]["tiebreak"] is None:
+            part[0]["tiebreak"] = criterion
+
+    def head_to_head(group: list[dict], index: int) -> list[list[dict]]:
+        mini = _mini_table(group, matches, rules)
+        parts = _partition(group, lambda row: mini[row["registration_id"]])
+        if len(parts) == 1:
+            return resolve(group, index + 1)
+        out: list[list[dict]] = []
+        for part in parts:
+            separated(part, "head_to_head")
+            # Restgruppe: Mini-Tabelle neu, nur mit ihren Spielen (Nr. 42).
+            out.extend([part] if len(part) == 1 else head_to_head(part, index))
+        return out
+
+    def resolve(group: list[dict], index: int) -> list[list[dict]]:
+        if len(group) == 1 or index >= len(criteria):
+            return [group]
+        criterion = criteria[index]
+        if criterion == "head_to_head":
+            return head_to_head(group, index)
+        if criterion == "lead_decision":
+            decision = _decision_for(group, decisions)
+            if not decision:
+                return resolve(group, index + 1)
+            order = {registration_id: position for position, registration_id in enumerate(decision["registration_ids"])}
+            info = {"id": decision.get("id"), "reason": decision.get("reason"), "decided_at": decision.get("decided_at")}
+            for row in group:
+                row["tiebreak"] = "lead_decision"
+                row["lead_decision"] = info
+            return [[row] for row in sorted(group, key=lambda row: order[row["registration_id"]])]
+        field = TIEBREAK_FIELDS.get(criterion)
+        if not field:
+            return resolve(group, index + 1)
+        parts = _partition(group, lambda row: row[field])
+        out = []
+        for part in parts:
+            if len(parts) > 1:
+                separated(part, criterion)
+            out.extend(resolve(part, index + 1))
+        return out
+
+    bottom = rules.get("exit_rule") == "all_for_opponents"
+    active = [row for row in rows if not (bottom and row.get("exit"))]
+    gone = [row for row in rows if bottom and row.get("exit")]
+    blocks: list[list[dict]] = []
+    for group in _partition(active, lambda row: row["points"]):
+        blocks.extend(resolve(group, 0))
+    # Tabellenende (Nr. 43): wer später ausschied, steht weiter oben; Disqualifizierte immer unter den anderen.
+    gone.sort(key=lambda row: str(row["exit"].get("at") or ""), reverse=True)
+    gone.sort(key=lambda row: row["exit"]["kind"] == "disqualified")
+    blocks.extend([row] for row in gone)
+    position = 1
+    ordered: list[dict] = []
+    for block in blocks:
+        for row in block:
+            row["rank"] = position
+            ordered.append(row)
+        position += len(block)
+    rows[:] = ordered
 
 
 def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
@@ -347,7 +640,9 @@ def _form(matches: list[dict]) -> dict[str, list[str]]:
         for registration_id in (registration_a, registration_b):
             if not registration_id:
                 continue
-            letter = "D" if winner_id is None else "W" if winner_id == registration_id else "L"
+            # Beide nicht erschienen (E.1): für beide eine Niederlage, kein Unentschieden.
+            letter = "L" if match.get("table_double_loss") else \
+                "D" if winner_id is None else "W" if winner_id == registration_id else "L"
             form.setdefault(registration_id, []).append(letter)
     return {registration_id: letters[-FORM_LENGTH:] for registration_id, letters in form.items()}
 
@@ -473,11 +768,11 @@ def standings_for_structure(
         if format_key == "groups":
             return group_standings(stage_matches, registrations, list(groups))
         if format_key in {"round_robin", "league"}:
-            return round_robin_standings(stage_matches, registrations, table_rules(tournament))
+            return round_robin_standings(stage_matches, registrations, table_rules(tournament), tournament=tournament)
         return stage_standings(stage_matches, registrations)
     legacy_matches = [match for match in matches if match.get("source", {}).get("engine") == "legacy"]
     if format_key in {"round_robin", "league"}:
-        return round_robin_standings(legacy_matches, registrations, table_rules(tournament))
+        return round_robin_standings(legacy_matches, registrations, table_rules(tournament), tournament=tournament)
     if format_key == "swiss":
         return swiss_standings(legacy_matches, registrations)
     if format_key == "groups":
@@ -649,7 +944,7 @@ def placements_for_structure(
     ]
     format_key = (tournament or {}).get("format")
     if not wanted_sections and format_key in {"round_robin", "league"}:
-        rows = round_robin_standings(stage_matches, registrations, table_rules(tournament))
+        rows = round_robin_standings(stage_matches, registrations, table_rules(tournament), tournament=tournament)
     elif not wanted_sections and format_key == "swiss":
         rows = swiss_standings(stage_matches, registrations)
     else:
