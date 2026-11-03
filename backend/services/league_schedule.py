@@ -247,8 +247,8 @@ def history_push(entry: dict) -> dict:
 
 
 async def record_history(db, match_id: str, tournament: dict | None, entry: dict) -> None:
-    """Ein Eintrag in die Historie - nur in Staffeln, eine fehlende Zeile hält nichts auf."""
-    if not is_league_staffel(tournament):
+    """Ein Eintrag in die Historie - nur in Staffeln mit Terminregeln, eine fehlende Zeile hält nichts auf."""
+    if not rules_of(tournament):
         return
     try:
         await db.matches_v2.update_one({"id": match_id}, {"$push": history_push(entry)})
@@ -259,16 +259,15 @@ async def record_history(db, match_id: str, tournament: dict | None, entry: dict
 async def after_agreement(db, match: dict, tournament: dict | None, proposal: dict, user: dict | None,
                           registration_id: str | None) -> None:
     """Ein Vorschlag wurde angenommen (Einigung): Historie, und mit Regeln schließen die übrigen offenen Vorschläge - der
-    Termin steht jetzt fest."""
-    if not is_league_staffel(tournament):
+    Termin steht jetzt fest. Nur in Staffeln mit Terminregeln - Altbestand bekommt keine D.1-Felder."""
+    if not rules_of(tournament):
         return
     await record_history(db, match["id"], tournament, history_entry(
         "agreement", by=(user or {}).get("id"), registration_id=registration_id, from_at=match.get("scheduled_at"),
         to_at=proposal.get("scheduled_at"), reason=proposal.get("note"), request_id=proposal.get("id")))
-    if rules_of(tournament):
-        await db.match_schedule_proposals.update_many(
-            {"match_id": match["id"], "status": "pending", "id": {"$ne": proposal.get("id")}},
-            {"$set": {"status": "declined", "decision_rule": "agreed_elsewhere", "updated_at": now_utc().isoformat()}})
+    await db.match_schedule_proposals.update_many(
+        {"match_id": match["id"], "status": "pending", "id": {"$ne": proposal.get("id")}},
+        {"$set": {"status": "declined", "decision_rule": "agreed_elsewhere", "updated_at": now_utc().isoformat()}})
 
 
 async def lead_changed(db, before: dict, after: dict, user: dict | None, reason: str | None) -> None:
@@ -276,8 +275,9 @@ async def lead_changed(db, before: dict, after: dict, user: dict | None, reason:
     und die Erinnerung fallen weg (die Leitung hat entschieden)."""
     if _moment(before.get("scheduled_at")) == _moment(after.get("scheduled_at")):
         return
-    tournament = await db.tournaments.find_one({"id": after.get("tournament_id")}, {"_id": 0, "id": 1, "league_context": 1})
-    if not is_league_staffel(tournament):
+    tournament = await db.tournaments.find_one({"id": after.get("tournament_id")},
+                                               {"_id": 0, "id": 1, "league_context": 1, "schedule_rules": 1})
+    if not rules_of(tournament):
         return
     now = now_utc()
     requests = _requests(after)

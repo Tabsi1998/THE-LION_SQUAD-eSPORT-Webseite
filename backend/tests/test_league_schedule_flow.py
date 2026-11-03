@@ -370,3 +370,18 @@ async def test_a_fixed_time_still_lets_sides_decline_or_withdraw_old_proposals(f
     url = f"/api/matches/{mid(world)}/schedule-proposals/{old['id']}/decision"
     assert (await flow.post(url, json={"action": "accept"})).status_code == 409
     assert (await flow.post(url, json={"action": "decline"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_without_rules_gets_no_d1_fields(flow):
+    """Altbestand ohne ``schedule_rules``: Einigung, Standardtermin und Termin der Leitung schreiben keine D.1-Felder."""
+    from services.matchday_schedule import persist_matchday_schedule
+
+    world = await live_world(flow, rules=None)
+    await persist_matchday_schedule(flow.db, await tournament_of(flow, world))
+    await agree(flow, world)
+    flow.act_as(world["staff"])
+    assert (await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(90), "schedule_reason": "Test"})).status_code == 200
+    stored = await flow.reload(world["match"])
+    for field in ("schedule_history", "reschedule_requests", "reschedule_count", "result_reminded_at", "result_overdue_at"):
+        assert field not in stored, field

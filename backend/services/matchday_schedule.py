@@ -598,8 +598,8 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
-    if isinstance(tournament.get("league_context"), dict):
-        # Termin-Historie (#2194) - dieselbe Form wie league_schedule.history_entry, hier ohne Import (kein Import-Kreis).
+    if _home_rule_managed(tournament):
+        # Termin-Historie (#2194), nur in Staffeln mit Terminregeln - dieselbe Form wie league_schedule.history_entry, hier ohne Import (kein Import-Kreis).
         from uuid import uuid4
 
         for write in writes:
