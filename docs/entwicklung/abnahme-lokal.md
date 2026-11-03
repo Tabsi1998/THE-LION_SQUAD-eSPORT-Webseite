@@ -119,6 +119,9 @@ zwei Anträge gehen gleichzeitig auf den letzten Platz, die Leitung nimmt an, se
 mit Ergebnisregel an, verwendet ihn im Pool der Season „Liga-Anmeldung“ und überträgt ihn auf die Staffel. Entfernen wird abgelehnt
 (Schloss, 409), nach dem Deaktivieren steht er in keinem neuen Pool zur Wahl (422), Staffel und Ligaseite zeigen ihn weiter. Die
 Seed-Modi bleiben unberührt; jeder Lauf legt zwei Modi dazu, ab 19 Modi überspringt die Spec (Stand neu aufsetzen).
+`spielseite-abnahme.spec.js` (gleiche Stand-Datei, #2249) öffnet je Breite die Spielseite über das Zahnrad, legt im Reiter Modi
+einen Modus an, im Reiter Maps eine Map und gibt sie per Häkchen in zwei Modi frei, deaktiviert den Modus und prüft die
+Weiterleitung der alten Map-Adresse; Map und Modus räumt sie danach wieder weg.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem
