@@ -1081,7 +1081,9 @@ Fläche ein neutrales Platzhalter-Symbol (`components/tls/ModeIcon`).
   `copy_version` und „Map sperren“. Ein Liga-Spiel hält es je Map aus dem Pool (`games[].mode_icon_url`, nur wenn gesetzt), wie
   `mode_label`. Ein neues Symbol am Modus erreicht einen gespeicherten Pool erst mit dem nächsten Speichern. Bis dahin nennt die
   Verwaltung es wie eine geänderte Map: `admin_entry` trägt `outdated_modes` (Modi, deren Symbol im Pool nicht mehr dem des Spiels
-  gleicht), der Pool-Editor zeigt „Symbol geändert – mit dem nächsten Speichern übernommen“.
+  gleicht), der Pool-Editor zeigt „Symbol geändert – mit dem nächsten Speichern übernommen“. Beim Übertragen Season → Staffel zählt
+  das Symbol mit (`league_service._pool_maps`): Ein nur wegen des Symbols neu gespeicherter Season-Pool kommt als neue Version in die
+  Staffeln; festgehaltene Versionen und fertige Spiele bleiben, wie sie sind.
 - **Mediathek:** Verwendung sind `games.match_modes.icon_url` und `map_pools.modes.icon_url`. In einer Pool-Version (außer dem
   Standard-Pool `game_default`) ist das Symbol **eingefroren** (`media_audit.is_frozen` mit Feld): Drehen und Löschen gehen nicht, auch
   nicht mit Bestätigung (409 „… Symbol eines Modus in einem gespeicherten Map-Pool …“). Map-Bilder in Pools bleiben wie bisher. Steht
@@ -1205,7 +1207,7 @@ leer würde oder ein Modus der Reihenfolge keine Map mehr hätte; 409 bei einer 
   Staffel (`league_service.create_staffel`, die einzige Stelle, die einer Season eine Staffel hinzufügt; belegt: 409 „bitte gleich noch
   einmal“). Ist eine Sperre belegt oder kommt währenddessen eine Staffel dazu: 409, es wird nichts geschrieben.
 - **Genau diese Version:** Übertragen wird die gerade angelegte Version, nie eine, die danach entsteht (`league_service.transfer_pool`
-  mit `pool`). Eine Staffel mit denselben Maps bekommt keine neue Version.
+  mit `pool`). Eine Staffel mit denselben Maps und denselben Modus-Symbolen bekommt keine neue Version.
 - **Erneut ausführen:** Steht die Map schon nicht mehr im geltenden Pool, aber in einer früheren Version, entsteht keine neue Version
   (`unchanged: true`); übertragen wird nur, was einer Staffel noch fehlt. Das Protokoll trägt `new_version`.
 

@@ -1112,7 +1112,9 @@ async def _has_result(db, tournament_id: str) -> bool:
 
 
 def _pool_maps(pool: dict | None) -> list:
-    return [(group.get("mode"), [item.get("map_id") for item in group.get("maps") or []])
+    """Was beim Übertragen als „gleicher Pool“ zählt: je Modus die Maps und das Symbol des Schnappschusses (#2266, Prüfung Codex) - eine
+    Season, die ihren Pool nur wegen eines neuen Symbols neu speichert, gibt die neue Version an die Staffeln weiter."""
+    return [(group.get("mode"), group.get("icon_url") or None, [item.get("map_id") for item in group.get("maps") or []])
             for group in (pool or {}).get("modes") or []]
 
 

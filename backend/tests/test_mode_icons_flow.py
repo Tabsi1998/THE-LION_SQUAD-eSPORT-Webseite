@@ -297,3 +297,38 @@ async def test_the_admin_sees_when_a_saved_pool_has_an_outdated_icon(flow):
 
     entry = await map_pools.admin_entry(flow.db, held, "spiel", "tournament")
     assert entry["outdated_modes"] == ["stellung", "suchen"], "Symbol entfernt und Symbol neu: beides ein Hinweis"
+
+@pytest.mark.asyncio
+async def test_a_new_icon_reaches_the_staffel_even_with_the_same_maps(flow):
+    """Prüfung Codex: Speichert die Season ihren Pool nur wegen eines neuen Symbols neu, bekommt die Staffel beim Übertragen die neue
+    Version - auch wenn die Maps gleich blieben. Festgehaltene Versionen bleiben, wie sie sind."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    created = await flow.post("/api/games", json={"name": "Probe Shooter", "slug": "probe-symbol", "match_modes": MODES})
+    assert created.status_code == 200, created.text
+    game = created.json()
+    await add_maps(flow, game["id"])
+    first, second = await upload(flow, "alt.png"), await upload(flow, "neu.png")
+    assert (await patch_modes(flow, with_icon(first), game["id"])).status_code == 200
+    admin = "/api/admin/leagues"
+    league = (await flow.post(admin, json={"name": "Symbol-Liga", "game_id": game["id"]})).json()
+    season = (await flow.post(f"{admin}/{league['id']}/seasons", json={"start_date": "2026-11-10T00:00:00"})).json()
+    division = (await flow.post(f"{admin}/seasons/{season['id']}/divisions", json={})).json()
+    pool = {"modes": [{"mode": "stellung", "map_ids": ["map-hafen"]}, {"mode": "suchen", "map_ids": ["map-turm"]}]}
+    assert (await flow.put(f"{admin}/seasons/{season['id']}/map-pool", json=pool)).status_code == 200
+    staffel = (await flow.post(f"{admin}/divisions/{division['id']}/staffeln", json={})).json()
+    held = await map_pools.current(flow.db, "tournament", staffel["tournament_id"])
+    assert held["modes"][0]["icon_url"] == first
+
+    assert (await patch_modes(flow, with_icon(second), game["id"])).status_code == 200
+    assert (await flow.put(f"{admin}/seasons/{season['id']}/map-pool", json=pool)).status_code == 200
+    synced = await flow.post(f"{admin}/seasons/{season['id']}/sync")
+    assert synced.status_code == 200, synced.text
+
+    now = await map_pools.current(flow.db, "tournament", staffel["tournament_id"])
+    assert now["version"] == held["version"] + 1, "neue Version für die Staffel"
+    assert now["modes"][0]["icon_url"] == second
+    assert (await flow.db.map_pools.find_one({"id": held["id"]}, {"_id": 0}))["modes"][0]["icon_url"] == first, "die alte Version bleibt"
+    again = await flow.post(f"{admin}/seasons/{season['id']}/sync")
+    assert again.status_code == 200
+    assert (await map_pools.current(flow.db, "tournament", staffel["tournament_id"]))["version"] == now["version"], "ohne Änderung keine Version"
