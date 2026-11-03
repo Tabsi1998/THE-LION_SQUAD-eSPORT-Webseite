@@ -323,6 +323,27 @@ async def test_removing_a_decision_respects_the_conflict(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_table_overview_says_who_is_involved(flow):
+    """Codex zu E.1: Die Verwaltung erfährt je Gleichstand und Entscheid, ob es das eigene Team ist, und ob die Person
+    Superadmin ist - nur dann bietet sie die Notausnahme an."""
+    admin, league, staffel = await setup(flow)
+    winners, losers = await two_ties(flow, staffel)
+    await flow.put(f"{TABLE}/{staffel['id']}/table-decision", json={"registration_ids": losers, "reason": "Losentscheid vor Zeugen"})
+    own = await flow.db.tournament_registrations.find_one({"id": winners[0]}, {"_id": 0})
+    await flow.db.teams.update_one({"id": own["team_id"]}, {"$set": {"leader_id": admin["id"]}})
+    overview = (await flow.get(f"{TABLE}/{staffel['id']}/table")).json()
+    assert overview["superadmin"] is True
+    assert {tuple(sorted(tie["registration_ids"])): tie["own_team"] for tie in overview["ties"]} == {tuple(sorted(winners)): True}
+    assert [decision["own_team"] for decision in overview["decisions"]] == [False]
+    planner = await flow.add_user(name="Planerin")
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": league["id"], "user_id": planner["id"],
+                                           "capabilities": ["matches"], "created_at": now_utc().isoformat()})
+    flow.act_as(planner)
+    overview = (await flow.get(f"{TABLE}/{staffel['id']}/table")).json()
+    assert overview["superadmin"] is False and overview["ties"][0]["own_team"] is False
+
+
+@pytest.mark.asyncio
 async def test_setting_a_game_again_respects_the_conflict(flow):
     """Codex zu E.1: Neu ansetzen nimmt den Grund der Notausnahme an und schreibt ihn ins Protokoll."""
     admin, _league, staffel = await setup(flow)

@@ -66,6 +66,37 @@ test("nimmt einen Entscheid mit Grund zurück - ohne Recht gibt es keine Knöpfe
   expect(screen.queryByTestId("season-decision-remove-d0")).toBeNull();
 });
 
+test("befangen (eigenes Team): der Satz statt der Knöpfe - der Superadmin nur mit Grund für die Notausnahme", async () => {
+  const own = { ...TABLE, superadmin: false, ties: [{ ...TABLE.ties[0], own_team: true }], decisions: [{ ...TABLE.decisions[0], own_team: true }] };
+  apiMock.get.mockResolvedValue({ data: own });
+  const { unmount } = render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  expect(await screen.findByTestId("season-tie-own-1")).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
+  expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
+  expect(screen.getByTestId("season-decision-own-d0")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-decision-remove-d0")).toBeNull();
+  unmount();
+
+  apiMock.get.mockResolvedValue({ data: { ...own, superadmin: true } });
+  render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  fireEvent.click(await screen.findByTestId("season-tie-decide-1"));
+  const sheet = await screen.findByTestId("table-decision-sheet");
+  fireEvent.change(within(sheet).getByTestId("table-decision-reason"), { target: { value: "Losentscheid vor Zeugen" } });
+  fireEvent.click(within(sheet).getByTestId("table-decision-save"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  fireEvent.change(within(sheet).getByTestId("table-decision-conflict-reason"), { target: { value: "Keine zweite Person erreichbar" } });
+  fireEvent.click(within(sheet).getByTestId("table-decision-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/table-decision",
+    { registration_ids: ["r1", "r2"], reason: "Losentscheid vor Zeugen", conflict_reason: "Keine zweite Person erreichbar" }));
+
+  fireEvent.click(await screen.findByTestId("season-decision-remove-d0"));
+  const remove = await screen.findByTestId("table-decision-remove-sheet");
+  fireEvent.change(within(remove).getByTestId("table-decision-remove-reason"), { target: { value: "Ergebnis korrigiert" } });
+  fireEvent.change(within(remove).getByTestId("table-decision-remove-conflict-reason"), { target: { value: "Keine zweite Person erreichbar" } });
+  fireEvent.click(within(remove).getByTestId("table-decision-remove-save"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/table-decision/d0",
+    { data: { reason: "Ergebnis korrigiert", conflict_reason: "Keine zweite Person erreichbar" } }));
+});
+
 test("ohne gestartete Staffel bleibt das Feld weg", () => {
   const { container } = render(<SeasonTablePanel divisions={[{ label: "Liga 1", staffeln: [{ tournament_id: "t2", staffel: "B", status: "draft" }] }]} canDecide />);
   expect(container).toBeEmptyDOMElement();

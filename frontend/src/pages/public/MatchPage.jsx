@@ -540,7 +540,7 @@ function MatchPageView() {
                 </div>
               )}
               {/* Liga-Staffel (E.1, #1625): beide nicht erschienen werten oder das Spiel neu ansetzen. */}
-              {data.league && canStaffSubmit ? <DoubleNoShowAction match={match} onDone={() => load()} /> : null}
+              {data.league && canStaffSubmit ? <DoubleNoShowAction match={match} conflict={data.conflict} onDone={() => load()} /> : null}
               {canStaffSubmit && data.result_entry?.hold ? (
                 <p className="text-sm text-[#29B6E8]" data-testid="match-staff-result-held">{data.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${data.result_entry.hold.actor_name} trägt gerade das Ergebnis ein.`}</p>
               ) : null}

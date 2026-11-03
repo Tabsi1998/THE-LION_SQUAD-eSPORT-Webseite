@@ -68,7 +68,7 @@ async def admin_staffel_table(tournament_id: str, me: dict = Depends(require_lea
     tournament = await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Staffel nicht gefunden.")
-    return await league_table.overview(db, tournament)
+    return await league_table.overview(db, tournament, me)
 
 
 @admin_router.put("/{tournament_id}/table-decision")

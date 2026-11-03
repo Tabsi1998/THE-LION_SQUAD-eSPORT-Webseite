@@ -8,6 +8,7 @@ import { TextAreaField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { tiebreakOrder } from "@/lib/leagueTable";
 import { viennaDateTime } from "@/lib/vienna";
+import { ConflictReasonField, CONFLICT_REASON_MIN, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 
 // Gleichstände je Staffel (E.1, #1625, docs/LIGA.md „E.1 Tabelle“): Wo Teams nach allen Kriterien gleich stehen, legt die
 // Leitung mit Grund die Reihenfolge fest - nur dort, nie über das eigene Team (der Server prüft beides). Ein Entscheid gilt,
@@ -23,9 +24,10 @@ function when(value) {
   }
 }
 
-function OrderSheet({ staffel, tie, onClose, onSaved }) {
+function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
   const [order, setOrder] = useState(tie.registration_ids.map((id, index) => ({ id, name: tie.names[index] || "Team" })));
   const [reason, setReason] = useState("");
+  const [conflictReason, setConflictReason] = useState("");
   const [saving, setSaving] = useState(false);
   const move = (index, by) => setOrder((current) => {
     const next = [...current];
@@ -39,9 +41,14 @@ function OrderSheet({ staffel, tie, onClose, onSaved }) {
       toast.error(`Bitte einen Grund mit mindestens ${MIN_REASON} Zeichen angeben.`);
       return;
     }
+    if (overrideMissing(override, conflictReason)) {
+      toast.error(`Bitte den Grund für die Notausnahme mit mindestens ${CONFLICT_REASON_MIN} Zeichen angeben.`);
+      return;
+    }
     setSaving(true);
     try {
-      await api.put(`/admin/leagues/staffeln/${staffel.tournament_id}/table-decision`, { registration_ids: order.map((item) => item.id), reason: reason.trim() });
+      await api.put(`/admin/leagues/staffeln/${staffel.tournament_id}/table-decision`, { registration_ids: order.map((item) => item.id), reason: reason.trim(),
+        ...overridePayload(override, conflictReason) });
       toast.success("Reihenfolge festgelegt.");
       onSaved();
     } catch (err) {
@@ -73,12 +80,14 @@ function OrderSheet({ staffel, tie, onClose, onSaved }) {
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required placeholder="z. B. Losentscheid vor beiden Captains am 20.11."
           hint="Steht öffentlich an der Tabelle und im Protokoll." testId="table-decision-reason" />
       </div>
+      {override ? <div className="mt-4"><ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="table-decision-conflict-reason" /></div> : null}
     </AdminSheet>
   );
 }
 
-function RemoveSheet({ staffel, decision, onClose, onSaved }) {
+function RemoveSheet({ staffel, decision, override, onClose, onSaved }) {
   const [reason, setReason] = useState("");
+  const [conflictReason, setConflictReason] = useState("");
   const [saving, setSaving] = useState(false);
   const submit = async (event) => {
     event.preventDefault();
@@ -86,9 +95,14 @@ function RemoveSheet({ staffel, decision, onClose, onSaved }) {
       toast.error(`Bitte einen Grund mit mindestens ${MIN_REASON} Zeichen angeben.`);
       return;
     }
+    if (overrideMissing(override, conflictReason)) {
+      toast.error(`Bitte den Grund für die Notausnahme mit mindestens ${CONFLICT_REASON_MIN} Zeichen angeben.`);
+      return;
+    }
     setSaving(true);
     try {
-      await api.delete(`/admin/leagues/staffeln/${staffel.tournament_id}/table-decision/${decision.id}`, { data: { reason: reason.trim() } });
+      await api.delete(`/admin/leagues/staffeln/${staffel.tournament_id}/table-decision/${decision.id}`,
+        { data: { reason: reason.trim(), ...overridePayload(override, conflictReason) } });
       toast.success("Entscheid zurückgenommen.");
       onSaved();
     } catch (err) {
@@ -103,6 +117,7 @@ function RemoveSheet({ staffel, decision, onClose, onSaved }) {
       <div className="mt-4">
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required testId="table-decision-remove-reason" />
       </div>
+      {override ? <div className="mt-4"><ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="table-decision-remove-conflict-reason" /></div> : null}
     </AdminSheet>
   );
 }
@@ -130,6 +145,8 @@ function StaffelTies({ staffel, canDecide, version }) {
   const decide = canDecide && data.can_decide;
   const ties = Array.isArray(data.ties) ? data.ties : [];
   const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+  // Befangen (eigenes Team): nur der Superadmin, mit Grund für die Notausnahme - sonst der Satz statt des Knopfs.
+  const blocked = (entry) => Boolean(entry.own_team) && !data.superadmin;
   return (
     <div className="space-y-2" data-testid={`season-ties-${staffel.tournament_id}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -141,7 +158,8 @@ function StaffelTies({ staffel, canDecide, version }) {
         <div key={tie.rank} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2" data-testid={`season-tie-${staffel.tournament_id}-${tie.rank}`}>
           <span className="text-sm text-white">Platz {tie.rank}: {tie.names.join(", ")}</span>
           <span className="text-xs text-white/55 tabular-nums">{tie.points} Punkte, nach allen Kriterien gleich</span>
-          {decide ? (
+          {decide && blocked(tie) ? <span className="ml-auto"><OwnTeamNote testId={`season-tie-own-${tie.rank}`} /></span> : null}
+          {decide && !blocked(tie) ? (
             <button type="button" onClick={() => setSheet({ kind: "order", tie })} data-testid={`season-tie-decide-${tie.rank}`}
               className="tls-btn tls-btn--secondary ml-auto min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Reihenfolge festlegen</button>
           ) : null}
@@ -157,7 +175,8 @@ function StaffelTies({ staffel, canDecide, version }) {
               </span>
               <span className="text-white">{decision.names.join(" vor ")}</span>
               <span className="min-w-0 break-words">„{decision.reason}“ · {when(decision.decided_at)}</span>
-              {canDecide ? (
+              {canDecide && blocked(decision) ? <span className="ml-auto"><OwnTeamNote testId={`season-decision-own-${decision.id}`} /></span> : null}
+              {canDecide && !blocked(decision) ? (
                 <button type="button" onClick={() => setSheet({ kind: "remove", decision })} data-testid={`season-decision-remove-${decision.id}`}
                   className="tls-btn tls-btn--quiet ml-auto min-h-[40px] rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider">Zurücknehmen</button>
               ) : null}
@@ -165,8 +184,8 @@ function StaffelTies({ staffel, canDecide, version }) {
           ))}
         </ul>
       ) : null}
-      {sheet?.kind === "order" ? <OrderSheet staffel={staffel} tie={sheet.tie} onClose={() => setSheet(null)} onSaved={saved} /> : null}
-      {sheet?.kind === "remove" ? <RemoveSheet staffel={staffel} decision={sheet.decision} onClose={() => setSheet(null)} onSaved={saved} /> : null}
+      {sheet?.kind === "order" ? <OrderSheet staffel={staffel} tie={sheet.tie} override={Boolean(sheet.tie.own_team)} onClose={() => setSheet(null)} onSaved={saved} /> : null}
+      {sheet?.kind === "remove" ? <RemoveSheet staffel={staffel} decision={sheet.decision} override={Boolean(sheet.decision.own_team)} onClose={() => setSheet(null)} onSaved={saved} /> : null}
     </div>
   );
 }

@@ -1146,7 +1146,10 @@ Tabelle nicht öffentlich.
 
 - `GET /api/admin/leagues/staffeln/{tid}/table` (jede Zuständigkeit der Liga): Tabelle wie öffentlich, dazu `ties` (Gruppen mit
   geteiltem Platz, die die Leitung ordnen darf), `decisions` (mit `applies`: gilt gerade) und `can_decide`
-  (`lead_decision` in den Regeln).
+  (`lead_decision` in den Regeln). Je Gleichstand und Entscheid `own_team` (die Person gehört zu einer Seite) und
+  `superadmin`: Die Verwaltung zeigt bei `own_team` ohne Superadmin „Über dein eigenes Team entscheidet eine andere Person.“
+  statt der Knöpfe, dem Superadmin das Feld „Grund für die Notausnahme“ (ab fünf Zeichen, geht als `conflict_reason` mit).
+  Die Matchseite nimmt dafür ihr `conflict` (`{kind, override}`) – ebenso bei „beide nicht erschienen“.
 - `PUT /api/admin/leagues/staffeln/{tid}/table-decision` `{registration_ids, reason, conflict_reason?}` – Zuständigkeit
   `results`. Nur für einen echten Gleichstand: die Menge muss genau einer Gruppe mit geteiltem Platz entsprechen (ein älterer
   Entscheid für dieselbe Menge zählt dabei nicht), sonst 409. Grund mindestens fünf Zeichen. Befangen ist, wer zu einer der

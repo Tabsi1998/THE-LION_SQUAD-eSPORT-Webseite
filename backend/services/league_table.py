@@ -84,10 +84,23 @@ def can_decide(tournament: dict) -> bool:
     return "lead_decision" in ((table_rules(tournament) or {}).get("table_tiebreakers") or [])
 
 
-async def overview(db, tournament: dict) -> dict:
+async def overview(db, tournament: dict, user: dict | None = None) -> dict:
+    """Was die Verwaltung sieht. ``own_team`` je Gleichstand und Entscheid: gehört die Person zu einer der Seiten
+    (Befangenheit wie beim Festlegen); ``superadmin``: nur der darf dann, als Notausnahme mit Grund."""
+    from services import league_permissions
+
     rows = await table_rows(db, tournament)
-    return {"standings": rows, "ties": ties(rows), "decisions": decisions_view(tournament, rows),
-            "can_decide": can_decide(tournament), "rules": public_rules(tournament)}
+    open_ties, decisions = ties(rows), decisions_view(tournament, rows)
+    wanted = {item for entry in (*open_ties, *decisions) for item in entry["registration_ids"]}
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tournament["id"], "id": {"$in": sorted(wanted)}}, {"_id": 0}).to_list(500) if wanted else []
+    teams = await league_permissions.teams_by_id(db, registrations)
+    own = {row["id"] for row in registrations
+           if league_permissions.belongs_to_side(user, row, teams.get(row.get("team_id") or ""))}
+    for entry in (*open_ties, *decisions):
+        entry["own_team"] = bool(own & set(entry["registration_ids"]))
+    return {"standings": rows, "ties": open_ties, "decisions": decisions, "can_decide": can_decide(tournament),
+            "rules": public_rules(tournament), "superadmin": league_permissions.is_superadmin(user)}
 
 
 async def set_decision(db, tournament: dict, registration_ids: list[str], reason: str, actor_id: str) -> dict:
