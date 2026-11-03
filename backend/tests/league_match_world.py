@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from flow_harness import new_id
 from models import now_utc
+from services.checkin_rules import iso
 from squad_world import make_squad, make_team, squad_registration
 
 GAME_ID = "probe-shooter"
@@ -24,6 +25,24 @@ async def without_score_duty(flow, season: dict) -> None:
     saved = await flow.put(f"/api/admin/leagues/seasons/{season['id']}/result-rules",
                            json={"scores_required": False, "rules": season.get("result_rules") or {}})
     assert saved.status_code == 200, saved.text
+
+
+async def checked_in(flow, match_id: str) -> None:
+    """Erst einchecken, dann melden (D.2, #1652): beide Seiten gelten für den geltenden Termin als eingecheckt - die Vorbedingung jeder
+    Meldung der Captains in einer Staffel mit Check-in-Regeln (jede neue Season hat sie). Schreibt die Einträge in der Form von
+    ``match_flow.check_in`` direkt, ohne Fenster und Kader: Tests zu Maps, Pools, Tabelle und Fristen brauchen den Check-in als
+    Vorbedingung, nicht als Gegenstand (den prüft test_league_checkin_flow)."""
+    match = await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0, "slots": 1, "scheduled_at": 1}) or {}
+    now_iso = now_utc().isoformat()
+    for_at = iso(match.get("scheduled_at"))
+    entries = {
+        f"flow.checkin.{slot['registration_id']}": {"at": now_iso, "updated_at": now_iso, "user_id": None, "present": [], "via": "side",
+                                                   "by": None, "reason": None, "rule_version_id": None, "for_at": for_at}
+        for slot in match.get("slots") or [] if slot.get("registration_id")}
+    assert len(entries) == 2, "zwei Seiten"
+    await flow.db.matches_v2.update_one({"id": match_id}, {"$set": {**entries, "flow.ready_at": now_iso, "flow.ready_for": for_at}})
+
+
 POOL = [
     {
         "mode": "stellung",
