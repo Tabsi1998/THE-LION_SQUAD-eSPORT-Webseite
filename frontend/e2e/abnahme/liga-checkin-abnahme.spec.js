@@ -128,6 +128,9 @@ test.describe("Abnahme: Liga-Check-in gegen den echten Server", () => {
     await expect(home.page.getByTestId("checkin-hint")).toContainText("Das Regelwerk hat sich geändert");
     await expect(home.page.getByTestId("checkin-rules-link")).toHaveAttribute("href", `/liga/${ablauf.league.slug}/${ablauf.season.slug}/regeln`);
     await expect(home.page.getByTestId("checkin-submit")).toHaveCount(0);
+    // Erst einchecken, dann melden (Codex zu D.2): statt des Meldeformulars steht der Satz, wer fehlt.
+    await expect(home.page.getByTestId("match-report-hint")).toContainText("eure Seite hat noch nicht eingecheckt");
+    await expect(home.page.getByTestId("match-report-form")).toHaveCount(0);
     await noSideScroll(home.page);
     await shot(home.page, "checkin-regelwerk-390.png");
     const refused = await api(home.page, "POST", `/api/matches/${play.id}/checkin`, { present: [] });
@@ -184,6 +187,9 @@ test.describe("Abnahme: Liga-Check-in gegen den echten Server", () => {
     await home.page.goto(`/matches/${play.id}`);
     await expect(home.page.getByTestId("checkin-headline")).toHaveText("Spiel läuft");
     await expect(home.page.getByTestId("checkin-own")).toHaveCount(0);
+    // Beide eingecheckt und gestartet: jetzt steht das Meldeformular da.
+    await expect(home.page.getByTestId("match-report-form")).toBeVisible();
+    await expect(home.page.getByTestId("match-report-hint")).toHaveCount(0);
     const page = await (await home.page.request.get(`/api/matches/${play.id}/page`)).json();
     expect(page.match.status).toBe("in_progress");
     expect(page.match.started_at).toBeTruthy();

@@ -366,7 +366,7 @@ Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → e
 
 | Thema | Vertrag | Stelle |
 | --- | --- | --- |
-| „Nicht erschienen?“ | Staffeln ohne Check-in haben keine Frist und keinen Vorschlag, alte offene Vorschläge räumt der Fristen-Job ab, entschiedene bleiben. „Ergebnis fehlt“ bleibt. `POST /lead/no-show/{match}` mit `confirm` gilt in Staffeln auch ohne Vorschlag, solange `no_show_open` (keine Meldung, nicht begonnen). Endgültig mit dem Check-in (#1652) | `match_deadlines.no_show_deadline`, `match_deadline_sweep`, `tournament_lead_routes` |
+| „Nicht erschienen?“ | Staffeln ohne Check-in haben keine Frist und keinen Vorschlag, alte offene Vorschläge räumt der Fristen-Job ab, entschiedene bleiben. „Ergebnis fehlt“ bleibt. `POST /lead/no-show/{match}` mit `confirm` gilt in Staffeln ohne Check-in auch ohne Vorschlag, solange `no_show_open` (keine Meldung, nicht begonnen); mit Check-in (#1652, D.2) nur mit dem Vorschlag zum abgelaufenen Fenster und nur für die Seite ohne Check-in | `match_deadlines.no_show_deadline`, `match_deadline_sweep`, `tournament_lead_routes` |
 | Karte | Mit einer Meldung gibt es in keinem Format mehr die Karte „Nicht erschienen?“ | `match_attention.attention_items` |
 | Kampflos in den Strafen | Teamstrafe des Co-Teams: Captain, Vertreter, Leitung und Co-Leitung des Hauptteams (`match_audience.team_penalty_ids`), nicht der Kader. Admin-Liste einmal je Wertung mit `team_name`. Kein persönlicher Negativ-Eintrag | `penalty_routes` |
 | Maps bei Wertung | `apply_forfeit` setzt `games` und `lineups_missing` leer, wenn das Spiel Maps hat; `match_reports_v2.previous_games` hält sie fest | `match_forfeit` |
@@ -1676,6 +1676,16 @@ zustimmen muss – ändert sich das Regelwerk zwischen Check-in und Start, hält
 `flow.start` mit Bedingung `started_at: null`; der zweite Klick antwortet `idempotent_replay`. Protokoll `match.checkin.start`, Nachricht
 „Match startet jetzt“ an die Verantwortlichen beider Seiten (`checkin_started`, `checkin-start:<spiel>:<at>`). Ab hier gelten alle Regeln für
 begonnene Spiele (D.1: keine Verschiebung; kein Vorschlag „nicht erschienen“; „Ergebnis fehlt“ wie bisher).
+
+**Erst einchecken, dann melden** (`POST /api/matches/{id}/report`, Web und App; `match_flow.report_refusal`): In einer Staffel mit
+Check-in-Regeln nimmt der Server eine Meldung der Captains erst an, wenn beide Seiten für den aktuellen Termin eingecheckt sind – sonst 409
+„Melden geht erst, wenn beide Seiten für diesen Termin eingecheckt sind – eure Seite / <Gegenseite> hat noch nicht eingecheckt.“ (ohne
+Termin: „… der Check-in öffnet erst mit dem Termin“). Die Regelwerks-Sperre gilt dabei wie beim Start (409 nennt die Seite). Die Matchseite
+liefert denselben Satz als `report_hint` und zeigt ihn statt des Meldeformulars; die App bekommt ihn als Antwort auf die Meldung. Frei
+bleiben: ein begonnenes Spiel (`started_at` oder Stand „läuft“), die Bestätigung der Gegenseite (es liegt schon eine Meldung vor), die
+Leitung über `/result`, andere Formate und Seasons ohne Check-in. Fehlt nur der Start-Klick, setzt die erste gültige Meldung den Start
+einmal nach (`match_flow.start_by_report`: `started_at`, `status: "in_progress"`, `flow.start.via: "report"`, Protokoll
+`match.checkin.start`, keine Nachricht).
 
 **Nach Ablauf (§ 8.4, 8.5 – kein automatischer Nichtantritt):** Der Fristen-Job (`match_deadline_sweep`, Regel `check_in` in
 `match_deadlines.no_show_deadline`) legt nach Fensterende genau einen Vorschlag an das Spiel: `no_show_proposal`

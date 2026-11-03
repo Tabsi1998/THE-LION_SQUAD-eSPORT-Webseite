@@ -327,7 +327,9 @@ function MatchPageView() {
   // Ergebnis (#1132): Spieler melden über das Meldeformular, die Turnierleitung trägt über /result ein. Wer beides
   // dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmit = Boolean(data.can_staff_submit_result);
-  const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted);
+  // Liga-Check-in (#1652): erst einchecken, dann melden - der Server sagt, wer fehlt; der Satz steht statt des Formulars.
+  const reportHint = !canStaffSubmit && !isCompleted && data.report_hint ? data.report_hint : null;
+  const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted && !reportHint);
   // Team-Mitglieder ohne Leitung (#1159): sie sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung.
   const showReportReadOnly = Boolean(!canPlayerReport && !canStaffSubmit && !isCompleted && data.report_state?.status === "confirm");
   const wrongResult = () => {
@@ -512,6 +514,10 @@ function MatchPageView() {
           {/* Deine Meldung – Entscheidung (#2124): was die Turnierleitung zur eigenen Meldung entschieden hat. */}
           <OwnDisputes match={match} userId={user?.id} />
 
+          {reportHint ? (
+            <p className="mt-5 rounded-sm border border-honor/30 bg-honor/5 px-4 py-3 text-sm text-white/85" data-testid="match-report-hint">{reportHint}</p>
+          ) : null}
+
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
               {(canPlayerReport || showReportReadOnly) && data.league && (
@@ -561,7 +567,7 @@ function MatchPageView() {
             <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
-          ) : showStaffEnters ? null : (
+          ) : showStaffEnters || reportHint ? null : (
             <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
           )}
           {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}

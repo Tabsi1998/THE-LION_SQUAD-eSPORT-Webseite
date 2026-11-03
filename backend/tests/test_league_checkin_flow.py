@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
-from league_match_world import ids, world as league_world  # noqa: E402
+from league_match_world import ids, two_nil, world as league_world  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import league_checkin_sweep, league_schedule, league_schedule_sweep, match_deadline_sweep, match_flow  # noqa: E402
 from services.match_flow import DEFAULTS  # noqa: E402
@@ -360,6 +360,73 @@ async def test_without_consent_there_is_no_checkin_and_no_start(flow):
     assert still.status_code == 409 and "Horst" in still.json()["detail"]
     await consent(flow, world, "horst", version=2)
     assert (await start(flow, world, "Kapitaen")).status_code == 200
+
+
+# ---------------------------------------------------------------- Meldung erst nach dem Check-in (Codex zu D.2)
+
+async def report(flow, world, user: str, side: str = "reg_a", *names: str):
+    flow.act_as(world["users"][user])
+    return await flow.post(f"/api/matches/{mid(world)}/report", json=two_nil(world, lineup=ids(world, *names), side=side))
+
+
+@pytest.mark.asyncio
+async def test_captains_report_only_after_both_checked_in_and_the_first_report_sets_the_start(flow):
+    """Codex zu D.2 (4): In einer Staffel mit Check-in melden die Captains erst, wenn beide Seiten für diesen Termin eingecheckt sind -
+    der Satz sagt, wer fehlt. Fehlt nur der Start-Klick, setzt die erste gültige Meldung den Start einmal nach."""
+    world = await checkin_world(flow)
+    refused = await report(flow, world, "Kapitaen", "reg_a", "Kapitaen", "Mila")
+    assert refused.status_code == 409, refused.text
+    assert "eingecheckt" in refused.json()["detail"] and "eure Seite" in refused.json()["detail"]
+    own = await page(flow, world, "Kapitaen")
+    assert own["can_player_report_result"] is True and "eure Seite" in own["report_hint"], "die Seite zeigt den Satz statt des Formulars"
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    still = await report(flow, world, "Kapitaen", "reg_a", "Kapitaen", "Mila")
+    assert still.status_code == 409 and "Horst" in still.json()["detail"], still.text
+    assert "Horst" in (await page(flow, world, "Kapitaen"))["report_hint"]
+    assert (await checkin(flow, world, "Falke1", "Falke1", "Falke2")).status_code == 200
+    assert (await page(flow, world, "Kapitaen"))["report_hint"] is None
+    assert not (await flow.reload(world["match"])).get("started_at"), "niemand hat auf Starten getippt"
+    first = await report(flow, world, "Kapitaen", "reg_a", "Kapitaen", "Mila")
+    assert first.status_code == 200, first.text
+    stored = await flow.reload(world["match"])
+    assert stored["started_at"] and stored["status"] == "in_progress"
+    assert stored["flow"]["start"]["via"] == "report" and stored["flow"]["start"]["registration_id"] == world["reg_a"]["id"]
+    assert await flow.db.audit_logs.count_documents({"action": "match.checkin.start"}) == 1
+    assert (await page(flow, world, "Falke1"))["checkin"]["state"] == "running"
+    second = await report(flow, world, "Falke1", "reg_h", "Falke1", "Falke2")
+    assert second.status_code == 200, second.text
+    done = await flow.reload(world["match"])
+    assert done["status"] == "completed" and done["flow"]["start"] == stored["flow"]["start"], "der Start bleibt, wie er war"
+    assert await flow.db.audit_logs.count_documents({"action": "match.checkin.start"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_lead_enters_results_without_check_in_and_other_seasons_stay_as_before(flow):
+    world = await checkin_world(flow)
+    flow.act_as(world["lead"])
+    entered = await flow.post(f"/api/matches/{mid(world)}/result", json={"results": [
+        {"registration_id": world["reg_a"]["id"], "rank": 1, "score": 2}, {"registration_id": world["reg_h"]["id"], "rank": 2, "score": 0}]})
+    assert entered.status_code == 200, entered.text
+    other = await checkin_world(flow, rules=None)
+    reported = await report(flow, other, "Kapitaen", "reg_a", "Kapitaen", "Mila")
+    assert reported.status_code == 200, reported.text
+    assert (await page(flow, other, "Kapitaen")).get("report_hint") is None
+    assert not (await flow.reload(other["match"])).get("started_at"), "ohne Check-in setzt die Meldung keinen Start"
+
+
+@pytest.mark.asyncio
+async def test_a_report_waits_for_the_consent_like_the_start(flow):
+    """Zwischen Check-in und Meldung kommt eine neue Regelfassung: ohne Zustimmung beider Seiten keine Meldung - wie beim Start."""
+    world = await checkin_world(flow)
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    assert (await checkin(flow, world, "Falke1", "Falke1", "Falke2")).status_code == 200
+    await with_rules(flow, world)
+    blocked = await report(flow, world, "Kapitaen", "reg_a", "Kapitaen", "Mila")
+    assert blocked.status_code == 409 and "Regelwerk" in blocked.json()["detail"], blocked.text
+    assert "Regelwerk" in (await page(flow, world, "Kapitaen"))["report_hint"]
+    await consent(flow, world, "squad_a")
+    await consent(flow, world, "horst")
+    assert (await report(flow, world, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
 
 
 # ---------------------------------------------------------------- Nach dem Fenster: Vorschlag, nie eine Wertung

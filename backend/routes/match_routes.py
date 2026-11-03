@@ -708,6 +708,13 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     checkin_block = await match_flow.page_block(
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
         can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None)
+    # Erst einchecken, dann melden (D.2): der Satz, den auch /report gäbe - die Seite zeigt ihn statt des Meldeformulars.
+    report_hint = None
+    if can_player_report and checkin_block:
+        rows = checkin_block.get("sides") or []
+        report_hint = match_flow.report_refusal(
+            match, tournament, own_id=acting_reg["id"], names={row["registration_id"]: row["name"] for row in rows},
+            consent={row["registration_id"]: {"open": True, "rules_url": row.get("rules_url")} for row in rows if row.get("consent_open")})
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
@@ -785,6 +792,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "call": call,
         "result_entry": result_entry,
         "report_entry": report_entry_info if can_player_report else None,
+        "report_hint": report_hint,
         "can_forfeit": can_decide and await _can_forfeit_match(match, user),
         "can_decide_dispute": can_decide and bool(user) and await has_match_result_permission(user, match, capability="disputes"),
         "conflict": conflict,
@@ -1449,6 +1457,15 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         raise HTTPException(status_code=409, detail="Dieses Spiel ist in Klärung – die Turnierleitung entscheidet.")
     if status in REPORT_CLOSED_STATUSES:
         raise HTTPException(status_code=409, detail="Dieses Spiel ist schon entschieden.")
+    # Liga-Check-in (D.2, #1652): mit Check-in-Regeln melden die Captains erst, wenn beide Seiten für diesen Termin eingecheckt
+    # sind und keine Regelfassung offen ist - der Satz sagt, wer fehlt. Die Leitung trägt über /result weiter ohne Check-in ein.
+    checkin_sides = None
+    if match_flow.rules_of(tournament):
+        checkin_sides = await match_flow.sides(db, match, tournament)
+        refusal = match_flow.report_refusal(match, tournament, own_id=my_registration["id"], names=checkin_sides.names,
+                                            consent=checkin_sides.consent)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
     # Jede Meldung wird geprüft wie ein Ergebnis der Turnierleitung: alle Teilnehmer genau einmal, Plätze passend
     # zum Spielstand. So vergleicht der Server zwei Meldungen inhaltlich - nicht nur ihre Schreibweise.
@@ -1482,6 +1499,9 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         entry[league_result_rules.SNAPSHOT_KEY] = league.rule_snapshot()
     if lineup:
         entry["lineup"] = lineup
+    if checkin_sides is not None:
+        # Fehlte nur der Start-Klick, setzt die erste gültige Meldung den Start nach - einmal (D.2, #1652).
+        await match_flow.start_by_report(db, match, tournament, user=me, registration_id=my_registration["id"])
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},

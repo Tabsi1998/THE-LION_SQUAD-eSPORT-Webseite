@@ -308,6 +308,54 @@ async def start(db, match: dict, tournament: dict | None, setup: Sides, *, user:
     return {"started_at": now_iso, "idempotent_replay": False}
 
 
+# ---------------------------------------------------------------- Meldung der Captains (Codex zu D.2)
+
+REPORT = "report"
+REPORT_NEEDS_CHECKIN = "Melden geht erst, wenn beide Seiten für diesen Termin eingecheckt sind"
+
+
+def report_refusal(match: dict, tournament: dict | None, *, own_id: str | None, names: dict[str, str],
+                   consent: dict[str, dict | None] | None = None) -> str | None:
+    """Warum die Captains gerade nicht melden können - ``None``: es geht. Nur Staffeln mit Check-in. Ein begonnenes Spiel (Start
+    gesetzt oder Stand „läuft“) und eins mit Meldung (die Bestätigung der Gegenseite) bleiben frei; die Leitung (``/result``) immer.
+    Zwischen Check-in und Meldung gilt die Regelwerks-Sperre wie beim Start."""
+    rules = rules_of(tournament)
+    if not rules or is_running(match) or is_finished(match) or has_report(match):
+        return None
+    missing = missing_sides(match)
+    if missing:
+        if not window_of(match, rules):
+            return f"{REPORT_NEEDS_CHECKIN} – das Spiel hat noch keinen Termin, der Check-in öffnet erst mit dem Termin."
+        others = ", ".join(names.get(reg_id) or "die Gegenseite" for reg_id in missing if reg_id != own_id)
+        if own_id in missing:
+            who = f"eure Seite und {others} haben" if others else "eure Seite hat"
+            return f"{REPORT_NEEDS_CHECKIN} – {who} noch nicht eingecheckt. Bitte zuerst auf der Matchseite einchecken."
+        return f"{REPORT_NEEDS_CHECKIN} – {others} hat noch nicht eingecheckt."
+    for reg_id in _filled(match):
+        block = (consent or {}).get(reg_id)
+        if block and block.get("open"):
+            return rules_changed_detail(block, None if reg_id == own_id else names.get(reg_id))
+    return None
+
+
+async def start_by_report(db, match: dict, tournament: dict | None, *, user: dict, registration_id: str,
+                          now: datetime | None = None) -> bool:
+    """Beide sind eingecheckt, aber niemand hat „Spiel starten“ getippt: Die erste gültige Meldung setzt den Start nach - einmal,
+    ``via: "report"``, ohne Nachricht (gespielt ist schon). Ohne Regeln, mit Start oder mit fehlender Seite passiert nichts."""
+    if not rules_of(tournament) or is_running(match) or missing_sides(match):
+        return False
+    now_iso = (now or now_utc()).isoformat()
+    entry = {"at": now_iso, "by": user.get("id"), "registration_id": registration_id, "via": REPORT}
+    written = await db.matches_v2.update_one(
+        {"id": match["id"], "started_at": None, "status": {"$in": sorted(OPEN_MATCH_STATUSES)}},
+        {"$set": {"started_at": now_iso, "status": "in_progress", "flow.start": entry, "updated_at": now_iso},
+         "$addToSet": {"flow.user_ids": user.get("id")}})
+    if not written.matched_count:
+        return False
+    await _audit(db, "match.checkin.start", match, user.get("id"), {"registration_id": registration_id, "via": REPORT})
+    return True
+
+
 # ---------------------------------------------------------------- Matchseite
 
 async def _names(db, user_ids) -> dict[str, dict]:
