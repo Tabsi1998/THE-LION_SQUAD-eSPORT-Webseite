@@ -172,7 +172,8 @@ PERSONAL: dict[str, Entry] = {
                                   "die Regelversion selbst bleibt"),
     # Selbstanmeldung (#2205): Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt heraus.
     "league_applications": Entry(OVERWRITTEN, ("league_applications",), "Antrag eines Co-Teams je Liga-Season mit Zustimmung; die Kennung der Person fällt heraus, der Antrag bleibt als Nachweis"),
-    "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances"), SPORT),
+    # Liga-Termine (#2194): Verschiebungsanträge und Termin-Historie am Spiel - die Kennung fällt heraus, der Grund bleibt.
+    "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances", "league_schedule"), SPORT),
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),
     "match_commendations": Entry(KEPT, ("commendations_given",), "das GG gehört zum Match wie das Ergebnis"),

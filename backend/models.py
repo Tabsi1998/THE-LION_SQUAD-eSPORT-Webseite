@@ -1241,6 +1241,8 @@ class MatchUpdate(BaseModel):
     duration_minutes: Optional[int] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203) - geht ins Protokoll, nicht ans Spiel.
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Grund zum Termin der Leitung (Liga, #2194) - in Historie und Protokoll, nicht ans Spiel.
+    schedule_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2Update(BaseModel):

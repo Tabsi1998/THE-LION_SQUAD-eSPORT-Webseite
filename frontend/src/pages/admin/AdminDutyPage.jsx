@@ -9,6 +9,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { DutyList, ModerationDuty } from "@/pages/admin/duty/DutyList";
 import { SeriesDutyList } from "@/pages/admin/duty/SeriesDutyList";
+import { DutyAttention, hasDutyAttention } from "@/pages/admin/duty/DutyAttention";
 import { useAuth } from "@/context/AuthContext";
 import { hasLeagueStaff, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { capabilityWords } from "@/pages/admin/league/LeagueStaffSheet";
@@ -31,7 +32,8 @@ export default function AdminDutyPage() {
   const series = data?.series || [];
   const leagues = data?.leagues || [];
   const leagueDuty = hasLeagueStaff(user);
-  const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0 && series.length === 0 && !leagueDuty;
+  const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0 && series.length === 0 && !leagueDuty
+    && !hasDutyAttention(data);
 
   return (
     <AdminLayout>
@@ -46,6 +48,14 @@ export default function AdminDutyPage() {
         </p>
       )}
       {!data && !failed && <p className="text-sm text-white/45" data-testid="duty-loading">Lade deinen Dienst …</p>}
+
+      {/* Was die Leitung entscheiden muss (#2194): nach dem Ende noch „Live“, überfällige Liga-Spiele. */}
+      {hasDutyAttention(data) && (
+        <section className="mb-8" aria-labelledby="duty-attention-heading">
+          <h2 id="duty-attention-heading" className="font-heading font-bold uppercase text-lg mb-3">Braucht deine Entscheidung</h2>
+          <DutyAttention duty={data} />
+        </section>
+      )}
 
       {data?.moderation && (
         <section className="mb-8" aria-labelledby="duty-moderation-heading">

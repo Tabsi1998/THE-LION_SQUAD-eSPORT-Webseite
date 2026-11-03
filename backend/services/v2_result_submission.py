@@ -188,6 +188,13 @@ async def _finish_result_side_effects(db, match: dict, force: bool, dispute_reso
             match.get("id"),
             type(exc).__name__,
         )
+    # Läuft länger (#2194): War das das letzte offene Spiel nach dem Ende, zeigt die Seite gleich „Beendet“.
+    try:
+        from services.tournament_overrun import settle
+
+        await settle(db, match.get("tournament_id"))
+    except Exception:  # noqa: BLE001 - der Fristen-Job holt es nach
+        logger.debug("Läuft-länger-Merkmal für Turnier %s nicht geprüft", match.get("tournament_id"), exc_info=True)
 
 
 def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dict], *,
