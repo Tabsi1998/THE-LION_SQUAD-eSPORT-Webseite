@@ -50,7 +50,7 @@ REASON_TEXTS = {
     "unchanged": "Inhalt unverändert – nichts zu bearbeiten.",
     "build_failed": "Die Nachricht ließ sich nicht aufbauen",
     "server_off": "Der Server ist aus oder der Bot nicht mehr dort – nichts wird aktualisiert.",
-    "no_games": "Diesem Server ist noch kein Spiel zugeordnet (Spiele → Spiel bearbeiten → Discord-Server).",
+    "no_games": "Diesem Server ist noch kein Spiel zugeordnet (Spiele → Spiel → Allgemein → Discord-Server).",
 }
 
 

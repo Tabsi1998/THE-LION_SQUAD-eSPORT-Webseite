@@ -162,7 +162,7 @@ async def answer_verknuepfen(db, discord_user_id, base_url: str = "") -> dict:
 # ---------------------------------------------------------------- Server-Kontext (#630)
 
 NO_GAMES = ("Diesem Server ist noch kein Spiel zugeordnet – mit `alle: True` siehst du alles. "
-            "(Vorstand: Spiele → Spiel bearbeiten → Discord-Server.)")
+            "(Vorstand: Spiele → Spiel → Allgemein → Discord-Server.)")
 GAME_FIELDS = {"_id": 0, "id": 1, "name": 1, "display_name": 1, "short_name": 1, "slug": 1, "parent_game_id": 1}
 
 
