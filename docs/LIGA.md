@@ -60,6 +60,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `min_squad_size` | int ≥ `team_size` | ja | = `team_size` |
 | `game_mode_order` | `[str]` | nein | `[]` = Modus je Map frei; sonst Modus je Position (zyklisch) |
 | `map_repeat` | `"never"` \| `"other_mode"` \| `"always"` | ja | `"other_mode"`: dieselbe Map in einer Serie nur in einem anderen Modus (#2096); `"never"` jede Map einmal, `"always"` frei |
+| `pool_min_maps` | `[{mode, min_maps}]` | nein | fehlt = abgeleitet aus Reihenfolge, Best of und `map_repeat` (C.2, Abschnitt 12) |
 | `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden nur `match_points` (3/1/0) und `table_tiebreakers` |
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
@@ -1073,6 +1074,101 @@ in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
 
 **Bekannte Grenze:** Prüfen und Schreiben beim Entfernen sind zwei Schritte. Speichert jemand in genau diesem Moment einen Pool mit
 dem Modus, kann der Pool auf einen entfernten Modus zeigen. Das ist der Zustand von vor C.1 und wird gelesen wie bisher.
+
+### C.2 Maps und Pools (#2207)
+
+Maps bleiben in `game_maps`, Pools in `map_pools` mit unveränderlichen Versionen. C.2 gibt Maps einen Zustand wie den Modi, prüft
+Pools gegen Reihenfolge und Wiederholungsregel der Season und bündelt alles in einer Prüfung vor der Veröffentlichung. Logik in
+`services/game_maps.py` (Zustand), `services/map_pools.py` (Vergleich, Map herausnehmen), `services/league_pool_check.py`
+(Mindestgröße, Länge der Reihenfolge, betroffene Seasons) und `services/league_readiness.py` (Prüfung). Kein Wert eines Titels steht
+im Code. **Migration: keine.** Unberührt: `map_pools.allowed`, `effective_pool`, die Versionen selbst, festgehaltene Pools
+(`map_pool_id`), fertige Spiele, der Vertrag `games[]`, die Dauerplanung, die Referenz-Ligen und alle anderen Formate.
+
+**Zustand einer Map** (`game_maps.status`, fehlt = aktiv):
+
+| Zustand | Neu in einen Pool | Bibliothek der Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` (oder fehlt) | ja | sichtbar | – |
+| `inactive` | nein. Im selben Pool, wo sie schon im selben Modus steht, bleibt sie beim nächsten Speichern erlaubt | sichtbar mit „inaktiv“; der Pool-Editor zeigt sie nur, wo sie schon gewählt ist | bleibt gültig und meldbar |
+| `archived` | nein, auch nicht im selben Pool (wie bisher) | nur mit „Archivierte zeigen“ | bleibt gültig und meldbar; der Pool-Editor nennt sie als „geändert“ |
+
+- `PATCH /api/games/{id}/maps/{map_id}` nimmt `status: "inactive"` an. Die Antwort trägt zusätzlich `affected_seasons` und
+  `warning`, wenn die Map beim Deaktivieren oder Archivieren im geltenden Pool einer Season im Entwurf oder in einer laufenden
+  Season steht (Pool der Season oder einer ihrer Staffeln). **Nur Warnung, keine Sperre.** Vorab fragt die Verwaltung
+  `GET /api/games/{id}/maps/{map_id}/usage`: `{pools, affected_seasons: [{season_id, season_name, league_id, league_name, status,
+  in_season_pool, staffeln}]}`.
+- **Löschen** geht wie bisher nur, wenn die Map in keiner Pool-Version (außer dem Standard-Pool) und keinem Ergebnisblatt steht. Neu
+  zusätzlich: nicht in `games[]`, einer Meldung oder einem gehaltenen Ergebnis eines Spiels. Sonst 409 „… bitte archivieren statt
+  löschen“.
+- Gelesen wird der Zustand nur beim Speichern eines Pools und in der Verwaltung. Melden, Bestätigen, Veto und `effective_pool` lesen
+  den Snapshot im Pool, nie den Zustand der Map.
+
+**Pool-Versionen vergleichen:** `GET /api/admin/leagues/seasons/{id}/map-pool/versions` listet die Versionen der Season (neueste
+zuerst, `{id, version, saved_at, saved_by, note, cleared, maps}`). `GET …/map-pool/compare?base=<Nr>&target=<Nr>` stellt zwei
+gegenüber: `{base, target, modes: [{mode, label, added: [{map_id, name}], removed: [...], kept: Zahl, status: "added"|"removed"|"changed"|"same"}], same}`. Die Reihenfolge innerhalb eines Modus zählt nicht als Änderung. Recht: jede Zuständigkeit der Liga.
+
+**Mindestgröße je Modus** (`league_pool_check.requirements`): Die längste Serie der Season ist das größte Best of aus Season und
+aktiven Liga N (`max_maps`). Mit `game_mode_order` zählt jeder Modus so oft, wie er in den ersten `max_maps` Positionen steht
+(zyklisch wie beim Melden). Daraus je Modus:
+
+| `map_repeat` | braucht je Modus | dazu |
+| --- | --- | --- |
+| `always` | 1 | – |
+| `other_mode` (Vorgabe) | so viele Maps, wie der Modus Positionen hat | – |
+| `never` | ebenso | Modi zusammen genug verschiedene Maps (jede Teilmenge der Modi der Reihenfolge, Satz von Hall) |
+
+Ohne Reihenfolge (Modus frei) gilt: `always` 1 Map, `other_mode` so viele Paare aus Modus und Map wie `max_maps`, `never` so viele
+verschiedene Maps wie `max_maps`. Neues Season-Feld `pool_min_maps: [{mode, min_maps}]` (optional, `min_maps` 1–50, `mode` ein Modus
+des Spiels, `null` für Spiele ohne Modi) überschreibt die Ableitung je Modus nach oben oder unten; fehlt es, gilt die Ableitung. Es
+gehört nur der Season, die Staffel trägt es nicht. Zu klein: **Warnung** beim Speichern des Pools (`warnings[]` in der Antwort), in
+der Prüfung ein Problem.
+
+**Länge der Reihenfolge:** `game_mode_order` ist leer oder genau `max_maps` lang. Gespeichert wird beim Anlegen und Ändern der Season
+(nur wenn sich Reihenfolge oder Best of ändern) und beim Ändern einer Liga N (nur wenn sich ihr Best of ändert). Season im Entwurf:
+422. Season läuft schon (jeder Stand außer Entwurf): nur Warnung (`warnings[]`), damit Altbestand speicherbar bleibt.
+
+**Map in einem Schritt sperren:** `POST /api/admin/leagues/seasons/{id}/map-pool/remove-map` mit `{map_id, mode?, reason,
+expected_version?}` (Recht `season`). Ohne `mode` fällt die Map aus allen Modi. Der Server legt aus der geltenden Version eine neue an
+(Snapshot ohne neue Prüfung gegen die Bibliothek, wie `copy_version`), überträgt sie auf alle Staffeln der Season (derselbe Weg wie
+beim Übertragen, auch gesperrte und laufende Staffeln) und schreibt `league.season.map_pool.remove_map` mit Grund, Map, Modus, neuer
+Version und je Staffel dem Ergebnis. Grund mindestens fünf Zeichen. 404 ohne Pool oder ohne die Map darin; 422, wenn der Pool leer würde
+oder ein Modus der Reihenfolge keine Map mehr hätte; 409 bei gleichzeitigem Speichern. Antwort: `{pool, staffeln[], warnings[]}`.
+Alte Versionen, festgehaltene Pools und fertige Spiele bleiben.
+
+**`season_readiness`** (`GET /api/admin/leagues/seasons/{id}/readiness`, jede Zuständigkeit der Liga):
+`{ok, problems: [{code, text}], warnings: [{code, text}], requirements: [{mode, label, derived, override, needed, have}], max_maps,
+superadmin}`.
+
+| Code | Art | Wann |
+| --- | --- | --- |
+| `pool_missing` | Problem | kein geltender Pool der Season |
+| `pool_stale` | Problem | der Pool gehört zu einem anderen Spiel |
+| `pool_too_small` | Problem | ein Modus oder die Modi zusammen haben zu wenige Maps (Mindestgröße oben) |
+| `mode_order_length` | Problem | Reihenfolge nicht leer und nicht `max_maps` lang |
+| `mode_order_missing` | Problem | ein Modus der Reihenfolge fehlt im Pool |
+| `rules_missing` | Problem | kein gültiges Regelwerk (B.2), ein Regeltext allein reicht nicht |
+| `rules_upcoming` | Warnung | es gibt nur eine Fassung, die erst später gilt (kein Problem, wenn eine schon gilt) |
+| `divisions_missing` | Problem | keine aktive Liga N |
+| `staffel_missing` | Problem | eine aktive Liga N ohne Staffel |
+| `application_after_start` | Problem | das Anmeldefenster (B.4) endet nach dem Beginn der Season |
+| `application_closed` | Warnung | das Anmeldefenster ist schon vorbei |
+| `application_none` | Warnung | kein Anmeldefenster: keine Selbstanmeldung |
+| `inactive_mode` | Warnung | ein inaktiver oder archivierter Modus im Pool oder in der Reihenfolge |
+| `inactive_map` | Warnung | eine inaktive, archivierte oder gelöschte Map im Pool |
+
+**Veröffentlichen:** Wechselt die Sichtbarkeit einer Season von `off` auf `admins`, `members` oder `public` (auch beim Anlegen mit einer
+Sichtbarkeit), prüft der Server vor dem Schreiben auf dem neuen Stand. Probleme: 409 „Veröffentlichen geht noch nicht: …“, nichts wird
+gespeichert. Warnungen halten nichts auf. Notausnahme nur für den Superadmin mit `readiness_override_reason` (mindestens fünf Zeichen,
+sonst 409) im selben Aufruf; Protokoll `league.season.readiness_override` mit Grund und den Codes. Von `admins` weiter auf `members`
+oder `public` prüft nichts mehr. Bekannte Grenze: Prüfen und Schreiben sind zwei Schritte.
+
+**Verwaltung:** Season-Seite mit Abschnitt „Prüfung vor der Veröffentlichung“ (Probleme, Warnungen, Mindestgröße je Modus mit Feld
+zum Überschreiben, beim Superadmin das Feld für den Grund), „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer
+Bibliothek: Knopf „Deaktivieren“ mit Rückfrage, die betroffene Seasons nennt.
+
+**App:** liest nur den Snapshot `map_pool.modes` und keine Map-Zustände. Antworten bekommen nur Felder dazu.
+
+**Audit-Aktionen neu:** `league.season.map_pool.remove_map`, `league.season.readiness_override`.
 
 ### Darf nicht beschädigt werden
 
