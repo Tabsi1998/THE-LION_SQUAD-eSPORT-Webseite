@@ -438,6 +438,33 @@ async def test_the_lead_extends_the_window_and_the_side_can_still_check_in(flow)
     assert (await flow.reload(world["match"]))["no_show_proposal"]["missing_registration_ids"] == [world["reg_a"]["id"]]
 
 
+async def decide(flow, world, **body):
+    flow.act_as(world["lead"])
+    return await flow.post(f"/api/tournaments/{world['tournament']['id']}/lead/no-show/{mid(world)}", json=body)
+
+
+@pytest.mark.asyncio
+async def test_with_check_in_the_lead_scores_a_no_show_only_after_the_window_and_only_with_a_proposal(flow):
+    """Codex zu D.2 (1): In einer Staffel mit Check-in wertet die Leitung nicht vor Fensterende und nicht ohne aktuellen, abgelaufenen
+    Vorschlag - die Ausnahme „ohne Vorschlag werten“ gilt nur für Staffeln ohne Check-in (#2201)."""
+    world = await checkin_world(flow)
+    early = await decide(flow, world, action="confirm", registration_id=world["reg_h"]["id"])
+    assert early.status_code == 409, early.text
+    assert (await flow.reload(world["match"]))["status"] == "scheduled", "nichts gewertet"
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    await shift(flow, world, -16)
+    still = await decide(flow, world, action="confirm", registration_id=world["reg_h"]["id"])
+    assert still.status_code == 409, "Fenster zu, aber noch kein Vorschlag des Jobs"
+    assert (await sweep(flow, world, 0))["proposed"] == 1
+    scored = await decide(flow, world, action="confirm", registration_id=world["reg_h"]["id"])
+    assert scored.status_code == 200, scored.text
+    assert (await flow.reload(world["match"]))["forfeit_registration_id"] == world["reg_h"]["id"]
+    # Ohne Check-in bleibt es wie seit #2201: Die Leitung wertet auch ohne Vorschlag.
+    other = await checkin_world(flow, rules=None)
+    without = await decide(flow, other, action="confirm", registration_id=other["reg_h"]["id"])
+    assert without.status_code == 200, without.text
+
+
 @pytest.mark.asyncio
 async def test_a_new_time_from_the_lead_voids_old_checkins_and_the_proposal(flow):
     """E.1 „Neu ansetzen“ und jeder neue Termin der Leitung: alte Check-ins zählen nicht mehr, der alte Vorschlag fällt weg, „beide da“

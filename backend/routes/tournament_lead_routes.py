@@ -21,6 +21,7 @@ from database import get_db
 from models import new_id, now_utc
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
+from services import checkin_rules
 from services.league_permissions import READ, require_no_conflict
 from services.match_forfeit import apply_forfeit
 from services.league_scope import is_league_staffel
@@ -101,9 +102,14 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     await _ensure_tournament_unlocked(db, tournament_id)
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0}) or {}
     # Liga-Staffel (#2201): ohne Check-in entsteht kein Vorschlag mehr - die Leitung wertet trotzdem, solange nichts gemeldet ist.
+    # Mit Check-in (D.2, #1652) nur über den Vorschlag des Jobs, also erst nach dem Fenster - vorher kann niemand „fehlen“.
     league_staffel = is_league_staffel(tournament)
-    if not isinstance(match.get("no_show_proposal"), dict) and not (league_staffel and body.action == "confirm"):
-        raise HTTPException(status_code=409, detail="Für dieses Spiel liegt kein Vorschlag „nicht erschienen“ vor.")
+    with_checkin = checkin_rules.rules_of(tournament) is not None
+    if not isinstance(match.get("no_show_proposal"), dict) and not (league_staffel and body.action == "confirm" and not with_checkin):
+        detail = "Für dieses Spiel liegt kein Vorschlag „nicht erschienen“ vor."
+        if with_checkin:
+            detail += " Er kommt erst, wenn das Check-in-Fenster zu ist und eine Seite fehlt."
+        raise HTTPException(status_code=409, detail=detail)
     proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else {}
     # Schon bestätigt: im Duell der ganze Vorschlag, im Lauf diese eine Person (#1823: je Person). Mit Stand - im Lauf
     # bleibt er offen, im Duell ist er „forfeit“; danach richtet sich die Rückmeldung.
@@ -131,9 +137,14 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     stage_id = match.get("stage_id")
     stage = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0}) if stage_id else None
     same_pairing = sorted(proposal.get("registration_ids") or filled) == sorted(filled)
-    if league_staffel:
-        # In der Liga läuft keine Frist: es zählt nur, dass das Spiel noch offen ist.
+    if league_staffel and not with_checkin:
+        # In der Liga ohne Check-in läuft keine Frist: es zählt nur, dass das Spiel noch offen ist.
         still_valid = no_show_open(match)
+    elif league_staffel:
+        # Liga-Check-in (D.2, #1652): der Vorschlag gehört zum Fenster des aktuellen Termins - nach einem neuen Termin oder einer
+        # Verlängerung gilt er nicht mehr, auch wenn der Job ihn noch nicht weggeräumt hat.
+        info = no_show_deadline(match, tournament, stage)
+        still_valid = bool(info and info["due_at"] <= now and proposal.get("rule") == "check_in")
     else:
         info = no_show_deadline(match, tournament, stage)
         still_valid = bool(info and info["due_at"] <= now)
