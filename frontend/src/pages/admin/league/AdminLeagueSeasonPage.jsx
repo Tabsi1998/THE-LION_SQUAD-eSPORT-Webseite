@@ -23,6 +23,7 @@ import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
+import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
   ACTIVE_STATUS_OPTIONS,
@@ -504,6 +505,9 @@ export default function AdminLeagueSeasonPage() {
               <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
                 hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
             ) : null}
+
+            {/* Ergebnisregeln (C.3, #1617): eigene Speichern-Taste, Hinweis aufs Übertragen wie beim Season-Formular. */}
+            <SeasonResultRulesPanel seasonId={seasonId} canEdit={canSeason} onSaved={setPendingSync} />
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">
               <div className="flex flex-wrap items-center justify-between gap-3">
