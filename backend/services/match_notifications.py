@@ -100,10 +100,11 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     reg_ids = participant_source_ids(match)
     if not reg_ids:
         return 0
+    # Alle Plätze des Spiels (#2216) - eine Battle-Royale-Lobby hat mehr als 100.
     registrations = await db.tournament_registrations.find(
         {"id": {"$in": reg_ids}},
         {"_id": 0},
-    ).to_list(100)
+    ).to_list(len(reg_ids))
     user_ids = await _participant_user_ids(db, registrations)
     if not user_ids:
         return 0
