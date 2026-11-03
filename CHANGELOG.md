@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.63.0 (03.11.2026)
+
+### Neu
+
+* Pool-Editor, Discord-Einstellungen und Hinweise führen auf die Spielseite (#2249)
+* Verwaltung: eigene Spielseite mit Reitern Allgemein, Spiel-IDs, Modi und Maps, per Adresse ansteuerbar (#2249)
+* Verwaltung: Maps als Tabelle Map × Modus, ein Häkchen gibt frei; alte Map-Adresse leitet weiter (#2249)
+* Verwaltung: Modi als Zeilen mit Zustand, Spielern, Ergebnisregel und Dauer, aufklappbar (#2249)
+* Verwaltung: Speichern je Reiter, ungespeicherte Änderungen bleiben beim Reiterwechsel und werden beim Verlassen erfragt (#2249)
+* Verwaltung: Spiel-IDs mit beschrifteten Feldern; gespeicherte Schlüssel bleiben fest, neue müssen eindeutig sein (#2249)
+* Verwaltung: Spieleliste mit Zahnrad, neues Spiel schnell mit Name und Art (#2249)
+
 ## 1.62.0 (03.11.2026)
 
 ### Neu
