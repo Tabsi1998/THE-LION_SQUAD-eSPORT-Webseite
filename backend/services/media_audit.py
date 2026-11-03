@@ -35,6 +35,8 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("f1_challenges", ["banner_url", "cover_url"]),
     ("f1_tracks", ["image_url"]),
     ("game_maps", ["image_url"]),
+    # Ausrüstung je Spiel (#2218): Waffen, Aufsätze, übrige Ausrüstung.
+    ("game_equipment", ["image_url"]),
     ("seasons", ["banner_url"]),
     ("gallery_albums", ["cover_url"]),
     ("gallery_photos", ["image_url", "thumbnail_url", "video_url"]),
@@ -78,6 +80,8 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # Ergebnisblatt kommt immer aus einem Pool-Snapshot oder der Bibliothek - darum zählen diese beiden, die Blätter
     # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
     ("game_maps", ["image_history"]),
+    # Frühere Bilder der Ausrüstung (#2218).
+    ("game_equipment", ["image_history"]),
     # Gewinnbilder der Liga (#2107) je Season und Liga N.
     ("league_seasons", ["prizes.image_url"]),
     ("league_divisions", ["prizes.image_url"]),
@@ -100,6 +104,7 @@ COLLECTION_LABELS = {
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
+    "game_equipment": "Ausrüstung", "loadout_bans": "Sperrliste",
     "reference_lineages": "Spur", "reference_series": "Saison",
     "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N", "league_rules": "Regelwerk",
     "direct_messages": "Direktnachricht", "team_chat_messages": "Team-Chat", "tournament_chat_messages": "Turnier-Chat",
@@ -117,6 +122,8 @@ FIELD_LABELS = {
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     "body_md": "Text", "annexes.body_md": "Text einer Anlage",
+    "entries.image_url": "Bild eines Eintrags", "entries.attachments.image_url": "Bild eines Aufsatzes",
+    "frozen_images": "Bild in einem Baustein",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
        for kind in ("logo", "banner") for variant in ("dark", "light")},
@@ -159,6 +166,7 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("f1_challenges", ["banner_url", "cover_url"], "admin"),
     ("f1_tracks", ["image_url"], "admin"),
     ("game_maps", ["image_url"], "admin"),
+    ("game_equipment", ["image_url"], "admin"),
     ("seasons", ["banner_url"], "admin"),
     ("member_benefits", ["image_url"], "admin"),
     ("club_member_profiles", ["photo_url", "cover_url"], "admin"),

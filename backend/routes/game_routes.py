@@ -267,5 +267,7 @@ async def delete_game(game_id: str, me: dict = Depends(require_admin())):
     if used["total"]:
         raise HTTPException(status_code=409, detail=game_usage.still_in_use(used["text"]))
     await db.map_pools.delete_many({"scope": game_maps.DEFAULT_POOL_SCOPE, "scope_id": game_id})
+    # Kategorien der Ausrüstung (#2218) gehören zum Spiel; Einträge gibt es dann keine mehr (``usage``).
+    await db.game_equipment_categories.delete_many({"game_id": game_id})
     await db.games.delete_one({"id": game_id})
     return {"ok": True}
