@@ -30,7 +30,8 @@ from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
 from services.log_safe import log_safe
-from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock, tournament_write_resource
+from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
+                                    mutation_lock, tournament_write_resource)
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
@@ -993,9 +994,23 @@ async def _next_letter(db, division_id: str) -> str:
     raise LeagueProblem("Alle Buchstaben sind vergeben.", 409)
 
 
+STAFFEL_POOL_BUSY = "Der Map-Pool der Season wird gerade geändert – bitte die Staffel gleich noch einmal anlegen."
+
+
 async def create_staffel(db, division: dict, staffel: str | None, user: dict) -> dict:
     """Legt das Staffel-Turnier an (Status ``draft``) mit allen Vorgaben aus Season und Liga N, dem Map-Pool der Season
-    als eigener Version im Scope ``tournament`` und der Prüfung „Runden ≤ aktive Wochen“."""
+    als eigener Version im Scope ``tournament`` und der Prüfung „Runden ≤ aktive Wochen“.
+
+    Unter der Pool-Sperre der Season (#2207): So liest eine neue Staffel nie einen Pool, den „Map aus dem Pool nehmen“ gerade ersetzt.
+    Die Staffel ist neu und hat noch keine Turnier-Sperre - die Reihenfolge „erst Turniere, dann Pool“ bleibt gewahrt."""
+    try:
+        async with mutation_lock(db, league_season_pool_resource(division["season_id"])):
+            return await _create_staffel(db, division, staffel, user)
+    except MutationLockBusy:
+        raise LeagueProblem(STAFFEL_POOL_BUSY, 409) from None
+
+
+async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -> dict:
     season = await get_season(db, division["season_id"])
     league = await get_league(db, division["league_id"])
     game = await _game(db, league.get("game_id"))

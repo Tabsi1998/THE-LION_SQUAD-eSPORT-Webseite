@@ -368,6 +368,54 @@ async def test_removing_and_saving_the_pool_wait_for_each_other(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_new_staffel_waits_for_the_pool_lock(flow):
+    """Codex-Nachprüfung #2207: Staffel anlegen hält dieselbe Pool-Sperre - belegt heißt 409, es entsteht keine Staffel."""
+    from services.mutation_lock import league_season_pool_resource, mutation_lock
+
+    w = await build(flow)
+    before = await flow.db.tournaments.count_documents({"league_context.season_id": w["season"]["id"]})
+    async with mutation_lock(flow.db, league_season_pool_resource(w["season"]["id"]), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+        busy = await flow.post(f"{ADMIN}/divisions/{w['division']['id']}/staffeln", json={})
+    assert busy.status_code == 409
+    assert await flow.db.tournaments.count_documents({"league_context.season_id": w["season"]["id"]}) == before
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_created_while_removing_never_keeps_the_removed_map(flow, monkeypatch):
+    """Codex-Nachprüfung #2207: Kommt eine Staffel dazu, während die Map gesperrt wird, darf sie den alten Pool nicht behalten und die
+    Sperraktion trotzdem Erfolg melden. Entweder die Sperraktion bricht ohne neue Version ab (409), oder jede Staffel ist ohne die Map."""
+    import asyncio
+
+    w = await build(flow)
+    hafen = w["maps"]["Hafenkante"]
+    real = map_pools.without_map
+
+    async def slowly(db, **kwargs):
+        await asyncio.sleep(0.5)  # in dieser Zeit legt die Leitung eine Staffel an
+        return await real(db, **kwargs)
+
+    monkeypatch.setattr(map_pools, "without_map", slowly)
+
+    async def create_soon():
+        await asyncio.sleep(0.1)
+        return await flow.post(f"{ADMIN}/divisions/{w['division']['id']}/staffeln", json={})
+
+    removing, creating = await asyncio.gather(
+        flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map", json={"map_id": hafen["id"], "reason": "Fehler im Spiel"}),
+        create_soon())
+    assert creating.status_code in (200, 409), creating.text
+    season_pool = await map_pools.current(flow.db, "league_season", w["season"]["id"])
+    staffeln = [row["id"] for row in await flow.db.tournaments.find({"league_context.season_id": w["season"]["id"]}, {"_id": 0, "id": 1}).to_list(None)]
+    if removing.status_code == 200:
+        assert not map_pools.allowed(season_pool, "stellung", hafen["id"])
+        for tid in staffeln:
+            assert not map_pools.allowed(await map_pools.current(flow.db, "tournament", tid), "stellung", hafen["id"]), tid
+    else:
+        assert removing.status_code == 409, removing.text
+        assert season_pool["version"] == 1
+
+
+@pytest.mark.asyncio
 async def test_removing_again_finishes_what_is_missing_and_creates_nothing_twice(flow):
     w = await build(flow)
     other_tid = await second_staffel(flow, w)
