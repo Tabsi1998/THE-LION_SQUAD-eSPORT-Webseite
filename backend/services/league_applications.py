@@ -64,6 +64,9 @@ GONE = "Diesen Antrag gibt es nicht."
 BUSY = "An dieser Season wird gerade etwas geändert. Bitte gleich noch einmal versuchen."
 STAFFEL_GONE = "Diese Staffel gehört nicht zu dieser Season."
 SQUAD_GONE = "Das Co-Team gibt es nicht mehr."
+# Der Dialog „Co-Team zuteilen“ fragt nach keinem Grund: Die Notausnahme geht über den Eingang, dort steht das Feld (#2245).
+ADMIN_WAY_OVERRIDE = ("Über dein eigenes Team entscheidet eine andere Person. Das Co-Team hat einen offenen Antrag: Als Superadmin geht es nur "
+                      "als Notausnahme mit Grund, im Eingang der Season unter „Anmeldungen“.")
 
 
 # ---------------------------------------------------------------- Fenster und Plätze
@@ -581,7 +584,7 @@ async def admin_assignment_conflict(db, tournament: dict, squad_id: str | None, 
     application = await _open_for_admin_way(db, tournament, squad_id)
     if not application:
         return None
-    return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason)
+    return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason, superadmin_detail=ADMIN_WAY_OVERRIDE)
 
 
 async def link_admin_assignment(db, tournament: dict, registration: dict, actor: dict, override: str | None = None) -> None:

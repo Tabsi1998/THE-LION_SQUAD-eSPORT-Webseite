@@ -381,8 +381,9 @@ async def side_conflict(db, user: dict | None, side: dict) -> dict | None:
     return {"kind": CONFLICT_INVOLVED, "override": is_superadmin(user)}
 
 
-async def require_no_side_conflict(db, user: dict, side: dict, *, conflict_reason: str | None = None) -> str | None:
+async def require_no_side_conflict(db, user: dict, side: dict, *, conflict_reason: str | None = None,
+                                   superadmin_detail: str = SIDE_CONFLICT_SUPERADMIN_DETAIL) -> str | None:
     """403, wenn die Person zur Seite gehört; der Superadmin nur mit Grund. Gibt den Grund der Notausnahme zurück, das Protokoll
     schreibt der Aufrufer, wenn die Entscheidung gelungen ist (``record_override``)."""
     return override_reason(await side_conflict(db, user, side), conflict_reason,
-                           detail=SIDE_CONFLICT_DETAIL, superadmin_detail=SIDE_CONFLICT_SUPERADMIN_DETAIL)
+                           detail=SIDE_CONFLICT_DETAIL, superadmin_detail=superadmin_detail)

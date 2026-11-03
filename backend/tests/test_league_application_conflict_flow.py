@@ -267,7 +267,8 @@ async def test_the_admin_way_lets_the_superadmin_through_with_reason(flow):
     flow.act_as({**side["lead"], "role": "superadmin"})
     body = {"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]}
 
-    assert (await flow.post(squad_url(w), json=body)).status_code == 403
+    refused = await flow.post(squad_url(w), json=body)
+    assert refused.status_code == 403 and "im Eingang der Season" in refused.json()["detail"], "der Dialog hat kein Feld, der Satz zeigt den Weg"
     ok(await flow.post(squad_url(w), json={**body, "conflict_reason": REASON}))
 
     linked = await stored(flow, application)
