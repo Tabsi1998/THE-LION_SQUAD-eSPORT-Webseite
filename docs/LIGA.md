@@ -1147,6 +1147,9 @@ lesen sie nicht):
 - **`not_played`** steht nie in `games` – alle Leser zählen dort gespielte Maps. Die Matchseite liefert im Block `league`
   `not_played: [Position]`: die Positionen nach dem Serienende bis `best_of`.
 - Matchseite: „wiederholt“ und „zugesprochen“ an der Map; `proof_id` sehen nur Beteiligte und Leitung (wie Aufstellungen).
+- Öffentlich: `status`, `replay_reason`, `decision` und `host_registration_id` stehen (nur wenn gesetzt) in beiden
+  `PUBLIC_GAME_FIELDS` (`match_public_view`, `league_page`), `proof_id` nie. Die Ligaseite (`StaffelPanel`) zeigt „wiederholt“,
+  „zugesprochen“ und je Spiel `not_played` wie die Matchseite.
 
 **Meldeformular und Ergebnis-Fenster:** zeigen je Map die Regel („bis 250 Punkte“, „6 Runden, höchstens 11“), bei Punktepflicht
 die Punktefelder ohne „freiwillig“ und prüfen vorab mit denselben Sätzen (`leagueResultRules.js`). Der Server bleibt maßgeblich.

@@ -4,6 +4,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDateTime } from "@/lib/vienna";
 import { LineupPicker, ParticipantsPicker } from "./LeagueReportForm";
 import { followLineups, gamesProblem, isSeries, lineupAmendClosed, participantsProblem, personIds } from "./leagueGames";
+import { notPlayedText } from "./leagueResultRules";
 
 // Die gespielten Maps eines Liga-Spiels (docs/LIGA.md, #1650): je Map Bild, Name, Modus, Sieger, Punkte und die
 // Aufstellungen beider Seiten - fehlt eine noch, steht es da. Wer darf, trägt die eigene Aufstellung hier nach.
@@ -14,12 +15,6 @@ function until(value) {
   } catch {
     return "";
   }
-}
-
-/** „Map 4 und 5 nicht gespielt – …“: die Positionen nach dem Serienende (C.3, `not_played`). */
-function notPlayedText(positions) {
-  const list = positions.length > 1 ? `${positions.slice(0, -1).join(", ")} und ${positions.at(-1)}` : String(positions[0]);
-  return `Map ${list} nicht gespielt – die Serie war entschieden.`;
 }
 
 export function LeagueGamesView({ league }) {

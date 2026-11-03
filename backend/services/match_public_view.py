@@ -28,7 +28,9 @@ INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 # Liga (#1650): öffentlich je Map nur der Schnappschuss, Sieger und Punkte - Aufstellungen (Konto-Kennungen) bekommen
 # die Beteiligten mit Namen über den Block ``league`` der Matchseite. Gleich wie die Staffel-API (league_page).
 PUBLIC_GAME_FIELDS = ("position", "mode", "mode_label", "map_id", "map_name", "map_image_url", "winner_registration_id",
-                      "scores")
+                      "scores",
+                      # Zusatzfelder je Map (C.3, #1617), nur wenn gesetzt. Der Nachweis (``proof_id``) bleibt privat.
+                      "status", "replay_reason", "decision", "host_registration_id")
 
 
 def public_games(games: list | None) -> list:

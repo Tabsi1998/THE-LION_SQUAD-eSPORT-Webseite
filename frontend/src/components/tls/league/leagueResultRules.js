@@ -15,6 +15,12 @@ export function ruleHint(rule) {
     rule.draw_allowed ? "Remis möglich" : ""].filter(Boolean).join(" · ");
 }
 
+/** „Map 4 und 5 nicht gespielt – …“: die Positionen nach dem Serienende (`not_played`) - Matchseite und Ligaseite. */
+export function notPlayedText(positions) {
+  const list = positions.length > 1 ? `${positions.slice(0, -1).join(", ")} und ${positions.at(-1)}` : String(positions[0]);
+  return `Map ${list} nicht gespielt – die Serie war entschieden.`;
+}
+
 /** Die Regel einer Map: die der Staffel für ihren Modus - sonst keine. */
 export function ruleFor(league, mode) {
   const rule = mode ? league?.result_rules?.[mode] : null;
