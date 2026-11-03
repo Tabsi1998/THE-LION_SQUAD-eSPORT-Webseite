@@ -145,3 +145,17 @@ async def test_the_last_result_and_the_status_change_clear_the_flag_at_once(flow
     answer = await flow.post(f"/api/tournaments/{other['id']}/status", json={"status": "completed"})
     assert answer.status_code == 200, answer.text
     assert "running_past_end" not in await stored(flow, other)
+
+
+@pytest.mark.asyncio
+async def test_more_than_five_hundred_running_tournaments_all_keep_their_flag(flow):
+    """Der Lauf liest alle laufenden Turniere - und nimmt nur Merkmale weg, deren Turnier er geprüft hat."""
+    end = (now_utc() - timedelta(hours=2)).isoformat()
+    tournaments = [{"id": f"t-{index:04d}", "slug": f"cup-{index:04d}", "title": "Cup", "status": "live", "end_date": end,
+                    "running_past_end": True} for index in range(501)]
+    await flow.db.tournaments.insert_many([dict(row) for row in tournaments])
+    await flow.db.matches_v2.insert_many([{"id": f"m-{row['id']}", "tournament_id": row["id"], "status": "scheduled", "slots": []}
+                                          for row in tournaments])
+    counts = await tournament_overrun.refresh(flow.db)
+    assert counts["cleared"] == 0
+    assert await flow.db.tournaments.count_documents({"running_past_end": True}) == 501

@@ -25,11 +25,18 @@ def _open_filter(tournament_id: str) -> dict:
     return {"tournament_id": tournament_id, "status": {"$in": list(OPEN_MATCH_STATUSES)}, "is_preview": {"$ne": True}}
 
 
+def _past_end(row: dict, now: datetime) -> bool:
+    return row.get("status", "live") == "live" and (parse_dt(row.get("end_date")) or now) < now
+
+
 async def _live_past_end(db, now: datetime) -> list[dict]:
-    rows = await db.tournaments.find({"status": "live", "end_date": {"$nin": [None, ""]}},
-                                     {"_id": 0, "id": 1, "title": 1, "slug": 1, "end_date": 1, "league_context": 1, FLAG: 1}
-                                     ).to_list(500)
-    return [row for row in rows if (parse_dt(row.get("end_date")) or now) < now]
+    """Alle laufenden Turniere nach ihrem Ende - ohne Obergrenze (ein Cursor, keine Liste von 500)."""
+    rows = []
+    async for row in db.tournaments.find({"status": "live", "end_date": {"$nin": [None, ""]}},
+                                         {"_id": 0, "id": 1, "title": 1, "slug": 1, "end_date": 1, "league_context": 1, FLAG: 1}):
+        if _past_end(row, now):
+            rows.append(row)
+    return rows
 
 
 async def _has_open(db, tournament_id: str) -> bool:
@@ -72,8 +79,13 @@ async def refresh(db, *, now: datetime | None = None) -> dict:
             counts["set"] += await _mark(db, tournament["id"])
         elif await settle(db, tournament["id"]):
             counts["cleared"] += 1
-    done = await db.tournaments.update_many({FLAG: {"$exists": True}, "id": {"$nin": sorted(running_ids)}}, {"$unset": {FLAG: ""}})
-    counts["cleared"] += done.modified_count
+    # Übrige Merkmale: nur bei Turnieren, die dieser Lauf selbst geprüft hat - nicht mehr „live“ oder das Ende liegt (wieder) vorn.
+    async for row in db.tournaments.find({FLAG: {"$exists": True}}, {"_id": 0, "id": 1, "status": 1, "end_date": 1}):
+        if row["id"] in running_ids or _past_end(row, now):
+            continue
+        done = await db.tournaments.update_one({"id": row["id"], "status": row.get("status"), "end_date": row.get("end_date"),
+                                                FLAG: {"$exists": True}}, {"$unset": {FLAG: ""}})
+        counts["cleared"] += done.modified_count
     return counts
 
 
