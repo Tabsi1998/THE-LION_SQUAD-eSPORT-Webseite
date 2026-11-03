@@ -317,7 +317,12 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit
     # kampflosen Niederlagen ausgeschieden ist, bleibt mit ihnen drin.
     regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
+    # Tabellenende der Liga-Staffel (E.1, Nr. 43): wann jemand ausschied - die Projektion gibt ``removal`` nicht mit.
+    removed_at = {r.get("id"): (r.get("removal") or {}).get("at") for r in regs if r.get("removal")}
     regs = [_public_registration(r, user, is_staff) for r in regs]
+    for r in regs:
+        if removed_at.get(r.get("id")):
+            r["removal_at"] = removed_at[r["id"]]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, private_projection()).to_list(500)}

@@ -267,7 +267,9 @@ def seat_summary(tournament: dict | None, registrations: list[dict] | None) -> d
 # Die Tabelle am TV (#2121): Liga, Jeder gegen jeden, Schweizer System und Gruppen - Platz, Name und die Zahlen der
 # Tabelle, nie Konto (user_id) oder Team-Kennung.
 STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "played", "won", "drawn", "lost",
-                   "score_for", "score_against", "score_diff", "buchholz", "points", "form")
+                   "score_for", "score_against", "score_diff", "buchholz", "points", "form",
+                   # Liga-Staffel (E.1, #1625): was den Gleichstand entschied, kampflos, Abzug, Ausscheiden.
+                   "tiebreak", "forfeit_won", "forfeit_lost", "deducted_points", "exit")
 STANDING_GROUP_FIELDS = ("id", "group_key", "name")
 
 
