@@ -119,7 +119,8 @@ function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
   );
 }
 
-export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved }) {
+// `modes` (Season-Seite #2267): nur diese Modi zeigen - die Modi der Season. Gespeichert werden weiter die Regeln aller Modi.
+export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, modes }) {
   const [data, setData] = useState(null);
   const [rows, setRows] = useState({});
   const [settings, setSettings] = useState({});
@@ -183,7 +184,7 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved }) {
       <CheckField label="Punkte je Map Pflicht – jede Map bekommt ihren Endstand" checked={required} onChange={setRequired} disabled={!canEdit} testId="result-rules-required" />
       {!data.rules.length ? <p className="text-sm text-white/55">Das Spiel hat keine Modi – es gibt nichts einzustellen.</p> : null}
       <ul className="space-y-3">
-        {data.rules.map((row) => {
+        {data.rules.filter((row) => !modes || modes.includes(row.mode)).map((row) => {
           const form = rows[row.mode] || ruleToRow(null);
           const id = `result-rules-${row.mode}`;
           return (

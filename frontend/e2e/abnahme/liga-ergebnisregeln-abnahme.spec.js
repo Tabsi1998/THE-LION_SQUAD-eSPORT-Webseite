@@ -73,7 +73,7 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
 
   test("Leitung: Regeln der Season einstellen und auf die laufende Staffel übertragen", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
-    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}`);
+    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}#ergebnisregeln`);
     const panel = lead.page.getByTestId("season-result-rules");
     await expect(panel).toBeVisible();
     await expect(lead.page.getByTestId("result-rules-required")).toBeChecked();

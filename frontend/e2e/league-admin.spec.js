@@ -73,8 +73,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await mockServer(page);
     await page.goto("/admin/leagues/seasons/s1");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Season 1");
+    // Season-Seite mit Reitern (#2267): Kalender im Reiter Termine, Liga N und Staffeln im eigenen Reiter.
+    await page.getByTestId("season-tab-termine").click();
     await expect(page.getByTestId("season-calendar")).toContainText("8 Spielwochen");
     await expect(page.getByTestId("blocked-label-0")).toHaveValue("Weihnachtspause");
+    await noSideScroll(page);
+    await page.getByTestId("season-tab-ligen").click();
     await expect(page.getByTestId("staffel-manage-1-B")).toHaveAttribute("href", "/admin/tournaments/t2");
     await noSideScroll(page);
   });

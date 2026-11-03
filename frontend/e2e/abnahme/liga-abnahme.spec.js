@@ -44,11 +44,14 @@ test.describe("Abnahme: Liga gegen den echten Server", () => {
       await noSideScroll(page);
       await shot(page, `liga-verwaltung-${width}.png`);
 
-      await page.goto(`/admin/leagues/seasons/${state.season.id}`);
+      // Season-Seite mit Reitern (#2267): Termine, Spielbetrieb, Ligen und Staffeln.
+      await page.goto(`/admin/leagues/seasons/${state.season.id}#termine`);
       await expect(page.getByRole("heading", { level: 1 })).toContainText("Season 1");
       await expect(page.getByTestId("season-calendar")).toContainText("8 Spielwochen");
       await expect(page.getByTestId("blocked-label-0")).toHaveValue("Weihnachtspause");
+      await page.getByTestId("season-tab-spielbetrieb").click();
       await expect(page.getByTestId("season-pool")).toContainText("Hafenkante");
+      await page.getByTestId("season-tab-ligen").click();
       await expect(page.getByTestId("staffel-1-A")).toContainText("8 von 8 Teams");
       await noSideScroll(page);
       await shot(page, `liga-season-${width}.png`);

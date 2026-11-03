@@ -143,6 +143,8 @@ for (const [width, height] of WIDTHS) {
         return undefined;
       });
       await page.goto("/admin/leagues/seasons/s1#anmeldungen");
+      // Die Marke aus den Nachrichten des Servers öffnet seit #2267 den Reiter „Anmeldung und Kader“.
+      await expect(page.getByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("season-applications-stats")).toContainText("5 von 8 Startplätzen belegt");
       await expect(page.getByTestId("application-a1")).toContainText("Geburtsdatum fehlt");
       await expect(page.getByTestId("application-accept-a1")).toBeVisible();

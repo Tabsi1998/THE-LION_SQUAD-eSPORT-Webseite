@@ -107,7 +107,10 @@ test.describe("Abnahme: Symbol und Einstellungen je Modus gegen den echten Serve
       const maps = (await apiJson(page, "GET", `/api/games/${game.id}/maps`)).body.maps;
       const map = maps.find((row) => row.name === MAP);
       expect((await apiJson(page, "PATCH", `/api/games/${game.id}/maps/${map.id}`, { modes: [...map.modes, key] })).status).toBe(200);
-      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}`);
+      // Reiter Spielbetrieb (#2267): den Modus der Season anhaken (Symbol am Haken), dann erscheinen seine Maps.
+      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}#modi`);
+      await expect(page.getByTestId(`season-pool-pick-${key}-icon`)).toHaveAttribute("data-icon", "image");
+      await page.getByTestId(`season-pool-pick-${key}`).check();
       await expect(page.getByTestId(`season-pool-mode-${key}-icon`)).toHaveAttribute("data-icon", "image");
       await page.getByTestId(`season-pool-mode-${key}`).getByRole("checkbox", { name: `${MAP} in ${label}` }).check();
       await page.getByTestId("season-pool-save").click();
@@ -164,7 +167,7 @@ test.describe("Abnahme: Symbol und Einstellungen je Modus gegen den echten Serve
       await guest.close();
 
       // 7. „Modus je Map“: gewählt steht das Symbol daneben (nur angesehen, nicht gespeichert).
-      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}`);
+      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}#modi`);
       const order = page.getByTestId("mode-order-0");
       if (await order.count()) {
         await order.selectOption(key);

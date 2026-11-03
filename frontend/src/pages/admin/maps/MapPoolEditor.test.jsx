@@ -183,3 +183,42 @@ test("Modus-Symbol im Kopf, „Symbol geändert“ bei veraltetem Pool", () => {
   expect(screen.getByTestId("pool-mode-snd-icon-changed")).toHaveTextContent("Symbol geändert – mit dem nächsten Speichern übernommen.");
   expect(screen.queryByTestId("pool-mode-stellung-icon-changed")).toBeNull();
 });
+
+// Season-Seite (#2267): Die Modi der Season stehen an einer Stelle - anhaken, darunter je Modus die Maps.
+test("Modi anhaken: nur angehakte Modi zeigen ihre Maps, ein abgehakter fällt beim Speichern aus dem Pool", () => {
+  const onModesChange = vi.fn();
+  const onDirtyChange = vi.fn();
+  const { onSave } = renderEditor({ pickModes: true, onModesChange, onDirtyChange, entry: { ...ENTRY, outdated_map_ids: [] },
+    modeAside: (mode) => <span data-testid={`aside-${mode}`}>mindestens 2</span> });
+  expect(screen.getByTestId("pool-pick-snd")).toBeChecked();
+  expect(screen.getByTestId("pool-pick-stellung")).not.toBeChecked();
+  expect(screen.queryByTestId("pool-mode-stellung")).toBeNull();
+  expect(within(screen.getByTestId("pool-mode-snd")).getByTestId("aside-snd")).toHaveTextContent("mindestens 2");
+  expect(onModesChange).toHaveBeenLastCalledWith({ picked: ["snd"], withMaps: ["snd"] });
+  expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+  fireEvent.click(screen.getByTestId("pool-pick-stellung"));
+  expect(screen.getByTestId("pool-mode-stellung")).toBeInTheDocument();
+  expect(screen.getByTestId("pool-modes")).toHaveTextContent("noch keine Map");
+  fireEvent.click(within(screen.getByTestId("pool-mode-stellung")).getByLabelText("Hafenkante in Stellung"));
+  expect(onModesChange).toHaveBeenLastCalledWith({ picked: ["stellung", "snd"], withMaps: ["stellung", "snd"] });
+
+  fireEvent.click(screen.getByTestId("pool-pick-snd"));
+  expect(screen.queryByTestId("pool-mode-snd")).toBeNull();
+  expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "stellung", map_ids: ["hafen"] }] }));
+
+  // Wieder angehakt: die gemerkte Auswahl ist zurück.
+  fireEvent.click(screen.getByTestId("pool-pick-snd"));
+  expect(within(screen.getByTestId("pool-mode-snd")).getByText("2 von 2")).toBeInTheDocument();
+});
+
+test("ohne Pool ist kein Modus angehakt - „Vorgabe des Spiels“ hakt die Modi mit Maps an", () => {
+  renderEditor({ pickModes: true, entry: null });
+  expect(screen.getByTestId("pool-pick-none")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("pool-defaults"));
+  expect(screen.getByTestId("pool-pick-snd")).toBeChecked();
+  expect(screen.getByTestId("pool-pick-stellung")).toBeChecked();
+  expect(screen.queryByTestId("pool-pick-none")).toBeNull();
+});
