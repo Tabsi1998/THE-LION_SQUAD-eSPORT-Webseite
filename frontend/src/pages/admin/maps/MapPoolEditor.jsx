@@ -11,6 +11,7 @@ import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDate } from "@/lib/vienna";
 import { modeStatusOf, selectableModes } from "@/lib/gameMatchData";
+import { gamePageUrl } from "@/lib/gameForm";
 import {
   choosableMaps,
   defaultSelection,
@@ -30,6 +31,12 @@ import "@/components/tls/maps/maps.css";
 const keyOf = (mode) => mode ?? "";
 const ORIGIN_TEXT = { tournament: "Pool des Turniers", stage: "eigener Pool der Phase", reference_series: "Pool der Saison",
   league_season: "Pool der Liga-Season", game_default: "Standard-Pool des Spiels" };
+
+// Wo Modi wieder aktiviert werden (#2249): auf der Spielseite im Reiter Modi - als Link, wo der Editor zur Bibliothek führen darf.
+function ModesPlace({ game, libraryLink }) {
+  if (!libraryLink) return <>auf der Spielseite im Reiter Modi</>;
+  return <>auf der <Link to={gamePageUrl(game.id, "modi")} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline" data-testid="pool-modes-link">Spielseite im Reiter Modi</Link></>;
+}
 
 /** Die Auswahl eines gespeicherten Pools, beschränkt auf das, was heute noch wählbar ist (aktiv, im Modus frei). */
 function startSelection(entry, library, modes) {
@@ -175,7 +182,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
       ) : library.length === 0 ? (
         <p className="text-sm text-white/55" data-testid={`${testId}-no-maps`}>
           Für {game.name} gibt es noch keine aktiven Maps.
-          {libraryLink ? <> <Link to={`/admin/games/${game.id}/maps`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Maps anlegen</Link></> : null}
+          {libraryLink ? <> <Link to={gamePageUrl(game.id, "maps")} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Maps anlegen</Link></> : null}
         </p>
       ) : null}
 
@@ -196,18 +203,18 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
       ) : null}
       {game && library.length > 0 && noModeLeft ? (
         <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" data-testid={`${testId}-no-modes`}>
-          Kein Modus von {game.name} steht für einen neuen Pool zur Wahl – alle sind inaktiv oder archiviert. Aktivieren unter Spiele → Spiel bearbeiten.
+          Kein Modus von {game.name} steht für einen neuen Pool zur Wahl – alle sind inaktiv oder archiviert. Aktivieren <ModesPlace game={game} libraryLink={libraryLink} />.
         </p>
       ) : null}
       {game && hiddenInactive.length ? (
         <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-inactive`}>
-          Inaktiv und hier nicht zur Wahl: {hiddenInactive.map((mode) => `„${mode.label || mode.mode}“`).join(", ")}. Wieder aktivieren unter Spiele → Spiel bearbeiten.
+          Inaktiv und hier nicht zur Wahl: {hiddenInactive.map((mode) => `„${mode.label || mode.mode}“`).join(", ")}. Wieder aktivieren <ModesPlace game={game} libraryLink={libraryLink} />.
         </p>
       ) : null}
       {game && withoutMode.length ? (
         <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-without-mode`}>
           {withoutMode.length === 1 ? "1 Map hat" : `${withoutMode.length} Maps haben`} noch keinen Modus und {withoutMode.length === 1 ? "steht" : "stehen"} hier nicht zur Wahl.
-          {libraryLink ? <> <Link to={`/admin/games/${game.id}/maps`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Zuordnen</Link></> : " Zuordnen unter Spiele → Maps."}
+          {libraryLink ? <> <Link to={gamePageUrl(game.id, "maps")} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Zuordnen</Link></> : " Zuordnen auf der Spielseite im Reiter Maps."}
         </p>
       ) : null}
 

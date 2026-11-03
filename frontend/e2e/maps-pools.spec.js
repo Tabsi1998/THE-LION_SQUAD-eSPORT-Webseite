@@ -34,6 +34,7 @@ async function mockServer(page) {
   for (const path of ["sponsors**", "notifications/me", "games"]) await page.route(`**/api/${path}`, json([]));
   await page.route("**/api/friends", json({ incoming: [], friends: [], outgoing: [] }));
   await page.route("**/api/auth/me", json(ADMIN));
+  await page.route("**/api/games/g1", json({ id: "g1", name: GAME.name, slug: GAME.slug, kind: "standalone", match_modes: GAME.modes }));
   const created = [];
   await page.route("**/api/games/g1/maps", (route) => {
     if (route.request().method() === "POST") {
@@ -75,12 +76,14 @@ async function noSideScroll(page) {
 }
 
 for (const [width, height] of [[390, 844], [1440, 900]]) {
-  test(`Map-Bibliothek (${width} px): Karten mit Modi, neue Map im Seitenblatt`, async ({ page }) => {
+  test(`Map-Bibliothek (${width} px): alte Adresse führt zum Reiter Maps, neue Map im Seitenblatt`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     const created = await mockServer(page);
+    // Seit #2249 ist die Map-Seite der Reiter Maps der Spielseite; die alte Adresse leitet weiter.
     await page.goto("/admin/games/g1/maps");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Maps · Probe Shooter");
-    await expect(page.getByTestId("game-map-card-hafenkante")).toContainText("in 1 Pool");
+    await expect(page).toHaveURL(/\/admin\/games\/g1#maps$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Probe Shooter");
+    await expect(page.getByTestId("game-map-state-hafenkante")).toContainText("in 1 Pool");
     await expect(page.getByTestId("game-map-delete-hafenkante")).toBeDisabled();
     await noSideScroll(page);
 

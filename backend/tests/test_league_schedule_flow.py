@@ -1,9 +1,10 @@
 """Liga-Termine (#2194, docs/LIGA.md D.1) über die echten Routen: Einigung, Verschiebung mit Grenzen, Leitung, 72-h-Regel,
 überfällige Spiele, Historie, Aufgaben und Einstellung je Season. Erfundene Namen."""
 import asyncio
+import os
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -28,8 +29,14 @@ async def flow():
         await shutdown()
 
 
+_BASE: dict[str, datetime] = {}
+
+
 def at(hours: float) -> str:
-    return (now_utc() + timedelta(hours=hours)).replace(second=0, microsecond=0).isoformat()
+    """Termin in ``hours`` Stunden, auf die Minute. Die Minute steht je Test fest: Sonst liefert ``at(72)`` nach einem Minutenwechsel
+    mitten im Test einen anderen Wert als beim Anlegen."""
+    base = _BASE.setdefault(os.environ.get("PYTEST_CURRENT_TEST", ""), now_utc().replace(second=0, microsecond=0))
+    return (base + timedelta(hours=hours)).isoformat()
 
 
 async def live_world(flow, rules: dict | None = DEFAULTS, **fields) -> dict:
