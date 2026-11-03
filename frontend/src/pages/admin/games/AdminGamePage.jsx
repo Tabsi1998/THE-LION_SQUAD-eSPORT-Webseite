@@ -197,6 +197,22 @@ export default function AdminGamePage() {
     toast.success(text);
   };
 
+  // Verliert das Spiel mit dem Speichern Spieler-IDs (#2249: Feld entfernt, andere ID-Quelle, anderes Hauptspiel, Erben aus),
+  // antwortet der Server mit 409 und der Zahl je Schlüssel. Dann fragt die Seite mit genau diesem Text und schickt bestätigt
+  // die Schlüssel mit. `null`: abgebrochen, nichts gespeichert.
+  const patchWithIdConfirmation = async (payload) => {
+    try {
+      return (await api.patch(`/games/${game.id}`, payload)).data;
+    } catch (err) {
+      const detail = err.response?.status === 409 ? err.response?.data?.detail : null;
+      if (detail?.code !== "id_keys_in_use") throw err;
+      const ok = await confirm({ title: "Spieler-IDs gehen verloren", description: detail.message, confirmLabel: "Trotzdem speichern" });
+      if (!ok) return null;
+      const keys = [...new Set([...(payload.confirm_removed_keys || []), ...Object.keys(detail.keys || {})])];
+      return (await api.patch(`/games/${game.id}`, { ...payload, confirm_removed_keys: keys })).data;
+    }
+  };
+
   const save = async (key) => {
     if (!game || saving) return;
     const form = formOf(key);
@@ -223,13 +239,18 @@ export default function AdminGamePage() {
     }
     setSaving(key);
     try {
-      const { data } = await api.patch(`/games/${game.id}`, payload);
+      const data = await patchWithIdConfirmation(payload);
+      if (!data) {
+        setSaving("");
+        return;
+      }
       if (key === "modi") {
         await finish(key, gameSavedText(data));
         loadUsage(game.id);
         setMapsKey((value) => value + 1);
       } else {
         await finish(key, key === "allgemein" ? "Allgemein gespeichert." : "Spiel-IDs gespeichert.");
+        if (key === "ids") loadUsage(game.id);
         if (key === "allgemein") loadGames();
       }
     } catch (err) {
@@ -240,7 +261,7 @@ export default function AdminGamePage() {
 
   const PANELS = game ? {
     allgemein: () => <GameGeneralTab gameId={game.id} form={formOf("allgemein")} onChange={setForm("allgemein")} games={games} servers={servers} />,
-    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} />,
+    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} usage={usage} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
     // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps. Ist ein Blatt mit Änderungen offen, meldet es das: Punkt am

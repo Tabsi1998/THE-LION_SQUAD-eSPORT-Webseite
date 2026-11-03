@@ -169,6 +169,8 @@ async def init_indexes():
     # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
     await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
     await db.league_rosters.create_index("user_id")
+    # Spiel-ID-Schlüssel (#2249): Wer im Kader eines Spiels eine ID unter einem Schlüssel hat - Zählung vor dem Entfernen.
+    await db.league_rosters.create_index("game_id")
     # Spielberechtigung (#2204): Jede Spiel-ID nur einmal je Season - nur Seasons mit ``unique_game_ids`` schreiben ``id_keys``.
     await db.league_rosters.create_index(
         [("season_id", 1), ("id_keys", 1)], unique=True, name="league_roster_unique_id",
