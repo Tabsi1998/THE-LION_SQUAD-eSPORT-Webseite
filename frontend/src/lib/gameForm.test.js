@@ -1,5 +1,5 @@
 import {
-  GAME_TABS, gamePageUrl, generalPayload, generalToForm, idsPayload, idsToForm, newGamePayload, sameForm, tabFromHash,
+  GAME_TABS, gamePageUrl, generalPayload, generalToForm, idFieldsProblem, idsPayload, idsToForm, newGamePayload, sameForm, tabFromHash,
 } from "./gameForm";
 import { gameMatchDataPayload, gameMatchDataToForm } from "./gameMatchData";
 
@@ -94,6 +94,21 @@ test("Modi: der Weg durchs Formular verliert kein gespeichertes Feld", () => {
     { mode: "zonen", label: "Zonen", minutes: null, per_game: false },
   ];
   expect(gameMatchDataPayload(gameMatchDataToForm({ match_modes: modes })).match_modes).toEqual(modes);
+});
+
+// Codex-Prüfung #2249, Fund 3: zwei neue Felder mit demselben Schlüssel oder ein Feld ohne Schlüssel - vorher still verworfen.
+test("Schlüssel der ID-Felder: eindeutig und nicht leer, sonst sagt die Seite, was zu tun ist", () => {
+  const fresh = (label, key = "") => ({ key, label, _new: true });
+  expect(idFieldsProblem([fresh("PSN-ID", "psn_id"), fresh("PSN ID", "psn_id")]))
+    .toBe("Der Schlüssel „psn_id“ steht schon bei „PSN-ID“ – bitte für „PSN ID“ einen anderen Schlüssel eintragen.");
+  expect(idFieldsProblem([fresh("ゲーム")]))
+    .toBe("ID-Feld „ゲーム“: Aus der Bezeichnung entsteht kein Schlüssel – bitte unter „Schlüssel“ Buchstaben (a–z) oder Ziffern eintragen.");
+  expect(idFieldsProblem([fresh("", "probe")])).toBe("ID-Feld 1: Bitte eine Bezeichnung eintragen.");
+  expect(idFieldsProblem([{ key: "probe", label: " " }])).toBe("ID-Feld 1: Bitte eine Bezeichnung eintragen.");
+  // Ein ganz leeres neues Feld fällt still weg; doppelte gespeicherte Schlüssel (Altbestand) halten nichts auf.
+  expect(idFieldsProblem([fresh("")])).toBe("");
+  expect(idFieldsProblem([{ key: "alt", label: "Alt" }, { key: "alt", label: "Alt 2" }])).toBe("");
+  expect(idFieldsProblem([{ key: "alt", label: "Alt" }, fresh("Alt")])).toContain("„alt“ steht schon bei „Alt“");
 });
 
 test("Neues Spiel: Name und Art genügen, die Adresse entsteht aus dem Namen", () => {

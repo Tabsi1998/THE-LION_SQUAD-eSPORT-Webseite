@@ -16,7 +16,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useNavigationGuard } from "@/lib/navigationGuard";
 import { gameLabel, isArchivedGame } from "@/lib/gameLabels";
 import {
-  GAME_TABS, gameKindLabel, generalPayload, generalToForm, idsPayload, idsToForm, sameForm, tabFromHash,
+  GAME_TABS, gameKindLabel, generalPayload, generalToForm, idFieldsProblem, idsPayload, idsToForm, sameForm, tabFromHash,
 } from "@/lib/gameForm";
 import {
   gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm, gameSavedText, modeRemovalQuestion, removedModes,
@@ -184,6 +184,8 @@ export default function AdminGamePage() {
       if (!String(form.name || "").trim()) { toast.error("Bitte einen Namen eintragen."); return; }
       payload = generalPayload(form);
     } else if (key === "ids") {
+      const problem = idFieldsProblem(form.player_id_fields);
+      if (problem) { toast.error(problem); return; }
       payload = idsPayload(form, game.kind);
     } else {
       const problem = gameMatchDataProblem(form);

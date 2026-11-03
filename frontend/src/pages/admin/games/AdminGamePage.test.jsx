@@ -222,6 +222,26 @@ describe("Spiel-IDs", () => {
     expect(screen.getByTestId("game-id-field-key-0")).toHaveValue("epic");
   });
 
+  // Codex-Prüfung, Fund 3: „PSN-ID“ und „PSN ID“ ergeben denselben Schlüssel - die Seite sagt es, statt eines zu verwerfen.
+  test("zwei neue Felder mit gleichem Schlüssel: Hinweis, nichts geht an den Server; ein eigener Schlüssel löst es", async () => {
+    renderPage("/admin/games/g1#ids");
+    fireEvent.click(await screen.findByTestId("game-id-field-add"));
+    fireEvent.change(screen.getByTestId("game-id-field-label-0"), { target: { value: "PSN-ID" } });
+    fireEvent.click(screen.getByTestId("game-id-field-add"));
+    fireEvent.change(screen.getByTestId("game-id-field-label-1"), { target: { value: "PSN ID" } });
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("„psn_id“ steht schon bei „PSN-ID“")));
+    expect(apiMock.patch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("game-id-field-key-1"), { target: { value: "psn konto" } });
+    fireEvent.change(screen.getByTestId("game-id-field-label-1"), { target: { value: "PSN Konto" } });
+    expect(screen.getByTestId("game-id-field-key-1")).toHaveValue("psn_konto");
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", { player_id_fields: [
+      { key: "psn_id", label: "PSN-ID", help_text: "", required: true },
+      { key: "psn_konto", label: "PSN Konto", help_text: "", required: true },
+    ] }));
+  });
+
   // Codex-Prüfung, Fund 1: Unter „PSN-ID“ stehen die IDs der Spieler - Speichern darf daraus nie „psn_id“ machen.
   test("ein nicht kanonischer Altschlüssel geht unverändert zurück und lässt sich nicht verstellen", async () => {
     game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }] };

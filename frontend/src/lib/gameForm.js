@@ -130,6 +130,29 @@ export function normalizePlayerIdFields(fields = []) {
     .filter((field) => field.key && field.label);
 }
 
+const blankNew = (field) => field?._new && !String(field.label || "").trim() && !String(field.key || "").trim();
+
+/**
+ * Was vor dem Speichern der ID-Felder noch fehlt (Codex-Prüfung #2249) - leer, wenn alles passt. Jedes Feld braucht eine
+ * Bezeichnung und einen Schlüssel; ein neues Feld darf keinen Schlüssel eines anderen haben (aus „PSN-ID“ und „PSN ID“ wird
+ * sonst zweimal „psn_id“). Ein ganz leeres neues Feld fällt still weg, doppelte gespeicherte Schlüssel (Altbestand) halten nichts
+ * auf. Der Server prüft dasselbe (services/league_roster.id_key_problem).
+ */
+export function idFieldsProblem(fields = []) {
+  const rows = (fields || []).map((field, index) => ({ field, index, key: idFieldKey(field), label: String(field?.label || "").trim() }))
+    .filter(({ field }) => !blankNew(field));
+  for (const { field, index, key, label } of rows) {
+    if (!label) return `ID-Feld ${index + 1}: Bitte eine Bezeichnung eintragen.`;
+    if (!key.trim()) {
+      return `ID-Feld „${label}“: Aus der Bezeichnung entsteht kein Schlüssel – bitte unter „Schlüssel“ Buchstaben (a–z) oder Ziffern eintragen.`;
+    }
+    if (!field._new) continue;
+    const other = rows.find((row) => row.index !== index && row.key === key && (!row.field._new || row.index < index));
+    if (other) return `Der Schlüssel „${key}“ steht schon bei „${other.label}“ – bitte für „${label}“ einen anderen Schlüssel eintragen.`;
+  }
+  return "";
+}
+
 /** Reiter Spiel-IDs: die ID-Felder, bei Spielversionen dazu woher die IDs kommen. */
 export function idsToForm(game) {
   return {

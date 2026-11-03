@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 
 from pymongo.errors import DuplicateKeyError
@@ -236,8 +237,31 @@ def person_name(person: dict | None) -> str:
 MAX_ID_LENGTH = 200
 
 
-def id_fields_problem(fields: list | None) -> str | None:
-    """Passen die Angaben am Spiel (``player_id_fields[]``, #2204)? Ein Satz für die Verwaltung, sonst ``None``."""
+def _id_field_keys(fields: list | None) -> list[str]:
+    return [str(item.get("key") or "").strip() for item in fields or [] if isinstance(item, dict)]
+
+
+def id_key_problem(fields: list | None, current: list | None = None) -> str | None:
+    """Jedes ID-Feld braucht einen eigenen, nicht leeren Schlüssel (#2249) - an ihm hängen die IDs der Spieler. Altbestand
+    (``current``) bleibt speicherbar: Was dort schon doppelt oder leer ist, zählt nicht, nur ein weiteres kommt nicht dazu."""
+    if fields is None:
+        return None
+    now = Counter(_id_field_keys(fields))
+    before = Counter(_id_field_keys(current))
+    if now[""] > before[""]:
+        return "Jedes ID-Feld braucht einen Schlüssel aus Buchstaben oder Ziffern."
+    for key, count in now.items():
+        if key and count > 1 and count > before[key]:
+            return f"Der Schlüssel „{key}“ steht doppelt - jedes ID-Feld braucht einen eigenen."
+    return None
+
+
+def id_fields_problem(fields: list | None, current: list | None = None) -> str | None:
+    """Passen die Angaben am Spiel (``player_id_fields[]``, #2204)? Ein Satz für die Verwaltung, sonst ``None``.
+    ``current``: die gespeicherten Felder, damit Altbestand bei den Schlüsseln speicherbar bleibt (#2249)."""
+    keys = id_key_problem(fields, current)
+    if keys:
+        return keys
     for item in fields or []:
         if not isinstance(item, dict):
             continue
