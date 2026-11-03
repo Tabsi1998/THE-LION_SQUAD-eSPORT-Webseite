@@ -204,6 +204,10 @@ export default function AdminGameMapsPage() {
       <Link to="/admin/games" data-testid="game-maps-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
         <ArrowLeft className="w-3.5 h-3.5" /> Spiele
       </Link>
+      {/* Ausrüstung (#2218): vorläufig von hier erreichbar, bis die Spielseite mit Reitern (#2249) steht. */}
+      <Link to={`/admin/games/${gameId}/equipment`} data-testid="game-maps-equipment" className="ml-4 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+        Ausrüstung
+      </Link>
       {missing ? <p className="mt-6 text-white/60" data-testid="game-maps-missing">{missing}</p> : null}
       {data ? (
         <>
