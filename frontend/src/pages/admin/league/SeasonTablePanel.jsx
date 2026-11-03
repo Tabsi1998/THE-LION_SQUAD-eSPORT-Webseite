@@ -128,14 +128,16 @@ function StaffelTies({ staffel, canDecide, version }) {
   if (error) return <p className="text-xs text-warn" role="alert">{error}</p>;
   if (!data) return <p className="text-xs text-white/45" aria-busy="true">Lade Tabelle …</p>;
   const decide = canDecide && data.can_decide;
+  const ties = Array.isArray(data.ties) ? data.ties : [];
+  const decisions = Array.isArray(data.decisions) ? data.decisions : [];
   return (
     <div className="space-y-2" data-testid={`season-ties-${staffel.tournament_id}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-bold text-white">{staffel.label}</h3>
         {data.rules?.tiebreakers ? <span className="text-[11px] text-white/45">{tiebreakOrder(data.rules.tiebreakers)}</span> : null}
       </div>
-      {!data.ties.length ? <p className="text-xs text-white/55">Kein offener Gleichstand.</p> : null}
-      {data.ties.map((tie) => (
+      {!ties.length ? <p className="text-xs text-white/55">Kein offener Gleichstand.</p> : null}
+      {ties.map((tie) => (
         <div key={tie.rank} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2" data-testid={`season-tie-${staffel.tournament_id}-${tie.rank}`}>
           <span className="text-sm text-white">Platz {tie.rank}: {tie.names.join(", ")}</span>
           <span className="text-xs text-white/55 tabular-nums">{tie.points} Punkte, nach allen Kriterien gleich</span>
@@ -145,10 +147,10 @@ function StaffelTies({ staffel, canDecide, version }) {
           ) : null}
         </div>
       ))}
-      {data.ties.length && !data.can_decide ? <p className="text-xs text-white/50">Die Season sieht keinen Entscheid der Leitung vor – die Teams teilen sich den Platz.</p> : null}
-      {data.decisions.length ? (
+      {ties.length && !data.can_decide ? <p className="text-xs text-white/50">Die Season sieht keinen Entscheid der Leitung vor – die Teams teilen sich den Platz.</p> : null}
+      {decisions.length ? (
         <ul className="space-y-1.5" aria-label="Entscheide der Leitung">
-          {data.decisions.map((decision) => (
+          {decisions.map((decision) => (
             <li key={decision.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70" data-testid={`season-decision-${decision.id}`}>
               <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${decision.applies ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`}>
                 {decision.applies ? "Gilt" : "Gilt nicht mehr"}
