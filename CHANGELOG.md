@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.62.0 (03.11.2026)
+
+### Neu
+
+* Ergebnisregel übergehen durch die Liga-Leitung mit Grund (#1617)
+* Ergebnisregeln und Punktepflicht in den Season-Einstellungen (#1617)
+* Liga prüft den Endstand je Map gegen Ergebnisregel und Sieger (#1617)
+* Matchseite und Ligaseite zeigen wiederholte, zugesprochene und nicht gespielte Maps (#1617)
+* Meldeformular zeigt die Ergebnisregel je Map und prüft vorab (#1617)
+* Season hält die Ergebnisregeln der Modi fest, Punkte je Map Pflicht (#1617)
+
 ## 1.61.0 (03.11.2026)
 
 ### Neu
