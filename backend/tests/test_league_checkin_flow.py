@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 from league_match_world import ids, world as league_world  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import league_checkin_sweep, match_deadline_sweep, match_flow  # noqa: E402
+from services import league_checkin_sweep, league_schedule, league_schedule_sweep, match_deadline_sweep, match_flow  # noqa: E402
 from services.match_flow import DEFAULTS  # noqa: E402
 from services.match_public_view import public_match_view  # noqa: E402
 
@@ -483,6 +483,71 @@ async def test_the_proposal_binds_the_decision_to_the_missing_side_and_the_curre
     stale = await decide(flow, world, action="confirm", registration_id=world["reg_h"]["id"])
     assert stale.status_code == 409, stale.text
     assert (await flow.reload(world["match"]))["status"] == "scheduled"
+
+
+WEEK = {"schedule_rules": dict(league_schedule.DEFAULTS), "matchday_days": 7}
+
+
+@pytest.mark.asyncio
+async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
+    """Codex zu D.2 (3): Eine Verlängerung der Leitung gehört zum alten Fenster. Jeder neue Termin - Einigung, Verschiebung, Leitung,
+    „Neu ansetzen“, 72-h-Regel - lässt sie fallen; sonst bliebe das neue Fenster bis zur alten Verlängerung offen."""
+    world = await checkin_world(flow, start_date=(now_utc() - timedelta(days=1)).isoformat(), **WEEK)
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    await shift(flow, world, -16)
+    assert (await sweep(flow, world, 0))["proposed"] == 1
+    extended = await decide(flow, world, action="extend", minutes=30)
+    assert extended.status_code == 200, extended.text
+    assert (await flow.reload(world["match"])).get("no_show_extended_until")
+
+    async def extension_gone(step: str) -> None:
+        stored = await flow.reload(world["match"])
+        assert not stored.get("no_show_extended_until"), step
+        window = match_flow.window_of(stored, RULES)
+        assert window and window[1] == match_flow._moment(stored["scheduled_at"]) + timedelta(minutes=15), step
+
+    async def extend_by_hand() -> None:
+        await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"no_show_extended_until": at(6 * 60)}})
+
+    # Einigung: Heimseite schlägt vor, Gastseite nimmt an.
+    flow.act_as(world["users"]["Kapitaen"])
+    offer = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals", json={"scheduled_at": at(48 * 60)})
+    assert offer.status_code == 200, offer.text
+    flow.act_as(world["users"]["Falke1"])
+    agreed = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals/{offer.json()['id']}/decision", json={"action": "accept"})
+    assert agreed.status_code == 200, agreed.text
+    await extension_gone("Einigung")
+    # Verschiebung: Antrag der einen, Zustimmung der anderen Seite.
+    await extend_by_hand()
+    flow.act_as(world["users"]["Kapitaen"])
+    asked = await flow.post(f"/api/matches/{mid(world)}/reschedule", json={"scheduled_at": at(72 * 60), "reason": "Spieler im Nachtdienst"})
+    assert asked.status_code == 200, asked.text
+    flow.act_as(world["users"]["Falke1"])
+    moved = await flow.post(f"/api/matches/{mid(world)}/reschedule/{asked.json()['id']}/decision", json={"action": "accept"})
+    assert moved.status_code == 200, moved.text
+    await extension_gone("Verschiebung")
+    # Leitung setzt den Termin.
+    await extend_by_hand()
+    flow.act_as(world["lead"])
+    set_by_lead = await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(96 * 60), "schedule_reason": "Nachholtermin"})
+    assert set_by_lead.status_code == 200, set_by_lead.text
+    await extension_gone("Leitung")
+    # „Neu ansetzen“ (E.1): beide nicht erschienen, dann zurück in den offenen Stand.
+    url = f"/api/admin/leagues/staffeln/{world['tournament']['id']}/matches/{mid(world)}/double-no-show"
+    scored = await flow.post(url, json={"note": "Beide Teams nicht in der Lobby"})
+    assert scored.status_code == 200, scored.text
+    await extend_by_hand()
+    undone = await flow.client.request("DELETE", url, json={"reason": "Neuer Termin vereinbart"})
+    assert undone.status_code == 200, undone.text
+    await extension_gone("Neu ansetzen")
+    # 72-h-Regel: ohne festen Termin gilt der Vorschlag der Heimseite nach 72 Stunden ohne Antwort.
+    other = await checkin_world(flow, start_date=(now_utc() - timedelta(days=1)).isoformat(), **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(other)}, {"$set": {"scheduled_at": None, "status": "ready", "no_show_extended_until": at(90)}})
+    flow.act_as(other["users"]["Kapitaen"])
+    assert (await flow.post(f"/api/matches/{mid(other)}/schedule-proposals", json={"scheduled_at": at(100 * 60)})).status_code == 200
+    counts = await league_schedule_sweep.sweep(flow.db, [await tournament_of(flow, other)], now=now_utc() + timedelta(hours=73))
+    assert counts["home_rule"] == 1
+    assert not (await flow.reload(other["match"])).get("no_show_extended_until"), "72-h-Regel"
 
 
 @pytest.mark.asyncio
