@@ -1135,7 +1135,16 @@ class MatchScoreReport(BaseModel):
     lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
 
 
-class MatchGameReport(BaseModel):
+class MatchGameExtras(BaseModel):
+    """Zusatzfelder einer Map (C.3, #1617), alle freiwillig - geprüft mit deutschem Satz in services/league_result_rules.py."""
+    status: Optional[str] = Field(default=None, max_length=20)
+    replay_reason: Optional[str] = Field(default=None, max_length=500)
+    decision: Optional[str] = Field(default=None, max_length=20)
+    host_registration_id: Optional[str] = Field(default=None, max_length=100)
+    proof_id: Optional[str] = Field(default=None, max_length=100)
+
+
+class MatchGameReport(MatchGameExtras):
     """Eine Map einer Meldung - ``lineup`` ist die eigene Seite."""
     position: int = Field(ge=1, le=MATCH_GAMES_MAX)
     mode: Optional[str] = Field(default=None, max_length=40)
@@ -1145,7 +1154,7 @@ class MatchGameReport(BaseModel):
     lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_LINEUP_MAX)
 
 
-class MatchGameAdmin(BaseModel):
+class MatchGameAdmin(MatchGameExtras):
     """Eine Map der Turnierleitung - Aufstellungen beider Seiten, je Seite freiwillig."""
     position: int = Field(ge=1, le=MATCH_GAMES_MAX)
     mode: Optional[str] = Field(default=None, max_length=40)
@@ -1195,6 +1204,8 @@ class MatchV2ResultSubmit(BaseModel):
     lineups: Optional[Dict[str, List[str]]] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Ergebnisregel übergehen (C.3, #1617): nur der Superadmin, mit Grund im Protokoll.
+    rule_override_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchResultUndo(BaseModel):

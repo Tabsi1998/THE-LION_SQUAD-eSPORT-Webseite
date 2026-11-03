@@ -75,6 +75,8 @@ from services.tournament_rules import match_policy, players_can_report, schedule
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services import league_games
+from services import league_result_rules
+from services.permissions import is_superadmin
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -715,7 +717,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     if league:
         side = acting_reg or (await _member_registration_for_match(db, match, user.get("id")) if user else None)
         league_block = await league_games.page_block(db, league, side_id=(side or {}).get("id"),
-                                                     can_act=bool(acting_reg), staff=bool(can_submit_result))
+                                                     can_act=bool(acting_reg), staff=bool(can_submit_result),
+                                                     can_override=is_superadmin(user))
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
@@ -1172,7 +1175,12 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
-    games, missing, league, lineups = await _staff_games(db, match, body, raw_results)
+    try:
+        # Ergebnisregel übergehen (C.3, #1617): nur der Superadmin mit Grund - nie Best of, Pool oder Aufstellung.
+        override = league_result_rules.override_reason(me, body.rule_override_reason)
+    except league_result_rules.RuleProblem as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+    games, missing, league, lineups = await _staff_games(db, match, body, raw_results, skip_rules=bool(override))
     saved = league_games.with_series(games, lineups)
     if body.hold:
         # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
@@ -1184,6 +1192,8 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         if league and saved:
             await league_games.lock_lineup_ids(db, league, saved, league.reg_ids)
             await league_games.log_both_sides_kept(db, league, saved, league.reg_ids, me.get("id"))
+        if override and games:
+            await _audit_match_action(db, "match.games.rule_override", match, me.get("id"), {"reason": override})
         return held
     ensure_no_hold(match)
     outcome = await submit_v2_result(
@@ -1209,11 +1219,13 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         # Spiel-ID je Season (#2108): erst nach dem Speichern des Ergebnisses festhalten.
         await league_games.lock_lineup_ids(db, league, saved, league.reg_ids)
         await league_games.log_both_sides_kept(db, league, saved, league.reg_ids, me.get("id"))
+    if override and games and not outcome.get("idempotent_replay"):
+        await _audit_match_action(db, "match.games.rule_override", match, me.get("id"), {"reason": override})
     return outcome
 
 
 async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
-                       raw_results: list[dict]) -> tuple[list[dict] | None, list[str] | None,
+                       raw_results: list[dict], *, skip_rules: bool = False) -> tuple[list[dict] | None, list[str] | None,
                                                          "league_games.LeagueSetup | None", dict | None]:
     """Liga (#1650): Maps der Turnierleitung prüfen. Ohne Maps bleiben die des Spiels - außer das neue Ergebnis passt
     nicht mehr zu ihnen, dann fallen sie weg (eine Korrektur des Stands ohne Maps). Andere Turniere: nichts. Dazu der
@@ -1223,11 +1235,12 @@ async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
         return None, None, None, None
     normalized = await checked_results(db, match, raw_results)
     if body.games and league.is_series:
-        games, lineups, missing = league_games.admin_series(league, [game.model_dump() for game in body.games], body.lineups, normalized)
+        games, lineups, missing = league_games.admin_series(league, [game.model_dump() for game in body.games], body.lineups, normalized,
+                                                            skip_rules=skip_rules)
         await league_games.check_double_use(db, league, league_games.with_series(None, lineups), set(league.reg_ids))
         return games, missing, league, lineups
     if body.games:
-        games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized)
+        games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized, skip_rules=skip_rules)
         await league_games.check_double_use(db, league, games, set(league.reg_ids))
         return games, missing, league, None
     if match.get("games"):
@@ -1414,7 +1427,8 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
     if league:
         try:
             games, lineup = await league_games.prepare_report(
-                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results, body.lineup)
+                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results, body.lineup,
+                photo_id=body.photo_id)
         except league_games.LeagueGamesError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     if is_duplicate_report(match, me["id"], results) and (
