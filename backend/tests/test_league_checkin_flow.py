@@ -466,6 +466,26 @@ async def test_with_check_in_the_lead_scores_a_no_show_only_after_the_window_and
 
 
 @pytest.mark.asyncio
+async def test_the_proposal_binds_the_decision_to_the_missing_side_and_the_current_window(flow):
+    """Codex zu D.2 (2): Gewertet wird nur die Seite, die nicht eingecheckt hat; nach einem neuen Termin gilt der alte Vorschlag nicht."""
+    world = await checkin_world(flow)
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    await shift(flow, world, -16)
+    assert (await sweep(flow, world, 0))["proposed"] == 1
+    wrong = await decide(flow, world, action="confirm", registration_id=world["reg_a"]["id"])
+    assert wrong.status_code == 422, wrong.text
+    assert "eingecheckt" in wrong.json()["detail"]
+    assert (await flow.reload(world["match"]))["status"] == "scheduled"
+    flow.act_as(world["lead"])
+    moved = await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(60), "schedule_reason": "Nachholtermin"})
+    assert moved.status_code == 200, moved.text
+    assert (await flow.reload(world["match"]))["no_show_proposal"], "der alte Vorschlag steht noch, bis der Job läuft"
+    stale = await decide(flow, world, action="confirm", registration_id=world["reg_h"]["id"])
+    assert stale.status_code == 409, stale.text
+    assert (await flow.reload(world["match"]))["status"] == "scheduled"
+
+
+@pytest.mark.asyncio
 async def test_a_new_time_from_the_lead_voids_old_checkins_and_the_proposal(flow):
     """E.1 „Neu ansetzen“ und jeder neue Termin der Leitung: alte Check-ins zählen nicht mehr, der alte Vorschlag fällt weg, „beide da“
     gilt für den neuen Termin wieder einmal."""

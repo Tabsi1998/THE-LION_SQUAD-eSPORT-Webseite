@@ -57,8 +57,8 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     return view
 
 
-STALE_PROPOSAL_DETAIL = ("Der Vorschlag gilt nicht mehr: Das Spiel hat begonnen, eine Seite hat gemeldet "
-                         "oder die Paarung hat sich geändert. Bitte das Ergebnis-Fenster nutzen.")
+STALE_PROPOSAL_DETAIL = ("Der Vorschlag gilt nicht mehr: Das Spiel hat begonnen, eine Seite hat gemeldet, "
+                         "die Paarung oder der Termin hat sich geändert. Bitte das Ergebnis-Fenster nutzen.")
 
 
 class NoShowDecision(BaseModel):
@@ -144,12 +144,16 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
         # Liga-Check-in (D.2, #1652): der Vorschlag gehört zum Fenster des aktuellen Termins - nach einem neuen Termin oder einer
         # Verlängerung gilt er nicht mehr, auch wenn der Job ihn noch nicht weggeräumt hat.
         info = no_show_deadline(match, tournament, stage)
-        still_valid = bool(info and info["due_at"] <= now and proposal.get("rule") == "check_in")
+        still_valid = bool(info and info["due_at"] <= now and proposal.get("rule") == "check_in"
+                           and _parse(proposal.get("due_at")) == info["due_at"])
     else:
         info = no_show_deadline(match, tournament, stage)
         still_valid = bool(info and info["due_at"] <= now)
     if not same_pairing or not still_valid:
         raise HTTPException(status_code=409, detail=STALE_PROPOSAL_DETAIL)
+    if proposal.get("rule") == "check_in" and body.registration_id not in (proposal.get("missing_registration_ids") or []):
+        # Kampflos verliert nur, wer nicht eingecheckt hat - nie die Seite, die da war.
+        raise HTTPException(status_code=422, detail="Diese Seite hat eingecheckt. Kampflos verlieren kann nur die Seite ohne Check-in.")
     minutes = int(proposal.get("minutes") or 0)
     if proposal.get("rule") == "check_in":
         # Liga-Check-in (D.2, #1652): die Seite hat bis zum Ende des Fensters nicht eingecheckt - die Leitung entscheidet.
