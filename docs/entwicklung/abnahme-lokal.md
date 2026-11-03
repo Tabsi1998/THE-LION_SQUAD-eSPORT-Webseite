@@ -126,6 +126,11 @@ Weiterleitung der alten Map-Adresse; Map und Modus räumt sie danach wieder weg.
 Ergebnisregeln ein und überträgt sie auf die laufende Staffel; je Breite meldet ein Captain einen falschen Endstand (vom Server und
 vom Formular abgelehnt) und dann den richtigen, die Gegenseite bestätigt ohne Punkte; die Korrektur der Leitung prüft dieselbe Regel
 und übergeht sie nur mit Grund.
+`liga-checkin-abnahme.spec.js` (gleiche Stand-Datei, #1652, braucht eine Staffel „Liga-Probelauf“ im Entwurf - also den Seed davor) schreibt: Die
+Leitung speichert den Check-in der Season, veröffentlicht ein Regelwerk mit Zustimmungspflicht und startet die Staffel; bei 390 px lehnt die Seite
+den Check-in ohne Zustimmung ab, zwei Captains stimmen zu und checken in zwei Browser-Kontexten ein, zu wenige Anwesende lehnt der Server ab; bei
+1440 px startet eine Seite (der zweite Start ist eine Wiederholung); am zweiten Spiel legt der Fristen-Job nach dem Fenster nur den Vorschlag an,
+die Leitung sieht ihn in Mein Dienst und entscheidet in der Leitungsansicht. Für den Zeit-Job braucht sie `ABNAHME_PROJECT` und `PYTHON`.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem

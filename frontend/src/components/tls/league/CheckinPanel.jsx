@@ -127,22 +127,25 @@ function OwnCheckin({ block, matchId, busy, run, onChanged, onAskLead }) {
   const hint = block.checkin_hint;
   const consent = own.consent_open;
   const asksLead = Boolean(hint && hint.includes("@leitung"));
+  // Geht es gerade nicht, steht der Grund vor der Liste - niemand hakt erst an und sucht dann den Knopf.
+  const hintBox = !block.can_checkin && hint ? (
+    <p className={`mt-3 rounded-sm border px-3 py-2 text-sm text-white/80 ${consent ? "border-warn/40 bg-warn/10" : "border-white/10 bg-white/[0.03]"}`} data-testid="checkin-hint">
+      {hint}{" "}
+      {consent && own.rules_url ? <Link to={own.rules_url} className="tls-hit font-bold text-[#29B6E8] underline underline-offset-2" data-testid="checkin-rules-link">Zur neuen Fassung</Link> : null}
+      {asksLead && onAskLead ? <button type="button" onClick={onAskLead} className="tls-btn tls-btn--quiet tls-hit ml-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider">@leitung schreiben</button> : null}
+    </p>
+  ) : null;
   return (
     <div className="mt-5 rounded-sm border border-[#29B6E8]/30 bg-[#0A0A0A] p-4" data-testid="checkin-own">
       <h3 className="text-xs font-bold uppercase tracking-widest text-[#29B6E8]">{own.checked_in ? "Eure Anwesenden" : "Wer ist da?"}</h3>
       <p className="mt-1 text-xs text-white/60">Nur Spieler aus eurem Kader, nur wer spielen darf – wer nicht wählbar ist, steht grau mit Grund da.</p>
+      {hintBox}
       <RosterPicker roster={block.roster || []} selected={selected} onToggle={toggle} testId="checkin-roster" minimum={minimum} />
       {block.can_checkin ? (
         <button type="button" disabled={busy || !enough} onClick={submit} data-testid="checkin-submit"
           className="tls-btn tls-btn--primary mt-3 inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
           <ClipboardCheck className="h-4 w-4" aria-hidden="true" /> {own.checked_in ? "Anwesende aktualisieren" : "Einchecken"}
         </button>
-      ) : hint ? (
-        <p className={`mt-3 rounded-sm border px-3 py-2 text-sm text-white/80 ${consent ? "border-warn/40 bg-warn/10" : "border-white/10 bg-white/[0.03]"}`} data-testid="checkin-hint">
-          {hint}{" "}
-          {consent && own.rules_url ? <Link to={own.rules_url} className="tls-hit font-bold text-[#29B6E8] underline underline-offset-2" data-testid="checkin-rules-link">Zur neuen Fassung</Link> : null}
-          {asksLead && onAskLead ? <button type="button" onClick={onAskLead} className="tls-btn tls-btn--quiet tls-hit ml-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider">@leitung schreiben</button> : null}
-        </p>
       ) : null}
     </div>
   );
