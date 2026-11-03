@@ -229,13 +229,14 @@ export function orderPoolHints(order, poolModes, labelOf = (mode) => mode) {
  */
 export function rulesNotice(view, readiness) {
   const codes = (readiness?.problems || []).map((row) => row.code);
-  if (codes.includes("rules_missing") || (view && !view.current && !view.inherited && !(view.versions || []).length)) {
-    return { kind: "missing", text: "Es gibt noch kein freigegebenes Regelwerk. Ohne gültige Fassung geht keine Anmeldung und keine Veröffentlichung." };
-  }
   if (view?.data_changes?.rows?.length) {
     const count = view.data_changes.rows.length;
     return { kind: "changed", text: `Seit ${view.data_changes.label} haben sich Werte geändert, die im Regelwerk stehen (${count === 1 ? "1 Baustein" : `${count} Bausteine`}). Eine neue Fassung muss freigegeben werden.` };
   }
   if (view?.draft) return { kind: "draft", text: "Im Regelwerk liegt ein Entwurf, der noch nicht freigegeben ist." };
+  // „missing“ meldet auch die Prüfung - der Überblick zeigt dann nur ihren Punkt, nicht denselben Satz zweimal.
+  if (codes.includes("rules_missing") || (view && !view.current && !view.inherited && !(view.versions || []).length)) {
+    return { kind: "missing", text: "Es gibt noch kein freigegebenes Regelwerk. Ohne gültige Fassung geht keine Anmeldung und keine Veröffentlichung." };
+  }
   return null;
 }

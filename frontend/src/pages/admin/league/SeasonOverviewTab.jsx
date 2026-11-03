@@ -22,7 +22,7 @@ function PhaseDot({ state }) {
   if (state === "skipped") {
     return <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-white/25 bg-[#0A0A0A] text-white/35"><Minus className="h-3 w-3" aria-hidden="true" /></span>;
   }
-  return <span className="relative z-10 h-6 w-6 shrink-0 rounded-full border border-white/20 bg-[#0A0A0A]" />;
+  return <span className="relative z-10 block h-6 w-6 shrink-0 rounded-full border border-white/20 bg-[#0A0A0A]" />;
 }
 
 const STATE_TEXT = { done: "erledigt", current: "jetzt", upcoming: "kommt noch", skipped: "entfällt" };
@@ -61,11 +61,12 @@ export function SeasonPhaseBar({ season, calendar, divisions, now }) {
 }
 
 function RulesNotice({ notice, rulesLink, onJump }) {
-  if (!notice) return null;
+  // Fehlt das Regelwerk ganz, steht das schon als Punkt in „Was fehlt noch?“.
+  if (!notice || notice.kind === "missing") return null;
   return (
     <div role="status" className="flex flex-wrap items-start gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3" data-testid="season-rules-notice" data-kind={notice.kind}>
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
-      <div className="min-w-0 flex-1 text-sm">
+      <div className="min-w-[min(100%,14rem)] flex-1 text-sm">
         <p className="font-semibold text-white">Regelwerk muss freigegeben werden</p>
         <p className="mt-0.5 text-white/70">{notice.text}</p>
       </div>

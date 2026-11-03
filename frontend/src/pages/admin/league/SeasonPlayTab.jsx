@@ -46,7 +46,9 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "", 
         ))}
       </div>
       {note ? <p className="text-xs text-warn" data-testid="season-mode-order-note">{note}</p> : (
-        <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
+        <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>
+          {problem || (value.some(Boolean) ? "Gilt in jeder Serie in dieser Reihenfolge." : "Alle frei: die Teams wählen den Modus je Map selbst.")}
+        </p>
       )}
       {hints.length ? (
         <ul className="space-y-1" data-testid="season-mode-order-hints">
@@ -85,7 +87,7 @@ export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness,
         {canSeason ? (
           <MapPoolEditor key={pool?.id || "leer"} title="Modi und Maps der Season" game={data.game} library={data.library} entry={pool} defaultPool={data.default_pool}
             hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden."
-            onSave={onSavePool} onClear={onClearPool} libraryLink testId="season-pool" pickModes onModesChange={onSeasonModes} onDirtyChange={onPoolDirty}
+            onSave={onSavePool} onClear={onClearPool} libraryLink testId="season-pool" saveLabel="Modi und Maps speichern" pickModes onModesChange={onSeasonModes} onDirtyChange={onPoolDirty}
             modeAside={(mode) => <ModeNeed row={needOf(mode)} />} renderModeLabel={(mode, label) => <SeasonModeLabel mode={mode} label={label} />} />
         ) : null}
         <div className="grid items-start gap-3 lg:grid-cols-2">

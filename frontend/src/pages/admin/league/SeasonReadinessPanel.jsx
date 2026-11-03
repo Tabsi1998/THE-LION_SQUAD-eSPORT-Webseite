@@ -40,7 +40,7 @@ function Items({ items, tone, onJump, testId }) {
         return (
           <li key={`${item.code}-${index}`} data-code={item.code}
             className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 text-sm ${tone === "problem" ? "border-live/40 bg-live/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75"}`}>
-            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{item.text}</span>
+            <span className="min-w-[min(100%,14rem)] flex-1 [overflow-wrap:anywhere]">{item.text}</span>
             {anchor ? (
               <button type="button" onClick={() => onJump(anchor)} data-testid={`${testId}-go-${item.code}`}
                 className="tls-btn tls-btn--quiet inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider">
@@ -121,8 +121,9 @@ export function SeasonPoolMinimum({ seasonId, readiness, canEdit = true, onSaved
   };
 
   return (
-    <FormSection title="Mindestgröße im Map-Pool" collapsible defaultOpen={requirements.some((row) => row.have < row.needed)} testId={`${testId}-minimum`}
-      hint={`So viele Maps braucht jeder Modus – abgeleitet aus „Modus je Map“, der längsten Serie (Best of ${result.max_maps}) und der Map-Wiederholung. Stand nach dem letzten Speichern.`}>
+    // Mit Pool-Editor steht der Bedarf schon bei jedem Modus - hier nur das Anpassen, darum zugeklappt.
+    <FormSection title={canEdit ? "Mindestgröße anpassen" : "Mindestgröße im Map-Pool"} collapsible defaultOpen={!canEdit} testId={`${testId}-minimum`}
+      hint={`Abgeleitet aus „Modus je Map“, der längsten Serie (Best of ${result.max_maps}) und der Map-Wiederholung. Stand nach dem letzten Speichern.`}>
       <ul className="grid gap-2 sm:grid-cols-2">
         {requirements.map((row) => {
           const key = row.mode ?? "";

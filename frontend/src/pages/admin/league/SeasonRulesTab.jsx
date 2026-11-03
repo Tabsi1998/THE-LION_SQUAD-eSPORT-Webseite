@@ -27,11 +27,10 @@ export function SeasonRulesTab({ seasonId, season, canSeason, canRules, rulesVie
           <div className="min-w-0 space-y-1 text-sm" data-testid="season-rules-state">
             {current ? (
               <p className="text-white/85"><FileText className="mr-1.5 inline h-4 w-4 align-[-3px] text-[#29B6E8]" aria-hidden="true" />Gültig: <strong className="text-white">{versionLine(current)}</strong></p>
-            ) : rulesView ? (
-              <p className="text-white/70">Noch keine gültige Fassung.</p>
             ) : null}
-            {rulesView?.draft ? <p className="text-white/60">Ein Entwurf ist in Arbeit.</p> : null}
-            {rulesNotice ? <p className="text-warn" data-testid="season-rules-tab-notice">{rulesNotice.text}</p> : null}
+            {rulesView?.draft ? <p className="text-white/70">Ein Entwurf ist in Arbeit – er gilt erst, wenn du ihn freigibst.</p> : null}
+            {/* Fehlt das Regelwerk, sagt das der Kasten darunter; hier nur, was sonst noch freigegeben werden muss. */}
+            {rulesNotice?.kind === "changed" ? <p className="text-warn" data-testid="season-rules-tab-notice">{rulesNotice.text}</p> : null}
           </div>
           {canRules ? (
             <Link to={rulesLink} data-testid="season-rules-link"

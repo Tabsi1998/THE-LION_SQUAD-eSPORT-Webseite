@@ -124,7 +124,7 @@ function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove
 // „Modus je Map“), `onDirtyChange` Ungespeichertes (Punkt am Reiter). `modeAside(mode)` steht unter dem Namen eines Modus,
 // `renderModeLabel(mode, label)` ersetzt den Namen (Platz für das Modus-Symbol, #2266).
 export function MapPoolEditor({ title, hint = "", game, library = [], entry = null, sources = [], defaultPool = null, onSave, onClear, canEdit = true,
-  libraryLink = false, defaultsLabel = "Vorgabe des Spiels", testId = "map-pool-editor", pickModes = false, onModesChange, onDirtyChange, modeAside,
+  libraryLink = false, defaultsLabel = "Vorgabe des Spiels", saveLabel = "Speichern", testId = "map-pool-editor", pickModes = false, onModesChange, onDirtyChange, modeAside,
   renderModeLabel }) {
   const allModes = useMemo(() => game?.modes || [], [game]);
   // Inaktive und archivierte Modi (#2206) kommen in keinen neuen Pool - nur, was der gespeicherte Pool schon hat, bleibt zur Wahl.
@@ -312,7 +312,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
           ) : null}
           <button type="button" disabled={busy || !dirty || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
             className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
-            {busy ? "Speichere …" : "Speichern"}
+            {busy ? "Speichere …" : saveLabel}
           </button>
         </div>
       ) : null}

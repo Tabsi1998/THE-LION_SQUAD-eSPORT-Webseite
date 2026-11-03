@@ -160,6 +160,8 @@ describe("Hinweise", () => {
 
   it("Regelwerk: fehlt, Entwurf nicht freigegeben, Daten geändert", () => {
     expect(rulesNotice(null, { problems: [{ code: "rules_missing" }] })).toMatchObject({ kind: "missing" });
+    // Ohne gültige Fassung, aber mit Entwurf: Der Entwurf muss freigegeben werden - das sagt die Prüfung nicht.
+    expect(rulesNotice({ current: null, versions: [], draft: { revision: 1 } }, { problems: [{ code: "rules_missing" }] })).toMatchObject({ kind: "draft" });
     expect(rulesNotice({ current: { label: "Version 1" }, draft: { revision: 2 } }, null)).toMatchObject({ kind: "draft" });
     expect(rulesNotice({ current: { label: "Version 1" }, data_changes: { label: "Version 1", rows: [{}, {}] } }, null))
       .toMatchObject({ kind: "changed", text: expect.stringContaining("2 Bausteine") });
