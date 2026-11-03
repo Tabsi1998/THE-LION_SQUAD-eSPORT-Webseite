@@ -334,6 +334,11 @@ hoch. Jede Vergabe steht im Protokoll, die Person bekommt eine Meldung.
 keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen zum Spiel und setzt keinen Termin direkt (als Captain oder Vertreter gilt Vorschlag und Zustimmung). Es entscheidet eine zweite berechtigte Person. Nur der
 Superadmin darf als Notausnahme, mit Pflichtgrund im Protokoll (`league.conflict.override`).
 
+Dasselbe gilt für die **Anmeldung des eigenen Teams** (#2245, Entscheidung Nr. 73): Kader des Co-Teams, Captain, Vertreter, Leitung und Co-Leitung des
+Hauptteams und wer den Antrag eingereicht hat, prüfen, nehmen an, lehnen ab, setzen auf die Warteliste und teilen nicht zu, auch mit „Teams freigeben“
+oder dem Bereich Ligen. Anträge anderer Teams entscheiden sie weiter. Der Superadmin nur als Notausnahme mit Grund (mindestens fünf Zeichen), der Grund steht
+im Verlauf des Antrags und im Protokoll.
+
 **Helfer an Staffeln** lesen, ändern aber nichts. Sonstige Turniere bleiben unverändert. Die Matrix je Route steht in
 [`LIGA.md`](LIGA.md), Abschnitt 12. Code: `services/league_permissions.py`.
 
@@ -374,8 +379,9 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   nur in einer Staffel (auch wenn eine abgelehnte, ausgetretene oder nicht erschienene Anmeldung wieder aktiv
   gesetzt wird). Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
 - **Selbstanmeldung** (#2205, docs/LIGA.md, B.4): Anmelden und zurückziehen dürfen nur Captain und Vertreter des Co-Teams, nicht die Hauptteam-Leitung. Prüfen, annehmen,
-  ablehnen, Warteliste und Zuteilen liegen beim Bereich Ligen und bei der Zuständigkeit „Teams freigeben“ (`applications`). Der Kader sieht den Stand, nicht den Grund einer Ablehnung.
-  Das Zuteilen oben bleibt als Sonderweg. Eine Season kann zwei Co-Teams eines Hauptteams in derselben Staffel erlauben (`sibling_squads_in_staffel`, Vorgabe Nein).
+  ablehnen, Warteliste und Zuteilen liegen beim Bereich Ligen und bei der Zuständigkeit „Teams freigeben“ (`applications`), beim eigenen Team bei einer zweiten Person
+  (Befangenheit, oben). Der Kader sieht den Stand, nicht den Grund einer Ablehnung.
+  Das Zuteilen oben bleibt als Sonderweg; nimmt es einen offenen Antrag des eigenen Teams an, gilt dieselbe Befangenheit. Eine Season kann zwei Co-Teams eines Hauptteams in derselben Staffel erlauben (`sibling_squads_in_staffel`, Vorgabe Nein).
 - **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`,
   `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
 Spielberechtigung (#2204): Die Zuständigkeit „Kader prüfen“ (`roster`) hebt auch die Wartezeit auf (`POST …/roster/{uid}/waive-wait`, Pflichtgrund, `league.roster.wait_waive`) und entscheidet Transfers
