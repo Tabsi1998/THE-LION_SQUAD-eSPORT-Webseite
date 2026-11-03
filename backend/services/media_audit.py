@@ -332,14 +332,27 @@ async def iter_usages(db, names: set[str]):
                     yield collection, document, field, name, text
 
 
+# Sammlungen, deren Zeilen nie umgeschrieben werden: jede Version einer Sperrliste ist unveränderlich (#2218), Spiele halten sie fest.
+FROZEN_COLLECTIONS = frozenset({"loadout_bans"})
+
+
 def is_frozen(collection: str, document: dict) -> bool:
-    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht."""
+    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht; jede
+    Version einer Sperrliste ebenso (#2218)."""
+    if collection in FROZEN_COLLECTIONS:
+        return True
     return collection == "league_rules" and document.get("status") == "published"
+
+
+def _frozen_label(collection: str, document: dict) -> str:
+    if collection == "loadout_bans":
+        return f"Sperrliste, Version {document.get('version')}"
+    return f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
 
 
 async def frozen_usages(db, filename: str) -> list[str]:
     """Die unveränderlichen Stellen, die eine Datei zeigen - als Text für die Meldung. Solange es sie gibt, bleibt die Datei, wie sie ist."""
-    return sorted({f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
+    return sorted({_frozen_label(collection, document)
                    async for collection, document, _field, _name, _text in iter_usages(db, {filename})
                    if is_frozen(collection, document)})
 
@@ -364,8 +377,9 @@ async def rule_draft_locks(db, filename: str):
 
 
 def frozen_message(places: list[str], action: str) -> str:
-    return (f"Die Datei steht in einer veröffentlichten Regelversion ({'; '.join(places)}) und lässt sich deshalb nicht {action}. "
-            "Eine veröffentlichte Version bleibt unverändert. Für ein neues Bild bitte eine neue Version veröffentlichen.")
+    return (f"Die Datei steht in einer veröffentlichten Regelversion oder gespeicherten Sperrliste ({'; '.join(places)}) und lässt sich "
+            f"deshalb nicht {action}. Eine solche Version bleibt unverändert. Für ein neues Bild bitte eine neue Version speichern bzw. "
+            "veröffentlichen.")
 
 
 async def rewrite_field(collection, row_id, path: str, change, extra: dict | None = None, guard: dict | None = None) -> bool:

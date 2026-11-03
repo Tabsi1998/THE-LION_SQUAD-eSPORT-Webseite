@@ -121,9 +121,10 @@ async def test_the_media_library_keeps_images_of_a_published_list_unchanged(flow
 
     w = await ready(flow)
     ok(await save_bans(flow, w, standard(w)))
-    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == []
+    # Schon die gespeicherte Version der Sperrliste ist unveränderlich, danach auch die Fassung des Regelwerks.
+    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == ["Sperrliste, Version 1"]
     assert await media_audit.still_referenced(flow.db, {"blitz-1.webp"}) == {"blitz-1.webp"}
     await publish(flow, w, body=BODY, annexes=ANNEX)
-    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == ["Regelwerk, Version 1"]
+    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == ["Regelwerk, Version 1", "Sperrliste, Version 1"]
     places = {(collection, field) async for collection, _doc, field, _name, _text in media_audit.iter_usages(flow.db, {"sohlen-2.png"})}
     assert {("game_equipment", "image_url"), ("loadout_bans", "entries.image_url"), ("league_rules", "frozen_images")} <= places
