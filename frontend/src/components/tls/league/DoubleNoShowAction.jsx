@@ -16,7 +16,9 @@ export function DoubleNoShowAction({ match, onDone }) {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const scored = Boolean(match?.double_forfeit) && match?.status === "forfeit";
-  const openMatch = !match?.results?.length && !["completed", "forfeit", "cancelled"].includes(String(match?.status));
+  // Nur vor dem Spiel - wie der Server: kein Beginn, keine Meldung, kein bereitliegendes Ergebnis.
+  const openMatch = !match?.results?.length && ["pending", "ready", "scheduled"].includes(String(match?.status || "pending"))
+    && !match?.started_at && !match?.reports?.length && !match?.pending_result;
   if (!match?.tournament_id || (!scored && !openMatch)) return null;
   const url = `/admin/leagues/staffeln/${match.tournament_id}/matches/${match.id}/double-no-show`;
 
