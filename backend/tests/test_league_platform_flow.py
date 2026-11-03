@@ -467,7 +467,8 @@ async def test_a_playstation_player_below_the_minimum_blocks_and_is_named(flow):
 
     row = await check_of(flow, w)
 
-    assert any("Nur 3 Spieler sind spielberechtigt" in text for text in row["problems"]), row
+    assert any("Nur 3 Spieler sind spielberechtigt" in text and "anderen Plattform" in text and "Spiel-ID" not in text
+               for text in row["problems"]), row
     assert "TeamA S3: Diese Season ist nur für PC – angegeben ist PlayStation." in row["warnings"]
     refused = await submit(flow, w, side)
     assert refused.status_code == 400 and "spielberechtigt" in refused.json()["detail"]

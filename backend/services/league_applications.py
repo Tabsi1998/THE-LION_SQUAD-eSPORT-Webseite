@@ -185,8 +185,11 @@ async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *
     rows = league_eligibility.statuses(ctx, members, squad["id"])
     ready = [row for row in rows.values() if row["ok"]]
     if len(members) >= minimum and len(ready) < minimum:
-        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. "
-                              "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein."))
+        # Was zu tun ist, sagt der Grund: andere Plattform (#2270) heißt andere Spieler, sonst fehlt meist die Spiel-ID.
+        states = {row["state"] for row in rows.values() if not row["ok"]}
+        todo = ("Wer auf einer anderen Plattform spielt, zählt nicht mit – die Gründe stehen bei den Spielern."
+                if states <= {league_platform.NOT_ALLOWED} else "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein.")
+        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. {todo}"))
     # Alter und andere Co-Teams stehen schon oben als Grund.
     named = (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE, league_eligibility.OTHER_TEAM)
     warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] not in named]
