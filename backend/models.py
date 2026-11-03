@@ -712,6 +712,9 @@ class GameUpdate(GameMatchData):
     default_team_size: Optional[int] = None
     default_format: Optional[str] = None
     player_id_fields: Optional[List[dict]] = None
+    # Schlüssel, unter denen schon Spieler-IDs stehen und die trotzdem wegfallen dürfen (#2249) - nur eine Bestätigung, wird nie
+    # gespeichert.
+    confirm_removed_keys: Optional[List[str]] = None
     discord_guild_id: Optional[str] = None
     discord_role_name: Optional[str] = Field(default=None, max_length=100)
 
