@@ -904,16 +904,20 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
     # Von der Leitung wieder aktiviert (#2127): Der alte Auftrag ist storniert, es gilt ein neu eingefrorener Preis. Gibt es
     # schon einen Beleg, wird er nicht still ersetzt - Finanzen bekommt einen Prüffall.
     # Es zählt der Stand der Abrechnung, nicht der alte Status: auch wer nach einem Storno über die Warteliste zurückkommt.
+    # Und der beendete Status selbst (#2184): Der Abgleich setzt eine stornierte Anmeldung wieder auf den Stand ihres Belegs.
     moving_in = becomes_active and current.get("status") not in ACTIVE_EVENT_REGISTRATION_STATUSES
-    reactivated = pricing.is_paid(offer) and moving_in and current.get("billing_status") == "cancelled"
+    reactivated = pricing.is_paid(offer) and moving_in and (current.get("billing_status") == "cancelled" or current.get("status") in event_registration.ENDED_STATUSES)
     new_price_due = reactivated or (pricing.is_paid(offer) and moving_in and not current.get("price_snapshot"))
-    invoiced_before = new_price_due and bool(await db.billing_orders.find_one({"kind": "event", "registration_id": registration_id, "status": "invoiced"}, {"_id": 0, "id": 1}))
+    # Dieselbe Regel wie bei der Neuanmeldung durch die Person selbst (``event_registration._register``).
+    invoiced_before = await billing_orders.invoiced_order(db, kind="event", registration_id=registration_id) if new_price_due else None
     if invoiced_before:
         try:
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
         except pricing.PricingError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=registration_id, reason="Anmeldung wieder aktiviert", new_total_cents=int(price.get("total_cents") or 0))
+        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=registration_id, reason=event_registration.REBOOKED_BY_LEAD,
+                                                       new_total_cents=int(price.get("total_cents") or 0))
+        updates.update(billing_orders.rebooked_fields(invoiced_before))
     elif pricing.is_paid(offer) and becomes_active and (reactivated or not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):
         try:
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
@@ -938,7 +942,7 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             updates["billing_status"] = "cancelled"
     updates["updated_at"] = now_utc().isoformat()
     await db.event_registrations.update_one({"id": registration_id}, {"$set": updates})
-    if updates.get("price_snapshot") and becomes_active:
+    if updates.get("price_snapshot") and becomes_active and not invoiced_before:
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration_id, user_id=current["user_id"],
                                           snapshot=updates["price_snapshot"], timing=pricing.order_timing(updates["price_snapshot"], offer))
     updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})

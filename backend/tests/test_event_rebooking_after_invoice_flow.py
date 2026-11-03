@@ -199,6 +199,25 @@ async def test_entwurf_nach_der_neuanmeldung_geloescht_der_prueffall_bleibt(flow
     assert "changed_after_invoice" in cases and "cancelled_after_invoice" not in cases
 
 
+@pytest.mark.asyncio
+async def test_leitung_aktiviert_nach_dem_abgleich_wieder_auch_dann_ein_prueffall(flow, fake):
+    """Dieselbe Regel für die Leitung (#2127): Auch wenn der Abgleich die stornierte Anmeldung schon wieder auf den Stand des
+    Belegs gesetzt hat, entsteht beim Wiederaktivieren ein Prüffall - kein stiller Wechsel zurück."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    flow.act_as(kassier)
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    assert (await flow.patch(url, json={"status": "cancelled"})).status_code == 200
+    await billing_orders.sync_due()
+    assert (await registration(flow, booked))["billing_status"] == "invoiced"
+
+    response = await flow.patch(url, json={"status": "registered"})
+    assert response.status_code == 200, response.text
+    await assert_review(flow, booked, order, reason=LEAD_REASON, new_cents=4000, billing_status="invoiced")
+    note = await last_note(flow, paula)
+    assert note["title"].startswith("Du bist wieder dabei") and "Kostenbeitrag" not in note["body"]
+
+
 def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
     """Dieselbe Regel für Glocke, Mail und die Discord-Antwort: kein Betrag, wenn schon ein Beleg da ist oder storniert wurde."""
     snapshot = {"total_cents": 2000, "currency": "EUR"}

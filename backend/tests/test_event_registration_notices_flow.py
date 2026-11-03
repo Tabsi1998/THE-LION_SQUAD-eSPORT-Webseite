@@ -146,7 +146,8 @@ async def test_wieder_aktiviert_mit_gestellter_rechnung_kein_zweiter_auftrag_und
     response = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "registered"})
     assert response.status_code == 200, response.text
     row = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
-    assert row["billing_status"] == "cancelled"
+    # Kein neuer Preis: Die Anmeldung trägt wieder den Stand des Belegs (#2184), wie nach dem nächsten Abgleich.
+    assert row["billing_status"] == "invoiced" and row["invoice_ref"] == "RE-1"
     assert await flow.db.billing_orders.count_documents({"registration_id": first["id"]}) == 1
     order = await flow.db.billing_orders.find_one({"registration_id": first["id"]}, {"_id": 0})
     assert order["booking_change"] == "Anmeldung wieder aktiviert", "Finanzen bekommt den Prüffall"
