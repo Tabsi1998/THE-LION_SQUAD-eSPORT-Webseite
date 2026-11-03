@@ -184,6 +184,15 @@ test("Modus-Symbol im Kopf, „Symbol geändert“ bei veraltetem Pool", () => {
   expect(screen.queryByTestId("pool-mode-stellung-icon-changed")).toBeNull();
 });
 
+test("nur ein geändertes Symbol: Speichern geht, ohne dass der Pool als ungespeichert gilt", () => {
+  const onDirtyChange = vi.fn();
+  const { onSave } = renderEditor({ entry: { ...ENTRY, outdated_map_ids: [], outdated_modes: ["snd"] }, onDirtyChange });
+  expect(onDirtyChange).not.toHaveBeenCalledWith(true);
+  expect(screen.getByTestId("pool-save")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel", "hafen"] }] }));
+});
+
 // Season-Seite (#2267): Die Modi der Season stehen an einer Stelle - anhaken, darunter je Modus die Maps.
 test("Modi anhaken: nur angehakte Modi zeigen ihre Maps, ein abgehakter fällt beim Speichern aus dem Pool", () => {
   const onModesChange = vi.fn();

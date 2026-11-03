@@ -150,6 +150,8 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
   const selection = useMemo(() => (picking ? Object.fromEntries(Object.entries(rawSelection).filter(([key]) => picked.includes(key))) : rawSelection),
     [picking, rawSelection, picked]);
   const dirty = !sameSelection(baseline, selection) || Boolean(entry?.stale);
+  // Nur ein geändertes Modus-Symbol (#2266): kein ungespeicherter Entwurf, aber Speichern muss gehen, sonst erreicht es nie Season und Staffeln.
+  const iconsOutdated = !entry?.stale && (entry?.outdated_modes || []).some((mode) => Object.prototype.hasOwnProperty.call(selection, keyOf(mode)));
   const count = selectionCount(selection);
   const disabled = !canEdit || busy;
   const noModeLeft = allGroups.length === 0;
@@ -320,7 +322,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Pool entfernen
             </button>
           ) : null}
-          <button type="button" disabled={busy || !dirty || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
+          <button type="button" disabled={busy || !(dirty || iconsOutdated) || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
             className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
             {busy ? "Speichere …" : saveLabel}
           </button>
