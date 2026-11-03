@@ -80,14 +80,18 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 ### 2.1 Modi und Maps in der Bibliothek
 
 1. **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere → Modi und Dauer**: je Modus eine Zeile,
-   etwa **Stellung**, **Suchen & Zerstören**, **Kontrolle**. Minuten braucht ein Modus nur für Maps nicht.
+   etwa **Stellung**, **Suchen & Zerstören**, **Kontrolle**. Minuten braucht ein Modus nur für Maps nicht. Aufgeklappt
+   trägt jeder Modus auf Wunsch **Beschreibung**, **Spieler je Seite**, **Format** und eine **Ergebnisregel** (Punkte bis
+   zum Ziel, Runden gewinnen oder höherer Endstand; Ziel, Rundenlimit, Zeitlimit, Remis, Verlängerung) – die Werte laut
+   Regelwerk tragt ihr selbst ein. Details: [Turniere, 3.12](turniere.md#312-spieldauer-und-spiel-daten).
 2. **Admin → eSports → Spiele → Maps** → **Map hinzufügen**: Name, **Bild** im Format 16 : 9 (nur eigene Uploads),
    und die **Modi**, in denen die Map gespielt wird. Mit **Aus Spiel übernehmen** kommen Maps einer anderen Spielversion
    samt Bild dazu; gibt es schon Maps ohne Modus, ordnet **Allen … Maps zuordnen** sie gesammelt zu. Details:
    [Turniere, 3.14](turniere.md#314-maps-und-map-pools).
 
 Modi und Maps dürfen sich auch während einer laufenden Season ändern: Gemeldet wird immer aus dem gespeicherten Pool der
-Staffel. Wer einen Modus entfernt, bekommt vorher die Zahl der betroffenen Maps genannt; Pool und Ergebnisse bleiben.
+Staffel. Ein Modus, der in Pool, Reihenfolge oder Spielen steht, lässt sich nicht entfernen, nur auf **Inaktiv** oder
+**Archiviert** stellen: Er kommt dann in keinen neuen Pool und keine neue Reihenfolge, Pool und Ergebnisse bleiben.
 Nennt **Modus je Map** den Modus noch, ändert zuerst diese Reihenfolge: Einen Pool ohne ihn nimmt die Season sonst nicht an.
 Nach dem ersten Ergebnis geht beim **Übertragen** nur noch der Pool an die Staffel, nicht die Reihenfolge. Fehlt ihrem Pool
 dann ein Modus der Reihenfolge, sagt das Übertragen das, und die Teams wählen den Modus je Map frei. Spiele mit

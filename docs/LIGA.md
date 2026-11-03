@@ -905,7 +905,7 @@ Code; Beispiele in Seeds und Tests sind erfunden. Logik in `models.GameMatchMode
 | `label` | str 1–60 | Pflicht | Name, darf sich ändern |
 | `minutes`, `per_game` | wie bisher | wie bisher | Dauerplanung (#1554), unverändert |
 | `status` | `active` \| `inactive` \| `archived` | `active` | Zustand, siehe unten |
-| `description` | str ≤ 500 | – | Beschreibung für die Verwaltung |
+| `description` | str ≤ 500 | – | Beschreibung; wie alle Spieldaten über `GET /api/games` lesbar |
 | `players_per_side` | int 1–64 | – | Spielerzahl je Seite |
 | `format` | str ≤ 60 | – | Freitext, etwa die Regel-Variante des Modus |
 | `result_rule` | Objekt | keine Regel | Ergebnisregel, siehe unten |

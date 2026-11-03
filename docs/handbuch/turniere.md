@@ -718,6 +718,22 @@ freiwillig:
 | **Geräte für Stationen** | Der Planer nimmt nur Stationen mit einem dieser Geräte (Switch, Switch 2, PC, PS5, Xbox …). Nichts gewählt: jede Station. Eine Station, die fest diesem Spiel zugeordnet ist, passt immer. |
 | **Punktetabelle** | Punkte je Platz, z. B. `15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1` oder `4-3-2-1`. Wird gespeichert; die Wertung rechnet noch nicht damit. |
 
+**Je Modus mehr festhalten** (#2206): Unter jeder Modus-Zeile stehen **Zustand** und eine aufklappbare Zeile, die
+zusammenfasst, was eingetragen ist (etwa „4 je Seite · Runden gewinnen: 6 Siege · Verlängerung“). Ein Klick öffnet:
+
+| Feld | Wofür |
+| --- | --- |
+| **Zustand** | **Aktiv** (Vorgabe). **Inaktiv**: steht für neue Map-Pools, **Modus je Map** einer Season und den **Spielmodus** eines Turniers nicht mehr zur Wahl. **Archiviert**: dazu in allen Auswahllisten der Verwaltung ausgeblendet und an keiner Map neu wählbar. Was den Modus schon hat, behält ihn: laufende Spiele, gespeicherte Pools, alte Ergebnisse, die Reihenfolge einer Season und die Dauerplanung. |
+| **Beschreibung** | Worum es im Modus geht, höchstens 500 Zeichen. Nichts Vertrauliches eintragen: Spiel-Daten sind über die Schnittstelle lesbar. |
+| **Spieler je Seite** | 4 heißt 4 gegen 4. Leer: keine Vorgabe. |
+| **Format** | Freitext bis 60 Zeichen, etwa die Regel-Variante. |
+| **Ergebnisregel** | **Art**: Punkte bis zum Ziel, Runden gewinnen oder höherer Endstand gewinnt. Dazu **Ziel** (Punkte bzw. Runden zum Sieg), bei Runden ein **Rundenlimit**, ein **Zeitlimit** je Map, **Remis erlaubt** und **Verlängerung bei Gleichstand**. Die Regel wird gespeichert und angezeigt; gemeldete Endstände prüft die Seite damit noch nicht. |
+
+Werte eines bestimmten Titels sind nicht eingebaut; ihr tragt sie je Spiel selbst ein. Passt etwas nicht (Ziel fehlt,
+Rundenlimit kleiner als das Ziel …), sagt es die Seite vor dem Speichern.
+
+<img src="../assets/turniere/spiel-modus-details.png" alt="Spiel bearbeiten, Für Turniere: zwei Modi, einer aufgeklappt mit Zustand, Beschreibung, Spieler je Seite, Format und Ergebnisregel; beim verwendeten Modus ein Schloss statt Papierkorb" width="560">
+
 **Best-of als Erwartungswert:** Ist die Dauer **je Einzelspiel** angegeben, plant der Planer die Mitte aus kürzestem und
 längstem Verlauf: Best of 1 = 1 Spiel, **Best of 3 = 2,5**, Best of 5 = 4, Best of 7 = 5,5 Spiele. Minuten = aufgerundet
 (Spiele × Minuten je Spiel) + Aufbauzeit. Beispiel: 4 Minuten je Rennen, Best of 3, 3 Minuten Aufbau → 10 + 3 = **13 Min.**
@@ -789,13 +805,21 @@ Maps dieses Spiels mit demselben Bild, die Modi nur soweit dieses Spiel sie kenn
 
 **Modi ändern, ohne etwas zu sperren:**
 
-- **Modus entfernen** (Spiel bearbeiten → Für Turniere): Beim Speichern fragt die Seite mit der Zahl der betroffenen
-  Maps nach. Der Modus verschwindet dann auch aus den Maps. Gespeicherte Pools, laufende Liga-Spiele und alte Ergebnisse
-  bleiben, wie sie sind: Der Editor nennt den alten Modus („Im gespeicherten Pool steht noch …“), und gemeldet wird weiter
-  aus dem gespeicherten Pool. Erst neues Speichern des Pools nimmt ihn heraus. Steht der Modus in der Reihenfolge einer
-  Liga-Season (**Modus je Map**), ändert ihr zuerst die Reihenfolge: Einen Pool ohne diesen Modus nimmt die Season sonst nicht
-  an. Wird der Modus später wieder angelegt, haben die Maps ihn nicht mehr. Turniere und Phasen, die mit ihm planen, nehmen
-  danach den ersten Modus des Spiels.
+- **Modus entfernen** (Spiel bearbeiten → Für Turniere) geht nur bei einem **unbenutzten** Modus. Verwendet ist er, sobald
+  er in einem Map-Pool (auch einer alten Version), in **Modus je Map** einer Season oder Staffel, als **Spielmodus** eines
+  Turniers oder einer Phase, in einem Spiel oder Ergebnisblatt steht. Dann steht statt des Papierkorbs ein Schloss mit
+  dem Hinweis „Wird verwendet – entfernen geht nicht, nur deaktivieren oder archivieren“; stellt den **Zustand** auf
+  **Inaktiv** oder **Archiviert**. Auch direkt über die Schnittstelle lehnt der Server das Entfernen ab. Einen unbenutzten
+  Modus entfernt der Papierkorb: Beim Speichern fragt die Seite mit der Zahl der betroffenen Maps nach, der Modus
+  verschwindet dann auch aus den Maps.
+- **Umbenennen** ändert nur den Namen. Die Kennung bleibt, Maps, Pools, Reihenfolgen und Spiele zeigen weiter auf den
+  Modus. Gespeicherte Pools und gemeldete Spiele zeigen den Namen von damals.
+- **Inaktiv** im laufenden Betrieb: Pools, die den Modus schon haben, gelten weiter, gemeldet wird weiter daraus. Erst ein
+  neu gespeicherter Pool ohne ihn nimmt ihn heraus; der Pool-Editor nennt inaktive Modi („Inaktiv und hier nicht zur
+  Wahl“). Steht der Modus in **Modus je Map** einer Season, ändert ihr zuerst die Reihenfolge: Einen Pool ohne diesen Modus
+  nimmt die Season sonst nicht an.
+- **Altbestand:** Ein Modus, der vor dieser Regel trotz Verwendung entfernt wurde, bleibt in gespeicherten Pools lesbar
+  („Im gespeicherten Pool steht noch …“), gemeldet wird weiter aus dem gespeicherten Pool.
 - **Erster Modus:** Sobald ein Spiel Modi hat, steht eine Map ohne Modus in keinem neuen Pool zur Wahl. Die Map-Seite
   zeigt dann **Diese Maps haben noch keinen Modus**: Modi anhaken, **Allen … Maps zuordnen**, fertig. Auch der Pool-Editor
   weist darauf hin. Bestehende Pools ohne Modus gelten unverändert weiter.
