@@ -317,8 +317,11 @@ test("nach dem Speichern bietet die Seite das Übertragen an - in jedem Reiter",
   fireEvent.change(await screen.findByTestId("season-form-staffel-size"), { target: { value: "6" } });
   fireEvent.click(screen.getByTestId("season-save-ligen"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/seasons/s1", { max_staffel_size: 6 }));
+  apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"], skipped: [] }] } });
   fireEvent.click(await screen.findByTestId("season-sync-now"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/sync"));
+  // Das Ergebnis steht dort, wo übertragen wurde - oben, nicht versteckt in einem anderen Reiter.
+  expect(within(await screen.findByTestId("season-sync-top")).getByTestId("sync-results")).toHaveTextContent("Staffel A");
 });
 
 test("Staffel anlegen und Liga 2 mit eigener Teamgröße anlegen", async () => {

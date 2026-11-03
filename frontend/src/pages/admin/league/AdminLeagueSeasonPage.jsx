@@ -12,7 +12,7 @@
 // gelten für bestehende Staffeln erst nach „Vorgaben auf Staffeln übertragen“.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminTabBar } from "@/components/tls/AdminTabBar";
@@ -31,7 +31,7 @@ import {
 import { SEASON_TABS, TAB_FIELDS, dirtyTabs, rebaseForm, rulesNotice as noticeOf, seasonTarget, tabPayload } from "@/lib/seasonTabs";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { SeasonDatesTab } from "./SeasonDatesTab";
-import { DivisionSheet, SeasonDivisionsTab } from "./SeasonDivisionsTab";
+import { DivisionSheet, SeasonDivisionsTab, SyncResults } from "./SeasonDivisionsTab";
 import { SeasonEntryTab } from "./SeasonEntryTab";
 import { SeasonOverviewTab } from "./SeasonOverviewTab";
 import { SeasonPlayTab } from "./SeasonPlayTab";
@@ -230,11 +230,12 @@ export default function AdminLeagueSeasonPage() {
     navigate({ pathname: location.pathname, search: location.search, hash: anchor === SEASON_TABS[0].key ? "" : `#${anchor}` }, { replace: true });
   };
 
-  const sync = async () => {
+  // Das Ergebnis je Staffel steht dort, wo übertragen wurde: oben unter dem Hinweis (aus jedem Reiter) oder im Reiter Ligen und Staffeln.
+  const sync = async (from = "ligen") => {
     setSyncing(true);
     try {
       const { data: body } = await api.post(`/admin/leagues/seasons/${seasonId}/sync`);
-      setSyncRows(body.staffeln || []);
+      setSyncRows({ from, rows: body.staffeln || [] });
       setPendingSync(0);
       toast.success("Vorgaben übertragen.");
       await reload();
@@ -345,7 +346,7 @@ export default function AdminLeagueSeasonPage() {
     ),
     ligen: () => (
       <SeasonDivisionsTab data={data} form={form} set={set} canSeason={canSeason} formProps={formProps("ligen")} staffelCount={staffelCount} syncing={syncing}
-        syncRows={syncRows} onSync={sync} onAddDivision={() => setDivisionSheet({})} onEditDivision={setDivisionSheet} onDelete={setDeleting}
+        syncRows={syncRows?.from === "ligen" ? syncRows.rows : null} onSync={() => sync("ligen")} onAddDivision={() => setDivisionSheet({})} onEditDivision={setDivisionSheet} onDelete={setDeleting}
         onCreateStaffel={createStaffel} />
     ),
   } : {};
@@ -381,8 +382,20 @@ export default function AdminLeagueSeasonPage() {
           {pendingSync > 0 ? (
             <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn" data-testid="season-sync-hint">
               <span>Gespeichert. Die {pendingSync === 1 ? "bestehende Staffel trägt" : `${pendingSync} bestehenden Staffeln tragen`} noch die alten Werte.</span>
-              <button type="button" onClick={sync} disabled={syncing} data-testid="season-sync-now"
+              <button type="button" onClick={() => sync("oben")} disabled={syncing} data-testid="season-sync-now"
                 className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Jetzt übertragen</button>
+            </div>
+          ) : null}
+          {syncRows?.from === "oben" ? (
+            <div className="mb-5 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="season-sync-top">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Übertragen</span>
+                <button type="button" onClick={() => setSyncRows(null)} aria-label="Ergebnis schließen" data-testid="season-sync-top-close"
+                  className="rounded-sm p-1.5 text-white/50 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <SyncResults rows={syncRows.rows} />
             </div>
           ) : null}
 

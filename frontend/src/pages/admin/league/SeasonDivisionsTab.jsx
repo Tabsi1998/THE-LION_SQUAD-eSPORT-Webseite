@@ -92,7 +92,7 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
   );
 }
 
-function SyncResults({ rows }) {
+export function SyncResults({ rows }) {
   if (!rows) return null;
   if (!rows.length) return <p className="text-sm text-white/55" data-testid="sync-results">Noch keine Staffel – nichts zu übertragen.</p>;
   return (
