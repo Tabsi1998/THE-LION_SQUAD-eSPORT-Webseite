@@ -76,6 +76,7 @@ const TournamentSchedulePage = lazyPage(() => import("@/pages/public/TournamentS
 const LeagueIndexPage = lazyPage(() => import("@/pages/public/LeagueIndexPage"));
 const LeagueSeasonPage = lazyPage(() => import("@/pages/public/LeagueSeasonPage"));
 const LeagueRulesPage = lazyPage(() => import("@/pages/public/LeagueRulesPage"));
+const LeagueApplyPage = lazyPage(() => import("@/pages/public/LeagueApplyPage"));
 const MatchPage = lazyPage(() => import("@/pages/public/MatchPage"));
 // Turnierleitung am Handy (#1156): Ergebnisse eintragen, was fehlt, Streitfälle - nur für die Turnierleitung des Turniers.
 const TournamentLeadPage = lazyPage(() => import("@/pages/public/TournamentLeadPage"));
@@ -307,6 +308,7 @@ function App() {
           <Route path="/liga/:league/regeln" element={<LeagueRulesPage />} />
           <Route path="/liga/:league/:season" element={<LeagueSeasonPage />} />
           <Route path="/liga/:league/:season/regeln" element={<LeagueRulesPage />} />
+          <Route path="/liga/:league/:season/anmelden" element={<ProtectedRoute><LeagueApplyPage /></ProtectedRoute>} />
           <Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} />
           <Route path="/tournaments/:slug/ergebnis/:username" element={<ResultSharePage />} />
           <Route path="/matches/:id" element={<MatchPage />} />

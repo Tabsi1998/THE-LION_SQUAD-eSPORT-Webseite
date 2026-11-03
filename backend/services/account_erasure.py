@@ -586,6 +586,10 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
         purged += (await getattr(db, name).delete_many({"user_id": user_id})).deleted_count
     directory_images = await _directory(db, user_id, now)
     await _applications(db, user_id, now)
+    # Selbstanmeldung (#2205): Der Antrag gehört dem Co-Team, die Person fällt heraus.
+    from services.league_applications import scrub_person
+
+    await scrub_person(db, user_id)
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.

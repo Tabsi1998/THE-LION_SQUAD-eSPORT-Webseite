@@ -12,6 +12,7 @@ import { TEAM_ROLE_LABELS } from "./constants";
 import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
 import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadGameLabel, squadStatusLabel } from "@/components/tls/league/squadRoles";
 import { SquadEligibilityPanel } from "@/components/tls/league/SquadEligibilityPanel";
+import { SquadApplicationStatus } from "@/components/tls/league/application/SquadApplicationStatus";
 import { requirementHint } from "@/lib/leagueEligibility";
 
 const emptySquad = {
@@ -34,6 +35,7 @@ export function TeamsPanel() {
   const [games, setGames] = useState([]);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [applications, setApplications] = useState([]);
   const confirm = useConfirm();
   const myId = useOptionalAuth()?.user?.id || "";
   // „Co-Teams verwalten“ auf der Teamseite (#2110) öffnet hier genau dieses Team (?team=<id>).
@@ -61,6 +63,11 @@ export function TeamsPanel() {
     api.get("/teams/dissolved/mine").then(({ data }) => setDissolved(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
 
+  // Stand der Liga-Anmeldungen (#2205): nur die eigenen Co-Teams, kein Fehler, wenn er nicht kommt.
+  const loadApplications = useCallback(() => {
+    Promise.resolve(api.get("/me/league-applications")).then((answer) => setApplications(answer?.data?.items || [])).catch(() => {});
+  }, []);
+
   const loadMeta = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
@@ -70,7 +77,8 @@ export function TeamsPanel() {
     loadInvites().catch(() => {});
     loadDissolved();
     loadMeta();
-  }, [loadDissolved, loadInvites, loadMeta, loadTeams]);
+    loadApplications();
+  }, [loadApplications, loadDissolved, loadInvites, loadMeta, loadTeams]);
   useApiInvalidation(() => {
     loadTeams();
     loadInvites();
@@ -332,6 +340,7 @@ export function TeamsPanel() {
                           );
                         })}
                       </div>
+                      <SquadApplicationStatus items={applications.filter((row) => row.squad_id === squad.id)} />
                       {squad.league_requirement ? <SquadEligibilityPanel teamId={activeId} squad={squad} /> : null}
                     </div>
                   ))}

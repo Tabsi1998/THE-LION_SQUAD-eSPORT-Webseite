@@ -84,6 +84,9 @@ SEASON = {
 ABLAUF_LEAGUE = "Liga-Probelauf"
 ABLAUF_ASSIGNED = 5  # zugeteilt vom Seed; das sechste Co-Team teilt die Spec im Browser zu
 ABLAUF_SEASON = {**{key: value for key, value in SEASON.items() if key != "name"}, "max_staffel_size": 6, "visibility": "public"}
+# Die Liga der Selbstanmeldung (#2205): je Lauf eine neue Season, Anträge bleiben als Nachweis stehen.
+ANMELDUNG_LEAGUE = "Liga-Anmeldung"
+ANMELDUNG_RULES = "# Fairplay\n\nFair spielen, immer. Platzhalter der lokalen Abnahme, erfunden.\n"
 JOBS = ("matchday_schedule", "match_deadlines", "match_reminders")
 # Acht erfundene Hauptteams: Name, Kürzel, Co-Team, Kadergröße des Co-Teams, Stamm der Spielernamen.
 TEAMS = [("Nebelwölfe", "NBW", "Rudel", 4, "Nebel"), ("Sturmvögel", "STV", "Schwarm", 5, "Sturm"),
@@ -452,6 +455,27 @@ async def ensure_ablauf(admin: Session, db, game: dict, maps: dict, squads: list
             "pool": {mode: [maps[name]["id"] for name in names] for mode, names in POOL.items()}}
 
 
+async def ensure_anmeldung(admin: Session, db, game: dict, maps: dict) -> dict:
+    """Für liga-anmeldung-abnahme.spec.js: öffentliche Season mit gültigem Regelwerk, Liga 1 und leerer Staffel A. Das Anmeldefenster setzt die Spec im Browser."""
+    listing = await admin.call("GET", "/api/admin/leagues")
+    league = next((row for row in listing["leagues"] if row.get("game_id") == game["id"] and row.get("name") == ANMELDUNG_LEAGUE), None)
+    if not league:
+        league = await admin.call("POST", "/api/admin/leagues", json={"name": ANMELDUNG_LEAGUE, "game_id": game["id"]})
+        league["seasons"] = []
+    number = int(max((row.get("number") or 0 for row in league.get("seasons") or []), default=0)) + 1
+    season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={
+        **ABLAUF_SEASON, **season_dates(), "number": number, "name": f"Anmeldung {number}", "slug": f"anmeldung-{number}"})
+    await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
+        {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
+    division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
+    staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
+    scope = f"/api/admin/league-rules/league_season/{season['id']}"
+    draft = await admin.call("PUT", f"{scope}/draft", json={"title": "Regelwerk Anmeldung", "body_md": ANMELDUNG_RULES, "annexes": []})
+    today = datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
+    await admin.call("POST", f"{scope}/publish", json={"revision": draft["revision"], "valid_from": today, "change_reason": "Fassung für die Abnahme", "requires_consent": False})
+    return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]}, "tournament_id": staffel["tournament_id"]}
+
+
 async def inside_main() -> None:
     guard_environment(os.environ)
     from database import get_db
@@ -469,6 +493,7 @@ async def inside_main() -> None:
         tid = staffel.get("tournament_id")
         squads = await ensure_squads(admin, db, game, tid, teams)
         ablauf = await ensure_ablauf(admin, db, game, maps, squads)
+        anmeldung = await ensure_anmeldung(admin, db, game, maps)
     finally:
         await admin.close()
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "slug": 1, "status": 1, "title": 1})
@@ -486,6 +511,7 @@ async def inside_main() -> None:
         "game": {"id": game["id"], "slug": game.get("slug")},
         "maps": {name: row["id"] for name, row in maps.items()},
         "ablauf": ablauf,
+        "anmeldung": anmeldung,
         "teams": [{"name": row["team"]["name"], "team_id": row["team"]["id"], "squad_id": row["squad"]["id"],
                    "squad_name": row["squad"]["name"], "registration_id": row["registration"]["id"],
                    "leader": row["people"][0]["email"], "captain": by_id[row["squad"]["captain_id"]]["email"],

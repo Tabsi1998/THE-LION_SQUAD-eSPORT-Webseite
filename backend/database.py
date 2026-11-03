@@ -181,6 +181,12 @@ async def init_indexes():
     await db.league_rule_consents.create_index([("rule_version_id", 1), ("season_id", 1), ("squad_id", 1), ("user_id", 1)], unique=True)
     await db.league_rule_consents.create_index([("season_id", 1), ("squad_id", 1)])
     await db.league_rule_consents.create_index("user_id")
+    # Selbstanmeldung (#2205): ``active_key`` steht nur an offenen Anträgen - je Season und Co-Team höchstens einer.
+    await db.league_applications.create_index("id", unique=True)
+    await db.league_applications.create_index("active_key", unique=True, sparse=True)
+    await db.league_applications.create_index([("season_id", 1), ("status", 1)])
+    await db.league_applications.create_index("squad_id")
+    await db.league_applications.create_index("applied_by")
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)

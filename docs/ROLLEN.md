@@ -373,6 +373,9 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   alle im Hauptteam, Staffel nicht voll, zwei Co-Teams desselben Teams nie in derselben Staffel, ein Co-Team je Season
   nur in einer Staffel (auch wenn eine abgelehnte, ausgetretene oder nicht erschienene Anmeldung wieder aktiv
   gesetzt wird). Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
+- **Selbstanmeldung** (#2205, docs/LIGA.md, B.4): Anmelden und zurückziehen dürfen nur Captain und Vertreter des Co-Teams, nicht die Hauptteam-Leitung. Prüfen, annehmen,
+  ablehnen, Warteliste und Zuteilen liegen beim Bereich Ligen und bei der Zuständigkeit „Teams freigeben“ (`applications`). Der Kader sieht den Stand, nicht den Grund einer Ablehnung.
+  Das Zuteilen oben bleibt als Sonderweg. Eine Season kann zwei Co-Teams eines Hauptteams in derselben Staffel erlauben (`sibling_squads_in_staffel`, Vorgabe Nein).
 - **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`,
   `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
 Spielberechtigung (#2204): Die Zuständigkeit „Kader prüfen“ (`roster`) hebt auch die Wartezeit auf (`POST …/roster/{uid}/waive-wait`, Pflichtgrund, `league.roster.wait_waive`) und entscheidet Transfers

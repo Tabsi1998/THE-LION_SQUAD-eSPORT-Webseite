@@ -1,6 +1,7 @@
 """Spielberechtigung (#2204): Was jemand tun muss oder was ohne ihn entschieden wurde, kommt auch per Mail - nach den Einstellungen der Person.
 Vorlage ``league_notice``. Nie ein Geburtsdatum, nie wem eine Spiel-ID gehört. Erfundene Namen."""
 import pathlib
+import re
 import sys
 
 import pytest
@@ -82,7 +83,8 @@ async def test_no_league_answer_or_message_carries_a_birth_date(flow):
     written += [str(row) async for row in flow.db.audit_logs.find({}, {"_id": 0})]
     for text in [*(answer.text for answer in answers), *written]:
         assert marker not in text and "2020-06-05" not in text and "birth_date" not in text
-        assert "1987" not in text
+        # Das Jahr allein, nicht als Teil einer zufälligen Kennung oder Uhrzeit (3319876bd2d9).
+        assert not re.search(r"(?<![\w.:-])1987(?!\w)", text), text
 
 
 @pytest.mark.asyncio
