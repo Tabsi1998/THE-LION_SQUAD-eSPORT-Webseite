@@ -17,7 +17,11 @@ const MODES = [
 ];
 const GAME = {
   id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", short_name: "PS", match_modes: MODES,
-  player_id_fields: [{ key: "probe_id", label: "Probe-ID", help_text: "Steht im Spielprofil", required: true, pattern: "[^#]+#\\d+", format_hint: "Name#1234" }],
+  player_id_fields: [
+    { key: "probe_id", label: "Probe-ID", help_text: "Steht im Spielprofil", required: true, pattern: "[^#]+#\\d+", format_hint: "Name#1234" },
+    // Altbestand (Codex-Nachprüfung #2249): ein Feld mit leerem Schlüssel bleibt, wie es ist.
+    { key: "", label: "Altfeld", required: false },
+  ],
   default_best_of: 3, setup_minutes: 3,
 };
 const image = (name) => `/api/static/uploads/probe-${name}.webp`;
@@ -65,7 +69,7 @@ async function mockServer(page) {
   });
   await page.route("**/api/games/g9", json({ id: "g9", name: "Neues Probe-Spiel", slug: "neues-probe-spiel", kind: "standalone", match_modes: [], player_id_fields: [] }));
   await page.route("**/api/games/g1/usage", json({ total: 4, text: "1 Liga, 3 Maps", counts: {},
-    modes: { stellung: { in_use: true }, snd: { in_use: true }, kontrolle: { in_use: false } } }));
+    modes: { stellung: { in_use: true }, snd: { in_use: true }, kontrolle: { in_use: false } }, id_fields: { probe_id: 2 } }));
   await page.route("**/api/games/g1/maps", json({ game: { id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", modes: MODES }, maps: MAPS, limit: 200, default_pool: null }));
   await page.route("**/api/games/g1/maps/kupfer", (route) => {
     calls.mapPatch.push(route.request().postDataJSON());
@@ -95,10 +99,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.getByTestId("game-page-title")).toHaveText("Probe Shooter");
     await expect(page.getByRole("tab", { selected: true })).toHaveText("Allgemein");
     await expect(page.getByTestId("game-edit-name")).toHaveValue("Probe Shooter");
-    // Vier Reiter passen auch bei 390 px in die Leiste; erst ein fünfter (C.4) bringt Wischen und Hinweis.
+    // Fünf Reiter seit C.4 (Ausrüstung, #2218): Passen sie nicht in die Leiste, wird gewischt - dann steht der Hinweis da; am PC passen alle.
     const tabs = await page.getByTestId("game-tabs").evaluate((node) => node.scrollWidth - node.clientWidth);
-    expect(tabs).toBeLessThanOrEqual(1);
-    await expect(page.getByTestId("game-tabs-hint")).toHaveCount(0);
+    if (width >= 768) expect(tabs).toBeLessThanOrEqual(1);
+    await expect(page.getByTestId("game-tabs-hint")).toHaveCount(tabs > 1 ? 1 : 0);
     await noSideScroll(page);
     await shot(page, `spielseite-allgemein-${width}.png`);
 
@@ -171,6 +175,25 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.getByTestId("admin-form-cancel").click();
     await page.getByTestId("game-page-back").click();
     await expect(page).toHaveURL(/\/admin\/games$/);
+  });
+
+  // Codex-Nachprüfung #2249: Altbestand mit leerem Schlüssel bleibt leer; ein Feld mit gespeicherten IDs entfernen fragt mit
+  // der Zahl der Personen, und die Bestätigung geht beim Speichern mit.
+  test(`Spiel-IDs (${width} px): leerer Altschlüssel bleibt, Entfernen mit gespeicherten IDs fragt nach`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const calls = await mockServer(page);
+    await page.goto("/admin/games/g1#ids");
+    await expect(page.getByTestId("game-id-field-key-1")).toHaveValue("");
+    await expect(page.getByTestId("game-id-field-key-1")).toBeDisabled();
+    await page.getByTestId("game-id-field-remove-0").click();
+    const dialog = page.getByRole("dialog").filter({ hasText: "„Probe-ID“ entfernen?" });
+    await expect(dialog).toContainText("IDs von 2 Personen");
+    await noSideScroll(page);
+    await dialog.getByRole("button", { name: "Entfernen" }).click();
+    await expect(page.getByTestId("game-ids-removed")).toContainText("„Probe-ID“ (IDs von 2 Personen)");
+    await page.getByTestId("game-save-ids").click();
+    await expect.poll(() => calls.patch.length).toBe(1);
+    expect(calls.patch[0]).toEqual({ player_id_fields: [{ key: "", label: "Altfeld", help_text: "", required: false }], confirm_removed_keys: ["probe_id"] });
   });
 
   test(`Neues Spiel (${width} px): Name und Art im kurzen Blatt, danach öffnet die Spielseite`, async ({ page }) => {

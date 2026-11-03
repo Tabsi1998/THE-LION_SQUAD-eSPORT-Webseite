@@ -90,7 +90,9 @@ test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
       const maps = (await apiJson(page, "GET", `/api/games/${game.id}/maps`)).body.maps;
       const map = maps.find((row) => row.name === MAP);
       expect((await apiJson(page, "PATCH", `/api/games/${game.id}/maps/${map.id}`, { modes: [...map.modes, key] })).status).toBe(200);
-      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}`);
+      // Reiter Spielbetrieb (#2267): den Modus der Season anhaken, dann erscheinen seine Maps.
+      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}#modi`);
+      await page.getByTestId(`season-pool-pick-${key}`).check();
       const group = page.getByTestId(`season-pool-mode-${key}`);
       await expect(group).toContainText(label);
       await group.getByRole("checkbox", { name: `${MAP} in ${label}` }).check();

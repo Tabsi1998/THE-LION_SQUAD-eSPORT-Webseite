@@ -118,6 +118,13 @@ async def init_indexes():
     await db.map_pools.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
     await db.map_pools.create_index([("tournament_id", 1), ("scope", 1)])
     await db.map_pools.create_index("game_id")
+    # Ausrüstung je Spiel und Sperrlisten mit Versionen (#2218): Name je Spiel und Kategorie nur einmal, Version je Liste nur einmal.
+    await db.game_equipment.create_index("id", unique=True)
+    await db.game_equipment.create_index([("game_id", 1), ("category", 1), ("name_key", 1)], unique=True)
+    await db.game_equipment_categories.create_index("game_id", unique=True)
+    await db.loadout_bans.create_index("id", unique=True)
+    await db.loadout_bans.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
+    await db.loadout_bans.create_index("game_id")
     # Maps in Ergebnisblättern der Team-Liga (#1616): nur fürs Löschen einer Map gefragt (``game_maps.in_results``).
     await db.reference_round_results.create_index("matches.maps.map_id", sparse=True)
     await db.reference_round_results.create_index("pending_draft.matches.maps.map_id", sparse=True)
@@ -162,6 +169,8 @@ async def init_indexes():
     # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
     await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
     await db.league_rosters.create_index("user_id")
+    # Spiel-ID-Schlüssel (#2249): Wer im Kader eines Spiels eine ID unter einem Schlüssel hat - Zählung vor dem Entfernen.
+    await db.league_rosters.create_index("game_id")
     # Spielberechtigung (#2204): Jede Spiel-ID nur einmal je Season - nur Seasons mit ``unique_game_ids`` schreiben ``id_keys``.
     await db.league_rosters.create_index(
         [("season_id", 1), ("id_keys", 1)], unique=True, name="league_roster_unique_id",

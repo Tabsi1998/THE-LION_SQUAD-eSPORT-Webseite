@@ -7,6 +7,7 @@ export const GAME_TABS = [
   { key: "ids", label: "Spiel-IDs" },
   { key: "modi", label: "Modi" },
   { key: "maps", label: "Maps" },
+  { key: "ausruestung", label: "Ausrüstung" },
 ];
 
 export const GAME_KIND_OPTIONS = [
@@ -96,27 +97,31 @@ function optionList(value) {
 
 /**
  * Der Schlüssel eines ID-Felds. An einem gespeicherten hängen die IDs der Spieler (users.game_ids.<spiel>.<schlüssel>) - er
- * geht unverändert zurück, auch wenn er nicht kanonisch ist („PSN-ID“, nichtlateinisch). Nur ein neues Feld (`_new`) oder
- * eines ganz ohne Schlüssel bekommt einen aus der Bezeichnung.
+ * geht exakt so zurück, wie er gespeichert ist: nicht kanonisch („PSN-ID“), nichtlateinisch und auch leer (Altbestand). Ein
+ * neues Feld (`_new`) bekommt einen aus der Bezeichnung - oder den Schlüssel eines eben entfernten Felds gleicher Bezeichnung
+ * zurück (`_restoredKey`), damit dessen IDs nicht verloren gehen.
  */
 export function idFieldKey(field) {
-  const key = String(field?.key ?? "");
-  if (!field?._new && key.trim()) return key;
-  return fieldKeyFrom(key || field?.label || "");
+  if (!field?._new) return String(field?.key ?? "");
+  if (field._restoredKey) return field._restoredKey;
+  return fieldKeyFrom(String(field.key ?? "") || field.label || "");
 }
 
 // Was die Verwaltung pflegt; alles andere an einem Feld geht unverändert zurück (Codex-Prüfung #2249: Speichern ersetzt die
 // ganze Liste). Nur die Hilfsfelder der Oberfläche fallen weg.
 const ID_FIELD_OWN = ["key", "label", "help_text", "required", "pattern", "format_hint", "options", "unique_in_season"];
-const ID_FIELD_UI = ["_new", "_keyTouched"];
+const ID_FIELD_UI = ["_new", "_keyTouched", "_restoredKey"];
+
+const blankNew = (field) => field?._new && !String(field.label || "").trim() && !String(field.key || "").trim();
 
 export function normalizePlayerIdFields(fields = []) {
   return (fields || [])
+    .filter((field) => field && !blankNew(field))
     .map((field) => {
-      const rest = Object.fromEntries(Object.entries(field || {}).filter(([name]) => !ID_FIELD_OWN.includes(name) && !ID_FIELD_UI.includes(name)));
+      const rest = Object.fromEntries(Object.entries(field).filter(([name]) => !ID_FIELD_OWN.includes(name) && !ID_FIELD_UI.includes(name)));
       return {
         key: idFieldKey(field),
-        label: text(field.label || field.key).trim(),
+        label: text(field.label).trim() || text(field.key).trim(),
         help_text: field.help_text || "",
         required: field.required !== false,
         // Spielberechtigung (#2204): Format, Beispiel, Auswahl - leer heißt „keine Vorgabe“.
@@ -126,31 +131,36 @@ export function normalizePlayerIdFields(fields = []) {
         ...(field.unique_in_season === false ? { unique_in_season: false } : {}),
         ...rest,
       };
-    })
-    .filter((field) => field.key && field.label);
+    });
 }
 
-const blankNew = (field) => field?._new && !String(field.label || "").trim() && !String(field.key || "").trim();
-
 /**
- * Was vor dem Speichern der ID-Felder noch fehlt (Codex-Prüfung #2249) - leer, wenn alles passt. Jedes Feld braucht eine
- * Bezeichnung und einen Schlüssel; ein neues Feld darf keinen Schlüssel eines anderen haben (aus „PSN-ID“ und „PSN ID“ wird
- * sonst zweimal „psn_id“). Ein ganz leeres neues Feld fällt still weg, doppelte gespeicherte Schlüssel (Altbestand) halten nichts
- * auf. Der Server prüft dasselbe (services/league_roster.id_key_problem).
+ * Was vor dem Speichern der ID-Felder noch fehlt (Codex-Prüfung #2249) - leer, wenn alles passt. Geprüft werden nur neue
+ * Felder: Sie brauchen eine Bezeichnung und einen Schlüssel, und keiner darf schon an einem anderen Feld stehen (aus „PSN-ID“ und
+ * „PSN ID“ würde sonst zweimal „psn_id“). Gespeicherte Felder bleiben, wie sie sind - auch doppelt oder leer (Altbestand). Ein
+ * ganz leeres neues Feld fällt still weg. Der Server prüft dasselbe (services/league_roster.id_key_problem).
  */
 export function idFieldsProblem(fields = []) {
   const rows = (fields || []).map((field, index) => ({ field, index, key: idFieldKey(field), label: String(field?.label || "").trim() }))
-    .filter(({ field }) => !blankNew(field));
+    .filter(({ field }) => field && !blankNew(field));
   for (const { field, index, key, label } of rows) {
+    if (!field._new) continue;
     if (!label) return `ID-Feld ${index + 1}: Bitte eine Bezeichnung eintragen.`;
     if (!key.trim()) {
       return `ID-Feld „${label}“: Aus der Bezeichnung entsteht kein Schlüssel – bitte unter „Schlüssel“ Buchstaben (a–z) oder Ziffern eintragen.`;
     }
-    if (!field._new) continue;
     const other = rows.find((row) => row.index !== index && row.key === key && (!row.field._new || row.index < index));
-    if (other) return `Der Schlüssel „${key}“ steht schon bei „${other.label}“ – bitte für „${label}“ einen anderen Schlüssel eintragen.`;
+    if (other) return `Der Schlüssel „${key}“ steht schon bei „${other.label || other.key}“ – bitte für „${label}“ einen anderen Schlüssel eintragen.`;
   }
   return "";
+}
+
+/** Ein eben entferntes, noch nicht gespeichertes Feld mit dieser Bezeichnung - ein neues Feld bekommt dann dessen Schlüssel. */
+export function removedFieldFor(form, label) {
+  const wanted = String(label || "").trim().toLowerCase();
+  if (!wanted) return null;
+  const inUse = new Set((form?.player_id_fields || []).filter((field) => !field._new).map((field) => String(field.key ?? "")));
+  return (form?.removed_fields || []).find((row) => String(row.label || "").trim().toLowerCase() === wanted && !inUse.has(row.key)) || null;
 }
 
 /** Reiter Spiel-IDs: die ID-Felder, bei Spielversionen dazu woher die IDs kommen. */
@@ -162,12 +172,19 @@ export function idsToForm(game) {
   };
 }
 
+/**
+ * Was an die API geht. Wurde ein Feld entfernt, unter dem schon IDs stehen, und hat die Person das in der Rückfrage bestätigt,
+ * geht sein Schlüssel als `confirm_removed_keys` mit - sonst lehnt der Server mit 409 ab (#2249). Ein Schlüssel, der über ein
+ * neues Feld gleicher Bezeichnung zurückkam, ist nicht entfernt.
+ */
 export function idsPayload(form, kind) {
-  const body = { player_id_fields: normalizePlayerIdFields(form.player_id_fields) };
+  const fields = normalizePlayerIdFields(form.player_id_fields);
+  const kept = new Set(fields.map((field) => field.key));
+  const confirmed = (form.removed_fields || []).filter((row) => row.confirmed && row.key && !kept.has(row.key)).map((row) => row.key);
+  const body = { player_id_fields: fields, ...(confirmed.length ? { confirm_removed_keys: confirmed } : {}) };
   if (kind !== "edition") return body;
   return { ...body, identity_source_game_id: form.identity_source_game_id || null, inherit_player_ids: form.inherit_player_ids !== false };
 }
-
 /** Gleicher Stand? Reicht für Formulare aus Text, Zahlen und Listen. */
 export function sameForm(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);

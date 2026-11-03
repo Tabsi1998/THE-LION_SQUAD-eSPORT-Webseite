@@ -121,7 +121,9 @@ for (const [name, viewport] of [["390", { width: 390, height: 844 }], ["1440", {
         saved.push(route.request().postDataJSON());
         await route.fulfill({ contentType: "application/json", body: "{}" });
       });
+      // Reiter „Anmeldung und Kader“ (#2267): mit „Kader prüfen“ allein der einzige Weg dorthin.
       await page.goto("/admin/leagues/seasons/s1");
+      await page.getByTestId("season-tab-anmeldung").click();
       await page.getByTestId("roster-edit-r9").click();
       const sheet = page.getByTestId("kader-sheet");
       await expect(sheet.getByTestId("kader-member-p1")).toBeDisabled();

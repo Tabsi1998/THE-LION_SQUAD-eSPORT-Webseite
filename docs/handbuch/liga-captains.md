@@ -59,6 +59,19 @@ Termin oder Best of eures Spiels, bekommt ihr ebenfalls eine Nachricht.
 Eine kampflose Niederlage steht als Teamstrafe bei Captain, Vertreter und der Leitung des Hauptteams unter **Meine
 Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und die Turnierleitung.
 
+## Tabelle
+
+- **Punkte:** Sieg 3, Niederlage 0, kein Remis. Ein **kampfloser Sieg** zählt die Maps des Best of (BO3 2:0) und steht
+  in der Tabelle als „kampflos“. Sind **beide nicht erschienen**, verlieren beide ohne Punkte und Maps; die Leitung kann
+  das Spiel neu ansetzen.
+- **Punktgleich?** Zuerst der **direkte Vergleich** (bei drei und mehr Teams eine Mini-Tabelle nur aus euren Spielen
+  untereinander – nur, wenn die alle gespielt sind), dann Map-Differenz und gewonnene Maps. Stehen Teams danach in allem gleich, teilen sie sich den Platz,
+  bis die Liga-Leitung mit Grund entscheidet. Unter eurem Namen steht klein, was entschied.
+- **Steigt ein Team aus** (Austritt, Auflösung, Disqualifikation), zählen **alle** seine Spiele für die Gegner, auch schon
+  gespielte. Das echte Ergebnis bleibt sichtbar, das Team steht am Tabellenende.
+
+Die genaue Reihenfolge stellt jede Season ein – sie steht unter der Tabelle.
+
 ## Regeln
 
 Die Regeln stehen auf der Ligaseite unter **Regeln**, mit Inhaltsverzeichnis, Suche und PDF. Oben steht, was **neu in dieser Version** ist, geänderte

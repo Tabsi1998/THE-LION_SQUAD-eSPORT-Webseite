@@ -1,15 +1,17 @@
 // Spielseite der Verwaltung (#2249) unter /admin/games/<Spiel>: alles zu einem Spiel an einem Ort, in Reitern Allgemein,
-// Spiel-IDs, Modi und Maps (per Adresse ansteuerbar: #allgemein, #ids, #modi, #maps). Vorher verteilt auf die Seitenleiste
-// „Spiel bearbeiten“ und eine eigene Map-Seite (die alte Adresse /admin/games/<Spiel>/maps leitet hierher weiter).
+// Spiel-IDs, Modi, Maps und Ausrüstung (per Adresse ansteuerbar: #allgemein, #ids, #modi, #maps, #ausruestung). Vorher verteilt auf
+// die Seitenleiste „Spiel bearbeiten“ und eigene Seiten (die alten Adressen …/maps und …/equipment leiten hierher weiter).
 //
 // Speichern je Reiter: jeder Reiter mit Formular hält seinen Entwurf, solange die Seite offen ist - ein Reiterwechsel verliert
-// nichts, der Reiter trägt dann einen Punkt. Wer die Seite mit Ungespeichertem verlässt, wird gefragt. Maps speichern sofort.
+// nichts, der Reiter trägt dann einen Punkt. Wer die Seite mit Ungespeichertem verlässt, wird gefragt. Maps und Ausrüstung speichern
+// sofort.
 // Ein weiterer Reiter (etwa „Ausrüstung“ mit C.4) braucht einen Eintrag in GAME_TABS (lib/gameForm.js) und eines in PANELS unten.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminTabBar } from "@/components/tls/AdminTabBar";
 import { FormActions } from "@/components/tls/AdminForm";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -25,6 +27,7 @@ import { GameGeneralTab } from "./GameGeneralTab";
 import { GameIdsTab } from "./GameIdsTab";
 import { GameModesTab } from "./GameModesTab";
 import { GameMapsTab } from "./GameMapsTab";
+import { EquipmentLibrary } from "./equipment/EquipmentLibrary";
 import { toast } from "sonner";
 
 const SAVE_LABELS = { allgemein: "Allgemein speichern", ids: "Spiel-IDs speichern", modi: "Modi speichern" };
@@ -33,54 +36,6 @@ const FORMS = {
   ids: idsToForm,
   modi: gameMatchDataToForm,
 };
-
-// Reiter als Wischleiste: am Handy seitlich wischbar, mit Hinweis, sobald nicht alle Platz haben. Pfeiltasten wechseln den Reiter.
-function GameTabBar({ tabs, active, dirty, onSelect, idBase }) {
-  const ref = useRef(null);
-  const [overflow, setOverflow] = useState(false);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return undefined;
-    const measure = () => setOverflow(node.scrollWidth - node.clientWidth > 1);
-    measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [tabs.length]);
-  const onKeyDown = (event) => {
-    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
-    const edge = { Home: 0, End: tabs.length - 1 }[event.key];
-    if (step === undefined && edge === undefined) return;
-    event.preventDefault();
-    const at = tabs.findIndex((tab) => tab.key === active);
-    const next = tabs[edge ?? (at + step + tabs.length) % tabs.length];
-    onSelect(next.key);
-    ref.current?.querySelector(`[data-tab="${next.key}"]`)?.focus();
-  };
-  return (
-    <div className="mb-6">
-      <div ref={ref} role="tablist" aria-label="Bereiche des Spiels" className="flex gap-1 border-b border-white/10 tls-swipe pb-0" data-testid="game-tabs">
-        {tabs.map((tab) => {
-          const selected = tab.key === active;
-          return (
-            <button key={tab.key} type="button" role="tab" id={`${idBase}-tab-${tab.key}`} aria-selected={selected} aria-controls={`${idBase}-panel`}
-              tabIndex={selected ? 0 : -1} data-tab={tab.key} onKeyDown={onKeyDown} onClick={() => onSelect(tab.key)} data-testid={`game-tab-${tab.key}`}
-              className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 sm:px-3 text-xs font-bold uppercase tracking-wider focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-t-sm ${selected ? "border-[#29B6E8] text-white" : "border-transparent text-white/50 hover:text-white"}`}>
-              {tab.label}
-              {dirty[tab.key] ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-warn" data-testid={`game-tab-dirty-${tab.key}`}>
-                  <span className="sr-only">(nicht gespeichert)</span>
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-      {overflow ? <p className="mt-1.5 text-[11px] text-white/45" data-testid="game-tabs-hint">Seitlich wischen: weitere Reiter liegen rechts.</p> : null}
-    </div>
-  );
-}
 
 export default function AdminGamePage() {
   const { gameId: ref } = useParams();
@@ -98,6 +53,7 @@ export default function AdminGamePage() {
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState("");
   const [mapsKey, setMapsKey] = useState(0);
+  const [equipmentDirty, setEquipmentDirty] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -131,7 +87,11 @@ export default function AdminGamePage() {
   const saved = useMemo(() => (game ? Object.fromEntries(Object.entries(FORMS).map(([key, toForm]) => [key, toForm(game)])) : {}), [game]);
   const formOf = (key) => drafts[key] ?? saved[key];
   const setForm = (key) => (next) => setDrafts((current) => ({ ...current, [key]: next }));
-  const dirty = Object.fromEntries(Object.keys(FORMS).map((key) => [key, Boolean(drafts[key] && saved[key] && !sameForm(drafts[key], saved[key]))]));
+  // Ausrüstung (#2218) speichert je Eintrag sofort - ungespeichert ist nur ein offenes Blatt mit Änderungen (es meldet sich selbst).
+  const dirty = {
+    ...Object.fromEntries(Object.keys(FORMS).map((key) => [key, Boolean(drafts[key] && saved[key] && !sameForm(drafts[key], saved[key]))])),
+    ausruestung: equipmentDirty,
+  };
   const dirtyLabels = GAME_TABS.filter((entry) => dirty[entry.key]).map((entry) => entry.label);
   const discard = (key) => setDrafts((current) => {
     const rest = { ...current };
@@ -168,12 +128,42 @@ export default function AdminGamePage() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirtyLabels.length]);
 
-  const selectTab = (key) => navigate({ pathname: location.pathname, search: location.search, hash: key === GAME_TABS[0].key ? "" : `#${key}` }, { replace: true });
+  // Ein offenes Ausrüstungs-Blatt (#2218) hängt am Reiter: Ein anderer Reiter verwirft es - darum dieselbe Rückfrage wie beim Verlassen.
+  // Die Formulare der übrigen Reiter bleiben dagegen beim Wechsel erhalten.
+  const selectTab = async (key) => {
+    if (key !== tab && tab === "ausruestung" && equipmentDirty) {
+      const leave = await confirm({
+        title: "Nicht gespeicherte Änderungen",
+        description: "In Ausrüstung ist noch etwas nicht gespeichert. Wechselst du den Reiter, geht es verloren.",
+        confirmLabel: "Verwerfen und weiter",
+        cancelLabel: "Zurück zum Blatt",
+        tone: "danger",
+      });
+      if (!leave) return;
+    }
+    navigate({ pathname: location.pathname, search: location.search, hash: key === GAME_TABS[0].key ? "" : `#${key}` }, { replace: true });
+  };
 
   const finish = async (key, text) => {
     await load();
     discard(key);
     toast.success(text);
+  };
+
+  // Verliert das Spiel mit dem Speichern Spieler-IDs (#2249: Feld entfernt, andere ID-Quelle, anderes Hauptspiel, Erben aus),
+  // antwortet der Server mit 409 und der Zahl je Schlüssel. Dann fragt die Seite mit genau diesem Text und schickt bestätigt
+  // die Schlüssel mit. `null`: abgebrochen, nichts gespeichert.
+  const patchWithIdConfirmation = async (payload) => {
+    try {
+      return (await api.patch(`/games/${game.id}`, payload)).data;
+    } catch (err) {
+      const detail = err.response?.status === 409 ? err.response?.data?.detail : null;
+      if (detail?.code !== "id_keys_in_use") throw err;
+      const ok = await confirm({ title: "Spieler-IDs gehen verloren", description: detail.message, confirmLabel: "Trotzdem speichern" });
+      if (!ok) return null;
+      const keys = [...new Set([...(payload.confirm_removed_keys || []), ...Object.keys(detail.keys || {})])];
+      return (await api.patch(`/games/${game.id}`, { ...payload, confirm_removed_keys: keys })).data;
+    }
   };
 
   const save = async (key) => {
@@ -202,13 +192,18 @@ export default function AdminGamePage() {
     }
     setSaving(key);
     try {
-      const { data } = await api.patch(`/games/${game.id}`, payload);
+      const data = await patchWithIdConfirmation(payload);
+      if (!data) {
+        setSaving("");
+        return;
+      }
       if (key === "modi") {
         await finish(key, gameSavedText(data));
         loadUsage(game.id);
         setMapsKey((value) => value + 1);
       } else {
         await finish(key, key === "allgemein" ? "Allgemein gespeichert." : "Spiel-IDs gespeichert.");
+        if (key === "ids") loadUsage(game.id);
         if (key === "allgemein") loadGames();
       }
     } catch (err) {
@@ -219,9 +214,12 @@ export default function AdminGamePage() {
 
   const PANELS = game ? {
     allgemein: () => <GameGeneralTab gameId={game.id} form={formOf("allgemein")} onChange={setForm("allgemein")} games={games} servers={servers} />,
-    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} />,
+    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} usage={usage} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
+    // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps. Ist ein Blatt mit Änderungen offen, meldet es das: Punkt am
+    // Reiter und Rückfrage beim Verlassen.
+    ausruestung: () => <EquipmentLibrary gameId={game.id} onDirtyChange={setEquipmentDirty} />,
   } : {};
   const hasForm = Boolean(FORMS[tab]);
 
@@ -241,8 +239,8 @@ export default function AdminGamePage() {
               {isArchivedGame(game) ? <span className="text-[11px] font-bold uppercase tracking-widest text-warn" data-testid="game-page-archived">Archiviert – beim Anlegen nicht zur Wahl</span> : null}
             </p>
           </div>
-          <GameTabBar tabs={GAME_TABS} active={tab} dirty={dirty} onSelect={selectTab} idBase={idBase} />
-          <div role="tabpanel" id={`${idBase}-panel`} aria-labelledby={`${idBase}-tab-${tab}`} data-testid={`game-panel-${tab}`} className="min-w-0">
+          <AdminTabBar tabs={GAME_TABS} active={tab} dirty={dirty} onSelect={selectTab} idBase={idBase} label="Bereiche des Spiels" testPrefix="game" />
+          <div role="tabpanel" id={`${idBase}-panel-${tab}`} aria-labelledby={`${idBase}-tab-${tab}`} data-testid={`game-panel-${tab}`} className="min-w-0">
             {hasForm ? (
               <form onSubmit={(event) => { event.preventDefault(); save(tab); }} noValidate data-testid={`game-form-${tab}`}>
                 {PANELS[tab]()}

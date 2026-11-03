@@ -25,6 +25,11 @@ const SERVERS = [
   { guild_id: "4", name: "Weg", role: "sub", enabled: false, left: true },
 ];
 const MAPS = { game: { id: "g1", name: "Mario Kart 8 Deluxe", slug: "mario-kart-8", modes: [] }, maps: [], limit: 200, default_pool: null };
+// Ausrüstung (C.4, #2218): fünfter Reiter, speichert je Eintrag sofort.
+const EQUIPMENT = { game: { id: "g1", name: "Mario Kart 8 Deluxe", modes: [] }, categories: [{ key: "waffen", label: "Waffen", role: "weapon", count: 1 }],
+  items: [{ id: "w1", category: "waffen", name: "Probewaffe", status: "active", in_lists: 0, weapon_ids: [] }], limit: 1000, categories_limit: 20,
+  suggested_categories: [], attachments_without_weapon: [] };
+const IMPORT_ITEMS = [{ id: "a1", name: "Altwaffe", category_label: "Waffen", exists: false }, { id: "a2", name: "Altschild", category_label: "Perks", exists: false }];
 
 let game;
 let servers;
@@ -35,6 +40,9 @@ function serve() {
     if (url === "/games") return { data: [game, { id: "p1", name: "Call of Duty", slug: "cod", kind: "series" }] };
     if (url === "/games/g1/usage") return { data: usage };
     if (url === "/games/g1/maps") return { data: MAPS };
+    if (url === "/games/g1/equipment") return { data: EQUIPMENT };
+    if (url === "/games/g1/equipment/import-sources") return { data: [{ id: "g0", name: "Vorgänger", items: 2 }] };
+    if (url === "/games/g1/equipment/import-sources/g0") return { data: { items: IMPORT_ITEMS } };
     if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
     throw Object.assign(new Error("nicht da"), { response: { status: 404 } });
   });
@@ -75,7 +83,7 @@ describe("Reiter", () => {
     const { unmount } = renderPage();
     expect(await screen.findByTestId("game-page-title")).toHaveTextContent("Mario Kart 8 Deluxe");
     expect(screen.getByTestId("game-tab-allgemein")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Allgemein", "Spiel-IDs", "Modi", "Maps"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Allgemein", "Spiel-IDs", "Modi", "Maps", "Ausrüstung"]);
     expect(screen.getByTestId("game-edit-name")).toHaveValue("Mario Kart 8 Deluxe");
     unmount();
 
@@ -88,6 +96,99 @@ describe("Reiter", () => {
     expect(await screen.findByTestId("game-maps-empty")).toBeInTheDocument();
     expect(apiMock.get).toHaveBeenCalledWith("/games/mario-kart-8");
     expect(apiMock.get).toHaveBeenCalledWith("/games/g1/maps");
+  });
+
+  test("#ausruestung öffnet die Bibliothek; sie speichert sofort, also kein Punkt und keine Rückfrage beim Verlassen", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    expect(await screen.findByTestId("equipment-row-w1")).toHaveTextContent("Probewaffe");
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(apiMock.get).toHaveBeenCalledWith("/games/g1/equipment");
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-form-ausruestung")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    expect(await screen.findByTestId("games-list")).toBeInTheDocument();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  // Folge-Review C.4: Ein offenes Blatt mit Änderungen ist „ungespeichert“ - Punkt am Reiter und Rückfrage beim Verlassen.
+  test("ein geändertes Eintrags-Blatt zeigt den Punkt und fragt beim Verlassen; unverändert oder geschlossen nicht", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe neu" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Ausrüstung") })));
+    expect(screen.queryByTestId("games-list")).not.toBeInTheDocument();
+    // Zurück auf den alten Stand: kein Punkt mehr.
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe" } });
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+  });
+
+  test("ein geändertes Kategorien-Blatt zählt ebenso, Schließen verwirft es", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-categories"));
+    fireEvent.change(screen.getByLabelText("Name der Kategorie 1"), { target: { value: "Primärwaffen" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("equipment-categories-sheet")).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    expect(await screen.findByTestId("games-list")).toBeInTheDocument();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  // Folge-Review C.4: Auch ein anderer Reiter verwirft das offene Blatt - darum dieselbe Rückfrage.
+  test("Reiterwechsel mit geändertem Blatt fragt nach; „Zurück“ bleibt beim Blatt, „Verwerfen“ wechselt", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe neu" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-tab-allgemein"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Ausrüstung") })));
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("equipment-name")).toHaveValue("Probewaffe neu");
+
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-tab-allgemein"));
+    await waitFor(() => expect(screen.getByTestId("game-tab-allgemein")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    expect(confirmMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("das Import-Blatt: die geladene Vorauswahl ist keine Änderung, ein abgewählter Eintrag schon", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-import"));
+    expect(await screen.findByTestId("equipment-import-row-a2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Altschild")).toBeChecked();
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("equipment-import-sheet")).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+  });
+
+  test("Reiterwechsel aus einem geänderten Import-Blatt fragt nach; „Zurück“ behält die Auswahl, „Verwerfen“ wechselt", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-import"));
+    expect(await screen.findByTestId("equipment-import-row-a2")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-tab-modi"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Altschild")).not.toBeChecked();
+
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-tab-modi"));
+    await waitFor(() => expect(screen.getByTestId("game-tab-modi")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
   });
 
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {
@@ -120,6 +221,15 @@ describe("Allgemein", () => {
     expect(body).toMatchObject({ name: "Mario Kart 8 Deluxe", slug: "mario-kart-8", short_name: "MK8DX", kind: "standalone" });
     for (const key of ["match_modes", "player_id_fields", "points_table", "genre", "platforms", "supports_solo"]) expect(body).not.toHaveProperty(key);
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Allgemein gespeichert."));
+  });
+
+  // Codex-Nachprüfung #2249: Unter der Adresse stehen die Spieler-IDs - ein neuer Name lässt sie, wie sie ist.
+  test("ein neuer Name ändert die Adresse nicht", async () => {
+    renderPage();
+    fireEvent.change(await screen.findByTestId("game-edit-name"), { target: { value: "Mario Kart Welt" } });
+    expect(screen.getByTestId("game-edit-slug")).toHaveValue("mario-kart-8");
+    fireEvent.click(screen.getByTestId("game-save-allgemein"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ name: "Mario Kart Welt", slug: "mario-kart-8" })));
   });
 
   test("ohne Namen wird nicht gespeichert", async () => {
@@ -242,6 +352,60 @@ describe("Spiel-IDs", () => {
     ] }));
   });
 
+  // Codex-Nachprüfung: Ein Feld mit gespeicherten IDs entfernen fragt mit der Zahl der Personen; bestätigt geht der Schlüssel
+  // als `confirm_removed_keys` mit. Ein neues Feld mit derselben Bezeichnung bekommt den alten Schlüssel zurück.
+  test("Feld mit gespeicherten IDs entfernen: Rückfrage mit Zahl, Abbrechen behält es, Bestätigen schickt die Bestätigung", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }, { key: "leer", label: "Leer" }] };
+    usage = { modes: {}, id_fields: { "PSN-ID": 3, leer: 0 } };
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ids");
+    fireEvent.click(await screen.findByTestId("game-id-field-remove-0"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "„PSN-ID“ entfernen?", description: expect.stringContaining("IDs von 3 Personen"),
+    })));
+    expect(screen.getByTestId("game-id-field-label-0")).toHaveValue("PSN-ID");
+    // Ohne gespeicherte IDs keine Frage.
+    confirmMock.mockClear();
+    fireEvent.click(screen.getByTestId("game-id-field-remove-1"));
+    await waitFor(() => expect(screen.queryByTestId("game-id-field-1")).toBeNull());
+    expect(confirmMock).not.toHaveBeenCalled();
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-id-field-remove-0"));
+    await waitFor(() => expect(screen.getByTestId("game-ids-removed")).toHaveTextContent("„PSN-ID“ (IDs von 3 Personen)"));
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", { player_id_fields: [], confirm_removed_keys: ["leer", "PSN-ID"] }));
+  });
+
+  test("gelöscht und mit derselben Bezeichnung neu angelegt: der alte Schlüssel kommt zurück, nichts wird entfernt", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }] };
+    usage = { modes: {}, id_fields: { "PSN-ID": 3 } };
+    renderPage("/admin/games/g1#ids");
+    fireEvent.click(await screen.findByTestId("game-id-field-remove-0"));
+    await screen.findByTestId("game-ids-empty");
+    fireEvent.click(screen.getByTestId("game-id-field-add"));
+    fireEvent.change(screen.getByTestId("game-id-field-label-0"), { target: { value: "psn-id " } });
+    expect(screen.getByTestId("game-id-field-key-0")).toHaveValue("PSN-ID");
+    expect(screen.getByTestId("game-id-field-key-0")).toBeDisabled();
+    expect(screen.queryByTestId("game-ids-removed")).toBeNull();
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", {
+      player_id_fields: [{ key: "PSN-ID", label: "psn-id", help_text: "", required: true }],
+    }));
+  });
+
+  // Codex-Nachprüfung, Punkt 2: Altbestand mit leerem Schlüssel bleibt leer und hält das Speichern nicht auf.
+  test("gespeichertes Feld mit leerem Schlüssel: bleibt leer, Speichern geht", async () => {
+    game = { ...GAME, player_id_fields: [{ key: "", label: "Altfeld", required: true }] };
+    renderPage("/admin/games/g1#ids");
+    expect(await screen.findByTestId("game-id-field-key-0")).toHaveValue("");
+    fireEvent.change(screen.getByTestId("game-id-field-help-0"), { target: { value: "Steht im Profil" } });
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", {
+      player_id_fields: [{ key: "", label: "Altfeld", help_text: "Steht im Profil", required: true }],
+    }));
+    expect(toastMock.error).not.toHaveBeenCalled();
+  });
+
   // Codex-Prüfung, Fund 1: Unter „PSN-ID“ stehen die IDs der Spieler - Speichern darf daraus nie „psn_id“ machen.
   test("ein nicht kanonischer Altschlüssel geht unverändert zurück und lässt sich nicht verstellen", async () => {
     game = { ...GAME, player_id_fields: [{ key: "PSN-ID", label: "PSN-ID", required: true }] };
@@ -261,6 +425,43 @@ describe("Spiel-IDs", () => {
     fireEvent.click(screen.getByTestId("game-edit-inherit-ids"));
     fireEvent.click(screen.getByTestId("game-save-ids"));
     await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", { player_id_fields: [], identity_source_game_id: "p1", inherit_player_ids: false }));
+  });
+
+  // Codex-Prüfung zu fix/2249-id-schluessel: Eine andere ID-Quelle (oder Erben aus) lässt geerbte IDs verschwinden - der Server
+  // antwortet mit 409 und der Zahl, die Seite fragt mit genau diesem Text und schickt bestätigt die Schlüssel mit.
+  const LOST = { response: { status: 409, data: { detail: {
+    code: "id_keys_in_use", keys: { activision_id: 4, plattform: 2 },
+    message: "Unter „Activision ID“ (4 Personen), „Plattform“ (2 Personen) sind schon Spieler-IDs gespeichert.",
+  } } } };
+
+  test("andere ID-Quelle mit gespeicherten IDs: Rückfrage mit Zahl, bestätigt geht es mit den Schlüsseln", async () => {
+    game = { ...GAME, kind: "edition", parent_game_id: "p1", identity_source_game_id: "p1", player_id_fields: [{ key: "plattform", label: "Plattform" }] };
+    apiMock.patch.mockRejectedValueOnce(LOST).mockResolvedValue({ data: game });
+    renderPage("/admin/games/g1#ids");
+    fireEvent.change(await screen.findByTestId("game-edit-identity-source"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("game-edit-inherit-ids"));
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Spieler-IDs gehen verloren", description: expect.stringContaining("„Activision ID“ (4 Personen)"),
+    })));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1", expect.objectContaining({
+      inherit_player_ids: false, confirm_removed_keys: ["activision_id", "plattform"],
+    })));
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Spiel-IDs gespeichert."));
+  });
+
+  test("anderes Hauptspiel in Allgemein, Rückfrage abgebrochen: nichts gespeichert, der Entwurf bleibt", async () => {
+    game = { ...GAME, kind: "edition", parent_game_id: "p1" };
+    apiMock.patch.mockRejectedValueOnce(LOST);
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1");
+    fireEvent.change(await screen.findByTestId("game-edit-kind"), { target: { value: "standalone" } });
+    fireEvent.click(screen.getByTestId("game-save-allgemein"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiMock.patch).toHaveBeenCalledTimes(1);
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(screen.getByTestId("game-tab-dirty-allgemein")).toBeInTheDocument();
   });
 });
 

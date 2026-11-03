@@ -11,8 +11,10 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
   **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Maps** (nur mit Spiel, siehe 3.14), **Team**, **Rückmeldungen** (erst nach
   dem Ende), **Bearbeiten**
 - **Admin → eSports → Spiele → Zahnrad** (`/admin/games/<Spiel>`) – die Spielseite mit den Reitern **Allgemein**,
-  **Spiel-IDs**, **Modi** (`#modi`) und **Maps** (`#maps`, Map-Bibliothek mit Bildern; die alte Adresse
-  `/admin/games/<Spiel>/maps` leitet dorthin weiter), siehe 3.12 und 3.14
+  **Spiel-IDs**, **Modi** (`#modi`), **Maps** (`#maps`, Map-Bibliothek mit Bildern; die alte Adresse
+  `/admin/games/<Spiel>/maps` leitet dorthin weiter) und **Ausrüstung** (`#ausruestung`, Waffen, Aufsätze und übrige Ausrüstung
+  für die Sperrlisten der Liga; die alte Adresse `/admin/games/<Spiel>/equipment` leitet dorthin), siehe 3.12, 3.14 und
+  [Liga leiten 2.1a](liga.md#21a-ausrüstung-und-sperrliste)
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga N und Staffeln (3.15); den ganzen Weg bis zum
   Saisonende erklärt [Liga leiten](liga.md)
 - **Admin → eSports → Turnier-Leitfaden** (`/admin/tournament-guide`) – welches Format wofür, mit „Voreinstellung übernehmen“
@@ -715,7 +717,7 @@ bietet das Archiv an.
 | Reiter | Was dort steht |
 | --- | --- |
 | **Allgemein** | Name, Kurzname, **Art** (Einzelspiel, Hauptspiel / Serie, Spielversion), **Adresse** (eine geänderte leitet alte Links weiter), bei einer Spielversion das **Hauptspiel**, Logo und Cover, **Discord-Server** und **Discord-Rolle** |
-| **Spiel-IDs** | Welche Spieler-ID die Anmeldung fragt: je Feld **Bezeichnung**, **Schlüssel**, **Hinweis für Spieler**, **Format**, **Beispiel**, **Auswahl** und die Haken **Pflichtfeld** und **Je Liga-Season nur einmal**. Der **Schlüssel** entsteht bei einem neuen Feld aus der Bezeichnung und ist nach dem Speichern fest – an ihm hängen die IDs der Spieler. Jedes Feld braucht einen eigenen; ergeben zwei Bezeichnungen denselben (etwa „PSN-ID“ und „PSN ID“), sagt die Seite es vor dem Speichern. Bei einer Spielversion dazu **ID-Quelle** und „IDs vom Hauptspiel verwenden“ |
+| **Spiel-IDs** | Welche Spieler-ID die Anmeldung fragt: je Feld **Bezeichnung**, **Schlüssel**, **Hinweis für Spieler**, **Format**, **Beispiel**, **Auswahl** und die Haken **Pflichtfeld** und **Je Liga-Season nur einmal**. Der **Schlüssel** entsteht bei einem neuen Feld aus der Bezeichnung und ist nach dem Speichern fest – an ihm hängen die IDs der Spieler. Jedes Feld braucht einen eigenen; ergeben zwei Bezeichnungen denselben (etwa „PSN-ID“ und „PSN ID“), sagt die Seite es vor dem Speichern. Stehen unter einem Feld schon IDs (im Profil oder in einem Liga-Kader), fragt der Papierkorb mit der Zahl der Personen nach; ohne das Feld findet die Seite diese IDs nicht mehr. Legt ihr gleich danach ein Feld mit derselben Bezeichnung an, bekommt es den alten Schlüssel zurück. Dasselbe gilt, wenn ihr bei einer Spielversion die **ID-Quelle**, das **Hauptspiel** oder das Erben ändert: Gehen dadurch gespeicherte IDs verloren, fragt die Seite mit der Zahl der Personen, bevor sie speichert. Ein Spiel, an dem noch IDs hängen (auch unter seiner ID-Quelle oder in einem Liga-Kader), lässt sich nur archivieren, nicht löschen. Bei einer Spielversion dazu **ID-Quelle** und „IDs vom Hauptspiel verwenden“ |
 | **Modi** | Die Modi mit Dauer und Ergebnisregel (unten), darunter die **Vorgaben für Turniere** |
 | **Maps** | Die Map-Bibliothek als Tabelle Map × Modus (siehe 3.14) |
 
@@ -897,12 +899,11 @@ gewohnt. Den Rahmen legst du unter **Admin → eSports → Liga** an (nur Turnie
 
 1. **Liga anlegen:** Name und Spiel, etwa „CoD-Liga“.
 2. **Season anlegen:** nur der Beginn der ersten Spielwoche (00:00 Uhr Wien). Danach auf der Seite der Season die
-   Vorgaben festlegen: Wochen gesamt (mit Sperrwochen), Spielwoche in Tagen, Standardtag und -zeit, Runden (nur Hinrunde
-   oder Hin- und Rückrunde), **Sperrzeiten** wie die Weihnachtspause, Meldeschluss, Best of, Teamgröße, Mindestkader,
-   Teams je Staffel, Modus je Map, Punkte und Gleichstand, Fristen, **Regeltext** und **Sichtbarkeit**. Der Kalender
-   darunter zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
+   Vorgaben in ihren Reitern festlegen (Überblick, Spielbetrieb, Termine, Anmeldung und Kader, Tabelle, Regelwerk und Sperrliste,
+   Ligen und Staffeln – Einzelheiten im [Liga-Handbuch, 2.2](liga.md#22-liga-und-season-anlegen)). Der Kalender im Reiter
+   Termine zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
    und wie viele Teams eine Staffel höchstens fassen kann.
-3. **Map-Pool der Season** wählen – jede neue Staffel bekommt eine Kopie.
+3. **Modi und Maps der Season** im Reiter Spielbetrieb anhaken – jede neue Staffel bekommt eine Kopie des Map-Pools.
 4. **Liga 1 anlegen**, bei Bedarf mit Beiname und eigenen Werten (Best of, Teamgröße, Mindestkader, Teams je Staffel,
    Punkte); leer heißt „wie die Season“.
 5. **Staffel anlegen:** legt das Turnier als Entwurf mit allen Vorgaben an – ohne offene Anmeldung, ohne Discord, ohne

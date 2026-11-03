@@ -749,18 +749,27 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
                "staffel": tournament["league_context"].get("staffel"), "status": tournament.get("status"),
                "max_participants": tournament.get("max_participants")}
     division = {**division, "label": leagues.division_label(division)}
+    # Ausgeschiedene behalten ihren Namen im Spielplan - ihre echten Ergebnisse bleiben sichtbar (E.1, #1625).
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tournament["id"], "status": {"$in": list(league_page.PUBLIC_REGISTRATION_STATUSES)}},
-        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1}).to_list(200)
+        {"tournament_id": tournament["id"],
+         "status": {"$in": [*league_page.PUBLIC_REGISTRATION_STATUSES, "withdrawn", "disqualified"]}},
+        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1, "status": 1}).to_list(200)
     names = {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+    active_ids = {row["id"] for row in registrations
+                  if row.get("id") and row.get("status") in league_page.PUBLIC_REGISTRATION_STATUSES}
     matches = await db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}},
                                        {"_id": 0}).to_list(500)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tournament["id"]},
                                                        {"_id": 0, "match_collection": 0}).to_list(2000)
     table = await tournament_standings(tournament["id"], None, user)
+    from services.league_table import public_rules
+
     return {
-        "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"]},
+        "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"],
+                    # Regeln der Tabelle (E.1, #1625): Remis, Reihenfolge bei Gleichstand - für Spalten und Legende.
+                    "table_rules": public_rules(tournament)},
         "standings": table,
-        "teams": sorted(names.values(), key=lambda row: str(row["display_name"]).casefold()),
+        "teams": sorted((row for key, row in names.items() if key in active_ids),
+                        key=lambda row: str(row["display_name"]).casefold()),
         **league_page.staffel_weeks(tournament, matches, names, proposals),
     }

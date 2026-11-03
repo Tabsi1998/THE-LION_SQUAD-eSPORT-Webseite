@@ -98,6 +98,8 @@
 .tls-rules-doc .prose-cms pre { overflow-wrap: normal; }
 .tls-rules-doc .prose-cms .prose-cms-table { overflow-wrap: normal; }
 .tls-rules-doc .prose-cms td, .tls-rules-doc .prose-cms th { overflow-wrap: break-word; }
+/* Bilder in Tabellen (Sperrliste, #2218): kleines Vorschaubild statt voller Breite, Seitenverhältnis wie in der Bibliothek. */
+.tls-rules-doc .prose-cms td img { display: block; width: 5.5rem; max-width: none; aspect-ratio: 16 / 9; object-fit: contain; margin: 0; padding: 0.25rem; background: #0a0a0a; }
 
 .tls-rules-section {
   position: relative;

@@ -39,7 +39,7 @@ machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von bei
 | Ebene | Beispiel | Was dort festgelegt wird |
 | --- | --- | --- |
 | **Liga** (je Spiel) | CoD-Liga | Name, Spiel, Adresse `/liga/call-of-duty`, Gestaltung (Emblem, Banner, Farbe – 2.10) |
-| **Season** | Season 1 | alle Vorgaben: Kalender, Sperrzeiten, Best of, Teamgröße, Punkte, Fristen, Map-Pool, Regeltext, Sichtbarkeit |
+| **Season** | Season 1 | alle Vorgaben: Kalender, Sperrzeiten, Best of, Teamgröße, Punkte, Fristen, Map-Pool, Regelwerk, Sichtbarkeit |
 | **Liga N** | Liga 1 | Stufe der Liga; darf Best of, Teamgröße, Mindestkader, Staffelgröße, Punkte und Antwortfrist abweichend festlegen |
 | **Staffel** | Staffel A | ein gewöhnliches Turnier im Format Liga mit den Werten der Season – Spiele, Termine, Ergebnisse, Tabelle |
 | **Co-Team** | Nebelwölfe · Rudel | Teilnehmer der Staffel: ein Kader eines Hauptteams mit Captain und Vertreter |
@@ -47,8 +47,9 @@ machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von bei
 So läuft eine Spielwoche: Die Woche geht von **Dienstag bis Montag**. Die Captains vereinbaren einen Termin – ohne
 Einigung gilt der **Standardtermin** (Season 1: Sonntag 20:00). Nach dem Spiel meldet eine Seite das Ergebnis **im
 Web** mit Maps und hakt einmal an, wer bei ihr gespielt hat (**Teilnehmerliste**, siehe 3.3), die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach **48 Stunden**
-(spätestens am Ende der Spielwoche, mindestens 24 Stunden Zeit). Die Tabelle rechnet **3 Punkte für einen Sieg,
-1 für ein Remis, 0 für eine Niederlage**; bei Gleichstand entscheiden Differenz und mehr gewonnene Maps.
+(spätestens am Ende der Spielwoche, mindestens 24 Stunden Zeit). Die Tabelle rechnet in neuen Seasons **3 Punkte für
+einen Sieg, 0 für eine Niederlage, ohne Remis**; bei Punktgleichheit entscheiden der **direkte Vergleich**, dann
+Map-Differenz und gewonnene Maps, zuletzt die Liga-Leitung (siehe 3.5). Alles stellt die Season ein.
 
 Season 1 im Kalender (10 Wochen, nur Hinrunde, acht Teams = sieben Spieltage):
 
@@ -101,59 +102,113 @@ festgehaltenem Pool behalten ihre Reihenfolge.
 *Inaktiv* heißt: Die Map kommt in keinen neuen Pool, dort, wo sie schon steht, bleibt sie gültig und meldbar. *Archiviert*
 blendet sie zusätzlich aus. Vor beidem fragt die Verwaltung nach und nennt die Seasons, in deren Map-Pool die Map gerade
 steht – das ist nur ein Hinweis, gesperrt wird nichts. Soll eine kaputte Map wirklich aus einer laufenden Season raus, geht
-das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
+das in der Season mit **Map aus dem Pool nehmen** (2.2, Reiter Spielbetrieb).
+
+### 2.1a Ausrüstung und Sperrliste
+
+Grundsatz: **Alles ist erlaubt außer dem, was auf der Sperrliste der Season steht.** Die Website prüft nicht, was im Spiel benutzt
+wird – ein Verstoß läuft über Einspruch und Strafe.
+
+1. **Bibliothek:** **Admin → eSports → Spiele → Zahnrad → Reiter Ausrüstung** (`/admin/games/<Spiel>#ausruestung`), auch aus der Season
+   über **Sperrliste → Bibliothek pflegen**. Der Reiter speichert je Eintrag sofort – es gibt nichts „Ungespeichertes“. Zuerst **Kategorien**: Ohne Kategorien gibt es einen Vorschlag (Waffen, Aufsätze, Perks, Ausrüstung, Abschussserien), den
+   du anpasst und speicherst. Die **Art** entscheidet: An einer *Waffe* lassen sich einzelne Aufsätze sperren, ein *Aufsatz* passt zu Waffen,
+   alles andere ist *sonstige Ausrüstung*. Hat eine Kategorie Einträge, bleibt ihre Art und sie lässt sich nicht entfernen.
+2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek; ohne Medienrechte nur eigene Bilder), bei Aufsätzen
+   **Passt zu**: Ein Aufsatz passt nur zu den gewählten Waffen, **ohne Wahl zu keiner**. Aufsätze ohne Waffe nennt oben ein gelber Hinweis;
+   dort Waffen anhaken und **Allen … Aufsätzen zuordnen** (wie „Maps ohne Modus“). Suche und Kategorie-Knöpfe helfen bei vielen Einträgen.
+   **Aus Spiel übernehmen** holt Einträge einer anderen Spielversion, fehlende Kategorien kommen mit, Aufsätze finden ihre Waffen über den
+   Namen (Waffen also mit übernehmen, sonst kommen sie ohne Waffe).
+3. **Zustand:** *Deaktivieren* (Ein/Aus-Symbol): kommt auf keine neue Sperrliste, wo er steht, bleibt er. *Archivieren*: zusätzlich
+   ausgeblendet. Was auf einer gespeicherten Sperrliste steht, lässt sich nicht löschen, nur archivieren.
+4. **Sperrliste der Season:** auf der Season-Seite im Reiter **Regelwerk und Sperrliste** (`#sperrliste`). Haken bei **sperren**, darunter **Gilt in**: allen Modi oder
+   einzelnen. Bei einer Waffe öffnet **Aufsätze einzeln sperren** die passenden Aufsätze – die Waffe bleibt erlaubt, nur diese Aufsätze nicht.
+   Ein Aufsatz in seiner eigenen Kategorie gesperrt gilt an jeder Waffe. **Nur gesperrte** zeigt, was schon auf der Liste steht.
+5. **Speichern** legt eine neue **Version** an. Bestehende Staffeln bekommen sie mit **Jetzt übertragen** (auch gesperrte und laufende),
+   neue Staffeln gleich beim Anlegen. Ein Spiel hält die Version fest, die bei seinem Ergebnis galt. **Versionen vergleichen** zeigt neu
+   gesperrt, geändert und wieder erlaubt.
+6. **Regelwerk:** Steht der Baustein **Sperrliste** im Regelwerk, sagt der Abschnitt, ob die letzte Fassung noch den alten Stand zeigt.
+   **Neue Version vorbereiten** führt ins Regelwerk; dort sind die Unterschiede markiert, du gibst frei und wählst, ob neu zugestimmt werden
+   muss (2.11). Jede Fassung friert ihre Liste ein.
+
+Öffentlich steht die Liste auf der Ligaseite unter dem Map-Pool, nur wenn die Season sichtbar ist. Rechte: Bibliothek wie Maps (Bereich
+Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständigkeit der Liga).
+
+<table>
+<tr>
+<td><img src="../assets/liga/ausruestung-bibliothek.png" alt="Bibliothek Ausrüstung: Kategorie-Knöpfe, Suche, je Kategorie Einträge mit Bild, Zustand und „auf N Sperrlisten“" width="560"></td>
+<td><img src="../assets/liga/ausruestung-bibliothek-handy.png" alt="Dieselbe Bibliothek am Handy mit 390 px, lange Namen brechen um" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season: Hinweis aufs Regelwerk, gesperrte Waffe mit Modus, Aufsätze an einer Waffe" width="560"></td>
+<td><img src="../assets/liga/sperrliste-ligaseite-handy.png" alt="Ligaseite am Handy: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen" width="220"></td>
+</tr>
+</table>
 
 ### 2.2 Liga und Season anlegen
 
 1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“) und Spiel.
 2. In der Liga **Season anlegen**: nur der **Beginn der ersten Spielwoche** (00:00 Uhr Wiener Zeit, Season 1:
    10.11.2026). Die übrigen Vorgaben kommen als Startwerte mit.
-3. Die Season öffnen und die Vorgaben prüfen, dann **Season speichern**:
+3. Die Season öffnen. Die Season-Seite hat sieben **Reiter**; jede Angabe steht an genau einer Stelle. Am Handy wischst du die
+   Reiterleiste seitlich. Jeder Reiter speichert für sich (**Termine speichern**, **Tabelle speichern** …) und schickt nur seine
+   eigenen Felder. Was noch nicht gespeichert ist, trägt am Reiter einen **Punkt** und bleibt beim Wechsel erhalten; die Seite fragt
+   dann einmal, ob du **jetzt speichern** willst. Verlässt du die Seite mit Ungespeichertem, fragt sie nach.
 
-| Abschnitt | Feld | Season 1 |
+| Reiter | Was dort steht | Adresse |
 | --- | --- | --- |
-| Kalender | **Wochen gesamt** (mit Sperrwochen) | 10 |
-| | **Spielwoche (Tage)**, **Standardtag**, **Standardzeit** | 7 · Sonntag · 20:00 |
-| | **Runden** | Nur Hinrunde |
-| | **Meldeschluss** (nur zur Anzeige) | 6.11.2026 |
-| | **Sperrzeiten** (Von, Bis, Bezeichnung) | 21.12.2026–3.1.2027 „Weihnachtspause“ |
-| Spiel und Wertung | **Best of** | Best of 3 |
-| | **Teamgröße (je Map)** · **Mindestkader** | 4 · 3 (Sollstärke 4, der Kader darf kleiner sein) |
-| | **Teams je Staffel höchstens** | 8 |
-| | **Modus je Map** (Map 1, 2, 3 – „frei“ heißt: die Teams wählen). So viele Felder wie die längste Serie: Spielt eine Liga N Best of 5, sind es fünf. Entweder alle frei oder jedes belegt | nach Regelwerk |
-| | **Map-Wiederholung in einer Serie** | Gleiche Map nur in anderem Modus (Vorgabe); auch „Aus – jede Map nur einmal“ oder „Immer erlaubt“ |
-| | **Punkte Sieg / Remis / Niederlage**, **Bei Punktgleichheit** | 3 / 1 / 0 · Differenz, Mehr gewonnene Maps |
-| | **Ergebnis gilt nach (Stunden)** · **Teilnehmerliste nachtragen bis (Stunden)** | 48 · 48 |
-| | **Antwort auf Terminvorschlag (Stunden)** – so lange hat die Gegenseite Zeit; leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
-| Spielberechtigung (siehe 3.9) | **Höchstkader** · **Mindestalter (Jahre)** · **Wartezeit neuer Spieler (Tage)** | 50 · 18 · 7 |
-| | **Wer gespielt hat**, **Mindestens auf der Liste** | Teilnehmerliste einmal je Spiel, 3 |
-| | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
-| | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
-| Plattform (eigener Kasten, siehe 2.7b) | **Feld**, **Erlaubte Plattformen**, **Crossplay**, **Eingabegerät** | nach Regelwerk |
-| Regeltext und Sichtbarkeit | **Regeltext** (Markdown) – nur, solange es kein Regelwerk gibt (2.11) | leer, Regelwerk nutzen |
-| | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
+| **Überblick** | Ablauf der Season, **Was fehlt noch?**, Name, Sichtbarkeit, Stand, Gestaltung und Gewinne | `…/seasons/<id>` |
+| **Spielbetrieb** | Modi der Season mit Maps, Mindestgröße, Ergebnisregeln, Serie (Best of, Teamgröße, Modus je Map, Map-Wiederholung), Fristen nach dem Spiel | `#spielbetrieb` |
+| **Termine** | Kalender, Standardtermin, Sperrzeiten, Antwortfrist, Terminregeln (2.7a) | `#termine` |
+| **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7b), Eingang der Anmeldungen, Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#kader` |
+| **Tabelle** | Punkte, Gleichstand, Ausscheiden, Gleichstände der Staffeln (3.5) | `#tabelle` |
+| **Regelwerk und Sperrliste** | Stand des Regelwerks mit Weg dorthin (2.11), Sperrliste (2.1a) | `#regelwerk`, `#sperrliste` |
+| **Ligen und Staffeln** | Liga 1, 2 …, Staffeln, Staffelgröße, Vorgaben übertragen (2.3, 2.7) | `#ligen` |
 
-Unter dem Kalender steht nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel höchstens
-fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
+<table>
+<tr>
+<td><img src="../assets/liga/liga-season-ueberblick-pc.png" alt="Reiter Überblick: Ablaufleiste mit „Anmeldung – jetzt“, Was fehlt noch? mit Sprung je Punkt, Sichtbarkeit und Stand mit Erklärung" width="560"></td>
+<td><img src="../assets/liga/liga-season-ueberblick-handy.png" alt="Derselbe Überblick am Handy mit 390 px: Reiter zum Wischen, Ablauf untereinander" width="220"></td>
+</tr>
+</table>
 
-4. **Map-Pool der Season**: je Modus die Maps anhaken und sortieren, **Speichern** (**Vorgabe des Spiels** lädt den
-   Standard-Pool des Spiels, ohne ihn alle aktiven Maps). Ohne Pool kann niemand mit Maps melden. Jede neue Staffel bekommt
-   eine Kopie. Hat ein Modus zu wenige Maps für **Modus je Map** und die **Map-Wiederholung** (etwa zweimal Stellung in einer
-   Serie, „gleiche Map nur in anderem Modus“: mindestens zwei Stellungs-Maps), sagt das Speichern das als Warnung.
-5. Unter dem Pool:
-   - **Map aus dem Pool nehmen**: Map wählen, „aus allen Modi“ oder nur aus einem, **Grund** (mindestens 5 Zeichen), dann
-     **Sperren und übertragen**. Es entsteht eine neue Version ohne die Map, und sie geht sofort an alle Staffeln. Spiele, die
-     ihren Pool schon festhalten, und fertige Spiele bleiben unverändert; der Grund steht im Protokoll.
-   - **Versionen vergleichen**: zwei Versionen wählen, **Vergleichen** zeigt je Modus, was dazukam und was wegfiel.
-6. **Prüfung vor der Veröffentlichung** (siehe 2.8): zeigt, was vor dem Veröffentlichen noch fehlt, und die **Mindestgröße im
-   Map-Pool** je Modus. Wer mehr oder weniger Maps verlangen will, trägt die Zahl ein und tippt **Mindestgröße speichern** – leer
-   heißt: abgeleitet aus Reihenfolge, Best of und Map-Wiederholung.
-7. **Ergebnisregeln** (unter dem Map-Pool): Eine neue Season übernimmt beim Anlegen die Ergebnisregel jedes Modus aus dem
-   Spiel (2.1) als eigene Kopie, und **Punkte je Map Pflicht** ist an. Je Modus stehen die Regel der Season und darunter
-   „Spiel: …“. Abweichen geht je Modus: **Art** (Punkte bis zum Ziel, Runden gewinnen, Höherer Endstand gewinnt, Keine Regel),
-   **Zielpunkte** bzw. **Rundensiege zum Sieg**, **Höchstens Runden**, **Zeitlimit**, **Remis möglich**, **Verlängerung** →
-   **Ergebnisregeln speichern**. Ändert jemand später die Regel am Spiel, bleibt die Season, wie sie ist: Dann steht
-   **weicht vom Spiel ab** am Modus, und **Vom Spiel übernehmen** holt die neue Regel – erst mit dem Speichern gilt sie.
+**Überblick.** Oben die **Ablaufleiste**: Vorbereitung → Anmeldung (das Anmeldefenster; ohne Fenster „ohne Selbstanmeldung“) →
+Einteilung → Spielbetrieb (mit der laufenden Spielwoche) → Abschluss. Sie folgt aus den Einstellungen und Staffeln, nichts davon
+stellst du von Hand. Darunter **Was fehlt noch?** – die Prüfung vor der Veröffentlichung (2.8). Jeder Punkt hat einen Knopf
+**Zu …**, der in den richtigen Reiter springt. Daneben **Name**, **Sichtbarkeit** und **Stand**, je mit einem Satz, was sie bewirken.
+Der *Stand* ist deine bewusste Schaltung (Entwurf, Läuft, Beendet, Archiviert); mit dem Start der ersten Staffel springt er von selbst
+auf *Läuft*. Muss das Regelwerk freigegeben werden (Entwurf liegt bereit oder Daten haben sich geändert), steht oben
+**Regelwerk muss freigegeben werden** mit Weg dorthin. **Gestaltung und Gewinne** (2.10) klappt unten auf. Speichern: **Überblick
+speichern**.
+
+**Spielbetrieb – die Modi an einer Stelle.**
+
+<table>
+<tr>
+<td><img src="../assets/liga/liga-season-spielbetrieb-pc.png" alt="Reiter Spielbetrieb: Modi der Season anhaken, je Modus die Maps mit „Braucht mindestens …“" width="560"></td>
+<td><img src="../assets/liga/liga-season-spielbetrieb-handy.png" alt="Derselbe Reiter am Handy: Modi als Haken untereinander" width="220"></td>
+</tr>
+</table>
+
+1. **Welche Modi spielt die Season?** Haken bei jedem Modus setzen. Darunter erscheint je angehaktem Modus die Liste seiner Maps:
+   anhaken und mit den Pfeilen sortieren. Unter dem Namen steht, wie viele Maps der Modus **mindestens braucht** (aus Modus je Map,
+   längster Serie und Map-Wiederholung). **Vorgabe des Spiels** lädt den Standard-Pool des Spiels (ohne ihn alle aktiven Maps) und hakt
+   die Modi gleich an. Ein Modus ohne Haken kommt nicht in den Pool. **Modi und Maps speichern** legt eine neue Version an; ohne Pool
+   kann niemand mit Maps melden, jede neue Staffel bekommt eine Kopie.
+2. Darunter: **Map aus dem Pool nehmen** (Map, „aus allen Modi“ oder einer, **Grund** mit mindestens 5 Zeichen → **Sperren und
+   übertragen**: neue Version ohne die Map, sofort an alle Staffeln; Spiele mit festgehaltenem Pool und fertige Spiele bleiben) und
+   **Versionen vergleichen**.
+3. **Mindestgröße anpassen** (zugeklappt): eine eigene Zahl je Modus überschreibt die Ableitung, leer heißt abgeleitet →
+   **Mindestgröße speichern**.
+4. **Ergebnisregeln** – nur für die angehakten Modi. Eine neue Season übernimmt beim Anlegen die Regel jedes Modus aus dem Spiel (2.1)
+   als eigene Kopie, **Punkte je Map Pflicht** ist an. Je Modus stehen die Regel der Season und darunter „Spiel: …“. Abweichen geht je
+   Modus: **Art** (Punkte bis zum Ziel, Runden gewinnen, Höherer Endstand gewinnt, Keine Regel), **Zielpunkte** bzw. **Rundensiege zum
+   Sieg**, **Höchstens Runden**, **Zeitlimit**, **Remis möglich**, **Verlängerung** → **Ergebnisregeln speichern**. Ändert jemand später
+   die Regel am Spiel, bleibt die Season, wie sie ist: Dann steht **weicht vom Spiel ab** am Modus, und **Vom Spiel übernehmen** holt die
+   neue Regel – erst mit dem Speichern gilt sie.
+5. **Serie:** **Best of**, **Teamgröße (je Map)**, **Map-Wiederholung in einer Serie** und **Modus je Map** (Map 1, 2, 3 – „frei“ heißt:
+   die Teams wählen; so viele Felder wie die längste Serie, entweder alle frei oder jedes belegt). Steht in Modus je Map ein Modus ohne
+   Maps im Pool, oder hat ein Modus Maps, kommt aber nie dran, sagt das ein Hinweis direkt darunter. Dazu **Nach dem Spiel**:
+   **Ergebnis gilt nach** und **Teilnehmerliste nachtragen bis** (Stunden). Speichern: **Spielbetrieb speichern**.
 
 | Art | Beispiel | Was die Meldung prüft |
 | --- | --- | --- |
@@ -165,16 +220,70 @@ Mit **Verlängerung** dürfen Ziel und Rundenlimit überschritten werden. Ein Gl
 Map braucht trotzdem einen Sieger. Ohne Regel prüft die Meldung den Endstand nicht. Seasons von vor dieser Funktion haben
 keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier speicherst.
 
-![Ergebnisregeln der Season](bilder/liga-ergebnisregeln-season.png)
+**Die Werte für Season 1** in den übrigen Reitern:
+
+| Reiter | Feld | Season 1 |
+| --- | --- | --- |
+| Spielbetrieb | **Best of** · **Teamgröße (je Map)** | Best of 3 · 4 |
+| | **Modus je Map** | nach Regelwerk |
+| | **Map-Wiederholung in einer Serie** | Gleiche Map nur in anderem Modus (Vorgabe); auch „Aus – jede Map nur einmal“ oder „Immer erlaubt“ |
+| | **Ergebnis gilt nach** · **Teilnehmerliste nachtragen bis** (Stunden) | 48 · 48 |
+| Termine | **Wochen gesamt** (mit Sperrwochen) | 10 |
+| | **Spielwoche (Tage)**, **Standardtag**, **Standardzeit** | 7 · Sonntag · 20:00 |
+| | **Runden** | Nur Hinrunde |
+| | **Sperrzeiten** (Von, Bis, Bezeichnung) | 21.12.2026–3.1.2027 „Weihnachtspause“ |
+| | **Antwort auf Terminvorschlag (Stunden)** – leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
+| Anmeldung und Kader | **Anmeldung ab / bis**, **Startplätze** … (2.5a) | nach Plan |
+| | **Meldeschluss** (nur Anzeige) – nur ohne Anmeldefenster, sonst gilt „Anmeldung bis“ | – |
+| | **Mindestkader** · **Höchstkader** · **Mindestalter (Jahre)** · **Wartezeit neuer Spieler (Tage)** | 3 · 50 · 18 · 7 |
+| | **Wer gespielt hat**, **Mindestens auf der Liste** | Teilnehmerliste einmal je Spiel, 3 |
+| | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
+| | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
+| | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7b) | nach Regelwerk |
+| Tabelle | **Punkte Sieg / Remis / Niederlage** | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
+| | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
+| | **Direkter Vergleich (Mini-Tabelle)** – erscheint mit dem direkten Vergleich | Punkte, Map-Differenz, Gewonnene Maps |
+| | **Kampflos (Default-Win)** | Maps des Best of (BO3 2:0, BO5 3:0) |
+| | **Austritt, Auflösung, Disqualifikation** | Alle Spiele zählen für die Gegner, Team ans Tabellenende |
+| | **Remis erlaubt** | aus |
+| Ligen und Staffeln | **Teams je Staffel höchstens** | 8 |
+| Überblick | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
+
+Im Reiter **Termine** steht unter den Sperrzeiten nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel
+höchstens fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
+
+<table>
+<tr>
+<td><img src="../assets/liga/liga-season-termine-pc.png" alt="Reiter Termine: Kalender, Sperrzeiten, Spielwochen" width="380"></td>
+<td><img src="../assets/liga/liga-season-anmeldung-pc.png" alt="Reiter Anmeldung und Kader: Sprünge zu Selbstanmeldung, Kader, Eingang und Kaderübersicht" width="380"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/liga-season-tabelle-pc.png" alt="Reiter Tabelle: Punkte und Reihenfolge bei Punktgleichheit" width="380"></td>
+<td><img src="../assets/liga/liga-season-regelwerk-pc.png" alt="Reiter Regelwerk und Sperrliste: Stand des Regelwerks und Weg dorthin" width="380"></td>
+</tr>
+</table>
+
+**Regeltext:** Das alte Freitextfeld gibt es auf der Season-Seite nicht mehr. Regeln stehen im Regelwerk mit Versionen (2.11). Hat
+eine ältere Season noch einen Regeltext und kein Regelwerk, steht er im Reiter **Regelwerk und Sperrliste** zum Nachlesen und gilt auf
+der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird nichts.
 
 ### 2.3 Liga 1 und Staffel anlegen
 
-1. Auf der Season-Seite unter **Ligen und Staffeln** → **Liga 1 anlegen**. Beiname freiwillig; leere Felder heißen
-   „wie die Season“. Liga 2, 3 … entstehen genauso und dürfen eigene Werte haben.
+1. Auf der Season-Seite im Reiter **Ligen und Staffeln** → **Liga 1 anlegen**. Leere Felder heißen „wie die Season“.
+   Der **Beiname** ist freiwillig: „Liga 1“ zählt die Seite von selbst, trag dort nur einen Zusatz wie „Elite“ ein (Anzeige
+   „Liga 1 · Elite“). Wiederholt der Beiname die Stufe – etwa „Liga 1“, dann hieße es „Liga 1 · Liga 1“ –, sagt das ein Hinweis
+   im Blatt und in der Liste. Liga 2, 3 … entstehen genauso und dürfen eigene Werte haben.
 2. In der Zeile von Liga 1 → **Staffel anlegen** → bestätigen. Es entsteht das Turnier „CoD-Liga Season 1 · Liga 1 ·
    Staffel A“ als **Entwurf** – ohne offene Anmeldung, ohne Discord, ohne Jahreswertung. Mehr als acht Teams? Eine
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
    Staffel.
+
+<table>
+<tr>
+<td><img src="../assets/liga/liga-season-ligen-pc.png" alt="Reiter Ligen und Staffeln: Liga 1 mit Hinweis zum Beinamen, Staffelgröße und Vorgaben übertragen" width="560"></td>
+<td><img src="../assets/liga/liga-season-beiname-handy.png" alt="Blatt Liga 1 bearbeiten am Handy: Beiname „Liga 1“ mit Hinweis, dass der Titel sonst „Liga 1 · Liga 1“ hieße" width="220"></td>
+</tr>
+</table>
 
 ### 2.4 Co-Teams vorbereiten (Teamleitung)
 
@@ -191,7 +300,7 @@ Unter jedem Co-Team, das in einer Staffel spielt, zeigt **Spielberechtigung** di
 
 ### 2.5 Co-Teams zuteilen
 
-1. Season-Seite → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
+1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
 3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein oder zu groß, Team schon in der Staffel, Staffel voll, Geburtsdatum fehlt, jemand steht schon in einem anderen Co-Team der Season …).
 4. Bei jedem Co-Team steht je Spieler die **Spiel-ID** (Haken) bzw. **keine ID** (gelb), darunter „Ohne gültige
@@ -206,7 +315,7 @@ Start. Bis dahin ist der Spielplan eine Vorschau und wird bei jeder Änderung ne
 
 Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entscheidest. Ohne Anmeldefenster gibt es das nicht, dann bleibt es beim Zuteilen aus 2.5. Das Zuteilen bleibt auch danach als Sonderweg.
 
-**Einrichten** (Season-Seite → **Selbstanmeldung**, Zuständigkeit „Season konfigurieren“):
+**Einrichten** (Season-Seite, Reiter **Anmeldung und Kader** → **Selbstanmeldung**, Zuständigkeit „Season konfigurieren“):
 
 1. **Anmeldung ab** und **Anmeldung bis** in Wiener Zeit eintragen. Beides oder nichts.
 2. **Startplätze** eintragen. Leer heißt: keine Grenze außer der Staffelgröße.
@@ -216,7 +325,7 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei.
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
 
-**Entscheiden** (Season-Seite → **Anmeldungen**, Zuständigkeit „Teams freigeben“). Bei jeder neuen Anmeldung bekommst du eine Nachricht mit Link. Je Anmeldung steht da, wer eingereicht hat, welcher Regelversion und wann zugestimmt wurde und was der Kader gerade nicht erfüllt.
+**Entscheiden** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**, Zuständigkeit „Teams freigeben“). Bei jeder neuen Anmeldung bekommst du eine Nachricht mit Link; er öffnet den Reiter gleich an dieser Stelle. Je Anmeldung steht da, wer eingereicht hat, welcher Regelversion und wann zugestimmt wurde und was der Kader gerade nicht erfüllt.
 
 | Knopf | Was passiert |
 | --- | --- |
@@ -262,7 +371,7 @@ Staffel A“; der Filter **Nur Liga-Staffeln** zeigt nur sie.
 ### 2.7 Vorgaben später ändern und übertragen
 
 Eine Staffel trägt die Werte, die beim Anlegen galten. Ändert ihr danach etwas an der Season, steht oben „Die
-bestehende Staffel trägt noch die alten Werte“ – **Jetzt übertragen** bzw. unten **Vorgaben übertragen**. Was nicht
+bestehende Staffel trägt noch die alten Werte“ – **Jetzt übertragen** bzw. im Reiter **Ligen und Staffeln** **Vorgaben übertragen**. Was nicht
 mehr geht, steht je Staffel mit Grund da:
 
 | Was | Wird übertragen |
@@ -277,7 +386,7 @@ mehr geht, steht je Staffel mit Grund da:
 
 ### 2.7a Termine und Verschiebungen (Regelwerk § 7)
 
-Auf der Season-Seite steht der Kasten **Termine und Verschiebungen** (Zuständigkeit „Season konfigurieren“). Er hat ein eigenes
+Im Reiter **Termine** der Season-Seite steht der Kasten **Termine und Verschiebungen** (Zuständigkeit „Season konfigurieren“). Er hat ein eigenes
 **Terminregeln speichern** und gilt sofort für alle Staffeln der Season. Neue Seasons bekommen die Vorgaben; eine ältere Season
 sagt „Diese Season ist älter als die Terminregeln“ – dort gilt ein Vorschlag der Heimseite sofort und es gibt keine
 Verschiebung, bis ihr einmal speichert.
@@ -295,11 +404,11 @@ Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), leg
 
 ### 2.7b Plattform und Eingabegerät
 
-Eine Season kann nur für PC, nur für PlayStation, für mehrere oder alle Plattformen sein. Auf der Season-Seite steht dafür der
-Kasten **Plattform und Eingabegerät** (Zuständigkeit „Season konfigurieren“) mit eigenem **Plattform speichern**. Er gilt sofort,
-ohne Übertragen, auch in laufenden Staffeln.
+Eine Season kann nur für PC, nur für PlayStation, für mehrere oder alle Plattformen sein. Im Reiter **Anmeldung und Kader** steht dafür
+der Kasten **Plattform und Eingabegerät** (Zuständigkeit „Season konfigurieren“, Adresse `#plattform`) mit eigenem **Plattform
+speichern**. Er gilt sofort, ohne Übertragen, auch in laufenden Staffeln.
 
-![Kasten Plattform und Eingabegerät](bilder/liga-plattform-season.png)
+<img src="../assets/liga/liga-season-plattform-pc.png" alt="Kasten Plattform und Eingabegerät: Feld Plattform gewählt, nur PC angehakt, Crossplay aus, darunter was je Liga gilt" width="560">
 
 1. **In welchem Feld steht die Plattform?** Wählt das Spiel-ID-Feld mit Auswahl, etwa „Plattform“. Fehlt es, legt es zuerst unter
    **Admin → Spiele → Spiel → Spiel-IDs** an: Feld mit den Auswahlwerten (PC, PlayStation …), am besten als Pflichtfeld. Dann
@@ -308,9 +417,9 @@ ohne Übertragen, auch in laufenden Staffeln.
 3. **Crossplay** (an, aus) und **Eingabegerät** (Controller, Maus und Tastatur, beides) sind nur Angaben für Regelwerk und
    Ligaseite. Geprüft werden sie nicht.
 
-Darunter steht **So gilt es je Liga**. Eine Liga N weicht im Liga-N-Blatt (Stift) unter **Plattform** ab: **Eigene Plattformen für diese
-Liga** anhaken und wählen. Mit Haken und ohne Auswahl sind in dieser Liga alle Plattformen erlaubt. Crossplay und Eingabegerät
-stehen dort auf „wie Season“, bis ihr etwas anderes wählt.
+Darunter steht **So gilt es je Liga**. Eine Liga N weicht im Liga-N-Blatt ab (Reiter **Ligen und Staffeln**, Stift bei der Liga, Abschnitt
+**Plattform**): **Eigene Plattformen für diese Liga** anhaken und wählen. Mit Haken und ohne Auswahl sind in dieser Liga alle Plattformen
+erlaubt. Crossplay und Eingabegerät stehen dort auf „wie Season“, bis ihr etwas anderes wählt.
 
 Wer auf einer anderen Plattform spielt, ist nicht spielberechtigt und sieht den Grund, etwa „Diese Season ist nur für PC – angegeben
 ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Profil“. Wo das wirkt, steht in 3.9.
@@ -324,10 +433,10 @@ ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Pr
 | **Nur Mitglieder** | angemeldete Mitglieder | Nur Mitglieder |
 | **Öffentlich** | alle | öffentlich |
 
-Die Sichtbarkeit gilt beim **Season speichern** sofort für alle Staffeln. Wer in einer Staffel spielt, sieht seine
+Die Sichtbarkeit steht im Reiter **Überblick** und gilt beim **Überblick speichern** sofort für alle Staffeln. Wer in einer Staffel spielt, sieht seine
 Spiele, Termine und den Matchchat immer – auch bei *Aus*.
 
-**Prüfung vor der Veröffentlichung:** Der Abschnitt auf der Season-Seite listet **Probleme** (rot) und **Warnungen**. Probleme
+**Prüfung vor der Veröffentlichung:** **Was fehlt noch?** im Reiter **Überblick** listet **Probleme** (rot) und **Warnungen**; jeder Punkt führt mit **Zu …** in den Reiter, wo du ihn erledigst. Probleme
 sind: kein oder ein fremder Map-Pool, zu wenige Maps für einen Modus, ein Modus aus **Modus je Map** fehlt im Pool, **Modus je Map**
 passt nicht zur längsten Serie, kein veröffentlichtes **Regelwerk** (ein Regeltext allein reicht nicht), keine Liga N oder eine Liga
 N ohne Staffel, ein Anmeldefenster, das erst nach dem Beginn der Season endet. Warnungen sind etwa ein abgelaufenes oder fehlendes
@@ -335,7 +444,7 @@ Anmeldefenster oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine 
 Solange es Probleme gibt, lässt sich die Sichtbarkeit aber nicht auf **Nur Mitglieder** oder **Öffentlich** stellen – weder von *Aus*
 noch von der Vorschau aus; das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
 kann im Notfall trotzdem veröffentlichen: Er trägt im Abschnitt einen **Grund für die Notausnahme** ein (mindestens 5 Zeichen) und
-speichert die Season; der Grund steht im Protokoll. Von *Nur Mitglieder* weiter auf *Öffentlich* prüft nichts mehr.
+tippt **Überblick speichern**; der Grund steht im Protokoll. Von *Nur Mitglieder* weiter auf *Öffentlich* prüft nichts mehr.
 
 ### 2.9 Korrigieren, archivieren, löschen
 
@@ -347,7 +456,7 @@ Falsch angelegt? So kommst du zurück – Löschen geht nur, solange nichts gesp
 der Seasons wird dabei geleert, den Map-Pool neu wählen). Die **Adresse** (`/liga/…`) nur, bis eine Season zum ersten
 Mal sichtbar war – danach bleibt sie, damit geteilte Links weiter gehen.
 
-**Season bearbeiten:** auf der Season-Seite wie in 2.2; archivieren über **Stand → Archiviert**.
+**Season bearbeiten:** auf der Season-Seite wie in 2.2; archivieren im Reiter **Überblick** über **Stand → Archiviert**.
 **Liga N bearbeiten:** Stift bei der Liga → Beiname, Abweichungen und **Stand** (*Aktiv*/*Archiviert*). Eine
 archivierte Liga N verschwindet von der Ligaseite, ihre Staffeln bleiben.
 
@@ -362,7 +471,7 @@ der Liga N. Es öffnet sich ein Blatt:
 Eine Season lässt sich nur als **Entwurf** löschen. Eine Liga löschen heißt: mit allen Seasons, Ligen N und leeren
 Staffeln darunter.
 
-**Staffel löschen:** auf der Season-Seite der Papierkorb in der Zeile der Staffel – nur im **Entwurf** und vor dem
+**Staffel löschen:** auf der Season-Seite im Reiter **Ligen und Staffeln** der Papierkorb in der Zeile der Staffel – nur im **Entwurf** und vor dem
 festen Spielplan, wie in der Turnierverwaltung. Zugeteilte Co-Teams werden dabei aus der Staffel genommen (das Blatt
 sagt, wie viele); Grund eintragen → **Endgültig löschen**. Nach dem Start: Status **Abgesagt** oder **Archiviert** in
 der Turnierverwaltung.
@@ -377,7 +486,7 @@ Gestaltung wirkt beim **Speichern sofort**, ohne „Vorgaben übertragen“.
 | **Akzentfarbe** | Stift bei der Liga → *Gestaltung* | Farbe für Kopf, Zeichen und Abzeichen der Ligaseite. Zu dunkle Farben lehnt die Seite ab (sie wären auf dem dunklen Grund nicht lesbar, nötig ist ein Kontrast von 4,5 : 1). **Vereinsfarbe** setzt sie zurück |
 | **Emblem** | Stift bei der Liga, auf der Season-Seite überschreibbar | Quadratisch, am besten SVG oder PNG mit durchsichtigem Hintergrund. Zuständige ohne Admin-Medien laden PNG, JPG oder WebP hoch, kein SVG. Über **Hochladen** oder die **Mediathek** – eine fremde Adresse geht nicht. Zu sehen auf Ligaseite, Ligaübersicht, Teamseite (Abschnitt *Liga*) und Spielseite einer Staffel |
 | **Banner** | Stift bei der Liga, auf der Season-Seite überschreibbar | Breitformat (16 : 9 reicht). Am Desktop zeigt die Ligaseite einen breiten Streifen (3 : 1), am Handy einen höheren Ausschnitt (4 : 3). Unter dem Bild **Fokuspunkt für Desktop** bzw. **Handy** wählen und ins Bild klicken – dieser Punkt bleibt beim Zuschneiden sichtbar; die Vorschau zeigt beide Zuschnitte |
-| **Gewinne** | Season-Seite → *Gestaltung und Gewinne*; je Liga N über den Stift | Platz → Preis, optional mit Bild (etwa der Pokal). Die Ligaseite zeigt sie als **„Um was gespielt wird“**. Eine Liga N ohne eigene Gewinne spielt um die der Season |
+| **Gewinne** | Season-Seite, Reiter **Überblick** → *Gestaltung und Gewinne*; je Liga N über den Stift | Platz → Preis, optional mit Bild (etwa der Pokal). Die Ligaseite zeigt sie als **„Um was gespielt wird“**. Eine Liga N ohne eigene Gewinne spielt um die der Season |
 
 **Rückfälle:** Season → Liga → Standard. Leert die Season ihr Emblem oder Banner, gilt wieder das der Liga; die
 Season-Seite zeigt das geerbte zur Vorschau.
@@ -416,13 +525,13 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 | **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
 | **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
 | **Strafen** | Vorgesehen, kommt später |
-| **Regeln veröffentlichen** | Regeltext der Season |
+| **Regeln veröffentlichen** | Regelwerk der Liga und der Season (2.11) |
 
 - Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
 - Zuständige finden ihre Ligen unter **Admin → Mein Dienst → Meine Ligen** und im Menü unter **Liga**. Sie sehen nur ihre Ligen und nur die Knöpfe ihrer Zuständigkeiten. Das gilt auch für Turnierleitung und Helfer, die zugleich zuständig sind.
 - **Bilder:** Zuständige ohne Admin-Medien laden Emblem, Banner und Gewinnbilder als eigene Bilder hoch (kein SVG), die Mediathek zeigt ihnen nur diese.
 - Vergeben und entfernen darf nur der Bereich **Ligen**. Liga anlegen und löschen auch.
-- **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Kader und Spiel-IDs → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
+- **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
 - **Helfer** am Turnier (Organisation, Schiedsrichter, Ergebnisdienst, Station) lesen in einer Staffel nur noch. Ergebnisse tragen dort nur Zuständige und der Bereich Ligen ein.
 
 **Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
@@ -441,15 +550,16 @@ beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie.
 ### 2.11 Regelwerk: Versionen, PDF und Zustimmung
 
 Das Regelwerk hat eine eigene Seite mit Inhaltsverzeichnis, Suche und festen Links auf jeden Paragrafen, dazu ein PDF je Version. Gepflegt
-wird es an einer Stelle: **Season → Regeltext und Sichtbarkeit → Regelwerk mit Versionen pflegen** (nur diese Season) oder **Liga → Regelwerk**
+wird es an einer Stelle: **Season → Reiter Regelwerk und Sperrliste → Regelwerk mit Versionen pflegen** (nur diese Season; **zurück** führt wieder in den Reiter) oder **Liga → Regelwerk**
 (für alle Seasons ohne eigenes). Fertige Dateien hochladen geht bewusst nicht, das PDF entsteht aus dem Text.
 Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen** in dieser Liga, mit Zwei-Faktor-Anmeldung. Die Turnierleitung allein darf es nicht.
 
 1. **Neuen Entwurf beginnen.** Titel und Text in Markdown. Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch
    der Link über alle Versionen gleich.
 2. **Anlagen** bekommen ihren Buchstaben aus der Reihenfolge (Anlage A, B, C …) und stehen eigens im Inhaltsverzeichnis.
-3. **Bausteine:** Die Knöpfe **Map-Pool** und **Modusfolge** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt kommt aus den
-   Daten der Season. Tippe die Listen also nicht ab.
+3. **Bausteine:** Die Knöpfe **Map-Pool**, **Modusfolge** und **Sperrliste** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt
+   kommt aus den Daten der Season. Tippe die Listen also nicht ab. Die **Sperrliste** (`[[baustein:loadout_bans]]`, gedacht für Anlage A) zeigt im
+   Web Bilder, im PDF eine schlichte Liste (2.1a).
 4. **Vorschau** zeigt die Seite mit den Daten von heute und den Änderungen zur letzten Version.
 5. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
    die Version nicht mehr ändern. Die Bausteine werden eingefroren: alte Versionen zeigen ihre Listen von damals, im Web und im PDF.
@@ -545,6 +655,10 @@ was dabei geprüft wird, steht für die Captains in
 - **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite. Schon eingetragene Maps fallen dabei
   weg, der alte Stand bleibt im Verlauf des Spiels. Die Wertung ist eine Teamstrafe: Captain, Vertreter und die Leitung
   des Hauptteams sehen sie unter **Meine Strafen**, in **Admin → Strafen** steht sie einmal unter dem Co-Team.
+- **Beide nicht erschienen**: am Spiel **Beide nicht erschienen** (nur in einer Staffel, nur ohne Ergebnis, mit
+  Begründung). Beide verlieren, keine Punkte, keine Maps, je Seite ein Eintrag „nicht erschienen“; im Spielplan steht
+  „beide nicht erschienen“. Wollt ihr das Spiel doch nachholen: am selben Spiel **Neu ansetzen** mit Grund – das Spiel ist
+  wieder offen, den Termin setzt ihr wie gewohnt. Recht: **Ergebnisse korrigieren**, nicht im eigenen Spiel.
 - **Kein automatisches „Nicht erschienen?“**: Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war. Deshalb gibt
   es in der Liga diesen Vorschlag nicht – fehlt ein Ergebnis, meldet sich **Ergebnis fehlt**. Klärt es mit beiden Seiten
   und wertet dann selbst. Das kommt mit dem Check-in (#1652) neu.
@@ -584,7 +698,40 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 
 Die Tabelle steht auf der Ligaseite je Staffel (und in der Turnierverwaltung): Punkte, Spiele, Differenz, Form der
 letzten fünf Spiele, Bewegung seit dem letzten Spieltag. Darunter die Spielwochen mit Pause und Reserve, jedes Spiel
-mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen.
+mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen. Website, App, TV, Druck und Ergebnis-PDF zeigen dieselbe
+Reihenfolge.
+
+<img src="../assets/liga/liga-tabelle-gleichstand-pc.png" alt="Staffel-Tabelle: unter den Namen klein Direkter Vergleich, kampflos gewonnen, Platz durch Entscheid der Leitung mit Grund und am Ende Ausgetreten; darunter die Reihenfolge bei Punktgleichheit" width="560">
+
+**Punktgleichheit** (Reihenfolge stellt die Season ein, siehe 2.2):
+
+1. **Direkter Vergleich**: nur die Spiele der gleichstehenden Teams untereinander (bei drei und mehr eine
+   **Mini-Tabelle**) – Punkte, Map-Differenz, gewonnene Maps. Trennt sie nur einen Teil ab, wird für die übrigen die
+   Mini-Tabelle **neu gerechnet**, nur mit ihren Spielen. Der direkte Vergleich zählt nur, wenn **alle Spiele** der
+   gleichstehenden Teams untereinander gespielt sind – steht eines noch aus, entscheidet gleich der nächste Punkt.
+2. Dann **Map-Differenz** und **gewonnene Maps** über alle Spiele.
+3. Stehen Teams danach in allem gleich, **teilen sie sich den Platz** (1, 2, 2, 4) – bis die Leitung entscheidet.
+
+Unter dem Namen steht klein, was den Platz entschied („Direkter Vergleich“, „Map-Differenz“ …), dazu
+„kampflos gewonnen/verloren“ und am Ende der Tabelle **Ausgetreten** bzw. **Disqualifiziert**. Unter der Tabelle steht
+die Reihenfolge der Kriterien.
+
+**Entscheid der Leitung:** Admin → Liga → Season → Reiter **Tabelle** → **Tabelle und Gleichstand**. Je gestarteter Staffel stehen dort die
+geteilten Plätze. **Reihenfolge festlegen** → mit den Pfeilen sortieren → **Grund** (mindestens fünf Zeichen, steht
+öffentlich an der Tabelle: „Platz durch Entscheid der Leitung: …“) → **Festlegen**. Das geht nur bei echtem Gleichstand und
+nur für alle Teams auf diesem Platz; über das eigene Team entscheidet eine andere Person. Recht: **Ergebnisse
+korrigieren**. Ändert ein späteres Ergebnis den Gleichstand, gilt der Entscheid nicht mehr (Hinweis **Gilt nicht mehr**)
+und bleibt zur Nachvollziehbarkeit stehen; **Zurücknehmen** löscht ihn mit Grund.
+
+<img src="../assets/liga/liga-gleichstand-entscheid-handy.png" alt="Season-Verwaltung am Handy, Feld Tabelle und Gleichstand: Platz 4 geteilt mit Knopf Reihenfolge festlegen, darunter ein älterer Entscheid mit Gilt nicht mehr und Zurücknehmen" width="300">
+
+**Austritt, Auflösung, Disqualifikation:** In der Teilnehmerliste der Staffel **Austritt eintragen** bzw.
+**Disqualifizieren** (eine Auflösung tragt ihr als Austritt mit Grund „Team aufgelöst“ ein). Mit der Vorgabe neuer
+Seasons zählen dann **alle** Spiele des Teams für die Gegner, auch schon gespielte – wie ein kampfloser Sieg (Maps des Best
+of). Offene Spiele werden kampflos gewertet. Die echten Ergebnisse bleiben im Spielplan und auf der Matchseite sichtbar.
+Das Team steht am Tabellenende: wer später ausschied, weiter oben; Disqualifizierte immer darunter. Ein Spiel zwischen
+zwei ausgeschiedenen Teams zählt für keinen. Ältere Seasons rechnen weiter mit der 50-%-Regel, bis ihr die Einstellung
+ändert und überträgt (nur vor dem ersten Ergebnis).
 
 Staffel- und Spielseite führen zurück zur Ligaseite: Brotkrumen **Liga · Season · Staffel** und auf der Staffel der
 Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga · Staffel A“ ohne Link).
@@ -662,7 +809,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Zahnrad → Spiel-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
 | **Plattform** (2.7b) | Bei der Anmeldung zählt nicht als spielberechtigt, wer eine andere oder keine Plattform angibt: Er steht als Warnung da, und unter dem Mindestkader geht die Anmeldung nicht. Weil die Liga dort noch nicht feststeht, gilt die weiteste Regel aller Liga N. Beim Zuteilen gilt die Liga N der Staffel: Bleiben ohne Spieler anderer Plattformen zu wenige übrig, geht es nicht, sonst steht ein Hinweis im Dialog. Auf die Teilnehmerliste kommt niemand mit anderer Plattform. Die Aufnahme in den Kader prüft die Plattform nicht |
 
-**Wartezeit aufheben:** Season → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
+**Wartezeit aufheben:** Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
 
 **Transfer:** Die Teamleitung tippt unter **Spielberechtigung** auf **Transfer beantragen**; die Person muss schon im Hauptteam stehen. Ihr seht den Antrag oben unter **Kader und Spiel-IDs**: **Genehmigen** nimmt die Person aus dem alten Co-Team und setzt sie ins neue, die Wartezeit beginnt, aufheben könnt nur ihr mit Grund; **Ablehnen** braucht einen Grund. Ist die Person im alten Co-Team Captain oder Vertreter, vergibt die Teamleitung die Rolle zuerst neu. Person und beide Teamleitungen bekommen eine Nachricht.
 
@@ -714,7 +861,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | „… die Aufstellung von … braucht genau 4 Spieler.“ / „… nur Spieler aus dem Kader …“ | Aufstellung falsch | Genau die Teamgröße aus dem eigenen Kader wählen |
 | „… steht an diesem Spieltag schon in der Aufstellung eines anderen Teams …“ | Doppel-Einsatz | Andere Person aufstellen |
 | „Map 1: … kann nicht aufgestellt werden – Activision-ID fehlt im Profil.“ | Spieler ohne Spiel-ID | Spieler trägt die ID im Profil ein, danach geht es (3.7) |
-| „… kann nicht aufgestellt werden – Nach dem Stichtag ins Co-Team gekommen …“ | Neuer Spieler nach dem Stichtag | Season → **Kader und Spiel-IDs** → **ID freigeben** mit Grund |
+| „… kann nicht aufgestellt werden – Nach dem Stichtag ins Co-Team gekommen …“ | Neuer Spieler nach dem Stichtag | Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → **ID freigeben** mit Grund |
 | „… kann nicht aufgestellt werden – Das Konto ist gesperrt.“ | Gesperrtes Konto | Andere Person aufstellen (3.8) |
 | „… steht schon in der Aufstellung der anderen Seite – dieselbe Person spielt nie auf beiden Seiten eines Spiels.“ | Person in den Kadern beider Seiten | Für eine Seite eine andere Person aufstellen (3.8) |
 | „Kader zu klein: …“ (Nachricht), Aufgabe **Kader auffüllen** | Mindestkader der Staffel unterschritten | Teamleitung ergänzt den Kader; danach ist die Aufgabe weg (3.8) |
@@ -761,16 +908,17 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] **Best of 3**, **Teamgröße 4**, Mindestkader, **Modus je Map** laut Regelwerk, Punkte 3/1/0 – 2.2
 - [ ] **Regelwerk** veröffentlicht, Bausteine für Map-Pool und Modusfolge gesetzt – 2.11
 - [ ] **Map-Pool der Season** gespeichert – 2.2
+- [ ] **Ausrüstung** in der Bibliothek, **Sperrliste der Season** gespeichert und als Baustein im Regelwerk – 2.1a
 - [ ] **Prüfung vor der Veröffentlichung** ohne Probleme – 2.8
 - [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
 - [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4
-- [ ] Jeder im Kader hat die **Activision-ID** im Profil; Season → **Kader und Spiel-IDs** zeigt niemanden „ohne ID“,
+- [ ] Jeder im Kader hat die **Activision-ID** im Profil; Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** zeigt niemanden „ohne ID“,
       Stichtag für neue Spieler entschieden – 3.7
 - [ ] Je Co-Team **Captain** und **Vertreter** vergeben – 2.4
 - [ ] Alle Co-Teams **zugeteilt** (Teilnehmer: 8 von 8) – 2.5
 - [ ] Season gespeichert und, falls nach dem Anlegen der Staffel etwas geändert wurde, **Vorgaben übertragen** – 2.7
 - [ ] Ligaseite mit *Nur Liga-Leitung* geprüft: Teams, Wochen mit Weihnachtspause, Pool, Regeln – 2.8
 - [ ] **Liga starten** (Spielplan fest, sieben Spieltage) – 2.6
-- [ ] **Am 10.11.:** Sichtbarkeit auf **Öffentlich**, **Season speichern** – 2.8
+- [ ] **Am 10.11.:** Sichtbarkeit auf **Öffentlich**, **Überblick speichern** – 2.8
 - [ ] **Discord-Ankündigung von Hand** (die Liga meldet sich noch nicht selbst): Link zur Ligaseite, Start, Ablauf,
       [Spickzettel für Captains](liga-captains.md)

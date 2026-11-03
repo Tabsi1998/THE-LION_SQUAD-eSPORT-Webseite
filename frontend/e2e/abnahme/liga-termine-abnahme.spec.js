@@ -55,7 +55,7 @@ test.describe("Abnahme: Liga-Termine gegen den echten Server", () => {
 
   test("Leitung: Terminregeln der Season speichern und die Staffel starten", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
-    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}`);
+    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}#terminregeln`);
     const panel = lead.page.getByTestId("season-schedule-rules");
     await expect(panel).toBeVisible();
     await expect(lead.page.getByTestId("schedule-rules-max")).toHaveValue("2");
@@ -169,8 +169,10 @@ test.describe("Abnahme: Liga-Termine gegen den echten Server", () => {
       await lead.page.getByTestId("lead-schedule-form-submit").click();
       await expect(lead.page.getByTestId("schedule-history").locator('[data-testid="schedule-history-lead"]').first())
         .toContainText("Dritte Verschiebung, Leitung entscheidet");
-      const page = await (await lead.page.request.get(`/api/matches/${shared.id}/page`)).json();
-      expect(new Date(page.match.scheduled_at).getTime()).toBe(when.getTime());
+      // Der Eintrag der Breite davor steht schon in der Historie - darum auf den neuen Termin warten, nicht nur auf den Eintrag.
+      const readPage = async () => (await (await lead.page.request.get(`/api/matches/${shared.id}/page`)).json());
+      await expect.poll(async () => new Date((await readPage()).match.scheduled_at).getTime()).toBe(when.getTime());
+      const page = await readPage();
       expect(page.match.schedule_source).toBe("manual");
       await noSideScroll(lead.page);
       await shot(lead.page, `termine-leitung-${width}.png`);

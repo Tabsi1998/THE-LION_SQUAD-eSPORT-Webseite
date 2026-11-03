@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from services import league_service, map_pools  # noqa: E402
-from services.scoring_rules import normalize_rules  # noqa: E402
+from services.scoring_rules import league_default_rules, normalize_rules  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
 SHOOTER = {
@@ -89,7 +89,9 @@ async def test_a_season_starts_with_the_documented_defaults(flow):
     assert season["best_of"] == 3 and season["team_size"] == 4 and season["min_squad_size"] == 3
     assert season["result_confirm_hours"] == 48 and season["lineup_amend_hours"] == 48
     assert season["visibility"] == "off" and season["status"] == "draft"
-    assert season["scoring_rules"] == normalize_rules({})
+    # Tabelle (E.1, #1625): neue Seasons mit den entschiedenen Vorgaben - direkter Vergleich, kein Remis, Default-Win.
+    assert season["scoring_rules"] == league_default_rules()
+    assert season["scoring_rules"] != normalize_rules({})
     assert season["start_date"] == "2026-11-09T23:00:00+00:00"  # 00:00 Wien
     assert season["blocked_periods"][0]["label"] == "Weihnachtspause"
     assert season["registration_deadline"] == "2026-11-06"
@@ -127,7 +129,7 @@ async def test_creating_a_staffel_copies_every_setting_into_the_tournament(flow)
         "result_entry_mode": "player_confirmed", "registration_enabled": False, "discord_registration": False,
         "discord_skip": True, "season_weight": 0, "visibility": "internal", "is_public": False, "status": "draft",
         "round_robin_legs": 1, "matchday_blocked_weeks": [7, 8], "matchday_weeks_total": 10,
-        "scoring_rules": normalize_rules({}), "game_mode_order": [], "lineup_amend_hours": 48,
+        "scoring_rules": league_default_rules(), "game_mode_order": [], "lineup_amend_hours": 48,
         "blocked_periods": [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "Weihnachtspause"}],
     }
     assert {key: tournament.get(key) for key in expected} == expected

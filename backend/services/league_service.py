@@ -14,6 +14,7 @@ daraus die Antwort.
 """
 from __future__ import annotations
 
+import copy
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -23,7 +24,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
 from services import (game_maps, game_modes, game_usage, league_games, league_look, league_platform, league_pool_check,
-                      league_result_rules, map_pools, pricing, staffel_guard)
+                      league_result_rules, loadout_bans, map_pools, pricing, staffel_guard)
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
@@ -36,7 +37,7 @@ from services.mutation_lock import (MutationLockBusy, league_resource, league_se
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
-from services.scoring_rules import normalize_rules
+from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, league_default_rules, normalize_rules
 from services.slug_utils import slugify, unique_slug
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -487,6 +488,7 @@ SYNC_GROUP_LABELS = {
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
+    "loadout_bans": loadout_bans.SYNC_LABEL,
 }
 
 
@@ -709,6 +711,9 @@ def order_length_check(season: dict, divisions: list[dict], warnings: list | Non
 
 async def create_season(db, league: dict, body: dict, user: dict, *, before_write=None) -> dict:
     game = await _game(db, league.get("game_id"))
+    if isinstance(body.get("scoring_rules"), dict):
+        # Tabelle (E.1, #1625): was eine neue Season nicht selbst setzt, kommt aus den Vorgaben neuer Liga-Seasons.
+        body = {**body, "scoring_rules": {**copy.deepcopy(LEAGUE_TABLE_DEFAULTS), **body["scoring_rules"]}}
     fields = clean_season({key: value for key, value in body.items() if value is not None}, None, game)
     order_length_check({**SEASON_DEFAULTS, **fields}, [], None)
     number = fields.pop("number", None)
@@ -724,7 +729,7 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
     doc = {**new_season_settings(fields), **look}
     if doc.get("scoring_rules") is None:
-        doc["scoring_rules"] = normalize_rules({})
+        doc["scoring_rules"] = league_default_rules()
     # Ergebnisregeln (C.3, #1617): die neue Season hält die Regeln der Modi fest, Punkte je Map sind Pflicht.
     doc.update(league_result_rules.new_season_fields(game))
     # Terminregeln (#2194, docs/LIGA.md D.1): Vorgabe nur für neue Seasons, gepflegt über …/schedule-rules.
@@ -922,6 +927,7 @@ async def _purge_staffel(db, tournament_id: str) -> None:
     await purge_tournament(db, tournament_id)
     await db.map_pools.delete_many({"$or": [{"tournament_id": tournament_id},
                                             {"scope": "tournament", "scope_id": tournament_id}]})
+    await db.loadout_bans.delete_many({"scope": loadout_bans.TOURNAMENT, "scope_id": tournament_id})
 
 
 CHANGED_MEANWHILE = "Inzwischen ist etwas dazugekommen – bitte die Seite neu laden und noch einmal prüfen."
@@ -986,6 +992,7 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
                 await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
             if season_ids:
                 await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
+                await db.loadout_bans.delete_many({"scope": loadout_bans.SEASON, "scope_id": {"$in": sorted(season_ids)}})
                 # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
                 await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
                 await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
@@ -1100,6 +1107,8 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -
     if pool and pool.get("game_id") == game["id"]:
         await map_pools.copy_version(db, pool, scope="tournament", scope_id=doc["id"], user=user,
                                      tournament_id=doc["id"], note=f"Aus {season.get('name')} übernommen")
+    # Sperrliste der Season (#2218): dieselbe Sperre, die Staffel bekommt eine eigene Version.
+    await loadout_bans.copy_to_staffel(db, season, doc, user)
     return doc
 
 
@@ -1183,6 +1192,9 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     except map_pools.MapProblem as problem:
         # Die Felder oben sind schon geschrieben - das Ergebnis sagt ehrlich, dass nur der Pool fehlt.
         skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"], "reason": problem.message})
+    # Sperrliste (#2218): wie der Map-Pool - eine neue Liste geht immer, Spiele mit festgehaltener Version behalten ihre.
+    await loadout_bans.sync_staffel(db, tournament, season, user, locked=locked, has_result=has_result, applied=applied,
+                                    skipped=skipped, changed=changed)
     await _note_mode_order(db, tournament, updates, skipped)
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
 
@@ -1387,6 +1399,9 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
         # „Um was gespielt wird“ - die Gewinne der Season; eine Liga N mit eigenen trägt sie unter ``prizes``.
         "prizes": list(season.get(league_look.PRIZES) or []),
         "map_pool": pool,
+        # Sperrliste (#2218): nur der Schnappschuss der Season, ohne Notiz und Autor.
+        "loadout_bans": loadout_bans.view(loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]),
+                                                                 league.get("game_id")), loadout_bans.SEASON),
         "divisions": [{
             "id": division["id"], "level": division["level"], "nickname": division.get("nickname"),
             "label": division_label(division),

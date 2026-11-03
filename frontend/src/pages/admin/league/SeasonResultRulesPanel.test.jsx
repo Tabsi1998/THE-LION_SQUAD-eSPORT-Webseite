@@ -65,3 +65,14 @@ test("nur lesen ohne Recht „Season konfigurieren“", async () => {
   expect(screen.queryByTestId("result-rules-save")).not.toBeInTheDocument();
   expect(screen.getByTestId("result-rules-stellung-season")).toHaveTextContent("Season: Punkte bis zum Ziel: 250 · 10 Min.");
 });
+
+// Season-Seite (#2267): nur die Modi der Season stehen da - gespeichert werden trotzdem alle Regeln, nichts geht verloren.
+test("zeigt nur die Modi der Season und speichert die Regeln aller Modi", async () => {
+  apiMock.put.mockResolvedValue({ data: { ...BODY, changed: false } });
+  render(<SeasonResultRulesPanel seasonId="s1" modes={["suchen"]} />);
+  await waitFor(() => expect(screen.getByTestId("result-rules-suchen")).toBeInTheDocument());
+  expect(screen.queryByTestId("result-rules-stellung")).toBeNull();
+  fireEvent.click(screen.getByTestId("result-rules-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalled());
+  expect(Object.keys(apiMock.put.mock.calls[0][1].rules)).toEqual(["stellung"]);
+});
