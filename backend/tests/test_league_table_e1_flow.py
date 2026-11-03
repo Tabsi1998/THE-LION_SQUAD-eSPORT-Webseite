@@ -238,15 +238,32 @@ NOTE = {"note": "Beide Teams nicht in der Lobby"}
 async def test_both_no_show_only_before_the_game_starts_and_with_the_side_effects(flow, monkeypatch):
     """Codex zu E.1: nicht nach Spielbeginn, nicht mit Meldung oder gehaltenem Ergebnis - und dieselben Nebenwirkungen wie
     beim kampflos (Station frei, Discord vorgemerkt), auch beim Neu ansetzen."""
-    from services import discord_bracket, station_runtime
+    from services import change_events, competition_versions, discord_bracket, station_runtime, walkover_incidents
 
     _admin, _league, staffel = await setup(flow)
-    refreshed, released = [], []
+    refreshed, released, events, versions, incidents, revoked = [], [], [], [], [], []
     monkeypatch.setattr(discord_bracket, "request_refresh", lambda tid: refreshed.append(tid))
 
     async def release(_db, match, _collection):
         released.append(match["id"])
+
+    async def event(tid, kind, **kwargs):
+        events.append((tid, kind, tuple(kwargs.get("match_ids") or ())))
+
+    async def persist(_db, tournament, engine):
+        versions.append((tournament["id"], engine))
+
+    async def record(_db, match, registration_id, _actor):
+        incidents.append((match["id"], registration_id))
+
+    async def revoke(_db, match_id, registration_id):
+        revoked.append((match_id, registration_id))
+        return True
     monkeypatch.setattr(station_runtime, "release_station_for_match", release)
+    monkeypatch.setattr(change_events, "publish_tournament_event", event)
+    monkeypatch.setattr(competition_versions, "persist_competition_versions", persist)
+    monkeypatch.setattr(walkover_incidents, "record_walkover_incident", record)
+    monkeypatch.setattr(walkover_incidents, "revoke_walkover_incident", revoke)
     first, second = (await matches_of(flow, staffel, 1))[:2]
     side = first["slots"][0]["registration_id"]
     url = f"{TABLE}/{staffel['id']}/matches/{first['id']}/double-no-show"
@@ -259,16 +276,23 @@ async def test_both_no_show_only_before_the_game_starts_and_with_the_side_effect
         refused = await flow.post(url, json=NOTE)
         assert refused.status_code == 409, change
         await flow.db.matches_v2.replace_one({"id": first["id"]}, dict(original))
-    assert refreshed == [] and released == []
+    assert refreshed == released == events == versions == incidents == []
 
     await flow.db.matches_v2.update_one({"id": second["id"]}, {"$set": {"station_id": "station-1"}})
+    sides = [slot["registration_id"] for slot in second["slots"]]
     url = f"{TABLE}/{staffel['id']}/matches/{second['id']}/double-no-show"
     response = await flow.post(url, json=NOTE)
     assert response.status_code == 200, response.text
     assert released == [second["id"]] and refreshed == [staffel["id"]]
+    assert events == [(staffel["id"], "walkover", (second["id"],))]
+    assert versions == [(staffel["id"], "graph")]
+    assert sorted(incidents) == sorted((second["id"], side) for side in sides) and revoked == []
     undone = await flow.client.request("DELETE", url, json={"reason": "Neuer Termin vereinbart"})
     assert undone.status_code == 200, undone.text
-    assert refreshed == [staffel["id"], staffel["id"]]
+    assert refreshed == [staffel["id"], staffel["id"]] and released == [second["id"]]
+    assert events[-1] == (staffel["id"], "result_corrected", (second["id"],))
+    assert versions == [(staffel["id"], "graph"), (staffel["id"], "graph")]
+    assert sorted(revoked) == sorted((second["id"], side) for side in sides)
 
 
 @pytest.mark.asyncio
