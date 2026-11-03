@@ -28,6 +28,7 @@ ACTORS = ("superadmin", "club_admin", "leagues_grant", "cap_right", "cap_other",
           "player", "no_mfa_area", "no_mfa_cap")
 DELETE_BODY = {"reason": "Testfall aufräumen"}
 RESULT_BODY = "RESULT"
+OVERRIDE_BODY = "OVERRIDE"
 FORFEIT_BODY = "FORFEIT"
 POOL_BODY = {"modes": [{"mode": "stellung", "map_ids": ["map-hafen"]}]}
 RULE_TEXT = {"title": "Regelwerk", "body_md": "# Fairplay\nText", "annexes": []}
@@ -56,7 +57,15 @@ ROUTES = [
     route("PATCH", "/api/admin/leagues/seasons/{season}", "rules", {"rules_text": "Neue Regeln"}),
     route("PUT", "/api/admin/leagues/seasons/{season}/map-pool", "season", POOL_BODY),
     route("DELETE", "/api/admin/leagues/seasons/{season}/map-pool", "season"),
+    # Maps und Pools (#2207, C.2)
+    route("GET", "/api/admin/leagues/seasons/{season}/map-pool/versions", ANY),
+    route("GET", "/api/admin/leagues/seasons/{season}/map-pool/compare?base=1&target=1", ANY),
+    route("POST", "/api/admin/leagues/seasons/{season}/map-pool/remove-map", "season", {"map_id": "map-hafen", "reason": "Grund genug"}),
+    route("GET", "/api/admin/leagues/seasons/{season}/readiness", ANY),
     route("POST", "/api/admin/leagues/seasons/{season}/sync", "season"),
+    # Ergebnisregeln (C.3, #1617)
+    route("GET", "/api/admin/leagues/seasons/{season}/result-rules", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/result-rules", "season", {"scores_required": True, "rules": {}}),
     route("POST", "/api/admin/leagues/seasons/{season}/divisions", "season", {"level": 7}),
     route("PATCH", "/api/admin/leagues/divisions/{division}", "season", {"nickname": "Neu"}),
     route("GET", "/api/admin/leagues/divisions/{division}/delete-plan", "season"),
@@ -135,6 +144,8 @@ ROUTES = [
     route("GET", "/api/tournaments/{tid}/schedule/deadlines", READ),
     # Spiel: entscheiden
     route("POST", "/api/matches/{match}/result", "results", RESULT_BODY),
+    # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“, mit Grund - Captains und andere Rechte nie.
+    route("POST", "/api/matches/{match}/result?force=true", "results", OVERRIDE_BODY),
     route("POST", "/api/matches/{match}/result/undo", "results", {}),
     route("POST", "/api/matches/{match}/forfeit", "results", FORFEIT_BODY),
     route("PUT", "/api/matches/{match}/lineups", "results", "LINEUPS"),
@@ -277,9 +288,10 @@ def fill(text: str, w: dict) -> str:
 
 def fill_body(body, w: dict):
     a, h = w["reg_a"]["id"], w["reg_h"]["id"]
-    if body == RESULT_BODY:
+    if body in (RESULT_BODY, OVERRIDE_BODY):
         return {"results": [{"registration_id": a, "rank": 1, "score": 2}, {"registration_id": h, "rank": 2, "score": 0}],
-                "reason": "Korrektur laut Protokoll"}
+                "reason": "Korrektur laut Protokoll",
+                **({"rule_override_reason": "Server stürzte ab"} if body == OVERRIDE_BODY else {})}
     if body == FORFEIT_BODY:
         return {"forfeit_registration_id": a, "note": "Nicht angetreten"}
     if body == "LINEUPS":

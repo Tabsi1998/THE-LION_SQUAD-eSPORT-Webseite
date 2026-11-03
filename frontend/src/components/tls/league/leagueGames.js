@@ -1,8 +1,11 @@
 // Ergebnis je Map mit Aufstellung (docs/LIGA.md, #1650): was das Melde-Formular der Liga rechnet. Der Server prüft
 // alles noch einmal (services/league_games.py) - hier geht es darum, dass man gar nicht erst etwas Falsches eingibt.
 import { viennaDay, viennaTime } from "@/lib/vienna";
+import { mapRuleProblem } from "./leagueResultRules";
 
 const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+// Zusatzfelder einer Map (docs/LIGA.md, C.3): Stand, Wiederholung, Wertung, Seite, Nachweis.
+const GAME_EXTRAS = ["status", "replay_reason", "decision", "host_registration_id", "proof_id"];
 
 /** Teilnehmerliste einmal je Spiel (#2204): Staffeln ohne Feld bleiben bei der Aufstellung je Map. */
 export function isSeries(league) {
@@ -144,7 +147,7 @@ export function repeatedMap(games, position, mode, mapId, league) {
 }
 
 /** Was noch fehlt - der erste Satz für die Seite, sonst `null`. `withLineup`: die eigene Aufstellung ist Pflicht. */
-export function gamesProblem(games, league, { withLineup = true, needMaps = true } = {}) {
+export function gamesProblem(games, league, { withLineup = true, needMaps = true, skipRules = false } = {}) {
   for (const game of games) {
     const label = `Map ${game.position}`;
     if (needMaps) {
@@ -160,6 +163,9 @@ export function gamesProblem(games, league, { withLineup = true, needMaps = true
       for (const value of Object.values(game.scores || {})) {
         if (scoreValue(value) === undefined) return `${label}: Punkte bitte als Zahl ab 0.`;
       }
+      // Ergebnisregel und Punktepflicht (C.3, #1617) - übergehen darf nur der Superadmin mit Grund.
+      const ruleProblem = skipRules ? null : mapRuleProblem(game, league);
+      if (ruleProblem) return ruleProblem;
     }
     if (withLineup && (game.lineup || []).length !== league.team_size) {
       return `${label}: bitte genau ${league.team_size} Spieler aufstellen.`;
@@ -200,6 +206,8 @@ export function reportPayload(games, league, lineup = null) {
         winner_registration_id: game.winner,
         ...(Object.keys(scores).length ? { scores } : {}),
         ...(series ? {} : { lineup: game.lineup }),
+        // Zusatzfelder einer Map (C.3, #1617) - nur, wenn die Map sie schon trägt (Korrektur der Leitung).
+        ...Object.fromEntries(GAME_EXTRAS.filter((key) => game[key]).map((key) => [key, game[key]])),
       };
     }),
   };
@@ -265,6 +273,7 @@ export function staffStart(league) {
     scores: Object.fromEntries(Object.entries(game.scores || {}).map(([side, value]) => [side, String(value)])),
     lineup: [],
     lineups: Object.fromEntries(Object.entries(game.lineups || {}).map(([side, people]) => [side, lineupIds(people)])),
+    ...Object.fromEntries(GAME_EXTRAS.filter((key) => game[key]).map((key) => [key, game[key]])),
   }));
 }
 
@@ -280,8 +289,8 @@ export function staffListsStart(league) {
 }
 
 /** Was fehlt: wie beim Melden, Aufstellungen je Seite aber freiwillig - wenn, dann vollständig. */
-export function staffProblem(games, league, lists = {}) {
-  const problem = gamesProblem(games, league, { withLineup: false });
+export function staffProblem(games, league, lists = {}, { skipRules = false } = {}) {
+  const problem = gamesProblem(games, league, { withLineup: false, skipRules });
   if (problem) return problem;
   if (isSeries(league)) {
     const minimum = league.lineup_min_players || 1;

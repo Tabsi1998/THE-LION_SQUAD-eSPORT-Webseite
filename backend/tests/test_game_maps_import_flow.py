@@ -63,6 +63,19 @@ async def test_sources_and_candidates_show_what_can_be_taken(flow):
 
 
 @pytest.mark.asyncio
+async def test_sources_count_maps_without_status_as_active_and_skip_inactive_ones(flow):
+    """#2207: Fehlt der Zustand, ist die Map aktiv - auch beim Zählen der Quellen. Inaktive zählen wie archivierte nicht."""
+    old, new, maps = await two_versions(flow)
+    await flow.db.game_maps.update_one({"id": maps["Hafenkante"]["id"]}, {"$unset": {"status": ""}})
+    await flow.patch(f"/api/games/{old['id']}/maps/{maps['Nebelwerk']['id']}", json={"status": "inactive"})
+
+    sources = (await flow.get(f"/api/games/{new['id']}/maps/import-sources")).json()
+    assert [(row["id"], row["maps"]) for row in sources] == [(old["id"], 1)]
+    candidates = (await flow.get(f"/api/games/{new['id']}/maps/import-sources/{old['id']}")).json()
+    assert [row["name"] for row in candidates["maps"]] == ["Hafenkante"]
+
+
+@pytest.mark.asyncio
 async def test_taking_over_copies_maps_with_image_and_known_modes_and_leaves_the_source_alone(flow):
     old, new, maps = await two_versions(flow)
     tournament = await flow.create_tournament(game_id=old["id"])

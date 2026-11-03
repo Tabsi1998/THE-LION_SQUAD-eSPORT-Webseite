@@ -68,6 +68,12 @@ def league_season_resource(season_id: str) -> str:
     return f"league_season:{season_id}:squads"
 
 
+def league_season_pool_resource(season_id: str) -> str:
+    """Der Map-Pool einer Liga-Season (#2207): Speichern, Entfernen und „Map aus dem Pool nehmen“ nacheinander. Nach den Turnier-Sperren
+    der Staffeln."""
+    return f"league_season:{season_id}:map_pool"
+
+
 def league_resource(league_id: str) -> str:
     """Eine Liga: liga-weites Regelwerk veröffentlichen, Liga löschen (#1646). Vor den Sperren ihrer Seasons."""
     return f"league:{league_id}:rules"

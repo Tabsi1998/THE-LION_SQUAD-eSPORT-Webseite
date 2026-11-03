@@ -20,7 +20,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import OLD_RULES  # noqa: E402
+from league_match_world import OLD_RULES, without_score_duty  # noqa: E402
 from squad_world import make_team  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
@@ -55,6 +55,8 @@ SEASON_ONE = {
     "rules_text": "## Regeln\nPlatzhalter für den Regeltext der Season.",
     "registration_deadline": "2026-11-06",
     "visibility": "admins",
+    # Veröffentlichen prüft seit #2207 Pool, Regelwerk und Staffeln - der Aufbau kommt erst danach.
+    "readiness_override_reason": "Testaufbau ohne Prüfung",
 }
 # Acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im Kader).
 TEAMS = [("Nebelwölfe", "Rudel"), ("Sturmvögel", "Schwarm"), ("Glutfüchse", "Bau"), ("Frostluchse", "Pfote"),
@@ -96,6 +98,7 @@ async def build_league(flow) -> dict:
         maps[name] = ok(await flow.post(f"/api/games/{game['id']}/maps", json={"name": name, "modes": modes}))
     league = ok(await flow.post(ADMIN, json={"name": "CoD-Liga", "game_id": game["id"]}))
     season = ok(await flow.post(f"{ADMIN}/{league['id']}/seasons", json={**OLD_RULES, **SEASON_ONE}))
+    await without_score_duty(flow, season)
     ok(await flow.put(f"{ADMIN}/seasons/{season['id']}/map-pool", json={"modes": [
         {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]}))
     division = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={}))
@@ -286,7 +289,9 @@ async def test_from_the_league_to_a_started_schedule_with_the_christmas_break(fl
 
     # Am 10.11. stellt der Obmann auf „Öffentlich“: Ligaseite und Staffel sind für alle da.
     flow.act_as(world["lead"])
-    saved = ok(await flow.patch(f"{ADMIN}/seasons/{world['season']['id']}", json={"visibility": "public"}))
+    # Die Welt hat nur den Regeltext, kein Regelwerk: Veröffentlichen geht mit der Notausnahme des Superadmins (#2207).
+    saved = ok(await flow.patch(f"{ADMIN}/seasons/{world['season']['id']}",
+                                json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Regelwerk"}))
     assert saved["visibility_applied"] == 1
     flow.act_as(None)
     assert ok(await flow.get(season_page(world)))["season"]["name"] == "Season 1"

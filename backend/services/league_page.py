@@ -21,6 +21,12 @@ from services.matchday_schedule import (
 from services.match_winner import match_winner_id
 
 PUBLIC_GAME_FIELDS = ("position", "mode", "map_id", "map_name", "map_image_url", "winner_registration_id", "scores")
+# Zusatzfelder je Map (C.3, #1617): nur wenn gesetzt - der Nachweis (``proof_id``) bleibt bei Beteiligten und Leitung.
+PUBLIC_GAME_EXTRAS = ("status", "replay_reason", "decision", "host_registration_id")
+
+
+def _public_game(game: dict) -> dict:
+    return {**{key: game.get(key) for key in PUBLIC_GAME_FIELDS}, **{key: game[key] for key in PUBLIC_GAME_EXTRAS if game.get(key)}}
 DONE_STATUSES = frozenset({"completed", "forfeit"})
 PUBLIC_REGISTRATION_STATUSES = ("approved", "checked_in")
 
@@ -46,8 +52,10 @@ def _side(match: dict, index: int, names: dict, results: dict) -> dict | None:
             "team_id": info.get("team_id"), "score": score if isinstance(score, (int, float)) else None}
 
 
-def public_match(match: dict, names: dict, scheduled: dict | None = None) -> dict:
-    """Ein Spiel für die Ligaseite: Heim/Auswärts, Termin, Ergebnis, Maps (sobald P4 sie liefert) - ohne Aufstellungen."""
+def public_match(match: dict, names: dict, scheduled: dict | None = None, best_of: int | None = None) -> dict:
+    """Ein Spiel für die Ligaseite: Heim/Auswärts, Termin, Ergebnis, Maps (sobald P4 sie liefert) - ohne Aufstellungen.
+    ``best_of``: das der Staffel, wenn das Spiel keines trägt - für die nicht gespielten Maps (C.3)."""
+    from services.league_result_rules import not_played
     results = {row.get("registration_id"): row for row in match.get("results") or [] if row.get("registration_id")}
     # Gemeldete und eingetragene Ergebnisse tragen nur den Platz (``rank``), kein ``outcome`` - dieselbe Regel wie
     # überall (#2096, im Durchlauf gefunden).
@@ -67,9 +75,10 @@ def public_match(match: dict, names: dict, scheduled: dict | None = None) -> dic
         "forfeit": bool(match.get("forfeit_registration_id")) or match.get("status") == "forfeit",
         # Beide nicht erschienen (E.1, #1625): beide verlieren, kein Sieger.
         "double_forfeit": bool(match.get("double_forfeit")) and match.get("status") == "forfeit",
-        "games": [{key: game.get(key) for key in PUBLIC_GAME_FIELDS}
+        "games": [_public_game(game)
                   for game in sorted(match.get("games") or [], key=lambda game: game.get("position") or 0)
                   if isinstance(game, dict)] if done else [],
+        "not_played": not_played(match.get("games"), int(match.get("best_of") or best_of or 1)) if done else [],
     }
 
 
@@ -122,7 +131,8 @@ def staffel_weeks(tournament: dict, matches: list[dict], names: dict, proposals:
         games = sorted(by_day.get(matchday, []), key=lambda match: (match.get("order") or 0, match.get("match_key") or ""))
         weeks.append({**row, "kind": "matchday" if games else "reserve", "matchday": matchday,
                       "label": f"Spieltag {matchday}" if games else "Reserve",
-                      "matches": [public_match(match, names, scheduled.get(match.get("id"))) for match in games]})
+                      "matches": [public_match(match, names, scheduled.get(match.get("id")), tournament.get("best_of"))
+                                  for match in games]})
     moment = now or datetime.now(timezone.utc)
     current = None
     for row in weeks:

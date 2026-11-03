@@ -91,6 +91,12 @@ async function report(page, matchId, winner, maps) {
     const position = index + 1;
     await page.getByTestId(`league-game-${position}-map-${mapId}`).click();
     await page.getByTestId(`league-game-${position}-winner-${winner}`).click();
+    // Punkte je Map sind in neuen Seasons Pflicht (C.3, #1617): Sieger 6, Gegenseite 2.
+    const scores = page.locator(`[data-testid^="league-game-${position}-score-"]`);
+    for (let index = 0; index < await scores.count(); index += 1) {
+      const field = scores.nth(index);
+      await field.fill((await field.getAttribute("data-testid")).endsWith(`-${winner}`) ? "6" : "2");
+    }
   }
   const chips = page.getByTestId("league-participants").getByRole("button");
   for (let chip = 0; chip < 4; chip += 1) await chips.nth(chip).click();
@@ -235,6 +241,9 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
         const position = index + 1;
         await form.getByTestId(`league-game-${position}-map-${mapId}`).click();
         await form.getByTestId(`league-game-${position}-winner-${match.away}`).click();
+        // Der Endstand muss zum neuen Sieger passen (C.3, #1617) - die Punkte der Meldung tauschen.
+        await form.getByTestId(`league-game-${position}-score-${match.away}`).fill("6");
+        await form.getByTestId(`league-game-${position}-score-${match.home}`).fill("2");
       }
       await expect(form.getByTestId("result-sentence")).toContainText("2:0");
       await noSideScroll(lead.page);
@@ -259,8 +268,12 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       await expect(lead.page.getByTestId("match-staff-result-open")).toContainText("Ergebnis korrigieren");
       await lead.page.getByTestId("match-staff-result-open").click();
       await form.getByTestId(`league-game-1-winner-${match.home}`).click();
+      await form.getByTestId(`league-game-1-score-${match.home}`).fill("6");
+      await form.getByTestId(`league-game-1-score-${match.away}`).fill("2");
       await form.getByTestId(`league-game-3-map-${ablauf.pool.kontrolle[0]}`).click();
       await form.getByTestId(`league-game-3-winner-${match.away}`).click();
+      await form.getByTestId(`league-game-3-score-${match.away}`).fill("6");
+      await form.getByTestId(`league-game-3-score-${match.home}`).fill("2");
       await expect(form.getByTestId("result-sentence")).toContainText("2:1");
       await form.getByTestId("result-save").click();
       await expect(form.getByTestId("result-error")).toContainText("Grund");

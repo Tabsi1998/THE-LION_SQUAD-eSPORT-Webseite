@@ -38,6 +38,19 @@ test("bietet je Modus nur freigegebene Maps an, die gewählten zuerst in ihrer R
   expect(screen.getByTestId("pool-save")).toBeDisabled();
 });
 
+// #2207: Eine inaktive Map steht nur dort zur Wahl, wo der gespeicherte Pool sie schon hat - mit „inaktiv“.
+test("eine inaktive Map bleibt, wo sie steht, und kommt nirgends neu dazu", () => {
+  const library = [{ ...LIBRARY[0], status: "inactive" }, LIBRARY[1]];
+  const { onSave } = renderEditor({ library, entry: { ...ENTRY, outdated_map_ids: [] } });
+  const snd = screen.getByTestId("pool-mode-snd");
+  expect(within(snd).getAllByTestId(/pool-map-/).map((row) => row.dataset.mapId)).toEqual(["nebel", "hafen"]);
+  expect(within(snd).getByTestId("pool-inactive-hafen")).toHaveTextContent("inaktiv");
+  expect(within(screen.getByTestId("pool-mode-stellung")).queryAllByTestId(/pool-map-/)).toEqual([]);
+  fireEvent.click(screen.getByTestId("pool-defaults"));
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel"] }] }));
+});
+
 // #2129, SP2: Bereinigter Modus und Maps ohne Modus - alles lesbar und benannt, nichts still gesperrt.
 test("ein entfernter Modus im gespeicherten Pool bleibt benannt, Speichern nimmt ihn erst bewusst heraus", () => {
   const entry = { ...ENTRY, outdated_map_ids: [], modes: [...ENTRY.modes, { mode: "alt", label: "Alter Modus", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };

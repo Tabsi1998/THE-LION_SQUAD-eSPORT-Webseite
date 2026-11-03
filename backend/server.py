@@ -47,6 +47,7 @@ from routes.league_roster_routes import admin_router as league_roster_admin_rout
 from routes.league_application_routes import admin_router as league_application_admin_router, me_router as league_application_me_router, router as league_application_router
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.league_table_routes import admin_router as league_table_admin_router
+from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
 from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
@@ -362,6 +363,7 @@ app.include_router(league_application_router)  # Selbstanmeldung: einreichen, zu
 app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md, #1646)
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)
+app.include_router(league_result_rule_admin_router)  # Ergebnisregeln der Season (docs/LIGA.md, C.3, #1617)
 app.include_router(league_schedule_admin_router)  # Terminregeln je Season (#2194)
 app.include_router(league_schedule_router)  # Verschiebung am Spiel (#2194)
 app.include_router(game_server_router)

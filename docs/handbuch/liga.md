@@ -98,6 +98,12 @@ Nach dem ersten Ergebnis geht beim **Übertragen** nur noch der Pool an die Staf
 dann ein Modus der Reihenfolge, sagt das Übertragen das, und die Teams wählen den Modus je Map frei. Spiele mit
 festgehaltenem Pool behalten ihre Reihenfolge.
 
+**Maps deaktivieren:** In der Map-Bibliothek hat jede Karte die Knöpfe **Deaktivieren** (Pause-Symbol) und **Archivieren**.
+*Inaktiv* heißt: Die Map kommt in keinen neuen Pool, dort, wo sie schon steht, bleibt sie gültig und meldbar. *Archiviert*
+blendet sie zusätzlich aus. Vor beidem fragt die Verwaltung nach und nennt die Seasons, in deren Map-Pool die Map gerade
+steht – das ist nur ein Hinweis, gesperrt wird nichts. Soll eine kaputte Map wirklich aus einer laufenden Season raus, geht
+das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
+
 ### 2.2 Liga und Season anlegen
 
 1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“) und Spiel.
@@ -115,7 +121,7 @@ festgehaltenem Pool behalten ihre Reihenfolge.
 | Spiel und Wertung | **Best of** | Best of 3 |
 | | **Teamgröße (je Map)** · **Mindestkader** | 4 · 3 (Sollstärke 4, der Kader darf kleiner sein) |
 | | **Teams je Staffel höchstens** | 8 |
-| | **Modus je Map** (Map 1, 2, 3 – „frei“ heißt: die Teams wählen) | nach Regelwerk |
+| | **Modus je Map** (Map 1, 2, 3 – „frei“ heißt: die Teams wählen). So viele Felder wie die längste Serie: Spielt eine Liga N Best of 5, sind es fünf. Entweder alle frei oder jedes belegt | nach Regelwerk |
 | | **Map-Wiederholung in einer Serie** | Gleiche Map nur in anderem Modus (Vorgabe); auch „Aus – jede Map nur einmal“ oder „Immer erlaubt“ |
 | | **Punkte Sieg / Remis / Niederlage** | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
 | | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
@@ -137,7 +143,34 @@ fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
 4. **Map-Pool der Season**: je Modus die Maps anhaken und sortieren, **Speichern** (**Vorgabe des Spiels** lädt den
    Standard-Pool des Spiels, ohne ihn alle aktiven Maps). Ohne Pool kann niemand mit Maps melden. Jede neue Staffel bekommt
-   eine Kopie.
+   eine Kopie. Hat ein Modus zu wenige Maps für **Modus je Map** und die **Map-Wiederholung** (etwa zweimal Stellung in einer
+   Serie, „gleiche Map nur in anderem Modus“: mindestens zwei Stellungs-Maps), sagt das Speichern das als Warnung.
+5. Unter dem Pool:
+   - **Map aus dem Pool nehmen**: Map wählen, „aus allen Modi“ oder nur aus einem, **Grund** (mindestens 5 Zeichen), dann
+     **Sperren und übertragen**. Es entsteht eine neue Version ohne die Map, und sie geht sofort an alle Staffeln. Spiele, die
+     ihren Pool schon festhalten, und fertige Spiele bleiben unverändert; der Grund steht im Protokoll.
+   - **Versionen vergleichen**: zwei Versionen wählen, **Vergleichen** zeigt je Modus, was dazukam und was wegfiel.
+6. **Prüfung vor der Veröffentlichung** (siehe 2.8): zeigt, was vor dem Veröffentlichen noch fehlt, und die **Mindestgröße im
+   Map-Pool** je Modus. Wer mehr oder weniger Maps verlangen will, trägt die Zahl ein und tippt **Mindestgröße speichern** – leer
+   heißt: abgeleitet aus Reihenfolge, Best of und Map-Wiederholung.
+7. **Ergebnisregeln** (unter dem Map-Pool): Eine neue Season übernimmt beim Anlegen die Ergebnisregel jedes Modus aus dem
+   Spiel (2.1) als eigene Kopie, und **Punkte je Map Pflicht** ist an. Je Modus stehen die Regel der Season und darunter
+   „Spiel: …“. Abweichen geht je Modus: **Art** (Punkte bis zum Ziel, Runden gewinnen, Höherer Endstand gewinnt, Keine Regel),
+   **Zielpunkte** bzw. **Rundensiege zum Sieg**, **Höchstens Runden**, **Zeitlimit**, **Remis möglich**, **Verlängerung** →
+   **Ergebnisregeln speichern**. Ändert jemand später die Regel am Spiel, bleibt die Season, wie sie ist: Dann steht
+   **weicht vom Spiel ab** am Modus, und **Vom Spiel übernehmen** holt die neue Regel – erst mit dem Speichern gilt sie.
+
+| Art | Beispiel | Was die Meldung prüft |
+| --- | --- | --- |
+| Punkte bis zum Ziel | Ziel 250, Zeitlimit 10 Min. | Sieger hat mehr Punkte, höchstens 250; ohne Zeitlimit genau 250 |
+| Runden gewinnen | 6 Rundensiege, höchstens 11 Runden | 6:5 geht, 7:5 nicht („höchstens 11 Runden – 7:5 sind 12“) |
+| Höherer Endstand gewinnt | – | nur: der Sieger hat mehr |
+
+Mit **Verlängerung** dürfen Ziel und Rundenlimit überschritten werden. Ein Gleichstand geht nur mit **Remis möglich**; die
+Map braucht trotzdem einen Sieger. Ohne Regel prüft die Meldung den Endstand nicht. Seasons von vor dieser Funktion haben
+keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier speicherst.
+
+![Ergebnisregeln der Season](bilder/liga-ergebnisregeln-season.png)
 
 ### 2.3 Liga 1 und Staffel anlegen
 
@@ -241,6 +274,7 @@ mehr geht, steht je Staffel mit Grund da:
 | --- | --- |
 | Regeltext, Map-Pool | immer (ein entfernter Pool verschwindet nur vor dem ersten Ergebnis; Spiele mit festgehaltenem Pool behalten ihn) |
 | Antwortfrist auf Terminvorschläge | auch während der Season – gilt für neue Vorschläge; nicht bei gesperrten Staffeln. Ist das Feld der Season leer (ältere Seasons), behält jede Staffel ihre Frist |
+| Ergebnisregeln und Punktepflicht | auch während der Season – gilt für neue Meldungen, fertige Ergebnisse bleiben; nicht bei gesperrten Staffeln |
 | Termine und Kalender (Beginn, Wochen, Sperrzeiten, Standardtermin, Runden, Staffelgröße) | nur vor dem Start |
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
@@ -275,6 +309,16 @@ Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), leg
 
 Die Sichtbarkeit gilt beim **Season speichern** sofort für alle Staffeln. Wer in einer Staffel spielt, sieht seine
 Spiele, Termine und den Matchchat immer – auch bei *Aus*.
+
+**Prüfung vor der Veröffentlichung:** Der Abschnitt auf der Season-Seite listet **Probleme** (rot) und **Warnungen**. Probleme
+sind: kein oder ein fremder Map-Pool, zu wenige Maps für einen Modus, ein Modus aus **Modus je Map** fehlt im Pool, **Modus je Map**
+passt nicht zur längsten Serie, kein veröffentlichtes **Regelwerk** (ein Regeltext allein reicht nicht), keine Liga N oder eine Liga
+N ohne Staffel, ein Anmeldefenster, das erst nach dem Beginn der Season endet. Warnungen sind etwa ein abgelaufenes oder fehlendes
+Anmeldefenster oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine **Vorschau** und geht immer, auch mit Problemen.
+Solange es Probleme gibt, lässt sich die Sichtbarkeit aber nicht auf **Nur Mitglieder** oder **Öffentlich** stellen – weder von *Aus*
+noch von der Vorschau aus; das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
+kann im Notfall trotzdem veröffentlichen: Er trägt im Abschnitt einen **Grund für die Notausnahme** ein (mindestens 5 Zeichen) und
+speichert die Season; der Grund steht im Protokoll. Von *Nur Mitglieder* weiter auf *Öffentlich* prüft nichts mehr.
 
 ### 2.9 Korrigieren, archivieren, löschen
 
@@ -513,6 +557,15 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   **Grund** (mindestens fünf Zeichen). Die Korrektur schließt einen offenen Einspruch, die Tabelle rechnet sofort neu.
   Ohne neue Maps bleiben die alten, solange sie zum Stand passen – sonst fallen sie weg. Ablauf wie in
   [Turniere, 3.7](turniere.md#37-dispute-streit-um-ein-ergebnis).
+- **Ergebnisregeln gelten auch für die Leitung** (2.2, Schritt 5): Eintragen und Korrigieren prüfen dieselben Endstände
+  wie die Meldung der Captains. Passt ein Endstand wirklich nicht zur Regel (etwa nach einem Absturz), darf die
+  **Liga-Leitung mit der Zuständigkeit „Ergebnisse“** sie übergehen: im Ergebnis-Fenster **Ergebnisregel übergehen
+  (Liga-Leitung, mit Grund)** einen Grund eintragen (mindestens fünf Zeichen). Best of, Map-Pool und Aufstellung gelten
+  trotzdem; der Grund steht im Protokoll. Im eigenen Spiel entscheidet eine zweite Person (2.11), der Superadmin nur als
+  Notausnahme mit Grund. Captains können eine Regel nie übergehen.
+- **Wiederholte und zugesprochene Maps**: Über die Schnittstelle kann eine Map als **wiederholt** (mit Grund) markiert
+  oder von der Leitung **zugesprochen** werden (ohne Punkte, ohne Regel). Die Matchseite zeigt beides an der Map; nach
+  dem Serienende steht dort, welche Maps nicht gespielt wurden.
 
 ### 3.5 Tabelle und Ligaseite
 
@@ -723,6 +776,7 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] **Best of 3**, **Teamgröße 4**, Mindestkader, **Modus je Map** laut Regelwerk, Punkte 3/1/0 – 2.2
 - [ ] **Regelwerk** veröffentlicht, Bausteine für Map-Pool und Modusfolge gesetzt – 2.11
 - [ ] **Map-Pool der Season** gespeichert – 2.2
+- [ ] **Prüfung vor der Veröffentlichung** ohne Probleme – 2.8
 - [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
 - [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4
 - [ ] Jeder im Kader hat die **Activision-ID** im Profil; Season → **Kader und Spiel-IDs** zeigt niemanden „ohne ID“,

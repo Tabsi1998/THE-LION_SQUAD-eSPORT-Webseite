@@ -1135,7 +1135,16 @@ class MatchScoreReport(BaseModel):
     lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
 
 
-class MatchGameReport(BaseModel):
+class MatchGameExtras(BaseModel):
+    """Zusatzfelder einer Map (C.3, #1617), alle freiwillig - geprüft mit deutschem Satz in services/league_result_rules.py."""
+    status: Optional[str] = Field(default=None, max_length=20)
+    replay_reason: Optional[str] = Field(default=None, max_length=500)
+    decision: Optional[str] = Field(default=None, max_length=20)
+    host_registration_id: Optional[str] = Field(default=None, max_length=100)
+    proof_id: Optional[str] = Field(default=None, max_length=100)
+
+
+class MatchGameReport(MatchGameExtras):
     """Eine Map einer Meldung - ``lineup`` ist die eigene Seite."""
     position: int = Field(ge=1, le=MATCH_GAMES_MAX)
     mode: Optional[str] = Field(default=None, max_length=40)
@@ -1145,7 +1154,7 @@ class MatchGameReport(BaseModel):
     lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_LINEUP_MAX)
 
 
-class MatchGameAdmin(BaseModel):
+class MatchGameAdmin(MatchGameExtras):
     """Eine Map der Turnierleitung - Aufstellungen beider Seiten, je Seite freiwillig."""
     position: int = Field(ge=1, le=MATCH_GAMES_MAX)
     mode: Optional[str] = Field(default=None, max_length=40)
@@ -1195,6 +1204,8 @@ class MatchV2ResultSubmit(BaseModel):
     lineups: Optional[Dict[str, List[str]]] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Ergebnisregel übergehen (C.3, #1617): nur der Superadmin, mit Grund im Protokoll.
+    rule_override_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchResultUndo(BaseModel):
@@ -2541,6 +2552,13 @@ class LeagueTransferWindow(BaseModel):
     _days = field_validator("start_date", "end_date", mode="before")(_calendar_day)
 
 
+class LeaguePoolMinimum(BaseModel):
+    """Mindestens so viele Maps braucht der Pool in diesem Modus (#2207)."""
+    model_config = ConfigDict(extra="forbid")
+    mode: Optional[str] = Field(default=None, max_length=40)
+    min_maps: int = Field(ge=1, le=50)
+
+
 class LeagueSeasonFields(LeagueLookFields):
     """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern. Dazu die
     Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, ``prizes`` sind die Gewinne der Season."""
@@ -2590,7 +2608,13 @@ class LeagueSeasonFields(LeagueLookFields):
     visibility: Optional[LeagueVisibility] = None
     status: Optional[LeagueSeasonStatus] = None
 
+    # Mindestgröße je Modus im Map-Pool (#2207, C.2): überschreibt die Ableitung; ``mode: null`` bei Spielen ohne Modi.
+    pool_min_maps: Optional[List[LeaguePoolMinimum]] = Field(default=None, max_length=GAME_MODES_MAX)
+    # Notausnahme des Superadmins beim Veröffentlichen trotz Problemen (#2207) - kein Feld der Season, nur fürs Protokoll.
+    readiness_override_reason: Optional[str] = Field(default=None, max_length=500)
+
     _deadline = field_validator("registration_deadline", mode="before")(_calendar_day)
+
 
 
 class LeagueSeasonCreate(LeagueSeasonFields):
@@ -2600,6 +2624,15 @@ class LeagueSeasonCreate(LeagueSeasonFields):
 
 class LeagueSeasonUpdate(LeagueSeasonFields):
     number: Optional[int] = Field(default=None, ge=1, le=999)
+
+
+class LeagueMapRemove(BaseModel):
+    """Map in einem Schritt aus dem Pool der Season nehmen und übertragen (#2207). Ohne ``mode``: aus allen Modi."""
+    model_config = ConfigDict(extra="forbid")
+    map_id: str = Field(min_length=1, max_length=80)
+    mode: Optional[str] = Field(default=None, max_length=40)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    expected_version: Optional[int] = Field(default=None, ge=0)
 
 
 class LeagueDivisionOverrides(BaseModel):
