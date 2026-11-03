@@ -200,14 +200,26 @@ def _cancel(match: dict, kind: str, registration_id: str, now_iso: str, *, annul
 
 
 def _plan_table(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
-    """50-Prozent-Regel (E12): gespielt sind entschiedene Spiele, gesamt alle noch gültigen der Person."""
+                kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None,
+                exit_rule: str = "half") -> dict:
+    """50-Prozent-Regel (E12): gespielt sind entschiedene Spiele, gesamt alle noch gültigen der Person.
+
+    Liga-Staffel mit ``exit_rule: all_for_opponents`` (E.1, #1625): nie annullieren - die offenen Spiele werden kampflos
+    verloren gewertet, die gespielten bleiben am Spiel; dass alle für die Gegner zählen, rechnet die Tabelle."""
     mine = [m for m in stage_matches if _seats(m, registration_id) and str(m.get("status") or "") != "cancelled"
             and not m.get("is_preview")]
     played = [m for m in mine if str(m.get("status") or "") in {"completed", "forfeit"}]
     total = len(mine)
     if not mine:
         return {"mode": "table", "played": 0, "total": 0}
+    if exit_rule == "all_for_opponents":
+        for match in sorted(mine, key=_sort_key):
+            if _is_live(match):
+                if len(_filled(match)) < 2:
+                    _cancel(match, kind, registration_id, now_iso, annulled=False, ops=ops)
+                else:
+                    _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
+        return {"mode": "opponents", "played": len(played), "total": total}
     if len(played) < total * TABLE_PLAYED_SHARE:
         for match in sorted(mine, key=_sort_key):
             _cancel(match, kind, registration_id, now_iso, annulled=True, ops=ops)
@@ -378,13 +390,22 @@ def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[st
     return {"mode": "bracket"}
 
 
+def exit_rule_of(tournament: dict | None) -> str:
+    """Die Regel beim Ausscheiden aus ``scoring_rules`` der Staffel (E.1, #1625): ``half`` (Vorgabe, 50-%-Regel) oder
+    ``all_for_opponents``."""
+    from services.competition_standings import table_rules
+
+    return (table_rules(tournament) or {}).get("exit_rule") or "half"
+
+
 def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_iso: str | None = None,
-                 eliminated: set[str] | None = None) -> dict:
+                 eliminated: set[str] | None = None, exit_rule: str = "half") -> dict:
     """Der Umbauplan für Disqualifikation oder Austritt - rechnet im Speicher auf den übergebenen Spielen.
 
     ``eliminated``: wer vorher schon ausgeschieden ist (rückt beim Aufrücken nie nach). Antwort: ``ops`` (je Umbau ein
-    Eintrag mit ``kind``), ``changed_ids``, ``mode`` (``bracket`` / ``annulled`` / ``forfeit`` / ``swiss``), bei
-    Tabellen ``played`` und ``total``. Zweimal aufgerufen ändert der zweite Lauf nichts."""
+    Eintrag mit ``kind``), ``changed_ids``, ``mode`` (``bracket`` / ``annulled`` / ``forfeit`` / ``opponents`` /
+    ``swiss``), bei Tabellen ``played`` und ``total``. ``exit_rule`` gilt nur für Tabellen-Phasen (``exit_rule_of``).
+    Zweimal aufgerufen ändert der zweite Lauf nichts."""
     if kind not in REMOVAL_KINDS:
         raise ValueError(f"Unbekannte Art: {kind}")
     eliminated = set(eliminated or ()) - {registration_id}
@@ -406,7 +427,8 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
         had_live = any(_is_live(m) for m in involved)
         stage_kind = _stage_kind(stage_matches)
         if stage_kind == "table":
-            outcome = _plan_table(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
+            outcome = _plan_table(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws,
+                                  exit_rule=exit_rule)
         elif stage_kind == "swiss":
             outcome = _plan_swiss(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         else:
@@ -479,6 +501,12 @@ def describe_removal(plan: dict, names: dict[str, str] | None = None) -> str:
     if mode == "annulled":
         head = (f"{label}: {plan.get('played')} von {plan.get('total')} Spielen gespielt, weniger als die Hälfte - "
                 f"alle Spiele werden annulliert und die Person aus der Tabelle genommen.")
+    elif mode == "opponents":
+        rest = len([op for op in ops if op.get("kind") == "forfeit"])
+        open_text = {0: "kein offenes wird", 1: "1 offenes wird"}.get(rest, f"{rest} offene werden")
+        head = (f"{label}: alle {plan.get('total')} Spiele zählen für die Gegner, auch die {plan.get('played')} gespielten "
+                f"(die echten Ergebnisse bleiben sichtbar) - {open_text} kampflos verloren gewertet, das Team steht am "
+                f"Tabellenende.")
     elif mode == "forfeit":
         rest = len([op for op in ops if op.get("kind") == "forfeit"])
         # Einzahl und Mehrzahl (#1793): „1 offenes wird“, „2 offene werden“.
@@ -539,7 +567,7 @@ async def propose_removal(db, tournament: dict, registration: dict, *, kind: str
         return {"ok": True, "idempotent_replay": True, "registration": registration, "plan": None}
     matches = copy.deepcopy(await _load_matches(db, tid))
     plan = plan_removal(matches, registration["id"], kind=kind, now_iso=now_utc().isoformat(),
-                        eliminated=await _eliminated(db, tid))
+                        eliminated=await _eliminated(db, tid), exit_rule=exit_rule_of(tournament))
     names = await _names(db, tid)
     for op in plan["ops"]:
         op["text"] = describe_op(op, names)
@@ -593,7 +621,8 @@ async def confirm_removal(db, tournament: dict, registration: dict, plan_id: str
     now_iso = now_utc().isoformat()
     matches = await _load_matches(db, tid)
     original = {m["id"]: copy.deepcopy(m) for m in matches}
-    fresh = plan_removal(matches, registration["id"], kind=kind, now_iso=now_iso, eliminated=await _eliminated(db, tid))
+    fresh = plan_removal(matches, registration["id"], kind=kind, now_iso=now_iso, eliminated=await _eliminated(db, tid),
+                         exit_rule=exit_rule_of(tournament))
     if removal_hash(fresh) != plan.get("hash"):
         await db.tournaments.update_one({"id": tid}, {"$set": {"participant_removal_plan": None}})
         tournament["participant_removal_plan"] = None

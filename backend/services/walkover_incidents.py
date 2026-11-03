@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 from services.achievement_core import NEGATIVE_INCIDENTS
+from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.match")
 
@@ -24,7 +25,7 @@ async def record_walkover_incident(db, match: dict, forfeiting_registration_id: 
                 registration["user_id"], "no_show",
                 {"match_id": match["id"], "reason": "forfeit"}, awarded_by=actor_id)
     except Exception as exc:  # noqa: BLE001 - die Wertung gilt auch ohne den Eintrag
-        logger.warning("Walkover incident failed for match=%s type=%s", match.get("id"), type(exc).__name__)
+        logger.warning("Walkover incident failed for match=%s type=%s", log_safe(match.get("id")), type(exc).__name__)
 
 
 async def revoke_walkover_incident(db, match_id: str, forfeiting_registration_id: str) -> bool:
@@ -42,5 +43,5 @@ async def revoke_walkover_incident(db, match_id: str, forfeiting_registration_id
         })
         return bool(removed.deleted_count)
     except Exception as exc:  # noqa: BLE001 - die Korrektur gilt auch ohne den Eintrag
-        logger.warning("Walkover incident revoke failed for match=%s type=%s", match_id, type(exc).__name__)
+        logger.warning("Walkover incident revoke failed for match=%s type=%s", log_safe(match_id), type(exc).__name__)
         return False
