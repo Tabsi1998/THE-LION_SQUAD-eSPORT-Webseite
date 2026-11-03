@@ -716,7 +716,7 @@ bietet das Archiv an.
 | --- | --- |
 | **Allgemein** | Name, Kurzname, **Art** (Einzelspiel, Hauptspiel / Serie, Spielversion), **Adresse** (eine geänderte leitet alte Links weiter), bei einer Spielversion das **Hauptspiel**, Logo und Cover, **Discord-Server** und **Discord-Rolle** |
 | **Spiel-IDs** | Welche Spieler-ID die Anmeldung fragt: je Feld **Bezeichnung**, **Schlüssel**, **Hinweis für Spieler**, **Format**, **Beispiel**, **Auswahl** und die Haken **Pflichtfeld** und **Je Liga-Season nur einmal**. Der **Schlüssel** entsteht bei einem neuen Feld aus der Bezeichnung und ist nach dem Speichern fest – an ihm hängen die IDs der Spieler. Jedes Feld braucht einen eigenen; ergeben zwei Bezeichnungen denselben (etwa „PSN-ID“ und „PSN ID“), sagt die Seite es vor dem Speichern. Bei einer Spielversion dazu **ID-Quelle** und „IDs vom Hauptspiel verwenden“ |
-| **Modi** | Die Modi mit Dauer und Ergebnisregel (unten), darunter die **Vorgaben für Turniere** |
+| **Modi** | Die Modi mit Symbol, Dauer, Ergebnisregel und Einstellungen (unten), darunter die **Vorgaben für Turniere** |
 | **Maps** | Die Map-Bibliothek als Tabelle Map × Modus (siehe 3.14) |
 
 Jeder Reiter mit Formular hat unten seinen eigenen Knopf (**Allgemein speichern**, **Spiel-IDs speichern**, **Modi
@@ -751,10 +751,20 @@ Zeilen. Ein Klick klappt die Zeile auf: Name, Zustand, Minuten und dazu:
 | **Beschreibung** | Worum es im Modus geht, höchstens 500 Zeichen. Nichts Vertrauliches eintragen: Spiel-Daten sind über die Schnittstelle lesbar. |
 | **Spieler je Seite** | 4 heißt 4 gegen 4. Leer: keine Vorgabe. |
 | **Format** | Freitext bis 60 Zeichen, etwa die Regel-Variante. |
-| **Ergebnisregel** | **Art**: Punkte bis zum Ziel, Runden gewinnen oder höherer Endstand gewinnt. Dazu **Ziel** (Punkte bzw. Runden zum Sieg), bei Runden ein **Rundenlimit**, ein **Zeitlimit** je Map, **Remis erlaubt** und **Verlängerung bei Gleichstand**. Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand ([Liga leiten, 2.2](liga.md#22-liga-und-season-anlegen)); spätere Änderungen hier erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts. |
+| **Symbol (quadratisch)** | Ein kleines Bild je Modus (#2266): **Bild hochladen**, **Medien wählen** (Bibliothek) oder **Entfernen**. Es steht vor dem Namen in der Modus-Zeile, an den Maps auf Match- und Ligaseite, im Meldeformular, im Map-Pool, bei **Modus je Map** der Season und im Regelwerk (im PDF nicht). Ohne Bild steht ein neutrales Symbol. Wer keine Medienrolle hat, nimmt eigene Bilder; SVG geht nur mit Medienrolle. Ein gespeicherter Map-Pool behält das Symbol von damals – ein neues Symbol erreicht ihn erst, wenn ihr den Pool neu speichert. |
+| **Ergebnisregel** | **Art**: Punkte bis zum Ziel, Runden gewinnen oder höherer Endstand gewinnt. Dazu **Ziel** (Punkte bzw. Runden zum Sieg), bei Runden ein **Rundenlimit**, ein **Zeitlimit je Map**, die **Zeit je Runde**, **Remis erlaubt** und **Verlängerung bei Gleichstand**. Zeiten gehen als `1:30`, `90 s` oder als Minuten (`10`); gespeichert wird in Sekunden, ältere Angaben in Minuten liest die Seite einfach weiter. Die Zeit je Runde ist nur eine Angabe für Regelwerk und Anzeige. Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand ([Liga leiten, 2.2](liga.md#22-liga-und-season-anlegen)); spätere Änderungen hier erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts. |
+| **Einstellungen** | Freie Liste je Modus (#2271), etwa Lobby-Einstellungen: je Zeile **Gruppe** (z. B. „Lobby“, „Spieler“), **Bezeichnung**, **Einheit** (Text, Sekunden, Minuten, Punkte, An/aus) und **Wert**; Sekunden gehen auch als `1:30`. Die Pfeile ändern die Reihenfolge, der Papierkorb entfernt eine Zeile; höchstens 40. Die Season übernimmt die Liste als Kopie und darf einzelne Werte ändern. |
+| **Eigene Regeln** | Kurzer Regeltext je Modus (bis 1000 Zeichen), etwa „Die Uhr läuft nur, solange keine Seite die Zone hält.“ Steht im Regelwerk unter dem Modus. |
 
 Werte eines bestimmten Titels sind nicht eingebaut; ihr tragt sie je Spiel selbst ein. Passt etwas nicht (Ziel fehlt,
-Rundenlimit kleiner als das Ziel …), sagt es die Seite vor dem Speichern.
+Rundenlimit kleiner als das Ziel, `1:75` als Zeit …), sagt es die Seite vor dem Speichern.
+
+**In der Liga-Season:** Unter **Ergebnisregeln** der Season steht je Modus zusätzlich **Einstellungen und eigene Regeln** –
+die Kopie aus dem Spiel. Weicht ein Wert ab, steht an der Zeile **weicht vom Spiel ab**; **Einstellungen vom Spiel
+übernehmen** holt die Werte des Spiels. Bestehende Staffeln bekommen Änderungen mit **Vorgaben auf Staffeln übertragen**
+(Gruppe „Ergebnisregeln, Einstellungen und Punktepflicht“). Im Regelwerk zeigt der Baustein **Einstellungen je Modus**
+(`[[baustein:mode_settings]]`) Zeitlimit, Zeit je Runde, die Einstellungen als Tabelle und den Regeltext – im Web mit Symbol,
+im PDF als Tabelle ohne Symbol.
 
 <img src="../assets/turniere/spiel-modus-details.png" alt="Spielseite, Reiter Modi (Testdaten): drei Modi als Zeilen mit Zustand, Spielern, Ergebnisregel und Dauer, einer aufgeklappt mit Name, Zustand und Minuten; bei verwendeten Modi ein Schloss statt Papierkorb" width="560">
 

@@ -723,7 +723,11 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 `anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
 
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
-`game_mode_order` mit den Namen der Modi). Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
+`game_mode_order` mit den Namen der Modi), `[[baustein:mode_settings]]` (#2271: je Modus fett der Name, darunter Zeitlimit je Map
+und Zeit je Runde aus `result_rules`, die Einstellungen aus `mode_settings` als Tabelle Gruppe · Einstellung · Wert und der Regeltext
+als Zitat; ältere Seasons ohne Kopie lesen die des Spiels, Modi ohne Angaben fehlen). Vor den Namen steht das Symbol des Modus (Web ja,
+PDF nein, siehe C.1). Namen und Werte aus der Verwaltung setzt der Baustein harmlos (`league_rule_blocks.plain`: keine
+Tabellenspalte, kein Link, keine Auszeichnung) – bis C.4 eine gemeinsame Lösung bringt. Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
 `league_rule_blocks.BLOCKS` (für #2218 die Waffenliste). Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
 Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
@@ -1025,17 +1029,57 @@ Code; Beispiele in Seeds und Tests sind erfunden. Logik in `models.GameMatchMode
 | `players_per_side` | int 1–64 | – | Spielerzahl je Seite |
 | `format` | str ≤ 60 | – | Freitext, etwa die Regel-Variante des Modus |
 | `result_rule` | Objekt | keine Regel | Ergebnisregel, siehe unten |
+| `icon_url` | str ≤ 300 | Platzhalter | Quadratisches Symbol (#2266), siehe „Symbol“ unten |
+| `settings` | `[setting]`, höchstens 40 | – | Freie Einstellungen (#2271), siehe unten; leer wird nicht geschrieben |
+| `rules_text` | str ≤ 1000 | – | Kurzer Regeltext des Modus (#2271), steht im Baustein `mode_settings` |
 
-**`result_rule`** (gespeichert und angezeigt, noch nicht angewandt):
+**`result_rule`** (angewandt seit C.3):
 
 | Feld | Typ | Regel |
 | --- | --- | --- |
 | `kind` | `score` \| `rounds` \| `highest` | Pflicht. `score`: Punkte bis zum Ziel. `rounds`: Runden gewinnen. `highest`: höherer Endstand gewinnt, ohne Ziel |
 | `target` | int 1–100 000 | Pflicht bei `score` und `rounds` (Zielpunkte bzw. Rundensiege), bei `highest` nicht erlaubt |
 | `round_limit` | int 1–999 | nur bei `rounds`, mindestens `target` |
-| `time_limit_minutes` | int 1–600 | Zeitlimit je Map, freiwillig |
+| `time_limit_seconds` | int 1–36 000 | Zeitlimit je Map in Sekunden, freiwillig (#2271) |
+| `round_time_seconds` | int 1–3 600 | Zeit je Runde in Sekunden, freiwillig (#2271) – nur Angabe für Regelwerk und Anzeige, keine Prüfung |
 | `draw_allowed` | bool | Remis erlaubt, Vorgabe `false` |
 | `overtime` | bool | Verlängerung bei Gleichstand, Vorgabe `false` |
+
+**Zeiten in Sekunden (#2271), keine Migration:** Bis #2271 stand das Zeitlimit als `time_limit_minutes` (int 1–600). Ein Aufruf mit
+`time_limit_minutes` wird beim Speichern in `time_limit_seconds` umgerechnet und nie mehr geschrieben. Gespeicherter Altbestand bleibt,
+wie er ist, und wird beim Lesen umgerechnet (`models.normalize_rule`, `rule_time_limit_seconds`): `GET /api/games`, die Übersicht der
+Season-Regeln, der Block `league` der Matchseite und die C.3-Prüfung lesen beides. Die Verwaltung nimmt `1:30`, `90 s` oder Minuten
+(`10`) an.
+
+**`settings[]`** (#2271, `models.GameModeSetting`) – Werte eines Titels stehen nie im Code:
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Identität der Einstellung, aus der Bezeichnung, wenn sie fehlt; bleibt beim Umbenennen. Gleiche Schlüssel bekommen `_2`, `_3` … |
+| `label` | str 1–60 | Bezeichnung |
+| `unit` | `seconds` \| `minutes` \| `points` \| `toggle` \| `text` \| fehlt | Einheit; fehlt = Text |
+| `value` | je Einheit | `seconds` ganze Zahl ≥ 0, `minutes`/`points` Zahl (±1 000 000), `toggle` bool, sonst Text 1–120 Zeichen |
+| `group` | str ≤ 40 | Gruppe, etwa „Lobby“ – freiwillig |
+
+Reihenfolge wie gespeichert. Was nicht passt, lehnt der Server mit 422 und deutschem Satz ab.
+
+**Symbol (#2266, `services/mode_icons.py`):** `icon_url` ist eine Adresse aus dem eigenen Upload (`/api/static/uploads/<name>` mit
+PNG, JPG, WebP oder SVG, optional `?v=`), die einen Eintrag in `media_uploads` hat (`filename` oder `raster_filename`). Ohne Medienrolle
+(`ADMIN_MEDIA_ROLES`) nur eigene Bilder (`media_scope: "user"` und eigene `owner_id`), SVG nur mit Medienrolle. Geprüft wird nur, was
+neu ist: Ein Symbol, das das Spiel schon trägt, hält kein Speichern auf. Sonst 422 mit deutschem Satz. Fehlt `icon_url`, zeigt jede
+Fläche ein neutrales Platzhalter-Symbol (`components/tls/ModeIcon`).
+
+- **Schnappschuss:** Eine Pool-Version hält das Symbol je Modus wie den Namen (`map_pools.modes[].icon_url`, nur wenn gesetzt), ebenso
+  `copy_version` und „Map sperren“. Ein Liga-Spiel hält es je Map aus dem Pool (`games[].mode_icon_url`, nur wenn gesetzt), wie
+  `mode_label`. Ein neues Symbol am Modus erreicht einen gespeicherten Pool erst mit dem nächsten Speichern.
+- **Mediathek:** Verwendung sind `games.match_modes.icon_url` und `map_pools.modes.icon_url`. In einer Pool-Version (außer dem
+  Standard-Pool `game_default`) ist das Symbol **eingefroren** (`media_audit.is_frozen` mit Feld): Drehen und Löschen gehen nicht, auch
+  nicht mit Bestätigung (409 „… Symbol eines Modus in einem gespeicherten Map-Pool …“). Map-Bilder in Pools bleiben wie bisher.
+- **Lesen:** `game_modes.entries` (Auswahllisten der Verwaltung) und die Übersicht der Season-Regeln tragen `icon_url`, die öffentlichen
+  Spielfelder (`match_public_view`, `league_page`) `mode_icon_url`, die Staffel-API dazu `mode_label`. Alles nur additiv.
+- **Regelwerk:** Die Bausteine `map_pool`, `mode_order` und `mode_settings` setzen ein Raster-Symbol als Markdown-Bild mit dem Text
+  `Modus-Symbol` vor den Namen. Das Web zeigt es klein (`rules.css`), das PDF lässt es weg (`pdf_service.RULES_ICON_ALT`). SVG-Symbole
+  erscheinen im Regelwerk nicht.
 
 Unpassendes lehnt der Server mit 422 und deutschem Satz ab, gekürzt oder still verworfen wird nichts, auch kein unbekanntes Feld
 in `result_rule`.
@@ -1078,7 +1122,8 @@ Eintrag ohne Kennung ist ein neuer Modus; ein alter Modus, dessen Kennung fehlt,
 für einen verwendeten Modus gibt es also nicht. Gelesen werden Modi überall über die Kennung; Namen stehen nur als Schnappschuss
 in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
 
-**App:** liest `match_modes` nicht, nur `map_pool.modes` (Schnappschuss). Antworten bekommen nur Felder dazu.
+**App:** liest `match_modes` nicht, nur `map_pool.modes` (Schnappschuss). Antworten bekommen nur Felder dazu (`icon_url`,
+`mode_icon_url`); die App zeigt sie nicht.
 
 **Bekannte Grenze:** Prüfen und Schreiben beim Entfernen sind zwei Schritte. Speichert jemand in genau diesem Moment einen Pool mit
 dem Modus, kann der Pool auf einen entfernten Modus zeigen. Das ist der Zustand von vor C.1 und wird gelesen wie bisher.
@@ -1201,16 +1246,21 @@ in `routes/league_result_rule_routes.py`, Prüfung in `league_games.normalize_ga
 | --- | --- | --- | --- |
 | `result_rules` | `{mode: result_rule}` | keine Prüfung | Festgehaltene Kopie der Regeln je Modus, Form wie C.1. Eine neue Season kopiert beim Anlegen die Regeln aller Modi des Spiels, die eine haben. Je Modus darf die Season abweichen; ein Modus ohne Eintrag hat in der Season keine Regel |
 | `scores_required` | bool | `false` | Punkte je Map Pflicht, ein Feld für alle Modi (jede Map bekommt ihren Endstand). Neue Seasons: `true` |
+| `mode_settings` | `{mode: {settings, rules_text?}}` | die des Spiels | Kopie der Einstellungen und des Regeltexts je Modus (#2271), Form wie C.1. Eine neue Season kopiert sie beim Anlegen von allen Modi, die etwas davon haben. Je Modus darf die Season abweichen. Ältere Seasons ohne das Feld: Regelwerk und Verwaltung zeigen die des Spiels |
 
 - **Festgehalten wie ein Pool:** Ändert jemand später die Regel am Modus, bleibt die Season, wie sie ist. Die Verwaltung zeigt je
   Modus die Regel der Season und die des Spiels und markiert Abweichungen. „Vom Spiel übernehmen“ ist eine Handlung der Leitung.
 - **API:** `GET /api/admin/leagues/seasons/{id}/result-rules` (jede Zuständigkeit der Liga) liefert `scores_required`, je Modus
-  `{mode, label, status, season_rule, game_rule, differs}` und `staffeln`. `PUT` (Recht `season`) nimmt
-  `{scores_required, rules: {mode: result_rule | null}}` und ersetzt die Kopie ganz. Neue Regeln nur für Modi des Spiels, die
-  schon in der Season stehenden bleiben speicherbar; geprüft wie C.1 (`GameModeResultRule`), sonst 422 mit deutschem Satz.
-  Protokoll `league.season.result_rules` mit den geänderten Modi und `scores_required`, ohne Werte.
-- **Staffel:** `staffel_fields` kopiert beide Felder, wenn die Season sie trägt. Übertragen in der eigenen Gruppe `result_rules`
-  („Ergebnisregeln und Punktepflicht“), die wie **laufend** wirkt (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln): Die
+  `{mode, label, status, icon_url?, season_rule, game_rule, differs, season_settings, game_settings, settings_differ}`, `staffeln`
+  und `settings_held` (trägt die Season `mode_settings`?). Regeln kommen mit Sekunden (Altbestand umgerechnet). `PUT` (Recht
+  `season`) nimmt `{scores_required, rules: {mode: result_rule | null}, settings?: {mode: {settings, rules_text} | null}}` und
+  ersetzt die Kopie ganz; fehlt `settings`, bleibt `mode_settings`, wie es ist. Neue Regeln und Einstellungen nur für Modi des
+  Spiels, die schon in der Season stehenden bleiben speicherbar; geprüft wie C.1 (`GameModeResultRule`, `GameModeSetting`), sonst
+  422 mit deutschem Satz. Protokoll `league.season.result_rules` mit den geänderten Modi, `scores_required` und
+  `settings_modes`, ohne Werte. Die Verwaltung zeigt je Einstellung „weicht vom Spiel ab“ und bietet „Einstellungen vom Spiel
+  übernehmen“.
+- **Staffel:** `staffel_fields` kopiert die Felder (`result_rules`, `scores_required`, `mode_settings`), wenn die Season sie trägt.
+  Übertragen in der eigenen Gruppe `result_rules` („Ergebnisregeln, Einstellungen und Punktepflicht“), die wie **laufend** wirkt (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln): Die
   Regel prüft nur neue Eingaben, gespeicherte Ergebnisse bleiben. Der Turnierkern liest nur `tournaments.result_rules` und
   `tournaments.scores_required`. Tests, die nicht diese Regel prüfen, schalten die Punktepflicht mit
   `league_match_world.without_score_duty` aus.
@@ -1224,7 +1274,7 @@ in `routes/league_result_rule_routes.py`, Prüfung in `league_games.normalize_ga
 | Sieger | der Sieger hat mehr Punkte; Gleichstand nur mit `draw_allowed` | „Map 1: Der Endstand 100:250 passt nicht zum Sieger – mehr Punkte hat Horst.“ |
 | `score` ohne `overtime` | Sieger höchstens `target`, Verlierer unter `target` | „Map 1: höchstens 250 Punkte – die Map endet beim Ziel (Endstand 251:240).“ |
 | `rounds` ohne `overtime` | Runden zusammen höchstens `round_limit`, Sieger höchstens `target` | „Map 1: höchstens 11 Runden – 7:5 sind 12.“ |
-| `score`, `rounds` ohne `time_limit_minutes` | der Sieger erreicht `target` (die Map endet nur dort) | „Map 1: Die Map endet erst bei 6 gewonnenen Runden – der Sieger hat 5.“ |
+| `score`, `rounds` ohne Zeitlimit (`time_limit_seconds`, Altbestand `time_limit_minutes`) | der Sieger erreicht `target` (die Map endet nur dort) | „Map 1: Die Map endet erst bei 6 gewonnenen Runden – der Sieger hat 5.“ |
 | `highest` | nur „Sieger hat mehr“ | – |
 
 Mit `overtime` dürfen Ziel und Rundenlimit überschritten werden. Gleichstand mit `draw_allowed` wird angenommen; die Serie braucht
