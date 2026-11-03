@@ -60,7 +60,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `min_squad_size` | int ≥ `team_size` | ja | = `team_size` |
 | `game_mode_order` | `[str]` | nein | `[]` = Modus je Map frei; sonst Modus je Position (zyklisch) |
 | `map_repeat` | `"never"` \| `"other_mode"` \| `"always"` | ja | `"other_mode"`: dieselbe Map in einer Serie nur in einem anderen Modus (#2096); `"never"` jede Map einmal, `"always"` frei |
-| `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden nur `match_points` (3/1/0) und `table_tiebreakers` |
+| `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden `match_points` und `table_tiebreakers`, seit E.1 auch `head_to_head_criteria`, `allow_draws`, `forfeit_score`, `exit_rule` (Abschnitt 12) |
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
 | `match_schedule_response_hours` | int 1–720 | nein | 72 – Antwortfrist auf Terminvorschläge (#2106, F3); fehlt (Seasons von vorher) = jede Staffel behält ihre |
@@ -234,7 +234,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Wochen gesamt, Sperrzeiten, Spielwoche, Standardtag/-zeit | Season | 10 · keine · 7 Tage · So 20:00 |
 | Runden (1 = Hinrunde, 2 = Hin/Rück) | Season | 1 |
 | Staffelgröße max., Best of, Teamgröße, Mindestkader | Season, Liga N überschreibt | 8 · 3 · 4 · 4 |
-| Punkte Sieg/Remis/Niederlage, Gleichstand | Season (`scoring_rules`), Liga N überschreibt | 3/1/0 · `score_diff`, `score_for` |
+| Punkte Sieg/Remis/Niederlage, Gleichstand, Remis, Default-Win, Ausscheiden (E.1) | Season (`scoring_rules`), Liga N überschreibt | neue Seasons 3/0/0 · direkter Vergleich, Differenz, Maps, Leitung · kein Remis · Best of · alle Spiele für die Gegner (ältere: 3/1/0 · `score_diff`, `score_for`) |
 | Modus je Position | Season | frei |
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
@@ -456,7 +456,6 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
 | Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
 | Solo-Ligen (`participant_kind="solo"`) | #1629 |
-| Direkter Vergleich als Gleichstandsregel | #1559 |
 | Discord-Meldungen der Liga (Spieltag, Saisonende) | eigenes Folgepaket |
 | Map-Pool je Liga N, Statistik je Map/Spieler | später |
 
@@ -1073,6 +1072,101 @@ in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
 
 **Bekannte Grenze:** Prüfen und Schreiben beim Entfernen sind zwei Schritte. Speichert jemand in genau diesem Moment einen Pool mit
 dem Modus, kann der Pool auf einen entfernten Modus zeigen. Das ist der Zustand von vor C.1 und wird gelesen wie bisher.
+
+### E.1 Tabelle (#1625)
+
+Tabellen-Regeln einer Liga-Staffel: direkter Vergleich mit Mini-Tabelle, Default-Win, beide nicht erschienen, Ausscheiden
+(Austritt, Auflösung, Disqualifikation), Punktabzug und Entscheid der Leitung. Das ist der Tiebreaker-Teil von #1559 für
+Liga-Staffeln; Swiss, Playoffs und Heimrecht bleiben dort. Rechenkern in `services/competition_standings.py` (`_league_rows`),
+Regeln in `services/scoring_rules.py`, Entscheide und „beide nicht erschienen“ in `services/league_table.py`, Routen in
+`routes/league_table_routes.py`. **Migration: keine.** Kein Wert eines Titels steht im Code.
+
+**Weiche:** Ohne `scoring_rules` am Turnier rechnet die Tabelle wie bisher (`_round_robin_rows`). Mit `scoring_rules`
+(nur Liga-Staffeln, `format` `league` oder `round_robin`) rechnet `_league_rows`; mit den Vorgaben für fehlende Felder
+ergibt das genau die alte Reihenfolge (Regressionstest). Gruppen, Swiss, K.-o. und FFA bleiben unverändert. Alle Leser gehen
+über `standings_for_structure` bzw. `public_standings`: Turnierseite, Ligaseite (`/api/leagues/…/staffeln/…`), TV, PDF,
+App (`/api/tournaments/{id}/standings`), Plätze (`placements_for_structure`) und Discord.
+
+**Neue Felder in `scoring_rules`** (je Season, Liga N überschreibt wie bisher, Übertragen in der Gruppe `before_result`):
+
+| Feld | Werte | Fehlt (alte Seasons) | Vorgabe neuer Liga-Seasons |
+| --- | --- | --- | --- |
+| `table_tiebreakers` | Liste aus `head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` | `score_diff`, `score_for` | `head_to_head`, `score_diff`, `score_for`, `lead_decision` (Nr. 25) |
+| `head_to_head_criteria` | Liste aus `points`, `score_diff`, `score_for`, mindestens eines | `points`, `score_diff`, `score_for` | ebenso (Nr. 42) |
+| `allow_draws` | bool | `true` | `false` – die Tabelle zeigt keine Spalte „U“ |
+| `forfeit_score` | `recorded` \| `best_of` | `recorded` (wie eingetragen) | `best_of`: Sieger bekommt ⌊Best of/2⌋+1 Maps, der andere 0 (BO5 3:0, Nr. 26) |
+| `exit_rule` | `half` \| `all_for_opponents` | `half` (50-%-Regel) | `all_for_opponents` (Kommentar 02.11., Nr. 43, Nr. 48) |
+| `match_points` | wie bisher | 3/1/0 | 3/0/0 |
+
+Punkte zählen immer zuerst. `points`, `score_diff`, `score_for` und `wins` meinen Punkte, Map-Differenz, gewonnene Maps und Siege.
+
+**Reihenfolge bei Punktgleichheit** – die Kriterien in der Reihenfolge von `table_tiebreakers`:
+
+- Ein Gesamtkriterium (`score_diff`, `score_for`, `wins`) teilt die Gruppe nach dem Wert über alle Spiele.
+- `head_to_head`: Mini-Tabelle nur aus den Spielen der Gruppe untereinander (zwei Teams: direkter Vergleich), sortiert nach
+  `head_to_head_criteria`. Teilt sie die Gruppe, wird für jede Restgruppe mit mindestens zwei Teams die Mini-Tabelle neu
+  gerechnet, nur mit den Spielen der Restgruppe. Teilt sie nicht mehr, geht es mit dem nächsten Kriterium weiter (Gesamtwerte).
+  Gezählt werden nur gespielte Spiele: Fehlt ein Spiel der Gruppe noch, rechnet die Mini-Tabelle ohne es.
+- `lead_decision`: steht ein echter Gleichstand nach allen Kriterien, gilt die Reihenfolge der Leitung, wenn sie für genau diese
+  Gruppe besteht (siehe unten). Ohne Entscheid teilen sich die Teams den Platz (1, 2, 2, 4), wie bisher.
+- Nie entscheidet der Name oder die Reihenfolge der Anmeldung.
+
+**Spiele in der Tabelle** (nur Spiele mit Stand `completed` oder `forfeit`):
+
+| Fall | Erkennung | Wertung |
+| --- | --- | --- |
+| Kampflos (Default-Win) | Stand `forfeit`, eine Seite mit `forfeit` | Sieg/Niederlage; mit `forfeit_score: best_of` Maps ⌊Best of/2⌋+1 : 0 (Best of am Spiel, sonst am Turnier). Zeile zählt `forfeit_won` bzw. `forfeit_lost` |
+| Beide nicht erschienen (Nr. 27) | `double_forfeit: true`, beide Seiten mit `forfeit` | beide verlieren: Niederlagenpunkte, keine Maps, `forfeit_lost` +1; Form „N“ für beide |
+| Ausgeschiedenes Team (`exit_rule: all_for_opponents`) | Anmeldung `withdrawn` oder `disqualified` | **jedes** Spiel des Teams, auch gespielte, zählt wie ein Default-Win für den Gegner. Das echte Ergebnis bleibt am Spiel und auf Spielplan und Matchseite sichtbar |
+| Zwei ausgeschiedene Teams gegeneinander (Nr. 48) | beide `withdrawn`/`disqualified` | zählt für keinen, auch nicht als gespielt |
+
+**Tabellenende (Nr. 43, nur mit `all_for_opponents`):** Ausgeschiedene stehen unter allen anderen, ohne Rücksicht auf Punkte.
+Zuerst Ausgetretene und Aufgelöste, darunter Disqualifizierte; innerhalb jeweils wer später ausschied (`removal.at`) weiter
+oben. Eine Auflösung trägt die Leitung als Austritt ein (Grund „Team aufgelöst“). Mit `half` bleibt alles wie bisher
+(annulliert oder kampflos verloren, Platz nach Punkten).
+
+**Ausscheiden (`tournament_events.plan_removal`):** Mit `all_for_opponents` gibt es in Staffeln keine Annullierung mehr: alle
+offenen Spiele werden kampflos verloren gewertet (wie bisher ab der Hälfte), die gespielten bleiben unverändert am Spiel; den Rest
+macht die Tabelle. Modus des Plans `opponents`, Satz „alle Spiele zählen für die Gegner, das Team steht am Tabellenende“.
+Andere Formate und Staffeln mit `half` unverändert.
+
+**Punktabzug (vorbereitet für E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, reason, source,
+sanction_id?, created_at, created_by}]`. Die Tabelle zieht die Summe je Anmeldung von den Punkten ab (`deducted_points`), in der
+Mini-Tabelle zählt er nicht. Gelesen wird nur mit `scoring_rules`. Geschrieben wird es in E.1 nirgends; den Grund zeigt die
+Tabelle nicht öffentlich.
+
+**Entscheid der Leitung** (`tournaments.table_decisions: [{id, registration_ids, reason, decided_by, decided_at}]`):
+
+- `GET /api/admin/leagues/staffeln/{tid}/table` (jede Zuständigkeit der Liga): Tabelle wie öffentlich, dazu `ties` (Gruppen mit
+  geteiltem Platz, die die Leitung ordnen darf), `decisions` (mit `applies`: gilt gerade) und `can_decide`
+  (`lead_decision` in den Regeln).
+- `PUT /api/admin/leagues/staffeln/{tid}/table-decision` `{registration_ids, reason, conflict_reason?}` – Zuständigkeit
+  `results`. Nur für einen echten Gleichstand: die Menge muss genau einer Gruppe mit geteiltem Platz entsprechen (ein älterer
+  Entscheid für dieselbe Menge zählt dabei nicht), sonst 409. Grund mindestens fünf Zeichen. Befangen ist, wer zu einer der
+  Seiten gehört (`require_no_side_conflict`, Notausnahme Superadmin mit Grund). Ersetzt einen Entscheid für dieselbe Menge.
+  Protokoll `league.table.decision`.
+- `DELETE /api/admin/leagues/staffeln/{tid}/table-decision/{decision_id}` `{reason}` – `results`, Protokoll
+  `league.table.decision.remove`.
+- Ein Entscheid gilt nur, solange genau diese Teams nach allen Kriterien gleich stehen. Ändert ein Ergebnis das, gilt er nicht mehr
+  (`applies: false`) und bleibt zur Nachvollziehbarkeit stehen.
+- Öffentlich trägt die Zeile `tiebreak: "lead_decision"` und `lead_decision: {reason, decided_at}`; die Tabelle zeigt
+  „Platz durch Entscheid der Leitung“ mit dem Grund.
+
+**Beide nicht erschienen** (`POST /api/admin/leagues/staffeln/{tid}/matches/{mid}/double-no-show` `{note, conflict_reason?}`,
+Zuständigkeit `results`, Befangenheit wie beim Ergebnis): nur in einer Staffel, nur für ein Spiel mit zwei Seiten ohne Ergebnis.
+Schreibt `status: "forfeit"`, `double_forfeit: true`, `results` beide mit `rank: 2, forfeit: true`, `games: []`, Begründung wie
+beim Forfeit (mindestens fünf Zeichen) und je Seite den Eintrag „nicht erschienen“. Protokoll `match.forfeit.double`.
+**Neu ansetzen:** `DELETE` auf dieselbe Adresse `{reason}` setzt das Spiel zurück (ohne Ergebnis, Stand `scheduled` mit Termin,
+sonst `ready`), Protokoll `match.forfeit.double.undo`; den Termin setzt die Leitung danach wie gewohnt.
+
+**Antworten (nur zusätzlich, die App bleibt ohne Build lauffähig):** Jede Zeile einer Staffel-Tabelle trägt dazu `tiebreak`
+(`head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` oder `null`), `forfeit_won`, `forfeit_lost`,
+`deducted_points`, `exit` (`{kind, at}` oder `null`) und `lead_decision`. Die Staffel der Ligaseite trägt `table_rules`
+(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`).
+
+**Darstellung (Entscheidung 15.10.):** Platz und Zone, kein öffentliches Rating, Hervorhebung in Cyan (Gold bleibt dem
+Season-Meister, F.1). Bei Gleichstand ein kleiner Hinweis, was entschied („Direkter Vergleich“, „Map-Differenz“, „Mehr Maps“,
+„Mehr Siege“, „Entscheid der Leitung“), „kampflos“ bei Default-Wins, am Tabellenende „Ausgetreten“ bzw. „Disqualifiziert“.
 
 ### Darf nicht beschädigt werden
 
