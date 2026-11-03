@@ -350,3 +350,23 @@ async def test_season_rules_write_season_and_staffeln(flow):
     assert tournament["schedule_rules"]["home_rule_hours"] == 48 and tournament["schedule_rules"]["reschedule_max"] == 1
     assert (await flow.get(url)).json()["schedule_rules"]["reschedule_max"] == 1
     assert await flow.db.audit_logs.find_one({"action": "league.season.schedule_rules"})
+
+
+# ---------------------------------------------------------------- Codex-Prüfung (#2194)
+
+@pytest.mark.asyncio
+async def test_a_fixed_time_still_lets_sides_decline_or_withdraw_old_proposals(flow):
+    """Steht der Termin fest (hier: von der Leitung), bleibt ein alter offener Vorschlag ablehnbar - nur Vorschlagen, Annehmen und
+    Gegenvorschlag sind gesperrt. Die App liest ``can_manage_schedule`` für Ablehnen."""
+    world = await live_world(flow)
+    flow.act_as(world["users"]["Kapitaen"])
+    old = (await flow.post(f"/api/matches/{mid(world)}/schedule-proposals", json={"scheduled_at": at(80)})).json()
+    flow.act_as(world["staff"])
+    assert (await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(90)})).status_code == 200
+    away = await page(flow, world, "Falke1")
+    assert away["can_propose_schedule"] is False
+    assert away["can_manage_schedule"] is True
+    flow.act_as(world["users"]["Falke1"])
+    url = f"/api/matches/{mid(world)}/schedule-proposals/{old['id']}/decision"
+    assert (await flow.post(url, json={"action": "accept"})).status_code == 409
+    assert (await flow.post(url, json={"action": "decline"})).status_code == 200

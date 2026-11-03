@@ -691,10 +691,10 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     can_decide = not conflict or conflict["override"]
     can_submit_result = can_decide and await _can_submit_result_for_match(match, user)
     can_player_report = bool(acting_reg and _players_can_report(policy) and _accepts_reports(match))
-    can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
-    # Liga-Termine (#2194): Steht der Termin fest, geht es nur noch über eine Verschiebung oder die Leitung.
-    if league_schedule.blocks_proposals(tournament, match):
-        can_propose_schedule = False
+    can_manage_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
+    # Liga-Termine (#2194): Steht der Termin fest, gibt es keinen neuen Vorschlag mehr - alte offene lassen sich weiter
+    # ablehnen und zurückziehen (``can_manage_schedule``, so liest es auch die App).
+    can_propose_schedule = can_manage_schedule and not league_schedule.blocks_proposals(tournament, match)
     plans_as_lead = bool(user) and await has_match_result_permission(user, match, capability="matches")
     schedule_block = await league_schedule.page_block(
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
@@ -769,7 +769,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_submit_result": can_submit_result,
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
-        "can_manage_schedule": can_propose_schedule,
+        "can_manage_schedule": can_manage_schedule,
         "can_dispute": bool(acting_reg and window["open"]),
         "dispute_until": window["until"],
         "in_dispute": str(match.get("status") or "") == "disputed",

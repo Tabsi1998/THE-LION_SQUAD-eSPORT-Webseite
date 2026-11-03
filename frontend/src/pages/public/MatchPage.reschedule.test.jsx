@@ -99,6 +99,18 @@ test("aufgebraucht: der Weg zur Leitung; die Leitung legt mit Grund fest", async
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/matches/m1", expect.objectContaining({ schedule_reason: "Serverausfall am Abend" })));
 });
 
+test("fester Termin: alter offener Vorschlag lässt sich ablehnen, aber nicht annehmen oder kontern", async () => {
+  const theirs = { id: "p-old", status: "pending", kind: "proposal", actor_registration_id: "b", scheduled_at: FUTURE, actor: { display_name: "Falke" } };
+  const own = { id: "p-own", status: "pending", kind: "proposal", actor_registration_id: "a", scheduled_at: FUTURE, actor: { display_name: "Kapitaen" } };
+  renderMatch({ ...BASE, can_manage_schedule: true, schedule_proposals: [theirs, own] });
+  expect(await screen.findByTestId("match-proposal-decline-p-old")).toBeInTheDocument();
+  expect(screen.queryByTestId("match-proposal-accept-p-old")).toBeNull();
+  expect(screen.queryByText("Gegenvorschlag")).toBeNull();
+  expect(screen.getByTestId("match-proposal-withdraw-p-own")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("match-proposal-decline-p-old"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/p-old/decision", expect.objectContaining({ action: "decline" })));
+});
+
 test("ohne Block (andere Turniere, Unbeteiligte) bleibt alles wie vorher", async () => {
   renderMatch({ ...BASE, can_propose_schedule: true, can_manage_schedule: true, schedule_block: null });
   expect(await screen.findByTestId("match-proposal-at")).toBeInTheDocument();
