@@ -320,3 +320,18 @@ async def test_a_legacy_slug_survives_the_form_sending_it_back_normalized(flow):
     saved = await flow.patch("/api/games/legacy", json={"name": "Probe Alt Neu", "slug": "probe-alt"})
     assert saved.status_code == 200, saved.text
     assert saved.json()["slug"] == "Probe_Alt"
+
+
+@pytest.mark.asyncio
+async def test_a_slug_in_other_case_is_no_change_and_asks_nothing(flow):
+    admin_user = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin_user)
+    world = await shooter_world(flow)
+    main = world["main"]
+    player = await flow.add_user(role="user", name="Probe Gross")
+    await save_profile_ids(flow, player, {main["slug"]: {"activision_id": "probe#4"}})
+
+    flow.act_as(admin_user)
+    saved = await flow.patch(f"/api/games/{main['id']}", json={"slug": main["slug"].upper()})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["slug"] == main["slug"]
