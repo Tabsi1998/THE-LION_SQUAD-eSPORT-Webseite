@@ -77,6 +77,29 @@ async def test_without_a_list_the_block_says_everything_is_allowed(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_word_diffs_show_names_with_special_characters_as_written(flow):
+    """„Daten geändert“ und der Vergleich zweier Fassungen zeigen Namen so, wie sie eingegeben sind - ohne Schutzzeichen (Review C.4)."""
+    w = await ready(flow)
+    ok(await save_bans(flow, w, standard(w)))
+    first = await publish(flow, w, body=BODY, annexes=ANNEX)
+    flow.act_as(w["lead"])
+    special = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": "Schild [Test] *x* (neu)"}))
+    ok(await save_bans(flow, w, [*standard(w), {"item_id": special["id"], "kind": "item", "modes": []}]))
+    row = next(row for row in ok(await flow.get(season_scope(w)))["data_changes"]["rows"] if row["block"] == "loadout_bans")
+    inserted = "".join(op["text"] for op in row["ops"] if op["op"] == "ins")
+    assert "Schild [Test] *x* (neu)" in inserted
+    assert not any(0xE000 <= ord(char) < 0xF8FF or char == "\\" for op in row["ops"] for char in op["text"])
+
+    prepared = ok(await flow.post(f"{season_scope(w)}/draft/from-version", json={}))
+    second = await publish(flow, w, body=prepared["body_md"], annexes=prepared["annexes"], reason="Neue Sperrliste")
+    flow.act_as(None)
+    diff = ok(await flow.get(f"{season_page(w)}/compare?base={first['id']}&target={second['id']}"))
+    shown = str(diff["sections"])
+    assert "Schild [Test] *x* (neu)" in shown
+    assert not any(0xE000 <= ord(char) < 0xF8FF for char in shown)
+
+
+@pytest.mark.asyncio
 async def test_a_changed_list_suggests_a_new_version_and_each_version_keeps_its_list(flow):
     w = await ready(flow)
     ok(await save_bans(flow, w, standard(w)))

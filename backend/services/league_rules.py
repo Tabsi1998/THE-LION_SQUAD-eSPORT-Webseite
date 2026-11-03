@@ -20,6 +20,7 @@ from models import new_id, now_utc
 from services import game_maps, league_look, media_audit, uploads_inventory
 from services.league_rules_cache import rules_cache
 from services import league_rule_blocks as blocks
+from services import markdown_text
 from services import league_rules_text as text
 from services import league_service as leagues
 from services.dolibarr_policy import club_today
@@ -94,15 +95,17 @@ async def _chain(db, league: dict, season: dict | None) -> dict:
     return _chain_of(league_rows, await _published(db, SEASON, season["id"]) if season else None)
 
 
-def _frozen_values(version: dict, season: dict | None, variant: str = "markdown") -> dict[str, str]:
-    """Die eingefrorenen Bausteine - ``variant`` ``text``: die Fassung ohne Bilder (PDF, Wort-Vergleich, #2218), sonst ``markdown``."""
+def _frozen_values(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> dict[str, str]:
+    """Die eingefrorenen Bausteine - ``variant`` ``text``: die Fassung ohne Bilder (PDF, Wort-Vergleich, #2218), sonst ``markdown``.
+    ``plain``: die geschützten Zeichen der Bausteinwerte als echte Zeichen - für den Wort-Vergleich, der Text und kein Markdown zeigt."""
     frozen = (version.get("frozen") or {}).get((season or {}).get("id") or "") or {}
-    return {key: (row.get(variant) if row.get(variant) is not None else row.get("markdown")) or "" for key, row in frozen.items()}
+    values = {key: (row.get(variant) if row.get(variant) is not None else row.get("markdown")) or "" for key, row in frozen.items()}
+    return {key: markdown_text.plain(value) for key, value in values.items()} if plain else values
 
 
-def _sections(version: dict, season: dict | None, variant: str = "markdown") -> list[dict]:
+def _sections(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> list[dict]:
     """Die Abschnitte einer Fassung auf dieser Seite - mit den eingefrorenen Bausteinen."""
-    values = _frozen_values(version, season, variant)
+    values = _frozen_values(version, season, variant, plain)
     missing = blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT
     return text.sections_of(version.get("body_md"), version.get("annexes"),
                             fill=lambda body: text.fill_blocks(body, values, missing=missing))
@@ -219,7 +222,7 @@ async def compare_view(db, league: dict, season: dict | None, base_id: str | Non
     base, target = _find(chain["rows"], base_id), _find(chain["rows"], target_id)
     sections = await rules_cache.get_or_make_json(
         ("compare", base["id"], target["id"], (season or {}).get("id")),
-        lambda: text.diff_view(_sections(base, season, blocks.TEXT), _sections(target, season, blocks.TEXT)))
+        lambda: text.diff_view(_sections(base, season, blocks.TEXT, plain=True), _sections(target, season, blocks.TEXT, plain=True)))
     return {"base": _head(base, chain["current"]), "target": _head(target, chain["current"]), "sections": sections}
 
 
@@ -315,7 +318,7 @@ async def data_changes(db, league: dict, season: dict | None, version: dict | No
     rows: list[dict] = []
     for row in seasons:
         frozen = _frozen_values(version, row)
-        frozen_text = _frozen_values(version, row, blocks.TEXT)
+        frozen_text = _frozen_values(version, row, blocks.TEXT, plain=True)
         for key, now in (await blocks.resolve(db, keys, league, row)).items():
             before = frozen.get(key)
             if before == now["markdown"]:
@@ -323,7 +326,7 @@ async def data_changes(db, league: dict, season: dict | None, version: dict | No
             # Markiert wird Wort für Wort in der Fassung ohne Bilder (#2218) - geändert ist, was sich im Markdown samt Bild änderte.
             rows.append({"block": key, "label": now["label"], "season_id": row["id"], "season_name": row.get("name"),
                          "status": "missing" if before is None else "changed", "before": before or "", "after": now["markdown"],
-                         "ops": text.word_ops(frozen_text.get(key) or "", now.get(blocks.TEXT) or now["markdown"])})
+                         "ops": text.word_ops(frozen_text.get(key) or "", markdown_text.plain(now.get(blocks.TEXT) or now["markdown"]))})
     return {"version_id": version["id"], "version": version.get("version"), "label": _label(version), "rows": rows} if rows else None
 
 
