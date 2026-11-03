@@ -14,6 +14,7 @@ daraus die Antwort.
 """
 from __future__ import annotations
 
+import copy
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -33,7 +34,7 @@ from services.mutation_lock import MutationLockBusy, league_resource, league_sea
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
-from services.scoring_rules import normalize_rules
+from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, league_default_rules, normalize_rules
 from services.slug_utils import slugify, unique_slug
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -644,6 +645,9 @@ async def _season_unique(db, league_id: str, season_id: str | None, number: int 
 
 async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     game = await _game(db, league.get("game_id"))
+    if isinstance(body.get("scoring_rules"), dict):
+        # Tabelle (E.1, #1625): was eine neue Season nicht selbst setzt, kommt aus den Vorgaben neuer Liga-Seasons.
+        body = {**body, "scoring_rules": {**copy.deepcopy(LEAGUE_TABLE_DEFAULTS), **body["scoring_rules"]}}
     fields = clean_season({key: value for key, value in body.items() if value is not None}, None, game)
     number = fields.pop("number", None)
     if number is None:
@@ -658,7 +662,7 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
     doc = {**new_season_settings(fields), **look}
     if doc.get("scoring_rules") is None:
-        doc["scoring_rules"] = normalize_rules({})
+        doc["scoring_rules"] = league_default_rules()
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
     try:
