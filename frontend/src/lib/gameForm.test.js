@@ -90,7 +90,7 @@ test("unbekannte Angaben an einem ID-Feld bleiben erhalten, nur Hilfsfelder der 
 test("Modi: der Weg durchs Formular verliert kein gespeichertes Feld", () => {
   const modes = [
     { mode: "snd", label: "Suchen", minutes: 12, per_game: true, status: "inactive", description: "Bombe legen", players_per_side: 4, format: "Standard",
-      result_rule: { kind: "rounds", target: 6, round_limit: 11, time_limit_minutes: 2, draw_allowed: true, overtime: true } },
+      result_rule: { kind: "rounds", target: 6, round_limit: 11, time_limit_seconds: 120, draw_allowed: true, overtime: true } },
     { mode: "zonen", label: "Zonen", minutes: null, per_game: false },
   ];
   expect(gameMatchDataPayload(gameMatchDataToForm({ match_modes: modes })).match_modes).toEqual(modes);
