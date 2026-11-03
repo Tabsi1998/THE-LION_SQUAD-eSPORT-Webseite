@@ -99,7 +99,8 @@ def _frozen_values(version: dict, season: dict | None, variant: str = "markdown"
     """Die eingefrorenen Bausteine - ``variant`` ``text``: die Fassung ohne Bilder (PDF, Wort-Vergleich, #2218), sonst ``markdown``.
     ``plain``: die geschützten Zeichen der Bausteinwerte als echte Zeichen - für den Wort-Vergleich, der Text und kein Markdown zeigt."""
     frozen = (version.get("frozen") or {}).get((season or {}).get("id") or "") or {}
-    values = {key: (row.get(variant) if row.get(variant) is not None else row.get("markdown")) or "" for key, row in frozen.items()}
+    # Neu eingefroren: strukturiert im Klartext (``data``), erst hier Markdown; ältere Fassungen: das gespeicherte Markdown (#2218).
+    values = {key: blocks.value(key, row, variant) for key, row in frozen.items()}
     return {key: markdown_text.plain(value) for key, value in values.items()} if plain else values
 
 
@@ -321,12 +322,14 @@ async def data_changes(db, league: dict, season: dict | None, version: dict | No
         frozen_text = _frozen_values(version, row, blocks.TEXT, plain=True)
         for key, now in (await blocks.resolve(db, keys, league, row)).items():
             before = frozen.get(key)
-            if before == now["markdown"]:
+            if before == blocks.value(key, now):
                 continue
-            # Markiert wird Wort für Wort in der Fassung ohne Bilder (#2218) - geändert ist, was sich im Markdown samt Bild änderte.
+            # Geändert ist, was sich samt Bild änderte; markiert wird Wort für Wort im Klartext ohne Bilder (#2218) - auch ``before`` und
+            # ``after`` sind Klartext, nie das Darstellungs-Zwischenformat mit Schutzzeichen.
+            after = blocks.plain_value(key, now)
             rows.append({"block": key, "label": now["label"], "season_id": row["id"], "season_name": row.get("name"),
-                         "status": "missing" if before is None else "changed", "before": before or "", "after": now["markdown"],
-                         "ops": text.word_ops(frozen_text.get(key) or "", markdown_text.plain(now.get(blocks.TEXT) or now["markdown"]))})
+                         "status": "missing" if before is None else "changed", "before": frozen_text.get(key) or "", "after": after,
+                         "ops": text.word_ops(frozen_text.get(key) or "", after)})
     return {"version_id": version["id"], "version": version.get("version"), "label": _label(version), "rows": rows} if rows else None
 
 
@@ -504,7 +507,7 @@ async def preview(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
     draft = await draft_of(db, scope, scope_id) or {}
     _check_size(body.get("body_md"), annexes)
     keys = text.block_keys(body.get("body_md"), *[row["body_md"] for row in annexes])
-    values = {key: row["markdown"] for key, row in (await blocks.resolve(db, keys, league, season)).items()} if season else {}
+    values = {key: blocks.value(key, row) for key, row in (await blocks.resolve(db, keys, league, season)).items()} if season else {}
     missing = blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT
     sections = text.sections_of(body.get("body_md"), annexes, fill=lambda value: text.fill_blocks(value, values, missing=missing))
     chain = await _chain(db, league, season)

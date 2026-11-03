@@ -37,6 +37,13 @@ test("mit `blockText` bleiben Bausteinwerte Text, auch in Tabellen; freier Text 
   expect(renderMarkdownLite("Pfad C:\\Daten\\[x] und \\_frei\\_", options)).toContain("Pfad C:\\Daten\\[x] und \\_frei\\_");
 });
 
+// Folge-Review C.4: Auch in einem Codeblock kommt kein Schutzzeichen heraus.
+test("mit `blockText` zeigt auch ein Codeblock die Bausteinwerte als echte Zeichen", () => {
+  const html = renderMarkdownLite(`\`\`\`\n${protectBlockText("Schild [Test] *x*")}\n\`\`\``, { blockText: true });
+  expect(html).toContain("Schild [Test] *x*");
+  expect([...html].some((char) => char.charCodeAt(0) >= 0xe000 && char.charCodeAt(0) <= 0xf8ff)).toBe(false);
+});
+
 test("protokoll-relative Links auf fremde Seiten werden kein Link", () => {
   for (const href of ["//evil.example", "//evil.example/pfad", "/\\evil.example"]) {
     const html = renderMarkdownLite(`[Klick](${href})`);

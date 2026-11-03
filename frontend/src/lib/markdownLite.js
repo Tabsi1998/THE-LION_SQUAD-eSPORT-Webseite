@@ -130,7 +130,9 @@ export function renderMarkdownLite(md, options = {}) {
     inList = null;
   };
   const closeCodeBlock = () => {
-    html += `<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`;
+    const code = escapeHtml(codeLines.join("\n"));
+    // Bausteinwerte (#2218) auch im Codeblock als echte Zeichen.
+    html += `<pre><code>${options.blockText ? restoreBlockText(code) : code}</code></pre>`;
     codeLines = [];
     inCodeBlock = false;
   };
