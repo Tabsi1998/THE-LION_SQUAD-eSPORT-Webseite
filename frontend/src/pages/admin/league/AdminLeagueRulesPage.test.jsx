@@ -175,3 +175,9 @@ test("Fehler vom Server stehen da", async () => {
   renderPage();
   expect(await screen.findByRole("alert")).toHaveTextContent("Keine Season");
 });
+
+// Season-Seite mit Reitern (#2267): zurück geht es in den Reiter „Regelwerk und Sperrliste“.
+test("der Weg zurück führt in den Reiter Regelwerk der Season", async () => {
+  renderPage();
+  expect(await screen.findByTestId("rules-back")).toHaveAttribute("href", "/admin/leagues/seasons/s1#regelwerk");
+});
