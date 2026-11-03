@@ -17,7 +17,8 @@ from models import now_utc  # noqa: E402
 ADMIN = "/api/admin/leagues"
 TABLE = "/api/admin/leagues/staffeln"
 PAGE = "/api/leagues/probe-shooter/season-1"
-SEASON = {"start_date": "2026-11-10T00:00:00", "visibility": "public"}
+# Ohne Map-Pool sichtbar: die Vorab-Prüfung (C.2, #2207) übergeht der Testaufbau mit Grund.
+SEASON = {"start_date": "2026-11-10T00:00:00", "visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"}
 
 
 @pytest_asyncio.fixture
