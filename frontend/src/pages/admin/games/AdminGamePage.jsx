@@ -66,7 +66,7 @@ function GameTabBar({ tabs, active, dirty, onSelect, idBase }) {
           return (
             <button key={tab.key} type="button" role="tab" id={`${idBase}-tab-${tab.key}`} aria-selected={selected} aria-controls={`${idBase}-panel`}
               tabIndex={selected ? 0 : -1} data-tab={tab.key} onKeyDown={onKeyDown} onClick={() => onSelect(tab.key)} data-testid={`game-tab-${tab.key}`}
-              className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-xs font-bold uppercase tracking-wider transition-colors duration-fast focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-t-sm ${selected ? "border-[#29B6E8] text-white" : "border-transparent text-white/50 hover:text-white"}`}>
+              className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 sm:px-3 text-xs font-bold uppercase tracking-wider focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-t-sm ${selected ? "border-[#29B6E8] text-white" : "border-transparent text-white/50 hover:text-white"}`}>
               {tab.label}
               {dirty[tab.key] ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-warn" data-testid={`game-tab-dirty-${tab.key}`}>

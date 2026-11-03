@@ -147,7 +147,7 @@ function MapSheet({ game, item, onClose, onSaved }) {
 
 function MapThumb({ item }) {
   return (
-    <span className="relative block h-9 w-16 shrink-0 overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A]">
+    <span className="relative hidden sm:block h-9 w-16 shrink-0 overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A]">
       {item.image_url ? (
         <LazyImg src={item.image_url} alt="" sizes="64px" widths={[160]} width={64} height={36} className="h-full w-full object-cover" />
       ) : (
@@ -293,8 +293,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
           <table className="w-full min-w-max text-sm">
             <thead className="bg-[#0A0A0A] text-[10px] uppercase tracking-widest text-white/50">
               <tr>
-                <th scope="col" className="text-left px-3 py-2.5 font-bold">Map</th>
-                <th scope="col" className="text-left px-3 py-2.5 font-bold">Zustand</th>
+                <th scope="col" className="sticky left-0 z-10 bg-[#0A0A0A] text-left px-3 py-2.5 font-bold">Map</th>
                 {columns.map((mode) => {
                   const count = shown.filter((item) => (item.modes || []).includes(mode.mode)).length;
                   return (
@@ -304,6 +303,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                     </th>
                   );
                 })}
+                <th scope="col" className="text-left px-3 py-2.5 font-bold">Zustand</th>
                 <th scope="col" className="px-3 py-2.5 text-right font-bold"><span className="sr-only">Aktionen</span></th>
               </tr>
             </thead>
@@ -314,18 +314,14 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                 const waiting = busy.has(item.id);
                 return (
                   <tr key={item.id} className={archived ? "opacity-60" : undefined} data-testid={`game-map-row-${item.slug}`} data-slug={item.slug}>
-                    <td className="px-3 py-2">
+                    <td className="sticky left-0 z-10 bg-[#121212] px-3 py-2">
                       <div className="flex items-center gap-3">
                         <MapThumb item={item} />
                         <div className="min-w-0">
-                          <div className="max-w-[16rem] truncate font-semibold text-white" title={item.name}>{item.name}</div>
-                          <div className="max-w-[16rem] truncate text-[11px] text-white/40">{item.slug}</div>
+                          <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate font-semibold text-white" title={item.name}>{item.name}</div>
+                          <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate text-[11px] text-white/40">{item.slug}</div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs" data-testid={`game-map-state-${item.slug}`}>
-                      <span className={`font-semibold ${STATE_CLASS[status]}`}>{STATE_TEXT[status]}</span>
-                      <span className="block text-white/45 tabular-nums">{poolsText(item.in_pools)}</span>
                     </td>
                     {columns.map((mode) => {
                       const on = (item.modes || []).includes(mode.mode);
@@ -339,6 +335,10 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                         </td>
                       );
                     })}
+                    <td className="px-3 py-2 whitespace-nowrap text-xs" data-testid={`game-map-state-${item.slug}`}>
+                      <span className={`font-semibold ${STATE_CLASS[status]}`}>{STATE_TEXT[status]}</span>
+                      <span className="block text-white/45 tabular-nums">{poolsText(item.in_pools)}</span>
+                    </td>
                     <td className="px-2 py-2">
                       <div className="flex items-center justify-end">
                         <button type="button" className={ICON_BUTTON} onClick={() => move(item, -1)} disabled={index === 0} aria-label={`${item.name} nach vorne`} data-testid={`game-map-up-${item.slug}`}><ArrowUp className="w-4 h-4" aria-hidden="true" /></button>
