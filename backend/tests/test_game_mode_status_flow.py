@@ -374,6 +374,29 @@ async def test_unknown_fields_of_a_rule_are_refused(flow):
 
 
 @pytest.mark.asyncio
+async def test_new_duplicate_names_are_refused_old_ones_stay_saveable(flow):
+    await as_admin(flow)
+    created = await flow.post("/api/games", json={"name": "Doppel", "match_modes": [{"label": "Zonen"}, {"mode": "z2", "label": " zonen "}]})
+    assert created.status_code == 422
+    assert "Zonen" in created.text
+    game = await new_game(flow)
+    assert (await patch_modes(flow, game, [*MODES, {"mode": "neu", "label": "STELLUNG"}])).status_code == 422
+
+    # Altbestand mit zwei gleichen Namen: speichern geht weiter, solange keine neue Dublette dazukommt.
+    old = [{"mode": "a", "label": "Zonen"}, {"mode": "b", "label": "Zonen"}, {"mode": "c", "label": "Jagd"}]
+    await flow.db.games.update_one({"id": game["id"]}, {"$set": {"match_modes": old}})
+    assert (await patch_modes(flow, game, [{**old[0], "minutes": 5}, old[1], old[2]])).status_code == 200
+    assert (await patch_modes(flow, game, [*old, {"mode": "d", "label": "jagd"}])).status_code == 422
+    # Ohne Kennung ist „Zonen“ mehrdeutig, solange beide frei sind: 422 statt still die erste zu nehmen.
+    ambiguous = await patch_modes(flow, game, [{"label": "Zonen"}, old[2]])
+    assert ambiguous.status_code == 422
+    assert "mehreren" in ambiguous.json()["detail"]
+    # Ist die andere mit Kennung dabei, bleibt nur eine übrig - die bekommt der Eintrag.
+    assert (await patch_modes(flow, game, [{"label": "Zonen"}, old[1], old[2]])).status_code == 200
+    assert [mode["mode"] for mode in await stored_modes(flow, game)] == ["a", "b", "c"]
+
+
+@pytest.mark.asyncio
 async def test_archived_modes_are_not_assigned_anew_to_maps(flow):
     await as_admin(flow)
     game = await new_game(flow)

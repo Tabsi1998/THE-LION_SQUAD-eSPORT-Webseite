@@ -63,19 +63,48 @@ def _label_key(value) -> str:
     return text.casefold()
 
 
+class ModeProblem(ValueError):
+    """Eine Modusliste, die nicht passt - die Route macht daraus 422."""
+
+
 def adopt_keys(entries_in: list[dict], given: list[bool], current: dict | None) -> list[dict]:
     """Ein Eintrag ohne Kennung, dessen Name einem bestehenden Modus gleicht, bekommt dessen Kennung (#2206) - so ändert
     ein Aufruf über die API, der nur Namen schickt, keine Kennung. Ein schon vergebener Schlüssel wird nie doppelt
-    vergeben."""
-    by_label: dict[str, str] = {}
+    vergeben. Passt der Name zu mehreren noch freien Modi (Altbestand mit gleichen Namen), wird nicht geraten:
+    ``ModeProblem``."""
+    by_label: dict[str, list[str]] = {}
     for mode in _modes(current):
-        by_label.setdefault(_label_key(mode.get("label")), mode["mode"])
+        by_label.setdefault(_label_key(mode.get("label")), []).append(mode["mode"])
     taken = {entry.get("mode") for entry, was_given in zip(entries_in, given) if was_given}
     out: list[dict] = []
     for entry, was_given in zip(entries_in, given):
-        found = None if was_given else by_label.get(_label_key(entry.get("label")))
-        if found and found not in taken:
-            entry = {**entry, "mode": found}
+        if not was_given:
+            free = [key for key in by_label.get(_label_key(entry.get("label")), []) if key not in taken]
+            if len(free) > 1:
+                raise ModeProblem(f"Der Name „{entry.get('label')}“ passt zu mehreren Modi dieses Spiels - bitte die Kennung "
+                                  "(mode) mitschicken.")
+            if free:
+                entry = {**entry, "mode": free[0]}
         taken.add(entry.get("mode"))
         out.append(entry)
     return out
+
+
+def duplicate_name_problem(entries_in: list[dict] | None, current: dict | None = None) -> str | None:
+    """Neue gleiche Namen innerhalb eines Spiels (ohne Groß und klein, Leerraum zusammengefasst) - der Satz für 422, sonst
+    ``None``. Gleiche Namen, die das Spiel schon hatte, bleiben erlaubt, damit Altbestand speicherbar bleibt; nur mehr
+    davon darf es nicht werden."""
+    before: dict[str, int] = {}
+    for mode in _modes(current):
+        key = _label_key(mode.get("label"))
+        before[key] = before.get(key, 0) + 1
+    now: dict[str, int] = {}
+    first: dict[str, str] = {}
+    for entry in entries_in or []:
+        key = _label_key(entry.get("label"))
+        now[key] = now.get(key, 0) + 1
+        first.setdefault(key, str(entry.get("label") or ""))
+    for key, count in now.items():
+        if count > 1 and count > before.get(key, 0):
+            return f"Den Modus „{first[key]}“ gibt es in diesem Spiel schon - jeder Modus braucht einen eigenen Namen."
+    return None

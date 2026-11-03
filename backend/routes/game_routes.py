@@ -158,6 +158,9 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
     doc = body.model_dump()
     _check_id_fields(doc.get("player_id_fields"))
+    duplicate = game_modes.duplicate_name_problem(doc.get("match_modes"))
+    if duplicate:
+        raise HTTPException(status_code=422, detail=duplicate)
     doc["slug"] = await unique_slug(db.games, doc.get("slug") or doc.get("name"), fallback="spiel")
     if doc.get("parent_game_id") and not await db.games.find_one({"id": doc["parent_game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
@@ -204,10 +207,17 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     raw = body.model_dump(exclude_unset=True)
     if raw.get("match_modes"):
         # Kennung bleibt (#2206): ein Eintrag ohne Kennung mit dem Namen eines bestehenden Modus behält dessen Kennung.
-        raw["match_modes"] = game_modes.adopt_keys(raw["match_modes"], [mode._key_given for mode in body.match_modes], current)
+        try:
+            raw["match_modes"] = game_modes.adopt_keys(raw["match_modes"], [mode._key_given for mode in body.match_modes], current)
+        except game_modes.ModeProblem as problem:
+            raise HTTPException(status_code=422, detail=str(problem)) from None
         keys = [mode["mode"] for mode in raw["match_modes"]]
         if len(keys) != len(set(keys)):
             raise HTTPException(status_code=422, detail="Jeder Modus braucht einen eigenen Namen.")
+        # Gleiche Namen (#2206): neue Dubletten nie, vorhandene aus Altbestand halten das Speichern nicht auf.
+        duplicate = game_modes.duplicate_name_problem(raw["match_modes"], current)
+        if duplicate:
+            raise HTTPException(status_code=422, detail=duplicate)
     if "match_modes" in raw:
         await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
