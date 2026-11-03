@@ -3,7 +3,7 @@
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
-import { divisionPlatformPayload, divisionPlatformToForm } from "@/lib/leaguePlatform";
+import { divisionPlatformPayload, divisionPlatformToForm, platformPayload, platformToForm } from "@/lib/leaguePlatform";
 import { tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
 
 export const VISIBILITY_OPTIONS = [
@@ -66,6 +66,8 @@ export function seasonToForm(season = {}) {
     lineup_mode: season.lineup_mode || "per_map",
     lineup_min_players: season.lineup_min_players != null ? String(season.lineup_min_players) : "",
     transfer_windows: (season.transfer_windows || []).map((window) => ({ ...window })),
+    // Plattform je Season (#2270): Feld, erlaubte Plattformen, Crossplay, Eingabegerät.
+    ...platformToForm(season),
     // Selbstanmeldung (#2205): Ohne Fenster gibt es sie nicht.
     ...applicationToForm(season),
     points_win: String(points.win ?? 3),
@@ -149,6 +151,7 @@ export function seasonPayload(form, maps = form.best_of, savedOrder = undefined)
     ...(form.had_rules || (form.lineup_mode && form.lineup_mode !== "per_map") ? { lineup_mode: form.lineup_mode || "per_map" } : {}),
     lineup_min_players: number(form.lineup_min_players),
     transfer_windows: (form.transfer_windows || []).filter((window) => window.start_date && window.end_date),
+    ...platformPayload(form),
     ...applicationPayload(form),
     scoring_rules: {
       ...(form.scoring_rules || {}),

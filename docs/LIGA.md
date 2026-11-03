@@ -845,8 +845,11 @@ neuen Felder nicht und prüfen nichts Neues.
 Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern` oder `options` passen. Fehlen beide, gibt es keine Prüfung.
 
 **Plattform je Season (#2270).** Das Spiel kennzeichnet kein Feld als Plattform, darum wählt die Season das Feld. Einstellungen an `league_seasons`,
-gepflegt im eigenen Kasten „Plattform und Eingabegerät“ (`GET|PUT /api/admin/leagues/seasons/{id}/platform`, Lesen jede Zuständigkeit, Speichern
-Zuständigkeit `season`, Protokoll `league.season.platform` mit vorher und nachher). Sie wirken sofort, ohne Übertragen; Logik in `services/league_platform.py`:
+gepflegt im Abschnitt „Plattform und Eingabegerät“ des Reiters „Anmeldung und Kader“ (`#plattform`). Gespeichert wird mit dem Reiter über
+`PATCH /api/admin/leagues/seasons/{id}` (Zuständigkeit `season`; trägt die Anfrage die vier Felder unverändert, prüft sie nichts, damit ein am Spiel
+verschwundenes Feld das Speichern des Reiters nicht aufhält; Protokoll zusätzlich `league.season.platform` mit vorher und nachher). Wählbare Felder,
+Optionen und was je Liga N gilt liefert `GET /api/admin/leagues/seasons/{id}/platform` (jede Zuständigkeit). Die Felder wirken sofort, ohne Übertragen;
+Logik in `services/league_platform.py`:
 
 | Feld | Typ | Vorgabe neu | Fehlt | Bedeutung |
 | --- | --- | --- | --- | --- |
@@ -1664,7 +1667,7 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 | Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
 | Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`; Pool, Mindestgröße und Ergebnisregeln eigene Knöpfe |
 | Termine | `#termine`, `#kalender`, `#terminregeln` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1); Platz für Check-in-Regeln (D.2) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln eigener Knopf |
-| Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Eingang, Kaderübersicht; Platz für die Plattform (#2270) | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar) |
+| Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#plattform`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Plattform und Eingabegerät (#2270), Eingang, Kaderübersicht | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar), `platform_field`, `allowed_platforms`, `crossplay`, `input_device` |
 | Tabelle | `#tabelle`, `#punkte`, `#gleichstand` | Punkte, Gleichstand, Ausscheiden (E.1), Gleichstände der Staffeln | `scoring_rules` |
 | Regelwerk und Sperrliste | `#regelwerk`, `#sperrliste` | Stand des Regelwerks (B.2) mit Weg dorthin, Sperrliste (C.4) | Sperrliste eigener Knopf |
 | Ligen und Staffeln | `#ligen`, `#staffeln`, `#uebertragen` | Liga N, Staffeln, Staffelgröße, Vorgaben übertragen | `max_staffel_size` |

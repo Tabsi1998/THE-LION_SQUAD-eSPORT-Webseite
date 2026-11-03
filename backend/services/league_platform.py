@@ -312,20 +312,3 @@ async def admin_view(db, season: dict) -> dict:
         "divisions": [{"id": row["id"], "label": _division_label(row), "status": row.get("status") or "active",
                        "overrides": own_overrides(row), "effective": view(season, row, game)} for row in divisions],
     }
-
-
-async def save(db, season: dict, raw: dict, actor: dict) -> dict:
-    """Speichern mit Protokoll ``league.season.platform`` (vorher und nachher, nur bei einer Änderung). Wirft ``PlatformProblem``."""
-    from models import new_id, now_utc
-
-    game = await league_game(db, season)
-    after = clean_season(raw, season, game, await divisions_of(db, season["id"]))
-    before = settings_of(season)
-    if after != before:
-        now = now_utc().isoformat()
-        await db.league_seasons.update_one({"id": season["id"]}, {"$set": {**after, "updated_at": now}})
-        await db.audit_logs.insert_one({
-            "id": new_id(), "action": "league.season.platform", "target_id": season["id"], "actor_id": actor.get("id"),
-            "data": {"season_id": season["id"], "before": before, "after": after}, "created_at": now,
-        })
-    return await admin_view(db, {**season, **after})

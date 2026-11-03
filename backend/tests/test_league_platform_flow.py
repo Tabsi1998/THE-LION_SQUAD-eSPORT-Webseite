@@ -65,6 +65,10 @@ def settings_url(w: dict) -> str:
     return f"{ADMIN_LEAGUES}/seasons/{w['season_id']}/platform"
 
 
+def season_url(w: dict) -> str:
+    return f"{ADMIN_LEAGUES}/seasons/{w['season_id']}"
+
+
 # ---------------------------------------------------------------- Altbestand
 
 
@@ -285,21 +289,45 @@ async def test_staff_saves_the_settings_and_the_protocol_keeps_before_and_after(
     assert [row["key"] for row in view["fields"]] == ["platform"], "nur Felder mit Auswahl"
     assert view["fields"][0]["options"] == ["PC", "PlayStation", "Xbox"]
 
-    saved = ok(await flow.put(settings_url(w), json={"platform_field": "platform", "allowed_platforms": ["Xbox", "PC"],
+    saved = ok(await flow.patch(season_url(w), json={"platform_field": "platform", "allowed_platforms": ["Xbox", "PC"],
                                                      "crossplay": False, "input_device": "mouse_keyboard"}))
 
-    assert saved["settings"] == {"platform_field": "platform", "allowed_platforms": ["PC", "Xbox"], "crossplay": False,
-                                 "input_device": "mouse_keyboard"}, "Reihenfolge wie am Spiel"
+    assert sorted(saved["changed"]) == ["allowed_platforms", "crossplay", "input_device", "platform_field"]
+    assert ok(await flow.get(settings_url(w)))["settings"] == {"platform_field": "platform", "allowed_platforms": ["PC", "Xbox"],
+                                                               "crossplay": False, "input_device": "mouse_keyboard"}, "Reihenfolge wie am Spiel"
     stored = await flow.db.league_seasons.find_one({"id": w["season_id"]}, {"_id": 0})
     assert stored["allowed_platforms"] == ["PC", "Xbox"] and stored["input_device"] == "mouse_keyboard"
     audit = await flow.db.audit_logs.find_one({"action": "league.season.platform"}, {"_id": 0})
     assert audit["target_id"] == w["season_id"]
     assert audit["data"]["before"]["allowed_platforms"] == [] and audit["data"]["after"]["allowed_platforms"] == ["PC", "Xbox"]
 
-    again = ok(await flow.put(settings_url(w), json={"platform_field": "platform", "allowed_platforms": ["PC", "Xbox"],
-                                                     "crossplay": False, "input_device": "mouse_keyboard"}))
-    assert again["settings"]["allowed_platforms"] == ["PC", "Xbox"]
+    again = ok(await flow.patch(season_url(w), json={"platform_field": "platform", "allowed_platforms": ["PC", "Xbox"],
+                                                     "crossplay": False, "input_device": "mouse_keyboard", "min_age": 18}))
+    assert again["changed"] == ["min_age"]
     assert await flow.db.audit_logs.count_documents({"action": "league.season.platform"}) == 1, "ohne Änderung kein Eintrag"
+
+
+@pytest.mark.asyncio
+async def test_saving_the_tab_unchanged_never_stops_on_a_vanished_field(flow):
+    w = await platform_world(flow, platform_field="gibt-es-nicht", allowed_platforms=["PC"])
+    flow.act_as(w["staff"])
+
+    saved = ok(await flow.patch(season_url(w), json={"platform_field": "gibt-es-nicht", "allowed_platforms": ["PC"], "crossplay": None,
+                                                     "input_device": None, "min_age": 16}))
+
+    assert saved["changed"] == ["min_age"]
+
+
+@pytest.mark.asyncio
+async def test_an_old_season_saved_without_platform_stays_without(flow):
+    w = await platform_world(flow)
+    flow.act_as(w["staff"])
+
+    saved = ok(await flow.patch(season_url(w), json={"platform_field": None, "allowed_platforms": [], "crossplay": None, "input_device": None,
+                                                     "min_age": 16}))
+
+    assert saved["changed"] == ["min_age"]
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.platform"}) == 0
 
 
 @pytest.mark.asyncio
@@ -314,7 +342,7 @@ async def test_wrong_settings_are_refused_with_a_sentence(flow, body, text):
     w = await platform_world(flow)
     flow.act_as(w["staff"])
 
-    refused = await flow.put(settings_url(w), json=body)
+    refused = await flow.patch(season_url(w), json=body)
 
     assert refused.status_code == 422, refused.text
     if text:
@@ -329,7 +357,7 @@ async def test_a_saved_platform_stays_selectable_after_the_game_drops_it(flow):
                                    {"$set": {"player_id_fields.$.options": ["PC", "PlayStation"]}})
     flow.act_as(w["staff"])
 
-    kept = await flow.put(settings_url(w), json={"platform_field": "platform", "allowed_platforms": ["PC", "Xbox"]})
+    kept = await flow.patch(season_url(w), json={"platform_field": "platform", "allowed_platforms": ["Xbox", "PC"], "crossplay": True})
 
     assert kept.status_code == 200, kept.text
     assert ok(await flow.get(settings_url(w)))["fields"][0]["options"] == ["PC", "PlayStation", "Xbox"], "gespeichert bleibt wählbar"
@@ -353,7 +381,7 @@ async def test_liga_n_overrides_go_through_the_division_sheet_and_are_checked(fl
     without_field = await flow.patch(url, json={"overrides": {"allowed_platforms": ["PC"]}})
     assert without_field.status_code == 422 and "Feld" in without_field.json()["detail"]
 
-    ok(await flow.put(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}/platform", json={"platform_field": "platform", "allowed_platforms": ["PC"]}))
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"platform_field": "platform", "allowed_platforms": ["PC"]}))
     unknown = await flow.patch(url, json={"overrides": {"allowed_platforms": ["Handheld"]}})
     assert unknown.status_code == 422 and "Handheld" in unknown.json()["detail"]
 
@@ -364,7 +392,7 @@ async def test_liga_n_overrides_go_through_the_division_sheet_and_are_checked(fl
     assert opened["overrides"] == {"allowed_platforms": []}, "leer heißt in Liga N: alle erlaubt"
 
     ok(await flow.patch(url, json={"overrides": {"allowed_platforms": ["Xbox"]}}))
-    cleared = await flow.put(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}/platform", json={"platform_field": None, "allowed_platforms": []})
+    cleared = await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"platform_field": None, "allowed_platforms": []})
     assert cleared.status_code == 422 and "Liga 1" in cleared.json()["detail"], "das Feld bleibt, solange Liga N eigene Plattformen trägt"
 
     view = ok(await flow.get(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}/platform"))
@@ -410,7 +438,7 @@ async def apply_world(flow, *, min_squad_size: int) -> dict:
     for user in w["teams"][0]["people"]:
         await flow.db.users.update_one({"id": user["id"]}, {"$set": {f"game_ids.{game['slug']}.platform": "PC"}})
     flow.act_as(w["lead"])
-    ok(await flow.put(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}/platform", json={"platform_field": "platform", "allowed_platforms": ["PC"]}))
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"platform_field": "platform", "allowed_platforms": ["PC"]}))
     return w
 
 

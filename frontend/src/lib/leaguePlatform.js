@@ -31,22 +31,22 @@ function crossplayPayload(value) {
   return null;
 }
 
-/** Die gespeicherten Angaben der Season als Formular. */
-export function platformToForm(settings = {}) {
+/** Die gespeicherten Angaben der Season als Teil des Season-Formulars (`seasonToForm`, Reiter „Anmeldung und Kader“). */
+export function platformToForm(season = {}) {
   return {
-    platform_field: settings.platform_field || "",
-    allowed_platforms: [...(settings.allowed_platforms || [])],
-    crossplay: crossplayToForm(settings.crossplay),
-    input_device: settings.input_device || "",
+    platform_field: season.platform_field || "",
+    allowed_platforms: [...(season.allowed_platforms || [])],
+    crossplay: crossplayToForm(season.crossplay),
+    input_device: season.input_device || "",
   };
 }
 
-/** Das Formular für `PUT …/platform`: Plattformen in der Reihenfolge des Felds, leer heißt „keine Angabe“. */
-export function platformPayload(form, options = []) {
-  const picked = new Set(form.allowed_platforms || []);
+/** Teil der Anfrage `PATCH …/seasons/{id}` (`seasonPayload`): ohne Feld keine Grenze, leer heißt „keine Angabe“. Die Reihenfolge
+ *  der Plattformen legt der Server fest (wie am Spiel). */
+export function platformPayload(form) {
   return {
     platform_field: form.platform_field || null,
-    allowed_platforms: form.platform_field ? options.filter((value) => picked.has(value)) : [],
+    allowed_platforms: form.platform_field ? [...new Set(form.allowed_platforms || [])] : [],
     crossplay: crossplayPayload(form.crossplay),
     input_device: form.input_device || null,
   };

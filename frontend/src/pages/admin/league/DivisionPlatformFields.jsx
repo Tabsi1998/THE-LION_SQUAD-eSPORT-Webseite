@@ -5,7 +5,7 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField } from "@/components/tls/FormFields";
 import { api } from "@/lib/api";
 import { CROSSPLAY_OPTIONS, INPUT_DEVICE_OPTIONS, platformShort } from "@/lib/leaguePlatform";
-import { PlatformChoices } from "./SeasonPlatformPanel";
+import { PlatformChoices } from "./SeasonPlatformSection";
 
 function asSeason(options, current) {
   return [["", `wie Season (${current})`], ...options.filter(([key]) => key)];
@@ -40,7 +40,7 @@ export function DivisionPlatformFields({ form, set, seasonId }) {
           ) : null}
         </>
       ) : (
-        <p className="text-xs text-white/50">Plattformen eingrenzen geht erst, wenn die Season im Kasten „Plattform und Eingabegerät“ das Feld gewählt hat.</p>
+        <p className="text-xs text-white/50">Plattformen eingrenzen geht erst, wenn die Season das Feld gewählt hat: Reiter „Anmeldung und Kader“ → „Plattform und Eingabegerät“.</p>
       )}
       <FormGrid cols={2}>
         <SelectField label="Crossplay" value={form.crossplay} onChange={(value) => set("crossplay", value)} options={asSeason(CROSSPLAY_OPTIONS, crossplayNow)}

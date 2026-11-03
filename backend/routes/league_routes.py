@@ -373,6 +373,10 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     await _record_readiness_override(db, me, season_id, passed)
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
+    if set(changed) & set(league_platform.SEASON_KEYS):
+        # Plattform je Season (#2270): vorher und nachher - nur Auswahlwerte des Spiels, keine Personen.
+        await _audit(db, "league.season.platform", me, season_id, {"season_id": season_id, "before": league_platform.settings_of(season),
+                                                                  "after": league_platform.settings_of(doc)})
     visibility_applied = 0
     if "visibility" in changed:
         # „Aus“ heißt sofort aus: die Sichtbarkeit geht ohne „Übertragen“ auf alle Staffeln, auch gesperrte.

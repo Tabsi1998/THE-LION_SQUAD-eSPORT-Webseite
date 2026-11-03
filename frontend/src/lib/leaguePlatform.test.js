@@ -13,12 +13,11 @@ test("Plattformen lesen sich wie im Server", () => {
   expect(allowedText(["PC"])).toBe("nur PC");
 });
 
-test("die Season: Plattformen in der Reihenfolge des Felds, ohne Feld keine Grenze, leer heißt keine Angabe", () => {
-  const form = { ...platformToForm({}), platform_field: "platform", allowed_platforms: ["Xbox", "PC"], crossplay: "off", input_device: "both" };
-  expect(platformPayload(form, ["PC", "PlayStation", "Xbox"])).toEqual({
-    platform_field: "platform", allowed_platforms: ["PC", "Xbox"], crossplay: false, input_device: "both" });
-  expect(platformPayload({ ...form, platform_field: "" }, ["PC"])).toEqual({ platform_field: null, allowed_platforms: [], crossplay: false, input_device: "both" });
-  expect(platformPayload(platformToForm({}), [])).toEqual({ platform_field: null, allowed_platforms: [], crossplay: null, input_device: null });
+test("die Season: ohne Feld keine Grenze, leer heißt keine Angabe, doppelte Plattformen fallen weg", () => {
+  const form = { ...platformToForm({}), platform_field: "platform", allowed_platforms: ["PC", "Xbox", "PC"], crossplay: "off", input_device: "both" };
+  expect(platformPayload(form)).toEqual({ platform_field: "platform", allowed_platforms: ["PC", "Xbox"], crossplay: false, input_device: "both" });
+  expect(platformPayload({ ...form, platform_field: "" })).toEqual({ platform_field: null, allowed_platforms: [], crossplay: false, input_device: "both" });
+  expect(platformPayload(platformToForm({}))).toEqual({ platform_field: null, allowed_platforms: [], crossplay: null, input_device: null });
   expect(platformToForm({ platform_field: "platform", allowed_platforms: ["PC"], crossplay: true, input_device: null })).toEqual({
     platform_field: "platform", allowed_platforms: ["PC"], crossplay: "on", input_device: "" });
 });

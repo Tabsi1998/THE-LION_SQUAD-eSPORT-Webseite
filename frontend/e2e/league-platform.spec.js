@@ -1,3 +1,4 @@
+const nodePath = require("node:path");
 const { test, expect } = require("@playwright/test");
 
 // Plattform je Season (docs/LIGA.md, B.3, #2270) bei 390 und 1440 px, Server nachgestellt, nur erfundene Namen: Kasten auf der
@@ -74,21 +75,25 @@ for (const [width, height] of WIDTHS) {
     test("Verwaltung: Feld wählen, nur PC, Crossplay aus; Liga N weicht im Blatt ab", async ({ page }) => {
       let saved = null;
       let division = null;
+      let season = SEASON;
       await mock(page, ADMIN, (path, request) => {
-        if (path === "/admin/leagues/seasons/s1") return SEASON_PAGE;
-        if (path === "/admin/leagues/seasons/s1/platform" && request.method() === "PUT") {
+        if (path === "/admin/leagues/seasons/s1" && request.method() === "PATCH") {
           saved = request.postDataJSON();
-          return { ...PLATFORM, settings: saved };
+          season = { ...season, ...saved, updated_at: "2026-11-04T10:00:00Z" };
+          return { ...season, changed: ["allowed_platforms", "crossplay", "platform_field"], staffeln_to_sync: 0, warnings: [] };
         }
-        if (path === "/admin/leagues/seasons/s1/platform") return saved ? { ...PLATFORM, settings: saved } : PLATFORM;
+        if (path === "/admin/leagues/seasons/s1") return { ...SEASON_PAGE, season };
+        if (path === "/admin/leagues/seasons/s1/platform") return { ...PLATFORM, settings: { ...PLATFORM.settings, ...(saved ? {
+          platform_field: saved.platform_field, allowed_platforms: saved.allowed_platforms, crossplay: saved.crossplay, input_device: saved.input_device } : {}) } };
         if (path === "/admin/leagues/divisions/d1" && request.method() === "PATCH") {
           division = request.postDataJSON();
           return { ...DIVISION, ...division, warnings: [] };
         }
         return undefined;
       });
-      await page.goto("/admin/leagues/seasons/s1");
+      await page.goto("/admin/leagues/seasons/s1#plattform");
 
+      await expect(page.getByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
       const box = page.getByTestId("season-platform");
       await expect(box).toContainText("Plattform und Eingabegerät");
       await page.getByTestId("season-platform-field").selectOption("platform");
@@ -97,9 +102,15 @@ for (const [width, height] of WIDTHS) {
       await page.getByTestId("season-platform-crossplay").selectOption("off");
       await expect(page.getByTestId("season-platform-division-d2")).toContainText("weicht ab");
       await noSideScroll(page);
-      await page.getByTestId("season-platform-save").click();
-      await expect.poll(() => saved).toEqual({ platform_field: "platform", allowed_platforms: ["PC"], crossplay: false, input_device: null });
+      if (process.env.E2E_SCREENS_DIR && width === 1440) {
+        await box.screenshot({ path: nodePath.join(process.env.E2E_SCREENS_DIR, "liga-season-plattform-pc.png") });
+      }
+      await page.getByTestId("season-save-anmeldung").click();
+      await expect.poll(() => saved && { platform_field: saved.platform_field, allowed_platforms: saved.allowed_platforms, crossplay: saved.crossplay,
+        input_device: saved.input_device }).toEqual({ platform_field: "platform", allowed_platforms: ["PC"], crossplay: false, input_device: null });
+      await expect(page.getByTestId("season-saved-anmeldung")).toBeVisible();
 
+      await page.getByTestId("season-tab-ligen").click();
       await page.getByTestId("division-edit-1").click();
       const sheet = page.getByTestId("division-sheet");
       await expect(sheet.getByTestId("division-platform-season")).toContainText("Season: nur PC · Crossplay aus");
