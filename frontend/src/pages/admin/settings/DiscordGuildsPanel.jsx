@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { gamePageUrl } from "@/lib/gameForm";
 
 // Server-Verzeichnis (#624, Discord VI): ein Bot, mehrere Server. Der Hauptserver bekommt alle Meldungen wie bisher;
 // weitere Server (etwa je Spiel) erscheinen, sobald der Bot dort ist - ausgeschaltet, bis du sie einschaltest. Je
@@ -67,11 +68,11 @@ function GuildGames({ guild }) {
       {games.length ? games.map((game, index) => (
         <span key={game.id}>
           {index ? ", " : ""}
-          <Link to="/admin/games" className="text-white/75 hover:text-[#29B6E8]">{game.name}</Link>
+          <Link to={gamePageUrl(game.id)} className="text-white/75 hover:text-[#29B6E8]">{game.name}</Link>
           {game.inherited ? <span className="text-white/35"> (vom Hauptspiel)</span> : null}
         </span>
       )) : (
-        <span className="text-white/40">{guild.role === "main" ? "alle Spiele ohne eigenen Server" : "noch keines – zuordnen unter Spiele → Spiel bearbeiten"}</span>
+        <span className="text-white/40">{guild.role === "main" ? "alle Spiele ohne eigenen Server" : "noch keines – zuordnen auf der Spielseite unter Allgemein → Discord-Server"}</span>
       )}
     </div>
   );

@@ -16,7 +16,7 @@ export default function AdminGameEquipmentPage() {
         <Link to="/admin/games" data-testid="equipment-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]">
           <ArrowLeft className="h-3.5 w-3.5" /> Spiele
         </Link>
-        <Link to={`/admin/games/${gameId}/maps`} className="text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]">Maps</Link>
+        <Link to={`/admin/games/${gameId}`} data-testid="equipment-game" className="text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]">Spielseite</Link>
       </div>
       <h1 className="mt-3 mb-5 font-heading text-3xl font-black uppercase break-words md:text-4xl" data-testid="equipment-title">
         Ausrüstung{game?.name ? ` · ${game.name}` : ""}

@@ -833,6 +833,7 @@ neuen Felder nicht und prüfen nichts Neues.
 
 | Feld | Typ | Bedeutung |
 | --- | --- | --- |
+| `key` | str | Pflicht, je Spiel eindeutig (#2249): Unter ihm stehen die IDs der Spieler (`users.game_ids.<spiel>.<key>`). Doppelt oder leer: 422; was schon doppelt oder leer gespeichert ist (Altbestand), hält ein anderes Speichern nicht auf. Die Verwaltung ändert einen gespeicherten Schlüssel nie, auch keinen nicht kanonischen („PSN-ID“), und schickt fremde Angaben am Feld unverändert zurück |
 | `pattern` | str ≤ 200 | Regulärer Ausdruck für den ganzen Wert. Der Server prüft beim Speichern, ob er gültig ist |
 | `format_hint` | str ≤ 120 | Beispiel oder Beschreibung, steht im Profil und in jeder Meldung zum Format |
 | `options` | `[str]`, höchstens 30 | Auswahl statt Freitext. So wird die **Plattform** zum Feld: Pflicht über `required`, einmal je Season festgehalten wie jede ID |

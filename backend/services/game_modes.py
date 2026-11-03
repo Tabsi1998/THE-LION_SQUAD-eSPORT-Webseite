@@ -54,7 +54,7 @@ def choice_problem(game: dict | None, wanted: Iterable, kept: Iterable = (), *, 
         if status == ARCHIVED or (status == INACTIVE and not inactive_ok):
             label = mode.get("label") or mode["mode"]
             return (f"Der Modus „{label}“ ist {STATUS_WORDS[status]} und steht für Neues nicht mehr zur Wahl. "
-                    "Unter Spiele → Spiel bearbeiten lässt er sich wieder aktivieren.")
+                    "Auf der Spielseite (Spiele → Spiel → Modi) lässt er sich wieder aktivieren.")
     return None
 
 

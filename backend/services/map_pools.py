@@ -251,7 +251,7 @@ async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None =
                 raise MapProblem(f"Die Map „{row.get('name')}“ ist archiviert und kommt in keinen neuen Pool.")
             if status == game_maps.INACTIVE and (mode, map_id) not in (kept_maps or set()):
                 raise MapProblem(f"Die Map „{row.get('name')}“ ist inaktiv und kommt in {label} nicht neu dazu. "
-                                 "Unter Spiele → Maps lässt sie sich wieder aktivieren.")
+                                 "Auf der Spielseite (Spiele → Spiel → Maps) lässt sie sich wieder aktivieren.")
             if mode is not None and mode not in (row.get("modes") or []):
                 raise MapProblem(f"Die Map „{row.get('name')}“ ist für {label} nicht freigegeben.")
             if any(item["map_id"] == map_id for item in maps):

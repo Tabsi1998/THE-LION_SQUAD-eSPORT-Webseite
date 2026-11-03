@@ -144,11 +144,12 @@ async def game_usage_route(game_id: str, me: dict = Depends(require_admin())):
     return await game_usage.usage(db, game)
 
 
-def _check_id_fields(fields: list | None) -> None:
-    """Format und Auswahl der Spiel-IDs (#2204): Ein kaputtes Muster fällt beim Speichern auf, nicht erst bei den Spielern."""
+def _check_id_fields(fields: list | None, current: list | None = None) -> None:
+    """Format und Auswahl der Spiel-IDs (#2204): Ein kaputtes Muster fällt beim Speichern auf, nicht erst bei den Spielern.
+    Dazu eindeutige, nicht leere Schlüssel (#2249); ``current`` hält Altbestand speicherbar."""
     from services.league_roster import id_fields_problem
 
-    problem = id_fields_problem(fields)
+    problem = id_fields_problem(fields, current)
     if problem:
         raise HTTPException(status_code=422, detail=problem)
 
@@ -221,7 +222,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     if "match_modes" in raw:
         await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    _check_id_fields(updates.get("player_id_fields"))
+    _check_id_fields(updates.get("player_id_fields"), current.get("player_id_fields"))
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")

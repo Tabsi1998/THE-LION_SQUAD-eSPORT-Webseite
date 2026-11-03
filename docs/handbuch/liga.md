@@ -7,8 +7,8 @@ steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es e
 
 **Wo im Admin:**
 
-- **Admin → eSports → Spiele → Spiel bearbeiten** – die **Modi** des Spiels (etwa Stellung, Suchen & Zerstören)
-- **Admin → eSports → Spiele → Maps** (Karten-Symbol in der Zeile des Spiels) – Map-Bibliothek mit Bildern und Modi
+- **Admin → eSports → Spiele → Zahnrad** (`/admin/games/<Spiel>`) – die Spielseite: Reiter **Modi** (etwa Stellung, Suchen & Zerstören)
+  und Reiter **Maps** (`#maps`) – Map-Bibliothek als Tabelle Map × Modus mit Bildern
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga 1, 2 …, Staffel A, B …
 - **Turnierverwaltung der Staffel** (`/admin/tournaments/<Staffel>`, aus der Season über **Turnierverwaltung · Co-Teams
   zuteilen**) – Co-Teams zuteilen, starten, Spiele, Ergebnisse
@@ -79,13 +79,13 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 
 ### 2.1 Modi und Maps in der Bibliothek
 
-1. **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere → Modi und Dauer**: je Modus eine Zeile,
+1. **Admin → eSports → Spiele → Zahnrad**, Reiter **Modi**, **Modus hinzufügen**: je Modus eine Zeile,
    etwa **Stellung**, **Suchen & Zerstören**, **Kontrolle**. Minuten braucht ein Modus nur für Maps nicht. Aufgeklappt
    trägt jeder Modus auf Wunsch **Beschreibung**, **Spieler je Seite**, **Format** und eine **Ergebnisregel** (Punkte bis
    zum Ziel, Runden gewinnen oder höherer Endstand; Ziel, Rundenlimit, Zeitlimit, Remis, Verlängerung) – die Werte laut
    Regelwerk tragt ihr selbst ein. Details: [Turniere, 3.12](turniere.md#312-spieldauer-und-spiel-daten).
-2. **Admin → eSports → Spiele → Maps** → **Map hinzufügen**: Name, **Bild** im Format 16 : 9 (nur eigene Uploads),
-   und die **Modi**, in denen die Map gespielt wird. Mit **Aus Spiel übernehmen** kommen Maps einer anderen Spielversion
+2. Reiter **Maps** → **Map hinzufügen**: Name, **Bild** im Format 16 : 9 (nur eigene Uploads),
+   und die **Modi**, in denen die Map gespielt wird; später setzt ein Häkchen in der Tabelle sie frei. Mit **Aus Spiel übernehmen** kommen Maps einer anderen Spielversion
    samt Bild dazu; gibt es schon Maps ohne Modus, ordnet **Allen … Maps zuordnen** sie gesammelt zu. Details:
    [Turniere, 3.14](turniere.md#314-maps-und-map-pools).
 
@@ -108,8 +108,8 @@ das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
 Grundsatz: **Alles ist erlaubt außer dem, was auf der Sperrliste der Season steht.** Die Website prüft nicht, was im Spiel benutzt
 wird – ein Verstoß läuft über Einspruch und Strafe.
 
-1. **Bibliothek:** **Admin → eSports → Spiele → Maps → Ausrüstung** (Adresse `/admin/games/<Spiel>/equipment`, später ein Reiter der
-   Spielseite). Zuerst **Kategorien**: Ohne Kategorien gibt es einen Vorschlag (Waffen, Aufsätze, Perks, Ausrüstung, Abschussserien), den
+1. **Bibliothek:** vorläufig unter der Adresse `/admin/games/<Spiel>/equipment`, erreichbar aus der Season über **Sperrliste → Bibliothek
+   pflegen** (bald ein Reiter **Ausrüstung** der Spielseite). Zuerst **Kategorien**: Ohne Kategorien gibt es einen Vorschlag (Waffen, Aufsätze, Perks, Ausrüstung, Abschussserien), den
    du anpasst und speicherst. Die **Art** entscheidet: An einer *Waffe* lassen sich einzelne Aufsätze sperren, ein *Aufsatz* passt zu Waffen,
    alles andere ist *sonstige Ausrüstung*. Hat eine Kategorie Einträge, bleibt ihre Art und sie lässt sich nicht entfernen.
 2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek; ohne Medienrechte nur eigene Bilder), bei Aufsätzen
@@ -677,7 +677,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | **Stichtag** | Optional in der Kaderübersicht: Neue warten auf eure Freigabe, Abgänge bleiben frei (3.7) |
 | **Transferfenster** | Die Teamleitung beantragt im Fenster, ihr entscheidet. Nach der Genehmigung wartet die Person ab der Kaderaufnahme die volle Wartezeit, immer und auch wenn sie das alte Co-Team schon verlassen hatte |
 | **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum keine Anmeldung und keine Aufnahme. Ihr seht nur „Alter erfüllt“, „Geburtsdatum fehlt“ oder „Altersvorgabe nicht erfüllt“, die Liga nennt nie ein Datum oder Alter |
-| **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Spieler-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
+| **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Zahnrad → Spiel-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
 
 **Wartezeit aufheben:** Season → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
 

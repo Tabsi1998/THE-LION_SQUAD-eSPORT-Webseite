@@ -126,7 +126,7 @@ function GuildEmbeds({ guild, labels, reload }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="text-sm font-bold">{guild.name}</div>
         <div className="text-[11px] text-white/45" data-testid={`discord-embeds-guild-${guild.guild_id}-games`}>
-          {games.length ? `nur ${games.map((game) => game.name).join(", ")}` : "noch kein Spiel zugeordnet – Spiele → Spiel bearbeiten → Discord-Server"}
+          {games.length ? `nur ${games.map((game) => game.name).join(", ")}` : "noch kein Spiel zugeordnet – Spiele → Spiel öffnen → Allgemein → Discord-Server"}
         </div>
       </div>
       {SUB_EMBEDS.map((kind) => {

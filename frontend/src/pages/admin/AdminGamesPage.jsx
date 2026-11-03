@@ -1,102 +1,73 @@
+// Spiele der Verwaltung: die Liste mit Archiv und Löschen. Alles Weitere zu einem Spiel steht auf seiner Spielseite (#2249)
+// unter /admin/games/<Spiel> - erreichbar über das Zahnrad oder den Namen. Neu anlegen geht schnell im Seitenblatt mit Name und
+// Art, danach öffnet die Spielseite.
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
-import { FormGrid } from "@/components/tls/AdminForm";
-import { CheckField } from "@/components/tls/FormFields";
-import { ImageUpload } from "@/components/tls/ImageUpload";
+import { SelectField, TextField } from "@/components/tls/FormFields";
+import { TableScroll } from "@/components/tls/TableScroll";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { gameLabel, gameOptionLabel, isArchivedGame, selectableGames } from "@/lib/gameLabels";
-import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm, gameSavedText, modeRemovalQuestion, removedModes } from "@/lib/gameMatchData";
-import { GameMatchDataFields } from "./GameMatchDataFields";
+import { GAME_KIND_OPTIONS, emptyNewGame, gameKindLabel, gamePageUrl, newGamePayload } from "@/lib/gameForm";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Settings, Trash2 } from "lucide-react";
 
-const slugFrom = (txt) => (txt || "")
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .replace(/ß/g, "ss")
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, "-")
-  .replace(/^-|-$/g, "")
-    .slice(0, 80);
+const ICON = "p-1.5 text-white/40 rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
 
-const fieldKeyFrom = (txt) => slugFrom(txt).replace(/-/g, "_");
-const GAME_KIND_OPTIONS = [
-  ["standalone", "Einzelspiel"],
-  ["series", "Hauptspiel / Serie"],
-  ["edition", "Spielversion / Saisonspiel"],
-];
+function NewGameSheet({ games, onClose }) {
+  const navigate = useNavigate();
+  const [form, setForm] = useState(emptyNewGame);
+  const [saving, setSaving] = useState(false);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const parentOptions = selectableGames(games).filter((game) => game.kind !== "edition").map((game) => [game.id, gameOptionLabel(game)]);
+  const isEdition = form.kind === "edition";
 
-const emptyGameForm = {
-  name: "", slug: "", short_name: "", cover_url: "", logo_url: "",
-  kind: "standalone", parent_game_id: "", identity_source_game_id: "", inherit_player_ids: true,
-  player_id_fields: [], discord_guild_id: "", discord_role_name: "",
-};
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post("/games", newGamePayload(form));
+      toast.success("Spiel angelegt – jetzt IDs, Modi und Maps eintragen.");
+      navigate(gamePageUrl(data.id));
+    } catch (err) {
+      toast.error(formatRequestError(err, "Spiel konnte nicht angelegt werden.", { name: form.name }));
+      setSaving(false);
+    }
+  };
 
-// Spiel-Rolle im Discord (#629): je Hauptspiel eine; leer heißt „<Kurzname>-Spieler“. Editionen zählen fürs Hauptspiel.
-export function roleNamePlaceholder(form) {
-  return `Discord-Rolle (leer: „${(form.short_name || form.name || "Spiel").trim()}-Spieler“)`;
-}
-
-// Discord-Server je Spiel (#626): leer heißt erben - vom Hauptspiel, sonst der Hauptserver.
-export function inheritedServerText(form, games, servers) {
-  const main = servers.find((server) => server.role === "main");
-  const parent = form.kind === "edition" ? games.find((game) => game.id === form.parent_game_id) : null;
-  const parentServer = parent?.discord_guild_id ? servers.find((server) => server.guild_id === parent.discord_guild_id) : null;
-  if (parentServer && parentServer.enabled && !parentServer.left) return `geerbt von ${gameLabel(parent)}: ${parentServer.name}`;
-  return main ? `Hauptserver: ${main.name}` : "Hauptserver";
-}
-
-export function serverOptionLabel(server) {
-  if (server.left) return `${server.name} – Bot nicht mehr dort`;
-  return `${server.name}${server.role === "main" ? " (Hauptserver)" : ""}${server.enabled ? "" : " – ausgeschaltet"}`;
-}
-
-function DiscordServerField({ form, games, servers, onChange, testId }) {
-  if (!servers.length) return null;
-  const current = servers.find((server) => server.guild_id === form.discord_guild_id);
-  const options = servers.filter((server) => !server.left || server.guild_id === form.discord_guild_id);
-  const inherited = inheritedServerText(form, games, servers);
   return (
-    <div className="space-y-1">
-      <Select value={form.discord_guild_id} onChange={onChange} testId={testId}
-        options={[["", `Discord-Server: erben (${inherited})`], ...options.map((server) => [server.guild_id, `Discord: ${serverOptionLabel(server)}`])]} />
-      {current && (!current.enabled || current.left) ? (
-        <div className="text-[11px] text-[#FFD700]" data-testid={`${testId}-off`}>Dieser Server ist {current.left ? "nicht mehr erreichbar" : "ausgeschaltet"} – bis dahin gilt: {inherited}.</div>
+    <AdminSheet title="Neues Spiel" eyebrow="Spiele" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Anlegen und öffnen"
+      submitTestId="game-submit" testId="game-new-sheet">
+      <p className="text-sm text-white/55">Name und Art genügen. Logo, Spiel-IDs, Modi und Maps trägst du danach auf der Spielseite ein.</p>
+      <TextField label={isEdition ? "Versionsname" : "Name"} required value={form.name} onChange={(value) => set("name", value)}
+        placeholder={isEdition ? "z. B. Black Ops 7" : "z. B. Call of Duty"} testId="game-name" />
+      <SelectField label="Art" value={form.kind} onChange={(value) => set("kind", value)} options={GAME_KIND_OPTIONS}
+        hint="Spielversionen (etwa Black Ops 7) hängen unter einem Hauptspiel und haben eigene Modi und Maps." testId="game-kind" />
+      {isEdition ? (
+        <SelectField label="Hauptspiel" value={form.parent_game_id} onChange={(value) => set("parent_game_id", value)}
+          options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-parent" />
       ) : null}
-    </div>
+    </AdminSheet>
   );
 }
 
 export default function AdminGamesPage() {
-  const [list, setList] = useState([]);
-  const [form, setForm] = useState(emptyGameForm);
-  const [editing, setEditing] = useState(null);
+  const [list, setList] = useState(null);
   const [servers, setServers] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
+  const [creating, setCreating] = useState(false);
   const confirm = useConfirm();
-  const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
+  const load = useCallback(async () => { const { data } = await api.get("/games"); setList(Array.isArray(data) ? data : []); }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get("/games/discord-servers").then(({ data }) => setServers(Array.isArray(data) ? data : [])).catch(() => setServers([])); }, []);
   useApiInvalidation(load, ["games"]);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parentOptions = selectableGames(list).filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
-  const identityOptions = selectableGames(list).map((g) => [g.id, `ID von ${gameLabel(g)}`]);
-  const archivedCount = list.filter(isArchivedGame).length;
-  const shown = list.filter((g) => showArchived || !isArchivedGame(g));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post("/games", gamePayload(form));
-      toast.success("Spiel erstellt.");
-      setForm(emptyGameForm);
-      load();
-    } catch (err) { toast.error(formatRequestError(err, "Spiel konnte nicht erstellt werden.", { slug: form.slug, name: form.name })); }
-  };
+  const games = list || [];
+  const archivedCount = games.filter(isArchivedGame).length;
+  const shown = games.filter((g) => showArchived || !isArchivedGame(g));
 
   const setStatus = async (game, status) => {
     try {
@@ -146,277 +117,70 @@ export default function AdminGamesPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spiele</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Spiele</h1>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        <form onSubmit={submit} className="lg:col-span-1 border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neues Spiel</div>
-          <Input placeholder={form.kind === "edition" ? "Versionsname, z.B. Black Ops 7" : "Name, z.B. Call of Duty"} value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v, slug: f.slug || slugFrom(v) }))} required testId="game-name" />
-          <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-slug" />
-          <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-kind" />
-          {form.kind === "edition" && (
-            <>
-              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-parent" />
-              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...identityOptions]} testId="game-identity-source" />
-              <EditionPreview form={form} games={list} />
-              <label className="flex items-start gap-2 text-xs text-white/65 border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
-                <input type="checkbox" checked={form.inherit_player_ids !== false} onChange={(e) => set("inherit_player_ids", e.target.checked)} className="accent-[#29B6E8] mt-0.5" />
-                Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist.
-              </label>
-            </>
-          )}
-          <DiscordServerField form={form} games={list} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-discord" />
-          {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-role" />}
-          <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
-          <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
-          <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-cover" variant="wide" allowLibrary />
-          <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
-          <button data-testid="game-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
-            <Plus className="w-4 h-4" /> Anlegen
-          </button>
-        </form>
-        <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          {archivedCount ? (
-            <label className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 text-xs text-white/65">
-              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="accent-[#29B6E8]" data-testid="games-show-archived" />
-              Archivierte zeigen ({archivedCount})
-            </label>
-          ) : null}
-          <table className="w-full text-sm">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-              <tr><th className="text-left px-4 py-3">Name</th><th className="hidden md:table-cell text-left px-4 py-3">Typ</th><th className="hidden md:table-cell text-left px-4 py-3">ID-Quelle</th><th></th></tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {shown.map((g) => (
-                <tr key={g.id} className={isArchivedGame(g) ? "opacity-60" : undefined} data-testid={`game-row-${g.slug}`}>
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-white">{gameLabel(g)}</div>
-                    {isArchivedGame(g) ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-warn" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
-                    {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
-                    {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
-                  </td>
-                  <td className="hidden md:table-cell px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-2">
-                      {/* Map-Bibliothek (#1616): Maps mit Bild und Modi für Pools in Turnieren und Saisons. */}
-                      <Link to={`/admin/games/${g.id}/maps`} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Maps des Spiels" aria-label={`Maps von ${gameLabel(g)}`} data-testid={`game-maps-${g.slug}`}>
-                        <MapIcon className="w-4 h-4" />
-                      </Link>
-                      <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setStatus(g, isArchivedGame(g) ? "active" : "archived")} className="p-1 text-white/40 hover:text-warn"
-                        title={isArchivedGame(g) ? "Spiel zurückholen" : "Spiel archivieren"} aria-label={isArchivedGame(g) ? `${gameLabel(g)} zurückholen` : `${gameLabel(g)} archivieren`} data-testid={`game-archive-${g.slug}`}>
-                        {isArchivedGame(g) ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => del(g)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel löschen" data-testid={`game-delete-${g.slug}`}>
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spiele</span>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Spiele</h1>
+          <p className="mt-1 text-sm text-white/55">Das Zahnrad öffnet die Spielseite mit Allgemein, Spiel-IDs, Modi und Maps.</p>
         </div>
+        <button type="button" onClick={() => setCreating(true)} data-testid="game-new"
+          className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+          <Plus className="w-4 h-4" aria-hidden="true" /> Neues Spiel
+        </button>
       </div>
-      {editing && <EditGameModal game={editing} games={list} servers={servers} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+
+      {archivedCount ? (
+        <label className="mb-3 flex items-center gap-2 text-xs text-white/65">
+          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="accent-[#29B6E8]" data-testid="games-show-archived" />
+          Archivierte zeigen ({archivedCount})
+        </label>
+      ) : null}
+      <TableScroll label="Spiele" testId="games-table">
+        <table className="w-full text-sm">
+          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <tr>
+              <th scope="col" className="text-left px-4 py-3">Name</th>
+              <th scope="col" className="hidden md:table-cell text-left px-4 py-3">Art</th>
+              <th scope="col" className="hidden md:table-cell text-left px-4 py-3">ID-Quelle</th>
+              <th scope="col" className="hidden md:table-cell text-left px-4 py-3">Modi</th>
+              <th scope="col" className="px-4 py-3"><span className="sr-only">Aktionen</span></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {shown.map((g) => (
+              <tr key={g.id} className={isArchivedGame(g) ? "opacity-60" : undefined} data-testid={`game-row-${g.slug}`}>
+                <td className="px-4 py-3 min-w-0">
+                  <Link to={gamePageUrl(g.id)} className="font-semibold text-white hover:text-[#29B6E8] [overflow-wrap:anywhere]" data-testid={`game-open-${g.slug}`}>{gameLabel(g)}</Link>
+                  {isArchivedGame(g) ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-warn" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
+                  {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
+                  {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
+                </td>
+                <td className="hidden md:table-cell px-4 py-3 text-white/60">{gameKindLabel(g.kind)}</td>
+                <td className="hidden md:table-cell px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
+                <td className="hidden md:table-cell px-4 py-3 text-white/60 tabular-nums">{(g.match_modes || []).length || "–"}</td>
+                <td className="px-4 py-3 text-right">
+                  <div className="inline-flex items-center gap-1">
+                    <Link to={gamePageUrl(g.id)} className={`${ICON} hover:text-[#29B6E8]`} title="Einstellungen" aria-label={`Einstellungen von ${gameLabel(g)}`} data-testid={`game-settings-${g.slug}`}>
+                      <Settings className="w-4 h-4" aria-hidden="true" />
+                    </Link>
+                    <button type="button" onClick={() => setStatus(g, isArchivedGame(g) ? "active" : "archived")} className={`${ICON} hover:text-warn`}
+                      title={isArchivedGame(g) ? "Spiel zurückholen" : "Spiel archivieren"} aria-label={isArchivedGame(g) ? `${gameLabel(g)} zurückholen` : `${gameLabel(g)} archivieren`} data-testid={`game-archive-${g.slug}`}>
+                      {isArchivedGame(g) ? <ArchiveRestore className="w-4 h-4" aria-hidden="true" /> : <Archive className="w-4 h-4" aria-hidden="true" />}
+                    </button>
+                    <button type="button" onClick={() => del(g)} className={`${ICON} hover:text-[#FF3B30]`} title="Spiel löschen" aria-label={`${gameLabel(g)} löschen`} data-testid={`game-delete-${g.slug}`}>
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {list && !shown.length ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-sm text-white/55" data-testid="games-empty">Noch kein Spiel. „Neues Spiel“ legt eines an.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </TableScroll>
+      {creating ? <NewGameSheet games={games} onClose={() => setCreating(false)} /> : null}
     </AdminLayout>
-  );
-}
-
-function Input({ value, onChange, placeholder, required, testId }) {
-  return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none text-sm" />;
-}
-
-function Select({ value, onChange, options, testId }) {
-  return (
-    <select value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none text-sm">
-      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-    </select>
-  );
-}
-
-function toForm(game) {
-  return {
-    id: game.id,
-    name: game.name || "",
-    slug: game.slug || "",
-    kind: game.kind || "standalone",
-    parent_game_id: game.parent_game_id || "",
-    identity_source_game_id: game.identity_source_game_id || "",
-    inherit_player_ids: game.inherit_player_ids !== false,
-    short_name: game.short_name || "",
-    cover_url: game.cover_url || "",
-    logo_url: game.logo_url || "",
-    player_id_fields: game.player_id_fields || [],
-    discord_guild_id: game.discord_guild_id || "",
-    discord_role_name: game.discord_role_name || "",
-    // Spiel-Daten für Turniere (#1554) - eigener Teil des Formulars, beim Speichern umgerechnet.
-    match_data: gameMatchDataToForm(game),
-  };
-}
-
-function optionList(value) {
-  const rows = Array.isArray(value) ? value : String(value || "").split(",");
-  return rows.map((row) => String(row).trim()).filter(Boolean);
-}
-
-function normalizePlayerIdFields(fields = []) {
-  return (fields || [])
-    .map((field) => ({
-      key: fieldKeyFrom(field.key || field.label || ""),
-      label: field.label || field.key || "",
-      help_text: field.help_text || "",
-      required: field.required !== false,
-      // Spielberechtigung (#2204): Format, Beispiel, Auswahl - leer heißt „keine Vorgabe“.
-      ...(String(field.pattern || "").trim() ? { pattern: String(field.pattern).trim() } : {}),
-      ...(String(field.format_hint || "").trim() ? { format_hint: String(field.format_hint).trim() } : {}),
-      ...(optionList(field.options).length ? { options: optionList(field.options) } : {}),
-      ...(field.unique_in_season === false ? { unique_in_season: false } : {}),
-    }))
-    .filter((field) => field.key && field.label);
-}
-
-function gamePayload(form) {
-  const isEdition = form.kind === "edition";
-  const { match_data: matchData, ...rest } = form;
-  return {
-    ...rest,
-    ...(matchData ? gameMatchDataPayload(matchData) : {}),
-    slug: slugFrom(form.slug),
-    parent_game_id: isEdition ? (form.parent_game_id || null) : null,
-    identity_source_game_id: isEdition ? (form.identity_source_game_id || null) : null,
-    inherit_player_ids: form.inherit_player_ids !== false,
-    player_id_fields: normalizePlayerIdFields(form.player_id_fields),
-    discord_guild_id: form.discord_guild_id || null,
-    discord_role_name: isEdition ? null : ((form.discord_role_name || "").trim() || null),
-  };
-}
-
-function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
-  const [form, setForm] = useState(game);
-  const [saving, setSaving] = useState(false);
-  // Wo die Modi verwendet werden (#2206): Entfernen nur bei unbenutzten. undefined = lädt, null = unbekannt.
-  const [usage, setUsage] = useState(undefined);
-  const confirm = useConfirm();
-  useEffect(() => {
-    let alive = true;
-    if (!game.id) {
-      setUsage(null);
-      return undefined;
-    }
-    api.get(`/games/${game.id}/usage`).then(({ data }) => { if (alive) setUsage(data || null); }).catch(() => { if (alive) setUsage(null); });
-    return () => { alive = false; };
-  }, [game.id]);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parentOptions = selectableGames(games, form.parent_game_id).filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameOptionLabel(g)]);
-  const identityOptions = selectableGames(games, form.identity_source_game_id).filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameOptionLabel(g)}`]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    const problem = gameMatchDataProblem(form.match_data);
-    if (problem) { toast.error(problem); return; }
-    setSaving(true);
-    try {
-      const payload = gamePayload(form);
-      // Modus entfernt (#2129, SP2): vor dem Speichern fragen, mit der Zahl der betroffenen Maps - auf dem Server
-      // verschwindet er dann auch aus den Maps.
-      const removed = removedModes(game.match_data?.match_modes, payload);
-      if (removed.length) {
-        const usage = await api.get(`/games/${form.id}/usage`).then(({ data }) => data).catch(() => null);
-        const question = modeRemovalQuestion(removed, usage);
-        if (question && !await confirm({ ...question, confirmLabel: "Entfernen" })) {
-          setSaving(false);
-          return;
-        }
-      }
-      const { data } = await api.patch(`/games/${form.id}`, payload);
-      toast.success(gameSavedText(data));
-      onSaved();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Spiel konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
-    }
-    setSaving(false);
-  };
-
-  // Seitenblatt statt Fenster (#435): die Spieleliste bleibt daneben sichtbar.
-  return (
-    <AdminSheet title="Spiel bearbeiten" eyebrow="Spiele" size="lg" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="game-edit-save" testId="game-sheet">
-      <FormGrid>
-        <Input placeholder={form.kind === "edition" ? "Versionsname, z.B. Black Ops 7" : "Name, z.B. Call of Duty"} value={form.name} onChange={(v) => { set("name", v); if (!form.slug) set("slug", slugFrom(v)); }} required testId="game-edit-name" />
-        <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
-        <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
-        <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
-        <DiscordServerField form={form} games={games} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-edit-discord" />
-        {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-edit-role" />}
-      </FormGrid>
-      {form.kind === "edition" && (
-        <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-          <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-edit-parent" />
-          <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...identityOptions]} testId="game-edit-identity-source" />
-          <div className="md:col-span-2"><EditionPreview form={form} games={games} /></div>
-          <CheckField label="Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist." checked={form.inherit_player_ids !== false} onChange={(v) => set("inherit_player_ids", v)} className="md:col-span-2" />
-        </div>
-      )}
-      <FormGrid>
-        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
-        <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
-      </FormGrid>
-      <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
-      <GameMatchDataFields value={form.match_data} onChange={(v) => set("match_data", v)} usage={usage} />
-    </AdminSheet>
-  );
-}
-
-function EditionPreview({ form, games }) {
-  const parent = games.find((game) => game.id === form.parent_game_id);
-  if (!parent || form.kind !== "edition" || !form.name) return null;
-  return (
-    <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 text-xs text-white/60">
-      Anzeige in Turnieren und Profilen: <span className="font-bold text-white">{gameLabel({ ...form, parent_game: parent })}</span>
-    </div>
-  );
-}
-
-function PlayerIdFieldsEditor({ value = [], onChange }) {
-  const fields = value || [];
-  const update = (idx, patch) => {
-    const next = [...fields];
-    next[idx] = { ...next[idx], ...patch };
-    onChange(next);
-  };
-  return (
-    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spieler-IDs</div>
-          <div className="text-[10px] text-white/45 mt-0.5">Pflichtfelder werden bei Turnieranmeldungen geprüft.</div>
-        </div>
-        <button type="button" onClick={() => onChange([...fields, { key: "", label: "", help_text: "", required: true }])} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8]">+ Feld</button>
-      </div>
-      {fields.map((field, idx) => (
-        <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-          <input value={field.label || ""} onChange={(e) => update(idx, { label: e.target.value, key: field.key || fieldKeyFrom(e.target.value) })} placeholder="Label, z.B. Activision ID" className="col-span-5 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" />
-          <input value={field.key || ""} onChange={(e) => update(idx, { key: fieldKeyFrom(e.target.value) })} placeholder="key" className="col-span-3 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" />
-          <input value={field.help_text || ""} onChange={(e) => update(idx, { help_text: e.target.value })} placeholder="Hinweis" className="col-span-3 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" />
-          <button type="button" onClick={() => onChange(fields.filter((_, i) => i !== idx))} className="col-span-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
-          <label className="col-span-12 inline-flex items-center gap-2 text-xs text-white/65">
-            <input type="checkbox" checked={field.required !== false} onChange={(e) => update(idx, { required: e.target.checked })} className="accent-[#29B6E8]" />
-            Pflichtfeld für Turnieranmeldung
-          </label>
-          {/* Liga (#2204): Format und Auswahl gelten für neue Werte im Profil und für die Spielberechtigung. Leer = keine Vorgabe. */}
-          <input value={field.pattern || ""} onChange={(e) => update(idx, { pattern: e.target.value })} placeholder="Format (regulärer Ausdruck), z.B. [^#]+#\d+" className="col-span-12 sm:col-span-4 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs font-mono" data-testid={`game-id-field-pattern-${idx}`} />
-          <input value={field.format_hint || ""} onChange={(e) => update(idx, { format_hint: e.target.value })} placeholder="Beispiel für Spieler, z.B. Name#1234567" maxLength={120} className="col-span-12 sm:col-span-4 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" data-testid={`game-id-field-hint-${idx}`} />
-          <input value={Array.isArray(field.options) ? field.options.join(", ") : field.options || ""} onChange={(e) => update(idx, { options: e.target.value })} placeholder="Auswahl, durch Komma getrennt (etwa Plattformen)" className="col-span-12 sm:col-span-4 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" data-testid={`game-id-field-options-${idx}`} />
-          <label className="col-span-12 inline-flex items-center gap-2 text-xs text-white/65">
-            <input type="checkbox" checked={field.unique_in_season !== false} onChange={(e) => update(idx, { unique_in_season: e.target.checked })} className="accent-[#29B6E8]" />
-            Je Liga-Season nur einmal vergeben (für Auswahlfelder wirkungslos, wenn nicht eigens gesetzt)
-          </label>
-        </div>
-      ))}
-    </div>
   );
 }
