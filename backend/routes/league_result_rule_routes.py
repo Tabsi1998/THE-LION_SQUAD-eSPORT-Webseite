@@ -42,7 +42,9 @@ async def _season_and_game(db, season_id: str) -> tuple[dict, dict | None]:
 async def _view(db, season: dict, game: dict | None) -> dict:
     staffeln = await db.tournaments.count_documents({"league_context.season_id": season["id"], **ONLY_LEAGUE})
     return {"scores_required": bool(season.get("scores_required")), "rules": league_result_rules.overview(season, game),
-            "staffeln": staffeln}
+            "staffeln": staffeln,
+            # Hat die Season Einstellungen je Modus übernommen (#2271)? Ältere Seasons nicht - dort gelten die des Spiels.
+            "settings_held": isinstance(season.get("mode_settings"), dict)}
 
 
 @admin_router.get("/seasons/{season_id}/result-rules")

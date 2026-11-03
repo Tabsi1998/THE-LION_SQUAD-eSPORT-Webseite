@@ -1,5 +1,6 @@
 // Ergebnisregeln je Map (docs/LIGA.md, C.3, #1617): die Regel, die die Staffel für den Modus trägt, als Hinweis und als
 // Vorabprüfung. Dieselben Sätze wie der Server (services/league_result_rules.py) - der bleibt maßgeblich.
+import { durationText, ruleTimeLimitSeconds } from "@/lib/modeSettings";
 
 const count = (number, one, many) => `${number} ${Number(number) === 1 ? one : many}`;
 
@@ -11,8 +12,9 @@ export function ruleHint(rule) {
     rounds: `${count(rule.target, "Runde", "Runden")}${rule.round_limit ? `, höchstens ${rule.round_limit}` : ""}`,
     highest: "höherer Endstand gewinnt",
   }[rule.kind] || "";
-  return [head, rule.time_limit_minutes ? `${rule.time_limit_minutes} Min.` : "", rule.overtime ? "Verlängerung" : "",
-    rule.draw_allowed ? "Remis möglich" : ""].filter(Boolean).join(" · ");
+  const time = ruleTimeLimitSeconds(rule);
+  return [head, time ? durationText(time) : "", rule.round_time_seconds ? `${durationText(rule.round_time_seconds)} je Runde` : "",
+    rule.overtime ? "Verlängerung" : "", rule.draw_allowed ? "Remis möglich" : ""].filter(Boolean).join(" · ");
 }
 
 /** „Map 4 und 5 nicht gespielt – …“: die Positionen nach dem Serienende (`not_played`) - Matchseite und Ligaseite. */
@@ -72,7 +74,7 @@ export function mapRuleProblem(game, league) {
   if (!rule.overtime && target && won > target) {
     return `${label}: höchstens ${target} ${rule.kind === "score" ? "Punkte" : "Rundensiege"} – die Map endet beim Ziel (Endstand ${stand}).`;
   }
-  if (!rule.time_limit_minutes && !tie && target && won < target) {
+  if (!ruleTimeLimitSeconds(rule) && !tie && target && won < target) {
     return `${label}: Die Map endet erst bei ${target} ${rule.kind === "score" ? "Punkten" : "gewonnenen Runden"} – der Sieger hat ${shown(won)}.`;
   }
   return null;
