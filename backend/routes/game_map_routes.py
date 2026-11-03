@@ -89,7 +89,8 @@ async def map_import_sources(game_id: str, me: dict = Depends(require_admin())):
     for other in games:
         if other["id"] == game["id"]:
             continue
-        count = await db.game_maps.count_documents({"game_id": other["id"], "status": "active"})
+        # Aktiv heißt auch: ohne Zustand (#2207) - inaktive und archivierte zählen nicht.
+        count = await db.game_maps.count_documents({"game_id": other["id"], **game_maps.ACTIVE_QUERY})
         if count:
             related = family in (other["id"], other.get("parent_game_id"))
             rows.append({"id": other["id"], "name": other.get("display_name") or other.get("name"), "maps": count, "related": related})
