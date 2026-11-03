@@ -107,6 +107,34 @@ describe("Reiter", () => {
     expect(confirmMock).not.toHaveBeenCalled();
   });
 
+  // Folge-Review C.4: Ein offenes Blatt mit Änderungen ist „ungespeichert“ - Punkt am Reiter und Rückfrage beim Verlassen.
+  test("ein geändertes Eintrags-Blatt zeigt den Punkt und fragt beim Verlassen; unverändert oder geschlossen nicht", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe neu" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Ausrüstung") })));
+    expect(screen.queryByTestId("games-list")).not.toBeInTheDocument();
+    // Zurück auf den alten Stand: kein Punkt mehr.
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe" } });
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+  });
+
+  test("ein geändertes Kategorien-Blatt zählt ebenso, Schließen verwirft es", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-categories"));
+    fireEvent.change(screen.getByLabelText("Name der Kategorie 1"), { target: { value: "Primärwaffen" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("equipment-categories-sheet")).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    expect(await screen.findByTestId("games-list")).toBeInTheDocument();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("game-tab-ids"));

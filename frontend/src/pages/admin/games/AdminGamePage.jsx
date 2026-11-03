@@ -100,6 +100,7 @@ export default function AdminGamePage() {
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState("");
   const [mapsKey, setMapsKey] = useState(0);
+  const [equipmentDirty, setEquipmentDirty] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -133,7 +134,11 @@ export default function AdminGamePage() {
   const saved = useMemo(() => (game ? Object.fromEntries(Object.entries(FORMS).map(([key, toForm]) => [key, toForm(game)])) : {}), [game]);
   const formOf = (key) => drafts[key] ?? saved[key];
   const setForm = (key) => (next) => setDrafts((current) => ({ ...current, [key]: next }));
-  const dirty = Object.fromEntries(Object.keys(FORMS).map((key) => [key, Boolean(drafts[key] && saved[key] && !sameForm(drafts[key], saved[key]))]));
+  // Ausrüstung (#2218) speichert je Eintrag sofort - ungespeichert ist nur ein offenes Blatt mit Änderungen (es meldet sich selbst).
+  const dirty = {
+    ...Object.fromEntries(Object.keys(FORMS).map((key) => [key, Boolean(drafts[key] && saved[key] && !sameForm(drafts[key], saved[key]))])),
+    ausruestung: equipmentDirty,
+  };
   const dirtyLabels = GAME_TABS.filter((entry) => dirty[entry.key]).map((entry) => entry.label);
   const discard = (key) => setDrafts((current) => {
     const rest = { ...current };
@@ -224,8 +229,9 @@ export default function AdminGamePage() {
     ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
-    // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps - kein Entwurf, also kein Punkt und keine Rückfrage beim Verlassen.
-    ausruestung: () => <EquipmentLibrary gameId={game.id} />,
+    // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps. Ist ein Blatt mit Änderungen offen, meldet es das: Punkt am
+    // Reiter und Rückfrage beim Verlassen.
+    ausruestung: () => <EquipmentLibrary gameId={game.id} onDirtyChange={setEquipmentDirty} />,
   } : {};
   const hasForm = Boolean(FORMS[tab]);
 
