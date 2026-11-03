@@ -13,6 +13,8 @@ import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SeasonApplicationSection } from "./SeasonApplicationSection";
 import { SeasonApplicationsPanel } from "./SeasonApplicationsPanel";
 import { SeasonEligibilitySection } from "./SeasonEligibilitySection";
+import { SeasonTableRules } from "./SeasonTableRules";
+import { SeasonTablePanel } from "./SeasonTablePanel";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -30,7 +32,6 @@ import {
   LEGS_OPTIONS,
   MAP_REPEAT_OPTIONS,
   SEASON_STATUS_OPTIONS,
-  TIEBREAKER_LABELS,
   VISIBILITY_OPTIONS,
   VISIBILITY_SHORT,
   WEEKDAY_OPTIONS,
@@ -101,29 +102,6 @@ function BlockedPeriods({ periods, onChange }) {
         <CalendarOff className="w-3.5 h-3.5" aria-hidden="true" /> Sperrzeit hinzufügen
       </button>
     </div>
-  );
-}
-
-function Tiebreakers({ value, onChange }) {
-  const all = Object.keys(TIEBREAKER_LABELS);
-  const toggle = (key) => onChange(value.includes(key) ? value.filter((item) => item !== key) : [...value, key]);
-  return (
-    <fieldset className="space-y-1.5">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Bei Punktgleichheit</legend>
-      <div className="flex flex-wrap gap-2">
-        {all.map((key) => {
-          const position = value.indexOf(key);
-          return (
-            <label key={key} className={`inline-flex items-center gap-2 rounded-sm border px-3 py-1.5 text-xs cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${position >= 0 ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65"}`}>
-              <input type="checkbox" checked={position >= 0} onChange={() => toggle(key)} className="accent-[#29B6E8]" data-testid={`tiebreaker-${key}`} />
-              {position >= 0 ? <span className="font-bold tabular-nums text-[#29B6E8]">{position + 1}.</span> : null}
-              {TIEBREAKER_LABELS[key]}
-            </label>
-          );
-        })}
-      </div>
-      <p className="text-xs text-white/45">In der Reihenfolge des Anklickens. Zuerst zählen immer die Punkte.</p>
-    </fieldset>
   );
 }
 
@@ -436,7 +414,7 @@ export default function AdminLeagueSeasonPage() {
                   <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} testId="season-form-points-draw" />
                   <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} testId="season-form-points-loss" />
                 </FormGrid>
-                <Tiebreakers value={form.table_tiebreakers} onChange={(value) => set("table_tiebreakers", value)} />
+                <SeasonTableRules form={form} set={set} />
                 <FormGrid cols={3}>
                   <TextField label="Ergebnis gilt nach (Stunden)" type="number" min={1} max={336} value={form.result_confirm_hours} onChange={(value) => set("result_confirm_hours", value)}
                     hint="ohne Antwort der Gegenseite" testId="season-form-confirm" />
@@ -569,6 +547,9 @@ export default function AdminLeagueSeasonPage() {
                 </div>
               ))}
             </section>
+
+            {/* Tabelle (E.1, #1625): Gleichstände je Staffel, Entscheid der Leitung - lesen darf jede Zuständigkeit. */}
+            <SeasonTablePanel divisions={data.divisions} canDecide={can("results")} />
 
             {can("applications") ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
 

@@ -3,6 +3,7 @@
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
@@ -17,7 +18,6 @@ export const BEST_OF_OPTIONS = [["1", "Best of 1"], ["3", "Best of 3"], ["5", "B
 export const LEGS_OPTIONS = [["1", "Nur Hinrunde"], ["2", "Hin- und Rückrunde"]];
 // Map-Wiederholung in einer Serie (#2096): Vorgabe „gleiche Map nur in anderem Modus“.
 export const MAP_REPEAT_OPTIONS = [["other_mode", "Gleiche Map nur in anderem Modus"], ["never", "Aus – jede Map nur einmal"], ["always", "Immer erlaubt"]];
-export const TIEBREAKER_LABELS = { score_diff: "Differenz", score_for: "Mehr gewonnene Maps", wins: "Mehr Siege" };
 // Stand einer Liga und einer Liga N (#2106): archiviert heißt ausgeblendet, aber erhalten.
 export const ACTIVE_STATUS_OPTIONS = [["active", "Aktiv"], ["archived", "Archiviert"]];
 export const SYNC_GROUP_TEXT = {
@@ -66,7 +66,8 @@ export function seasonToForm(season = {}) {
     points_win: String(points.win ?? 3),
     points_draw: String(points.draw ?? 1),
     points_loss: String(points.loss ?? 0),
-    table_tiebreakers: rules.table_tiebreakers || ["score_diff", "score_for"],
+    // Tabelle (E.1, #1625): Gleichstand, Mini-Tabelle, Remis, Default-Win, Ausscheiden.
+    ...tableRulesToForm(rules),
     game_mode_order: season.game_mode_order || [],
     map_repeat: season.map_repeat || "other_mode",
     result_confirm_hours: String(season.result_confirm_hours ?? 48),
@@ -122,7 +123,7 @@ export function seasonPayload(form) {
     scoring_rules: {
       ...(form.scoring_rules || {}),
       match_points: { win: number(form.points_win) ?? 0, draw: number(form.points_draw) ?? 0, loss: number(form.points_loss) ?? 0 },
-      table_tiebreakers: form.table_tiebreakers,
+      ...tableRulesPayload(form),
     },
     game_mode_order: order.every(Boolean) ? order : [],
     map_repeat: form.map_repeat || "other_mode",
