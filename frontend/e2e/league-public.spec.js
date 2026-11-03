@@ -37,8 +37,10 @@ const weeks = Array.from({ length: 10 }, (_, index) => {
       home: { ...home, score: done ? 2 : null }, away: { ...away, score: done ? 1 : null },
       winner_registration_id: done ? home.registration_id : null,
       games: done ? [{ position: 1, map_name: "Hafenkante", winner_registration_id: home.registration_id },
-        { position: 2, map_name: "Nebelwerk", winner_registration_id: away.registration_id },
-        { position: 3, map_name: "Hafenkante", winner_registration_id: home.registration_id }] : [] };
+        { position: 2, map_name: "Nebelwerk", winner_registration_id: away.registration_id, status: "replayed", replay_reason: "Verbindung brach ab" },
+        { position: 3, map_name: "Hafenkante", winner_registration_id: home.registration_id, decision: "awarded" }] : [],
+      // Ergebnisregeln (C.3, #1617): Spiel 4 endete 2:0, Map 3 blieb ungespielt.
+      ...(done && pair === 4 ? { not_played: [3] } : {}) };
   }) };
 });
 const STAFFEL = {
@@ -92,6 +94,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await staffel.getByTestId("league-week-1").getByRole("button").click();
     await expect(staffel.getByTestId("league-match-m1-1")).toContainText("2 : 1");
     await expect(staffel.getByTestId("league-match-m1-1")).toContainText("Nebelwerk");
+    await expect(staffel.getByTestId("league-map-m1-1-2")).toContainText("wiederholt");
+    await expect(staffel.getByTestId("league-map-m1-1-3")).toContainText("zugesprochen");
+    await expect(staffel.getByTestId("league-maps-m1-4-not-played")).toHaveText("Map 3 nicht gespielt – die Serie war entschieden.");
     await noSideScroll(page);
   });
 }

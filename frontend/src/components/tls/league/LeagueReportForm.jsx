@@ -21,6 +21,7 @@ import {
   startGames,
   toggleLineup,
 } from "./leagueGames";
+import { ruleFor, ruleHint } from "./leagueResultRules";
 
 // Liga-Ergebnis melden (docs/LIGA.md, #1650): je Map Modus, Map aus dem Pool, Sieger, auf Wunsch die Punkte und die
 // eigene Aufstellung. Die nächste Map erscheint, sobald die letzte einen Sieger hat - bis die Serie entschieden ist.
@@ -99,13 +100,17 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
   const modes = poolModes(league.pool);
   const fixedMode = (league.mode_order || []).length > 0 || modes.length <= 1;
   const maps = mapsFor(league.pool, game.mode);
-  const [showScores, setShowScores] = useState(Object.keys(game.scores || {}).length > 0);
+  const [openScores, setShowScores] = useState(Object.keys(game.scores || {}).length > 0);
+  // Punkte je Map Pflicht (C.3, #1617): die Felder stehen gleich da. Die Regel des Modus steht als Hinweis an der Map.
+  const showScores = openScores || Boolean(league.scores_required);
+  const rule = ruleHint(ruleFor(league, game.mode));
   const set = (patch) => onChange({ ...game, ...patch });
   return (
     <fieldset className="min-w-0 space-y-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 sm:p-4" data-testid={`league-game-${game.position}`}>
       <legend className="px-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">
         Map {game.position}{game.mode && fixedMode ? ` · ${modeLabel(league.pool, game.mode)}` : ""}
       </legend>
+      {rule ? <p className="text-xs text-white/60" data-testid={`league-game-${game.position}-rule`}>Gewertet: {rule}</p> : null}
       {!fixedMode && (
         <div role="group" aria-label={`Modus Map ${game.position}`} className="flex flex-wrap gap-1.5">
           {modes.map((group) => (
@@ -151,7 +156,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
         <div className="grid grid-cols-2 gap-2">
           {league.sides.map((side) => (
             <label key={side.registration_id} className="block min-w-0 text-xs text-white/55">
-              <span className="block truncate">Punkte {side.name}</span>
+              <span className="block truncate">{league.scores_required ? "Punkte (Pflicht)" : "Punkte"} {side.name}</span>
               <input inputMode="numeric" value={game.scores?.[side.registration_id] ?? ""} onChange={(event) => set({ scores: { ...game.scores, [side.registration_id]: event.target.value } })}
                 className="input mt-1 w-full" data-testid={`league-game-${game.position}-score-${side.registration_id}`} />
             </label>

@@ -16,6 +16,14 @@ from squad_world import make_squad, make_team, squad_registration
 GAME_ID = "probe-shooter"
 # Eine Season mit den Regeln von vor #2204: Aufstellung je Map, keine Altersprüfung, keine Wartezeit. Für Tests, die nicht diese Regeln prüfen.
 OLD_RULES = {"lineup_mode": "per_map", "min_age": 0, "new_player_wait_days": 0, "one_team_per_season": False, "unique_game_ids": False}
+
+
+async def without_score_duty(flow, season: dict) -> None:
+    """Punkte je Map sind in neuen Seasons Pflicht (C.3, #1617) - hier aus, für Tests, die nicht diese Regel prüfen. Die Kopie der
+    Ergebnisregeln bleibt."""
+    saved = await flow.put(f"/api/admin/leagues/seasons/{season['id']}/result-rules",
+                           json={"scores_required": False, "rules": season.get("result_rules") or {}})
+    assert saved.status_code == 200, saved.text
 POOL = [
     {
         "mode": "stellung",

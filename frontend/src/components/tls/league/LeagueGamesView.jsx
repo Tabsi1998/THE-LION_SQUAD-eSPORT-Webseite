@@ -4,6 +4,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDateTime } from "@/lib/vienna";
 import { LineupPicker, ParticipantsPicker } from "./LeagueReportForm";
 import { followLineups, gamesProblem, isSeries, lineupAmendClosed, participantsProblem, personIds } from "./leagueGames";
+import { notPlayedText } from "./leagueResultRules";
 
 // Die gespielten Maps eines Liga-Spiels (docs/LIGA.md, #1650): je Map Bild, Name, Modus, Sieger, Punkte und die
 // Aufstellungen beider Seiten - fehlt eine noch, steht es da. Wer darf, trägt die eigene Aufstellung hier nach.
@@ -58,10 +59,20 @@ export function LeagueGamesView({ league }) {
                   </div>
                 );
               })}
+              {/* Zusatzfelder (C.3, #1617): wiederholt mit Grund, von der Leitung zugesprochen. */}
+              {game.status === "replayed" ? (
+                <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>Wiederholt: {game.replay_reason}</p>
+              ) : null}
+              {game.decision === "awarded" ? (
+                <p className="text-xs text-warn" data-testid={`league-games-${game.position}-awarded`}>Zugesprochen von der Liga-Leitung</p>
+              ) : null}
             </div>
           </li>
         ))}
       </ol>
+      {(league.not_played || []).length ? (
+        <p className="text-xs text-white/50" data-testid="league-games-not-played">{notPlayedText(league.not_played)}</p>
+      ) : null}
       {series ? <ParticipantsView league={league} missing={missing} /> : null}
     </div>
   );

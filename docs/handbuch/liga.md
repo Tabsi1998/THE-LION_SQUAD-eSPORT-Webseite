@@ -147,6 +147,24 @@ fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 6. **Prüfung vor der Veröffentlichung** (siehe 2.8): zeigt, was vor dem Veröffentlichen noch fehlt, und die **Mindestgröße im
    Map-Pool** je Modus. Wer mehr oder weniger Maps verlangen will, trägt die Zahl ein und tippt **Mindestgröße speichern** – leer
    heißt: abgeleitet aus Reihenfolge, Best of und Map-Wiederholung.
+7. **Ergebnisregeln** (unter dem Map-Pool): Eine neue Season übernimmt beim Anlegen die Ergebnisregel jedes Modus aus dem
+   Spiel (2.1) als eigene Kopie, und **Punkte je Map Pflicht** ist an. Je Modus stehen die Regel der Season und darunter
+   „Spiel: …“. Abweichen geht je Modus: **Art** (Punkte bis zum Ziel, Runden gewinnen, Höherer Endstand gewinnt, Keine Regel),
+   **Zielpunkte** bzw. **Rundensiege zum Sieg**, **Höchstens Runden**, **Zeitlimit**, **Remis möglich**, **Verlängerung** →
+   **Ergebnisregeln speichern**. Ändert jemand später die Regel am Spiel, bleibt die Season, wie sie ist: Dann steht
+   **weicht vom Spiel ab** am Modus, und **Vom Spiel übernehmen** holt die neue Regel – erst mit dem Speichern gilt sie.
+
+| Art | Beispiel | Was die Meldung prüft |
+| --- | --- | --- |
+| Punkte bis zum Ziel | Ziel 250, Zeitlimit 10 Min. | Sieger hat mehr Punkte, höchstens 250; ohne Zeitlimit genau 250 |
+| Runden gewinnen | 6 Rundensiege, höchstens 11 Runden | 6:5 geht, 7:5 nicht („höchstens 11 Runden – 7:5 sind 12“) |
+| Höherer Endstand gewinnt | – | nur: der Sieger hat mehr |
+
+Mit **Verlängerung** dürfen Ziel und Rundenlimit überschritten werden. Ein Gleichstand geht nur mit **Remis möglich**; die
+Map braucht trotzdem einen Sieger. Ohne Regel prüft die Meldung den Endstand nicht. Seasons von vor dieser Funktion haben
+keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier speicherst.
+
+![Ergebnisregeln der Season](bilder/liga-ergebnisregeln-season.png)
 
 ### 2.3 Liga 1 und Staffel anlegen
 
@@ -250,6 +268,7 @@ mehr geht, steht je Staffel mit Grund da:
 | --- | --- |
 | Regeltext, Map-Pool | immer (ein entfernter Pool verschwindet nur vor dem ersten Ergebnis; Spiele mit festgehaltenem Pool behalten ihn) |
 | Antwortfrist auf Terminvorschläge | auch während der Season – gilt für neue Vorschläge; nicht bei gesperrten Staffeln. Ist das Feld der Season leer (ältere Seasons), behält jede Staffel ihre Frist |
+| Ergebnisregeln und Punktepflicht | auch während der Season – gilt für neue Meldungen, fertige Ergebnisse bleiben; nicht bei gesperrten Staffeln |
 | Termine und Kalender (Beginn, Wochen, Sperrzeiten, Standardtermin, Runden, Staffelgröße) | nur vor dem Start |
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
@@ -528,6 +547,15 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   **Grund** (mindestens fünf Zeichen). Die Korrektur schließt einen offenen Einspruch, die Tabelle rechnet sofort neu.
   Ohne neue Maps bleiben die alten, solange sie zum Stand passen – sonst fallen sie weg. Ablauf wie in
   [Turniere, 3.7](turniere.md#37-dispute-streit-um-ein-ergebnis).
+- **Ergebnisregeln gelten auch für die Leitung** (2.2, Schritt 5): Eintragen und Korrigieren prüfen dieselben Endstände
+  wie die Meldung der Captains. Passt ein Endstand wirklich nicht zur Regel (etwa nach einem Absturz), darf die
+  **Liga-Leitung mit der Zuständigkeit „Ergebnisse“** sie übergehen: im Ergebnis-Fenster **Ergebnisregel übergehen
+  (Liga-Leitung, mit Grund)** einen Grund eintragen (mindestens fünf Zeichen). Best of, Map-Pool und Aufstellung gelten
+  trotzdem; der Grund steht im Protokoll. Im eigenen Spiel entscheidet eine zweite Person (2.11), der Superadmin nur als
+  Notausnahme mit Grund. Captains können eine Regel nie übergehen.
+- **Wiederholte und zugesprochene Maps**: Über die Schnittstelle kann eine Map als **wiederholt** (mit Grund) markiert
+  oder von der Leitung **zugesprochen** werden (ohne Punkte, ohne Regel). Die Matchseite zeigt beides an der Map; nach
+  dem Serienende steht dort, welche Maps nicht gespielt wurden.
 
 ### 3.5 Tabelle und Ligaseite
 
