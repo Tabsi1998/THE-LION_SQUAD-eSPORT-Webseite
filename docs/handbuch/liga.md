@@ -129,6 +129,7 @@ das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
 | | **Wer gespielt hat**, **Mindestens auf der Liste** | Teilnehmerliste einmal je Spiel, 3 |
 | | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
 | | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
+| Plattform (eigener Kasten, siehe 2.7b) | **Feld**, **Erlaubte Plattformen**, **Crossplay**, **Eingabegerät** | nach Regelwerk |
 | Regeltext und Sichtbarkeit | **Regeltext** (Markdown) – nur, solange es kein Regelwerk gibt (2.11) | leer, Regelwerk nutzen |
 | | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
 
@@ -291,6 +292,28 @@ Verschiebung, bis ihr einmal speichert.
 | **Überfällig nach** | 48 h nach dem Termin | das Spiel steht bei euch unter **Mein Dienst → Braucht deine Entscheidung** |
 
 Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), legt die Liga-Leitung fest – siehe 3.1.
+
+### 2.7b Plattform und Eingabegerät
+
+Eine Season kann nur für PC, nur für PlayStation, für mehrere oder alle Plattformen sein. Auf der Season-Seite steht dafür der
+Kasten **Plattform und Eingabegerät** (Zuständigkeit „Season konfigurieren“) mit eigenem **Plattform speichern**. Er gilt sofort,
+ohne Übertragen, auch in laufenden Staffeln.
+
+![Kasten Plattform und Eingabegerät](bilder/liga-plattform-season.png)
+
+1. **In welchem Feld steht die Plattform?** Wählt das Spiel-ID-Feld mit Auswahl, etwa „Plattform“. Fehlt es, legt es zuerst unter
+   **Admin → Spiele → Spiel → Spiel-IDs** an: Feld mit den Auswahlwerten (PC, PlayStation …), am besten als Pflichtfeld. Dann
+   wird die Plattform mit der Spiel-ID für die Season festgehalten; ein freiwilliges Feld liest immer den aktuellen Wert im Profil.
+2. **Erlaubte Plattformen** anhaken. Nichts angehakt: alle erlaubt, keine Prüfung. Alle angehakt: jede erlaubt, die Angabe ist aber Pflicht.
+3. **Crossplay** (an, aus) und **Eingabegerät** (Controller, Maus und Tastatur, beides) sind nur Angaben für Regelwerk und
+   Ligaseite. Geprüft werden sie nicht.
+
+Darunter steht **So gilt es je Liga**. Eine Liga N weicht im Liga-N-Blatt (Stift) unter **Plattform** ab: **Eigene Plattformen für diese
+Liga** anhaken und wählen. Mit Haken und ohne Auswahl sind in dieser Liga alle Plattformen erlaubt. Crossplay und Eingabegerät
+stehen dort auf „wie Season“, bis ihr etwas anderes wählt.
+
+Wer auf einer anderen Plattform spielt, ist nicht spielberechtigt und sieht den Grund, etwa „Diese Season ist nur für PC – angegeben
+ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Profil“. Wo das wirkt, steht in 3.9.
 
 ### 2.8 Sichtbarkeit
 
@@ -637,6 +660,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | **Transferfenster** | Die Teamleitung beantragt im Fenster, ihr entscheidet. Nach der Genehmigung wartet die Person ab der Kaderaufnahme die volle Wartezeit, immer und auch wenn sie das alte Co-Team schon verlassen hatte |
 | **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum keine Anmeldung und keine Aufnahme. Ihr seht nur „Alter erfüllt“, „Geburtsdatum fehlt“ oder „Altersvorgabe nicht erfüllt“, die Liga nennt nie ein Datum oder Alter |
 | **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Zahnrad → Spiel-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
+| **Plattform** (2.7b) | Bei der Anmeldung zählt nicht als spielberechtigt, wer eine andere oder keine Plattform angibt: Er steht als Warnung da, und unter dem Mindestkader geht die Anmeldung nicht. Weil die Liga dort noch nicht feststeht, gilt die weiteste Regel aller Liga N. Beim Zuteilen gilt die Liga N der Staffel: Bleiben ohne Spieler anderer Plattformen zu wenige übrig, geht es nicht, sonst steht ein Hinweis im Dialog. Auf die Teilnehmerliste kommt niemand mit anderer Plattform. Die Aufnahme in den Kader prüft die Plattform nicht |
 
 **Wartezeit aufheben:** Season → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
 
@@ -666,6 +690,10 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder, auch die Antwortfrist) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
 | „In einer Liga-Staffel spielen nur Co-Teams …“ | Teilnehmer ohne Co-Team eingetragen | **Co-Team zuteilen** |
 | „Für diese Season ist noch kein gültiges Regelwerk veröffentlicht.“ | Fenster offen, aber keine gültige Version | Regelwerk veröffentlichen (2.11), „Gültig ab“ darf nicht in der Zukunft liegen |
+| „Diese Season ist nur für PC – angegeben ist PlayStation.“ (oder „Liga 2 ist nur für …“) | Spieler auf einer nicht erlaubten Plattform | Andere Spieler aufstellen; stimmt die Angabe nicht, ändert sie die Person im Profil (festgehalten: Freigabe wie bei der Spiel-ID, 3.7) |
+| „… Nur 2 Spieler sind auf einer erlaubten Plattform …“ beim Zuteilen | Ohne Spieler anderer Plattformen fehlt der Mindestkader | Kader ergänzen oder Co-Team in eine Liga mit passender Plattform |
+| „Bitte zuerst das Feld wählen, in dem die Plattform steht …“ / „Eigene Plattformen einer Liga N brauchen bei der Season das Feld …“ | Plattformen ohne Feld eingegrenzt | Im Kasten **Plattform und Eingabegerät** das Feld wählen (2.7b) |
+| „Dieses Feld gibt es am Spiel nicht, oder es hat keine Auswahl.“ | Feld ohne Auswahlwerte | Am Spiel unter **Spiel-IDs** Auswahlwerte eintragen |
 | „Alle Startplätze sind vergeben.“ beim Annehmen | Plätze voll, auch über 2.5 Zugeteilte zählen | Warteliste, oder **Startplätze** an der Season erhöhen |
 | „Eine Liga-Staffel hat keine Anmeldung – Co-Teams teilt die Turnierleitung zu.“ | Zugangslink mit Anmelderecht für eine Staffel | Link nur zum Ansehen anlegen, Co-Team zuteilen |
 | „Der Spielplan dieser Staffel steht – zurücksetzen oder neu aufbauen geht nur vor dem Start …“ | Spielplan oder Phase einer gestarteten Staffel neu aufbauen oder löschen | Einzelne Spiele im Reiter **Spiele** korrigieren |
