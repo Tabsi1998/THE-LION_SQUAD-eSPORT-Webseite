@@ -123,6 +123,9 @@ Seed-Modi bleiben unberührt; jeder Lauf legt zwei Modi dazu, ab 19 Modi übersp
 Ergebnisregeln ein und überträgt sie auf die laufende Staffel; je Breite meldet ein Captain einen falschen Endstand (vom Server und
 vom Formular abgelehnt) und dann den richtigen, die Gegenseite bestätigt ohne Punkte; die Korrektur der Leitung prüft dieselbe Regel
 und übergeht sie nur mit Grund.
+`ausruestung-abnahme.spec.js` (gleiche Stand-Datei, #2218) legt im Spiel „Call of Duty“ eine Waffe mit erfundenem Bild und Aufsätze an,
+setzt die Sperrliste der Season „Liga-Anmeldung“ im Browser, überträgt sie, veröffentlicht das Regelwerk mit Baustein „Sperrliste“, ändert
+die Liste und bestätigt den Vorschlag einer neuen Version; ein Gast liest Ligaseite, Regelwerk und PDF bei 390 und 1440 px.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem
