@@ -277,7 +277,12 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
    Staffel.
 
-<img src="../assets/liga/liga-season-beiname-handy.png" alt="Blatt Liga 1 bearbeiten am Handy: Beiname „Liga 1“ mit Hinweis, dass der Titel sonst „Liga 1 · Liga 1“ hieße" width="300">
+<table>
+<tr>
+<td><img src="../assets/liga/liga-season-ligen-pc.png" alt="Reiter Ligen und Staffeln: Liga 1 mit Hinweis zum Beinamen, Staffelgröße und Vorgaben übertragen" width="560"></td>
+<td><img src="../assets/liga/liga-season-beiname-handy.png" alt="Blatt Liga 1 bearbeiten am Handy: Beiname „Liga 1“ mit Hinweis, dass der Titel sonst „Liga 1 · Liga 1“ hieße" width="220"></td>
+</tr>
+</table>
 
 ### 2.4 Co-Teams vorbereiten (Teamleitung)
 
