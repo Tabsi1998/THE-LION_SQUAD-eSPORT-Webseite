@@ -120,6 +120,10 @@ test.describe("Abnahme: Symbol und Einstellungen je Modus gegen den echten Serve
       await page.reload();
       const rules = page.getByTestId(`result-rules-${key}`);
       await expect(rules.getByTestId(`result-rules-${key}-icon`)).toHaveAttribute("data-icon", "image");
+      // Die Ergebnisregel des neuen Modus kennt die Season noch nicht - übernehmen, dann stehen die Zeiten auch im Regelwerk.
+      await page.getByTestId(`result-rules-${key}-adopt`).click();
+      await expect(page.getByTestId(`result-rules-${key}-time`)).toHaveValue("1:30");
+      await expect(page.getByTestId(`result-rules-${key}-round-time`)).toHaveValue("1:45");
       // Eine Season mit Kopie kennt den neuen Modus noch nicht (weicht ab, übernehmen); eine ältere ohne Kopie zeigt die Werte des Spiels.
       const adopt = page.getByTestId(`result-rules-${key}-settings-adopt`);
       if (await adopt.isVisible()) await adopt.click();
