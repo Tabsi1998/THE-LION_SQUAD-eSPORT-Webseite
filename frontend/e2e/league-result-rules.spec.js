@@ -4,6 +4,8 @@ const { test, expect } = require("@playwright/test");
 // Punkte sind Pflicht, ein Endstand gegen die Regel kommt vor dem Absenden im Klartext - kein seitlicher Überlauf. Die API ist
 // nachgestellt, Namen und Werte sind erfunden.
 
+// Bilder fürs Handbuch: feste Leisten (Kopf, Sprunglink, Leiste unten) liegen sonst mitten im Ausschnitt.
+const CLEAN_SHOT = "header, .fixed, .sticky, a[href^='#'] { visibility: hidden !important; }";
 const json = (body, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 const SIDES = [{ registration_id: "a", name: "Loewen Langername · Rudel Alpha" }, { registration_id: "b", name: "Falken mit sehr langem Namen · Horst" }];
 const POOL = {
@@ -81,7 +83,7 @@ test.describe("Liga: Ergebnisregeln im Meldeformular", () => {
       await expect(page.getByTestId("match-report-error")).toHaveText("Map 2: höchstens 11 Runden – 7:5 sind 12.");
       expect(reports).toHaveLength(0);
       await expectNoSideScroll(page);
-      await testInfo.attach(`regel-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+      await testInfo.attach(`regel-${width}.png`, { body: await page.getByTestId("match-report-form").screenshot({ style: CLEAN_SHOT }), contentType: "image/png" });
 
       await page.getByTestId("league-game-2-score-a").fill("6");
       await page.getByTestId("match-report-submit").click();
@@ -150,7 +152,7 @@ test.describe("Liga: Ergebnisregeln der Season", () => {
       await expect(page.getByTestId("result-rules-stellung-target")).toHaveValue("300");
       await panel.scrollIntoViewIfNeeded();
       await expectNoSideScroll(page);
-      await testInfo.attach(`season-regeln-${width}.png`, { body: await panel.screenshot(), contentType: "image/png" });
+      await testInfo.attach(`season-regeln-${width}.png`, { body: await panel.screenshot({ style: CLEAN_SHOT }), contentType: "image/png" });
       await page.getByTestId("result-rules-save").click();
       await expect.poll(() => puts.length).toBe(1);
       expect(puts[0].rules.stellung.target).toBe(300);

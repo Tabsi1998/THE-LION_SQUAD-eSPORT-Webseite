@@ -727,7 +727,7 @@ zusammenfasst, was eingetragen ist (etwa „4 je Seite · Runden gewinnen: 6 Sie
 | **Beschreibung** | Worum es im Modus geht, höchstens 500 Zeichen. Nichts Vertrauliches eintragen: Spiel-Daten sind über die Schnittstelle lesbar. |
 | **Spieler je Seite** | 4 heißt 4 gegen 4. Leer: keine Vorgabe. |
 | **Format** | Freitext bis 60 Zeichen, etwa die Regel-Variante. |
-| **Ergebnisregel** | **Art**: Punkte bis zum Ziel, Runden gewinnen oder höherer Endstand gewinnt. Dazu **Ziel** (Punkte bzw. Runden zum Sieg), bei Runden ein **Rundenlimit**, ein **Zeitlimit** je Map, **Remis erlaubt** und **Verlängerung bei Gleichstand**. Die Regel wird gespeichert und angezeigt; gemeldete Endstände prüft die Seite damit noch nicht. |
+| **Ergebnisregel** | **Art**: Punkte bis zum Ziel, Runden gewinnen oder höherer Endstand gewinnt. Dazu **Ziel** (Punkte bzw. Runden zum Sieg), bei Runden ein **Rundenlimit**, ein **Zeitlimit** je Map, **Remis erlaubt** und **Verlängerung bei Gleichstand**. Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand ([Liga leiten, 2.2](liga.md#22-liga-und-season-anlegen)); spätere Änderungen hier erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts. |
 
 Werte eines bestimmten Titels sind nicht eingebaut; ihr tragt sie je Spiel selbst ein. Passt etwas nicht (Ziel fehlt,
 Rundenlimit kleiner als das Ziel …), sagt es die Seite vor dem Speichern.
@@ -886,7 +886,10 @@ Website stehen sie nicht, im Profil und auf der Teamseite gekennzeichnet als „
 In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teamleitung) – auf der Matchseite im Web:
 
 1. **Melden:** je gespielter Map den Modus (steht fest, wenn die Season eine Reihenfolge vorgibt), die **Map aus dem
-   Pool** antippen, den **Sieger** antippen, auf Wunsch die Punkte. Die nächste Map erscheint, sobald die letzte einen Sieger hat – bis die
+   Pool** antippen, den **Sieger** antippen und den **Endstand** der Map eintragen (in neuen Seasons Pflicht, sonst
+   freiwillig). An jeder Map steht, wie sie gewertet wird, etwa „Gewertet: bis 250 Punkte · 10 Min.“ oder „6 Runden,
+   höchstens 11“. Passt ein Endstand nicht dazu oder nicht zum Sieger, steht das gleich unter den Maps, etwa „Map 2: höchstens
+   11 Runden – 7:5 sind 12.“ Die nächste Map erscheint, sobald die letzte einen Sieger hat – bis die
    Serie entschieden ist. Am Schluss einmal ankreuzen, **wer bei euch gespielt hat** (mindestens 3, bei Wechseln auch mehr; ältere Staffeln stellen stattdessen je Map auf).
    Ein Map-Veto gibt es nicht im System; ihr tragt ein, was gespielt wurde.
 2. **Bestätigen:** die Gegenseite sieht die Maps in Worten, kreuzt ihre Teilnehmer an und tippt
@@ -897,7 +900,12 @@ In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teaml
 4. **Teilnehmerliste nachtragen:** wer aus der App oder durch die Automatik ohne Liste dasteht, sieht auf der
    Matchseite „Teilnehmerliste fehlt noch“ und trägt sie nach – bis 48 Stunden ab der Bestätigung, danach entscheidet die Liga-Leitung. Das Ergebnis bleibt gültig.
 
-Geprüft wird: Best of (keine Map nach der Entscheidung), Map im Pool und für den Modus freigegeben, auf der Liste nur
+Beim **Bestätigen** gelten die Punkte der ersten Meldung – ihr müsst sie nicht noch einmal eintippen.
+
+![Meldeformular mit Ergebnisregel je Map](bilder/liga-ergebnisregeln-melden.png)
+
+Geprüft wird: Best of (keine Map nach der Entscheidung), der Endstand je Map gegen Sieger und Ergebnisregel der Season
+([Liga leiten, 2.2](liga.md#22-liga-und-season-anlegen)), Map im Pool und für den Modus freigegeben, auf der Liste nur
 der eigene Kader und nur, wer spielberechtigt ist (**Spiel-ID**, Alter, Wartezeit, siehe
 [Liga leiten, 3.7](liga.md#37-spiel-ids-im-kader) und [3.9](liga.md#39-spielberechtigung-regeln-je-season)), nie jemand auf beiden Seiten und **kein Doppel-Einsatz** – niemand spielt am selben Spieltag für
 zwei Teams derselben Season.
