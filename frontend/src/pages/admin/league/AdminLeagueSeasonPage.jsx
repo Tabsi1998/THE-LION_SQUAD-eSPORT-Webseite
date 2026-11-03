@@ -28,6 +28,7 @@ import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
+import { SeasonCheckinRulesPanel } from "./SeasonCheckinRulesPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
   ACTIVE_STATUS_OPTIONS,
@@ -613,6 +614,8 @@ export default function AdminLeagueSeasonPage() {
 
             {can("roster") ? <SeasonRosterPanel seasonId={seasonId} /> : null}
             {canSeason ? <SeasonScheduleRulesPanel seasonId={seasonId} /> : null}
+            {/* Check-in (#1652): eigener Kasten - kommt mit dem Reiter-Umbau nach „Spielbetrieb“. */}
+            {canSeason ? <SeasonCheckinRulesPanel seasonId={seasonId} /> : null}
 
             {canSeason ? (
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
