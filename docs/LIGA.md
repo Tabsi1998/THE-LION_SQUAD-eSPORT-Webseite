@@ -1098,7 +1098,7 @@ an der Staffel verhält sich alles wie vorher (Heimrecht sofort, keine Verschieb
 
 **Einstellung `schedule_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Neue Seasons bekommen die Vorgabe, ältere
 nichts. Gepflegt unter `GET|PUT /api/admin/leagues/seasons/{id}/schedule-rules` (Zuständigkeit `season`), das Speichern schreibt sofort
-auf alle nicht gesperrten Staffeln der Season (Gruppe `running` beim Übertragen, `staffel_fields` beim Anlegen). Protokoll
+auf alle nicht gesperrten Staffeln der Season (eigene Gruppe `schedule` beim Übertragen, wie `running` auch nach dem Start, `staffel_fields` beim Anlegen). Protokoll
 `league.season.schedule_rules` mit altem und neuem Wert.
 
 | Feld | Typ | Vorgabe | Bedeutung |

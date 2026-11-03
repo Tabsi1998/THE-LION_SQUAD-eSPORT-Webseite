@@ -424,7 +424,9 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "always": ("visibility", "is_public", "rules"),
     # Die Antwortfrist gilt nur für neue Terminvorschläge - sie darf auch während der Season wechseln, nur nicht in
     # einer gesperrten Staffel.
-    "running": (RESPONSE_HOURS, "schedule_rules"),
+    "running": (RESPONSE_HOURS,),
+    # Terminregeln (#2194): wie die Antwortfrist auch während der Season, eigene Gruppe - ältere Seasons ohne Regeln lassen sie aus.
+    "schedule": ("schedule_rules",),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -434,7 +436,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
 }
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
-    "running": "Antwortfrist und Terminregeln",
+    "running": "Antwortfrist auf Terminvorschläge",
+    "schedule": "Terminregeln",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",

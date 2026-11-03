@@ -69,6 +69,9 @@ test.describe("Abnahme: Liga-Termine gegen den echten Server", () => {
     await lead.page.goto(`/admin/tournaments/${tid}`);
     await expect(lead.page.getByTestId("admin-tr-primary-action")).toContainText("Liga starten");
     await lead.page.getByTestId("admin-tr-primary-action").click();
+    // Fünf statt sechs Co-Teams: die Planung fragt nach („Mit Hinweisen live schalten?“).
+    const anyway = lead.page.getByRole("button", { name: "Trotzdem live" });
+    if (await anyway.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await anyway.click();
     await expect(lead.page.getByTestId("admin-tr-status-select")).toHaveValue("live");
 
     const rows = await (await lead.page.request.get(`/api/tournaments/${tid}/matches-v2`)).json();
@@ -143,7 +146,9 @@ test.describe("Abnahme: Liga-Termine gegen den echten Server", () => {
     await shot(home.page, "termine-aufgebraucht-1440.png");
 
     // Die dritte über die API: der Server lehnt sie ab (außerhalb des Browsers, damit die Wache sie nicht als Fehler zählt).
+    const csrf = (await home.page.context().cookies()).find((cookie) => cookie.name === "csrf_token")?.value || "";
     const third = await home.page.request.post(`/api/matches/${shared.id}/reschedule`, {
+      headers: { "X-CSRF-Token": decodeURIComponent(csrf) },
       data: { scheduled_at: dayAt(shared.start, 5).toISOString(), reason: "Noch einmal verschieben" } });
     expect(third.status()).toBe(409);
     expect((await third.json()).detail).toContain("Liga-Leitung");
