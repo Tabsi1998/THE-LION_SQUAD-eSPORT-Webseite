@@ -28,6 +28,8 @@ MAPS = (("Hafenkante", ["stellung", "suchen"]), ("Nebelwerk", ["suchen"]), ("Tur
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
+    # Die Sperren brauchen den eindeutigen Index (auf echtem MongoDB legt ihn init_indexes an).
+    await instance.db.mutation_locks.create_index("resource", unique=True)
     try:
         yield instance
     finally:
@@ -286,13 +288,105 @@ async def test_removing_a_map_makes_a_new_version_and_transfers_it(flow):
     assert len(log) == 1 and log[0]["data"]["reason"] == "Fehler im Spiel" and log[0]["data"]["map_name"] == "Hafenkante"
     assert log[0]["data"]["staffeln"] == [{"tournament_id": w["tid"], "applied": True}]
 
-    # Nochmal: nicht mehr im Pool. Alte Version erwartet: 409.
-    again = await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
-                            json={"map_id": hafen["id"], "reason": "Fehler im Spiel"})
-    assert again.status_code == 404
+    # Alte Version erwartet: 409. Eine Map, die nie im Pool stand: 404.
     stale = await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
                             json={"map_id": w["maps"]["Turmblick"]["id"], "reason": "Fehler im Spiel", "expected_version": 1})
     assert stale.status_code == 409
+    other = ok(await flow.post(f"/api/games/{w['game']['id']}/maps", json={"name": "Neuland", "modes": ["stellung"]}))
+    never = await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map", json={"map_id": other["id"], "reason": "Fehler im Spiel"})
+    assert never.status_code == 404
+
+
+async def second_staffel(flow, w: dict) -> str:
+    flow.act_as(w["lead"])
+    return ok(await flow.post(f"{ADMIN}/divisions/{w['division']['id']}/staffeln", json={}))["tournament_id"]
+
+
+def pool_maps(doc: dict | None) -> list:
+    return [(group.get("mode"), [item.get("map_id") for item in group.get("maps") or []]) for group in (doc or {}).get("modes") or []]
+
+
+async def versions_of(flow, scope: str, scope_id: str) -> int:
+    return await flow.db.map_pools.count_documents({"scope": scope, "scope_id": scope_id})
+
+
+@pytest.mark.asyncio
+async def test_removing_a_map_transfers_exactly_its_version_to_every_staffel(flow, monkeypatch):
+    """Codex-Prüfung #2207: Auch wenn danach eine neuere Version entsteht, bekommen die Staffeln genau die Version ohne die Map."""
+    w = await build(flow)
+    other_tid = await second_staffel(flow, w)
+    hafen, turm = w["maps"]["Hafenkante"], w["maps"]["Turmblick"]
+    real = map_pools.without_map
+
+    async def and_then_a_newer_one(db, **kwargs):
+        previous, doc = await real(db, **kwargs)
+        await db.map_pools.insert_one({**doc, "id": new_id(), "version": doc["version"] + 1, "note": "später",
+                                       "modes": [{"mode": "stellung", "label": "Stellung", "maps": [doc["modes"][0]["maps"][0]]}]})
+        return previous, doc
+
+    monkeypatch.setattr(map_pools, "without_map", and_then_a_newer_one)
+    done = ok(await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
+                              json={"map_id": hafen["id"], "reason": "Fehler im Spiel"}))
+    removed = await flow.db.map_pools.find_one({"id": done["pool"]["id"]}, {"_id": 0})
+    assert pool_maps(removed) == [("stellung", [turm["id"]]), ("suchen", [w["maps"]["Nebelwerk"]["id"]])]
+    assert {row["tournament_id"] for row in done["staffeln"] if row["applied"]} == {w["tid"], other_tid}
+    for tid in (w["tid"], other_tid):
+        assert pool_maps(await map_pools.current(flow.db, "tournament", tid)) == pool_maps(removed), tid
+
+
+@pytest.mark.asyncio
+async def test_a_busy_staffel_stops_removing_before_anything_is_written(flow):
+    from services.mutation_lock import mutation_lock, tournament_write_resource
+
+    w = await build(flow)
+    other_tid = await second_staffel(flow, w)
+    before = await versions_of(flow, "league_season", w["season"]["id"])
+    async with mutation_lock(flow.db, tournament_write_resource(other_tid), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+        busy = await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
+                               json={"map_id": w["maps"]["Hafenkante"]["id"], "reason": "Fehler im Spiel"})
+    assert busy.status_code == 409 and "gerade bearbeitet" in busy.json()["detail"]
+    assert await versions_of(flow, "league_season", w["season"]["id"]) == before
+    assert await versions_of(flow, "tournament", w["tid"]) == 1
+    assert not [row for row in await actions(flow) if row["action"] == "league.season.map_pool.remove_map"]
+
+
+@pytest.mark.asyncio
+async def test_removing_and_saving_the_pool_wait_for_each_other(flow):
+    from services.mutation_lock import league_season_pool_resource, mutation_lock
+
+    w = await build(flow)
+    before = await versions_of(flow, "league_season", w["season"]["id"])
+    async with mutation_lock(flow.db, league_season_pool_resource(w["season"]["id"]), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+        removing = await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
+                                   json={"map_id": w["maps"]["Hafenkante"]["id"], "reason": "Fehler im Spiel"})
+        saving = await flow.put(f"{ADMIN}/seasons/{w['season']['id']}/map-pool", json={"modes": [
+            {"mode": "stellung", "map_ids": [w["maps"]["Turmblick"]["id"], w["maps"]["Glutsenke"]["id"]]},
+            {"mode": "suchen", "map_ids": [w["maps"]["Nebelwerk"]["id"]]}]})
+        clearing = await flow.delete(f"{ADMIN}/seasons/{w['season']['id']}/map-pool")
+    assert (removing.status_code, saving.status_code, clearing.status_code) == (409, 409, 409)
+    assert await versions_of(flow, "league_season", w["season"]["id"]) == before
+
+
+@pytest.mark.asyncio
+async def test_removing_again_finishes_what_is_missing_and_creates_nothing_twice(flow):
+    w = await build(flow)
+    other_tid = await second_staffel(flow, w)
+    hafen = w["maps"]["Hafenkante"]
+    first = ok(await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
+                               json={"map_id": hafen["id"], "reason": "Fehler im Spiel"}))
+    # Wie nach einem Abbruch mitten im Übertragen: Die zweite Staffel spielt noch den alten Pool.
+    old = await flow.db.map_pools.find_one({"scope": "league_season", "scope_id": w["season"]["id"], "version": 1}, {"_id": 0})
+    await map_pools.copy_version(flow.db, old, scope="tournament", scope_id=other_tid, user=w["lead"], tournament_id=other_tid)
+    seasons, own = await versions_of(flow, "league_season", w["season"]["id"]), await versions_of(flow, "tournament", w["tid"])
+
+    again = ok(await flow.post(f"{ADMIN}/seasons/{w['season']['id']}/map-pool/remove-map",
+                               json={"map_id": hafen["id"], "reason": "Fehler im Spiel"}))
+    assert again["unchanged"] is True and again["pool"]["version"] == first["pool"]["version"]
+    assert await versions_of(flow, "league_season", w["season"]["id"]) == seasons
+    assert await versions_of(flow, "tournament", w["tid"]) == own, "die schon übertragene Staffel bekommt nichts doppelt"
+    assert not map_pools.allowed(await map_pools.current(flow.db, "tournament", other_tid), "stellung", hafen["id"])
+    log = [row for row in await actions(flow) if row["action"] == "league.season.map_pool.remove_map"]
+    assert [row["data"]["new_version"] for row in log] == [True, False]
 
 
 @pytest.mark.asyncio

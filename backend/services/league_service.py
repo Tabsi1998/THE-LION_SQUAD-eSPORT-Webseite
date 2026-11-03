@@ -1142,13 +1142,13 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
 
 
-async def transfer_pool(db, tournament: dict, season: dict, user: dict, *, locked: bool, applied: list, skipped: list,
-                        changed: list) -> None:
-    """Nur den Map-Pool der Season auf eine Staffel übertragen (#2207, „Map aus dem Pool nehmen“) - derselbe Weg wie beim
-    Übertragen: Spiele mit festgehaltenem Pool behalten ihren."""
+async def transfer_pool(db, tournament: dict, season: dict, user: dict, *, pool: dict, locked: bool, applied: list,
+                        skipped: list, changed: list) -> None:
+    """Genau die Version ``pool`` der Season auf eine Staffel übertragen (#2207, „Map aus dem Pool nehmen“) - derselbe Weg wie beim
+    Übertragen: Spiele mit festgehaltenem Pool behalten ihren. Hat die Staffel schon dieselben Maps, entsteht keine neue Version."""
     has_result = await _has_result(db, tournament["id"])
     await _sync_pool(db, tournament, season, user, locked=locked, has_result=has_result, applied=applied, skipped=skipped,
-                     changed=changed)
+                     changed=changed, pool=pool)
     await _note_mode_order(db, tournament, {}, skipped)
 
 
@@ -1164,11 +1164,11 @@ async def _note_mode_order(db, tournament: dict, updates: dict, skipped: list) -
 
 
 async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: bool, has_result: bool,
-                     applied: list, skipped: list, changed: list) -> None:
+                     applied: list, skipped: list, changed: list, pool: dict | None = None) -> None:
     """Map-Pool der Season → Staffel. Ein neuer Pool geht immer (Spiele mit festgehaltenem Pool behalten ihren). Hat die
     Season keinen Pool mehr, wird die Kopie der Staffel entfernt - nur vor dem ersten Ergebnis und nicht gesperrt, sonst
-    steht der Grund im Ergebnis."""
-    pool = await map_pools.current(db, "league_season", season["id"])
+    steht der Grund im Ergebnis. ``pool``: genau diese Version übertragen statt der gerade geltenden (#2207, „Map sperren“)."""
+    pool = pool if pool is not None else await map_pools.current(db, "league_season", season["id"])
     own = await map_pools.current(db, "tournament", tournament["id"])
     if pool and pool.get("game_id") == tournament.get("game_id"):
         if _pool_maps(pool) != _pool_maps(own):

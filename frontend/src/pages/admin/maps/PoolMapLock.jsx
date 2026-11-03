@@ -39,7 +39,9 @@ export function PoolMapLock({ endpoint, pool, onDone, testId = "pool-lock" }) {
       setMapId("");
       setMode(ALL);
       setReason("");
-      toast.success(`„${chosen.name}“ gesperrt – Version ${data.pool.version}.`);
+      // Schon gesperrt (#2207): keine neue Version, nur fehlende Staffeln wurden nachgezogen.
+      toast.success(data.unchanged ? `„${chosen.name}“ war schon gesperrt – fehlende Staffeln sind nachgezogen.`
+        : `„${chosen.name}“ gesperrt – Version ${data.pool.version}.`);
       (data.warnings || []).forEach((text) => toast.warning(text));
       await onDone?.();
     } catch (err) {

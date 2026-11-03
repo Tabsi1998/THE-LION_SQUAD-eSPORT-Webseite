@@ -56,6 +56,17 @@ test("aus allen Modi ist die Vorgabe, abbrechen schickt nichts", async () => {
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 
+test("noch einmal ausgeführt: keine neue Version, die Meldung sagt es (#2207)", async () => {
+  apiMock.post.mockResolvedValue({ data: { pool: { version: 4 }, unchanged: true, warnings: [],
+    staffeln: [{ tournament_id: "b", title: "Staffel B", applied: true, notes: [] }] } });
+  render(<PoolMapLock endpoint={URL} pool={POOL} />);
+  fireEvent.change(screen.getByTestId("pool-lock-map"), { target: { value: "t" } });
+  fireEvent.change(screen.getByTestId("pool-lock-reason"), { target: { value: "Vom Hersteller gesperrt" } });
+  fireEvent.click(screen.getByTestId("pool-lock-run"));
+
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("„Turmblick“ war schon gesperrt – fehlende Staffeln sind nachgezogen."));
+});
+
 test("ohne Pool bleibt der Baustein weg", () => {
   const { container } = render(<PoolMapLock endpoint={URL} pool={null} />);
   expect(container).toBeEmptyDOMElement();

@@ -1133,9 +1133,17 @@ der Prüfung ein Problem.
 expected_version?}` (Recht `season`). Ohne `mode` fällt die Map aus allen Modi. Der Server legt aus der geltenden Version eine neue an
 (Snapshot ohne neue Prüfung gegen die Bibliothek, wie `copy_version`), überträgt sie auf alle Staffeln der Season (derselbe Weg wie
 beim Übertragen, auch gesperrte und laufende Staffeln) und schreibt `league.season.map_pool.remove_map` mit Grund, Map, Modus, neuer
-Version und je Staffel dem Ergebnis. Grund mindestens fünf Zeichen. 404 ohne Pool oder ohne die Map darin; 422, wenn der Pool leer würde
-oder ein Modus der Reihenfolge keine Map mehr hätte; 409 bei gleichzeitigem Speichern. Antwort: `{pool, staffeln[], warnings[]}`.
-Alte Versionen, festgehaltene Pools und fertige Spiele bleiben.
+Version und je Staffel dem Ergebnis. Grund mindestens fünf Zeichen. 404 ohne Pool oder wenn die Map nie im Pool stand; 422, wenn der Pool
+leer würde oder ein Modus der Reihenfolge keine Map mehr hätte; 409 bei einer älteren `expected_version`. Antwort:
+`{pool, staffeln[], warnings[], unchanged}`. Alte Versionen, festgehaltene Pools und fertige Spiele bleiben.
+
+- **Alles unter Sperren:** zuerst die Turnier-Sperren aller Staffeln der Season (feste Reihenfolge), dann die Sperre des Season-Pools
+  (`mutation_lock.league_season_pool_resource`). Dieselbe Pool-Sperre halten `PUT` und `DELETE …/map-pool`. Ist eine Sperre belegt oder
+  kommt währenddessen eine Staffel dazu: 409, es wird nichts geschrieben.
+- **Genau diese Version:** Übertragen wird die gerade angelegte Version, nie eine, die danach entsteht (`league_service.transfer_pool`
+  mit `pool`). Eine Staffel mit denselben Maps bekommt keine neue Version.
+- **Erneut ausführen:** Steht die Map schon nicht mehr im geltenden Pool, aber in einer früheren Version, entsteht keine neue Version
+  (`unchanged: true`); übertragen wird nur, was einer Staffel noch fehlt. Das Protokoll trägt `new_version`.
 
 **`season_readiness`** (`GET /api/admin/leagues/seasons/{id}/readiness`, jede Zuständigkeit der Liga):
 `{ok, problems: [{code, text}], warnings: [{code, text}], requirements: [{mode, label, derived, override, needed, have}], max_maps,

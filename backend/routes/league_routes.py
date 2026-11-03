@@ -11,6 +11,8 @@ Die Logik steht in ``services/league_service.py``.
 """
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
+
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.errors import DuplicateKeyError
 
@@ -54,7 +56,7 @@ from services.game_maps import MapProblem
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.map_pools import MapPoolSave
-from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+from services.mutation_lock import MutationLockBusy, league_season_pool_resource, mutation_lock, tournament_write_resource
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
@@ -414,7 +416,12 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
         names = [f"„{labels[mode]}“" for mode in dict.fromkeys(missing) if mode in labels]
         what = ", ".join(names) if names else "ein Modus der Reihenfolge"  # dem Spiel schon entfernt: nie eine rohe Kennung
         raise HTTPException(status_code=422, detail=f"Im neuen Pool fehlt {what}. Bitte „Modus je Map“ zuerst ändern und speichern.")
-    doc = await _call(map_pools.save(db, scope="league_season", scope_id=season_id, game=game, body=body, user=me))
+    # Dieselbe Sperre wie „Map aus dem Pool nehmen“ (#2207): beide nacheinander, nie verschränkt.
+    try:
+        async with mutation_lock(db, league_season_pool_resource(season_id)):
+            doc = await _call(map_pools.save(db, scope="league_season", scope_id=season_id, game=game, body=body, user=me))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=POOL_BUSY) from None
     await _audit(db, "league.season.map_pool.save", me, season_id, {"version": doc["version"], "pool_id": doc["id"]})
     # Mindestgröße je Modus (#2207): nur Warnung - die Prüfung vor der Veröffentlichung nennt es als Problem.
     warnings = league_pool_check.pool_problems(season, await league_pool_check.divisions_of(db, season_id), doc, game)
@@ -446,60 +453,102 @@ async def admin_season_pool_compare(season_id: str, base: int, target: int,
 @admin_router.post("/seasons/{season_id}/map-pool/remove-map")
 async def admin_season_pool_remove_map(season_id: str, body: LeagueMapRemove,
                                        me: dict = Depends(require_league("season", via="season_id"))):
-    """Map in einem Schritt sperren (#2207): neue Version ohne die Map, übertragen auf alle Staffeln, Protokoll mit Grund."""
-    from routes.tournament_common import _is_tournament_locked
+    """Map in einem Schritt sperren (#2207): neue Version ohne die Map, übertragen auf alle Staffeln, Protokoll mit Grund.
 
+    Alles unter den Sperren: zuerst die Turnier-Sperren aller Staffeln (feste Reihenfolge), dann die Sperre des Season-Pools - dieselbe
+    wie beim Speichern. Ist eine belegt: 409, nichts geschrieben. Übertragen wird genau die neue Version, nie eine, die danach entsteht.
+    Steht die Map schon nicht mehr im Pool, aber in einer früheren Version, entsteht keine neue: Dann wird nur noch übertragen, was
+    einer Staffel fehlt (erneutes Ausführen nach einem Abbruch legt nichts doppelt an)."""
     db = get_db()
     reason = _reason(LeagueDelete(reason=body.reason))
     season = await _call(leagues.get_season(db, season_id))
     league = await _call(leagues.get_league(db, season["league_id"]))
     game = await _season_game(db, season)
-    current = map_pools.valid_for(await map_pools.current(db, "league_season", season_id), league.get("game_id"))
-    if current:
-        # Wie beim Speichern: Ein Modus aus „Modus je Map“ darf nicht leer werden (#2129).
-        left = {group.get("mode"): [item.get("map_id") for item in group.get("maps") or []
-                                    if body.mode not in (None, group.get("mode")) or item.get("map_id") != body.map_id]
-                for group in current.get("modes") or []}
-        empty = [mode for mode in dict.fromkeys(season.get("game_mode_order") or []) if mode and not left.get(mode)]
-        if empty:
-            labels = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
-            names = ", ".join(f"„{labels.get(mode) or mode}“" for mode in empty)
-            raise HTTPException(status_code=422, detail=f"Ohne diese Map hätte {names} keine Map mehr, steht aber in „Modus je Map“. "
-                                                        "Bitte zuerst eine andere Map aufnehmen oder „Modus je Map“ ändern.")
-    previous, doc = await _call(map_pools.without_map(
-        db, scope="league_season", scope_id=season_id, map_id=body.map_id, mode=body.mode, user=me,
-        note=f"Map gesperrt: {reason}", expected_version=body.expected_version))
-    name = next((item.get("name") for group in previous.get("modes") or [] for item in group.get("maps") or []
-                 if item.get("map_id") == body.map_id), None)
-    fresh = await _call(leagues.get_season(db, season_id))
-    divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season_id}, {"_id": 0}).to_list(50)}
-    results = []
     try:
-        for row in await leagues.staffeln_of(db, season_id):
-            entry = {"tournament_id": row["id"], "title": row.get("title"), "applied": False, "notes": []}
-            try:
-                async with mutation_lock(db, tournament_write_resource(row["id"])):
-                    tournament = await db.tournaments.find_one({"id": row["id"], **ONLY_LEAGUE}, {"_id": 0})
-                    if not tournament or not divisions.get((tournament.get("league_context") or {}).get("division_id")):
-                        continue
-                    applied, skipped, changed = [], [], []
-                    await leagues.transfer_pool(db, tournament, fresh, me, locked=_is_tournament_locked(tournament),
-                                                applied=applied, skipped=skipped, changed=changed)
-                    entry["applied"] = "map_pool" in applied
-                    entry["notes"] = [item["reason"] for item in skipped]
-            except MutationLockBusy:
-                entry["notes"] = ["Die Staffel wird gerade bearbeitet - bitte „Vorgaben übertragen“ gleich noch einmal."]
-            except (LeagueProblem, MapProblem) as problem:
-                entry["notes"] = [problem.message]
-            results.append(entry)
+        async with AsyncExitStack() as locks:
+            staffeln = sorted(row["id"] for row in await leagues.staffeln_of(db, season_id))
+            for tournament_id in staffeln:
+                await locks.enter_async_context(mutation_lock(db, tournament_write_resource(tournament_id)))
+            await locks.enter_async_context(mutation_lock(db, league_season_pool_resource(season_id)))
+            if sorted(row["id"] for row in await leagues.staffeln_of(db, season_id)) != staffeln:
+                raise HTTPException(status_code=409, detail=leagues.CHANGED_MEANWHILE)
+            fresh = await _call(leagues.get_season(db, season_id))
+            previous, doc, created = await _remove_map_version(db, fresh, league, game, body, me, reason)
+            results = await _transfer_version(db, fresh, staffeln, doc, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=f"{POOL_BUSY} Es wurde nichts geändert.") from None
     finally:
         reset_scope_cache()
+    name = next((item.get("name") for group in (previous or {}).get("modes") or [] for item in group.get("maps") or []
+                 if item.get("map_id") == body.map_id), None)
     await _audit(db, "league.season.map_pool.remove_map", me, season_id, {
         "reason": reason, "map_id": body.map_id, "map_name": name, "mode": body.mode, "version": doc["version"],
-        "pool_id": doc["id"], "from_version": previous.get("version"),
+        "pool_id": doc["id"], "from_version": (previous or {}).get("version"), "new_version": created,
         "staffeln": [{"tournament_id": entry["tournament_id"], "applied": entry["applied"]} for entry in results]})
-    warnings = league_pool_check.pool_problems(fresh, list(divisions.values()), doc, game)
-    return {"pool": map_pools.saved_view(doc, "league_season", admin=True), "staffeln": results, "warnings": warnings}
+    divisions = await league_pool_check.divisions_of(db, season_id)
+    warnings = league_pool_check.pool_problems(fresh, divisions, doc, game)
+    return {"pool": map_pools.saved_view(doc, "league_season", admin=True), "staffeln": results, "warnings": warnings,
+            "unchanged": not created}
+
+
+POOL_BUSY = "Der Map-Pool oder eine Staffel wird gerade bearbeitet – bitte gleich noch einmal."
+
+
+def _has_map(doc: dict | None, map_id: str, mode: str | None) -> bool:
+    return any(item.get("map_id") == map_id for group in (doc or {}).get("modes") or []
+               if mode is None or group.get("mode") == mode for item in group.get("maps") or [])
+
+
+async def _remove_map_version(db, season: dict, league: dict, game: dict | None, body: LeagueMapRemove, me: dict,
+                              reason: str) -> tuple[dict | None, dict, bool]:
+    """Unter der Pool-Sperre: die neue Version ohne die Map - oder, wenn sie schon draußen ist, die geltende (``created`` False)."""
+    current = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
+    if not current:
+        raise HTTPException(status_code=404, detail="Es gibt keinen Map-Pool.")
+    if not _has_map(current, body.map_id, body.mode):
+        earlier = await db.map_pools.find_one({"scope": "league_season", "scope_id": season["id"],
+                                               "modes.maps.map_id": body.map_id}, {"_id": 0})
+        if not earlier:
+            raise HTTPException(status_code=404, detail="Diese Map steht nicht im Map-Pool.")
+        return earlier, current, False
+    if body.expected_version is not None and int(current.get("version") or 0) != body.expected_version:
+        raise HTTPException(status_code=409, detail=map_pools.CHANGED_MEANWHILE)
+    # Wie beim Speichern: Ein Modus aus „Modus je Map“ darf nicht leer werden (#2129).
+    left = {group.get("mode"): [item.get("map_id") for item in group.get("maps") or []
+                                if body.mode not in (None, group.get("mode")) or item.get("map_id") != body.map_id]
+            for group in current.get("modes") or []}
+    empty = [mode for mode in dict.fromkeys(season.get("game_mode_order") or []) if mode and not left.get(mode)]
+    if empty:
+        labels = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
+        names = ", ".join(f"„{labels.get(mode) or mode}“" for mode in empty)
+        raise HTTPException(status_code=422, detail=f"Ohne diese Map hätte {names} keine Map mehr, steht aber in „Modus je Map“. "
+                                                    "Bitte zuerst eine andere Map aufnehmen oder „Modus je Map“ ändern.")
+    previous, doc = await _call(map_pools.without_map(
+        db, scope="league_season", scope_id=season["id"], map_id=body.map_id, mode=body.mode, user=me,
+        note=f"Map gesperrt: {reason}", expected_version=body.expected_version))
+    return previous, doc, True
+
+
+async def _transfer_version(db, season: dict, staffel_ids: list[str], doc: dict, me: dict) -> list[dict]:
+    """Genau ``doc`` auf jede Staffel - die Sperren hält der Aufrufer. Hat eine Staffel dieselben Maps schon, entsteht nichts."""
+    from routes.tournament_common import _is_tournament_locked
+
+    divisions = {row["id"] for row in await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0, "id": 1}).to_list(50)}
+    results = []
+    for tournament_id in staffel_ids:
+        tournament = await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 0})
+        if not tournament or (tournament.get("league_context") or {}).get("division_id") not in divisions:
+            continue
+        entry = {"tournament_id": tournament_id, "title": tournament.get("title"), "applied": False, "notes": []}
+        applied, skipped, changed = [], [], []
+        try:
+            await leagues.transfer_pool(db, tournament, season, me, pool=doc, locked=_is_tournament_locked(tournament),
+                                        applied=applied, skipped=skipped, changed=changed)
+        except (LeagueProblem, MapProblem) as problem:
+            skipped.append({"reason": problem.message})
+        entry.update({"applied": "map_pool" in applied, "notes": [item["reason"] for item in skipped]})
+        results.append(entry)
+    return results
 
 
 @admin_router.get("/seasons/{season_id}/readiness")
@@ -515,7 +564,11 @@ async def admin_season_readiness(season_id: str, me: dict = Depends(require_leag
 async def admin_clear_season_pool(season_id: str, me: dict = Depends(require_league("season", via="season_id"))):
     db = get_db()
     await _call(leagues.get_season(db, season_id))
-    doc = await _call(map_pools.clear(db, scope="league_season", scope_id=season_id, user=me))
+    try:
+        async with mutation_lock(db, league_season_pool_resource(season_id)):
+            doc = await _call(map_pools.clear(db, scope="league_season", scope_id=season_id, user=me))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=POOL_BUSY) from None
     if doc:
         await _audit(db, "league.season.map_pool.clear", me, season_id, {"version": doc["version"]})
     return {"ok": True}
