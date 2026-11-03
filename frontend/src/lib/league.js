@@ -1,6 +1,7 @@
 // Liga verwalten (docs/LIGA.md, #1622): Formularwerte einer Season ↔ Anfrage an /api/admin/leagues. Die Regeln prüft der
 // Server noch einmal (services/league_service.py); hier steht nur, was die Oberfläche selbst wissen muss.
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
+import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 
 export const VISIBILITY_OPTIONS = [
@@ -60,6 +61,8 @@ export function seasonToForm(season = {}) {
     lineup_mode: season.lineup_mode || "per_map",
     lineup_min_players: season.lineup_min_players != null ? String(season.lineup_min_players) : "",
     transfer_windows: (season.transfer_windows || []).map((window) => ({ ...window })),
+    // Selbstanmeldung (#2205): Ohne Fenster gibt es sie nicht.
+    ...applicationToForm(season),
     points_win: String(points.win ?? 3),
     points_draw: String(points.draw ?? 1),
     points_loss: String(points.loss ?? 0),
@@ -115,6 +118,7 @@ export function seasonPayload(form) {
     ...(form.had_rules || (form.lineup_mode && form.lineup_mode !== "per_map") ? { lineup_mode: form.lineup_mode || "per_map" } : {}),
     lineup_min_players: number(form.lineup_min_players),
     transfer_windows: (form.transfer_windows || []).filter((window) => window.start_date && window.end_date),
+    ...applicationPayload(form),
     scoring_rules: {
       ...(form.scoring_rules || {}),
       match_points: { win: number(form.points_win) ?? 0, draw: number(form.points_draw) ?? 0, loss: number(form.points_loss) ?? 0 },

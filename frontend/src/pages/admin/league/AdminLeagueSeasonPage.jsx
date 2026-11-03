@@ -10,6 +10,8 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { SeasonApplicationSection } from "./SeasonApplicationSection";
+import { SeasonApplicationsPanel } from "./SeasonApplicationsPanel";
 import { SeasonEligibilitySection } from "./SeasonEligibilitySection";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -447,6 +449,8 @@ export default function AdminLeagueSeasonPage() {
 
               <SeasonEligibilitySection form={form} set={set} />
 
+              <SeasonApplicationSection form={form} set={set} />
+
               </>) : null}
               <FormSection title={canSeason ? "Regeltext und Sichtbarkeit" : "Regeltext"}>
                 {/* Regelwerk (#1646): Versionen, PDF und Zustimmung auf eigener Seite; der Regeltext bleibt der Rückfall ohne Regelwerk. */}
@@ -563,6 +567,8 @@ export default function AdminLeagueSeasonPage() {
                 </div>
               ))}
             </section>
+
+            {can("applications") ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
 
             {can("roster") ? <SeasonRosterPanel seasonId={seasonId} /> : null}
 

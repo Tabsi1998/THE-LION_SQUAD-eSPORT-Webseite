@@ -75,10 +75,18 @@ SEASON_RULE_DEFAULTS: dict = {
     "unique_game_ids": True,
     "lineup_mode": "series",
     "lineup_min_players": 3,
+    # Selbstanmeldung (#2205): Vorgaben der Regeln. Ohne Fenster gibt es sie gar nicht.
+    "entry_policy": "all",
+    "sibling_squads_in_staffel": False,
+    "application_waitlist": True,
 }
+# Selbstanmeldung (#2205): Leer heißt: gibt es nicht - darum dürfen die Felder auch wieder leer werden.
+APPLICATION_TIMES = ("application_opens_at", "application_closes_at")
+APPLICATION_TEXTS = ("application_waitlist_note", "application_privacy_text")
+APPLICATION_OPTIONAL = (*APPLICATION_TIMES, *APPLICATION_TEXTS, "application_slots", "application_waitlist_limit")
 NEW_SEASON_MIN_SQUAD = 3
 SERIES = "series"
-SEASON_FIELDS = tuple(SEASON_DEFAULTS) + tuple(SEASON_RULE_DEFAULTS) + ("name", "slug", "number", "start_date")
+SEASON_FIELDS = tuple(SEASON_DEFAULTS) + tuple(SEASON_RULE_DEFAULTS) + APPLICATION_OPTIONAL + ("name", "slug", "number", "start_date")
 OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size", "scoring_rules",
                    "match_schedule_response_hours")
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
@@ -278,8 +286,11 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
     for key, value in raw.items():
         if key not in SEASON_FIELDS:
             continue
-        if key in ("name", "rules_text"):
+        if key in ("name", "rules_text", *APPLICATION_TEXTS):
             value = (str(value).strip() or None) if value is not None else None
+        elif key in APPLICATION_TIMES:
+            moment = _aware(value)
+            value = moment.isoformat() if moment else None
         elif key == "slug":
             value = slugify(value, fallback="season", max_length=80) if value else None
         elif key == "start_date":
@@ -302,6 +313,11 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
         out["min_squad_size"] = int(out["team_size"])  # der Mindestkader wächst mit der Teamgröße mit
     merged = {**SEASON_DEFAULTS, **existing, **out} if existing else new_season_settings(out)
     _check_squad(merged, "Season")
+    opens, closes = merged.get("application_opens_at"), merged.get("application_closes_at")
+    if bool(opens) != bool(closes):
+        raise LeagueProblem("Das Anmeldefenster braucht Beginn und Ende.")
+    if opens and _aware(closes) <= _aware(opens):
+        raise LeagueProblem("Das Anmeldefenster endet vor seinem Beginn.")
     if merged.get("slug") in RESERVED_SLUGS:
         raise LeagueProblem("Diese Kurzadresse ist reserviert - bitte eine andere wählen.")
     return out

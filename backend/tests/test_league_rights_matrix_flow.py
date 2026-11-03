@@ -66,6 +66,13 @@ ROUTES = [
     route("GET", "/api/admin/leagues/seasons/{season}/roster", "roster"),
     route("POST", "/api/admin/leagues/seasons/{season}/roster/{user}/approve", "roster", {"reason": "Geprüft"}),
     route("PUT", "/api/admin/leagues/seasons/{season}/roster-settings", "roster", {"roster_deadline": None}),
+    # Selbstanmeldung (#2205): Eingang der Leitung
+    route("GET", "/api/admin/leagues/seasons/{season}/applications", "applications"),
+    route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/review", "applications"),
+    route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/accept", "applications", {}),
+    route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/reject", "applications", {"reason": "Grund genug"}),
+    route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/waitlist", "applications", {}),
+    route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/assign", "applications", {"tournament_id": "{tid}"}),
     # Regelwerk (#1646): je Season und liga-weit
     *[entry for target in ("league_season/{season}", "league/{league}") for entry in (
         route("GET", f"/api/admin/league-rules/{target}", "rules"),

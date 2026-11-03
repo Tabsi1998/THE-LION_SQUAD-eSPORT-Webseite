@@ -2483,6 +2483,16 @@ class LeagueSeasonFields(LeagueLookFields):
     unique_game_ids: Optional[bool] = None
     lineup_mode: Optional[Literal["series", "per_map"]] = None
     lineup_min_players: Optional[int] = Field(default=None, ge=1, le=20)
+    # Selbstanmeldung (#2205, docs/LIGA.md Abschnitt 12): ohne Fenster gibt es sie nicht.
+    application_opens_at: Optional[datetime] = None
+    application_closes_at: Optional[datetime] = None
+    application_slots: Optional[int] = Field(default=None, ge=1, le=500)
+    application_waitlist: Optional[bool] = None
+    application_waitlist_limit: Optional[int] = Field(default=None, ge=1, le=500)
+    application_waitlist_note: Optional[str] = Field(default=None, max_length=500)
+    application_privacy_text: Optional[str] = Field(default=None, max_length=2000)
+    entry_policy: Optional[Literal["all", "members"]] = None
+    sibling_squads_in_staffel: Optional[bool] = None
     game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
     # Map-Wiederholung in einer Serie (#2096): nie, nur in anderem Modus (Vorgabe) oder immer.
     map_repeat: Optional[Literal["never", "other_mode", "always"]] = None
@@ -2550,3 +2560,21 @@ class LeagueStaffUpdate(BaseModel):
 class LeagueDelete(BaseModel):
     """Liga, Season, Liga N oder Staffel löschen (#2106): der Grund kommt ins Protokoll (geprüft im Liga-Service)."""
     reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class LeagueApplicationSubmit(BaseModel):
+    """Selbstanmeldung einreichen (#2205): das Co-Team, die gezeigte Fassung und beide ausdrücklichen Zustimmungen."""
+    model_config = ConfigDict(extra="forbid")
+
+    squad_id: str = Field(min_length=1, max_length=64)
+    rule_version_id: Optional[str] = Field(default=None, max_length=64)
+    accept_rules: bool = False
+    accept_privacy: bool = False
+
+
+class LeagueApplicationDecision(BaseModel):
+    """Entscheidung der Leitung über einen Antrag (#2205). Was davon Pflicht ist, prüft der Liga-Service."""
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+    tournament_id: Optional[str] = Field(default=None, max_length=64)

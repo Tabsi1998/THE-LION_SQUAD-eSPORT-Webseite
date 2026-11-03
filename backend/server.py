@@ -44,6 +44,7 @@ from routes.game_map_routes import router as game_map_router
 from routes.map_pool_routes import router as map_pool_router
 from routes.league_routes import admin_router as league_admin_router, router as league_router
 from routes.league_roster_routes import admin_router as league_roster_admin_router, me_router as league_roster_me_router
+from routes.league_application_routes import admin_router as league_application_admin_router, me_router as league_application_me_router, router as league_application_router
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
@@ -353,6 +354,9 @@ app.include_router(league_admin_router)  # Liga verwalten (docs/LIGA.md, #1622)
 app.include_router(league_router)  # Liga lesen nach Sichtbarkeit der Season (#1622)
 app.include_router(league_roster_admin_router)  # Liga-Kader mit Spiel-ID je Season (#2108)
 app.include_router(league_roster_me_router)  # eigene Spiel-ID je laufender Season (#2108)
+app.include_router(league_application_admin_router)  # Selbstanmeldung: Eingang der Leitung (#2205)
+app.include_router(league_application_me_router)  # Stand der eigenen Co-Teams (#2205)
+app.include_router(league_application_router)  # Selbstanmeldung: einreichen, zurückziehen (#2205)
 app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md, #1646)
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(game_server_router)

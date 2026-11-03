@@ -94,7 +94,7 @@ class FakeDb:
             # Wunschnummer (#2034)
             "jersey_numbers", "jersey_number_requests",
             # Liga-Kader mit Spiel-ID je Season (#2108)
-            "league_rosters", "league_transfers", "league_appearances", "league_rule_consents",
+            "league_rosters", "league_transfers", "league_appearances", "league_rule_consents", "league_applications",
             # Shop (#1703)
             "shop_orders", "shop_order_items", "shop_carts", "shop_gamertag_files", "shop_print_files",
         ):

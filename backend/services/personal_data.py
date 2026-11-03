@@ -170,6 +170,8 @@ PERSONAL: dict[str, Entry] = {
     # Regelwerk (#1646): wer für ein Co-Team welcher Fassung zugestimmt hat. Ohne Konto ohne Zweck - das Co-Team wird neu gefragt.
     "league_rule_consents": Entry(DELETED, ("league_rule_consents",), "Zustimmung zu einer Regelversion je Co-Team und Season; "
                                   "die Regelversion selbst bleibt"),
+    # Selbstanmeldung (#2205): Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt heraus.
+    "league_applications": Entry(OVERWRITTEN, ("league_applications",), "Antrag eines Co-Teams je Liga-Season mit Zustimmung; die Kennung der Person fällt heraus, der Antrag bleibt als Nachweis"),
     "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances"), SPORT),
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),

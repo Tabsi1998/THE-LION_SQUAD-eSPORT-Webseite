@@ -6,6 +6,29 @@ Vertreter macht das die Teamleitung. Melden, Bestätigen und Nachtragen ausführ
 [Turniere, 3.16 Ergebnis je Map melden](turniere.md#316-liga-ergebnis-je-map-melden-für-captains); für die
 Turnierleitung: [Liga leiten](liga.md).
 
+## Anmelden
+
+Das Co-Team meldet sich auf der **Ligaseite** an, sobald das Anmeldefenster offen ist. Das geht nur als **Captain oder Vertreter**. Fehlen beide, trägt die Teamleitung erst einen Captain ein: **Teams → Deine Teams → Co-Team bearbeiten**.
+
+1. Ligaseite → **Mit Co-Team anmelden**.
+2. **Co-Team wählen.**
+3. **Prüfung lesen.** Die Seite sagt im Klartext, was fehlt, etwa zu wenige Spieler oder ein fehlendes Geburtsdatum. Ist es behoben, geht es weiter. Spieler ohne Spiel-ID stehen als Hinweis da: Das hält die Anmeldung nicht auf, solange genug andere spielen dürfen. Sie selbst spielen aber erst, wenn die ID im Profil steht.
+4. **Regeln lesen und zustimmen**, **Datenschutz-Hinweis lesen und zustimmen**. Beides wird mit Zeitpunkt und deinem Namen gespeichert.
+5. **Anmeldung einreichen.** Das ist noch kein Startplatz: Die Liga-Leitung prüft und entscheidet, du bekommst eine Nachricht.
+
+Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
+
+| Stand | Heißt |
+| --- | --- |
+| Anmeldung offen | Ihr könnt einreichen |
+| Eingereicht, In Prüfung | Die Liga-Leitung ist dran |
+| Angenommen | Ihr habt einen Startplatz. Liga und Staffel teilt die Liga-Leitung zu, dann stehen sie dabei |
+| Warteliste | Wird ein Platz frei, entscheidet die Liga-Leitung. Niemand rückt von selbst nach |
+| Abgelehnt | Der Grund steht dabei. Im offenen Fenster dürft ihr neu einreichen |
+| Zurückgezogen | Du oder dein Vertreter habt zurückgezogen. Im offenen Fenster dürft ihr neu einreichen |
+
+**Zurückziehen** geht, bis das Co-Team einer Staffel zugeteilt ist. Danach klärt ihr den Austritt mit der Liga-Leitung.
+
 ## Die Woche
 
 - Eine **Spielwoche** geht von **Dienstag bis Montag**, je Woche ein Spiel.
