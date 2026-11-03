@@ -177,6 +177,12 @@ def pending_request(match: dict | None) -> dict | None:
     return next((row for row in _requests(match) if row.get("status") == "pending"), None)
 
 
+async def matches_with_open_requests(db, sides: dict, closed_statuses: list[str], limit: int = 100) -> list[dict]:
+    """Spiele der eigenen Seiten mit offenem Verschiebungsantrag - für die Aufgabe „Verschiebung beantworten“."""
+    return await db.matches_v2.find(
+        {**sides, "reschedule_requests.status": "pending", "status": {"$nin": list(closed_statuses)}}, {"_id": 0}).to_list(limit)
+
+
 def request_until(match: dict | None, rules: dict) -> datetime | None:
     current = _moment((match or {}).get("scheduled_at"))
     return current - timedelta(hours=int(rules["reschedule_notice_hours"])) if current else None

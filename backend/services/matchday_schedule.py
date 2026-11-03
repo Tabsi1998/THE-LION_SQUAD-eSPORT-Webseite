@@ -599,12 +599,15 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
     if isinstance(tournament.get("league_context"), dict):
-        from services.league_schedule import history_entry
+        # Termin-Historie (#2194) - dieselbe Form wie league_schedule.history_entry, hier ohne Import (kein Import-Kreis).
+        from uuid import uuid4
 
         for write in writes:
             if write["update"].get("schedule_source") == "default":
-                write["history"] = history_entry("default", from_at=write["expect"].get("scheduled_at"),
-                                                 to_at=write["update"].get("scheduled_at"))
+                previous = _parse(write["expect"].get("scheduled_at"))
+                write["history"] = {"id": str(uuid4()), "at": datetime.now(timezone.utc).isoformat(), "kind": "default",
+                                    "by": None, "registration_id": None, "from": previous.isoformat() if previous else None,
+                                    "to": write["update"].get("scheduled_at"), "reason": None, "request_id": None}
     written = await apply_schedule_writes(db, writes)
     by_id = {match.get("id"): match for match in matches}
     for write in writes:

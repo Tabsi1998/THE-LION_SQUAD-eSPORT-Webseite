@@ -271,10 +271,10 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
         if waiting:
             tasks.append(("schedule", match, min(str(row.get("scheduled_at") or "") for row in waiting) or None))
     # Verschiebung beantworten (#2194): ein offener Antrag der anderen Seite.
-    # Direkt aus dem Speicher: die kanonische Form der Spiele kennt die Anträge nicht.
-    rescheduling = await db.matches_v2.find(
-        {**sides, "reschedule_requests.status": "pending", "status": {"$nin": sorted(SCHEDULE_TASK_CLOSED)}},
-        {"_id": 0}).to_list(100)
+    # Die kanonische Form der Spiele kennt die Anträge nicht - die Liga-Termine lesen sie selbst.
+    from services.league_schedule import matches_with_open_requests
+
+    rescheduling = await matches_with_open_requests(db, sides, sorted(SCHEDULE_TASK_CLOSED))
     for match in rescheduling:
         own = acting.intersection(match_registration_ids(match))
         waiting = [row for row in match.get("reschedule_requests") or []
