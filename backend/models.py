@@ -1,5 +1,5 @@
 """Pydantic v2 models for THE LION SQUAD eSports."""
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, PrivateAttr, field_validator, model_serializer, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
 import re
@@ -335,27 +335,95 @@ def _game_key(value) -> str:
     return re.sub(r"[^a-z0-9]+", "_", text).strip("_")[:40]
 
 
+RESULT_RULE_KINDS = ("score", "rounds", "highest")
+RESULT_TARGET_MAX = 100_000
+MODE_DESCRIPTION_MAX = 500
+MODE_FORMAT_MAX = 60
+# Felder aus C.1 (#2206): fehlen sie, werden sie nicht geschrieben - alte Spiele bleiben Zeichen für Zeichen gleich.
+MODE_EXTRA_FIELDS = ("status", "description", "players_per_side", "format", "result_rule")
+
+
+class GameModeResultRule(BaseModel):
+    """Ergebnisregel eines Modus (#2206, C.1) - nur gespeichert und angezeigt; angewandt wird sie erst mit C.3 (#1617).
+    ``score``: Punkte bis zum Ziel, ``rounds``: Runden gewinnen (höchstens ``round_limit``), ``highest``: höherer Endstand
+    gewinnt. Keine Werte eines Titels: Ziel und Grenzen trägt die Verwaltung je Spiel ein."""
+    kind: Literal["score", "rounds", "highest"]
+    target: Optional[int] = Field(default=None, ge=1, le=RESULT_TARGET_MAX)
+    round_limit: Optional[int] = Field(default=None, ge=1, le=999)
+    time_limit_minutes: Optional[int] = Field(default=None, ge=1, le=600)
+    draw_allowed: bool = False
+    overtime: bool = False
+
+    @model_validator(mode="after")
+    def _fits(self):
+        if self.kind in ("score", "rounds") and self.target is None:
+            raise ValueError("Ergebnisregel: Bitte das Ziel angeben (Punkte bzw. Rundensiege).")
+        if self.kind == "highest" and self.target is not None:
+            raise ValueError("Ergebnisregel: „Höherer Endstand“ hat kein Ziel - bitte das Ziel leeren oder eine andere Art wählen.")
+        if self.round_limit is not None and self.kind != "rounds":
+            raise ValueError("Ergebnisregel: Ein Rundenlimit gibt es nur bei der Art „Runden“.")
+        if self.round_limit is not None and self.target is not None and self.round_limit < self.target:
+            raise ValueError(f"Ergebnisregel: Das Rundenlimit ({self.round_limit}) ist kleiner als das Ziel ({self.target}).")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler):
+        return {key: value for key, value in handler(self).items() if value is not None}
+
+
 class GameMatchMode(BaseModel):
     """Ein Spielmodus mit Dauer (#1554): „Grand Prix 4 Rennen“ 12 Min. je Spiel, oder 4 Min. je Einzelspiel (``per_game``),
     dann zählt Best-of als Erwartungswert (siehe ``services/match_duration.py``). Die Minuten sind freiwillig (#1616):
     ein Modus nur für Maps hat keine Dauer, dann plant das Turnier mit der nächsten Ebene. Die Kennung ``mode`` bleibt
-    beim Umbenennen gleich - Maps und Map-Pools zeigen auf sie."""
+    beim Umbenennen gleich - Maps und Map-Pools zeigen auf sie.
+
+    C.1 (#2206): Zustand, Beschreibung, Spielerzahl je Seite, Format und Ergebnisregel, alle freiwillig (docs/LIGA.md).
+    ``status`` fehlt = aktiv; „aktiv“ wird nicht geschrieben."""
     mode: Optional[str] = None
     label: str = Field(min_length=1, max_length=60)
     minutes: Optional[int] = Field(default=None, ge=1, le=600)
     per_game: bool = False
+    status: Optional[Literal["active", "inactive", "archived"]] = None
+    description: Optional[str] = Field(default=None, max_length=MODE_DESCRIPTION_MAX)
+    players_per_side: Optional[int] = Field(default=None, ge=1, le=64)
+    format: Optional[str] = Field(default=None, max_length=MODE_FORMAT_MAX)
+    result_rule: Optional[GameModeResultRule] = None
+    # Kam die Kennung mit der Anfrage? Ohne sie sucht ``update_game`` einen bestehenden Modus gleichen Namens (#2206).
+    _key_given: bool = PrivateAttr(default=False)
 
     @field_validator("label", mode="before")
     @classmethod
     def _label(cls, value):
         return str(value or "").strip()
 
+    @field_validator("description", mode="before")
+    @classmethod
+    def _description(cls, value):
+        return (str(value).strip() or None) if value is not None else None
+
+    @field_validator("format", mode="before")
+    @classmethod
+    def _format(cls, value):
+        return (" ".join(str(value).split()) or None) if value is not None else None
+
+    @field_validator("status", mode="after")
+    @classmethod
+    def _status(cls, value):
+        return None if value == "active" else value
+
     @model_validator(mode="after")
     def _key(self):
-        self.mode = _game_key(self.mode) or _game_key(self.label)
+        given = _game_key(self.mode)
+        self._key_given = bool(given)
+        self.mode = given or _game_key(self.label)
         if not self.mode:
             raise ValueError("Der Modus braucht einen Namen aus Buchstaben oder Ziffern.")
         return self
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler):
+        data = handler(self)
+        return {key: value for key, value in data.items() if key not in MODE_EXTRA_FIELDS or value is not None}
 
 
 def _clean_game_modes(value):
