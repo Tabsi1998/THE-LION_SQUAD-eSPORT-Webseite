@@ -40,6 +40,8 @@ eine ihrer Seasons sichtbar ist). `members`: erreichbar, aber `noindex` mit neut
 Selbstanmeldung der Liga (docs/LIGA.md, #2205): `GET /api/leagues/<liga>/<season>` trägt für alle nur Fenster-Stand und freie Plätze, keine Personen und keine Anträge. `/liga/<liga>/<season>/anmelden` verlangt eine Anmeldung und ist nicht in der Sitemap;
 `GET …/application`, `POST …/applications` und `POST …/applications/<id>/withdraw` verlangen eine Anmeldung und folgen `league_seasons.visibility` (unsichtbar 404), Schreiben dürfen nur Captain und Vertreter. `GET /api/me/league-applications` zeigt nur die eigenen Co-Teams.
 
+Check-in der Liga (docs/LIGA.md, D.2, #1652): `POST /api/matches/<id>/checkin` und `POST /api/matches/<id>/checkin/start` verlangen eine Anmeldung und die Verantwortung für eine Seite des Spiels (Captain, Vertreter) oder das Liga-Recht „Spiele betreuen“; Unbeteiligte bekommen 403, Spiele ohne Check-in 409. `GET /api/matches/<id>/page` trägt den Block `checkin` nur für Beteiligte und Leitung; `matches_v2.flow` (Konto-Kennungen) steht in keiner öffentlichen Antwort. `GET|PUT /api/admin/leagues/seasons/<id>/checkin-rules` ist Verwaltung (`/api/admin/`, robots gesperrt).
+
 ## Oeffentlich, aber bewusst nicht indexiert
 
 Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noindex, follow` lesen koennen. Sie stehen nicht in der Sitemap:

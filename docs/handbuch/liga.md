@@ -273,6 +273,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
 | Terminregeln (Kasten „Termine und Verschiebungen“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
+| Check-in (Kasten „Check-in vor dem Spiel“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 
 ### 2.7a Termine und Verschiebungen (Regelwerk § 7)
 
@@ -291,6 +292,22 @@ Verschiebung, bis ihr einmal speichert.
 | **Überfällig nach** | 48 h nach dem Termin | das Spiel steht bei euch unter **Mein Dienst → Braucht deine Entscheidung** |
 
 Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), legt die Liga-Leitung fest – siehe 3.1.
+
+### 2.7b Check-in vor dem Spiel (Regelwerk § 8)
+
+Auf der Season-Seite steht der Kasten **Check-in vor dem Spiel** (Zuständigkeit „Season konfigurieren“), mit eigenem
+**Check-in speichern**; er gilt sofort für alle Staffeln der Season. Neue Seasons bekommen die Vorgaben; eine ältere Season sagt
+„Diese Season ist älter als der Check-in“ – dort gibt es keinen Check-in und keinen Vorschlag „nicht erschienen“, bis ihr einmal
+speichert.
+
+| Feld | Vorgabe | Wirkung |
+| --- | --- | --- |
+| **Öffnet (Minuten vor dem Termin)** | 15 | Nr. 19: ab dann checken Captain oder Vertreter ihre Seite ein |
+| **Schließt (Minuten nach dem Termin)** | 15 | danach kein Check-in mehr durch die Seiten – ihr könnt nachtragen oder verlängern |
+| **Mindestens Anwesende je Seite** | 3 (aus Teilnehmerliste oder Teamgröße − 1) | Nr. 46: nur Spieler aus dem Kader, nur wer spielen darf (3.9); bis zum Schluss lässt sich ergänzen |
+| **Erinnerung vor Schluss (Minuten)** | 5 | zweite Nachricht an Seiten ohne Check-in; 0 = keine |
+
+Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
 
 ### 2.8 Sichtbarkeit
 
@@ -389,7 +406,7 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 | **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
 | **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
 | **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
-| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben |
+| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b) |
 | **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
 | **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
 | **Strafen** | Vorgesehen, kommt später |
@@ -501,6 +518,31 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
   Entscheiden heißt: Ergebnis eintragen, kampflos werten oder einen neuen Termin festlegen. Ohne Entscheidung schließt
   die Season später nicht ab.
 
+### 3.1b Check-in und Start (Regelwerk § 8)
+
+Mit dem Kasten aus 2.7b läuft jedes Spiel so, alles auf der **Matchseite** im Block **Check-in**:
+
+- **Fenster:** öffnet 15 Minuten vor dem Termin, schließt 15 Minuten danach (Vorgaben). Die Seite zählt herunter und sagt in einem
+  Satz, was zu tun ist. Beide Seiten bekommen bei der Öffnung eine Nachricht („Check-in offen“, Push wie „Du bist dran“), Seiten
+  ohne Check-in kurz vor Schluss noch eine.
+- **Einchecken:** Captain oder Vertreter haken an, wer da ist – mindestens die Mindestzahl, nur Spieler aus dem Kader, nur wer
+  spielen darf (gesperrt, Wartezeit, fehlende ID stehen grau mit Grund). Bis zum Schluss lassen sich Anwesende ergänzen. Die
+  Gegenseite sieht, dass und mit wie vielen eingecheckt wurde.
+- **Regelwerks-Sperre:** Hat das Co-Team einer neuen Regelversion mit Zustimmungspflicht nicht zugestimmt, geht für dieses Team kein
+  Check-in und kein Start – die Seite sagt „Das Regelwerk hat sich geändert – bitte erst zustimmen“ mit Weg zur Fassung. Das gilt
+  auch, wenn ihr für die Seite eintragen wollt, und auch, wenn die neue Fassung erst zwischen Check-in und Start kommt.
+- **Start:** Sind beide Seiten eingecheckt, steht **Spiel starten – Map 1 läuft**; eine Seite tippt, auch vor dem Termin. Ab dann
+  gilt das Spiel als begonnen (Spielzeit, kein Verschieben, kein „nicht erschienen“ mehr). Ihr könnt mit „Spiele betreuen“ ebenfalls
+  starten. Das Veto (D.3) kommt später zwischen Check-in und Start.
+- **Fehlt eine Seite nach dem Fenster:** Der Server wertet **nie** von selbst. Es entsteht ein Vorschlag „Nicht erschienen?“ – als
+  Nachricht an euch, unter **Mein Dienst → Braucht deine Entscheidung** („Check-in abgelaufen“) und als Karte in der
+  Leitungsansicht der Staffel. Dort entscheidet ihr: **<Team> nicht erschienen** (kampflos über den bekannten Weg, Teamstrafe wie in
+  3.2), **+5 Min. verlängern** (das Fenster geht wieder auf) – oder ihr tragt die Seite auf der Matchseite unter **Für eine Seite
+  eintragen (Liga-Leitung)** mit Grund nach, etwa wenn der Captain ohne Netz anruft; dann ist der Vorschlag erledigt. Im eigenen
+  Spiel macht das eine zweite Person (Befangenheit, 2.11).
+- **Ohne Check-in** (ältere Season oder Kasten nie gespeichert) bleibt alles wie vorher: kein Vorschlag, „Ergebnis fehlt“ meldet
+  sich, ihr wertet von Hand.
+
 ### 3.1a Turnier nach dem Ende noch „Live“
 
 Gilt für alle Turniere: Steht ein Turnier nach seinem eingetragenen Ende noch auf **Live**, sagt es euch **Mein Dienst**
@@ -522,9 +564,9 @@ was dabei geprüft wird, steht für die Captains in
 - **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite. Schon eingetragene Maps fallen dabei
   weg, der alte Stand bleibt im Verlauf des Spiels. Die Wertung ist eine Teamstrafe: Captain, Vertreter und die Leitung
   des Hauptteams sehen sie unter **Meine Strafen**, in **Admin → Strafen** steht sie einmal unter dem Co-Team.
-- **Kein automatisches „Nicht erschienen?“**: Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war. Deshalb gibt
-  es in der Liga diesen Vorschlag nicht – fehlt ein Ergebnis, meldet sich **Ergebnis fehlt**. Klärt es mit beiden Seiten
-  und wertet dann selbst. Das kommt mit dem Check-in (#1652) neu.
+- **„Nicht erschienen?“ nur als Vorschlag**: Mit Check-in (2.7b, 3.1b) schlägt der Server nach dem Fenster vor, wenn eine Seite
+  fehlt – gewertet wird nie von selbst, ihr entscheidet. Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war: Dann
+  gibt es keinen Vorschlag, **Ergebnis fehlt** meldet sich, klärt es mit beiden Seiten und wertet selbst.
 
 ### 3.3 Teilnehmerliste nachtragen
 
@@ -708,8 +750,9 @@ Team spielfrei.
 Im Kader ja, aber nicht am selben Spieltag in zwei Aufstellungen derselben Season.
 
 **Was, wenn ein Team nicht antritt?**
-Die Turnierleitung wertet das Spiel kampflos (Ergebnis-Fenster → **Nicht erschienen** auf der fehlenden Seite). Von
-selbst schlägt der Server das in der Liga nicht vor (3.2).
+Mit Check-in (3.1b) kommt nach dem Fenster der Vorschlag „Nicht erschienen?“ an euch – ihr wertet kampflos, tragt die Seite
+nach oder verlängert; von selbst wertet der Server nie. Ohne Check-in wertet ihr im Ergebnis-Fenster (**Nicht erschienen** auf
+der fehlenden Seite), ein Vorschlag entsteht dann nicht (3.2).
 
 **Zählt die Aufstellung für die Tabelle?**
 Nein, nur das Ergebnis. Die Aufstellung ist für Doppel-Einsatz und spätere Statistik da.
