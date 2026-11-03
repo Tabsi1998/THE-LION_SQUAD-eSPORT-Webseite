@@ -262,7 +262,10 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
         <EquipmentCategoriesSheet game={data.game} categories={categories} suggested={data.suggested_categories || []} limit={data.categories_limit || 20}
           onClose={() => setCategoriesOpen(false)} onSaved={() => { setCategoriesOpen(false); load(); }} onDirtyChange={onDirtyChange} />
       ) : null}
-      {importing ? <EquipmentImportSheet game={data.game} onClose={() => setImporting(false)} onDone={() => { setImporting(false); load(); }} /> : null}
+      {importing ? (
+        <EquipmentImportSheet game={data.game} onClose={() => setImporting(false)} onDone={() => { setImporting(false); load(); }}
+          onDirtyChange={onDirtyChange} />
+      ) : null}
       {editing ? (
         <EquipmentItemSheet game={data.game} categories={categories} items={items} item={editing.id ? editing : null} initialCategory={editing.category}
           onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} onDirtyChange={onDirtyChange} />

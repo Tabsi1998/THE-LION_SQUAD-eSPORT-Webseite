@@ -29,6 +29,7 @@ const MAPS = { game: { id: "g1", name: "Mario Kart 8 Deluxe", slug: "mario-kart-
 const EQUIPMENT = { game: { id: "g1", name: "Mario Kart 8 Deluxe", modes: [] }, categories: [{ key: "waffen", label: "Waffen", role: "weapon", count: 1 }],
   items: [{ id: "w1", category: "waffen", name: "Probewaffe", status: "active", in_lists: 0, weapon_ids: [] }], limit: 1000, categories_limit: 20,
   suggested_categories: [], attachments_without_weapon: [] };
+const IMPORT_ITEMS = [{ id: "a1", name: "Altwaffe", category_label: "Waffen", exists: false }, { id: "a2", name: "Altschild", category_label: "Perks", exists: false }];
 
 let game;
 let servers;
@@ -39,7 +40,10 @@ function serve() {
     if (url === "/games") return { data: [game, { id: "p1", name: "Call of Duty", slug: "cod", kind: "series" }] };
     if (url === "/games/g1/usage") return { data: usage };
     if (url === "/games/g1/maps") return { data: MAPS };
-    if (url === "/games/g1/equipment") return { data: EQUIPMENT };    if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
+    if (url === "/games/g1/equipment") return { data: EQUIPMENT };
+    if (url === "/games/g1/equipment/import-sources") return { data: [{ id: "g0", name: "Vorgänger", items: 2 }] };
+    if (url === "/games/g1/equipment/import-sources/g0") return { data: { items: IMPORT_ITEMS } };
+    if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
     throw Object.assign(new Error("nicht da"), { response: { status: 404 } });
   });
 }
@@ -151,6 +155,22 @@ describe("Reiter", () => {
     await waitFor(() => expect(screen.getByTestId("game-tab-allgemein")).toHaveAttribute("aria-selected", "true"));
     await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
     expect(confirmMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("das Import-Blatt: die geladene Vorauswahl ist keine Änderung, ein abgewählter Eintrag schon", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-import"));
+    expect(await screen.findByTestId("equipment-import-row-a2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Altschild")).toBeChecked();
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("equipment-import-sheet")).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
   });
 
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {
