@@ -73,7 +73,9 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     ("gallery_photos", ["original_url"]),
     ("game_servers", ["server_icon_url"]),
     # Map-Pools (#1616): der Snapshot zeigt das Bild von damals, auch wenn die Map inzwischen ein neues hat.
-    ("map_pools", ["modes.maps.image_url"]),
+    ("map_pools", ["modes.maps.image_url", "modes.icon_url"]),
+    # Symbol je Spielmodus (#2266): am Modus und als Schnappschuss in jeder Pool-Version (dort eingefroren, ``is_frozen``).
+    ("games", ["match_modes.icon_url"]),
     # Frühere Bilder einer Map: ein gespeichertes Spiel der Team-Liga zeigt das Bild von damals. Ein Bild im
     # Ergebnisblatt kommt immer aus einem Pool-Snapshot oder der Bibliothek - darum zählen diese beiden, die Blätter
     # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
@@ -115,6 +117,7 @@ FIELD_LABELS = {
     **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
     "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild", "sticker.url": "Sticker",
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
+    "modes.icon_url": "Symbol eines Modus", "match_modes.icon_url": "Symbol eines Modus",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     "body_md": "Text", "annexes.body_md": "Text einer Anlage",
     **{f"dolibarr_images.{kind}.{variant}.url":
@@ -321,16 +324,31 @@ async def iter_usages(db, names: set[str]):
                     yield collection, document, field, name, text
 
 
-def is_frozen(collection: str, document: dict) -> bool:
-    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht."""
-    return collection == "league_rules" and document.get("status") == "published"
+# Pool-Versionen halten das Symbol eines Modus als Schnappschuss (#2266) - eingefroren wie eine veröffentlichte Regelversion. Der
+# Standard-Pool eines Spiels ist nur eine Vorlage.
+FROZEN_POOL_FIELD = "modes.icon_url"
+FROZEN_POOL_PREFIX = "Map-Pool"
+
+
+def is_frozen(collection: str, document: dict, field: str | None = None) -> bool:
+    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht.
+    Dazu das Symbol eines Modus in einer Pool-Version (#2266) - ``field`` sagt, welche Stelle gemeint ist."""
+    if collection == "league_rules":
+        return document.get("status") == "published"
+    return collection == "map_pools" and field == FROZEN_POOL_FIELD and document.get("scope") != "game_default"
+
+
+def _frozen_place(collection: str, document: dict) -> str:
+    if collection == "map_pools":
+        return f"{FROZEN_POOL_PREFIX}, Version {document.get('version')}"
+    return f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
 
 
 async def frozen_usages(db, filename: str) -> list[str]:
     """Die unveränderlichen Stellen, die eine Datei zeigen - als Text für die Meldung. Solange es sie gibt, bleibt die Datei, wie sie ist."""
-    return sorted({f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
-                   async for collection, document, _field, _name, _text in iter_usages(db, {filename})
-                   if is_frozen(collection, document)})
+    return sorted({_frozen_place(collection, document)
+                   async for collection, document, field, _name, _text in iter_usages(db, {filename})
+                   if is_frozen(collection, document, field)})
 
 
 def write_guard(collection: str) -> dict:
@@ -353,6 +371,10 @@ async def rule_draft_locks(db, filename: str):
 
 
 def frozen_message(places: list[str], action: str) -> str:
+    pools = [place for place in places if place.startswith(FROZEN_POOL_PREFIX)]
+    if pools and len(pools) == len(places):
+        return (f"Die Datei ist das Symbol eines Modus in einem gespeicherten Map-Pool ({'; '.join(places)}) und lässt sich deshalb nicht "
+                f"{action}. Ein gespeicherter Pool bleibt unverändert. Für ein neues Symbol bitte am Modus ein anderes Bild wählen.")
     return (f"Die Datei steht in einer veröffentlichten Regelversion ({'; '.join(places)}) und lässt sich deshalb nicht {action}. "
             "Eine veröffentlichte Version bleibt unverändert. Für ein neues Bild bitte eine neue Version veröffentlichen.")
 
@@ -401,7 +423,7 @@ async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list
             return text
         return uploads_inventory.URL_IN_TEXT_RE.sub(in_address, text)
 
-    hits = [hit async for hit in iter_usages(db, {filename}) if not is_frozen(hit[0], hit[1])]
+    hits = [hit async for hit in iter_usages(db, {filename}) if not is_frozen(hit[0], hit[1], hit[2])]
     for collection, doc, field, _name, text in hits:
         await rewrite_field(getattr(db, collection), doc["_id"], field, in_text if text else in_field, stamp_for(collection, stamp),
                             guard=write_guard(collection))

@@ -22,7 +22,9 @@ from services.match_winner import match_winner_id
 
 PUBLIC_GAME_FIELDS = ("position", "mode", "map_id", "map_name", "map_image_url", "winner_registration_id", "scores")
 # Zusatzfelder je Map (C.3, #1617): nur wenn gesetzt - der Nachweis (``proof_id``) bleibt bei Beteiligten und Leitung.
-PUBLIC_GAME_EXTRAS = ("status", "replay_reason", "decision", "host_registration_id")
+PUBLIC_GAME_EXTRAS = ("status", "replay_reason", "decision", "host_registration_id",
+                      # Name und Symbol des Modus (#2266) für die Modus-Chips der Ligaseite - Schnappschuss am Spiel.
+                      "mode_label", "mode_icon_url")
 
 
 def _public_game(game: dict) -> dict:

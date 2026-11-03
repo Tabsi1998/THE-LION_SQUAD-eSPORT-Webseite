@@ -35,9 +35,19 @@ def status_of(mode: dict | None) -> str:
 
 
 def entries(game: dict | None) -> list[dict]:
-    """Die Modi für Auswahllisten der Verwaltung: ``{mode, label, status}`` in ihrer Reihenfolge."""
-    return [{"mode": mode["mode"], "label": mode.get("label") or mode["mode"], "status": status_of(mode)}
+    """Die Modi für Auswahllisten der Verwaltung: ``{mode, label, status}`` in ihrer Reihenfolge, dazu ``icon_url``, wenn der Modus
+    ein Symbol hat (#2266)."""
+    return [{"mode": mode["mode"], "label": mode.get("label") or mode["mode"], "status": status_of(mode),
+             **({"icon_url": mode["icon_url"]} if mode.get("icon_url") else {})}
             for mode in _modes(game)]
+
+
+def icon_of(game: dict | None, key: str | None) -> str | None:
+    """Das Symbol eines Modus (#2266) - ``None`` ohne Symbol oder ohne den Modus."""
+    for mode in _modes(game):
+        if mode["mode"] == key:
+            return mode.get("icon_url") or None
+    return None
 
 
 def choice_problem(game: dict | None, wanted: Iterable, kept: Iterable = (), *, inactive_ok: bool = False) -> str | None:

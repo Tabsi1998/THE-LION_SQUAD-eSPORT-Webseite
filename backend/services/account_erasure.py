@@ -291,7 +291,7 @@ async def _usage(db, names: set[str]) -> tuple[set[str], dict[str, list], set[st
     personal: dict[str, list] = {}
     frozen: set[str] = set()
     async for collection, document, field, name, text in media_audit.iter_usages(db, names):
-        if media_audit.is_frozen(collection, document):
+        if media_audit.is_frozen(collection, document, field):
             frozen.add(name)
         if not _personal(collection, document):
             elsewhere.add(name)

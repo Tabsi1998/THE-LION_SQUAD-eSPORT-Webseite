@@ -20,7 +20,8 @@ freigegeben ist, jede einmal je Modus. Fremde Kennungen (anderes Spiel, unbekann
 in zwei Spielen sind kein gemeinsamer Pool. ``allowed`` ist dieselbe Regel für die Wahl im Veto (#1618).
 
 Der Lesevertrag ``view`` ist für Website, App und TV gleich: ``{id, version, origin, game_id, saved_at, modes: [{mode,
-label, maps: [{map_id, slug, name, image_url}]}]}``; die Verwaltung bekommt dazu ``saved_by`` und ``note``.
+label, icon_url?, maps: [{map_id, slug, name, image_url}]}]}``; die Verwaltung bekommt dazu ``saved_by`` und ``note``.
+``icon_url`` (#2266) ist das Symbol des Modus von damals und steht nur, wenn der Modus beim Speichern eines hatte.
 """
 from __future__ import annotations
 
@@ -85,12 +86,17 @@ def view(doc: dict | None, origin: str | None = None, *, admin: bool = False) ->
     return saved_view(doc, origin, admin=admin) if doc else None
 
 
+def _group_head(group: dict) -> dict:
+    """Modus einer Gruppe im Snapshot: Kennung, Name und - nur wenn gesetzt - das Symbol von damals (#2266)."""
+    return {"mode": group.get("mode"), "label": group.get("label"), **({"icon_url": group["icon_url"]} if group.get("icon_url") else {})}
+
+
 def saved_view(doc: dict, origin: str | None = None, *, admin: bool = False) -> dict:
     """Der Lesevertrag einer vorhandenen Version."""
     out = {
         "id": doc.get("id"), "version": doc.get("version"), "origin": origin or doc.get("scope"),
         "game_id": doc.get("game_id"), "saved_at": doc.get("created_at"),
-        "modes": [{"mode": group.get("mode"), "label": group.get("label"),
+        "modes": [{**_group_head(group),
                    "maps": [{key: item.get(key) for key in ("map_id", "slug", "name", "image_url")}
                             for item in group.get("maps") or []]}
                   for group in doc.get("modes") or []],
@@ -259,7 +265,9 @@ async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None =
             maps.append({"map_id": row["id"], "slug": row.get("slug"), "name": row.get("name"),
                          "image_url": row.get("image_url")})
         if maps:
-            groups.append({"mode": mode, "label": label, "maps": maps})
+            # Symbol des Modus als Schnappschuss wie der Name (#2266) - nur wenn gesetzt.
+            icon = game_modes.icon_of(game, mode) if mode else None
+            groups.append({"mode": mode, "label": label, **({"icon_url": icon} if icon else {}), "maps": maps})
     if not groups:
         raise MapProblem("Bitte mindestens eine Map wählen - oder den Pool entfernen.")
     return groups
@@ -311,8 +319,7 @@ async def copy_version(db, source: dict, *, scope: str, scope_id: str, user: dic
     """Eine vorhandene Version als neue Version eines anderen Wettbewerbs - mit genau denselben Maps samt Namen und
     Bildern von damals (Snapshot), ohne neue Prüfung gegen die Bibliothek. Für die Liga: Season → Staffel."""
     previous = await latest(db, scope, scope_id)
-    groups = [{"mode": group.get("mode"), "label": group.get("label"),
-               "maps": [dict(item) for item in group.get("maps") or []]} for group in source.get("modes") or []]
+    groups = [{**_group_head(group), "maps": [dict(item) for item in group.get("maps") or []]} for group in source.get("modes") or []]
     return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=source.get("game_id"),
                         user=user, groups=groups, cleared=False, note=note, tournament_id=tournament_id)
 
@@ -387,7 +394,7 @@ async def without_map(db, *, scope: str, scope_id: str, map_id: str, mode: str |
             found = found or len(kept) != len(maps)
             maps = kept
         if maps:
-            groups.append({"mode": group.get("mode"), "label": group.get("label"), "maps": maps})
+            groups.append({**_group_head(group), "maps": maps})
     if not found:
         raise MapProblem("Diese Map steht nicht im Map-Pool." if mode is None else "Diese Map steht in diesem Modus nicht im Map-Pool.", 404)
     if not groups:
