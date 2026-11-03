@@ -12,6 +12,11 @@ test("proposalStatusLabel nennt jeden Zustand auf Deutsch", () => {
   expect(proposalStatusLabel({ status: "seltsam" })).toBe("unbekannt");
 });
 
+test("proposalStatusLabel: 72-h-Regel und erledigte Vorschläge (#2194)", () => {
+  expect(proposalStatusLabel({ status: "accepted", decision_rule: "home_rule" })).toBe("gilt nach der 72-h-Regel");
+  expect(proposalStatusLabel({ status: "declined", decision_rule: "agreed_elsewhere" })).toBe("erledigt – anderer Termin steht");
+});
+
 test("isOwnProposal: die eigene Seite zählt, ohne Seite (Turnierleitung) die eigene Person", () => {
   const proposal = { actor_registration_id: "a", actor_user_id: "u1" };
   expect(isOwnProposal(proposal, { acting_registration_id: "a" }, "u2")).toBe(true);

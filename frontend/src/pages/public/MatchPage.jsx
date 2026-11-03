@@ -27,6 +27,7 @@ import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
+import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -303,6 +304,7 @@ function MatchPageView() {
   const latestProposal = (data.schedule_proposals || []).find((p) => p.status === "pending");
   const canProposeSchedule = Boolean(data.can_propose_schedule);
   const canManageSchedule = Boolean(data.can_manage_schedule);
+  const fixedTime = Boolean(data.schedule_block?.fixed);
   const canUseChat = Boolean(user && data.can_act);
   const participants = data.participants || [];
   const duelParticipants = participants.slice(0, 2);
@@ -579,7 +581,7 @@ function MatchPageView() {
                 </form>
               ) : showFixedScheduleNotice ? (
                 <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
-              ) : (
+              ) : data.schedule_block?.fixed ? null : (
                 <p className="mt-3 text-sm text-white/50">Termine können Teilnehmer, Team-Captains und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
               )}
 
@@ -589,6 +591,8 @@ function MatchPageView() {
                   // Der eigene Vorschlag (#2110): annehmen oder ablehnen kann nur die Gegenseite - hier „Zurückziehen“.
                   const own = open && isOwnProposal(p, data, user?.id);
                   const answer = canManageSchedule && open && !own;
+                  // Fester Termin (#2194): ein alter Vorschlag lässt sich nur noch ablehnen - Annehmen und Gegenvorschlag gehen über die Verschiebung.
+                  const agree = answer && !fixedTime;
                   // Wer nicht zum Spiel gehört, bekommt keine Kennung (#2201) - dann zählt die Stelle in der Liste.
                   const rowId = p.id || `zeile-${index}`;
                   return (
@@ -601,7 +605,7 @@ function MatchPageView() {
                       </div>
                       {answer && (
                         <div className="flex gap-1 shrink-0">
-                          <button type="button" disabled={busy} onClick={() => decide(p, "accept")} aria-label="Termin annehmen" title="Annehmen" data-testid={`match-proposal-accept-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
+                          {agree && <button type="button" disabled={busy} onClick={() => decide(p, "accept")} aria-label="Termin annehmen" title="Annehmen" data-testid={`match-proposal-accept-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>}
                           <button type="button" disabled={busy} onClick={() => decide(p, "decline")} aria-label="Termin ablehnen" title="Ablehnen" data-testid={`match-proposal-decline-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm disabled:opacity-50"><X className="w-3.5 h-3.5" /></button>
                         </div>
                       )}
@@ -609,7 +613,7 @@ function MatchPageView() {
                         <button type="button" disabled={busy} onClick={() => decide(p, "withdraw")} data-testid={`match-proposal-withdraw-${p.id}`} className="tls-btn tls-btn--quiet shrink-0 min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Zurückziehen</button>
                       )}
                     </div>
-                    {answer && (
+                    {agree && (
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
                         <input type="datetime-local" min={earliestProposalInput()} aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
                         <input aria-label="Antwort oder Grund" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
@@ -619,8 +623,10 @@ function MatchPageView() {
                   </div>
                   );
                 })}
-                {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
+                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
+              {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}
+              <ScheduleChangePanel block={data.schedule_block} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })} onAskLead={canUseChat ? askStaff : null} />
             </div>
             )}
           </div>
