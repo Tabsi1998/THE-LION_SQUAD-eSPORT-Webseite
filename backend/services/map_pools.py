@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, new_id, now_utc
-from services import game_maps
+from services import game_maps, game_modes
 from services.game_maps import MapProblem
 
 # ``league_season``: Pool einer Liga-Season (docs/LIGA.md) - Vorlage; die Staffel bekommt beim Anlegen eine Kopie
@@ -155,7 +155,8 @@ async def library(db, game: dict | None) -> list[dict]:
 def game_summary(game: dict | None) -> dict | None:
     if not game:
         return None
-    return {"id": game["id"], "name": game.get("name"), "slug": game.get("slug"), "modes": game_maps.game_modes(game)}
+    # ``status`` je Modus (#2206): die Verwaltung bietet inaktive und archivierte nur an, wo sie schon gesetzt sind.
+    return {"id": game["id"], "name": game.get("name"), "slug": game.get("slug"), "modes": game_modes.entries(game)}
 
 
 async def default_pool(db, game: dict | None) -> dict | None:
@@ -201,7 +202,15 @@ async def tournament_sources(db, tournament: dict) -> list[dict]:
 
 # ---------------------------------------------------------------- Schreiben
 
-async def _snapshot_groups(db, game: dict, body: MapPoolSave) -> list[dict]:
+def _kept_modes(previous: dict | None, game: dict) -> set:
+    """Die Modi der geltenden Version desselben Wettbewerbs - ein inaktiver Modus darin hält das neue Speichern nicht auf
+    (#2206)."""
+    if not previous or previous.get("cleared") or previous.get("game_id") != game.get("id"):
+        return set()
+    return {group.get("mode") for group in previous.get("modes") or [] if group.get("mode")}
+
+
+async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None = None) -> list[dict]:
     modes = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
     game_name = game.get("name") or "dieses Spiel"
     seen_modes: set = set()
@@ -214,6 +223,10 @@ async def _snapshot_groups(db, game: dict, body: MapPoolSave) -> list[dict]:
             raise MapProblem(f"{game_name} hat Modi - bitte je Modus wählen.")
         if mode is not None and mode not in modes:
             raise MapProblem(f"Unbekannter Modus für {game_name}: {mode}.")
+        # Inaktiv oder archiviert (#2206): kommt in keinen neuen Pool - leer gelassen stört er nicht.
+        problem = game_modes.choice_problem(game, [mode], kept or ()) if group.map_ids else None
+        if problem:
+            raise MapProblem(problem)
         if mode in seen_modes:
             raise MapProblem(f"Der Modus {modes.get(mode, mode) if mode else NO_MODE_LABEL} steht zweimal im Pool.")
         seen_modes.add(mode)
@@ -274,7 +287,7 @@ async def save(db, *, scope: str, scope_id: str, game: dict | None, body: MapPoo
     previous = await latest(db, scope, scope_id)
     if body.expected_version is not None and _current_version(previous) != body.expected_version:
         raise MapProblem(CHANGED_MEANWHILE, 409)
-    groups = await _snapshot_groups(db, game, body)
+    groups = await _snapshot_groups(db, game, body, _kept_modes(previous, game))
     return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=game["id"], user=user,
                         groups=groups, cleared=False, note=body.note, tournament_id=tournament_id)
 

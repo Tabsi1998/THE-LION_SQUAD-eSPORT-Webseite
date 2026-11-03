@@ -33,7 +33,7 @@ from services.match_v2_results import (
     public_recalculation_error,
 )
 from models import TournamentStageCreate, TournamentStageUpdate, now_utc, new_id
-from services import tournament_guard
+from services import game_modes, tournament_guard
 from services.staffel_guard import staffel_rebuild_problem
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
@@ -91,6 +91,20 @@ def _sync_stage_settings(settings) -> None:
             settings[SHOW_MINUTES_KEY] = minutes
 
 
+async def _check_stage_mode(db, tid: str, settings, current_settings=None) -> None:
+    """Spielmodus einer Phase (#2206): ein inaktiver oder archivierter Modus des Spiels wird nicht neu gesetzt, der schon
+    gesetzte der Phase bleibt gültig."""
+    wanted = settings.get("game_mode") if isinstance(settings, dict) else None
+    if not wanted:
+        return
+    kept = (current_settings or {}).get("game_mode") if isinstance(current_settings, dict) else None
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "game_id": 1}) or {}
+    game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0, "match_modes": 1}) if tournament.get("game_id") else None
+    problem = game_modes.choice_problem(game, [wanted], [kept])
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+
+
 @router.post("/{tid}/stages")
 async def create_tournament_stage(tid: str, body: TournamentStageCreate,
                                   me: dict = Depends(get_current_user),
@@ -101,6 +115,7 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     doc = body.model_dump()
     _sync_stage_settings(doc.get("settings"))
+    await _check_stage_mode(db, tid, doc.get("settings"))
     creation_digest = hashlib.sha256(
         json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     ).hexdigest()
@@ -154,6 +169,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
         raise HTTPException(status_code=404, detail="Phase nicht gefunden")
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     _sync_stage_settings(updates.get("settings"))
+    await _check_stage_mode(db, tid, updates.get("settings"), current.get("settings"))
     if "number" in updates:
         duplicate = await db.tournament_stages.find_one(
             {"id": {"$ne": stage_id}, "tournament_id": tid, "number": updates["number"]},

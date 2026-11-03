@@ -41,7 +41,9 @@ async function mockServer(page) {
   });
   await page.route("**/api/games/g1/usage", json({
     total: 15, text: "2 Turniere, 12 Maps, 1 Liga", counts: {},
-    modes: { stellung: { label: "Stellung", maps: 3, pools: 1, seasons: 1 }, snd: { label: "Suchen & Zerstören", maps: 2, pools: 0, seasons: 0 } },
+    // Seit #2206: „Stellung“ hängt nur an Maps (entfernbar), „Suchen & Zerstören“ steht in einem Pool (nur deaktivieren).
+    modes: { stellung: { label: "Stellung", maps: 3, pools: 0, seasons: 0, in_use: false },
+      snd: { label: "Suchen & Zerstören", maps: 2, pools: 1, seasons: 1, pool_versions: 2, in_use: true } },
   }));
   await page.route("**/api/games/g1/maps", json({ game: { id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", modes: MODES }, maps: MAPS, limit: 200, default_pool: null }));
   await page.route("**/api/games/g1/maps/assign-modes", (route) => {
@@ -120,6 +122,45 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     expect(calls.patch[0].match_modes.map((mode) => mode.mode)).toEqual(["snd"]);
     await expect(page.getByText("Modus aus 3 Maps entfernt.", { exact: false })).toBeVisible();
     await noSideScroll(page);
+  });
+
+  test(`Spielmodi (${width} px): verwendeter Modus mit Schloss, Zustand und Ergebnisregel geführt eintragen`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const calls = await mockServer(page);
+    await page.goto("/admin/games");
+    await page.getByTestId("game-edit-probe-shooter").click();
+    await expect(page.getByTestId("game-edit-mode-locked-1")).toBeVisible();
+    await expect(page.getByTestId("game-edit-mode-remove-1")).toHaveCount(0);
+    await expect(page.getByTestId("game-edit-mode-used-1")).toContainText("nur deaktivieren oder archivieren");
+    await expect(page.getByTestId("game-edit-mode-remove-0")).toBeEnabled();
+
+    await page.getByTestId("game-edit-mode-status-1").selectOption("inactive");
+    await expect(page.getByTestId("game-edit-mode-status-hint-1")).toContainText("nicht mehr zur Wahl");
+    await page.getByTestId("game-edit-mode-more-1").click();
+    await page.getByTestId("game-edit-mode-players-1").fill("4");
+    await page.getByTestId("game-edit-mode-format-1").fill("Standard-Regeln");
+    await page.getByTestId("game-edit-mode-rule-kind-1").selectOption("rounds");
+    await page.getByTestId("game-edit-mode-rule-target-1").fill("6");
+    await page.getByTestId("game-edit-mode-rule-limit-1").fill("11");
+    await page.getByTestId("game-edit-mode-rule-overtime-1").check();
+    await expect(page.getByTestId("game-edit-mode-more-1")).toContainText("4 je Seite · Standard-Regeln · Runden gewinnen: 6 Siege, höchstens 11 Runden · Verlängerung");
+    await noSideScroll(page);
+    await page.getByTestId("game-edit-mode-more-1").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath("spiel-modus-details.png") });
+
+    // Passt die Regel nicht, sagt es die Seite vor dem Speichern - nichts geht an den Server.
+    await page.getByTestId("game-edit-mode-rule-limit-1").fill("5");
+    await page.getByTestId("game-edit-save").click();
+    await expect(page.getByText("Das Rundenlimit (5) ist kleiner als das Ziel (6).", { exact: false })).toBeVisible();
+    expect(calls.patch).toHaveLength(0);
+    await page.getByTestId("game-edit-mode-rule-limit-1").fill("11");
+    await page.getByTestId("game-edit-save").click();
+    await expect.poll(() => calls.patch.length).toBe(1);
+    expect(calls.patch[0].match_modes[1]).toEqual({
+      mode: "snd", label: "Suchen & Zerstören", minutes: null, per_game: false, status: "inactive", players_per_side: 4, format: "Standard-Regeln",
+      result_rule: { kind: "rounds", target: 6, round_limit: 11, draw_allowed: false, overtime: true },
+    });
+    expect(calls.patch[0].match_modes[0]).toEqual({ mode: "stellung", label: "Stellung", minutes: null, per_game: false });
   });
 
   test(`Map-Seite (${width} px): Maps ohne Modus zuordnen, aus einem Spiel übernehmen, Standard-Pool`, async ({ page }) => {

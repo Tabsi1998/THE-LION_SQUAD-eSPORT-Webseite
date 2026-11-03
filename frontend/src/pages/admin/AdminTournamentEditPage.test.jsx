@@ -675,6 +675,26 @@ test("ohne eigene Matchdauer steht „vom Spiel: 15 Min.“ - mit Modus und Aufb
   expect(apiMock.patch.mock.calls.at(-1)[1]).not.toHaveProperty("match_duration_minutes");
 });
 
+// Spielmodi mit Zustand (#2206): ein inaktiver Modus steht nur da, wo das Turnier ihn schon hat - archivierte sonst gar nicht.
+test("Spielmodus: inaktive und archivierte nur, wenn das Turnier sie schon hat", async () => {
+  const user = userEvent.setup();
+  KART.match_modes.push({ mode: "alt", label: "Altmodus", minutes: 5, status: "archived" });
+  KART.match_modes[1].status = "inactive";
+  try {
+    renderWithGames({ game_id: "g-kart", match_duration_minutes: null, best_of: 1, game_mode: "alt" });
+    await screen.findByRole("heading", { name: "Winter Cup 2026" });
+    await user.click(screen.getByTestId("admin-tr-tab-edit"));
+    const select = await screen.findByTestId("tr-edit-game-mode");
+    await waitFor(() => expect([...select.options].map((option) => option.value)).toEqual(["", "gp4", "alt"]));
+    expect(select).toHaveValue("alt");
+    expect(select.options[2].textContent).toContain("Altmodus (archiviert)");
+    expect(select.options[0].textContent).toContain("Erster Modus (Grand Prix 4 Rennen)");
+  } finally {
+    KART.match_modes.pop();
+    delete KART.match_modes[1].status;
+  }
+});
+
 test("eine eigene Matchdauer schlägt das Spiel, leeren heißt wieder „vom Spiel“", async () => {
   const user = userEvent.setup();
   renderWithGames({ game_id: "g-kart", match_duration_minutes: 40 });

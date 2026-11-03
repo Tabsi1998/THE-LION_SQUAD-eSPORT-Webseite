@@ -113,6 +113,22 @@ test("Modus je Map: ein Modus, den das Spiel nicht mehr hat, bleibt gesetzt und 
   expect(apiMock.patch.mock.calls[0][1].game_mode_order).toEqual(["snd", "kontrolle", "snd"]);
 });
 
+// #2206: Ein inaktiver Modus bleibt, wo die Season ihn hat; neu wählen lässt er sich nicht, ein archivierter fehlt ganz.
+test("Modus je Map: inaktive nur, wo die Season sie schon hat", async () => {
+  const game = { ...BODY.game, modes: [{ mode: "snd", label: "Suchen & Zerstören", status: "inactive" }, { mode: "stellung", label: "Stellung" },
+    { mode: "alt", label: "Altmodus", status: "archived" }] };
+  apiMock.get.mockResolvedValue({ data: { ...BODY, game, season: { ...SEASON, game_mode_order: ["snd", "stellung", "snd"] } } });
+  const first = renderPage();
+  const select = await screen.findByTestId("mode-order-0");
+  expect(select).toHaveValue("snd");
+  expect([...select.options].map((option) => option.textContent)).toEqual(["frei", "Suchen & Zerstören (inaktiv)", "Stellung"]);
+  apiMock.get.mockResolvedValue({ data: { ...BODY, game } });
+  first.unmount();
+  renderPage();
+  const fresh = await screen.findByTestId("mode-order-0");
+  expect([...fresh.options].map((option) => option.textContent)).toEqual(["frei", "Stellung"]);
+});
+
 test("Staffel anlegen und Liga 2 mit eigener Teamgröße anlegen", async () => {
   apiMock.post.mockResolvedValueOnce({ data: { tournament_id: "t2", staffel: "B" } });
   renderPage();

@@ -223,6 +223,8 @@ describe("einen Modus entfernen (#2129, SP2)", () => {
     render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
     fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
     expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue("Grand Prix");
+    // #2206: Erst nach der Zählung steht fest, ob der Modus entfernt werden darf.
+    await waitFor(() => expect(screen.getByTestId("game-edit-mode-remove-0")).toBeEnabled());
     fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
     fireEvent.submit(screen.getByTestId("game-sheet"));
   }
@@ -252,9 +254,25 @@ describe("einen Modus entfernen (#2129, SP2)", () => {
   });
 
   test("hängt nichts daran, gibt es keine Frage", async () => {
-    withMode({ modes: { gp4: { label: "Grand Prix", maps: 0, pools: 0, seasons: 0 } } });
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 0, pools: 0, seasons: 0, in_use: false } } });
     await removeAndSave();
     await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  // #2206: Ein verwendeter Modus hat kein Entfernen, nur den Hinweis; die Zählung fragt das Blatt beim Öffnen ab.
+  test("verwendet: Schloss statt Papierkorb, deaktivieren geht", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 2, pools: 1, seasons: 0, pool_versions: 1, in_use: true } } });
+    render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+    expect(await screen.findByTestId("game-edit-mode-locked-0")).toBeInTheDocument();
+    expect(screen.queryByTestId("game-edit-mode-remove-0")).toBeNull();
+    expect(apiMock.get).toHaveBeenCalledWith("/games/g1/usage");
+    fireEvent.change(screen.getByTestId("game-edit-mode-status-0"), { target: { value: "archived" } });
+    fireEvent.submit(screen.getByTestId("game-sheet"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({
+      match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12, per_game: false, status: "archived" }],
+    })));
     expect(confirmMock).not.toHaveBeenCalled();
   });
 });

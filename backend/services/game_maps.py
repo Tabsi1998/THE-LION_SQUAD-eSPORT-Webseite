@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, now_utc
+from services import game_modes as mode_states
 from services.media_formats import UPLOAD_URL_VERSION
 from services.slug_utils import slugify
 
@@ -149,13 +150,24 @@ def game_modes(game: dict | None) -> list[dict]:
             for mode in modes if isinstance(mode, dict) and mode.get("mode")]
 
 
-def clean_modes(game: dict, modes: list[str] | None) -> list[str]:
-    """Die Modus-Kennungen einer Map: jede einmal, in der Reihenfolge des Spiels; eine unbekannte ist ein Fehler."""
+def _mode_doc(game: dict | None, key: str) -> dict | None:
+    for mode in (game or {}).get("match_modes") or []:
+        if isinstance(mode, dict) and mode.get("mode") == key:
+            return mode
+    return None
+
+
+def clean_modes(game: dict, modes: list[str] | None, kept=()) -> list[str]:
+    """Die Modus-Kennungen einer Map: jede einmal, in der Reihenfolge des Spiels; eine unbekannte ist ein Fehler. Ein
+    archivierter Modus kommt an keine Map neu dazu (#2206), ``kept`` sind die, die sie schon hat."""
     known = [mode["mode"] for mode in game_modes(game)]
     wanted = [str(mode or "").strip() for mode in modes or [] if str(mode or "").strip()]
     unknown = [mode for mode in wanted if mode not in known]
     if unknown:
         raise MapProblem(f"Unbekannter Modus für {game.get('name') or 'dieses Spiel'}: {', '.join(unknown)}.")
+    problem = mode_states.choice_problem(game, wanted, kept, inactive_ok=True)
+    if problem:
+        raise MapProblem(problem)
     return [mode for mode in known if mode in wanted]
 
 
@@ -390,7 +402,7 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
         if key in raw:
             updates[key] = raw[key]
     if raw.get("modes") is not None:
-        updates["modes"] = clean_modes(game, raw["modes"])
+        updates["modes"] = clean_modes(game, raw["modes"], current.get("modes") or [])
     if raw.get("aliases") is not None:
         updates["aliases"] = clean_aliases(raw["aliases"], updates.get("name") or current.get("name"))
     # Name, Slug und Schreibweisen nach der Änderung: dieselbe Prüfung wie beim Anlegen - auch beim Umbenennen und bei
@@ -422,7 +434,8 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
 def mapped_modes(source: dict, game: dict, modes: list[str] | None) -> list[str]:
     """Die Modi einer Map im Zielspiel (#2129, SP4): gleiche Kennung oder gleicher Name. Was das Ziel nicht hat, fällt weg -
     die Map erscheint dann im Hinweis „noch keinen Modus“."""
-    target = game_modes(game)
+    # Archivierte Modi des Ziels nimmt keine Map neu an (#2206) - sie fallen hier weg wie unbekannte.
+    target = [mode for mode in game_modes(game) if mode_states.status_of(_mode_doc(game, mode["mode"])) != mode_states.ARCHIVED]
     by_key = {mode["mode"]: mode["mode"] for mode in target}
     by_label = {name_key(mode["label"]): mode["mode"] for mode in target}
     labels = {mode["mode"]: mode["label"] for mode in game_modes(source)}
