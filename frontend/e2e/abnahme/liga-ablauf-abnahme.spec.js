@@ -91,6 +91,12 @@ async function report(page, matchId, winner, maps) {
     const position = index + 1;
     await page.getByTestId(`league-game-${position}-map-${mapId}`).click();
     await page.getByTestId(`league-game-${position}-winner-${winner}`).click();
+    // Punkte je Map sind in neuen Seasons Pflicht (C.3, #1617): Sieger 6, Gegenseite 2.
+    const scores = page.locator(`[data-testid^="league-game-${position}-score-"]`);
+    for (let index = 0; index < await scores.count(); index += 1) {
+      const field = scores.nth(index);
+      await field.fill((await field.getAttribute("data-testid")).endsWith(`-${winner}`) ? "6" : "2");
+    }
   }
   const chips = page.getByTestId("league-participants").getByRole("button");
   for (let chip = 0; chip < 4; chip += 1) await chips.nth(chip).click();
