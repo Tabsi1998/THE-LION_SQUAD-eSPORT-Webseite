@@ -18,7 +18,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_eligibility, league_roster, league_rules, league_service, squad_registration
+from services import league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
 from services.league_permissions import belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
@@ -775,6 +775,8 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         rows.append(row)
     return {
         "application": await public_block(db, season),
+        # Plattform je Season (#2270): was gilt, bevor die Liga N feststeht - je Liga N, wenn sie abweicht.
+        "platform": await league_platform.season_block(db, season),
         "rules": league_rules.version_view(league, season, version) if version else None,
         "privacy": {"text": season.get("application_privacy_text") or PRIVACY_PLACEHOLDER, "url": PRIVACY_URL},
         "season_problems": blocked if state else [],

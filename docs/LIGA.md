@@ -876,8 +876,8 @@ Check-in lesen `status`. Die Aufnahme in einen Kader prüft die Plattform nicht.
 
 **Antworten:** `GET /api/leagues/{liga}/{season}` trägt `platform` (`null` ohne jede Angabe): `{field_label, allowed, crossplay, input_device, input_device_label,
 values, divisions: [{id, label, …, differs}]}`. `values` sind die Texte für das Regelwerk (#2269): `platforms` („PC“, „PC und PlayStation“, „alle Plattformen“),
-`crossplay` („an“, „aus“ oder `null`), `input_device` (Wort oder `null`). Dasselbe ohne `divisions` steht in `GET …/application` und unter `rules.platform` der
-Team-Seite und der Kaderübersicht. **Seasons ohne die Felder prüfen nichts Neues.**
+`crossplay` („an“, „aus“ oder `null`), `input_device` (Wort oder `null`). Dasselbe steht in `GET …/application`; ohne `divisions` und für die Liga N der Staffel
+unter `rules.platform` der Team-Seite, für die Season unter `rules.platform` der Kaderübersicht. **Seasons ohne die Felder prüfen nichts Neues.**
 
 **Felder an `league_rosters`:**
 

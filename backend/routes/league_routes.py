@@ -35,6 +35,7 @@ from models import (
 from services import game_maps
 from services import league_applications
 from services import league_look
+from services import league_platform
 from services import league_pool_check
 from services import league_readiness
 from services import league_service as leagues
@@ -718,7 +719,9 @@ async def public_season(league_slug: str, season_slug: str, user: dict | None = 
     season = await db.league_seasons.find_one({"id": view["season"]["id"]}, {"_id": 0})
     # Regelwerk (#1646): Link mit Version und Stand statt des Aufklappblocks; ``None`` - der Regeltext bleibt.
     return {**view, "rules": await rules_summary(db, view["league"]["id"], view["season"]["id"], user),
-            "application": await league_applications.public_block(db, season)}
+            "application": await league_applications.public_block(db, season),
+            # Plattform je Season (#2270): erlaubte Plattformen, Crossplay, Eingabegerät, je Liga N; ``None`` ohne jede Angabe.
+            "platform": await league_platform.season_block(db, season)}
 
 
 @router.get("/{league_slug}/{season_slug}/staffeln/{staffel_ref}")

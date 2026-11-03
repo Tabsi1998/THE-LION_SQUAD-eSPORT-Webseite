@@ -2644,6 +2644,10 @@ class LeagueDivisionOverrides(BaseModel):
     max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
     scoring_rules: Optional[dict] = None
     match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    # Plattform je Season (#2270): fehlt = wie Season, ``allowed_platforms: []`` = alle erlaubt. Werte prüft ``league_platform``.
+    allowed_platforms: Optional[List[str]] = Field(default=None, max_length=30)
+    crossplay: Optional[bool] = None
+    input_device: Optional[Literal["controller", "mouse_keyboard", "both"]] = None
 
 
 class LeagueDivisionCreate(BaseModel):
