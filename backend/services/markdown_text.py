@@ -17,6 +17,9 @@ _TO_PROTECTED = {ord(char): chr(PROTECT_BASE + index) for index, char in enumera
 _TO_PLAIN = {PROTECT_BASE + index: char for index, char in enumerate(MARKDOWN_SPECIAL)}
 _TO_ESCAPED = {PROTECT_BASE + index: f"\\{char}" for index, char in enumerate(MARKDOWN_SPECIAL)}
 _STRIP = dict.fromkeys(RESERVED)
+# Beim Zurückwandeln fällt jedes übrige Zeichen des Bereichs weg - auch aus Altfassungen, die es gespeichert haben.
+_TO_PLAIN = {**_STRIP, **_TO_PLAIN}
+_TO_ESCAPED = {**_STRIP, **_TO_ESCAPED}
 
 
 def strip_protected(text) -> str:

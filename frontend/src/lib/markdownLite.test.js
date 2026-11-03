@@ -58,10 +58,13 @@ test("mit `escapes` wird ein Backslash im freien Text kein fremder Link, ein ein
 });
 
 test("protokoll-relative Links auf fremde Seiten werden kein Link", () => {
-  for (const href of ["//evil.example", "//evil.example/pfad", "/\\evil.example"]) {
+  for (const href of ["//evil.example", "//evil.example/pfad", "/\\evil.example", "\\/\\/evil.example", "\\\\evil.example"]) {
     const html = renderMarkdownLite(`[Klick](${href})`);
     expect(html).not.toContain("href=");
     expect(html).toContain("Klick");
+    // Mit `escapes` wird „\\“ zu einem einzelnen Backslash - „\evil.example“ ist ein eigener Pfad, keine fremde Seite.
+    const escaped = renderMarkdownLite(`[Klick](${href})`, { escapes: true, linkMentions: false });
+    expect(escaped).not.toMatch(/href="[\\/]{2}/);
   }
   expect(renderMarkdownLite("[Turniere](/tournaments)")).toContain('href="/tournaments"');
   expect(renderMarkdownLite("[Regeln](#regeln)")).toContain('href="#regeln"');

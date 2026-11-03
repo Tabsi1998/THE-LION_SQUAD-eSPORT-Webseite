@@ -173,6 +173,24 @@ describe("Reiter", () => {
     await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
   });
 
+  test("Reiterwechsel aus einem geänderten Import-Blatt fragt nach; „Zurück“ behält die Auswahl, „Verwerfen“ wechselt", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-import"));
+    expect(await screen.findByTestId("equipment-import-row-a2")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-tab-modi"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Altschild")).not.toBeChecked();
+
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-tab-modi"));
+    await waitFor(() => expect(screen.getByTestId("game-tab-modi")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+  });
+
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("game-tab-ids"));
