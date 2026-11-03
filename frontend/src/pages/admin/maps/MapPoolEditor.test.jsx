@@ -70,7 +70,7 @@ test("ein Pool von vor dem ersten Modus zeigt seinen Stand, ohne etwas zu verlie
 test("Maps ohne Modus nennt der Editor und führt zur Bibliothek", () => {
   renderEditor({ library: [...LIBRARY, { id: "glut", name: "Glutsenke", modes: [] }], libraryLink: true });
   expect(screen.getByTestId("pool-without-mode")).toHaveTextContent("1 Map hat noch keinen Modus");
-  expect(within(screen.getByTestId("pool-without-mode")).getByRole("link", { name: "Zuordnen" })).toHaveAttribute("href", "/admin/games/g1/maps");
+  expect(within(screen.getByTestId("pool-without-mode")).getByRole("link", { name: "Zuordnen" })).toHaveAttribute("href", "/admin/games/g1#maps");
 });
 
 // #2129, SP3: Der Knopf heißt weiter „Vorgabe des Spiels“ und lädt den Standard-Pool, ohne ihn wie bisher alle aktiven Maps.
@@ -142,7 +142,7 @@ test("ohne Spiel oder ohne Maps sagt der Editor, was fehlt", () => {
   unmount();
   render(<MemoryRouter><MapPoolEditor title="Pool" game={GAME} library={[]} entry={null} onSave={vi.fn()} testId="pool" libraryLink /></MemoryRouter>);
   expect(screen.getByTestId("pool-no-maps")).toHaveTextContent("noch keine aktiven Maps");
-  expect(screen.getByRole("link", { name: /Maps anlegen/ })).toHaveAttribute("href", "/admin/games/g1/maps");
+  expect(screen.getByRole("link", { name: /Maps anlegen/ })).toHaveAttribute("href", "/admin/games/g1#maps");
 });
 
 test("ein Pool eines anderen Spiels gilt nicht mehr und wird so angezeigt", () => {
