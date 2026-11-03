@@ -316,8 +316,10 @@ def round_robin_standings(matches: list[dict], registrations: list[dict], rules:
         def compute(rows_matches, rows_registrations):
             return _round_robin_rows(rows_matches, rows_registrations, rules)
         return _with_form_and_movement(compute, matches, registrations)
-    context = tournament or {}
-    effective = _league_matches(matches, registrations, rules, context.get("best_of"))
+    effective = _league_matches(matches, registrations, rules, (tournament or {}).get("best_of"))
+    # Der ganze Spielplan: Ob unter Punktgleichen alles gespielt ist, entscheidet er - auch für die Tabelle des vorigen
+    # Spieltags (Bewegung), die nur einen Teil der Spiele sieht.
+    context = {**(tournament or {}), "_schedule": effective}
 
     def league_compute(rows_matches, rows_registrations):
         return _league_rows(rows_matches, rows_registrations, rules, context)
@@ -476,7 +478,7 @@ def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, co
     for row in rows:
         row["points"] -= row["deducted_points"]
         row["score_diff"] = row["score_for"] - row["score_against"]
-    _rank_league(rows, matches, rules, context.get("table_decisions") or [])
+    _rank_league(rows, matches, rules, context.get("table_decisions") or [], schedule=context.get("_schedule"))
     return rows
 
 
@@ -531,6 +533,20 @@ def _mini_table(group: list[dict], matches: list[dict], rules: dict) -> dict[str
     return {registration_id: tuple(value(entry, name) for name in criteria) for registration_id, entry in mini.items()}
 
 
+def _head_to_head_complete(group: list[dict], matches: list[dict], schedule: list[dict] | None) -> bool:
+    """Sind alle Spiele der Gruppe untereinander gespielt? Entscheidung des Obmanns zu E.1: sonst zählt der direkte
+    Vergleich nicht. ``schedule``: der ganze Spielplan; ``matches``: was in dieser Tabelle zählt."""
+    ids = {row["registration_id"] for row in group}
+
+    def inside(match: dict) -> bool:
+        sides = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
+        return len(sides) == 2 and set(sides) <= ids and sides[0] != sides[1]
+
+    played = {match.get("id") for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES and inside(match)}
+    return all(match.get("id") in played for match in (schedule if schedule is not None else matches)
+               if inside(match) and match.get("status") != "cancelled" and not match.get("is_preview"))
+
+
 def _decision_for(group: list[dict], decisions: list[dict]) -> dict | None:
     """Der Entscheid der Leitung für genau diese Gruppe - der jüngste, wenn es mehrere gäbe."""
     ids = {row["registration_id"] for row in group}
@@ -539,7 +555,8 @@ def _decision_for(group: list[dict], decisions: list[dict]) -> dict | None:
     return max(matching, key=lambda decision: str(decision.get("decided_at") or "")) if matching else None
 
 
-def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: list[dict]) -> None:
+def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: list[dict], *,
+                 schedule: list[dict] | None = None) -> None:
     """Reihenfolge der Liga-Staffel: Punkte, dann ``table_tiebreakers`` der Reihe nach (Nr. 25, 42). Ausgeschiedene mit
     ``all_for_opponents`` stehen unten (Nr. 43). Sortiert ``rows`` an Ort und Stelle und setzt ``rank`` (1, 2, 2, 4)."""
     criteria = list(rules.get("table_tiebreakers") or [])
@@ -549,6 +566,9 @@ def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: 
             part[0]["tiebreak"] = criterion
 
     def head_to_head(group: list[dict], index: int) -> list[list[dict]]:
+        if not _head_to_head_complete(group, matches, schedule):
+            # Noch nicht alles gespielt: das Kriterium fällt weg, es geht mit dem nächsten weiter.
+            return resolve(group, index + 1)
         mini = _mini_table(group, matches, rules)
         parts = _partition(group, lambda row: mini[row["registration_id"]])
         if len(parts) == 1:

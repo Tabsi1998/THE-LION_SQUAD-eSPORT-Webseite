@@ -479,7 +479,8 @@ Reihenfolge.
 
 1. **Direkter Vergleich**: nur die Spiele der gleichstehenden Teams untereinander (bei drei und mehr eine
    **Mini-Tabelle**) – Punkte, Map-Differenz, gewonnene Maps. Trennt sie nur einen Teil ab, wird für die übrigen die
-   Mini-Tabelle **neu gerechnet**, nur mit ihren Spielen. Ein noch offenes Spiel zählt dabei nicht.
+   Mini-Tabelle **neu gerechnet**, nur mit ihren Spielen. Der direkte Vergleich zählt nur, wenn **alle Spiele** der
+   gleichstehenden Teams untereinander gespielt sind – steht eines noch aus, entscheidet gleich der nächste Punkt.
 2. Dann **Map-Differenz** und **gewonnene Maps** über alle Spiele.
 3. Stehen Teams danach in allem gleich, **teilen sie sich den Platz** (1, 2, 2, 4) – bis die Leitung entscheidet.
 

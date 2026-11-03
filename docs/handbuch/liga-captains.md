@@ -61,7 +61,7 @@ Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und
   in der Tabelle als „kampflos“. Sind **beide nicht erschienen**, verlieren beide ohne Punkte und Maps; die Leitung kann
   das Spiel neu ansetzen.
 - **Punktgleich?** Zuerst der **direkte Vergleich** (bei drei und mehr Teams eine Mini-Tabelle nur aus euren Spielen
-  untereinander), dann Map-Differenz und gewonnene Maps. Stehen Teams danach in allem gleich, teilen sie sich den Platz,
+  untereinander – nur, wenn die alle gespielt sind), dann Map-Differenz und gewonnene Maps. Stehen Teams danach in allem gleich, teilen sie sich den Platz,
   bis die Liga-Leitung mit Grund entscheidet. Unter eurem Namen steht klein, was entschied.
 - **Steigt ein Team aus** (Austritt, Auflösung, Disqualifikation), zählen **alle** seine Spiele für die Gegner, auch schon
   gespielte. Das echte Ergebnis bleibt sichtbar, das Team steht am Tabellenende.

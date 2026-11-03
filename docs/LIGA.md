@@ -1109,7 +1109,9 @@ Punkte zählen immer zuerst. `points`, `score_diff`, `score_for` und `wins` mein
 - `head_to_head`: Mini-Tabelle nur aus den Spielen der Gruppe untereinander (zwei Teams: direkter Vergleich), sortiert nach
   `head_to_head_criteria`. Teilt sie die Gruppe, wird für jede Restgruppe mit mindestens zwei Teams die Mini-Tabelle neu
   gerechnet, nur mit den Spielen der Restgruppe. Teilt sie nicht mehr, geht es mit dem nächsten Kriterium weiter (Gesamtwerte).
-  Gezählt werden nur gespielte Spiele: Fehlt ein Spiel der Gruppe noch, rechnet die Mini-Tabelle ohne es.
+  Der direkte Vergleich zählt nur, wenn **alle** Spiele der Gruppe untereinander gespielt sind (Entscheidung des Obmanns,
+  03.11.); steht eines noch aus, wird das Kriterium übersprungen und es geht mit dem nächsten weiter. Maßgeblich ist der ganze
+  Spielplan der Staffel, auch für die Tabelle des vorigen Spieltags (Bewegung). Annullierte Spiele zählen nicht mit.
 - `lead_decision`: steht ein echter Gleichstand nach allen Kriterien, gilt die Reihenfolge der Leitung, wenn sie für genau diese
   Gruppe besteht (siehe unten). Ohne Entscheid teilen sich die Teams den Platz (1, 2, 2, 4), wie bisher.
 - Nie entscheidet der Name oder die Reihenfolge der Anmeldung.

@@ -84,12 +84,23 @@ def _two_teams_direct():
     return [duel("b", "a", 2, 1), duel("a", "c", 2, 0), duel("d", "b", 2, 1), duel("d", "c", 2, 0)]
 
 
+def _open(a, b, round_number=9):
+    """Ein angesetztes, noch offenes Spiel."""
+    return {**duel(a, b, 0, 0, round_number=round_number), "status": "scheduled", "results": []}
+
+
 def _incomplete_head_to_head():
-    """a, b, c je 3 Punkte, gespielt ist unter ihnen nur a-b (b gewinnt 2:1): die Mini-Tabelle rechnet nur damit -
-    b 3 Punkte, c ohne Spiel 0 Punkte und Differenz 0, a 0 Punkte und Differenz -1. Gesamt hätte c (+2) ebenfalls vor
-    a (+1) gelegen; entschieden hat aber schon der direkte Vergleich."""
+    """a, b, c je 3 Punkte, gespielt ist unter ihnen nur a-b (b gewinnt 2:1), a-c und b-c stehen noch aus. Entscheidung
+    des Obmanns: Der direkte Vergleich zählt nur, wenn in der Gruppe alle Spiele gespielt sind - sonst gleich die
+    Map-Differenz gesamt: c +2, a +1, b -1."""
     return [duel("b", "a", 2, 1), duel("a", "d", 2, 0), duel("c", "d", 2, 0),
-            duel("e", "b", 2, 0), duel("e", "d", 2, 0)]
+            duel("e", "b", 2, 0), duel("e", "d", 2, 0), _open("a", "c"), _open("b", "c")]
+
+
+def _complete_group_with_open_games_elsewhere():
+    """a und b je 3 Punkte, ihr Spiel ist gespielt (b gewinnt knapp); offen ist nur ein Spiel außerhalb der Gruppe (c-d).
+    Der direkte Vergleich gilt - b vor a, obwohl a gesamt die bessere Differenz hat."""
+    return [duel("b", "a", 2, 1), duel("a", "c", 2, 0), duel("d", "b", 2, 1), duel("d", "c", 2, 0), _open("c", "d")]
 
 
 CASES = [
@@ -103,9 +114,26 @@ CASES = [
      {"a": None, "b": None, "c": None}),
     ("Zwei Teams: direkter Vergleich vor Differenz", _two_teams_direct, "abcd", ["d", "b", "a", "c"],
      {"a": "head_to_head", "b": "head_to_head", "c": None, "d": None}),
-    ("Unvollständiger Direktvergleich", _incomplete_head_to_head, "abcde", ["e", "b", "c", "a", "d"],
-     {"b": "head_to_head", "c": "head_to_head", "a": "head_to_head", "e": None}),
+    ("Unvollständiger Direktvergleich: übersprungen, Gesamt-Differenz", _incomplete_head_to_head, "abcde",
+     ["e", "c", "a", "b", "d"], {"c": "score_diff", "a": "score_diff", "b": "score_diff", "e": None}),
+    ("Gruppe komplett, offene Spiele anderswo", _complete_group_with_open_games_elsewhere, "abcd", ["d", "b", "a", "c"],
+     {"a": "head_to_head", "b": "head_to_head"}),
 ]
+
+
+def test_the_previous_matchday_knows_the_head_to_head_was_not_complete_then():
+    """Bewegung (previous_rank): Nach Spieltag 1 stand das Rückspiel a-b noch aus - damals zählte der direkte Vergleich
+    nicht, obwohl am Ende beide Spiele gespielt sind."""
+    matches = [duel("b", "a", 2, 1, round_number=1), duel("c", "d", 2, 0, round_number=1),
+               duel("a", "c", 2, 0, round_number=2), duel("d", "b", 2, 0, round_number=2),
+               duel("a", "b", 2, 0, round_number=3), duel("c", "d", 2, 0, round_number=3)]
+    full = round_robin_standings(matches, regs("a", "b", "c", "d"), LEAGUE)
+    # Der Stand nach Spieltag 2, wie er damals war: Spieltag 3 angesetzt, aber offen.
+    then = [m if m["round"] < 3 else {**m, "status": "scheduled", "results": []} for m in matches]
+    earlier = round_robin_standings(then, regs("a", "b", "c", "d"), LEAGUE)
+    # Alle vier mit 3 Punkten, unter ihnen ist noch nicht alles gespielt - der direkte Vergleich zählt nicht.
+    assert all(row["tiebreak"] != "head_to_head" for row in earlier)
+    assert {row["registration_id"]: row["previous_rank"] for row in full} == {row["registration_id"]: row["rank"] for row in earlier}
 
 
 @pytest.mark.parametrize("label,build,names,expected,tiebreaks", CASES, ids=[case[0] for case in CASES])
