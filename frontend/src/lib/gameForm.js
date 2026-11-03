@@ -105,19 +105,28 @@ export function idFieldKey(field) {
   return fieldKeyFrom(key || field?.label || "");
 }
 
+// Was die Verwaltung pflegt; alles andere an einem Feld geht unverändert zurück (Codex-Prüfung #2249: Speichern ersetzt die
+// ganze Liste). Nur die Hilfsfelder der Oberfläche fallen weg.
+const ID_FIELD_OWN = ["key", "label", "help_text", "required", "pattern", "format_hint", "options", "unique_in_season"];
+const ID_FIELD_UI = ["_new", "_keyTouched"];
+
 export function normalizePlayerIdFields(fields = []) {
   return (fields || [])
-    .map((field) => ({
-      key: idFieldKey(field),
-      label: text(field.label || field.key).trim(),
-      help_text: field.help_text || "",
-      required: field.required !== false,
-      // Spielberechtigung (#2204): Format, Beispiel, Auswahl - leer heißt „keine Vorgabe“.
-      ...(String(field.pattern || "").trim() ? { pattern: String(field.pattern).trim() } : {}),
-      ...(String(field.format_hint || "").trim() ? { format_hint: String(field.format_hint).trim() } : {}),
-      ...(optionList(field.options).length ? { options: optionList(field.options) } : {}),
-      ...(field.unique_in_season === false ? { unique_in_season: false } : {}),
-    }))
+    .map((field) => {
+      const rest = Object.fromEntries(Object.entries(field || {}).filter(([name]) => !ID_FIELD_OWN.includes(name) && !ID_FIELD_UI.includes(name)));
+      return {
+        key: idFieldKey(field),
+        label: text(field.label || field.key).trim(),
+        help_text: field.help_text || "",
+        required: field.required !== false,
+        // Spielberechtigung (#2204): Format, Beispiel, Auswahl - leer heißt „keine Vorgabe“.
+        ...(String(field.pattern || "").trim() ? { pattern: String(field.pattern).trim() } : {}),
+        ...(String(field.format_hint || "").trim() ? { format_hint: String(field.format_hint).trim() } : {}),
+        ...(optionList(field.options).length ? { options: optionList(field.options) } : {}),
+        ...(field.unique_in_season === false ? { unique_in_season: false } : {}),
+        ...rest,
+      };
+    })
     .filter((field) => field.key && field.label);
 }
 

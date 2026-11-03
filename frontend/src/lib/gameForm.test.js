@@ -1,6 +1,7 @@
 import {
   GAME_TABS, gamePageUrl, generalPayload, generalToForm, idsPayload, idsToForm, newGamePayload, sameForm, tabFromHash,
 } from "./gameForm";
+import { gameMatchDataPayload, gameMatchDataToForm } from "./gameMatchData";
 
 // Spielseite (#2249): Reiter per Adresse, und je Reiter genau seine Felder - kein Reiter überschreibt, was ein anderer pflegt.
 
@@ -72,6 +73,27 @@ test("gespeicherte Schlüssel bleiben genau so, wie sie sind - auch nicht kanoni
   // Ein neues Feld bekommt seinen Schlüssel aus der Bezeichnung.
   const added = { player_id_fields: [...saved.player_id_fields, { key: "", label: "Epic Konto", _new: true }] };
   expect(idsPayload(added, "standalone").player_id_fields.map((field) => field.key)).toEqual(["PSN-ID", "RiotID", "ゲームID", "epic_konto"]);
+});
+
+// Codex-Prüfung #2249, Fund 2: Speichern ersetzt die ganze Liste - was die Verwaltung an einem Feld nicht kennt, bleibt dran.
+test("unbekannte Angaben an einem ID-Feld bleiben erhalten, nur Hilfsfelder der Oberfläche fallen weg", () => {
+  const form = idsToForm({ player_id_fields: [
+    { key: "probe", label: "Probe", required: true, pattern: "x+", source: "import", extra: { stufe: 2 } },
+  ] });
+  const changed = { player_id_fields: [{ ...form.player_id_fields[0], pattern: "", _keyTouched: true }, { key: "neu", label: "Neu", _new: true }] };
+  const [kept, added] = idsPayload(changed, "standalone").player_id_fields;
+  expect(kept).toEqual({ key: "probe", label: "Probe", help_text: "", required: true, source: "import", extra: { stufe: 2 } });
+  expect(added).toEqual({ key: "neu", label: "Neu", help_text: "", required: true });
+});
+
+// Dasselbe Muster bei den Modi: Hin und zurück durch das Formular geht kein Feld verloren, das der Server speichert.
+test("Modi: der Weg durchs Formular verliert kein gespeichertes Feld", () => {
+  const modes = [
+    { mode: "snd", label: "Suchen", minutes: 12, per_game: true, status: "inactive", description: "Bombe legen", players_per_side: 4, format: "Standard",
+      result_rule: { kind: "rounds", target: 6, round_limit: 11, time_limit_minutes: 2, draw_allowed: true, overtime: true } },
+    { mode: "zonen", label: "Zonen", minutes: null, per_game: false },
+  ];
+  expect(gameMatchDataPayload(gameMatchDataToForm({ match_modes: modes })).match_modes).toEqual(modes);
 });
 
 test("Neues Spiel: Name und Art genügen, die Adresse entsteht aus dem Namen", () => {
