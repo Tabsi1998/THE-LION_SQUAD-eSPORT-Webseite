@@ -270,11 +270,11 @@ Spiele, Termine und den Matchchat immer – auch bei *Aus*.
 sind: kein oder ein fremder Map-Pool, zu wenige Maps für einen Modus, ein Modus aus **Modus je Map** fehlt im Pool, **Modus je Map**
 passt nicht zur längsten Serie, kein veröffentlichtes **Regelwerk** (ein Regeltext allein reicht nicht), keine Liga N oder eine Liga
 N ohne Staffel, ein Anmeldefenster, das erst nach dem Beginn der Season endet. Warnungen sind etwa ein abgelaufenes oder fehlendes
-Anmeldefenster oder inaktive Modi und Maps im Pool. Solange es Probleme gibt, lässt sich die Sichtbarkeit nicht von **Aus** auf
-eine andere stellen – das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
+Anmeldefenster oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine **Vorschau** und geht immer, auch mit Problemen.
+Solange es Probleme gibt, lässt sich die Sichtbarkeit aber nicht auf **Nur Mitglieder** oder **Öffentlich** stellen – weder von *Aus*
+noch von der Vorschau aus; das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
 kann im Notfall trotzdem veröffentlichen: Er trägt im Abschnitt einen **Grund für die Notausnahme** ein (mindestens 5 Zeichen) und
-speichert die Season; der Grund steht im Protokoll. Von *Nur Liga-Leitung* weiter auf *Mitglieder* oder *Öffentlich* prüft nichts
-mehr.
+speichert die Season; der Grund steht im Protokoll. Von *Nur Mitglieder* weiter auf *Öffentlich* prüft nichts mehr.
 
 ### 2.9 Korrigieren, archivieren, löschen
 

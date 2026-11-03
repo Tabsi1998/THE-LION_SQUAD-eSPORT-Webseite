@@ -62,10 +62,12 @@ export function SeasonReadinessPanel({ seasonId, version, visibility = "off", ca
     setBusy(false);
   };
 
-  const offerOverride = result && !result.ok && result.superadmin && visibility === "off" && onOverrideReason;
+  // „Nur Liga-Leitung“ ist Vorschau (#2207): veröffentlicht wird erst mit „Nur Mitglieder“ oder „Öffentlich“.
+  const published = visibility === "members" || visibility === "public";
+  const offerOverride = result && !result.ok && result.superadmin && !published && onOverrideReason;
   return (
     <FormSection title="Prüfung vor der Veröffentlichung" testId={testId}
-      hint="Probleme halten das Veröffentlichen auf (Sichtbarkeit von „Aus“ auf sichtbar). Warnungen halten nichts auf.">
+      hint="Probleme halten das Veröffentlichen auf (Sichtbarkeit auf „Nur Mitglieder“ oder „Öffentlich“). Die Vorschau „Nur Liga-Leitung“ geht immer, Warnungen halten nichts auf.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {result ? (
           <p className={`inline-flex items-center gap-2 text-sm font-semibold ${result.ok ? "text-[#29B6E8]" : "text-live"}`} data-testid={`${testId}-state`} role="status">

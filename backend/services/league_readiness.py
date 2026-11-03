@@ -1,6 +1,7 @@
 """Prüfung vor der Veröffentlichung einer Season (``season_readiness``, #2207, Paket C.2 - Vertrag in docs/LIGA.md).
 
-Eine Liste im Klartext: **Probleme** halten das Veröffentlichen auf (von „aus“ auf sichtbar, 409), **Warnungen** nicht. Geprüft wird
+Eine Liste im Klartext: **Probleme** halten das Veröffentlichen auf (von „aus“ oder der Vorschau „Nur Liga-Leitung“ auf Mitglieder oder
+Öffentlich, 409), **Warnungen** nicht. Geprüft wird
 immer der Stand, der gespeichert werden soll (``season`` darf ungespeicherte Änderungen tragen). Notausnahme: der Superadmin mit Grund
 (``override``). Kein Wert eines Titels steht hier.
 """
@@ -15,7 +16,9 @@ from services.permissions import is_superadmin
 
 OVERRIDE_MIN = 5
 OVERRIDE_MAX = 500
-VISIBLE = ("admins", "members", "public")
+# „Nur Liga-Leitung“ (admins) ist Vorschau und wird nicht geprüft (Entscheidung zu #2207). Veröffentlicht ist erst, was Mitglieder
+# oder alle sehen.
+PUBLISHED = ("members", "public")
 BLOCKED_HEAD = "Veröffentlichen geht noch nicht: "
 OVERRIDE_MISSING = ("Für die Notausnahme bitte einen Grund angeben (mindestens 5 Zeichen) – er steht im Protokoll.")
 OVERRIDE_ONLY_SUPERADMIN = " Nur der Superadmin kann mit Grund trotzdem veröffentlichen."
@@ -36,8 +39,8 @@ def _moment(value) -> datetime | None:
 
 
 def publishing(before: str | None, after: str | None) -> bool:
-    """Wird die Season gerade veröffentlicht? Von „aus“ (oder neu) auf eine Sichtbarkeit."""
-    return (before or "off") == "off" and after in VISIBLE
+    """Wird die Season gerade veröffentlicht? Von „aus“, der Vorschau „Nur Liga-Leitung“ oder neu auf Mitglieder oder Öffentlich."""
+    return (before or "off") not in PUBLISHED and after in PUBLISHED
 
 
 async def _rules_items(db, league: dict, season: dict) -> list[tuple[str, dict]]:

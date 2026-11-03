@@ -352,16 +352,36 @@ async def test_an_unready_season_lists_its_problems_and_does_not_publish(flow):
 @pytest.mark.asyncio
 async def test_the_superadmin_publishes_with_a_reason_and_it_is_logged(flow):
     w = await build(flow, divisions=False, rules=False)
-    without = await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "admins", "readiness_override_reason": "kurz"})
+    without = await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "members", "readiness_override_reason": "kurz"})
     assert without.status_code == 409 and "Grund" in without.json()["detail"]
     done = ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}",
-                               json={"visibility": "admins", "readiness_override_reason": "Vorschau für die Leitung"}))
-    assert done["visibility"] == "admins"
+                               json={"visibility": "members", "readiness_override_reason": "Saisonstart trotz Lücke"}))
+    assert done["visibility"] == "members"
     log = [row for row in await actions(flow) if row["action"] == "league.season.readiness_override"]
-    assert len(log) == 1 and log[0]["data"]["reason"] == "Vorschau für die Leitung"
+    assert len(log) == 1 and log[0]["data"]["reason"] == "Saisonstart trotz Lücke"
     assert set(log[0]["data"]["problems"]) == {"rules_missing", "divisions_missing"}
-    # Von „admins“ weiter auf „public“ prüft nichts mehr.
+    # Von „members“ weiter auf „public“ ist schon veröffentlicht - das prüft nichts mehr.
     assert ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "public"}))["visibility"] == "public"
+
+
+@pytest.mark.asyncio
+async def test_the_preview_for_the_league_lead_is_not_checked_but_leaving_it_is(flow):
+    """Entscheidung des Orchestrators (#2207): „Nur Liga-Leitung“ ist Vorschau. Geprüft wird erst auf dem Weg zu Mitgliedern oder
+    Öffentlichkeit - auch von der Vorschau aus."""
+    w = await build(flow, divisions=False, rules=False)
+    club = await flow.add_user(role="club_admin", name="Vorstand")
+    flow.act_as(club)
+    preview = ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "admins"}))
+    assert preview["visibility"] == "admins"
+    for target in ("members", "public"):
+        blocked = await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": target})
+        assert blocked.status_code == 409, target
+    assert (await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 0}))["visibility"] == "admins"
+    # Zurück auf „aus“ geht immer, und eine neue Season darf gleich als Vorschau entstehen.
+    assert ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "off"}))["visibility"] == "off"
+    created = ok(await flow.post(f"{ADMIN}/{w['league']['id']}/seasons", json=season_body(name="Season Vorschau", visibility="admins")))
+    assert created["visibility"] == "admins"
+    assert not [row for row in await actions(flow) if row["action"] == "league.season.readiness_override"]
 
 
 @pytest.mark.asyncio

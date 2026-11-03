@@ -1158,11 +1158,12 @@ superadmin}`.
 | `inactive_mode` | Warnung | ein inaktiver oder archivierter Modus im Pool oder in der Reihenfolge |
 | `inactive_map` | Warnung | eine inaktive, archivierte oder gelöschte Map im Pool |
 
-**Veröffentlichen:** Wechselt die Sichtbarkeit einer Season von `off` auf `admins`, `members` oder `public` (auch beim Anlegen mit einer
-Sichtbarkeit), prüft der Server vor dem Schreiben auf dem neuen Stand. Probleme: 409 „Veröffentlichen geht noch nicht: …“, nichts wird
-gespeichert. Warnungen halten nichts auf. Notausnahme nur für den Superadmin mit `readiness_override_reason` (mindestens fünf Zeichen,
-sonst 409) im selben Aufruf; Protokoll `league.season.readiness_override` mit Grund und den Codes. Von `admins` weiter auf `members`
-oder `public` prüft nichts mehr. Bekannte Grenze: Prüfen und Schreiben sind zwei Schritte.
+**Veröffentlichen:** Wechselt die Sichtbarkeit einer Season von `off` oder `admins` auf `members` oder `public` (auch beim Anlegen mit
+einer dieser Sichtbarkeiten), prüft der Server vor dem Schreiben auf dem neuen Stand. `admins` („Nur Liga-Leitung“) ist **Vorschau** und
+wird nicht geprüft (Entscheidung zu #2207). Probleme: 409 „Veröffentlichen geht noch nicht: …“, nichts wird gespeichert. Warnungen halten
+nichts auf. Notausnahme nur für den Superadmin mit `readiness_override_reason` (mindestens fünf Zeichen, sonst 409) im selben Aufruf;
+Protokoll `league.season.readiness_override` mit Grund und den Codes. Von `members` auf `public` (schon veröffentlicht) und zurück auf
+`admins` oder `off` prüft nichts. Bekannte Grenze: Prüfen und Schreiben sind zwei Schritte.
 
 **Verwaltung:** Season-Seite mit Abschnitt „Prüfung vor der Veröffentlichung“ (Probleme, Warnungen, Mindestgröße je Modus mit Feld
 zum Überschreiben, beim Superadmin das Feld für den Grund), „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer

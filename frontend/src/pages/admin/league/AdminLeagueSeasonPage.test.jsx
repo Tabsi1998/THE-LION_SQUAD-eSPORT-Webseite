@@ -66,12 +66,12 @@ function withPlan(plan) {
 test("die Prüfung steht auf der Seite, der Grund der Notausnahme geht mit dem Veröffentlichen mit (#2207)", async () => {
   renderPage();
   expect(await screen.findByTestId("season-readiness-problems")).toHaveTextContent("keinen Map-Pool");
-  fireEvent.change(screen.getByTestId("season-readiness-override"), { target: { value: "Vorschau für die Leitung" } });
-  fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "admins" } });
+  fireEvent.change(screen.getByTestId("season-readiness-override"), { target: { value: "Saisonstart trotz Lücke" } });
+  fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "members" } });
   fireEvent.click(screen.getByTestId("season-save"));
 
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
-  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ visibility: "admins", readiness_override_reason: "Vorschau für die Leitung" });
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ visibility: "members", readiness_override_reason: "Saisonstart trotz Lücke" });
 });
 
 test("„Modus je Map“ ist so lang wie die längste Serie einer Liga N (#2207)", async () => {

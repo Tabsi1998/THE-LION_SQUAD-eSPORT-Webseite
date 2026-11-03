@@ -51,13 +51,16 @@ test("die Mindestgröße wird je Modus überschrieben und gespeichert", async ()
   expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("zwischen 1 und 50"));
 });
 
-test("nur der Superadmin bekommt das Feld für die Notausnahme - und nur solange die Season aus ist", async () => {
+test("nur der Superadmin bekommt das Feld für die Notausnahme - und nur solange die Season nicht veröffentlicht ist", async () => {
   apiMock.get.mockResolvedValue({ data: { ...UNREADY, superadmin: true } });
   const reason = vi.fn();
   const { rerender } = render(<SeasonReadinessPanel seasonId="s1" onOverrideReason={reason} />);
 
-  fireEvent.change(await screen.findByTestId("season-readiness-override"), { target: { value: "Vorschau für die Leitung" } });
-  expect(reason).toHaveBeenCalledWith("Vorschau für die Leitung");
+  fireEvent.change(await screen.findByTestId("season-readiness-override"), { target: { value: "Saisonstart trotz Lücke" } });
+  expect(reason).toHaveBeenCalledWith("Saisonstart trotz Lücke");
+  // „Nur Liga-Leitung“ ist Vorschau (Entscheidung zu #2207): Von dort aus wird noch veröffentlicht, das Feld bleibt.
+  rerender(<SeasonReadinessPanel seasonId="s1" visibility="admins" onOverrideReason={reason} />);
+  expect(screen.getByTestId("season-readiness-override")).toBeInTheDocument();
   rerender(<SeasonReadinessPanel seasonId="s1" visibility="public" onOverrideReason={reason} />);
   expect(screen.queryByTestId("season-readiness-override")).toBeNull();
 });

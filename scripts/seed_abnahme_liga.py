@@ -85,7 +85,8 @@ ABLAUF_LEAGUE = "Liga-Probelauf"
 ABLAUF_ASSIGNED = 5  # zugeteilt vom Seed; das sechste Co-Team teilt die Spec im Browser zu
 ABLAUF_SEASON = {**{key: value for key, value in SEASON.items() if key != "name"}, "max_staffel_size": 6, "visibility": "public"}
 # Prüfung vor der Veröffentlichung (#2207): Seasons entstehen „aus“ und werden erst nach Pool, Liga N und Staffel sichtbar. Season 1
-# und der Probelauf haben nur den Regeltext-Platzhalter, kein Regelwerk - dafür nimmt der Seed (Superadmin) die Notausnahme.
+# steht auf der Vorschau „Nur Liga-Leitung“, die nicht geprüft wird. Der Probelauf ist öffentlich, hat aber nur den Regeltext-Platzhalter,
+# kein Regelwerk - dafür nimmt der Seed (Superadmin) die Notausnahme.
 SEED_OVERRIDE = {"readiness_override_reason": "Abnahme-Stand: Regeltext-Platzhalter statt Regelwerk (erfunden)"}
 
 
@@ -96,6 +97,8 @@ def hidden(fields: dict) -> dict:
 
 async def publish_season(admin: "Session", season_id: str, visibility: str) -> None:
     await admin.call("PATCH", f"/api/admin/leagues/seasons/{season_id}", json={"visibility": visibility, **SEED_OVERRIDE})
+
+
 # Die Liga der Selbstanmeldung (#2205): je Lauf eine neue Season, Anträge bleiben als Nachweis stehen.
 ANMELDUNG_LEAGUE = "Liga-Anmeldung"
 ANMELDUNG_RULES = "# Fairplay\n\nFair spielen, immer. Platzhalter der lokalen Abnahme, erfunden.\n"
