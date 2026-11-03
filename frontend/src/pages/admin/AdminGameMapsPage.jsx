@@ -16,6 +16,7 @@ import { MapCard } from "@/components/tls/maps/MapPoolView";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { mapFormPayload, mapToForm, mapsWithoutMode } from "@/lib/mapPools";
+import { modeStatusOf } from "@/lib/gameMatchData";
 import { MapPoolEditor } from "./maps/MapPoolEditor";
 import { MapImportSheet } from "./maps/MapImportSheet";
 import { toast } from "sonner";
@@ -30,8 +31,10 @@ function poolsText(count) {
 // Maps ohne Modus (#2129, SP2): Sobald das Spiel Modi hat, steht eine Map ohne Modus in keinem Pool zur Wahl. Das sagt dieser
 // Hinweis, statt sie still zu sperren; ein Klick ordnet alle zu. Vorbelegt sind alle Modi, abwählen geht vorher.
 function WithoutModeNotice({ game, maps, onAssign }) {
-  const [off, setOff] = useState([]);
-  const chosen = game.modes.map(({ mode }) => mode).filter((mode) => !off.includes(mode));
+  // Archivierte Modi stehen nicht zur Wahl (#2206), inaktive schon, sind aber nicht vorbelegt.
+  const offered = game.modes.filter((mode) => modeStatusOf(mode) !== "archived");
+  const [off, setOff] = useState(() => offered.filter((mode) => modeStatusOf(mode) === "inactive").map(({ mode }) => mode));
+  const chosen = offered.map(({ mode }) => mode).filter((mode) => !off.includes(mode));
   const names = maps.slice(0, 5).map((item) => item.name).join(", ");
   const more = maps.length > 5 ? ` und ${maps.length - 5} weitere` : "";
   return (
@@ -41,11 +44,11 @@ function WithoutModeNotice({ game, maps, onAssign }) {
         {names}{more}. In neuen Pools stehen sie erst mit Modus zur Wahl. Gespeicherte Pools und laufende Spiele betrifft das nicht.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {game.modes.map(({ mode, label }) => (
+        {offered.map(({ mode, label, status }) => (
           <label key={mode} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-sm border border-white/15 bg-[#0A0A0A] text-xs text-white/80 cursor-pointer">
             <input type="checkbox" checked={chosen.includes(mode)} onChange={() => setOff((list) => (list.includes(mode) ? list.filter((key) => key !== mode) : [...list, mode]))}
               className="accent-[#29B6E8]" data-testid={`game-maps-assign-${mode}`} />
-            {label}
+            {label}{status === "inactive" ? " (inaktiv)" : ""}
           </label>
         ))}
         <button type="button" disabled={!chosen.length} onClick={() => onAssign(chosen)} data-testid="game-maps-assign"
@@ -64,6 +67,12 @@ function MapSheet({ game, item, onClose, onSaved }) {
     return { ...start, modes: start.modes.filter((mode) => game.modes.some((known) => known.mode === mode)) };
   });
   const [saving, setSaving] = useState(false);
+  // Archivierte Modi (#2206) nur, wenn die Map sie schon hat - neu zuordnen geht nicht.
+  // Inaktive darf eine Map haben (nur Pools, Reihenfolgen und Turniere sperren sie), sie stehen mit „(inaktiv)“ da.
+  const had = item?.modes || [];
+  const choices = game.modes
+    .filter((mode) => modeStatusOf(mode) !== "archived" || had.includes(mode.mode))
+    .map((mode) => (modeStatusOf(mode) === "active" ? mode : { ...mode, label: `${mode.label} (${modeStatusOf(mode) === "inactive" ? "inaktiv" : "archiviert"})` }));
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const toggleMode = (mode) => set("modes", form.modes.includes(mode) ? form.modes.filter((key) => key !== mode) : [...form.modes, mode]);
 
@@ -97,7 +106,7 @@ function MapSheet({ game, item, onClose, onSaved }) {
         <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modi</legend>
         {game.modes.length ? (
           <div className="flex flex-wrap gap-2">
-            {game.modes.map(({ mode, label }) => {
+            {choices.map(({ mode, label }) => {
               const on = form.modes.includes(mode);
               return (
                 <label key={mode} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
@@ -226,8 +235,11 @@ export default function AdminGameMapsPage() {
           </div>
           <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-white/55" data-testid="game-maps-modes">
             <span className="font-bold uppercase tracking-widest text-white/45 text-[11px]">Modi</span>
-            {data.game.modes.length ? data.game.modes.map(({ mode, label }) => (
-              <span key={mode} className="px-2 py-0.5 rounded-sm border border-white/10 bg-[#0A0A0A] text-white/70">{label}</span>
+            {data.game.modes.length ? data.game.modes.map((entry) => (
+              <span key={entry.mode} data-testid={`game-maps-mode-${entry.mode}`}
+                className={`px-2 py-0.5 rounded-sm border border-white/10 bg-[#0A0A0A] ${modeStatusOf(entry) === "active" ? "text-white/70" : "text-white/45"}`}>
+                {entry.label}{modeStatusOf(entry) !== "active" ? ` · ${modeStatusOf(entry) === "inactive" ? "inaktiv" : "archiviert"}` : ""}
+              </span>
             )) : <span>keine – Maps gelten dann für jeden Pool</span>}
           </div>
           {withoutMode.length ? <WithoutModeNotice game={data.game} maps={withoutMode} onAssign={assignModes} /> : null}

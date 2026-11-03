@@ -136,3 +136,27 @@ test("ein Pool eines anderen Spiels gilt nicht mehr und wird so angezeigt", () =
   renderEditor({ entry: { ...ENTRY, stale: true } });
   expect(screen.getByTestId("pool-stale")).toHaveTextContent("anderen Spiel");
 });
+
+// #2206: Inaktive und archivierte Modi kommen in keinen neuen Pool - was der gespeicherte Pool schon hat, bleibt wählbar.
+test("ein inaktiver Modus steht nur zur Wahl, wenn der Pool ihn schon hat", () => {
+  const game = { ...GAME, modes: [{ mode: "stellung", label: "Stellung", status: "inactive" }, { mode: "snd", label: "Suchen & Zerstören", status: "inactive" }] };
+  const { onSave } = renderEditor({ game, entry: { ...ENTRY, outdated_map_ids: [] } });
+  expect(screen.queryByTestId("pool-mode-stellung")).toBeNull();
+  expect(screen.getByTestId("pool-mode-snd")).toHaveTextContent("Suchen & Zerstören (inaktiv)");
+  expect(screen.getByTestId("pool-inactive")).toHaveTextContent("„Stellung“");
+  expect(screen.queryByTestId("pool-old-groups")).toBeNull();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hafenkante in Suchen & Zerstören (inaktiv)" }));
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel"] }] }));
+});
+
+test("archivierte Modi verschwinden, alle Modi nicht wählbar heißt: keine Gruppe „Alle Maps“", () => {
+  const game = { ...GAME, modes: [{ mode: "stellung", label: "Stellung", status: "archived" }, { mode: "snd", label: "Suchen & Zerstören", status: "archived" }] };
+  renderEditor({ game, entry: null });
+  expect(screen.queryByTestId("pool-mode-stellung")).toBeNull();
+  expect(screen.queryByTestId("pool-mode-alle")).toBeNull();
+  expect(screen.queryByTestId("pool-inactive")).toBeNull();
+  expect(screen.getByTestId("pool-no-modes")).toHaveTextContent("alle sind inaktiv oder archiviert");
+  expect(screen.getByTestId("pool-defaults")).toBeDisabled();
+  expect(screen.getByTestId("pool-save")).toBeDisabled();
+});
