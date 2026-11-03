@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, game_modes, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
+from services import game_maps, game_modes, game_usage, league_games, league_look, league_result_rules, map_pools, pricing, staffel_guard
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
@@ -91,6 +91,8 @@ OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size",
                    "match_schedule_response_hours")
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
 RESPONSE_HOURS = "match_schedule_response_hours"
+# Ergebnisregeln (C.3, #1617): gepflegt über …/result-rules, nicht über das Season-Formular; gelten nur für neue Eingaben.
+RESULT_RULE_FIELDS = ("result_rules", "scores_required")
 # Ab hier hat eine Staffel begonnen: Termine und Kalender bleiben dann, wie sie sind.
 PRE_START_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed", "check_in"})
 # Sichtbarkeit der Season → Sichtbarkeit der Staffel-Turniere (docs/LIGA.md, Abschnitt 10).
@@ -412,6 +414,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     # überschreibt die Frist ihrer Staffeln nicht mit der Vorgabe.
     if settings.get(RESPONSE_HOURS) is not None:
         fields[RESPONSE_HOURS] = int(settings[RESPONSE_HOURS])
+    # Ergebnisregeln (C.3, #1617): nur, wenn die Season sie trägt - ältere Seasons prüfen nichts Neues.
+    fields.update({key: season[key] for key in RESULT_RULE_FIELDS if key in season})
     return fields
 
 
@@ -421,6 +425,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     # Die Antwortfrist gilt nur für neue Terminvorschläge - sie darf auch während der Season wechseln, nur nicht in
     # einer gesperrten Staffel.
     "running": (RESPONSE_HOURS,),
+    # Ergebnisregeln (C.3): wie „laufend“ - sie prüfen nur neue Eingaben, gespeicherte Ergebnisse bleiben.
+    "result_rules": RESULT_RULE_FIELDS,
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -431,6 +437,7 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
     "running": "Antwortfrist auf Terminvorschläge",
+    "result_rules": "Ergebnisregeln und Punktepflicht",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
@@ -659,6 +666,8 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     doc = {**new_season_settings(fields), **look}
     if doc.get("scoring_rules") is None:
         doc["scoring_rules"] = normalize_rules({})
+    # Ergebnisregeln (C.3, #1617): die neue Season hält die Regeln der Modi fest, Punkte je Map sind Pflicht.
+    doc.update(league_result_rules.new_season_fields(game))
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
     try:

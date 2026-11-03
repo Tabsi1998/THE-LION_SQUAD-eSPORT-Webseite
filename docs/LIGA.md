@@ -1098,9 +1098,11 @@ in `routes/league_result_rule_routes.py`, Prüfung in `league_games.normalize_ga
   `{scores_required, rules: {mode: result_rule | null}}` und ersetzt die Kopie ganz. Neue Regeln nur für Modi des Spiels, die
   schon in der Season stehenden bleiben speicherbar; geprüft wie C.1 (`GameModeResultRule`), sonst 422 mit deutschem Satz.
   Protokoll `league.season.result_rules` mit den geänderten Modi und `scores_required`, ohne Werte.
-- **Staffel:** `staffel_fields` kopiert beide Felder, wenn die Season sie trägt. Übertragen in der Gruppe **laufend** (auch nach
-  Start und Ergebnis, nicht bei gesperrten Staffeln): Die Regel prüft nur neue Eingaben, gespeicherte Ergebnisse bleiben. Der
-  Turnierkern liest nur `tournaments.result_rules` und `tournaments.scores_required`.
+- **Staffel:** `staffel_fields` kopiert beide Felder, wenn die Season sie trägt. Übertragen in der eigenen Gruppe `result_rules`
+  („Ergebnisregeln und Punktepflicht“), die wie **laufend** wirkt (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln): Die
+  Regel prüft nur neue Eingaben, gespeicherte Ergebnisse bleiben. Der Turnierkern liest nur `tournaments.result_rules` und
+  `tournaments.scores_required`. Tests, die nicht diese Regel prüfen, schalten die Punktepflicht mit
+  `league_match_world.without_score_duty` aus.
 
 **Prüfung je Map** (Melden, Bestätigen, Ergebnis und Korrektur der Leitung; Regel = `result_rules[mode]` der Staffel):
 
