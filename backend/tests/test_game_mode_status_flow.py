@@ -342,6 +342,28 @@ async def test_switching_the_game_does_not_carry_a_same_named_inactive_mode(flow
 
 
 @pytest.mark.asyncio
+async def test_a_stage_does_not_take_an_inactive_mode_anew(flow):
+    await as_admin(flow)
+    game = await new_game(flow)
+    await patch_modes(flow, game, with_status("archived"))
+    tournament = await flow.create_tournament(game_id=game["id"])
+    url = f"/api/tournaments/{tournament['id']}/stages"
+    stage = {"name": "Baum", "stage_type": "single_elimination", "match_type": "duel"}
+
+    refused = await flow.post(url, json={**stage, "settings": {"game_mode": "suchen"}})
+    assert refused.status_code == 422, refused.text
+    assert "archiviert" in refused.json()["detail"]
+    created = await flow.post(url, json={**stage, "settings": {"game_mode": "stellung"}})
+    assert created.status_code == 200, created.text
+    stage_id = created.json()["id"]
+    assert (await flow.patch(f"{url}/{stage_id}", json={"settings": {"game_mode": "suchen"}})).status_code == 422
+    # Schon gesetzt (Altbestand oder vor dem Archivieren): ein anderes Speichern hängt nicht daran.
+    await flow.db.tournament_stages.update_one({"id": stage_id}, {"$set": {"settings": {"game_mode": "suchen"}}})
+    kept = await flow.patch(f"{url}/{stage_id}", json={"name": "Finale", "settings": {"game_mode": "suchen", "best_of": 3}})
+    assert kept.status_code == 200, kept.text
+
+
+@pytest.mark.asyncio
 async def test_archived_modes_are_not_assigned_anew_to_maps(flow):
     await as_admin(flow)
     game = await new_game(flow)
