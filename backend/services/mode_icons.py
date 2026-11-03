@@ -3,8 +3,8 @@
 - Nur Adressen aus dem eigenen Upload (``/api/static/uploads/…``) - eine fremde Adresse ließe jede Person beim Ansehen bei Dritten anfragen.
 - Jede Datei braucht ihren Eintrag in der Mediathek (``media_uploads``), wie Bilder im Regelwerk (#2230).
 - Ohne Medienrolle nur eigene Bilder (``media_scope: "user"`` und eigene ``owner_id``); SVG nur mit Medienrolle - wie Logos (#1952).
-- Was das Spiel schon trägt, bleibt speicherbar (``kept``): Ein anderes Speichern scheitert nie an einem Symbol, das jemand anderes
-  gesetzt hat.
+- Was ein Modus schon trägt, bleibt an genau diesem Modus speicherbar (``kept`` je Kennung): Ein anderes Speichern scheitert nie an einem
+  Symbol, das jemand anderes gesetzt hat. An einen anderen Modus gesetzt, wird es wie jedes neue Symbol geprüft.
 
 Pool-Versionen halten das Symbol als Schnappschuss wie den Namen (``services/map_pools.py``), die Mediathek zählt beides als Verwendung
 (``services/media_audit.py``).
@@ -29,21 +29,26 @@ class IconProblem(ValueError):
     """Ein Symbol, das nicht passt - die Route macht daraus 422."""
 
 
-def icons_of(game: dict | None) -> set[str]:
-    """Die Symbole, die das Spiel schon trägt."""
+def icons_of(game: dict | None) -> dict[str, str]:
+    """Die Symbole, die das Spiel schon trägt - je Modus-Kennung. Beibehalten gilt nur am selben Modus (Prüfung Codex): An einen anderen
+    Modus gesetzt, ist dasselbe Bild eine neue Zuordnung und wird geprüft."""
     modes = (game or {}).get("match_modes")
-    return {str(mode["icon_url"]) for mode in modes or [] if isinstance(mode, dict) and mode.get("icon_url")} if isinstance(modes, list) else set()
+    if not isinstance(modes, list):
+        return {}
+    return {str(mode["mode"]): str(mode["icon_url"]) for mode in modes if isinstance(mode, dict) and mode.get("mode") and mode.get("icon_url")}
 
 
 def _filename(url: str) -> str:
     return bare_upload_url(url).rsplit("/", 1)[-1]
 
 
-async def check(db, modes: list[dict] | None, user: dict | None, kept: set[str] | None = None) -> None:
-    """Prüft die Symbole einer Modusliste (Einträge wie ``GameMatchMode.model_dump()``). ``IconProblem`` mit deutschem Satz."""
-    kept = kept or set()
+async def check(db, modes: list[dict] | None, user: dict | None, kept: dict[str, str] | None = None) -> None:
+    """Prüft die Symbole einer Modusliste (Einträge wie ``GameMatchMode.model_dump()``, Kennung schon nach ``adopt_keys``). ``kept``: je
+    Modus-Kennung das gespeicherte Symbol (``icons_of``) - nur dasselbe Symbol am selben Modus bleibt ungeprüft. ``IconProblem`` mit
+    deutschem Satz."""
+    kept = kept or {}
     wanted = [(mode.get("label") or mode.get("mode") or "", str(mode["icon_url"])) for mode in modes or []
-              if isinstance(mode, dict) and mode.get("icon_url") and str(mode["icon_url"]) not in kept]
+              if isinstance(mode, dict) and mode.get("icon_url") and kept.get(str(mode.get("mode") or "")) != str(mode["icon_url"])]
     if not wanted:
         return
     for label, url in wanted:

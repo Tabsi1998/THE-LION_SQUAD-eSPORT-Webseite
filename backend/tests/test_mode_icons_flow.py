@@ -174,6 +174,25 @@ async def test_an_icon_set_by_someone_else_stays_savable(flow):
     assert (await stored_modes(flow))[0] == {"mode": "stellung", "label": "Stellung neu", "icon_url": icon}
 
 
+@pytest.mark.asyncio
+async def test_a_kept_icon_does_not_move_to_another_mode_without_the_check(flow):
+    """Prüfung Codex: Das Symbol der Leitung an Modus A darf eine Freigabe-Person nicht ungeprüft an Modus B setzen - beibehalten gilt
+    nur für denselben Modus."""
+    await lead(flow)
+    await add_game(flow)
+    icon = await upload(flow, "verein.png", scope="admin")
+    assert (await patch_modes(flow, with_icon(icon))).status_code == 200
+
+    await granted(flow)
+    moved = await patch_modes(flow, [with_icon(icon)[0], {**MODES[1], "icon_url": icon}])
+
+    assert moved.status_code == 422
+    assert "nur eigene Bilder" in moved.json()["detail"]
+    assert "icon_url" not in (await stored_modes(flow))[1]
+    swapped = await patch_modes(flow, [MODES[0], {**MODES[1], "icon_url": icon}])
+    assert swapped.status_code == 422, "auch nicht, wenn A es dabei abgibt"
+
+
 # ---------------------------------------------------------------- Schnappschuss im Pool
 
 

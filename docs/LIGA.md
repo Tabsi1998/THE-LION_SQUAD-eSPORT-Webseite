@@ -1073,7 +1073,8 @@ Reihenfolge wie gespeichert. Was nicht passt, lehnt der Server mit 422 und deuts
 **Symbol (#2266, `services/mode_icons.py`):** `icon_url` ist eine Adresse aus dem eigenen Upload (`/api/static/uploads/<name>` mit
 PNG, JPG, WebP oder SVG, optional `?v=`), die einen Eintrag in `media_uploads` hat (`filename` oder `raster_filename`). Ohne Medienrolle
 (`ADMIN_MEDIA_ROLES`) nur eigene Bilder (`media_scope: "user"` und eigene `owner_id`), SVG nur mit Medienrolle. Geprüft wird nur, was
-neu ist: Ein Symbol, das das Spiel schon trägt, hält kein Speichern auf. Sonst 422 mit deutschem Satz. Fehlt `icon_url`, zeigt jede
+neu ist: Ein Symbol, das ein Modus schon trägt, hält an diesem Modus (Kennung nach `adopt_keys`) kein Speichern auf; an einen anderen
+Modus gesetzt, ist es eine neue Zuordnung und wird geprüft. Sonst 422 mit deutschem Satz. Fehlt `icon_url`, zeigt jede
 Fläche ein neutrales Platzhalter-Symbol (`components/tls/ModeIcon`).
 
 - **Schnappschuss:** Eine Pool-Version hält das Symbol je Modus wie den Namen (`map_pools.modes[].icon_url`, nur wenn gesetzt), ebenso
