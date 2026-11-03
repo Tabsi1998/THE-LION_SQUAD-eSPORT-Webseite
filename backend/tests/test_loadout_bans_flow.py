@@ -312,11 +312,41 @@ async def test_undoing_the_result_forgets_the_list_version(flow):
 
 
 @pytest.mark.asyncio
-async def test_without_a_list_and_in_other_formats_no_version_is_stored(flow):
+async def test_a_finished_match_without_a_list_keeps_having_none(flow):
+    """Ohne Liste beim Ergebnis hält das Spiel ausdrücklich „keine“ fest - eine später übertragene Liste gilt dafür nicht (Review C.4)."""
+    from services import loadout_bans
+
     w = await match_world(flow)
     await confirm_result(flow, w)
-    assert "loadout_ban_id" not in await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    stored = await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    assert "loadout_ban_id" in stored and stored["loadout_ban_id"] is None
 
+    await bans_version(flow, w["tournament"], 1, "Blitz 9")
+    assert await loadout_bans.effective(flow.db, w["tournament"], stored) is None
+    later = await duel(flow, w["tournament"], w["reg_a"], w["reg_h"], matchday=2)
+    assert (await loadout_bans.effective(flow.db, w["tournament"], later))["entries"][0]["name"] == "Blitz 9"
+    # Altbestand: ein fertiges Spiel von vor C.4 (ohne Vermerk) zeigt keine Liste.
+    old = {**later, "id": "alt", "status": "completed"}
+    assert await loadout_bans.effective(flow.db, w["tournament"], old) is None
+
+
+@pytest.mark.asyncio
+async def test_a_failing_stamp_is_not_swallowed(flow, monkeypatch):
+    from services import loadout_bans
+
+    w = await match_world(flow)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(loadout_bans, "current", broken)
+    with pytest.raises(RuntimeError):
+        await loadout_bans.match_stamp(flow.db, w["match"])
+
+
+@pytest.mark.asyncio
+async def test_other_formats_never_get_the_field(flow):
+    w = await match_world(flow)
     tournament, _users, regs = await flow.with_participants(2, game_id=GAME_ID)
     await flow.start(tournament)
     await bans_version(flow, tournament, 1, "Blitz 9")

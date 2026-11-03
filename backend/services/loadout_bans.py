@@ -11,7 +11,6 @@ Das System prüft nicht, was im Spiel benutzt wird - Verstöße laufen über Pro
 """
 from __future__ import annotations
 
-import logging
 import re
 from typing import List, Literal, Optional
 
@@ -23,8 +22,6 @@ from services import game_equipment as library
 from services import game_maps, game_modes
 from services.game_equipment import ARCHIVED, ATTACHMENT, INACTIVE, WEAPON, EquipmentProblem
 
-logger = logging.getLogger("tls.loadout_bans")
-
 SEASON, TOURNAMENT = "league_season", "tournament"
 SCOPES = (SEASON, TOURNAMENT)
 ITEM, ATTACHMENTS = "item", "attachments"
@@ -34,6 +31,9 @@ ATTACHMENTS_MAX = 200
 ALL_MODES = "alle Modi"
 CHANGED_MEANWHILE = "Die Sperrliste wurde inzwischen geändert - bitte neu laden."
 EMPTY = "Bitte mindestens einen Eintrag sperren - oder die Sperrliste entfernen."
+# Vermerk am Spiel: Kennung der Version oder ``None`` für „keine Liste“; fehlt das Feld, wurde nie gestempelt.
+STAMP = "loadout_ban_id"
+FINISHED = frozenset({"completed", "forfeit"})
 SNAPSHOT_KEYS = ("item_id", "name", "category", "category_label", "role", "image_url")
 
 
@@ -120,13 +120,14 @@ async def versions(db, scope: str, scope_id: str) -> list[dict]:
 
 
 async def effective(db, tournament: dict | None, match: dict | None = None) -> dict | None:
-    """Die Liste, die für ein Spiel gilt: die festgehaltene Version, sonst die der Staffel, sonst keine."""
-    held = (match or {}).get("loadout_ban_id")
-    if held:
-        doc = await db.loadout_bans.find_one({"id": held}, {"_id": 0})
-        if doc and not doc.get("cleared"):
-            return view(doc, "match")
-    if not tournament:
+    """Die Liste, die für ein Spiel gilt: die festgehaltene Version (auch „keine“, ``None``), sonst die der Staffel, sonst keine. Ein fertiges
+    Spiel ohne Vermerk (vor C.4) zeigt keine Liste - die heutige galt damals nicht."""
+    match = match or {}
+    if STAMP in match:
+        held = match.get(STAMP)
+        doc = await db.loadout_bans.find_one({"id": held}, {"_id": 0}) if held else None
+        return view(doc, "match") if doc and not doc.get("cleared") else None
+    if match.get("status") in FINISHED or not tournament:
         return None
     return view(valid_for(await current(db, TOURNAMENT, tournament["id"]), tournament.get("game_id")), TOURNAMENT)
 
@@ -360,19 +361,17 @@ async def sync_staffel(db, tournament: dict, season: dict, user: dict, *, locked
 
 
 async def match_stamp(db, match: dict) -> dict:
-    """Das Feld fürs Festschreiben eines Ergebnisses einer Staffel: die Liste, die gerade gilt - leer bei anderen Formaten, ohne Liste und
-    wenn das Spiel schon eine festhält. Darf ein Ergebnis nie aufhalten."""
-    if match.get("loadout_ban_id") or not match.get("tournament_id"):
+    """Das Feld fürs Festschreiben eines Ergebnisses einer Staffel: die Liste, die gerade gilt, oder ``None`` für „keine“ - leer bei anderen
+    Formaten und wenn das Spiel schon einen Vermerk hat (eine Korrektur ändert nicht, was galt)."""
+    if STAMP in match or not match.get("tournament_id"):
         return {}
-    try:
-        tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "id": 1, "game_id": 1, "league_context": 1})
-        if not tournament or not tournament.get("league_context"):
-            return {}
-        doc = valid_for(await current(db, TOURNAMENT, tournament["id"]), tournament.get("game_id"))
-        return {"loadout_ban_id": doc["id"]} if doc else {}
-    except Exception:  # noqa: BLE001 - das Ergebnis geht vor, der fehlende Vermerk steht im Protokoll
-        logger.exception("Sperrliste für ein Spiel nicht ermittelt")
+    tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "id": 1, "game_id": 1, "league_context": 1})
+    if not tournament or not tournament.get("league_context"):
         return {}
+    # Fehler gehen hier nicht still verloren (Review C.4): Ein fehlender Vermerk ließe später eine andere Liste gelten.
+    doc = valid_for(await current(db, TOURNAMENT, tournament["id"]), tournament.get("game_id"))
+    # Auch „keine Liste“ wird festgehalten (``None``) - eine später übertragene Liste gilt für dieses Spiel nicht.
+    return {STAMP: doc["id"] if doc else None}
 
 
 # ---------------------------------------------------------------- Regelwerk-Baustein
