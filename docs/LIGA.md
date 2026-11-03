@@ -1377,3 +1377,117 @@ der Stand `live` ist, das Ende vorbei und noch offene Spiele da sind; sonst fäl
 Leitung sieht in Mein Dienst (`ended_live[]`: `{id, title, end_date, open_matches, admin_url, league}`) und in der Turnierliste den Hinweis
 „Läuft laut Stand noch, Ende war am … – beenden?“ mit Weg in die Verwaltung. Umgestellt wird nie automatisch. Turnierleitung sieht Turniere
 ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.
+
+### D.2 Check-in und Start (#1652)
+
+Regelwerk § 8 (Nr. 19, 40, 46; § 8.4 und 8.5) und die Regelwerks-Sperre des Obmanns vom 03.11. Logik in `services/match_flow.py`
+(Regeln, Fenster, Stand, Check-in, Start, Matchseite, Datenschutz), `services/league_checkin_sweep.py` (Zeit-Job: Erinnerungen), Routen in
+`routes/league_checkin_routes.py`. **Migration: keine.** Ohne `checkin_rules` an der Staffel verhält sich alles wie vorher: kein Check-in, kein
+Vorschlag „nicht erschienen“, `started_at` setzt online niemand. Andere Formate, die App und der TV bleiben unverändert.
+
+**Einstellung `checkin_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Gepflegt unter
+`GET|PUT /api/admin/leagues/seasons/{id}/checkin-rules` (Zuständigkeit `season`); das Speichern schreibt sofort auf alle nicht gesperrten
+Staffeln der Season (eigene Gruppe `checkin` beim Übertragen, wirkt wie `schedule`; `staffel_fields` beim Anlegen). Neue Seasons bekommen die
+Vorgabe, ältere nichts, bis die Leitung einmal speichert. Protokoll `league.season.checkin_rules` mit altem und neuem Wert.
+
+| Feld | Typ | Vorgabe | Bedeutung |
+| --- | --- | --- | --- |
+| `opens_minutes_before` | int 1–240 | 15 | Nr. 19: der Check-in öffnet so viele Minuten vor dem Termin |
+| `closes_minutes_after` | int 0–240 | 15 | und schließt so viele Minuten nach dem Termin |
+| `min_present` | int 1–50 | 3 | Nr. 46: mindestens so viele berechtigte Anwesende je Seite. Vorgabe einer neuen Season: `lineup_min_players` (Teilnehmerliste), sonst Teamgröße − 1, mindestens 1 |
+| `remind_minutes_before_close` | int 0–60 | 5 | zweite Erinnerung an Seiten ohne Check-in, so viele Minuten vor Schluss; 0 = keine |
+
+**Fenster** (`match_flow.window_of`): nur mit `scheduled_at`; öffnet `scheduled_at − opens_minutes_before`, schließt
+`scheduled_at + closes_minutes_after`. „Verlängern“ der Leitung (`no_show_extended_until`, bestehender Knopf) schiebt das Ende. Gerechnet wird
+in UTC, Wiener Zeit steht nur in Texten; die Sommerzeit ändert am Fenster nichts.
+
+**`matches_v2.flow`** (optional; nur Staffeln mit Regeln schreiben es, intern wie `lineups`):
+
+| Feld | Inhalt |
+| --- | --- |
+| `checkin.<registration_id>` | `{at, updated_at, user_id, present: [user_id], via: "side" \| "lead", by, reason, rule_version_id}` – wer wann für die Seite eingecheckt hat, die Anwesenden, bei der Leitung Person und Grund, die Regelfassung von damals |
+| `ready_at` | ISO, einmal gesetzt, sobald beide Seiten eingecheckt sind (Nr. 40) |
+| `start` | `{at, by, registration_id, via: "side" \| "lead"}` – der festgehaltene Beginn; zugleich `started_at` und `status: "in_progress"` am Spiel |
+| `notices` | `{open: <Termin>, closing: <Termin>}` – welche Erinnerung für welchen Termin schon ging |
+
+**Stand** (`match_flow.state(match, tournament, now)`, abgeleitet, kein neuer globaler `status`): `none` (keine Regeln, kein Termin, keine zwei
+Seiten), `waiting` (Termin da, Fenster noch zu), `open` (Fenster offen, mindestens eine Seite fehlt), `closed` (Fenster zu, eine Seite fehlt –
+Fall bei der Leitung), `veto` (beide da, Veto offen – Haken `match_flow.veto_pending`, heute immer `False`, D.3 ersetzt ihn), `ready` (beide
+da, spielbereit – Map 1 darf sofort beginnen, auch vor dem Termin), `running` (`started_at`), `finished` (entschieden, abgesagt). Der Start
+schreibt wie der Stationsstart `in_progress` – App und TV zeigen „Läuft“ aus `status` und `started_at` wie bisher.
+
+**Check-in** `POST /api/matches/{id}/checkin` `{present: [user_id], registration_id?, reason?, conflict_reason?}`:
+
+- Für die eigene Seite: Captain oder Vertreter, ohne beide die Hauptteam-Leitung (`acting_registration`). Die Liga-Leitung mit „Spiele betreuen“
+  (`matches`) trägt im Notfall für eine Seite ein (`registration_id`, `reason` mindestens fünf Zeichen), auch nach Fensterende, solange nichts
+  begonnen und nichts gemeldet ist; Befangenheit wie B.1 (403, Superadmin mit `conflict_reason`), Protokoll `match.checkin.lead`.
+- Prüfungen mit deutschem Satz: Staffel mit Regeln und zwei Seiten (409), nicht begonnen und keine Meldung (409), Fenster offen – „Der Check-in
+  öffnet erst um …“ bzw. „Der Check-in ist seit … geschlossen – das entscheidet die Liga-Leitung“ (409, nur Seiten); Anwesende: nur Kader,
+  jede Person einmal, mindestens `min_present`, nur spielberechtigt (`league_eligibility.check_participants`, Grund im Klartext, 422).
+- **Regelwerks-Sperre:** Hat das Co-Team der Seite der geforderten Fassung (B.2, `requires_consent`) nicht zugestimmt, gibt es keinen Check-in
+  – auch nicht durch die Leitung: 409 „Das Regelwerk hat sich geändert – bitte erst zustimmen.“ mit dem Weg zur Fassung (`rules_url`). Die
+  Matchseite zeigt denselben Satz vor dem Klick.
+- **Ergänzen bis Fensterende:** ein erneuter Aufruf derselben Seite ersetzt die Liste (`updated_at`), `at` bleibt; dieselbe Liste antwortet
+  `idempotent_replay`. Nach Fensterende ergänzt nur die Leitung.
+- Geschrieben wird unter der Turniersperre (`_serialized_match_write`) mit Bedingung auf den gelesenen Stand der Seite, `started_at` und `status`;
+  gleichzeitige Klicks beider Seiten gehen beide durch, `ready_at` setzt genau einmal (Bedingung „beide da und `ready_at` leer“). Ein zweiter
+  gleichzeitiger Klick derselben Seite bekommt 409 „Gerade hat sich am Check-in etwas geändert – bitte neu laden.“
+- Protokoll `match.checkin` (`registration_id`, `count`, `via`, `rule_version_id`, bei der Leitung `reason`). Nachrichten (Art `match_schedule`,
+  Thema Match-Erinnerungen): an die Verantwortlichen der Gegenseite „… ist eingecheckt“ (`meta.reason` `checkin_side`, Schlüssel
+  `checkin-side:<spiel>:<seite>:<at>`), sobald beide da sind an beide Seiten „Beide Seiten eingecheckt – ihr könnt starten“ (`checkin_ready`,
+  `checkin-ready:<spiel>:<ready_at>`).
+
+**Start** `POST /api/matches/{id}/checkin/start` (ohne Inhalt, `conflict_reason?` für die Leitung): Captain oder Vertreter einer Seite oder die
+Leitung mit `matches` (Befangenheit wie oben). Nur im Stand `ready`; die Regelwerks-Sperre gilt für beide Seiten (409 nennt die Seite, die noch
+zustimmen muss – ändert sich das Regelwerk zwischen Check-in und Start, hält das den Start auf). Setzt `started_at`, `status: "in_progress"` und
+`flow.start` mit Bedingung `started_at: null`; der zweite Klick antwortet `idempotent_replay`. Protokoll `match.checkin.start`, Nachricht
+„Match startet jetzt“ an die Verantwortlichen beider Seiten (`checkin_started`, `checkin-start:<spiel>:<at>`). Ab hier gelten alle Regeln für
+begonnene Spiele (D.1: keine Verschiebung; kein Vorschlag „nicht erschienen“; „Ergebnis fehlt“ wie bisher).
+
+**Nach Ablauf (§ 8.4, 8.5 – kein automatischer Nichtantritt):** Der Fristen-Job (`match_deadline_sweep`, Regel `check_in` in
+`match_deadlines.no_show_deadline`) legt nach Fensterende genau einen Vorschlag an das Spiel: `no_show_proposal`
+`{rule: "check_in", minutes, due_at, registration_ids, missing_registration_ids}`, Protokoll `match.no_show.proposed`, Nachricht „Nicht
+erschienen?“ an die Liga-Leitung mit `results` oder `disputes` (Art `match_attention`, `no-show:<vorschlag>`), Eintrag in Mein Dienst
+(`checkin_proposals[]`) und Karte in der Leitungsansicht (Teilnehmer = fehlende Seiten). Eine Wertung schreibt nie der Job. Die Leitung
+entscheidet wie bisher über `POST /api/tournaments/{tid}/lead/no-show/{match}`: `confirm` wertet kampflos über den Forfeit-Weg (Notiz „Nicht
+erschienen – Check-in bis … nicht erfolgt“, Teamstrafe wie bei jedem Kampflos), `extend` verlängert das Fenster und nimmt den Vorschlag zurück
+(nach Ablauf kommt er neu). Trägt die Leitung die fehlende Seite nach, räumt der Job den Vorschlag ab (`match.no_show.cleared`, Grund
+`checked_in`). Ein begonnenes Spiel (`started_at`) oder eins mit Meldung bekommt nie einen Vorschlag (laufendes BO5 ist kein Nichtantritt).
+Alte Vorschläge ohne Regel `check_in` räumt der Job wie seit #2201 ab.
+
+**Erinnerungen** (`league_checkin_sweep.sweep`, im Fristen-Job mit denselben laufenden Turnieren): bei Öffnung des Fensters „Check-in offen“ an
+die Verantwortlichen beider Seiten, die noch nicht eingecheckt sind (Art `match_call` – Push mit Vibration wie „Du bist dran“, Schlüssel
+`checkin-open:<spiel>:<termin>`), `remind_minutes_before_close` Minuten vor Schluss „Noch … Minuten“ an Seiten ohne Check-in
+(`checkin-closing:<spiel>:<termin>`). Merker `flow.notices` je Termin: ein neuer Termin erinnert neu, ein zweiter Lauf findet nichts mehr.
+In einer Sperrzeit läuft nichts.
+
+**Matchseite** `checkin` (nur Staffeln mit Regeln, nur Beteiligte und Leitung, sonst `null`): `rules`, `state`, `scheduled_at`, `window
+{opens_at, closes_at}`, `ready_at`, `started_at`, `sides[]` je Seite `{registration_id, name, own, checked_in, at, via, present: [{id, name}],
+present_count, consent_open, rules_url, lead_reason}` (die Anwesenden sehen beide Seiten und die Leitung, wie Aufstellungen; einen
+Eignungsgrund sieht nur die eigene Seite), `own_registration_id`, `can_checkin`, `checkin_hint` (warum nicht), `roster[]` der eigenen Seite
+`{id, name, blocked}` (Grund im Klartext, nicht wählbar), `min_present`, `can_start`, `start_hint`, `proposal` (`{due_at, missing: [name]}` oder
+`null`), `lead {can_enter, conflict, rosters: {registration_id: [{id, name, blocked}]}}` für die Leitung.
+
+**Aufgabe** `me.actions[]` `type: "match_checkin"` („Jetzt einchecken“, `target_type: "match"`) für die Verantwortlichen einer Seite ohne
+Check-in, solange das Fenster offen ist; ältere Apps öffnen damit die Matchseite, eingecheckt wird im Web.
+
+**Datenschutz:** `flow` ist intern (`match_public_view.INTERNAL_KEYS`), die Matchseite gibt die Namen im Block `checkin`. Auskunft
+`league_checkin` (`match_flow.export_snapshot`): je Spiel der eigene Check-in (Zeit, Anzahl, Grund als Leitung nur Vorgang und Zeit), die eigene
+Anwesenheit, der eigene Start. Kontolöschung (`match_flow.scrub_person`): `user_id`, `by` und `start.by` werden `null`; Anwesenheitslisten
+bleiben wie Aufstellungen (Sportdaten, das Konto heißt dort „Gelöschter User“).
+
+**Rechte** (Ergänzung der Matrix in B.1):
+
+| Route | Liga-Recht | Befangenheit | Helfer |
+| --- | --- | --- | --- |
+| `GET …/seasons/{id}/checkin-rules` | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/checkin-rules` | `season` | – | – |
+| Spiel: `POST /checkin` mit `registration_id` (für eine Seite), `POST /checkin/start` als Leitung | `matches`; Beteiligte als Captain oder Vertreter wie jede Seite | ja (Notausnahme `conflict_reason`) | – |
+
+**Regelwerk:** Baustein `[[baustein:checkin]]` (`league_rule_blocks`) nennt Fenster und Mindestzahl der Season im Text; eingefroren beim
+Veröffentlichen wie jeder Baustein. Der dynamische Umbau des Regelwerks ist #2269.
+
+**Audit-Aktionen neu:** `match.checkin`, `match.checkin.lead`, `match.checkin.start`, `league.season.checkin_rules`.
+
+**Haken für D.3:** `match_flow.veto_pending(match, tournament)` – zwischen `ready_at` und Start; liefert heute `False`. D.3 setzt dort den
+Zustandsautomaten des Vetos ein, der Start bleibt der Schritt danach.
