@@ -239,6 +239,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
 | Map-Pool | Season (`league_season`) | keiner = keine Liga-Meldung möglich |
+| Ergebnisregel je Modus, Punkte je Map Pflicht (C.3) | Season (`result_rules`, `scores_required`) | Kopie der Modi · an (nur neue Seasons) |
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
 | Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
 
@@ -639,6 +640,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `DELETE …/seasons/{id}`, `GET …/seasons/{id}/delete-plan` | `manage` | – | – |
 | `PATCH …/seasons/{id}` | `season`; `rules_text` braucht `rules` | – | – |
 | `PUT`, `DELETE …/seasons/{id}/map-pool`, `POST …/seasons/{id}/sync` | `season` | – | – |
+| `GET …/seasons/{id}/result-rules` (C.3) | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/result-rules` (C.3) | `season` | – | – |
 | `POST …/seasons/{id}/divisions`, `PATCH`, `DELETE …/divisions/{id}`, `GET …/delete-plan` | `season` | – | – |
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
@@ -1073,6 +1076,75 @@ in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
 
 **Bekannte Grenze:** Prüfen und Schreiben beim Entfernen sind zwei Schritte. Speichert jemand in genau diesem Moment einen Pool mit
 dem Modus, kann der Pool auf einen entfernten Modus zeigen. Das ist der Zustand von vor C.1 und wird gelesen wie bisher.
+
+### C.3 Ergebnisregeln (#1617)
+
+C.3 wendet die Ergebnisregel der Modi (C.1) auf Liga-Meldungen an. Nur Staffeln sind betroffen: Andere Turniere, Seasons und
+Staffeln ohne die neuen Felder und Maps ohne Regel verhalten sich wie vorher. Logik in `services/league_result_rules.py`, Verwaltung
+in `routes/league_result_rule_routes.py`, Prüfung in `league_games.normalize_games`. Keine Werte eines Titels im Code.
+**Migration: keine.**
+
+**Season** (`league_seasons`, beide Felder optional):
+
+| Feld | Typ | Fehlt | Bedeutung |
+| --- | --- | --- | --- |
+| `result_rules` | `{mode: result_rule}` | keine Prüfung | Festgehaltene Kopie der Regeln je Modus, Form wie C.1. Eine neue Season kopiert beim Anlegen die Regeln aller Modi des Spiels, die eine haben. Je Modus darf die Season abweichen; ein Modus ohne Eintrag hat in der Season keine Regel |
+| `scores_required` | bool | `false` | Punkte je Map Pflicht, ein Feld für alle Modi (jede Map bekommt ihren Endstand). Neue Seasons: `true` |
+
+- **Festgehalten wie ein Pool:** Ändert jemand später die Regel am Modus, bleibt die Season, wie sie ist. Die Verwaltung zeigt je
+  Modus die Regel der Season und die des Spiels und markiert Abweichungen. „Vom Spiel übernehmen“ ist eine Handlung der Leitung.
+- **API:** `GET /api/admin/leagues/seasons/{id}/result-rules` (jede Zuständigkeit der Liga) liefert `scores_required`, je Modus
+  `{mode, label, status, season_rule, game_rule, differs}` und `staffeln`. `PUT` (Recht `season`) nimmt
+  `{scores_required, rules: {mode: result_rule | null}}` und ersetzt die Kopie ganz. Neue Regeln nur für Modi des Spiels, die
+  schon in der Season stehenden bleiben speicherbar; geprüft wie C.1 (`GameModeResultRule`), sonst 422 mit deutschem Satz.
+  Protokoll `league.season.result_rules` mit den geänderten Modi und `scores_required`, ohne Werte.
+- **Staffel:** `staffel_fields` kopiert beide Felder, wenn die Season sie trägt. Übertragen in der Gruppe **laufend** (auch nach
+  Start und Ergebnis, nicht bei gesperrten Staffeln): Die Regel prüft nur neue Eingaben, gespeicherte Ergebnisse bleiben. Der
+  Turnierkern liest nur `tournaments.result_rules` und `tournaments.scores_required`.
+
+**Prüfung je Map** (Melden, Bestätigen, Ergebnis und Korrektur der Leitung; Regel = `result_rules[mode]` der Staffel):
+
+| Fall | Regel | Satz (Beispiel) |
+| --- | --- | --- |
+| Punktepflicht | beide Seiten haben Punkte | „Map 1: bitte die Punkte beider Seiten eintragen – in dieser Liga sind sie Pflicht.“ |
+| Mit Regel | Punkte beider Seiten oder keine; bei `score` und `rounds` ganze Zahlen | „Map 1: bitte die Punkte beider Seiten eintragen.“ |
+| Sieger | der Sieger hat mehr Punkte; Gleichstand nur mit `draw_allowed` | „Map 1: Der Endstand 100:250 passt nicht zum Sieger – mehr Punkte hat Horst.“ |
+| `score` ohne `overtime` | Sieger höchstens `target`, Verlierer unter `target` | „Map 1: höchstens 250 Punkte – die Map endet beim Ziel (Endstand 251:240).“ |
+| `rounds` ohne `overtime` | Runden zusammen höchstens `round_limit`, Sieger höchstens `target` | „Map 1: höchstens 11 Runden – 7:5 sind 12.“ |
+| `score`, `rounds` ohne `time_limit_minutes` | der Sieger erreicht `target` (die Map endet nur dort) | „Map 1: Die Map endet erst bei 6 gewonnenen Runden – der Sieger hat 5.“ |
+| `highest` | nur „Sieger hat mehr“ | – |
+
+Mit `overtime` dürfen Ziel und Rundenlimit überschritten werden. Gleichstand mit `draw_allowed` wird angenommen; die Serie braucht
+trotzdem einen Sieger der Map (Datenmodell ohne Map-Remis, offene Fachfrage). Beispiele: S&D mit Ziel 6 und Limit 11: 6:5 geht,
+7:5 nicht.
+
+- **Bestätigen:** Es zählen die Punkte der ersten Meldung (unverändert). Schickt die bestätigende Seite keine Punkte, prüft der
+  Server mit denen der Gegenseite – sonst scheiterte jede Bestätigung an der Punktepflicht. Die App bestätigt ohne Maps wie bisher.
+- **Best of** (unverändert): Siegschwelle ⌊N/2⌋+1, keine Map nach der Entscheidung; im BO5 ohne Remis nur 3:0, 3:1, 3:2.
+- **Korrektur der Leitung** (`/result`, auch mit `force`): dieselben Prüfungen. Übergehen darf nur der Superadmin mit
+  `rule_override_reason` (mindestens fünf Zeichen) – nur Ergebnisregel und Punktepflicht, nie Best of, Pool oder Aufstellung.
+  Protokoll `match.games.rule_override` mit Grund. Die Matchseite meldet es mit `league.can_override_rules`.
+
+**`games[]` erweitert** (alle optional, geschrieben nur wenn gesetzt; `same_outcome`, `derived_results`, Konsens, Tabelle und App
+lesen sie nicht):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `status` | `played` \| `replayed` | fehlt = gespielt (`played` wird nicht geschrieben). `replayed`: Endstand und Sieger stammen aus einer Wiederholung der Map |
+| `replay_reason` | str 5–200 | Pflicht bei `replayed`, sonst nicht erlaubt |
+| `decision` | `awarded` | Wertung: Map von der Leitung zugesprochen (nur `/result`), ohne Punkte; Regel und Punktepflicht entfallen |
+| `host_registration_id` | str | Seite bzw. Host der Map, eine der beiden Anmeldungen |
+| `proof_id` | str | Nachweis: ein Foto dieses Spiels (`match_proof_photos`), schon angehängt oder mit derselben Meldung angehängt |
+
+- **`not_played`** steht nie in `games` – alle Leser zählen dort gespielte Maps. Die Matchseite liefert im Block `league`
+  `not_played: [Position]`: die Positionen nach dem Serienende bis `best_of`.
+- Matchseite: „wiederholt“ und „zugesprochen“ an der Map; `proof_id` sehen nur Beteiligte und Leitung (wie Aufstellungen).
+
+**Meldeformular und Ergebnis-Fenster:** zeigen je Map die Regel („bis 250 Punkte“, „6 Runden, höchstens 11“), bei Punktepflicht
+die Punktefelder ohne „freiwillig“ und prüfen vorab mit denselben Sätzen (`leagueResultRules.js`). Der Server bleibt maßgeblich.
+Der Block `league` der Matchseite trägt dazu `result_rules` (nur Modi des Pools) und `scores_required`.
+
+**Map-Wiederholung** (Nr. 15) gibt es seit #2096 (`map_repeat` an Season und Staffel, Vorgabe `other_mode`); C.3 baut nichts dazu.
 
 ### Darf nicht beschädigt werden
 
