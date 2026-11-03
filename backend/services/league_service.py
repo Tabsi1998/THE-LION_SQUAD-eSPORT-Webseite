@@ -99,7 +99,9 @@ OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size",
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
 RESPONSE_HOURS = "match_schedule_response_hours"
 # Ergebnisregeln (C.3, #1617): gepflegt über …/result-rules, nicht über das Season-Formular; gelten nur für neue Eingaben.
-RESULT_RULE_FIELDS = ("result_rules", "scores_required")
+RESULT_RULE_FIELDS = ("result_rules", "scores_required",
+                      # Einstellungen und Regeltext je Modus (#2271): dieselbe Kopie, dieselbe Gruppe.
+                      "mode_settings")
 # Ab hier hat eine Staffel begonnen: Termine und Kalender bleiben dann, wie sie sind.
 PRE_START_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed", "check_in"})
 # Sichtbarkeit der Season → Sichtbarkeit der Staffel-Turniere (docs/LIGA.md, Abschnitt 10).
@@ -480,7 +482,7 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
     "running": "Antwortfrist auf Terminvorschläge",
-    "result_rules": "Ergebnisregeln und Punktepflicht",
+    "result_rules": "Ergebnisregeln, Einstellungen und Punktepflicht",
     "schedule": "Terminregeln",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",

@@ -13,9 +13,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from services.league_result_rules import RuleProblem, check_map, clean_rules, rules_of_game  # noqa: E402
 
 NAMES = {"a": "Rudel A", "h": "Horst"}
-SCORE = {"kind": "score", "target": 250, "time_limit_minutes": 10}
+SCORE = {"kind": "score", "target": 250, "time_limit_seconds": 600}
 SCORE_NO_TIME = {"kind": "score", "target": 250}
-SCORE_OT = {"kind": "score", "target": 250, "time_limit_minutes": 10, "overtime": True}
+SCORE_OT = {"kind": "score", "target": 250, "time_limit_seconds": 600, "overtime": True}
 ROUNDS = {"kind": "rounds", "target": 6, "round_limit": 11}
 ROUNDS_OT = {"kind": "rounds", "target": 6, "round_limit": 11, "overtime": True}
 ROUNDS_DRAW = {"kind": "rounds", "target": 7, "round_limit": 12, "draw_allowed": True}
