@@ -477,11 +477,14 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     if await game_usage.chosen_is_archived(db, body.game_id, existing.get("game_id")):
         raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     raw_updates = body.model_dump(exclude_unset=True)
-    if raw_updates.get("game_mode"):
-        # Spielmodus (#2206): neu wählen nur aktive; der schon gesetzte bleibt gültig, auch wenn er inzwischen inaktiv ist.
-        mode_game_id = raw_updates.get("game_id") or existing.get("game_id")
-        mode_game = await db.games.find_one({"id": mode_game_id}, {"_id": 0, "match_modes": 1}) if mode_game_id else None
-        mode_problem = game_modes.choice_problem(mode_game, [raw_updates["game_mode"]], [existing.get("game_mode")])
+    # Spielmodus (#2206): neu wählen nur aktive; der schon gesetzte bleibt gültig, auch wenn er inzwischen inaktiv ist. Wechselt
+    # das Spiel, ist nichts „schon gesetzt“ - ein mitgenommener Modus wird gegen das neue Spiel geprüft, auch ohne ``game_mode``.
+    mode_game_id = raw_updates.get("game_id") or existing.get("game_id")
+    same_game = mode_game_id == existing.get("game_id")
+    wanted_mode = raw_updates["game_mode"] if "game_mode" in raw_updates else existing.get("game_mode")
+    if wanted_mode and mode_game_id and ("game_mode" in raw_updates or not same_game):
+        mode_game = await db.games.find_one({"id": mode_game_id}, {"_id": 0, "match_modes": 1})
+        mode_problem = game_modes.choice_problem(mode_game, [wanted_mode], [existing.get("game_mode")] if same_game else [])
         if mode_problem:
             raise HTTPException(status_code=422, detail=mode_problem)
     # Status nur über den Ablauf (#2109): ``POST /status`` prüft Spielplan, Check-in und schreibt ins Protokoll - das

@@ -320,6 +320,28 @@ async def test_inactive_modes_are_not_chosen_anew_for_a_tournament(flow):
 
 
 @pytest.mark.asyncio
+async def test_switching_the_game_does_not_carry_a_same_named_inactive_mode(flow):
+    """Prüfung #2206: Der alte Schlüssel gilt nach einem Spielwechsel nicht als „schon gesetzt“ - auch ohne ``game_mode`` im
+    Aufruf wird der übernommene Modus gegen das neue Spiel geprüft."""
+    await as_admin(flow)
+    first = await new_game(flow)
+    second = await new_game(flow)
+    await patch_modes(flow, second, with_status("inactive"))
+    tournament = await flow.create_tournament(game_id=first["id"], game_mode="suchen")
+
+    named = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"game_id": second["id"], "game_mode": "suchen"})
+    assert named.status_code == 422, named.text
+    carried = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"game_id": second["id"]})
+    assert carried.status_code == 422, carried.text
+    assert "inaktiv" in carried.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": tournament["id"]}))["game_id"] == first["id"]
+    cleared = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"game_id": second["id"], "game_mode": None})
+    assert cleared.status_code == 200, cleared.text
+    kept = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"game_id": second["id"], "game_mode": "stellung", "title": "X"})
+    assert kept.status_code == 200, kept.text
+
+
+@pytest.mark.asyncio
 async def test_archived_modes_are_not_assigned_anew_to_maps(flow):
     await as_admin(flow)
     game = await new_game(flow)
