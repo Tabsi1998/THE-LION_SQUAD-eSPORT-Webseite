@@ -957,7 +957,7 @@ Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` un
 
 **Sperren:** Einreichen, Rückzug und Entscheidungen halten `league_season_resource`. Beim Zuteilen zuerst die Turnier-Sperre, dann diese. Besetzt: 409. Der Status wechselt nur mit Bedingung auf den alten Stand.
 
-**Abgebrochenes Zuteilen:** Anmeldung und Antrag sind zwei Schreibvorgänge ohne Transaktion. Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie stehen (Prozess stirbt dazwischen), findet `_left_over` sie über `application_id`: Annehmen und Zuteilen schließen mit ihrer Staffel ab, auch wenn eine andere gewählt ist, und zwar unter deren Sperre und mit derselben Prüfung (`check_squad`, gesperrte Staffel 423). Fällt die Prüfung durch, bleibt der Antrag stehen, die Leitung nimmt die Anmeldung aus der Teilnehmerliste. Ablehnen, Warteliste und Rückzug antworten 409, bis eines von beiden geschehen ist.
+**Abgebrochenes Zuteilen:** Anmeldung und Antrag sind zwei Schreibvorgänge ohne Transaktion. Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie stehen (Prozess stirbt dazwischen), findet `_left_over` sie über `application_id`: Annehmen und Zuteilen schließen mit ihrer Staffel ab, auch wenn eine andere gewählt ist, und zwar unter deren Sperre und mit derselben Prüfung (`check_squad`). Ist die Staffel gesperrt: 423, bis die Leitung sie entsperrt (`POST /api/tournaments/{id}/unlock`). Fällt die Prüfung durch, bleibt der Antrag stehen, die Leitung nimmt die Anmeldung aus der Teilnehmerliste. Ablehnen, Warteliste und Rückzug antworten 409, bis eines von beiden geschehen ist.
 
 **Routen**
 
