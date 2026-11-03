@@ -101,7 +101,9 @@ async def usage(db, game: dict) -> dict:
         }
         for mode in game_modes(game)
     }
-    return {"counts": counts, "total": sum(counts.values()), "text": usage_text(counts), "modes": modes}
+    # Je ID-Feld, wie viele Personen darunter schon eine ID haben (#2249) - die Rückfrage vor dem Entfernen nennt die Zahl.
+    id_fields = await id_key_usage(db, game, [str(item.get("key") or "") for item in game.get("player_id_fields") or [] if isinstance(item, dict)])
+    return {"counts": counts, "total": sum(counts.values()), "text": usage_text(counts), "modes": modes, "id_fields": id_fields}
 
 
 # Was einen Modus „verwendet“ (#2206, C.1): Dann lässt er sich nur noch deaktivieren oder archivieren, nicht entfernen.
@@ -212,3 +214,53 @@ def usage_text(counts: dict) -> str:
 
 def still_in_use(text: str) -> str:
     return f"Das Spiel wird noch verwendet: {text}. Archiviere es – dann steht es beim Anlegen nicht mehr zur Wahl, alles Bestehende zeigt es weiter."
+
+
+# Schlüssel der Spiel-ID-Felder (#2249, Codex-Nachprüfung): Unter einem Schlüssel stehen die IDs der Spieler - im Profil unter
+# dem Spiel (``users.game_ids.<slug>.<key>``), auch unter jeder Spielversion, die ihre IDs von diesem Spiel nimmt, und im
+# Liga-Kader (``league_rosters.player_ids.<key>``). Fällt ein solcher Schlüssel weg, fände die Seite sie nicht mehr.
+async def _games_reading_ids_from(db, game: dict) -> list[dict]:
+    """Das Spiel und alle Versionen, deren Spieler-IDs von ihm kommen (ID-Quelle oder geerbt vom Hauptspiel)."""
+    rows = await db.games.find({"$or": [{"identity_source_game_id": game["id"]}, {"parent_game_id": game["id"]}]},
+                               {"_id": 0, "id": 1, "slug": 1, "identity_source_game_id": 1, "parent_game_id": 1,
+                                "inherit_player_ids": 1}).to_list(None)
+    reading = [row for row in rows if row.get("identity_source_game_id") == game["id"]
+               or (not row.get("identity_source_game_id") and row.get("inherit_player_ids") is not False)]
+    return [game, *[row for row in reading if row.get("id") != game["id"]]]
+
+
+def _has_value(values, key: str) -> bool:
+    return isinstance(values, dict) and bool(str(values.get(key) or "").strip())
+
+
+async def id_key_usage(db, game: dict, keys: list[str]) -> dict[str, int]:
+    """Je Schlüssel die Zahl der Personen mit einer gespeicherten ID darunter (Profil oder Liga-Kader, je Person einmal)."""
+    wanted = [key for key in dict.fromkeys(keys) if key]
+    if not wanted:
+        return {}
+    games = await _games_reading_ids_from(db, game)
+    slugs = [row["slug"] for row in games if row.get("slug")]
+    people: dict[str, set[str]] = {key: set() for key in wanted}
+    if slugs:
+        users = await db.users.find({"$or": [{f"game_ids.{slug}": {"$exists": True}} for slug in slugs]},
+                                    {"_id": 0, "id": 1, "game_ids": 1}).to_list(None)
+        for user in users:
+            stored = user.get("game_ids") or {}
+            for key in wanted:
+                if any(_has_value(stored.get(slug), key) for slug in slugs):
+                    people[key].add(user["id"])
+    rosters = await db.league_rosters.find({"game_id": {"$in": [row["id"] for row in games]}},
+                                           {"_id": 0, "user_id": 1, "player_ids": 1}).to_list(None)
+    for row in rosters:
+        for key in wanted:
+            if row.get("user_id") and _has_value(row.get("player_ids"), key):
+                people[key].add(row["user_id"])
+    return {key: len(found) for key, found in people.items()}
+
+
+def id_keys_in_use_text(fields: list | None, used: dict[str, int]) -> str:
+    """Die Antwort, wenn ein Schlüssel mit gespeicherten IDs ohne Bestätigung wegfallen soll (409)."""
+    labels = {str(item.get("key") or ""): item.get("label") or item.get("key") for item in fields or [] if isinstance(item, dict)}
+    parts = [f"„{labels.get(key) or key}“ ({count} {'Person' if count == 1 else 'Personen'})" for key, count in used.items()]
+    return (f"Unter {', '.join(parts)} sind schon Spieler-IDs gespeichert. Fällt der Schlüssel weg, findet die Seite sie nicht mehr – "
+            "bitte das Entfernen bestätigen oder das Feld behalten.")

@@ -193,6 +193,24 @@ async def _refuse_used_removal(db, current: dict, modes: list[dict] | None) -> N
             raise HTTPException(status_code=409, detail=game_usage.mode_in_use_text(mode["label"], counts))
 
 
+async def _removed_id_keys(db, current: dict, fields: list | None, confirmed: set[str]) -> dict[str, int]:
+    """Fällt ein Schlüssel weg, unter dem schon Spieler-IDs stehen (#2249)? Ohne Bestätigung 409 mit der Zahl der Personen;
+    bestätigt: die Zählung fürs Protokoll. Ein Schlüssel ohne gespeicherte IDs fällt einfach weg. Verglichen wird genau,
+    so ist ein Wechsel von „PSN-ID“ zu „psn_id“ dasselbe wie Löschen und Neuanlegen."""
+    if fields is None:
+        return {}
+    kept = {str(item.get("key") or "") for item in fields if isinstance(item, dict)}
+    gone = [str(item.get("key") or "") for item in current.get("player_id_fields") or [] if isinstance(item, dict)]
+    gone = [key for key in dict.fromkeys(gone) if key and key not in kept]
+    if not gone:
+        return {}
+    used = {key: count for key, count in (await game_usage.id_key_usage(db, current, gone)).items() if count}
+    open_keys = {key: count for key, count in used.items() if key not in confirmed}
+    if open_keys:
+        raise HTTPException(status_code=409, detail=game_usage.id_keys_in_use_text(current.get("player_id_fields"), open_keys))
+    return used
+
+
 @router.put("/{game_id}")
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
@@ -206,6 +224,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
                        "match_modes", "players_per_run_local", "players_per_run_online", "station_devices", "setup_minutes",
                        "points_table", "default_best_of"}
     raw = body.model_dump(exclude_unset=True)
+    confirmed = set(raw.pop("confirm_removed_keys", None) or [])
     if raw.get("match_modes"):
         # Kennung bleibt (#2206): ein Eintrag ohne Kennung mit dem Namen eines bestehenden Modus behält dessen Kennung.
         try:
@@ -223,6 +242,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_id_fields(updates.get("player_id_fields"), current.get("player_id_fields"))
+    lost_keys = await _removed_id_keys(db, current, updates.get("player_id_fields"), confirmed)
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")
@@ -246,6 +266,10 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         updates["archived_at"] = now_utc().isoformat() if status == game_usage.ARCHIVED else None
     updates["updated_at"] = now_utc().isoformat()
     await db.games.update_one({"id": game_id}, {"$set": updates})
+    if lost_keys:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "game.player_id_fields.remove", "target_id": game_id, "actor_id": me.get("id"),
+            "data": {"keys": lost_keys}, "created_at": now_utc().isoformat()})
     game = await db.games.find_one({"id": game_id}, {"_id": 0})
     if "match_modes" not in raw:
         return game
