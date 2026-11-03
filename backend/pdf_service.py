@@ -1479,7 +1479,11 @@ def pdf_qr_sign(
 
 # Randstrich und Hinweis der geänderten Abschnitte: Der Strich trägt die Farbe, das Wort „GEÄNDERT“ sagt es auch ohne Farbe.
 MARK_INK = GOLD_INK
-_RULES_PDF_SUBSTITUTES = {"→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "OK", "✔": "OK", "✗": "X", "✘": "X"}
+_RULES_PDF_SUBSTITUTES = {"→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "OK", "✔": "OK", "✗": "X", "✘": "X",
+                          # Harmlose Ersatzzeichen der Bausteine (league_rule_blocks.plain, #2271).
+                          "∗": "*", "＋": "+"}
+# Symbol eines Modus im Baustein (#2266, ``league_rule_blocks.ICON_ALT``): Das Web zeigt es, das PDF lässt es weg.
+RULES_ICON_ALT = "Modus-Symbol"
 _RULES_LINK = re.compile(r"(!?)\[([^\]\n]+)\]\(([^)\s]+)\)")
 _RULES_SAFE_LINK = re.compile(r"^(https?://|mailto:|tel:)", re.IGNORECASE)
 _RULES_IMAGE_LINE = re.compile(r"^!\[[^\]\n]*\]\(([^)\s]+)\)$")
@@ -1517,6 +1521,10 @@ def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
         out += _rules_inline_marks(text[last:match.start()])
         label = _rules_inline_marks(match.group(2))
         target = match.group(3)
+        if match.group(1) and match.group(2) == RULES_ICON_ALT:
+            # Das Symbol eines Modus ist Schmuck vor dem Namen - im PDF ohne Hinweis und ohne Lücke.
+            last = match.end() + (1 if text[match.end():match.end() + 1] == " " else 0)
+            continue
         if match.group(1):
             out += f"[Bild: {escape(match.group(2))}]"
         elif _RULES_SAFE_LINK.match(target) or (target.startswith("#") and target[1:] in anchors):
