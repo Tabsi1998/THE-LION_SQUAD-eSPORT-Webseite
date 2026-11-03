@@ -18,20 +18,35 @@ NO_SEASON_HINT = "*Dieser Baustein gilt je Season - er steht auf den Regeln der 
 NOT_FROZEN_HINT = "*Für diese Season noch nicht festgehalten.*"
 
 
-def _cell(value) -> str:
-    """Ein Tabellenfeld: Ein senkrechter Strich im Namen zerlegte sonst die Spalten."""
-    return " ".join(str(value or "").replace("|", "/").split())
+# Zeichen, die im Markdown von Web (markdownLite, Option ``escapes``) und PDF (``pdf_rules_inline``) etwas auslösen. Ein Name aus Bibliothek
+# oder Modus ist Text: Davor steht ein Backslash, beide Darstellungen zeigen das Zeichen dann so, wie es ist (Review #2218).
+MARKDOWN_SPECIAL = "\\`*_[]()!~+"
+
+
+def text_cell(value) -> str:
+    """Ein Name als Markdown-Text: Leerraum zusammengefasst, ein senkrechter Strich (zerlegte sonst die Tabelle) wird „/“, alle übrigen
+    Steuerzeichen bekommen einen Backslash - so wird „[x](https://…)“ nie ein Link und „**x**“ nie fett."""
+    text = " ".join(str(value or "").replace("|", "/").split())
+    return "".join(f"\\{char}" if char in MARKDOWN_SPECIAL else char for char in text)
+
+
+_cell = text_cell
+
+
+def pool_table(doc: dict) -> str:
+    """Die Tabelle Modus → Maps eines Pools."""
+    lines = ["| Modus | Maps |", "| --- | --- |"]
+    for group in doc.get("modes") or []:
+        names = ", ".join(_cell(item.get("name")) for item in group.get("maps") or [])
+        lines.append(f"| {_cell(group.get('label') or map_pools.NO_MODE_LABEL)} | {names} |")
+    return "\n".join(lines)
 
 
 async def _map_pool(db, league: dict, season: dict) -> dict:
     doc = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
     if not doc:
         return {"markdown": "*Für diese Season ist noch kein Map-Pool hinterlegt.*", "source": {"map_pool_id": None}}
-    lines = ["| Modus | Maps |", "| --- | --- |"]
-    for group in doc.get("modes") or []:
-        names = ", ".join(_cell(item.get("name")) for item in group.get("maps") or [])
-        lines.append(f"| {_cell(group.get('label') or map_pools.NO_MODE_LABEL)} | {names} |")
-    return {"markdown": "\n".join(lines), "source": {"map_pool_id": doc.get("id"), "map_pool_version": doc.get("version")}}
+    return {"markdown": pool_table(doc), "source": {"map_pool_id": doc.get("id"), "map_pool_version": doc.get("version")}}
 
 
 async def _mode_order(db, league: dict, season: dict) -> dict:
@@ -40,7 +55,7 @@ async def _mode_order(db, league: dict, season: dict) -> dict:
         return {"markdown": "*Der Modus je Map ist frei wählbar.*", "source": {"game_mode_order": []}}
     game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0}) if league.get("game_id") else None
     labels = {row["mode"]: row["label"] for row in game_maps.game_modes(game)} if game else {}
-    lines = [f"- Map {index}: {labels.get(mode, mode)}" for index, mode in enumerate(order, 1)]
+    lines = [f"- Map {index}: {_cell(labels.get(mode, mode))}" for index, mode in enumerate(order, 1)]
     lines.append("")
     lines.append("Bei mehr Maps beginnt die Folge von vorn.")
     return {"markdown": "\n".join(lines), "source": {"game_mode_order": order}}

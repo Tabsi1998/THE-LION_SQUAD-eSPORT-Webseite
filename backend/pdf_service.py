@@ -1507,10 +1507,29 @@ def _rules_inline_marks(raw: str) -> str:
     return re.sub(r"\*(.+?)\*", r"<i>\1</i>", html)
 
 
+# Ein Backslash vor einem Steuerzeichen macht es zu Text (wie markdownLite mit ``escapes``, Namen in Bausteinen, #2218): Für die Regeln
+# steht es solange als Zeichen aus dem privaten Bereich da, das keine Regel trifft, und kommt am Ende maskiert zurück.
+_RULES_ESCAPABLE = "\\`*_[]()!~+"
+_RULES_ESCAPE = re.compile(r"\\([\\`*_\[\]()!~+])")
+_RULES_PROTECT_BASE = 0xE000
+
+
+def _rules_protect(text: str) -> str:
+    return _RULES_ESCAPE.sub(lambda match: chr(_RULES_PROTECT_BASE + _RULES_ESCAPABLE.index(match.group(1))), text)
+
+
+def _rules_restore(markup: str) -> str:
+    return "".join(escape(_RULES_ESCAPABLE[ord(char) - _RULES_PROTECT_BASE])
+                   if _RULES_PROTECT_BASE <= ord(char) < _RULES_PROTECT_BASE + len(_RULES_ESCAPABLE) else char for char in markup)
+
+
 def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
     """Eine Zeile Markdown als Absatz-Markup - alles maskiert, nur unsere Tags; Links nur auf sichere Ziele oder eigene Anker,
-    Bilder als Hinweis (das PDF lädt nichts nach)."""
-    text = _rules_pdf_text(raw)
+    Bilder als Hinweis (das PDF lädt nichts nach). Ein Backslash vor einem Steuerzeichen zeigt das Zeichen als Text."""
+    return _rules_restore(_rules_inline(_rules_protect(_rules_pdf_text(raw)), anchors))
+
+
+def _rules_inline(text: str, anchors) -> str:
     out = ""
     last = 0
     for match in _RULES_LINK.finditer(text):

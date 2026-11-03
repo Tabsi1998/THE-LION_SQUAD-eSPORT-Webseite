@@ -62,7 +62,29 @@ function formatInlineText(rawText, options = {}) {
   return options.linkMentions === false ? html : linkMentions(html, options);
 }
 
+// `escapes` (Regelwerk, #2218): Ein Backslash vor einem Steuerzeichen macht es zu Text - so wird ein Name aus der Bibliothek nie ein Link
+// oder fett. Dasselbe Zeichen-Set wie das PDF (pdf_service._RULES_ESCAPABLE). Bis zum Schluss steht ein Zeichen aus dem privaten Bereich da.
+const ESCAPABLE = "\\`*_[]()!~+";
+const ESCAPE_PATTERN = /\\([\\`*_[\]()!~+])/g;
+const PROTECT_BASE = 0xe000;
+
+function protectEscapes(text) {
+  return text.replace(ESCAPE_PATTERN, (_, char) => String.fromCharCode(PROTECT_BASE + ESCAPABLE.indexOf(char)));
+}
+
+function restoreEscapes(html) {
+  return [...html].map((char) => {
+    const index = char.charCodeAt(0) - PROTECT_BASE;
+    return index >= 0 && index < ESCAPABLE.length ? escapeHtml(ESCAPABLE[index]) : char;
+  }).join("");
+}
+
 function renderInline(rawText, options = {}) {
+  if (options.escapes) return restoreEscapes(renderInlinePlain(protectEscapes(rawText), options));
+  return renderInlinePlain(rawText, options);
+}
+
+function renderInlinePlain(rawText, options = {}) {
   const linkPattern = /(!?)\[([^\]\n]+)\]\(([^)\s]+)\)/g;
   let html = "";
   let lastIndex = 0;

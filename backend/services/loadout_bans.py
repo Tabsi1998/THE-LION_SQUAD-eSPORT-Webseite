@@ -21,6 +21,7 @@ from models import GAME_MODES_MAX, new_id, now_utc
 from services import game_equipment as library
 from services import game_maps, game_modes
 from services.game_equipment import ARCHIVED, ATTACHMENT, INACTIVE, WEAPON, EquipmentProblem
+from services.league_rule_blocks import text_cell
 
 SEASON, TOURNAMENT = "league_season", "tournament"
 SCOPES = (SEASON, TOURNAMENT)
@@ -382,13 +383,13 @@ ATTACHMENTS_TITLE = "Aufsätze an erlaubten Waffen"
 
 
 def _cell(value) -> str:
-    """Ein Tabellenfeld: Ein senkrechter Strich im Namen zerlegte sonst die Spalten."""
-    return " ".join(str(value or "").replace("|", "/").split())
+    """Ein Name als Text im Markdown - Steuerzeichen maskiert, damit kein Name zum Link oder zur Formatierung wird (Review C.4)."""
+    return text_cell(value)
 
 
 def _alt(value) -> str:
-    """Der Bildtext: eckige Klammern beendeten sonst das Bild im Markdown."""
-    return re.sub(r"[\[\]]", "", _cell(value)) or "Bild"
+    """Der Bildtext: ohne eckige Klammern und Backslash (sie beendeten das Bild im Markdown); er wird nie formatiert, nur angezeigt."""
+    return re.sub(r"[\[\]\\|]", "", " ".join(str(value or "").split())) or "Bild"
 
 
 def _image(entry: dict) -> str:
