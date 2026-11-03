@@ -1612,9 +1612,10 @@ ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.
 
 ### D.2 Check-in und Start (#1652)
 
-Regelwerk § 8 (Nr. 19, 40, 46; § 8.4 und 8.5) und die Regelwerks-Sperre des Obmanns vom 03.11. Logik in `services/match_flow.py`
-(Regeln, Fenster, Stand, Check-in, Start, Matchseite, Datenschutz), `services/league_checkin_sweep.py` (Zeit-Job: Erinnerungen), Routen in
-`routes/league_checkin_routes.py`. **Migration: keine.** Ohne `checkin_rules` an der Staffel verhält sich alles wie vorher: kein Check-in, kein
+Regelwerk § 8 (Nr. 19, 40, 46; § 8.4 und 8.5) und die Regelwerks-Sperre des Obmanns vom 03.11. Logik in `services/checkin_rules.py`
+(Blatt-Modul ohne Datenbank: Regeln, Fenster, Stand, Vorschlag – lesen `league_service`, `match_deadlines` und der Regelwerk-Baustein) und
+`services/match_flow.py` (Check-in, Start, Matchseite, Aufgaben, Datenschutz), `services/league_checkin_sweep.py` (Zeit-Job: Erinnerungen),
+Routen in `routes/league_checkin_routes.py`. **Migration: keine.** Ohne `checkin_rules` an der Staffel verhält sich alles wie vorher: kein Check-in, kein
 Vorschlag „nicht erschienen“, `started_at` setzt online niemand. Andere Formate, die App und der TV bleiben unverändert.
 
 **Einstellung `checkin_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Gepflegt unter

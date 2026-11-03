@@ -119,7 +119,7 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
 def _league_proposal_stale(tournament: dict, match: dict) -> str | None:
     """Warum ein offener Liga-Vorschlag weg darf: ohne Regel ``check_in`` stammt er aus der Zeit vor dem Check-in (#2201); mit ihr
     ist er erledigt, sobald die fehlenden Seiten eingecheckt sind (D.2, die Leitung hat sie nachgetragen). Sonst ``None``."""
-    from services.match_flow import missing_sides, no_show_info
+    from services.checkin_rules import missing_sides, no_show_info
 
     proposal = match.get("no_show_proposal")
     if not isinstance(proposal, dict) or proposal.get("decision"):

@@ -79,15 +79,15 @@ NO_CHECKIN = "*In dieser Season gibt es keinen Check-in.*"
 
 async def _checkin(db, league: dict, season: dict) -> dict:
     """Check-in der Season: Fenster und Mindestzahl - eingefroren werden nur die Zahlen, der Satz entsteht beim Darstellen."""
-    from services import match_flow
+    from services import checkin_rules
 
     raw = season.get("checkin_rules")
     if not isinstance(raw, dict):
         return {"source": {"checkin_rules": None}, "data": {"rules": None}}
     try:
-        rules = match_flow.normalize({key: value for key, value in raw.items() if key in match_flow.DEFAULTS})
-    except match_flow.FlowProblem:
-        rules = dict(match_flow.DEFAULTS)
+        rules = checkin_rules.normalize({key: value for key, value in raw.items() if key in checkin_rules.DEFAULTS})
+    except checkin_rules.FlowProblem:
+        rules = dict(checkin_rules.DEFAULTS)
     return {"source": {"checkin_rules": rules}, "data": {"rules": rules}}
 
 

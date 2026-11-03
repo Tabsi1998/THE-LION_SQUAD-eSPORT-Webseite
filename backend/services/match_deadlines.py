@@ -138,7 +138,7 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
     # wertet von Hand. Mit Check-in (D.2, #1652) kommt nach Fensterende der Vorschlag für die fehlende Seite (Regel
     # ``check_in``) - nie eine Wertung.
     if is_league_staffel(tournament):
-        from services.match_flow import no_show_info
+        from services.checkin_rules import no_show_info
 
         return no_show_info(match, tournament)
     mode = (tournament or {}).get("event_mode") or "online"

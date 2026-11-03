@@ -30,7 +30,7 @@ from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
-from services import match_flow
+from services import checkin_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.log_safe import log_safe
 from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
@@ -740,7 +740,7 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     # Terminregeln (#2194, docs/LIGA.md D.1): Vorgabe nur für neue Seasons, gepflegt über …/schedule-rules.
     doc.setdefault("schedule_rules", dict(SCHEDULE_RULE_DEFAULTS))
     # Check-in (#1652, docs/LIGA.md D.2): ebenso, die Mindestzahl aus Teilnehmerliste oder Teamgröße; gepflegt über …/checkin-rules.
-    doc.setdefault("checkin_rules", match_flow.defaults_for_season(doc))
+    doc.setdefault("checkin_rules", checkin_rules.defaults_for_season(doc))
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
     if before_write:
