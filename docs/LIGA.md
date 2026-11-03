@@ -1292,7 +1292,7 @@ App (`/api/tournaments/{id}/standings`), Plätze (`placements_for_structure`) un
 | --- | --- | --- | --- |
 | `table_tiebreakers` | Liste aus `head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` | `score_diff`, `score_for` | `head_to_head`, `score_diff`, `score_for`, `lead_decision` (Nr. 25) |
 | `head_to_head_criteria` | Liste aus `points`, `score_diff`, `score_for`, mindestens eines | `points`, `score_diff`, `score_for` | ebenso (Nr. 42) |
-| `allow_draws` | bool | `true` | `false` – die Tabelle zeigt keine Spalte „U“; Ergebnis der Leitung, Meldung und App-Bestätigung lehnen einen geteilten Platz mit 422 ab (`match_v2_results.checked_results` → `match_rules.match_allows_draw`) |
+| `allow_draws` | bool | `true` | `false` – die Tabelle zeigt keine Spalte „U“; Ergebnis der Leitung, Meldung und App-Bestätigung lehnen einen geteilten Platz mit 422 ab (`match_v2_results.checked_results` → `match_rules.match_allows_draw`). Das gilt für die Serie; ob eine einzelne Map unentschieden enden darf, sagt die Ergebnisregel des Modus (`draw_allowed`, C.3, `league_games.normalize_games`) – beide Prüfungen laufen nacheinander |
 | `forfeit_score` | `recorded` \| `best_of` | `recorded` (wie eingetragen) | `best_of`: Sieger bekommt ⌊Best of/2⌋+1 Maps, der andere 0 (BO5 3:0, Nr. 26) |
 | `exit_rule` | `half` \| `all_for_opponents` | `half` (50-%-Regel) | `all_for_opponents` (Kommentar 02.11., Nr. 43, Nr. 48) |
 | `match_points` | wie bisher | 3/1/0 | 3/0/0 |
