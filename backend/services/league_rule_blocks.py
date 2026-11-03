@@ -1,12 +1,13 @@
 """Bausteine im Regelwerk der Liga (docs/LIGA.md, #1646): ``[[baustein:map_pool]]`` steht im Text, der Inhalt kommt aus den Daten der
 Season und wird beim Veröffentlichen eingefroren.
 
-Ein neuer Baustein (die Waffenliste kommt mit #2218) ist ein Eintrag in ``BLOCKS``: Name für die Verwaltung und eine Funktion, die aus
-Liga und Season Markdown samt Herkunft baut. Mehr braucht es nicht - Web und PDF lesen das Markdown, der Vergleich und der Vorschlag
+Ein neuer Baustein ist ein Eintrag in ``BLOCKS``: Name für die Verwaltung und eine Funktion, die aus Liga und Season Markdown samt
+Herkunft baut (die Sperrliste #2218 dazu eine Fassung ohne Bilder, ``text``). Mehr braucht es nicht - Web und PDF lesen das Markdown, der Vergleich und der Vorschlag
 „Daten geändert“ auch. Werte stehen hier keine, nur der Weg zu den Daten.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Awaitable, Callable
 
@@ -45,6 +46,14 @@ async def _mode_order(db, league: dict, season: dict) -> dict:
     return {"markdown": "\n".join(lines), "source": {"game_mode_order": order}}
 
 
+async def _loadout_bans(db, league: dict, season: dict) -> dict:
+    """Die Sperrliste der Season (#2218): ``markdown`` mit Bildern fürs Web, ``text`` ohne Bilder für PDF und Vergleich."""
+    from services import loadout_bans
+
+    return loadout_bans.block(loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]),
+                                                     league.get("game_id")))
+
+
 @dataclass(frozen=True)
 class Block:
     key: str
@@ -60,7 +69,22 @@ class Block:
 BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("map_pool", "Map-Pool", "Die Maps je Modus aus dem Map-Pool der Season.", _map_pool),
     Block("mode_order", "Modusfolge", "Die Modi je Map aus den Vorgaben der Season.", _mode_order),
+    Block("loadout_bans", "Sperrliste", "Gesperrte Waffen, Aufsätze und Ausrüstung der Season, mit Bildern (Anlage A).", _loadout_bans),
 )}
+# Ein Baustein kann eine zweite Fassung ohne Bilder liefern (``text``): Die nimmt das PDF und der Wort-Vergleich. Fehlt sie, gilt ``markdown``.
+TEXT = "text"
+_IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
+
+
+def frozen_images(frozen: dict | None) -> list[str]:
+    """Die Bilder in eingefrorenen Bausteinen (#2218) - so weiß die Mediathek, dass eine veröffentlichte Fassung sie zeigt."""
+    urls: list[str] = []
+    for blocks_of_season in (frozen or {}).values():
+        for row in (blocks_of_season or {}).values():
+            for url in _IMAGE.findall(str((row or {}).get("markdown") or "")):
+                if url not in urls:
+                    urls.append(url)
+    return urls
 
 
 def catalog() -> list[dict]:

@@ -80,8 +80,11 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # Ergebnisblatt kommt immer aus einem Pool-Snapshot oder der Bibliothek - darum zählen diese beiden, die Blätter
     # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
     ("game_maps", ["image_history"]),
-    # Frühere Bilder der Ausrüstung (#2218).
+    # Sperrlisten (#2218): wie die Map-Pools ein Schnappschuss von damals, dazu frühere Bilder der Einträge.
+    ("loadout_bans", ["entries.image_url", "entries.attachments.image_url"]),
     ("game_equipment", ["image_history"]),
+    # Bilder in eingefrorenen Bausteinen einer Regelwerk-Fassung (#2218) - unveränderlich wie der Text (``is_frozen``).
+    ("league_rules", ["frozen_images"]),
     # Gewinnbilder der Liga (#2107) je Season und Liga N.
     ("league_seasons", ["prizes.image_url"]),
     ("league_divisions", ["prizes.image_url"]),

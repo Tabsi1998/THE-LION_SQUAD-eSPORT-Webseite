@@ -363,6 +363,9 @@ async def submit_v2_result(
     # Regelwerk (#1646): welche Fassung galt, als das Ergebnis festgeschrieben wurde - nur Liga-Staffeln, nur beim ersten Mal.
     from services.league_rules import match_stamp
     application["match_set"].update(await match_stamp(db, match))
+    # Sperrliste (#2218): ebenso die Version, die galt - die Staffel kann später eine neue bekommen.
+    from services.loadout_bans import match_stamp as loadout_stamp
+    application["match_set"].update(await loadout_stamp(db, match))
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
     if games is not None or match_lineups is not None or match.get("lineup_user_ids"):
         # Liga (#1650): mit dem Ergebnis gelten nur noch seine Maps - auch ohne Maps (etwa „Nicht erschienen“).
