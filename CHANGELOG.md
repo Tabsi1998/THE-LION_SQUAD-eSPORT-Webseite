@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.65.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.64.0...v1.65.0) (2026-11-03)
+
+
+### Neu
+
+* „Beide nicht erschienen“ vor dem Spiel werten und neu ansetzen in der Staffel ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Austritt in der Liga-Staffel – alle Spiele zählen für die Gegner statt 50-%-Regel ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Entscheid der Leitung bei echtem Gleichstand mit Grund ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Liga-Staffel ohne Remis lehnt ein Remis beim Eintragen ab ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Liga-Tabelle mit direktem Vergleich (nur wenn die Gruppe alle Spiele gespielt hat), kampflos und Tabellenende ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Liga-Tabelle zeigt, was bei Gleichstand entschied, kampflos und ausgeschiedene Teams ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Neue Liga-Seasons mit den entschiedenen Tabellenregeln ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* Tabellenregeln je Season für Liga-Staffeln: direkter Vergleich, Mini-Tabelle, Remis, Default-Win, Ausscheiden ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+* TV, Druck und Ergebnis-PDF nennen ausgeschiedene Teams ([#1625](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1625)) ([1de5b78](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1de5b78cdb92def9bd6551c0b5606c683c7e0c64))
+
 ## 1.64.0 (03.11.2026)
 
 ### Neu
