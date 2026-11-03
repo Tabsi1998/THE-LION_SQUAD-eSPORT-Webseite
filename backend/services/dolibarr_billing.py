@@ -36,8 +36,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
-from services.billing_amounts import paid_cents
-from services.billing_orders import invoice_fields
+from services.billing_amounts import invoice_fields, paid_cents
 from services.billing_facts import booking_facts, source_label
 from services.discord_plain_text import _without_tags
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, write_capable

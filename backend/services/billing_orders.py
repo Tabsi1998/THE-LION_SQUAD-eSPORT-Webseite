@@ -39,7 +39,7 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from models import new_id, now_utc
-from services.billing_amounts import credited_cents, paid_cents, refunded_cents, waived_cents
+from services.billing_amounts import credited_cents, invoice_fields, paid_cents, refunded_cents, waived_cents
 
 logger = logging.getLogger("tls.billing")
 
@@ -178,12 +178,6 @@ async def note_change_after_invoice(db, *, kind: str, registration_id: str, reas
     return await billing_cases.open_case(db, order, "changed_after_invoice", {
         "reason": reason, "invoiced_cents": int(order.get("total_cents") or 0), "new_total_cents": int(new_total_cents), "invoice_ref": order.get("invoice_ref") or "",
     })
-
-
-def invoice_fields(source: dict) -> dict:
-    """Was die Anmeldung vom Beleg trägt - aus dem gelesenen Stand oder aus dem Auftrag, die Felder heißen gleich."""
-    return {"billing_status": "paid" if source.get("paid") else "invoiced", "invoice_id": source.get("invoice_id"), "invoice_ref": source.get("invoice_ref"),
-            "invoice_status": source.get("invoice_status"), "payment_state": source.get("payment_state")}
 
 
 async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
