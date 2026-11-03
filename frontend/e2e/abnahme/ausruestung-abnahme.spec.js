@@ -117,7 +117,10 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     const perk = await ok(page, "POST", base, { category: role("item").key, name: PERK });
 
     // Der zweite Aufsatz im Browser: Seitenblatt, Waffe suchen und wählen.
-    await page.goto(`/admin/games/${game.id}/equipment`);
+    // Einstieg über die Spielseite: Reiter „Ausrüstung“ (#2249); die alte Adresse leitet dorthin.
+    await page.goto(`/admin/games/${game.id}`);
+    await page.getByTestId("game-tab-ausruestung").click();
+    await expect(page).toHaveURL(/#ausruestung$/);
     // Ohne Waffe passt der Griff zu keiner (Obmann, 03.11.): Der Hinweis nennt ihn, ein Schritt ordnet ihn der Waffe zu.
     const notice = page.getByTestId("equipment-without-weapon");
     await expect(notice).toContainText(GRIP);

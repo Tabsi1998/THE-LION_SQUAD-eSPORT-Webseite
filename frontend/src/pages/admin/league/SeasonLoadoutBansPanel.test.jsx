@@ -57,7 +57,7 @@ test("Kopf, Hinweis aufs Regelwerk und was beim Speichern wegfällt", async () =
   expect(within(outdated).getByRole("link", { name: "Neue Version vorbereiten" })).toHaveAttribute("href", "/admin/leagues/rules/league_season/s1");
   expect(screen.getByTestId("season-bans-dropped")).toHaveTextContent("Altperk");
   expect(screen.getByTestId("season-bans-outdated")).toHaveTextContent("1 Eintrag");
-  expect(screen.getByTestId("season-bans-library")).toHaveAttribute("href", "/admin/games/g1/equipment");
+  expect(screen.getByTestId("season-bans-library")).toHaveAttribute("href", "/admin/games/g1#ausruestung");
 });
 
 test("je Modus sperren, an einer Waffe einzelne Aufsätze, speichern als neue Version", async () => {

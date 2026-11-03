@@ -1,5 +1,5 @@
-// Ausrüstungs-Bibliothek eines Spiels (docs/LIGA.md, C.4 #2218) - eigenständig, damit sie als Reiter „Ausrüstung“ auf der Spielseite
-// (#2249) sitzen kann; bis dahin trägt sie AdminGameEquipmentPage unter /admin/games/<id>/equipment. Je Kategorie die Einträge mit
+// Ausrüstungs-Bibliothek eines Spiels (docs/LIGA.md, C.4 #2218) - der Reiter „Ausrüstung“ der Spielseite (#2249, Sprungmarke
+// #ausruestung; die alte Adresse /admin/games/<id>/equipment leitet dorthin). Speichert je Eintrag sofort. Je Kategorie die Einträge mit
 // Bild, Zustand, „auf N Sperrlisten“ und bei Aufsätzen den Waffen. Was auf einer gespeicherten Sperrliste steht, lässt sich nur
 // archivieren - die Liste behält Name und Bild von damals. Keine Werte eines Titels: Kategorien und Einträge legt die Verwaltung an.
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -102,7 +102,7 @@ function ItemRow({ item, role, weaponNames, onEdit, onStatus, onDelete }) {
   );
 }
 
-export function EquipmentLibrary({ gameId, onGame }) {
+export function EquipmentLibrary({ gameId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -118,11 +118,10 @@ export function EquipmentLibrary({ gameId, onGame }) {
       const { data: body } = await api.get(`/games/${gameId}/equipment`);
       setData(body);
       setError("");
-      onGame?.(body.game);
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail));
     }
-  }, [gameId, onGame]);
+  }, [gameId]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["games"]);
 

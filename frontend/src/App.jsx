@@ -45,6 +45,12 @@ function GameMapsLegacyRedirect() {
   return <Navigate to={gamePageUrl(gameId, "maps")} replace />;
 }
 
+// Ausrüstung (#2218): die vorläufige eigene Adresse führt auf den Reiter der Spielseite.
+function GameEquipmentLegacyRedirect() {
+  const { gameId } = useParams();
+  return <Navigate to={gamePageUrl(gameId, "ausruestung")} replace />;
+}
+
 function FastLapLegacyRedirect() {
   const { slug } = useParams();
   return <Navigate to={slug ? `/fastlap/${slug}` : "/fastlap"} replace />;
@@ -133,7 +139,6 @@ const AdminF1NewPage = lazyPage(() => import("@/pages/admin/AdminF1NewPage"));
 const AdminF1EditPage = lazyPage(() => import("@/pages/admin/AdminF1EditPage"));
 const AdminGamesPage = lazyPage(() => import("@/pages/admin/AdminGamesPage"));
 const AdminGamePage = lazyPage(() => import("@/pages/admin/games/AdminGamePage"));
-const AdminGameEquipmentPage = lazyPage(() => import("@/pages/admin/games/equipment/AdminGameEquipmentPage"));
 const AdminLeaguesPage = lazyPage(() => import("@/pages/admin/league/AdminLeaguesPage"));
 const AdminLeagueSeasonPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueSeasonPage"));
 const AdminLeagueRulesPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueRulesPage"));
@@ -395,8 +400,8 @@ function App() {
           <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
           <Route path="/admin/games/:gameId" element={<ProtectedRoute requireArea="tournaments"><AdminGamePage /></ProtectedRoute>} />
           <Route path="/admin/games/:gameId/maps" element={<GameMapsLegacyRedirect />} />
-          {/* Ausrüstung (#2218): vorläufig eigene Adresse, später Reiter der Spielseite (#2249). */}
-          <Route path="/admin/games/:gameId/equipment" element={<ProtectedRoute requireArea="tournaments"><AdminGameEquipmentPage /></ProtectedRoute>} />
+          {/* Ausrüstung (#2218): Reiter der Spielseite, die alte Adresse leitet weiter. */}
+          <Route path="/admin/games/:gameId/equipment" element={<GameEquipmentLegacyRedirect />} />
           <Route path="/admin/leagues" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeaguesPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueSeasonPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueRulesPage /></ProtectedRoute>} />

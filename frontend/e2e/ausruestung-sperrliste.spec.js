@@ -11,6 +11,7 @@ const CONSENT = () => window.localStorage.setItem("tls_cookie_consent_v1", JSON.
 const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const LONG = "mit einem wirklich sehr langen Namen, der nirgends hineinpasst";
 const MODES = [{ mode: "stellung", label: "Stellung", status: "active" }, { mode: "suchen", label: "Suchen & Zerstören", status: "active" }];
+const GAME = { id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", match_modes: MODES, player_id_fields: [] };
 const CATEGORIES = [
   { key: "waffen", label: "Waffen", role: "weapon", count: 24 },
   { key: "aufsaetze", label: "Aufsätze", role: "attachment", count: 30 },
@@ -77,6 +78,10 @@ async function mock(page) {
     const method = request.method();
     if (method !== "GET") calls[method.toLowerCase()]?.push([path, request.postDataJSON?.() ?? null]);
     if (path === "/games/g1/equipment" && method === "GET") return json(LIBRARY);
+    // Spielseite (#2249): das Spiel selbst, die Liste der Spiele und die Verwendung.
+    if (path === "/games/g1" && method === "GET") return json(GAME);
+    if (path === "/games" && method === "GET") return json([GAME]);
+    if (path === "/games/g1/usage") return json({ total: 0, text: "", counts: {}, modes: {} });
     if (path === "/admin/leagues/seasons/s1") return json(SEASON_PAGE);
     if (path === "/admin/leagues/seasons/s1/loadout-bans" && method === "PUT") return json({ ...LIST, version: 2, staffeln_to_sync: 2 });
     if (path === "/admin/leagues/seasons/s1/loadout-bans") return json(BANS);
@@ -100,8 +105,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     test("Bibliothek: viele Einträge, lange Namen, neuer Aufsatz mit Waffe", async ({ page }) => {
       await page.setViewportSize({ width, height });
       const calls = await mock(page);
+      // Die alte Adresse führt auf den Reiter „Ausrüstung“ der Spielseite.
       await page.goto("/admin/games/g1/equipment");
-      await expect(page.getByTestId("equipment-title")).toHaveText("Ausrüstung · Probe Shooter");
+      await expect(page).toHaveURL(/\/admin\/games\/g1#ausruestung$/);
+      await expect(page.getByTestId("game-page-title")).toHaveText("Probe Shooter");
+      await expect(page.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("equipment-group-waffen").getByRole("listitem")).toHaveCount(24);
       await expect(page.getByTestId("equipment-row-w0")).toContainText("auf 1 Sperrliste");
       await expect(page.getByTestId("equipment-delete-w0")).toBeDisabled();
@@ -129,6 +137,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await sheet.getByTestId("equipment-save").click();
       await expect.poll(() => calls.post.length).toBe(1);
       expect(calls.post[0]).toEqual(["/games/g1/equipment", { category: "aufsaetze", name: "Laservisier", image_url: null, note: null, weapon_ids: ["w1"] }]);
+      // Die Bibliothek speichert sofort: kein Punkt am Reiter, und Verlassen der Seite fragt nicht nach.
+      await expect(page.getByTestId("game-tab-dirty-ausruestung")).toHaveCount(0);
+      await page.getByTestId("game-page-back").click();
+      await expect(page).toHaveURL(/\/admin\/games$/);
+      await expect(page.getByTestId("confirm-dialog-confirm")).toHaveCount(0);
     });
 
     test("Season: Sperrliste je Modus und Aufsätze an einer Waffe, neue Version", async ({ page }) => {

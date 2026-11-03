@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Ban, ChevronDown, GitCompare, Search } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
+import { gamePageUrl } from "@/lib/gameForm";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField } from "@/components/tls/FormFields";
 import { EquipmentThumb, LoadoutBansView } from "@/components/tls/league/LoadoutBansView";
@@ -276,7 +277,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
           </p>
         </div>
         {data.game ? (
-          <Link to={`/admin/games/${data.game.id}/equipment`} className="text-[11px] font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]" data-testid={`${testId}-library`}>
+          <Link to={gamePageUrl(data.game.id, "ausruestung")} className="text-[11px] font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]" data-testid={`${testId}-library`}>
             Bibliothek pflegen
           </Link>
         ) : null}

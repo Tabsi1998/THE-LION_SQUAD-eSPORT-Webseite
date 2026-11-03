@@ -1,11 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 // Ausrüstungs-Bibliothek (#2218): Kategorien mit Art, Einträge mit Bild, Suche, Zustand, Aufsatz zu Waffe, archivieren statt löschen.
 // Nur erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler"), resolveMediaUrl: (url) => url || "" }));
-vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
@@ -13,7 +12,7 @@ vi.mock("@/components/tls/ImageUpload", () => ({
   ImageUpload: ({ value, onChange, testId }) => <input data-testid={testId} value={value} onChange={(event) => onChange(event.target.value)} />,
 }));
 
-const { default: AdminGameEquipmentPage } = await import("./AdminGameEquipmentPage");
+const { EquipmentLibrary } = await import("./EquipmentLibrary");
 
 const BODY = {
   game: { id: "g1", name: "Probe Shooter", modes: [] },
@@ -45,15 +44,13 @@ beforeEach(() => {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/admin/games/g1/equipment"]}>
-      <Routes><Route path="/admin/games/:gameId/equipment" element={<AdminGameEquipmentPage />} /></Routes>
-    </MemoryRouter>,
+    <MemoryRouter><EquipmentLibrary gameId="g1" /></MemoryRouter>,
   );
 }
 
 test("je Kategorie die Einträge mit Zustand, Sperrlisten und bei Aufsätzen den Waffen", async () => {
   renderPage();
-  expect(await screen.findByTestId("equipment-title")).toHaveTextContent("Ausrüstung · Probe Shooter");
+  expect(await screen.findByTestId("equipment-library")).toBeInTheDocument();
   const weapons = screen.getByTestId("equipment-group-waffen");
   expect(within(weapons).getByTestId("equipment-row-w1")).toHaveTextContent("auf 2 Sperrlisten");
   expect(within(weapons).getByTestId("equipment-row-w2")).toHaveTextContent("Inaktiv · auf keiner Sperrliste");
