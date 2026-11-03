@@ -14,6 +14,7 @@ daraus die Antwort.
 """
 from __future__ import annotations
 
+import copy
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -36,7 +37,7 @@ from services.mutation_lock import (MutationLockBusy, league_resource, league_se
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
-from services.scoring_rules import normalize_rules
+from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, league_default_rules, normalize_rules
 from services.slug_utils import slugify, unique_slug
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -710,6 +711,9 @@ def order_length_check(season: dict, divisions: list[dict], warnings: list | Non
 
 async def create_season(db, league: dict, body: dict, user: dict, *, before_write=None) -> dict:
     game = await _game(db, league.get("game_id"))
+    if isinstance(body.get("scoring_rules"), dict):
+        # Tabelle (E.1, #1625): was eine neue Season nicht selbst setzt, kommt aus den Vorgaben neuer Liga-Seasons.
+        body = {**body, "scoring_rules": {**copy.deepcopy(LEAGUE_TABLE_DEFAULTS), **body["scoring_rules"]}}
     fields = clean_season({key: value for key, value in body.items() if value is not None}, None, game)
     order_length_check({**SEASON_DEFAULTS, **fields}, [], None)
     number = fields.pop("number", None)
@@ -725,7 +729,7 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
     doc = {**new_season_settings(fields), **look}
     if doc.get("scoring_rules") is None:
-        doc["scoring_rules"] = normalize_rules({})
+        doc["scoring_rules"] = league_default_rules()
     # Ergebnisregeln (C.3, #1617): die neue Season hält die Regeln der Modi fest, Punkte je Map sind Pflicht.
     doc.update(league_result_rules.new_season_fields(game))
     # Terminregeln (#2194, docs/LIGA.md D.1): Vorgabe nur für neue Seasons, gepflegt über …/schedule-rules.
