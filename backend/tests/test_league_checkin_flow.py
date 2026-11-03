@@ -35,10 +35,10 @@ def at(minutes: float) -> str:
     return (now_utc() + timedelta(minutes=minutes)).replace(microsecond=0).isoformat()
 
 
-async def checkin_world(flow, *, minutes: float = 0, rules: dict | None = RULES, **fields) -> dict:
+async def checkin_world(flow, *, minutes: float = 0, rules: dict | None = RULES, letter: str = "A", **fields) -> dict:
     """Die Spielwelt mit Check-in: Termin ``minutes`` ab jetzt (Fenster 15 Minuten davor bis 15 danach), dazu eine Liga-Leitung mit
-    „Spiele betreuen“ und „Ergebnisse“."""
-    world = await league_world(flow)
+    „Spiele betreuen“ und „Ergebnisse“. Eine zweite Welt im selben Test bekommt einen anderen Staffel-Buchstaben (``letter``)."""
+    world = await league_world(flow, letter=letter)
     update = {"checkin_rules": dict(rules)} if rules is not None else {}
     await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {**update, **fields}})
     await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {"scheduled_at": at(minutes), "status": "scheduled"}})
@@ -407,7 +407,7 @@ async def test_the_lead_enters_results_without_check_in_and_other_seasons_stay_a
     entered = await flow.post(f"/api/matches/{mid(world)}/result", json={"results": [
         {"registration_id": world["reg_a"]["id"], "rank": 1, "score": 2}, {"registration_id": world["reg_h"]["id"], "rank": 2, "score": 0}]})
     assert entered.status_code == 200, entered.text
-    other = await checkin_world(flow, rules=None)
+    other = await checkin_world(flow, rules=None, letter="B")
     reported = await report(flow, other, "Kapitaen", "reg_a", "Kapitaen", "Mila")
     assert reported.status_code == 200, reported.text
     assert (await page(flow, other, "Kapitaen")).get("report_hint") is None
@@ -527,7 +527,7 @@ async def test_with_check_in_the_lead_scores_a_no_show_only_after_the_window_and
     assert scored.status_code == 200, scored.text
     assert (await flow.reload(world["match"]))["forfeit_registration_id"] == world["reg_h"]["id"]
     # Ohne Check-in bleibt es wie seit #2201: Die Leitung wertet auch ohne Vorschlag.
-    other = await checkin_world(flow, rules=None)
+    other = await checkin_world(flow, rules=None, letter="B")
     without = await decide(flow, other, action="confirm", registration_id=other["reg_h"]["id"])
     assert without.status_code == 200, without.text
 
@@ -608,7 +608,7 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
     assert undone.status_code == 200, undone.text
     await extension_gone("Neu ansetzen")
     # 72-h-Regel: ohne festen Termin gilt der Vorschlag der Heimseite nach 72 Stunden ohne Antwort.
-    other = await checkin_world(flow, start_date=(now_utc() - timedelta(days=1)).isoformat(), **WEEK)
+    other = await checkin_world(flow, start_date=(now_utc() - timedelta(days=1)).isoformat(), letter="B", **WEEK)
     await flow.db.matches_v2.update_one({"id": mid(other)}, {"$set": {"scheduled_at": None, "status": "ready", "no_show_extended_until": at(90)}})
     flow.act_as(other["users"]["Kapitaen"])
     assert (await flow.post(f"/api/matches/{mid(other)}/schedule-proposals", json={"scheduled_at": at(100 * 60)})).status_code == 200

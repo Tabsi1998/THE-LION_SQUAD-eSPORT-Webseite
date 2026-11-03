@@ -115,7 +115,9 @@ async def duel(flow, tournament: dict, reg_a: dict, reg_b: dict, *, matchday: in
     return match
 
 
-async def world(flow) -> dict:
+async def world(flow, *, letter: str = "A") -> dict:
+    """``letter``: Buchstabe der Staffel - eine zweite Welt im selben Test braucht einen anderen, sonst hält auf echtem MongoDB der
+    eindeutige Index ``league_staffel_unique`` (Liga N + Staffel) sie auf."""
     names = ["LoeLeitung", "Kapitaen", "Mila", "Tom", "Ida", "FalLeitung", "Falke1", "Falke2", "Falke3", "Fremd"]
     users = {name: await flow.add_user(name=name) for name in names}
     lions = await make_team(
@@ -144,7 +146,7 @@ async def world(flow) -> dict:
         game_id=GAME_ID,
     )
     season_id = new_id()
-    tournament = await staffel(flow, season_id)
+    tournament = await staffel(flow, season_id, letter)
     reg_a = await squad_registration(flow, tournament, lions, squad_a)
     reg_h = await squad_registration(flow, tournament, falcons, horst)
     match = await duel(flow, tournament, reg_a, reg_h)
