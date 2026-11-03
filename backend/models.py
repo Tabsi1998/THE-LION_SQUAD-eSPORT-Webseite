@@ -347,12 +347,26 @@ class GameModeResultRule(BaseModel):
     """Ergebnisregel eines Modus (#2206, C.1) - nur gespeichert und angezeigt; angewandt wird sie erst mit C.3 (#1617).
     ``score``: Punkte bis zum Ziel, ``rounds``: Runden gewinnen (höchstens ``round_limit``), ``highest``: höherer Endstand
     gewinnt. Keine Werte eines Titels: Ziel und Grenzen trägt die Verwaltung je Spiel ein."""
+    # Unbekannte Felder werden nicht still verworfen (Prüfung #2206): ``_known`` sagt es auf Deutsch, ``forbid`` sichert ab.
+    model_config = ConfigDict(extra="forbid")
+
     kind: Literal["score", "rounds", "highest"]
     target: Optional[int] = Field(default=None, ge=1, le=RESULT_TARGET_MAX)
     round_limit: Optional[int] = Field(default=None, ge=1, le=999)
     time_limit_minutes: Optional[int] = Field(default=None, ge=1, le=600)
     draw_allowed: bool = False
     overtime: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _known(cls, value):
+        if isinstance(value, dict):
+            unknown = sorted(str(key) for key in value if key not in cls.model_fields)
+            if unknown:
+                names = ", ".join(f"„{key[:40]}“" for key in unknown[:5])
+                raise ValueError(f"Ergebnisregel: unbekanntes Feld {names}. Erlaubt sind kind, target, round_limit, "
+                                 "time_limit_minutes, draw_allowed und overtime.")
+        return value
 
     @model_validator(mode="after")
     def _fits(self):

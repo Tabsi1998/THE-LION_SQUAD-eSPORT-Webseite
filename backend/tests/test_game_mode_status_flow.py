@@ -364,6 +364,16 @@ async def test_a_stage_does_not_take_an_inactive_mode_anew(flow):
 
 
 @pytest.mark.asyncio
+async def test_unknown_fields_of_a_rule_are_refused(flow):
+    await as_admin(flow)
+    game = await new_game(flow)
+    refused = await patch_modes(flow, game, [{**MODES[0], "result_rule": {"kind": "score", "target": 5, "foo": 1}}])
+    assert refused.status_code == 422
+    assert "„foo“" in refused.text and "Ergebnisregel" in refused.text
+    assert await stored_modes(flow, game) == MODES
+
+
+@pytest.mark.asyncio
 async def test_archived_modes_are_not_assigned_anew_to_maps(flow):
     await as_admin(flow)
     game = await new_game(flow)
