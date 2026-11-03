@@ -102,9 +102,7 @@ async def test_a_first_report_still_checks_the_current_rule(flow):
 
 
 @pytest.mark.asyncio
-async def test_app_confirmation_and_automatic_take_the_first_report_after_a_rule_change(flow):
-    from services.match_deadline_sweep import _auto_confirm
-
+async def test_app_confirmation_takes_the_first_report_after_a_rule_change(flow):
     app = await world(flow)
     await first_report(flow, app, NO_SCORES)
     await rules(flow, app, result_rules=STRICT, scores_required=True)
@@ -113,6 +111,12 @@ async def test_app_confirmation_and_automatic_take_the_first_report_after_a_rule
     assert answer.status_code == 200, answer.text
     assert (await stored(flow, app))["status"] == "completed"
 
+
+@pytest.mark.asyncio
+async def test_the_automatic_takes_the_first_report_after_a_rule_change(flow):
+    from services.match_deadline_sweep import _auto_confirm
+
+    # Eine Welt je Test: auf echtem MongoDB gibt es Staffel A in Liga 1 nur einmal.
     auto = await world(flow)
     await first_report(flow, auto, NO_SCORES)
     await rules(flow, auto, result_rules=STRICT, scores_required=True)
