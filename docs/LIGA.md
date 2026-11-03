@@ -1013,19 +1013,24 @@ Code; Beispiele in Seeds und Tests sind erfunden. Logik in `models.GameMatchMode
 | `draw_allowed` | bool | Remis erlaubt, Vorgabe `false` |
 | `overtime` | bool | Verlängerung bei Gleichstand, Vorgabe `false` |
 
-Unpassendes lehnt der Server mit 422 und deutschem Satz ab, gekürzt oder still verworfen wird nichts.
+Unpassendes lehnt der Server mit 422 und deutschem Satz ab, gekürzt oder still verworfen wird nichts, auch kein unbekanntes Feld
+in `result_rule`.
+
+**Namen:** Innerhalb eines Spiels heißt jeder Modus anders (ohne Groß und klein, Leerraum zusammengefasst), sonst 422 beim Anlegen
+und Ändern. Gleiche Namen aus Altbestand bleiben speicherbar, solange keine neue Dublette dazukommt.
 
 **Zustände:**
 
 | Zustand | Neu wählbar | Verwaltung | Bestehendes |
 | --- | --- | --- | --- |
 | `active` (oder fehlt) | ja | sichtbar | – |
-| `inactive` | nein: neuer Map-Pool, Modus je Map der Season, Spielmodus des Turniers | in Auswahllisten nur, wo er schon gesetzt ist, mit „(inaktiv)“ | bleibt gültig und sichtbar |
+| `inactive` | nein: neuer Map-Pool, Modus je Map der Season, Spielmodus des Turniers oder einer Phase | in Auswahllisten nur, wo er schon gesetzt ist, mit „(inaktiv)“ | bleibt gültig und sichtbar |
 | `archived` | nein, dazu keine neue Zuordnung an Maps | zusätzlich aus allen Auswahllisten ausgeblendet, außer wo er schon gesetzt ist | bleibt gültig und sichtbar |
 
 - „Neu“ heißt: Der Wert war vorher nicht gesetzt. Ein schon gesetzter Modus hält kein anderes Speichern auf (Muster
   `game_usage.chosen_is_archived`): ein Pool mit dem Modus in seiner geltenden Version, eine Season mit ihm in `game_mode_order`, ein
-  Turnier mit ihm als `game_mode`, eine Map mit ihm in `modes`.
+  Turnier mit ihm als `game_mode`, eine Phase mit ihm in `settings.game_mode`, eine Map mit ihm in `modes`. Wechselt ein Turnier das
+  Spiel, ist nichts „schon gesetzt“: Der mitgenommene `game_mode` wird gegen das neue Spiel geprüft, auch ohne `game_mode` im Aufruf.
 - **Unberührt:** fertige und laufende Spiele, festgehaltene Pools (`map_pool_id`), `effective_pool`, `map_pools.allowed`, das
   Kopieren Season → Staffel (`copy_version`), `GET /api/games` (inaktive und archivierte Modi stehen weiter in `match_modes`) und
   die Dauerplanung: `match_duration.game_mode` nimmt wie bisher den gewählten Modus, sonst den ersten, ohne Blick auf den Zustand.
@@ -1043,7 +1048,8 @@ bisher auch aus den Maps (Rückfrage mit Zahl). `GET /api/games/{id}/usage` trä
 `matches`, `references` und `in_use`.
 
 **Umbenennen:** Die Kennung `mode` ist die Identität und ändert sich nie. Die Verwaltung schickt sie bei jedem Speichern mit.
-Ein Eintrag ohne Kennung, dessen Name einem bestehenden Modus gleicht (ohne Groß und klein), bekommt dessen Kennung. Jeder andere
+Ein Eintrag ohne Kennung, dessen Name einem bestehenden Modus gleicht (ohne Groß und klein), bekommt dessen Kennung; passt er zu
+mehreren noch freien Modi (Altbestand), gibt es 422 statt einer geratenen Kennung. Jeder andere
 Eintrag ohne Kennung ist ein neuer Modus; ein alter Modus, dessen Kennung fehlt, gilt als entfernt (siehe oben). Eine neue Kennung
 für einen verwendeten Modus gibt es also nicht. Gelesen werden Modi überall über die Kennung; Namen stehen nur als Schnappschuss
 in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
