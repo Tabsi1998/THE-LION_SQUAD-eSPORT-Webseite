@@ -48,7 +48,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [reason, setReason] = useState("");
   // Befangen (#2203): Der Superadmin darf als Notausnahme, mit Grund im Protokoll. Der Server prüft das selbst.
   const [conflictReason, setConflictReason] = useState("");
-  // Ergebnisregel übergehen (C.3, #1617): nur der Superadmin, mit Grund im Protokoll - nie Best of, Pool oder Aufstellung.
+  // Ergebnisregel übergehen (C.3, #1617): die Liga-Leitung mit „Ergebnisse“, mit Grund im Protokoll - nie Best of, Pool oder
+  // Aufstellung. Im eigenen Spiel entscheidet eine zweite Person (Befangenheit wie oben).
   const [ruleOverride, setRuleOverride] = useState("");
   const overriding = Boolean(league?.can_override_rules) && ruleOverride.trim().length >= 5;
   const [busy, setBusy] = useState(false);
@@ -219,7 +220,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
 
           {withMaps && league?.can_override_rules ? (
             <label className="block rounded-sm border border-white/10 bg-white/5 px-3 py-2" data-testid="result-rule-override">
-              <span className="block text-sm font-bold text-white">Ergebnisregel übergehen (nur Superadmin)</span>
+              <span className="block text-sm font-bold text-white">Ergebnisregel übergehen (Liga-Leitung, mit Grund)</span>
               <span className="mt-0.5 mb-2 block text-xs text-white/70">Nur wenn ein Endstand wirklich so war und nicht zur Regel passt. Best of, Pool und Aufstellung gelten trotzdem; der Grund steht im Protokoll.</span>
               <input value={ruleOverride} onChange={(event) => setRuleOverride(event.target.value)} maxLength={500} className="input" placeholder="Grund, mindestens 5 Zeichen" aria-label="Grund für das Übergehen der Ergebnisregel" data-testid="result-rule-override-reason" />
             </label>

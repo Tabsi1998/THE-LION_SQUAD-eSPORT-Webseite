@@ -28,6 +28,7 @@ ACTORS = ("superadmin", "club_admin", "leagues_grant", "cap_right", "cap_other",
           "player", "no_mfa_area", "no_mfa_cap")
 DELETE_BODY = {"reason": "Testfall aufräumen"}
 RESULT_BODY = "RESULT"
+OVERRIDE_BODY = "OVERRIDE"
 FORFEIT_BODY = "FORFEIT"
 POOL_BODY = {"modes": [{"mode": "stellung", "map_ids": ["map-hafen"]}]}
 RULE_TEXT = {"title": "Regelwerk", "body_md": "# Fairplay\nText", "annexes": []}
@@ -138,6 +139,8 @@ ROUTES = [
     route("GET", "/api/tournaments/{tid}/schedule/deadlines", READ),
     # Spiel: entscheiden
     route("POST", "/api/matches/{match}/result", "results", RESULT_BODY),
+    # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“, mit Grund - Captains und andere Rechte nie.
+    route("POST", "/api/matches/{match}/result?force=true", "results", OVERRIDE_BODY),
     route("POST", "/api/matches/{match}/result/undo", "results", {}),
     route("POST", "/api/matches/{match}/forfeit", "results", FORFEIT_BODY),
     route("PUT", "/api/matches/{match}/lineups", "results", "LINEUPS"),
@@ -274,9 +277,10 @@ def fill(text: str, w: dict) -> str:
 
 def fill_body(body, w: dict):
     a, h = w["reg_a"]["id"], w["reg_h"]["id"]
-    if body == RESULT_BODY:
+    if body in (RESULT_BODY, OVERRIDE_BODY):
         return {"results": [{"registration_id": a, "rank": 1, "score": 2}, {"registration_id": h, "rank": 2, "score": 0}],
-                "reason": "Korrektur laut Protokoll"}
+                "reason": "Korrektur laut Protokoll",
+                **({"rule_override_reason": "Server stürzte ab"} if body == OVERRIDE_BODY else {})}
     if body == FORFEIT_BODY:
         return {"forfeit_registration_id": a, "note": "Nicht angetreten"}
     if body == "LINEUPS":

@@ -151,15 +151,25 @@ def snapshot_of(report: dict | None) -> dict:
     return {"result_rules": dict(rules) if isinstance(rules, dict) else {}, "scores_required": bool(held.get("scores_required"))}
 
 
-def override_reason(user: dict | None, raw) -> str | None:
-    """Ergebnisregel übergehen (Korrektur der Leitung): nur der Superadmin, mit Grund. ``None``: nichts übergehen."""
-    from services.permissions import is_superadmin
+OVERRIDE_RIGHT_DETAIL = "Eine Ergebnisregel übergehen darf nur die Liga-Leitung mit der Zuständigkeit „Ergebnisse“."
+
+
+async def override_reason(db, user: dict | None, match: dict, raw) -> str | None:
+    """Ergebnisregel übergehen (Korrektur der Leitung, Entscheidung des Obmanns): die Liga-Leitung mit der Zuständigkeit
+    „Ergebnisse“ (Bereich Ligen oder Zuständigkeit dieser Liga), immer mit Grund. Befangenheit prüft die Route wie bei jedem
+    Ergebnis (``require_no_conflict``) - im eigenen Spiel entscheidet eine zweite Person, der Superadmin nur als Notausnahme.
+    ``None``: nichts übergehen (auch außerhalb einer Liga-Staffel)."""
+    from services.league_permissions import capabilities_of
 
     reason = " ".join(str(raw or "").split())
     if not reason:
         return None
-    if not is_superadmin(user):
-        raise RuleProblem("Eine Ergebnisregel übergehen darf nur der Superadmin.", 403)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "league_context": 1}) or {}
+    league_id = (tournament.get("league_context") or {}).get("league_id")
+    if not tournament.get("league_context"):
+        return None
+    if "results" not in await capabilities_of(db, user, league_id):
+        raise RuleProblem(OVERRIDE_RIGHT_DETAIL, 403)
     if len(reason) < OVERRIDE_REASON_MIN:
         raise RuleProblem(f"Bitte einen Grund angeben, warum die Regel übergangen wird (mindestens {OVERRIDE_REASON_MIN} Zeichen).")
     return reason[:500]

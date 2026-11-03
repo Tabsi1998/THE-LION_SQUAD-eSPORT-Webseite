@@ -28,7 +28,7 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { held: true, hold: { id: "h1", undo_seconds: 10 } } });
 });
 
-test("die Leitung prüft dieselbe Regel - ohne Superadmin gibt es kein Übergehen", () => {
+test("die Leitung prüft dieselbe Regel - ohne Recht „Ergebnisse“ gibt es kein Übergehen", () => {
   render(<ResultWindow entry={ENTRY} league={LEAGUE} onClose={() => {}} onSaved={vi.fn()} />);
   fireEvent.change(screen.getByTestId("result-reason"), { target: { value: "Stand korrigiert" } });
   fireEvent.click(screen.getByTestId("result-save"));
@@ -37,8 +37,10 @@ test("die Leitung prüft dieselbe Regel - ohne Superadmin gibt es kein Übergehe
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 
-test("der Superadmin übergeht die Regel mit Grund, Zusatzfelder der Map bleiben", async () => {
+test("die Liga-Leitung übergeht die Regel mit Grund, Zusatzfelder der Map bleiben", async () => {
   render(<ResultWindow entry={ENTRY} league={{ ...LEAGUE, can_override_rules: true }} onClose={() => {}} onSaved={vi.fn()} />);
+  expect(screen.getByTestId("result-rule-override")).toHaveTextContent("Ergebnisregel übergehen (Liga-Leitung, mit Grund)");
+  expect(screen.getByTestId("result-rule-override")).not.toHaveTextContent("Superadmin");
   fireEvent.change(screen.getByTestId("result-reason"), { target: { value: "Stand korrigiert" } });
   fireEvent.change(screen.getByTestId("result-rule-override-reason"), { target: { value: "Server stürzte ab" } });
   fireEvent.click(screen.getByTestId("result-save"));

@@ -1129,9 +1129,12 @@ trotzdem einen Sieger der Map (Datenmodell ohne Map-Remis, offene Fachfrage). Be
   prüfen nichts Neues. Die Matchseite zeigt der bestätigenden Seite den Regelstand der Erstmeldung. Die Korrektur der Leitung
   (`/result`) prüft immer die aktuelle Regel der Staffel.
 - **Best of** (unverändert): Siegschwelle ⌊N/2⌋+1, keine Map nach der Entscheidung; im BO5 ohne Remis nur 3:0, 3:1, 3:2.
-- **Korrektur der Leitung** (`/result`, auch mit `force`): dieselben Prüfungen. Übergehen darf nur der Superadmin mit
-  `rule_override_reason` (mindestens fünf Zeichen) – nur Ergebnisregel und Punktepflicht, nie Best of, Pool oder Aufstellung.
-  Protokoll `match.games.rule_override` mit Grund. Die Matchseite meldet es mit `league.can_override_rules`.
+- **Korrektur der Leitung** (`/result`, auch mit `force`): dieselben Prüfungen. Übergehen darf die **Liga-Leitung mit der
+  Zuständigkeit „Ergebnisse“** (`results`, Bereich Ligen oder Zuständigkeit dieser Liga; Entscheidung des Obmanns 03.11.) mit
+  `rule_override_reason` (Pflichtgrund, mindestens fünf Zeichen, sonst 422; ohne Recht 403) – nur Ergebnisregel und Punktepflicht,
+  nie Best of, Pool oder Aufstellung. Im eigenen Spiel entscheidet wie überall eine zweite Person (Befangenheit wie B.1,
+  `require_no_conflict`); der Superadmin bleibt Notausnahme mit `conflict_reason`. Captains nie (`/result` ist Leitung). Protokoll
+  `match.games.rule_override` mit Grund. Die Matchseite meldet es mit `league.can_override_rules` (wer Ergebnisse eintragen darf).
 
 **`games[]` erweitert** (alle optional, geschrieben nur wenn gesetzt; `same_outcome`, `derived_results`, Konsens, Tabelle und App
 lesen sie nicht):

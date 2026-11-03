@@ -475,9 +475,11 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   Ohne neue Maps bleiben die alten, solange sie zum Stand passen – sonst fallen sie weg. Ablauf wie in
   [Turniere, 3.7](turniere.md#37-dispute-streit-um-ein-ergebnis).
 - **Ergebnisregeln gelten auch für die Leitung** (2.2, Schritt 5): Eintragen und Korrigieren prüfen dieselben Endstände
-  wie die Meldung der Captains. Passt ein Endstand wirklich nicht zur Regel (etwa nach einem Absturz), darf nur der
-  **Superadmin** sie übergehen: im Ergebnis-Fenster **Ergebnisregel übergehen (nur Superadmin)** mit einem Grund
-  (mindestens fünf Zeichen). Best of, Map-Pool und Aufstellung gelten trotzdem; der Grund steht im Protokoll.
+  wie die Meldung der Captains. Passt ein Endstand wirklich nicht zur Regel (etwa nach einem Absturz), darf die
+  **Liga-Leitung mit der Zuständigkeit „Ergebnisse“** sie übergehen: im Ergebnis-Fenster **Ergebnisregel übergehen
+  (Liga-Leitung, mit Grund)** einen Grund eintragen (mindestens fünf Zeichen). Best of, Map-Pool und Aufstellung gelten
+  trotzdem; der Grund steht im Protokoll. Im eigenen Spiel entscheidet eine zweite Person (2.11), der Superadmin nur als
+  Notausnahme mit Grund. Captains können eine Regel nie übergehen.
 - **Wiederholte und zugesprochene Maps**: Über die Schnittstelle kann eine Map als **wiederholt** (mit Grund) markiert
   oder von der Leitung **zugesprochen** werden (ohne Punkte, ohne Regel). Die Matchseite zeigt beides an der Map; nach
   dem Serienende steht dort, welche Maps nicht gespielt wurden.

@@ -145,26 +145,44 @@ async def test_app_confirmation_without_maps_is_unchanged(flow):
 
 
 @pytest.mark.asyncio
-async def test_staff_correction_follows_the_same_rules_and_only_a_superadmin_overrides(flow):
+async def test_staff_correction_follows_the_same_rules_and_the_league_lead_overrides_with_a_reason(flow):
     w = await ruled(flow)
     wrong = body(w, [("stellung", "map-hafen", "a", (251, 240)), ("suchen", "map-turm", "a", (6, 5))])
     url = f"/api/matches/{w['match']['id']}/result?force=true"
 
+    # Liga-Leitung mit Zuständigkeit „Ergebnisse“ (Entscheidung des Obmanns): dieselbe Prüfung, übergehen nur mit Grund.
     lead = await flow.add_user(role="club_admin", name="Ligaleitung")
     flow.act_as(lead)
     refused = await flow.post(url, json={**wrong, "reason": "Stand korrigiert"})
     assert refused.status_code == 422 and "höchstens 250 Punkte" in refused.json()["detail"]
-    not_allowed = await flow.post(url, json={**wrong, "reason": "Stand korrigiert", "rule_override_reason": "Server stürzte ab"})
-    assert not_allowed.status_code == 403
-    assert not_allowed.json()["detail"] == "Eine Ergebnisregel übergehen darf nur der Superadmin."
-
-    flow.act_as(w["staff"])
     short = await flow.post(url, json={**wrong, "reason": "Stand korrigiert", "rule_override_reason": "ab"})
     assert short.status_code == 422
+    assert short.json()["detail"] == "Bitte einen Grund angeben, warum die Regel übergangen wird (mindestens 5 Zeichen)."
     passed = await flow.post(url, json={**wrong, "reason": "Stand korrigiert", "rule_override_reason": "Server stürzte ab"})
     assert passed.status_code == 200, passed.text
     log = await flow.db.audit_logs.find_one({"action": "match.games.rule_override"}, {"_id": 0})
+    assert log["actor_id"] == lead["id"]
     assert log["data"]["match_id"] == w["match"]["id"] and log["data"]["reason"] == "Server stürzte ab"
+
+
+@pytest.mark.asyncio
+async def test_no_override_for_captains_or_a_lead_in_their_own_match(flow):
+    w = await ruled(flow)
+    wrong = {**body(w, [("stellung", "map-hafen", "a", (251, 240)), ("suchen", "map-turm", "a", (6, 5))]),
+             "reason": "Stand korrigiert", "rule_override_reason": "Server stürzte ab"}
+    url = f"/api/matches/{w['match']['id']}/result?force=true"
+
+    flow.act_as(w["users"]["Kapitaen"])
+    assert (await flow.post(url, json=wrong)).status_code == 403
+    # Befangen (B.1): Wer im Spiel steht, entscheidet nicht - auch mit Liga-Recht.
+    flow.act_as({**w["users"]["Kapitaen"], "areas": ["leagues"]})
+    assert (await flow.post(url, json=wrong)).status_code == 403
+    # Der Superadmin bleibt Notausnahme mit Grund.
+    flow.act_as({**w["users"]["Kapitaen"], "role": "superadmin"})
+    assert (await flow.post(url, json=wrong)).status_code == 403
+    passed = await flow.post(url, json={**wrong, "conflict_reason": "Sonst niemand erreichbar"})
+    assert passed.status_code == 200, passed.text
+    assert await flow.db.audit_logs.find_one({"action": "match.games.rule_override"}, {"_id": 0})
 
 
 @pytest.mark.asyncio

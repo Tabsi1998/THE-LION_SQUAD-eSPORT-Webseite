@@ -6,7 +6,8 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // Ergebnisregeln gegen den echten Server (docs/LIGA.md, C.3, #1617) - ohne nachgestellte API. Stand aus scripts/seed_abnahme_liga.py,
 // Staffel „Liga-Probelauf“ gestartet von liga-ablauf-abnahme.spec.js (vorher laufen lassen). Die Leitung stellt in der Season die
 // Regeln ein und überträgt sie; ein Captain meldet bei 390 und 1440 px: falscher Endstand abgelehnt (Server und Formular),
-// richtiger angenommen, die Gegenseite bestätigt ohne Punkte. Übergehen darf die Leitung nicht. Erfundene Werte.
+// richtiger angenommen, die Gegenseite bestätigt ohne Punkte. Die Korrektur der Leitung prüft dieselbe Regel und übergeht sie nur
+// mit Grund. Erfundene Werte.
 
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const ablauf = state?.ablauf;
@@ -147,12 +148,15 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
       await noSideScroll(away.page);
       await shot(away.page, `ergebnisregeln-bestaetigt-${width}.png`);
 
-      // Übergehen darf nur der Superadmin - die Liga-Leitung bekommt 403, auch mit Grund.
+      // Die Korrektur der Leitung prüft dieselbe Regel; übergehen darf die Liga-Leitung („Ergebnisse“) nur mit Grund.
       await lead.page.goto(`/matches/${match.id}`);
+      const correction = { ...reportBody(match, [7, 5]), reason: "Stand korrigiert" };
+      const checked = await post(lead.page, `/api/matches/${match.id}/result?force=true`, correction);
+      expect(checked.status()).toBe(422);
+      expect((await checked.json()).detail).toBe("Map 2: höchstens 11 Runden – 7:5 sind 12.");
       const override = await post(lead.page, `/api/matches/${match.id}/result?force=true`,
-        { ...reportBody(match, [7, 5]), reason: "Stand korrigiert", rule_override_reason: "Server stürzte ab" });
-      expect(override.status()).toBe(403);
-      expect((await override.json()).detail).toBe("Eine Ergebnisregel übergehen darf nur der Superadmin.");
+        { ...correction, rule_override_reason: "Server stürzte ab, Stand laut Aufzeichnung" });
+      expect(override.status(), await override.text()).toBe(200);
 
       for (const person of [lead, home, away]) {
         expect(person.problems).toEqual([]);

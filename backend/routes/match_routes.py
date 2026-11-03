@@ -76,7 +76,6 @@ from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services import league_games
 from services import league_result_rules
-from services.permissions import is_superadmin
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -718,7 +717,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         side = acting_reg or (await _member_registration_for_match(db, match, user.get("id")) if user else None)
         league_block = await league_games.page_block(db, league, side_id=(side or {}).get("id"),
                                                      can_act=bool(acting_reg), staff=bool(can_submit_result),
-                                                     can_override=is_superadmin(user))
+                                                     can_override=bool(can_submit_result))
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
@@ -1176,8 +1175,8 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
     try:
-        # Ergebnisregel übergehen (C.3, #1617): nur der Superadmin mit Grund - nie Best of, Pool oder Aufstellung.
-        override = league_result_rules.override_reason(me, body.rule_override_reason)
+        # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“ und Grund - nie Best of, Pool oder Aufstellung.
+        override = await league_result_rules.override_reason(db, me, match, body.rule_override_reason)
     except league_result_rules.RuleProblem as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
     games, missing, league, lineups = await _staff_games(db, match, body, raw_results, skip_rules=bool(override))
