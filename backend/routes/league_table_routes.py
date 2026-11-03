@@ -36,6 +36,7 @@ class TableDecisionBody(BaseModel):
 
 class TableReasonBody(BaseModel):
     reason: str = Field(max_length=500)
+    conflict_reason: str | None = Field(default=None, max_length=500)
 
 
 class DoubleNoShowBody(BaseModel):
@@ -108,11 +109,24 @@ async def admin_remove_table_decision(tournament_id: str, decision_id: str, body
         reason = league_table.reason_text(body.reason)
         async with mutation_lock(db, tournament_write_resource(tournament_id)):
             tournament = await _staffel(db, tournament_id)
+            found = next((row for row in tournament.get("table_decisions") or []
+                          if isinstance(row, dict) and row.get("id") == decision_id), None)
+            # Befangenheit wie beim Festlegen (Codex zu E.1): über das eigene Team nimmt auch niemand einen Entscheid zurück.
+            registrations = await db.tournament_registrations.find(
+                {"tournament_id": tournament_id, "id": {"$in": list((found or {}).get("registration_ids") or [])}},
+                {"_id": 0}).to_list(64)
+            overrides = [await league_permissions.require_no_side_conflict(db, me, registration,
+                                                                           conflict_reason=body.conflict_reason)
+                         for registration in registrations]
             removed = await league_table.remove_decision(db, tournament, decision_id)
     except league_table.TableProblem as problem:
         raise _refuse(problem) from None
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=BUSY) from None
+    override_reason = next((item for item in overrides if item), None)
+    if override_reason:
+        await league_permissions.record_override(db, me, action="table_decision_remove", target_id=tournament_id,
+                                                 reason=override_reason, decision_id=decision_id)
     await _audit(db, "league.table.decision.remove", me, tournament_id, {
         "decision_id": decision_id, "registration_ids": removed.get("registration_ids"), "reason": reason})
     await publish_api_change("DELETE", f"/api/tournaments/{tournament_id}/standings", 200)

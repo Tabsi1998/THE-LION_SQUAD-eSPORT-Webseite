@@ -269,3 +269,30 @@ async def test_both_no_show_only_before_the_game_starts_and_with_the_side_effect
     undone = await flow.client.request("DELETE", url, json={"reason": "Neuer Termin vereinbart"})
     assert undone.status_code == 200, undone.text
     assert refreshed == [staffel["id"], staffel["id"]]
+
+
+@pytest.mark.asyncio
+async def test_removing_a_decision_respects_the_conflict(flow):
+    """Codex zu E.1: Zurücknehmen eines Entscheids prüft die Befangenheit - der Superadmin nur als Notausnahme mit Grund,
+    die im Protokoll steht."""
+    admin, league, staffel = await setup(flow)
+    winners, _losers = await two_ties(flow, staffel)
+    decision = (await flow.put(f"{TABLE}/{staffel['id']}/table-decision",
+                               json={"registration_ids": winners[::-1], "reason": "Losentscheid vor Zeugen"})).json()
+    own = await flow.db.tournament_registrations.find_one({"id": winners[0]}, {"_id": 0})
+    judge = await flow.add_user(name="Leitung im Team")
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": league["id"], "user_id": judge["id"],
+                                           "capabilities": ["results"], "created_at": now_utc().isoformat()})
+    await flow.db.teams.update_one({"id": own["team_id"]}, {"$set": {"leader_id": judge["id"]}})
+    remove = f"{TABLE}/{staffel['id']}/table-decision/{decision['id']}"
+    flow.act_as(judge)
+    assert (await flow.client.request("DELETE", remove, json={"reason": "Ergebnis korrigiert"})).status_code == 403
+
+    await flow.db.teams.update_one({"id": own["team_id"]}, {"$set": {"leader_id": admin["id"]}})
+    flow.act_as(admin)
+    assert (await flow.client.request("DELETE", remove, json={"reason": "Ergebnis korrigiert"})).status_code == 403
+    allowed = await flow.client.request("DELETE", remove, json={"reason": "Ergebnis korrigiert",
+                                                                "conflict_reason": "Keine zweite Person erreichbar"})
+    assert allowed.status_code == 200, allowed.text
+    overrides = [row["data"]["action"] for row in await flow.db.audit_logs.find({"action": "league.conflict.override"}, {"_id": 0}).to_list(50)]
+    assert "table_decision_remove" in overrides

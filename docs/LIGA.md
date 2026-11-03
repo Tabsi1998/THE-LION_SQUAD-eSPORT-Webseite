@@ -661,7 +661,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Spiel: `POST /dispute` (ohne eigene Seite) | `disputes` | nein | – |
 | Spiel: `POST /proof-photos` als Leitung, `matches-v2/recalculate-advancement` | `results` | nein | – |
 | `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
-| `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team (beim Setzen) | – |
+| `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
 | `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
 | PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
 | Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
@@ -1150,7 +1150,8 @@ Tabelle nicht öffentlich.
   Entscheid für dieselbe Menge zählt dabei nicht), sonst 409. Grund mindestens fünf Zeichen. Befangen ist, wer zu einer der
   Seiten gehört (`require_no_side_conflict`, Notausnahme Superadmin mit Grund). Ersetzt einen Entscheid für dieselbe Menge.
   Protokoll `league.table.decision`.
-- `DELETE /api/admin/leagues/staffeln/{tid}/table-decision/{decision_id}` `{reason}` – `results`, Protokoll
+- `DELETE /api/admin/leagues/staffeln/{tid}/table-decision/{decision_id}` `{reason, conflict_reason?}` – `results`,
+  Befangenheit wie beim Festlegen (Seiten des Entscheids, Notausnahme `table_decision_remove`), Protokoll
   `league.table.decision.remove`.
 - Ein Entscheid gilt nur, solange genau diese Teams nach allen Kriterien gleich stehen. Ändert ein Ergebnis das, gilt er nicht mehr
   (`applies: false`) und bleibt zur Nachvollziehbarkeit stehen.
