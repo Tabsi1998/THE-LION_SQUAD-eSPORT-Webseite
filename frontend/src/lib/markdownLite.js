@@ -62,25 +62,29 @@ function formatInlineText(rawText, options = {}) {
   return options.linkMentions === false ? html : linkMentions(html, options);
 }
 
-// `escapes` (Regelwerk, #2218): Ein Backslash vor einem Steuerzeichen macht es zu Text - so wird ein Name aus der Bibliothek nie ein Link
-// oder fett. Dasselbe Zeichen-Set wie das PDF (pdf_service._RULES_ESCAPABLE). Bis zum Schluss steht ein Zeichen aus dem privaten Bereich da.
-const ESCAPABLE = "\\`*_[]()!~+";
-const ESCAPE_PATTERN = /\\([\\`*_[\]()!~+])/g;
+// `blockText` (Regelwerk, #2218): Werte aus Bausteinen (Namen aus Bibliothek und Modus) tragen ihre Steuerzeichen als Zeichen aus dem
+// privaten Bereich von Unicode (services/markdown_text.py) - keine Regel trifft sie, erst am Schluss werden sie das echte Zeichen. So wird ein
+// Name nie Link oder fett, und der frei geschriebene Text bleibt unberührt, auch ein Backslash darin. Dasselbe Zeichen-Set wie im PDF.
+const BLOCK_TEXT_CHARS = "\\`*_[]()!~+";
 const PROTECT_BASE = 0xe000;
 
-function protectEscapes(text) {
-  return text.replace(ESCAPE_PATTERN, (_, char) => String.fromCharCode(PROTECT_BASE + ESCAPABLE.indexOf(char)));
+/** Ein Text so, wie der Server ihn als Bausteinwert einsetzt (für Tests und Vorschauen). */
+export function protectBlockText(text) {
+  return [...String(text ?? "")].map((char) => {
+    const index = BLOCK_TEXT_CHARS.indexOf(char);
+    return index >= 0 ? String.fromCharCode(PROTECT_BASE + index) : char;
+  }).join("");
 }
 
-function restoreEscapes(html) {
+function restoreBlockText(html) {
   return [...html].map((char) => {
     const index = char.charCodeAt(0) - PROTECT_BASE;
-    return index >= 0 && index < ESCAPABLE.length ? escapeHtml(ESCAPABLE[index]) : char;
+    return index >= 0 && index < BLOCK_TEXT_CHARS.length ? escapeHtml(BLOCK_TEXT_CHARS[index]) : char;
   }).join("");
 }
 
 function renderInline(rawText, options = {}) {
-  if (options.escapes) return restoreEscapes(renderInlinePlain(protectEscapes(rawText), options));
+  if (options.blockText) return restoreBlockText(renderInlinePlain(rawText, options));
   return renderInlinePlain(rawText, options);
 }
 

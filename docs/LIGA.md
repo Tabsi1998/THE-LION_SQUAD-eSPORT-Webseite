@@ -1356,9 +1356,11 @@ schreiben das Feld nie.
 Bild, Name und „Gilt in“, danach die Aufsätze an erlaubten Waffen. Ohne Sperrliste: „Für diese Season ist keine Sperrliste hinterlegt –
 alles ist erlaubt.“ Der Baustein liefert zwei Fassungen: `markdown` mit Bildern (Web, Vorschau, Hinweis „Daten geändert“) und `text`
 ohne Bilder (PDF, Wort-Vergleich). Beide werden beim Veröffentlichen eingefroren; ältere eingefrorene Bausteine ohne `text` nehmen
-`markdown`. Namen aus Bibliothek und Modus sind Text: `markdown_text.text_cell` setzt einen Backslash vor jedes Steuerzeichen
-(`` \`*_[]()!~+ ``, „|“ wird „/“) – in allen Bausteinen, auch Map-Pool und Modusfolge. Web (`markdownLite` mit `escapes`) und PDF
-(`pdf_rules_inline`) zeigen das Zeichen dann als Text; ein Name wird nie Link oder Formatierung. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
+`markdown`. Namen aus Bibliothek und Modus sind Text: `markdown_text.text_cell` ersetzt jedes Steuerzeichen (`` \`*_[]()!~+ ``,
+„|“ wird „/“) durch ein Zeichen aus dem privaten Unicode-Bereich (`U+E000`…), das keine Markdown-Regel trifft – in allen Bausteinen, auch
+Map-Pool und Modusfolge. Erst die Darstellung setzt das echte Zeichen ein: Web (`markdownLite` mit `blockText`), PDF (`pdf_rules_inline`),
+Wort-Vergleich (`markdown_text.plain`). Ein Name wird so nie Link oder Formatierung, und der frei geschriebene Regeltext bleibt unberührt,
+auch ein Backslash darin. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
 Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
 Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
 

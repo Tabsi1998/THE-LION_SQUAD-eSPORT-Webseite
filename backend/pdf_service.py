@@ -1486,10 +1486,14 @@ _RULES_IMAGE_LINE = re.compile(r"^!\[[^\]\n]*\]\(([^)\s]+)\)$")
 _RULES_TABLE_DIVIDER = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
 
 
-def _rules_pdf_text(value) -> str:
+def _rules_pdf_text(value, keep_block: bool = False) -> str:
     """Die Standardschrift kann nur Westeuropäisches: Bekannte Zeichen bekommen eine Umschreibung, Emoji fallen weg."""
     out = []
     for char in str(value or ""):
+        if _is_block_char(char):
+            # Geschütztes Zeichen eines Bausteins (#2218): als Text das echte Zeichen; pdf_rules_inline hält es bis zum Schluss geschützt.
+            out.append(char if keep_block else _RULES_BLOCK_CHARS[ord(char) - _RULES_PROTECT_BASE])
+            continue
         try:
             char.encode("cp1252")
             out.append(char)
@@ -1507,26 +1511,25 @@ def _rules_inline_marks(raw: str) -> str:
     return re.sub(r"\*(.+?)\*", r"<i>\1</i>", html)
 
 
-# Ein Backslash vor einem Steuerzeichen macht es zu Text (wie markdownLite mit ``escapes``, Namen in Bausteinen, #2218): Für die Regeln
-# steht es solange als Zeichen aus dem privaten Bereich da, das keine Regel trifft, und kommt am Ende maskiert zurück.
-_RULES_ESCAPABLE = "\\`*_[]()!~+"
-_RULES_ESCAPE = re.compile(r"\\([\\`*_\[\]()!~+])")
+# Bausteinwerte (Namen aus Bibliothek und Modus, #2218): Ihre Steuerzeichen stehen als Zeichen aus dem privaten Bereich da
+# (``services.markdown_text``), die keine Regel trifft. Erst hier am Ende werden sie wieder das echte, maskierte Zeichen. Der frei
+# geschriebene Text bleibt unberührt, auch ein Backslash darin.
+_RULES_BLOCK_CHARS = "\\`*_[]()!~+"
 _RULES_PROTECT_BASE = 0xE000
 
 
-def _rules_protect(text: str) -> str:
-    return _RULES_ESCAPE.sub(lambda match: chr(_RULES_PROTECT_BASE + _RULES_ESCAPABLE.index(match.group(1))), text)
+def _is_block_char(char: str) -> bool:
+    return _RULES_PROTECT_BASE <= ord(char) < _RULES_PROTECT_BASE + len(_RULES_BLOCK_CHARS)
 
 
 def _rules_restore(markup: str) -> str:
-    return "".join(escape(_RULES_ESCAPABLE[ord(char) - _RULES_PROTECT_BASE])
-                   if _RULES_PROTECT_BASE <= ord(char) < _RULES_PROTECT_BASE + len(_RULES_ESCAPABLE) else char for char in markup)
+    return "".join(escape(_RULES_BLOCK_CHARS[ord(char) - _RULES_PROTECT_BASE]) if _is_block_char(char) else char for char in markup)
 
 
 def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
     """Eine Zeile Markdown als Absatz-Markup - alles maskiert, nur unsere Tags; Links nur auf sichere Ziele oder eigene Anker,
-    Bilder als Hinweis (das PDF lädt nichts nach). Ein Backslash vor einem Steuerzeichen zeigt das Zeichen als Text."""
-    return _rules_restore(_rules_inline(_rules_protect(_rules_pdf_text(raw)), anchors))
+    Bilder als Hinweis (das PDF lädt nichts nach). Geschützte Zeichen aus Bausteinen kommen als Text heraus."""
+    return _rules_restore(_rules_inline(_rules_pdf_text(raw, keep_block=True), anchors))
 
 
 def _rules_inline(text: str, anchors) -> str:
