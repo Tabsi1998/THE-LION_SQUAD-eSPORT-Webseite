@@ -25,6 +25,7 @@ import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
@@ -153,10 +154,19 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "" }
     <fieldset className="space-y-1.5" data-testid="season-mode-order">
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modus je Map</legend>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Array.from({ length: count }, (_, index) => (
-          <SelectField key={index} label={`Map ${index + 1}`} value={value[index] || ""} onChange={(mode) => set(index, mode)}
-            options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
-        ))}
+        {Array.from({ length: count }, (_, index) => {
+          const chosen = choices.find((mode) => mode.mode === value[index]);
+          return (
+            <div key={index} className="flex min-w-0 items-end gap-2">
+              {/* Modus-Symbol (#2266): ohne Wahl nichts, ohne Bild das neutrale Symbol. */}
+              <span className="mb-2 inline-flex h-7 w-7 shrink-0 items-center justify-center">
+                {chosen ? <ModeIcon src={chosen.icon_url} size="md" testId={`mode-order-${index}-icon`} /> : null}
+              </span>
+              <SelectField label={`Map ${index + 1}`} value={value[index] || ""} onChange={(mode) => set(index, mode)} className="flex-1"
+                options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
+            </div>
+          );
+        })}
       </div>
       {note ? <p className="text-xs text-warn" data-testid="season-mode-order-note">{note}</p> : (
         <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>

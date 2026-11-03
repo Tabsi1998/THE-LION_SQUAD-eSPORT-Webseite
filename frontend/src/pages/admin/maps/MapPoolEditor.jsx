@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { viennaDate } from "@/lib/vienna";
 import { modeStatusOf, selectableModes } from "@/lib/gameMatchData";
 import { gamePageUrl } from "@/lib/gameForm";
@@ -61,7 +62,7 @@ function Thumb({ item }) {
   );
 }
 
-function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove, disabled, testId }) {
+function ModeGroup({ mode, label, icon, library, selected, kept = [], onToggle, onMove, disabled, testId }) {
   // Inaktive Maps (#2207) nur, wo der gespeicherte Pool sie in diesem Modus schon hat.
   const choices = choosableMaps(library, mode, kept);
   const byId = Object.fromEntries(choices.map((item) => [item.id, item]));
@@ -69,7 +70,9 @@ function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove
   const name = label || "Alle Maps";
   return (
     <fieldset className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3" data-testid={`${testId}-mode-${mode ?? "alle"}`}>
-      <legend className="px-1 text-[11px] font-bold uppercase tracking-widest text-white/70">
+      <legend className="inline-flex items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-widest text-white/70">
+        {/* Modus-Symbol (#2266): das des Spiels - beim Speichern kommt es als Schnappschuss in den Pool. */}
+        {mode ? <ModeIcon src={icon} size="sm" testId={`${testId}-mode-${mode}-icon`} /> : null}
         {name} <span className="ml-1 normal-case tracking-normal font-semibold text-white/45 tabular-nums">{selected.length} von {choices.length}</span>
       </legend>
       {choices.length === 0 ? (
@@ -239,8 +242,8 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
             </button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            {groups.map(({ mode, label }) => (
-              <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} library={library} selected={selection[keyOf(mode)] || []}
+            {groups.map(({ mode, label, icon_url: icon }) => (
+              <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} icon={icon} library={library} selected={selection[keyOf(mode)] || []}
                 kept={baseline[keyOf(mode)] || []}
                 onToggle={(m, id) => setSelection((current) => toggleMap(current, m, id))}
                 onMove={(m, id, delta) => setSelection((current) => moveMap(current, m, id, delta))}

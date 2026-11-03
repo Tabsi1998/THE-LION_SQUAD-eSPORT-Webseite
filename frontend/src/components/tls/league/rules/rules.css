@@ -98,6 +98,16 @@
 .tls-rules-doc .prose-cms pre { overflow-wrap: normal; }
 .tls-rules-doc .prose-cms .prose-cms-table { overflow-wrap: normal; }
 .tls-rules-doc .prose-cms td, .tls-rules-doc .prose-cms th { overflow-wrap: break-word; }
+/* Symbol eines Modus aus den Bausteinen (#2266, league_rule_blocks.ICON_ALT): klein vor dem Namen, quadratisch, auch in Tabelle und Liste. */
+.tls-rules-doc .prose-cms img[alt="Modus-Symbol"] {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  margin: 0 0.4em 0.15em 0;
+  vertical-align: middle;
+  object-fit: contain;
+  border-radius: 2px;
+}
 
 .tls-rules-section {
   position: relative;

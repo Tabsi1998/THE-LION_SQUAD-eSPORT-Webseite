@@ -12,6 +12,7 @@ import { StaggerIn } from "@/components/tls/motion";
 import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
 import { standingSignature } from "@/lib/liveChanges";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
@@ -54,12 +55,16 @@ export function MapChips({ match }) {
           const why = note === "wiederholt" && game.replay_reason ? `: ${game.replay_reason}` : "";
           return (
             <li key={game.position} className="tls-league-map" data-side={side || undefined} data-testid={`league-map-${match.id}-${game.position}`}
-              title={`Map ${game.position}: ${game.map_name || "Map"}${winner ? ` – ${winner}` : ""}${note ? ` · ${note}${why}` : ""}`}>
+              title={`Map ${game.position}: ${game.map_name || "Map"}${game.mode_label ? ` (${game.mode_label})` : ""}${winner ? ` – ${winner}` : ""}${note ? ` · ${note}${why}` : ""}`}>
               <span className="tls-league-map__thumb" aria-hidden="true">
                 {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[11px] font-semibold text-white/85">{game.map_name || `Map ${game.position}`}</span>
+                <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold text-white/85">
+                  {/* Modus-Symbol (#2266): Schnappschuss am Spiel, ohne Bild das neutrale Symbol. */}
+                  {game.mode ? <ModeIcon src={game.mode_icon_url} label={game.mode_label || ""} size="xs" testId={`league-map-${match.id}-${game.position}-mode`} /> : null}
+                  <span className="truncate">{game.map_name || `Map ${game.position}`}</span>
+                </span>
                 <span className="block truncate text-[10px] text-white/45">{winner ? `für ${winner}` : "offen"}{note ? ` · ${note}` : ""}</span>
               </span>
             </li>
