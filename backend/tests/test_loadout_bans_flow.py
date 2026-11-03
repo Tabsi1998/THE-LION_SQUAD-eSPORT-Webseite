@@ -360,3 +360,54 @@ async def test_other_formats_never_get_the_field(flow):
                            audit_action="match.result.submit")
     stored = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     assert stored["status"] == "completed" and "loadout_ban_id" not in stored
+
+
+# ---------------------------------------------------------------- Stempel vor dem ersten Schreiben (Review C.4)
+
+@pytest.mark.asyncio
+async def test_the_app_confirmation_stamps_the_list(flow):
+    w = await match_world(flow)
+    first = await bans_version(flow, w["tournament"], 1, "Blitz 9")
+    flow.act_as(w["users"]["Kapitaen"])
+    ok(await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=ids(w, "Kapitaen", "Mila"))))
+    flow.act_as(w["users"]["Falke1"])
+    ok(await flow.post(f"/api/matches/{w['match']['id']}/report", json={"results": two_nil(w)["results"]}))
+    stored = await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    assert stored["status"] == "completed" and stored["loadout_ban_id"] == first["id"]
+
+
+@pytest.mark.asyncio
+async def test_the_48_hour_rule_stamps_the_list(flow):
+    from datetime import timedelta
+
+    from services.match_deadline_sweep import _auto_confirm
+
+    w = await match_world(flow)
+    first = await bans_version(flow, w["tournament"], 1, "Blitz 9")
+    flow.act_as(w["users"]["Kapitaen"])
+    ok(await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=ids(w, "Kapitaen", "Mila"))))
+    assert await _auto_confirm(flow.db, w["tournament"], w["match"]["id"], None, now_utc() + timedelta(days=8)) == 1
+    stored = await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    assert stored["status"] == "completed" and stored["loadout_ban_id"] == first["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_failing_stamp_writes_nothing(flow, monkeypatch):
+    """Scheitert das Ermitteln, bleibt das Spiel, wie es war - kein Bericht, kein Folgespiel, kein halbes Ergebnis."""
+    from services import loadout_bans
+    from services.v2_result_submission import submit_v2_result
+
+    w = await match_world(flow)
+    await bans_version(flow, w["tournament"], 1, "Blitz 9")
+    before = await flow.db.matches_v2.find({}, {"_id": 0}).sort("id", 1).to_list(None)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(loadout_bans, "current", broken)
+    rows = two_nil(w)["results"]
+    with pytest.raises(RuntimeError):
+        await submit_v2_result(flow.db, w["match"], rows, actor_id=w["staff"]["id"], proof_url=None, note=None, force=False,
+                               audit_action="match.result.submit")
+    assert await flow.db.match_reports_v2.count_documents({}) == 0
+    assert await flow.db.matches_v2.find({}, {"_id": 0}).sort("id", 1).to_list(None) == before

@@ -328,6 +328,12 @@ async def submit_v2_result(
         application["match_set"].update({"games": games, "lineups_missing": sorted(lineups_missing or [])})
     if match_lineups is not None:
         application["match_set"]["lineups"] = match_lineups
+    # Was galt, als das Ergebnis festgeschrieben wurde - nur Liga-Staffeln, nur beim ersten Mal: Regelwerk (#1646) und Sperrliste (#2218).
+    # Vor dem ersten Schreiben ermittelt (Review C.4): Scheitert es, bleibt das Spiel, wie es war, statt halb gespeichert.
+    from services.league_rules import match_stamp
+    from services.loadout_bans import match_stamp as loadout_stamp
+    application["match_set"].update(await match_stamp(db, match))
+    application["match_set"].update(await loadout_stamp(db, match))
 
     await db.match_reports_v2.update_one(
         {"id": report_id},
@@ -360,12 +366,6 @@ async def submit_v2_result(
     # for a completed replay.
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
-    # Regelwerk (#1646): welche Fassung galt, als das Ergebnis festgeschrieben wurde - nur Liga-Staffeln, nur beim ersten Mal.
-    from services.league_rules import match_stamp
-    application["match_set"].update(await match_stamp(db, match))
-    # Sperrliste (#2218): ebenso die Version, die galt - die Staffel kann später eine neue bekommen.
-    from services.loadout_bans import match_stamp as loadout_stamp
-    application["match_set"].update(await loadout_stamp(db, match))
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
     if games is not None or match_lineups is not None or match.get("lineup_user_ids"):
         # Liga (#1650): mit dem Ergebnis gelten nur noch seine Maps - auch ohne Maps (etwa „Nicht erschienen“).
