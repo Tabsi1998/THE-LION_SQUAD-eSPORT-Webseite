@@ -74,6 +74,29 @@ test("die Prüfung steht auf der Seite, der Grund der Notausnahme geht mit dem V
   expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ visibility: "members", readiness_override_reason: "Saisonstart trotz Lücke" });
 });
 
+test("eine laufende Season mit alter, zu kurzer Reihenfolge lässt sich speichern - unverändert, mit Warnung (#2207)", async () => {
+  const running = { ...SEASON, status: "active", game_mode_order: ["snd", "stellung"] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : { ...BODY, season: running } }));
+  apiMock.patch.mockResolvedValue({ data: { ...running, changed: ["name"], staffeln_to_sync: 0, warnings: ["Modus je Map: Die Reihenfolge hat 2 Einträge."] } });
+  renderPage();
+  expect(await screen.findByTestId("season-mode-order-note")).toHaveTextContent("2 Einträge");
+  fireEvent.change(screen.getByTestId("season-form-name"), { target: { value: "Season Eins" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1].game_mode_order).toEqual(["snd", "stellung"]);
+  expect(toastMock.error).not.toHaveBeenCalled();
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith("Modus je Map: Die Reihenfolge hat 2 Einträge."));
+});
+
+test("in einem Entwurf hält eine geänderte, halb gesetzte Reihenfolge das Speichern auf (#2207)", async () => {
+  renderPage();
+  fireEvent.change(await screen.findByTestId("mode-order-0"), { target: { value: "snd" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
 test("„Modus je Map“ ist so lang wie die längste Serie einer Liga N (#2207)", async () => {
   const body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { best_of: 5 } }] };
   apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : body }));

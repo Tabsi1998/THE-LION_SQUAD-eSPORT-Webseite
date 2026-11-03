@@ -1,4 +1,4 @@
-import { deletionGroups, longestSeries, modeOrderProblem, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
+import { deletionGroups, longestSeries, modeOrderProblem, orderLengthNote, sameOrder, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
 
 // Liga verwalten (docs/LIGA.md, #1622): Formular ↔ Anfrage. Der Beginn ist ein Wiener Kalendertag (00:00 Wien).
 
@@ -46,6 +46,25 @@ test("Modus je Map ist so lang wie die längste Serie aus Season und aktiven Lig
   const order = ["snd", "stellung", "snd", "stellung", "snd"];
   expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: order }, 5).game_mode_order).toEqual(order);
   expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: order }).game_mode_order).toEqual(["snd", "stellung", "snd"]);
+});
+
+test("eine unveränderte alte Reihenfolge geht unverändert mit – nicht gekürzt, nicht geleert (#2207)", () => {
+  const tooLong = ["snd", "stellung", "snd", "stellung", "snd"];
+  const tooShort = ["snd", "stellung"];
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: tooLong }, 3, tooLong).game_mode_order).toEqual(tooLong);
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: tooShort }, 3, tooShort).game_mode_order).toEqual(tooShort);
+  // Geändert gilt die Länge der Serie.
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: ["snd", "snd", "snd", "x"] }, 3, tooShort).game_mode_order).toEqual(["snd", "snd", "snd"]);
+  expect(sameOrder(["a", "b"], ["a", "b"])).toBe(true);
+  expect(sameOrder(["a", "b", ""], ["a", "b"])).toBe(false);
+  expect(sameOrder(undefined, [])).toBe(true);
+});
+
+test("der Hinweis nennt eine Reihenfolge, die nicht zur längsten Serie passt (#2207)", () => {
+  expect(orderLengthNote(["snd", "stellung"], 3)).toMatch("2 Einträge");
+  expect(orderLengthNote(["snd", "stellung"], 3)).toMatch("Best of 3");
+  expect(orderLengthNote([], 3)).toBe("");
+  expect(orderLengthNote(["a", "b", "c"], 3)).toBe("");
 });
 
 test("Liga N: nur abweichende Werte, leer heißt wie die Season", () => {

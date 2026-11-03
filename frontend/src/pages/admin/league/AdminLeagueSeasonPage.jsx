@@ -39,6 +39,8 @@ import {
   WEEKDAY_OPTIONS,
   longestSeries,
   modeOrderProblem,
+  orderLengthNote,
+  sameOrder,
   overridesPayload,
   overridesToForm,
   seasonPayload,
@@ -131,7 +133,7 @@ function Tiebreakers({ value, onChange }) {
   );
 }
 
-function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
+function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "" }) {
   // Ein Modus, den das Spiel nicht mehr hat (#2129): bleibt sichtbar gesetzt und gilt weiter, neu wählen geht nicht.
   const gone = [...new Set(value.filter((mode) => mode && !modes.some((known) => known.mode === mode)))]
     .map((mode) => ({ mode, label: `${poolModes.find((group) => group.mode === mode)?.label || mode} (nicht mehr im Spiel)` }));
@@ -143,7 +145,8 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
     next[index] = mode;
     onChange(next);
   };
-  const problem = modeOrderProblem(value, bestOf);
+  // Altbestand (#2207): Eine gespeicherte Reihenfolge, die nicht zur Serie passt, nennt der Hinweis statt eines Fehlers.
+  const problem = note ? "" : modeOrderProblem(value, bestOf);
   return (
     <fieldset className="space-y-1.5" data-testid="season-mode-order">
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modus je Map</legend>
@@ -153,7 +156,9 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
             options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
         ))}
       </div>
-      <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
+      {note ? <p className="text-xs text-warn" data-testid="season-mode-order-note">{note}</p> : (
+        <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
+      )}
     </fieldset>
   );
 }
@@ -278,9 +283,16 @@ export default function AdminLeagueSeasonPage() {
 
   // „Modus je Map“ ist so lang wie die längste Serie (#2207): Best of der Season oder einer Liga N.
   const longest = longestSeries(form?.best_of, data?.divisions);
+  // Altbestand (#2207): Eine gespeicherte Reihenfolge, die nicht zur Serie passt, bleibt unverändert speicherbar. Geprüft wird nur, was
+  // jemand geändert hat - der Server lehnt im Entwurf ab und warnt in einer laufenden Season.
+  const savedOrder = data?.season?.game_mode_order || [];
+  const orderEdited = form ? !sameOrder(form.game_mode_order, savedOrder) : false;
+  const bestOfEdited = form ? String(form.best_of) !== String(data?.season?.best_of) : false;
+  const draft = (data?.season?.status || "draft") === "draft";
+  const orderNote = form && !orderEdited ? orderLengthNote(savedOrder, longest) : "";
   const save = async (event) => {
     event.preventDefault();
-    const problem = modeOrderProblem(form.game_mode_order, longest);
+    const problem = orderEdited || (draft && bestOfEdited) ? modeOrderProblem(form.game_mode_order, longest) : "";
     if (problem) {
       toast.error(problem);
       return;
@@ -288,7 +300,7 @@ export default function AdminLeagueSeasonPage() {
     setSaving(true);
     try {
       // Nur „Regeln veröffentlichen“ (#2203): Der Server nimmt von dieser Person nur den Regeltext an.
-      const body = canSeason ? seasonPayload(form, longest) : { rules_text: seasonPayload(form).rules_text };
+      const body = canSeason ? seasonPayload(form, longest, savedOrder) : { rules_text: seasonPayload(form).rules_text };
       // Notausnahme des Superadmins beim Veröffentlichen trotz Problemen (#2207) - der Server prüft selbst.
       if (canSeason && overrideReason.trim()) body.readiness_override_reason = overrideReason.trim();
       const { data: saved } = await api.patch(`/admin/leagues/seasons/${seasonId}`, body);
@@ -439,7 +451,7 @@ export default function AdminLeagueSeasonPage() {
                   <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)} testId="season-form-min-squad" />
                   <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)} testId="season-form-staffel-size" />
                 </FormGrid>
-                <ModeOrder modes={modes} poolModes={data.map_pool?.modes} bestOf={longest} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} />
+                <ModeOrder modes={modes} poolModes={data.map_pool?.modes} bestOf={longest} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} note={orderNote} />
                 <FormGrid>
                   <SelectField label="Map-Wiederholung in einer Serie" value={form.map_repeat} onChange={(value) => set("map_repeat", value)} options={MAP_REPEAT_OPTIONS}
                     hint="Ob dieselbe Map in einer Serie noch einmal gespielt werden darf. Die Meldung prüft es." testId="season-form-map-repeat" />

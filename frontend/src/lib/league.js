@@ -100,10 +100,28 @@ export function longestSeries(bestOf, divisions = []) {
   return Math.max(Number(bestOf) || 1, ...own);
 }
 
+/** Gleiche Reihenfolge wie gespeichert? Fehlt eine, ist sie leer. */
+export function sameOrder(a, b) {
+  const left = a || [];
+  const right = b || [];
+  return left.length === right.length && left.every((mode, index) => mode === right[index]);
+}
+
+/** Hinweis, wenn eine gesetzte Reihenfolge nicht so lang ist wie die längste Serie (#2207) - Altbestand in laufenden Seasons. */
+export function orderLengthNote(order, maps) {
+  const filled = (order || []).filter(Boolean);
+  const count = Number(maps) || 0;
+  if (!filled.length || (order || []).length === count) return "";
+  return `Gespeichert sind ${(order || []).length} ${(order || []).length === 1 ? "Eintrag" : "Einträge"}, die längste Serie hat ${count} Maps (Best of ${count}). `
+    + "In einer laufenden Season gilt die Reihenfolge weiter (zyklisch) - ändern heißt: für jede Map einen Modus wählen.";
+}
+
 /** Das Formular als Anfrage. ``season`` ist der gespeicherte Stand: die übrigen Punkte-Regeln bleiben, wie sie sind. ``maps``: Länge von
- * „Modus je Map“, Vorgabe das Best of der Season. */
-export function seasonPayload(form, maps = form.best_of) {
-  const order = (form.game_mode_order || []).slice(0, Number(maps) || 0);
+ * „Modus je Map“, Vorgabe das Best of der Season. ``savedOrder``: die gespeicherte Reihenfolge - ist sie unverändert, geht sie genau so
+ * mit, auch wenn sie nicht zur Serie passt (#2207: Altbestand laufender Seasons, der Server warnt nur). */
+export function seasonPayload(form, maps = form.best_of, savedOrder = undefined) {
+  const kept = savedOrder !== undefined && sameOrder(form.game_mode_order, savedOrder);
+  const order = kept ? [...(savedOrder || [])] : (form.game_mode_order || []).slice(0, Number(maps) || 0);
   return {
     name: form.name.trim() || null,
     start_date: form.start_day ? fromViennaInput(`${form.start_day}T00:00`) : null,
