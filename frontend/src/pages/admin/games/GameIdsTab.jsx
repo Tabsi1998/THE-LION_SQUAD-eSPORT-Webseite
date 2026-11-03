@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { api } from "@/lib/api";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { fieldKeyFrom, idFieldKey, removedFieldFor } from "@/lib/gameForm";
 
@@ -86,7 +87,9 @@ export function GameIdsTab({ gameId, kind, form, onChange, games, usage }) {
       setFields(rest);
       return;
     }
-    const counted = usage?.id_fields && typeof usage.id_fields[key] === "number" ? usage.id_fields[key] : null;
+    // Lädt die Zählung noch, fragt der Klick selbst nach - sonst stünde in der Rückfrage „ließ sich nicht prüfen“.
+    const counts = usage === undefined ? await api.get(`/games/${gameId}/usage`).then(({ data }) => data).catch(() => null) : usage;
+    const counted = counts?.id_fields && typeof counts.id_fields[key] === "number" ? counts.id_fields[key] : null;
     const label = String(field.label || "").trim() || key;
     if (counted !== 0) {
       const ok = await confirm({
