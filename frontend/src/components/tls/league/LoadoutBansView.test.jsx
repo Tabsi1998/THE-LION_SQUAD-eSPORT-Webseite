@@ -29,4 +29,27 @@ test("Gruppen mit Bild, Modus und Aufsätzen an Waffen", () => {
   const weapon = screen.getByTestId("loadout-ban-weapon");
   expect(weapon).toHaveTextContent("Donner 4");
   expect(weapon).toHaveTextContent("GriffLauf");
+  // Ohne Unterkategorien kein Abschnittskopf.
+  expect(screen.queryByTestId("loadout-ban-section-head")).not.toBeInTheDocument();
+});
+
+// #2287: je Unterkategorie ein Abschnitt; eine ganz gesperrte Klasse zeigt ihre Einträge und sagt es einmal im Kopf.
+const GROUPED = { entries: [
+  { kind: "class", subcategory: "schrot", subcategory_label: "Schrotflinte", category_label: "Waffen", image_url: "/api/static/uploads/klasse.png",
+    mode_labels: [], items: [{ item_id: "s1", name: "Hagel", image_url: null }, { item_id: "s2", name: "Bö", image_url: null }] },
+  { kind: "item", item_id: "w1", name: "Blitz 9", subcategory: "sturm", subcategory_label: "Sturmgewehr", category_label: "Waffen",
+    image_url: null, mode_labels: ["Suchen"], attachments: [] },
+  { kind: "class", subcategory: "leer", subcategory_label: "Raketenwerfer", category_label: "Waffen", mode_labels: [], items: [] },
+] };
+
+test("gruppiert nach Unterkategorie, ganze Klasse einmal im Kopf, leere Klasse entfällt", () => {
+  render(<LoadoutBansView list={GROUPED} />);
+  const sections = screen.getAllByTestId("loadout-ban-section");
+  expect(sections.map((section) => section.querySelector("h4").textContent)).toEqual(["Schrotflinte", "Sturmgewehr"]);
+  expect(within(sections[0]).getByTestId("loadout-ban-class")).toHaveTextContent("Ganze Klasse gesperrt · in allen Modi");
+  expect(within(sections[0]).getAllByTestId("loadout-ban-entry").map((row) => row.textContent)).toEqual(["Bö", "Hagel"]);
+  expect(within(sections[0]).queryByTestId("loadout-ban-modes")).not.toBeInTheDocument();
+  expect(sections[0].querySelector("h4 img")).toHaveAttribute("sizes", "24px");
+  expect(within(sections[1]).getByTestId("loadout-ban-modes")).toHaveTextContent("nur Suchen");
+  expect(screen.getByTestId("loadout-ban-group").querySelector("h3")).toHaveTextContent("Waffen3 Einträge");
 });
