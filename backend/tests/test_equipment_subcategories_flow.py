@@ -349,7 +349,8 @@ async def test_deleting_an_entry_waits_for_the_library_lock(flow):
     w = await setup(flow)
     blitz = await add(flow, w, "Waffen", "Blitz 9")
     await hold_lock(flow, w)
-    assert (await flow.delete(url(w, f"/{blitz['id']}"))).status_code == 409
+    refused = await flow.delete(url(w, f"/{blitz['id']}"))
+    assert refused.status_code == 409
     await flow.db.mutation_locks.delete_many({})
     ok(await flow.delete(url(w, f"/{blitz['id']}")))
 
