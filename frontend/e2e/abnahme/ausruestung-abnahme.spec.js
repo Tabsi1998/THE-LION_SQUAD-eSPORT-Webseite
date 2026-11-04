@@ -171,7 +171,7 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     await shot(page, "sperrliste-season-abnahme.png");
     await panel.getByRole("link", { name: "Neue Version vorbereiten" }).click();
     const changes = page.getByTestId("rules-data-changes");
-    await expect(changes).toContainText("Sperrliste");
+    await expect(changes).toContainText("Erlaubte Ausrüstung");
     await expect(changes).toContainText(PERK);
     await shot(page, "sperrliste-regelwerk-vorschlag-abnahme.png");
     const second = await publishWithBlock(page, seasonId, `Sperrliste ${stamp} ergänzt`, true);
@@ -196,7 +196,7 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
       // Erlaubte Ausrüstung (#2287, Nr. 99): Die Waffe ist nur in einem Modus gesperrt - erlaubt mit „nicht in …“, der Aufsatz „nicht an …“.
       const block = page.getByTestId("league-allowed-equipment");
       await expect(block).toContainText(WEAPON);
-      await expect(block.getByTestId("allowed-entry").filter({ hasText: WEAPON })).toContainText("nicht in ");
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: WEAPON }).first()).toContainText("nicht in ");
       await expect(block.getByTestId("allowed-entry").filter({ hasText: SCOPE })).toContainText(`nicht an ${WEAPON}`);
       await block.scrollIntoViewIfNeeded();
       await noSideScroll(page);

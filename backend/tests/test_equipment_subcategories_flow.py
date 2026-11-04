@@ -31,6 +31,9 @@ async def flow():
 
 async def register(flow, *urls: str) -> None:
     for url in urls:
+        # Zwei Spiele im selben Test (Import): die Datei steht nur einmal in der Mediathek (eindeutiger Index im echten MongoDB).
+        if await flow.db.media_uploads.find_one({"filename": url.rsplit("/", 1)[-1]}):
+            continue
         await flow.db.media_uploads.insert_one({"id": new_id(), "filename": url.rsplit("/", 1)[-1], "url": url, "media_type": "image",
                                                 "media_scope": "admin", "owner_role": "admin"})
 

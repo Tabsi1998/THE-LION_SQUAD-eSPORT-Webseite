@@ -206,7 +206,7 @@ test.describe("Abnahme: Unterkategorien und erlaubte Ausrüstung gegen den echte
       await expect(block.getByTestId("allowed-entry").filter({ hasText: SIGHT })).toContainText(`nicht an ${RIFLE_A}`);
       await expect(block.getByTestId("allowed-banned-names").first()).toContainText(SHOTGUN_NEW);
       await expect(block.getByTestId("allowed-entry").filter({ hasText: SHOTGUN })).toHaveCount(0);
-      await block.getByTestId("allowed-entry").filter({ hasText: RIFLE_A }).scrollIntoViewIfNeeded();
+      await block.getByTestId("allowed-entry").filter({ hasText: RIFLE_A }).first().scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await shot(page, `ligaseite-erlaubt-${width}.png`);
 
