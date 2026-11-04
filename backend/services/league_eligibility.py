@@ -260,18 +260,23 @@ async def _candidate_rows(db, season: dict, tournament: dict, squad: dict, team:
     return sorted(rows, key=lambda row: row["name"].lower())
 
 
-async def squad_view(db, team: dict, squad: dict, *, can_edit: bool, transfers) -> dict:
-    """Für die Team-Seite: je Season Regeln, Stand der Spieler, mögliche Neuzugänge und Transfers. ``transfers``: liest die Anträge."""
+async def squad_view(db, team: dict, squad: dict, *, can_edit: bool, transfers, rules_doc=None) -> dict:
+    """Für die Team-Seite: je Season Regeln, Stand der Spieler, mögliche Neuzugänge und Transfers. ``transfers``: liest die Anträge;
+    ``rules_doc(db, league, season, squad_id)``: das Regelwerk mit Zustimmungsstand (#2269, ``league_rules.rules_info``) - die Route reicht
+    es herein, damit dieses Modul nicht nach oben importiert; ohne es ``None``."""
     seasons = []
     for season, tournament in await open_seasons_of_squad(db, squad.get("id")):
         members = [uid for uid in squad.get("member_ids") or [] if uid]
         ctx = await context_for_tournament(db, tournament, members)
         players = sorted((public_row(row) for row in statuses(ctx, members, squad["id"]).values()), key=lambda row: row["name"].lower())
         platform = league_platform.view(season, ctx.division, ctx.roster.game) if ctx else None
+        league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0}) if rules_doc else None
         seasons.append({
             "season_id": season["id"],
             "title": season.get("name"),
             "rules": {**rules_view(season, platform), "min_squad_size": league_roster.min_squad_size(tournament)},
+            # Regelwerk (#2269): gültige Fassung und der Stand der Zustimmung dieses Co-Teams - für die Team-Seite.
+            "rules_doc": await rules_doc(db, league, season, squad["id"]) if league else None,
             "players": players,
             "candidates": await _candidate_rows(db, season, tournament, squad, team) if can_edit else [],
             "transfers": await transfers(db, squad["id"], season["id"]),

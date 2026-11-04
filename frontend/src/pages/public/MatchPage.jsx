@@ -27,6 +27,7 @@ import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
+import { LeagueRulesNote } from "@/components/tls/league/LeagueRulesNote";
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
@@ -409,6 +410,9 @@ function MatchPageView() {
             </div>
           )}
         </div>
+
+        {/* Regelwerk der Liga (#2269): gültige Fassung mit PDF und, für die eigene Seite, ob das Co-Team zugestimmt hat. */}
+        {data.league?.rules ? <LeagueRulesNote rules={data.league.rules} testId="match-rules" className="mt-5" /> : null}
 
         {data.call && <MatchCallBox call={data.call} />}
         {/* Liga-Check-in (#1652): Stand, Countdown, Anwesende und Start - nur Beteiligte und Leitung bekommen den Block. */}

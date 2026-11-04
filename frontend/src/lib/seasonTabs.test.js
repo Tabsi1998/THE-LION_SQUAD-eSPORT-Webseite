@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { seasonPayload, seasonToForm } from "./league";
 import {
-  SEASON_TABS, TAB_FIELDS, TAB_PAYLOAD_KEYS, dirtyTabs, nicknameRepeatsLevel, orderPoolHints, readinessAnchor, rebaseForm, rulesNotice,
+  SEASON_TABS, TAB_FIELDS, TAB_PAYLOAD_KEYS, changedPlaces, dirtyTabs, nicknameRepeatsLevel, orderPoolHints, readinessAnchor, rebaseForm, rulesNotice,
   seasonAnchorUrl, seasonPhases, seasonTarget, tabPayload,
 } from "./seasonTabs";
 
@@ -165,6 +165,10 @@ describe("Hinweise", () => {
     expect(rulesNotice({ current: { label: "Version 1" }, draft: { revision: 2 } }, null)).toMatchObject({ kind: "draft" });
     expect(rulesNotice({ current: { label: "Version 1" }, data_changes: { label: "Version 1", rows: [{}, {}] } }, null))
       .toMatchObject({ kind: "changed", text: expect.stringContaining("2 Bausteine") });
+    // Variablen (#2269) zählen eigens.
+    expect(rulesNotice({ current: { label: "Version 1" }, data_changes: { label: "Version 1", rows: [{ kind: "block" }, { kind: "variable" }, { kind: "variable" }] } }, null))
+      .toMatchObject({ kind: "changed", text: expect.stringContaining("1 Baustein, 2 Variablen") });
+    expect(changedPlaces([{ kind: "variable" }])).toBe("1 Variable");
     expect(rulesNotice({ current: { label: "Version 1" }, draft: null, data_changes: null }, { problems: [] })).toBeNull();
   });
 });

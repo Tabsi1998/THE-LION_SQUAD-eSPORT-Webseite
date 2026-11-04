@@ -575,22 +575,67 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
 1. **Neuen Entwurf beginnen.** Titel und Text in Markdown. Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch
    der Link über alle Versionen gleich.
 2. **Anlagen** bekommen ihren Buchstaben aus der Reihenfolge (Anlage A, B, C …) und stehen eigens im Inhaltsverzeichnis.
-3. **Bausteine:** Die Knöpfe **Map-Pool**, **Modusfolge** und **Sperrliste** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt
-   kommt aus den Daten der Season. Tippe die Listen also nicht ab. Die **Sperrliste** (`[[baustein:loadout_bans]]`, gedacht für Anlage A) zeigt im
-   Web Bilder, im PDF eine schlichte Liste (2.1a).
-4. **Vorschau** zeigt die Seite mit den Daten von heute und den Änderungen zur letzten Version.
-5. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
-   die Version nicht mehr ändern. Die Bausteine werden eingefroren: alte Versionen zeigen ihre Listen von damals, im Web und im PDF.
+3. **Bausteine:** Die Knöpfe setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`, und werden in den **zuletzt benutzten Editor**
+   eingefügt (Haupttext oder Anlage). Der Inhalt kommt aus den Einstellungen der Season - tippe Listen, Ziele oder Zeiten also nie ab.
+   Im Web stehen sie schön mit Symbolen und Bildern, im PDF als schlichte Liste oder Tabelle. Alle Bausteine:
+
+   | Baustein | Marke | Zeigt | Quelle in der Verwaltung |
+   | --- | --- | --- | --- |
+   | Map-Pool | `[[baustein:map_pool]]` | Tabelle Modus · Maps | Season → Spielbetrieb → Map-Pool |
+   | Modusfolge | `[[baustein:mode_order]]` | Modus je Map | Season → Spielbetrieb → Serie |
+   | Check-in | `[[baustein:checkin]]` | Fenster (öffnet und schließt, Minuten um den Termin), Mindestens Anwesende je Seite, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen (2.7b); ohne Check-in ein Satz | Season → Termine → Check-in vor dem Spiel |
+   | Sperrliste | `[[baustein:loadout_bans]]` | gesperrte Waffen, Aufsätze, Ausrüstung mit Bild (gedacht für Anlage A, 2.1a) | Season → Regelwerk und Sperrliste |
+   | Einstellungen je Modus | `[[baustein:mode_settings]]` | je Modus Zeitlimit, Zeit je Runde, Einstellungen (Tabelle), Regeltext | Spiel → Modi, Season → Ergebnisregeln |
+   | Modi der Season | `[[baustein:modes]]` | Tabelle Modus (mit Symbol) · Ergebnisregel in Klartext (Ziel, Runden, Verlängerung, Remis) · Zeit · Spieler je Seite | Season → Spielbetrieb → Modi, Ergebnisregeln |
+   | Spielformat | `[[baustein:format]]` | Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste; Abweichungen je Liga N | Season → Spielbetrieb → Serie, Anmeldung und Kader, Ligen |
+   | Tabelle und Wertung | `[[baustein:table]]` | Punkte, Remis, Reihenfolge bei Punktgleichheit, kampflos, beide nicht erschienen, Ausscheiden | Season → Tabelle |
+   | Termine | `[[baustein:schedule]]` | Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig | Season → Termine |
+   | Spielberechtigung | `[[baustein:eligibility]]` | Zulassung, Mindestalter, Spiel-IDs, Plattform (erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N, 2.7c), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster | Season → Anmeldung und Kader, Spiel → Spiel-IDs |
+
+4. **Variablen** stehen mitten im Satz, etwa „Gespielt wird Best of `{{best_of}}`“, und werden beim Lesen durch den Wert der Season
+   ersetzt. **Variable einfügen** zeigt die Liste mit dem Wert von heute (mit Suche); die **Hilfe** darunter nennt alle Bausteine und
+   Variablen. Eine Variable **ohne Wert** in dieser Season (etwa ohne Höchstkader) steht als „(nicht festgelegt)“ im Text - nie still leer.
+   Bei einem Regelwerk der Liga zählt jede Season, für die es eingefroren wird - auch wenn die Seite der Liga „(je Season)“ zeigt.
+   Vorschau und Vorschlag nennen solche Variablen; veröffentlichen (auch über die Freigabe) geht erst mit dem Haken **Trotzdem
+   veröffentlichen - im Text steht dann „(nicht festgelegt)“**, der nur dann erscheint. Eine **unbekannte** Variable (Tippfehler) nennt die Vorschau, und das
+   Veröffentlichen lehnt sie mit der ganzen Liste ab.
+
+   | Variable | Wert |
+   | --- | --- |
+   | `{{league.name}}`, `{{game.name}}` | Name der Liga, des Spiels |
+   | `{{season.name}}`, `{{season.number}}`, `{{season.start}}`, `{{season.end}}`, `{{season.weeks}}` | Season, Nummer, erster und letzter Tag, Spielwochen |
+   | `{{best_of}}`, `{{maps_to_win}}`, `{{team_size}}`, `{{min_squad_size}}`, `{{max_squad_size}}`, `{{map_repeat}}` | Serie, Maps zum Sieg, Teamgröße, Kader, Map-Wiederholung in Worten |
+   | `{{lineup_mode}}`, `{{lineup_min_players}}`, `{{result_confirm_hours}}`, `{{lineup_amend_hours}}` | Aufstellung, Mindestzahl, Bestätigungs- und Nachtragsfrist |
+   | `{{schedule.matchday_days}}`, `{{schedule.default_weekday}}`, `{{schedule.default_time}}`, `{{schedule.default_slot}}`, `{{schedule.response_hours}}`, `{{schedule.blocked_periods}}` | Spielwoche, Standardtermin („Sonntag, 20:00 Uhr“), Antwortfrist, Sperrzeiten |
+   | `{{schedule.home_rule_hours}}`, `{{schedule.reschedule_max}}`, `{{schedule.reschedule_notice_hours}}`, `{{schedule.result_reminder_hours}}`, `{{schedule.result_overdue_hours}}` | Terminregeln (2.7a) |
+   | `{{table.points_win}}`, `{{table.points_draw}}`, `{{table.points_loss}}`, `{{table.draws}}`, `{{table.tiebreakers}}`, `{{table.head_to_head}}`, `{{table.forfeit_score}}`, `{{table.exit_rule}}` | Punkte, Remis, Reihenfolge bei Punktgleichheit, direkter Vergleich, kampflos, Ausscheiden |
+   | `{{eligibility.min_age}}`, `{{eligibility.wait_days}}`, `{{eligibility.roster_deadline}}`, `{{eligibility.transfer_windows}}`, `{{eligibility.entry_policy}}`, `{{eligibility.id_fields}}` | Spielberechtigung (3.9) |
+   | `{{eligibility.platform}}`, `{{eligibility.crossplay}}`, `{{eligibility.input_device}}` | Plattform je Season (2.7c): „PC und PlayStation“ oder „alle Plattformen“, Crossplay „an“/„aus“, Eingabegerät; ohne Plattform-Feld „(nicht festgelegt)“ |
+   | `{{application.opens}}`, `{{application.closes}}`, `{{application.slots}}` | Anmeldefenster und Startplätze (2.5a) |
+   | `{{mode:<kennung>.name}}`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus: Name, Regel in Klartext, Ziel, Rundenlimit, Zeitlimit, Zeit je Runde, Spieler je Seite, Verlängerung und Remis („ja“/„nein“). Die Kennung steht in der Liste. |
+
+5. **Vorschau** zeigt die Seite mit den Werten von heute und den Änderungen zur letzten Version.
+6. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
+   die Version nicht mehr ändern. Bausteine und Variablen werden eingefroren: alte Versionen zeigen ihre Werte von damals, im Web und im PDF.
 
 **Was die Seite selbst macht:** Sie vergleicht jede Version mit der vorigen. Geänderte Paragrafen tragen einen Strich am Rand und das Wort
 „Geändert“, oben steht „Neu in Version X“ mit Links zu den Stellen. Leser können die Markierung ausblenden und Wort für Wort mit jeder alten Version
 vergleichen, auch entfernter Text ist dann zu sehen.
 
-**„Daten geändert, neue Version vorbereiten“:** Hast du zum Beispiel den Map-Pool geändert, zeigt die Verwaltung den Unterschied zur letzten Version.
-Das ist nur ein Vorschlag: Die gültige Version bleibt, wie sie ist, bis du eine neue veröffentlichst.
+**Regelwerk muss freigegeben werden.** Änderst du eine Einstellung, die im Regelwerk steht (Modus umbenannt, Ziel geändert, Best of, Map-Pool,
+Sperrliste …), ändert sich die veröffentlichte Version **nie von selbst**. Die Verwaltung zeigt an drei Stellen **Regelwerk muss freigegeben
+werden**: im Season-Überblick, in **Mein Dienst** (für wer „Regeln veröffentlichen“ darf) und auf der Regelwerk-Seite. Dort steht, welche
+Bausteine und Variablen sich geändert haben (alt durchgestrichen, neu unterstrichen), und darunter der **Vorschlag**: die neue Fassung mit
+den Werten von heute, geänderte Paragrafen markiert. Du prüfst, setzt **Gültig ab** und **Änderungsgrund** (vorbelegt mit den geänderten
+Stellen), wählst, ob **die Teams neu zustimmen** müssen, und klickst **Freigeben und veröffentlichen**. Willst du den Text vorher anpassen:
+**Text vorher anpassen** legt den Entwurf an. Bis zur Freigabe gilt und zeigt die alte Version.
 
-**Zustimmung:** Verlangt eine Version Zustimmung, sehen Captain und Vertreter (ohne beide die Leitung des Hauptteams) eine Aufgabe auf der Startseite und
-einen Hinweis auf der Regelseite. Der Stand je Co-Team steht unter **Zustimmungen**. **Fehlt sie, läuft das Spiel trotzdem**, nichts wird blockiert.
+**Zustimmung:** Verlangt eine Version Zustimmung, sehen Captain und Vertreter (ohne beide die Leitung des Hauptteams) **Neue Fassung, bitte
+zustimmen** - als Aufgabe auf der Startseite, auf der Regelseite, auf der Ligaseite, auf der Team-Seite (Spielberechtigung des Co-Teams) und auf
+jeder Matchseite der Staffel. Der Stand je Co-Team steht unter **Zustimmungen**. **Fehlt sie, läuft das Spiel trotzdem**, nichts wird blockiert.
+
+**Auffindbar:** Das Regelwerk steht auf der Liga-Übersicht (`/liga`, Link **Regeln** je Season), auf der Ligaseite, auf der Team-Seite und auf
+der Matchseite, je mit Version, Stand und PDF.
 
 **Gut zu wissen:**
 

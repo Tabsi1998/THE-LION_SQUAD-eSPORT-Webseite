@@ -133,3 +133,39 @@ export function insertBlock(body, token) {
   const text = String(body || "").trimEnd();
   return `${text}${text ? "\n\n" : ""}${token}\n`;
 }
+
+// ---------------------------------------------------------------- Variablen und Freigabe (#2269)
+
+/** Die Variablen der Verwaltung nach Gruppen, in der Reihenfolge des Servers; ``query`` filtert nach Name, Bezeichnung und Wert. */
+export function variableGroups(variables = [], query = "") {
+  const needle = String(query || "").trim().toLowerCase();
+  const groups = [];
+  for (const row of variables) {
+    if (needle && !`${row.name} ${row.label} ${row.value || ""}`.toLowerCase().includes(needle)) continue;
+    let group = groups.find((item) => item.name === row.group);
+    if (!group) {
+      group = { name: row.group || "Weitere", rows: [] };
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+  return groups;
+}
+
+/** Der Wert einer Variable, wie die Auswahl ihn zeigt: ohne Wert steht da, was auch im Text stünde. */
+export function variableValueText(row) {
+  return row?.value == null || row.value === "" ? "(nicht festgelegt)" : String(row.value);
+}
+
+export const CHANGE_KIND_WORDS = { block: "Baustein", variable: "Variable" };
+
+/** Der vorgeschlagene Änderungsgrund aus den geänderten Stellen: „Einstellungen geändert: Map-Pool, Teamgröße“. */
+export function proposedReason(changes) {
+  const labels = [];
+  for (const row of changes?.rows || []) {
+    const label = row.kind === "variable" ? String(row.label || "").split(" · ").slice(1).join(" · ") || row.label : row.label;
+    if (label && !labels.includes(label)) labels.push(label);
+  }
+  const text = `Einstellungen geändert: ${labels.join(", ")}`;
+  return labels.length ? (text.length > 500 ? `${text.slice(0, 497)}…` : text) : "Einstellungen geändert";
+}

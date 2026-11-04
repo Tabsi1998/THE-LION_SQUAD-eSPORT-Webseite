@@ -741,6 +741,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         league_block = await league_games.page_block(db, league, side_id=(side or {}).get("id"),
                                                      can_act=bool(acting_reg), staff=bool(can_submit_result),
                                                      can_override=bool(can_submit_result))
+        # Regelwerk (#2269): gültige Fassung mit PDF und, für die eigene Seite, der Stand der Zustimmung ihres Co-Teams.
+        from services.league_rules import match_rules_info
+        league_block["rules"] = await match_rules_info(db, tournament, (side or {}).get("squad_id"))
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}

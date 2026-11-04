@@ -33,19 +33,35 @@ const COMPARE = { base: V1, target: V2, sections: [
   { anchor: "gleich", title: "Gleich", level: 1, status: "same" },
   { anchor: "weg", title: "Alte Regel", level: 1, status: "removed", ops: [{ op: "del", text: "Entfernter Satz der alten Fassung" }] },
 ] };
-const BLOCKS = [{ key: "map_pool", label: "Map-Pool", hint: "Die Maps je Modus.", token: "[[baustein:map_pool]]" }, { key: "mode_order", label: "Modusfolge", hint: "Die Modi je Map.", token: "[[baustein:mode_order]]" }];
+const BLOCKS = [{ key: "map_pool", label: "Map-Pool", hint: "Die Maps je Modus.", token: "[[baustein:map_pool]]" }, { key: "mode_order", label: "Modusfolge", hint: "Die Modi je Map.", token: "[[baustein:mode_order]]" },
+  { key: "modes", label: "Modi der Season", hint: "Je Modus Symbol, Ergebnisregel in Klartext und Spieler je Seite.", token: "[[baustein:modes]]" }];
+// Variablen (#2269) mit dem Wert von heute - eine ohne Wert, damit die Liste das zeigt.
+const VARIABLES = [
+  { name: "best_of", label: "Best of", hint: "Länge der Serie.", group: "Serie und Kader", token: "{{best_of}}", value: "3" },
+  { name: "team_size", label: "Teamgröße", hint: "Spieler je Map.", group: "Serie und Kader", token: "{{team_size}}", value: "4" },
+  { name: "max_squad_size", label: "Höchstkader", hint: "", group: "Serie und Kader", token: "{{max_squad_size}}", value: null },
+  { name: "mode:stellung.target", label: `Stellung ${LONG_WORD} · Ziel`, hint: "Zielpunkte.", group: "Modi", token: "{{mode:stellung.target}}", value: "250" },
+];
+const DATA_CHANGES = { version_id: "v2", version: 2, label: "Version 2", rows: [
+  { kind: "block", block: "map_pool", label: "Map-Pool", season_id: "s1", season_name: "Season 1", status: "changed",
+    before: "| Stellung | Hafenkante |", after: "| Stellung | Turmblick |", ops: [{ op: "eq", text: "| Stellung | " }, { op: "del", text: "Hafenkante" }, { op: "ins", text: "Turmblick" }, { op: "eq", text: " |" }] },
+  { kind: "variable", block: "team_size", label: "{{team_size}} · Teamgröße", season_id: "s1", season_name: "Season 1", status: "changed",
+    before: "4", after: "5", ops: [{ op: "del", text: "4" }, { op: "ins", text: "5" }] },
+] };
+const PROPOSAL = { base: V2, unknown_vars: [], empty_vars: ["max_squad_size"], fingerprint: "abdruck-2",
+  sections: SECTIONS.map((row) => (row.anchor === "1-fairplay" ? { ...row, body_md: `Gespielt wird mit 5 Spielern je Map. ${FILLER}`, mark: "changed" } : { ...row, mark: null })),
+  changes: { base: V2, changed: [{ anchor: "1-fairplay", title: "§ 1 Fairplay" }], new: [], removed: [] } };
 const ADMIN_VIEW = {
   scope: "league_season", scope_id: "s1", league: { id: "l1", name: "Probe-Liga mit einem recht langen Namen", slug: "probe" }, season: { id: "s1", name: "Season 1", slug: "s1", visibility: "public" },
   draft: { id: "d1", status: "draft", revision: 2, title: "Regelwerk", body_md: `# § 1 Fairplay\n${FILLER}\n\n[[baustein:map_pool]]`, annexes: [{ key: "A", title: "Strafen", body_md: "Katalog" }] },
-  versions: [{ ...V2, published_by: "admin-1" }, { ...V1, published_by: "admin-1" }], inherited: null, current: V2, blocks: BLOCKS, today: "2030-03-05", public_url: "/liga/probe/s1/regeln",
-  data_changes: { version_id: "v2", version: 2, label: "Version 2", rows: [{ block: "map_pool", label: "Map-Pool", season_id: "s1", season_name: "Season 1", status: "changed",
-    before: "| Stellung | Hafenkante |", after: "| Stellung | Turmblick |", ops: [{ op: "eq", text: "| Stellung | " }, { op: "del", text: "Hafenkante" }, { op: "ins", text: "Turmblick" }, { op: "eq", text: " |" }] }] },
+  versions: [{ ...V2, published_by: "admin-1" }, { ...V1, published_by: "admin-1" }], inherited: null, current: V2, blocks: BLOCKS, variables: VARIABLES, today: "2030-03-05", public_url: "/liga/probe/s1/regeln",
+  data_changes: DATA_CHANGES, proposal: null,
   consents: { version_id: "v2", label: "Version 2", rows: [
     { squad_id: "a", squad_name: "Rudel A", team_name: `Löwen · Rudel A ${LONG_WORD}`, agreed: true, agreed_at: "2030-03-02T10:00:00+00:00", agreed_by: "Testkapitän" },
     { squad_id: "b", squad_name: "Horst", team_name: "Falken · Horst", agreed: false, agreed_at: null, agreed_by: "" }] },
 };
 
-async function mockServer(page, { user = null } = {}) {
+async function mockServer(page, { user = null, adminView = ADMIN_VIEW } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
       essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
@@ -59,7 +75,7 @@ async function mockServer(page, { user = null } = {}) {
   await page.route("**/api/auth/me", user ? json(user) : (route) => route.fulfill({ status: 401, contentType: "application/json", body: "{}" }));
   await page.route("**/api/league-rules/seasons/probe/s1**", (route) => route.fulfill({ contentType: "application/json",
     body: JSON.stringify(route.request().url().includes("/compare") ? COMPARE : PAGE) }));
-  await page.route("**/api/admin/league-rules/league_season/s1", json(ADMIN_VIEW));
+  await page.route("**/api/admin/league-rules/league_season/s1", json(adminView));
 }
 
 async function noSideScroll(page) {
@@ -192,21 +208,64 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await mockServer(page, { user: ADMIN });
     await page.goto("/admin/leagues/rules/league_season/s1");
     await expect(page.getByRole("heading", { level: 1, name: "Regelwerk", exact: true })).toBeVisible();
-    await expect(page.getByTestId("rules-data-changes")).toContainText("Daten geändert, neue Version vorbereiten");
+    await expect(page.getByTestId("rules-data-changes")).toContainText("Regelwerk muss freigegeben werden");
+    await expect(page.getByTestId("rules-data-changes")).toContainText("1 Baustein, 1 Variable");
+    await expect(page.getByTestId("rules-pending-draft")).toBeVisible();
     if (process.env.ABNAHME_SHOTS) await page.screenshot({ path: `${process.env.ABNAHME_SHOTS}/regeln-pflege-${width}.png`, fullPage: true });
     await expect(page.getByTestId("rules-versions")).toContainText("Pool erneuert");
     await expect(page.getByTestId("rules-consent-row-b")).toContainText("offen");
     await page.getByTestId("rules-block-mode_order").click();
     await expect(page.getByText("Nicht gespeichert")).toBeVisible();
     await noSideScroll(page);
+    // Variable einfügen (#2269): die Liste zeigt den Wert von heute, die Marke landet im Editor.
+    await page.getByTestId("rules-variables").locator("summary").click();
+    await expect(page.getByTestId("rules-var-best_of")).toContainText("{{best_of}}");
+    await expect(page.getByTestId("rules-var-max_squad_size")).toContainText("(nicht festgelegt)");
+    await page.getByTestId("rules-variables-search").fill("Ziel");
+    await expect(page.getByTestId("rules-var-best_of")).toHaveCount(0);
+    await page.getByTestId("rules-var-mode:stellung.target").click();
+    await expect(page.getByTestId("rules-body-visual")).toContainText("{{mode:stellung.target}}");
+    await noSideScroll(page);
+    await page.getByTestId("rules-help").locator("summary").click();
+    await expect(page.getByTestId("rules-help")).toContainText("[[baustein:modes]]");
+    await noSideScroll(page);
     await page.route("**/api/admin/league-rules/league_season/s1/preview", (route) => route.fulfill({ contentType: "application/json",
-      body: JSON.stringify({ sections: SECTIONS, changes: PAGE.changes, blocks_used: ["map_pool"], unknown_blocks: [] }) }));
+      body: JSON.stringify({ sections: SECTIONS, changes: PAGE.changes, blocks_used: ["map_pool"], unknown_blocks: [], unknown_vars: ["gibtsnicht"], empty_vars: [] }) }));
     await page.getByTestId("rules-preview").click();
     await expect(page.getByTestId("rules-preview-document")).toContainText("§ 2 Maps");
+    await expect(page.getByTestId("rules-preview-vars-unknown")).toContainText("{{gibtsnicht}}");
     await noSideScroll(page);
     await expect(page.getByTestId("rules-publish")).toBeDisabled();
     await page.getByTestId("rules-reason").fill("Neue Modusfolge eingetragen");
     await expect(page.getByTestId("rules-publish")).toBeEnabled();
+  });
+
+  test(`Pflege (${width} px): Regelwerk muss freigegeben werden - Vorschlag mit Unterschieden, Freigabe mit Zustimmungspflicht`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockServer(page, { user: ADMIN, adminView: { ...ADMIN_VIEW, draft: null, proposal: PROPOSAL } });
+    let sent = null;
+    await page.route("**/api/admin/league-rules/league_season/s1/proposal/publish", (route) => {
+      sent = route.request().postDataJSON();
+      route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...V2, version: 3 }) });
+    });
+    await page.goto("/admin/leagues/rules/league_season/s1");
+    const box = page.getByTestId("rules-data-changes");
+    await expect(box).toContainText("Regelwerk muss freigegeben werden");
+    await expect(page.getByTestId("rules-change-variable-team_size")).toContainText("Teamgröße");
+    await expect(page.getByTestId("rules-proposal-document")).toContainText("Gespielt wird mit 5 Spielern je Map.");
+    await expect(page.getByTestId("rules-proposal-empty")).toContainText("{{max_squad_size}}");
+    await expect(page.locator("[data-testid='rules-proposal-document'] [id='1-fairplay']")).toContainText("Geändert in der neuen Fassung");
+    await noSideScroll(page);
+    if (process.env.ABNAHME_SHOTS) await page.screenshot({ path: `${process.env.ABNAHME_SHOTS}/regeln-freigabe-${width}.png`, fullPage: true });
+    await expect(page.getByTestId("rules-approve-reason")).toHaveValue("Einstellungen geändert: Map-Pool, Teamgröße");
+    await expect(page.getByTestId("rules-approve-consent")).toBeChecked();
+    // Leere Variable: erst der Haken „Trotzdem veröffentlichen“, dann geht der Knopf.
+    await expect(page.getByTestId("rules-approve-publish")).toBeDisabled();
+    await page.getByTestId("rules-approve-confirm-empty").check();
+    await page.getByTestId("rules-approve-publish").click();
+    await page.getByRole("button", { name: "Freigeben", exact: true }).click();
+    await expect.poll(() => sent).toEqual({ base_version_id: "v2", fingerprint: "abdruck-2", valid_from: "2030-03-05",
+      change_reason: "Einstellungen geändert: Map-Pool, Teamgröße", requires_consent: true, confirm_empty: true });
   });
 }
 
