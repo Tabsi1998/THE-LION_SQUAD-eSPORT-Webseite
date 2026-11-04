@@ -713,31 +713,53 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
 
 @pytest.mark.asyncio
 async def test_without_check_in_rules_a_new_time_keeps_the_extension(flow):
-    """Die Verlängerung fällt nur in Staffeln mit Check-in-Regeln: in einer Staffel ohne Regeln und in einem anderen Format bleibt
-    ``no_show_extended_until`` bei jedem neuen Termin stehen - Spieltag-Plan, Einigung und Termin der Leitung."""
+    """Die Verlängerung fällt nur in Staffeln mit Check-in-Regeln. Staffel ohne Regeln: Spieltag-Plan, Einigung und Termin der Leitung
+    lassen ``no_show_extended_until`` stehen. K.-o.-Turnier (kein Ligaformat): Einigung und Leitung ebenso; den Spieltag-Plan kennt das
+    Format nicht."""
     from services.matchday_schedule import persist_matchday_schedule
 
-    start_date = (now_utc() - timedelta(days=1)).isoformat()
-    plain = await checkin_world(flow, rules=None, start_date=start_date, **WEEK)
-    other = await checkin_world(flow, rules=None, letter="B", start_date=start_date, **WEEK)
-    await flow.db.tournaments.update_one({"id": other["tournament"]["id"]}, {"$unset": {"league_context": ""}})
     kept = at(6 * 60)
-    for label, world, lead in (("Staffel ohne Check-in", plain, plain["lead"]), ("kein Ligaformat", other, other["staff"])):
-        await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"no_show_extended_until": kept}})
-        assert (await persist_matchday_schedule(flow.db, await tournament_of(flow, world)))["written"] == 1, label
-        stored = await flow.reload(world["match"])
-        assert stored["schedule_source"] == "default" and stored.get("no_show_extended_until") == kept, f"{label}: Spieltag-Plan"
-        flow.act_as(world["users"]["Kapitaen"])
-        offer = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals", json={"scheduled_at": at(48 * 60)})
+    start_date = (now_utc() - timedelta(days=1)).isoformat()
+
+    async def still_kept(match_id: str, label: str) -> None:
+        assert (await flow.reload({"id": match_id})).get("no_show_extended_until") == kept, label
+
+    async def agree_then_lead_sets(match_id: str, proposer: dict, acceptor: dict, lead: dict, label: str) -> None:
+        flow.act_as(proposer)
+        offer = await flow.post(f"/api/matches/{match_id}/schedule-proposals", json={"scheduled_at": at(48 * 60)})
         assert offer.status_code == 200, f"{label}: {offer.text}"
-        flow.act_as(world["users"]["Falke1"])
-        agreed = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals/{offer.json()['id']}/decision", json={"action": "accept"})
+        flow.act_as(acceptor)
+        agreed = await flow.post(f"/api/matches/{match_id}/schedule-proposals/{offer.json()['id']}/decision", json={"action": "accept"})
         assert agreed.status_code == 200, f"{label}: {agreed.text}"
-        assert (await flow.reload(world["match"])).get("no_show_extended_until") == kept, f"{label}: Einigung"
+        await still_kept(match_id, f"{label}: Einigung")
         flow.act_as(lead)
-        moved = await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(96 * 60), "schedule_reason": "Nachholtermin"})
+        moved = await flow.patch(f"/api/matches/{match_id}", json={"scheduled_at": at(96 * 60), "schedule_reason": "Nachholtermin"})
         assert moved.status_code == 200, f"{label}: {moved.text}"
-        assert (await flow.reload(world["match"])).get("no_show_extended_until") == kept, f"{label}: Leitung"
+        await still_kept(match_id, f"{label}: Leitung")
+
+    # Staffel ohne Check-in-Regeln: der Spieltag-Plan schreibt den Standardtermin, danach Einigung und Leitung.
+    plain = await checkin_world(flow, rules=None, start_date=start_date, **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(plain)}, {"$set": {"no_show_extended_until": kept}})
+    assert (await persist_matchday_schedule(flow.db, await tournament_of(flow, plain)))["written"] == 1
+    assert (await flow.reload(plain["match"]))["schedule_source"] == "default"
+    await still_kept(mid(plain), "Staffel ohne Check-in: Spieltag-Plan")
+    await agree_then_lead_sets(mid(plain), plain["users"]["Kapitaen"], plain["users"]["Falke1"], plain["lead"], "Staffel ohne Check-in")
+
+    # K.-o.-Turnier online, zwei Spieler (kein Ligaformat): der Spieltag-Plan greift nicht, Einigung und Leitung lassen alles stehen.
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    cup, players, registrations = await flow.with_participants(2, format="single_elim", event_mode="online",
+                                                               schedule_mode="player_proposal", start_date=start_date)
+    assert (await flow.post(f"/api/tournaments/{cup['id']}/bracket/from-format?preview=false")).status_code == 200
+    await flow.start(cup)
+    duel = (await flow.matches(cup))[0]
+    await flow.db.matches_v2.update_one({"id": duel["id"]}, {"$set": {"no_show_extended_until": kept}})
+    cup_doc = await flow.db.tournaments.find_one({"id": cup["id"]}, {"_id": 0})
+    assert (await persist_matchday_schedule(flow.db, cup_doc))["written"] == 0, "kein Spieltag-Plan in diesem Format"
+    await still_kept(duel["id"], "K.-o.-Turnier: Spieltag-Plan")
+    player_of = {registration["id"]: player for player, registration in zip(players, registrations)}
+    first, second = [slot["registration_id"] for slot in duel["slots"]]
+    await agree_then_lead_sets(duel["id"], player_of[first], player_of[second], staff, "K.-o.-Turnier")
 
 
 @pytest.mark.asyncio
