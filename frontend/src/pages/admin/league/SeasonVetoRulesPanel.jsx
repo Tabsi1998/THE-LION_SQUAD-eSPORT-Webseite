@@ -35,7 +35,8 @@ function Toggle({ label, hint, checked, onChange, testId }) {
 
 // Eine Zeile je Schritt (Fabian: übersichtlich): Nr. · Art · Modus · Wer · Position · Pfeile/Löschen; bei 390 px bricht sie in zwei
 // saubere Zeilen (Nr., Art, Modus / Wer, Position, Knöpfe). Die Felder tragen ihre Beschriftung für Vorleser, der Satz steht nur dort.
-const FIELD = "min-h-9 w-full rounded-sm border border-white/10 bg-[#121212] px-2 py-1 text-sm text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
+// Ohne w-full: die Breite je Feld steht unten (sonst gewinnt w-full, und jedes Feld nimmt eine eigene Zeile).
+const FIELD = "min-h-9 rounded-sm border border-white/10 bg-[#121212] px-2 py-1 text-sm text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
 
 function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemove }) {
   const set = (patch) => onChange({ ...step, ...patch });

@@ -130,6 +130,12 @@ test.describe("Liga: Veto", () => {
       await expect(page.getByTestId("veto-rules-steps").locator("li")).toHaveCount(11);
       await expect(page.getByTestId("veto-step-10-sentence")).toHaveText("Die übrige Map wird Map 3 (Kontrolle)");
       await expect(page.getByTestId("veto-rules-ok")).toBeVisible();
+      // Eine Zeile je Schritt (Feinschliff): Art, Modus und Wer stehen bei 1440 px nebeneinander, bei 390 px in zwei sauberen Zeilen.
+      const box = async (id) => (await page.getByTestId(id).boundingBox()) || {};
+      const [kind, mode, team] = await Promise.all([box("veto-step-0-kind"), box("veto-step-0-mode"), box("veto-step-0-team")]);
+      expect(kind.y).toBeCloseTo(mode.y, 0);
+      if (width === 1440) expect(team.y).toBeCloseTo(mode.y, 0);
+      else expect(team.y).toBeGreaterThan(mode.y + mode.height - 1);
       await page.getByTestId("veto-step-3-position").fill("1");
       await expect(page.getByTestId("veto-rules-problems")).toContainText("Position 1 ist mehrfach belegt (Schritt 3 und 4).");
       await expect(page.getByTestId("veto-rules-save")).toBeDisabled();
