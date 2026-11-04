@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from models import now_utc
 from services.league_scope import is_league_staffel
-from services.matchday_schedule import LOCAL_TZ
+
+# Wiener Zeit nur für Texte (wie matchday_schedule.LOCAL_TZ) - hier eigens, damit dieses Modul ein Blatt bleibt und der
+# Spieltag-Plan es importieren kann.
+LOCAL_TZ = ZoneInfo("Europe/Vienna")
 
 logger = logging.getLogger("tls.checkin_rules")
 
@@ -139,6 +143,13 @@ def rules_of(tournament: dict | None) -> dict | None:
         # Ein von Hand verbogener Wert sperrt die Staffel nicht - es gelten die Vorgaben.
         logger.warning("[checkin_rules] Check-in-Regeln von %s ungültig, Vorgaben gelten", tournament.get("id"))
         return dict(DEFAULTS)
+
+
+def new_time_unset(tournament: dict | None) -> dict:
+    """Für ``$unset`` auf jedem Weg zu einem neuen Termin (Einigung, Verschiebung, 72-h-Regel, Leitung, Spieltag-Plan, Stationsplan):
+    Eine Verlängerung der Leitung (``no_show_extended_until``) gehört zum alten Fenster - in Staffeln mit Check-in-Regeln fällt sie
+    mit dem neuen Termin, überall sonst bleibt alles, wie es ist (leeres Dict)."""
+    return {"no_show_extended_until": ""} if rules_of(tournament) else {}
 
 
 # ---------------------------------------------------------------- Fenster und Stand

@@ -1696,9 +1696,10 @@ entscheidet wie bisher über `POST /api/tournaments/{tid}/lead/no-show/{match}`:
 erschienen – Check-in bis … nicht erfolgt“, Teamstrafe wie bei jedem Kampflos), `extend` verlängert das Fenster und nimmt den Vorschlag zurück
 (nach Ablauf kommt er neu). Mit Check-in-Regeln geht `confirm` nur mit diesem Vorschlag (die Ausnahme „ohne Vorschlag werten“ aus #2201 gilt
 nur für Staffeln ohne Check-in), nur für eine Seite aus `missing_registration_ids` (sonst 422) und nur, solange `due_at` zum Fenster des
-aktuellen Termins passt (sonst 409 – auch wenn der Job den alten Vorschlag noch nicht weggeräumt hat). Jeder neue Termin (Einigung,
-Verschiebung, 72-h-Regel, Leitung, „Neu ansetzen“) löscht `no_show_extended_until`: Das neue Fenster endet mit seiner eigenen Regel, nicht mit
-der alten Verlängerung. Trägt die Leitung die fehlende Seite nach, räumt der Job den Vorschlag ab (`match.no_show.cleared`, Grund
+aktuellen Termins passt (sonst 409 – auch wenn der Job den alten Vorschlag noch nicht weggeräumt hat); `extend` prüft den Vorschlag genauso
+(aus einem alten Vorschlag entsteht keine Verlängerung für den neuen Termin). Jeder neue Termin (Einigung, Verschiebung, 72-h-Regel,
+Leitung, Standardtermin des Spieltag-Plans, Stationsplan – alle über `checkin_rules.new_time_unset`; „Neu ansetzen“ setzt das Feld leer)
+löscht `no_show_extended_until`: Das neue Fenster endet mit seiner eigenen Regel, nicht mit der alten Verlängerung. Trägt die Leitung die fehlende Seite nach, räumt der Job den Vorschlag ab (`match.no_show.cleared`, Grund
 `checked_in`). Ein begonnenes Spiel (`started_at`) oder eins mit Meldung bekommt nie einen Vorschlag (laufendes BO5 ist kein Nichtantritt).
 Alte Vorschläge ohne Regel `check_in` räumt der Job wie seit #2201 ab.
 

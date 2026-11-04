@@ -615,6 +615,24 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
     counts = await league_schedule_sweep.sweep(flow.db, [await tournament_of(flow, other)], now=now_utc() + timedelta(hours=73))
     assert counts["home_rule"] == 1
     assert not (await flow.reload(other["match"])).get("no_show_extended_until"), "72-h-Regel"
+    # Spieltag-Plan (Standardtermin) und Stationsplan schreiben den Termin ebenfalls (Codex-Nachprüfung).
+    from services.match_scheduler import apply_plan
+    from services.matchday_schedule import persist_matchday_schedule
+
+    third = await checkin_world(flow, start_date=(now_utc() - timedelta(days=1)).isoformat(), letter="C", **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(third)}, {"$set": {"no_show_extended_until": at(90)}})
+    written = await persist_matchday_schedule(flow.db, await tournament_of(flow, third))
+    stored = await flow.reload(third["match"])
+    assert written["written"] == 1 and stored["schedule_source"] == "default", "der Standardtermin steht"
+    assert not stored.get("no_show_extended_until"), "Spieltag-Plan"
+    await flow.db.matches_v2.update_one({"id": mid(third)}, {"$set": {"no_show_extended_until": at(90), "schedule_source": None}})
+    stored = await flow.reload(third["match"])
+    plan = {"assignments": [{"match_id": mid(third), "changed": True, "scheduled_at": at(3 * 60), "schedule_source": "planner",
+                             "station_id": None, "forecast": False,
+                             "previous": {"scheduled_at": stored["scheduled_at"], "schedule_source": None, "status": stored["status"],
+                                          "station_id": None}}]}
+    assert (await apply_plan(flow.db, await tournament_of(flow, third), plan))["written"] == 1
+    assert not (await flow.reload(third["match"])).get("no_show_extended_until"), "Stationsplan"
 
 
 @pytest.mark.asyncio
