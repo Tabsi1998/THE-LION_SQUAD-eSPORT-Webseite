@@ -330,3 +330,25 @@ async def test_deleting_a_subcategory_while_moving_into_it_leaves_no_retired_key
     stored = await flow.db.game_equipment.find_one({"id": blitz["id"]}, {"_id": 0})
     assert stored.get("subcategory") not in (doc.get("retired_subcategory_keys") or []), (remove.text, move.text)
     assert sorted([remove.status_code, move.status_code]) in ([200, 409], [200, 422])
+
+async def hold_lock(flow, w: dict) -> None:
+    """Die Sperre der Bibliothek gezielt belegen - wie ein anderer Vorgang, der gerade schreibt."""
+    from datetime import timedelta
+
+    from models import now_utc
+    from services.mutation_lock import game_equipment_resource
+
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    await flow.db.mutation_locks.insert_one({"resource": game_equipment_resource(w["game"]["id"]), "owner": "fremd",
+                                             "expires_at": now_utc() + timedelta(minutes=5)})
+
+
+@pytest.mark.asyncio
+async def test_deleting_an_entry_waits_for_the_library_lock(flow):
+    """Codex Runde 2: Auch Löschen schreibt unter der Sperre der Bibliothek - belegt: 409, frei: geht."""
+    w = await setup(flow)
+    blitz = await add(flow, w, "Waffen", "Blitz 9")
+    await hold_lock(flow, w)
+    assert (await flow.delete(url(w, f"/{blitz['id']}"))).status_code == 409
+    await flow.db.mutation_locks.delete_many({})
+    ok(await flow.delete(url(w, f"/{blitz['id']}")))

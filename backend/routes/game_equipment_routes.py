@@ -184,10 +184,13 @@ async def update_game_equipment(game_id: str, item_id: str, body: EquipmentUpdat
 async def delete_game_equipment(game_id: str, item_id: str, me: dict = Depends(require_admin())):
     db = get_db()
     game = await _game(db, game_id)
-    current = await _item(db, game, item_id)
-    try:
-        await game_equipment.delete(db, game, current)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+
+    async def remove() -> dict:
+        # Unter der Sperre neu geladen (Codex Runde 2): Gelöscht wird der Stand, der gilt.
+        found = await _item(db, game, item_id)
+        await game_equipment.delete(db, game, found)
+        return found
+
+    current = await _locked(db, game, remove)
     await _audit(db, "game.equipment.delete", me, current["id"], {"game_id": game["id"], "category": current.get("category")})
     return {"ok": True}
