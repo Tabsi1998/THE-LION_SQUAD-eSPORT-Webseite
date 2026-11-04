@@ -352,3 +352,19 @@ async def test_deleting_an_entry_waits_for_the_library_lock(flow):
     assert (await flow.delete(url(w, f"/{blitz['id']}"))).status_code == 409
     await flow.db.mutation_locks.delete_many({})
     ok(await flow.delete(url(w, f"/{blitz['id']}")))
+
+@pytest.mark.asyncio
+async def test_the_library_lock_refuses_while_held_and_is_free_again_after_an_error(flow):
+    """Codex Runde 2: belegt → 409 bei jedem Schreibweg; frei → geht; eine Absage unter der Sperre (422) gibt sie wieder frei."""
+    w = await setup(flow)
+    key = ok(await save_subs(flow, w, "Waffen", [{"label": "Pistole"}]))["subcategories"][0]["key"]
+    blitz = await add(flow, w, "Waffen", "Blitz 9")
+    await hold_lock(flow, w)
+    move = {"item_ids": [blitz["id"]], "subcategory": key}
+    busy = await flow.post(url(w, "/move"), json=move)
+    assert busy.status_code == 409 and "gerade bearbeitet" in busy.json()["detail"]
+    assert (await save_subs(flow, w, "Waffen", [{"key": key, "label": "Pistolen"}])).status_code == 409
+    await flow.db.mutation_locks.delete_many({})
+    assert (await flow.post(url(w, "/move"), json={**move, "subcategory": "gibt-es-nicht"})).status_code == 422
+    assert ok(await flow.post(url(w, "/move"), json=move)) == {"updated": 1}
+    assert await flow.db.mutation_locks.count_documents({}) == 0, "nach jedem Vorgang wieder frei"
