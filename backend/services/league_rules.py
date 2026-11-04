@@ -106,16 +106,20 @@ def _frozen_values(version: dict, season: dict | None, variant: str = "markdown"
     return {key: markdown_text.plain(value) for key, value in values.items()} if plain else values
 
 
-def _frozen_vars(version: dict, season: dict | None) -> dict[str, dict]:
-    """Die eingefrorenen Variablen dieser Season (#2269) - ``{name: {label, value}}``; die Seite der Liga liest den Schlüssel ``""``."""
+def _frozen_vars(version: dict, season: dict | None) -> dict[str, dict] | None:
+    """Die eingefrorenen Variablen dieser Season (#2269) - ``{name: {label, value}}``; die Seite der Liga liest den Schlüssel ``""``.
+    ``None`` für Fassungen von vor #2269 (ohne ``vars_used``): Ihr Text bleibt Wort für Wort, auch ein zufälliges „{{…}}“ darin
+    (Prüfung Codex)."""
+    if "vars_used" not in version:
+        return None
     return (version.get("frozen_vars") or {}).get((season or {}).get("id") or "") or {}
 
 
-def _fill(body: str, values: dict[str, str], var_values: dict[str, dict], season: dict | None, plain: bool = False, keep=()) -> str:
+def _fill(body: str, values: dict[str, str], var_values: dict[str, dict] | None, season: dict | None, plain: bool = False, keep=()) -> str:
     """Erst die Variablen im Satz, dann die Bausteine als Absatz - beide mit dem Hinweis, wenn für die Seite nichts eingefroren ist.
-    ``keep``: unbekannte Variablen, die in der Vorschau als Marke stehen bleiben."""
-    filled = variables.fill_vars(body, var_values, missing=variables.NOT_FROZEN_VALUE if season else variables.NO_SEASON_VALUE, plain=plain,
-                                 keep=keep)
+    ``keep``: unbekannte Variablen, die in der Vorschau als Marke stehen bleiben. ``var_values`` ``None``: keine Variablen (Altfassung)."""
+    filled = body if var_values is None else variables.fill_vars(
+        body, var_values, missing=variables.NOT_FROZEN_VALUE if season else variables.NO_SEASON_VALUE, plain=plain, keep=keep)
     return text.fill_blocks(filled, values, missing=blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT)
 
 
