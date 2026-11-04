@@ -221,6 +221,34 @@ test("Aufsätze je Slot an der Waffe: je Aufsatz Modi, für die Klasse übernehm
   }));
 });
 
+// Codex zu #2299: „K gesperrt“ zählt auch, was über die Zeile des Aufsatzes oder seine ganz gesperrte Klasse überall gesperrt ist.
+const banList = (...entries) => ({ id: "v1", version: 1, saved_at: "2026-11-04T10:00:00+00:00", stale: false, outdated_item_ids: [],
+  class_new_items: [], entries });
+
+test("„K gesperrt“ zählt einen überall gesperrten Aufsatz mit", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BY_SLOT, list: banList(
+    { kind: "item", item_id: "a1", name: "Rotpunkt", category: "aufsaetze", subcategory: "optik", modes: [], mode_labels: [], attachments: [] },
+    { kind: "item", item_id: "a3", name: "Holo", category: "aufsaetze", subcategory: "optik", modes: ["suchen"], mode_labels: ["Suchen"], attachments: [] },
+  ) } });
+  renderPanel();
+  // Rotpunkt in allen Modi gesperrt zählt, Holo nur in Suchen (nicht angehakt) nicht.
+  expect(await screen.findByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 1 gesperrt");
+  expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 1 gesperrt");
+  fireEvent.click(screen.getByTestId("season-bans-open-w1"));
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a1")).toBeChecked();
+});
+
+test("„K gesperrt“ zählt die Aufsätze einer ganz gesperrten Aufsatzklasse mit, jeden nur einmal", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BY_SLOT, list: banList(
+    { kind: "class", item_id: null, name: "Optik", category: "aufsaetze", subcategory: "optik", modes: [], mode_labels: [], attachments: [], items: [] },
+    { kind: "attachments", item_id: "w1", name: "Blitz 9", category: "waffen", subcategory: "sturm", modes: [], mode_labels: [],
+      attachments: [{ item_id: "a2", name: "Griff", image_url: null }] },
+  ) } });
+  renderPanel();
+  expect(await screen.findByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 3 gesperrt");
+  expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 2 gesperrt");
+});
+
 test("Aufsätze ohne erlaubte Waffe werden genannt (Nr. 81)", async () => {
   apiMock.get.mockResolvedValue({ data: { ...BODY, unusable_attachments: [{ id: "a3", name: "Kompensator", reason: "keiner Waffe zugeordnet" },
     { id: "a1", name: "Rotpunkt", reason: "passt nur zu gesperrten Waffen" }] } });

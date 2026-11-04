@@ -1,5 +1,5 @@
 import {
-  attachmentModes, attachmentSlots, attachmentsSummary, banAttachmentEverywhere, categoriesPayload, categoriesProblem, copyAttachmentsToClass,
+  attachmentModes, attachmentSlots, attachmentsSummary, banAttachmentEverywhere, bannedAttachmentCount, categoriesPayload, categoriesProblem, copyAttachmentsToClass,
   differsFromSection, equipmentPayload, everywhereText, fitsNothing, fitsWeapon, formPayload, formProblem, groupByCategory, groupBySubcategory, listToForm,
   matchesSearch, missingSuggestions, modesNote, modesText, ownRestrictionParts, publicGroups, restrictionParts, rowKey, sameRows,
   subcategoriesPayload, subcategoriesProblem, subcategoryOf, weaponClasses,
@@ -179,6 +179,17 @@ test("Modi je Aufsatz: laden, unverändert gleich, schicken wie bisher oder je A
   expect(formPayload(same, ARMORY)).toEqual([{ item_id: "w1", kind: "attachments", modes: ["stellung"], attachment_ids: ["a1", "a2"] }]);
   expect(sameRows(same, { "attachments:w1": { kind: "attachments", item_id: "w1", modes: ["stellung"], attachment_ids: ["a2", "a1"] } })).toBe(true);
   expect(sameRows(rows, same)).toBe(false);
+});
+
+test("„K gesperrt“ in der Verwaltung: an der Waffe, überall über die Zeile des Aufsatzes oder seine Klasse - jeden einmal", () => {
+  const fitting = ARMORY.filter((item) => item.category === "aufsaetze" && fitsWeapon(item, ARMORY[0]));
+  expect(bannedAttachmentCount({}, "w1", fitting)).toBe(0);
+  expect(bannedAttachmentCount({ "attachments:w1": { attachment_ids: ["a2"], modes: [] } }, "w1", fitting)).toBe(1);
+  expect(bannedAttachmentCount({ "item:a1": { kind: "item", item_id: "a1", modes: [] } }, "w1", fitting)).toBe(1);
+  expect(bannedAttachmentCount({ "item:a1": { kind: "item", item_id: "a1", modes: ["suchen"] } }, "w1", fitting)).toBe(0);
+  expect(bannedAttachmentCount({ "class:optik": { kind: "class", subcategory: "optik", modes: [] },
+    "attachments:w1": { attachment_ids: ["a1", "a2"], modes: [] } }, "w1", fitting)).toBe(3);
+  expect(bannedAttachmentCount({ "class:optik": { kind: "class", subcategory: "optik", modes: ["suchen"] } }, "w1", fitting)).toBe(0);
 });
 
 test("die passenden Aufsätze je Slot, ohne Slot zuerst", () => {

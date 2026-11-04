@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField } from "@/components/tls/FormFields";
 import { EquipmentThumb, LoadoutBansView, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import {
-  attachmentModes, attachmentSlots, banAttachmentEverywhere, classRow, copyAttachmentsToClass, countText, fitsWeapon, formPayload, formProblem,
+  attachmentModes, attachmentSlots, banAttachmentEverywhere, bannedAttachmentCount, classRow, copyAttachmentsToClass, countText, fitsWeapon, formPayload, formProblem,
   groupByCategory, groupBySubcategory, listToForm, matchesSearch, NO_SUBCATEGORY, rowKey, sameRows, statusOf, subcategoryOf,
 } from "@/lib/loadoutBans";
 import { viennaDate } from "@/lib/vienna";
@@ -235,7 +235,8 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
   const banned = !!row || viaClass;
   const blocked = statusOf(item) === "inactive" && !kept.has(rowKey("item", item.id));
   const fullyBanned = (row && !row.modes.length) || viaClass;
-  const attachmentCount = attachmentRow?.attachment_ids?.length || 0;
+  // K zählt, was aufgeklappt als gesperrt angehakt erscheint - auch über die Zeile des Aufsatzes oder seine Klasse (Codex zu #2299).
+  const attachmentCount = bannedAttachmentCount(rows, item.id, attachments);
   return (
     <li className={`rounded-sm border p-2.5 ${banned ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-item-${item.id}`}>
       <div className="flex items-start gap-3">

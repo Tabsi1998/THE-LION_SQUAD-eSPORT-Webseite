@@ -227,7 +227,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await page.goto("/admin/leagues/seasons/s1#sperrliste");
       const panel = page.getByTestId("season-bans");
       const open = panel.getByTestId("season-bans-open-w2");
-      await expect(open).toHaveText("4 Aufsätze · 2 gesperrt");
+      // Rotpunkt und Holo an dieser Waffe (Holo nur in Modi - angehakt), Kompensator überall (Codex zu #2299).
+      await expect(open).toHaveText("4 Aufsätze · 3 gesperrt");
       await open.click();
       const weapon = panel.getByTestId("season-bans-attachments-w2");
       await expect(weapon.getByTestId("season-bans-slot-w2")).toHaveCount(2);
@@ -241,7 +242,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await shot(panel.getByTestId("season-bans-item-w2"), `verwaltung-aufgeklappt-${width}.png`);
 
       await weapon.getByTestId("season-bans-copy-class-w2").click();
-      await expect(panel.getByTestId("season-bans-open-w1")).toHaveText("5 Aufsätze · 2 gesperrt");
+      await expect(panel.getByTestId("season-bans-open-w1")).toHaveText("5 Aufsätze · 3 gesperrt");
       await panel.getByTestId("season-bans-save").click();
       await expect.poll(() => calls.put.length).toBe(1);
       const attached = { item_id: "", kind: "attachments", modes: [], attachment_ids: ["a1", "a4"], attachment_modes: { a4: ["stellung", "kapern"] } };

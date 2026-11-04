@@ -248,6 +248,15 @@ const fullyBanned = (rows, item) => (rows[rowKey("item", item.id)] && !rows[rowK
   || (item.subcategory && rows[rowKey("class", item.subcategory)] && !rows[rowKey("class", item.subcategory)].modes.length);
 
 /**
+ * „K gesperrt“ am Knopf einer Waffe in der Verwaltung: die passenden Aufsätze, die aufgeklappt als gesperrt angehakt sind - an dieser Waffe
+ * (auch nur in Modi) oder überall in allen Modi über die Zeile des Aufsatzes bzw. seine ganz gesperrte Klasse (wie `AttachmentLine`).
+ */
+export function bannedAttachmentCount(rows = {}, weaponId, attachments = []) {
+  const local = new Set(rows[rowKey("attachments", weaponId)]?.attachment_ids || []);
+  return attachments.filter((item) => local.has(item.id) || Boolean(fullyBanned(rows, item))).length;
+}
+
+/**
  * „Für alle <Waffenklasse> übernehmen“: jede andere aktive Waffe derselben Klasse sperrt danach dieselben Aufsätze mit denselben Modi -
  * soweit sie zu ihr passen und dort neu sperrbar sind (inaktive nur, wo sie schon standen). Ganz gesperrte Waffen bleiben, wie sie sind.
  * Gibt die neuen Zeilen und die Zahl der Waffen zurück.
