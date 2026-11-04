@@ -72,6 +72,7 @@ test("Aufsätze ohne Waffe: Hinweis und Zuordnung in einem Schritt", async () =>
   const notice = await screen.findByTestId("equipment-without-weapon");
   expect(notice).toHaveTextContent("Kompensator");
   expect(within(notice).getByTestId("equipment-assign")).toBeDisabled();
+  fireEvent.click(within(notice).getByTestId("equipment-assign-open"));
   fireEvent.click(within(notice).getByTestId("equipment-assign-w1"));
   fireEvent.click(within(notice).getByTestId("equipment-assign"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/games/g1/equipment/assign-weapons", { weapon_ids: ["w1"], weapon_class_ids: [] }));
@@ -246,4 +247,18 @@ test("ein Aufsatz über seine Klasse nennt sie, ohne Waffe und Klasse passt er z
   apiMock.get.mockResolvedValue({ data: { ...GROUPED, items: [...GROUPED.items, { id: "a9", category: "aufsaetze", name: "Laser", status: "active", in_lists: 0, weapon_ids: [], weapon_class_ids: ["schrot"] }] } });
   renderPage();
   expect(await screen.findByTestId("equipment-row-a9")).toHaveTextContent("passt zu Schrotflinte (Klasse)");
+});
+
+// Codex Runde 1: Bei vielen Waffen bleibt der Hinweis kurz - die Auswahl ist zugeklappt und hat eine Suche.
+test("Aufsätze ohne Waffe: Auswahl zugeklappt, mit Suche", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, attachments_without_weapon: [{ id: "a3", name: "Kompensator" }] } });
+  renderPage();
+  const notice = await screen.findByTestId("equipment-without-weapon");
+  expect(within(notice).queryByTestId("equipment-assign-w1")).not.toBeInTheDocument();
+  expect(within(notice).getByTestId("equipment-assign-open")).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(within(notice).getByTestId("equipment-assign-open"));
+  fireEvent.change(within(notice).getByTestId("equipment-assign-search"), { target: { value: "donner" } });
+  expect(within(notice).queryByTestId("equipment-assign-w1")).not.toBeInTheDocument();
+  fireEvent.click(within(notice).getByTestId("equipment-assign-w2"));
+  expect(within(notice).getByTestId("equipment-assign-open")).toHaveTextContent("1 gewählt");
 });

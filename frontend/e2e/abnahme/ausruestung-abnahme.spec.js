@@ -124,6 +124,8 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     // Ohne Waffe passt der Griff zu keiner (Obmann, 03.11.): Der Hinweis nennt ihn, ein Schritt ordnet ihn der Waffe zu.
     const notice = page.getByTestId("equipment-without-weapon");
     await expect(notice).toContainText(GRIP);
+    await notice.getByTestId("equipment-assign-open").click();
+    await notice.getByTestId("equipment-assign-search").fill(WEAPON);
     await notice.getByTestId(`equipment-assign-${weapon.id}`).check();
     await notice.getByTestId("equipment-assign").click();
     await expect(notice).toHaveCount(0);

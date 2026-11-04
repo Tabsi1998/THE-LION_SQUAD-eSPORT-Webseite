@@ -43,9 +43,15 @@ function fitsText(item, weaponNames, classNames) {
 
 // Aufsätze ohne Waffe (Obmann, 03.11.): Sie passen zu keiner Waffe und lassen sich an keiner einzeln sperren. Wie „Maps ohne Modus“
 // nennt der Hinweis sie und ordnet allen auf einmal die gewählten Waffen und Waffenklassen (#2287) zu.
+// Codex Runde 1: Die Auswahl ist zugeklappt und hat eine Suche - bei vielen Waffen bleibt der Hinweis am Handy kurz.
 function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
   const [chosen, setChosen] = useState([]);
   const [chosenClasses, setChosenClasses] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const shownClasses = classes.filter((klass) => matchesSearch({ name: klass.label }, search));
+  const shownWeapons = weapons.filter((weapon) => matchesSearch(weapon, search));
+  const picked = chosen.length + chosenClasses.length;
   const names = rows.slice(0, 5).map((row) => row.name).join(", ");
   const more = rows.length > 5 ? ` und ${rows.length - 5} weitere` : "";
   const toggle = (setter) => (id) => setter((list) => (list.includes(id) ? list.filter((key) => key !== id) : [...list, id]));
@@ -59,19 +65,40 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
     <section className="mt-5 space-y-2 rounded-sm border border-warn/30 bg-warn/5 p-3" aria-label="Aufsätze ohne Waffe" data-testid="equipment-without-weapon">
       <p className="text-sm font-semibold text-warn">Diese Aufsätze passen noch zu keiner Waffe</p>
       <p className="text-xs text-white/70 break-words">{names}{more}. An einer Waffe einzeln sperren lassen sie sich erst mit Zuordnung.</p>
-      {classes.length ? (
-        <div className="flex flex-wrap items-center gap-2" data-testid="equipment-assign-classes">
-          <span className="text-[11px] text-white/55">Waffenklassen</span>
-          {classes.map((klass) => chip(klass.key, klass.label, chosenClasses.includes(klass.key), () => toggle(setChosenClasses)(klass.key), `equipment-assign-class-${klass.key}`))}
+      {weapons.length || classes.length ? (
+        <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="equipment-assign-choice"
+          data-testid="equipment-assign-open"
+          className="inline-flex items-center gap-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+          Waffen wählen{picked ? ` · ${picked} gewählt` : ""}
+        </button>
+      ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
+      {open ? (
+        <div id="equipment-assign-choice" className="space-y-2">
+          {weapons.length + classes.length > 1 ? (
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" aria-hidden="true" />
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Waffe oder Klasse suchen"
+                aria-label="Waffe oder Klasse suchen" data-testid="equipment-assign-search"
+                className="w-full rounded-sm border border-white/15 bg-[#0A0A0A] py-1.5 pl-8 pr-3 text-sm text-white placeholder:text-white/45 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" />
+            </label>
+          ) : null}
+          {shownClasses.length ? (
+            <div className="flex flex-wrap items-center gap-2" data-testid="equipment-assign-classes">
+              <span className="text-[11px] text-white/55">Waffenklassen</span>
+              {shownClasses.map((klass) => chip(klass.key, klass.label, chosenClasses.includes(klass.key), () => toggle(setChosenClasses)(klass.key), `equipment-assign-class-${klass.key}`))}
+            </div>
+          ) : null}
+          {shownWeapons.length ? (
+            <div className="flex max-h-48 flex-wrap items-center gap-2 overflow-y-auto pr-1">
+              {classes.length ? <span className="text-[11px] text-white/55">Waffen</span> : null}
+              {shownWeapons.map((weapon) => chip(weapon.id, weapon.name, chosen.includes(weapon.id), () => toggle(setChosen)(weapon.id), `equipment-assign-${weapon.id}`))}
+            </div>
+          ) : null}
+          {!shownClasses.length && !shownWeapons.length ? <p className="text-xs text-white/60">Nichts gefunden.</p> : null}
         </div>
       ) : null}
-      {weapons.length ? (
-        <div className="flex max-h-40 flex-wrap items-center gap-2 overflow-y-auto pr-1">
-          {classes.length ? <span className="text-[11px] text-white/55">Waffen</span> : null}
-          {weapons.map((weapon) => chip(weapon.id, weapon.name, chosen.includes(weapon.id), () => toggle(setChosen)(weapon.id), `equipment-assign-${weapon.id}`))}
-        </div>
-      ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
-      <button type="button" disabled={!chosen.length && !chosenClasses.length} onClick={() => onAssign(chosen, chosenClasses)} data-testid="equipment-assign"
+      <button type="button" disabled={!picked} onClick={() => onAssign(chosen, chosenClasses)} data-testid="equipment-assign"
         className="tls-btn tls-btn--primary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
         {rows.length === 1 ? "Dem Aufsatz zuordnen" : `Allen ${rows.length} Aufsätzen zuordnen`}
       </button>
