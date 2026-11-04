@@ -308,7 +308,7 @@ def tiebreakers_sentence(rules: dict) -> str:
 
 def forfeit_sentence(rules: dict) -> str:
     if rules.get("forfeit_score") == "best_of":
-        return "Der Sieger bekommt so viele Maps, wie zum Sieg der Serie nötig sind, der andere 0 (im Best of 3 also 2:0)."
+        return "Der Sieger bekommt so viele Maps, wie zum Sieg der Serie nötig sind, der andere 0."
     return "Gewertet wird, was die Liga-Leitung einträgt."
 
 

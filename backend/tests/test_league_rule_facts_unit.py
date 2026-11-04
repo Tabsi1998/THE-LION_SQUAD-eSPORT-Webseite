@@ -105,7 +105,8 @@ def test_table_block_speaks_e1_and_the_old_defaults():
     assert "- Punkte: Sieg 3, Niederlage 0 Punkte." in out and "ein Remis gibt es nicht" in out
     assert ("- Bei Punktgleichheit entscheidet der Reihe nach: direkter Vergleich (Punkte, Map-Differenz, gewonnene Maps), Map-Differenz, "
             "gewonnene Maps, Entscheid der Liga-Leitung.") in out
-    assert "im Best of 3 also 2:0" in out and "Beide nicht erschienen" in out and "steht am Tabellenende" in out
+    assert "wie zum Sieg der Serie nötig sind, der andere 0." in out and "Best of 3" not in out, "kein festes Beispiel in einer BO5-Liga"
+    assert "Beide nicht erschienen" in out and "steht am Tabellenende" in out
     assert "**Abweichend in Liga 1 · Elite**" in plain(out) and "Sieg 3, Remis 1, Niederlage 0 Punkte" in out
     old = facts.render_table(facts.table_data({"scoring_rules": {"match_points": {"win": 3, "draw": 1, "loss": 0}}}, []))
     assert "Sieg 3, Remis 1, Niederlage 0" in old and "Map-Differenz, gewonnene Maps." in old
