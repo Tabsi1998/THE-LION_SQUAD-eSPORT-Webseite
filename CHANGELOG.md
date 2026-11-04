@@ -1,35 +1,33 @@
 # Changelog
 
-## [1.66.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.65.1...v1.66.0) (2026-11-04)
-
+## 1.66.0 (04.11.2026)
 
 ### Neu
 
-* Altes Freitextfeld Regeltext ausgeblendet, Hinweis „Regelwerk muss freigegeben werden“ im Überblick ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Ergebnisregel: Zeitlimit mit Sekunden (z. B. 1:30) und Zeit je Runde ([#2271](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2271)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Hinweis, wenn der Beiname einer Liga N die Stufe wiederholt („Liga 1 · Liga 1“) ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Liga: Anmeldung, Zuteilen, Kaderübersicht und Team-Seite nennen die Plattform mit Grund im Klartext ([#2270](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2270)) ([8244b1a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8244b1af04e459d90d14c7648967d69cc96ee822))
-* Liga: Plattform je Season (nur PC, nur PlayStation, mehrere oder alle) in der Spielberechtigung ([#2270](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2270)) ([8244b1a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8244b1af04e459d90d14c7648967d69cc96ee822))
-* Links auf die Season-Seite führen in den passenden Reiter, „Transfer beantragt“ direkt in die Kaderübersicht ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Map-Pool-Editor nennt ein geändertes Modus-Symbol und bringt es mit dem nächsten Speichern in Season und Staffeln ([#2266](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2266)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Mediathek zählt Modus-Symbole, in gespeicherten Pools und veröffentlichten Regelwerken bleiben sie unverändert ([#2266](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2266)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Modi der Season an einer Stelle anhaken, je Modus Maps, Mindestgröße und Ergebnisregel, Hinweis wenn Pool und Modus je Map nicht passen ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Modus-Symbol auf Match- und Ligaseite, im Map-Pool, bei „Modus je Map“ und im Regelwerk (Web) ([#2266](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2266)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Regelwerk: Baustein „Einstellungen je Modus“, im PDF als Tabelle ([#2271](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2271)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Season übernimmt Einstellungen je Modus als Kopie, mit „weicht vom Spiel ab“ und „Vom Spiel übernehmen“ ([#2271](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2271)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Season-Seite mit Reitern: Überblick, Spielbetrieb, Termine, Anmeldung und Kader, Tabelle, Regelwerk und Sperrliste, Ligen und Staffeln, Speichern je Reiter mit Punkt und Rückfrage ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Spielmodi: freie Einstellungen je Modus mit Gruppe, Einheit und Reihenfolge, dazu eigene Regeln ([#2271](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2271)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Spielmodi: quadratisches Symbol je Modus mit Hochladen, Bibliothek und Entfernen im Reiter Modi ([#2266](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2266)) ([4ae7396](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4ae739669e71bff4bac28f0d7b2281b70ee30d7c))
-* Überblick der Season mit Ablaufleiste, „Was fehlt noch?“ mit Sprung an die Stelle und Erklärung von Sichtbarkeit und Stand ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Verwaltung: Plattform, Crossplay und Eingabegerät im Reiter „Anmeldung und Kader“, Liga N weicht im Liga-N-Blatt ab ([#2270](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2270)) ([8244b1a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8244b1af04e459d90d14c7648967d69cc96ee822))
-
+* Altes Freitextfeld Regeltext ausgeblendet, Hinweis „Regelwerk muss freigegeben werden“ im Überblick (#2267)
+* Ergebnisregel: Zeitlimit mit Sekunden (z. B. 1:30) und Zeit je Runde (#2271)
+* Hinweis, wenn der Beiname einer Liga N die Stufe wiederholt („Liga 1 · Liga 1“) (#2267)
+* Liga: Anmeldung, Zuteilen, Kaderübersicht und Team-Seite nennen die Plattform mit Grund im Klartext (#2270)
+* Liga: Plattform je Season (nur PC, nur PlayStation, mehrere oder alle) in der Spielberechtigung (#2270)
+* Links auf die Season-Seite führen in den passenden Reiter, „Transfer beantragt“ direkt in die Kaderübersicht (#2267)
+* Map-Pool-Editor nennt ein geändertes Modus-Symbol und bringt es mit dem nächsten Speichern in Season und Staffeln (#2266)
+* Mediathek zählt Modus-Symbole, in gespeicherten Pools und veröffentlichten Regelwerken bleiben sie unverändert (#2266)
+* Modi der Season an einer Stelle anhaken, je Modus Maps, Mindestgröße und Ergebnisregel, Hinweis wenn Pool und Modus je Map nicht passen (#2267)
+* Modus-Symbol auf Match- und Ligaseite, im Map-Pool, bei „Modus je Map“ und im Regelwerk (Web) (#2266)
+* Regelwerk: Baustein „Einstellungen je Modus“, im PDF als Tabelle (#2271)
+* Season übernimmt Einstellungen je Modus als Kopie, mit „weicht vom Spiel ab“ und „Vom Spiel übernehmen“ (#2271)
+* Season-Seite mit Reitern: Überblick, Spielbetrieb, Termine, Anmeldung und Kader, Tabelle, Regelwerk und Sperrliste, Ligen und Staffeln, Speichern je Reiter mit Punkt und Rückfrage (#2267)
+* Spielmodi: freie Einstellungen je Modus mit Gruppe, Einheit und Reihenfolge, dazu eigene Regeln (#2271)
+* Spielmodi: quadratisches Symbol je Modus mit Hochladen, Bibliothek und Entfernen im Reiter Modi (#2266)
+* Überblick der Season mit Ablaufleiste, „Was fehlt noch?“ mit Sprung an die Stelle und Erklärung von Sichtbarkeit und Stand (#2267)
+* Verwaltung: Plattform, Crossplay und Eingabegerät im Reiter „Anmeldung und Kader“, Liga N weicht im Liga-N-Blatt ab (#2270)
 
 ### Fehlerbehebungen
 
-* Ergebnis von „Jetzt übertragen“ steht dort, wo übertragen wurde ([#2267](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2267)) ([e611469](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e611469460b0fe63b50a27fabf9a840100c46a8d))
-* Spiel-IDs: Rückfrage auch, wenn eine Spielversion ID-Quelle, Hauptspiel oder Erben wechselt; Spiele mit gespeicherten IDs lassen sich nicht löschen ([#2249](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2249)) ([134baee](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/134baeef3f6526664313099ca3bee156fec7da3e))
-* Spiel-IDs: Schlüssel mit gespeicherten Spieler-IDs fallen nur nach Rückfrage weg, alte Schlüssel bleiben erhalten ([#2249](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2249)) ([134baee](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/134baeef3f6526664313099ca3bee156fec7da3e))
-* Spiele: Umbenennen ändert die Adresse nicht mehr, ein neuer Slug mit gespeicherten Spieler-IDs nur nach Rückfrage ([#2249](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2249)) ([134baee](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/134baeef3f6526664313099ca3bee156fec7da3e))
+* Ergebnis von „Jetzt übertragen“ steht dort, wo übertragen wurde (#2267)
+* Spiel-IDs: Rückfrage auch, wenn eine Spielversion ID-Quelle, Hauptspiel oder Erben wechselt; Spiele mit gespeicherten IDs lassen sich nicht löschen (#2249)
+* Spiel-IDs: Schlüssel mit gespeicherten Spieler-IDs fallen nur nach Rückfrage weg, alte Schlüssel bleiben erhalten (#2249)
+* Spiele: Umbenennen ändert die Adresse nicht mehr, ein neuer Slug mit gespeicherten Spieler-IDs nur nach Rückfrage (#2249)
 
 ## 1.65.1 (03.11.2026)
 
