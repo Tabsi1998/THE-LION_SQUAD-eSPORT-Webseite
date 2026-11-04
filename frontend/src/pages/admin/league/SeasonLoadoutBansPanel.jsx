@@ -2,6 +2,8 @@
 // Alles ist erlaubt außer dem, was hier gesperrt ist; je Eintrag in allen Modi oder in einzelnen, an einer Waffe auch nur einzelne
 // Aufsätze. Jedes Speichern ist eine neue Version: Staffeln bekommen sie beim Übertragen, ein Spiel mit Ergebnis behält seine. Das
 // Regelwerk zeigt die Liste über den Baustein „Sperrliste“ - ist sie neuer als die letzte Fassung, sagt es der Hinweis oben.
+// Unterkategorien (#2287): je Kategorie gruppiert, je Unterkategorie der Schalter „Ganze Klasse sperren“ (auch je Modus) - er gilt für
+// alle Einträge der Klasse, auch spätere. Darunter die Einzelnen wie bisher.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Ban, ChevronDown, GitCompare, Search } from "lucide-react";
@@ -9,9 +11,10 @@ import { api, formatApiError } from "@/lib/api";
 import { gamePageUrl } from "@/lib/gameForm";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField } from "@/components/tls/FormFields";
-import { EquipmentThumb, LoadoutBansView } from "@/components/tls/league/LoadoutBansView";
+import { EquipmentThumb, LoadoutBansView, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import {
-  countText, fitsWeapon, formPayload, formProblem, groupByCategory, listToForm, matchesSearch, rowKey, sameRows, statusOf,
+  classRow, countText, fitsWeapon, formPayload, formProblem, groupByCategory, groupBySubcategory, listToForm, matchesSearch, NO_SUBCATEGORY,
+  rowKey, sameRows, statusOf,
 } from "@/lib/loadoutBans";
 import { viennaDate } from "@/lib/vienna";
 import { toast } from "sonner";
@@ -64,7 +67,10 @@ function VersionCompare({ seasonId, versions }) {
       setError(formatApiError(err.response?.data?.detail));
     }
   };
-  const line = (row) => `${row.name}${row.kind === "attachments" ? ` (Aufsätze: ${row.attachments.join(", ")})` : ""} · ${row.modes.join(", ")}`;
+  const line = (row) => {
+    if (row.kind === "class") return `ganze Klasse ${row.name} · ${row.modes.join(", ")}`;
+    return `${row.name}${row.kind === "attachments" ? ` (Aufsätze: ${row.attachments.join(", ")})` : ""} · ${row.modes.join(", ")}`;
+  };
   return (
     <details className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="season-bans-compare">
       <summary className="cursor-pointer select-none rounded-sm text-xs font-bold uppercase tracking-widest text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
@@ -82,9 +88,9 @@ function VersionCompare({ seasonId, versions }) {
         {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
         {diff ? (diff.same ? <p className="text-sm text-white/60" data-testid="season-bans-compare-same">Beide Versionen sperren dasselbe.</p> : (
           <ul className="space-y-1 text-sm break-words" data-testid="season-bans-compare-result" aria-live="polite">
-            {diff.added.map((row) => <li key={`a-${row.kind}-${row.item_id}`} className="text-[#29B6E8]">Neu gesperrt: {line(row)}</li>)}
-            {diff.changed.map((row) => <li key={`c-${row.kind}-${row.item_id}`} className="text-white/85">Geändert: {line(row)} <span className="text-white/50">(vorher {line(row.before)})</span></li>)}
-            {diff.removed.map((row) => <li key={`r-${row.kind}-${row.item_id}`} className="text-warn">Wieder erlaubt: {line(row)}</li>)}
+            {diff.added.map((row) => <li key={`a-${row.kind}-${row.item_id || row.subcategory}`} className="text-[#29B6E8]">Neu gesperrt: {line(row)}</li>)}
+            {diff.changed.map((row) => <li key={`c-${row.kind}-${row.item_id || row.subcategory}`} className="text-white/85">Geändert: {line(row)} <span className="text-white/50">(vorher {line(row.before)})</span></li>)}
+            {diff.removed.map((row) => <li key={`r-${row.kind}-${row.item_id || row.subcategory}`} className="text-warn">Wieder erlaubt: {line(row)}</li>)}
           </ul>
         )) : null}
       </div>
@@ -133,26 +139,63 @@ function WeaponAttachments({ weapon, attachments, row, keptIds, modes, onChange 
   );
 }
 
-function ItemLine({ item, role, row, attachmentRow, attachments, kept, keptAttached, modes, open, onToggleOpen, onItem, onAttachments }) {
-  const banned = !!row;
+// Kopf einer Unterkategorie (#2287): Symbol, Name, Zahl der Einträge und der Schalter „Ganze Klasse sperren“ mit den Modi.
+function ClassHead({ sub, count, row, modes, onChange, testId }) {
+  const on = Boolean(row);
+  return (
+    <div className={`mb-2 rounded-sm border px-2.5 py-2 ${on ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#0D0D0D]"}`} data-testid={testId}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <p className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+          <SubcategoryIcon src={sub.icon_url} />
+          <span className="break-words">{sub.label}</span>
+          <span className="font-semibold normal-case tracking-normal text-white/50 tabular-nums">{countText(count, "Eintrag", "Einträge")}</span>
+        </p>
+        <label className={`inline-flex cursor-pointer select-none items-center gap-2 rounded-sm border px-2.5 py-1 text-xs font-semibold focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-warn/60 bg-warn/10 text-warn" : "border-white/15 bg-[#0A0A0A] text-white/75 hover:border-white/30"}`}>
+          <input type="checkbox" checked={on} onChange={() => onChange(on ? null : { modes: [] })} className="accent-[#FF9F0A]"
+            aria-label={`Ganze Klasse ${sub.label} sperren`} data-testid={`${testId}-toggle`} />
+          Ganze Klasse sperren
+        </label>
+      </div>
+      {on ? (
+        <div className="mt-2 space-y-1.5">
+          {modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onChange({ modes: value })} label={`Modi für die Klasse ${sub.label}`} /> : null}
+          <p className="text-[11px] text-white/60">Gilt für alle Einträge der Klasse – auch für später angelegte.</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function modeNames(keys, modes) {
+  return keys.map((key) => modes.find((mode) => mode.mode === key)?.label || key).join(", ");
+}
+
+function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept, keptAttached, modes, open, onToggleOpen, onItem, onAttachments }) {
+  // Ganze Klasse in allen Modi gesperrt (#2287): der Eintrag ist mitgesperrt, einzeln gibt es nichts mehr zu tun.
+  const viaClass = Boolean(classBan && !classBan.modes.length);
+  const banned = !!row || viaClass;
   const blocked = statusOf(item) === "inactive" && !kept.has(rowKey("item", item.id));
-  const fullyBanned = banned && !row.modes.length;
+  const fullyBanned = (row && !row.modes.length) || viaClass;
   const attachmentCount = attachmentRow?.attachment_ids?.length || 0;
   return (
     <li className={`rounded-sm border p-2.5 ${banned ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-item-${item.id}`}>
       <div className="flex items-start gap-3">
         <EquipmentThumb src={item.image_url} sizes="80px" className="w-16 shrink-0 sm:w-20" />
         <div className="min-w-0 flex-1 space-y-1.5">
-          <label className={`flex items-start gap-2 ${blocked && !banned ? "cursor-not-allowed text-white/50" : "cursor-pointer text-white"}`}>
-            <input type="checkbox" checked={banned} disabled={blocked && !banned} onChange={() => onItem(banned ? null : { modes: [] })}
+          <label className={`flex items-start gap-2 ${(blocked && !banned) || viaClass ? "cursor-not-allowed text-white/70" : "cursor-pointer text-white"}`}>
+            <input type="checkbox" checked={banned} disabled={(blocked && !banned) || viaClass} onChange={() => onItem(row ? null : { modes: [] })}
               className="mt-0.5 accent-[#FF9F0A]" aria-label={`${item.name} sperren`} data-testid={`season-bans-toggle-${item.id}`} />
             <span className="min-w-0 text-sm font-semibold leading-snug break-words">
               {item.name}
               {statusOf(item) === "inactive" ? <span className="ml-1.5 text-[11px] font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
             </span>
           </label>
-          {banned && modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onItem({ modes: value })} label={`Modi für ${item.name}`} /> : null}
-          {role === "weapon" && !fullyBanned ? (
+          {viaClass ? <p className="text-[11px] text-warn" data-testid={`season-bans-via-class-${item.id}`}>Mit der ganzen Klasse gesperrt</p> : null}
+          {classBan && !viaClass ? (
+            <p className="text-[11px] text-white/60" data-testid={`season-bans-via-class-${item.id}`}>Klasse gesperrt in {modeNames(classBan.modes, modes)} – einzeln zusätzlich möglich</p>
+          ) : null}
+          {row && !viaClass && modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onItem({ modes: value })} label={`Modi für ${item.name}`} /> : null}
+          {role === "weapon" && !fullyBanned && !viaClass ? (
             <button type="button" onClick={onToggleOpen} aria-expanded={open} data-testid={`season-bans-open-${item.id}`}
               className="inline-flex items-center gap-1 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -184,7 +227,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   const load = useCallback(async () => {
     try {
       const { data: body } = await api.get(`/admin/leagues/seasons/${seasonId}/loadout-bans`);
-      const form = listToForm(body.list, body.library, body.game?.modes || []);
+      const form = listToForm(body.list, body.library, body.game?.modes || [], body.categories || []);
       setData(body);
       setRows(form.rows);
       setSaved(form.rows);
@@ -203,14 +246,38 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   const attachmentsByWeapon = useMemo(() => {
     const keys = new Set(categories.filter((row) => row.role === "attachment").map((row) => row.key));
     const all = library.filter((item) => keys.has(item.category));
-    return (weaponId) => all.filter((item) => fitsWeapon(item, weaponId));
+    return (weapon) => all.filter((item) => fitsWeapon(item, weapon));
   }, [categories, library]);
 
   if (error) return <p className="text-sm text-warn" role="alert" data-testid={`${testId}-error`}>{error}</p>;
   if (!data) return null;
   const list = data.list;
   const changed = !sameRows(rows, saved) || dropped.length > 0;
-  const bannedCount = Object.values(rows).filter((row) => row.kind === "item" || row.attachment_ids.length).length;
+  const bannedCount = Object.values(rows).filter((row) => row.kind !== "attachments" || row.attachment_ids.length).length;
+
+  // Ganze Klasse (#2287): an oder aus, dazu die Modi. In allen Modi gesperrt, entfallen Einzelzeilen darin (der Server nähme sie nicht).
+  const setClass = (subKey, patch) => setRows((current) => {
+    const key = rowKey("class", subKey);
+    const next = { ...current };
+    if (patch === null) {
+      delete next[key];
+      return next;
+    }
+    next[key] = { kind: "class", subcategory: subKey, modes: [], attachment_ids: [], ...current[key], ...patch };
+    if (!next[key].modes.length) {
+      const members = new Set(library.filter((item) => item.subcategory === subKey).map((item) => item.id));
+      for (const [rowId, row] of Object.entries(next)) {
+        if (row.kind === "class") continue;
+        if (members.has(row.item_id)) delete next[rowId];
+        else if (row.kind === "attachments" && row.attachment_ids.some((id) => members.has(id))) {
+          const rest = row.attachment_ids.filter((id) => !members.has(id));
+          if (rest.length) next[rowId] = { ...row, attachment_ids: rest };
+          else delete next[rowId];
+        }
+      }
+    }
+    return next;
+  });
 
   const setItem = (id, patch) => setRows((current) => {
     const next = { ...current };
@@ -229,7 +296,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   });
 
   const save = async () => {
-    const problem = formProblem(rows, library);
+    const problem = formProblem(rows, library, categories);
     if (problem) {
       toast.error(problem);
       return;
@@ -237,7 +304,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
     setSaving(true);
     try {
       const { data: body } = await api.put(`/admin/leagues/seasons/${seasonId}/loadout-bans`, {
-        entries: formPayload(rows, library), expected_version: list?.version || 0 });
+        entries: formPayload(rows, library, categories), expected_version: list?.version || 0 });
       toast.success(`Sperrliste gespeichert (Version ${body.version}).`);
       onSaved?.(body.staffeln_to_sync || 0);
       await load();
@@ -260,9 +327,17 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   };
 
   const keptAttached = (weaponId) => new Set((saved[rowKey("attachments", weaponId)]?.attachment_ids) || []);
+  const searching = Boolean(search.trim());
   const visible = library.filter((item) => matchesSearch(item, search)
-    && (!onlyBanned || rows[rowKey("item", item.id)] || rows[rowKey("attachments", item.id)]));
-  const groups = groupByCategory(visible, categories).filter((group) => (!only || group.category.key === only) && group.items.length);
+    && (!onlyBanned || rows[rowKey("item", item.id)] || rows[rowKey("attachments", item.id)] || classRow(rows, item.subcategory)));
+  // Je Kategorie die Abschnitte: ohne Unterkategorie zuerst, dann je Unterkategorie - eine Klasse bleibt sichtbar, solange sie gesperrt
+  // ist oder (ohne Suche und Filter) zum Sperren angeboten wird, auch leer.
+  const groups = groupByCategory(visible, categories)
+    .filter((group) => !only || group.category.key === only)
+    .map((group) => ({ ...group, sections: groupBySubcategory(group.items, group.category).filter(({ sub, items }) => items.length
+      || (sub && (classRow(rows, sub.key) || (!searching && !onlyBanned)))) }))
+    .filter((group) => group.sections.length);
+  const newInClasses = list?.class_new_items || [];
 
   return (
     <section className="space-y-4 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby={`${testId}-title`} data-testid={testId}>
@@ -324,24 +399,50 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
               </button>
             ))}
           </div>
-          <div className="space-y-6">
-            {groups.map(({ category, items }) => (
+          {newInClasses.length ? (
+            <p className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-xs text-white/70" role="status" data-testid={`${testId}-class-new`}>
+              Seit dieser Version neu in gesperrten Klassen und schon mitgesperrt: {newInClasses.map((row) => `${row.label}: ${row.names.join(", ")}`).join(" · ")}.
+            </p>
+          ) : null}
+          <div className="space-y-8">
+            {groups.map(({ category, sections }) => (
               <div key={category.key} data-testid={`${testId}-group-${category.key}`}>
-                <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{category.label}</h3>
-                <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-                  {items.map((item) => (
-                    <ItemLine key={item.id} item={item} role={category.role} row={rows[rowKey("item", item.id)]}
-                      attachmentRow={rows[rowKey("attachments", item.id)]} attachments={category.role === "weapon" ? attachmentsByWeapon(item.id) : []}
-                      kept={kept} keptAttached={keptAttached(item.id)} modes={modes} open={!!open[item.id] || !!rows[rowKey("attachments", item.id)]}
-                      onToggleOpen={() => setOpen((current) => ({ ...current, [item.id]: !current[item.id] }))}
-                      onItem={(patch) => setItem(item.id, patch)} onAttachments={(patch) => setAttachments(item.id, patch)} />
+                <h3 className="mb-3 border-b border-white/10 pb-2 font-heading text-base font-bold uppercase text-white">{category.label}</h3>
+                <div className="space-y-5">
+                  {sections.map(({ sub, items }) => (
+                    <div key={sub?.key || "ohne"} data-testid={`${testId}-section-${sub?.key || `${category.key}-ohne`}`}>
+                      {sub ? (
+                        <ClassHead sub={sub} count={library.filter((item) => item.subcategory === sub.key).length} row={classRow(rows, sub.key)} modes={modes}
+                          onChange={(patch) => setClass(sub.key, patch)} testId={`${testId}-class-${sub.key}`} />
+                      ) : category.subcategories?.length ? (
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-white/55">{NO_SUBCATEGORY}</p>
+                      ) : null}
+                      {items.length ? (
+                        <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                          {items.map((item) => (
+                            <ItemLine key={item.id} item={item} role={category.role} row={rows[rowKey("item", item.id)]} classBan={classRow(rows, item.subcategory)}
+                              attachmentRow={rows[rowKey("attachments", item.id)]} attachments={category.role === "weapon" ? attachmentsByWeapon(item) : []}
+                              kept={kept} keptAttached={keptAttached(item.id)} modes={modes} open={!!open[item.id] || !!rows[rowKey("attachments", item.id)]}
+                              onToggleOpen={() => setOpen((current) => ({ ...current, [item.id]: !current[item.id] }))}
+                              onItem={(patch) => setItem(item.id, patch)} onAttachments={(patch) => setAttachments(item.id, patch)} />
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="rounded-sm border border-dashed border-white/15 px-3 py-2 text-xs text-white/55">
+                          Noch kein Eintrag in dieser Klasse – eine Sperre gilt ab dem ersten.
+                        </p>
+                      )}
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             ))}
             {!groups.length ? <p className="text-sm text-white/60">Nichts gefunden.</p> : null}
           </div>
-          <p className="text-xs text-white/60">Ein Aufsatz in seiner Kategorie gesperrt gilt an jeder Waffe; an einer einzelnen Waffe sperrst du ihn über „Aufsätze einzeln sperren“.</p>
+          <p className="text-xs text-white/60">
+            Eine ganze Klasse gesperrt gilt für alle ihre Einträge, auch später angelegte. Ein Aufsatz in seiner Kategorie gesperrt gilt an
+            jeder Waffe; an einer einzelnen Waffe sperrst du ihn über „Aufsätze einzeln sperren“.
+          </p>
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#121212]/95 px-4 py-3 md:-mx-5 md:px-5">
             <button type="button" onClick={save} disabled={saving || !changed} data-testid={`${testId}-save`}
               className="tls-btn tls-btn--primary rounded-sm px-5 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
