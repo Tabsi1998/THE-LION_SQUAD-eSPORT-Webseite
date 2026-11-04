@@ -126,6 +126,37 @@ async def test_publishing_freezes_blocks_and_variables_and_a_changed_setting_nev
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("used", [False, True])
+async def test_a_preset_variable_only_asks_for_a_release_when_the_version_uses_it(flow, used):
+    """Vorab angelegte Variablen (E.2, E.3, D.5): Eine Fassung ohne sie bleibt ruhig, wenn das Season-Feld später kommt; nutzt sie die
+    Variable, meldet die Verwaltung „Regelwerk muss freigegeben werden“ mit altem und neuem Wert."""
+    w = await make_world(flow)
+    await set_rule(flow, w, RULE)
+    body = BODY + ("\n\n# § 6 Proteste\nFrist {{protest.hours}}, Pause {{match.break_minutes}} nach Map {{match.break_after_map}}." if used else "")
+    version = await publish(flow, w, body=body, annexes=[])
+    sid = w["season"]["id"]
+    if used:
+        assert version["frozen_vars"][sid]["protest.hours"]["value"] == "48 Stunden", "eingefroren mit der Vorgabe"
+    flow.act_as(w["lead"])
+    assert ok(await flow.get(season_scope(w)))["data_changes"] is None
+
+    # Das spätere Paket schreibt das Season-Feld.
+    await flow.db.league_seasons.update_one({"id": sid}, {"$set": {"protest_hours": 72, "map_break_minutes": 10}})
+
+    view = ok(await flow.get(season_scope(w)))
+    if not used:
+        assert view["data_changes"] is None and view["proposal"] is None
+        assert ok(await flow.get("/api/users/me/duty"))["rules_pending"] == []
+        return
+    rows = {row["block"]: row for row in view["data_changes"]["rows"] if row["kind"] == "variable"}
+    assert set(rows) == {"protest.hours", "match.break_minutes"}
+    assert (rows["protest.hours"]["before"], rows["protest.hours"]["after"]) == ("48 Stunden", "72 Stunden")
+    assert (rows["match.break_minutes"]["before"], rows["match.break_minutes"]["after"]) == ("5 Min.", "10 Min.")
+    assert "Frist 72 Stunden, Pause 10 Min. nach Map 2." in body_of(view["proposal"])
+    assert ok(await flow.get("/api/users/me/duty"))["rules_pending"][0]["kind"] == "changed"
+
+
+@pytest.mark.asyncio
 async def test_a_draft_blocks_the_proposal_and_an_old_base_is_refused(flow):
     w = await make_world(flow)
     version = await publish(flow, w, body=BODY, annexes=[], confirm_empty=True)

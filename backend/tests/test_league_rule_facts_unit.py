@@ -233,8 +233,12 @@ def test_preset_variables_use_the_default_until_the_season_carries_the_field():
         "protest.hours", "appeal.hours", "evidence.keep_days", "match.break_after_map", "match.break_minutes")} == {
         "protest.hours": "48 Stunden", "appeal.hours": "48 Stunden", "evidence.keep_days": "30 Tage",
         "match.break_after_map": "2", "match.break_minutes": "5 Min."}
-    later = variables.Context(league=ctx.league, season={**SEASON, "protest_hours": 72, "map_break_minutes": 10}, game=GAME)
-    assert variables.value_of("protest.hours", later) == "72 Stunden" and variables.value_of("match.break_minutes", later) == "10 Min."
+    later = variables.Context(league=ctx.league, season={**SEASON, "protest_hours": 72, "appeal_hours": 24, "evidence_keep_days": 60,
+                                                         "map_break_after": 3, "map_break_minutes": 10}, game=GAME)
+    assert {name: variables.value_of(name, later) for name in (
+        "protest.hours", "appeal.hours", "evidence.keep_days", "match.break_after_map", "match.break_minutes")} == {
+        "protest.hours": "72 Stunden", "appeal.hours": "24 Stunden", "evidence.keep_days": "60 Tage",
+        "match.break_after_map": "3", "match.break_minutes": "10 Min."}, "jede Variable liest ihr eigenes Feld"
     league_only = variables.Context(league=ctx.league, season=None, game=GAME)
     assert variables.value_of("protest.hours", league_only) is None, "auf der Seite der Liga „(je Season)“"
     frozen = variables.resolve(["protest.hours", "match.break_minutes"], ctx)
