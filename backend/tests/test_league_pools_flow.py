@@ -478,8 +478,9 @@ async def test_an_unready_season_lists_its_problems_and_does_not_publish(flow):
     await flow.db.map_pools.update_one({"id": pool["id"]}, {"$set": {"modes": [pool["modes"][0] | {"maps": pool["modes"][0]["maps"][:1]}]}})
     result = ok(await flow.get(f"{ADMIN}/seasons/{w['season']['id']}/readiness"))
     assert not result["ok"]
+    # Seit D.3 (#1618) beginnt eine neue Season mit Veto an und vorbelegter Vorlage - mit diesem Pool geht sie nicht auf.
     assert codes(result["problems"]) == {"pool_too_small", "mode_order_missing", "rules_missing", "staffel_missing",
-                                         "application_after_start"}
+                                         "application_after_start", "veto_invalid"}
     club = await flow.add_user(role="club_admin", name="Vorstand")
     flow.act_as(club)
     blocked = await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "members", "readiness_override_reason": "Bitte trotzdem"})

@@ -137,3 +137,23 @@ test("bestätigen: Punkte der Erstmeldung stehen da, mit dem Hinweis auf den Ein
   expect(screen.queryByTestId("league-games-summary-score-2")).toBeNull();
   expect(screen.getByTestId("league-confirm-scores-hint")).toHaveTextContent("Es zählen die Punkte der ersten Meldung");
 });
+// Veto (#1618, D.3): die festgelegte Map steht fest im Formular, Map-Kacheln gibt es dann nicht; der Server prüft die Meldung dagegen.
+test("melden nach dem Veto: Map und Modus je Position stehen fest, nur Sieger und Aufstellung werden eingetragen", async () => {
+  const onReport = vi.fn().mockResolvedValue(true);
+  const league = { ...LEAGUE, planned_games: [
+    { position: 1, mode: "stellung", mode_label: "Stellung", map_id: "nebel", map_name: "Nebel", map_image_url: null, role: "picked", by_registration_id: "a" },
+    { position: 2, mode: "suchen", mode_label: "Suchen", map_id: "turm", map_name: "Turm", map_image_url: null, role: "decider", by_registration_id: null },
+  ] };
+  render(<LeagueReportForm league={league} state={{ status: "open" }} onReport={onReport} />);
+  expect(screen.getByTestId("league-game-1-planned")).toHaveTextContent("Nebel");
+  expect(screen.getByTestId("league-game-1-planned")).toHaveTextContent("laut Veto · Stellung");
+  expect(screen.queryByTestId("league-game-1-map-hafen")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("league-game-1-winner-a"));
+  fireEvent.click(screen.getByTestId("league-game-1-lineup-u1"));
+  fireEvent.click(screen.getByTestId("league-game-1-lineup-u2"));
+  expect(screen.getByTestId("league-game-2-planned")).toHaveTextContent("laut Veto (Decider) · Suchen");
+  fireEvent.click(screen.getByTestId("league-game-2-winner-a"));
+  fireEvent.click(screen.getByTestId("match-report-submit"));
+  await waitFor(() => expect(onReport).toHaveBeenCalled());
+  expect(onReport.mock.calls[0][0].games.map((game) => [game.position, game.mode, game.map_id])).toEqual([[1, "stellung", "nebel"], [2, "suchen", "turm"]]);
+});

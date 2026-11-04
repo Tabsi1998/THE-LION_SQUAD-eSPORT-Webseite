@@ -45,6 +45,7 @@ from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
     STATION_GONE,
     restore_change,
+    undo_revision,
     written_state,
     ensure_plan_keeps_result_state,
     ensure_station_open,
@@ -1036,7 +1037,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "decision_note": normalized_note,
             "updated_at": now_iso,
         }})
-        await getattr(db, collection).update_one({"id": match_id}, {"$set": {
+        # Liga-Check-in (D.2, #1652): eine Verlängerung gehört zum alten Fenster; die Termin-Revision steigt (Codex zu D.3, #1618).
+        await getattr(db, collection).update_one({"id": match_id}, checkin_rules.new_time_change(tournament, {"$set": {
             "scheduled_at": scheduled_at,
             "schedule_status": "accepted",
             # Der geltende Termin steht in der Partie, mit Quelle (#235).
@@ -1044,9 +1046,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "schedule_written_at": now_iso,
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
-        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": "",  # Der Termin steht: keine Frist mehr.
-                      # Liga-Check-in (D.2, #1652): eine Verlängerung gehört zum alten Fenster.
-                      **checkin_rules.new_time_unset(tournament)}})
+        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}}))  # Der Termin steht: keine Frist mehr.
         # Liga-Termine (#2194): Einigung in die Historie; mit Regeln schließen die übrigen offenen Vorschläge.
         await league_schedule.after_agreement(db, match, tournament, proposal, me, (acting_reg or {}).get("id"))
         await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
@@ -1391,21 +1391,20 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         station_moved = "station_id" in updates and updates["station_id"] != v2_match.get("station_id")
         if v2_match.get("called_at") and (status_moved or station_moved):
             change["$unset"] = {"called_at": ""}
-        if (v2_match.get("no_show_extended_until") and "scheduled_at" in updates
-                and _moment(updates["scheduled_at"]) != _moment(v2_match.get("scheduled_at"))):
-            # Liga-Check-in (D.2, #1652): eine Verlängerung der Leitung gehört zum alten Fenster - der neue Termin bringt sein eigenes.
+        if "scheduled_at" in updates and _moment(updates["scheduled_at"]) != _moment(v2_match.get("scheduled_at")):
+            # Liga-Check-in (D.2, #1652): eine Verlängerung der Leitung gehört zum alten Fenster - der neue Termin bringt sein eigenes;
+            # die Termin-Revision steigt (Codex zu D.3, #1618), auch zurück auf den alten Termin.
             tournament_scope = await db.tournaments.find_one({"id": v2_match["tournament_id"]},
                                                              {"_id": 0, "league_context": 1, "checkin_rules": 1})
-            change.setdefault("$unset", {}).update(checkin_rules.new_time_unset(tournament_scope))
-            if not change["$unset"]:
-                del change["$unset"]
+            change = checkin_rules.new_time_change(tournament_scope, change)
         before = await db.matches_v2.find_one_and_update({"id": match_id}, change, projection={"_id": 0},
                                                          return_document=ReturnDocument.BEFORE) or v2_match
         if new_station and not await station_open_for_matches(db, new_station):
             # Die Station wurde zwischen Prüfung und Schreiben gelöscht (Codex zu #1611): exakt zurück auf den Stand vor
             # dem Schreiben (auch ein entferntes „aufgerufen um“) - nur, wenn das Spiel noch so dasteht wie geschrieben.
-            back = await db.matches_v2.update_one(
-                written_state(match_id, change), restore_change(before, [*updates, *change.get("$unset", {})]))
+            # Auch die Termin-Revision (Codex-Nachprüfung zu D.3): sonst wären Check-ins und Veto ungültig, obwohl der Termin blieb.
+            rollback = undo_revision(before, change, restore_change(before, [*updates, *change.get("$unset", {})]))
+            back = await db.matches_v2.update_one(written_state(match_id, change), rollback)
             if not back.matched_count:
                 logger.warning("[match] %s an gelöschter Station %s, inzwischen fremd geändert - nicht zurückgesetzt",
                                _log_safe(match_id), _log_safe(new_station))

@@ -419,7 +419,7 @@ function MatchPageView() {
         {/* Liga-Check-in (#1652): Stand, Countdown, Anwesende und Start - nur Beteiligte und Leitung bekommen den Block. */}
         {data.checkin ? (
           <CheckinPanel block={data.checkin} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })}
-            onAskLead={canUseChat ? askStaff : null}
+            onPoll={() => load().catch(() => {})} onAskLead={canUseChat ? askStaff : null}
             leadUrl={data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ns-${id}` : null} />
         ) : null}
         {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}

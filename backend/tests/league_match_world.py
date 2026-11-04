@@ -27,20 +27,30 @@ async def without_score_duty(flow, season: dict) -> None:
     assert saved.status_code == 200, saved.text
 
 
+async def without_veto(flow, season: dict) -> None:
+    """Neue Seasons beginnen mit Veto an (D.3, #1618, Fabian Nr. 105) - hier aus, für Tests, die melden, ohne das Veto zu prüfen
+    (sonst heißt es „Erst das Veto abschließen“). Über die Route, wie die Leitung es täte."""
+    saved = await flow.put(f"/api/admin/leagues/seasons/{season['id']}/veto-rules", json={"enabled": False})
+    assert saved.status_code == 200, saved.text
+
+
 async def checked_in(flow, match_id: str) -> None:
     """Erst einchecken, dann melden (D.2, #1652): beide Seiten gelten für den geltenden Termin als eingecheckt - die Vorbedingung jeder
     Meldung der Captains in einer Staffel mit Check-in-Regeln (jede neue Season hat sie). Schreibt die Einträge in der Form von
     ``match_flow.check_in`` direkt, ohne Fenster und Kader: Tests zu Maps, Pools, Tabelle und Fristen brauchen den Check-in als
     Vorbedingung, nicht als Gegenstand (den prüft test_league_checkin_flow)."""
-    match = await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0, "slots": 1, "scheduled_at": 1}) or {}
+    match = await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0, "slots": 1, "scheduled_at": 1, "flow": 1}) or {}
     now_iso = now_utc().isoformat()
     for_at = iso(match.get("scheduled_at"))
+    # Termin-Revision (Codex zu D.3): der Eintrag gehört zum geltenden Termin und seiner Revision.
+    rev = int(((match.get("flow") or {}).get("schedule_rev")) or 0)
     entries = {
         f"flow.checkin.{slot['registration_id']}": {"at": now_iso, "updated_at": now_iso, "user_id": None, "present": [], "via": "side",
-                                                   "by": None, "reason": None, "rule_version_id": None, "for_at": for_at}
+                                                   "by": None, "reason": None, "rule_version_id": None, "for_at": for_at, "rev": rev}
         for slot in match.get("slots") or [] if slot.get("registration_id")}
     assert len(entries) == 2, "zwei Seiten"
-    await flow.db.matches_v2.update_one({"id": match_id}, {"$set": {**entries, "flow.ready_at": now_iso, "flow.ready_for": for_at}})
+    await flow.db.matches_v2.update_one({"id": match_id}, {"$set": {**entries, "flow.ready_at": now_iso, "flow.ready_for": for_at,
+                                                                     "flow.ready_rev": rev}})
 
 
 POOL = [

@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date
 
 from models import normalize_rule, rule_time_limit_seconds
-from services import game_maps, league_platform, map_pools, mode_icons
+from services import game_maps, league_platform, league_veto_rules, map_pools, mode_icons
 from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS, ScheduleProblem, normalize as normalize_schedule
 from services.markdown_text import text_cell
 from services.scoring_rules import normalize_rules
@@ -524,3 +524,57 @@ async def build_eligibility(db, league: dict, season: dict) -> dict:
 
 def game_mode_labels(game: dict | None) -> dict[str, str]:
     return {row["mode"]: row["label"] for row in game_maps.game_modes(game)}
+
+
+# ---------------------------------------------------------------- Veto (D.3, #1618)
+
+NO_VETO = "*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*"
+TEAM_A_WORDS = {"home": "Team A ist das Heimteam laut Spielplan, Team B der Gast.", "draw": "Team A wird je Spiel vom System gelost."}
+TEAM_A_SHORT = {"home": "das Heimteam laut Spielplan", "draw": "per Los je Spiel"}
+
+
+def veto_rules_of(season: dict) -> dict | None:
+    """Die Veto-Vorlage (D.3) der Season - ``None`` ohne Feld, mit Veto aus oder ohne Schritte; ein von Hand verbogener Wert zählt wie aus."""
+    raw = season.get("veto_rules")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        rules = league_veto_rules.normalize(raw)
+    except league_veto_rules.VetoProblem:
+        return None
+    return rules if rules["enabled"] and rules["steps"] else None
+
+
+def veto_data(season: dict, game: dict | None) -> dict:
+    """Die Daten des Bausteins: Team-A-Regel, Zeit je Schritt und die Schritte mit dem heutigen Namen des Modus - ``{enabled: false}``
+    ohne Veto."""
+    rules = veto_rules_of(season)
+    if not rules:
+        return {"enabled": False}
+    labels = game_mode_labels(game)
+    return {"enabled": True, "team_a": rules["team_a"], "step_seconds": int(rules["step_seconds"]),
+            "steps": [{"kind": step["kind"], "mode": step["mode"], "mode_label": labels.get(step["mode"], step["mode"]), "team": step["team"],
+                       "position": step["position"]} for step in rules["steps"]]}
+
+
+def render_veto(data: dict, variant: str = MARKDOWN) -> str:
+    """Liste: Team-A-Regel, Zeit je Schritt, Start nach dem Check-in; dann die Schritte nummeriert („1. Team A sperrt eine Map (Stellung)“)."""
+    if not data.get("enabled") or not data.get("steps"):
+        return NO_VETO
+    lines = [
+        f"- {TEAM_A_WORDS.get(data.get('team_a'), TEAM_A_WORDS['home'])}",
+        f"- Je Schritt {int(data.get('step_seconds') or 60)} Sekunden – nach Ablauf wählt das System zufällig aus den noch zulässigen Maps.",
+        "- Das Veto beginnt, sobald beide Teams eingecheckt sind; Map 1 folgt direkt danach.",
+        "",
+    ]
+    lines += [f"{index}. {_cell(league_veto_rules.step_sentence(step, step.get('mode_label') or step.get('mode') or ''))}"
+              for index, step in enumerate(data["steps"], 1)]
+    return "\n".join(lines)
+
+
+async def build_veto(db, league: dict, season: dict) -> dict:
+    data = veto_data(season, await game_of(db, league))
+    source = ({"team_a": data["team_a"], "step_seconds": data["step_seconds"],
+               "steps": [{key: step[key] for key in ("kind", "mode", "team", "position")} for step in data["steps"]]}
+              if data.get("enabled") else None)
+    return {"source": {"veto_rules": source}, "data": data}

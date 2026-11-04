@@ -740,6 +740,18 @@ async def _safe_match_deadlines():
         _log_task_failure("match_deadlines", exc)
 
 
+async def _safe_league_veto():
+    """Veto der Liga (#1618, D.3): abgelaufene Fristen auflösen - alle 10 Sekunden, nur laufende Vetos mit erreichter Frist."""
+    try:
+        from database import get_db
+        from services.league_veto_sweep import sweep
+        result = await sweep(get_db())
+        if result.get("auto"):
+            logger.info(f"[scheduler] league_veto auto={result['auto']}")
+    except Exception as exc:
+        _log_task_failure("league_veto", exc)
+
+
 async def _safe_draw_show():
     """Show-Auslosung (#1590): Erinnerung an die Turnierleitung, nach der Frist lost der Server selbst."""
     try:
@@ -1217,6 +1229,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Show-Auslosung (#1590): erinnern und nach der Frist selbst auslosen - jede Minute.
     sched.add_job(_single_replica("draw_show", _safe_draw_show, lease_seconds=120.0), IntervalTrigger(seconds=60),
                   id="draw_show", max_instances=1, coalesce=True)
+    # Veto der Liga (#1618, D.3): 60 Sekunden je Schritt - alle 10 Sekunden nachsehen, ob eine Frist abgelaufen ist.
+    sched.add_job(_single_replica("league_veto", _safe_league_veto, lease_seconds=60.0), IntervalTrigger(seconds=10),
+                  id="league_veto", max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
     sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",
                   max_instances=1, coalesce=True)

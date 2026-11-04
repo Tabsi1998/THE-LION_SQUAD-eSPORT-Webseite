@@ -108,6 +108,23 @@ test("beide da, aber eine Seite muss erst zustimmen: kein Start, der Satz nennt 
   expect(screen.getByTestId("checkin-consent-b")).toHaveTextContent("diese Seite muss erst zustimmen");
 });
 
+test("Veto läuft: nur eine Überschrift - der Check-in-Kopf wird schlank, die Seiten in einer Zeile, kein Start", () => {
+  const both = [{ ...OWN, checked_in: true, present_count: 2 }, { ...OTHER, checked_in: true, present_count: 3 }];
+  const veto = { status: "running", version: 1, step_seconds: 60, team_a: { registration_id: "a", name: OWN.name, via: "home" }, team_b: { registration_id: "b", name: OTHER.name },
+    current: { index: 0, number: 1, total: 5, kind: "ban", mode: "hp", mode_label: "Stellung", registration_id: "a", name: OWN.name, position: null, deadline_at: LATER, remaining_seconds: 50 },
+    own_turn: true, can_pick: true, pick_hint: null, options: [{ map_id: "hafen", name: "Hafen", image_url: null, allowed: true, hint: null }],
+    remaining: [], history: [], planned_games: [], paused: null, lead: null };
+  renderPanel({ ...BLOCK, state: "veto", sides: both, can_start: false, start_hint: "Erst das Veto abschließen, dann starten.", veto });
+  expect(screen.queryByTestId("checkin-headline")).toBeNull();
+  expect(screen.getByTestId("checkin-slim")).toHaveTextContent("Beide Seiten eingecheckt");
+  expect(screen.getByTestId("checkin-slim")).toHaveTextContent("2 Spieler");
+  expect(screen.queryByTestId("checkin-sides")).toBeNull();
+  expect(screen.getAllByText("Veto läuft")).toHaveLength(1);
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Veto läuft");
+  expect(screen.queryByTestId("checkin-start")).toBeNull();
+  expect(screen.queryByTestId("checkin-countdown")).toBeNull();
+});
+
 test("läuft: nur noch der Stand", () => {
   renderPanel({ ...BLOCK, state: "running", started_at: "2026-11-14T19:02:00+00:00", can_checkin: false, checkin_hint: "Das Spiel läuft schon." });
   expect(screen.getByTestId("checkin-headline")).toHaveTextContent("Spiel läuft");

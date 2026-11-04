@@ -267,6 +267,9 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("map_pool", "Map-Pool", "Die Maps je Modus aus dem Map-Pool der Season.", _map_pool, pool_table, _pool_images),
     Block("mode_order", "Modusfolge", "Die Modi je Map aus den Vorgaben der Season.", _mode_order, _mode_order_text, _mode_order_images),
     Block("checkin", "Check-in", "Fenster und Mindestzahl des Check-ins aus den Vorgaben der Season (D.2).", _checkin, _checkin_text),
+    # Veto (D.3, #1618) - Daten und Darstellung in league_rule_facts, wie die Bausteine aus den Einstellungen.
+    Block("veto", "Veto", "Team-A-Regel, Zeit je Schritt und die Schrittfolge des Map-Vetos aus den Vorgaben der Season (D.3).",
+          facts.build_veto, facts.render_veto),
     Block("loadout_bans", "Erlaubte Ausrüstung", "Was gespielt werden darf: die aktive Bibliothek ohne die Sperrliste der Season, je "
           "Kategorie und Unterkategorie mit Bildern und Einschränkungen (nicht in einem Modus, nicht an einer Waffe); ganz gesperrte "
           "Klassen als „nicht erlaubt“ (Anlage A).", _loadout_bans,

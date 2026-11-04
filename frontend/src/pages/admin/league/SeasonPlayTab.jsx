@@ -16,6 +16,7 @@ import { orderPoolHints } from "@/lib/seasonTabs";
 import { SeasonPoolMinimum } from "./SeasonReadinessPanel";
 import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
+import { SeasonVetoRulesPanel } from "./SeasonVetoRulesPanel";
 
 /** Name eines Modus - das Symbol davor setzt der Map-Pool-Editor selbst (#2266). */
 export function SeasonModeLabel({ label }) {
@@ -138,6 +139,10 @@ export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness,
             <ModeOrder modes={orderModes} poolModes={pool?.modes} bestOf={longest} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)}
               note={orderNote} hints={hints} />
           </FormSection>
+          {/* Veto (D.3, #1618): eigener Kasten mit eigenem Speichern, direkt nach Best of und „Modus je Map“, auf die sich die Vorlage bezieht. */}
+          <div id="veto" className="scroll-mt-24">
+            <SeasonVetoRulesPanel seasonId={seasonId} />
+          </div>
           <FormSection title="Nach dem Spiel" testId="season-after-match" hint="Fristen fürs Bestätigen und Nachtragen.">
             <FormGrid>
               <TextField label="Ergebnis gilt nach (Stunden)" type="number" min={1} max={336} value={form.result_confirm_hours} onChange={(value) => set("result_confirm_hours", value)}

@@ -30,7 +30,7 @@ from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
-from services import checkin_rules
+from services import checkin_rules, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.log_safe import log_safe
 from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
@@ -466,6 +466,9 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     # Check-in (#1652, D.2): ebenso - ohne Feld gibt es in der Staffel keinen Check-in.
     if isinstance(season.get("checkin_rules"), dict):
         fields["checkin_rules"] = dict(season["checkin_rules"])
+    # Veto (#1618, D.3): ebenso - ohne Feld (oder aus) gibt es in der Staffel kein Veto.
+    if isinstance(season.get("veto_rules"), dict):
+        fields["veto_rules"] = copy.deepcopy(season["veto_rules"])
     return fields
 
 
@@ -481,6 +484,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "schedule": ("schedule_rules",),
     # Check-in (#1652, D.2): ebenso eine eigene Gruppe, gilt für die nächsten Spiele.
     "checkin": ("checkin_rules",),
+    # Veto (#1618, D.3): ebenso - ein laufendes Veto behält seinen Schnappschuss der Vorlage.
+    "veto": ("veto_rules",),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -494,6 +499,7 @@ SYNC_GROUP_LABELS = {
     "result_rules": "Ergebnisregeln, Einstellungen und Punktepflicht",
     "schedule": "Terminregeln",
     "checkin": "Check-in",
+    "veto": "Veto",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
@@ -763,6 +769,11 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     doc.setdefault("schedule_rules", dict(SCHEDULE_RULE_DEFAULTS))
     # Check-in (#1652, docs/LIGA.md D.2): ebenso, die Mindestzahl aus Teilnehmerliste oder Teamgröße; gepflegt über …/checkin-rules.
     doc.setdefault("checkin_rules", checkin_rules.defaults_for_season(doc))
+    # Veto (#1618, docs/LIGA.md D.3; Fabian Nr. 105): neue Seasons mit Veto an, die Vorlage aus Modusfolge und Best of vorbelegt - der
+    # Pool kommt erst später; bis zum ersten Speichern von Hand (Merker ``auto``, Nr. 108) zieht sie mit dem Pool nach. Je Season
+    # abschaltbar, gepflegt über …/veto-rules.
+    doc.setdefault("veto_rules", {**league_veto_rules.defaults(), "enabled": True, league_veto_rules.AUTO: True,
+                                  "steps": league_veto_rules.propose(order=doc.get("game_mode_order"), pool=None, best_of=doc.get("best_of"))})
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
     if before_write:

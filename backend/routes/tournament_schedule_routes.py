@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
+from services import checkin_rules
 from services.match_deadlines import auto_confirm_due, no_show_deadline, opened_at
 from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, apply_plan, plan_for_tournament, station_query
 from services.league_permissions import BULK_CONFLICT_DETAIL, READ, involved_match_ids
@@ -148,14 +149,17 @@ async def release_schedule(tid: str, body: ScheduleRelease, me: dict = Depends(g
         chosen.append(match)
     await _refuse_own_matches(db, tournament, me, chosen)
     stamp = now_utc().isoformat()
+    # Liga (D.2/D.3, #1652/#1618; Codex-Nachprüfung): ohne Termin gilt das alte Fenster nicht mehr, die Termin-Revision steigt -
+    # alte Check-ins und ein laufendes Veto zählen nicht mehr. Für andere Turniere ändert new_time_change nichts.
+    change = checkin_rules.new_time_change(tournament, {
+        "$set": {"scheduled_at": None, "station_id": None, "schedule_source": None, "schedule_forecast": False, "updated_at": stamp},
+        "$unset": {"called_at": ""}})
     released = []
     for match in chosen:
         # Compare-and-Set: nur wenn das Spiel noch so dasteht wie gelesen und nicht begonnen hat.
         result = await db.matches_v2.update_one(
             {"id": match["id"], "scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
-             "schedule_source": match.get("schedule_source"), "started_at": None},
-            {"$set": {"scheduled_at": None, "station_id": None, "schedule_source": None, "schedule_forecast": False,
-                      "updated_at": stamp}, "$unset": {"called_at": ""}})
+             "schedule_source": match.get("schedule_source"), "started_at": None}, change)
         if result.matched_count:
             released.append(match)
     if released:

@@ -26,6 +26,8 @@ export const SYNC_GROUP_TEXT = {
   running: "Antwortfrist auf Terminvorschläge",
   // Wie SYNC_GROUP_LABELS im Server (league_service.py): Terminregeln (#2194), Ergebnisregeln (#1617), Sperrliste (#2218).
   schedule: "Terminregeln",
+  checkin: "Check-in",
+  veto: "Veto",
   result_rules: "Ergebnisregeln und Punktepflicht",
   before_start: "Termine und Kalender",
   before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",

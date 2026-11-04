@@ -46,8 +46,11 @@ describe("Reiter und Adresse", () => {
     expect(readinessAnchor("rules_missing")).toBe("regelwerk");
     expect(readinessAnchor("application_after_start")).toBe("selbstanmeldung");
     expect(readinessAnchor("staffel_missing")).toBe("staffeln");
+    expect(readinessAnchor("veto_invalid")).toBe("veto");
+    expect(readinessAnchor("veto_without_checkin")).toBe("checkin");
     expect(readinessAnchor("neu_und_unbekannt")).toBe("");
-    for (const anchor of ["modi", "serie", "regelwerk", "selbstanmeldung", "staffeln"]) expect(seasonTarget(`#${anchor}`).tab).not.toBe("ueberblick");
+    for (const anchor of ["modi", "serie", "veto", "regelwerk", "selbstanmeldung", "staffeln"]) expect(seasonTarget(`#${anchor}`).tab).not.toBe("ueberblick");
+    expect(seasonTarget("#veto")).toEqual({ tab: "spielbetrieb", section: "veto" });
   });
 });
 

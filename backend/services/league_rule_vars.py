@@ -39,6 +39,8 @@ class Context:
     table: dict = field(default_factory=dict)
     schedule: dict = field(default_factory=dict)
     eligibility: dict = field(default_factory=dict)
+    # Veto (D.3, #1618): ``{enabled: false}`` ohne Veto - die Variablen sind dann „(nicht festgelegt)“.
+    veto: dict = field(default_factory=dict)
 
 
 async def context(db, league: dict, season: dict | None) -> Context:
@@ -53,6 +55,7 @@ async def context(db, league: dict, season: dict | None) -> Context:
         ctx.table = facts.table_data(season, ctx.divisions)
         ctx.schedule = facts.schedule_data(season)
         ctx.eligibility = facts.eligibility_data(season, ctx.id_fields, platform=await facts.platform_data(db, season))
+        ctx.veto = facts.veto_data(season, game)
     return ctx
 
 
@@ -147,6 +150,11 @@ def _static() -> list[Variable]:
                  lambda ctx: facts.hours(_season(ctx, "result_confirm_hours")) if _season(ctx, "result_confirm_hours") else None),
         Variable("lineup_amend_hours", "Nachtragsfrist", "Stunden nach dem Ergebnis für die eigene Aufstellung.", "Serie und Kader",
                  lambda ctx: facts.hours(_season(ctx, "lineup_amend_hours")) if _season(ctx, "lineup_amend_hours") else None),
+        # Veto (D.3, #1618): nur mit Veto in der Season - sonst „(nicht festgelegt)“.
+        Variable("veto.step_seconds", "Zeit je Veto-Schritt", "Sekunden je Schritt im Map-Veto, danach wählt das System.", "Serie und Kader",
+                 lambda ctx: f"{ctx.veto['step_seconds']} Sekunden" if ctx.veto.get("enabled") else None),
+        Variable("veto.team_a", "Team A im Veto", "„das Heimteam laut Spielplan“ oder „per Los je Spiel“.", "Serie und Kader",
+                 lambda ctx: facts.TEAM_A_SHORT.get(ctx.veto.get("team_a")) if ctx.veto.get("enabled") else None),
         Variable("schedule.matchday_days", "Tage je Spielwoche", "Länge der Spielwoche in Tagen.", "Termine", lambda ctx: _count(ctx.schedule.get("matchday_days"))),
         Variable("schedule.default_weekday", "Standardtag", "Wochentag des Standardtermins.", "Termine",
                  lambda ctx: facts.WEEKDAYS[int(ctx.schedule.get("default_weekday") or 0) % 7] if ctx.schedule else None),

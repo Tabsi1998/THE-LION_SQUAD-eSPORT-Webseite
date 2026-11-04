@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from models import now_utc
+from services import league_veto_rules
 from services.league_scope import is_league_staffel
 
 # Wiener Zeit nur für Texte (wie matchday_schedule.LOCAL_TZ) - hier eigens, damit dieses Modul ein Blatt bleibt und der
@@ -152,6 +153,35 @@ def new_time_unset(tournament: dict | None) -> dict:
     return {"no_show_extended_until": ""} if rules_of(tournament) else {}
 
 
+REVISION_KEY = "flow.schedule_rev"
+
+
+def schedule_rev(match: dict | None) -> int:
+    """Die Termin-Revision eines Spiels (Codex zu D.3, #1618): steigt auf jedem Weg zu einem neuen Termin. Check-ins und Veto binden
+    an Termin **und** Revision - Termin A → B → wieder A zählt nicht als derselbe Termin. Altbestand ohne Feld zählt als 0."""
+    return int((((match or {}).get("flow") or {}).get("schedule_rev")) or 0)
+
+
+def new_time_inc(tournament: dict | None) -> dict:
+    """Für ``$inc`` auf denselben Wegen wie ``new_time_unset`` (dazu „Neu ansetzen“, das denselben Termin behält)."""
+    return {REVISION_KEY: 1} if rules_of(tournament) else {}
+
+
+def new_time_change(tournament: dict | None, change: dict | None = None) -> dict:
+    """Beides in eine Änderung einarbeiten: ``$unset`` der Verlängerung und ``$inc`` der Revision - leere Teile kommen nicht dazu, so
+    bleibt ein Turnier ohne Liga oder ohne Check-in genau bei seiner Änderung."""
+    out = {key: dict(value) if isinstance(value, dict) else value for key, value in (change or {}).items()}
+    unset, inc = new_time_unset(tournament), new_time_inc(tournament)
+    # Setzt die Änderung ein Feld schon selbst (etwa „Neu ansetzen“ mit ``no_show_extended_until: None``), kommt es nicht zusätzlich ins
+    # ``$unset`` - echtes MongoDB lehnt dasselbe Feld in zwei Operatoren ab (Fehler 40), mongomock nicht.
+    unset = {key: value for key, value in unset.items() if key not in (out.get("$set") or {})}
+    if unset:
+        out["$unset"] = {**out.get("$unset", {}), **unset}
+    if inc:
+        out["$inc"] = {**out.get("$inc", {}), **inc}
+    return out
+
+
 # ---------------------------------------------------------------- Fenster und Stand
 
 def window_of(match: dict | None, rules: dict) -> tuple[datetime, datetime] | None:
@@ -173,13 +203,15 @@ def filled(match: dict | None) -> list[str]:
 
 
 def checkins(match: dict | None) -> dict[str, dict]:
-    """Die Check-ins je Seite - nur die, deren Seite noch im Spiel steht und die zum geltenden Termin gehören (``for_at``): Setzt
-    die Leitung einen neuen Termin (auch nach „Neu ansetzen“, E.1), zählt ein Check-in von früher nicht mehr."""
+    """Die Check-ins je Seite - nur die, deren Seite noch im Spiel steht und die zum geltenden Termin gehören (``for_at`` und die
+    Termin-Revision ``rev``): Setzt die Leitung einen neuen Termin (auch nach „Neu ansetzen“, E.1, oder zurück auf den alten), zählt
+    ein Check-in von früher nicht mehr."""
     raw = ((match or {}).get("flow") or {}).get("checkin") or {}
     seated = set(filled(match))
-    current = iso((match or {}).get("scheduled_at"))
+    current, rev = iso((match or {}).get("scheduled_at")), schedule_rev(match)
     return {key: value for key, value in raw.items()
-            if isinstance(value, dict) and key in seated and ("for_at" not in value or value.get("for_at") == current)}
+            if isinstance(value, dict) and key in seated and ("for_at" not in value or value.get("for_at") == current)
+            and int(value.get("rev") or 0) == rev}
 
 
 def missing_sides(match: dict | None) -> list[str]:
@@ -202,8 +234,9 @@ def has_report(match: dict | None) -> bool:
 
 
 def veto_pending(match: dict | None, tournament: dict | None) -> bool:
-    """Haken für D.3: Ist zwischen „beide eingecheckt“ und dem Start ein Veto offen? Heute gibt es keins."""
-    return False
+    """Ist zwischen „beide eingecheckt“ und dem Start ein Veto offen (D.3, #1618)? Ohne Vorlage an der Staffel nie; mit Vorlage, solange
+    zum geltenden Termin keins da ist (es beginnt beim nächsten Lesen oder Zug) oder es läuft bzw. pausiert."""
+    return league_veto_rules.veto_pending(match, tournament)
 
 
 def state(match: dict | None, tournament: dict | None, now: datetime | None = None) -> str:

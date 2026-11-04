@@ -15,6 +15,7 @@ import {
   modeLabel,
   participantsProblem,
   personIds,
+  plannedFor,
   poolModes,
   repeatedMap,
   reportPayload,
@@ -100,7 +101,9 @@ export function LineupPicker({ roster = [], value = [], size = 1, minimum = null
 
 export function GameEditor({ game, league, onChange, index, staff = false, games = [] }) {
   const modes = poolModes(league.pool);
-  const fixedMode = (league.mode_order || []).length > 0 || modes.length <= 1;
+  // Veto (#1618, D.3): Modus und Map der Position stehen fest - die Captains tragen nur Sieger, Punkte und Aufstellung ein.
+  const plan = !staff && game.planned ? plannedFor(game.position, league) : null;
+  const fixedMode = Boolean(plan) || (league.mode_order || []).length > 0 || modes.length <= 1;
   const maps = mapsFor(league.pool, game.mode);
   const [openScores, setShowScores] = useState(Object.keys(game.scores || {}).length > 0);
   // Punkte je Map Pflicht (C.3, #1617): die Felder stehen gleich da. Die Regel des Modus steht als Hinweis an der Map.
@@ -115,6 +118,15 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
         Map {game.position}{game.mode && fixedMode ? ` · ${modeLabel(league.pool, game.mode)}` : ""}
       </legend>
       {rule ? <p className="text-xs text-white/60" data-testid={`league-game-${game.position}-rule`}>Gewertet: {rule}</p> : null}
+      {plan ? (
+        <div className="flex items-center gap-3 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-2" data-testid={`league-game-${game.position}-planned`}>
+          {plan.map_image_url ? <LazyImg src={plan.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
+          <span className="min-w-0">
+            <span className="block truncate font-bold text-white">{plan.map_name}</span>
+            <span className="block text-xs text-white/60">laut Veto{plan.role === "decider" ? " (Decider)" : ""} · {plan.mode_label || modeLabel(league.pool, game.mode)}</span>
+          </span>
+        </div>
+      ) : null}
       {!fixedMode && (
         <div role="group" aria-label={`Modus Map ${game.position}`} className="flex flex-wrap gap-1.5">
           {modes.map((group) => (
@@ -126,7 +138,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           ))}
         </div>
       )}
-      {(fixedMode || game.mode) && (
+      {!plan && (fixedMode || game.mode) && (
         <div role="group" aria-label={`Map ${game.position}`} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {maps.map((item) => {
             const active = game.map_id === item.map_id;

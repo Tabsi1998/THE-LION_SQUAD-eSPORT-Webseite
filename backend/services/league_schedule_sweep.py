@@ -98,16 +98,16 @@ async def _apply_home_rule(db, tournament: dict, match_id: str, proposal_id: str
                           "updated_at": now_iso}})
             if not taken.modified_count:
                 return 0
-            update = {
+            # Der neue Termin bringt sein eigenes Check-in-Fenster - eine alte Verlängerung fällt (D.2, #1652), die Revision steigt (D.3).
+            update = checkin_rules.new_time_change(fresh_tournament, {
                 "$set": {"scheduled_at": league_schedule._iso(proposal["scheduled_at"]), "schedule_source": "accepted",
                          "schedule_status": "accepted", "schedule_written_at": now_iso, "updated_at": now_iso,
                          **({"status": "scheduled"} if match.get("status") in {"pending", "ready", "preview"} else {})},
-                # Der neue Termin bringt sein eigenes Check-in-Fenster - eine alte Verlängerung fällt (D.2, #1652).
-                "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": "", **checkin_rules.new_time_unset(fresh_tournament)},
+                "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""},
                 "$push": league_schedule.history_push(league_schedule.history_entry(
                     "home_rule", registration_id=proposal.get("actor_registration_id"), from_at=match.get("scheduled_at"),
                     to_at=proposal["scheduled_at"], request_id=proposal_id, at=now, hours=int(rules["home_rule_hours"]))),
-            }
+            })
             written = await db.matches_v2.update_one(
                 {"id": match_id, "scheduled_at": match.get("scheduled_at"), "schedule_source": match.get("schedule_source"),
                  "status": match.get("status")}, update)

@@ -69,6 +69,10 @@ ROUTES = [
     # Check-in (D.2, #1652): Regeln je Season
     route("GET", "/api/admin/leagues/seasons/{season}/checkin-rules", ANY),
     route("PUT", "/api/admin/leagues/seasons/{season}/checkin-rules", "season", {"min_present": 2}),
+    # Veto (D.3, #1618): Vorlage je Season
+    route("GET", "/api/admin/leagues/seasons/{season}/veto-rules", ANY),
+    route("GET", "/api/admin/leagues/seasons/{season}/veto-rules/proposal", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/veto-rules", "season", {"enabled": False, "steps": []}),
     # Plattform je Season (#2270)
     route("GET", "/api/admin/leagues/seasons/{season}/platform", ANY),
     route("PATCH", "/api/admin/leagues/seasons/{season}", "season", {"crossplay": True}),
@@ -145,6 +149,8 @@ ROUTES = [
     # Check-in (D.2, #1652): für eine Seite eintragen und starten als Leitung - Captains handeln als Seite, nicht hier.
     route("POST", "/api/matches/{match}/checkin", "matches", {"present": [], "registration_id": "{reg}", "reason": "Grund genug"}),
     route("POST", "/api/matches/{match}/checkin/start", "matches", {}),
+    # Veto (D.3, #1618): Eingriff der Leitung - der Zug selbst gehört den Captains (kein Liga-Recht).
+    route("POST", "/api/matches/{match}/veto/lead", "matches", {"action": "pause", "reason": "Grund genug", "version": 0}),
     # Staffel: lesen
     route("GET", "/api/tournaments/{tid}/staff", READ),
     route("GET", "/api/tournaments/{tid}/lead", READ),

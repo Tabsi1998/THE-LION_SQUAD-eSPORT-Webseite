@@ -374,12 +374,19 @@ def normalize_games(
         raise LeagueGamesError("Die Maps brauchen die Positionen 1, 2, 3 … ohne Lücke.")
     sides = setup.reg_ids
     with_modes = bool(_pool_modes(setup.pool))
+    # Veto (D.3, #1618): Die Captains melden die Maps, die das Veto festgelegt hat - die Leitung trägt über /result frei ein.
+    planned = {} if staff else {int(row["position"]): row for row in setup.match.get("planned_games") or []
+                                if isinstance(row, dict) and row.get("position")}
     games: list[dict] = []
     wins = {reg_id: 0 for reg_id in sides}
     for item in sorted(items, key=lambda row: int(row.get("position") or 0)):
         position = int(item["position"])
         label = f"Map {position}"
         mode = (str(item.get("mode") or "").strip() or None) if with_modes else None
+        plan = planned.get(position)
+        if plan and (str(item.get("map_id") or "").strip() != plan.get("map_id") or (mode or None) != (plan.get("mode") or None)):
+            where = f" ({plan.get('mode_label')})" if plan.get("mode_label") else ""
+            raise LeagueGamesError(f"{label}: laut Veto wird hier {plan.get('map_name') or 'eine andere Map'}{where} gespielt.")
         if with_modes:
             if not mode or mode not in {group["mode"] for group in _pool_modes(setup.pool)}:
                 raise LeagueGamesError(f"{label}: bitte einen Modus aus dem Pool wählen.")
@@ -1132,6 +1139,8 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "lobby_ids": _lobby_ids(setup, side_id, staff) if sees_lineups else [],
         "id_label": league_roster.labels(setup.roster.fields) if setup.roster and setup.roster.fields else None,
         "games": _games_view(match.get("games"), people, sees_lineups),
+        # Veto (D.3, #1618): die festgelegte Spielreihenfolge - das Meldeformular übernimmt Modus und Map je Position.
+        "planned_games": [dict(row) for row in match.get("planned_games") or [] if isinstance(row, dict)],
         "lineups_missing": list(match.get("lineups_missing") or []),
         "own_games": _games_view((own_report or {}).get("games"), people) if side_id else [],
         "proposal_games": (

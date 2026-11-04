@@ -140,6 +140,11 @@ Leitung speichert den Check-in der Season, veröffentlicht ein Regelwerk mit Zus
 den Check-in ohne Zustimmung ab, zwei Captains stimmen zu und checken in zwei Browser-Kontexten ein, zu wenige Anwesende lehnt der Server ab; bei
 1440 px startet eine Seite (der zweite Start ist eine Wiederholung); am zweiten Spiel legt der Fristen-Job nach dem Fenster nur den Vorschlag an,
 die Leitung sieht ihn in Mein Dienst und entscheidet in der Leitungsansicht. Für den Zeit-Job braucht sie `ABNAHME_PROJECT` und `PYTHON`.
+`liga-veto-abnahme.spec.js` (gleiche Stand-Datei, #1618, braucht eine Staffel „Liga-Probelauf“ im Entwurf - also den Seed davor) schreibt: Die
+Leitung speichert Check-in und Veto der Season (Vorschlag aus Modusfolge und Pools, 1440 px), startet die Staffel und legt den Termin auf jetzt;
+zwei Captains checken bei 390 px in zwei Browser-Kontexten ein, das Veto beginnt von selbst, beide ziehen abwechselnd bis die Spielreihenfolge
+steht (ein Zug der falschen Seite und eine im selben Modus gesperrte Map lehnt der Server ab); bei 1440 px startet eine Seite und das
+Meldeformular zeigt die Maps laut Veto fest.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem

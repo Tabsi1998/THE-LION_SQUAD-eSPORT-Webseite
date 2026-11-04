@@ -361,6 +361,8 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | Dasselbe bei allen anderen Co-Teams | Team-Admin-Rollen wie bisher | ja | nein | nein | nein |
 | Die eigene Rolle abgeben („Rolle abgeben“, #2110) | – | – | ja | ja | nein |
 | Termin vorschlagen, annehmen; einchecken (Anwesende wählen) und das Spiel starten (#1652) | ja, „Spiele betreuen“ – im Notfall für eine Seite mit Grund, nicht im eigenen Spiel (Befangenheit) | nur ohne Captain und Vertreter | ja | ja | nein |
+| Im Veto ziehen (Map sperren oder wählen, #1618) | nein – nach Ablauf der Zeit wählt das System | nur ohne Captain und Vertreter | ja | ja | nein |
+| Ins Veto eingreifen: Pause, Fortsetzen, Schritt zurück, Neustart – mit Grund (#1618) | ja, „Spiele betreuen“, nicht im eigenen Spiel (Befangenheit) | nein | nein | nein | nein |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur ohne Captain und Vertreter | ja | ja | nein |
 | Matchchat schreiben, Spiel-Hinweise (Aufruf, Erinnerung, Ergebnis) | ja | ja | ja | ja | ja |
 
