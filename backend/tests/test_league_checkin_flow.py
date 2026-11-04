@@ -686,12 +686,24 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
     assert not stored.get("no_show_extended_until"), "Spieltag-Plan"
     await flow.db.matches_v2.update_one({"id": mid(third)}, {"$set": {"no_show_extended_until": at(90), "schedule_source": None}})
     stored = await flow.reload(third["match"])
+    station = {"id": new_id(), "name": "Tisch 1", "device_type": "pc", "tournament_id": third["tournament"]["id"], "status": "free",
+               "current_match_id": None, "notes": None}
+    await flow.db.stations.insert_one(dict(station))
     plan = {"assignments": [{"match_id": mid(third), "changed": True, "scheduled_at": at(3 * 60), "schedule_source": "planner",
-                             "station_id": None, "forecast": False,
+                             "station_id": station["id"], "forecast": False,
                              "previous": {"scheduled_at": stored["scheduled_at"], "schedule_source": None, "status": stored["status"],
                                           "station_id": None}}]}
+    # Die Station wird zwischen Vorschau und Schreiben gelöscht (Codex zu #1611): der Plan nimmt alles exakt zurück - auch die
+    # schon entfernte Verlängerung.
+    await flow.db.stations.update_one({"id": station["id"]}, {"$set": {"deleting": True}})
+    rolled_back = await apply_plan(flow.db, await tournament_of(flow, third), plan)
+    assert rolled_back["written"] == 0 and any(row["type"] == "station_gone" for row in rolled_back["warnings"])
+    assert await flow.reload(third["match"]) == stored, "exakt der Vorzustand, samt Verlängerung"
+    await flow.db.stations.update_one({"id": station["id"]}, {"$unset": {"deleting": ""}})
     assert (await apply_plan(flow.db, await tournament_of(flow, third), plan))["written"] == 1
-    assert not (await flow.reload(third["match"])).get("no_show_extended_until"), "Stationsplan"
+    planned = await flow.reload(third["match"])
+    assert planned["station_id"] == station["id"] and planned["scheduled_at"] == at(3 * 60)
+    assert not planned.get("no_show_extended_until"), "Stationsplan"
 
 
 @pytest.mark.asyncio
