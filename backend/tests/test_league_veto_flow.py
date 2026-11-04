@@ -587,6 +587,36 @@ async def test_a_locked_staffel_is_only_read(flow):
     assert len((await page(flow, world, "Kapitaen"))["checkin"]["veto"]["history"]) == 1, "entsperrt: die Frist wird aufgelöst"
 
 
+# Für „jede Map nur einmal je Serie“: Nebel steht in Stellung und Suchen, Suchen hat fünf Maps - eine davon darf anderswo laufen.
+ELSEWHERE_POOL = [
+    {"mode": HP, "label": "Stellung", "maps": [m("hafen"), m("nebel"), m("turm"), m("glut")]},
+    {"mode": SND, "label": "Suchen", "maps": [m("nebel"), m("werk"), m("dock"), m("see"), m("kai")]},
+    {"mode": CTL, "label": "Kontrolle", "maps": [m("hafen"), m("ruine"), m("halle")]},
+]
+
+
+@pytest.mark.asyncio
+async def test_with_never_a_map_played_in_another_mode_is_shown_as_such(flow):
+    world = await veto_world(flow, rules=veto_rules(), repeat="never", pool=ELSEWHERE_POOL)
+    await both_in(flow, world)
+    # Hafen muss in Stellung gesperrt werden (sonst fehlt Kontrolle eine Map) - die Prüfung lässt der Gastseite nur diese Sperre.
+    assert (await pick(flow, world, "Kapitaen", "map-glut", 1)).status_code == 200
+    block = await veto_block(flow, world, "Falke1")
+    assert [row["map_id"] for row in block["options"] if row["allowed"]] == ["map-hafen"]
+    assert (await pick(flow, world, "Falke1", "map-hafen", 2)).status_code == 200
+    assert (await pick(flow, world, "Kapitaen", "map-nebel", 3)).status_code == 200
+    assert (await pick(flow, world, "Falke1", "map-turm", 4)).status_code == 200
+    block = await veto_block(flow, world, "Falke1")
+    assert block["current"]["mode"] == SND and block["own_turn"] is True
+    snd = next(row for row in block["remaining"] if row["mode"] == SND)
+    nebel = next(row for row in snd["maps"] if row["map_id"] == "map-nebel")
+    assert nebel["status"] == "elsewhere" and nebel["position"] == 1
+    option = next(row for row in block["options"] if row["map_id"] == "map-nebel")
+    assert option["allowed"] is False and "anderen Modus" in option["hint"]
+    refused = await pick(flow, world, "Falke1", "map-nebel", 5)
+    assert refused.status_code == 422 and "anderen Modus" in refused.json()["detail"]
+
+
 # ---------------------------------------------------------------- Ergebnis nach dem Veto
 
 @pytest.mark.asyncio

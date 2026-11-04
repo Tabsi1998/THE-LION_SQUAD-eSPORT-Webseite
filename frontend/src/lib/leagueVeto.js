@@ -183,6 +183,8 @@ export function mapStatusText(row) {
   if (row.status === "banned") return row.by_name ? `gesperrt von ${row.by_name}` : "gesperrt";
   if (row.status === "picked") return `Map ${row.position}${row.by_name ? ` · ${row.by_name}` : ""}`;
   if (row.status === "decider") return `Map ${row.position} · Decider`;
+  // Jede Map nur einmal je Serie (`never`): in einem anderen Modus schon gewählt - nicht „offen“.
+  if (row.status === "elsewhere") return `in anderem Modus gespielt${row.position ? ` (Map ${row.position})` : ""}`;
   return "offen";
 }
 

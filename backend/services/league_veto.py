@@ -333,6 +333,11 @@ def _refusal(veto: dict) -> str | None:
     return None
 
 
+def _taken_here(run: _Run, mode: str | None, map_id: str) -> bool:
+    """Steht die Map in diesem Modus schon im Verlauf (gesperrt, gewählt, Decider)?"""
+    return any(row.get("mode") == mode and row.get("map_id") == map_id for row in run.veto.get("steps") or [])
+
+
 def _option_hint(run: _Run, map_id: str) -> str:
     step = run.current or {}
     pool_ids = rules_mod.pool_ids(run.pool).get(step.get("mode"), [])
@@ -340,7 +345,9 @@ def _option_hint(run: _Run, map_id: str) -> str:
     if map_id not in pool_ids:
         return f"{name} ist im Pool für {_mode_head(run.pool, step.get('mode'))['mode_label']} nicht freigegeben."
     if map_id not in run.remaining.get(step.get("mode"), []):
-        return f"{name} ist in diesem Modus schon gesperrt oder gewählt."
+        if _taken_here(run, step.get("mode"), map_id):
+            return f"{name} ist in diesem Modus schon gesperrt oder gewählt."
+        return f"{name} läuft schon in einem anderen Modus – in dieser Season jede Map nur einmal je Serie."
     return f"{name} ließe sich nicht mehr zu Ende spielen – die restlichen Schritte gingen nicht auf."
 
 
@@ -494,6 +501,8 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
             options.append({"map_id": item["map_id"], "name": item.get("name"), "image_url": item.get("image_url"), "allowed": ok,
                             "hint": None if ok else _option_hint(run, item["map_id"])})
     taken = {(row.get("mode"), row.get("map_id")): row for row in veto.get("steps") or []}
+    # Jede Map nur einmal je Serie (``never``): eine in einem anderen Modus gewählte Map ist hier nicht mehr „offen“.
+    played = {row.get("map_id"): row for row in veto.get("steps") or [] if row.get("kind") != rules_mod.BAN}
     remaining = []
     for group in (run.pool or {}).get("modes") or []:
         if not group.get("mode"):
@@ -501,8 +510,12 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
         maps = []
         for item in group.get("maps") or []:
             row = taken.get((group["mode"], item.get("map_id")))
+            if row is None and item.get("map_id") not in run.remaining.get(group["mode"], []) and item.get("map_id") in played:
+                row, status = played[item["map_id"]], "elsewhere"
+            else:
+                status = (row or {}).get("role") or "open"
             maps.append({"map_id": item.get("map_id"), "name": item.get("name"), "image_url": item.get("image_url"),
-                         "status": (row or {}).get("role") or "open", "by_name": names.get((row or {}).get("registration_id")) if row else None,
+                         "status": status, "by_name": names.get((row or {}).get("registration_id")) if row else None,
                          "position": (row or {}).get("position")})
         remaining.append({"mode": group["mode"], "label": group.get("label") or group["mode"],
                           **({"icon_url": group["icon_url"]} if group.get("icon_url") else {}), "maps": maps})

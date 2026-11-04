@@ -89,6 +89,8 @@ describe("Matchseite", () => {
     expect(mapStatusText({ status: "banned", by_name: "Loewen" })).toBe("gesperrt von Loewen");
     expect(mapStatusText({ status: "picked", position: 1, by_name: "Loewen" })).toBe("Map 1 · Loewen");
     expect(mapStatusText({ status: "decider", position: 3 })).toBe("Map 3 · Decider");
+    // Jede Map nur einmal je Serie: in einem anderen Modus schon gewählt - nicht „offen“.
+    expect(mapStatusText({ status: "elsewhere", position: 1 })).toBe("in anderem Modus gespielt (Map 1)");
     expect(mapStatusText({ status: "open" })).toBe("offen");
     expect(historyLine({ index: 0, kind: "ban", name: "Loewen", map_name: "Glut", mode_label: "Stellung", via: "side" })).toBe("1. Loewen sperrt Glut (Stellung)");
     expect(historyLine({ index: 2, kind: "pick", name: "Loewen", map_name: "Hafen", mode_label: "Stellung", position: 1, via: "auto" }))

@@ -14,7 +14,12 @@ import { motionAllowed } from "@/lib/motion";
 const POLL_MS = 3000;
 const RING = 100;
 const REASON_MIN = 5;
-const STATUS_TONE = { open: "border-white/10 bg-white/[0.03] text-white/85", banned: "border-live/40 bg-live/10 text-white/50 line-through", picked: "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white", decider: "border-honor/60 bg-honor/10 text-white" };
+const STATUS_TONE = {
+  open: "border-white/10 bg-white/[0.03] text-white/85", banned: "border-live/40 bg-live/10 text-white/50 line-through",
+  picked: "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white", decider: "border-honor/60 bg-honor/10 text-white",
+  // Jede Map nur einmal je Serie: anderswo schon gewählt - gedimmt, nicht „offen“.
+  elsewhere: "border-white/5 bg-white/[0.02] text-white/40 line-through",
+};
 
 function Countdown({ block }) {
   const target = vetoDeadline(block);
