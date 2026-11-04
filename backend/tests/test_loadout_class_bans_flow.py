@@ -391,3 +391,22 @@ async def test_deleting_a_subcategory_while_banning_it_leaves_no_retired_key(flo
     used = {entry.get("subcategory") async for version in flow.db.loadout_bans.find({}, {"_id": 0}) for entry in version["entries"]}
     assert not used & retired, (remove.text, banned.text)
     assert sorted([remove.status_code, banned.status_code]) in ([200, 409], [200, 422])
+
+@pytest.mark.asyncio
+async def test_a_snapshot_written_at_the_same_time_is_no_error():
+    """Codex Runde 2: Zwei Ergebnisse schreiben gleichzeitig denselben Schnappschuss - der zweite trifft den eindeutigen Index und nimmt
+    den vorhandenen, statt mit 500 abzubrechen."""
+    from types import SimpleNamespace
+
+    from pymongo.errors import DuplicateKeyError
+    from services import loadout_bans
+
+    class Clash:
+        async def update_one(self, *_args, **_kwargs):
+            raise DuplicateKeyError("E11000 duplicate key")
+
+        async def find_one(self, query, *_args, **_kwargs):
+            return {"id": query["id"]}
+
+    key = await loadout_bans.hold_allowed(SimpleNamespace(loadout_allowed=Clash()), "spiel", {"layout": 3, "categories": []})
+    assert len(key) == 64

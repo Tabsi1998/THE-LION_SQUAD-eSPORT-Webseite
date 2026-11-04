@@ -529,8 +529,13 @@ ALLOWED_STAMP = "loadout_allowed_id"
 
 async def hold_allowed(db, game_id: str | None, data: dict) -> str:
     key = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
-    await db.loadout_allowed.update_one({"id": key}, {"$setOnInsert": {"id": key, "game_id": game_id, "data": data,
-                                                                      "created_at": now_utc().isoformat()}}, upsert=True)
+    try:
+        await db.loadout_allowed.update_one({"id": key}, {"$setOnInsert": {"id": key, "game_id": game_id, "data": data,
+                                                                          "created_at": now_utc().isoformat()}}, upsert=True)
+    except DuplicateKeyError:
+        # Gleichzeitig angelegt (Codex Runde 2): derselbe Inhalt, dieselbe Kennung - die vorhandene Zeile gilt.
+        if not await db.loadout_allowed.find_one({"id": key}, {"_id": 0, "id": 1}):
+            raise
     return key
 
 
