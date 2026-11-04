@@ -1,5 +1,6 @@
-"""Regelwerk aus den Einstellungen, Prüfung Codex (#2269): alte Fassungen ohne Variablen-Metadaten bleiben Wort für Wort, wie sie waren;
-Liga-, Season- und Spielname stehen an der Fassung fest. Erfundene Inhalte."""
+"""Regelwerk aus den Einstellungen, Prüfung Codex (#2269): Die Freigabe veröffentlicht nur die Datenbasis, die der Vorschlag gezeigt hat
+(Fingerabdruck, sonst 409); alte Fassungen ohne Variablen-Metadaten bleiben Wort für Wort, wie sie waren; Liga-, Season- und Spielname
+stehen an der Fassung fest. Erfundene Inhalte."""
 import pathlib
 import sys
 
@@ -10,9 +11,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_rules_world import make_world, publish, season_page  # noqa: E402
+from league_rules_world import ADMIN_LEAGUES, make_world, publish, season_page, season_scope, today  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from services import league_rules  # noqa: E402
+
+BODY = "# § 1 Serie\nGespielt wird mit {{team_size}} Spielern je Map.\n\n# § 2 Modi\n[[baustein:modes]]"
 
 
 @pytest_asyncio.fixture
@@ -28,7 +31,46 @@ def body_of(page: dict) -> str:
     return "\n".join(row["body_md"] for row in page["sections"])
 
 
-# ---------------------------------------------------------------- Alte Fassungen ohne Variablen-Metadaten bleiben, wie sie sind
+async def rename_mode(flow, w: dict, label: str) -> None:
+    flow.act_as(w["lead"])
+    ok(await flow.patch(f"/api/games/{w['game']['id']}", json={"match_modes": [{"mode": "stellung", "label": label}, {"mode": "suchen", "label": "Suchen"}]}))
+
+
+# ---------------------------------------------------------------- 1. Die Freigabe veröffentlicht nur die geprüfte Datenbasis
+
+@pytest.mark.asyncio
+async def test_the_release_refuses_when_a_setting_changed_since_the_proposal_was_fetched(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w, body=BODY, annexes=[])
+    await rename_mode(flow, w, "Hardpoint")
+    proposal = ok(await flow.get(season_scope(w)))["proposal"]
+    assert proposal["fingerprint"], "der Vorschlag nennt seine Datenbasis"
+    # Zwischen Abruf und Freigabe ändert jemand eine Einstellung, die im Regelwerk steht - ohne die Sperre des Regelwerks.
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"team_size": 5}))
+    body = {"base_version_id": version["id"], "fingerprint": proposal["fingerprint"], "valid_from": today(), "change_reason": "Modus umbenannt"}
+    refused = await flow.post(f"{season_scope(w)}/proposal/publish", json=body)
+    assert refused.status_code == 409 and "inzwischen geändert" in refused.json()["detail"]
+    assert await flow.db.league_rules.count_documents({"status": "published"}) == 1
+    assert await flow.db.league_rules.count_documents({"status": "draft"}) == 0, "kein liegen gebliebener Entwurf"
+    # Neu geprüft: der neue Fingerabdruck geht durch, und veröffentlicht wird genau dieser Stand.
+    fresh = ok(await flow.get(season_scope(w)))["proposal"]
+    assert fresh["fingerprint"] != proposal["fingerprint"]
+    released = ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={**body, "fingerprint": fresh["fingerprint"]}))
+    assert released["version"] == 2 and released["frozen_vars"][w["season"]["id"]]["team_size"]["value"] == "5"
+    assert "Hardpoint" in str(released["frozen"][w["season"]["id"]]["modes"]["data"])
+
+
+@pytest.mark.asyncio
+async def test_the_release_needs_the_fingerprint(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w, body=BODY, annexes=[])
+    await rename_mode(flow, w, "Hardpoint")
+    without = await flow.post(f"{season_scope(w)}/proposal/publish", json={"base_version_id": version["id"], "valid_from": today(), "change_reason": "Grund genug"})
+    assert without.status_code == 422
+    assert await flow.db.league_rules.count_documents({"status": "published"}) == 1
+
+
+# ---------------------------------------------------------------- 2. Alte Fassungen ohne Variablen-Metadaten bleiben, wie sie sind
 
 @pytest.mark.asyncio
 async def test_an_old_version_without_variable_metadata_keeps_its_text_in_web_pdf_and_history(flow):
@@ -51,7 +93,7 @@ async def test_an_old_version_without_variable_metadata_keeps_its_text_in_web_pd
     assert "{{best_of}}" in "".join(op["text"] for op in compare["sections"][0]["ops"] if op["op"] == "del")
 
 
-# ---------------------------------------------------------------- Namen stehen an der Fassung fest
+# ---------------------------------------------------------------- 3. Namen stehen an der Fassung fest
 
 @pytest.mark.asyncio
 async def test_renaming_league_and_season_leaves_old_versions_pdf_and_history_unchanged(flow):

@@ -99,7 +99,8 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, o
             <CheckField className="mt-3" label="Die Teams müssen der neuen Fassung zustimmen" checked={release.requires_consent} onChange={(value) => setRelease((row) => ({ ...row, requires_consent: value }))}
               hint="Captain und Vertreter sehen „Neue Fassung, bitte zustimmen“ - auf Startseite, Regelseite, Team-Seite und Matchseite." testId="rules-approve-consent" />
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" className={PRIMARY} disabled={!canApprove} onClick={() => onApprove({ ...release, base_version_id: proposal.base.id })} data-testid="rules-approve-publish">Freigeben und veröffentlichen</button>
+              <button type="button" className={PRIMARY} disabled={!canApprove} data-testid="rules-approve-publish"
+                onClick={() => onApprove({ ...release, base_version_id: proposal.base.id, fingerprint: proposal.fingerprint })}>Freigeben und veröffentlichen</button>
               <button type="button" className={QUIET} disabled={busy} onClick={onPrepare} data-testid="rules-prepare">Text vorher anpassen</button>
             </div>
           </div>
@@ -310,7 +311,10 @@ export default function AdminLeagueRulesPage() {
     try {
       await work();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      const detail = err.response?.data?.detail;
+      toast.error(formatApiError(detail));
+      // Einstellungen haben sich seit dem Vorschlag geändert (409): den Vorschlag neu laden, damit die Leitung ihn neu prüft.
+      if (err.response?.status === 409) await load();
     } finally {
       setBusy(false);
     }

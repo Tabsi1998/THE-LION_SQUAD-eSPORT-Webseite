@@ -65,8 +65,10 @@ class RulePublish(BaseModel):
 
 
 class RuleProposalPublish(BaseModel):
-    """Den Vorschlag „Daten geändert“ freigeben (#2269): aus der letzten Fassung, mit den Daten von heute."""
+    """Den Vorschlag „Daten geändert“ freigeben (#2269): aus der letzten Fassung, mit genau der Datenbasis, die der Vorschlag gezeigt hat
+    (``fingerprint``; weicht sie inzwischen ab, 409)."""
     base_version_id: str = Field(max_length=64)
+    fingerprint: str = Field(max_length=128)
     valid_from: str = Field(max_length=10)
     change_reason: str = Field(default="", max_length=1000)
     requires_consent: bool = False

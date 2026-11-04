@@ -148,6 +148,12 @@ def _names_of(version: dict, league: dict, season: dict | None) -> dict:
     return {"league": frozen.get("league") or league.get("name"), "season": season_name}
 
 
+def data_fingerprint(frozen: dict, frozen_vars: dict) -> str:
+    """Der Fingerabdruck einer Datenbasis (#2269, Prüfung Codex): Bausteine und Variablenwerte, stabil sortiert. Die Freigabe veröffentlicht
+    nur, was der Vorschlag gezeigt hat - weicht er ab, 409."""
+    return fingerprint({"blocks": frozen, "vars": frozen_vars})
+
+
 def page_path(league: dict, season: dict | None) -> str:
     return f"/liga/{league['slug']}/{season['slug']}/regeln" if season else f"/liga/{league['slug']}/regeln"
 
@@ -443,7 +449,7 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
         "variables": variables.catalog(await variables.context(db, league, season)),
         "data_changes": changes,
         # Der Vorschlag entsteht von selbst (#2269): der Text der letzten Fassung mit den Daten von heute, markiert gegen die Fassung.
-        "proposal": await _proposal(db, league, season, latest, current) if changes and latest and not draft else None,
+        "proposal": await _proposal(db, scope, league, season, latest, current) if changes and latest and not draft else None,
         "consents": consent_state,
         "public_url": page_path(league, season),
         "today": _today(),
@@ -465,6 +471,28 @@ async def _rendered(db, league: dict, season: dict | None, body_md: str | None, 
             "unknown_vars": unknown_vars, "empty_vars": variables.empty(names, var_values), "result": result}
 
 
+def _used_in(version: dict) -> tuple[list[str], list[str]]:
+    """Bausteine und Variablen im Text einer Fassung - aus dem Text, nicht aus den gespeicherten Listen (Altfassungen haben keine)."""
+    texts = [version.get("body_md"), *[row.get("body_md") for row in version.get("annexes") or []]]
+    return text.block_keys(*texts), variables.var_names(*texts)
+
+
+async def _freeze(db, scope: str, league: dict, season: dict | None, keys: list[str], names: list[str]) -> tuple[dict, dict]:
+    """Die Datenbasis einer Fassung: je Season die Bausteine und Variablen von heute, bei einer Fassung der Liga zusätzlich unter ``""``
+    die Werte ohne Season. So wird eingefroren - und so lautet der Fingerabdruck des Vorschlags."""
+    frozen: dict[str, dict] = {}
+    frozen_vars: dict[str, dict] = {}
+    if keys or names:
+        for row in await _seasons_to_freeze(db, league, season):
+            if keys:
+                frozen[row["id"]] = await blocks.resolve(db, keys, league, row)
+            if names:
+                frozen_vars[row["id"]] = variables.resolve(names, await variables.context(db, league, row))
+    if names and scope == LEAGUE:
+        frozen_vars[""] = variables.resolve(names, await variables.context(db, league, None))
+    return frozen, frozen_vars
+
+
 async def _frozen_names(db, league: dict, season: dict | None) -> dict:
     """Liga-, Spiel- und Season-Namen, wie sie beim Veröffentlichen heißen - sie stehen an der Fassung fest (Prüfung Codex)."""
     game = await facts.game_of(db, league)
@@ -472,11 +500,14 @@ async def _frozen_names(db, league: dict, season: dict | None) -> dict:
             "seasons": {row["id"]: row.get("name") for row in await _seasons_to_freeze(db, league, season)}}
 
 
-async def _proposal(db, league: dict, season: dict | None, base: dict, current: dict | None) -> dict:
+async def _proposal(db, scope: str, league: dict, season: dict | None, base: dict, current: dict | None) -> dict:
     rendered = await _rendered(db, league, season, base.get("body_md"), base.get("annexes") or [], base)
+    keys, names = _used_in(base)
     return {"base": _head(base, current), "sections": rendered["sections"],
             "changes": {"base": _head(base, current), **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
-            "unknown_vars": rendered["unknown_vars"], "empty_vars": rendered["empty_vars"]}
+            "unknown_vars": rendered["unknown_vars"], "empty_vars": rendered["empty_vars"],
+            # Die Datenbasis, die dieser Vorschlag zeigt - die Freigabe schickt sie mit und veröffentlicht nur genau sie.
+            "fingerprint": data_fingerprint(*await _freeze(db, scope, league, season, keys, names))}
 
 
 # ---------------------------------------------------------------- Verwaltung: Schreiben
@@ -650,9 +681,10 @@ async def publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
         raise LeagueProblem(SCOPE_BUSY, 409) from None
 
 
-async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
+async def _publish(db, scope: str, scope_id: str, body: dict, user: dict, *, frozen: tuple[dict, dict] | None = None) -> dict:
     """Macht den Entwurf zur Fassung, in einem Schritt: Hat ihn inzwischen jemand geändert oder veröffentlicht, passt der Filter
-    nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index."""
+    nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index. ``frozen``: eine schon geprüfte Datenbasis (Freigabe des
+    Vorschlags) - dann wird genau sie veröffentlicht, nichts neu gelesen."""
     league, season = await resolve_scope(db, scope, scope_id)
     draft = await draft_of(db, scope, scope_id)
     if not draft or draft.get("revision") != body.get("revision"):
@@ -666,24 +698,14 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dic
     if wrong:
         # Nie still leer (#2269): Eine unbekannte Variable hält das Veröffentlichen auf, mit der ganzen Liste.
         raise LeagueProblem("Unbekannte Variable im Text: " + ", ".join("{{" + name + "}}" for name in wrong) + ".")
-    frozen: dict[str, dict] = {}
-    frozen_vars: dict[str, dict] = {}
-    if keys or names:
-        for row in await _seasons_to_freeze(db, league, season):
-            if keys:
-                frozen[row["id"]] = await blocks.resolve(db, keys, league, row)
-            if names:
-                frozen_vars[row["id"]] = variables.resolve(names, await variables.context(db, league, row))
-    if names and scope == LEAGUE:
-        # Die Seite der Liga ohne Season: nur, was ohne Season gilt (Name von Liga und Spiel).
-        frozen_vars[""] = variables.resolve(names, await variables.context(db, league, None))
+    frozen_blocks, frozen_vars = frozen if frozen is not None else await _freeze(db, scope, league, season, keys, names)
     now = now_utc().isoformat()
     try:
         doc = await db.league_rules.find_one_and_update(
             {"id": draft["id"], "status": DRAFT, "revision": draft["revision"]},
-            {"$set": {"status": PUBLISHED, "version": int((predecessor or {}).get("version") or 0) + 1, "frozen": frozen,
+            {"$set": {"status": PUBLISHED, "version": int((predecessor or {}).get("version") or 0) + 1, "frozen": frozen_blocks,
                       # Bilder der eingefrorenen Bausteine (#2218): Die Mediathek dreht und löscht sie nicht, solange die Fassung steht.
-                      "frozen_images": blocks.frozen_images(frozen),
+                      "frozen_images": blocks.frozen_images(frozen_blocks),
                       "blocks_used": keys, "frozen_vars": frozen_vars, "vars_used": names,
                       # Namen von Liga, Spiel und Seasons, wie sie heute heißen - eine Umbenennung ändert die Fassung nicht mehr.
                       "frozen_names": await _frozen_names(db, league, season),
@@ -713,8 +735,14 @@ async def publish_proposal(db, scope: str, scope_id: str, body: dict, user: dict
             latest = own[-1] if own else (current if season and current and current.get("scope") == LEAGUE else None)
             if not latest or latest["id"] != body.get("base_version_id"):
                 raise LeagueProblem("Die Grundlage ist nicht mehr die letzte Fassung - bitte die Seite neu laden.", 409)
+            # Unter der Sperre die Datenbasis neu lesen: Nur was der Vorschlag gezeigt hat, wird veröffentlicht (Prüfung Codex) - eine
+            # Season-Einstellung hält diese Sperre nicht, darum zählt der Fingerabdruck. Beide Prüfungen vor dem Entwurf: Nichts bleibt liegen.
+            keys, names = _used_in(latest)
+            frozen = await _freeze(db, scope, league, season, keys, names)
+            if data_fingerprint(*frozen) != body.get("fingerprint"):
+                raise LeagueProblem("Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen.", 409)
             draft = await draft_from_version(db, scope, scope_id, latest["id"], user)
-            return await _publish(db, scope, scope_id, {**body, "revision": draft["revision"]}, user)
+            return await _publish(db, scope, scope_id, {**body, "revision": draft["revision"]}, user, frozen=frozen)
     except MutationLockBusy:
         raise LeagueProblem(SCOPE_BUSY, 409) from None
 
