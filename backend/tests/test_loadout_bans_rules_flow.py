@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from league_rules_world import make_world, publish, season_page, season_scope  # noqa: E402
 from league_start_world import ok  # noqa: E402
-from loadout_world import IMAGE, add_library, attachments, bans_url, item, save_bans, standard  # noqa: E402
+from loadout_world import IMAGE, PERK_IMAGE, add_library, attachments, bans_url, item, save_bans, standard  # noqa: E402
 
 BODY = "Vorwort.\n\n# § 1 Fairplay\nFair spielen.\n"
 ANNEX = [{"title": "Sperrliste", "body_md": "[[baustein:loadout_bans]]"}]
@@ -69,13 +69,14 @@ async def test_stored_versions_and_api_fields_carry_plain_text(flow):
     w = await ready(flow)
     flow.act_as(w["lead"])
     special = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": SPECIAL}))
-    ok(await save_bans(flow, w, [*standard(w), {"item_id": special["id"], "kind": "item", "modes": []}]))
+    # Erlaubte Ausrüstung (Nr. 99): Der Schild steht erst als erlaubt im Regelwerk, dann wird er gesperrt.
+    ok(await save_bans(flow, w, standard(w)))
     first = await publish(flow, w, body=BODY, annexes=ANNEX)
     assert not protected(first) and contains(first["frozen"], SPECIAL)
     stored = await flow.db.league_rules.find_one({"id": first["id"]}, {"_id": 0})
     assert not protected(stored)
 
-    ok(await save_bans(flow, w, standard(w)))
+    ok(await save_bans(flow, w, [*standard(w), {"item_id": special["id"], "kind": "item", "modes": []}]))
     changes = ok(await flow.get(season_scope(w)))["data_changes"]
     row = next(row for row in changes["rows"] if row["block"] == "loadout_bans")
     assert not protected(changes) and SPECIAL in row["before"] and SPECIAL not in row["after"]
@@ -123,8 +124,8 @@ async def test_the_public_page_and_the_preview_deliver_no_protection_characters(
     Ein eingegebenes Schutzzeichen im freien Text fällt weg."""
     w = await ready(flow)
     flow.act_as(w["lead"])
-    special = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": SPECIAL}))
-    ok(await save_bans(flow, w, [*standard(w), {"item_id": special["id"], "kind": "item", "modes": []}]))
+    ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": SPECIAL}))
+    ok(await save_bans(flow, w, standard(w)))
     # Optional-Fund: Ein eingegebenes Schutzzeichen im Namen wird nicht gespeichert.
     cloak = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": "Mantel", "note": "ab"}))
     assert cloak["name"] == "Mantel" and cloak["note"] == "ab"
@@ -163,18 +164,21 @@ async def test_the_block_shows_images_on_the_web_and_a_clean_list_in_the_pdf(flo
     from services import league_rule_blocks
 
     frozen = version["frozen"][w["season"]["id"]]["loadout_bans"]
-    # Eingefroren wird strukturiert im Klartext; Markdown entsteht erst beim Darstellen (Folge-Review #2218).
-    assert "markdown" not in frozen and frozen["data"]["groups"][0]["entries"][0] == {"name": "Blitz 9", "image_url": IMAGE, "modes": []}
+    # Eingefroren wird strukturiert im Klartext; Markdown entsteht erst beim Darstellen (Folge-Review #2218). Gezeigt wird, was
+    # erlaubt ist (Nr. 99): Blitz 9 ist ganz gesperrt und fehlt, Leise Sohlen ist erlaubt außer in „Suchen“.
+    assert "markdown" not in frozen and frozen["data"]["layout"] == 3
+    perks = frozen["data"]["categories"][-1]["sections"][0]["entries"]
+    assert perks == [{"name": "Leise Sohlen", "image_url": PERK_IMAGE, "not_in": ["Suchen"], "not_at": []}]
     web, pdf_text = (league_rule_blocks.plain_value("loadout_bans", frozen, variant) for variant in ("markdown", "text"))
-    assert f"![Blitz 9]({IMAGE})" in web and "| Bild | Name | Gilt in |" in web
-    assert "![" not in pdf_text and "- Leise Sohlen – gilt in: Suchen" in pdf_text
-    assert "- Donner 4: Griff, Lauf – gilt in: alle Modi" in pdf_text
+    assert f"- ![Ausrüstung]({PERK_IMAGE}) Leise Sohlen *nicht in Suchen*" in web and "Blitz 9" not in web
+    assert "![" not in pdf_text and "| Perks | – | Leise Sohlen | nicht in Suchen |" in pdf_text
+    assert "| Aufsätze | – | Griff, Lauf | nicht an Donner 4 |" in pdf_text
     assert frozen["source"]["loadout_ban_version"] == 1
-    assert IMAGE in version["frozen_images"]
+    assert PERK_IMAGE in version["frozen_images"] and IMAGE not in version["frozen_images"]
 
     flow.act_as(None)
     page = ok(await flow.get(season_page(w)))
-    assert f"![Blitz 9]({IMAGE})" in annex_body(page) and "**Aufsätze an erlaubten Waffen**" in annex_body(page)
+    assert f"![Ausrüstung]({PERK_IMAGE})" in annex_body(page) and "**Waffen**" in annex_body(page)
 
     from services import league_rules
 
@@ -183,7 +187,7 @@ async def test_the_block_shows_images_on_the_web_and_a_clean_list_in_the_pdf(flo
     stored = await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 0})
     document = league_rules._pdf_document(league, season, stored, None, False)
     annex = next(row["body_md"] for row in document["sections"] if row["anchor"] == "anlage-a")
-    assert "![" not in annex and "- Blitz 9 – gilt in: alle Modi" in annex
+    assert "![" not in annex and "| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |" in annex and "Donner 4" in annex
     pdf = await flow.get(f"{season_page(w)}/versions/{version['id']}/pdf")
     assert pdf.status_code == 200 and pdf.headers["content-type"].startswith("application/pdf")
 
@@ -195,9 +199,22 @@ async def test_without_a_list_the_block_says_everything_is_allowed(flow):
     from services import league_rule_blocks
 
     frozen = version["frozen"][w["season"]["id"]]["loadout_bans"]
-    assert frozen["data"]["list"] is False
+    # Mit Bibliothek (Nr. 99): die ganze aktive Ausrüstung als erlaubt.
+    assert frozen["data"]["list"] is False and frozen["data"]["layout"] == 3
+    assert "nichts gesperrt" in league_rule_blocks.value("loadout_bans", frozen)
+    assert "| Waffen | – | alle: Blitz 9, Donner 4 | – |" in league_rule_blocks.plain_value("loadout_bans", frozen, "text")
+    assert version["frozen_images"] == [IMAGE, PERK_IMAGE]
+
+
+@pytest.mark.asyncio
+async def test_without_a_library_the_block_keeps_the_old_sentence(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w, body=BODY, annexes=ANNEX)
+    from services import league_rule_blocks
+
+    frozen = version["frozen"][w["season"]["id"]]["loadout_bans"]
+    assert frozen["data"] == {"list": False, "groups": [], "weapons": []}
     assert "keine Sperrliste" in league_rule_blocks.value("loadout_bans", frozen)
-    assert "alles ist erlaubt" in league_rule_blocks.value("loadout_bans", frozen, "text")
     assert version["frozen_images"] == []
 
 
@@ -208,8 +225,8 @@ async def test_the_word_diffs_show_names_with_special_characters_as_written(flow
     ok(await save_bans(flow, w, standard(w)))
     first = await publish(flow, w, body=BODY, annexes=ANNEX)
     flow.act_as(w["lead"])
-    special = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": "Schild [Test] *x* (neu)"}))
-    ok(await save_bans(flow, w, [*standard(w), {"item_id": special["id"], "kind": "item", "modes": []}]))
+    # Ein neuer aktiver Eintrag ist erlaubt (Nr. 99) - der Baustein ändert sich.
+    ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": "Schild [Test] *x* (neu)"}))
     row = next(row for row in ok(await flow.get(season_scope(w)))["data_changes"]["rows"] if row["block"] == "loadout_bans")
     inserted = "".join(op["text"] for op in row["ops"] if op["op"] == "ins")
     assert "Schild [Test] *x* (neu)" in inserted
@@ -238,18 +255,20 @@ async def test_a_changed_list_suggests_a_new_version_and_each_version_keeps_its_
     changes = ok(await flow.get(season_scope(w)))["data_changes"]
     row = next(row for row in changes["rows"] if row["block"] == "loadout_bans")
     assert row["status"] == "changed" and changes["version_id"] == first["id"]
-    assert {"op": "ins", "text": "Rotpunkt"} in [{"op": op["op"], "text": op["text"].strip()} for op in row["ops"]]
+    # Rotpunkt ist jetzt gesperrt und fällt aus der erlaubten Liste (Nr. 99).
+    assert "Rotpunkt" in row["before"] and "Rotpunkt" not in row["after"]
+    assert any(op["op"] == "del" and "Rotpunkt" in op["text"] for op in row["ops"])
     assert not any("![" in op["text"] for op in row["ops"]), "markiert wird ohne Bild-Markdown"
     assert await flow.db.league_rules.count_documents({"status": "published"}) == 1, "nichts veröffentlicht sich selbst"
 
     prepared = ok(await flow.post(f"{season_scope(w)}/draft/from-version", json={}))
     second = await publish(flow, w, body=prepared["body_md"], annexes=prepared["annexes"], reason="Neue Sperrliste", requires_consent=True)
-    assert second["requires_consent"] is True and "Rotpunkt" in str(second["frozen"][w["season"]["id"]]["loadout_bans"]["data"])
+    assert second["requires_consent"] is True and "Rotpunkt" not in str(second["frozen"][w["season"]["id"]]["loadout_bans"]["data"])
     assert ok(await flow.get(bans_url(w)))["rules"]["outdated"] is False
 
     flow.act_as(None)
     old = ok(await flow.get(f"{season_page(w)}?version={first['id']}"))
-    assert "Rotpunkt" not in annex_body(old) and "Leise Sohlen" in annex_body(old)
+    assert "Rotpunkt" in annex_body(old) and "Leise Sohlen" in annex_body(old)
     diff = ok(await flow.get(f"{season_page(w)}/compare?base={first['id']}&target={second['id']}"))
     assert "![" not in str(diff["sections"])
 
@@ -269,10 +288,12 @@ async def test_the_media_library_keeps_images_of_a_published_list_unchanged(flow
 
     w = await ready(flow)
     ok(await save_bans(flow, w, standard(w)))
-    # Schon die gespeicherte Version der Sperrliste ist unveränderlich, danach auch die Fassung des Regelwerks.
-    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == ["Sperrliste, Version 1"]
+    # Schon die gespeicherte Version der Sperrliste ist unveränderlich, danach auch die Fassung des Regelwerks - sie zeigt die erlaubten
+    # Einträge (Nr. 99): Leise Sohlen ist erlaubt (außer in „Suchen“), Blitz 9 gesperrt.
+    assert await media_audit.frozen_usages(flow.db, "sohlen-2.png") == ["Sperrliste, Version 1"]
     assert await media_audit.still_referenced(flow.db, {"blitz-1.webp"}) == {"blitz-1.webp"}
     await publish(flow, w, body=BODY, annexes=ANNEX)
-    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == ["Regelwerk, Version 1", "Sperrliste, Version 1"]
+    assert await media_audit.frozen_usages(flow.db, "sohlen-2.png") == ["Regelwerk, Version 1", "Sperrliste, Version 1"]
+    assert await media_audit.frozen_usages(flow.db, "blitz-1.webp") == ["Sperrliste, Version 1"]
     places = {(collection, field) async for collection, _doc, field, _name, _text in media_audit.iter_usages(flow.db, {"sohlen-2.png"})}
     assert {("game_equipment", "image_url"), ("loadout_bans", "entries.image_url"), ("league_rules", "frozen_images")} <= places

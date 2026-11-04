@@ -731,7 +731,7 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 `anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
 
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
-`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` (Sperrliste, C.4), `[[baustein:mode_settings]]` (#2271: je Modus
+`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` („Erlaubte Ausrüstung“ aus der Sperrliste, C.4), `[[baustein:mode_settings]]` (#2271: je Modus
 fett der Name, darunter Zeitlimit je Map und Zeit je Runde aus `result_rules`, die Einstellungen aus `mode_settings` als Tabelle
 Gruppe · Einstellung · Wert und der Regeltext als Zitat; ältere Seasons ohne Kopie lesen die des Spiels, Modi ohne Angaben fehlen). Wie
 jeder Baustein liefert er Daten im Klartext (`league_rule_blocks.mode_settings_data`, eingefroren als `data`); erst die Darstellung
@@ -1604,15 +1604,26 @@ der frei geschriebene Regeltext bleibt unberührt, auch ein Backslash darin. Jed
 Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
 Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
 
-**Regelwerk gruppiert (#2287):** Trägt eine Zeile der Liste eine Unterkategorie oder sperrt sie eine Klasse, liefert der Baustein
-`data = {list, layout: 2, categories: [{label, sections: [{label | null, icon_url?, all, modes, entries: [{name, image_url, modes}]}]}],
-weapons}` – sonst unverändert das Format oben, damit ohne Änderung kein Vorschlag entsteht. Eine Klassenzeile liest die Einträge **von
-heute** (wie zur Laufzeit): Ein neuer Eintrag in einer gesperrten Klasse ändert die Daten, `data_changes` meldet „Regelwerk muss freigegeben
-werden“ und der Vorschlag (#2269) zeigt ihn. Eingefroren wird wie immer `data`. Web (`markdown`): je Kategorie fett der Name, Einträge
-ohne Unterkategorie direkt darunter, je Unterkategorie eine Zeile (Symbol `![Klassen-Symbol](…)`, Name kursiv, „alle gesperrt“, Modi)
-und darunter die Einträge als Karten (`- ![Ausrüstung](…) Name *nur in …*`, Raster per CSS `.tls-rules-doc`). PDF und Vergleich (`text`):
-Tabelle Kategorie · Unterkategorie · Gesperrt · Modi (eine Zeile je Unterkategorie und Modus-Satz, ganze Klasse „alle: A, B“), danach
-Waffe · Gesperrte Aufsätze · Modi. Leere Klassen entfallen. Ältere Fassungen (ohne `layout`) bleiben Wort für Wort.
+**Erlaubte Ausrüstung im Regelwerk (#2287, Fabian Nr. 99):** Der Baustein `[[baustein:loadout_bans]]` heißt in der Verwaltung **„Erlaubte
+Ausrüstung“** (die Kennung bleibt, vorhandene Texte gehen weiter) und zeigt, was **erlaubt** ist - gepflegt wird weiter die Sperrliste. Er
+liest die **aktiven** Einträge der Bibliothek von heute (inaktive und archivierte fehlen) und zieht die Sperren der geltenden Version ab
+(`loadout_bans.allowed_block`): `data = {list, layout: 3, categories: [{label, sections: [{label | null, icon_url?, state, not_in, banned,
+entries: [{name, image_url, not_in, not_at: [{name, modes}]}]}]}]}`. `state`: `all` („alle erlaubt“), `some` (mit Einschränkungen oder
+einzeln gesperrten Einträgen) oder `banned` (ganze Klasse in allen Modi gesperrt, oder alle ihre Einträge: nur eine Zeile „nicht erlaubt“ mit
+den Namen in Klammern, keine Karten). `not_in`: Modi, in denen ein Eintrag (am Abschnitt: die ganze Klasse) nicht erlaubt ist; `not_at`:
+Waffen, an denen ein Aufsatz nicht erlaubt ist. Ganz gesperrte Einträge fehlen, leere Unterkategorien entfallen (eine ganz gesperrte leere
+Klasse steht als „nicht erlaubt“). Ohne Sperrliste ist die ganze aktive Bibliothek erlaubt; hat das Spiel keine aktiven Einträge, bleibt
+der Baustein wie bisher („keine Sperrliste – alles ist erlaubt“). Eingefroren wird `data`; weil er die Bibliothek von heute liest, ändert
+jeder neue, umbenannte oder deaktivierte Eintrag die Daten - auch ein neuer in einer gesperrten Klasse (sein Name steht in der Klammer) -,
+und `data_changes` meldet „Regelwerk muss freigegeben werden“ samt Vorschlag (#2269). Web (`markdown`): je Kategorie fett der Name,
+Einträge ohne Unterkategorie direkt darunter, je Unterkategorie eine Zeile (Symbol als Bild mit dem Bildtext „Klassen-Symbol“, Name kursiv,
+„alle erlaubt“ / „nicht in …“ / fett „nicht erlaubt“) und darunter die Einträge als Liste von Karten (Bild mit dem Bildtext „Ausrüstung“,
+Name, kursiv „nicht in …“ und „nicht an …“; Raster per CSS `.tls-rules-doc`). PDF und Vergleich (`text`): Tabelle Kategorie ·
+Unterkategorie · Erlaubt · Einschränkungen, je Unterkategorie und Einschränkung eine Zeile („alle: A, B“, wenn die Zeile die ganze
+Unterkategorie meint). Ältere Fassungen (ohne `layout`, mit den Sperren) bleiben Wort für Wort; nach dem Einspielen schlägt die
+Verwaltung für eine Season mit dem Baustein darum einmal eine neue Fassung vor. **Liga- und Matchseite** zeigen dieselbe Sicht:
+`allowed_equipment` (gleiche Form wie `data`, `null` ohne Bibliothek) in `GET /api/leagues/{liga}/{season}` und im Block `league` der
+Matchseite (dort aus der Liste, die für das Spiel gilt).
 
 **Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
 
