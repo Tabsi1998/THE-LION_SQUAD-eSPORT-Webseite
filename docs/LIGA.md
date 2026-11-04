@@ -711,7 +711,8 @@ Import-Kreis), `pdf_service.pdf_league_rules`. Routen in `routes/league_rules_ro
 | `annexes` | `[{key, title, body_md}]`, höchstens 26 | Anlagen; `key` = „A“, „B“ … aus der Reihenfolge |
 | `frozen` | `{season_id: {block: {label, markdown, source}}}` | eingefrorene Bausteine; je Season, bei `scope: league` für jede Season, die nicht archiviert ist |
 | `blocks_used` | `[str]` | im Text verwendete Bausteine |
-| `frozen_vars`, `vars_used` | `{season_id: {name: {label, value}}}`, `[str]` | eingefrorene Variablen (#2269, siehe unten); bei `scope: league` zusätzlich der Schlüssel `""` für Werte ohne Season |
+| `frozen_vars`, `vars_used` | `{season_id: {name: {label, value}}}`, `[str]` | eingefrorene Variablen (#2269, siehe unten); bei `scope: league` zusätzlich der Schlüssel `""` für Werte ohne Season. Fassungen ohne `vars_used` (von vor #2269) bekommen beim Lesen keine Ersetzung: Ihr Text bleibt Wort für Wort, auch ein zufälliges `{{…}}` |
+| `frozen_names` | `{league, game, seasons: {season_id: name}}` | Namen von Liga, Spiel und Seasons beim Veröffentlichen (#2269): Seite (`version.names`), PDF-Kopf und PDF-Schlüssel lesen sie, eine Umbenennung ändert alte Fassungen nicht. Fassungen ohne das Feld nehmen die heutigen Namen |
 | `valid_from` | `YYYY-MM-DD` | Wiener Kalendertag; nie vor heute und nie vor dem der Vorgänger-Fassung |
 | `change_reason` | str 5–500 | Änderungsgrund |
 | `requires_consent` | bool | muss der Fassung neu zugestimmt werden |
@@ -804,8 +805,8 @@ Hinweis auf die Regelseite. Das schreibt das Veröffentlichen sofort und das Üb
 | `GET /api/admin/league-rules/{scope}/{id}` | Zuständigkeit `rules` oder Bereich `leagues` | Entwurf, Fassungen, Geerbtes, Bausteine, `data_changes`, Stand der Zustimmungen |
 | `PUT …/draft`, `POST …/draft/from-version`, `DELETE …/draft` | ebenso | Entwurf speichern, aus einer Fassung vorbereiten, verwerfen |
 | `POST …/preview` | ebenso | Vorschau mit heutigen Bausteinen und Änderungen zur letzten Fassung |
-| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent}`; 409 bei gleichzeitigem Veröffentlichen |
-| `POST …/proposal/publish` (#2269) | ebenso | `{base_version_id, valid_from, change_reason, requires_consent}`: den Vorschlag „Daten geändert“ in einem Schritt freigeben; 409 mit Entwurf oder veralteter Grundlage |
+| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent, confirm_empty}`; 409 bei gleichzeitigem Veröffentlichen; 422 `{code: "empty_vars", names, message}` bei leeren Variablen ohne `confirm_empty` |
+| `POST …/proposal/publish` (#2269) | ebenso | `{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}`: den Vorschlag „Daten geändert“ in einem Schritt freigeben; 409 mit Entwurf, veralteter Grundlage oder wenn die Datenbasis nicht mehr dem `fingerprint` des Vorschlags entspricht |
 
 `GET /api/leagues/{liga}/{season}` trägt zusätzlich `rules`: `{source, version, valid_from, url, pdf_url, consent_open}` oder `null`.
 `require_rules_editor` prüft das über `require_league`: Die Liga steht nie im Inhalt, eine Fassung aus einer anderen Liga ist im Geltungsbereich nicht zu finden (404). Die
@@ -844,7 +845,8 @@ Bausteinwert eingesetzt (`text_cell`: nie Link, nie fett, nie Tabellenspalte) un
 zusätzlich unter dem Schlüssel `""` die Werte ein, die ohne Season gelten (`league.name`, `game.name`); auf der Seite der Liga steht
 für alles andere „(je Season)“, für eine Season, die erst nach dem Veröffentlichen dazukam, „(noch nicht festgehalten)“. Ein bekannter
 Name **ohne Wert** (die Season trägt das Feld nicht) wird nie still leer: Es steht „(nicht festgelegt)“ da, die Vorschau nennt ihn
-unter `empty_vars`. Ein **unbekannter** Name (`unknown_vars`, auch `mode:<kennung>` eines Modus, den das Spiel nicht hat): deutlicher
+unter `empty_vars`, und das Veröffentlichen (normal wie über die Freigabe) verlangt die ausdrückliche Bestätigung `confirm_empty` -
+sonst 422 mit `{code: "empty_vars", names, message}` (Entscheidung Fabian). Ein **unbekannter** Name (`unknown_vars`, auch `mode:<kennung>` eines Modus, den das Spiel nicht hat): deutlicher
 Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variable im Text: {{…}}“ mit der ganzen Liste.
 
 | Variable | Wert (Klartext) |
@@ -870,10 +872,14 @@ werden“** an drei Stellen: im Season-Überblick (#2267), in „Mein Dienst“ 
 `league_name`, `season_name`, `kind` `changed` | `draft`, `count`, `label`, `admin_url`; für wer in der Liga „Regeln veröffentlichen“
 darf) und auf der Regelwerk-Seite. Dort entsteht der **Vorschlag** von selbst: `admin_view.proposal` = der Text der letzten Fassung mit
 den Daten von heute (`sections` mit Markierung, `changes` gegen die Fassung) - ohne Entwurf, ohne Schreiben, solange kein Entwurf
-liegt. Die Leitung prüft, gibt mit `POST /api/admin/league-rules/{scope}/{id}/proposal/publish` `{base_version_id, valid_from,
-change_reason, requires_consent}` frei (Recht `rules`; 409, wenn inzwischen ein Entwurf liegt oder die Grundlage nicht mehr die
-letzte Fassung ist) und wählt dabei, ob die Teams neu zustimmen müssen. Der Server legt den Entwurf aus der Fassung an und
-veröffentlicht ihn in einem Schritt unter derselben Sperre; Protokoll `league.rules.publish` mit `proposal: true`. „Neue Version
+liegt. Der Vorschlag trägt den **Fingerabdruck** seiner Datenbasis (`fingerprint`: Bausteine und Variablenwerte aller betroffenen Seasons,
+stabil sortiert, `league_rules.data_fingerprint`). Die Leitung prüft, gibt mit `POST /api/admin/league-rules/{scope}/{id}/proposal/publish`
+`{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}` frei (Recht `rules`) und wählt dabei, ob die
+Teams neu zustimmen müssen. Unter der Sperre liest der Server die Datenbasis neu: Weicht sie vom `fingerprint` ab (eine Season-Einstellung
+hält diese Sperre nicht), antwortet er 409 „Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen“, und das Web
+lädt den Vorschlag neu; ebenso 409, wenn inzwischen ein Entwurf liegt oder die Grundlage nicht mehr die letzte Fassung ist. Beide Prüfungen
+laufen vor dem Entwurf, es bleibt nichts liegen. Dann legt der Server den Entwurf aus der Fassung an und veröffentlicht genau die geprüfte
+Datenbasis in einem Schritt; Protokoll `league.rules.publish` mit `proposal: true`. „Neue Version
 vorbereiten“ (Text vorher anpassen) bleibt der zweite Weg. Bis zur Freigabe gilt und zeigt die alte Fassung. Mit `requires_consent`
 sehen die Verantwortlichen „Neue Fassung, bitte zustimmen“ (Aufgabe, Regelseite, Season-Seite, Team-Seite, Matchseite).
 
