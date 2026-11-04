@@ -162,7 +162,34 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         # Nach dem Ende noch „Live“ (#2194) und überfällige Liga-Spiele (Nr. 28): Hinweise für die Leitung.
         "ended_live": await ended_live_rows(db, user, now=now),
         "overdue_matches": await overdue_match_rows(db, user),
+        # Regelwerk muss freigegeben werden (#2269): für wer in der Liga „Regeln veröffentlichen“ darf.
+        "rules_pending": await rules_pending_rows(db, user),
     }
+
+
+async def rules_pending_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    """Seasons, deren Regelwerk freigegeben werden muss (#2269): Einstellungen geändert oder ein Entwurf wartet - je Liga, in der die
+    Person „Regeln veröffentlichen“ darf. Beendete und archivierte Seasons zählen nicht."""
+    from services import league_rules
+    from services.league_permissions import can, has_leagues_area, staffed_league_ids
+
+    if not user or needs_mfa(user):
+        return []
+    query = {"status": "active"} if has_leagues_area(user) else {"status": "active", "id": {"$in": sorted(await staffed_league_ids(db, user))}}
+    rows: list[dict] = []
+    for league in await db.leagues.find(query, {"_id": 0, "id": 1, "name": 1, "slug": 1, "game_id": 1}).sort("name", 1).to_list(200):
+        if not await can(user, "rules", league["id"], db=db):
+            continue
+        seasons = await db.league_seasons.find({"league_id": league["id"], "status": {"$nin": ["completed", "archived"]}},
+                                               {"_id": 0}).sort("number", -1).to_list(20)
+        for season in seasons:
+            pending = await league_rules.pending_release(db, league, season)
+            if pending:
+                rows.append({"league_id": league["id"], "league_name": league.get("name"), "season_id": season["id"],
+                             "season_name": season.get("name"), **pending})
+            if len(rows) >= limit:
+                return rows
+    return rows
 
 
 async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[dict]:
