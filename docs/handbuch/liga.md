@@ -165,6 +165,17 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 <td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season: Hinweis aufs Regelwerk, gesperrte Waffe mit Modus, Aufsätze an einer Waffe" width="560"></td>
 <td><img src="../assets/liga/sperrliste-ligaseite-handy.png" alt="Ligaseite am Handy: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen" width="220"></td>
 </tr>
+<tr>
+<td><img src="../assets/liga/ausruestung-unterkategorien.png" alt="Bibliothek mit Unterkategorien: Gruppen Sturmgewehr und Schrotflinte mit Zähler, Knöpfe Unterkategorien und Auswählen" width="560"></td>
+<td><img src="../assets/liga/erlaubte-ausruestung-handy.png" alt="Ligaseite am Handy: Erlaubte Ausrüstung je Unterkategorie, Hinweis nicht in Stellung, Schrotflinte nicht erlaubt" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/sperrliste-klassen.png" alt="Sperrliste der Season: je Unterkategorie der Schalter Ganze Klasse sperren, Hinweis auf neu hinzugekommene Einträge" width="560"></td>
+<td><img src="../assets/liga/regelwerk-erlaubte-ausruestung-pdf.png" alt="PDF des Regelwerks: Tabelle Kategorie, Unterkategorie, Erlaubt, Einschränkungen" width="220"></td>
+</tr>
+<tr>
+<td colspan="2"><img src="../assets/liga/regelwerk-erlaubte-ausruestung.png" alt="Regelwerk im Web: Anlage Erlaubte Ausrüstung mit Karten je Unterkategorie und der Zeile Schrotflinte nicht erlaubt" width="560"></td>
+</tr>
 </table>
 
 ### 2.2 Liga und Season anlegen
