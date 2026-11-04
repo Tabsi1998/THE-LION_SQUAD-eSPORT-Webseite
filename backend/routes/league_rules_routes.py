@@ -62,6 +62,8 @@ class RulePublish(BaseModel):
     valid_from: str = Field(max_length=10)
     change_reason: str = Field(default="", max_length=1000)
     requires_consent: bool = False
+    # Leere Variablen (#2269) nur mit ausdrücklicher Bestätigung - sonst 422 mit der Liste.
+    confirm_empty: bool = False
 
 
 class RuleProposalPublish(BaseModel):
@@ -72,6 +74,7 @@ class RuleProposalPublish(BaseModel):
     valid_from: str = Field(max_length=10)
     change_reason: str = Field(default="", max_length=1000)
     requires_consent: bool = False
+    confirm_empty: bool = False
 
 
 class RuleConsent(BaseModel):
@@ -84,7 +87,8 @@ async def _call(coroutine):
     try:
         return await coroutine
     except LeagueProblem as problem:
-        raise HTTPException(status_code=problem.status, detail=problem.message) from None
+        # Mit Code und Liste (``RulesProblem``, etwa leere Variablen): die Oberfläche zeigt den Text und bietet die Bestätigung an.
+        raise HTTPException(status_code=problem.status, detail=getattr(problem, "payload", None) or problem.message) from None
 
 
 async def _audit(db, action: str, me: dict, target_id: str, data: dict | None = None) -> None:

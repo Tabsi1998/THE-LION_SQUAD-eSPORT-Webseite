@@ -121,7 +121,7 @@ test("Veröffentlichen schickt Revision, Tag, Grund und die Wahl zur Zustimmung;
   fireEvent.click(screen.getByTestId("rules-requires-consent"));
   fireEvent.click(screen.getByTestId("rules-publish"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/league-rules/league_season/s1/publish", {
-    revision: 4, valid_from: "2030-03-05", change_reason: "Fairplay neu gefasst", requires_consent: true,
+    revision: 4, valid_from: "2030-03-05", change_reason: "Fairplay neu gefasst", requires_consent: true, confirm_empty: false,
   }));
   expect(apiMock.put).toHaveBeenCalledTimes(1);
 });
@@ -138,7 +138,7 @@ const CHANGES = { version_id: "v1", version: 1, label: "Version 1", rows: [
   { kind: "variable", block: "team_size", label: "{{team_size}} · Teamgröße", season_id: "s1", season_name: "Season 1", status: "changed",
     before: "4", after: "5", ops: [{ op: "del", text: "4" }, { op: "ins", text: "5" }] },
 ] };
-const PROPOSAL = { base: HEAD, unknown_vars: [], empty_vars: [],
+const PROPOSAL = { base: HEAD, unknown_vars: [], empty_vars: [], fingerprint: "abdruck-1",
   sections: [{ anchor: "1-serie", title: "§ 1 Serie", level: 1, kind: "main", body_md: "Gespielt wird mit 5 Spielern.", mark: "changed" }],
   changes: { base: HEAD, changed: [{ anchor: "1-serie", title: "§ 1 Serie" }], new: [], removed: [] } };
 
@@ -161,10 +161,55 @@ test("Regelwerk muss freigegeben werden: Unterschiede je Baustein und Variable, 
   expect(screen.getByTestId("rules-approve-reason")).toHaveValue("Einstellungen geändert: Map-Pool, Teamgröße");
   expect(screen.getByTestId("rules-approve-consent")).toBeChecked();
   fireEvent.click(screen.getByTestId("rules-approve-consent"));
+  expect(screen.queryByTestId("rules-approve-confirm-empty")).toBeNull();
   fireEvent.click(screen.getByTestId("rules-approve-publish"));
+  // Mit dem Fingerabdruck der Datenbasis: Veröffentlicht wird nur, was der Vorschlag gezeigt hat.
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/league-rules/league_season/s1/proposal/publish", {
-    base_version_id: "v1", valid_from: "2030-03-05", change_reason: "Einstellungen geändert: Map-Pool, Teamgröße", requires_consent: false,
+    base_version_id: "v1", fingerprint: "abdruck-1", valid_from: "2030-03-05", change_reason: "Einstellungen geändert: Map-Pool, Teamgröße",
+    requires_consent: false, confirm_empty: false,
   }));
+});
+
+test("Leere Variablen im Vorschlag: Freigeben erst mit dem Haken „Trotzdem veröffentlichen“", async () => {
+  serve({ ...VIEW, versions: [HEAD], current: HEAD, data_changes: CHANGES, proposal: { ...PROPOSAL, empty_vars: ["max_squad_size"] } });
+  apiMock.post.mockResolvedValue({ data: { ...HEAD, version: 2 } });
+  renderPage();
+  expect(await screen.findByTestId("rules-proposal-empty")).toHaveTextContent("{{max_squad_size}}");
+  expect(screen.getByTestId("rules-approve-publish")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("rules-approve-confirm-empty"));
+  expect(screen.getByTestId("rules-approve-publish")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("rules-approve-publish"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/league-rules/league_season/s1/proposal/publish",
+    expect.objectContaining({ fingerprint: "abdruck-1", confirm_empty: true })));
+});
+
+test("Einstellungen haben sich seit dem Vorschlag geändert (409): der Vorschlag wird neu geladen", async () => {
+  serve({ ...VIEW, versions: [HEAD], current: HEAD, data_changes: CHANGES, proposal: PROPOSAL });
+  apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen." } } });
+  renderPage();
+  await screen.findByTestId("rules-approve");
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByTestId("rules-approve-publish"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
+});
+
+test("Veröffentlichen mit leeren Variablen: 422 mit Liste zeigt den Haken, mit Haken geht es durch", async () => {
+  serve({ ...VIEW, draft: DRAFT });
+  apiMock.put.mockResolvedValue({ data: { ...DRAFT, revision: 4 } });
+  apiMock.post.mockRejectedValueOnce({ response: { status: 422, data: { detail: { code: "empty_vars", names: ["application.slots"],
+    message: "Ohne Wert in dieser Season: {{application.slots}} - im Text steht dann „(nicht festgelegt)“. Zum Veröffentlichen bitte bestätigen." } } } });
+  renderPage();
+  fireEvent.change(await screen.findByTestId("rules-reason"), { target: { value: "Startplätze folgen" } });
+  expect(screen.queryByTestId("rules-confirm-empty")).toBeNull();
+  fireEvent.click(screen.getByTestId("rules-publish"));
+  const check = await screen.findByTestId("rules-confirm-empty");
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/league-rules/league_season/s1/publish", expect.objectContaining({ confirm_empty: false }));
+  expect(screen.getByTestId("rules-publish")).toBeDisabled();
+  fireEvent.click(check);
+  apiMock.post.mockResolvedValue({ data: { ...HEAD, version: 2 } });
+  fireEvent.click(screen.getByTestId("rules-publish"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/admin/league-rules/league_season/s1/publish", expect.objectContaining({ confirm_empty: true })));
 });
 
 test("Freigeben geht nicht mit unbekannter Variable im Vorschlag; „Text vorher anpassen“ bereitet den Entwurf vor", async () => {

@@ -102,7 +102,8 @@ async def test_publishing_freezes_blocks_and_variables_and_a_changed_setting_nev
 
     # Freigeben mit Zustimmungspflicht: neue Fassung mit den Werten von heute, die alte unverändert, die Captains müssen zustimmen.
     released = ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={
-        "base_version_id": version["id"], "valid_from": today(), "change_reason": "Modus umbenannt, Ziel und Teamgröße geändert", "requires_consent": True}))
+        "base_version_id": version["id"], "fingerprint": proposal["fingerprint"], "valid_from": today(),
+        "change_reason": "Modus umbenannt, Ziel und Teamgröße geändert", "requires_consent": True}))
     assert released["version"] == 2 and released["requires_consent"] and released["body_md"] == BODY
     assert released["frozen_vars"][sid]["team_size"]["value"] == "5" and released["frozen_vars"][sid]["mode:stellung.name"]["value"] == "Hardpoint"
     audit = await flow.db.audit_logs.find_one({"action": "league.rules.publish", "target_id": released["id"]}, {"_id": 0})
@@ -127,14 +128,14 @@ async def test_publishing_freezes_blocks_and_variables_and_a_changed_setting_nev
 @pytest.mark.asyncio
 async def test_a_draft_blocks_the_proposal_and_an_old_base_is_refused(flow):
     w = await make_world(flow)
-    version = await publish(flow, w, body=BODY, annexes=[])
+    version = await publish(flow, w, body=BODY, annexes=[], confirm_empty=True)
     await rename_mode(flow, w, "Hardpoint")
-    wrong = await flow.post(f"{season_scope(w)}/proposal/publish", json={"base_version_id": "nicht-da", "valid_from": today(), "change_reason": "Grund genug"})
+    wrong = await flow.post(f"{season_scope(w)}/proposal/publish", json={"base_version_id": "nicht-da", "fingerprint": "egal", "valid_from": today(), "change_reason": "Grund genug"})
     assert wrong.status_code == 409 and "Grundlage" in wrong.json()["detail"]
     ok(await flow.put(f"{season_scope(w)}/draft", json={"title": "Regelwerk", "body_md": "# Neu\nText", "annexes": []}))
     view = ok(await flow.get(season_scope(w)))
     assert view["proposal"] is None and view["data_changes"]["rows"], "mit Entwurf nur der Hinweis, kein Vorschlag"
-    blocked = await flow.post(f"{season_scope(w)}/proposal/publish", json={"base_version_id": version["id"], "valid_from": today(), "change_reason": "Grund genug"})
+    blocked = await flow.post(f"{season_scope(w)}/proposal/publish", json={"base_version_id": version["id"], "fingerprint": "egal", "valid_from": today(), "change_reason": "Grund genug"})
     assert blocked.status_code == 409 and "Entwurf" in blocked.json()["detail"]
     assert await flow.db.league_rules.count_documents({"status": "published"}) == 1
     duty = ok(await flow.get("/api/users/me/duty"))["rules_pending"]
@@ -149,7 +150,7 @@ async def test_a_draft_blocks_the_proposal_and_an_old_base_is_refused(flow):
 @pytest.mark.asyncio
 async def test_the_captain_has_no_duty_and_the_lead_only_for_own_leagues(flow):
     w = await make_world(flow)
-    await publish(flow, w, body=BODY, annexes=[])
+    await publish(flow, w, body=BODY, annexes=[], confirm_empty=True)
     await rename_mode(flow, w, "Hardpoint")
     flow.act_as(w["captain"])
     assert ok(await flow.get("/api/users/me/duty"))["rules_pending"] == []
@@ -180,7 +181,8 @@ async def test_a_known_variable_without_a_value_is_never_silently_empty(flow):
     preview = ok(await flow.post(f"{season_scope(w)}/preview", json={"title": "R", "body_md": text, "annexes": []}))
     assert preview["empty_vars"] == ["application.slots"] and preview["unknown_vars"] == []
     assert "Startplätze: (nicht festgelegt)." in preview["sections"][0]["body_md"]
-    version = await publish(flow, w, body=text, annexes=[])
+    # Veröffentlichen nur mit ausdrücklicher Bestätigung (Entscheidung Fabian; die Absage prüft test_league_rules_review_flow).
+    version = await publish(flow, w, body=text, annexes=[], confirm_empty=True)
     assert version["frozen_vars"][w["season"]["id"]]["application.slots"]["value"] is None
     flow.act_as(None)
     assert "Startplätze: (nicht festgelegt)." in body_of(ok(await flow.get(season_page(w))))

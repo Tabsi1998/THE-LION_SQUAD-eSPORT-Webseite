@@ -148,10 +148,32 @@ def _names_of(version: dict, league: dict, season: dict | None) -> dict:
     return {"league": frozen.get("league") or league.get("name"), "season": season_name}
 
 
+class RulesProblem(LeagueProblem):
+    """Eine Absage mit Code und Liste für die Oberfläche (``payload`` wird ``detail``), zusätzlich zur deutschen Meldung."""
+
+    def __init__(self, payload: dict, status: int = 422):
+        super().__init__(str(payload.get("message") or ""), status)
+        self.payload = payload
+
+
 def data_fingerprint(frozen: dict, frozen_vars: dict) -> str:
     """Der Fingerabdruck einer Datenbasis (#2269, Prüfung Codex): Bausteine und Variablenwerte, stabil sortiert. Die Freigabe veröffentlicht
     nur, was der Vorschlag gezeigt hat - weicht er ab, 409."""
     return fingerprint({"blocks": frozen, "vars": frozen_vars})
+
+
+def _empty_names(frozen_vars: dict) -> list[str]:
+    """Bekannte Variablen ohne Wert in einer der eingefrorenen Seasons - sie stehen als „(nicht festgelegt)“ im Text."""
+    return sorted({name for rows in frozen_vars.values() for name, row in (rows or {}).items() if (row or {}).get("value") is None})
+
+
+def _check_empty(frozen_vars: dict, body: dict) -> None:
+    """Leere Variablen nur mit ausdrücklicher Bestätigung (Entscheidung Fabian): sonst 422 mit Code und Liste."""
+    empty = _empty_names(frozen_vars)
+    if empty and not body.get("confirm_empty"):
+        raise RulesProblem({"code": "empty_vars", "names": empty,
+                            "message": "Ohne Wert in dieser Season: " + ", ".join("{{" + name + "}}" for name in empty)
+                            + " - im Text steht dann „(nicht festgelegt)“. Zum Veröffentlichen bitte bestätigen."})
 
 
 def page_path(league: dict, season: dict | None) -> str:
@@ -699,6 +721,7 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict, *, fro
         # Nie still leer (#2269): Eine unbekannte Variable hält das Veröffentlichen auf, mit der ganzen Liste.
         raise LeagueProblem("Unbekannte Variable im Text: " + ", ".join("{{" + name + "}}" for name in wrong) + ".")
     frozen_blocks, frozen_vars = frozen if frozen is not None else await _freeze(db, scope, league, season, keys, names)
+    _check_empty(frozen_vars, body)
     now = now_utc().isoformat()
     try:
         doc = await db.league_rules.find_one_and_update(
@@ -741,6 +764,7 @@ async def publish_proposal(db, scope: str, scope_id: str, body: dict, user: dict
             frozen = await _freeze(db, scope, league, season, keys, names)
             if data_fingerprint(*frozen) != body.get("fingerprint"):
                 raise LeagueProblem("Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen.", 409)
+            _check_empty(frozen[1], body)
             draft = await draft_from_version(db, scope, scope_id, latest["id"], user)
             return await _publish(db, scope, scope_id, {**body, "revision": draft["revision"]}, user, frozen=frozen)
     except MutationLockBusy:

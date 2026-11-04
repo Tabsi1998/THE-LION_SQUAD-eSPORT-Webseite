@@ -48,7 +48,7 @@ const DATA_CHANGES = { version_id: "v2", version: 2, label: "Version 2", rows: [
   { kind: "variable", block: "team_size", label: "{{team_size}} · Teamgröße", season_id: "s1", season_name: "Season 1", status: "changed",
     before: "4", after: "5", ops: [{ op: "del", text: "4" }, { op: "ins", text: "5" }] },
 ] };
-const PROPOSAL = { base: V2, unknown_vars: [], empty_vars: ["max_squad_size"],
+const PROPOSAL = { base: V2, unknown_vars: [], empty_vars: ["max_squad_size"], fingerprint: "abdruck-2",
   sections: SECTIONS.map((row) => (row.anchor === "1-fairplay" ? { ...row, body_md: `Gespielt wird mit 5 Spielern je Map. ${FILLER}`, mark: "changed" } : { ...row, mark: null })),
   changes: { base: V2, changed: [{ anchor: "1-fairplay", title: "§ 1 Fairplay" }], new: [], removed: [] } };
 const ADMIN_VIEW = {
@@ -259,9 +259,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     if (process.env.ABNAHME_SHOTS) await page.screenshot({ path: `${process.env.ABNAHME_SHOTS}/regeln-freigabe-${width}.png`, fullPage: true });
     await expect(page.getByTestId("rules-approve-reason")).toHaveValue("Einstellungen geändert: Map-Pool, Teamgröße");
     await expect(page.getByTestId("rules-approve-consent")).toBeChecked();
+    // Leere Variable: erst der Haken „Trotzdem veröffentlichen“, dann geht der Knopf.
+    await expect(page.getByTestId("rules-approve-publish")).toBeDisabled();
+    await page.getByTestId("rules-approve-confirm-empty").check();
     await page.getByTestId("rules-approve-publish").click();
     await page.getByRole("button", { name: "Freigeben", exact: true }).click();
-    await expect.poll(() => sent).toEqual({ base_version_id: "v2", valid_from: "2030-03-05", change_reason: "Einstellungen geändert: Map-Pool, Teamgröße", requires_consent: true });
+    await expect.poll(() => sent).toEqual({ base_version_id: "v2", fingerprint: "abdruck-2", valid_from: "2030-03-05",
+      change_reason: "Einstellungen geändert: Map-Pool, Teamgröße", requires_consent: true, confirm_empty: true });
   });
 }
 

@@ -51,8 +51,11 @@ function VarAlerts({ unknown = [], empty = [], testId }) {
 
 /** „Regelwerk muss freigegeben werden“: die geänderten Stellen, der Vorschlag mit markierten Unterschieden und die Freigabe. */
 function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, onApprove }) {
-  const [release, setRelease] = useState({ valid_from: today || "", change_reason: proposedReason(changes), requires_consent: true });
-  const canApprove = release.change_reason.trim().length >= REASON_MIN && release.valid_from && !busy && !proposal?.unknown_vars?.length;
+  const [release, setRelease] = useState({ valid_from: today || "", change_reason: proposedReason(changes), requires_consent: true, confirm_empty: false });
+  // Leere Variablen (Entscheidung Fabian): nur mit ausdrücklicher Bestätigung - der Haken erscheint erst, wenn es welche gibt.
+  const emptyVars = proposal?.empty_vars || [];
+  const canApprove = release.change_reason.trim().length >= REASON_MIN && release.valid_from && !busy && !proposal?.unknown_vars?.length
+    && (!emptyVars.length || release.confirm_empty);
   return (
     <section className="mb-6 rounded-sm border border-warn/40 bg-warn/5 p-4" data-testid="rules-data-changes" aria-labelledby="rules-pending-title">
       <div className="flex items-start gap-3">
@@ -98,6 +101,11 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, o
             </div>
             <CheckField className="mt-3" label="Die Teams müssen der neuen Fassung zustimmen" checked={release.requires_consent} onChange={(value) => setRelease((row) => ({ ...row, requires_consent: value }))}
               hint="Captain und Vertreter sehen „Neue Fassung, bitte zustimmen“ - auf Startseite, Regelseite, Team-Seite und Matchseite." testId="rules-approve-consent" />
+            {emptyVars.length ? (
+              <CheckField className="mt-2" label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={release.confirm_empty}
+                onChange={(value) => setRelease((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
+                hint={`Ohne Wert in dieser Season: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-approve-confirm-empty" />
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" className={PRIMARY} disabled={!canApprove} data-testid="rules-approve-publish"
                 onClick={() => onApprove({ ...release, base_version_id: proposal.base.id, fingerprint: proposal.fingerprint })}>Freigeben und veröffentlichen</button>
@@ -253,7 +261,9 @@ export default function AdminLeagueRulesPage() {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
-  const [publish, setPublish] = useState({ valid_from: "", change_reason: "", requires_consent: false });
+  const [publish, setPublish] = useState({ valid_from: "", change_reason: "", requires_consent: false, confirm_empty: false });
+  // Leere Variablen im Entwurf (Entscheidung Fabian): aus der Vorschau oder aus der Absage des Servers - erst dann erscheint der Haken.
+  const [emptyVars, setEmptyVars] = useState([]);
   // Wohin ein Baustein oder eine Variable geht: der zuletzt benutzte Editor (Haupttext oder eine Anlage).
   const [target, setTarget] = useState("body");
   const bodyRef = useRef(null);
@@ -312,6 +322,8 @@ export default function AdminLeagueRulesPage() {
       await work();
     } catch (err) {
       const detail = err.response?.data?.detail;
+      // Leere Variablen (422 mit Liste): der Haken zum Bestätigen erscheint, der Text bleibt.
+      if (detail?.code === "empty_vars" && Array.isArray(detail.names)) setEmptyVars(detail.names);
       toast.error(formatApiError(detail));
       // Einstellungen haben sich seit dem Vorschlag geändert (409): den Vorschlag neu laden, damit die Leitung ihn neu prüft.
       if (err.response?.status === 409) await load();
@@ -320,7 +332,7 @@ export default function AdminLeagueRulesPage() {
     }
   };
   const onSave = () => run(async () => { await save(); toast.success("Entwurf gespeichert."); });
-  const onPreview = () => run(async () => { const { data } = await api.post(`${base}/preview`, form); setPreview(data); });
+  const onPreview = () => run(async () => { const { data } = await api.post(`${base}/preview`, form); setPreview(data); setEmptyVars(data.empty_vars || []); });
   const onPrepare = () => run(async () => { await api.post(`${base}/draft/from-version`, {}); toast.success("Entwurf vorbereitet."); await load(); });
   const onApprove = (body) => run(async () => {
     if (!await confirm({ title: "Neue Fassung freigeben?", description: "Der Text der letzten Fassung mit den Werten von heute wird veröffentlicht. Danach lässt sie sich nicht mehr ändern.", confirmLabel: "Freigeben" })) return;
@@ -339,14 +351,15 @@ export default function AdminLeagueRulesPage() {
     const current = dirty || !revision ? (await save()).revision : revision;
     await api.post(`${base}/publish`, { revision: current, ...publish });
     toast.success("Version veröffentlicht.");
-    setPublish((value) => ({ ...value, change_reason: "", requires_consent: false }));
+    setPublish((value) => ({ ...value, change_reason: "", requires_consent: false, confirm_empty: false }));
+    setEmptyVars([]);
     setPreview(null);
     await load();
   });
 
   // Zurück in den Reiter „Regelwerk und Sperrliste“ der Season (#2267).
   const back = view?.season ? seasonAnchorUrl(view.season.id, "regelwerk") : "/admin/leagues";
-  const canPublish = publish.change_reason.trim().length >= REASON_MIN && publish.valid_from && !busy;
+  const canPublish = publish.change_reason.trim().length >= REASON_MIN && publish.valid_from && !busy && (!emptyVars.length || publish.confirm_empty);
   return (
     <AdminLayout>
       <Link to={back} data-testid="rules-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
@@ -464,6 +477,11 @@ export default function AdminLeagueRulesPage() {
                     placeholder="Was sich ändert und warum" hint="Steht öffentlich bei der Fassung, mindestens fünf Zeichen." testId="rules-reason" />
                   <CheckField label="Captains müssen dieser Fassung neu zustimmen" checked={publish.requires_consent} onChange={(value) => setPublish((row) => ({ ...row, requires_consent: value }))}
                     hint="Fehlt die Zustimmung, gibt es eine Aufgabe auf der Startseite. Spiele laufen trotzdem weiter." testId="rules-requires-consent" />
+                  {emptyVars.length ? (
+                    <CheckField label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={publish.confirm_empty}
+                      onChange={(value) => setPublish((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
+                      hint={`Ohne Wert in dieser Season: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-confirm-empty" />
+                  ) : null}
                   <button type="button" className={PRIMARY} disabled={!canPublish} onClick={onPublish} data-testid="rules-publish">Version veröffentlichen</button>
                 </FormSection>
               </>
