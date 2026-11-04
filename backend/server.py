@@ -182,11 +182,51 @@ def validate_runtime_env():
     return validate_runtime_environment()
 
 
+_variant_sweep_task = None
+_variant_sweep_stop = None
+
+
+def _start_variant_sweep() -> None:
+    global _variant_sweep_task, _variant_sweep_stop
+    import asyncio
+    import threading
+    from services.image_variants import sweep_variants
+
+    stop = threading.Event()
+
+    async def _run() -> None:
+        try:
+            removed = await asyncio.to_thread(sweep_variants, UPLOAD_DIR, stop)
+            if removed:
+                logger.info("[media] %s kaputte Bildfassungen entfernt", removed)
+        except Exception as exc:  # noqa: BLE001 - nie den Betrieb gefährden
+            logger.warning("[media] Aufräumen der Bildfassungen fehlgeschlagen: %s", type(exc).__name__)
+
+    _variant_sweep_stop = stop
+    _variant_sweep_task = asyncio.get_running_loop().create_task(_run())
+
+
+async def _stop_variant_sweep() -> None:
+    """Beim Herunterfahren: Stoppsignal an den Lauf (er hört nach der aktuellen Datei auf) und kurz abwarten."""
+    import asyncio
+
+    if _variant_sweep_stop is not None:
+        _variant_sweep_stop.set()
+    if _variant_sweep_task is not None and not _variant_sweep_task.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(_variant_sweep_task), timeout=5)
+        except Exception:  # noqa: BLE001 - nie das Herunterfahren aufhalten
+            logger.warning("[shutdown] Aufräumen der Bildfassungen nicht rechtzeitig beendet")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_env()
     ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     ensure_storage_directories()
+    # Kaputte Bildfassungen aus früheren abgebrochenen Schreibvorgängen: nginx würde sie als leeres Bild ausliefern. Läuft im
+    # Hintergrund, damit ein großer Upload-Ordner den Start nicht aufhält.
+    _start_variant_sweep()
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
     from services.migrations import run_pending_migrations
@@ -228,6 +268,7 @@ async def lifespan(app: FastAPI):
         stop_scheduler()
     except Exception:
         logger.warning("[shutdown] Planer nicht sauber gestoppt", exc_info=True)
+    await _stop_variant_sweep()
     await close_client()
 
 
