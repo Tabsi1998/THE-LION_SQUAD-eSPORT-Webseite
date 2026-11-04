@@ -483,9 +483,9 @@ async def decide_reschedule(db, match: dict, tournament: dict | None, acting_reg
             "scheduled_at": new_at.isoformat(), "schedule_source": "accepted", "schedule_status": "accepted",
             "schedule_written_at": now.isoformat(), "reschedule_count": int(match.get("reschedule_count") or 0) + 1,
         })
-        # Mit dem neuen Termin fällt auch eine Verlängerung des alten Check-in-Fensters (D.2, #1652).
-        change["$unset"] = {"schedule_deadline_at": "", "schedule_escalated_at": "", "result_reminded_at": "",
-                            "result_overdue_at": "", **checkin_rules.new_time_unset(tournament)}
+        # Mit dem neuen Termin fällt auch eine Verlängerung des alten Check-in-Fensters (D.2, #1652), die Termin-Revision steigt (D.3).
+        change["$unset"] = {"schedule_deadline_at": "", "schedule_escalated_at": "", "result_reminded_at": "", "result_overdue_at": ""}
+        change = checkin_rules.new_time_change(tournament, change)
         change["$push"] = history_push(history_entry(
             "reschedule", by=user.get("id"), registration_id=acting_reg.get("id"), from_at=request.get("from_at"),
             to_at=new_at, reason=request.get("reason"), request_id=request_id, at=now,

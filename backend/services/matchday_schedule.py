@@ -582,6 +582,8 @@ async def apply_schedule_writes(db, writes) -> int:
             change["$push"] = {"schedule_history": {"$each": [write["history"]], "$slice": -50}}
         if write.get("unset"):
             change["$unset"] = dict(write["unset"])
+        if write.get("inc"):
+            change["$inc"] = dict(write["inc"])
         result = await db.matches_v2.update_one(
             {"id": write["match_id"], "schedule_source": expect.get("schedule_source"), "scheduled_at": expect.get("scheduled_at"),
              "status": expect.get("status"), "started_at": None},
@@ -601,11 +603,14 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
-    # Liga-Check-in (D.2, #1652): jeder Eintrag hier ist ein neuer Termin - eine Verlängerung des alten Fensters fällt damit.
-    unset = checkin_rules.new_time_unset(tournament)
-    if unset:
-        for write in writes:
+    # Liga-Check-in (D.2, #1652): jeder Eintrag hier ist ein neuer Termin - eine Verlängerung des alten Fensters fällt damit, die
+    # Termin-Revision steigt (Codex zu D.3, #1618).
+    unset, inc = checkin_rules.new_time_unset(tournament), checkin_rules.new_time_inc(tournament)
+    for write in writes:
+        if unset:
             write["unset"] = dict(unset)
+        if inc:
+            write["inc"] = dict(inc)
     if _home_rule_managed(tournament):
         # Termin-Historie (#2194), nur in Staffeln mit Terminregeln - dieselbe Form wie league_schedule.history_entry, hier ohne Import (kein Import-Kreis).
         from uuid import uuid4

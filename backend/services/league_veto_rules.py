@@ -376,11 +376,14 @@ def _iso(value) -> str | None:
 
 
 def veto_of(match: dict | None) -> dict | None:
-    """Das Veto zum geltenden Termin - ein neuer Termin der Leitung macht ein altes ungültig (wie ``flow.ready_for``, D.2)."""
-    veto = ((match or {}).get("flow") or {}).get("veto")
+    """Das Veto zum geltenden Termin und seiner Revision - ein neuer Termin macht ein altes ungültig (wie ``flow.ready_for``, D.2),
+    auch Termin A → B → wieder A (Codex zu D.3: ``flow.schedule_rev``; Altbestand ohne Revision zählt als 0)."""
+    flow = (match or {}).get("flow") or {}
+    veto = flow.get("veto")
     if not isinstance(veto, dict):
         return None
-    return veto if veto.get("for_at") == _iso((match or {}).get("scheduled_at")) else None
+    same_time = veto.get("for_at") == _iso((match or {}).get("scheduled_at"))
+    return veto if same_time and int(veto.get("rev") or 0) == int(flow.get("schedule_rev") or 0) else None
 
 
 def veto_pending(match: dict | None, tournament: dict | None) -> bool:

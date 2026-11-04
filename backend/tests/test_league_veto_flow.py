@@ -15,16 +15,17 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
-from league_match_world import ids, world as league_world  # noqa: E402
+from league_match_world import checked_in, ids, world as league_world  # noqa: E402
 from league_rules_world import publish  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from models import now_utc  # noqa: E402
 from routes import dsgvo_routes  # noqa: E402
 from services import (  # noqa: E402
-    account_erasure, league_rule_blocks, league_rule_facts, league_rule_vars, league_rules, league_veto, league_veto_sweep,
-    match_deadline_sweep, match_flow,
+    account_erasure, league_rule_blocks, league_rule_facts, league_rule_vars, league_rules, league_schedule_sweep, league_veto,
+    league_veto_sweep, match_deadline_sweep, match_flow,
 )
 from services.checkin_rules import DEFAULTS as CHECKIN_DEFAULTS  # noqa: E402
+from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS  # noqa: E402
 from services.match_public_view import public_match_view  # noqa: E402
 
 CHECKIN = {**CHECKIN_DEFAULTS, "min_present": 2}
@@ -434,6 +435,132 @@ async def test_a_template_that_does_not_fit_this_match_skips_the_veto_and_says_w
     assert refused.status_code == 409 and "läuft kein Veto" in refused.json()["detail"]
     assert (await lead(flow, world, "pause", 1)).status_code == 409
     assert "planned_games" not in await flow.reload(world["match"])
+
+
+# ---------------------------------------------------------------- Termin-Revision (Codex zu D.3), gesperrte Staffel
+
+WEEK = {"start_date": (now_utc() - timedelta(days=1)).isoformat(), "schedule_rules": dict(SCHEDULE_DEFAULTS), "matchday_days": 7}
+
+
+def rev_of(match: dict) -> int:
+    return int(((match.get("flow") or {}).get("schedule_rev")) or 0)
+
+
+async def seat(flow, world) -> dict:
+    """Beide Seiten direkt eingecheckt (zum geltenden Termin und seiner Revision), dann startet der Seitenaufruf das Veto."""
+    await checked_in(flow, mid(world))
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    assert block["state"] == "veto" and block["veto"]["status"] == "running", block["state"]
+    return block
+
+
+async def expect_reset(flow, world, label: str, before_rev: int) -> None:
+    """Nach einem Terminweg: die Revision ist um eins höher, alte Check-ins und das alte Veto zählen nicht mehr."""
+    stored = await flow.reload(world["match"])
+    assert rev_of(stored) == before_rev + 1, (label, rev_of(stored), before_rev)
+    assert match_flow.missing_sides(stored) == [stored["slots"][0]["registration_id"], stored["slots"][1]["registration_id"]], label
+    assert league_veto.rules_mod.veto_of(stored) is None, label
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    assert block["state"] != "veto" and block["veto"]["status"] == "waiting" and block["sides"][0]["checked_in"] is False, label
+
+
+@pytest.mark.asyncio
+async def test_time_a_then_b_then_a_resets_checkins_and_the_veto(flow):
+    """Codex zu D.3: Termin A → B → wieder genau A - alte Check-ins und das alte Veto gelten nicht wieder, weil beide an der
+    Termin-Revision hängen, nicht nur am Zeitpunkt."""
+    world = await veto_world(flow, rules=veto_rules())
+    first = await seat(flow, world)
+    stored = await flow.reload(world["match"])
+    time_a, start_a = stored["scheduled_at"], stored["flow"]["veto"]["started_at"]
+    assert stored["flow"]["checkin"][world["reg_a"]["id"]]["rev"] == 0 and stored["flow"]["veto"]["rev"] == 0
+    flow.act_as(world["lead"])
+    assert (await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(60), "schedule_reason": "B"})).status_code == 200
+    assert (await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": time_a, "schedule_reason": "wieder A"})).status_code == 200
+    stored = await flow.reload(world["match"])
+    assert stored["scheduled_at"] == time_a and rev_of(stored) == 2
+    assert match_flow.missing_sides(stored) == [world["reg_a"]["id"], world["reg_h"]["id"]], "A → B → A: die alten Check-ins zählen nicht"
+    assert league_veto.rules_mod.veto_of(stored) is None, "das alte Veto zählt nicht"
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    assert block["state"] == "open" and block["veto"]["status"] == "waiting"
+    second = await seat(flow, world)
+    fresh = await flow.reload(world["match"])
+    assert fresh["flow"]["veto"]["started_at"] > start_a and fresh["flow"]["veto"]["version"] == 1 and fresh["flow"]["veto"]["rev"] == 2
+    assert fresh["flow"]["checkin"][world["reg_a"]["id"]]["rev"] == 2 and fresh["flow"]["ready_rev"] == 2
+    assert first["veto"]["status"] == second["veto"]["status"] == "running"
+    # Altbestand ohne Revision zählt wie Revision 0 - und ein neuer Weg zu A hebt ihn auf.
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$unset": {"flow.schedule_rev": "", "flow.veto.rev": "", "flow.ready_rev": "",
+                                                                        f"flow.checkin.{world['reg_a']['id']}.rev": "", f"flow.checkin.{world['reg_h']['id']}.rev": ""}})
+    stored = await flow.reload(world["match"])
+    assert not match_flow.missing_sides(stored) and league_veto.rules_mod.veto_of(stored) is not None
+
+
+@pytest.mark.asyncio
+async def test_every_way_to_a_new_time_raises_the_revision(flow):
+    """Alle Terminwege aus D.2 erhöhen die Revision: Einigung, Verschiebung, Leitung, „Neu ansetzen“ (derselbe Termin!), 72-h-Regel,
+    Standardtermin des Spieltag-Plans, Stationsplan."""
+    from services.match_scheduler import apply_plan
+    from services.matchday_schedule import persist_matchday_schedule
+
+    world = await veto_world(flow, rules=veto_rules(), **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(60)}})
+    # Einigung
+    await seat(flow, world)
+    flow.act_as(world["users"]["Kapitaen"])
+    offer = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals", json={"scheduled_at": at(48 * 60)})
+    assert offer.status_code == 200, offer.text
+    flow.act_as(world["users"]["Falke1"])
+    assert (await flow.post(f"/api/matches/{mid(world)}/schedule-proposals/{offer.json()['id']}/decision", json={"action": "accept"})).status_code == 200
+    await expect_reset(flow, world, "Einigung", 0)
+    # Verschiebung
+    await seat(flow, world)
+    flow.act_as(world["users"]["Kapitaen"])
+    asked = await flow.post(f"/api/matches/{mid(world)}/reschedule", json={"scheduled_at": at(72 * 60), "reason": "Spieler im Nachtdienst"})
+    assert asked.status_code == 200, asked.text
+    flow.act_as(world["users"]["Falke1"])
+    assert (await flow.post(f"/api/matches/{mid(world)}/reschedule/{asked.json()['id']}/decision", json={"action": "accept"})).status_code == 200
+    await expect_reset(flow, world, "Verschiebung", 1)
+    # Leitung
+    await seat(flow, world)
+    flow.act_as(world["lead"])
+    assert (await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(96 * 60), "schedule_reason": "Nachholtermin"})).status_code == 200
+    await expect_reset(flow, world, "Leitung", 2)
+    # „Neu ansetzen“ (E.1): derselbe Termin - nur die Revision trennt alt von neu.
+    await seat(flow, world)
+    before_undo = (await flow.reload(world["match"]))["scheduled_at"]
+    flow.act_as(world["lead"])
+    url = f"/api/admin/leagues/staffeln/{world['tournament']['id']}/matches/{mid(world)}/double-no-show"
+    assert (await flow.post(url, json={"note": "Beide Teams nicht in der Lobby"})).status_code == 200
+    assert (await flow.client.request("DELETE", url, json={"reason": "Neuer Anlauf zum selben Termin"})).status_code == 200
+    assert (await flow.reload(world["match"]))["scheduled_at"] == before_undo, "derselbe Termin bleibt stehen"
+    await expect_reset(flow, world, "Neu ansetzen", 3)
+    # 72-h-Regel
+    other = await veto_world(flow, rules=veto_rules(), letter="B", **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(other)}, {"$set": {"scheduled_at": None, "status": "ready"}})
+    await seat(flow, other)
+    flow.act_as(other["users"]["Kapitaen"])
+    assert (await flow.post(f"/api/matches/{mid(other)}/schedule-proposals", json={"scheduled_at": at(100 * 60)})).status_code == 200
+    counts = await league_schedule_sweep.sweep(flow.db, [await tournament_of(flow, other)], now=now_utc() + timedelta(hours=73))
+    assert counts["home_rule"] == 1
+    await expect_reset(flow, other, "72-h-Regel", 0)
+    # Spieltag-Plan (Standardtermin) und Stationsplan
+    third = await veto_world(flow, rules=veto_rules(), letter="C", **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(third)}, {"$set": {"scheduled_at": at(-60), "schedule_source": None}})
+    await seat(flow, third)
+    written = await persist_matchday_schedule(flow.db, await tournament_of(flow, third))
+    assert written["written"] == 1 and (await flow.reload(third["match"]))["schedule_source"] == "default"
+    await expect_reset(flow, third, "Spieltag-Plan", 0)
+    await flow.db.matches_v2.update_one({"id": mid(third)}, {"$set": {"schedule_source": None}})
+    await seat(flow, third)
+    stored = await flow.reload(third["match"])
+    station = {"id": new_id(), "name": "Tisch 1", "device_type": "pc", "tournament_id": third["tournament"]["id"], "status": "free",
+               "current_match_id": None, "notes": None}
+    await flow.db.stations.insert_one(dict(station))
+    plan = {"assignments": [{"match_id": mid(third), "changed": True, "scheduled_at": at(3 * 60), "schedule_source": "planner",
+                             "station_id": station["id"], "forecast": False,
+                             "previous": {"scheduled_at": stored["scheduled_at"], "schedule_source": None, "status": stored["status"],
+                                          "station_id": None}}]}
+    assert (await apply_plan(flow.db, await tournament_of(flow, third), plan))["written"] == 1
+    await expect_reset(flow, third, "Stationsplan", 1)
 
 
 # ---------------------------------------------------------------- Ergebnis nach dem Veto

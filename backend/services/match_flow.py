@@ -46,9 +46,12 @@ from services.checkin_rules import (  # noqa: F401 - weiterhin über match_flow 
     iso as _iso,
     missing_sides,
     moment as _moment,
+    new_time_change,
+    new_time_inc,
     no_show_info,
     normalize,
     rules_of,
+    schedule_rev,
     state,
     veto_pending,
     when_text,
@@ -226,16 +229,18 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
         return {"side": previous, "ready": not missing_sides(match), "idempotent_replay": True}
     now_iso = now.isoformat()
     for_at = _iso(match.get("scheduled_at"))
+    # Termin-Revision (Codex zu D.3): der Eintrag gehört zu Termin und Revision - Termin A → B → A zählt nicht als derselbe Termin.
+    rev = schedule_rev(match)
     entry = {
         "at": (previous or {}).get("at") or now_iso, "updated_at": now_iso, "user_id": user.get("id"), "present": ids, "via": via,
         "by": user.get("id") if via == LEAD else None, "reason": reason_text,
-        "rule_version_id": (consent or {}).get("version_id"), "for_at": for_at,
+        "rule_version_id": (consent or {}).get("version_id"), "for_at": for_at, "rev": rev,
     }
     # Ein Eintrag zu einem früheren Termin zählt nicht mehr (``checkins``) - überschrieben wird er mit Bedingung auf seinen Stand.
     stored = ((match.get("flow") or {}).get("checkin") or {}).get(registration_id) or {}
     written = await db.matches_v2.update_one(
         {"id": match["id"], "started_at": None, "status": {"$in": sorted(OPEN_MATCH_STATUSES)}, "reports.0": {"$exists": False},
-         "scheduled_at": match.get("scheduled_at"),
+         "scheduled_at": match.get("scheduled_at"), "flow.schedule_rev": rev if rev else {"$in": [None, 0]},
          f"flow.checkin.{registration_id}.updated_at": (stored if isinstance(stored, dict) else {}).get("updated_at")},
         {"$set": {f"flow.checkin.{registration_id}": entry, "updated_at": now_iso},
          "$addToSet": {"flow.user_ids": {"$each": sorted({user.get("id"), *ids} - {None})}}})
@@ -245,9 +250,10 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
     ready = not missing_sides({**match, **fresh})
     became_ready = False
     if ready:
-        # „Beide da“ genau einmal je Termin: Bedingung auf den Termin, für den es zuletzt galt.
-        marked = await db.matches_v2.update_one({"id": match["id"], "flow.ready_for": {"$ne": for_at}},
-                                                {"$set": {"flow.ready_at": now_iso, "flow.ready_for": for_at}})
+        # „Beide da“ genau einmal je Termin und Revision: Bedingung auf den Stand, für den es zuletzt galt.
+        marked = await db.matches_v2.update_one(
+            {"id": match["id"], "$or": [{"flow.ready_for": {"$ne": for_at}}, {"flow.ready_rev": {"$ne": rev}}]},
+            {"$set": {"flow.ready_at": now_iso, "flow.ready_for": for_at, "flow.ready_rev": rev}})
         became_ready = bool(getattr(marked, "modified_count", 0))
     await _audit(db, "match.checkin.lead" if via == LEAD else "match.checkin", match, user.get("id"),
                  {"registration_id": registration_id, "count": len(ids), "via": via, "rule_version_id": entry["rule_version_id"],
@@ -624,6 +630,6 @@ async def scrub_person(db, user_id: str) -> int:
     return done
 
 
-__all__ = ["DEFAULTS", "FlowProblem", "check_in", "defaults_for_season", "export_snapshot", "missing_sides", "no_show_info",
-           "normalize", "open_checkin_tasks", "page_block", "proposal_rows", "rules_of", "scrub_person", "sides", "start",
-           "state", "veto_pending", "window_of", "_iso"]
+__all__ = ["DEFAULTS", "FlowProblem", "check_in", "defaults_for_season", "export_snapshot", "missing_sides", "new_time_change",
+           "new_time_inc", "no_show_info", "normalize", "open_checkin_tasks", "page_block", "proposal_rows", "rules_of", "schedule_rev",
+           "scrub_person", "sides", "start", "state", "veto_pending", "window_of", "_iso"]

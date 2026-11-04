@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from database import get_db
 from models import new_id, now_utc
-from services import league_permissions
+from services import checkin_rules, league_permissions
 from services import league_table
 from services.change_events import publish_api_change
 from services.league_scope import ONLY_LEAGUE
@@ -197,10 +197,12 @@ async def admin_undo_double_no_show(tournament_id: str, match_id: str, body: Tab
             await league_permissions.require_no_conflict(db, me, match, action="double_no_show_undo",
                                                          conflict_reason=body.conflict_reason)
             sides = [row.get("registration_id") for row in match.get("results") or [] if row.get("registration_id")]
-            await db.matches_v2.update_one({"id": match_id}, {
+            # „Neu ansetzen“ behält den Termin - alte Check-ins und ein altes Veto zählen trotzdem nicht mehr: die Termin-Revision
+            # steigt (Codex zu D.3, #1618), eine Verlängerung fällt (D.2).
+            await db.matches_v2.update_one({"id": match_id}, checkin_rules.new_time_change(tournament, {
                 "$set": league_table.undo_fields(match, now_utc().isoformat()),
                 "$unset": {"double_forfeit": "", "double_forfeit_before": "", "admin_decision_note": "",
-                           "admin_decision_by": "", "admin_decision_at": ""}})
+                           "admin_decision_by": "", "admin_decision_at": ""}}))
     except league_table.TableProblem as problem:
         raise _refuse(problem) from None
     except MutationLockBusy:

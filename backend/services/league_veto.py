@@ -31,6 +31,7 @@ from services.checkin_rules import (
     iso,
     missing_sides,
     moment,
+    schedule_rev,
 )
 from services.league_veto_rules import DECIDER, DONE, DRAW, HOME, PAUSED, ROLE_OF, RUNNING, SKIPPED, VetoProblem, veto_of
 
@@ -168,11 +169,13 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
     now = now or now_utc()
     now_iso = now.isoformat()
     for_at = iso(match.get("scheduled_at"))
+    # Termin-Revision (Codex zu D.3): das Veto gehört zu Termin und Revision - A → B → A zählt nicht als derselbe Termin.
+    rev = schedule_rev(match)
     home, away = filled(match)[:2]
     pool, best_of, order, repeat = await _match_setup(db, match, tournament)
     problem = rules_mod.fits_problem(rules, pool=pool, best_of=best_of, order=order, repeat=repeat)
     doc = {
-        "version": 1, "for_at": for_at, "started_at": now_iso, "finished_at": None,
+        "version": 1, "for_at": for_at, "rev": rev, "started_at": now_iso, "finished_at": None,
         "template": {"team_a": rules["team_a"], "step_seconds": int(rules["step_seconds"]), "steps": [dict(step) for step in rules["steps"]]},
         "map_pool_id": (pool or {}).get("id"), "best_of": best_of, "map_repeat": repeat,
         "team_a": None, "team_b": None, "team_a_via": rules["team_a"], "draw": None,
@@ -187,7 +190,8 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
                     "deadline_at": (now + timedelta(seconds=int(rules["step_seconds"]))).isoformat()})
     written = await db.matches_v2.update_one(
         {"id": match["id"], "started_at": None, "status": {"$in": sorted(OPEN_MATCH_STATUSES)}, "scheduled_at": match.get("scheduled_at"),
-         "$or": [{"flow.veto": {"$exists": False}}, {"flow.veto.for_at": {"$ne": for_at}}]},
+         "flow.schedule_rev": rev if rev else {"$in": [None, 0]},
+         "$or": [{"flow.veto": {"$exists": False}}, {"flow.veto.for_at": {"$ne": for_at}}, {"flow.veto.rev": {"$ne": rev}}]},
         {"$set": {"flow.veto": doc, "updated_at": now_iso}, "$unset": {"planned_games": ""}})
     fresh = await _reload(db, match)
     if not written.matched_count:
