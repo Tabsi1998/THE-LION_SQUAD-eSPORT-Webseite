@@ -119,7 +119,8 @@ test.describe("Abnahme: Liga-Veto gegen den echten Server", () => {
       for (const row of roster.slice(0, 3)) await person.page.getByTestId(`checkin-roster-${row.id}`).check();
       await person.page.getByTestId("checkin-submit").click();
     }
-    await expect(away.page.getByTestId("checkin-headline")).toHaveText("Veto läuft");
+    await expect(away.page.getByTestId("veto-headline")).toHaveText("Veto läuft");
+    await expect(away.page.getByTestId("checkin-slim")).toContainText("Beide Seiten eingecheckt");
     await expect(away.page.getByTestId("veto-panel")).toHaveAttribute("data-status", "running");
     await home.page.goto(`/matches/${play.id}`);
     await expect(home.page.getByTestId("veto-panel")).toHaveAttribute("data-status", "running");

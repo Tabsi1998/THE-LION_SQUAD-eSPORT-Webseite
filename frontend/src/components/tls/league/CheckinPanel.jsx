@@ -260,7 +260,8 @@ function LeadEntry({ block, matchId, busy, run, onChanged }) {
 export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, leadUrl, onPoll }) {
   if (!block) return null;
   const other = otherSide(block);
-  // Veto (#1618, D.3): solange es läuft, steht statt des Start-Knopfs der Veto-Block - der Start kommt danach.
+  // Veto (#1618, D.3): solange es läuft, trägt der Veto-Block die Überschrift - der Check-in-Kopf wird eine Zeile, die Seiten stehen
+  // in einem Satz, der Start-Knopf kommt danach (Fabian: nur eine Überschrift „Veto läuft“).
   const vetoRunning = block.state === "veto";
   const tone = { ready: "border-[#00D26A]/50", veto: "border-[#00D26A]/50", running: "border-[#29B6E8]/50", closed: "border-warn/50" }[block.state] || "border-[#29B6E8]/35";
   return (
@@ -269,15 +270,26 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Check-in · Regelwerk § 8</div>
-          <h2 className="mt-1 font-heading text-2xl font-black uppercase" data-testid="checkin-headline">{STATE_LABELS[block.state] || "Check-in"}</h2>
-          <p className="mt-1 text-sm text-white/75" data-testid="checkin-text">{stateText(block)}</p>
+          {vetoRunning ? (
+            <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]" data-testid="checkin-slim">
+              <span className="font-bold text-[#00D26A]">Beide Seiten eingecheckt</span>
+              {" – "}{(block.sides || []).map((side) => `${side.name} (${Number(side.present_count || 0)} Spieler)`).join(" · ")}.
+            </p>
+          ) : (
+            <>
+              <h2 className="mt-1 font-heading text-2xl font-black uppercase" data-testid="checkin-headline">{STATE_LABELS[block.state] || "Check-in"}</h2>
+              <p className="mt-1 text-sm text-white/75" data-testid="checkin-text">{stateText(block)}</p>
+            </>
+          )}
         </div>
-        <CountdownRing block={block} />
+        {vetoRunning ? null : <CountdownRing block={block} />}
       </div>
 
-      <ul className="mt-4 grid gap-3 sm:grid-cols-2" data-testid="checkin-sides">
-        {(block.sides || []).map((side) => <SideCard key={side.registration_id} side={side} />)}
-      </ul>
+      {vetoRunning ? null : (
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2" data-testid="checkin-sides">
+          {(block.sides || []).map((side) => <SideCard key={side.registration_id} side={side} />)}
+        </ul>
+      )}
 
       {block.proposal ? (
         <p className="mt-4 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="checkin-proposal">

@@ -148,7 +148,10 @@ test.describe("Liga: Veto", () => {
       const posts = [];
       await setup(page, CAPTAIN, { posts });
       await page.goto("/matches/m1");
-      await expect(page.getByTestId("checkin-headline")).toHaveText("Veto läuft");
+      // Nur eine Überschrift „Veto läuft“: der Check-in-Kopf wird schlank (Fabian: übersichtlich).
+      await expect(page.getByTestId("checkin-headline")).toHaveCount(0);
+      await expect(page.getByTestId("checkin-slim")).toContainText("Beide Seiten eingecheckt");
+      await expect(page.getByText("Veto läuft", { exact: true })).toHaveCount(1);
       await expect(page.getByTestId("checkin-start")).toHaveCount(0);
       await expect(page.getByTestId("veto-headline")).toHaveText("Veto läuft");
       await expect(page.getByTestId("veto-text")).toContainText("Ihr seid am Zug: sperrt eine Map (Stellung)");
