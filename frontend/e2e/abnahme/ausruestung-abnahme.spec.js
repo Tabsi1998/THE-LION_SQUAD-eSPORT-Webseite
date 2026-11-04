@@ -176,8 +176,9 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     await shot(page, "sperrliste-regelwerk-vorschlag-abnahme.png");
     const second = await publishWithBlock(page, seasonId, `Sperrliste ${stamp} ergänzt`, true);
     expect(second.requires_consent).toBe(true);
-    expect(JSON.stringify(second.frozen)).toContain(PERK);
-    expect(JSON.stringify(first.frozen)).not.toContain(PERK);
+    // Erlaubte Ausrüstung (Nr. 99): Der Perk war erlaubt und ist jetzt gesperrt - er fällt aus der neuen Fassung.
+    expect(JSON.stringify(second.frozen)).not.toContain(PERK);
+    expect(JSON.stringify(first.frozen)).toContain(PERK);
     await page.goto(`/admin/leagues/seasons/${seasonId}#sperrliste`);
     await expect(page.getByTestId("season-bans-rules-ok")).toBeVisible();
     expect(problems).toEqual([]);
@@ -192,19 +193,20 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
       const problems = watch(page);
       const { league, season } = anmeldung;
       await page.goto(`/liga/${league.slug}/${season.slug}`);
-      const block = page.getByTestId("league-loadout-bans");
+      // Erlaubte Ausrüstung (#2287, Nr. 99): Die Waffe ist nur in einem Modus gesperrt - erlaubt mit „nicht in …“, der Aufsatz „nicht an …“.
+      const block = page.getByTestId("league-allowed-equipment");
       await expect(block).toContainText(WEAPON);
-      await expect(block).toContainText("nur ");
-      await expect(block.getByTestId("loadout-ban-weapon").filter({ hasText: WEAPON })).toContainText(SCOPE);
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: WEAPON })).toContainText("nicht in ");
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: SCOPE })).toContainText(`nicht an ${WEAPON}`);
       await block.scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await shot(page, `sperrliste-ligaseite-${width}-abnahme.png`);
 
       await page.goto(`/liga/${league.slug}/${season.slug}/regeln`);
       await expect(page.getByText(WEAPON).first()).toBeVisible();
-      await expect(page.locator(`img[alt="${WEAPON}"]`).first()).toBeVisible();
+      await expect(page.locator(`img[alt="Ausrüstung"]`).first()).toBeVisible();
       await noSideScroll(page);
-      await page.locator(`img[alt="${WEAPON}"]`).first().scrollIntoViewIfNeeded();
+      await page.getByText(WEAPON).first().scrollIntoViewIfNeeded();
       await shot(page, `sperrliste-regelwerk-${width}-abnahme.png`);
       const href = await page.getByTestId("rules-pdf").getAttribute("href");
       const pdf = await page.request.get(href);
