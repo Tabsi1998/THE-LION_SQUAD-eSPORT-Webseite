@@ -701,8 +701,16 @@ async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: 
 
 @router.get("")
 async def public_leagues(user: dict | None = Depends(get_optional_user)):
-    """Ligen mit den für die Person sichtbaren Seasons - leer heißt: die Navigation zeigt „Liga“ nicht."""
-    return {"leagues": await leagues.visible_leagues(get_db(), user)}
+    """Ligen mit den für die Person sichtbaren Seasons - leer heißt: die Navigation zeigt „Liga“ nicht. Je Season ``rules_url``, wenn ein
+    Regelwerk gilt (#2269), damit die Liga-Übersicht es verlinkt - hier in der Route, der Liga-Service importiert nicht nach oben."""
+    from services.league_rules import current_version, page_path
+
+    db = get_db()
+    rows = await leagues.visible_leagues(db, user)
+    for league in rows:
+        for season in league["seasons"]:
+            season["rules_url"] = page_path(league, season) if await current_version(db, league, season) else None
+    return {"leagues": rows}
 
 
 @router.get("/{league_slug}/{season_slug}")

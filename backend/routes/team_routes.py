@@ -1493,14 +1493,16 @@ async def _squad_or_404(db, team_id: str, squad_id: str) -> tuple[dict, dict]:
 @router.get("/{team_id}/squads/{squad_id}/eligibility")
 async def squad_eligibility(team_id: str, squad_id: str, me: dict = Depends(get_current_user)):
     """Spielberechtigung im Co-Team (#2204): für Teamleitung, Liga-Leitung mit „Kader prüfen“, Captain und Vertreter. Nie ein Geburtsdatum."""
-    from services import league_transfers
+    from services import league_rules, league_transfers
 
     db = get_db()
     team, squad = await _squad_or_404(db, team_id, squad_id)
     can_edit = await _may_change_squad(db, team, squad_id, me)
     if not can_edit and me["id"] not in {squad.get("captain_id"), squad.get("vice_captain_id")}:
         raise HTTPException(status_code=403, detail="Das sehen Teamleitung, Captain und Vertreter.")
-    return await league_eligibility.squad_view(db, team, squad, can_edit=can_edit, transfers=league_transfers.for_squad)
+    # Regelwerk mit Zustimmungsstand (#2269): die Route reicht es herein, der Service importiert nicht nach oben.
+    return await league_eligibility.squad_view(db, team, squad, can_edit=can_edit, transfers=league_transfers.for_squad,
+                                               rules_doc=league_rules.rules_info)
 
 
 class SquadTransferBody(BaseModel):
