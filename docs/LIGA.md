@@ -833,6 +833,7 @@ Darstellung erst beim Lesen, jeder Wert über `markdown_text.text_cell`:
 | Baustein | Quelle | `data` | Darstellung |
 | --- | --- | --- | --- |
 | `[[baustein:checkin]]` „Check-in“ (D.2, #1652) | `checkin_rules` der Season (`checkin_rules.normalize`, nur Schlüssel aus `checkin_rules.DEFAULTS`); ohne gespeicherten Kasten `None` | `{rules: {…checkin_rules.DEFAULTS} \| null}` | Liste: Fenster (Minuten vor und nach dem Termin), Mindestzahl anwesender spielberechtigter Spieler je Team, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen; ohne Check-in der Satz „In dieser Season gibt es keinen Check-in.“ |
+| `[[baustein:veto]]` „Veto“ (D.3, #1618) | `veto_rules` der Season (`league_veto_rules.normalize`, `facts.veto_rules_of`: nur mit `enabled` und Schritten), Namen der Modi vom Spiel | `{enabled: false}` oder `{enabled: true, team_a, step_seconds, steps: [{kind, mode, mode_label, team, position}]}` | Liste: Team-A-Regel (Heim oder Los), Zeit je Schritt mit Zufallswahl nach Ablauf, Start nach dem Check-in; dann die Schritte nummeriert („1. Team A sperrt eine Map (Stellung)“, „11. Die übrige Map wird Map 3 (Kontrolle)“); aus heißt „In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.“ |
 | `[[baustein:modes]]` „Modi der Season“ | Modi des geltenden Pools und der Modusfolge (ohne beides: alle nicht archivierten Modi des Spiels); Regel aus `result_rules` der Season, sonst des Spiels; Symbol, `players_per_side` und Beschreibung vom Spiel | `{rows: [{mode, label, icon_url?, players_per_side, description, rule: {kind, target, round_limit, time_limit_seconds, round_time_seconds, overtime, draw_allowed} \| null}]}` | Tabelle Modus · Ergebnisregel (Klartext: „Punkte bis zum Ziel 250 · Verlängerung bei Gleichstand · kein Remis“) · Zeit („10 Min. je Map · 1:30 Min. je Runde“) · Spieler je Seite; Symbol nur in `markdown` |
 | `[[baustein:format]]` „Spielformat“ | `best_of`, `team_size`, `min_squad_size`, `max_squad_size`, `map_repeat`, `lineup_mode`, `lineup_min_players` der Season (`effective_settings`), dazu je Liga N die Abweichungen (`overrides`) | `{best_of, maps_to_win, team_size, min_squad_size, max_squad_size, map_repeat, lineup_mode, lineup_min_players, divisions: [{label, best_of, team_size, min_squad_size}]}` | Liste: Serie, Teamgröße, Kader, Map-Wiederholung, Teilnehmerliste; danach „Abweichend in Liga N: …“ |
 | `[[baustein:table]]` „Tabelle und Wertung“ | `scoring_rules` der Season (`normalize_rules`, Altbestand mit seinen Vorgaben), dazu Liga N mit eigenen `scoring_rules` | `{points: {win, draw, loss}, allow_draws, tiebreakers, head_to_head, forfeit_score, exit_rule, divisions: [{label, …dieselben Felder}]}` | Liste: Punkte, Remis, Reihenfolge bei Punktgleichheit, Kampflos, Beide nicht erschienen, Ausscheiden (E.1) |
@@ -860,6 +861,7 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `map_repeat` | „nur in einem anderen Modus“ / „jede Map nur einmal“ / „frei“ |
 | `lineup_mode`, `lineup_min_players` | „Teilnehmerliste je Spiel“ / „Aufstellung je Map“, Mindestzahl |
 | `result_confirm_hours`, `lineup_amend_hours` | Bestätigungsfrist, Nachtragsfrist (Stunden) |
+| `veto.step_seconds`, `veto.team_a` | Veto (D.3, #1618): „60 Sekunden“ je Schritt, „das Heimteam laut Spielplan“ / „per Los je Spiel“; ohne Veto in der Season „(nicht festgelegt)“ |
 | `schedule.matchday_days`, `schedule.default_weekday`, `schedule.default_time`, `schedule.default_slot` | Tage je Spielwoche, Standardtag, Uhrzeit, „Sonntag, 20:00 Uhr“ |
 | `schedule.response_hours`, `schedule.blocked_periods` | Antwortfrist auf Terminvorschläge, Sperrzeiten („Weihnachtspause 21.12.2026–03.01.2027“) |
 | `schedule.home_rule_hours`, `schedule.reschedule_max`, `schedule.reschedule_notice_hours`, `schedule.result_reminder_hours`, `schedule.result_overdue_hours` | D.1-Regeln; ohne `schedule_rules` an der Season „(nicht festgelegt)“ |
@@ -2094,10 +2096,13 @@ mit Prüfung live (`frontend/src/lib/leagueVeto.js`, dieselben Sätze wie der Se
 und der Abgleich mit dem gespeicherten Pool kommen vom Server), Knopf **„Vorschlag aus Modusfolge und Pools“**, eigener Knopf
 **„Veto speichern“**. „Was fehlt noch?“ springt bei `veto_invalid` an den Kasten, bei `veto_without_checkin` zum Check-in.
 
-**Regelwerk:** Baustein `[[baustein:veto]]` (`league_rule_blocks`, eingefroren als `{label, source, data}`): Team-A-Regel, Zeit je
-Schritt und die Schritte als Liste („1. Team A sperrt eine Map (Stellung)“, „3. Team A wählt Map 1 (Stellung)“, „9. Die übrige Map wird
-Map 3 (Kontrolle)“); aus heißt „*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*“. Klein und
-eigenständig gehalten (#2269 baut die Fakten-Bausteine parallel um).
+**Regelwerk:** Baustein `[[baustein:veto]]` nach dem Muster der Bausteine aus den Einstellungen (#2269: Daten und Darstellung in
+`league_rule_facts.veto_data`/`render_veto`, registriert in `league_rule_blocks.BLOCKS`, eingefroren als `{label, source, data}`):
+Team-A-Regel, Zeit je Schritt und die Schritte als Liste („1. Team A sperrt eine Map (Stellung)“, „3. Team A wählt Map 1 (Stellung)“,
+„11. Die übrige Map wird Map 3 (Kontrolle)“); aus heißt „*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*“.
+Dazu die Variablen `{{veto.step_seconds}}` („60 Sekunden“) und `{{veto.team_a}}` („das Heimteam laut Spielplan“ / „per Los je Spiel“).
+Beides ist Teil von Fingerabdruck und Vorschlag: Eine geänderte Vorlage löst „Regelwerk muss freigegeben werden“ aus (`data_changes`,
+`pending_release`), die veröffentlichte Fassung zeigt bis zur Freigabe ihren Stand von damals.
 
 **App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. **Audit-Aktionen neu:** `match.veto.start`,
 `match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`.

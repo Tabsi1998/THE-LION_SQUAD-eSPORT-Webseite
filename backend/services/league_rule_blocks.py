@@ -224,48 +224,6 @@ def _checkin_text(data: dict, variant: str = MARKDOWN) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------- Veto (D.3, #1618)
-
-NO_VETO = "*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*"
-TEAM_A_WORDS = {"home": "Team A ist das Heimteam laut Spielplan, Team B der Gast.", "draw": "Team A wird je Spiel vom System gelost."}
-
-
-async def _veto(db, league: dict, season: dict) -> dict:
-    """Die Veto-Vorlage der Season: Team-A-Regel, Zeit je Schritt und die Schritte mit den Namen der Modi - eingefroren als Daten im
-    Klartext, der Text entsteht beim Darstellen."""
-    from services import league_veto_rules
-
-    raw = season.get("veto_rules")
-    try:
-        rules = league_veto_rules.normalize(raw) if isinstance(raw, dict) else None
-    except league_veto_rules.VetoProblem:
-        rules = None
-    if not rules or not rules["enabled"] or not rules["steps"]:
-        return {"source": {"veto_rules": None}, "data": {"enabled": False}}
-    game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0}) if league.get("game_id") else None
-    labels = {row["mode"]: row["label"] for row in game_maps.game_modes(game)} if game else {}
-    steps = [{"kind": step["kind"], "mode": step["mode"], "mode_label": labels.get(step["mode"], step["mode"]), "team": step["team"],
-              "position": step["position"]} for step in rules["steps"]]
-    return {"source": {"veto_rules": {"team_a": rules["team_a"], "step_seconds": rules["step_seconds"], "steps": rules["steps"]}},
-            "data": {"enabled": True, "team_a": rules["team_a"], "step_seconds": rules["step_seconds"], "steps": steps}}
-
-
-def _veto_text(data: dict, variant: str = MARKDOWN) -> str:
-    from services import league_veto_rules
-
-    if not data.get("enabled") or not data.get("steps"):
-        return NO_VETO
-    lines = [
-        f"- {TEAM_A_WORDS.get(data.get('team_a'), TEAM_A_WORDS['home'])}",
-        f"- Je Schritt {int(data.get('step_seconds') or 60)} Sekunden – nach Ablauf wählt das System zufällig aus den noch zulässigen Maps.",
-        "- Das Veto beginnt, sobald beide Teams eingecheckt sind; Map 1 folgt direkt danach.",
-        "",
-    ]
-    lines += [f"{index}. {_cell(league_veto_rules.step_sentence(step, step.get('mode_label') or step.get('mode') or ''))}"
-              for index, step in enumerate(data["steps"], 1)]
-    return "\n".join(lines)
-
-
 # ---------------------------------------------------------------- Sperrliste (#2218)
 
 async def _loadout_bans(db, league: dict, season: dict) -> dict:
@@ -307,7 +265,9 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("map_pool", "Map-Pool", "Die Maps je Modus aus dem Map-Pool der Season.", _map_pool, pool_table, _pool_images),
     Block("mode_order", "Modusfolge", "Die Modi je Map aus den Vorgaben der Season.", _mode_order, _mode_order_text, _mode_order_images),
     Block("checkin", "Check-in", "Fenster und Mindestzahl des Check-ins aus den Vorgaben der Season (D.2).", _checkin, _checkin_text),
-    Block("veto", "Veto", "Team-A-Regel, Zeit je Schritt und die Schrittfolge des Map-Vetos aus den Vorgaben der Season (D.3).", _veto, _veto_text),
+    # Veto (D.3, #1618) - Daten und Darstellung in league_rule_facts, wie die Bausteine aus den Einstellungen.
+    Block("veto", "Veto", "Team-A-Regel, Zeit je Schritt und die Schrittfolge des Map-Vetos aus den Vorgaben der Season (D.3).",
+          facts.build_veto, facts.render_veto),
     Block("loadout_bans", "Sperrliste", "Gesperrte Waffen, Aufsätze und Ausrüstung der Season, mit Bildern (Anlage A).", _loadout_bans,
           _loadout_text, _loadout_images),
     Block("mode_settings", "Einstellungen je Modus", "Zeitlimit, Zeit je Runde, Einstellungen und Regeltext je Modus aus der Season.",

@@ -20,7 +20,10 @@ from league_rules_world import publish  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from models import now_utc  # noqa: E402
 from routes import dsgvo_routes  # noqa: E402
-from services import account_erasure, league_rule_blocks, league_veto, league_veto_sweep, match_deadline_sweep, match_flow  # noqa: E402
+from services import (  # noqa: E402
+    account_erasure, league_rule_blocks, league_rule_facts, league_rule_vars, league_rules, league_veto, league_veto_sweep,
+    match_deadline_sweep, match_flow,
+)
 from services.checkin_rules import DEFAULTS as CHECKIN_DEFAULTS  # noqa: E402
 from services.match_public_view import public_match_view  # noqa: E402
 
@@ -511,8 +514,8 @@ async def test_the_rule_block_freezes_the_template_as_data_and_renders_german(fl
     await flow.db.games.insert_one({"id": "probe-shooter", "name": "Probe", "match_modes": [
         {"mode": HP, "label": "Stellung"}, {"mode": SND, "label": "Suchen"}, {"mode": CTL, "label": "Kontrolle"}]})
     off = await league_rule_blocks.resolve(flow.db, ["veto"], league, {"id": "s", "veto_rules": veto_rules(enabled=False)})
-    assert off["veto"]["data"] == {"enabled": False} and league_rule_blocks.value("veto", off["veto"]) == league_rule_blocks.NO_VETO
-    assert league_rule_blocks.value("veto", {}) == "" and league_rule_blocks.value("veto", {"data": {}}) == league_rule_blocks.NO_VETO
+    assert off["veto"]["data"] == {"enabled": False} and league_rule_blocks.value("veto", off["veto"]) == league_rule_facts.NO_VETO
+    assert league_rule_blocks.value("veto", {}) == "" and league_rule_blocks.value("veto", {"data": {}}) == league_rule_facts.NO_VETO
     on = await league_rule_blocks.resolve(flow.db, ["veto"], league, {"id": "s", "veto_rules": veto_rules(step_seconds=45)})
     assert on["veto"]["label"] == "Veto" and on["veto"]["source"]["veto_rules"]["step_seconds"] == 45
     assert on["veto"]["data"]["steps"][0] == {"kind": "ban", "mode": HP, "mode_label": "Stellung", "team": "A", "position": None}
@@ -523,6 +526,43 @@ async def test_the_rule_block_freezes_the_template_as_data_and_renders_german(fl
     assert "" not in text, "Klartext ohne Schutzzeichen"
     assert "" in league_rule_blocks.value("veto", on["veto"]), "beim Darstellen sind die Namen geschützt"
     assert any(row["key"] == "veto" for row in league_rule_blocks.catalog())
+    # Variablen (#2269): nur mit Veto einen Wert, sonst „(nicht festgelegt)“.
+    with_veto = await league_rule_vars.context(flow.db, league, {"id": "s", "veto_rules": veto_rules(step_seconds=45, team_a="draw")})
+    assert league_rule_vars.resolve(["veto.step_seconds", "veto.team_a"], with_veto) == {
+        "veto.step_seconds": {"label": "Zeit je Veto-Schritt", "value": "45 Sekunden"}, "veto.team_a": {"label": "Team A im Veto", "value": "per Los je Spiel"}}
+    without = await league_rule_vars.context(flow.db, league, {"id": "s", "veto_rules": veto_rules(enabled=False)})
+    assert league_rule_vars.resolve(["veto.step_seconds"], without)["veto.step_seconds"]["value"] is None
+    assert {row["name"] for row in league_rule_vars.catalog(without)} >= {"veto.step_seconds", "veto.team_a"}
+
+
+@pytest.mark.asyncio
+async def test_a_changed_template_asks_for_a_new_rule_release(flow):
+    """#2286: Steht der Baustein (oder eine Variable) im Regelwerk, löst eine geänderte Vorlage „Regelwerk muss freigegeben werden“ aus."""
+    w = await season_world(flow)
+    sid = w["season"]["id"]
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules()))
+    version = await publish(flow, w, body="# Veto\n\n[[baustein:veto]]\n\nJe Schritt {{veto.step_seconds}}, Team A ist {{veto.team_a}}.\n",
+                            reason="Veto aufgenommen")
+    assert set(version["blocks_used"]) >= {"veto"} and "veto.step_seconds" in version["vars_used"]
+    # Die Regelseite folgt der Sichtbarkeit der Season - die Vorschau „Nur Liga-Leitung“ reicht der Leitung.
+    ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"visibility": "admins"}))
+    league_doc = await flow.db.leagues.find_one({"id": w["league"]["id"]}, {"_id": 0})
+    season_doc = await flow.db.league_seasons.find_one({"id": sid}, {"_id": 0})
+    assert await league_rules.data_changes(flow.db, league_doc, season_doc, version) is None, "nichts geändert"
+    page = ok(await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{season_doc['slug']}"))
+    body = league_rule_blocks.plain("\n".join(row["body_md"] for row in page["sections"]))
+    assert "Team A sperrt eine Map" in body and "60 Sekunden" in body and "das Heimteam laut Spielplan" in body
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(step_seconds=90, team_a="draw")))
+    season_doc = await flow.db.league_seasons.find_one({"id": sid}, {"_id": 0})
+    changes = await league_rules.data_changes(flow.db, league_doc, season_doc, version)
+    kinds = {(row["kind"], row["block"]) for row in changes["rows"]}
+    assert kinds == {("block", "veto"), ("variable", "veto.step_seconds"), ("variable", "veto.team_a")}
+    pending = await league_rules.pending_release(flow.db, league_doc, season_doc)
+    assert pending and pending["kind"] == "changed" and pending["count"] == 3
+    # Ein Lesen des alten Vertrags zeigt weiter die eingefrorenen 60 Sekunden - nie still geändert.
+    page = ok(await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{season_doc['slug']}"))
+    body = league_rule_blocks.plain("\n".join(row["body_md"] for row in page["sections"]))
+    assert "60 Sekunden" in body and "90 Sekunden" not in body
 
 
 # ---------------------------------------------------------------- Vorlage je Season (Verwaltung)
