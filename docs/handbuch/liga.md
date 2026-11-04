@@ -411,8 +411,9 @@ speichern**. Er gilt sofort, ohne Übertragen, auch in laufenden Staffeln.
 <img src="../assets/liga/liga-season-plattform-pc.png" alt="Kasten Plattform und Eingabegerät: Feld Plattform gewählt, nur PC angehakt, Crossplay aus, darunter was je Liga gilt" width="560">
 
 1. **In welchem Feld steht die Plattform?** Wählt das Spiel-ID-Feld mit Auswahl, etwa „Plattform“. Fehlt es, legt es zuerst unter
-   **Admin → Spiele → Spiel → Spiel-IDs** an: Feld mit den Auswahlwerten (PC, PlayStation …), am besten als Pflichtfeld. Dann
-   wird die Plattform mit der Spiel-ID für die Season festgehalten; ein freiwilliges Feld liest immer den aktuellen Wert im Profil.
+   **Admin → Spiele → Spiel → Spiel-IDs** an: Feld mit den Auswahlwerten (PC, PlayStation …). **Damit die Plattform je Season
+   festgehalten wird, das Plattform-Feld am Spiel als Pflicht führen.** Dann gilt sie wie die Spiel-ID die ganze Season; ein
+   freiwilliges Feld liest immer den aktuellen Wert im Profil.
 2. **Erlaubte Plattformen** anhaken. Nichts angehakt: alle erlaubt, keine Prüfung. Alle angehakt: jede erlaubt, die Angabe ist aber Pflicht.
 3. **Crossplay** (an, aus) und **Eingabegerät** (Controller, Maus und Tastatur, beides) sind nur Angaben für Regelwerk und
    Ligaseite. Geprüft werden sie nicht.

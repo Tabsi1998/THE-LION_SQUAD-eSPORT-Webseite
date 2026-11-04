@@ -873,7 +873,7 @@ das Feld nicht leeren oder wechseln, solange eine Liga N eigene Plattformen trä
 prüft die Season nichts, und der Kasten sagt das.
 
 **Die Plattform einer Person** ist der festgehaltene Wert in `league_rosters.player_ids` (nur, wenn das Feld Pflicht ist, wird er mit der ID festgehalten und
-gilt die ganze Season), sonst der Wert im Profil. Stand in `league_eligibility.status`, nach `age_not_met` und vor `waiting`, aber nur, wenn der ID-Stand passt:
+gilt die ganze Season), sonst der Wert im Profil. Damit die Plattform je Season festgehalten wird, das Plattform-Feld am Spiel als Pflicht führen. Stand in `league_eligibility.status`, nach `age_not_met` und vor `waiting`, aber nur, wenn der ID-Stand passt:
 Ein fehlerhafter ID-Stand (`late`, `missing`, `format`, `taken`) bleibt stehen und zählt beim Zuteilen als Hinweis, nicht als andere Plattform.
 
 | Stand | Wann | Meldung |
