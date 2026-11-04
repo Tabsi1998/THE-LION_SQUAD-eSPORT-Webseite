@@ -44,6 +44,8 @@ Sperrliste der Season (docs/LIGA.md, C.4 #2218): keine eigene öffentliche Route
 
 Check-in der Liga (docs/LIGA.md, D.2, #1652): `POST /api/matches/<id>/checkin` und `POST /api/matches/<id>/checkin/start` verlangen eine Anmeldung und die Verantwortung für eine Seite des Spiels (Captain, Vertreter) oder das Liga-Recht „Spiele betreuen“; Unbeteiligte bekommen 403, Spiele ohne Check-in 409. `GET /api/matches/<id>/page` trägt den Block `checkin` nur für Beteiligte und Leitung; `matches_v2.flow` (Konto-Kennungen) steht in keiner öffentlichen Antwort. `GET|PUT /api/admin/leagues/seasons/<id>/checkin-rules` ist Verwaltung (`/api/admin/`, robots gesperrt).
 
+Veto der Liga (docs/LIGA.md, D.3, #1618): `POST /api/matches/<id>/veto/pick` verlangt eine Anmeldung und die Verantwortung für die Seite am Zug (Captain, Vertreter), `POST /api/matches/<id>/veto/lead` das Liga-Recht „Spiele betreuen“; Unbeteiligte bekommen 403, Spiele ohne Veto 409. `GET /api/matches/<id>/page` trägt den Block `checkin.veto` nur für Beteiligte und Leitung; `matches_v2.flow.veto` (Konto-Kennungen) steht in keiner öffentlichen Antwort, `planned_games` (die Spielreihenfolge, keine Personen) schon. `GET|PUT /api/admin/leagues/seasons/<id>/veto-rules` und `…/veto-rules/proposal` sind Verwaltung (`/api/admin/`, robots gesperrt).
+
 ## Oeffentlich, aber bewusst nicht indexiert
 
 Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noindex, follow` lesen koennen. Sie stehen nicht in der Sitemap:

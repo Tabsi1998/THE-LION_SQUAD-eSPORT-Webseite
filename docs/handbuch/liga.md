@@ -384,6 +384,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
 | Terminregeln (Kasten „Termine und Verschiebungen“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 | Check-in (Kasten „Check-in vor dem Spiel“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
+| Veto (Kasten „Veto“, 2.7d) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen; ein laufendes Veto behält seinen Stand |
 
 ### 2.7a Termine und Verschiebungen (Regelwerk § 7)
 
@@ -418,6 +419,30 @@ speichert.
 | **Erinnerung vor Schluss (Minuten)** | 5 | zweite Nachricht an Seiten ohne Check-in; 0 = keine |
 
 Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
+
+### 2.7d Veto: Maps vor dem Spiel sperren und wählen (Regelwerk § 6, Anlage B)
+
+Auf der Season-Seite im Reiter **Spielbetrieb** steht direkt unter **Serie** der Kasten **Veto** (Zuständigkeit „Season konfigurieren“),
+mit eigenem **Veto speichern**; er gilt sofort für alle Staffeln der Season, ein gerade laufendes Veto behält seinen Stand. Neue Seasons
+beginnen mit **Veto aus** – dann tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b): Es
+beginnt, sobald beide Seiten eingecheckt sind, Map 1 folgt direkt danach.
+
+| Feld | Vorgabe | Wirkung |
+| --- | --- | --- |
+| **Veto in dieser Season** | aus | an: nach dem Check-in sperren und wählen die Teams nach der Schrittfolge |
+| **Team A** | Heimteam laut Spielplan | Nr. 22: Team A beginnt laut Vorlage, Team B ist die andere Seite. „Los je Spiel“: der Server lost je Spiel einmal, nie neu beim Neuladen |
+| **Zeit je Schritt (Sekunden)** | 60 | Nr. 23: läuft die Zeit ab, wählt das System zufällig aus den noch zulässigen Maps – das Veto bleibt nie stehen |
+| **Schrittfolge** | leer | je Schritt: **Sperren** oder **Wählen** durch Team A oder B in einem Modus, oder **Decider** (die übrige Map des Modus, setzt das System); Wahl und Decider bekommen ihre **Position** in der Serie (Map 1 bis Best of). Die Reihenfolge der Schritte ist die des Vetos, nicht die Spielreihenfolge |
+
+So geht es am schnellsten: **Vorschlag aus Modusfolge und Pools** baut eine Folge nach Anlage B aus „Modus je Map“, den Poolgrößen und
+dem Best of – je Modus beginnt abwechselnd Team A und B; ein Modus mit einer Position sperrt bis eine Map bleibt und endet mit dem Decider,
+ein Modus mit mehreren sperrt bis so viele Maps bleiben wie Positionen und wählt dann abwechselnd. Danach anpassen (Schritte ordnen,
+löschen, hinzufügen) und speichern. Die Prüfung läuft live und sagt in Sätzen, was nicht aufgeht: jede Position genau einmal, der Modus
+der Position wie in „Modus je Map“, genug Maps je Modus für Sperren und Wahlen, vor einem Decider genau eine übrige Map. Mit Veto an
+lässt sich nur eine Vorlage speichern, die aufgeht; mit Veto aus bleibt ein Entwurf speicherbar. **Was fehlt noch?** im Überblick nennt
+eine Vorlage, die nach einer Pool-Änderung nicht mehr passt, und eine Season ohne Check-in. Spielt eine Liga N ein anderes Best of als
+die Season, läuft dort kein Veto (Warnung) – die Maps kommen dann beim Ergebnis. Wie es dann läuft, steht in 3.1c. Im Regelwerk nennt
+der Baustein `[[baustein:veto]]` die Vorlage, `{{veto.step_seconds}}` die Zeit je Schritt (2.11).
 
 ### 2.7c Plattform und Eingabegerät
 
@@ -539,7 +564,7 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 | **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
 | **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
 | **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
-| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b) |
+| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b), ins Veto eingreifen (3.1c) |
 | **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
 | **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
 | **Strafen** | Vorgesehen, kommt später |
@@ -584,6 +609,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Map-Pool | `[[baustein:map_pool]]` | Tabelle Modus · Maps | Season → Spielbetrieb → Map-Pool |
    | Modusfolge | `[[baustein:mode_order]]` | Modus je Map | Season → Spielbetrieb → Serie |
    | Check-in | `[[baustein:checkin]]` | Fenster (öffnet und schließt, Minuten um den Termin), Mindestens Anwesende je Seite, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen (2.7b); ohne Check-in ein Satz | Season → Termine → Check-in vor dem Spiel |
+   | Veto | `[[baustein:veto]]` | Team A (Heim oder Los), Zeit je Schritt, Start nach dem Check-in und die Schrittfolge nummeriert („1. Team A sperrt eine Map (Stellung)“, 2.7d); ohne Veto ein Satz | Season → Spielbetrieb → Veto |
    | Sperrliste | `[[baustein:loadout_bans]]` | gesperrte Waffen, Aufsätze, Ausrüstung mit Bild (gedacht für Anlage A, 2.1a) | Season → Regelwerk und Sperrliste |
    | Einstellungen je Modus | `[[baustein:mode_settings]]` | je Modus Zeitlimit, Zeit je Runde, Einstellungen (Tabelle), Regeltext | Spiel → Modi, Season → Ergebnisregeln |
    | Modi der Season | `[[baustein:modes]]` | Tabelle Modus (mit Symbol) · Ergebnisregel in Klartext (Ziel, Runden, Verlängerung, Remis) · Zeit · Spieler je Seite | Season → Spielbetrieb → Modi, Ergebnisregeln |
@@ -606,6 +632,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{season.name}}`, `{{season.number}}`, `{{season.start}}`, `{{season.end}}`, `{{season.weeks}}` | Season, Nummer, erster und letzter Tag, Spielwochen |
    | `{{best_of}}`, `{{maps_to_win}}`, `{{team_size}}`, `{{min_squad_size}}`, `{{max_squad_size}}`, `{{map_repeat}}` | Serie, Maps zum Sieg, Teamgröße, Kader, Map-Wiederholung in Worten |
    | `{{lineup_mode}}`, `{{lineup_min_players}}`, `{{result_confirm_hours}}`, `{{lineup_amend_hours}}` | Aufstellung, Mindestzahl, Bestätigungs- und Nachtragsfrist |
+   | `{{veto.step_seconds}}`, `{{veto.team_a}}` | Veto (2.7d): „60 Sekunden“ je Schritt, „das Heimteam laut Spielplan“ oder „per Los je Spiel“; ohne Veto „(nicht festgelegt)“ |
    | `{{schedule.matchday_days}}`, `{{schedule.default_weekday}}`, `{{schedule.default_time}}`, `{{schedule.default_slot}}`, `{{schedule.response_hours}}`, `{{schedule.blocked_periods}}` | Spielwoche, Standardtermin („Sonntag, 20:00 Uhr“), Antwortfrist, Sperrzeiten |
    | `{{schedule.home_rule_hours}}`, `{{schedule.reschedule_max}}`, `{{schedule.reschedule_notice_hours}}`, `{{schedule.result_reminder_hours}}`, `{{schedule.result_overdue_hours}}` | Terminregeln (2.7a) |
    | `{{table.points_win}}`, `{{table.points_draw}}`, `{{table.points_loss}}`, `{{table.draws}}`, `{{table.tiebreakers}}`, `{{table.head_to_head}}`, `{{table.forfeit_score}}`, `{{table.exit_rule}}` | Punkte, Remis, Reihenfolge bei Punktgleichheit, direkter Vergleich, kampflos, Ausscheiden |
@@ -712,7 +739,7 @@ Mit dem Kasten aus 2.7b läuft jedes Spiel so, alles auf der **Matchseite** im B
   auch, wenn ihr für die Seite eintragen wollt, und auch, wenn die neue Fassung erst zwischen Check-in und Start kommt.
 - **Start:** Sind beide Seiten eingecheckt, steht **Spiel starten – Map 1 läuft**; eine Seite tippt, auch vor dem Termin. Ab dann
   gilt das Spiel als begonnen (Spielzeit, kein Verschieben, kein „nicht erschienen“ mehr). Ihr könnt mit „Spiele betreuen“ ebenfalls
-  starten. Das Veto (D.3) kommt später zwischen Check-in und Start.
+  starten. Mit Veto (2.7d) läuft zwischen Check-in und Start erst das Veto (3.1c); der Start-Knopf kommt danach.
 - **Erst einchecken, dann melden:** Die Captains können das Ergebnis erst melden, wenn beide Seiten eingecheckt sind – die Matchseite
   sagt sonst, wer fehlt (in der App kommt der Satz als Antwort auf die Meldung). Hat niemand auf **Spiel starten** getippt, gilt das Spiel
   mit der ersten Meldung als begonnen. Ihr selbst tragt über **Ergebnis eintragen** weiter ohne Check-in ein.
@@ -724,6 +751,32 @@ Mit dem Kasten aus 2.7b läuft jedes Spiel so, alles auf der **Matchseite** im B
   Spiel macht das eine zweite Person (Befangenheit, 2.11).
 - **Ohne Check-in** (ältere Season oder Kasten nie gespeichert) bleibt alles wie vorher: kein Vorschlag, „Ergebnis fehlt“ meldet
   sich, ihr wertet von Hand.
+
+### 3.1c Veto durchführen (Regelwerk § 6)
+
+Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matchseite** im Block **Check-in**, Abschnitt **Map-Veto**:
+
+- **Start:** Sobald beide Seiten eingecheckt sind, beginnt das Veto von selbst; beide Seiten bekommen eine Nachricht („Veto läuft“),
+  Team A (Heimteam, oder gelost) ist zuerst dran. Die Seite zeigt den laufenden Schritt („Schritt 3 von 11 · Stellung · Loewen wählt
+  Map 1“), einen Countdown und je Modus alle Maps mit Stand (offen, gesperrt, gewählt, Decider).
+- **Ziehen:** Captain oder Vertreter der Seite am Zug tippen eine Map an – **Sperren** oder **Wählen**, je nach Schritt. Ausgegraute
+  Maps sind gesperrt, schon gewählt oder würden die Serie nicht mehr aufgehen lassen (die Seite sagt es beim Antippen). Die übrige Map
+  eines Decider-Schritts setzt das System sofort. Ein Doppelklick oder ein zweites Gerät zählt nicht doppelt; war die Gegenseite schneller
+  oder die Zeit um, sagt die Seite „bitte neu laden“ und zeigt den neuen Stand (sie aktualisiert sich alle paar Sekunden von selbst).
+- **Zeit:** Läuft die Zeit je Schritt ab, wählt das System zufällig aus den zulässigen Maps und schreibt es in den Verlauf („Zeit
+  abgelaufen, das System hat gewählt“). Die nächste Seite hat wieder ihre volle Zeit.
+- **Ende:** Nach dem letzten Schritt steht die **Spielreihenfolge** (Map 1 bis Best of mit Modus und Map) – beide Seiten bekommen eine
+  Nachricht, dann erscheint **Spiel starten – Map 1 läuft**. Das Meldeformular zeigt je Map die festgelegte Map und den Modus fest; die
+  Captains tragen nur Sieger, Punkte und Aufstellung ein. Meldet jemand eine andere Map, lehnt der Server ab („Map 2: laut Veto wird
+  hier … gespielt“). Ihr selbst tragt über **Ergebnis eintragen** frei ein, etwa nach einem Map-Fehler.
+- **Eingriff der Leitung** (Zuständigkeit „Spiele betreuen“, nur mit Grund, alles im Protokoll und für beide Seiten sichtbar):
+  **Pausieren** (die Restzeit bleibt stehen), **Fortsetzen**, **Letzten Schritt zurück** (ein automatischer Decider geht mit dem Zug davor),
+  **Neu starten** (Team A bleibt, ein Los wird nicht neu gezogen). Nach dem Start von Map 1 ändert sich am Veto nichts mehr. Im eigenen
+  Spiel macht das eine zweite Person (Befangenheit, 2.11).
+- **Neuer Termin:** Setzt ihr einen anderen Termin, zählen Check-in und Veto neu – nach erneutem Check-in beider Seiten beginnt das Veto
+  von vorn.
+- **Ohne Veto** (Kasten aus, ältere Season, Liga N mit anderem Best of): Die Seite sagt es, nach dem Check-in kommt gleich der Start, die
+  Maps werden beim Ergebnis eingetragen.
 
 ### 3.1a Turnier nach dem Ende noch „Live“
 
