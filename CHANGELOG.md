@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.68.0 (04.11.2026)
+
+### Neu
+
+* „Regelwerk muss freigegeben werden“ in Mein Dienst und auf der Verwaltungs-Startseite (#2269)
+* „Regelwerk muss freigegeben werden“ mit Vorschlag der neuen Fassung, Freigabe in einem Schritt und Wahl der Zustimmungspflicht (#2269)
+* Regelwerk mit Zustimmungsstand auf Liga-Übersicht, Team-Seite und Matchseite (#2269)
+* Regelwerk-Editor: Bausteine und Variablen mit aktuellem Wert einfügen, Hilfe-Liste, Vorschau nennt unbekannte und leere Variablen (#2269)
+* Regelwerk: Bausteine Modi der Season, Spielformat, Tabelle und Wertung, Termine und Spielberechtigung aus den Einstellungen (#2269)
+* Regelwerk: leere Variablen nur mit ausdrücklicher Bestätigung veröffentlichen (#2269)
+* Regelwerk: Plattform je Season im Baustein Spielberechtigung und als Variablen (#2269)
+* Regelwerk: Variablen {{…}} im Fließtext aus der Season, je Fassung eingefroren; unbekannte halten das Veröffentlichen auf (#2269)
+* Regelwerk: Variablen für Protestfrist, Einspruchsfrist, Aufbewahrung der Beweise und Pause zwischen den Maps, heute mit Vorgabe, später einstellbar
+
+### Fehlerbehebungen
+
+* Bilder: abgebrochene verkleinerte Fassungen werden neu gebaut statt leer angezeigt (z. B. Waffen in der Ausrüstung)
+* Regelwerk: Altfassungen bleiben wörtlich, Namen werden beim Veröffentlichen festgehalten (#2269)
+* Regelwerk: Fassung der Liga nennt leere Season-Variablen in Vorschau und Vorschlag (#2269)
+* Regelwerk: Freigabe erkennt, wenn sich Einstellungen oder Namen seit dem Vorschlag geändert haben (#2269)
+
+### Dokumentation
+
+* Handbuch Regelwerk: alle Bausteine und Variablen samt Check-in, Freigabe-Ablauf (#2269)
+
 ## 1.67.0 (04.11.2026)
 
 ### Neu
