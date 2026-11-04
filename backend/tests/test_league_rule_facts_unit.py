@@ -226,6 +226,26 @@ def test_unknown_empty_and_season_free_variables():
     assert variables.fill_vars("{{league.name}}: Best of {{best_of}}", frozen, missing=variables.NO_SEASON_VALUE) == "Regel-Liga: Best of (je Season)"
 
 
+def test_preset_variables_use_the_default_until_the_season_carries_the_field():
+    """Vorab angelegt (E.2, E.3, D.5): ohne Season-Feld die Vorgabe, mit Feld dessen Wert, ohne Season nichts - kein „(nicht festgelegt)“."""
+    ctx = context()
+    assert {name: variables.value_of(name, ctx) for name in (
+        "protest.hours", "appeal.hours", "evidence.keep_days", "match.break_after_map", "match.break_minutes")} == {
+        "protest.hours": "48 Stunden", "appeal.hours": "48 Stunden", "evidence.keep_days": "30 Tage",
+        "match.break_after_map": "2", "match.break_minutes": "5 Min."}
+    later = variables.Context(league=ctx.league, season={**SEASON, "protest_hours": 72, "appeal_hours": 24, "evidence_keep_days": 60,
+                                                         "map_break_after": 3, "map_break_minutes": 10}, game=GAME)
+    assert {name: variables.value_of(name, later) for name in (
+        "protest.hours", "appeal.hours", "evidence.keep_days", "match.break_after_map", "match.break_minutes")} == {
+        "protest.hours": "72 Stunden", "appeal.hours": "24 Stunden", "evidence.keep_days": "60 Tage",
+        "match.break_after_map": "3", "match.break_minutes": "10 Min."}, "jede Variable liest ihr eigenes Feld"
+    league_only = variables.Context(league=ctx.league, season=None, game=GAME)
+    assert variables.value_of("protest.hours", league_only) is None, "auf der Seite der Liga „(je Season)“"
+    frozen = variables.resolve(["protest.hours", "match.break_minutes"], ctx)
+    assert variables.empty(list(frozen), frozen) == [], "eine Vorgabe ist kein leerer Wert"
+    assert variables.unknown(["protest.hours", "appeal.hours", "evidence.keep_days", "match.break_after_map", "match.break_minutes"], GAME) == []
+
+
 def test_a_value_is_set_as_text_never_as_markdown():
     frozen = variables.resolve(["mode:stellung.name"], context())
     filled = variables.fill_vars("Modus {{mode:stellung.name}} gilt", frozen, missing="?")

@@ -90,6 +90,20 @@ def _periods(rows) -> str:
     return ", ".join(facts.period_label(row) for row in rows or []) or "keine"
 
 
+# Vorgaben für Season-Felder, deren Einstellung erst mit einem späteren Paket kommt (E.2 Proteste, E.3 Strafen, D.5 Vorfälle).
+PRESETS = {"protest_hours": 48, "appeal_hours": 48, "evidence_keep_days": 30, "map_break_after": 2, "map_break_minutes": 5}
+
+
+def _preset(key: str, default, show: Callable) -> Callable[[Context], str | None]:
+    """Der Wert der Season, ohne Feld die Vorgabe - ohne Season keiner (auf der Liga-Seite steht dann „(je Season)“)."""
+    def resolve(ctx: Context) -> str | None:
+        if not ctx.season:
+            return None
+        value = ctx.season.get(key)
+        return show(default if value in (None, "") else value)
+    return resolve
+
+
 @dataclass(frozen=True)
 class Variable:
     name: str
@@ -185,6 +199,18 @@ def _static() -> list[Variable]:
         Variable("application.opens", "Anmeldung ab", "Beginn des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_opens_at"))),
         Variable("application.closes", "Anmeldung bis", "Ende des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_closes_at"))),
         Variable("application.slots", "Startplätze", "Zahl der Startplätze der Season.", "Anmeldung", lambda ctx: _count(_season(ctx, "application_slots"))),
+        # Vorab angelegt: Die Season trägt diese Felder noch nicht, es gilt die Vorgabe. Die Einstellung kommt mit dem genannten Paket
+        # und schreibt dasselbe Feld - Texte mit diesen Variablen passen sich dann von selbst an (docs/LIGA.md, B.2).
+        Variable("protest.hours", "Protestfrist", "Frist für einen Protest ab der Ergebnisbestätigung (Vorgabe 48 Stunden, einstellbar mit E.2).",
+                 "Proteste und Strafen", _preset("protest_hours", PRESETS["protest_hours"], facts.hours)),
+        Variable("appeal.hours", "Einspruchsfrist", "Frist für einen Einspruch ab Bekanntgabe (Vorgabe 48 Stunden, einstellbar mit E.3).",
+                 "Proteste und Strafen", _preset("appeal_hours", PRESETS["appeal_hours"], facts.hours)),
+        Variable("evidence.keep_days", "Aufbewahrung der Beweise", "Tage nach Season-Ende (Vorgabe 30 Tage, einstellbar mit E.2).",
+                 "Proteste und Strafen", _preset("evidence_keep_days", PRESETS["evidence_keep_days"], facts.days)),
+        Variable("match.break_after_map", "Pause nach Map", "Nach welcher Map die Standardpause liegt (Vorgabe 2, einstellbar mit D.5).",
+                 "Matchablauf", _preset("map_break_after", PRESETS["map_break_after"], _count)),
+        Variable("match.break_minutes", "Länge der Pause", "Standardpause zwischen den Maps (Vorgabe 5 Minuten, einstellbar mit D.5).",
+                 "Matchablauf", _preset("map_break_minutes", PRESETS["map_break_minutes"], lambda value: facts.duration(int(value) * 60))),
     ]
 
 
