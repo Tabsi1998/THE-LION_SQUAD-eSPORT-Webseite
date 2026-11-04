@@ -244,6 +244,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
 | Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
 | Plattform: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (#2270, B.3) | Season (Feld), Liga N überschreibt den Rest | keines · alle · keine Angabe · keine Angabe |
+| Veto: an/aus, Team A (Heim oder Los), Zeit je Schritt, Schrittfolge (D.3, #1618) | Season (`veto_rules`) | aus · Heim · 60 s · leer |
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
@@ -1852,8 +1853,171 @@ Veröffentlichen wie jeder Baustein. Der dynamische Umbau des Regelwerks ist #22
 
 **Audit-Aktionen neu:** `match.checkin`, `match.checkin.lead`, `match.checkin.start`, `league.season.checkin_rules`.
 
-**Haken für D.3:** `match_flow.veto_pending(match, tournament)` – zwischen `ready_at` und Start; liefert heute `False`. D.3 setzt dort den
-Zustandsautomaten des Vetos ein, der Start bleibt der Schritt danach.
+**Haken für D.3:** `match_flow.veto_pending(match, tournament)` – zwischen `ready_at` und Start. Seit D.3 liefert er `True`, solange in
+einer Staffel mit Veto-Vorlage das Veto noch läuft (`checkin_rules.veto_pending` liest `league_veto_rules`); der Start bleibt der Schritt danach.
+
+### D.3 Veto (#1618)
+
+Regelwerk § 6 und Anlage B (Nr. 21, 22, 23, 40, 79; Obmann 04.11.: keine Seitenwahl, Team A = Heim). Nur Liga-Staffeln (Turnier mit
+`league_context`), Team gegen Team. Turniere, andere Formate, Map-Voting und Solo bleiben unverändert; ohne Veto-Vorlage an der Season
+verhält sich alles wie vorher. Logik in `services/league_veto_rules.py` (Blatt-Modul ohne Datenbank: Vorlage prüfen, Simulation, zulässige
+Züge, Zufallswahl, Vorschlag), `services/league_veto.py` (Zustandsautomat am Spiel, Matchseite, Datenschutz), `services/league_veto_sweep.py`
+(Zeit-Job), Routen in `routes/league_veto_routes.py`. **Migration: keine.** Das Veto setzt den Check-in (D.2) voraus: Es beginnt, sobald
+beide Seiten für den geltenden Termin gültig eingecheckt sind (Nr. 40); Map 1 folgt direkt danach, auch vor oder nach dem Termin – die
+Verspätung zählt nur beim Check-in.
+
+**Einstellung `veto_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Gepflegt unter
+`GET|PUT /api/admin/leagues/seasons/{id}/veto-rules` (Zuständigkeit `season`, lesen jede Zuständigkeit); das Speichern schreibt sofort auf
+alle nicht gesperrten Staffeln der Season (eigene Gruppe `veto` beim Übertragen, wirkt wie `checkin`; `staffel_fields` beim Anlegen).
+Neue Seasons bekommen das Objekt mit `enabled: false` (Pflicht im System, je Season abschaltbar – Nr. 21); ältere nichts. Liga N weicht
+nicht ab (kein `overrides`-Eintrag). Protokoll `league.season.veto_rules` mit altem und neuem Wert.
+
+| Feld | Typ | Vorgabe | Bedeutung |
+| --- | --- | --- | --- |
+| `enabled` | bool | `false` | an/aus; aus = die Maps werden wie bisher beim Ergebnis eingetragen |
+| `team_a` | `"home"` \| `"draw"` | `"home"` | Nr. 22: Team A ist das Heimteam aus dem Spielplan (`slots[0]`) – oder wird je Spiel einmal gelost |
+| `step_seconds` | int 10–600 | 60 | Nr. 23: Zeit je Schritt; nach Ablauf wählt das System |
+| `steps` | `[{kind, mode, team, position}]` | `[]` | die Vorlage, höchstens 60 Schritte: `kind` `ban` \| `pick` \| `decider`; `mode` ein Modus des Spiels; `team` `"A"` \| `"B"` (beim Decider `null` – das System); `position` 1…Best of bei `pick` und `decider`, sonst `null`. Das Modell bleibt offen für weitere Schrittarten; eine Seitenwahl gibt es nicht (Seiten ergeben sich aus Heim/Gast) |
+
+**Prüfung der Vorlage** (`league_veto_rules.template_problems(rules, pool, best_of, order, repeat)` – deutsche Sätze, kein JSON). Beim
+`PUT` mit `enabled: true` lehnt der Server Probleme mit 422 ab (mit `enabled: false` wird nur die Form geprüft, so bleibt ein Entwurf
+speicherbar); `season_readiness` prüft die gespeicherte Vorlage gegen den geltenden Pool (Code `veto_invalid`, je Satz ein Problem,
+und `veto_without_checkin`, wenn die Season keinen Check-in trägt; beides nur mit `enabled: true`):
+
+- jede Position 1…Best of genau einmal durch `pick` oder `decider`, keine Position darüber;
+- der Modus einer Position passt zu `game_mode_order` (zyklisch wie beim Melden), sofern die Reihenfolge gesetzt ist;
+- jeder Modus der Vorlage hat Maps im Pool; je Modus reicht der Pool: Sperren + Wahlen + Decider ≤ Maps des Modus;
+- `decider` höchstens einmal je Modus und als letzter Schritt seines Modus; bei `map_repeat` `other_mode` oder `always` bleibt nach allen
+  Sperren und Wahlen des Modus **genau eine** Map übrig; bei `never` muss die Simulation mindestens einen vollständigen Durchlauf finden
+  (gewählte Maps fallen aus allen Modi);
+- Liga N mit eigenem Best of ≠ dem der Season: Warnung `veto_division_mismatch` („Dort läuft kein Veto – die Maps werden beim Ergebnis
+  eingetragen“); in solchen Staffeln bleibt das Veto aus (`skipped`, siehe unten).
+
+Innerhalb eines Modus steht jede Map höchstens einmal in der Vorlage-Ausführung (gesperrt, gewählt oder Decider) – unabhängig von
+`map_repeat`; `map_repeat` regelt nur, ob eine in einem Modus gewählte Map in einem anderen Modus noch wählbar ist (`never`: nein,
+sonst ja). `map_pools.allowed` gibt die Maps je Modus frei.
+
+**Vorschlag** `GET …/seasons/{id}/veto-rules/proposal` (jede Zuständigkeit): eine passende Folge aus `game_mode_order`, Poolgrößen und
+dem Best of der Season (`league_veto_rules.propose`), generisch ohne Werte eines Titels, zum Anpassen – nicht gespeichert. Muster wie
+Anlage B: Modi in der Reihenfolge ihres ersten Auftretens; je Modus beginnt abwechselnd Team A, Team B, A …; hat ein Modus eine Position,
+sperren beide abwechselnd bis eine Map bleibt, dann `decider`; hat er mehrere Positionen, sperren beide abwechselnd bis so viele Maps
+bleiben wie Positionen, dann wählen beide abwechselnd, jede Wahl bekommt die nächste Position des Modus. Ohne Reihenfolge nimmt der
+Vorschlag die Modi des Pools zyklisch.
+
+**`matches_v2.flow.veto`** (intern wie `flow.checkin`, nur Staffeln mit Vorlage schreiben es):
+
+| Feld | Inhalt |
+| --- | --- |
+| `version` | ganze Zahl ab 1, steigt mit jeder Änderung – die optimistische Sperre jedes Zugs |
+| `status` | `running`, `paused`, `done`, `skipped` |
+| `for_at` | der Termin, für den das Veto gilt (wie `flow.ready_for`); ein neuer Termin der Leitung macht es ungültig, nach erneutem Check-in beider Seiten beginnt es neu |
+| `started_at`, `finished_at` | ISO |
+| `template` | Schnappschuss der Vorlage beim Start (`team_a`, `step_seconds`, `steps`) – eine spätere Änderung der Season ändert ein laufendes Veto nicht |
+| `map_pool_id`, `best_of`, `map_repeat` | der Pool (geltende Version, `effective_pool`) und die Werte, mit denen gespielt wird |
+| `team_a`, `team_b` | `registration_id` je Seite; `team_a_via` `home` \| `draw`; bei `draw` dazu `draw: {at}` – serverseitig einmal gelost, nie neu bei einem Reload |
+| `step` | Index des nächsten Schritts (0-basiert); gleich der Zahl der Schritte, wenn fertig |
+| `deadline_at` | Ende des laufenden Schritts (`null` bei Pause oder fertig); nach einem Zug oder einer automatischen Wahl `jetzt + step_seconds` – nie an die alte Frist gekettet, nach einem Ausfall wählt das System also nur einen Schritt, die nächste Seite hat wieder ihre volle Zeit |
+| `steps[]` | erledigte Schritte in Veto-Reihenfolge: `{index, kind, mode, mode_label, team, registration_id, position, map_id, map_name, map_image_url, role, via, by, at}`; `role` wie #1931 (`banned`, `picked`, `decider`), `via` `side` (Captain/Vertreter), `auto` (Zeit abgelaufen oder Decider), `by` die Person (nur bei `side`) |
+| `paused` | `{at, by, reason, remaining_seconds}` oder `null` |
+| `lead_log[]` | Eingriffe der Leitung `{action, at, by, reason}` |
+| `skipped_reason` | bei `skipped` der Satz, warum (Vorlage passt nicht zu Best of oder Pool dieses Spiels) |
+
+Beim Start liest der Server `effective_pool` und `result_best_of` des Spiels und prüft die Vorlage dagegen; passt sie nicht (anderes Best
+of einer Liga N, Pool ohne die Modi), schreibt er `status: "skipped"` mit Grund – das Spiel läuft dann wie ohne Veto (Stand `ready`), die
+Matchseite nennt den Grund. Jede Person, die am Zug ist, kommt in `flow.user_ids` (Datenschutz wie D.2).
+
+**Stand:** `checkin_rules.veto_pending(match, tournament)` ist `True`, wenn die Staffel eine aktive Vorlage trägt (`enabled`, Schritte)
+und das Veto zum geltenden Termin fehlt (es beginnt beim nächsten Lesen oder Zug) oder `running`/`paused` ist. Dann zeigt
+`match_flow.state` `veto`; `done` und `skipped` ergeben `ready`. Der Start (D.2) sagt bis dahin „Erst das Veto abschließen, dann starten.“,
+die Meldung der Captains (`report_refusal`) „Erst das Veto abschließen – dann melden.“ (die Leitung über `/result` bleibt frei).
+
+**Start** (`league_veto.ensure_started`): sobald beide Seiten für den geltenden Termin eingecheckt sind – im Check-in selbst
+(`became_ready`), sonst beim nächsten Lesen der Matchseite, beim ersten Zug, beim Start oder im Job. Geschrieben wird genau einmal je Termin
+mit Bedingung „kein `flow.veto` für diesen `for_at`“; gleichzeitige Leser gewinnen nie beide. Team A nach `team_a`, erste Frist
+`jetzt + step_seconds`. Protokoll `match.veto.start` (`team_a`, `team_a_via`, `map_pool_id`), Nachricht (Art `match_call`, Thema
+Match-Erinnerungen): an die Verantwortlichen von Team A „Veto läuft – ihr seid am Zug“, an Team B „Veto läuft – … beginnt“ (`meta.reason`
+`veto_start`, Schlüssel `veto-start:<spiel>:<started_at>`). Je Schritt gibt es keine Nachricht (60 Sekunden – die Seite zeigt es).
+
+**Zug** `POST /api/matches/{id}/veto/pick` `{map_id, version}` – Captain oder Vertreter (ohne beide die Hauptteam-Leitung,
+`acting_registration`) der Seite, die laut Schritt am Zug ist; die Leitung zieht nicht (Nr. 23: nach Ablauf wählt das System). Prüfungen
+mit deutschem Satz: Staffel mit Vorlage (409), Veto läuft (`paused`: „Das Veto ist pausiert – …“, `done`: „Das Veto ist abgeschlossen.“),
+`version` gleich dem Stand (sonst 409 „Gerade hat sich am Veto etwas geändert – bitte die Seite neu laden.“), richtige Seite (sonst 409
+„Jetzt ist … am Zug.“), Unbeteiligte 403, die Map wählbar (422 „… ist hier nicht wählbar – …“: nicht im Pool für den Modus, schon
+gesperrt oder gewählt, oder sie ließe die Serie nicht vervollständigen). **Wählbar** ist nur, was `map_pools.allowed` für genau diesen
+Modus freigibt, im Modus noch offen ist und nach dem die restlichen Schritte noch aufgehen (`league_veto_rules.allowed_options`:
+Simulation, bei `never` eine Suche mit Merkliste). Vor dem Zug räumt der Server abgelaufene Fristen auf (siehe Zeit). Geschrieben wird
+unter der Turniersperre (`_serialized_match_write`) mit Bedingung auf `flow.veto.version` und `status: "running"`: Der Schritt kommt an
+`steps[]`, `step` und `version` steigen, die nächste Frist beginnt. Ist der nächste Schritt ein `decider`, setzt ihn derselbe Zug sofort
+(`via: "auto"`, einzige übrige Map). **Idempotent:** derselbe Zug (gleiche Seite, gleiche Map, `version` um eins älter, der Schritt steht
+schon) antwortet `idempotent_replay`; zwei verschiedene Züge auf denselben Stand: der zweite bekommt 409 – nichts doppelt, nichts verloren.
+Protokoll `match.veto.step` (`index`, `kind`, `mode`, `map_id`, `registration_id`, `via`).
+
+**Zeit** (Nr. 23): Ist `deadline_at` erreicht, wählt das System zufällig und gleichverteilt (`secrets.SystemRandom`) aus den wählbaren
+Maps – auch, wenn nur die Vervollständigbarkeit die Wahl einschränkt – und schreibt den Schritt mit `via: "auto"` (`league_veto.settle_due`,
+Bedingung auf `version`, deshalb auch ohne Sperre sicher). Das macht der Job `league_veto` (`scheduler`, alle 10 Sekunden, nur eine Abfrage
+auf den Teil-Index `veto_deadline` über `flow.veto.deadline_at` bei `status: "running"`, Schreiben unter der Turniersperre), dazu der
+Fristen-Job (`match_deadline_sweep`, für die Abnahme per `--job match_deadlines`) und – damit die Seite nie auf einen Job wartet – jedes
+Lesen der Matchseite und jeder Zug. Idempotent: Ein zweiter Lauf findet nichts mehr, auch nach einem Neustart des Schedulers.
+
+**Abschluss:** Nach dem letzten Schritt `status: "done"`, `finished_at`, und am Spiel `planned_games[]` (öffentlich, nach `position`
+sortiert) mit denselben Schlüsseln wie `games[]` – `{position, mode, mode_label, mode_icon_url?, map_id, map_name, map_image_url}` als
+Schnappschuss aus dem Pool – dazu `role` (`picked` \| `decider`, Begriffe wie #1931) und `by_registration_id` (die wählende Seite, beim
+Decider `null`). `map_pool_id` wird gesetzt, wenn leer (wie `remember_pool`). Stand `ready`, Protokoll `match.veto.done`, Nachricht an
+beide Seiten „Veto abgeschlossen – die Spielreihenfolge steht, ihr könnt starten“ (`veto_done`, `veto-done:<spiel>:<finished_at>`).
+**Ergebnis:** Das Meldeformular übernimmt Modus und Map je Position aus `planned_games` (fest, nur Sieger, Punkte und Aufstellung
+werden eingetragen); der Server prüft die Meldung der Captains dagegen (`league_games.normalize_games`, 422 „Map 2: laut Veto wird hier …
+gespielt.“) – die Leitung trägt über `/result` frei ein und korrigiert. `games[]`, `same_outcome`, die App-Bestätigung ohne Maps und
+Spiele ohne `planned_games` bleiben unverändert. Nach `started_at` ändert niemand mehr still etwas am Veto.
+
+**Leitung** `POST /api/matches/{id}/veto/lead` `{action, reason, version, conflict_reason?}` – Liga-Recht `matches`, Befangenheit wie
+B.1 (403, Superadmin mit `conflict_reason`), Grund 5–500 Zeichen, `version` wie beim Zug:
+
+| `action` | Wirkung |
+| --- | --- |
+| `pause` | `running` → `paused`, `paused.remaining_seconds` = Rest der Frist |
+| `resume` | `paused` → `running`, Frist = jetzt + Rest |
+| `undo` | nimmt den letzten Schritt zurück (einen automatischen Decider samt dem Zug davor); nur solange nichts begonnen (`started_at`) und nichts gemeldet ist – auch bei `done` (dann wieder `running`, `planned_games` fällt weg) |
+| `restart` | beginnt die Vorlage von vorn, Team A bleibt (ein Los wird nicht neu gezogen) |
+
+Jeder Eingriff steht in `lead_log[]` und im Protokoll `match.veto.lead` (`action`, `reason`); die Matchseite zeigt Pause und Grund beiden
+Seiten.
+
+**Matchseite** – Block `checkin.veto` (nur Staffeln mit Vorlage, nur Beteiligte und Leitung, sonst `null`): `status`, `skipped_reason`,
+`version`, `step_seconds`, `team_a {registration_id, name, via}`, `team_b {registration_id, name}`, `current` (`{index, number, total, kind,
+mode, mode_label, mode_icon_url?, registration_id, name, position, deadline_at, remaining_seconds}` oder `null`), `own_turn`, `can_pick`,
+`pick_hint`, `options[]` (alle Maps des Modus des laufenden Schritts `{map_id, name, image_url, allowed, hint}`), `remaining[]` je Modus
+`{mode, label, icon_url?, maps: [{map_id, name, image_url, status: open|banned|picked|decider, by_name, position}]}`, `history[]`
+(`{index, kind, mode_label, name, map_name, position, via, at}`), `planned_games[]`, `paused {at, reason, remaining_seconds}`,
+`lead {can_act, conflict}` (nur Leitung). D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
+Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4.
+
+**Datenschutz:** `flow.veto` ist intern (`flow` in `match_public_view.INTERNAL_KEYS`); `planned_games` ist öffentlich (keine Personen).
+Auskunft `league_checkin` (`match_flow.export_snapshot`) nennt je Spiel die eigenen Züge (`veto_step`: Schritt, Art, Zeit, Seite) und
+Eingriffe als Leitung (`veto_lead`: Vorgang und Zeit). Kontolöschung (`match_flow.scrub_person`): `steps[].by`, `paused.by` und
+`lead_log[].by` werden `null`, die Züge bleiben (Sportdaten).
+
+**Rechte** (Ergänzung der Matrix in B.1):
+
+| Route | Liga-Recht | Befangenheit | Helfer |
+| --- | --- | --- | --- |
+| `GET …/seasons/{id}/veto-rules`, `GET …/veto-rules/proposal` | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/veto-rules` | `season` | – | – |
+| Spiel: `POST /veto/pick` | keins – nur Captain oder Vertreter der Seite am Zug | – | – |
+| Spiel: `POST /veto/lead` | `matches` | ja (Notausnahme `conflict_reason`) | – |
+
+**Verwaltung:** Season-Seite, Reiter Spielbetrieb, Kasten **Veto** (Sprungmarke `#veto`, nach „Serie“ – die Vorlage bezieht sich auf
+Best of und „Modus je Map“ darüber): an/aus, Team A = Heim oder Los, Zeit je Schritt, Schrittliste (hinzufügen, nach oben/unten, löschen)
+mit Prüfung live (`frontend/src/lib/leagueVeto.js`, dieselben Sätze wie der Server für Positionen und Poolgrößen; die Suche bei `never`
+und der Abgleich mit dem gespeicherten Pool kommen vom Server), Knopf **„Vorschlag aus Modusfolge und Pools“**, eigener Knopf
+**„Veto speichern“**. „Was fehlt noch?“ springt bei `veto_invalid` an den Kasten, bei `veto_without_checkin` zum Check-in.
+
+**Regelwerk:** Baustein `[[baustein:veto]]` (`league_rule_blocks`, eingefroren als `{label, source, data}`): Team-A-Regel, Zeit je
+Schritt und die Schritte als Liste („1. Team A sperrt eine Map (Stellung)“, „3. Team A wählt Map 1 (Stellung)“, „9. Die übrige Map wird
+Map 3 (Kontrolle)“); aus heißt „*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*“. Klein und
+eigenständig gehalten (#2269 baut die Fakten-Bausteine parallel um).
+
+**App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. **Audit-Aktionen neu:** `match.veto.start`,
+`match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`.
 
 ### Season-Seite der Verwaltung (#2267)
 
@@ -1865,7 +2029,7 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 | Reiter | Sprungmarke | Inhalt | Speichern |
 | --- | --- | --- | --- |
 | Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
-| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`; Pool, Mindestgröße und Ergebnisregeln eigene Knöpfe |
+| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie`, `#veto` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Veto (D.3, #1618); Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`; Pool, Mindestgröße, Ergebnisregeln und Veto eigene Knöpfe |
 | Termine | `#termine`, `#kalender`, `#terminregeln`, `#checkin` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1), Check-in-Regeln (D.2, #1652) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln und Check-in eigene Knöpfe |
 | Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#plattform`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Plattform und Eingabegerät (#2270), Eingang, Kaderübersicht | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar), `platform_field`, `allowed_platforms`, `crossplay`, `input_device` |
 | Tabelle | `#tabelle`, `#punkte`, `#gleichstand` | Punkte, Gleichstand, Ausscheiden (E.1), Gleichstände der Staffeln | `scoring_rules` |
