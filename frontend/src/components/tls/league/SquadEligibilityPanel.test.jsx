@@ -8,10 +8,12 @@ const post = vi.fn();
 const remove = vi.fn();
 vi.mock("@/lib/api", () => ({
   api: { get: (...args) => get(...args), post: (...args) => post(...args), delete: (...args) => remove(...args) },
+  API: "/api",
   formatApiError: (value) => value || "Fehler",
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+vi.mock("react-router-dom", () => ({ Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a> }));
 
 const { SquadEligibilityPanel } = await import("./SquadEligibilityPanel");
 
@@ -52,6 +54,25 @@ test("zeigt Regeln und Stand, das Panel öffnet sich, wenn jemand nicht spielen 
   expect(screen.getByTestId("squad-eligibility-player-u2").textContent).toContain("Geburtsdatum fehlt");
   expect(screen.getByTestId("squad-eligibility-player-u1").textContent).toContain("Alter erfüllt");
   expect(panel.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+});
+
+// Regelwerk (#2269): gültige Fassung und der Stand der Zustimmung dieses Co-Teams auf der Team-Seite.
+test("zeigt das Regelwerk mit „Neue Fassung, bitte zustimmen“", async () => {
+  const rules_doc = { version_id: "v2", version: 2, label: "Version 2", valid_from: "2030-03-05", url: "/liga/probe/s1/regeln", pdf_url: "/api/x/pdf",
+    consent: { required: true, agreed: false, agreed_at: null, demanded_label: "Version 2" } };
+  const players = VIEW.seasons[0].players.map((player) => ({ ...player, ok: true, state: "locked", reason: null }));
+  get.mockResolvedValue({ data: { seasons: [{ ...VIEW.seasons[0], players, rules_doc }] } });
+  render(<SquadEligibilityPanel teamId="team" squad={{ id: "sq" }} />);
+
+  const note = await screen.findByTestId("squad-rules-s1");
+  expect(note).toHaveAttribute("data-consent", "open");
+  expect(note.textContent).toContain("Version 2");
+  expect(note.textContent).toContain("Neue Fassung, bitte zustimmen");
+  expect(screen.getByTestId("squad-rules-s1-link")).toHaveAttribute("href", "/liga/probe/s1/regeln");
+  // Auch wenn alle spielen dürfen: Der Bereich ist offen und die Überschrift sagt es, damit der Hinweis nicht verborgen bleibt.
+  const panel = screen.getByTestId("squad-eligibility-sq");
+  expect(panel).toHaveAttribute("open");
+  expect(panel.querySelector("summary").textContent).toContain("Regelwerk: bitte zustimmen");
 });
 
 test("beantragt den Transfer und lädt neu", async () => {

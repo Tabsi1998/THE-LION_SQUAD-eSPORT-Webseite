@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.67.0 (04.11.2026)
+
+### Neu
+
+* Auskunft und Kontolöschung kennen den Check-in; Regelwerk-Baustein [[baustein:checkin]] (#1652)
+* Check-in je Season einstellbar (Fenster, Mindestzahl, Erinnerung), sofort für alle Staffeln (#1652)
+* Check-ins gelten je Termin – jeder neue Termin (auch Spieltag- und Stationsplan) lässt neu einchecken und hebt Verlängerungen auf (#1652)
+* Ergebnis melden in Staffeln mit Check-in erst nach beiden Check-ins, die erste gültige Meldung setzt den Start nach (#1652)
+* Erinnerungen „Check-in offen“ und vor Schluss, Aufgabe „Jetzt einchecken“, Mein Dienst „Check-in abgelaufen“ (#1652)
+* Liga-Check-in je Spiel – Fenster um den Termin, Anwesende mit Spielberechtigung, Start setzt den Beginn (#1652)
+* Liga-Leitung trägt den Check-in im Notfall mit Grund ein (Befangenheit wie B.1) (#1652)
+* Matchseite mit Countdown-Ring, Anwesenden-Liste, Status der Gegenseite und „Spiel starten“ (#1652)
+* Nach dem Check-in-Fenster nur ein Vorschlag „nicht erschienen“ an die Leitung, nie eine automatische Wertung (#1652)
+* Regelwerks-Sperre – ohne Zustimmung zur geforderten Fassung kein Check-in und kein Start (#1652)
+* Verlängern und „nicht erschienen“ gelten nur für die fehlende Seite und das aktuelle Fenster (#1652)
+
+### Fehlerbehebungen
+
+* Karte „Nicht erschienen?“ nennt beim Check-in auch das Nachtragen (#1652)
+
+### Dokumentation
+
+* Vertrag D.2 in LIGA.md, Handbuch für Captains und Leitung, ROLLEN.md, Routen-Inventar (#1652)
+
 ## 1.66.0 (04.11.2026)
 
 ### Neu

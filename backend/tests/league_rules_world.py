@@ -86,8 +86,9 @@ def league_page(world: dict) -> str:
 
 
 async def publish(flow, world: dict, *, scope: str | None = None, body: str = BODY, annexes=None, title: str = "Regelwerk",
-                  valid_from: str | None = None, reason: str = "Fassung für die Season", requires_consent: bool = False) -> dict:
-    """Entwurf speichern und veröffentlichen - gibt die Fassung zurück."""
+                  valid_from: str | None = None, reason: str = "Fassung für die Season", requires_consent: bool = False,
+                  confirm_empty: bool = False) -> dict:
+    """Entwurf speichern und veröffentlichen - gibt die Fassung zurück. ``confirm_empty``: leere Variablen ausdrücklich bestätigen (#2269)."""
     target = scope or season_scope(world)
     flow.act_as(world["lead"])
     current = ok(await flow.get(target)).get("draft")
@@ -96,4 +97,4 @@ async def publish(flow, world: dict, *, scope: str | None = None, body: str = BO
         **({"revision": current["revision"]} if current else {})}))
     return ok(await flow.post(f"{target}/publish", json={
         "revision": draft["revision"], "valid_from": valid_from or today(), "change_reason": reason,
-        "requires_consent": requires_consent}))
+        "requires_consent": requires_consent, "confirm_empty": confirm_empty}))

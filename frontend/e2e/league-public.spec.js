@@ -5,7 +5,7 @@ const { test, expect } = require("@playwright/test");
 // Scrollen - die Tabelle scrollt in ihrem eigenen Bereich. Nur erfundene Namen.
 
 const LEAGUES = { leagues: [{ id: "l1", slug: "probe-liga", name: "Probe-Liga", game: { name: "Probe Shooter" },
-  seasons: [{ id: "s1", slug: "season-1", name: "Season 1", status: "active", start_date: "2026-11-09T23:00:00+00:00" }] }] };
+  seasons: [{ id: "s1", slug: "season-1", name: "Season 1", status: "active", start_date: "2026-11-09T23:00:00+00:00", rules_url: "/liga/probe-liga/season-1/regeln" }] }] };
 const SEASON = {
   league: { id: "l1", slug: "probe-liga", name: "Probe-Liga mit langem Namen", game: { name: "Probe Shooter" } },
   season: {
@@ -79,6 +79,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.goto("/liga");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Liga");
     await expect(page.getByTestId("league-index-season-season-1")).toHaveAttribute("href", "/liga/probe-liga/season-1");
+    // Regelwerk (#2269): direkt aus der Liga-Übersicht erreichbar.
+    await expect(page.getByTestId("league-index-rules-season-1")).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
     await noSideScroll(page);
   });
 

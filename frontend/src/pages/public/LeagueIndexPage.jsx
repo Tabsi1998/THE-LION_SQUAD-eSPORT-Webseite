@@ -2,7 +2,7 @@
 // sichtbare Season steht ein freundlicher Hinweis da - der Menüpunkt „Liga“ erscheint dann ohnehin nicht.
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ScrollText } from "lucide-react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -75,6 +75,13 @@ export default function LeagueIndexPage() {
                       </span>
                       <ChevronRight className="tls-card__arrow relative h-4 w-4 shrink-0 text-white/35" aria-hidden="true" />
                     </Link>
+                    {/* Regelwerk (#2269): leicht auffindbar, direkt aus der Liga-Übersicht. */}
+                    {season.rules_url ? (
+                      <Link to={season.rules_url} data-testid={`league-index-rules-${season.slug}`}
+                        className="tls-hit mt-1.5 inline-flex min-h-[36px] items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]">
+                        <ScrollText className="h-3.5 w-3.5" aria-hidden="true" /> Regeln
+                      </Link>
+                    ) : null}
                   </li>
                 ))}
               </StaggerIn>

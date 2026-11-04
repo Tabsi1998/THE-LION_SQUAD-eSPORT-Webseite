@@ -10,6 +10,9 @@ stehen hier keine, nur der Weg zu den Daten.
 
 Symbol eines Modus (#2266): Map-Pool, Modusfolge und „Einstellungen je Modus“ (#2271) tragen es in ``data`` (nur wenn gesetzt); nur die
 Fassung ``markdown`` (Web) zeigt es, ``text`` (PDF, Vergleich) nicht. ``images`` meldet es der Mediathek.
+
+Die Bausteine aus den Einstellungen (#2269: Modi, Spielformat, Tabelle, Termine, Spielberechtigung) stehen in ``league_rule_facts`` und
+sind hier nur registriert.
 """
 from __future__ import annotations
 
@@ -18,7 +21,8 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable
 
 from models import rule_time_limit_seconds
-from services import game_maps, game_modes, map_pools, mode_icons
+from services import game_maps, game_modes, league_rule_facts as facts, map_pools, mode_icons
+from services.league_rule_facts import ICON_ALT, MARKDOWN, TEXT, duration, icon_markdown  # noqa: F401 - weiter von hier gelesen
 from services.markdown_text import plain, text_cell
 
 # Steht, wo ein Baustein zu einer Season gehört, die Seite aber keine hat oder die Season erst später dazukam.
@@ -27,19 +31,11 @@ NOT_FROZEN_HINT = "*Für diese Season noch nicht festgehalten.*"
 NO_POOL = "*Für diese Season ist noch kein Map-Pool hinterlegt.*"
 FREE_MODES = "*Der Modus je Map ist frei wählbar.*"
 NO_SETTINGS = "*Für die Modi sind keine Einstellungen hinterlegt.*"
-# Ein Baustein hat eine zweite Fassung ohne Bilder (``text``): Die nimmt das PDF und der Wort-Vergleich.
-MARKDOWN, TEXT = "markdown", "text"
-# Symbol eines Modus (#2266): ein Markdown-Bild mit genau diesem Text vor dem Namen, nur in ``markdown``. Das Web zeigt es klein (rules.css).
-ICON_ALT = "Modus-Symbol"
 
 # Namen aus Bibliothek oder Modus sind Text (Review #2218): ``text_cell`` schützt die Steuerzeichen beim Darstellen.
 _cell = text_cell
-
-
-def _icon(url: str | None, variant: str) -> str:
-    """Das Symbol als Markdown vor dem Namen - nur in ``markdown`` und nur Raster-Bilder aus dem eigenen Upload (keine SVG im Regelwerk)."""
-    found = mode_icons.raster_icon(url) if variant == MARKDOWN else None
-    return f"![{ICON_ALT}]({found}) " if found else ""
+# Das Symbol vor dem Namen (#2266) - dieselbe Regel wie in den Bausteinen aus den Einstellungen.
+_icon = icon_markdown
 
 
 def _with_icon(row: dict, url: str | None) -> dict:
@@ -140,13 +136,6 @@ def mode_settings_data(game: dict | None, season: dict) -> dict:
         if row["time_limit_seconds"] or row["round_time_seconds"] or row["settings"] or row["rules_text"]:
             rows.append(_with_icon(row, game_modes.icon_of(game, key)))
     return {"rows": rows}
-
-
-def duration(seconds) -> str:
-    """Sekunden lesbar: volle Minuten als „10 Min.“, sonst „1:30 Min.“ bzw. „0:45 Min.“."""
-    total = int(seconds or 0)
-    minutes, rest = divmod(total, 60)
-    return f"{minutes} Min." if not rest else f"{minutes}:{rest:02d} Min."
 
 
 UNIT_WORDS = {"minutes": "Min.", "points": "Punkte"}
@@ -323,6 +312,17 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
           _loadout_text, _loadout_images),
     Block("mode_settings", "Einstellungen je Modus", "Zeitlimit, Zeit je Runde, Einstellungen und Regeltext je Modus aus der Season.",
           _mode_settings, render_mode_settings, _mode_settings_images),
+    # Aus den Einstellungen der Season (#2269) - Daten und Darstellung in league_rule_facts.
+    Block("modes", "Modi der Season", "Je Modus Symbol, Ergebnisregel in Klartext (Ziel, Runden, Zeit, Verlängerung, Remis) und Spieler je Seite.",
+          facts.build_modes, facts.render_modes, facts.modes_images),
+    Block("format", "Spielformat", "Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste - mit Abweichungen je Liga N.",
+          facts.build_format, facts.render_format),
+    Block("table", "Tabelle und Wertung", "Punkte, Remis, Reihenfolge bei Punktgleichheit, kampflos, beide nicht erschienen, Ausscheiden (E.1).",
+          facts.build_table, facts.render_table),
+    Block("schedule", "Termine", "Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen und Fristen (D.1).",
+          facts.build_schedule, facts.render_schedule),
+    Block("eligibility", "Spielberechtigung", "Zulassung, Mindestalter, Spiel-IDs, Plattform, ein Co-Team je Season, Wartezeit, Stichtag und Transferfenster (B.3, #2270).",
+          facts.build_eligibility, facts.render_eligibility),
 )}
 _IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
 

@@ -169,7 +169,9 @@ async def test_the_cache_does_not_outrun_the_visibility(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_renamed_league_gets_a_new_pdf(flow, monkeypatch):
+async def test_a_renamed_league_keeps_the_pdf_of_a_published_version(flow, monkeypatch):
+    """Die Namen von Liga und Season stehen an der Fassung fest (#2269, Prüfung Codex): Eine Umbenennung ändert weder die Datei noch
+    ihren Schlüssel - nur eine Fassung ohne eingefrorene Namen (von vor #2269) nimmt die heutigen."""
     import pdf_service
 
     calls = []
@@ -182,7 +184,10 @@ async def test_a_renamed_league_gets_a_new_pdf(flow, monkeypatch):
     assert (await flow.get(url)).status_code == 200
     await flow.db.leagues.update_one({"id": w["league"]["id"]}, {"$set": {"name": "Anderer Name"}})
     assert (await flow.get(url)).status_code == 200
-    assert len(calls) == 2
+    assert len(calls) == 1, "dieselbe Fassung, dieselbe Datei"
+    await flow.db.league_rules.update_one({"id": version["id"]}, {"$unset": {"frozen_names": ""}})
+    assert (await flow.get(url)).status_code == 200
+    assert len(calls) == 2, "ohne eingefrorene Namen zählt der heutige Name"
 
 
 @pytest.mark.asyncio

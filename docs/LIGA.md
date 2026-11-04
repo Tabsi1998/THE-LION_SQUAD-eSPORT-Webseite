@@ -713,6 +713,8 @@ Import-Kreis), `pdf_service.pdf_league_rules`. Routen in `routes/league_rules_ro
 | `annexes` | `[{key, title, body_md}]`, höchstens 26 | Anlagen; `key` = „A“, „B“ … aus der Reihenfolge |
 | `frozen` | `{season_id: {block: {label, markdown, source}}}` | eingefrorene Bausteine; je Season, bei `scope: league` für jede Season, die nicht archiviert ist |
 | `blocks_used` | `[str]` | im Text verwendete Bausteine |
+| `frozen_vars`, `vars_used` | `{season_id: {name: {label, value}}}`, `[str]` | eingefrorene Variablen (#2269, siehe unten); bei `scope: league` zusätzlich der Schlüssel `""` für Werte ohne Season. Fassungen ohne `vars_used` (von vor #2269) bekommen beim Lesen keine Ersetzung: Ihr Text bleibt Wort für Wort, auch ein zufälliges `{{…}}` |
+| `frozen_names` | `{league, game, seasons: {season_id: name}}` | Namen von Liga, Spiel und Seasons beim Veröffentlichen (#2269): Seite (`version.names`), PDF-Kopf und PDF-Schlüssel lesen sie, eine Umbenennung ändert alte Fassungen nicht. Fassungen ohne das Feld nehmen die heutigen Namen |
 | `valid_from` | `YYYY-MM-DD` | Wiener Kalendertag; nie vor heute und nie vor dem der Vorgänger-Fassung |
 | `change_reason` | str 5–500 | Änderungsgrund |
 | `requires_consent` | bool | muss der Fassung neu zugestimmt werden |
@@ -737,7 +739,8 @@ jeder Baustein liefert er Daten im Klartext (`league_rule_blocks.mode_settings_d
 (`render_mode_settings`) setzt jeden Wert aus der Verwaltung über `markdown_text.text_cell` (kein Link, keine Auszeichnung, keine
 Tabellenspalte). `map_pool`, `mode_order` und `mode_settings` tragen das Symbol des Modus in `data` (nur wenn gesetzt) und zeigen es im
 Web (`markdown`), die Fassung ohne Bilder (`text`, PDF und Vergleich) nicht (siehe C.1); `images` meldet es für `frozen_images`.
-Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in `league_rule_blocks.BLOCKS`. Beim Veröffentlichen werden die
+Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in `league_rule_blocks.BLOCKS`; `modes`, `format`, `table`,
+`schedule`, `eligibility` und die Variablen `{{…}}` beschreibt „Regelwerk aus den Einstellungen“ unten (#2269). Beim Veröffentlichen werden die
 Daten des Bausteins eingefroren; alte Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
 
@@ -804,7 +807,8 @@ Hinweis auf die Regelseite. Das schreibt das Veröffentlichen sofort und das Üb
 | `GET /api/admin/league-rules/{scope}/{id}` | Zuständigkeit `rules` oder Bereich `leagues` | Entwurf, Fassungen, Geerbtes, Bausteine, `data_changes`, Stand der Zustimmungen |
 | `PUT …/draft`, `POST …/draft/from-version`, `DELETE …/draft` | ebenso | Entwurf speichern, aus einer Fassung vorbereiten, verwerfen |
 | `POST …/preview` | ebenso | Vorschau mit heutigen Bausteinen und Änderungen zur letzten Fassung |
-| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent}`; 409 bei gleichzeitigem Veröffentlichen |
+| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent, confirm_empty}`; 409 bei gleichzeitigem Veröffentlichen; 422 `{code: "empty_vars", names, message}` bei leeren Variablen ohne `confirm_empty` |
+| `POST …/proposal/publish` (#2269) | ebenso | `{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}`: den Vorschlag „Daten geändert“ in einem Schritt freigeben; 409 mit Entwurf, veralteter Grundlage oder wenn die Datenbasis nicht mehr dem `fingerprint` des Vorschlags entspricht |
 
 `GET /api/leagues/{liga}/{season}` trägt zusätzlich `rules`: `{source, version, valid_from, url, pdf_url, consent_open}` oder `null`.
 `require_rules_editor` prüft das über `require_league`: Die Liga steht nie im Inhalt, eine Fassung aus einer anderen Liga ist im Geltungsbereich nicht zu finden (404). Die
@@ -813,6 +817,85 @@ Spiel. Bilder: Die Admin-Medien gehen über die Rolle, Zuständige ohne sie lade
 
 **Seiten:** `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` (Season-Slug `regeln` ist reserviert), Pflege unter
 `/admin/leagues/rules/{scope}/{id}`. Protokoll: `league.rules.draft`, `.draft_discard`, `.publish`, `.consent`, ohne Volltext.
+
+#### Regelwerk aus den Einstellungen: Bausteine und Variablen (#2269)
+
+Kein Wert einer Season steht fest im Regeltext. Was die Verwaltung einstellt (Modi, Ziele, Zeiten, Best of, Punkte, Fristen, Kader),
+kommt als **Baustein** (ein ganzer Absatz, Tabelle oder Liste) oder als **Variable** (ein Wert mitten im Satz) in den Text. Beides wird
+beim Veröffentlichen strukturiert eingefroren; ändert sich danach eine Einstellung, ändert sich die veröffentlichte Fassung **nie still**.
+Logik: `services/league_rule_facts.py` (die Daten und ihre Darstellung je Baustein), `services/league_rule_vars.py` (Variablen),
+Register weiter in `league_rule_blocks.BLOCKS`. Alles liest den heutigen Stand der Season; der Staffel-Stand (übertragen) ist bewusst
+nicht die Quelle, weil das Regelwerk je Season gilt.
+
+**Bausteine** (zusätzlich zu `map_pool`, `mode_order`, `loadout_bans`, `mode_settings`), je `{label, source, data}` eingefroren,
+Darstellung erst beim Lesen, jeder Wert über `markdown_text.text_cell`:
+
+| Baustein | Quelle | `data` | Darstellung |
+| --- | --- | --- | --- |
+| `[[baustein:checkin]]` „Check-in“ (D.2, #1652) | `checkin_rules` der Season (`checkin_rules.normalize`, nur Schlüssel aus `checkin_rules.DEFAULTS`); ohne gespeicherten Kasten `None` | `{rules: {…checkin_rules.DEFAULTS} \| null}` | Liste: Fenster (Minuten vor und nach dem Termin), Mindestzahl anwesender spielberechtigter Spieler je Team, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen; ohne Check-in der Satz „In dieser Season gibt es keinen Check-in.“ |
+| `[[baustein:modes]]` „Modi der Season“ | Modi des geltenden Pools und der Modusfolge (ohne beides: alle nicht archivierten Modi des Spiels); Regel aus `result_rules` der Season, sonst des Spiels; Symbol, `players_per_side` und Beschreibung vom Spiel | `{rows: [{mode, label, icon_url?, players_per_side, description, rule: {kind, target, round_limit, time_limit_seconds, round_time_seconds, overtime, draw_allowed} \| null}]}` | Tabelle Modus · Ergebnisregel (Klartext: „Punkte bis zum Ziel 250 · Verlängerung bei Gleichstand · kein Remis“) · Zeit („10 Min. je Map · 1:30 Min. je Runde“) · Spieler je Seite; Symbol nur in `markdown` |
+| `[[baustein:format]]` „Spielformat“ | `best_of`, `team_size`, `min_squad_size`, `max_squad_size`, `map_repeat`, `lineup_mode`, `lineup_min_players` der Season (`effective_settings`), dazu je Liga N die Abweichungen (`overrides`) | `{best_of, maps_to_win, team_size, min_squad_size, max_squad_size, map_repeat, lineup_mode, lineup_min_players, divisions: [{label, best_of, team_size, min_squad_size}]}` | Liste: Serie, Teamgröße, Kader, Map-Wiederholung, Teilnehmerliste; danach „Abweichend in Liga N: …“ |
+| `[[baustein:table]]` „Tabelle und Wertung“ | `scoring_rules` der Season (`normalize_rules`, Altbestand mit seinen Vorgaben), dazu Liga N mit eigenen `scoring_rules` | `{points: {win, draw, loss}, allow_draws, tiebreakers, head_to_head, forfeit_score, exit_rule, divisions: [{label, …dieselben Felder}]}` | Liste: Punkte, Remis, Reihenfolge bei Punktgleichheit, Kampflos, Beide nicht erschienen, Ausscheiden (E.1) |
+| `[[baustein:schedule]]` „Termine“ | Kalender der Season (`start_date`, `weeks_total`, `matchday_days`, Standardtermin, `blocked_periods`), `match_schedule_response_hours`, `schedule_rules` (D.1) | `{weeks_total, start_day, end_day, matchday_days, weekday_from, weekday_to, default_weekday, default_time, blocked_periods: [{label, start_date, end_date}], response_hours, rules: {…D.1} \| null}` | Liste: Season und Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig; ohne `schedule_rules` ein Satz, dass Verschiebungen die Leitung entscheidet |
+| `[[baustein:eligibility]]` „Spielberechtigung“ | B.3-Felder der Season (`league_eligibility.rules_view`), `entry_policy`, `unique_game_ids`, die Spiel-ID-Felder des Spiels (`player_id_fields[].label`), die Plattform je Season (#2270, `league_platform.season_block` → `values`) | `{min_age, one_team_per_season, new_player_wait_days, roster_deadline, transfer_windows: [{label, start_date, end_date}], entry_policy, unique_game_ids, id_fields: [label], platform: {field, platforms, crossplay, input_device, divisions: [{label, platforms, crossplay, input_device}]} \| null}` | Liste: Zulassung, Mindestalter, Spiel-IDs, Plattform (Feld, erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster |
+
+**Variablen** stehen als `{{name}}` im Fließtext (Groß und klein egal, Leerraum in den Klammern erlaubt). Der Wert wird wie ein
+Bausteinwert eingesetzt (`text_cell`: nie Link, nie fett, nie Tabellenspalte) und beim Veröffentlichen je Season in
+`league_rules.frozen_vars` (`{season_id: {name: {label, value}}}`) als Klartext eingefroren, dazu `vars_used`. Eine Fassung der Liga friert
+zusätzlich unter dem Schlüssel `""` die Werte ein, die ohne Season gelten (`league.name`, `game.name`); auf der Seite der Liga steht
+für alles andere „(je Season)“, für eine Season, die erst nach dem Veröffentlichen dazukam, „(noch nicht festgehalten)“. Ein bekannter
+Name **ohne Wert** (die Season trägt das Feld nicht) wird nie still leer: Es steht „(nicht festgelegt)“ da, Vorschau und Vorschlag nennen
+ihn unter `empty_vars` - aus demselben Schnappschuss, den das Veröffentlichen prüft, bei einer Fassung der Liga also aus allen Seasons,
+die sie einfriert, auch wenn die Seite der Liga „(je Season)“ zeigt -, und das Veröffentlichen (normal wie über die Freigabe) verlangt
+die ausdrückliche Bestätigung `confirm_empty` - sonst 422 mit `{code: "empty_vars", names, message}` (Entscheidung Fabian; `message`
+sagt bei der Liga „in einer Season dieser Liga“). Das Web zeigt Liste und Haken auch dann, wenn erst diese Absage sie bringt. Ein
+**unbekannter** Name (`unknown_vars`, auch `mode:<kennung>` eines Modus, den das Spiel nicht hat): deutlicher
+Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variable im Text: {{…}}“ mit der ganzen Liste.
+
+| Variable | Wert (Klartext) |
+| --- | --- |
+| `league.name`, `game.name` | Name der Liga und des Spiels |
+| `season.name`, `season.number`, `season.start`, `season.end`, `season.weeks` | Name, Nummer, erster und letzter Tag (Wiener Kalendertag, `TT.MM.JJJJ`), Zahl der Spielwochen |
+| `best_of`, `maps_to_win`, `team_size`, `min_squad_size`, `max_squad_size` | Serie, Maps zum Sieg (⌊N/2⌋+1), Spieler je Map, Kadergrenzen |
+| `map_repeat` | „nur in einem anderen Modus“ / „jede Map nur einmal“ / „frei“ |
+| `lineup_mode`, `lineup_min_players` | „Teilnehmerliste je Spiel“ / „Aufstellung je Map“, Mindestzahl |
+| `result_confirm_hours`, `lineup_amend_hours` | Bestätigungsfrist, Nachtragsfrist (Stunden) |
+| `schedule.matchday_days`, `schedule.default_weekday`, `schedule.default_time`, `schedule.default_slot` | Tage je Spielwoche, Standardtag, Uhrzeit, „Sonntag, 20:00 Uhr“ |
+| `schedule.response_hours`, `schedule.blocked_periods` | Antwortfrist auf Terminvorschläge, Sperrzeiten („Weihnachtspause 21.12.2026–03.01.2027“) |
+| `schedule.home_rule_hours`, `schedule.reschedule_max`, `schedule.reschedule_notice_hours`, `schedule.result_reminder_hours`, `schedule.result_overdue_hours` | D.1-Regeln; ohne `schedule_rules` an der Season „(nicht festgelegt)“ |
+| `table.points_win`, `table.points_draw`, `table.points_loss`, `table.draws` | Punkte, „möglich“ / „nicht möglich“ |
+| `table.tiebreakers`, `table.head_to_head`, `table.forfeit_score`, `table.exit_rule` | Reihenfolge bei Punktgleichheit in Worten, Kriterien des direkten Vergleichs, Wertung kampflos, Regel beim Ausscheiden |
+| `eligibility.min_age`, `eligibility.wait_days`, `eligibility.roster_deadline`, `eligibility.transfer_windows`, `eligibility.entry_policy`, `eligibility.id_fields` | B.3-Werte in Worten |
+| `eligibility.platform`, `eligibility.crossplay`, `eligibility.input_device` | Plattform je Season (#2270): „PC und PlayStation“ / „alle Plattformen“, „an“ / „aus“, Eingabegerät in Worten; ohne Plattform-Feld „(nicht festgelegt)“ |
+| `application.opens`, `application.closes`, `application.slots` | Anmeldefenster (Wiener Zeit) und Startplätze (B.4) |
+| `mode:<kennung>.name`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus des Spiels: Name, Ergebnisregel in Klartext, Ziel, Rundenlimit, Zeitlimit („10 Min.“), Zeit je Runde, Spieler je Seite, „ja“/„nein“ |
+
+**Ablauf bei Änderungen** (Obmann 03.11.): Ändert sich eine Einstellung, vergleicht die Verwaltung wie bisher die letzte Fassung mit
+dem heutigen Stand (`data_changes`, jetzt mit `kind: "block" | "variable"` je Zeile). Dann zeigt sie **„Regelwerk muss freigegeben
+werden“** an drei Stellen: im Season-Überblick (#2267), in „Mein Dienst“ (`GET /api/users/me/duty` → `rules_pending[]` je Season mit
+`league_name`, `season_name`, `kind` `changed` | `draft`, `count`, `label`, `admin_url`; für wer in der Liga „Regeln veröffentlichen“
+darf) und auf der Regelwerk-Seite. Dort entsteht der **Vorschlag** von selbst: `admin_view.proposal` = der Text der letzten Fassung mit
+den Daten von heute (`sections` mit Markierung, `changes` gegen die Fassung) - ohne Entwurf, ohne Schreiben, solange kein Entwurf
+liegt. Der Vorschlag trägt den **Fingerabdruck** seines Schnappschusses (`fingerprint`: Bausteine und Variablenwerte aller betroffenen
+Seasons und die Namen von Liga, Spiel und Seasons - alles, was eingefroren wird, `league_rules.Snapshot`, stabil sortiert,
+`league_rules.data_fingerprint`). Die Leitung prüft, gibt mit `POST /api/admin/league-rules/{scope}/{id}/proposal/publish`
+`{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}` frei (Recht `rules`) und wählt dabei, ob die
+Teams neu zustimmen müssen. Unter der Sperre liest der Server den Schnappschuss neu: Weicht er vom `fingerprint` ab (eine Season-Einstellung
+oder eine Umbenennung hält diese Sperre nicht), antwortet er 409 „Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu
+prüfen“, und das Web lädt den Vorschlag neu; ebenso 409, wenn inzwischen ein Entwurf liegt oder die Grundlage nicht mehr die letzte Fassung
+ist. Beide Prüfungen laufen vor dem Entwurf, es bleibt nichts liegen. Dann legt der Server den Entwurf aus der Fassung an und veröffentlicht
+genau den geprüften Schnappschuss in einem Schritt, auch die Namen; Protokoll `league.rules.publish` mit `proposal: true`. „Neue Version
+vorbereiten“ (Text vorher anpassen) bleibt der zweite Weg. Bis zur Freigabe gilt und zeigt die alte Fassung. Mit `requires_consent`
+sehen die Verantwortlichen „Neue Fassung, bitte zustimmen“ (Aufgabe, Regelseite, Season-Seite, Team-Seite, Matchseite).
+
+**Auffindbar:** `GET /api/leagues` trägt je Season `rules_url` (nur mit gültiger Fassung); die Liga-Übersicht zeigt den Link. Die
+Team-Seite (`GET /api/teams/{tid}/squads/{sid}/eligibility`, je Season `rules_doc`) und die Matchseite (Block `league.rules`) tragen
+`league_rules.rules_info`: `{url, pdf_url, label, version, valid_from, consent: {required, agreed, agreed_at} | null}` - der Stand der
+Zustimmung des eigenen Co-Teams, nie der eines anderen.
+
+**Editor:** `admin_view.variables[]` (`{name, label, hint, token, value, group}`, aufgelöst für die Season; `mode:…` je Modus des
+Spiels) und `blocks[]` zum Einfügen an der Schreibmarke, dazu die Hilfe-Liste. Die Vorschau zeigt aufgelöste Werte, `unknown_vars`
+und `empty_vars`.
 
 ### B.3 Spielberechtigung (#2204)
 
