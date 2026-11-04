@@ -5,7 +5,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ELIGIBILITY_LABELS, TRANSFER_LABELS, ageLabel, rulesLines } from "@/lib/leagueEligibility";
 import { viennaDateTime } from "@/lib/vienna";
-import { LeagueRulesNote } from "./LeagueRulesNote";
+import { LeagueRulesNote, rulesConsentState } from "./LeagueRulesNote";
 
 // Spielberechtigung im Co-Team (#2204): was die Season verlangt, wer spielen darf und wer nicht, und der Weg zum Transfer. Für Teamleitung,
 // Captain und Vertreter. Vom Alter steht hier nur „erfüllt“ oder „Geburtsdatum fehlt“, Spiel-IDs stehen nicht hier.
@@ -117,11 +117,16 @@ export function SquadEligibilityPanel({ teamId, squad }) {
   const seasons = data?.seasons || [];
   if (!seasons.length) return null;
   const blocked = seasons.reduce((sum, season) => sum + season.players.filter((player) => !player.ok).length, 0);
+  // Regelwerk (#2269): Verlangt eine neue Fassung die Zustimmung, bleibt das nicht hinter dem zugeklappten Bereich verborgen.
+  const consentOpen = seasons.some((season) => rulesConsentState(season.rules_doc) === "open");
   return (
-    <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" data-testid={`squad-eligibility-${squad.id}`} open={blocked > 0}>
+    <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" data-testid={`squad-eligibility-${squad.id}`} open={blocked > 0 || consentOpen}>
       <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden">
         <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1">Spielberechtigung{blocked ? ` · ${blocked} ${blocked === 1 ? "Person darf" : "Personen dürfen"} nicht spielen` : ""}</span>
+        <span className="min-w-0 flex-1">
+          Spielberechtigung{blocked ? ` · ${blocked} ${blocked === 1 ? "Person darf" : "Personen dürfen"} nicht spielen` : ""}
+          {consentOpen ? <span className="text-warn"> · Regelwerk: bitte zustimmen</span> : null}
+        </span>
         <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-fast ease-tls group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="space-y-3 border-t border-white/10 px-3 py-3">

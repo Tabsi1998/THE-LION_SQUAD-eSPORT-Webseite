@@ -60,7 +60,8 @@ test("zeigt Regeln und Stand, das Panel öffnet sich, wenn jemand nicht spielen 
 test("zeigt das Regelwerk mit „Neue Fassung, bitte zustimmen“", async () => {
   const rules_doc = { version_id: "v2", version: 2, label: "Version 2", valid_from: "2030-03-05", url: "/liga/probe/s1/regeln", pdf_url: "/api/x/pdf",
     consent: { required: true, agreed: false, agreed_at: null, demanded_label: "Version 2" } };
-  get.mockResolvedValue({ data: { seasons: [{ ...VIEW.seasons[0], rules_doc }] } });
+  const players = VIEW.seasons[0].players.map((player) => ({ ...player, ok: true, state: "locked", reason: null }));
+  get.mockResolvedValue({ data: { seasons: [{ ...VIEW.seasons[0], players, rules_doc }] } });
   render(<SquadEligibilityPanel teamId="team" squad={{ id: "sq" }} />);
 
   const note = await screen.findByTestId("squad-rules-s1");
@@ -68,6 +69,10 @@ test("zeigt das Regelwerk mit „Neue Fassung, bitte zustimmen“", async () => 
   expect(note.textContent).toContain("Version 2");
   expect(note.textContent).toContain("Neue Fassung, bitte zustimmen");
   expect(screen.getByTestId("squad-rules-s1-link")).toHaveAttribute("href", "/liga/probe/s1/regeln");
+  // Auch wenn alle spielen dürfen: Der Bereich ist offen und die Überschrift sagt es, damit der Hinweis nicht verborgen bleibt.
+  const panel = screen.getByTestId("squad-eligibility-sq");
+  expect(panel).toHaveAttribute("open");
+  expect(panel.querySelector("summary").textContent).toContain("Regelwerk: bitte zustimmen");
 });
 
 test("beantragt den Transfer und lädt neu", async () => {
