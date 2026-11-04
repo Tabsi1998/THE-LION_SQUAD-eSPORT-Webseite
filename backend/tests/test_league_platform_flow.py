@@ -145,17 +145,43 @@ async def test_a_required_platform_field_leaves_the_missing_text_to_the_id(flow)
     assert "Plattform fehlt im Profil" in row["reason"]
 
 
+async def faulty_id(flow, *, state: str, season_id: str, user_id: str, squad_id: str, game: dict, key: str) -> None:
+    """Macht den ID-Stand einer Person fehlerhaft: ``missing``, ``late``, ``format`` oder ``taken``."""
+    if state == "missing":
+        await flow.db.users.update_one({"id": user_id}, {"$unset": {f"game_ids.{game['slug']}.{key}": ""}})
+    elif state == "late":
+        await flow.db.league_rosters.insert_one({"season_id": season_id, "user_id": user_id, "game_id": game["id"],
+                                                "squad_ids": [squad_id], "late_squad_ids": [squad_id]})
+    elif state == "format":
+        fields = (await flow.db.games.find_one({"id": game["id"]}))["player_id_fields"]
+        fields = [{**item, "pattern": "^[0-9]+$"} if item["key"] == key else item for item in fields]
+        await flow.db.games.update_one({"id": game["id"]}, {"$set": {"player_id_fields": fields}})
+    elif state == "taken":
+        mine = (await flow.db.users.find_one({"id": user_id}))["game_ids"][game["slug"]][key]
+        await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"unique_game_ids": True}})
+        await flow.db.league_rosters.insert_one({"season_id": season_id, "user_id": "fremde-person", "game_id": game["id"],
+                                                "squad_ids": [], "player_ids": {key: mine}, "locked_at": "2026-11-01T10:00:00+00:00"})
+
+
+FAULTY_ID_STATES = ("missing", "late", "format", "taken")
+
+
 @pytest.mark.asyncio
-async def test_a_faulty_id_comes_before_the_platform(flow):
-    """Fehlt eine andere Pflicht-ID, sagt das der ID-Stand - auch wenn die Plattform nicht erlaubt ist (Codex #2270)."""
+@pytest.mark.parametrize("faulty", FAULTY_ID_STATES)
+async def test_a_faulty_id_comes_before_the_platform(flow, faulty):
+    """Ein fehlerhafter ID-Stand bleibt stehen - auch wenn die Plattform nicht erlaubt ist (Codex #2270)."""
     w = await platform_world(flow, platform_field="platform", allowed_platforms=["PC"])
     await plays_on(flow, w, "Mila", "PlayStation")
-    await flow.db.users.update_one({"id": w["users"]["Mila"]["id"]}, {"$unset": {f"game_ids.{MAIN_SLUG}.activision_id": ""}})
+    await faulty_id(flow, state=faulty, season_id=w["season_id"], user_id=w["users"]["Mila"]["id"], squad_id=w["squad_a"]["id"],
+                    game={"id": "probe-main", "slug": MAIN_SLUG}, key="activision_id")
 
     row = await state_of(flow, w, "Mila")
 
-    assert (row["state"], row["ok"]) == ("missing", False)
-    assert row["reason"] == "Activision-ID fehlt im Profil."
+    assert (row["state"], row["ok"]) == (faulty, False), row
+    assert row["state"] == row["id_state"]
+    assert "PlayStation" not in (row["reason"] or "")
+    if faulty == "missing":
+        assert row["reason"] == "Activision-ID fehlt im Profil."
 
 
 @pytest.mark.asyncio
@@ -536,8 +562,10 @@ async def test_assigning_warns_beyond_and_refuses_below_the_minimum(flow):
 
 
 @pytest.mark.asyncio
-async def test_assigning_a_faulty_id_does_not_count_as_another_platform(flow):
-    """Fehlende Pflicht-ID plus PlayStation: Es zählt der ID-Stand (Hinweis), nicht die Plattform - kein Halt unter dem Mindestkader (Codex #2270)."""
+@pytest.mark.parametrize("faulty", FAULTY_ID_STATES)
+async def test_assigning_a_faulty_id_does_not_count_as_another_platform(flow, faulty):
+    """Fehlerhafte Pflicht-ID plus PlayStation: Es zählt der ID-Stand, nicht die Plattform - kein Halt wegen der Plattform unter dem
+    Mindestkader (Codex #2270)."""
     w = await apply_world(flow, min_squad_size=4)
     side = w["teams"][0]
     slug = w["game"]["slug"]
@@ -545,16 +573,19 @@ async def test_assigning_a_faulty_id_does_not_count_as_another_platform(flow):
         {"key": "probe_id", "label": "Probe-ID", "required": True}, {**PLATFORM, "required": False}]}})
     for user in side["people"]:
         await flow.db.users.update_one({"id": user["id"]}, {"$set": {f"game_ids.{slug}.probe_id": f"Probe#{user['id'][:6]}"}})
-    await flow.db.users.update_one({"id": side["member"]["id"]}, {"$set": {f"game_ids.{slug}.platform": "PlayStation"},
-                                                                 "$unset": {f"game_ids.{slug}.probe_id": ""}})
+    await flow.db.users.update_one({"id": side["member"]["id"]}, {"$set": {f"game_ids.{slug}.platform": "PlayStation"}})
+    await faulty_id(flow, state=faulty, season_id=w["season"]["id"], user_id=side["member"]["id"], squad_id=side["squad"]["id"],
+                    game=w["game"], key="probe_id")
     flow.act_as(w["lead"])
 
     candidates = ok(await flow.get(f"/api/tournaments/{w['tid']}/squad-candidates"))
     squad = next(row for team in candidates["teams"] for row in team["squads"] if row["id"] == side["squad"]["id"])
 
-    assert squad["problems"] == [], squad
-    assert squad["notes"] == []
-    missing = next(row for row in squad["players"] if row["name"] == "TeamA S3")
-    assert missing["state"] == "missing"
+    player = next(row for row in squad["players"] if row["name"] == "TeamA S3")
+    assert player["state"] == faulty, player
+    assert not [text for text in squad["problems"] + squad["notes"] if "Plattform" in text or "PlayStation" in text], squad
     assigned = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
-    assert assigned.status_code == 200, assigned.text
+    assert "Plattform" not in assigned.text, assigned.text
+    if faulty == "missing":
+        assert squad["problems"] == [] and squad["notes"] == [], squad
+        assert assigned.status_code == 200, assigned.text
