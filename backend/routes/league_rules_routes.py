@@ -64,6 +64,14 @@ class RulePublish(BaseModel):
     requires_consent: bool = False
 
 
+class RuleProposalPublish(BaseModel):
+    """Den Vorschlag „Daten geändert“ freigeben (#2269): aus der letzten Fassung, mit den Daten von heute."""
+    base_version_id: str = Field(max_length=64)
+    valid_from: str = Field(max_length=10)
+    change_reason: str = Field(default="", max_length=1000)
+    requires_consent: bool = False
+
+
 class RuleConsent(BaseModel):
     version_id: str = Field(max_length=64)
     season_id: str = Field(max_length=64)
@@ -210,5 +218,17 @@ async def admin_publish(scope: str, scope_id: str, body: RulePublish, me: dict =
     doc = await _call(rules.publish(db, _scope(scope), scope_id, body.model_dump(), me))
     await _audit(db, "league.rules.publish", me, doc["id"], {
         "scope": scope, "scope_id": scope_id, "version": doc["version"], "valid_from": doc["valid_from"],
-        "requires_consent": doc["requires_consent"], "blocks": doc["blocks_used"]})
+        "requires_consent": doc["requires_consent"], "blocks": doc["blocks_used"], "variables": doc.get("vars_used") or []})
+    return doc
+
+
+@admin_router.post("/{scope}/{scope_id}/proposal/publish")
+async def admin_publish_proposal(scope: str, scope_id: str, body: RuleProposalPublish, me: dict = Depends(require_rules_editor)):
+    """Regelwerk freigeben (#2269): Der Vorschlag mit den geänderten Daten wird in einem Schritt Entwurf und Fassung."""
+    db = get_db()
+    doc = await _call(rules.publish_proposal(db, _scope(scope), scope_id, body.model_dump(), me))
+    await _audit(db, "league.rules.publish", me, doc["id"], {
+        "scope": scope, "scope_id": scope_id, "version": doc["version"], "valid_from": doc["valid_from"], "proposal": True,
+        "base_version_id": body.base_version_id, "requires_consent": doc["requires_consent"], "blocks": doc["blocks_used"],
+        "variables": doc.get("vars_used") or []})
     return doc
