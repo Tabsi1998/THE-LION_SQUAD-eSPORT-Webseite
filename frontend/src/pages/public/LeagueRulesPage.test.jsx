@@ -62,6 +62,15 @@ beforeEach(() => {
   serve();
 });
 
+// Namen stehen an der Fassung fest (#2269): Der Kopf nennt Liga und Season, wie sie beim Veröffentlichen hießen.
+test("der Kopf nimmt die eingefrorenen Namen der Fassung, nicht die heutigen", async () => {
+  serve({ ...PAGE, league: { slug: "probe", name: "Umbenannte Liga" }, version: { ...VERSION_TWO, names: { league: "Probe-Liga", season: "Season 1" } } });
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.getByText("Probe-Liga Season 1")).toBeInTheDocument();
+  expect(titleMock).toHaveBeenCalledWith("Regeln Probe-Liga Season 1", expect.any(String), expect.any(Object));
+});
+
 test("Kopf mit Version, Stand und PDF, Inhaltsverzeichnis mit Anlagen und festen Ankern", async () => {
   renderPage();
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Regelwerk Probe");

@@ -224,7 +224,9 @@ export default function LeagueRulesPage() {
   const active = useActiveAnchor(sections, !!compareParam);
   const fallbackHtml = useMemo(() => renderRulesMarkdown(data?.fallback_text || ""), [data?.fallback_text]);
 
-  const name = [data?.league?.name, data?.season?.name].filter(Boolean).join(" ");
+  // Die Namen, wie die Fassung sie zeigt (#2269): beim Veröffentlichen eingefroren - eine Umbenennung ändert alte Fassungen nicht.
+  const names = data?.version?.names;
+  const name = (names ? [names.league, names.season] : [data?.league?.name, data?.season?.name]).filter(Boolean).join(" ");
   const title = name ? `Regeln ${name}` : "Regeln";
   const indexable = !!data?.public && !versionParam && !compareParam && !missing;
   useDocumentTitle(title, `Das Regelwerk der ${name || "Liga"}: Inhaltsverzeichnis, Änderungen je Version und PDF.`, {

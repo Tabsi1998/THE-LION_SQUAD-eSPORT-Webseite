@@ -140,6 +140,14 @@ def _head(version: dict, current: dict | None) -> dict:
             "is_current": bool(current and current.get("id") == version.get("id"))}
 
 
+def _names_of(version: dict, league: dict, season: dict | None) -> dict:
+    """Liga- und Season-Name, wie die Fassung sie zeigt (Prüfung Codex): beim Veröffentlichen eingefroren (``frozen_names``), damit eine
+    Umbenennung alte Fassungen, PDF und ``?version=`` nicht ändert; Fassungen ohne diese Daten nehmen die heutigen Namen."""
+    frozen = version.get("frozen_names") or {}
+    season_name = ((frozen.get("seasons") or {}).get(season["id"]) if season else None) or (season or {}).get("name")
+    return {"league": frozen.get("league") or league.get("name"), "season": season_name}
+
+
 def page_path(league: dict, season: dict | None) -> str:
     return f"/liga/{league['slug']}/{season['slug']}/regeln" if season else f"/liga/{league['slug']}/regeln"
 
@@ -211,7 +219,8 @@ async def page_view(db, league: dict, season: dict | None, user: dict | None, *,
     sections, result = document["sections"], document["result"]
     return {
         **out, "source": "rules", "fallback_text": None,
-        "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf"},
+        "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf",
+                    "names": _names_of(version, league, season)},
         "sections": _served(sections, result),
         "changes": {"base": _head(previous, current) if previous else None,
                     **{key: result[key] for key in ("new", "changed", "removed")}},
@@ -255,9 +264,10 @@ def _pdf_document(league: dict, season: dict | None, version: dict, previous: di
     """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt. Bausteine in ihrer Fassung ohne Bilder (#2218)."""
     sections = _sections(version, season, blocks.TEXT)
     result = text.compare(_sections(previous, season, blocks.TEXT) if previous else None, sections)
+    names = _names_of(version, league, season)
     return {
         "title": version.get("title") or "Regelwerk",
-        "context": " · ".join(str(part) for part in (league.get("name"), (season or {}).get("name")) if part),
+        "context": " · ".join(str(part) for part in (names["league"], names["season"]) if part),
         "version": version.get("version"), "label": _label(version), "valid_from": version.get("valid_from"),
         "published_at": version.get("published_at"), "change_reason": version.get("change_reason"),
         "sections": [{**row, "mark": result["marks"].get(row["anchor"]) if marks else None} for row in sections],
@@ -267,12 +277,13 @@ def _pdf_document(league: dict, season: dict | None, version: dict, previous: di
 
 
 async def pdf_file(db, league: dict, season: dict | None, version_id: str, *, marks: bool, branding: dict | None) -> tuple[bytes, str]:
-    """Das PDF einer Fassung und sein Dateiname - einmal je Fassung und Markierung gebaut. Name von Liga und Season und die Marke stehen
-    in der Datei, darum auch im Schlüssel; die Fassungen ändern sich nie."""
+    """Das PDF einer Fassung und sein Dateiname - einmal je Fassung und Markierung gebaut. Name von Liga und Season (wie die Fassung sie
+    zeigt) und die Marke stehen in der Datei, darum auch im Schlüssel; die Fassungen ändern sich nie."""
     chain = await _chain(db, league, season)
     version = _find(chain["rows"], version_id)
     previous = _previous(chain["rows"], version)
-    looks = fingerprint([league.get("name"), (season or {}).get("name"), branding])
+    names = _names_of(version, league, season)
+    looks = fingerprint([names["league"], names["season"], branding])
     key = ("pdf", version["id"], (previous or {}).get("id"), (season or {}).get("id"), marks, looks)
 
     def build() -> bytes:
@@ -452,6 +463,13 @@ async def _rendered(db, league: dict, season: dict | None, body_md: str | None, 
     return {"sections": _served(sections, result), "blocks_used": [key for key in keys if key in blocks.BLOCKS],
             "unknown_blocks": blocks.unknown(keys), "vars_used": [name for name in names if name in var_values],
             "unknown_vars": unknown_vars, "empty_vars": variables.empty(names, var_values), "result": result}
+
+
+async def _frozen_names(db, league: dict, season: dict | None) -> dict:
+    """Liga-, Spiel- und Season-Namen, wie sie beim Veröffentlichen heißen - sie stehen an der Fassung fest (Prüfung Codex)."""
+    game = await facts.game_of(db, league)
+    return {"league": league.get("name"), "game": (game or {}).get("name"),
+            "seasons": {row["id"]: row.get("name") for row in await _seasons_to_freeze(db, league, season)}}
 
 
 async def _proposal(db, league: dict, season: dict | None, base: dict, current: dict | None) -> dict:
@@ -666,9 +684,11 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dic
             {"$set": {"status": PUBLISHED, "version": int((predecessor or {}).get("version") or 0) + 1, "frozen": frozen,
                       # Bilder der eingefrorenen Bausteine (#2218): Die Mediathek dreht und löscht sie nicht, solange die Fassung steht.
                       "frozen_images": blocks.frozen_images(frozen),
-                      "blocks_used": keys, "frozen_vars": frozen_vars, "vars_used": names, "valid_from": valid_from,
-                      "change_reason": reason, "requires_consent": bool(body.get("requires_consent")), "published_at": now,
-                      "published_by": user["id"], "updated_at": now}},
+                      "blocks_used": keys, "frozen_vars": frozen_vars, "vars_used": names,
+                      # Namen von Liga, Spiel und Seasons, wie sie heute heißen - eine Umbenennung ändert die Fassung nicht mehr.
+                      "frozen_names": await _frozen_names(db, league, season),
+                      "valid_from": valid_from, "change_reason": reason, "requires_consent": bool(body.get("requires_consent")),
+                      "published_at": now, "published_by": user["id"], "updated_at": now}},
             return_document=ReturnDocument.AFTER)
     except DuplicateKeyError:
         raise LeagueProblem(CHANGED_MEANWHILE, 409) from None

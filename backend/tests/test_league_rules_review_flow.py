@@ -1,5 +1,5 @@
-"""Regelwerk aus den Einstellungen, Prüfung Codex (#2269): alte Fassungen ohne Variablen-Metadaten bleiben Wort für Wort, wie sie waren.
-Erfundene Inhalte."""
+"""Regelwerk aus den Einstellungen, Prüfung Codex (#2269): alte Fassungen ohne Variablen-Metadaten bleiben Wort für Wort, wie sie waren;
+Liga-, Season- und Spielname stehen an der Fassung fest. Erfundene Inhalte."""
 import pathlib
 import sys
 
@@ -49,3 +49,31 @@ async def test_an_old_version_without_variable_metadata_keeps_its_text_in_web_pd
     assert "Best of {{best_of}} bleibt stehen." in "\n".join(row["body_md"] for row in pdf["sections"])
     compare = ok(await flow.get(f"{season_page(w)}/compare?base={version['id']}&target={newer['id']}"))
     assert "{{best_of}}" in "".join(op["text"] for op in compare["sections"][0]["ops"] if op["op"] == "del")
+
+
+# ---------------------------------------------------------------- Namen stehen an der Fassung fest
+
+@pytest.mark.asyncio
+async def test_renaming_league_and_season_leaves_old_versions_pdf_and_history_unchanged(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w)
+    assert version["frozen_names"]["league"] == "Regel-Liga" and version["frozen_names"]["game"] == "Regel-Shooter"
+    assert version["frozen_names"]["seasons"][w["season"]["id"]] == w["season"]["name"]
+    await flow.db.leagues.update_one({"id": w["league"]["id"]}, {"$set": {"name": "Neue Liga"}})
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {"name": "Umbenannte Season"}})
+    flow.act_as(None)
+    page = ok(await flow.get(f"{season_page(w)}?version={version['id']}"))
+    assert page["version"]["names"] == {"league": "Regel-Liga", "season": w["season"]["name"]}
+    assert page["league"]["name"] == "Neue Liga", "die Seite selbst zeigt den heutigen Namen"
+    league = await flow.db.leagues.find_one({"id": w["league"]["id"]}, {"_id": 0})
+    season = await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 0})
+    stored = await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 0})
+    assert league_rules._pdf_document(league, season, stored, None, True)["context"] == f"Regel-Liga · {w['season']['name']}"
+    pdf = await flow.get(f"{season_page(w)}/versions/{version['id']}/pdf")
+    assert pdf.status_code == 200
+    # Eine Fassung von vor #2269 ohne eingefrorene Namen nimmt die heutigen.
+    await flow.db.league_rules.update_one({"id": version["id"]}, {"$unset": {"frozen_names": ""}})
+    stored = await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 0})
+    assert league_rules._pdf_document(league, season, stored, None, True)["context"] == "Neue Liga · Umbenannte Season"
+    page = ok(await flow.get(f"{season_page(w)}?version={version['id']}"))
+    assert page["version"]["names"] == {"league": "Neue Liga", "season": "Umbenannte Season"}
