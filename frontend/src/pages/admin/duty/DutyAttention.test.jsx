@@ -10,7 +10,22 @@ const DUTY = {
     { id: "t2", title: "Langer Cup", end_date: "2026-10-31T22:00:00Z", open_matches: 3, admin_url: "/admin/tournaments/t2" },
   ],
   overdue_matches: [{ match_id: "m1", title: "Liga · Staffel A", label: "Spieltag 2", scheduled_at: "2026-11-01T19:00:00Z", url: "/matches/m1" }],
+  rules_pending: [
+    { league_id: "l1", league_name: "Probe-Liga", season_id: "s1", season_name: "Season 1", kind: "changed", count: 3, label: "Version 2", admin_url: "/admin/leagues/rules/league_season/s1" },
+    { league_id: "l1", league_name: "Probe-Liga", season_id: "s2", season_name: "Season 2", kind: "draft", count: 0, label: null, admin_url: "/admin/leagues/rules/league/l1" },
+  ],
 };
+
+test("Regelwerk muss freigegeben werden (#2269): geänderte Werte oder wartender Entwurf, je mit Weg", () => {
+  render(<MemoryRouter><DutyAttention duty={{ rules_pending: DUTY.rules_pending }} /></MemoryRouter>);
+  expect(hasDutyAttention({ rules_pending: DUTY.rules_pending })).toBe(true);
+  const changed = screen.getByTestId("duty-rules-s1");
+  expect(changed).toHaveTextContent("Regelwerk muss freigegeben werden: Probe-Liga Season 1");
+  expect(changed).toHaveTextContent("Seit Version 2 haben sich 3 Werte geändert");
+  expect(screen.getByTestId("duty-rules-open-s1")).toHaveAttribute("href", "/admin/leagues/rules/league_season/s1");
+  expect(screen.getByTestId("duty-rules-s2")).toHaveTextContent("Ein Entwurf wartet auf die Freigabe");
+  expect(screen.getByTestId("duty-rules-open-s2")).toHaveAttribute("href", "/admin/leagues/rules/league/l1");
+});
 
 test("zeigt beide Arten mit Satz und Weg", () => {
   render(<MemoryRouter><DutyAttention duty={DUTY} /></MemoryRouter>);
