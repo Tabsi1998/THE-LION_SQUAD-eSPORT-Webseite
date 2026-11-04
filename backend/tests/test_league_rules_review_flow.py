@@ -61,6 +61,31 @@ async def test_the_release_refuses_when_a_setting_changed_since_the_proposal_was
 
 
 @pytest.mark.asyncio
+async def test_the_release_refuses_when_league_season_or_game_was_renamed_since_the_proposal(flow):
+    """Zweite Prüfung Codex: Die Namen stehen an der Fassung fest - also gehören sie zur geprüften Datenbasis. Eine Umbenennung zwischen
+    Vorschlag und Freigabe darf keine Namensfassung veröffentlichen, die niemand gesehen hat."""
+    w = await make_world(flow)
+    version = await publish(flow, w, body=BODY, annexes=[])
+    await rename_mode(flow, w, "Hardpoint")
+    body = {"base_version_id": version["id"], "valid_from": today(), "change_reason": "Modus umbenannt"}
+    renames = (
+        (flow.db.leagues, w["league"]["id"], "Neue Liga"),
+        (flow.db.league_seasons, w["season"]["id"], "Umbenannte Season"),
+        (flow.db.games, w["game"]["id"], "Neuer Shooter"),
+    )
+    for collection, doc_id, name in renames:
+        proposal = ok(await flow.get(season_scope(w)))["proposal"]
+        await collection.update_one({"id": doc_id}, {"$set": {"name": name}})
+        refused = await flow.post(f"{season_scope(w)}/proposal/publish", json={**body, "fingerprint": proposal["fingerprint"]})
+        assert refused.status_code == 409 and "inzwischen geändert" in refused.json()["detail"], name
+        assert await flow.db.league_rules.count_documents({"status": "published"}) == 1, name
+        assert await flow.db.league_rules.count_documents({"status": "draft"}) == 0, name
+    fresh = ok(await flow.get(season_scope(w)))["proposal"]
+    released = ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={**body, "fingerprint": fresh["fingerprint"]}))
+    assert released["frozen_names"] == {"league": "Neue Liga", "game": "Neuer Shooter", "seasons": {w["season"]["id"]: "Umbenannte Season"}}
+
+
+@pytest.mark.asyncio
 async def test_the_release_needs_the_fingerprint(flow):
     w = await make_world(flow)
     version = await publish(flow, w, body=BODY, annexes=[])

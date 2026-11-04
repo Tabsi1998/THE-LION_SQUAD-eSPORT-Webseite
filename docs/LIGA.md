@@ -874,14 +874,15 @@ werden“** an drei Stellen: im Season-Überblick (#2267), in „Mein Dienst“ 
 `league_name`, `season_name`, `kind` `changed` | `draft`, `count`, `label`, `admin_url`; für wer in der Liga „Regeln veröffentlichen“
 darf) und auf der Regelwerk-Seite. Dort entsteht der **Vorschlag** von selbst: `admin_view.proposal` = der Text der letzten Fassung mit
 den Daten von heute (`sections` mit Markierung, `changes` gegen die Fassung) - ohne Entwurf, ohne Schreiben, solange kein Entwurf
-liegt. Der Vorschlag trägt den **Fingerabdruck** seiner Datenbasis (`fingerprint`: Bausteine und Variablenwerte aller betroffenen Seasons,
-stabil sortiert, `league_rules.data_fingerprint`). Die Leitung prüft, gibt mit `POST /api/admin/league-rules/{scope}/{id}/proposal/publish`
+liegt. Der Vorschlag trägt den **Fingerabdruck** seines Schnappschusses (`fingerprint`: Bausteine und Variablenwerte aller betroffenen
+Seasons und die Namen von Liga, Spiel und Seasons - alles, was eingefroren wird, `league_rules.Snapshot`, stabil sortiert,
+`league_rules.data_fingerprint`). Die Leitung prüft, gibt mit `POST /api/admin/league-rules/{scope}/{id}/proposal/publish`
 `{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}` frei (Recht `rules`) und wählt dabei, ob die
-Teams neu zustimmen müssen. Unter der Sperre liest der Server die Datenbasis neu: Weicht sie vom `fingerprint` ab (eine Season-Einstellung
-hält diese Sperre nicht), antwortet er 409 „Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen“, und das Web
-lädt den Vorschlag neu; ebenso 409, wenn inzwischen ein Entwurf liegt oder die Grundlage nicht mehr die letzte Fassung ist. Beide Prüfungen
-laufen vor dem Entwurf, es bleibt nichts liegen. Dann legt der Server den Entwurf aus der Fassung an und veröffentlicht genau die geprüfte
-Datenbasis in einem Schritt; Protokoll `league.rules.publish` mit `proposal: true`. „Neue Version
+Teams neu zustimmen müssen. Unter der Sperre liest der Server den Schnappschuss neu: Weicht er vom `fingerprint` ab (eine Season-Einstellung
+oder eine Umbenennung hält diese Sperre nicht), antwortet er 409 „Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu
+prüfen“, und das Web lädt den Vorschlag neu; ebenso 409, wenn inzwischen ein Entwurf liegt oder die Grundlage nicht mehr die letzte Fassung
+ist. Beide Prüfungen laufen vor dem Entwurf, es bleibt nichts liegen. Dann legt der Server den Entwurf aus der Fassung an und veröffentlicht
+genau den geprüften Schnappschuss in einem Schritt, auch die Namen; Protokoll `league.rules.publish` mit `proposal: true`. „Neue Version
 vorbereiten“ (Text vorher anpassen) bleibt der zweite Weg. Bis zur Freigabe gilt und zeigt die alte Fassung. Mit `requires_consent`
 sehen die Verantwortlichen „Neue Fassung, bitte zustimmen“ (Aufgabe, Regelseite, Season-Seite, Team-Seite, Matchseite).
 
