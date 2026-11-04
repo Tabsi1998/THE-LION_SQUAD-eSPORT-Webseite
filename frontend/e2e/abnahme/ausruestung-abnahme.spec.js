@@ -125,7 +125,8 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     const notice = page.getByTestId("equipment-without-weapon");
     await expect(notice).toContainText(GRIP);
     await notice.getByTestId("equipment-assign-open").click();
-    await notice.getByTestId("equipment-assign-search").fill(WEAPON);
+    const assignSearch = notice.getByTestId("equipment-assign-search");
+    if (await assignSearch.count()) await assignSearch.fill(WEAPON);
     await notice.getByTestId(`equipment-assign-${weapon.id}`).check();
     await notice.getByTestId("equipment-assign").click();
     await expect(notice).toHaveCount(0);
@@ -199,7 +200,9 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
       const block = page.getByTestId("league-allowed-equipment");
       await expect(block).toContainText(WEAPON);
       await expect(block.getByTestId("allowed-entry").filter({ hasText: WEAPON }).first()).toContainText("nicht in ");
-      await expect(block.getByTestId("allowed-entry").filter({ hasText: SCOPE })).toContainText(`nicht an ${WEAPON}`);
+      // Nr. 81 (Codex Runde 1): Das Visier passt nur zur Waffe und ist dort gesperrt - es ist nicht erlaubt; der Griff passt und ist es.
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: SCOPE })).toHaveCount(0);
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: GRIP })).toHaveCount(1);
       await block.scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await shot(page, `sperrliste-ligaseite-${width}-abnahme.png`);
