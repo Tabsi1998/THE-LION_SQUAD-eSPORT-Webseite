@@ -170,3 +170,10 @@ test("ganze Klasse sperren: je Modus, in allen Modi mitgesperrt, leere Klasse an
     ],
   }));
 });
+
+test("Aufsätze ohne erlaubte Waffe werden genannt (Nr. 81)", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, unusable_attachments: [{ id: "a3", name: "Kompensator", reason: "keiner Waffe zugeordnet" },
+    { id: "a1", name: "Rotpunkt", reason: "passt nur zu gesperrten Waffen" }] } });
+  renderPanel();
+  expect(await screen.findByTestId("season-bans-unusable")).toHaveTextContent("Kompensator (keiner Waffe zugeordnet), Rotpunkt (passt nur zu gesperrten Waffen)");
+});

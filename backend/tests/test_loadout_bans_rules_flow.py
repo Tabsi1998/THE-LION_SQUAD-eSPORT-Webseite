@@ -172,7 +172,9 @@ async def test_the_block_shows_images_on_the_web_and_a_clean_list_in_the_pdf(flo
     web, pdf_text = (league_rule_blocks.plain_value("loadout_bans", frozen, variant) for variant in ("markdown", "text"))
     assert f"- ![Ausrüstung]({PERK_IMAGE}) Leise Sohlen *nicht in Suchen*" in web and "Blitz 9" not in web
     assert "![" not in pdf_text and "| Perks | – | Leise Sohlen | nicht in Suchen |" in pdf_text
-    assert "| Aufsätze | – | Griff, Lauf | nicht an Donner 4 |" in pdf_text
+    # Nr. 81 (Codex Runde 1): Griff und Lauf passen nur zu Blitz 9 (gesperrt) und Donner 4 (dort gesperrt), Rotpunkt nur zu Blitz 9,
+    # der Kompensator zu keiner Waffe - keiner davon ist erlaubt.
+    assert "Aufsätze" not in pdf_text and "Griff" not in pdf_text
     assert frozen["source"]["loadout_ban_version"] == 1
     assert PERK_IMAGE in version["frozen_images"] and IMAGE not in version["frozen_images"]
 
@@ -255,20 +257,20 @@ async def test_a_changed_list_suggests_a_new_version_and_each_version_keeps_its_
     changes = ok(await flow.get(season_scope(w)))["data_changes"]
     row = next(row for row in changes["rows"] if row["block"] == "loadout_bans")
     assert row["status"] == "changed" and changes["version_id"] == first["id"]
-    # Rotpunkt ist jetzt gesperrt und fällt aus der erlaubten Liste (Nr. 99).
-    assert "Rotpunkt" in row["before"] and "Rotpunkt" not in row["after"]
-    assert any(op["op"] == "del" and "Rotpunkt" in op["text"] for op in row["ops"])
+    # Blitz 9 ist jetzt nur noch in „Stellung“ gesperrt und steht als erlaubt da (Nr. 99).
+    assert "Blitz 9" in row["after"] and "Blitz 9" not in row["before"]
+    assert any(op["op"] == "ins" and "Blitz 9" in op["text"] for op in row["ops"])
     assert not any("![" in op["text"] for op in row["ops"]), "markiert wird ohne Bild-Markdown"
     assert await flow.db.league_rules.count_documents({"status": "published"}) == 1, "nichts veröffentlicht sich selbst"
 
     prepared = ok(await flow.post(f"{season_scope(w)}/draft/from-version", json={}))
     second = await publish(flow, w, body=prepared["body_md"], annexes=prepared["annexes"], reason="Neue Sperrliste", requires_consent=True)
-    assert second["requires_consent"] is True and "Rotpunkt" not in str(second["frozen"][w["season"]["id"]]["loadout_bans"]["data"])
+    assert second["requires_consent"] is True and "Blitz 9" in str(second["frozen"][w["season"]["id"]]["loadout_bans"]["data"])
     assert ok(await flow.get(bans_url(w)))["rules"]["outdated"] is False
 
     flow.act_as(None)
     old = ok(await flow.get(f"{season_page(w)}?version={first['id']}"))
-    assert "Rotpunkt" in annex_body(old) and "Leise Sohlen" in annex_body(old)
+    assert "Blitz 9" not in annex_body(old) and "Leise Sohlen" in annex_body(old)
     diff = ok(await flow.get(f"{season_page(w)}/compare?base={first['id']}&target={second['id']}"))
     assert "![" not in str(diff["sections"])
 

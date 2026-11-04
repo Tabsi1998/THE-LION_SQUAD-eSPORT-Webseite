@@ -50,7 +50,7 @@ ITEMS = [
     item("s1", "waffen", "Hagel", "schrot"), item("s2", "waffen", "Bö", "schrot"),
     item("p1", "waffen", "Funke", "pistole"), item("p2", "waffen", "Zunder", "pistole"),
     item("o1", "waffen", "Ohne Klasse"), item("x1", "waffen", "Alt", "sturm", status="inactive"),
-    item("a1", "aufsaetze", "Rotpunkt", "optik"), item("a2", "aufsaetze", "Griff"),
+    item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_class_ids=["sturm"]), item("a2", "aufsaetze", "Griff", weapon_ids=["w1"]),
     item("k1", "perks", "Leise Sohlen"), item("k2", "perks", "Kaltblut"), item("k3", "perks", "Weg", status="archived"),
 ]
 
@@ -147,3 +147,26 @@ def test_names_in_the_block_stay_text():
         assert TRICKY.replace("|", "/") in markdown_text.plain(shown)
     for line in loadout_bans.render_block(data, "text").splitlines():
         assert "<a " not in pdf_service.pdf_rules_inline(line)
+
+
+def test_attachments_only_count_as_allowed_where_they_fit_an_allowed_weapon():
+    """Codex Runde 1, Fund 3 (Nr. 81): Ein Aufsatz ohne Waffe und ohne Klasse passt zu keiner - er ist nicht erlaubt. Ebenso einer, der nur zu
+    gesperrten Waffen oder Klassen passt oder an jeder passenden Waffe gesperrt ist. Die Verwaltung nennt sie."""
+    items = [
+        item("w1", "waffen", "Blitz 9", "sturm"), item("s1", "waffen", "Hagel", "schrot"), item("o1", "waffen", "Weg"),
+        item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_class_ids=["sturm"]),
+        item("a2", "aufsaetze", "Kompensator"),
+        item("a3", "aufsaetze", "Choke", weapon_class_ids=["schrot"]),
+        item("a4", "aufsaetze", "Lauf", weapon_ids=["o1"]),
+        item("a5", "aufsaetze", "Laser", weapon_ids=["w1"]),
+        item("a6", "aufsaetze", "Griff", weapon_ids=["w1", "s1"]),
+    ]
+    doc = {"entries": [ban("class", subcategory="schrot"), ban("item", item_id="o1"),
+                       ban("attachments", item_id="w1", name="Blitz 9", attachments=[{"item_id": "a5", "name": "Laser"}])]}
+    data = loadout_bans.allowed_block(CATEGORIES, items, doc)
+    shown = [entry["name"] for section in sections(data, "Aufsätze").values() for entry in section["entries"]]
+    assert shown == ["Griff", "Rotpunkt"], "nur, was an einer erlaubten Waffe passt"
+    unusable = loadout_bans.unusable_attachments(CATEGORIES, items, doc)
+    assert [(row["name"], row["reason"]) for row in unusable] == [
+        ("Choke", "passt nur zu gesperrten Waffen"), ("Kompensator", "keiner Waffe zugeordnet"), ("Laser", "an jeder passenden Waffe gesperrt"),
+        ("Lauf", "passt nur zu gesperrten Waffen")]

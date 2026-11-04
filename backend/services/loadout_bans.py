@@ -622,8 +622,54 @@ def _bans_of(doc: dict | None) -> tuple[dict, dict, dict]:
             items[entry["item_id"]] = _merge_modes(items[entry["item_id"]], modes) if entry["item_id"] in items else modes
         elif kind == ATTACHMENTS:
             for item in entry.get("attachments") or []:
-                at_weapons.setdefault(item.get("item_id"), []).append({"name": entry.get("name") or "", "modes": modes})
+                at_weapons.setdefault(item.get("item_id"), []).append({"id": entry.get("item_id"), "name": entry.get("name") or "",
+                                                                       "modes": modes})
     return items, classes, at_weapons
+
+
+class _Usability:
+    """Wo ein Aufsatz wirklich gespielt werden kann (Codex Runde 1, Nr. 81): an einer aktiven Waffe, die er trifft (Waffe oder Klasse), die
+    nicht ganz gesperrt ist und an der er selbst nicht in allen Modi gesperrt ist. Ohne so eine Waffe ist er praktisch nicht erlaubt."""
+
+    def __init__(self, categories: list[dict], active: list[dict], bans: tuple[dict, dict, dict]):
+        item_bans, class_bans, self.at_weapons = bans
+        weapon_keys = {row["key"] for row in categories if row["role"] == WEAPON}
+        self.attachment_keys = {row["key"] for row in categories if row["role"] == ATTACHMENT}
+        self.open = [row for row in active if row.get("category") in weapon_keys
+                     and item_bans.get(row["id"]) != [] and class_bans.get(row.get("subcategory") or "") != []]
+
+    def is_attachment(self, row: dict) -> bool:
+        return row.get("category") in self.attachment_keys
+
+    def reason(self, row: dict) -> str | None:
+        """``None``: an mindestens einer erlaubten Waffe spielbar - sonst der Grund in Worten."""
+        if not row.get("weapon_ids") and not row.get("weapon_class_ids"):
+            return "keiner Waffe zugeordnet"
+        fitting = [weapon for weapon in self.open if library.fits(row, weapon)]
+        if not fitting:
+            return "passt nur zu gesperrten Waffen"
+        blocked = {weapon["id"] for weapon in self.at_weapons.get(row["id"], []) if not weapon["modes"]}
+        return None if any(weapon["id"] not in blocked for weapon in fitting) else "an jeder passenden Waffe gesperrt"
+
+
+def _active(items: list[dict]) -> list[dict]:
+    return sorted((row for row in items if library.status_of(row) == library.ACTIVE), key=lambda row: library.name_key(row.get("name")))
+
+
+def unusable_attachments(categories: list[dict], items: list[dict], doc: dict | None) -> list[dict]:
+    """Aktive Aufsätze, die nach der Liste an keiner erlaubten Waffe passen - sie fehlen in der erlaubten Ausrüstung; die Verwaltung nennt sie
+    (``[{id, name, reason}]``)."""
+    active = _active(items)
+    usability = _Usability(categories, active, _bans_of(doc))
+    item_bans = _bans_of(doc)[0]
+    out = []
+    for row in active:
+        if not usability.is_attachment(row) or item_bans.get(row["id"]) == []:
+            continue
+        reason = usability.reason(row)
+        if reason:
+            out.append({"id": row["id"], "name": row.get("name") or "", "reason": reason})
+    return out
 
 
 def allowed_block(categories: list[dict], items: list[dict], doc: dict | None) -> dict:
@@ -634,9 +680,12 @@ def allowed_block(categories: list[dict], items: list[dict], doc: dict | None) -
     image_url, not_in, not_at}]}]}]}`` - ``state``: ``all`` (alle erlaubt), ``some`` (mit Einschränkungen oder einzeln gesperrten) oder
     ``banned`` (ganze Klasse nicht erlaubt, dann nur ``banned``: die Namen der Einträge, die darunter fallen). ``not_in``: Modi, in denen
     ein Eintrag (bzw. die ganze Klasse) nicht erlaubt ist; ``not_at``: Waffen, an denen ein Aufsatz nicht erlaubt ist (mit Modi). Inaktive
-    und archivierte Einträge fehlen, leere Unterkategorien entfallen."""
-    item_bans, class_bans, at_weapons = _bans_of(doc)
-    active = sorted((row for row in items if library.status_of(row) == library.ACTIVE), key=lambda row: library.name_key(row.get("name")))
+    und archivierte Einträge fehlen, leere Unterkategorien entfallen. Ein Aufsatz zählt nur, wenn er an einer erlaubten Waffe passt
+    (``_Usability``, Nr. 81)."""
+    bans = _bans_of(doc)
+    item_bans, class_bans, at_weapons = bans
+    active = _active(items)
+    usability = _Usability(categories, active, bans)
     out = []
     for category in categories:
         subs = category.get("subcategories") or []
@@ -657,7 +706,7 @@ def allowed_block(categories: list[dict], items: list[dict], doc: dict | None) -
             entries, blocked = [], 0
             for row in rows:
                 own = item_bans.get(row["id"])
-                if own == []:
+                if own == [] or (usability.is_attachment(row) and usability.reason(row)):
                     blocked += 1
                     continue
                 not_in = _merge_modes(klass, own) if klass and own else list(klass or own or [])
@@ -681,8 +730,8 @@ async def allowed_data(db, game_id: str | None, doc: dict | None) -> dict:
     if not game_id:
         return block_data(doc)
     rows = await db.game_equipment.find({"game_id": game_id, "status": {"$nin": [library.INACTIVE, library.ARCHIVED]}},
-                                        {"_id": 0, "id": 1, "category": 1, "subcategory": 1, "name": 1, "image_url": 1, "status": 1}
-                                        ).to_list(library.ITEMS_PER_GAME_MAX + 50)
+                                        {"_id": 0, "id": 1, "category": 1, "subcategory": 1, "name": 1, "image_url": 1, "status": 1,
+                                         "weapon_ids": 1, "weapon_class_ids": 1}).to_list(library.ITEMS_PER_GAME_MAX + 50)
     if not rows:
         return block_data(doc)
     return allowed_block(await library.categories_of(db, game_id), rows, doc)

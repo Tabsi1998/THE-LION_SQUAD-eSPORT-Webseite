@@ -1614,7 +1614,10 @@ liest die **aktiven** Einträge der Bibliothek von heute (inaktive und archivier
 entries: [{name, image_url, not_in, not_at: [{name, modes}]}]}]}]}`. `state`: `all` („alle erlaubt“), `some` (mit Einschränkungen oder
 einzeln gesperrten Einträgen) oder `banned` (ganze Klasse in allen Modi gesperrt, oder alle ihre Einträge: nur eine Zeile „nicht erlaubt“ mit
 den Namen in Klammern, keine Karten). `not_in`: Modi, in denen ein Eintrag (am Abschnitt: die ganze Klasse) nicht erlaubt ist; `not_at`:
-Waffen, an denen ein Aufsatz nicht erlaubt ist. Ganz gesperrte Einträge fehlen, leere Unterkategorien entfallen (eine ganz gesperrte leere
+Waffen, an denen ein Aufsatz nicht erlaubt ist. Ein **Aufsatz** zählt nur, wenn er an mindestens einer erlaubten Waffe passt (aktiv,
+nicht ganz gesperrt, auch nicht über ihre Klasse, und der Aufsatz ist dort nicht in allen Modi gesperrt) - ohne Zuordnung (Nr. 81), nur zu
+gesperrten Waffen oder an jeder passenden gesperrt fehlt er; die Verwaltung nennt solche in `unusable_attachments` (`[{id, name, reason}]`
+im Editor der Season). Ganz gesperrte Einträge fehlen, leere Unterkategorien entfallen (eine ganz gesperrte leere
 Klasse steht als „nicht erlaubt“). Ohne Sperrliste ist die ganze aktive Bibliothek erlaubt; hat das Spiel keine aktiven Einträge, bleibt
 der Baustein wie bisher („keine Sperrliste – alles ist erlaubt“). Eingefroren wird `data`; weil er die Bibliothek von heute liest, ändert
 jeder neue, umbenannte oder deaktivierte Eintrag die Daten - auch ein neuer in einer gesperrten Klasse (sein Name steht in der Klammer) -,

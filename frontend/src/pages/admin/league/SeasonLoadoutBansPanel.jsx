@@ -404,6 +404,16 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
               Seit dieser Version neu in gesperrten Klassen und schon mitgesperrt: {newInClasses.map((row) => `${row.label}: ${row.names.join(", ")}`).join(" · ")}.
             </p>
           ) : null}
+          {(data.unusable_attachments || []).length ? (
+            // Nr. 81 (Codex Runde 1): Aufsätze ohne erlaubte Waffe sind nicht spielbar - Regelwerk, Liga- und Matchseite zeigen sie nicht.
+            <section className="space-y-0.5 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs" role="status" data-testid={`${testId}-unusable`}>
+              <p className="font-semibold text-warn">Diese Aufsätze erscheinen nicht als erlaubt</p>
+              <p className="text-white/70 break-words">
+                {data.unusable_attachments.map((row) => `${row.name} (${row.reason})`).join(", ")}. Nach der gespeicherten Liste passen sie an
+                keiner erlaubten Waffe – in der Bibliothek einer Waffe oder Waffenklasse zuordnen oder hier weniger sperren.
+              </p>
+            </section>
+          ) : null}
           <div className="space-y-8">
             {groups.map(({ category, sections }) => (
               <div key={category.key} data-testid={`${testId}-group-${category.key}`}>

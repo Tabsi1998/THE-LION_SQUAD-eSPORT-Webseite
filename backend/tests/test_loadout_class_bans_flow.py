@@ -85,6 +85,8 @@ async def test_a_class_ban_holds_the_class_and_its_entries_at_the_time(flow):
     assert view["list"]["class_new_items"] == [{"subcategory": w["subs"]["Schrotflinte"], "label": "Schrotflinte", "names": ["Sturm 12"]}]
     live = next(row for row in view["list"]["entries"] if row["kind"] == "class")
     assert [entry["name"] for entry in live["items"]] == ["Bö", "Hagel", "Sturm 12"]
+    # Nr. 81 (Codex Runde 1): Der Kompensator passt zu keiner Waffe - der Editor nennt ihn, erlaubt ist er nicht.
+    assert {"id": w["items"]["Kompensator"]["id"], "name": "Kompensator", "reason": "keiner Waffe zugeordnet"} in view["unusable_attachments"]
     # Der Editor kennt Unterkategorie und Waffenklassen der Bibliothek.
     hagel = next(row for row in view["library"] if row["name"] == "Hagel")
     assert hagel["subcategory"] == w["subs"]["Schrotflinte"] and hagel["weapon_class_ids"] == []
