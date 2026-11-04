@@ -326,7 +326,7 @@ async def candidates(db, tournament: dict) -> dict:
             games=games,
             parents=parents,
             siblings=siblings,
-        ) + league_eligibility.registration_problems(eligibility, squad)
+        ) + league_eligibility.registration_problems(eligibility, squad, minimum=min_size)
         entry = out.setdefault(
             team["id"],
             {
@@ -349,6 +349,8 @@ async def candidates(db, tournament: dict) -> dict:
                 "captain": _public_user(people.get(squad.get("captain_id") or "")),
                 "vice_captain": _public_user(people.get(squad.get("vice_captain_id") or "")),
                 "problems": [text for _code, text in problems],
+                # Plattform je Season (#2270): wer nicht spielen darf, ohne das Zuteilen aufzuhalten.
+                "notes": league_eligibility.platform_notes(eligibility, squad),
                 "players": (
                     _id_players(squad, league_roster.statuses(roster_ctx, squad.get("member_ids"), squad.get("id")))
                     if roster_ctx and roster_ctx.fields
@@ -414,7 +416,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         siblings=siblings,
     )
     eligibility = await league_eligibility.context_for_tournament(db, tournament, squad.get("member_ids") or [])
-    problems += league_eligibility.registration_problems(eligibility, squad)
+    problems += league_eligibility.registration_problems(eligibility, squad, minimum=min_squad_size(tournament))
     if problems:
         code, text = problems[0]
         raise SquadAssignError(code, text)

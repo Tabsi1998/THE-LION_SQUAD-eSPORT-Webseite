@@ -66,6 +66,9 @@ ROUTES = [
     # Ergebnisregeln (C.3, #1617)
     route("GET", "/api/admin/leagues/seasons/{season}/result-rules", ANY),
     route("PUT", "/api/admin/leagues/seasons/{season}/result-rules", "season", {"scores_required": True, "rules": {}}),
+    # Plattform je Season (#2270)
+    route("GET", "/api/admin/leagues/seasons/{season}/platform", ANY),
+    route("PATCH", "/api/admin/leagues/seasons/{season}", "season", {"crossplay": True}),
     route("POST", "/api/admin/leagues/seasons/{season}/divisions", "season", {"level": 7}),
     route("PATCH", "/api/admin/leagues/divisions/{division}", "season", {"nickname": "Neu"}),
     route("GET", "/api/admin/leagues/divisions/{division}/delete-plan", "season"),

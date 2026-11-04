@@ -3,6 +3,7 @@
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { divisionPlatformPayload, divisionPlatformToForm, platformPayload, platformToForm } from "@/lib/leaguePlatform";
 import { tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
 
 export const VISIBILITY_OPTIONS = [
@@ -65,6 +66,8 @@ export function seasonToForm(season = {}) {
     lineup_mode: season.lineup_mode || "per_map",
     lineup_min_players: season.lineup_min_players != null ? String(season.lineup_min_players) : "",
     transfer_windows: (season.transfer_windows || []).map((window) => ({ ...window })),
+    // Plattform je Season (#2270): Feld, erlaubte Plattformen, Crossplay, Eingabegerät.
+    ...platformToForm(season),
     // Selbstanmeldung (#2205): Ohne Fenster gibt es sie nicht.
     ...applicationToForm(season),
     points_win: String(points.win ?? 3),
@@ -148,6 +151,7 @@ export function seasonPayload(form, maps = form.best_of, savedOrder = undefined)
     ...(form.had_rules || (form.lineup_mode && form.lineup_mode !== "per_map") ? { lineup_mode: form.lineup_mode || "per_map" } : {}),
     lineup_min_players: number(form.lineup_min_players),
     transfer_windows: (form.transfer_windows || []).filter((window) => window.start_date && window.end_date),
+    ...platformPayload(form),
     ...applicationPayload(form),
     scoring_rules: {
       ...(form.scoring_rules || {}),
@@ -209,7 +213,8 @@ export function overridesPayload(form) {
   if (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "") {
     out.scoring_rules = { match_points: { win: number(form.points_win) ?? 3, draw: number(form.points_draw) ?? 1, loss: number(form.points_loss) ?? 0 } };
   }
-  return out;
+  // Plattform je Season (#2270): mitschicken, sonst ginge die Abweichung der Liga N beim nächsten Speichern verloren.
+  return { ...out, ...divisionPlatformPayload(form) };
 }
 
 export function overridesToForm(overrides = {}) {
@@ -223,6 +228,7 @@ export function overridesToForm(overrides = {}) {
     points_win: points ? String(points.win) : "",
     points_draw: points ? String(points.draw) : "",
     points_loss: points ? String(points.loss) : "",
+    ...divisionPlatformToForm(overrides),
   };
 }
 

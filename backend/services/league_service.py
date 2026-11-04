@@ -23,8 +23,8 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import (game_maps, game_modes, game_usage, league_games, league_look, league_pool_check, league_result_rules,
-                      loadout_bans, map_pools, pricing, staffel_guard)
+from services import (game_maps, game_modes, game_usage, league_games, league_look, league_platform, league_pool_check,
+                      league_result_rules, loadout_bans, map_pools, pricing, staffel_guard)
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
@@ -371,8 +371,10 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
 
 
 def clean_overrides(raw: dict | None, season: dict) -> dict:
-    """Die Abweichungen einer Liga N - nur die erlaubten Felder, ohne leere."""
-    out = {key: value for key, value in (raw or {}).items() if key in OVERRIDE_FIELDS and value is not None}
+    """Die Abweichungen einer Liga N - nur die erlaubten Felder, ohne leere. Die Plattform (#2270) prüft danach
+    ``league_platform.check_division_overrides``."""
+    allowed = (*OVERRIDE_FIELDS, *league_platform.DIVISION_KEYS)
+    out = {key: value for key, value in (raw or {}).items() if key in allowed and value is not None}
     if "scoring_rules" in out:
         out["scoring_rules"] = _scoring(out["scoring_rules"])
     merged = effective_settings(season, {"overrides": out})
@@ -709,12 +711,30 @@ def order_length_check(season: dict, divisions: list[dict], warnings: list | Non
         warnings.append(f"{problem} {league_pool_check.ORDER_RUNNING_HINT}")
 
 
+async def _platform_season(db, season: dict, body: dict) -> dict:
+    """Plattform je Season (#2270): nur wenn die Anfrage eines der Felder trägt - dann alle vier geprüft (``league_platform``).
+    Fehlende Felder bleiben, wie sie gespeichert sind."""
+    before = league_platform.settings_of(season)
+    wanted = {**before, **{key: body[key] for key in league_platform.SEASON_KEYS if key in body}}
+    if wanted[league_platform.ALLOWED] is None:
+        wanted[league_platform.ALLOWED] = []
+    if wanted == before:
+        return {}  # unverändert: auch ein Feld, das es am Spiel nicht mehr gibt, hält das Speichern des Reiters nicht auf
+    divisions = await league_platform.divisions_of(db, season["id"]) if season.get("id") else []
+    try:
+        after = league_platform.clean_season(wanted, season, await league_platform.league_game(db, season), divisions)
+    except league_platform.PlatformProblem as problem:
+        raise LeagueProblem(problem.message, problem.status) from None
+    return {key: value for key, value in after.items() if value != before[key] or key not in season}
+
+
 async def create_season(db, league: dict, body: dict, user: dict, *, before_write=None) -> dict:
     game = await _game(db, league.get("game_id"))
     if isinstance(body.get("scoring_rules"), dict):
         # Tabelle (E.1, #1625): was eine neue Season nicht selbst setzt, kommt aus den Vorgaben neuer Liga-Seasons.
         body = {**body, "scoring_rules": {**copy.deepcopy(LEAGUE_TABLE_DEFAULTS), **body["scoring_rules"]}}
     fields = clean_season({key: value for key, value in body.items() if value is not None}, None, game)
+    fields.update(await _platform_season(db, {"league_id": league["id"]}, {key: value for key, value in body.items() if value is not None}))
     order_length_check({**SEASON_DEFAULTS, **fields}, [], None)
     number = fields.pop("number", None)
     if number is None:
@@ -753,6 +773,7 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     league = await get_league(db, season["league_id"])
     game = await _game(db, league.get("game_id"))
     fields = clean_season(body, season, game)
+    fields.update(await _platform_season(db, season, body))
     merged = {**SEASON_DEFAULTS, **season, **{key: value for key, value in fields.items() if value is not None}}
     if ("game_mode_order" in fields and list(fields["game_mode_order"] or []) != list(season.get("game_mode_order") or [])) or \
             ("best_of" in fields and fields["best_of"] is not None and fields["best_of"] != season.get("best_of")):
@@ -796,6 +817,14 @@ async def _division_order_check(db, season: dict, division: dict, before: dict |
     order_length_check({**SEASON_DEFAULTS, **season}, [*others, division], warnings)
 
 
+async def _platform_overrides(db, season: dict, overrides: dict, before: dict | None) -> dict:
+    """Die Plattform-Abweichung einer Liga N (#2270) geprüft - mit deutscher Meldung."""
+    try:
+        return await league_platform.check_division_overrides(db, season, overrides, before)
+    except league_platform.PlatformProblem as problem:
+        raise LeagueProblem(problem.message, problem.status) from None
+
+
 async def create_division(db, season: dict, body: dict, user: dict, *, warnings: list | None = None) -> dict:
     level = body.get("level")
     if level is None:
@@ -806,7 +835,8 @@ async def create_division(db, season: dict, body: dict, user: dict, *, warnings:
         raise LeagueProblem(f"Liga {level} gibt es in dieser Season schon.", 409)
     doc = {
         "id": new_id(), "league_id": season["league_id"], "season_id": season["id"], "level": int(level),
-        "nickname": _text(body.get("nickname")), "overrides": clean_overrides(body.get("overrides"), season),
+        "nickname": _text(body.get("nickname")),
+        "overrides": await _platform_overrides(db, season, clean_overrides(body.get("overrides"), season), None),
         "status": body.get("status") or "active",
         **await _look(db, {key: value for key, value in body.items() if value is not None}, (league_look.PRIZES,)),
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
@@ -826,7 +856,8 @@ async def update_division(db, division: dict, body: dict, *, warnings: list | No
     if "nickname" in body:
         updates["nickname"] = _text(body.get("nickname"))
     if "overrides" in body:
-        updates["overrides"] = clean_overrides(body.get("overrides"), season)
+        updates["overrides"] = await _platform_overrides(db, season, clean_overrides(body.get("overrides"), season),
+                                                         division.get("overrides"))
     if body.get("status"):
         updates["status"] = body["status"]
     updates.update(await _look(db, body, (league_look.PRIZES,)))
