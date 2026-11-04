@@ -74,6 +74,13 @@ test("Liga N: nur abweichende Werte, leer heißt wie die Season", () => {
   expect(overridesToForm({ team_size: 5 }).team_size).toBe("5");
 });
 
+test("Liga N: die Plattform-Abweichung bleibt beim Speichern anderer Werte erhalten (#2270)", () => {
+  const saved = { best_of: 5, allowed_platforms: ["PlayStation"], crossplay: false, input_device: "controller" };
+  expect(overridesPayload(overridesToForm(saved))).toEqual(saved);
+  expect(overridesPayload({ ...overridesToForm(saved), best_of: "" })).toEqual({ allowed_platforms: ["PlayStation"], crossplay: false, input_device: "controller" });
+  expect(overridesPayload(overridesToForm({ allowed_platforms: [] }))).toEqual({ allowed_platforms: [] });
+});
+
 test("Texte für Liga N und das Übertragen", () => {
   expect(weekdayName(6)).toBe("Sonntag");
   expect(settingsLine({ best_of: 3, team_size: 4, max_staffel_size: 8, scoring_rules: { match_points: { win: 3, draw: 1, loss: 0 } } }))

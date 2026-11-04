@@ -465,6 +465,44 @@ test("Liga N bearbeiten schickt den Stand mit, Antwortfrist je Liga N und als Se
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/admin/leagues/seasons/s1", expect.objectContaining({ match_schedule_response_hours: 48 })));
 });
 
+const PLATFORM_VIEW = { settings: { platform_field: "platform", allowed_platforms: ["PC"], crossplay: null, input_device: null },
+  fields: [{ key: "platform", label: "Plattform", options: ["PC", "PlayStation"], retired: [], required: true }], field_missing: false,
+  input_devices: [], game: { id: "g1", name: "Probe Shooter" }, divisions: [] };
+
+test("Plattform je Season (#2270): Abschnitt im Reiter Anmeldung und Kader, #plattform springt hin, gespeichert mit dem Reiter", async () => {
+  body = { ...BODY, season: { ...SEASON, platform_field: "platform", allowed_platforms: ["PC"] } };
+  extra["/admin/leagues/seasons/s1/platform"] = PLATFORM_VIEW;
+  renderPage("#plattform");
+
+  expect(await screen.findByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByTestId("season-platform-allowed-PC")).toBeChecked();
+  fireEvent.click(screen.getByTestId("season-platform-allowed-PlayStation"));
+  fireEvent.change(screen.getByTestId("season-platform-crossplay"), { target: { value: "off" } });
+  expect(screen.getByTestId("season-tab-dirty-anmeldung")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("season-save-anmeldung"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ platform_field: "platform", allowed_platforms: ["PC", "PlayStation"], crossplay: false, input_device: null });
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("weeks_total");
+});
+
+test("Plattform je Season (#2270): Liga N weicht im Blatt ab und behält die Abweichung beim Speichern", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { allowed_platforms: ["PlayStation"], crossplay: false } }] };
+  extra["/admin/leagues/seasons/s1/platform"] = PLATFORM_VIEW;
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderPage("#ligen");
+
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(await within(sheet).findByTestId("override-platform-own")).toBeChecked();
+  expect(within(sheet).getByTestId("override-platforms-PlayStation")).toBeChecked();
+  fireEvent.change(within(sheet).getByTestId("override-best-of"), { target: { value: "5" } });
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1",
+    { nickname: null, overrides: { best_of: 5, allowed_platforms: ["PlayStation"], crossplay: false }, status: "active" }));
+});
+
 test("Fehler beim Anlegen der Staffel steht als Meldung da", async () => {
   apiMock.post.mockRejectedValueOnce({ response: { data: { detail: "Mit bis zu 9 Teams braucht die Staffel 9 Spielwochen" } } });
   renderPage("#ligen");

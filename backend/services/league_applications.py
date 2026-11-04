@@ -18,7 +18,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_eligibility, league_roster, league_rules, league_service, squad_registration
+from services import league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
 from services.league_permissions import belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
@@ -185,8 +185,11 @@ async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *
     rows = league_eligibility.statuses(ctx, members, squad["id"])
     ready = [row for row in rows.values() if row["ok"]]
     if len(members) >= minimum and len(ready) < minimum:
-        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. "
-                              "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein."))
+        # Was zu tun ist, sagt der Grund: andere Plattform (#2270) heißt andere Spieler, sonst fehlt meist die Spiel-ID.
+        states = {row["state"] for row in rows.values() if not row["ok"]}
+        todo = ("Wer auf einer anderen Plattform spielt, zählt nicht mit – die Gründe stehen bei den Spielern."
+                if states <= {league_platform.NOT_ALLOWED} else "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein.")
+        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. {todo}"))
     # Alter und andere Co-Teams stehen schon oben als Grund.
     named = (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE, league_eligibility.OTHER_TEAM)
     warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] not in named]
@@ -775,6 +778,8 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         rows.append(row)
     return {
         "application": await public_block(db, season),
+        # Plattform je Season (#2270): was gilt, bevor die Liga N feststeht - je Liga N, wenn sie abweicht.
+        "platform": await league_platform.season_block(db, season),
         "rules": league_rules.version_view(league, season, version) if version else None,
         "privacy": {"text": season.get("application_privacy_text") or PRIVACY_PLACEHOLDER, "url": PRIVACY_URL},
         "season_problems": blocked if state else [],

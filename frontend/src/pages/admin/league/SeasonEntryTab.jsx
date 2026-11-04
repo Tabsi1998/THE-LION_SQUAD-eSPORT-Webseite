@@ -1,15 +1,16 @@
 // Reiter „Anmeldung und Kader“ der Season-Seite (#2267): Selbstanmeldung (B.4) und Kader samt Spielberechtigung (B.3) als ein Formular,
 // darunter der Eingang der Anmeldungen (#anmeldungen, die Marke aus den Nachrichten des Servers) und die Kaderübersicht (#kader).
-// Platz für die Plattform je Season (#2270): ein weiterer Abschnitt im Formular.
+// Plattform je Season (#2270, #plattform): ein weiterer Abschnitt im Formular, gespeichert mit dem Reiter.
 import { FormSection } from "@/components/tls/AdminForm";
 import { TextField } from "@/components/tls/FormFields";
 import { SeasonApplicationSection } from "./SeasonApplicationSection";
 import { SeasonApplicationsPanel } from "./SeasonApplicationsPanel";
 import { SeasonEligibilitySection } from "./SeasonEligibilitySection";
+import { SeasonPlatformSection } from "./SeasonPlatformSection";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
-const JUMPS = [["selbstanmeldung", "Selbstanmeldung"], ["spielberechtigung", "Kader und Spielberechtigung"], ["anmeldungen", "Eingang"], ["kader", "Kaderübersicht"]];
+const JUMPS = [["selbstanmeldung", "Selbstanmeldung"], ["spielberechtigung", "Kader und Spielberechtigung"], ["plattform", "Plattform"], ["anmeldungen", "Eingang"], ["kader", "Kaderübersicht"]];
 
 export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canApplications, canRoster, formProps, onJump }) {
   const hasWindow = Boolean(form.application_opens || form.application_closes);
@@ -34,6 +35,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
         <SeasonTabForm {...formProps}>
           <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} />
           <SeasonEligibilitySection form={form} set={set} id="spielberechtigung" />
+          <SeasonPlatformSection seasonId={seasonId} form={form} set={set} id="plattform" version={season.updated_at} />
         </SeasonTabForm>
       ) : null}
       {canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}

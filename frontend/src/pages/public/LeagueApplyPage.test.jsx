@@ -92,6 +92,35 @@ test("Warnungen halten nicht auf", async () => {
   expect(screen.getByTestId("apply-next")).toBeEnabled();
 });
 
+test("die Prüfung nennt die Plattform der Season und abweichende Ligen (#2270)", async () => {
+  const platform = { field_label: "Plattform", allowed: ["PC"], crossplay: false, input_device: null, divisions: [
+    { id: "d1", label: "Liga 1", allowed: ["PC"], crossplay: false, input_device: null, differs: false },
+    { id: "d2", label: "Liga 2", allowed: [], crossplay: true, input_device: null, differs: true },
+  ] };
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, platform, squads: [{ ...SQUAD, warnings: ["Tom: Diese Season ist nur für PC – angegeben ist PlayStation."] }] } });
+  renderPage();
+
+  fireEvent.click(await screen.findByTestId("apply-squad-s1"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+
+  const note = await screen.findByTestId("apply-platform");
+  expect(note).toHaveTextContent("Plattform: nur PC.");
+  expect(note).toHaveTextContent("Crossplay: aus.");
+  expect(note).toHaveTextContent("Abweichend: Liga 2: alle Plattformen · Crossplay an.");
+  expect(note).not.toHaveTextContent("Liga 1");
+  expect(screen.getByTestId("apply-warnings")).toHaveTextContent("angegeben ist PlayStation");
+});
+
+test("ohne Plattform-Angabe steht nichts dazu", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, platform: null, squads: [SQUAD] } });
+  renderPage();
+
+  fireEvent.click(await screen.findByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-check-ok")).toBeInTheDocument();
+  expect(screen.queryByTestId("apply-platform")).toBeNull();
+});
+
 test("ein einziges Co-Team ist schon gewählt", async () => {
   apiMock.get.mockResolvedValue({ data: { ...VIEW, squads: [SQUAD] } });
   renderPage();

@@ -2749,6 +2749,12 @@ class LeagueSeasonFields(LeagueLookFields):
     application_privacy_text: Optional[str] = Field(default=None, max_length=2000)
     entry_policy: Optional[Literal["all", "members"]] = None
     sibling_squads_in_staffel: Optional[bool] = None
+    # Plattform je Season (#2270, docs/LIGA.md B.3): Feld mit der Plattform, erlaubte Plattformen (leer = alle), Crossplay und
+    # Eingabegerät als Angabe. Geprüft wird in ``league_platform.clean_season``; ``null`` heißt: keine Angabe.
+    platform_field: Optional[str] = Field(default=None, max_length=80)
+    allowed_platforms: Optional[List[str]] = Field(default=None, max_length=30)
+    crossplay: Optional[bool] = None
+    input_device: Optional[Literal["controller", "mouse_keyboard", "both"]] = None
     game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
     # Map-Wiederholung in einer Serie (#2096): nie, nur in anderem Modus (Vorgabe) oder immer.
     map_repeat: Optional[Literal["never", "other_mode", "always"]] = None
@@ -2798,6 +2804,10 @@ class LeagueDivisionOverrides(BaseModel):
     max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
     scoring_rules: Optional[dict] = None
     match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    # Plattform je Season (#2270): fehlt = wie Season, ``allowed_platforms: []`` = alle erlaubt. Werte prüft ``league_platform``.
+    allowed_platforms: Optional[List[str]] = Field(default=None, max_length=30)
+    crossplay: Optional[bool] = None
+    input_device: Optional[Literal["controller", "mouse_keyboard", "both"]] = None
 
 
 class LeagueDivisionCreate(BaseModel):
