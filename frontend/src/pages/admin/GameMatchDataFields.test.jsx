@@ -163,3 +163,42 @@ test("schlimmster Fall: lange Beschreibung wird an der Grenze abgeschnitten, nic
   expect(screen.getByTestId("game-edit-modes")).toHaveTextContent("500 / 500 Zeichen");
   expect(screen.getByTestId("game-edit-modes")).not.toHaveTextContent("undefined");
 });
+
+// Symbol je Modus (#2266) und Einstellungen je Modus (#2271). Erfundene Namen.
+test("Symbol: die Zeile zeigt das Bild oder ein neutrales Platzhalter-Symbol, aufgeklappt Hochladen, Bibliothek und Entfernen", () => {
+  let last = null;
+  const game = { match_modes: [{ mode: "zonen", label: "Zonen", icon_url: "/api/static/uploads/zonen.png" }, { mode: "jagd", label: "Jagd" }] };
+  render(<Harness game={game} onValue={(value) => { last = value; }} />);
+  expect(screen.getByTestId("game-edit-mode-icon-thumb-0")).toHaveAttribute("data-icon", "image");
+  expect(screen.getByTestId("game-edit-mode-icon-thumb-1")).toHaveAttribute("data-icon", "placeholder");
+  fireEvent.click(screen.getByTestId("game-edit-mode-more-0"));
+  expect(screen.getByTestId("game-edit-mode-icon-0-btn")).toBeInTheDocument();
+  expect(screen.getByTestId("game-edit-mode-icon-0-library")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("game-edit-mode-icon-0-remove"));
+  expect(last.match_modes[0].icon_url).toBe("");
+  expect(screen.getByTestId("game-edit-mode-icon-thumb-0")).toHaveAttribute("data-icon", "placeholder");
+});
+
+test("Einstellungen: anlegen, Einheit an/aus, umsortieren und Regeltext; Zeitlimit als 1:30", () => {
+  let last = null;
+  render(<Harness game={{ match_modes: [{ mode: "zonen", label: "Zonen" }] }} onValue={(value) => { last = value; }} />);
+  fireEvent.click(screen.getByTestId("game-edit-mode-more-0"));
+  const prefix = "game-edit-mode-settings-0";
+  expect(screen.getByTestId(`${prefix}-empty`)).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId(`${prefix}-add`));
+  fireEvent.change(screen.getByTestId(`${prefix}-label-0`), { target: { value: "Uhr" } });
+  fireEvent.change(screen.getByTestId(`${prefix}-unit-0`), { target: { value: "seconds" } });
+  fireEvent.change(screen.getByTestId(`${prefix}-value-0`), { target: { value: "1:30" } });
+  fireEvent.click(screen.getByTestId(`${prefix}-add`));
+  fireEvent.change(screen.getByTestId(`${prefix}-label-1`), { target: { value: "Rückblende" } });
+  fireEvent.change(screen.getByTestId(`${prefix}-unit-1`), { target: { value: "toggle" } });
+  fireEvent.click(screen.getByTestId(`${prefix}-value-1`));
+  fireEvent.click(screen.getByTestId(`${prefix}-up-1`));
+  expect(last.match_modes[0].settings.map((row) => row.label)).toEqual(["Rückblende", "Uhr"]);
+  expect(last.match_modes[0].settings[0].value).toBe(true);
+  fireEvent.change(screen.getByTestId(`${prefix}-rules`), { target: { value: "Nur in der Zone." } });
+  expect(last.match_modes[0].rules_text).toBe("Nur in der Zone.");
+  fireEvent.change(screen.getByTestId("game-edit-mode-rule-kind-0"), { target: { value: "highest" } });
+  fireEvent.change(screen.getByTestId("game-edit-mode-rule-time-0"), { target: { value: "1:30" } });
+  expect(screen.getByTestId("game-edit-mode-more-0")).toHaveTextContent("1:30 Min.");
+});

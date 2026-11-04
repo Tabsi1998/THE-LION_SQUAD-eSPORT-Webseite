@@ -2,6 +2,10 @@
 // Hier: Formular ↔ API in der Spiele-Verwaltung und die Vorbelegung im Turnierformular. Die Dauer selbst rechnet
 // lib/matchDuration.js - dieselbe Kette wie im Backend.
 import { matchDurationSource } from "@/lib/matchDuration";
+import {
+  MODE_RULES_TEXT_MAX, MODE_SETTINGS_MAX, ROUND_TIME_SECONDS_MAX, TIME_LIMIT_SECONDS_MAX, durationInput, durationText, entryPayload,
+  parseDuration, ruleTimeLimitSeconds, settingProblem, settingToForm,
+} from "@/lib/modeSettings";
 
 // Dieselben Kennungen wie stations.device_type (Stationsverwaltung, lib/tournamentLabels.js DEVICE_TYPE_LABELS).
 export const STATION_DEVICE_OPTIONS = [
@@ -76,14 +80,17 @@ export function resultRuleText(rule) {
     rounds: `Runden gewinnen: ${rule.target} ${Number(rule.target) === 1 ? "Sieg" : "Siege"}${rule.round_limit ? `, höchstens ${rule.round_limit} Runden` : ""}`,
     highest: "Höherer Endstand gewinnt",
   }[rule.kind] || "";
-  return [head, rule.time_limit_minutes ? `${rule.time_limit_minutes} Min.` : "", rule.draw_allowed ? "Remis möglich" : "", rule.overtime ? "Verlängerung" : ""]
+  const time = ruleTimeLimitSeconds(rule);
+  return [head, time ? durationText(time) : "", rule.round_time_seconds ? `${durationText(rule.round_time_seconds)} je Runde` : "",
+    rule.draw_allowed ? "Remis möglich" : "", rule.overtime ? "Verlängerung" : ""]
     .filter(Boolean).join(" · ");
 }
 
 export function emptyMode() {
   return {
     mode: "", label: "", minutes: "", per_game: false, status: "active", description: "", players_per_side: "", format: "",
-    rule_kind: "", rule_target: "", rule_round_limit: "", rule_time_limit: "", rule_draw: false, rule_overtime: false,
+    rule_kind: "", rule_target: "", rule_round_limit: "", rule_time_limit: "", rule_round_time: "", rule_draw: false, rule_overtime: false,
+    icon_url: "", settings: [], rules_text: "",
   };
 }
 
@@ -93,7 +100,10 @@ function modeToForm(mode) {
     mode: text(mode.mode), label: text(mode.label), minutes: text(mode.minutes), per_game: Boolean(mode.per_game),
     status: modeStatusOf(mode), description: text(mode.description), players_per_side: text(mode.players_per_side), format: text(mode.format),
     rule_kind: text(rule.kind), rule_target: text(rule.target), rule_round_limit: text(rule.round_limit),
-    rule_time_limit: text(rule.time_limit_minutes), rule_draw: Boolean(rule.draw_allowed), rule_overtime: Boolean(rule.overtime),
+    // Zeiten in Sekunden (#2271), im Feld als „10“ (Minuten) oder „1:30“; Altbestand in Minuten wird umgerechnet.
+    rule_time_limit: durationInput(ruleTimeLimitSeconds(rule)), rule_round_time: durationInput(rule.round_time_seconds),
+    rule_draw: Boolean(rule.draw_allowed), rule_overtime: Boolean(rule.overtime),
+    icon_url: text(mode.icon_url), settings: (Array.isArray(mode.settings) ? mode.settings : []).map(settingToForm), rules_text: text(mode.rules_text),
   };
 }
 
@@ -113,12 +123,20 @@ function modeExtras(mode) {
     if (target !== null && mode.rule_kind !== "highest") rule.target = target;
     const limit = numberOrNull(mode.rule_round_limit);
     if (limit !== null && mode.rule_kind === "rounds") rule.round_limit = limit;
-    const time = numberOrNull(mode.rule_time_limit);
-    if (time !== null) rule.time_limit_minutes = time;
+    const time = parseDuration(mode.rule_time_limit);
+    if (time) rule.time_limit_seconds = time;
+    const round = parseDuration(mode.rule_round_time);
+    if (round) rule.round_time_seconds = round;
     rule.draw_allowed = Boolean(mode.rule_draw);
     rule.overtime = Boolean(mode.rule_overtime);
     out.result_rule = rule;
   }
+  // Symbol (#2266), Einstellungen und Regeltext (#2271): nur, wenn gesetzt.
+  const icon = String(mode.icon_url || "").trim();
+  if (icon) out.icon_url = icon;
+  const entry = entryPayload({ settings: mode.settings, rules_text: mode.rules_text });
+  if (entry?.settings?.length) out.settings = entry.settings;
+  if (entry?.rules_text) out.rules_text = entry.rules_text;
   return out;
 }
 
@@ -139,9 +157,25 @@ function ruleProblem(mode, label) {
     if (limit < target) return `${where}: Das Rundenlimit (${limit}) ist kleiner als das Ziel (${target}).`;
   }
   if (!isBlank(mode.rule_time_limit)) {
-    const time = numberOrNull(mode.rule_time_limit);
-    if (time === null || time < 1 || time > 600) return `${where}: Zeitlimit von 1 bis 600 Minuten – oder leer lassen.`;
+    const time = parseDuration(mode.rule_time_limit);
+    if (!time || time > TIME_LIMIT_SECONDS_MAX) return `${where}: Zeitlimit als Minuten:Sekunden (z. B. 1:30, 90 s oder 10) bis 600 Minuten – oder leer lassen.`;
   }
+  if (!isBlank(mode.rule_round_time)) {
+    const round = parseDuration(mode.rule_round_time);
+    if (!round || round > ROUND_TIME_SECONDS_MAX) return `${where}: Zeit je Runde als Minuten:Sekunden (z. B. 1:45) bis 60 Minuten – oder leer lassen.`;
+  }
+  return "";
+}
+
+/** Was an Einstellungen und Regeltext eines Modus nicht passt (#2271). */
+function settingsProblem(mode, label) {
+  const rows = (mode.settings || []).filter((row) => !isBlank(row.label) || !isBlank(row.value));
+  if (rows.length > MODE_SETTINGS_MAX) return `Modus „${label}“: höchstens ${MODE_SETTINGS_MAX} Einstellungen.`;
+  for (const row of rows) {
+    const problem = settingProblem(row);
+    if (problem) return `Modus „${label}“: ${problem}`;
+  }
+  if (String(mode.rules_text || "").trim().length > MODE_RULES_TEXT_MAX) return `Modus „${label}“: Regeltext höchstens ${MODE_RULES_TEXT_MAX} Zeichen.`;
   return "";
 }
 
@@ -194,6 +228,8 @@ export function gameMatchDataProblem(form) {
     if (String(mode.description || "").trim().length > MODE_DESCRIPTION_MAX) return `Modus „${label}“: Beschreibung höchstens ${MODE_DESCRIPTION_MAX} Zeichen.`;
     const rule = ruleProblem(mode, label);
     if (rule) return rule;
+    const settings = settingsProblem(mode, label);
+    if (settings) return settings;
   }
   const points = parsePointsTable(form?.points_table);
   return points.error ? `Punktetabelle: ${points.error}` : "";

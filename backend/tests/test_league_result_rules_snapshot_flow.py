@@ -17,7 +17,7 @@ from league_match_world import ids, world  # noqa: E402
 from models import now_utc  # noqa: E402
 from test_league_result_rules_flow import body  # noqa: E402
 
-LOOSE = {"stellung": {"kind": "score", "target": 250, "time_limit_minutes": 10, "draw_allowed": False, "overtime": False},
+LOOSE = {"stellung": {"kind": "score", "target": 250, "time_limit_seconds": 600, "draw_allowed": False, "overtime": False},
          "suchen": {"kind": "rounds", "target": 6, "round_limit": 11, "draw_allowed": False, "overtime": True}}
 STRICT = {**LOOSE, "suchen": {**LOOSE["suchen"], "overtime": False}}
 NO_SCORES = [("stellung", "map-hafen", "a", None), ("suchen", "map-turm", "a", None)]
