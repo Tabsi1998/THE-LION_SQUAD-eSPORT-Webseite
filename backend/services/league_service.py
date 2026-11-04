@@ -1447,7 +1447,7 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
         # heute (#2287).
         "loadout_bans": await loadout_bans.live_view(db, bans_doc, loadout_bans.SEASON),
         # Erlaubte Ausrüstung (#2287, Nr. 99): dieselbe Sicht wie der Baustein im Regelwerk; ``None`` ohne Bibliothek.
-        "allowed_equipment": await loadout_bans.public_allowed(db, league.get("game_id"), bans_doc),
+        "allowed_equipment": await loadout_bans.public_allowed(db, league.get("game_id"), bans_doc, season),
         "divisions": [{
             "id": division["id"], "level": division["level"], "nickname": division.get("nickname"),
             "label": division_label(division),

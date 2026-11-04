@@ -236,21 +236,25 @@ async def test_the_rules_show_what_is_allowed_and_new_entries_ask_for_release(fl
                                  attachments(w, "Donner 4", ["Griff"])]))
     first = await publish(flow, w, body=BODY, annexes=ANNEX)
     frozen = first["frozen"][w["season"]["id"]]["loadout_bans"]
-    assert frozen["data"]["layout"] == 3 and frozen["data"]["list"] is True
+    assert frozen["data"]["layout"] == 4 and frozen["data"]["list"] is True
     sections = {row["label"]: row for row in frozen["data"]["categories"][0]["sections"]}
     assert list(sections) == [None, "Sturmgewehr", "Schrotflinte", "Raketenwerfer"]
     assert sections["Schrotflinte"]["state"] == "banned" and sections["Schrotflinte"]["banned"] == ["Bö", "Hagel"]
-    assert sections["Sturmgewehr"]["entries"] == [{"name": "Blitz 9", "image_url": IMAGE, "not_in": ["Suchen"], "not_at": []}]
+    # Aufsätze je Waffe (#2299): Rotpunkt und Griff passen zu Blitz 9; die Season hat zwei Modi - 1:1 bleibt „nicht in“ (#2298).
+    assert sections["Sturmgewehr"]["entries"] == [{"name": "Blitz 9", "image_url": IMAGE, "not_in": ["Suchen"], "attachments": {
+        "count": 2, "banned": [], "groups": [{"label": None, "not_in": [], "entries": [
+            {"name": "Griff", "image_url": None, "not_in": []}, {"name": "Rotpunkt", "image_url": None, "not_in": []}]}]}}]
     web = league_rule_blocks.plain_value("loadout_bans", frozen, "markdown")
     assert "*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)" in web and "*Raketenwerfer* · **nicht erlaubt**" in web
-    assert f"- ![Ausrüstung]({IMAGE}) ++Blitz 9++ *nicht in Suchen*" in web and "- ++Griff++ *nicht an Donner 4*" in web
+    assert f"- ![Ausrüstung]({IMAGE}) ++Blitz 9++ *nicht in Suchen* alle passenden Aufsätze erlaubt" in web
+    assert "- ++Donner 4++ alle passenden Aufsätze erlaubt, außer: Griff" in web and "++Griff++" not in web
     assert "++Hagel++" not in web, "eine gesperrte Klasse zeigt keine Karten"
     text = league_rule_blocks.plain_value("loadout_bans", frozen, "text")
-    assert "| Waffen | Schrotflinte | nicht erlaubt (Bö, Hagel) | – |" in text and "| Perks | – | alle: Leise Sohlen | – |" in text
+    assert "*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)" in text and "| Perks | – | alle: Leise Sohlen | – |" in text
     flow.act_as(None)
     pdf = await flow.get(f"{season_page(w)}/versions/{first['id']}/pdf")
     words = "\n".join(sheet.get_text() for sheet in pymupdf.open(stream=pdf.content, filetype="pdf"))
-    assert "Einschränkungen" in words and "nicht erlaubt (Bö, Hagel)" in words and "nicht an Donner 4" in words
+    assert "Einschränkungen" in words and "nicht erlaubt (Bö, Hagel)" in words and "außer: Griff" in words
     # Die Liga- und die Matchseite lesen dasselbe (``allowed_equipment``).
     public = ok(await flow.get(public_url(w)))
     assert public["allowed_equipment"] == frozen["data"]

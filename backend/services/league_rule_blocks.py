@@ -232,7 +232,8 @@ async def _loadout_bans(db, league: dict, season: dict) -> dict:
     doc = loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]), league.get("game_id"))
     # Erlaubte Ausrüstung (#2287, Nr. 99): die aktive Bibliothek von heute ohne die Sperren - ein neuer Eintrag ändert den Baustein, das
     # Regelwerk will freigegeben werden.
-    return {"source": loadout_bans.block_source(doc), "data": await loadout_bans.allowed_data(db, league.get("game_id"), doc)}
+    # Aufsätze je Waffe (#2299), „nur in …“ nach den Modi der Season (#2298).
+    return {"source": loadout_bans.block_source(doc), "data": await loadout_bans.allowed_data(db, league.get("game_id"), doc, season)}
 
 
 def _loadout_text(data: dict, variant: str = MARKDOWN) -> str:
@@ -271,8 +272,8 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("veto", "Veto", "Team-A-Regel, Zeit je Schritt und die Schrittfolge des Map-Vetos aus den Vorgaben der Season (D.3).",
           facts.build_veto, facts.render_veto),
     Block("loadout_bans", "Erlaubte Ausrüstung", "Was gespielt werden darf: die aktive Bibliothek ohne die Sperrliste der Season, je "
-          "Kategorie und Unterkategorie mit Bildern und Einschränkungen (nicht in einem Modus, nicht an einer Waffe); ganz gesperrte "
-          "Klassen als „nicht erlaubt“ (Anlage A).", _loadout_bans,
+          "Kategorie und Unterkategorie mit Bildern und Einschränkungen („nicht in …“ bzw. „nur in …“), die Aufsätze je Waffe; ganz "
+          "gesperrte Klassen als „nicht erlaubt“ (Anlage A).", _loadout_bans,
           _loadout_text, _loadout_images),
     Block("mode_settings", "Einstellungen je Modus", "Zeitlimit, Zeit je Runde, Einstellungen und Regeltext je Modus aus der Season.",
           _mode_settings, render_mode_settings, _mode_settings_images),
