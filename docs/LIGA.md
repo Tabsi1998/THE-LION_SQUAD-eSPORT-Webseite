@@ -873,12 +873,13 @@ das Feld nicht leeren oder wechseln, solange eine Liga N eigene Plattformen trä
 prüft die Season nichts, und der Kasten sagt das.
 
 **Die Plattform einer Person** ist der festgehaltene Wert in `league_rosters.player_ids` (nur, wenn das Feld Pflicht ist, wird er mit der ID festgehalten und
-gilt die ganze Season), sonst der Wert im Profil. Stand in `league_eligibility.status`, nach `age_not_met` und vor `waiting`:
+gilt die ganze Season), sonst der Wert im Profil. Stand in `league_eligibility.status`, nach `age_not_met` und vor `waiting`, aber nur, wenn der ID-Stand passt:
+Ein fehlerhafter ID-Stand (`late`, `missing`, `format`, `taken`) bleibt stehen und zählt beim Zuteilen als Hinweis, nicht als andere Plattform.
 
 | Stand | Wann | Meldung |
 | --- | --- | --- |
-| `platform_not_allowed` | Wert steht nicht unter den erlaubten | „Diese Season ist nur für PC – angegeben ist PlayStation.“ Grenzt Liga N selbst ein: „Liga 2 ist nur für …“ |
-| `platform_missing` | kein Wert, und der ID-Stand passt sonst (ist das Feld Pflicht, sagt es schon `missing`) | „Plattform fehlt im Profil.“ (Name des Felds) |
+| `platform_not_allowed` | Wert steht nicht unter den erlaubten, die Spiel-ID passt | „Diese Season ist nur für PC – angegeben ist PlayStation.“ Grenzt Liga N selbst ein: „Liga 2 ist nur für …“ |
+| `platform_missing` | kein Wert, die Spiel-ID passt (ist das Feld Pflicht, sagt es schon `missing`) | „Plattform fehlt im Profil.“ (Name des Felds) |
 
 **Welche Regel gilt:** In einer Staffel Season plus ihre Liga N. Wo die Liga noch nicht feststeht (Prüfung der Selbstanmeldung, B.4), die weiteste aller aktiven
 Liga N: die Vereinigung ihrer erlaubten Plattformen, eine Liga N ohne Grenze hebt die Prüfung auf (wie beim Mindestkader). Die Kaderübersicht prüft je Co-Team mit der Liga N seiner Staffel.
@@ -907,7 +908,7 @@ unter `rules.platform` der Team-Seite, für die Season unter `rules.platform` de
 (eindeutiger Teilindex). Löschen des Kontos löscht die Zeilen, die Auskunft enthält sie.
 
 **Stand einer Person** (`league_eligibility.status`, Vorrang in dieser Reihenfolge): `banned`, `other_team`, `age_missing`, `age_not_met`,
-`platform_not_allowed`, `platform_missing` (#2270, nur bei passendem ID-Stand), `waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
+`platform_not_allowed`, `platform_missing` (#2270, beide nur bei passendem ID-Stand), `waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
 `age`: `null` (keine Regel), `met` oder `missing`. Für das Unterschreiten gibt es außerhalb der Person selbst nur den Stand `age_not_met` ohne Zahl.
 
 **Regeln je Einstellung:**

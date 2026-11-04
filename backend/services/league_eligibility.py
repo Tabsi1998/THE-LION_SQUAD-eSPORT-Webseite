@@ -168,9 +168,10 @@ def status(ctx: EligibilityContext | None, user_id: str, squad_id: str | None = 
         return {**out, "state": AGE_MISSING, "ok": False, "reason": AGE_MISSING_REASON}
     if age == AGE_NOT_MET_STATE:
         return {**out, "state": AGE_NOT_MET_STATE, "ok": False, "reason": AGE_NOT_MET}
-    platform = platform_state(ctx, user_id)
-    # Fehlt die Plattform und ist sie Pflicht, sagt es schon der ID-Stand („… fehlt im Profil“) - dann bleibt er stehen.
-    if platform and (platform[0] == league_platform.NOT_ALLOWED or out["ok"]):
+    # Die Plattform (#2270) erst, wenn die Spiel-ID passt: Ein fehlerhafter ID-Stand (missing, late, format, taken) bleibt stehen -
+    # er sagt, was zu tun ist, und zählt beim Zuteilen als Hinweis statt als andere Plattform.
+    platform = platform_state(ctx, user_id) if out["ok"] else None
+    if platform:
         return {**out, "state": platform[0], "ok": False, "reason": platform[1]}
     until = league_roster.wait_until(ctx.roster, user_id, squad_id)
     if until and now_utc() < until:
@@ -477,7 +478,10 @@ def registration_problems(ctx: EligibilityContext | None, squad: dict, *, minimu
         problems.append((400, f"{name}: {', '.join(names[uid] for uid in too_young)} {'erfüllt' if len(too_young) == 1 else 'erfüllen'} die "
                               "Altersvorgabe dieser Season nicht."))
     if minimum and ctx.platform:
-        other = {uid: found[2] for uid in members if (found := platform_state(ctx, uid)) and found[0] == league_platform.NOT_ALLOWED}
+        # Dieselbe Reihenfolge wie ``status``: Wer an der Spiel-ID scheitert, zählt hier nicht als andere Plattform.
+        rows = statuses(ctx, members, squad.get("id"))
+        other = {uid: found[2] for uid in members
+                 if rows[uid]["state"] == league_platform.NOT_ALLOWED and (found := platform_state(ctx, uid))}
         left = len(members) - len(other)
         if other and len(members) >= minimum > left:
             listed = ", ".join(f"{names[uid]} ({value})" for uid, value in other.items())

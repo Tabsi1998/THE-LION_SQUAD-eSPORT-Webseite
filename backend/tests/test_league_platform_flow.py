@@ -146,6 +146,19 @@ async def test_a_required_platform_field_leaves_the_missing_text_to_the_id(flow)
 
 
 @pytest.mark.asyncio
+async def test_a_faulty_id_comes_before_the_platform(flow):
+    """Fehlt eine andere Pflicht-ID, sagt das der ID-Stand - auch wenn die Plattform nicht erlaubt ist (Codex #2270)."""
+    w = await platform_world(flow, platform_field="platform", allowed_platforms=["PC"])
+    await plays_on(flow, w, "Mila", "PlayStation")
+    await flow.db.users.update_one({"id": w["users"]["Mila"]["id"]}, {"$unset": {f"game_ids.{MAIN_SLUG}.activision_id": ""}})
+
+    row = await state_of(flow, w, "Mila")
+
+    assert (row["state"], row["ok"]) == ("missing", False)
+    assert row["reason"] == "Activision-ID fehlt im Profil."
+
+
+@pytest.mark.asyncio
 async def test_the_locked_platform_counts_not_a_later_profile_change(flow):
     w = await platform_world(flow, required=True, platform_field="platform", allowed_platforms=["PC"])
     mila = w["users"]["Mila"]["id"]
@@ -520,3 +533,28 @@ async def test_assigning_warns_beyond_and_refuses_below_the_minimum(flow):
 
     refused = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
     assert refused.status_code == 400 and "erlaubten Plattform" in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_assigning_a_faulty_id_does_not_count_as_another_platform(flow):
+    """Fehlende Pflicht-ID plus PlayStation: Es zählt der ID-Stand (Hinweis), nicht die Plattform - kein Halt unter dem Mindestkader (Codex #2270)."""
+    w = await apply_world(flow, min_squad_size=4)
+    side = w["teams"][0]
+    slug = w["game"]["slug"]
+    await flow.db.games.update_one({"id": w["game"]["id"]}, {"$set": {"player_id_fields": [
+        {"key": "probe_id", "label": "Probe-ID", "required": True}, {**PLATFORM, "required": False}]}})
+    for user in side["people"]:
+        await flow.db.users.update_one({"id": user["id"]}, {"$set": {f"game_ids.{slug}.probe_id": f"Probe#{user['id'][:6]}"}})
+    await flow.db.users.update_one({"id": side["member"]["id"]}, {"$set": {f"game_ids.{slug}.platform": "PlayStation"},
+                                                                 "$unset": {f"game_ids.{slug}.probe_id": ""}})
+    flow.act_as(w["lead"])
+
+    candidates = ok(await flow.get(f"/api/tournaments/{w['tid']}/squad-candidates"))
+    squad = next(row for team in candidates["teams"] for row in team["squads"] if row["id"] == side["squad"]["id"])
+
+    assert squad["problems"] == [], squad
+    assert squad["notes"] == []
+    missing = next(row for row in squad["players"] if row["name"] == "TeamA S3")
+    assert missing["state"] == "missing"
+    assigned = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
+    assert assigned.status_code == 200, assigned.text
