@@ -1343,7 +1343,10 @@ def public_season_head(league: dict, season: dict) -> dict:
 
 
 async def visible_leagues(db, user: dict | None) -> list[dict]:
-    """Ligen mit mindestens einer für die Person sichtbaren Season - die Navigation zeigt „Liga“ nur dann."""
+    """Ligen mit mindestens einer für die Person sichtbaren Season - die Navigation zeigt „Liga“ nur dann. Je Season ``rules_url``, wenn
+    ein Regelwerk gilt (#2269), damit die Liga-Übersicht es verlinkt."""
+    from services.league_rules import current_version, page_path
+
     out = []
     leagues = await db.leagues.find({"status": "active"}, {"_id": 0}).sort("name", 1).to_list(200)
     for league in leagues:
@@ -1353,8 +1356,11 @@ async def visible_leagues(db, user: dict | None) -> list[dict]:
         visible = [season for season in seasons if await can_see_season(user, season)]
         if visible:
             game = await _game(db, league.get("game_id"))
-            out.append({**public_league(league), "game": map_pools.game_summary(game),
-                        "seasons": [public_season_head(league, season) for season in visible]})
+            heads = []
+            for season in visible:
+                heads.append({**public_season_head(league, season),
+                              "rules_url": page_path(league, season) if await current_version(db, league, season) else None})
+            out.append({**public_league(league), "game": map_pools.game_summary(game), "seasons": heads})
     return out
 
 
