@@ -24,6 +24,7 @@ export const SEASON_SECTIONS = {
   mindestgroesse: "spielbetrieb",
   ergebnisregeln: "spielbetrieb",
   serie: "spielbetrieb",
+  veto: "spielbetrieb",
   kalender: "termine",
   terminregeln: "termine",
   checkin: "termine",
@@ -57,6 +58,8 @@ export function seasonAnchorUrl(seasonId, anchor = "") {
 const READINESS_ANCHORS = {
   pool_missing: "modi", pool_stale: "modi", pool_too_small: "modi", inactive_mode: "modi", inactive_map: "modi",
   mode_order_missing: "serie", mode_order_length: "serie",
+  // Veto (D.3, #1618): die Vorlage steht im Reiter Spielbetrieb, der fehlende Check-in im Reiter Termine.
+  veto_invalid: "veto", veto_division_mismatch: "veto", veto_without_checkin: "checkin",
   rules_missing: "regelwerk", rules_upcoming: "regelwerk",
   application_none: "selbstanmeldung", application_after_start: "selbstanmeldung", application_closed: "selbstanmeldung",
   divisions_missing: "staffeln", staffel_missing: "staffeln",
