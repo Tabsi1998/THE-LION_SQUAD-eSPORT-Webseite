@@ -429,6 +429,61 @@ async def test_a_report_waits_for_the_consent_like_the_start(flow):
     assert (await report(flow, world, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
 
 
+@pytest.mark.asyncio
+async def test_reporting_edge_cases_around_the_check_in(flow):
+    """Codex-Nachprüfung zu D.2: vergangener Termin ohne Check-in, Altmeldung mit Gegenbestätigung, 48-h-Automatik nach dem Start durch
+    die Meldung, schon gestartetes Spiel - und genau ein ``match.checkin.start`` bei der ersten gültigen Meldung."""
+    started_audits = {"action": "match.checkin.start"}
+    # Vergangener Termin, niemand eingecheckt: keine Meldung - der Satz nennt beide Seiten, die Seite zeigt ihn statt des Formulars.
+    past = await checkin_world(flow, minutes=-60)
+    refused = await report(flow, past, "Kapitaen", "reg_a", "Kapitaen", "Mila")
+    assert refused.status_code == 409 and "haben noch nicht eingecheckt" in refused.json()["detail"], refused.text
+    assert "haben noch nicht eingecheckt" in (await page(flow, past, "Kapitaen"))["report_hint"]
+    assert not (await flow.reload(past["match"])).get("reports")
+    # Altmeldung: die Meldung kam, bevor die Season den Check-in bekam - die Gegenseite bestätigt ohne Check-in, kein Start.
+    old = await checkin_world(flow, rules=None, letter="B")
+    assert (await report(flow, old, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
+    await flow.db.tournaments.update_one({"id": old["tournament"]["id"]}, {"$set": {"checkin_rules": dict(RULES)}})
+    assert (await page(flow, old, "Falke1"))["report_hint"] is None, "die Bestätigung bleibt frei"
+    confirmed = await report(flow, old, "Falke1", "reg_h", "Falke1", "Falke2")
+    assert confirmed.status_code == 200, confirmed.text
+    stored = await flow.reload(old["match"])
+    assert stored["status"] == "completed" and not stored.get("started_at") and "start" not in (stored.get("flow") or {})
+    assert await flow.db.audit_logs.count_documents(started_audits) == 0
+    # 48-h-Automatik: der Start kam durch die Meldung, die Gegenseite schweigt - nach 48 Stunden gilt die Meldung trotzdem.
+    silent = await checkin_world(flow, letter="C")
+    assert (await checkin(flow, silent, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    assert (await checkin(flow, silent, "Falke1", "Falke1", "Falke2")).status_code == 200
+    assert (await report(flow, silent, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
+    running = await flow.reload(silent["match"])
+    assert running["status"] == "in_progress" and running["flow"]["start"]["via"] == "report"
+    assert (await sweep(flow, silent, 47 * 60))["confirmed"] == 0
+    assert (await sweep(flow, silent, 49 * 60))["confirmed"] == 1
+    done = await flow.reload(silent["match"])
+    assert done["status"] == "completed" and done["result_meta"]["auto_confirmed"] is True
+    assert await flow.db.audit_logs.count_documents({**started_audits, "data.match_id": mid(silent)}) == 1
+    # Schon gestartet (Klick auf „Spiel starten“): melden geht, der Start bleibt der eine vom Klick.
+    started = await checkin_world(flow, letter="D")
+    assert (await checkin(flow, started, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    assert (await checkin(flow, started, "Falke1", "Falke1", "Falke2")).status_code == 200
+    assert (await start(flow, started, "Kapitaen")).status_code == 200
+    assert (await page(flow, started, "Kapitaen"))["report_hint"] is None
+    assert (await report(flow, started, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
+    assert (await flow.reload(started["match"]))["flow"]["start"]["via"] == "side"
+    assert await flow.db.audit_logs.count_documents({**started_audits, "data.match_id": mid(started)}) == 1
+    # Genau ein Start bei der ersten gültigen Meldung: eine abgelehnte Meldung setzt nichts, die Bestätigung nichts Neues.
+    once = await checkin_world(flow, letter="E")
+    assert (await checkin(flow, once, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    assert (await checkin(flow, once, "Falke1", "Falke1", "Falke2")).status_code == 200
+    invalid = await report(flow, once, "Kapitaen", "reg_a")
+    assert invalid.status_code == 422, invalid.text
+    assert not (await flow.reload(once["match"])).get("started_at"), "eine abgelehnte Meldung startet nichts"
+    assert (await report(flow, once, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
+    assert (await report(flow, once, "Falke1", "reg_h", "Falke1", "Falke2")).status_code == 200
+    assert (await flow.reload(once["match"]))["status"] == "completed"
+    assert await flow.db.audit_logs.count_documents({**started_audits, "data.match_id": mid(once)}) == 1
+
+
 # ---------------------------------------------------------------- Nach dem Fenster: Vorschlag, nie eine Wertung
 
 @pytest.mark.asyncio
