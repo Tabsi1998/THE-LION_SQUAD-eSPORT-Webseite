@@ -550,6 +550,10 @@ async def test_the_proposal_binds_the_decision_to_the_missing_side_and_the_curre
     stale = await decide(flow, world, action="confirm", registration_id=world["reg_h"]["id"])
     assert stale.status_code == 409, stale.text
     assert (await flow.reload(world["match"]))["status"] == "scheduled"
+    # Auch „verlängern“ prüft den Vorschlag: Aus einem alten Vorschlag entsteht keine Verlängerung für den neuen Termin.
+    no_extension = await decide(flow, world, action="extend", minutes=10)
+    assert no_extension.status_code == 409, no_extension.text
+    assert not (await flow.reload(world["match"])).get("no_show_extended_until"), "keine Verlängerung aus einem alten Vorschlag"
 
 
 WEEK = {"schedule_rules": dict(league_schedule.DEFAULTS), "matchday_days": 7}

@@ -119,6 +119,15 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     if already and body.action == "confirm":
         return {"ok": True, "idempotent_replay": True, "match_id": match_id, "status": match.get("status")}
     now = now_utc()
+    stage_id = match.get("stage_id")
+    stage = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0}) if stage_id else None
+    if with_checkin:
+        # Liga-Check-in (D.2, #1652): der Vorschlag gehört zum Fenster des aktuellen Termins - für „verlängern“ wie für „kampflos“.
+        # Nach einem neuen Termin oder einer Verlängerung gilt er nicht mehr, auch wenn der Job ihn noch nicht weggeräumt hat.
+        info = no_show_deadline(match, tournament, stage)
+        if not (info and info["due_at"] <= now and proposal.get("rule") == "check_in"
+                and _parse(proposal.get("due_at")) == info["due_at"]):
+            raise HTTPException(status_code=409, detail=STALE_PROPOSAL_DETAIL)
     if body.action == "extend":
         start = max(now, _parse(proposal.get("due_at")) or now)
         until = (start + timedelta(minutes=body.minutes)).isoformat()
@@ -134,18 +143,10 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
         raise HTTPException(status_code=422, detail="Bitte die Seite wählen, die nicht erschienen ist.")
     await ensure_tournament_accepts_results(db, tournament_id)
     # Gilt der Vorschlag noch? Dieselbe Paarung, nicht begonnen, keine Meldung, Frist um - sonst keine Wertung.
-    stage_id = match.get("stage_id")
-    stage = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0}) if stage_id else None
     same_pairing = sorted(proposal.get("registration_ids") or filled) == sorted(filled)
-    if league_staffel and not with_checkin:
-        # In der Liga ohne Check-in läuft keine Frist: es zählt nur, dass das Spiel noch offen ist.
-        still_valid = no_show_open(match)
-    elif league_staffel:
-        # Liga-Check-in (D.2, #1652): der Vorschlag gehört zum Fenster des aktuellen Termins - nach einem neuen Termin oder einer
-        # Verlängerung gilt er nicht mehr, auch wenn der Job ihn noch nicht weggeräumt hat.
-        info = no_show_deadline(match, tournament, stage)
-        still_valid = bool(info and info["due_at"] <= now and proposal.get("rule") == "check_in"
-                           and _parse(proposal.get("due_at")) == info["due_at"])
+    if league_staffel:
+        # Mit Check-in oben geprüft; ohne Check-in läuft keine Frist - es zählt nur, dass das Spiel noch offen ist.
+        still_valid = with_checkin or no_show_open(match)
     else:
         info = no_show_deadline(match, tournament, stage)
         still_valid = bool(info and info["due_at"] <= now)
