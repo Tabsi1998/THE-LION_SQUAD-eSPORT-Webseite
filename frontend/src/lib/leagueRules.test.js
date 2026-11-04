@@ -131,3 +131,9 @@ test("Bilder im Editor: Admin-Medien nur mit der Rolle, Zuständige laden eigene
     expect(rulesMediaProps(user)).toEqual({ mediaScope: "user", libraryEndpoint: "/media?type=images" });
   }
 });
+
+// Codex Runde 2 (#2287): Ein Name mit „++“ in der Kartenmarke der erlaubten Ausrüstung - eine Unterstreichung, der Name wörtlich, kein Bruch.
+test("Kartenmarke mit „A++B“ im Namen bleibt eine Karte", () => {
+  const html = renderRulesSection("- ++A\\+\\+B++ *nicht in Suchen*\n- ++Zweite++");
+  expect(html).toBe("<ul><li><u>A++B</u> <em>nicht in Suchen</em></li><li><u>Zweite</u></li></ul>");
+});

@@ -180,3 +180,21 @@ def test_attachments_only_count_as_allowed_where_they_fit_an_allowed_weapon():
     assert [(row["name"], row["reason"]) for row in unusable] == [
         ("Choke", "passt nur zu gesperrten Waffen"), ("Kompensator", "keiner Waffe zugeordnet"), ("Laser", "an jeder passenden Waffe gesperrt"),
         ("Lauf", "passt nur zu gesperrten Waffen")]
+
+def test_a_name_with_plus_signs_stays_one_card_and_plain_text():
+    """Codex Runde 2: „A++B“ - der Name selbst trägt die Zeichen der Kartenmarke. Er bleibt Text: keine weitere Marke, im PDF wörtlich,
+    in der API ohne Schutzzeichen; die alte Fassung bleibt, wie sie war."""
+    name = "A++B"
+    data = loadout_bans.allowed_block([{"key": "w", "label": "Waffen", "role": "item", "subcategories": []}],
+                                      [item("p1", "w", name)], None)
+    web = loadout_bans.render_block(data, "markdown")
+    served = markdown_text.served(web)
+    assert "- ++A\\+\\+B++" in served and not any(0xE000 <= ord(char) <= 0xF8FF for char in served)
+    assert markdown_text.plain(web).splitlines()[-1] == "- ++A++B++"
+    text = loadout_bans.render_block(data, "text")
+    assert "| Waffen | – | alle: A++B | – |" in markdown_text.plain(text)
+    for line in text.splitlines():
+        assert "<u>" not in pdf_service.pdf_rules_inline(line)
+    assert "alle: A++B" in pdf_service.pdf_rules_inline(text.splitlines()[-1]), "im PDF wörtlich"
+    old = {"list": True, "groups": [{"label": "Waffen", "entries": [{"name": name, "image_url": None, "modes": []}]}], "weapons": []}
+    assert markdown_text.plain(loadout_bans.render_block(old, "markdown")).endswith("| – | A++B | alle Modi |")
