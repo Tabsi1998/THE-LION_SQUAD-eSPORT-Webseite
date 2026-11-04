@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_rules_world import ADMIN_LEAGUES, make_world, publish, season_page, season_scope, today  # noqa: E402
+from league_rules_world import ADMIN_LEAGUES, league_scope, make_world, publish, season_page, season_scope, today  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from services import league_rules  # noqa: E402
 
@@ -177,3 +177,25 @@ async def test_empty_variables_need_the_confirmation_in_the_release_too(flow):
     assert await flow.db.league_rules.count_documents({"status": "published"}) == 1
     assert await flow.db.league_rules.count_documents({"status": "draft"}) == 0
     assert ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={**body, "confirm_empty": True}))["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_league_wide_release_names_the_empty_variables_of_its_seasons(flow):
+    """Zweite Prüfung Codex: Auf der Seite der Liga gilt eine Season-Variable als „(je Season)“ - leer ist sie trotzdem in der Season.
+    Vorschlag und Vorschau nennen sie aus demselben Schnappschuss, den das Veröffentlichen prüft; sonst wäre die Freigabe im Web nicht
+    abzuschließen (422 ohne Haken)."""
+    w = await make_world(flow)
+    text = "# A\nStartplätze: {{application.slots}}.\n\n[[baustein:modes]]"
+    version = await publish(flow, w, scope=league_scope(w), body=text, annexes=[], confirm_empty=True)
+    assert version["frozen_vars"][w["season"]["id"]]["application.slots"]["value"] is None
+    preview = ok(await flow.post(f"{league_scope(w)}/preview", json={"title": "R", "body_md": text, "annexes": []}))
+    assert preview["empty_vars"] == ["application.slots"], "die Vorschau der Liga nennt die leere Variable der Season"
+    await rename_mode(flow, w, "Hardpoint")
+    proposal = ok(await flow.get(league_scope(w)))["proposal"]
+    assert proposal["empty_vars"] == ["application.slots"], "der Vorschlag der Liga nennt die leere Variable der Season"
+    body = {"base_version_id": version["id"], "fingerprint": proposal["fingerprint"], "valid_from": today(), "change_reason": "Modus umbenannt"}
+    refused = await flow.post(f"{league_scope(w)}/proposal/publish", json=body)
+    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "empty_vars"
+    assert "einer Season" in refused.json()["detail"]["message"], "die Meldung spricht nicht von „dieser Season“ - es ist die Liga"
+    released = ok(await flow.post(f"{league_scope(w)}/proposal/publish", json={**body, "confirm_empty": True}))
+    assert released["version"] == 2 and released["frozen_vars"][w["season"]["id"]]["application.slots"]["value"] is None

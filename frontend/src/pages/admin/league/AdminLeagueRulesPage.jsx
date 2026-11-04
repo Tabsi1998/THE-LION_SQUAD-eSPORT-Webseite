@@ -28,11 +28,14 @@ const REASON_MIN = 5;
 const ICON_BUTTON = "p-1.5 text-white/60 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm disabled:opacity-30";
 const SUMMARY = "tls-hit flex min-h-[40px] cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden";
 
+/** Wo eine Variable ohne Wert ist: Bei einer Fassung der Liga zählt jede Season, die sie einfriert - auch wenn die Seite „(je Season)“ zeigt. */
+const whereEmpty = (leagueWide) => (leagueWide ? "in einer Season dieser Liga" : "in dieser Season");
+
 function formOf(draft) {
   return { title: draft?.title || "", body_md: draft?.body_md || "", annexes: (draft?.annexes || []).map(({ title, body_md }) => ({ title: title || "", body_md: body_md || "" })) };
 }
 
-function VarAlerts({ unknown = [], empty = [], testId }) {
+function VarAlerts({ unknown = [], empty = [], leagueWide = false, testId }) {
   return (
     <>
       {unknown.length ? (
@@ -42,7 +45,7 @@ function VarAlerts({ unknown = [], empty = [], testId }) {
       ) : null}
       {empty.length ? (
         <p role="status" className="mb-3 break-words text-sm text-white/70" data-testid={`${testId}-empty`}>
-          Ohne Wert in dieser Season, im Text steht „(nicht festgelegt)“: {empty.map((name) => `{{${name}}}`).join(", ")}.
+          Ohne Wert {whereEmpty(leagueWide)}, im Text steht „(nicht festgelegt)“: {empty.map((name) => `{{${name}}}`).join(", ")}.
         </p>
       ) : null}
     </>
@@ -50,10 +53,11 @@ function VarAlerts({ unknown = [], empty = [], testId }) {
 }
 
 /** „Regelwerk muss freigegeben werden“: die geänderten Stellen, der Vorschlag mit markierten Unterschieden und die Freigabe. */
-function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, onApprove }) {
+function PendingRelease({ changes, proposal, hasDraft, busy, today, leagueWide, refusedEmpty, onPrepare, onApprove }) {
   const [release, setRelease] = useState({ valid_from: today || "", change_reason: proposedReason(changes), requires_consent: true, confirm_empty: false });
-  // Leere Variablen (Entscheidung Fabian): nur mit ausdrücklicher Bestätigung - der Haken erscheint erst, wenn es welche gibt.
-  const emptyVars = proposal?.empty_vars || [];
+  // Leere Variablen (Entscheidung Fabian): nur mit ausdrücklicher Bestätigung - der Haken erscheint erst, wenn es welche gibt. Nennt der
+  // Vorschlag keine, zählt als Rückfall die Liste aus der Absage des Servers (422 mit Code empty_vars).
+  const emptyVars = proposal?.empty_vars?.length ? proposal.empty_vars : refusedEmpty || [];
   const canApprove = release.change_reason.trim().length >= REASON_MIN && release.valid_from && !busy && !proposal?.unknown_vars?.length
     && (!emptyVars.length || release.confirm_empty);
   return (
@@ -93,7 +97,7 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, o
               Die neue Fassung übernimmt den Text von {changes.label} und die Werte von heute - sie steht darunter zum Prüfen, geänderte Abschnitte sind markiert.
               Zum Anpassen des Texts vorher „Text vorher anpassen“.
             </p>
-            <VarAlerts unknown={proposal.unknown_vars} empty={proposal.empty_vars} testId="rules-proposal" />
+            <VarAlerts unknown={proposal.unknown_vars} empty={emptyVars} leagueWide={leagueWide} testId="rules-proposal" />
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <TextField label="Gültig ab" type="date" value={release.valid_from} min={today} onChange={(value) => setRelease((row) => ({ ...row, valid_from: value }))} testId="rules-approve-valid-from" />
               <TextAreaField label="Änderungsgrund" value={release.change_reason} onChange={(value) => setRelease((row) => ({ ...row, change_reason: value }))} rows={2}
@@ -104,7 +108,7 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, o
             {emptyVars.length ? (
               <CheckField className="mt-2" label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={release.confirm_empty}
                 onChange={(value) => setRelease((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
-                hint={`Ohne Wert in dieser Season: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-approve-confirm-empty" />
+                hint={`Ohne Wert ${whereEmpty(leagueWide)}: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-approve-confirm-empty" />
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" className={PRIMARY} disabled={!canApprove} data-testid="rules-approve-publish"
@@ -269,6 +273,7 @@ export default function AdminLeagueRulesPage() {
   const bodyRef = useRef(null);
   const annexRefs = useRef([]);
   const base = `/admin/league-rules/${scope}/${scopeId}`;
+  const leagueWide = scope === "league";
 
   const applyDraft = useCallback((draft) => {
     setEditing(!!draft);
@@ -338,12 +343,14 @@ export default function AdminLeagueRulesPage() {
     if (!await confirm({ title: "Neue Fassung freigeben?", description: "Der Text der letzten Fassung mit den Werten von heute wird veröffentlicht. Danach lässt sie sich nicht mehr ändern.", confirmLabel: "Freigeben" })) return;
     await api.post(`${base}/proposal/publish`, body);
     toast.success("Neue Fassung freigegeben.");
+    setEmptyVars([]);
     await load();
   });
   const onDiscard = () => run(async () => {
     if (!await confirm({ title: "Entwurf verwerfen?", description: "Der Text des Entwurfs ist danach weg. Veröffentlichte Fassungen bleiben.", confirmLabel: "Verwerfen" })) return;
     await api.delete(`${base}/draft`);
     setPreview(null);
+    setEmptyVars([]);
     await load();
   });
   const onPublish = () => run(async () => {
@@ -380,7 +387,8 @@ export default function AdminLeagueRulesPage() {
 
           {view.data_changes ? (
             <PendingRelease key={`${view.data_changes.version_id}-${view.data_changes.rows.length}`} changes={view.data_changes} proposal={view.proposal}
-              hasDraft={!!view.draft || editing} busy={busy} today={view.today} onPrepare={onPrepare} onApprove={onApprove} />
+              hasDraft={!!view.draft || editing} busy={busy} today={view.today} leagueWide={leagueWide} refusedEmpty={emptyVars}
+              onPrepare={onPrepare} onApprove={onApprove} />
           ) : null}
 
           {view.inherited && !editing ? (
@@ -462,7 +470,7 @@ export default function AdminLeagueRulesPage() {
                     {preview.unknown_blocks?.length ? (
                       <p role="alert" className="mb-4 text-sm text-warn">Unbekannter Baustein: {preview.unknown_blocks.join(", ")}. So lässt sich nichts veröffentlichen.</p>
                     ) : null}
-                    <VarAlerts unknown={preview.unknown_vars} empty={preview.empty_vars} testId="rules-preview-vars" />
+                    <VarAlerts unknown={preview.unknown_vars} empty={preview.empty_vars} leagueWide={leagueWide} testId="rules-preview-vars" />
                     {preview.foreign_images?.length ? (
                       <p role="alert" className="mb-4 break-words text-sm text-warn" data-testid="rules-preview-foreign">Fremde Bilder lassen sich nicht speichern: {preview.foreign_images.join(", ")}. Bitte über „Hochladen“ oder die Mediathek wählen.</p>
                     ) : null}
@@ -480,7 +488,7 @@ export default function AdminLeagueRulesPage() {
                   {emptyVars.length ? (
                     <CheckField label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={publish.confirm_empty}
                       onChange={(value) => setPublish((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
-                      hint={`Ohne Wert in dieser Season: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-confirm-empty" />
+                      hint={`Ohne Wert ${whereEmpty(leagueWide)}: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-confirm-empty" />
                   ) : null}
                   <button type="button" className={PRIMARY} disabled={!canPublish} onClick={onPublish} data-testid="rules-publish">Version veröffentlichen</button>
                 </FormSection>

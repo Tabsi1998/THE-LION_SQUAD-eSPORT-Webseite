@@ -845,9 +845,12 @@ Bausteinwert eingesetzt (`text_cell`: nie Link, nie fett, nie Tabellenspalte) un
 `league_rules.frozen_vars` (`{season_id: {name: {label, value}}}`) als Klartext eingefroren, dazu `vars_used`. Eine Fassung der Liga friert
 zusätzlich unter dem Schlüssel `""` die Werte ein, die ohne Season gelten (`league.name`, `game.name`); auf der Seite der Liga steht
 für alles andere „(je Season)“, für eine Season, die erst nach dem Veröffentlichen dazukam, „(noch nicht festgehalten)“. Ein bekannter
-Name **ohne Wert** (die Season trägt das Feld nicht) wird nie still leer: Es steht „(nicht festgelegt)“ da, die Vorschau nennt ihn
-unter `empty_vars`, und das Veröffentlichen (normal wie über die Freigabe) verlangt die ausdrückliche Bestätigung `confirm_empty` -
-sonst 422 mit `{code: "empty_vars", names, message}` (Entscheidung Fabian). Ein **unbekannter** Name (`unknown_vars`, auch `mode:<kennung>` eines Modus, den das Spiel nicht hat): deutlicher
+Name **ohne Wert** (die Season trägt das Feld nicht) wird nie still leer: Es steht „(nicht festgelegt)“ da, Vorschau und Vorschlag nennen
+ihn unter `empty_vars` - aus demselben Schnappschuss, den das Veröffentlichen prüft, bei einer Fassung der Liga also aus allen Seasons,
+die sie einfriert, auch wenn die Seite der Liga „(je Season)“ zeigt -, und das Veröffentlichen (normal wie über die Freigabe) verlangt
+die ausdrückliche Bestätigung `confirm_empty` - sonst 422 mit `{code: "empty_vars", names, message}` (Entscheidung Fabian; `message`
+sagt bei der Liga „in einer Season dieser Liga“). Das Web zeigt Liste und Haken auch dann, wenn erst diese Absage sie bringt. Ein
+**unbekannter** Name (`unknown_vars`, auch `mode:<kennung>` eines Modus, den das Spiel nicht hat): deutlicher
 Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variable im Text: {{…}}“ mit der ganzen Liste.
 
 | Variable | Wert (Klartext) |

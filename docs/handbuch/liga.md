@@ -578,8 +578,9 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
 4. **Variablen** stehen mitten im Satz, etwa „Gespielt wird Best of `{{best_of}}`“, und werden beim Lesen durch den Wert der Season
    ersetzt. **Variable einfügen** zeigt die Liste mit dem Wert von heute (mit Suche); die **Hilfe** darunter nennt alle Bausteine und
    Variablen. Eine Variable **ohne Wert** in dieser Season (etwa ohne Höchstkader) steht als „(nicht festgelegt)“ im Text - nie still leer.
-   Die Vorschau nennt solche Variablen; veröffentlichen (auch über die Freigabe) geht erst mit dem Haken **Trotzdem veröffentlichen - im
-   Text steht dann „(nicht festgelegt)“**, der nur dann erscheint. Eine **unbekannte** Variable (Tippfehler) nennt die Vorschau, und das
+   Bei einem Regelwerk der Liga zählt jede Season, für die es eingefroren wird - auch wenn die Seite der Liga „(je Season)“ zeigt.
+   Vorschau und Vorschlag nennen solche Variablen; veröffentlichen (auch über die Freigabe) geht erst mit dem Haken **Trotzdem
+   veröffentlichen - im Text steht dann „(nicht festgelegt)“**, der nur dann erscheint. Eine **unbekannte** Variable (Tippfehler) nennt die Vorschau, und das
    Veröffentlichen lehnt sie mit der ganzen Liste ab.
 
    | Variable | Wert |

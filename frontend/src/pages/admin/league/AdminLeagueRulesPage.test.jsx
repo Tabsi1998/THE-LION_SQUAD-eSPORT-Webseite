@@ -194,6 +194,27 @@ test("Einstellungen haben sich seit dem Vorschlag geändert (409): der Vorschlag
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
 });
 
+test("Freigabe der Liga: nennt der Vorschlag keine leere Variable, bringt die Absage (422) Liste und Haken als Rückfall", async () => {
+  serve({ ...VIEW, scope: "league", scope_id: "l1", season: null, versions: [HEAD], current: HEAD, data_changes: CHANGES, proposal: PROPOSAL });
+  apiMock.post.mockRejectedValueOnce({ response: { status: 422, data: { detail: { code: "empty_vars", names: ["application.slots"],
+    message: "Ohne Wert in einer Season dieser Liga: {{application.slots}} - im Text steht dann „(nicht festgelegt)“. Zum Veröffentlichen bitte bestätigen." } } } });
+  renderPage("/admin/leagues/rules/league/l1");
+  await screen.findByTestId("rules-approve");
+  expect(screen.queryByTestId("rules-approve-confirm-empty")).toBeNull();
+  fireEvent.click(screen.getByTestId("rules-approve-publish"));
+  const check = await screen.findByTestId("rules-approve-confirm-empty");
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/league-rules/league/l1/proposal/publish", expect.objectContaining({ fingerprint: "abdruck-1", confirm_empty: false }));
+  // Die Liste aus der Absage steht da - und bei der Liga heißt es nicht „in dieser Season“.
+  expect(screen.getByTestId("rules-proposal-empty")).toHaveTextContent("Ohne Wert in einer Season dieser Liga");
+  expect(screen.getByTestId("rules-proposal-empty")).toHaveTextContent("{{application.slots}}");
+  expect(screen.getByTestId("rules-approve-publish")).toBeDisabled();
+  fireEvent.click(check);
+  apiMock.post.mockResolvedValue({ data: { ...HEAD, version: 2 } });
+  fireEvent.click(screen.getByTestId("rules-approve-publish"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/admin/league-rules/league/l1/proposal/publish",
+    expect.objectContaining({ fingerprint: "abdruck-1", confirm_empty: true })));
+});
+
 test("Veröffentlichen mit leeren Variablen: 422 mit Liste zeigt den Haken, mit Haken geht es durch", async () => {
   serve({ ...VIEW, draft: DRAFT });
   apiMock.put.mockResolvedValue({ data: { ...DRAFT, revision: 4 } });

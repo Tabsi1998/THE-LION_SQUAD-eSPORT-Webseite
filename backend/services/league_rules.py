@@ -176,16 +176,18 @@ class Snapshot(NamedTuple):
 
 
 def _empty_names(frozen_vars: dict) -> list[str]:
-    """Bekannte Variablen ohne Wert in einer der eingefrorenen Seasons - sie stehen als „(nicht festgelegt)“ im Text."""
-    return sorted({name for rows in frozen_vars.values() for name, row in (rows or {}).items() if (row or {}).get("value") is None})
+    """Bekannte Variablen ohne Wert in einer der eingefrorenen Seasons - sie stehen als „(nicht festgelegt)“ im Text. Bei einer Fassung
+    der Liga zählt jede Season, die sie einfriert, auch wenn die Seite der Liga „(je Season)“ zeigt (zweite Prüfung Codex)."""
+    return sorted({name for rows in frozen_vars.values() for name in variables.empty(list(rows or {}), rows or {})})
 
 
-def _check_empty(frozen_vars: dict, body: dict) -> None:
+def _check_empty(frozen_vars: dict, body: dict, scope: str) -> None:
     """Leere Variablen nur mit ausdrücklicher Bestätigung (Entscheidung Fabian): sonst 422 mit Code und Liste."""
     empty = _empty_names(frozen_vars)
     if empty and not body.get("confirm_empty"):
+        where = "in einer Season dieser Liga" if scope == LEAGUE else "in dieser Season"
         raise RulesProblem({"code": "empty_vars", "names": empty,
-                            "message": "Ohne Wert in dieser Season: " + ", ".join("{{" + name + "}}" for name in empty)
+                            "message": f"Ohne Wert {where}: " + ", ".join("{{" + name + "}}" for name in empty)
                             + " - im Text steht dann „(nicht festgelegt)“. Zum Veröffentlichen bitte bestätigen."})
 
 
@@ -491,19 +493,22 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
     }
 
 
-async def _rendered(db, league: dict, season: dict | None, body_md: str | None, annexes: list[dict], previous: dict | None) -> dict:
-    """Ein Text mit den Bausteinen und Variablen von heute, verglichen mit ``previous`` - für Vorschau und Vorschlag. Speichert nichts."""
+async def _rendered(db, scope: str, league: dict, season: dict | None, body_md: str | None, annexes: list[dict], previous: dict | None) -> dict:
+    """Ein Text mit den Bausteinen und Variablen von heute, verglichen mit ``previous`` - für Vorschau und Vorschlag. Speichert nichts.
+    Alles kommt aus demselben Schnappschuss, den das Veröffentlichen prüft - darum nennt ``empty_vars`` auf der Seite der Liga die leeren
+    Variablen jeder Season, die die Fassung einfriert (zweite Prüfung Codex)."""
     keys = text.block_keys(body_md, *[row["body_md"] for row in annexes])
     names = variables.var_names(body_md, *[row["body_md"] for row in annexes])
-    values = {key: blocks.value(key, row) for key, row in (await blocks.resolve(db, keys, league, season)).items()} if season else {}
-    ctx = await variables.context(db, league, season)
-    var_values = variables.resolve(names, ctx)
-    unknown_vars = variables.unknown(names, ctx.game)
+    snapshot = await _freeze(db, scope, league, season, keys, names)
+    own = season["id"] if season else ""
+    values = {key: blocks.value(key, row) for key, row in snapshot.blocks.get(own, {}).items()}
+    var_values = snapshot.vars.get(own, {})
+    unknown_vars = variables.unknown(names, await facts.game_of(db, league))
     sections = text.sections_of(body_md, annexes, fill=lambda value: _fill(value, values, var_values, season, keep=unknown_vars))
     result = await _compared(previous, season, sections)
     return {"sections": _served(sections, result), "blocks_used": [key for key in keys if key in blocks.BLOCKS],
             "unknown_blocks": blocks.unknown(keys), "vars_used": [name for name in names if name in var_values],
-            "unknown_vars": unknown_vars, "empty_vars": variables.empty(names, var_values), "result": result}
+            "unknown_vars": unknown_vars, "empty_vars": _empty_names(snapshot.vars), "result": result, "snapshot": snapshot}
 
 
 def _used_in(version: dict) -> tuple[list[str], list[str]]:
@@ -536,13 +541,12 @@ async def _frozen_names(db, league: dict, season: dict | None) -> dict:
 
 
 async def _proposal(db, scope: str, league: dict, season: dict | None, base: dict, current: dict | None) -> dict:
-    rendered = await _rendered(db, league, season, base.get("body_md"), base.get("annexes") or [], base)
-    keys, names = _used_in(base)
+    rendered = await _rendered(db, scope, league, season, base.get("body_md"), base.get("annexes") or [], base)
     return {"base": _head(base, current), "sections": rendered["sections"],
             "changes": {"base": _head(base, current), **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
             "unknown_vars": rendered["unknown_vars"], "empty_vars": rendered["empty_vars"],
-            # Die Datenbasis, die dieser Vorschlag zeigt - die Freigabe schickt sie mit und veröffentlicht nur genau sie.
-            "fingerprint": (await _freeze(db, scope, league, season, keys, names)).fingerprint}
+            # Der Schnappschuss, den dieser Vorschlag zeigt - die Freigabe schickt seinen Fingerabdruck mit und veröffentlicht nur genau ihn.
+            "fingerprint": rendered["snapshot"].fingerprint}
 
 
 # ---------------------------------------------------------------- Verwaltung: Schreiben
@@ -677,7 +681,7 @@ async def preview(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
     _check_size(body.get("body_md"), annexes)
     chain = await _chain(db, league, season)
     previous = chain["rows"][-1] if chain["rows"] else None
-    rendered = await _rendered(db, league, season, markdown_text.strip_protected(body.get("body_md")), annexes, previous)
+    rendered = await _rendered(db, scope, league, season, markdown_text.strip_protected(body.get("body_md")), annexes, previous)
     return {**{key: rendered[key] for key in ("sections", "blocks_used", "unknown_blocks", "vars_used", "unknown_vars", "empty_vars")},
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
                         **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
@@ -734,7 +738,7 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict, *, fro
         # Nie still leer (#2269): Eine unbekannte Variable hält das Veröffentlichen auf, mit der ganzen Liste.
         raise LeagueProblem("Unbekannte Variable im Text: " + ", ".join("{{" + name + "}}" for name in wrong) + ".")
     snapshot = frozen if frozen is not None else await _freeze(db, scope, league, season, keys, names)
-    _check_empty(snapshot.vars, body)
+    _check_empty(snapshot.vars, body, scope)
     now = now_utc().isoformat()
     try:
         doc = await db.league_rules.find_one_and_update(
@@ -778,7 +782,7 @@ async def publish_proposal(db, scope: str, scope_id: str, body: dict, user: dict
             snapshot = await _freeze(db, scope, league, season, keys, names)
             if snapshot.fingerprint != body.get("fingerprint"):
                 raise LeagueProblem("Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen.", 409)
-            _check_empty(snapshot.vars, body)
+            _check_empty(snapshot.vars, body, scope)
             draft = await draft_from_version(db, scope, scope_id, latest["id"], user)
             return await _publish(db, scope, scope_id, {**body, "revision": draft["revision"]}, user, frozen=snapshot)
     except MutationLockBusy:
