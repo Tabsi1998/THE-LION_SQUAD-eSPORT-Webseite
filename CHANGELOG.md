@@ -1,16 +1,15 @@
 # Changelog
 
-## [1.70.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.69.0...v1.70.0) (2026-11-04)
-
+## 1.70.0 (04.11.2026)
 
 ### Neu
 
-* Erlaubte Ausrüstung: Aufsätze, die an keiner Waffe erlaubt sind, stehen einmal in eigener Zeile statt an jeder Waffe ([#2299](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2299)) ([4a80ef2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a80ef2844dedcfd6628191fe5a3a506c9f7fc03))
-* Erlaubte Ausrüstung: Hinweis „nur in …“, wenn ein Eintrag in mehr Modi der Season gesperrt als erlaubt ist ([#2298](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2298)) ([4a80ef2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a80ef2844dedcfd6628191fe5a3a506c9f7fc03))
-* Ligaseite und Matchseite: Aufsätze je Waffe aufklappbar mit „N Aufsätze · K gesperrt“, erlaubte Aufsätze je Slot mit Bild ([#2299](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2299)) ([4a80ef2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a80ef2844dedcfd6628191fe5a3a506c9f7fc03))
-* Regelwerk: Aufsätze stehen an der Waffe statt als eigene Liste, PDF mit einer Zeile je Waffe „alle passenden Aufsätze erlaubt, außer: …“ ([#2299](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2299)) ([4a80ef2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a80ef2844dedcfd6628191fe5a3a506c9f7fc03))
-* Sperrliste: „Für alle &lt;Waffenklasse&gt; übernehmen“ und „Aufsatz an allen Waffen sperren“ ([#2299](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2299)) ([4a80ef2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a80ef2844dedcfd6628191fe5a3a506c9f7fc03))
-* Sperrliste: Waffe aufklappen zeigt die passenden Aufsätze je Slot, gesperrt auch je Modus ([#2299](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2299)) ([4a80ef2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a80ef2844dedcfd6628191fe5a3a506c9f7fc03))
+* Erlaubte Ausrüstung: Aufsätze, die an keiner Waffe erlaubt sind, stehen einmal in eigener Zeile statt an jeder Waffe (#2299)
+* Erlaubte Ausrüstung: Hinweis „nur in …“, wenn ein Eintrag in mehr Modi der Season gesperrt als erlaubt ist (#2298)
+* Ligaseite und Matchseite: Aufsätze je Waffe aufklappbar mit „N Aufsätze · K gesperrt“, erlaubte Aufsätze je Slot mit Bild (#2299)
+* Regelwerk: Aufsätze stehen an der Waffe statt als eigene Liste, PDF mit einer Zeile je Waffe „alle passenden Aufsätze erlaubt, außer: …“ (#2299)
+* Sperrliste: „Für alle &lt;Waffenklasse&gt; übernehmen“ und „Aufsatz an allen Waffen sperren“ (#2299)
+* Sperrliste: Waffe aufklappen zeigt die passenden Aufsätze je Slot, gesperrt auch je Modus (#2299)
 
 ## 1.69.0 (04.11.2026)
 
