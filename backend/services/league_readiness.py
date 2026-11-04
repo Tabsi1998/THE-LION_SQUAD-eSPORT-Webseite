@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services import game_maps, game_modes, league_pool_check, map_pools
+from services import game_maps, game_modes, league_pool_check, league_veto_rules, map_pools
 from services.league_scope import ONLY_LEAGUE
 from services.log_safe import log_safe
 from services.permissions import is_superadmin
@@ -97,6 +97,33 @@ def _pool_state_items(pool: dict | None, game: dict | None, order: list, maps: d
     return out
 
 
+def _veto_items(season: dict, divisions: list[dict], pool: dict | None, game: dict | None) -> list[tuple[str, dict]]:
+    """Veto (D.3, #1618): die gespeicherte Vorlage gegen den geltenden Pool, Best of und Modusfolge - nur, wenn sie an ist."""
+    raw = season.get("veto_rules")
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return []
+    try:
+        rules = league_veto_rules.normalize(raw)
+    except league_veto_rules.VetoProblem as problem:
+        return [("problem", _item("veto_invalid", f"Veto: {problem.detail}"))]
+    labels = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
+    best_of = int(season.get("best_of") or 1)
+    out: list[tuple[str, dict]] = [
+        ("problem", _item("veto_invalid", f"Veto: {text}"))
+        for text in league_veto_rules.template_problems(rules, pool=pool, best_of=best_of, order=season.get("game_mode_order"),
+                                                        repeat=season.get("map_repeat") or "other_mode", labels=labels)]
+    if not isinstance(season.get("checkin_rules"), dict):
+        out.append(("problem", _item("veto_without_checkin", "Das Veto braucht den Check-in – bitte den Kasten „Check-in vor dem Spiel“ "
+                                                            "einmal speichern.")))
+    for division in sorted(divisions, key=lambda row: int(row.get("level") or 0)):
+        own = (division.get("overrides") or {}).get("best_of")
+        if (division.get("status") or "active") == "active" and own and int(own) != best_of:
+            out.append(("warning", _item("veto_division_mismatch", f"Liga {division.get('level')} spielt Best of {int(own)}, die Veto-Vorlage "
+                                                                   f"belegt {best_of} Positionen – dort läuft kein Veto, die Maps werden beim "
+                                                                   "Ergebnis eingetragen.")))
+    return out
+
+
 async def season_readiness(db, league: dict, season: dict, user: dict | None = None) -> dict:
     """Die Prüfung für ``season`` (auch mit ungespeicherten Änderungen). Siehe Modulkopf und docs/LIGA.md."""
     items: list[tuple[str, dict]] = []
@@ -134,6 +161,7 @@ async def season_readiness(db, league: dict, season: dict, user: dict | None = N
     map_ids = sorted({item.get("map_id") for group in (pool or {}).get("modes") or [] for item in group.get("maps") or []})
     maps = {row["id"]: row for row in await db.game_maps.find({"id": {"$in": map_ids}}, {"_id": 0, "id": 1, "status": 1}).to_list(None)}
     items += _pool_state_items(pool, game, order, maps)
+    items += _veto_items(season, divisions, pool, game)
     problems = [item for kind, item in items if kind == "problem"]
     return {"ok": not problems, "problems": problems, "warnings": [item for kind, item in items if kind == "warning"],
             "requirements": need["rows"], "total": need["total"], "max_maps": need["max_maps"],

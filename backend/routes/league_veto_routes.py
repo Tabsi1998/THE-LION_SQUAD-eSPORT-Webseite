@@ -1,0 +1,209 @@
+"""Liga-Veto (docs/LIGA.md, „D.3 Veto“, #1618; Regelwerk § 6, Anlage B).
+
+- ``GET|PUT /api/admin/leagues/seasons/{season_id}/veto-rules``: die Vorlage je Season (an/aus, Team A, Zeit je Schritt, Schritte) -
+  Zuständigkeit „Season konfigurieren“, lesen jede Zuständigkeit. Das Speichern gilt sofort für alle nicht gesperrten Staffeln.
+- ``GET …/veto-rules/proposal``: ein Vorschlag aus Modusfolge, Poolgrößen und Best of - nichts wird gespeichert.
+- ``POST /api/matches/{match_id}/veto/pick``: die Seite am Zug sperrt oder wählt eine Map (Captain, Vertreter).
+- ``POST /api/matches/{match_id}/veto/lead``: Pause, Fortsetzen, Schritt zurück, Neustart - Liga-Leitung mit „Spiele betreuen“, mit Grund,
+  Befangenheit wie B.1.
+
+Die Logik steht in ``services/league_veto.py`` und ``services/league_veto_rules.py``.
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
+
+from auth import get_current_user
+from database import get_db
+from models import new_id, now_utc
+from routes.match_routes import (
+    _acting_registration_for_match,
+    _assert_match_visible,
+    _find_match_any,
+    _serialized_match_write,
+)
+from services import game_maps, league_veto, league_veto_rules, map_pools
+from services.checkin_rules import FlowProblem
+from services.league_permissions import ANY, require_league, require_no_conflict
+from services.tournament_permissions import has_match_result_permission
+
+admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
+router = APIRouter(prefix="/api/matches", tags=["matches"])
+
+require_season = require_league("season", via="season_id")
+require_any_capability = require_league(ANY, via="season_id")
+
+
+class VetoStepBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(max_length=20)
+    mode: str = Field(max_length=40)
+    team: Optional[str] = Field(default=None, max_length=1)
+    position: Optional[int] = None
+
+
+class VetoRulesBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    team_a: str = Field(default=league_veto_rules.HOME, max_length=10)
+    step_seconds: int = 60
+    steps: list[VetoStepBody] = Field(default_factory=list, max_length=league_veto_rules.STEPS_MAX)
+
+
+class PickBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    map_id: str = Field(min_length=1, max_length=120)
+    version: int = Field(ge=0)
+
+
+class LeadBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: str = Field(max_length=20)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    version: int = Field(ge=0)
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+def _raise(problem: FlowProblem | league_veto_rules.VetoProblem):
+    raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+
+
+async def _season(db, season_id: str) -> dict:
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+    if not season:
+        raise HTTPException(status_code=404, detail="Season nicht gefunden.")
+    return season
+
+
+async def _season_context(db, season: dict) -> dict:
+    """Pool, Modi, Best of, Modusfolge und Wiederholungsregel der Season - für Prüfung und Vorschlag."""
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "game_id": 1}) or {}
+    game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0}) if league.get("game_id") else None
+    pool = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
+    labels = {row["mode"]: row["label"] for row in game_maps.game_modes(game)} if game else {}
+    pool_modes = [{"mode": group["mode"], "label": group.get("label") or labels.get(group["mode"]) or group["mode"],
+                   "maps": len(group.get("maps") or [])} for group in (pool or {}).get("modes") or [] if group.get("mode")]
+    return {"pool": pool, "labels": labels, "modes": pool_modes, "best_of": int(season.get("best_of") or 1),
+            "order": [mode for mode in season.get("game_mode_order") or [] if mode], "repeat": season.get("map_repeat") or "other_mode"}
+
+
+def _stored(season: dict) -> dict | None:
+    raw = season.get("veto_rules")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return league_veto_rules.normalize(raw)
+    except league_veto_rules.VetoProblem:
+        return league_veto_rules.defaults()
+
+
+def _problems(rules: dict | None, context: dict) -> list[str]:
+    if not rules or not rules.get("enabled"):
+        return []
+    return league_veto_rules.template_problems(rules, pool=context["pool"], best_of=context["best_of"], order=context["order"],
+                                               repeat=context["repeat"], labels=context["labels"])
+
+
+def _answer(season: dict, rules: dict | None, context: dict, **extra) -> dict:
+    return {"veto_rules": rules, "active": bool(rules and rules.get("enabled") and rules.get("steps")),
+            "defaults": league_veto_rules.defaults(), "problems": _problems(rules, context), "modes": context["modes"],
+            "best_of": context["best_of"], "game_mode_order": context["order"], "map_repeat": context["repeat"],
+            "has_checkin": isinstance(season.get("checkin_rules"), dict), **extra}
+
+
+@admin_router.get("/seasons/{season_id}/veto-rules")
+async def get_veto_rules(season_id: str, _me: dict = Depends(require_any_capability)):
+    db = get_db()
+    season = await _season(db, season_id)
+    context = await _season_context(db, season)
+    return _answer(season, _stored(season), context,
+                   staffeln=await db.tournaments.count_documents({"league_context.season_id": season_id}))
+
+
+@admin_router.get("/seasons/{season_id}/veto-rules/proposal")
+async def propose_veto_rules(season_id: str, _me: dict = Depends(require_any_capability)):
+    db = get_db()
+    season = await _season(db, season_id)
+    context = await _season_context(db, season)
+    steps = league_veto_rules.propose(order=context["order"], pool=context["pool"], best_of=context["best_of"]) if context["pool"] else []
+    if not steps:
+        raise HTTPException(status_code=409, detail="Für einen Vorschlag braucht die Season einen Map-Pool mit mindestens einem Modus.")
+    proposal = {**(_stored(season) or league_veto_rules.defaults()), "enabled": True, "steps": steps}
+    return {"steps": steps, "problems": _problems(proposal, context)}
+
+
+@admin_router.put("/seasons/{season_id}/veto-rules")
+async def put_veto_rules(season_id: str, body: VetoRulesBody, me: dict = Depends(require_season)):
+    db = get_db()
+    season = await _season(db, season_id)
+    context = await _season_context(db, season)
+    try:
+        rules = league_veto_rules.normalize(body.model_dump())
+    except league_veto_rules.VetoProblem as problem:
+        _raise(problem)
+    problems = _problems(rules, context)
+    if problems:
+        raise HTTPException(status_code=422, detail=f"Die Vorlage passt noch nicht: {' '.join(problems)}")
+    before = season.get("veto_rules")
+    now = now_utc().isoformat()
+    if before != rules:
+        await db.league_seasons.update_one({"id": season_id}, {"$set": {"veto_rules": rules, "updated_at": now}})
+    # Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen nach dem Entsperren mit).
+    staffeln = await db.tournaments.update_many(
+        {"league_context.season_id": season_id, "locked_at": None, "veto_rules": {"$ne": rules}},
+        {"$set": {"veto_rules": rules, "updated_at": now}})
+    if before != rules:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "league.season.veto_rules", "target_id": season_id, "actor_id": me.get("id"),
+            "data": {"from": before, "to": rules, "staffeln": staffeln.modified_count}, "created_at": now})
+    return _answer(season, rules, context, staffeln_updated=staffeln.modified_count)
+
+
+async def _context(match_id: str, user: dict):
+    db = get_db()
+    match, collection = await _find_match_any(match_id)
+    if collection != "matches_v2":
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    await _assert_match_visible(match, user)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
+    if tournament and tournament.get("locked_at"):
+        raise HTTPException(status_code=423, detail="Turnier ist gesperrt und kann nur noch angesehen werden.")
+    return db, match, tournament, await _acting_registration_for_match(match, user)
+
+
+@router.post("/{match_id}/veto/pick")
+async def veto_pick(match_id: str, body: PickBody, me: dict = Depends(get_current_user),
+                    _mutation: None = Depends(_serialized_match_write)):
+    db, match, tournament, acting_reg = await _context(match_id, me)
+    if not acting_reg:
+        raise HTTPException(status_code=403, detail=league_veto.NOT_A_SIDE_DETAIL)
+    if not league_veto_rules.rules_of(tournament):
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    try:
+        return await league_veto.pick(db, match, tournament, registration_id=acting_reg["id"], map_id=body.map_id, version=body.version,
+                                      user=me)
+    except (FlowProblem, league_veto_rules.VetoProblem) as problem:
+        _raise(problem)
+
+
+@router.post("/{match_id}/veto/lead")
+async def veto_lead(match_id: str, body: LeadBody, me: dict = Depends(get_current_user),
+                    _mutation: None = Depends(_serialized_match_write)):
+    db, match, tournament, _acting_reg = await _context(match_id, me)
+    # Erst, wer handeln darf (403), dann, ob es hier ein Veto gibt (409) - so antwortet die Rechte-Matrix gleich.
+    if not await has_match_result_permission(me, match, capability="matches"):
+        raise HTTPException(status_code=403, detail="Eingreifen kann die Liga-Leitung mit „Spiele betreuen“.")
+    await require_no_conflict(db, me, match, action=f"veto_{body.action}", conflict_reason=body.conflict_reason)
+    if not league_veto_rules.rules_of(tournament):
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    try:
+        return await league_veto.lead_action(db, match, tournament, action=body.action, reason=body.reason, version=body.version, user=me)
+    except (FlowProblem, league_veto_rules.VetoProblem) as problem:
+        _raise(problem)
