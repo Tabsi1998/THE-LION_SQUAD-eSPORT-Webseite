@@ -467,9 +467,13 @@ async def test_reporting_edge_cases_around_the_check_in(flow):
     assert (await checkin(flow, started, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
     assert (await checkin(flow, started, "Falke1", "Falke1", "Falke2")).status_code == 200
     assert (await start(flow, started, "Kapitaen")).status_code == 200
+    clicked = await flow.reload(started["match"])
+    assert clicked["flow"]["start"] == {"at": clicked["started_at"], "by": started["users"]["Kapitaen"]["id"],
+                                        "registration_id": started["reg_a"]["id"], "via": "side"}
     assert (await page(flow, started, "Kapitaen"))["report_hint"] is None
     assert (await report(flow, started, "Kapitaen", "reg_a", "Kapitaen", "Mila")).status_code == 200
-    assert (await flow.reload(started["match"]))["flow"]["start"]["via"] == "side"
+    reported = await flow.reload(started["match"])
+    assert reported["flow"]["start"] == clicked["flow"]["start"] and reported["started_at"] == clicked["started_at"], "der Start bleibt der vom Klick"
     assert await flow.db.audit_logs.count_documents({**started_audits, "data.match_id": mid(started)}) == 1
     # Genau ein Start bei der ersten gültigen Meldung: eine abgelehnte Meldung setzt nichts, die Bestätigung nichts Neues.
     once = await checkin_world(flow, letter="E")
