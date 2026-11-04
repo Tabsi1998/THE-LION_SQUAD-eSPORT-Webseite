@@ -1,6 +1,7 @@
 import {
-  categoriesPayload, categoriesProblem, differsFromSection, equipmentPayload, fitsNothing, fitsWeapon, formPayload, formProblem,
-  groupByCategory, groupBySubcategory, listToForm, matchesSearch, missingSuggestions, modesText, publicGroups, rowKey, sameRows,
+  attachmentModes, attachmentSlots, attachmentsSummary, banAttachmentEverywhere, categoriesPayload, categoriesProblem, copyAttachmentsToClass,
+  differsFromSection, equipmentPayload, fitsNothing, fitsWeapon, formPayload, formProblem, groupByCategory, groupBySubcategory, listToForm,
+  matchesSearch, missingSuggestions, modesNote, modesText, ownRestrictionParts, publicGroups, restrictionParts, rowKey, sameRows,
   subcategoriesPayload, subcategoriesProblem, subcategoryOf, weaponClasses,
 } from "./loadoutBans";
 
@@ -151,6 +152,81 @@ test("vor dem Speichern: leer und eine ganz gesperrte Waffe mit Aufsätzen werde
     "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1"] } }, LIBRARY)).toContain("„Blitz 9“");
   expect(formProblem({ "item:w1": { kind: "item", item_id: "w1", modes: ["stellung"], attachment_ids: [] },
     "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1"] } }, LIBRARY)).toBe("");
+});
+
+// #2299: Modi je Aufsatz, Slots, „für die Klasse übernehmen“ und „an allen Waffen sperren“.
+const ARMORY = [
+  { id: "w1", category: "waffen", subcategory: "sturm", name: "Blitz 9" },
+  { id: "w2", category: "waffen", subcategory: "sturm", name: "Donner 4" },
+  { id: "w3", category: "waffen", subcategory: "sturm", name: "Alt", status: "inactive" },
+  { id: "w4", category: "waffen", subcategory: "sturm", name: "Gesperrt" },
+  { id: "s1", category: "waffen", subcategory: "schrot", name: "Hagel" },
+  { id: "a1", category: "aufsaetze", subcategory: "optik", name: "Rotpunkt", weapon_class_ids: ["sturm"] },
+  { id: "a2", category: "aufsaetze", name: "Griff", weapon_ids: ["w1"] },
+  { id: "a3", category: "aufsaetze", subcategory: "optik", name: "Holo", weapon_class_ids: ["sturm"], status: "inactive" },
+];
+
+test("Modi je Aufsatz: laden, unverändert gleich, schicken wie bisher oder je Aufsatz", () => {
+  const list = { entries: [{ kind: "attachments", item_id: "w1", name: "Blitz 9", modes: ["stellung"],
+    attachments: [{ item_id: "a1", name: "Rotpunkt" }, { item_id: "a2", name: "Griff", modes: ["suchen"] }] }] };
+  const { rows } = listToForm(list, ARMORY, [...MODES, { mode: "suchen", label: "Suchen" }]);
+  const row = rows["attachments:w1"];
+  expect([row.modes, attachmentModes(row, "a1"), attachmentModes(row, "a2")]).toEqual([[], ["stellung"], ["suchen"]]);
+  expect(formPayload(rows, ARMORY)).toEqual([{ item_id: "w1", kind: "attachments", modes: [], attachment_ids: ["a1", "a2"],
+    attachment_modes: { a1: ["stellung"], a2: ["suchen"] } }]);
+  // Alle mit denselben Modi: wie bisher die Modi der Zeile - eine alte Liste bleibt beim Speichern, wie sie war.
+  const same = { "attachments:w1": { ...row, attachment_modes: { a1: ["stellung"], a2: ["stellung"] } } };
+  expect(formPayload(same, ARMORY)).toEqual([{ item_id: "w1", kind: "attachments", modes: ["stellung"], attachment_ids: ["a1", "a2"] }]);
+  expect(sameRows(same, { "attachments:w1": { kind: "attachments", item_id: "w1", modes: ["stellung"], attachment_ids: ["a2", "a1"] } })).toBe(true);
+  expect(sameRows(rows, same)).toBe(false);
+});
+
+test("die passenden Aufsätze je Slot, ohne Slot zuerst", () => {
+  const fitting = ARMORY.filter((item) => item.category === "aufsaetze" && fitsWeapon(item, ARMORY[0]));
+  expect(attachmentSlots(fitting, CATEGORIES).map((slot) => [slot.label, slot.items.map((item) => item.name)]))
+    .toEqual([[null, ["Griff"]], ["Optik", ["Rotpunkt", "Holo"]]]);
+});
+
+test("für die ganze Waffenklasse übernehmen: nur was passt und neu sperrbar ist, ganz gesperrte und inaktive Waffen bleiben", () => {
+  const rows = {
+    "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1", "a2", "a3"], attachment_modes: { a1: ["suchen"] } },
+    "item:w4": { kind: "item", item_id: "w4", modes: [], attachment_ids: [] },
+    "attachments:s1": { kind: "attachments", item_id: "s1", modes: [], attachment_ids: ["a2"] },
+  };
+  const { rows: next, count } = copyAttachmentsToClass(rows, {}, "w1", ARMORY);
+  expect(count).toBe(1);
+  expect(next["attachments:w2"]).toEqual({ kind: "attachments", item_id: "w2", modes: [], attachment_ids: ["a1"], attachment_modes: { a1: ["suchen"] } });
+  expect(next["attachments:w3"]).toBeUndefined();
+  expect(next["attachments:w4"]).toBeUndefined();
+  expect(next["attachments:s1"]).toEqual(rows["attachments:s1"]);
+  // Holo (inaktiv) bleibt nur, wo es schon gesperrt war.
+  const kept = copyAttachmentsToClass(rows, { "attachments:w2": { attachment_ids: ["a3"] } }, "w1", ARMORY).rows;
+  expect(kept["attachments:w2"].attachment_ids).toEqual(["a1", "a3"]);
+});
+
+test("einen Aufsatz an allen Waffen sperren: eine Zeile für den Aufsatz, die Einzelzeilen fallen weg", () => {
+  const rows = {
+    "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1", "a2"], attachment_modes: { a1: ["suchen"] } },
+    "attachments:w2": { kind: "attachments", item_id: "w2", modes: [], attachment_ids: ["a1"] },
+  };
+  const everywhere = banAttachmentEverywhere(rows, "a1");
+  expect(everywhere["item:a1"]).toEqual({ kind: "item", item_id: "a1", modes: [], attachment_ids: [] });
+  expect(everywhere["attachments:w1"]).toEqual({ kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a2"], attachment_modes: {} });
+  expect(everywhere["attachments:w2"]).toBeUndefined();
+  const inModes = banAttachmentEverywhere(rows, "a1", ["suchen"]);
+  expect(inModes["item:a1"].modes).toEqual(["suchen"]);
+  expect(inModes["attachments:w2"]).toEqual(rows["attachments:w2"]);
+});
+
+test("„nur in …“ (#2298) und „14 Aufsätze · 2 gesperrt“", () => {
+  expect(modesNote({ not_in: ["Stellung", "Kapern"], only_in: ["Suchen"] })).toBe("nur in Suchen");
+  expect(modesNote({ not_in: ["Suchen"] })).toBe("nicht in Suchen");
+  expect(modesNote({ not_in: [] })).toBe("");
+  expect(restrictionParts({ not_in: ["Suchen"], not_at: [{ name: "Blitz 9", modes: [] }] })).toEqual(["nicht in Suchen", "nicht an Blitz 9"]);
+  const section = { not_in: ["Stellung", "Kapern"], only_in: ["Suchen"] };
+  expect(ownRestrictionParts({ not_in: ["Stellung", "Kapern"], only_in: ["Suchen"] }, section)).toEqual([]);
+  expect(attachmentsSummary({ count: 14, banned: ["A", "B"] })).toBe("14 Aufsätze · 2 gesperrt");
+  expect(attachmentsSummary({ count: 1, banned: [] })).toBe("1 Aufsatz");
 });
 
 test("öffentlich: je Kategorie die gesperrten Einträge, danach die Waffen mit Aufsätzen", () => {

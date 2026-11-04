@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AllowedEquipmentView } from "./AllowedEquipmentView";
 
 // Erlaubte Ausrüstung (#2287, Fabian Nr. 99): dieselbe Sicht wie das Regelwerk - erlaubt mit Hinweis, ganze Klasse „Nicht erlaubt“ als
@@ -43,6 +44,49 @@ test("erlaubt mit Hinweisen, ganze Klasse nicht erlaubt als kurze Zeile", () => 
   expect(within(tiles[0]).queryByTestId("allowed-note")).toBeNull();
   expect(within(tiles[1]).getByTestId("allowed-note")).toHaveTextContent("nicht in Suchen, Stellung");
   expect(within(groups[1]).getByTestId("allowed-note")).toHaveTextContent("nicht an Blitz 9, Donner 4 (in Suchen)");
+});
+
+// #2299/#2298 (layout 4): Aufsätze an der Waffe, aufklappbar; „nur in …“.
+const BY_WEAPON = { list: true, layout: 4, categories: [
+  { label: "Waffen", role: "weapon", sections: [
+    { label: "Sturmgewehr", state: "some", not_in: [], banned: [], entries: [
+      { name: "Blitz 9", image_url: null, not_in: ["Stellung", "Kapern"], only_in: ["Suchen"], attachments: { count: 4, banned: ["Laser", "Griff"], groups: [
+        { label: "Optik", icon_url: "/api/static/uploads/optik.png", not_in: [], entries: [
+          { name: "Rotpunkt", image_url: "/api/static/uploads/rotpunkt.png", not_in: [] },
+          { name: "Holo", image_url: null, not_in: ["Stellung", "Kapern"], only_in: ["Suchen"] }] }] } },
+      { name: "Donner 4", image_url: null, not_in: [] },
+      { name: "Sturm 12", image_url: null, not_in: [], attachments: { count: 1, banned: ["Rotpunkt"], groups: [] } },
+    ] },
+  ] },
+  { label: "Perks", role: "item", sections: [{ label: null, state: "some", not_in: [], banned: [], entries: [
+    { name: "Leise Sohlen", image_url: null, not_in: ["Suchen"] }] }] },
+] };
+
+test("je Waffe „N Aufsätze · K gesperrt“, aufgeklappt die erlaubten je Slot - per Tastatur", async () => {
+  const user = userEvent.setup();
+  render(<AllowedEquipmentView data={BY_WEAPON} />);
+  expect(screen.queryByText("Aufsätze")).toBeNull();
+  const [blitz, sturm] = screen.getAllByTestId("allowed-weapon-toggle");
+  expect(blitz).toHaveAttribute("aria-expanded", "false");
+  expect(within(blitz).getByTestId("allowed-weapon-summary")).toHaveTextContent("4 Aufsätze · 2 gesperrt");
+  expect(within(blitz).getByTestId("allowed-note")).toHaveTextContent("nur in Suchen");
+  expect(screen.getAllByTestId("allowed-entry")).toHaveLength(4);
+  expect(screen.queryByTestId("allowed-attachments")).toBeNull();
+
+  blitz.focus();
+  await user.keyboard("{Enter}");
+  expect(blitz).toHaveAttribute("aria-expanded", "true");
+  const panel = screen.getByTestId("allowed-attachments");
+  expect(blitz).toHaveAttribute("aria-controls", panel.id);
+  expect(within(panel).getByTestId("allowed-slot")).toHaveTextContent("Optik");
+  expect(within(panel).getAllByTestId("allowed-attachment").map((tile) => tile.textContent)).toEqual(["Rotpunkt", "Holonur in Suchen"]);
+  expect(within(panel).getByTestId("allowed-attachments-banned")).toHaveTextContent("Gesperrt: Laser, Griff");
+  await user.keyboard(" ");
+  expect(screen.queryByTestId("allowed-attachments")).toBeNull();
+
+  await user.click(sturm);
+  expect(within(screen.getByTestId("allowed-attachments")).getByText("Keine Aufsätze erlaubt.")).toBeInTheDocument();
+  expect(within(sturm).getByTestId("allowed-weapon-summary")).toHaveTextContent("1 Aufsatz · 1 gesperrt");
 });
 
 test("ohne Sperrliste: alles erlaubt, „Alle erlaubt“ an der Klasse", () => {
