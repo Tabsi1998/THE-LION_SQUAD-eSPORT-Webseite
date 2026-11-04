@@ -1434,6 +1434,7 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
     game = await _game(db, league.get("game_id"))
     pool = map_pools.view(map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]),
                                               league.get("game_id")), "league_season")
+    bans_doc = loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]), league.get("game_id"))
     return {
         "league": {**public_league(league), "game": map_pools.game_summary(game)},
         "season": public_season(season),
@@ -1442,9 +1443,11 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
         # „Um was gespielt wird“ - die Gewinne der Season; eine Liga N mit eigenen trägt sie unter ``prizes``.
         "prizes": list(season.get(league_look.PRIZES) or []),
         "map_pool": pool,
-        # Sperrliste (#2218): nur der Schnappschuss der Season, ohne Notiz und Autor.
-        "loadout_bans": loadout_bans.view(loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]),
-                                                                 league.get("game_id")), loadout_bans.SEASON),
+        # Sperrliste (#2218): nur der Schnappschuss der Season, ohne Notiz und Autor; eine ganze Klasse mit ihren Einträgen von
+        # heute (#2287).
+        "loadout_bans": await loadout_bans.live_view(db, bans_doc, loadout_bans.SEASON),
+        # Erlaubte Ausrüstung (#2287, Nr. 99): dieselbe Sicht wie der Baustein im Regelwerk; ``None`` ohne Bibliothek.
+        "allowed_equipment": await loadout_bans.public_allowed(db, league.get("game_id"), bans_doc),
         "divisions": [{
             "id": division["id"], "level": division["level"], "nickname": division.get("nickname"),
             "label": division_label(division),

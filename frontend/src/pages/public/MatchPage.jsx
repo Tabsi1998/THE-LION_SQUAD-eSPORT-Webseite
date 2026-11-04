@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, Check, Flag, MessageSquare, RefreshCw, Send, Trophy, X } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, Flag, MessageSquare, RefreshCw, Send, ShieldCheck, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -28,6 +28,7 @@ import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LeagueRulesNote } from "@/components/tls/league/LeagueRulesNote";
+import { AllowedEquipmentView } from "@/components/tls/league/AllowedEquipmentView";
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
@@ -646,6 +647,17 @@ function MatchPageView() {
               <ScheduleChangePanel block={data.schedule_block} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })} onAskLead={canUseChat ? askStaff : null} />
             </div>
             )}
+            {/* Erlaubte Ausrüstung (#2287, Nr. 99): wie im Regelwerk, aus der Liste, die für dieses Spiel gilt (nach dem Ergebnis die
+                festgehaltene). Zugeklappt, weil lang. */}
+            {data.league?.allowed_equipment ? (
+              <details className="group border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-allowed-equipment">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  <span className="font-heading text-xl font-black uppercase flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#29B6E8]" aria-hidden="true" /> Erlaubte Ausrüstung</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-white/60 transition-transform duration-fast group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <AllowedEquipmentView data={data.league.allowed_equipment} hideTitle className="mt-4" testId="match-allowed-equipment-view" />
+              </details>
+            ) : null}
           </div>
 
           {showChat && (

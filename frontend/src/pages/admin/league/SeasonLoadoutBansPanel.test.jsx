@@ -127,3 +127,53 @@ test("ohne Liste und ohne Ausrüstung: sagt, wo es weitergeht", async () => {
   expect(screen.getByTestId("season-bans-empty-library")).toHaveTextContent("Probe Shooter");
   expect(screen.getByTestId("season-bans-rules-none")).toBeInTheDocument();
 });
+
+// #2287: je Unterkategorie „Ganze Klasse sperren“, auch je Modus; Einträge der ganz gesperrten Klasse sind mitgesperrt.
+const CLASSES = {
+  ...BODY,
+  categories: [
+    { key: "waffen", label: "Waffen", role: "weapon", subcategories: [{ key: "schrot", label: "Schrotflinte", icon_url: null }, { key: "leer", label: "Raketenwerfer", icon_url: null }] },
+    ...BODY.categories.slice(1).map((row) => ({ ...row, subcategories: [] })),
+  ],
+  library: [...BODY.library, { id: "s1", category: "waffen", subcategory: "schrot", name: "Hagel", status: "active", weapon_ids: [], weapon_class_ids: [] },
+    { id: "a4", category: "aufsaetze", name: "Laser", status: "active", weapon_ids: [], weapon_class_ids: ["schrot"] }],
+  list: { ...LIST, entries: [LIST.entries[0], { kind: "class", subcategory: "schrot", subcategory_label: "Schrotflinte", name: "Schrotflinte", category_label: "Waffen",
+    modes: ["suchen"], mode_labels: ["Suchen"], items: [{ item_id: "s1", name: "Hagel" }], attachments: [] }], outdated_item_ids: [],
+  class_new_items: [{ subcategory: "schrot", label: "Schrotflinte", names: ["Hagel"] }] },
+};
+
+test("ganze Klasse sperren: je Modus, in allen Modi mitgesperrt, leere Klasse angeboten", async () => {
+  apiMock.get.mockResolvedValue({ data: CLASSES });
+  renderPanel();
+  const head = await screen.findByTestId("season-bans-class-schrot");
+  expect(within(head).getByTestId("season-bans-class-schrot-toggle")).toBeChecked();
+  expect(screen.getByTestId("season-bans-via-class-s1")).toHaveTextContent("Klasse gesperrt in Suchen");
+  expect(screen.getByTestId("season-bans-class-new")).toHaveTextContent("Schrotflinte: Hagel");
+  expect(screen.getByTestId("season-bans-class-leer")).toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-section-leer")).toHaveTextContent("gilt ab dem ersten");
+  // Der Laser passt über die Klasse zu Hagel.
+  fireEvent.click(screen.getByTestId("season-bans-open-s1"));
+  expect(within(screen.getByTestId("season-bans-attachments-s1")).getByLabelText("Laser")).toBeInTheDocument();
+  // In allen Modi: Hagel ist mitgesperrt und nicht mehr einzeln wählbar.
+  fireEvent.click(within(head).getByLabelText("allen Modi"));
+  expect(screen.getByTestId("season-bans-via-class-s1")).toHaveTextContent("Mit der ganzen Klasse gesperrt");
+  expect(screen.getByTestId("season-bans-toggle-s1")).toBeDisabled();
+  expect(screen.queryByTestId("season-bans-open-s1")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("season-bans-class-leer-toggle"));
+  fireEvent.click(screen.getByTestId("season-bans-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/loadout-bans", {
+    expected_version: 2,
+    entries: [
+      { kind: "class", subcategory: "schrot", modes: [], attachment_ids: [] },
+      { kind: "class", subcategory: "leer", modes: [], attachment_ids: [] },
+      { item_id: "w1", kind: "item", modes: [], attachment_ids: [] },
+    ],
+  }));
+});
+
+test("Aufsätze ohne erlaubte Waffe werden genannt (Nr. 81)", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, unusable_attachments: [{ id: "a3", name: "Kompensator", reason: "keiner Waffe zugeordnet" },
+    { id: "a1", name: "Rotpunkt", reason: "passt nur zu gesperrten Waffen" }] } });
+  renderPanel();
+  expect(await screen.findByTestId("season-bans-unusable")).toHaveTextContent("Kompensator (keiner Waffe zugeordnet), Rotpunkt (passt nur zu gesperrten Waffen)");
+});

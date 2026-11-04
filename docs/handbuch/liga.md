@@ -120,17 +120,40 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
    Namen (Waffen also mit übernehmen, sonst kommen sie ohne Waffe).
 3. **Zustand:** *Deaktivieren* (Ein/Aus-Symbol): kommt auf keine neue Sperrliste, wo er steht, bleibt er. *Archivieren*: zusätzlich
    ausgeblendet. Was auf einer gespeicherten Sperrliste steht, lässt sich nicht löschen, nur archivieren.
-4. **Sperrliste der Season:** auf der Season-Seite im Reiter **Regelwerk und Sperrliste** (`#sperrliste`). Haken bei **sperren**, darunter **Gilt in**: allen Modi oder
+4. **Unterkategorien (Klassen):** Je Kategorie über **Unterkategorien** neben dem Kategorie-Namen – etwa Waffen → Sturmgewehr,
+   Schrotflinte, Pistole oder Aufsätze → Mündung, Optik, Magazin. Ohne Unterkategorien bietet das Blatt einen **Vorschlag** aus
+   Gattungsbegriffen an, den du anpasst; gespeichert wird erst mit **Speichern**. Umbenennen und Umsortieren gehen jederzeit, entfernen nur
+   ohne Einträge (erst verschieben) und nicht, solange eine gespeicherte Sperrliste die Klasse ganz sperrt. Optional ein **Symbol** (eigener
+   Upload, quadratisch). In der Bibliothek stehen die Einträge dann je Unterkategorie in **einklappbaren Gruppen** mit Zähler, Einträge ohne
+   zuerst unter **Ohne Unterkategorie**. Zuordnen: im Eintrag **Unterkategorie** wählen, oder **Auswählen** → Einträge anhaken →
+   **Nach …** → **Verschieben** (nur innerhalb einer Kategorie). Ein **Aufsatz** passt zusätzlich zu ganzen **Waffenklassen**: Eine neue
+   Waffe dieser Klasse passt dann sofort. Ohne Waffe und ohne Klasse passt ein Aufsatz weiter zu keiner. **Aus Spiel übernehmen** legt
+   fehlende Unterkategorien an („neu“ in der Vorschau); ist kein Platz mehr, kommt der Eintrag ohne Unterkategorie und die Meldung sagt es.
+5. **Sperrliste der Season:** auf der Season-Seite im Reiter **Regelwerk und Sperrliste** (`#sperrliste`). Haken bei **sperren**, darunter **Gilt in**: allen Modi oder
    einzelnen. Bei einer Waffe öffnet **Aufsätze einzeln sperren** die passenden Aufsätze – die Waffe bleibt erlaubt, nur diese Aufsätze nicht.
    Ein Aufsatz in seiner eigenen Kategorie gesperrt gilt an jeder Waffe. **Nur gesperrte** zeigt, was schon auf der Liste steht.
-5. **Speichern** legt eine neue **Version** an. Bestehende Staffeln bekommen sie mit **Jetzt übertragen** (auch gesperrte und laufende),
+   Je Unterkategorie gibt es den Schalter **Ganze Klasse sperren**, auch nur für einzelne Modi. Er gilt für **alle Einträge der Klasse, auch
+   für später angelegte** – eine neue Schrotflinte in einer gesperrten Klasse „Schrotflinte“ ist sofort mitgesperrt (Ligaseite, Matchseite) und
+   das Regelwerk meldet **Regelwerk muss freigegeben werden** (2.11). In allen Modi gesperrt, sind die Einträge der Klasse mit „Mit der ganzen
+   Klasse gesperrt“ markiert und einzeln nicht mehr wählbar; nur für einzelne Modi lassen sie sich zusätzlich einzeln sperren. Eine leere
+   Klasse lässt sich schon sperren, sie gilt ab dem ersten Eintrag. Die Version hält Klasse und Einträge zum Zeitpunkt fest.
+6. **Speichern** legt eine neue **Version** an. Bestehende Staffeln bekommen sie mit **Jetzt übertragen** (auch gesperrte und laufende),
    neue Staffeln gleich beim Anlegen. Ein Spiel hält die Version fest, die bei seinem Ergebnis galt. **Versionen vergleichen** zeigt neu
    gesperrt, geändert und wieder erlaubt.
-6. **Regelwerk:** Steht der Baustein **Sperrliste** im Regelwerk, sagt der Abschnitt, ob die letzte Fassung noch den alten Stand zeigt.
-   **Neue Version vorbereiten** führt ins Regelwerk; dort sind die Unterschiede markiert, du gibst frei und wählst, ob neu zugestimmt werden
-   muss (2.11). Jede Fassung friert ihre Liste ein.
+7. **Regelwerk:** Der Baustein heißt **Erlaubte Ausrüstung** (`[[baustein:loadout_bans]]`). Er zeigt nicht die Sperren, sondern **was
+   erlaubt ist**: alle **aktiven** Einträge der Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild. Nur in einzelnen
+   Modi gesperrt, steht ein Eintrag mit „nicht in …“ da, ein an einzelnen Waffen gesperrter Aufsatz mit „nicht an …“. Eine ganz gesperrte
+   Klasse ist nur eine Zeile „Schrotflinte · nicht erlaubt“ (mit den Namen in Klammern), eine ohne jede Einschränkung sagt „alle erlaubt“.
+   Inaktive und archivierte Einträge fehlen. Im PDF steht eine Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen. Weil der
+   Baustein die Bibliothek von heute liest, meldet **jeder neue aktive Eintrag** (auch einer in einer gesperrten Klasse) und jede neue
+   Version der Sperrliste **Regelwerk muss freigegeben werden**. Steht der Baustein im Regelwerk, sagt der Abschnitt Sperrliste, ob die
+   letzte Fassung noch den alten Stand zeigt; **Neue Version vorbereiten** führt ins Regelwerk, dort sind die Unterschiede markiert, du gibst
+   frei und wählst, ob neu zugestimmt werden muss (2.11). Jede Fassung friert ihre Liste ein; ältere Fassungen mit der Sperrliste bleiben,
+   wie sie veröffentlicht wurden.
 
-Öffentlich steht die Liste auf der Ligaseite unter dem Map-Pool, nur wenn die Season sichtbar ist. Rechte: Bibliothek wie Maps (Bereich
+Öffentlich steht auf der Ligaseite unter dem Map-Pool **Erlaubte Ausrüstung** – genau die Sicht des Regelwerks, nur wenn die Season
+sichtbar ist und das Spiel eine Bibliothek hat. Auf der **Matchseite** eines Ligaspiels steht sie unten aufklappbar, aus der Liste, die für
+dieses Spiel gilt (nach dem Ergebnis die festgehaltene). Rechte: Bibliothek wie Maps (Bereich
 Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständigkeit der Liga).
 
 <table>
@@ -141,6 +164,17 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 <tr>
 <td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season: Hinweis aufs Regelwerk, gesperrte Waffe mit Modus, Aufsätze an einer Waffe" width="560"></td>
 <td><img src="../assets/liga/sperrliste-ligaseite-handy.png" alt="Ligaseite am Handy: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/ausruestung-unterkategorien.png" alt="Bibliothek mit Unterkategorien: Gruppen Sturmgewehr und Schrotflinte mit Zähler, Knöpfe Unterkategorien und Auswählen" width="560"></td>
+<td><img src="../assets/liga/erlaubte-ausruestung-handy.png" alt="Ligaseite am Handy: Erlaubte Ausrüstung je Unterkategorie, Hinweis nicht in Stellung, Schrotflinte nicht erlaubt" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/sperrliste-klassen.png" alt="Sperrliste der Season: je Unterkategorie der Schalter Ganze Klasse sperren, Hinweis auf neu hinzugekommene Einträge" width="560"></td>
+<td><img src="../assets/liga/regelwerk-erlaubte-ausruestung-pdf.png" alt="PDF des Regelwerks: Tabelle Kategorie, Unterkategorie, Erlaubt, Einschränkungen" width="220"></td>
+</tr>
+<tr>
+<td colspan="2"><img src="../assets/liga/regelwerk-erlaubte-ausruestung.png" alt="Regelwerk im Web: Anlage Erlaubte Ausrüstung mit Karten je Unterkategorie und der Zeile Schrotflinte nicht erlaubt" width="560"></td>
 </tr>
 </table>
 
@@ -613,7 +647,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Modusfolge | `[[baustein:mode_order]]` | Modus je Map | Season → Spielbetrieb → Serie |
    | Check-in | `[[baustein:checkin]]` | Fenster (öffnet und schließt, Minuten um den Termin), Mindestens Anwesende je Seite, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen (2.7b); ohne Check-in ein Satz | Season → Termine → Check-in vor dem Spiel |
    | Veto | `[[baustein:veto]]` | Team A (Heim oder Los), Zeit je Schritt, Start nach dem Check-in und die Schrittfolge nummeriert („1. Team A sperrt eine Map (Stellung)“, 2.7d); ohne Veto ein Satz | Season → Spielbetrieb → Veto |
-   | Sperrliste | `[[baustein:loadout_bans]]` | gesperrte Waffen, Aufsätze, Ausrüstung mit Bild (gedacht für Anlage A, 2.1a) | Season → Regelwerk und Sperrliste |
+   | Erlaubte Ausrüstung | `[[baustein:loadout_bans]]` | was erlaubt ist: aktive Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild, Hinweise „nicht in …“ und „nicht an …“, ganz gesperrte Klasse als Zeile „nicht erlaubt“ (PDF: Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen; gedacht für Anlage A, 2.1a) | Spiel → Ausrüstung, Season → Regelwerk und Sperrliste |
    | Einstellungen je Modus | `[[baustein:mode_settings]]` | je Modus Zeitlimit, Zeit je Runde, Einstellungen (Tabelle), Regeltext | Spiel → Modi, Season → Ergebnisregeln |
    | Modi der Season | `[[baustein:modes]]` | Tabelle Modus (mit Symbol) · Ergebnisregel in Klartext (Ziel, Runden, Verlängerung, Remis) · Zeit · Spieler je Seite | Season → Spielbetrieb → Modi, Ergebnisregeln |
    | Spielformat | `[[baustein:format]]` | Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste; Abweichungen je Liga N | Season → Spielbetrieb → Serie, Anmeldung und Kader, Ligen |
@@ -642,6 +676,8 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{eligibility.min_age}}`, `{{eligibility.wait_days}}`, `{{eligibility.roster_deadline}}`, `{{eligibility.transfer_windows}}`, `{{eligibility.entry_policy}}`, `{{eligibility.id_fields}}` | Spielberechtigung (3.9) |
    | `{{eligibility.platform}}`, `{{eligibility.crossplay}}`, `{{eligibility.input_device}}` | Plattform je Season (2.7c): „PC und PlayStation“ oder „alle Plattformen“, Crossplay „an“/„aus“, Eingabegerät; ohne Plattform-Feld „(nicht festgelegt)“ |
    | `{{application.opens}}`, `{{application.closes}}`, `{{application.slots}}` | Anmeldefenster und Startplätze (2.5a) |
+   | `{{protest.hours}}`, `{{appeal.hours}}`, `{{evidence.keep_days}}` | Protestfrist, Einspruchsfrist, Aufbewahrung der Beweise. Heute gelten die Vorgaben 48 Stunden, 48 Stunden, 30 Tage; einstellbar werden sie mit den Paketen Proteste und Strafen |
+   | `{{match.break_after_map}}`, `{{match.break_minutes}}` | Standardpause zwischen den Maps (Vorgabe nach Map 2, 5 Min.); einstellbar mit dem Paket Vorfälle |
    | `{{mode:<kennung>.name}}`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus: Name, Regel in Klartext, Ziel, Rundenlimit, Zeitlimit, Zeit je Runde, Spieler je Seite, Verlängerung und Remis („ja“/„nein“). Die Kennung steht in der Liste. |
 
 5. **Vorschau** zeigt die Seite mit den Werten von heute und den Änderungen zur letzten Version.

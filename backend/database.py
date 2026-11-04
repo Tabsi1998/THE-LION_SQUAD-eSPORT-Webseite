@@ -125,6 +125,8 @@ async def init_indexes():
     await db.loadout_bans.create_index("id", unique=True)
     await db.loadout_bans.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
     await db.loadout_bans.create_index("game_id")
+    # Erlaubte Ausrüstung am Spiel (#2287): je Inhalt eine Zeile, Kennung = Fingerabdruck.
+    await db.loadout_allowed.create_index("id", unique=True)
     # Maps in Ergebnisblättern der Team-Liga (#1616): nur fürs Löschen einer Map gefragt (``game_maps.in_results``).
     await db.reference_round_results.create_index("matches.maps.map_id", sparse=True)
     await db.reference_round_results.create_index("pending_draft.matches.maps.map_id", sparse=True)

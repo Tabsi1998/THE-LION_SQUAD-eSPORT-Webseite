@@ -24,7 +24,9 @@ TESTS = ROOT / "backend" / "tests"
 AREA = re.compile(r"league|squad|match|map|flow_harness|result_confirm|result_auto_confirm|result_contract|deadline_races"
                   r"|tournament_flows|dashboard_tasks|game_default_pool|platform_links|game_mode"
                   # Ausrüstung und Sperrliste (#2218): eindeutige Indizes und Versionen wie bei Maps und Pools.
-                  r"|game_equipment|loadout")
+                  r"|game_equipment|loadout"
+                  # Unterkategorien (#2287): positionsgenaues Schreiben in den Kategorien des Spiels.
+                  r"|equipment_subcategories")
 USES_HARNESS = re.compile(r"\bmake_flow\b")
 
 

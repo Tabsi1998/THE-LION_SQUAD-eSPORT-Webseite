@@ -64,6 +64,14 @@ const PUBLIC_SEASON = {
   season: { id: "s1", name: "Season 1", slug: "season-1", start_date: "2026-11-09T23:00:00+00:00", end_date: "2027-01-18T22:59:59+00:00", matchday_days: 7,
     default_match_weekday: 6, default_match_time: "20:00", best_of: 3, team_size: 4, match_points: { win: 3, draw: 1, loss: 0 }, blocked_periods: [] },
   look: {}, prizes: [], map_pool: null, divisions: [], rules: null, application: null, loadout_bans: LIST,
+  // Erlaubte Ausrüstung (#2287, Nr. 99), wie der Server sie aus Bibliothek und Liste rechnet - hier gekürzt.
+  allowed_equipment: { list: true, layout: 3, categories: [
+    { label: "Waffen", sections: [{ label: null, state: "some", not_in: [], banned: [], entries: [
+      { name: "Waffe 1", image_url: null, not_in: [], not_at: [] }, { name: "Waffe 2", image_url: null, not_in: [], not_at: [] }] }] },
+    { label: CATEGORIES[1].label, sections: [{ label: null, state: "some", not_in: [], banned: [], entries: [
+      { name: `Rotpunkt ${LONG}`, image_url: null, not_in: [], not_at: [{ name: "Waffe 2", modes: [] }] },
+      { name: "Aufsatz 5", image_url: null, not_in: ["Suchen & Zerstören"], not_at: [] }] }] },
+  ] },
 };
 
 async function mock(page) {
@@ -136,7 +144,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await noSideScroll(page);
       await sheet.getByTestId("equipment-save").click();
       await expect.poll(() => calls.post.length).toBe(1);
-      expect(calls.post[0]).toEqual(["/games/g1/equipment", { category: "aufsaetze", name: "Laservisier", image_url: null, note: null, weapon_ids: ["w1"] }]);
+      expect(calls.post[0]).toEqual(["/games/g1/equipment", { category: "aufsaetze", subcategory: null, name: "Laservisier", image_url: null, note: null,
+        weapon_ids: ["w1"], weapon_class_ids: [] }]);
       // Die Bibliothek speichert sofort: kein Punkt am Reiter, und Verlassen der Seite fragt nicht nach.
       await expect(page.getByTestId("game-tab-dirty-ausruestung")).toHaveCount(0);
       await page.getByTestId("game-page-back").click();
@@ -178,15 +187,15 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("season-sync-hint")).toContainText("2 bestehenden Staffeln");
     });
 
-    test("Ligaseite: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen", async ({ page }) => {
+    test("Ligaseite: erlaubte Ausrüstung nach Kategorien mit Hinweisen (#2287, Nr. 99)", async ({ page }) => {
       await page.setViewportSize({ width, height });
       await mock(page);
       await page.goto("/liga/probe-liga/season-1");
-      const block = page.getByTestId("league-loadout-bans");
-      await expect(block.getByRole("heading", { level: 2 })).toHaveText("Sperrliste");
-      await expect(block.getByTestId("loadout-ban-group")).toHaveCount(2);
-      await expect(block.getByTestId("loadout-ban-weapon")).toContainText("Aufsatz 4");
-      await expect(block.getByTestId("loadout-ban-modes").nth(1)).toHaveText("nur Suchen & Zerstören");
+      const block = page.getByTestId("league-allowed-equipment");
+      await expect(block.getByRole("heading", { level: 2 })).toHaveText("Erlaubte Ausrüstung");
+      await expect(block.getByTestId("allowed-group")).toHaveCount(2);
+      await expect(block.getByTestId("allowed-note").filter({ hasText: "nicht an" })).toHaveText("nicht an Waffe 2");
+      await expect(block.getByTestId("allowed-note").filter({ hasText: "nicht in" })).toHaveText("nicht in Suchen & Zerstören");
       await block.scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await block.screenshot({ path: test.info().outputPath(`ligaseite-sperrliste-${width}.png`) });

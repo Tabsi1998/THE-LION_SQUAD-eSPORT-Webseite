@@ -354,6 +354,9 @@ async def _remove(db, name: str, scans: list[dict], *, documents: bool = False) 
             path = base / name
             for width in VARIANT_WIDTHS:
                 _unlink(variant_path(path, width))
+                # Zwischendateien eines abgebrochenen Builds (``.<stem>-<breite>.<zufall>.tmp``) gehören zur Person wie die Fassung.
+                for temp in variant_path(path, width).parent.glob(f".{path.stem}-{width}.*.tmp"):
+                    _unlink(temp)
             _unlink(path)
             if path.suffix.lower() == ".svg":
                 _unlink(path.with_suffix(".png"))  # PNG-Fassung eines SVG-Logos (#1952)

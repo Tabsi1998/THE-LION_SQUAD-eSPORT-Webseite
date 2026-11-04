@@ -13,7 +13,7 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Spiele → Zahnrad** (`/admin/games/<Spiel>`) – die Spielseite mit den Reitern **Allgemein**,
   **Spiel-IDs**, **Modi** (`#modi`), **Maps** (`#maps`, Map-Bibliothek mit Bildern; die alte Adresse
   `/admin/games/<Spiel>/maps` leitet dorthin weiter) und **Ausrüstung** (`#ausruestung`, Waffen, Aufsätze und übrige Ausrüstung
-  für die Sperrlisten der Liga; die alte Adresse `/admin/games/<Spiel>/equipment` leitet dorthin), siehe 3.12, 3.14 und
+  in Kategorien und Unterkategorien wie Sturmgewehr oder Optik, für die Sperrlisten der Liga; die alte Adresse `/admin/games/<Spiel>/equipment` leitet dorthin), siehe 3.12, 3.14 und
   [Liga leiten 2.1a](liga.md#21a-ausrüstung-und-sperrliste)
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga N und Staffeln (3.15); den ganzen Weg bis zum
   Saisonende erklärt [Liga leiten](liga.md)

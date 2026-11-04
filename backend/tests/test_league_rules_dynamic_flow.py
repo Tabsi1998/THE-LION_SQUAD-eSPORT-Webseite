@@ -126,6 +126,56 @@ async def test_publishing_freezes_blocks_and_variables_and_a_changed_setting_nev
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("used", [False, True])
+async def test_a_preset_variable_only_asks_for_a_release_when_the_version_uses_it(flow, used):
+    """Vorab angelegte Variablen (E.2, E.3, D.5): Eine Fassung ohne sie bleibt ruhig, wenn das Season-Feld später kommt; nutzt sie die
+    Variable, meldet die Verwaltung „Regelwerk muss freigegeben werden“ mit altem und neuem Wert."""
+    w = await make_world(flow)
+    await set_rule(flow, w, RULE)
+    body = BODY + ("\n\n# § 6 Proteste\nFrist {{protest.hours}}, Einspruch {{appeal.hours}}, Beweise {{evidence.keep_days}}, "
+                   "Pause {{match.break_minutes}} nach Map {{match.break_after_map}}." if used else "")
+    version = await publish(flow, w, body=body, annexes=[])
+    sid = w["season"]["id"]
+    if used:
+        assert version["frozen_vars"][sid]["protest.hours"]["value"] == "48 Stunden", "eingefroren mit der Vorgabe"
+    else:
+        assert not {"protest.hours", "match.break_minutes"} & set(version["frozen_vars"][sid]), "nur, was der Text nutzt"
+    flow.act_as(w["lead"])
+    assert ok(await flow.get(season_scope(w)))["data_changes"] is None
+
+    # Das spätere Paket schreibt das Season-Feld.
+    await flow.db.league_seasons.update_one({"id": sid}, {"$set": {
+        "protest_hours": 72, "appeal_hours": 24, "evidence_keep_days": 60, "map_break_after": 3, "map_break_minutes": 10}})
+
+    view = ok(await flow.get(season_scope(w)))
+    if not used:
+        assert view["data_changes"] is None and view["proposal"] is None
+        assert ok(await flow.get("/api/users/me/duty"))["rules_pending"] == []
+        return
+    rows = {row["block"]: (row["before"], row["after"]) for row in view["data_changes"]["rows"] if row["kind"] == "variable"}
+    assert rows == {"protest.hours": ("48 Stunden", "72 Stunden"), "appeal.hours": ("48 Stunden", "24 Stunden"),
+                    "evidence.keep_days": ("30 Tage", "60 Tage"), "match.break_after_map": ("2", "3"),
+                    "match.break_minutes": ("5 Min.", "10 Min.")}
+    assert "Frist 72 Stunden, Einspruch 24 Stunden, Beweise 60 Tage, Pause 10 Min. nach Map 3." in body_of(view["proposal"])
+    assert ok(await flow.get("/api/users/me/duty"))["rules_pending"][0]["kind"] == "changed"
+
+    # Der Fingerabdruck deckt die neuen Werte: Ändert sich das Feld nach dem Vorschlag noch einmal, lehnt die Freigabe ab;
+    # mit dem frischen Vorschlag geht sie durch und friert den neuen Wert ein.
+    stale = view["proposal"]["fingerprint"]
+    await flow.db.league_seasons.update_one({"id": sid}, {"$set": {"protest_hours": 96}})
+    release = {"base_version_id": version["id"], "valid_from": today(), "change_reason": "Protestfrist", "requires_consent": False}
+    refused = await flow.post(f"{season_scope(w)}/proposal/publish", json={**release, "fingerprint": stale})
+    assert refused.status_code == 409
+    fresh = ok(await flow.get(season_scope(w)))["proposal"]["fingerprint"]
+    assert fresh != stale
+    released = ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={**release, "fingerprint": fresh}))
+    frozen = {name: row["value"] for name, row in released["frozen_vars"][sid].items()}
+    assert {name: frozen[name] for name in rows} == {"protest.hours": "96 Stunden", "appeal.hours": "24 Stunden",
+                                                     "evidence.keep_days": "60 Tage", "match.break_after_map": "3",
+                                                     "match.break_minutes": "10 Min."}
+
+
+@pytest.mark.asyncio
 async def test_a_draft_blocks_the_proposal_and_an_old_base_is_refused(flow):
     w = await make_world(flow)
     version = await publish(flow, w, body=BODY, annexes=[], confirm_empty=True)
