@@ -16,6 +16,8 @@ Das System prüft nicht, was im Spiel benutzt wird - Verstöße laufen über Pro
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from typing import List, Literal, Optional
 
@@ -514,8 +516,36 @@ async def match_stamp(db, match: dict) -> dict:
         return {}
     # Fehler gehen hier nicht still verloren (Review C.4): Ein fehlender Vermerk ließe später eine andere Liste gelten.
     doc = valid_for(await current(db, TOURNAMENT, tournament["id"]), tournament.get("game_id"))
+    # Erlaubte Ausrüstung (#2287): was in diesem Moment erlaubt ist, als Schnappschuss - ein späterer Eintrag ändert das Spiel nicht mehr.
+    allowed = await public_allowed(db, tournament.get("game_id"), doc)
     # Auch „keine Liste“ wird festgehalten (``None``) - eine später übertragene Liste gilt für dieses Spiel nicht.
-    return {STAMP: doc["id"] if doc else None}
+    return {STAMP: doc["id"] if doc else None, ALLOWED_STAMP: await hold_allowed(db, tournament.get("game_id"), allowed) if allowed else None}
+
+
+# Erlaubte Ausrüstung am Spiel (#2287, Codex Runde 1): je Inhalt eine Zeile in ``loadout_allowed`` (Kennung = Fingerabdruck), viele Spiele
+# teilen sie. Das Spiel trägt nur die Kennung; unveränderlich wie eine Version der Sperrliste.
+ALLOWED_STAMP = "loadout_allowed_id"
+
+
+async def hold_allowed(db, game_id: str | None, data: dict) -> str:
+    key = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    await db.loadout_allowed.update_one({"id": key}, {"$setOnInsert": {"id": key, "game_id": game_id, "data": data,
+                                                                      "created_at": now_utc().isoformat()}}, upsert=True)
+    return key
+
+
+async def match_allowed(db, tournament: dict | None, match: dict | None) -> dict | None:
+    """Die erlaubte Ausrüstung eines Spiels: nach dem Ergebnis der Schnappschuss von damals, sonst aus der Liste, die gilt, und der Bibliothek
+    von heute. Ältere Spiele mit Vermerk, aber ohne Schnappschuss, rechnen wie bisher; ein fertiges Spiel von vor C.4 zeigt nichts."""
+    match = match or {}
+    if ALLOWED_STAMP in match:
+        held = match.get(ALLOWED_STAMP)
+        row = await db.loadout_allowed.find_one({"id": held}, {"_id": 0, "data": 1}) if held else None
+        return (row or {}).get("data")
+    if not knows_list(match):
+        return None
+    doc, _held = await effective_doc(db, tournament, match)
+    return await public_allowed(db, (tournament or {}).get("game_id"), doc)
 
 
 # ---------------------------------------------------------------- Regelwerk-Baustein

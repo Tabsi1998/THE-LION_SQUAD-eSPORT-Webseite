@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
-from league_match_world import GAME_ID, world as match_world  # noqa: E402
+from league_match_world import GAME_ID, duel, ids, two_nil, world as match_world  # noqa: E402
 from league_rules_world import make_world, publish, season_page, season_scope  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from loadout_world import IMAGE, add_library, attachments, bans_url, item, save_bans, standard  # noqa: E402
@@ -319,3 +319,44 @@ async def test_images_of_class_entries_are_usages_in_the_media_library(flow):
     ok(await save_bans(flow, w, [klass(w, "Schrotflinte")]))
     places = {(collection, field) async for collection, _doc, field, _name, _text in media_audit.iter_usages(flow.db, {"blitz-1.webp"})}
     assert ("loadout_bans", "entries.items.image_url") in places
+
+
+# ---------------------------------------------------------------- Erlaubte Ausrüstung am Spiel (Codex Runde 1, Fund 1)
+
+async def match_library(flow) -> None:
+    await flow.db.game_equipment_categories.insert_one({"game_id": GAME_ID, "categories": [
+        {"key": "waffen", "label": "Waffen", "role": "weapon", "subcategories": []}]})
+    for item_id, name in (("e1", "Blitz 9"), ("e2", "Donner 4")):
+        await flow.db.game_equipment.insert_one({"id": item_id, "game_id": GAME_ID, "category": "waffen", "name": name,
+                                                 "name_key": name.casefold(), "status": "active"})
+
+
+def allowed_names(page: dict) -> list[str]:
+    data = page["league"]["allowed_equipment"] or {}
+    return [entry["name"] for category in data.get("categories") or [] for section in category["sections"] for entry in section["entries"]]
+
+
+@pytest.mark.asyncio
+async def test_a_finished_match_keeps_its_allowed_list(flow):
+    """Nach dem Ergebnis gilt, was damals erlaubt war: ein neuer, ein umbenannter oder ein deaktivierter Eintrag ändert die Matchseite nicht
+    mehr. Ein offenes Spiel liest die Bibliothek von heute."""
+    w = await match_world(flow)
+    await match_library(flow)
+    flow.act_as(None)
+    assert allowed_names(ok(await flow.get(f"/api/matches/{w['match']['id']}/page"))) == ["Blitz 9", "Donner 4"]
+    flow.act_as(w["users"]["Kapitaen"])
+    ok(await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=ids(w, "Kapitaen", "Mila"))))
+    flow.act_as(w["users"]["Falke1"])
+    ok(await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=ids(w, "Falke1", "Falke2"), side="reg_h")))
+    stored = await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    assert stored["status"] == "completed" and stored.get("loadout_allowed_id")
+    flow.act_as(None)
+    held = ok(await flow.get(f"/api/matches/{w['match']['id']}/page"))["league"]["allowed_equipment"]
+
+    await flow.db.game_equipment.insert_one({"id": "e3", "game_id": GAME_ID, "category": "waffen", "name": "Neu", "name_key": "neu",
+                                             "status": "active"})
+    await flow.db.game_equipment.update_one({"id": "e1"}, {"$set": {"name": "Blitz 10"}})
+    await flow.db.game_equipment.update_one({"id": "e2"}, {"$set": {"status": "inactive"}})
+    assert ok(await flow.get(f"/api/matches/{w['match']['id']}/page"))["league"]["allowed_equipment"] == held
+    later = await duel(flow, w["tournament"], w["reg_a"], w["reg_h"], matchday=2)
+    assert allowed_names(ok(await flow.get(f"/api/matches/{later['id']}/page"))) == ["Blitz 10", "Neu"]

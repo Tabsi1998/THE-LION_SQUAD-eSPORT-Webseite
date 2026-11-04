@@ -47,7 +47,8 @@ HOLD_SECONDS = 10
 GRACE_SECONDS = 2
 NO_SHOW_NOTE = "Nicht erschienen"
 # Was mit dem Ergebnis gilt und beim Zurücknehmen mit weggeht (Liga: #1650, Regelwerk: #1646, Sperrliste: #2218).
-RESULT_ONLY_FIELDS = ("games", "lineups_missing", "rule_version_id", "lineups", "lineup_overdue_at", "loadout_ban_id")
+RESULT_ONLY_FIELDS = ("games", "lineups_missing", "rule_version_id", "lineups", "lineup_overdue_at", "loadout_ban_id",
+                      "loadout_allowed_id")
 BUSY_DETAIL = "Für dieses Spiel wird gerade ein Ergebnis gespeichert. Bitte kurz warten oder „Rückgängig“ nutzen."
 # Felder einer Ergebniszeile, die das gehaltene Ergebnis aufhebt - dieselben, die der Ergebnis-Weg liest.
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "time_ms", "dnf", "forfeit", "note")

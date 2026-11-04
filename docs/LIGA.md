@@ -1623,7 +1623,11 @@ Unterkategorie · Erlaubt · Einschränkungen, je Unterkategorie und Einschränk
 Unterkategorie meint). Ältere Fassungen (ohne `layout`, mit den Sperren) bleiben Wort für Wort; nach dem Einspielen schlägt die
 Verwaltung für eine Season mit dem Baustein darum einmal eine neue Fassung vor. **Liga- und Matchseite** zeigen dieselbe Sicht:
 `allowed_equipment` (gleiche Form wie `data`, `null` ohne Bibliothek) in `GET /api/leagues/{liga}/{season}` und im Block `league` der
-Matchseite (dort aus der Liste, die für das Spiel gilt).
+Matchseite (dort aus der Liste, die für das Spiel gilt). Beim ersten Festschreiben eines Ergebnisses hält das Spiel neben
+`loadout_ban_id` auch die erlaubte Ausrüstung fest: `matches_v2.loadout_allowed_id` zeigt auf eine unveränderliche Zeile in
+`loadout_allowed` (`{id = sha256 des Inhalts, game_id, data, created_at}`, viele Spiele teilen sie; Vereinsinhalt, Bilder als Verwendung in
+der Mediathek). Danach liefert die Matchseite nur noch diesen Schnappschuss; „Rückgängig“ nimmt ihn mit, ältere Spiele ohne ihn rechnen wie
+bisher (Codex Runde 1).
 
 **Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
 
