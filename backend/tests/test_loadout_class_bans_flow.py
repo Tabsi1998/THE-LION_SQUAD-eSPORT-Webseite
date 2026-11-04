@@ -243,8 +243,8 @@ async def test_the_rules_show_what_is_allowed_and_new_entries_ask_for_release(fl
     assert sections["Sturmgewehr"]["entries"] == [{"name": "Blitz 9", "image_url": IMAGE, "not_in": ["Suchen"], "not_at": []}]
     web = league_rule_blocks.plain_value("loadout_bans", frozen, "markdown")
     assert "*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)" in web and "*Raketenwerfer* · **nicht erlaubt**" in web
-    assert f"- ![Ausrüstung]({IMAGE}) Blitz 9 *nicht in Suchen*" in web and "- Griff *nicht an Donner 4*" in web
-    assert "- Hagel" not in web, "eine gesperrte Klasse zeigt keine Karten"
+    assert f"- ![Ausrüstung]({IMAGE}) ++Blitz 9++ *nicht in Suchen*" in web and "- ++Griff++ *nicht an Donner 4*" in web
+    assert "++Hagel++" not in web, "eine gesperrte Klasse zeigt keine Karten"
     text = league_rule_blocks.plain_value("loadout_bans", frozen, "text")
     assert "| Waffen | Schrotflinte | nicht erlaubt (Bö, Hagel) | – |" in text and "| Perks | – | alle: Leise Sohlen | – |" in text
     flow.act_as(None)

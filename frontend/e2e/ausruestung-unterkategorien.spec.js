@@ -105,14 +105,14 @@ const ALLOWED = { list: true, layout: 3, categories: [
   { label: "Perks", sections: [{ label: null, state: "all", not_in: [], banned: [], entries: [entry("k2"), entry("k1")] }] },
 ] };
 PUBLIC_SEASON.allowed_equipment = ALLOWED;
-const card = (id, note = "") => `- ![Ausrüstung](${byId(id).image_url}) ${byId(id).name}${note ? ` *${note}*` : ""}`;
+const card = (id, note = "", image = true) => `- ${image ? `![Ausrüstung](${byId(id).image_url}) ` : ""}++${byId(id).name}++${note ? ` *${note}*` : ""}`;
 const BLOCK = [
   "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*", "", "**Waffen**", "",
   card("o2"), card("o1", "nicht in Suchen & Zerstören"), "",
-  `![Klassen-Symbol](${IMG("klasse-sturm")}) *Sturmgewehr*`, card("w1"), card("w2"), `- Kar ${LONG} *nicht in Suchen & Zerstören*`, "",
+  `![Klassen-Symbol](${IMG("klasse-sturm")}) *Sturmgewehr*`, card("w1"), card("w2"), `- ++Kar ${LONG}++ *nicht in Suchen & Zerstören*`, "",
   `![Klassen-Symbol](${IMG("klasse-schrot")}) *Schrotflinte* · **nicht erlaubt** (Bö, Hagel, Sturm 12)`, "",
   `*Pistole ${LONG}* · alle erlaubt`, card("p1"), "",
-  "**Aufsätze**", "", card("a2"), card("a3"), "", "*Optik*", card("a1", "nicht an Donner 4"), "",
+  "**Aufsätze**", "", card("a2", "", false), card("a3", "", false), "", "*Optik*", card("a1", "nicht an Donner 4", false), "",
   "**Perks**", "", card("k2"), card("k1"),
 ].join("\n");
 const V1 = { id: "r1", scope: "league_season", version: 1, label: "Version 1", title: "Regelwerk", valid_from: "2026-11-04", published_at: "2026-11-04T10:00:00+00:00",
@@ -267,6 +267,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       expect(await cards.evaluate((node) => getComputedStyle(node).display)).toBe("grid");
       await expect(annex.locator("img[alt='Klassen-Symbol']").first()).toBeVisible();
       await expect(annex.getByText("nicht erlaubt")).toBeVisible();
+      // Codex Runde 1: Alle Kategorien gleich - jede Kartenliste im Raster (auch Aufsätze ohne Bilder), gleiche Überschriften.
+      const lists = annex.locator("ul").filter({ has: page.locator("u") });
+      expect(await lists.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).display))).toEqual(Array(6).fill("grid"));
+      const heads = await annex.locator("p > strong:only-child").evaluateAll((nodes) => nodes.map((node) => [node.textContent, getComputedStyle(node).fontSize, getComputedStyle(node).textTransform]));
+      expect(heads.map((row) => row[0])).toEqual(["Waffen", "Aufsätze", "Perks"]);
+      expect(new Set(heads.map((row) => `${row[1]} ${row[2]}`)).size).toBe(1);
       await annex.scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await annex.screenshot({ path: test.info().outputPath(`regelwerk-gruppiert-${width}.png`) });

@@ -170,7 +170,7 @@ async def test_the_block_shows_images_on_the_web_and_a_clean_list_in_the_pdf(flo
     perks = frozen["data"]["categories"][-1]["sections"][0]["entries"]
     assert perks == [{"name": "Leise Sohlen", "image_url": PERK_IMAGE, "not_in": ["Suchen"], "not_at": []}]
     web, pdf_text = (league_rule_blocks.plain_value("loadout_bans", frozen, variant) for variant in ("markdown", "text"))
-    assert f"- ![Ausrüstung]({PERK_IMAGE}) Leise Sohlen *nicht in Suchen*" in web and "Blitz 9" not in web
+    assert f"- ![Ausrüstung]({PERK_IMAGE}) ++Leise Sohlen++ *nicht in Suchen*" in web and "Blitz 9" not in web
     assert "![" not in pdf_text and "| Perks | – | Leise Sohlen | nicht in Suchen |" in pdf_text
     # Nr. 81 (Codex Runde 1): Griff und Lauf passen nur zu Blitz 9 (gesperrt) und Donner 4 (dort gesperrt), Rotpunkt nur zu Blitz 9,
     # der Kompensator zu keiner Waffe - keiner davon ist erlaubt.

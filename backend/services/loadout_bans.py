@@ -814,7 +814,9 @@ def _allowed_card(entry: dict, section: dict) -> str:
     image = f"![{CARD_ALT}]({entry['image_url']}) " if entry.get("image_url") else ""
     parts = _own_parts(entry, section)
     note = f" *{_cell(' · '.join(parts))}*" if parts else ""
-    return f"- {image}{_cell(entry.get('name'))}{note}"
+    # Der Name als Marke (``++…++``, im Web ``<u>``, Codex Runde 1): So erkennt das Web jede Kartenliste, auch ohne ein einziges Bild, und
+    # stellt alle Kategorien gleich dar (``rules.css``).
+    return f"- {image}++{_cell(entry.get('name'))}++{note}"
 
 
 def _allowed_head(section: dict) -> str:

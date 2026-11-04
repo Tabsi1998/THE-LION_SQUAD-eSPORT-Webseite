@@ -98,12 +98,12 @@ def test_web_shows_cards_and_short_lines_the_pdf_a_table():
     data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
     web = markdown_text.plain(loadout_bans.render_block(data, "markdown"))
     assert web.startswith("*Erlaubt ist die Ausrüstung, die hier steht")
-    assert "**Waffen**" in web and "- Ohne Klasse" in web
+    assert "**Waffen**" in web and "- ++Ohne Klasse++" in web
     assert f"![Klassen-Symbol]({ICON}) *Sturmgewehr*" in web
-    assert f"- ![Ausrüstung]({IMAGE}) Blitz 9\n" in web and "- Donner 4 *nicht in Suchen*" in web
-    assert "*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)" in web and "- Hagel" not in web
-    assert "*Pistole* · nicht in Suchen" in web and "- Funke\n" in web and "- Zunder *nicht in Suchen, Stellung*" in web
-    assert "- Rotpunkt *nicht an Blitz 9, Donner 4 (in Suchen)*" in web
+    assert f"- ![Ausrüstung]({IMAGE}) ++Blitz 9++\n" in web and "- ++Donner 4++ *nicht in Suchen*" in web
+    assert "*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)" in web and "++Hagel++" not in web
+    assert "*Pistole* · nicht in Suchen" in web and "- ++Funke++\n" in web and "- ++Zunder++ *nicht in Suchen, Stellung*" in web
+    assert "- ++Rotpunkt++ *nicht an Blitz 9, Donner 4 (in Suchen)*" in web
     assert "Kaltblut" not in web and "Alt" not in web
     text = markdown_text.plain(loadout_bans.render_block(data, "text"))
     assert "![" not in text
@@ -133,6 +133,16 @@ def test_a_new_entry_changes_the_block_also_in_a_banned_class():
 
 
 TRICKY = "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad"
+
+
+def test_every_card_carries_its_marker_also_without_image():
+    """Codex Runde 1: Jede Karte trägt ihren Namen als Marke (++Name++, im Web <u>), auch ohne Bild - so stehen alle Kategorien gleich im
+    Raster, nicht nur die mit Bildern."""
+    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, None)
+    web = loadout_bans.render_block(data, "markdown")
+    cards = [line for line in web.splitlines() if line.startswith("- ")]
+    assert cards and all("++" in line for line in cards)
+    assert "++" not in loadout_bans.render_block(data, "text"), "das PDF bleibt eine Tabelle"
 
 
 def test_names_in_the_block_stay_text():

@@ -1624,7 +1624,8 @@ jeder neue, umbenannte oder deaktivierte Eintrag die Daten - auch ein neuer in e
 und `data_changes` meldet „Regelwerk muss freigegeben werden“ samt Vorschlag (#2269). Web (`markdown`): je Kategorie fett der Name,
 Einträge ohne Unterkategorie direkt darunter, je Unterkategorie eine Zeile (Symbol als Bild mit dem Bildtext „Klassen-Symbol“, Name kursiv,
 „alle erlaubt“ / „nicht in …“ / fett „nicht erlaubt“) und darunter die Einträge als Liste von Karten (Bild mit dem Bildtext „Ausrüstung“,
-Name, kursiv „nicht in …“ und „nicht an …“; Raster per CSS `.tls-rules-doc`). PDF und Vergleich (`text`): Tabelle Kategorie ·
+Name als Marke `++Name++` - im Web `<u>`, daran erkennt das CSS jede Kartenliste auch ohne Bild -, kursiv „nicht in …“ und „nicht an …“;
+Raster per CSS `.tls-rules-doc`, jede Kategorie mit derselben Zwischenüberschrift). PDF und Vergleich (`text`): Tabelle Kategorie ·
 Unterkategorie · Erlaubt · Einschränkungen, je Unterkategorie und Einschränkung eine Zeile („alle: A, B“, wenn die Zeile die ganze
 Unterkategorie meint). Ältere Fassungen (ohne `layout`, mit den Sperren) bleiben Wort für Wort; nach dem Einspielen schlägt die
 Verwaltung für eine Season mit dem Baustein darum einmal eine neue Fassung vor. **Liga- und Matchseite** zeigen dieselbe Sicht:
