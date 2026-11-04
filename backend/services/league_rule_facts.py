@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date
 
 from models import normalize_rule, rule_time_limit_seconds
-from services import game_maps, map_pools, mode_icons
+from services import game_maps, league_platform, map_pools, mode_icons
 from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS, ScheduleProblem, normalize as normalize_schedule
 from services.markdown_text import text_cell
 from services.scoring_rules import normalize_rules
@@ -438,7 +438,27 @@ async def id_field_labels(db, league: dict) -> list[str]:
     return [str(item.get("label") or item.get("key") or "") for item in league_roster.required_fields(game) if item.get("label") or item.get("key")]
 
 
-def eligibility_data(season: dict, id_fields: list[str]) -> dict:
+async def platform_data(db, season: dict) -> dict | None:
+    """Die Plattform je Season (#2270) im Klartext: Feld, erlaubte Plattformen, Crossplay, Eingabegerät und die Abweichungen je Liga N -
+    ``None`` ohne jede Angabe."""
+    block = await league_platform.season_block(db, season)
+    if not block:
+        return None
+    rows = [{"label": row.get("label"), **row.get("values", {})} for row in block.get("divisions") or [] if row.get("differs")]
+    return {"field": block.get("field_label"), **block.get("values", {}), "divisions": rows}
+
+
+def _platform_extras(row: dict) -> str:
+    """„ · Crossplay aus · Eingabegerät: Controller“ - nur, was festgelegt ist."""
+    parts = []
+    if row.get("crossplay"):
+        parts.append(f"Crossplay {_cell(row['crossplay'])}")
+    if row.get("input_device"):
+        parts.append(f"Eingabegerät: {_cell(row['input_device'])}")
+    return "".join(f" · {part}" for part in parts)
+
+
+def eligibility_data(season: dict, id_fields: list[str], platform: dict | None = None) -> dict:
     from services.league_eligibility import rules_view
 
     rules = rules_view(season)
@@ -452,8 +472,8 @@ def eligibility_data(season: dict, id_fields: list[str]) -> dict:
         "entry_policy": season.get("entry_policy") or "all",
         "unique_game_ids": bool(rules.get("unique_game_ids")),
         "id_fields": list(id_fields),
-        # Plattform (#2270): kommt mit dem Paket; bis dahin ``None`` und keine Zeile.
-        "platform": None,
+        # Plattform je Season (#2270, ``platform_data``): ``None`` ohne jede Angabe, dann keine Zeile.
+        "platform": platform or None,
     }
 
 
@@ -469,8 +489,13 @@ def render_eligibility(data: dict, variant: str = MARKDOWN) -> str:
         lines.append(f"- Spiel-IDs: Jeder Spieler hinterlegt im Profil {', '.join(_cell(name) for name in fields)}.{unique}")
     else:
         lines.append("- Spiel-IDs: Für dieses Spiel ist keine Spiel-ID vorgeschrieben.")
-    if data.get("platform"):
-        lines.append(f"- Plattform: {_cell(data['platform'])}.")
+    platform = data.get("platform")
+    if platform:
+        # Plattform je Season (#2270): erlaubte Plattformen (mit dem Feld, in dem sie steht), Crossplay und Eingabegerät, je Liga N die Abweichung.
+        field = f" (Feld „{_cell(platform['field'])}“)" if platform.get("field") else ""
+        lines.append(f"- Plattform: {_cell(platform.get('platforms') or league_platform.EVERY_PLATFORM)}{field}{_platform_extras(platform)}.")
+        for row in platform.get("divisions") or []:
+            lines.append(f"- Abweichend in {_cell(row.get('label'))}: {_cell(row.get('platforms') or league_platform.EVERY_PLATFORM)}{_platform_extras(row)}.")
     if data.get("one_team_per_season"):
         lines.append("- Ein Co-Team je Season: Eine Person steht in dieser Season nur in einem Co-Team; ein Wechsel geht nur als Transfer.")
     if data.get("new_player_wait_days"):
@@ -490,8 +515,9 @@ def render_eligibility(data: dict, variant: str = MARKDOWN) -> str:
 
 
 async def build_eligibility(db, league: dict, season: dict) -> dict:
-    data = eligibility_data(season, await id_field_labels(db, league))
-    return {"source": {key: data.get(key) for key in ("min_age", "new_player_wait_days", "roster_deadline", "entry_policy", "id_fields")}, "data": data}
+    data = eligibility_data(season, await id_field_labels(db, league), platform=await platform_data(db, season))
+    return {"source": {key: data.get(key) for key in ("min_age", "new_player_wait_days", "roster_deadline", "entry_policy", "id_fields", "platform")},
+            "data": data}
 
 
 # ---------------------------------------------------------------- Modi des Spiels (für Variablen und Auswahllisten)

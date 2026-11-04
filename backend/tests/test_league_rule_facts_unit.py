@@ -128,7 +128,11 @@ def test_schedule_block_with_and_without_d1_rules():
     assert "Verschiebungen entscheidet die Liga-Leitung" in plain_out and "72-h-Regel" not in plain_out
 
 
-def test_eligibility_block_lists_b3_with_id_fields_and_a_place_for_the_platform():
+PLATFORM = {"field": "Platt|form", "platforms": "PC und PlayStation", "crossplay": "aus", "input_device": "Controller",
+            "divisions": [{"label": "Liga 2", "platforms": "PC", "crossplay": None, "input_device": None}]}
+
+
+def test_eligibility_block_lists_b3_with_id_fields_and_the_platform():
     data = facts.eligibility_data(SEASON, ["Activision-ID", "PSN|ID"])
     assert data["platform"] is None
     out = facts.render_eligibility(data)
@@ -140,7 +144,13 @@ def test_eligibility_block_lists_b3_with_id_fields_and_a_place_for_the_platform(
     loose = facts.render_eligibility(facts.eligibility_data({"min_age": 0, "one_team_per_season": False}, []))
     assert "- Mindestalter: keine Vorgabe." in loose and "keine Spiel-ID vorgeschrieben" in loose and "- Wartezeit: keine" in loose
     assert "Transfer" not in loose
-    assert "- Plattform: PC." in facts.render_eligibility({**data, "platform": "PC"})
+    # Plattform je Season (#2270): Feld, erlaubte Plattformen, Crossplay, Eingabegerät und die Abweichungen je Liga N - Namen als Text.
+    with_platform = facts.render_eligibility(facts.eligibility_data(SEASON, ["ID"], platform=PLATFORM))
+    assert "- Plattform: PC und PlayStation (Feld „Platt/form“) · Crossplay aus · Eingabegerät: Controller." in plain(with_platform)
+    assert "- Abweichend in Liga 2: PC." in plain(with_platform)
+    every = facts.render_eligibility(facts.eligibility_data(SEASON, [], platform={"field": "Plattform", "platforms": "alle Plattformen",
+                                                                                   "crossplay": None, "input_device": None, "divisions": []}))
+    assert "- Plattform: alle Plattformen (Feld „Plattform“)." in plain(every)
 
 
 def test_every_block_render_is_free_of_protected_marks_in_data_and_api_text():
@@ -160,7 +170,7 @@ def context() -> variables.Context:
     ctx.format = facts.format_data(SEASON, DIVISIONS)
     ctx.table = facts.table_data(SEASON, DIVISIONS)
     ctx.schedule = facts.schedule_data(SEASON)
-    ctx.eligibility = facts.eligibility_data(SEASON, ctx.id_fields)
+    ctx.eligibility = facts.eligibility_data(SEASON, ctx.id_fields, platform=PLATFORM)
     return ctx
 
 
@@ -180,7 +190,8 @@ def test_variable_names_in_the_text_and_the_values():
                 "table.draws": "nicht möglich", "table.head_to_head": "Punkte, Map-Differenz, gewonnene Maps",
                 "eligibility.min_age": "18 Jahre", "eligibility.wait_days": "7 Tage", "eligibility.roster_deadline": "06.11.2026",
                 "eligibility.transfer_windows": "Winterfenster 01.12.2026–07.12.2026", "eligibility.entry_policy": "nur Vereinsmitglieder",
-                "eligibility.id_fields": "Activision-ID", "application.opens": "01.11.2026, 00:00 Uhr", "application.closes": "06.11.2026, 23:59 Uhr",
+                "eligibility.id_fields": "Activision-ID", "eligibility.platform": "PC und PlayStation", "eligibility.crossplay": "aus",
+                "eligibility.input_device": "Controller", "application.opens": "01.11.2026, 00:00 Uhr", "application.closes": "06.11.2026, 23:59 Uhr",
                 "application.slots": "16", "mode:stellung.name": "Stellung **fett** [x](y)", "mode:stellung.target": "300",
                 "mode:stellung.time_limit": "10 Min.", "mode:stellung.overtime": "ja", "mode:stellung.draw": "nein", "mode:stellung.players": "4",
                 "mode:suchen.round_limit": "11", "mode:suchen.round_time": "1:30 Min.",

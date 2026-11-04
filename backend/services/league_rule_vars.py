@@ -52,7 +52,7 @@ async def context(db, league: dict, season: dict | None) -> Context:
         ctx.format = facts.format_data(season, ctx.divisions)
         ctx.table = facts.table_data(season, ctx.divisions)
         ctx.schedule = facts.schedule_data(season)
-        ctx.eligibility = facts.eligibility_data(season, ctx.id_fields)
+        ctx.eligibility = facts.eligibility_data(season, ctx.id_fields, platform=await facts.platform_data(db, season))
     return ctx
 
 
@@ -175,6 +175,13 @@ def _static() -> list[Variable]:
                  lambda ctx: facts.ENTRY_POLICY_WORDS.get(ctx.eligibility.get("entry_policy"), facts.ENTRY_POLICY_WORDS["all"]) if ctx.eligibility else None),
         Variable("eligibility.id_fields", "Spiel-IDs", "Die Felder, die jeder Spieler im Profil hinterlegt.", "Spielberechtigung",
                  lambda ctx: (", ".join(ctx.eligibility.get("id_fields") or []) or "keine") if ctx.eligibility else None),
+        # Plattform je Season (#2270): nur, wenn die Season ein Plattform-Feld hat - sonst „(nicht festgelegt)“.
+        Variable("eligibility.platform", "Plattformen", "„PC“, „PC und PlayStation“ oder „alle Plattformen“.", "Spielberechtigung",
+                 lambda ctx: (ctx.eligibility.get("platform") or {}).get("platforms") if ctx.eligibility else None),
+        Variable("eligibility.crossplay", "Crossplay", "„an“ oder „aus“.", "Spielberechtigung",
+                 lambda ctx: (ctx.eligibility.get("platform") or {}).get("crossplay") if ctx.eligibility else None),
+        Variable("eligibility.input_device", "Eingabegerät", "„Controller“, „Maus und Tastatur“ oder „Controller oder Maus und Tastatur“.",
+                 "Spielberechtigung", lambda ctx: (ctx.eligibility.get("platform") or {}).get("input_device") if ctx.eligibility else None),
         Variable("application.opens", "Anmeldung ab", "Beginn des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_opens_at"))),
         Variable("application.closes", "Anmeldung bis", "Ende des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_closes_at"))),
         Variable("application.slots", "Startplätze", "Zahl der Startplätze der Season.", "Anmeldung", lambda ctx: _count(_season(ctx, "application_slots"))),
