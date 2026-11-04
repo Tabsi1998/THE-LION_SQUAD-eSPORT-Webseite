@@ -124,6 +124,9 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     // Ohne Waffe passt der Griff zu keiner (Obmann, 03.11.): Der Hinweis nennt ihn, ein Schritt ordnet ihn der Waffe zu.
     const notice = page.getByTestId("equipment-without-weapon");
     await expect(notice).toContainText(GRIP);
+    await notice.getByTestId("equipment-assign-open").click();
+    const assignSearch = notice.getByTestId("equipment-assign-search");
+    if (await assignSearch.count()) await assignSearch.fill(WEAPON);
     await notice.getByTestId(`equipment-assign-${weapon.id}`).check();
     await notice.getByTestId("equipment-assign").click();
     await expect(notice).toHaveCount(0);
@@ -171,13 +174,14 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     await shot(page, "sperrliste-season-abnahme.png");
     await panel.getByRole("link", { name: "Neue Version vorbereiten" }).click();
     const changes = page.getByTestId("rules-data-changes");
-    await expect(changes).toContainText("Sperrliste");
+    await expect(changes).toContainText("Erlaubte Ausrüstung");
     await expect(changes).toContainText(PERK);
     await shot(page, "sperrliste-regelwerk-vorschlag-abnahme.png");
     const second = await publishWithBlock(page, seasonId, `Sperrliste ${stamp} ergänzt`, true);
     expect(second.requires_consent).toBe(true);
-    expect(JSON.stringify(second.frozen)).toContain(PERK);
-    expect(JSON.stringify(first.frozen)).not.toContain(PERK);
+    // Erlaubte Ausrüstung (Nr. 99): Der Perk war erlaubt und ist jetzt gesperrt - er fällt aus der neuen Fassung.
+    expect(JSON.stringify(second.frozen)).not.toContain(PERK);
+    expect(JSON.stringify(first.frozen)).toContain(PERK);
     await page.goto(`/admin/leagues/seasons/${seasonId}#sperrliste`);
     await expect(page.getByTestId("season-bans-rules-ok")).toBeVisible();
     expect(problems).toEqual([]);
@@ -192,19 +196,22 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
       const problems = watch(page);
       const { league, season } = anmeldung;
       await page.goto(`/liga/${league.slug}/${season.slug}`);
-      const block = page.getByTestId("league-loadout-bans");
+      // Erlaubte Ausrüstung (#2287, Nr. 99): Die Waffe ist nur in einem Modus gesperrt - erlaubt mit „nicht in …“, der Aufsatz „nicht an …“.
+      const block = page.getByTestId("league-allowed-equipment");
       await expect(block).toContainText(WEAPON);
-      await expect(block).toContainText("nur ");
-      await expect(block.getByTestId("loadout-ban-weapon").filter({ hasText: WEAPON })).toContainText(SCOPE);
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: WEAPON }).first()).toContainText("nicht in ");
+      // Nr. 81 (Codex Runde 1): Das Visier passt nur zur Waffe und ist dort gesperrt - es ist nicht erlaubt; der Griff passt und ist es.
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: SCOPE })).toHaveCount(0);
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: GRIP })).toHaveCount(1);
       await block.scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await shot(page, `sperrliste-ligaseite-${width}-abnahme.png`);
 
       await page.goto(`/liga/${league.slug}/${season.slug}/regeln`);
       await expect(page.getByText(WEAPON).first()).toBeVisible();
-      await expect(page.locator(`img[alt="${WEAPON}"]`).first()).toBeVisible();
+      await expect(page.locator(`img[alt="Ausrüstung"]`).first()).toBeVisible();
       await noSideScroll(page);
-      await page.locator(`img[alt="${WEAPON}"]`).first().scrollIntoViewIfNeeded();
+      await page.getByText(WEAPON).first().scrollIntoViewIfNeeded();
       await shot(page, `sperrliste-regelwerk-${width}-abnahme.png`);
       const href = await page.getByTestId("rules-pdf").getAttribute("href");
       const pdf = await page.request.get(href);

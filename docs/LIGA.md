@@ -731,7 +731,7 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 `anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
 
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
-`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` (Sperrliste, C.4), `[[baustein:mode_settings]]` (#2271: je Modus
+`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` („Erlaubte Ausrüstung“ aus der Sperrliste, C.4), `[[baustein:mode_settings]]` (#2271: je Modus
 fett der Name, darunter Zeitlimit je Map und Zeit je Runde aus `result_rules`, die Einstellungen aus `mode_settings` als Tabelle
 Gruppe · Einstellung · Wert und der Regeltext als Zitat; ältere Seasons ohne Kopie lesen die des Spiels, Modi ohne Angaben fehlen). Wie
 jeder Baustein liefert er Daten im Klartext (`league_rule_blocks.mode_settings_data`, eingefroren als `data`); erst die Darstellung
@@ -1521,6 +1521,50 @@ mit Name und Rolle angelegt (wenn noch Platz ist). Aufsätze bekommen die Waffen
 ohne Zuordnung (passen dann zu keiner, Hinweis in der Bibliothek). Das Bild wird mitverwendet. Was schon da ist oder nicht passt, steht mit
 Grund in `skipped`.
 
+**Unterkategorien und Klassen (#2287).** Genau eine Ebene: Kategorie → Unterkategorie → Eintrag (etwa Waffen → Sturmgewehr → „Blitz 9“).
+Kein Wert eines Titels im Code. Je Kategorie in `game_equipment_categories.categories[].subcategories[]`, Reihenfolge = Reihenfolge der Liste:
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Kennung aus dem Namen beim Anlegen, **je Spiel** eindeutig (über alle Kategorien), ändert sich nie und wird **nie neu vergeben**: Entfernte stehen in `game_equipment_categories.retired_subcategory_keys` |
+| `label` | str 1–40 | Name, je Kategorie nur einmal (ohne Groß und klein) |
+| `icon_url` | str \| `null` | Symbol, optional: eigener Upload wie das Bild eines Eintrags (`checked_image`, PNG/JPG/WebP); ein schon gesetztes bleibt an derselben Unterkategorie speicherbar |
+
+Höchstens 30 je Kategorie (`SUBCATEGORIES_MAX`). Ohne Unterkategorien bietet die Verwaltung je Art einen Vorschlag aus Gattungsbegriffen an
+(`SUGGESTED_SUBCATEGORIES`; Waffe: Sturmgewehr, Maschinenpistole, Leichtes MG, Schrotflinte, Präzisionsgewehr, Scharfschützengewehr,
+Pistole, Raketenwerfer, Nahkampf; Aufsatz: Mündung, Lauf, Unterlauf, Optik, Magazin, Schaft, Griff, Laser; sonstige: keiner), gespeichert
+erst auf Knopfdruck. Gespeichert wird je Kategorie die ganze Liste (`PUT …/categories/{key}/subcategories`). Entfernen nur ohne Einträge
+(archivierte zählen mit; 409 „… hat noch N Einträge“) und wenn keine Version einer Sperrliste die Klasse ganz sperrt (409); Aufsätze
+verlieren die entfernte Klasse aus `weapon_class_ids`. Das Speichern der Kategorien lässt ihre Unterkategorien unberührt; eine entfernte
+(leere) Kategorie nimmt ihre mit, die Kennungen bleiben vergeben. **Sperre:** Alles Schreiben in die Bibliothek eines Spiels (Kategorien,
+Unterkategorien, Eintrag anlegen und ändern, Verschieben, Zuordnen, Übernehmen) und das Speichern einer Sperrliste (nach der Pool-Sperre der
+Season) läuft unter `mutation_lock.game_equipment_resource(game_id)` nacheinander und prüft erst darunter - so schreibt nie jemand eine eben
+entfernte Kennung an einen Eintrag oder in eine Klassensperre (Codex Runde 1). Besetzt: 409, bitte gleich noch einmal.
+
+Neue Felder an `game_equipment`:
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `subcategory` | str \| `null` | Kennung einer Unterkategorie **derselben** Kategorie; fehlt oder `null` = ohne Unterkategorie (Altbestand bleibt gültig, **keine Migration**). Ändern über `PATCH`, mehrere auf einmal über `POST …/equipment/move {item_ids, subcategory}` (alle aus derselben Kategorie, 422 sonst) |
+| `weapon_class_ids` | [str] | nur Aufsatz: Unterkategorien von Waffen-Kategorien (Waffenklassen). Ein Aufsatz passt zu Waffe W, wenn W in `weapon_ids` steht **oder** `W.subcategory` in `weapon_class_ids` – eine neue Waffe der Klasse passt sofort. Beide leer = passt zu keiner (Obmann 03.11., Nr. 81); `attachments_without_weapon` und `assign-weapons` (zusätzlich `weapon_class_ids`) zählen beides |
+
+**Import:** Die Unterkategorie passt über Kennung oder Namen in der Zielkategorie; fehlt sie, wird sie mit Name und Symbol angelegt (wenn
+Platz ist), sonst kommt der Eintrag ohne Unterkategorie und `notes[]` sagt es. Die Vorschau (`import-sources/{id}`) nennt je Eintrag
+`subcategory_label` und `subcategory_new` („wird angelegt“). Waffenklassen eines Aufsatzes finden sich ebenso über Kennung oder Namen.
+
+**Ganze Klasse sperren:** neue Zeilenart `kind: "class"` mit `subcategory` statt `item_id`, Modi wie bei Einzelnen. Sie sperrt **jeden
+Eintrag der Unterkategorie, auch später angelegte**. Snapshot: `{kind: "class", item_id: null, subcategory, subcategory_label, category,
+category_label, role, image_url (Symbol der Klasse), modes, mode_labels, items: [{item_id, name, image_url}], attachments: []}` – `items`
+sind die nicht archivierten Einträge zum Zeitpunkt des Speicherns. Zeilen `item` und `attachments` tragen zusätzlich `subcategory` und
+`subcategory_label` (ältere ohne = ohne Unterkategorie). Prüfung (422): Unterkategorie des Spiels; je Klasse eine Zeile; keine Einzelzeile
+(Eintrag oder Aufsätze an einer Waffe) für einen Eintrag einer in **allen** Modi gesperrten Klasse; eine leere Klasse lässt sich sperren
+(sie gilt ab dem ersten Eintrag). Vergleich der Versionen: Schlüssel (`class`, Kennung), Name = Name der Klasse.
+
+**Zur Laufzeit** heißt „Klasse gesperrt“: alle Einträge, die **heute** in ihr stehen (nicht archiviert). Ligaseite (`loadout_bans`) und
+Matchseite (neu: `league.loadout_bans`, `effective`) liefern je Klassenzeile `items` mit Namen und Bildern von heute; ein Spiel mit
+festgehaltener Version (`loadout_ban_id`) zeigt die Einträge seines Snapshots. Die Verwaltung bekommt zusätzlich `class_new_items`
+(`[{subcategory, label, names}]`: seit der Version neu in einer gesperrten Klasse – sie sind schon mitgesperrt).
+
 **Sperrliste** (`loadout_bans`): jedes Speichern legt eine neue, unveränderliche Version an. `scope` `league_season` (Vorlage) oder
 `tournament` (Kopie der Staffel). Felder: `id`, `scope`, `scope_id`, `tournament_id`, `game_id`, `version`, `cleared`, `note`,
 `created_at`, `created_by`, `entries[]`. Index (`scope`, `scope_id`, `version`) eindeutig wie bei Pools: gleichzeitiges Speichern wird 409.
@@ -1565,12 +1609,43 @@ der frei geschriebene Regeltext bleibt unberührt, auch ein Backslash darin. Jed
 Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
 Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
 
+**Erlaubte Ausrüstung im Regelwerk (#2287, Fabian Nr. 99):** Der Baustein `[[baustein:loadout_bans]]` heißt in der Verwaltung **„Erlaubte
+Ausrüstung“** (die Kennung bleibt, vorhandene Texte gehen weiter) und zeigt, was **erlaubt** ist - gepflegt wird weiter die Sperrliste. Er
+liest die **aktiven** Einträge der Bibliothek von heute (inaktive und archivierte fehlen) und zieht die Sperren der geltenden Version ab
+(`loadout_bans.allowed_block`): `data = {list, layout: 3, categories: [{label, sections: [{label | null, icon_url?, state, not_in, banned,
+entries: [{name, image_url, not_in, not_at: [{name, modes}]}]}]}]}`. `state`: `all` („alle erlaubt“), `some` (mit Einschränkungen oder
+einzeln gesperrten Einträgen) oder `banned` (ganze Klasse in allen Modi gesperrt, oder alle ihre Einträge: nur eine Zeile „nicht erlaubt“ mit
+den Namen in Klammern, keine Karten). `not_in`: Modi, in denen ein Eintrag (am Abschnitt: die ganze Klasse) nicht erlaubt ist; `not_at`:
+Waffen, an denen ein Aufsatz nicht erlaubt ist. Ein **Aufsatz** zählt nur, wenn er an mindestens einer erlaubten Waffe passt (aktiv,
+nicht ganz gesperrt, auch nicht über ihre Klasse, und der Aufsatz ist dort nicht in allen Modi gesperrt) - ohne Zuordnung (Nr. 81), nur zu
+gesperrten Waffen oder an jeder passenden gesperrt fehlt er; die Verwaltung nennt solche in `unusable_attachments` (`[{id, name, reason}]`
+im Editor der Season). Ganz gesperrte Einträge fehlen, leere Unterkategorien entfallen (eine ganz gesperrte leere
+Klasse steht als „nicht erlaubt“). Ohne Sperrliste ist die ganze aktive Bibliothek erlaubt; hat das Spiel keine aktiven Einträge, bleibt
+der Baustein wie bisher („keine Sperrliste – alles ist erlaubt“). Eingefroren wird `data`; weil er die Bibliothek von heute liest, ändert
+jeder neue, umbenannte oder deaktivierte Eintrag die Daten - auch ein neuer in einer gesperrten Klasse (sein Name steht in der Klammer) -,
+und `data_changes` meldet „Regelwerk muss freigegeben werden“ samt Vorschlag (#2269). Web (`markdown`): je Kategorie fett der Name,
+Einträge ohne Unterkategorie direkt darunter, je Unterkategorie eine Zeile (Symbol als Bild mit dem Bildtext „Klassen-Symbol“, Name kursiv,
+„alle erlaubt“ / „nicht in …“ / fett „nicht erlaubt“) und darunter die Einträge als Liste von Karten (Bild mit dem Bildtext „Ausrüstung“,
+Name als Marke `++Name++` - im Web `<u>`, daran erkennt das CSS jede Kartenliste auch ohne Bild -, kursiv „nicht in …“ und „nicht an …“;
+Raster per CSS `.tls-rules-doc`, jede Kategorie mit derselben Zwischenüberschrift). PDF und Vergleich (`text`): Tabelle Kategorie ·
+Unterkategorie · Erlaubt · Einschränkungen, je Unterkategorie und Einschränkung eine Zeile („alle: A, B“, wenn die Zeile die ganze
+Unterkategorie meint). Ältere Fassungen (ohne `layout`, mit den Sperren) bleiben Wort für Wort; nach dem Einspielen schlägt die
+Verwaltung für eine Season mit dem Baustein darum einmal eine neue Fassung vor. **Liga- und Matchseite** zeigen dieselbe Sicht:
+`allowed_equipment` (gleiche Form wie `data`, `null` ohne Bibliothek) in `GET /api/leagues/{liga}/{season}` und im Block `league` der
+Matchseite (dort aus der Liste, die für das Spiel gilt). Beim ersten Festschreiben eines Ergebnisses hält das Spiel neben
+`loadout_ban_id` auch die erlaubte Ausrüstung fest: `matches_v2.loadout_allowed_id` zeigt auf eine unveränderliche Zeile in
+`loadout_allowed` (`{id = sha256 des Inhalts, game_id, data, created_at}`, viele Spiele teilen sie; Vereinsinhalt, Bilder als Verwendung in
+der Mediathek). Danach liefert die Matchseite nur noch diesen Schnappschuss; „Rückgängig“ nimmt ihn mit, ältere Spiele ohne ihn rechnen wie
+bisher (Codex Runde 1).
+
 **Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
 
 | Route | Recht | Zweck |
 | --- | --- | --- |
 | `GET /api/games/{id}/equipment` | Bereich `tournaments` (wie Maps) | Spiel mit Modi, Kategorien, Einträge mit `in_lists`, `limit`, `suggested_categories` |
 | `PUT /api/games/{id}/equipment/categories` | ebenso | `{categories: [{key?, label, role}]}`; Protokoll `game.equipment.categories` |
+| `PUT /api/games/{id}/equipment/categories/{key}/subcategories` (#2287) | ebenso | `{subcategories: [{key?, label, icon_url?}]}` – anlegen, umbenennen, ordnen, entfernen; Protokoll `game.equipment.subcategories` |
+| `POST /api/games/{id}/equipment/move` (#2287) | ebenso | `{item_ids, subcategory}` (`null` = ohne); Protokoll `game.equipment.move` |
 | `POST`, `PATCH`, `DELETE /api/games/{id}/equipment[/{item}]` | ebenso | Eintrag anlegen, ändern (auch `status`), löschen; `game.equipment.create/.update/.delete` |
 | `GET …/equipment/import-sources[/{source}]`, `POST …/equipment/import` | ebenso | aus anderer Spielversion; `game.equipment.import` |
 | `GET /api/admin/leagues/seasons/{id}/loadout-bans` | jede Zuständigkeit der Liga | Spiel, Kategorien, Bibliothek (aktiv und inaktiv), geltende Version mit `stale` und `outdated_item_ids`, Versionen, Stand im Regelwerk |
@@ -1579,10 +1654,12 @@ Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlich
 | `GET …/loadout-bans/compare?base=<Nr>&target=<Nr>` | jede Zuständigkeit der Liga | `{base, target, added[], removed[], changed[], same}` je Zeile (`kind`, `item_id`) |
 
 **Öffentlich** nur, was die Season zeigt: `GET /api/leagues/{liga}/{season}` trägt `loadout_bans` (Lesevertrag `{id, version, saved_at,
-entries[]}` ohne `note` und Autor, `null` ohne Liste), die Regelseite den Baustein. Die Bibliothek selbst ist nie öffentlich.
+entries[]}` ohne `note` und Autor, `null` ohne Liste), die Regelseite den Baustein. Die Matchseite eines Staffel-Spiels trägt im Block
+`league` dieselbe Form als `loadout_bans` (die Liste, die für dieses Spiel gilt, #2287). Die Bibliothek selbst ist nie öffentlich.
 
 **Datenschutz:** Alle drei Sammlungen sind Vereinsinhalt (`personal_data.CLUB_CONTENT`), nur die Kennung, wer angelegt oder gespeichert
-hat. Bilder: `game_equipment.image_url` und `.image_history`, `loadout_bans.entries.image_url` und `.entries.attachments.image_url`
+hat. Bilder: `game_equipment.image_url` und `.image_history`, `loadout_bans.entries.image_url`, `.entries.attachments.image_url` und
+`.entries.items.image_url` (#2287) sowie das Symbol einer Unterkategorie (`game_equipment_categories.categories.subcategories.icon_url`)
 stehen in den Verwendungsstellen der Mediathek (`media_audit`); die Kontolöschung behält sie, solange sie dort stehen. Jede Version einer
 Sperrliste ist unveränderlich (`media_audit.FROZEN_COLLECTIONS`): Ein Bild darin lässt sich nicht drehen und nicht löschen (409), Duplikat-
 Ersetzen und Bild-Migration schreiben sie nicht um. In der Bibliothek darf sich ein Bild ändern.

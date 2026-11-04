@@ -83,8 +83,13 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
     ("game_maps", ["image_history"]),
     # Sperrlisten (#2218): wie die Map-Pools ein Schnappschuss von damals, dazu frühere Bilder der Einträge.
-    ("loadout_bans", ["entries.image_url", "entries.attachments.image_url"]),
+    # Ganz gesperrte Klasse (#2287): ihre Einträge von damals und das Symbol der Unterkategorie.
+    ("loadout_bans", ["entries.image_url", "entries.attachments.image_url", "entries.items.image_url", "entries.subcategory_icon_url"]),
     ("game_equipment", ["image_history"]),
+    # Symbol einer Unterkategorie der Ausrüstung (#2287).
+    ("game_equipment_categories", ["categories.subcategories.icon_url"]),
+    # Erlaubte Ausrüstung am Spiel (#2287): Schnappschuss beim Ergebnis, unveränderlich wie die Sperrliste.
+    ("loadout_allowed", ["data.categories.sections.entries.image_url", "data.categories.sections.icon_url"]),
     # Bilder in eingefrorenen Bausteinen einer Regelwerk-Fassung (#2218) - unveränderlich wie der Text (``is_frozen``).
     ("league_rules", ["frozen_images"]),
     # Gewinnbilder der Liga (#2107) je Season und Liga N.
@@ -109,7 +114,7 @@ COLLECTION_LABELS = {
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
-    "game_equipment": "Ausrüstung", "loadout_bans": "Sperrliste",
+    "game_equipment": "Ausrüstung", "loadout_bans": "Sperrliste", "game_equipment_categories": "Kategorien der Ausrüstung", "loadout_allowed": "Erlaubte Ausrüstung eines Spiels",
     "reference_lineages": "Spur", "reference_series": "Saison",
     "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N", "league_rules": "Regelwerk",
     "direct_messages": "Direktnachricht", "team_chat_messages": "Team-Chat", "tournament_chat_messages": "Turnier-Chat",
@@ -129,6 +134,9 @@ FIELD_LABELS = {
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     "body_md": "Text", "annexes.body_md": "Text einer Anlage",
     "entries.image_url": "Bild eines Eintrags", "entries.attachments.image_url": "Bild eines Aufsatzes",
+    "entries.items.image_url": "Bild eines Eintrags einer gesperrten Klasse", "entries.subcategory_icon_url": "Symbol einer Unterkategorie",
+    "categories.subcategories.icon_url": "Symbol einer Unterkategorie",
+    "data.categories.sections.entries.image_url": "Bild eines erlaubten Eintrags", "data.categories.sections.icon_url": "Symbol einer Unterkategorie",
     "frozen_images": "Bild in einem Baustein",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
@@ -340,7 +348,7 @@ async def iter_usages(db, names: set[str]):
 FROZEN_POOL_FIELD = "modes.icon_url"
 FROZEN_POOL_PREFIX = "Map-Pool"
 # Sammlungen, deren Zeilen nie umgeschrieben werden: jede Version einer Sperrliste ist unveränderlich (#2218), Spiele halten sie fest.
-FROZEN_COLLECTIONS = frozenset({"loadout_bans"})
+FROZEN_COLLECTIONS = frozenset({"loadout_bans", "loadout_allowed"})
 
 
 def is_frozen(collection: str, document: dict, field: str | None = None) -> bool:
@@ -357,6 +365,8 @@ def is_frozen(collection: str, document: dict, field: str | None = None) -> bool
 def _frozen_label(collection: str, document: dict) -> str:
     if collection == "loadout_bans":
         return f"Sperrliste, Version {document.get('version')}"
+    if collection == "loadout_allowed":
+        return "Erlaubte Ausrüstung eines gespielten Spiels"
     return f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
 
 

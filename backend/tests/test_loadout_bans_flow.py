@@ -310,7 +310,9 @@ async def test_undoing_the_result_forgets_the_list_version(flow):
     await confirm_result(flow, w)
     flow.act_as(w["staff"])
     ok(await flow.post(f"/api/matches/{w['match']['id']}/result/undo", json={}))
-    assert "loadout_ban_id" not in await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    undone = await flow.db.matches_v2.find_one({"id": w["match"]["id"]}, {"_id": 0})
+    # Mit dem Ergebnis geht auch die erlaubte Ausrüstung (#2287) wieder weg.
+    assert "loadout_ban_id" not in undone and "loadout_allowed_id" not in undone
 
 
 @pytest.mark.asyncio

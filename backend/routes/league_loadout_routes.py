@@ -6,6 +6,8 @@ erscheint die Liste nur über die Ligaseite der Season und den Baustein im Regel
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from database import get_db
@@ -17,7 +19,7 @@ from services.league_permissions import ANY, capabilities_of, require_league
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.loadout_bans import LoadoutBansSave
-from services.mutation_lock import MutationLockBusy, league_season_pool_resource, mutation_lock
+from services.mutation_lock import MutationLockBusy, game_equipment_resource, league_season_pool_resource, mutation_lock
 
 router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 BUSY = "Die Season wird gerade bearbeitet – bitte gleich noch einmal."
@@ -51,15 +53,21 @@ async def season_loadout_bans(season_id: str, me: dict = Depends(require_league(
     season, league, game = await _context(db, season_id)
     doc = await loadout_bans.current(db, loadout_bans.SEASON, season_id)
     categories = await game_equipment.categories_of(db, game["id"]) if game else []
+    rows = await game_equipment.items_of(db, game["id"], usable_only=True, categories=categories) if game else []
     library = [{**{key: row.get(key) for key in ("id", "category", "name", "image_url", "weapon_ids")},
+                # Unterkategorie und Waffenklassen (#2287): Gruppen, Klassensperre und „passt zu“ im Editor.
+                "subcategory": row.get("subcategory") or None, "weapon_class_ids": list(row.get("weapon_class_ids") or []),
                 "status": game_equipment.status_of(row)}
-               for row in (await game_equipment.items_of(db, game["id"], usable_only=True, categories=categories) if game else [])]
+               for row in rows]
     return {
         "capabilities": sorted(await capabilities_of(db, me, league["id"])),
         "game": {"id": game["id"], "name": game.get("name"), "modes": game_modes.entries(game)} if game else None,
         "categories": categories,
         "library": library,
         "list": await loadout_bans.admin_entry(db, doc, league.get("game_id"), loadout_bans.SEASON),
+        # Nr. 81 (Codex Runde 1): Aufsätze, die nach der geltenden Liste an keiner erlaubten Waffe passen - sie fehlen in der erlaubten
+        # Ausrüstung, der Editor nennt sie.
+        "unusable_attachments": loadout_bans.unusable_attachments(categories, rows, loadout_bans.valid_for(doc, league.get("game_id"))),
         "versions": await loadout_bans.versions(db, loadout_bans.SEASON, season_id),
         "rules": await league_rules.block_state(db, league, season, BLOCK),
         "staffeln": await _staffel_count(db, season_id),
@@ -72,9 +80,11 @@ async def save_season_loadout_bans(season_id: str, body: LoadoutBansSave,
     db = get_db()
     season, league, game = await _context(db, season_id)
     try:
-        # Dieselbe Sperre wie Map-Pool und neue Staffel: Eine Staffel entsteht nie mitten in einem Speichern.
+        # Dieselbe Sperre wie Map-Pool und neue Staffel: Eine Staffel entsteht nie mitten in einem Speichern. Danach die der Bibliothek
+        # (#2287): Eine ganze Klasse wird nie gespeichert, während jemand genau diese Unterkategorie entfernt.
         async with mutation_lock(db, league_season_pool_resource(season_id)):
-            doc = await loadout_bans.save(db, scope=loadout_bans.SEASON, scope_id=season_id, game=game, body=body, user=me)
+            async with (mutation_lock(db, game_equipment_resource(game["id"])) if game else nullcontext()):
+                doc = await loadout_bans.save(db, scope=loadout_bans.SEASON, scope_id=season_id, game=game, body=body, user=me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=BUSY) from None
     except EquipmentProblem as problem:

@@ -744,6 +744,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         # Regelwerk (#2269): gültige Fassung mit PDF und, für die eigene Seite, der Stand der Zustimmung ihres Co-Teams.
         from services.league_rules import match_rules_info
         league_block["rules"] = await match_rules_info(db, tournament, (side or {}).get("squad_id"))
+        # Sperrliste (#2287): die Liste, die für dieses Spiel gilt - festgehalten oder die der Staffel, ganze Klassen mit Einträgen.
+        from services import loadout_bans
+        league_block["loadout_bans"] = await loadout_bans.effective(db, tournament, match)
+        # Erlaubte Ausrüstung (Nr. 99): dieselbe Sicht wie im Regelwerk - nach dem Ergebnis der Schnappschuss von damals.
+        league_block["allowed_equipment"] = await loadout_bans.match_allowed(db, tournament, match)
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
