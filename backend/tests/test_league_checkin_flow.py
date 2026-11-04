@@ -695,6 +695,35 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
 
 
 @pytest.mark.asyncio
+async def test_without_check_in_rules_a_new_time_keeps_the_extension(flow):
+    """Die Verlängerung fällt nur in Staffeln mit Check-in-Regeln: in einer Staffel ohne Regeln und in einem anderen Format bleibt
+    ``no_show_extended_until`` bei jedem neuen Termin stehen - Spieltag-Plan, Einigung und Termin der Leitung."""
+    from services.matchday_schedule import persist_matchday_schedule
+
+    start_date = (now_utc() - timedelta(days=1)).isoformat()
+    plain = await checkin_world(flow, rules=None, start_date=start_date, **WEEK)
+    other = await checkin_world(flow, rules=None, letter="B", start_date=start_date, **WEEK)
+    await flow.db.tournaments.update_one({"id": other["tournament"]["id"]}, {"$unset": {"league_context": ""}})
+    kept = at(6 * 60)
+    for label, world, lead in (("Staffel ohne Check-in", plain, plain["lead"]), ("kein Ligaformat", other, other["staff"])):
+        await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"no_show_extended_until": kept}})
+        assert (await persist_matchday_schedule(flow.db, await tournament_of(flow, world)))["written"] == 1, label
+        stored = await flow.reload(world["match"])
+        assert stored["schedule_source"] == "default" and stored.get("no_show_extended_until") == kept, f"{label}: Spieltag-Plan"
+        flow.act_as(world["users"]["Kapitaen"])
+        offer = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals", json={"scheduled_at": at(48 * 60)})
+        assert offer.status_code == 200, f"{label}: {offer.text}"
+        flow.act_as(world["users"]["Falke1"])
+        agreed = await flow.post(f"/api/matches/{mid(world)}/schedule-proposals/{offer.json()['id']}/decision", json={"action": "accept"})
+        assert agreed.status_code == 200, f"{label}: {agreed.text}"
+        assert (await flow.reload(world["match"])).get("no_show_extended_until") == kept, f"{label}: Einigung"
+        flow.act_as(lead)
+        moved = await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(96 * 60), "schedule_reason": "Nachholtermin"})
+        assert moved.status_code == 200, f"{label}: {moved.text}"
+        assert (await flow.reload(world["match"])).get("no_show_extended_until") == kept, f"{label}: Leitung"
+
+
+@pytest.mark.asyncio
 async def test_a_new_time_from_the_lead_voids_old_checkins_and_the_proposal(flow):
     """E.1 „Neu ansetzen“ und jeder neue Termin der Leitung: alte Check-ins zählen nicht mehr, der alte Vorschlag fällt weg, „beide da“
     gilt für den neuen Termin wieder einmal."""
