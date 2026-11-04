@@ -78,7 +78,7 @@ export function SeasonVetoRulesPanel({ seasonId }) {
     return () => { alive = false; };
   }, [seasonId]);
 
-  const modes = state?.modes || [];
+  const modes = useMemo(() => state?.modes || [], [state]);
   const labelOf = (mode) => modes.find((row) => row.mode === mode)?.label || mode;
   const problems = useMemo(() => (form && form.enabled
     ? templateProblems(form, { modes, bestOf: state?.best_of, order: state?.game_mode_order, repeat: state?.map_repeat })
