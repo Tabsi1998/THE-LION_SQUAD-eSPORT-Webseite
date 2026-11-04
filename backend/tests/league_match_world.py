@@ -27,6 +27,13 @@ async def without_score_duty(flow, season: dict) -> None:
     assert saved.status_code == 200, saved.text
 
 
+async def without_veto(flow, season: dict) -> None:
+    """Neue Seasons beginnen mit Veto an (D.3, #1618, Fabian Nr. 105) - hier aus, für Tests, die melden, ohne das Veto zu prüfen
+    (sonst heißt es „Erst das Veto abschließen“). Über die Route, wie die Leitung es täte."""
+    saved = await flow.put(f"/api/admin/leagues/seasons/{season['id']}/veto-rules", json={"enabled": False})
+    assert saved.status_code == 200, saved.text
+
+
 async def checked_in(flow, match_id: str) -> None:
     """Erst einchecken, dann melden (D.2, #1652): beide Seiten gelten für den geltenden Termin als eingecheckt - die Vorbedingung jeder
     Meldung der Captains in einer Staffel mit Check-in-Regeln (jede neue Season hat sie). Schreibt die Einträge in der Form von

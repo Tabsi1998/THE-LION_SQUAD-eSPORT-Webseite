@@ -781,10 +781,21 @@ async def test_the_season_template_is_checked_proposed_saved_and_transferred(flo
     w = await season_world(flow)
     sid = w["season"]["id"]
     before = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
-    assert before["veto_rules"] == {"enabled": False, "team_a": "home", "step_seconds": 60, "steps": []} and before["active"] is False
-    assert before["problems"] == [] and before["best_of"] == 5 and before["game_mode_order"] == ORDER and before["has_checkin"] is True
+    # Neue Seasons (Fabian Nr. 105): Veto an, die Vorlage aus Modusfolge und Pools vorbelegt - beim Anlegen gibt es noch keinen Pool,
+    # also nur Wahlen und Decider; „Was fehlt noch?“ nennt, was mit dem Pool nicht aufgeht.
+    assert before["veto_rules"] == {"enabled": True, "team_a": "home", "step_seconds": 60, "steps": [
+        step("pick", HP, "A", 1), step("pick", HP, "B", 4), step("pick", SND, "B", 2), step("pick", SND, "A", 5), step("decider", CTL, None, 3)]}
+    assert before["active"] is True and before["best_of"] == 5 and before["game_mode_order"] == ORDER and before["has_checkin"] is True
+    assert before["problems"] == ["Kontrolle: Der Decider braucht genau eine übrige Map – nach 0 Sperren und 0 Wahlen bleiben 3."]
     assert {row["mode"]: row["maps"] for row in before["modes"]} == {HP: 4, SND: 4, CTL: 3}
-    assert (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["enabled"] is False
+    assert (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["enabled"] is True
+    unready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))
+    assert [row["text"] for row in unready["problems"] if row["code"] == "veto_invalid"] == [f"Veto: {before['problems'][0]}"]
+    # Bestehende Seasons ohne Feld bleiben aus - keine Migration.
+    await flow.db.league_seasons.update_one({"id": sid}, {"$unset": {"veto_rules": ""}})
+    legacy = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
+    assert legacy["veto_rules"] is None and legacy["active"] is False
+    assert not [row for row in ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))["problems"] if row["code"].startswith("veto")]
 
     proposal = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules/proposal"))
     assert proposal["steps"] == ANLAGE_B and proposal["problems"] == []

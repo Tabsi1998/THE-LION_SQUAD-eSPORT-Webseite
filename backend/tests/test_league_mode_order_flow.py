@@ -14,7 +14,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import GAME_ID, OLD_RULES, checked_in, ids, two_nil, without_score_duty, world  # noqa: E402
+from league_match_world import GAME_ID, OLD_RULES, checked_in, ids, two_nil, without_score_duty, without_veto, world  # noqa: E402
 from models import new_id, now_utc  # noqa: E402
 
 MODES = [{"mode": "stellung", "label": "Stellung"}, {"mode": "suchen", "label": "Suchen & Zerstören"}]
@@ -49,6 +49,7 @@ async def real_season(flow, w, *, order=("stellung", "suchen"), with_result=True
     assert season.status_code == 200, season.text
     season_id = season.json()["id"]
     await without_score_duty(flow, season.json())
+    await without_veto(flow, season.json())
     # Die Season läuft (die Staffel spielt schon): eine kürzere Reihenfolge ist dann nur eine Warnung (#2207).
     await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"status": "active"}})
     division = await flow.post(f"/api/admin/leagues/seasons/{season_id}/divisions", json={"level": 1})
