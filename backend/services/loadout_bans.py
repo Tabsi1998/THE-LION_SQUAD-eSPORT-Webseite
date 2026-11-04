@@ -873,14 +873,14 @@ async def season_mode_pairs(db, game_id: str | None, season: dict | None) -> lis
     Modusfolge, sonst die nicht archivierten Modi des Spiels."""
     if not season or not game_id:
         return []
-    from services import league_rule_facts, map_pools
+    from services import map_pools
 
     game = await db.games.find_one({"id": game_id}, {"_id": 0})
     if not game:
         return []
     pool = map_pools.valid_for(await map_pools.current(db, SEASON, season["id"]), game_id)
     labels = {row["mode"]: row["label"] for row in game_maps.game_modes(game)}
-    return [(key, labels.get(key, key)) for key in league_rule_facts.season_mode_keys(season, game, pool)]
+    return [(key, labels.get(key, key)) for key in game_modes.season_mode_keys(season, game, pool)]
 
 
 async def season_of(db, tournament: dict | None) -> dict | None:

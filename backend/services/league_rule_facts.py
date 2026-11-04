@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date
 
 from models import normalize_rule, rule_time_limit_seconds
-from services import game_maps, league_platform, league_veto_rules, map_pools, mode_icons
+from services import game_maps, game_modes, league_platform, league_veto_rules, map_pools, mode_icons
 from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS, ScheduleProblem, normalize as normalize_schedule
 from services.markdown_text import text_cell
 from services.scoring_rules import normalize_rules
@@ -162,19 +162,8 @@ def _season_rule(season: dict, game: dict | None, key: str) -> dict | None:
             "overtime": bool(rule.get("overtime")), "draw_allowed": bool(rule.get("draw_allowed"))}
 
 
-def season_mode_keys(season: dict, game: dict | None, pool: dict | None) -> list[str]:
-    """Die Modi der Season: die des geltenden Pools (in seiner Reihenfolge), dann die der Modusfolge; ohne beides alle nicht
-    archivierten Modi des Spiels."""
-    keys: list[str] = []
-    for group in (pool or {}).get("modes") or []:
-        if group.get("mode") and group["mode"] not in keys:
-            keys.append(group["mode"])
-    for key in season.get("game_mode_order") or []:
-        if key and key not in keys:
-            keys.append(key)
-    if not keys:
-        keys = [key for key, doc in _mode_docs(game).items() if doc.get("status") != "archived"]
-    return keys
+# Die Modi der Season stehen im Blatt-Modul ``game_modes`` (#2298: auch die Sperrliste braucht sie, ohne Import-Kreis).
+season_mode_keys = game_modes.season_mode_keys
 
 
 def modes_data(season: dict, game: dict | None, pool: dict | None) -> dict:
