@@ -26,6 +26,7 @@ export const SEASON_SECTIONS = {
   serie: "spielbetrieb",
   kalender: "termine",
   terminregeln: "termine",
+  checkin: "termine",
   selbstanmeldung: "anmeldung",
   spielberechtigung: "anmeldung",
   plattform: "anmeldung",

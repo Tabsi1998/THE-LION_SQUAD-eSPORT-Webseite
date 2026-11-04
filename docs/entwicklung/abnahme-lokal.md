@@ -108,7 +108,8 @@ Admin, bei 1440 und 375 px. `liga-abnahme.spec.js` (Stand aus `seed_abnahme_liga
 `ABNAHME_STATE=…/state-liga.json`): Verwaltung „Liga“, Season mit Pause und Pool, Staffel A mit acht Co-Teams und
 dem Knopf „Liga starten“, die Ligaseite bei 390 und 1440 px und ohne Anmeldung „Liga nicht gefunden“ – nur lesend.
 `liga-ablauf-abnahme.spec.js` (gleiche Stand-Datei, #2200) schreibt: Co-Team zuteilen, „Liga starten“, Standardtermin,
-dann bei 390 und 1440 px Terminvorschlag und Annahme durch zwei Captains, Erinnerung, Melden mit Maps und Teilnehmerliste,
+dann bei 390 und 1440 px Terminvorschlag und Annahme durch zwei Captains, Erinnerung, Check-in beider Seiten (D.2, #1652: ohne
+Check-in steht statt des Meldeformulars, wer fehlt), Melden mit Maps und Teilnehmerliste,
 Bestätigen, Tabelle und Ligaseite als Gast, Einspruch, Entscheidung und Korrektur der Leitung, zuletzt die
 48-Stunden-Automatik mit Nachtrag der Liste. Für die Zeit-Jobs braucht sie `ABNAHME_PROJECT` (der Stand) und `PYTHON`.
 `liga-regeln-abnahme.spec.js` (gleiche Stand-Datei, #1646) schreibt zwei Versionen des Regelwerks mit Baustein und Anlage; ein Gast liest bei 390
@@ -134,6 +135,11 @@ und übergeht sie nur mit Grund.
 (Reiter „Ausrüstung“ der Spielseite, Hinweis „Aufsätze ohne Waffe“),
 setzt die Sperrliste der Season „Liga-Anmeldung“ im Browser, überträgt sie, veröffentlicht das Regelwerk mit Baustein „Sperrliste“, ändert
 die Liste und bestätigt den Vorschlag einer neuen Version; ein Gast liest Ligaseite, Regelwerk und PDF bei 390 und 1440 px.
+`liga-checkin-abnahme.spec.js` (gleiche Stand-Datei, #1652, braucht eine Staffel „Liga-Probelauf“ im Entwurf - also den Seed davor) schreibt: Die
+Leitung speichert den Check-in der Season, veröffentlicht ein Regelwerk mit Zustimmungspflicht und startet die Staffel; bei 390 px lehnt die Seite
+den Check-in ohne Zustimmung ab, zwei Captains stimmen zu und checken in zwei Browser-Kontexten ein, zu wenige Anwesende lehnt der Server ab; bei
+1440 px startet eine Seite (der zweite Start ist eine Wiederholung); am zweiten Spiel legt der Fristen-Job nach dem Fenster nur den Vorschlag an,
+die Leitung sieht ihn in Mein Dienst und entscheidet in der Leitungsansicht. Für den Zeit-Job braucht sie `ABNAHME_PROJECT` und `PYTHON`.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem

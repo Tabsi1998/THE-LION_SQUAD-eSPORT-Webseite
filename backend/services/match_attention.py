@@ -27,7 +27,7 @@ from datetime import datetime
 
 from models import now_utc
 from services.league_scope import is_league_staffel
-from services.match_deadlines import no_show_action, no_show_candidates, no_show_due_text
+from services.match_deadlines import no_show_action, no_show_candidates, no_show_deadline, no_show_due_text
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
@@ -92,13 +92,22 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
         proposal = match.get("no_show_proposal")
         # Je Person (#1823): im Lauf bleibt der Fall offen für alle, die noch nicht als nicht erschienen markiert sind.
         candidates = no_show_candidates(match)
-        # Liga-Staffel (#2201): kein Vorschlag ohne Check-in - ein alter zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
-        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and not is_league_staffel(tournament)
+        # Liga-Staffel: ein Vorschlag nur aus dem Check-in (D.2, #1652: Regel ``check_in``, Teilnehmer = die fehlenden Seiten);
+        # ein alter ohne Check-in (#2201) zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
+        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and (
+            not is_league_staffel(tournament) or proposal.get("rule") == "check_in")
+        if open_proposal and proposal.get("rule") == "check_in":
+            # Nur, solange das Fenster wirklich zu ist und die Seite noch fehlt - nach einem neuen Termin (E.1 „Neu ansetzen“)
+            # oder dem Nachtragen räumt der Fristen-Job den Vorschlag ab, die Karte verschwindet sofort.
+            due = no_show_deadline(match, tournament, (stages or {}).get(match.get("stage_id") or ""))
+            open_proposal = bool(due and due["due_at"] <= now and set(due.get("missing") or []) & set(candidates))
+            candidates = [item for item in candidates if item in set(due.get("missing") or [])] if open_proposal else []
         # Mit einer Meldung gilt der Vorschlag nicht mehr (Bestätigen gäbe 409) - sie darf „Ergebnis fehlt“ nicht verdecken.
         if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and not match.get("reports") and candidates:
+            # Liga-Check-in (D.2): die Leitung kann die fehlende Seite auch nachtragen - das steht in der Karte mit.
+            action = "kampflos werten, Seite nachtragen oder verlängern" if proposal.get("rule") == "check_in" else no_show_action(match)
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
-                          "detail": f"{no_show_due_text(match, proposal)} – "
-                                    f"{no_show_action(match)}.",
+                          "detail": f"{no_show_due_text(match, proposal)} – {action}.",
                           "action": "no_show", "since": proposal.get("due_at"),
                           "participants": [{"registration_id": registration_id,
                                             "name": registration_name(regs_by_id.get(registration_id))}

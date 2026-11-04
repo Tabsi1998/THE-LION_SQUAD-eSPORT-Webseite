@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timedelta
 
 from models import new_id, now_utc
-from services import league_schedule
+from services import checkin_rules, league_schedule
 from services.league_schedule import CLOSED_MATCH_STATUSES, rules_of
 from services.matchday_schedule import blocked_period_at, home_registration_id, response_deadline
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
@@ -102,7 +102,8 @@ async def _apply_home_rule(db, tournament: dict, match_id: str, proposal_id: str
                 "$set": {"scheduled_at": league_schedule._iso(proposal["scheduled_at"]), "schedule_source": "accepted",
                          "schedule_status": "accepted", "schedule_written_at": now_iso, "updated_at": now_iso,
                          **({"status": "scheduled"} if match.get("status") in {"pending", "ready", "preview"} else {})},
-                "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""},
+                # Der neue Termin bringt sein eigenes Check-in-Fenster - eine alte Verlängerung fällt (D.2, #1652).
+                "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": "", **checkin_rules.new_time_unset(fresh_tournament)},
                 "$push": league_schedule.history_push(league_schedule.history_entry(
                     "home_rule", registration_id=proposal.get("actor_registration_id"), from_at=match.get("scheduled_at"),
                     to_at=proposal["scheduled_at"], request_id=proposal_id, at=now, hours=int(rules["home_rule_hours"]))),

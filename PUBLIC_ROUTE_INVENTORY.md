@@ -42,6 +42,8 @@ Selbstanmeldung der Liga (docs/LIGA.md, #2205): `GET /api/leagues/<liga>/<season
 
 Sperrliste der Season (docs/LIGA.md, C.4 #2218): keine eigene öffentliche Route. `GET /api/leagues/<liga>/<season>` trägt `loadout_bans` (Schnappschuss der geltenden Version ohne Notiz und Autor, `null` ohne Liste) nach derselben Sichtbarkeit; im Regelwerk steht sie als Baustein. Die Bibliothek (`/api/games/<id>/equipment…`) und die Verwaltung der Liste (`/api/admin/leagues/seasons/<id>/loadout-bans…`) sind nie öffentlich.
 
+Check-in der Liga (docs/LIGA.md, D.2, #1652): `POST /api/matches/<id>/checkin` und `POST /api/matches/<id>/checkin/start` verlangen eine Anmeldung und die Verantwortung für eine Seite des Spiels (Captain, Vertreter) oder das Liga-Recht „Spiele betreuen“; Unbeteiligte bekommen 403, Spiele ohne Check-in 409. `GET /api/matches/<id>/page` trägt den Block `checkin` nur für Beteiligte und Leitung; `matches_v2.flow` (Konto-Kennungen) steht in keiner öffentlichen Antwort. `GET|PUT /api/admin/leagues/seasons/<id>/checkin-rules` ist Verwaltung (`/api/admin/`, robots gesperrt).
+
 ## Oeffentlich, aber bewusst nicht indexiert
 
 Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noindex, follow` lesen koennen. Sie stehen nicht in der Sitemap:

@@ -833,6 +833,31 @@ async def _agreed(db, season_id: str, version_ids: list[str]) -> dict[str, dict]
     return {row["squad_id"]: row for row in rows}
 
 
+async def sides_consent(db, tournament: dict | None, registrations: list[dict]) -> dict[str, dict | None]:
+    """Regelwerks-Sperre für Check-in und Start (D.2, #1652; Obmann 03.11.): je Anmeldung einer Staffel der Stand der Zustimmung ihres
+    Co-Teams - ``None``, wenn nichts gefordert ist (kein Regelwerk, keine Fassung mit ``requires_consent``, kein Co-Team); sonst
+    ``{open, version_id, label, rules_url}``. ``open``: Die Seite muss erst zustimmen."""
+    out: dict[str, dict | None] = {reg["id"]: None for reg in registrations if reg.get("id")}
+    context = (tournament or {}).get("league_context") or {}
+    if not context.get("season_id") or not any(reg.get("squad_id") for reg in registrations):
+        return out
+    season = await db.league_seasons.find_one({"id": context["season_id"]}, {"_id": 0})
+    league = await db.leagues.find_one({"id": (season or {}).get("league_id")}, {"_id": 0}) if season else None
+    if not league:
+        return out
+    chain = await _chain(db, league, season)
+    demand = _demand(chain)
+    if not demand:
+        return out
+    agreed = await _agreed(db, season["id"], _covers(demand, chain))
+    current = chain["current"]
+    for reg in registrations:
+        if reg.get("id") and reg.get("squad_id"):
+            out[reg["id"]] = {"open": reg["squad_id"] not in agreed, "version_id": current["id"], "label": _label(current),
+                              "rules_url": page_path(league, season)}
+    return out
+
+
 async def consent_view(db, league: dict, season: dict | None, chain: dict, user: dict | None) -> dict | None:
     """Der Kapitäns-Hinweis: was die Person für ihre Co-Teams dieser Season zustimmen kann - ``None``, wenn nichts gefordert ist
     oder sie für keines verantwortlich ist."""

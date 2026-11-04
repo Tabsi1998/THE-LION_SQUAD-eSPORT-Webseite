@@ -1,11 +1,12 @@
 // Reiter „Termine“ der Season-Seite (#2267): Kalender mit Beginn, Wochen, Standardtermin und Sperrzeiten, die Antwortfrist auf
-// Terminvorschläge und die Terminregeln (D.1, eigenes Speichern). Platz für die Check-in-Regeln (D.2, `SeasonCheckinRulesPanel`, #1652):
-// Sie kommen als eigener Kasten unter die Terminregeln.
+// Terminvorschläge, die Terminregeln (D.1, eigenes Speichern) und darunter die Check-in-Regeln (D.2, `SeasonCheckinRulesPanel`,
+// #1652, eigenes Speichern, Sprungmarke `#checkin`).
 import { CalendarOff, Trash2 } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { LEGS_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/league";
 import { dayNoon, viennaDate } from "@/lib/vienna";
+import { SeasonCheckinRulesPanel } from "./SeasonCheckinRulesPanel";
 import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
@@ -95,6 +96,9 @@ export function SeasonDatesTab({ seasonId, data, form, set, canSeason, formProps
       </SeasonTabForm>
       <div id="terminregeln" className="scroll-mt-24">
         <SeasonScheduleRulesPanel seasonId={seasonId} />
+      </div>
+      <div id="checkin" className="scroll-mt-24">
+        <SeasonCheckinRulesPanel seasonId={seasonId} />
       </div>
     </div>
   );

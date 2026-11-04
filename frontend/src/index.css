@@ -3576,6 +3576,16 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-run-card:hover { transform: none; }
 }
 
+/* Liga-Check-in (#1652): der Haken setzt sich sanft (nur transform und opacity), der Ring beginnt oben und zählt in
+   CheckinPanel.jsx je Bild per JavaScript herunter - keine CSS-Dauer, keine Sprünge. „Bewegung reduzieren“: kein Haken-Weg,
+   der Ring steht (das prüft motionAllowed im Baustein). */
+@keyframes tls-checkin-tick { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+.tls-checkin-tick { animation: tls-checkin-tick var(--tls-motion-mid) var(--tls-ease) both; }
+.tls-checkin-ring { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .tls-checkin-tick { animation: none; }
+}
+
 /* Bestätigungs-Blatt der Anmeldung (#1261): am Handy fährt das Blatt von unten herein, ab 640 px blendet das Fenster
    leicht vergrößert ein; der Hintergrund blendet nur. Mit „Bewegung reduzieren“ nur die Deckkraft, ohne Weg. */
 @keyframes tls-register-fade { from { opacity: 0; } to { opacity: 1; } }

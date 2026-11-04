@@ -164,6 +164,8 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         "overdue_matches": await overdue_match_rows(db, user),
         # Regelwerk muss freigegeben werden (#2269): für wer in der Liga „Regeln veröffentlichen“ darf.
         "rules_pending": await rules_pending_rows(db, user),
+        # Check-in abgelaufen (#1652, § 8.4): der Vorschlag „nicht erschienen“ - entschieden wird nur von Hand.
+        "checkin_proposals": await checkin_proposal_rows(db, user),
     }
 
 
@@ -190,6 +192,12 @@ async def rules_pending_rows(db, user: dict, limit: int = 50) -> list[dict]:
             if len(rows) >= limit:
                 return rows
     return rows
+
+
+async def checkin_proposal_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    from services.match_flow import proposal_rows
+
+    return await proposal_rows(db, user, limit)
 
 
 async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[dict]:

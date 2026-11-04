@@ -1,13 +1,15 @@
-// Was die Leitung entscheiden muss (#2194): Turniere nach ihrem Ende noch auf „Live“ und überfällige Liga-Spiele (nie
-// gemeldet, Termin lange vorbei), dazu ein Regelwerk, das freigegeben werden muss (#2269: Einstellungen geändert oder ein Entwurf
-// wartet). Steht auf „Mein Dienst“ und oben auf der Startseite der Verwaltung, mit direktem Weg.
+// Was die Leitung entscheiden muss (#2194, #1652, #2269): ein Regelwerk, das freigegeben werden muss (Einstellungen geändert oder
+// ein Entwurf wartet), Turniere nach ihrem Ende noch auf „Live“, abgelaufene Check-ins (eine Seite fehlt - gewertet wird nie von
+// selbst) und überfällige Liga-Spiele (nie gemeldet, Termin lange vorbei). Steht auf „Mein Dienst“ und oben auf der Startseite der
+// Verwaltung, mit direktem Weg.
 import { Link } from "react-router-dom";
-import { AlarmClock, ArrowRight, Flag, ScrollText } from "lucide-react";
+import { AlarmClock, ArrowRight, ClipboardX, Flag, ScrollText } from "lucide-react";
 import { endedLiveText } from "@/lib/endedLive";
 import { shortWhen } from "@/lib/leagueSchedule";
 
 export function hasDutyAttention(duty) {
-  return Boolean((duty?.ended_live || []).length || (duty?.overdue_matches || []).length || (duty?.rules_pending || []).length);
+  return Boolean((duty?.ended_live || []).length || (duty?.overdue_matches || []).length || (duty?.rules_pending || []).length
+    || (duty?.checkin_proposals || []).length);
 }
 
 /** Der Satz zur Freigabe: was sich geändert hat oder dass ein Entwurf wartet. */
@@ -24,7 +26,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
   const ended = duty?.ended_live || [];
   const overdue = duty?.overdue_matches || [];
   const rules = duty?.rules_pending || [];
-  if (!ended.length && !overdue.length && !rules.length) return null;
+  const proposals = duty?.checkin_proposals || [];
+  if (!ended.length && !overdue.length && !rules.length && !proposals.length) return null;
   return (
     <ul className="space-y-2" data-testid={testId}>
       {rules.map((row) => (
@@ -48,6 +51,22 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
           </div>
           <Link to={row.admin_url} data-testid={`duty-ended-open-${row.id}`} className={BUTTON}>
             {Number(row.open_matches || 0) > 0 ? "Turnier öffnen" : "Beenden"} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </li>
+      ))}
+      {proposals.map((row) => (
+        <li key={`checkin-${row.match_id}`} className="rounded-sm border border-honor/45 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-checkin-${row.match_id}`}>
+          <ClipboardX className="hidden h-5 w-5 shrink-0 text-honor md:block" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">Check-in abgelaufen: {row.label}</div>
+            <div className="mt-1 text-sm text-white/70 [overflow-wrap:anywhere]">
+              {row.title} · {(row.missing || []).join(" und ") || "eine Seite"} nicht eingecheckt, Fenster bis {shortWhen(row.due_at)}.
+              {" "}Kampflos werten, Seite nachtragen oder verlängern – gewertet wird nichts von selbst.
+            </div>
+          </div>
+          <Link to={row.lead_url || row.url} data-testid={`duty-checkin-open-${row.match_id}`}
+            className="tls-btn tls-btn--secondary mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider md:mt-0 md:w-auto">
+            Entscheiden <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
           </Link>
         </li>
       ))}

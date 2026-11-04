@@ -223,5 +223,7 @@ def undo_fields(match: dict, now_iso: str) -> dict:
         "games": [],
         "completed_at": None,
         "pending_result": None,
+        # Das alte Check-in-Fenster ist vorbei - eine Verlängerung daraus gilt für den neuen Anlauf nicht (D.2, #1652).
+        "no_show_extended_until": None,
         "updated_at": now_iso,
     }

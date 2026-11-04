@@ -14,6 +14,9 @@ const DUTY = {
     { league_id: "l1", league_name: "Probe-Liga", season_id: "s1", season_name: "Season 1", kind: "changed", count: 3, label: "Version 2", admin_url: "/admin/leagues/rules/league_season/s1" },
     { league_id: "l1", league_name: "Probe-Liga", season_id: "s2", season_name: "Season 2", kind: "draft", count: 0, label: null, admin_url: "/admin/leagues/rules/league/l1" },
   ],
+  // Check-in abgelaufen (#1652): eine Seite fehlt - die Leitung entscheidet, gewertet wird nichts von selbst.
+  checkin_proposals: [{ match_id: "m2", title: "Liga · Staffel A", label: "Spieltag 3", due_at: "2026-11-08T19:15:00Z", missing: ["Falken · Horst"],
+    url: "/matches/m2", lead_url: "/tournaments/staffel-a/leitung?fall=ns-m2" }],
 };
 
 test("Regelwerk muss freigegeben werden (#2269): geänderte Werte oder wartender Entwurf, je mit Weg", () => {
@@ -27,8 +30,12 @@ test("Regelwerk muss freigegeben werden (#2269): geänderte Werte oder wartender
   expect(screen.getByTestId("duty-rules-open-s2")).toHaveAttribute("href", "/admin/leagues/rules/league/l1");
 });
 
-test("zeigt beide Arten mit Satz und Weg", () => {
+test("zeigt alle Arten mit Satz und Weg", () => {
   render(<MemoryRouter><DutyAttention duty={DUTY} /></MemoryRouter>);
+  expect(screen.getByTestId("duty-rules-s1")).toHaveTextContent("Regelwerk muss freigegeben werden");
+  expect(screen.getByTestId("duty-checkin-m2")).toHaveTextContent("Check-in abgelaufen: Spieltag 3");
+  expect(screen.getByTestId("duty-checkin-m2")).toHaveTextContent("Falken · Horst nicht eingecheckt, Fenster bis So 08.11. 20:15");
+  expect(screen.getByTestId("duty-checkin-open-m2")).toHaveAttribute("href", "/tournaments/staffel-a/leitung?fall=ns-m2");
   expect(screen.getByTestId("duty-ended-t1")).toHaveTextContent("alle Spiele sind fertig");
   expect(screen.getByTestId("duty-ended-open-t1")).toHaveTextContent("Beenden");
   expect(screen.getByTestId("duty-ended-open-t1")).toHaveAttribute("href", "/admin/tournaments/t1");
@@ -39,7 +46,8 @@ test("zeigt beide Arten mit Satz und Weg", () => {
 });
 
 test("ohne Fälle nichts", () => {
-  expect(hasDutyAttention({ ended_live: [], overdue_matches: [] })).toBe(false);
+  expect(hasDutyAttention({ ended_live: [], overdue_matches: [], rules_pending: [], checkin_proposals: [] })).toBe(false);
+  expect(hasDutyAttention({ checkin_proposals: [{ match_id: "m2" }] })).toBe(true);
   expect(hasDutyAttention(null)).toBe(false);
   const { container } = render(<MemoryRouter><DutyAttention duty={{}} /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();
