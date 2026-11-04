@@ -187,6 +187,15 @@ async def lifespan(app: FastAPI):
     validate_runtime_env()
     ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     ensure_storage_directories()
+    # Leere Bildfassungen aus früheren abgebrochenen Schreibvorgängen: nginx würde sie als leeres Bild ausliefern.
+    try:
+        import asyncio
+        from services.image_variants import remove_empty_variants
+        removed = await asyncio.to_thread(remove_empty_variants, UPLOAD_DIR)
+        if removed:
+            logger.info("[media] %s leere Bildfassungen entfernt", removed)
+    except Exception as exc:  # noqa: BLE001 - nie den Start gefährden
+        logger.warning("[media] Aufräumen leerer Bildfassungen fehlgeschlagen: %s", type(exc).__name__)
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
     from services.migrations import run_pending_migrations

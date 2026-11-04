@@ -134,6 +134,54 @@ def test_a_variant_is_written_once_and_then_reused(bild):
     assert erste.stat().st_mtime_ns == stempel, "die zweite Anfrage rechnet nicht neu"
 
 
+@pytest.mark.parametrize("weg", ["resolve", "build", "build_all"])
+def test_an_empty_variant_from_an_interrupted_write_is_rebuilt(bild, weg):
+    """Ein abgebrochener Schreibvorgang ließ eine leere Datei liegen. Sie galt als fertig und wurde als leeres Bild ausgeliefert -
+    in der Ausrüstung blieben so einzelne Waffen ohne Bild. Eine leere Fassung wird neu gebaut."""
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    leer = variant_path(quelle, 160)
+    leer.parent.mkdir(parents=True, exist_ok=True)
+    leer.write_bytes(b"")
+
+    if weg == "resolve":
+        fertig = resolve_variant(quelle, 160)
+    elif weg == "build":
+        fertig = build_variant(quelle, 160)
+    else:
+        fertig = next(path for path in build_all_variants(quelle) if path == leer)
+
+    assert fertig == leer and leer.stat().st_size > 0
+    with Image.open(fertig) as im:
+        assert im.size == (160, 60)
+
+
+def test_a_failed_write_leaves_no_empty_variant_behind(bild, monkeypatch):
+    """Scheitert das Schreiben, bleibt weder eine leere Fassung noch eine Zwischendatei - ausgeliefert wird das Original."""
+    quelle = bild(width=1280, height=480, name="waffe.png")
+
+    def kaputt(self, fp, *args, **kwargs):
+        open(fp, "wb").close()
+        raise OSError("Platte voll")
+
+    monkeypatch.setattr(Image.Image, "save", kaputt)
+
+    assert resolve_variant(quelle, 160) is None
+    ordner = variant_path(quelle, 160).parent
+    assert not ordner.exists() or list(ordner.iterdir()) == []
+
+
+def test_empty_variants_are_cleared_at_start_so_nginx_never_serves_them(bild, tmp_path):
+    from services.image_variants import remove_empty_variants
+
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    gut = build_variant(quelle, 320)
+    leer = variant_path(quelle, 160)
+    leer.write_bytes(b"")
+
+    assert remove_empty_variants(tmp_path) == 1
+    assert not leer.exists() and gut.stat().st_size > 0
+
+
 def test_a_picture_smaller_than_the_request_is_left_alone(bild):
     """Hochskalieren kostet Bytes und bringt nichts."""
     klein = bild(width=300, height=200, name="klein.webp")

@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import uuid
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -58,6 +60,40 @@ def variant_path(source: Path, width: int) -> Path:
     return source.parent / VARIANT_DIR_NAME / f"{source.stem}-{width}.webp"
 
 
+def _usable(path: Path) -> bool:
+    """Eine Fassung zählt nur mit Inhalt. Ein abgebrochener Schreibvorgang (Neustart, zwei gleichzeitige Abrufe) hinterließ
+    früher eine leere Datei, die als fertig galt - ausgeliefert als leeres Bild, 30 Tage im Browser."""
+    try:
+        return path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def _drop_empty(path: Path) -> None:
+    try:
+        if path.is_file() and path.stat().st_size == 0:
+            path.unlink()
+    except OSError:
+        pass
+
+
+def remove_empty_variants(root: Path) -> int:
+    """Leere Fassungen unter ``root`` löschen (beim Start): nginx liefert, was auf der Platte liegt, auch eine leere Datei.
+    Beim nächsten Abruf baut das Backend sie neu. Liefert die Zahl der gelöschten."""
+    removed = 0
+    for folder in root.rglob(VARIANT_DIR_NAME):
+        if not folder.is_dir():
+            continue
+        for path in folder.glob("*.webp"):
+            try:
+                if path.stat().st_size == 0:
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                continue
+    return removed
+
+
 def _read_upright(source: Path) -> "Image.Image | None":
     """The picture, decoded once and turned as its EXIF says; None when it should stay as it is.
 
@@ -88,10 +124,20 @@ def _write_variant(image: "Image.Image", source: Path, width: int) -> Path | Non
     if copy.mode not in ("RGB", "RGBA"):
         copy = copy.convert("RGBA" if "A" in copy.getbands() else "RGB")
     target.parent.mkdir(parents=True, exist_ok=True)
+    # Erst in eine eigene Zwischendatei, dann in einem Schritt an ihren Platz: Niemand sieht eine halb geschriebene oder leere
+    # Fassung, und zwei gleichzeitige Abrufe schreiben sich nicht gegenseitig in dieselbe Datei.
+    temp = target.with_name(f".{target.stem}.{uuid.uuid4().hex}.tmp")
     try:
-        copy.save(target, format="WEBP", quality=VARIANT_QUALITY.get(width, 80), method=6)
+        copy.save(temp, format="WEBP", quality=VARIANT_QUALITY.get(width, 80), method=6)
+        if temp.stat().st_size == 0:
+            raise OSError("leere Fassung")
+        os.replace(temp, target)
     except (OSError, ValueError) as exc:
         logger.warning("[media] variant %s@%s failed: %s", source.name, width, exc)
+        try:
+            temp.unlink()
+        except OSError:
+            pass
         return None
     return target
 
@@ -106,8 +152,9 @@ def build_variant(source: Path, width: int) -> Path | None:
     if width not in VARIANT_WIDTHS or not is_resizable(source):
         return None
     target = variant_path(source, width)
-    if target.exists():
+    if _usable(target):
         return target
+    _drop_empty(target)
     image = _read_upright(source)
     return _write_variant(image, source, width) if image is not None else None
 
@@ -126,9 +173,10 @@ def build_all_variants(source: Path) -> list[Path]:
     image = None
     for width in VARIANT_WIDTHS:
         target = variant_path(source, width)
-        if target.exists():
+        if _usable(target):
             built.append(target)
             continue
+        _drop_empty(target)
         if image is None:
             image = _read_upright(source)
             if image is None:
@@ -166,9 +214,8 @@ def resolve_variant(source: Path, requested) -> Path | None:
     width = normalize_width(requested)
     if width is None or not source.is_file():
         return None
-    target = variant_path(source, width)
-    if target.is_file():
-        return target
+    if _usable(variant_path(source, width)):
+        return variant_path(source, width)
     return build_variant(source, width)
 
 
