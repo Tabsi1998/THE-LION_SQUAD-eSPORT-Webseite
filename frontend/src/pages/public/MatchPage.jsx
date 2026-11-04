@@ -27,6 +27,7 @@ import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
+import { LeagueRulesNote } from "@/components/tls/league/LeagueRulesNote";
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
@@ -406,6 +407,9 @@ function MatchPageView() {
             </div>
           )}
         </div>
+
+        {/* Regelwerk der Liga (#2269): gültige Fassung mit PDF und, für die eigene Seite, ob das Co-Team zugestimmt hat. */}
+        {data.league?.rules ? <LeagueRulesNote rules={data.league.rules} testId="match-rules" className="mt-5" /> : null}
 
         {data.call && <MatchCallBox call={data.call} />}
         {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}

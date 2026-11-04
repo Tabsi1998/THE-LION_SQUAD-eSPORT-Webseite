@@ -5,6 +5,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ELIGIBILITY_LABELS, TRANSFER_LABELS, ageLabel, rulesLines } from "@/lib/leagueEligibility";
 import { viennaDateTime } from "@/lib/vienna";
+import { LeagueRulesNote } from "./LeagueRulesNote";
 
 // Spielberechtigung im Co-Team (#2204): was die Season verlangt, wer spielen darf und wer nicht, und der Weg zum Transfer. Für Teamleitung,
 // Captain und Vertreter. Vom Alter steht hier nur „erfüllt“ oder „Geburtsdatum fehlt“, Spiel-IDs stehen nicht hier.
@@ -126,6 +127,8 @@ export function SquadEligibilityPanel({ teamId, squad }) {
       <div className="space-y-3 border-t border-white/10 px-3 py-3">
         {seasons.map((season) => (
           <div key={season.season_id} className="space-y-3" data-testid={`squad-eligibility-season-${season.season_id}`}>
+            {/* Regelwerk (#2269): gültige Fassung und der Stand der Zustimmung dieses Co-Teams. */}
+            {season.rules_doc ? <LeagueRulesNote rules={season.rules_doc} testId={`squad-rules-${season.season_id}`} /> : null}
             <ul className="space-y-0.5 text-xs text-white/60">
               {rulesLines(season.rules).map((line) => <li key={line} className="[overflow-wrap:anywhere]">{line}</li>)}
             </ul>
