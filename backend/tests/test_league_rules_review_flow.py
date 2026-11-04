@@ -1,6 +1,6 @@
 """Regelwerk aus den Einstellungen, Prüfung Codex (#2269): Die Freigabe veröffentlicht nur die Datenbasis, die der Vorschlag gezeigt hat
 (Fingerabdruck, sonst 409); alte Fassungen ohne Variablen-Metadaten bleiben Wort für Wort, wie sie waren; Liga-, Season- und Spielname
-stehen an der Fassung fest. Erfundene Inhalte."""
+stehen an der Fassung fest; leere Variablen brauchen eine ausdrückliche Bestätigung. Erfundene Inhalte."""
 import pathlib
 import sys
 
@@ -119,3 +119,36 @@ async def test_renaming_league_and_season_leaves_old_versions_pdf_and_history_un
     assert league_rules._pdf_document(league, season, stored, None, True)["context"] == "Neue Liga · Umbenannte Season"
     page = ok(await flow.get(f"{season_page(w)}?version={version['id']}"))
     assert page["version"]["names"] == {"league": "Neue Liga", "season": "Umbenannte Season"}
+
+
+# ---------------------------------------------------------------- 4. Leere Variablen nur mit Bestätigung
+
+@pytest.mark.asyncio
+async def test_empty_variables_need_an_explicit_confirmation_when_publishing(flow):
+    w = await make_world(flow)
+    text = "# A\nStartplätze: {{application.slots}}."
+    flow.act_as(w["lead"])
+    draft = ok(await flow.put(f"{season_scope(w)}/draft", json={"title": "R", "body_md": text, "annexes": []}))
+    refused = await flow.post(f"{season_scope(w)}/publish", json={"revision": draft["revision"], "valid_from": today(), "change_reason": "Grund genug"})
+    assert refused.status_code == 422
+    detail = refused.json()["detail"]
+    assert detail["code"] == "empty_vars" and detail["names"] == ["application.slots"] and "(nicht festgelegt)" in detail["message"]
+    assert await flow.db.league_rules.count_documents({"status": "published"}) == 0
+    released = ok(await flow.post(f"{season_scope(w)}/publish", json={
+        "revision": draft["revision"], "valid_from": today(), "change_reason": "Grund genug", "confirm_empty": True}))
+    assert released["frozen_vars"][w["season"]["id"]]["application.slots"]["value"] is None
+
+
+@pytest.mark.asyncio
+async def test_empty_variables_need_the_confirmation_in_the_release_too(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w, body="# A\nStartplätze: {{application.slots}}.\n\n[[baustein:modes]]", annexes=[], confirm_empty=True)
+    await rename_mode(flow, w, "Hardpoint")
+    proposal = ok(await flow.get(season_scope(w)))["proposal"]
+    assert proposal["empty_vars"] == ["application.slots"]
+    body = {"base_version_id": version["id"], "fingerprint": proposal["fingerprint"], "valid_from": today(), "change_reason": "Modus umbenannt"}
+    refused = await flow.post(f"{season_scope(w)}/proposal/publish", json=body)
+    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "empty_vars"
+    assert await flow.db.league_rules.count_documents({"status": "published"}) == 1
+    assert await flow.db.league_rules.count_documents({"status": "draft"}) == 0
+    assert ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={**body, "confirm_empty": True}))["version"] == 2
