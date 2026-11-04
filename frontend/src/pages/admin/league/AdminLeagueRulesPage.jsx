@@ -162,7 +162,7 @@ function RulesHelp({ blocks, variables }) {
           Ein Baustein steht als eigener Absatz (Tabelle oder Liste), eine Variable mitten im Satz. Beide kommen aus den Einstellungen der Season und werden beim
           Veröffentlichen eingefroren. Ändert sich danach eine Einstellung, bleibt die Fassung, wie sie ist, und die Seite zeigt „Regelwerk muss freigegeben werden“.
         </p>
-        <div className="overflow-x-auto">
+        <div className="tls-swipe pb-0">
           <table className="w-full text-left text-xs">
             <thead><tr className="text-white/50"><th className="py-1 pr-3 font-bold uppercase tracking-wider">Baustein</th><th className="py-1 pr-3 font-bold uppercase tracking-wider">Marke</th><th className="py-1 font-bold uppercase tracking-wider">Inhalt</th></tr></thead>
             <tbody>
@@ -176,7 +176,7 @@ function RulesHelp({ blocks, variables }) {
             </tbody>
           </table>
         </div>
-        <div className="overflow-x-auto">
+        <div className="tls-swipe pb-0">
           <table className="w-full text-left text-xs">
             <thead><tr className="text-white/50"><th className="py-1 pr-3 font-bold uppercase tracking-wider">Variable</th><th className="py-1 pr-3 font-bold uppercase tracking-wider">Marke</th><th className="py-1 font-bold uppercase tracking-wider">Wert heute</th></tr></thead>
             <tbody>
