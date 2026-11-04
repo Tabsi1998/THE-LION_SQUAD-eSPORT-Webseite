@@ -49,7 +49,7 @@ function Countdown({ block }) {
     <div className="flex items-center gap-3" data-testid="veto-countdown" role="timer" aria-live="off">
       <svg viewBox="0 0 80 80" width="72" height="72" className="tls-checkin-ring shrink-0" aria-hidden="true">
         <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
-        <circle ref={circle} cx="40" cy="40" r="34" fill="none" stroke={block.own_turn ? "#29B6E8" : "#FFD700"} strokeWidth="6" strokeLinecap="round"
+        <circle ref={circle} cx="40" cy="40" r="34" fill="none" stroke={block.own_turn ? "#29B6E8" : "var(--tls-honor)"} strokeWidth="6" strokeLinecap="round"
           pathLength={RING} strokeDasharray={RING} strokeDashoffset={moving ? RING * (1 - vetoRingShare(block, now)) : 0} />
       </svg>
       <div className="text-right">
