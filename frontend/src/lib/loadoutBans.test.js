@@ -1,6 +1,7 @@
 import {
-  categoriesPayload, categoriesProblem, equipmentPayload, fitsWeapon, formPayload, formProblem, groupByCategory, listToForm,
-  matchesSearch, modesText, publicGroups, rowKey, sameRows,
+  categoriesPayload, categoriesProblem, differsFromSection, equipmentPayload, fitsNothing, fitsWeapon, formPayload, formProblem,
+  groupByCategory, groupBySubcategory, listToForm, matchesSearch, missingSuggestions, modesText, publicGroups, rowKey, sameRows,
+  subcategoriesPayload, subcategoriesProblem, subcategoryOf, weaponClasses,
 } from "./loadoutBans";
 
 // Sperrliste der Season (#2218): Formular, Anfrage und öffentliche Gruppen rechnen wie der Server. Nur erfundene Namen.
@@ -34,9 +35,84 @@ test("Kategorien: Kennung bleibt, leere fallen weg, doppelte Namen werden genann
 });
 
 test("ein Eintrag schickt Waffen nur als Aufsatz und die Kategorie nur beim Anlegen", () => {
-  const form = { category: "aufsaetze", name: " Rotpunkt ", image_url: "", note: " ", weapon_ids: ["w1"] };
-  expect(equipmentPayload(form, "attachment", { create: true })).toEqual({ category: "aufsaetze", name: "Rotpunkt", image_url: null, note: null, weapon_ids: ["w1"] });
-  expect(equipmentPayload(form, "weapon")).toEqual({ name: "Rotpunkt", image_url: null, note: null });
+  const form = { category: "aufsaetze", subcategory: "", name: " Rotpunkt ", image_url: "", note: " ", weapon_ids: ["w1"], weapon_class_ids: ["sturm"] };
+  expect(equipmentPayload(form, "attachment", { create: true })).toEqual({
+    category: "aufsaetze", subcategory: null, name: "Rotpunkt", image_url: null, note: null, weapon_ids: ["w1"], weapon_class_ids: ["sturm"] });
+  expect(equipmentPayload({ ...form, subcategory: "optik" }, "weapon")).toEqual({ name: "Rotpunkt", subcategory: "optik", image_url: null, note: null });
+});
+
+// #2287: Unterkategorien, Waffenklassen und ganze Klassen.
+const CATEGORIES = [
+  { key: "waffen", label: "Waffen", role: "weapon", subcategories: [{ key: "sturm", label: "Sturmgewehr" }, { key: "schrot", label: "Schrotflinte" }] },
+  { key: "aufsaetze", label: "Aufsätze", role: "attachment", subcategories: [{ key: "optik", label: "Optik" }] },
+  { key: "perks", label: "Perks", role: "item", subcategories: [] },
+];
+
+test("ein Aufsatz passt über die Klasse der Waffe - eine neue Waffe der Klasse sofort", () => {
+  const sight = { weapon_ids: [], weapon_class_ids: ["schrot"] };
+  expect(fitsWeapon(sight, { id: "neu", subcategory: "schrot" })).toBe(true);
+  expect(fitsWeapon(sight, { id: "w1", subcategory: "sturm" })).toBe(false);
+  expect(fitsWeapon(sight, "neu")).toBe(false);
+  expect(fitsNothing(sight)).toBe(false);
+  expect(fitsNothing({ weapon_ids: [], weapon_class_ids: [] })).toBe(true);
+  expect(weaponClasses(CATEGORIES).map((row) => [row.key, row.category_label])).toEqual([["sturm", "Waffen"], ["schrot", "Waffen"]]);
+});
+
+test("je Unterkategorie gruppiert, ohne Unterkategorie zuerst und nur mit Einträgen", () => {
+  const items = [{ id: "w1", subcategory: "sturm" }, { id: "w2" }, { id: "w3", subcategory: "weg" }];
+  expect(groupBySubcategory(items, CATEGORIES[0]).map((group) => [group.sub?.key || null, group.items.map((item) => item.id)]))
+    .toEqual([[null, ["w2", "w3"]], ["sturm", ["w1"]], ["schrot", []]]);
+  expect(groupBySubcategory([{ id: "w1", subcategory: "sturm" }], CATEGORIES[0])[0].sub.key).toBe("sturm");
+  expect(groupBySubcategory([{ id: "p1" }], CATEGORIES[2])).toEqual([{ sub: null, items: [{ id: "p1" }] }]);
+  expect(subcategoryOf(CATEGORIES, "optik")).toMatchObject({ label: "Optik", category_label: "Aufsätze" });
+});
+
+test("Unterkategorien: Kennung bleibt, Vorschlag nur, was fehlt", () => {
+  expect(subcategoriesPayload([{ key: "sturm", label: " Sturmgewehr ", icon_url: "" }, { label: "  " }, { label: "Pistole", icon_url: "/api/static/uploads/p.png" }]))
+    .toEqual([{ key: "sturm", label: "Sturmgewehr", icon_url: null }, { label: "Pistole", icon_url: "/api/static/uploads/p.png" }]);
+  expect(subcategoriesProblem([{ label: "Pistole" }, { label: "pistole" }])).toContain("zweimal");
+  expect(missingSuggestions([{ label: "sturmgewehr" }], ["Sturmgewehr", "Pistole"])).toEqual(["Pistole"]);
+});
+
+test("eine ganze Klasse im Formular: laden, schicken, Einzelzeilen darin werden genannt", () => {
+  const library = [...LIBRARY, { id: "s1", category: "waffen", name: "Hagel", subcategory: "schrot" }];
+  const list = { entries: [
+    { kind: "class", subcategory: "schrot", name: "Schrotflinte", modes: ["stellung"] },
+    { kind: "class", subcategory: "weg", name: "Entfernt", modes: [] },
+  ] };
+  const { rows, dropped } = listToForm(list, library, MODES, CATEGORIES);
+  expect(rows).toEqual({ "class:schrot": { kind: "class", subcategory: "schrot", modes: ["stellung"], attachment_ids: [] } });
+  expect(dropped).toEqual(["Entfernt"]);
+  const withItem = { ...rows, "item:w1": { kind: "item", item_id: "w1", modes: [], attachment_ids: [] } };
+  expect(formPayload(withItem, library, CATEGORIES)).toEqual([
+    { kind: "class", subcategory: "schrot", modes: ["stellung"], attachment_ids: [] },
+    { item_id: "w1", kind: "item", modes: [], attachment_ids: [] },
+  ]);
+  expect(sameRows(withItem, rows)).toBe(false);
+  expect(formProblem({ ...rows, "item:s1": { kind: "item", item_id: "s1", modes: [], attachment_ids: [] } }, library, CATEGORIES)).toBe("");
+  const full = { "class:schrot": { kind: "class", subcategory: "schrot", modes: [], attachment_ids: [] },
+    "item:s1": { kind: "item", item_id: "s1", modes: ["suchen"], attachment_ids: [] } };
+  expect(formProblem(full, library, CATEGORIES)).toContain("„Hagel“ gehört zu „Schrotflinte“");
+  expect(formProblem({ "class:schrot": full["class:schrot"] }, library, CATEGORIES)).toBe("");
+});
+
+test("öffentlich gruppiert: Kategorie, ohne Unterkategorie zuerst, ganze Klasse mit den Einträgen von heute", () => {
+  const list = { entries: [
+    { kind: "item", item_id: "w9", name: "Ohne", category_label: "Waffen", mode_labels: [] },
+    { kind: "class", subcategory: "schrot", subcategory_label: "Schrotflinte", category_label: "Waffen", image_url: "/api/static/uploads/k.png",
+      mode_labels: ["Suchen"], items: [{ item_id: "s2", name: "Hagel" }, { item_id: "s1", name: "Bö" }] },
+    { kind: "item", item_id: "s2", name: "Hagel", subcategory: "schrot", subcategory_label: "Schrotflinte", category_label: "Waffen", mode_labels: ["Stellung"] },
+    { kind: "class", subcategory: "leer", subcategory_label: "Raketenwerfer", category_label: "Waffen", mode_labels: [], items: [] },
+    { kind: "item", item_id: "p1", name: "Leise Sohlen", category_label: "Perks", mode_labels: [] },
+  ] };
+  const { categories } = publicGroups(list);
+  expect(categories.map((row) => [row.label, row.count, row.sections.map((section) => section.label)]))
+    .toEqual([["Waffen", 3, [null, "Schrotflinte"]], ["Perks", 1, [null]]]);
+  const shotguns = categories[0].sections[1];
+  expect([shotguns.all, shotguns.mode_labels, shotguns.icon_url]).toEqual([true, ["Suchen"], "/api/static/uploads/k.png"]);
+  expect(shotguns.entries.map((row) => [row.name, row.mode_labels])).toEqual([["Bö", ["Suchen"]], ["Hagel", ["Suchen", "Stellung"]]]);
+  expect(differsFromSection(shotguns.entries[0], shotguns)).toBe(false);
+  expect(differsFromSection(shotguns.entries[1], shotguns)).toBe(true);
 });
 
 test("die gespeicherte Liste wird Formular - Archiviertes und verschwundene Modi fallen mit Hinweis heraus", () => {
@@ -83,8 +159,10 @@ test("öffentlich: je Kategorie die gesperrten Einträge, danach die Waffen mit 
     { kind: "item", name: "Leise Sohlen", category_label: "Perks", mode_labels: ["Suchen"] },
     { kind: "attachments", name: "Donner 4", category_label: "Waffen", attachments: [{ name: "Griff" }] },
   ] };
-  const { groups, weapons } = publicGroups(list);
-  expect(groups.map((group) => [group.label, group.entries.map((row) => row.name)])).toEqual([["Waffen", ["Blitz 9"]], ["Perks", ["Leise Sohlen"]]]);
+  const { categories, weapons } = publicGroups(list);
+  // Ohne Unterkategorien: je Kategorie ein Abschnitt ohne Namen - wie vor #2287.
+  expect(categories.map((group) => [group.label, group.sections.length, group.sections[0].label, group.sections[0].entries.map((row) => row.name)]))
+    .toEqual([["Waffen", 1, null, ["Blitz 9"]], ["Perks", 1, null, ["Leise Sohlen"]]]);
   expect(weapons.map((row) => row.name)).toEqual(["Donner 4"]);
   expect(modesText(list.entries[0])).toBe("alle Modi");
   expect(modesText(list.entries[1])).toBe("Suchen");

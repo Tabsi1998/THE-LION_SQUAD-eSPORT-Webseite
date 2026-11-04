@@ -11,8 +11,11 @@ import { useReportDirty } from "./useReportDirty";
 export function equipmentImportText(result) {
   const created = result?.created?.length || 0;
   const skipped = result?.skipped || [];
+  const notes = result?.notes || [];
   const parts = [`${countText(created, "Eintrag", "Einträge")} übernommen.`];
   if (skipped.length) parts.push(`${skipped.length} ausgelassen: ${skipped[0].name} – ${skipped[0].reason}`);
+  // Unterkategorie ohne Platz (#2287): der Eintrag kam, aber ohne Unterkategorie.
+  if (notes.length) parts.push(`${notes.length === 1 ? notes[0].name : `${notes.length} Einträge`} – ${notes[0].reason}`);
   return parts.join(" ");
 }
 
@@ -89,7 +92,7 @@ export function EquipmentImportSheet({ game, onClose, onDone, onDirtyChange }) {
     setSaving(true);
     try {
       const { data } = await api.post(`/games/${game.id}/equipment/import`, { source_game_id: sourceId, item_ids: picked });
-      if ((data?.skipped || []).length) toast.warning(equipmentImportText(data));
+      if ((data?.skipped || []).length || (data?.notes || []).length) toast.warning(equipmentImportText(data));
       else toast.success(equipmentImportText(data));
       onDone();
     } catch (err) {
@@ -108,7 +111,7 @@ export function EquipmentImportSheet({ game, onClose, onDone, onDirtyChange }) {
         <>
           <SelectField label="Aus welchem Spiel?" value={sourceId} onChange={setSourceId}
             options={sources.map((row) => [row.id, `${row.name} (${row.items})`])} testId="equipment-import-source" />
-          <p className="text-xs text-white/60">Es entstehen eigene Einträge dieses Spiels. Fehlende Kategorien kommen dazu, Aufsätze bekommen die Waffen gleichen Namens – darum Waffen mit übernehmen. Die Quelle bleibt unverändert.</p>
+          <p className="text-xs text-white/60">Es entstehen eigene Einträge dieses Spiels. Fehlende Kategorien und Unterkategorien kommen dazu („neu“), Aufsätze bekommen die Waffen und Waffenklassen gleichen Namens – darum Waffen mit übernehmen. Die Quelle bleibt unverändert.</p>
           {candidates === null ? <p className="text-sm text-white/60">Lade Einträge …</p> : (
             <div className="space-y-4" data-testid="equipment-import-list">
               {groups.map((group) => (
@@ -121,7 +124,15 @@ export function EquipmentImportSheet({ game, onClose, onDone, onDirtyChange }) {
                     <label key={row.id} data-testid={`equipment-import-row-${row.id}`}
                       className={`flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-2.5 py-2 text-sm ${row.exists ? "text-white/45" : "cursor-pointer text-white/85"}`}>
                       <input type="checkbox" disabled={row.exists} checked={picked.includes(row.id)} onChange={() => toggle(row.id)} className="accent-[#29B6E8]" aria-label={row.name} />
-                      <span className="min-w-0 flex-1 break-words">{row.name}</span>
+                      <span className="min-w-0 flex-1 break-words">
+                        {row.name}
+                        {/* Unterkategorie (#2287): wohin der Eintrag kommt - „neu“, wenn sie im Ziel erst angelegt wird. */}
+                        {row.subcategory_label ? (
+                          <span className="ml-1.5 text-[11px] text-white/50" data-testid={`equipment-import-sub-${row.id}`}>
+                            · {row.subcategory_label}{row.subcategory_new ? <span className="ml-1 font-semibold text-[#29B6E8]">neu</span> : null}
+                          </span>
+                        ) : null}
+                      </span>
                       {row.exists ? <span className="shrink-0 text-[11px] text-white/50">schon da</span> : null}
                     </label>
                   ))}
