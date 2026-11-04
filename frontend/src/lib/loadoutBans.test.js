@@ -1,6 +1,6 @@
 import {
   attachmentModes, attachmentSlots, attachmentsSummary, banAttachmentEverywhere, categoriesPayload, categoriesProblem, copyAttachmentsToClass,
-  differsFromSection, equipmentPayload, fitsNothing, fitsWeapon, formPayload, formProblem, groupByCategory, groupBySubcategory, listToForm,
+  differsFromSection, equipmentPayload, everywhereText, fitsNothing, fitsWeapon, formPayload, formProblem, groupByCategory, groupBySubcategory, listToForm,
   matchesSearch, missingSuggestions, modesNote, modesText, ownRestrictionParts, publicGroups, restrictionParts, rowKey, sameRows,
   subcategoriesPayload, subcategoriesProblem, subcategoryOf, weaponClasses,
 } from "./loadoutBans";
@@ -227,6 +227,11 @@ test("„nur in …“ (#2298) und „14 Aufsätze · 2 gesperrt“", () => {
   expect(ownRestrictionParts({ not_in: ["Stellung", "Kapern"], only_in: ["Suchen"] }, section)).toEqual([]);
   expect(attachmentsSummary({ count: 14, banned: ["A", "B"] })).toBe("14 Aufsätze · 2 gesperrt");
   expect(attachmentsSummary({ count: 1, banned: [] })).toBe("1 Aufsatz");
+  // An keiner Waffe erlaubt (Fabian, 04.11.): steht oben, zählt bei „K gesperrt“ weiter mit.
+  expect(attachmentsSummary({ count: 14, banned: ["A"], banned_everywhere: 2 })).toBe("14 Aufsätze · 3 gesperrt");
+  expect(everywhereText({ attachments_everywhere: [{ name: "Kompensator", not_in: [] }, { name: "Holo", not_in: ["A", "B"], only_in: ["C"] }] }))
+    .toBe("Kompensator, Holo (nur in C)");
+  expect(everywhereText({})).toBe("");
 });
 
 test("öffentlich: je Kategorie die gesperrten Einträge, danach die Waffen mit Aufsätzen", () => {

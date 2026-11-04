@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Ban, Check, ChevronDown, ShieldCheck } from "lucide-react";
 import { EquipmentThumb, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
-import { allowedCount, attachmentsSummary, countText, modesNote, ownRestrictionParts } from "@/lib/loadoutBans";
+import { allowedCount, attachmentsSummary, countText, everywhereText, modesNote, ownRestrictionParts } from "@/lib/loadoutBans";
 
 const LAYOUTS = [3, 4];
 // Kleine Kacheln der Aufsätze: drei Spalten am Handy, bis sechs am PC.
@@ -106,9 +106,13 @@ function AttachmentsPanel({ entry, id }) {
           </div>
         ))}
       </div>
-      {banned.length ? (
+      {banned.length || entry.attachments?.banned_everywhere ? (
         <p className="mt-4 border-t border-white/10 pt-2.5 text-xs text-white/60 break-words" data-testid="allowed-attachments-banned">
-          <span className="font-semibold text-warn">Gesperrt:</span> {banned.join(", ")}
+          {banned.length ? <><span className="font-semibold text-warn">Gesperrt:</span> {banned.join(", ")}</> : null}
+          {/* Die an keiner Waffe erlaubten stehen einmal unter den Waffen (Fabian, 04.11.) - hier nur die Zahl, damit „K gesperrt“ aufgeht. */}
+          {entry.attachments?.banned_everywhere ? (
+            <span data-testid="allowed-attachments-everywhere">{banned.length ? " · " : ""}dazu {entry.attachments.banned_everywhere === 1 ? "1 Aufsatz, der an keiner Waffe erlaubt ist" : `${entry.attachments.banned_everywhere} Aufsätze, die an keiner Waffe erlaubt sind`}</span>
+          ) : null}
         </p>
       ) : null}
     </li>
@@ -144,6 +148,8 @@ export function AllowedEquipmentView({ data, title = "Erlaubte Ausrüstung", cla
   testId = "allowed-equipment", hideTitle = false }) {
   if (!data || !LAYOUTS.includes(data.layout)) return null;
   const categories = data.categories || [];
+  const nowhere = everywhereText(data);
+  const lastWeapons = categories.map((category) => category.role).lastIndexOf("weapon");
   return (
     <section className={className} {...(hideTitle ? { "aria-label": title } : { "aria-labelledby": headingId })} data-testid={testId}>
       {hideTitle ? null : (
@@ -170,6 +176,15 @@ export function AllowedEquipmentView({ data, title = "Erlaubte Ausrüstung", cla
                 </div>
               ))}
             </div>
+            {nowhere && categoryIndex === lastWeapons ? (
+              <p className="mt-6 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/80 break-words"
+                data-testid="allowed-nowhere">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-warn">
+                  <Ban className="h-3 w-3" aria-hidden="true" /> An keiner Waffe erlaubt
+                </span>
+                <span className="min-w-0">{nowhere}</span>
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

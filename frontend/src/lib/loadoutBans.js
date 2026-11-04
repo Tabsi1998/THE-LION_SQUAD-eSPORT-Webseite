@@ -400,10 +400,16 @@ export function ownRestrictionParts(entry, section) {
   return restrictionParts(entry);
 }
 
+/** „Kompensator, Holo (nur in Suchen)“ - die Aufsätze, die an keiner Waffe erlaubt sind (Fabian, 04.11.); leer ohne solche. */
+export function everywhereText(data) {
+  return (data?.attachments_everywhere || []).map((row) => (modesNote(row) ? `${row.name} (${modesNote(row)})` : row.name)).join(", ");
+}
+
 /** „14 Aufsätze · 2 gesperrt“ (#2299) - die Zahl der passenden und davon an dieser Waffe gesperrten. */
 export function attachmentsSummary(attachments) {
   const count = attachments?.count || 0;
-  const banned = attachments?.banned?.length || 0;
+  // Auch die, die an keiner Waffe erlaubt sind und darum oben in einer Zeile stehen (Fabian, 04.11.) - die Zahl bleibt ehrlich.
+  const banned = (attachments?.banned?.length || 0) + (attachments?.banned_everywhere || 0);
   return `${countText(count, "Aufsatz", "Aufsätze")}${banned ? ` · ${banned} gesperrt` : ""}`;
 }
 

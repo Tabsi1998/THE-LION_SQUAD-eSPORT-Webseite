@@ -89,6 +89,22 @@ test("je Waffe „N Aufsätze · K gesperrt“, aufgeklappt die erlaubten je Slo
   expect(within(sturm).getByTestId("allowed-weapon-summary")).toHaveTextContent("1 Aufsatz · 1 gesperrt");
 });
 
+test("„An keiner Waffe erlaubt“ einmal unter den Waffen, „K gesperrt“ zählt sie weiter (Fabian, 04.11.)", async () => {
+  const user = userEvent.setup();
+  render(<AllowedEquipmentView data={{ ...BY_WEAPON, attachments_everywhere: [{ name: "Kompensator", not_in: [] },
+    { name: "Holo", not_in: ["Stellung", "Kapern"], only_in: ["Suchen"] }],
+  categories: [{ ...BY_WEAPON.categories[0], sections: [{ ...BY_WEAPON.categories[0].sections[0], entries: [
+    { name: "Blitz 9", image_url: null, not_in: [], attachments: { count: 3, banned: ["Laser"], banned_everywhere: 1, groups: [] } }] }] },
+  BY_WEAPON.categories[1]] }} />);
+  const groups = screen.getAllByTestId("allowed-group");
+  expect(within(groups[0]).getByTestId("allowed-nowhere")).toHaveTextContent("An keiner Waffe erlaubtKompensator, Holo (nur in Suchen)");
+  expect(within(groups[1]).queryByTestId("allowed-nowhere")).toBeNull();
+  const blitz = screen.getByTestId("allowed-weapon-toggle");
+  expect(within(blitz).getByTestId("allowed-weapon-summary")).toHaveTextContent("3 Aufsätze · 2 gesperrt");
+  await user.click(blitz);
+  expect(screen.getByTestId("allowed-attachments-banned")).toHaveTextContent("Gesperrt: Laser · dazu 1 Aufsatz, der an keiner Waffe erlaubt ist");
+});
+
 test("ohne Sperrliste: alles erlaubt, „Alle erlaubt“ an der Klasse", () => {
   render(<AllowedEquipmentView data={{ list: false, layout: 3, categories: [{ label: "Waffen", sections: [
     { label: "Schrotflinte", state: "all", not_in: [], banned: [], entries: [{ name: "Hagel", image_url: null, not_in: [], not_at: [] }] }] }] }} />);

@@ -36,9 +36,7 @@
         "not_in": [],
         "attachments": {
          "count": 5,
-         "banned": [
-          "Kompensator"
-         ],
+         "banned": [],
          "groups": [
           {
            "label": null,
@@ -80,7 +78,8 @@
             }
            ]
           }
-         ]
+         ],
+         "banned_everywhere": 1
         }
        },
        {
@@ -90,7 +89,6 @@
         "attachments": {
          "count": 4,
          "banned": [
-          "Kompensator",
           "Rotpunkt"
          ],
          "groups": [
@@ -124,7 +122,8 @@
             }
            ]
           }
-         ]
+         ],
+         "banned_everywhere": 1
         }
        },
        {
@@ -139,9 +138,7 @@
         ],
         "attachments": {
          "count": 4,
-         "banned": [
-          "Kompensator"
-         ],
+         "banned": [],
          "groups": [
           {
            "label": "Mündung",
@@ -172,7 +169,8 @@
             }
            ]
           }
-         ]
+         ],
+         "banned_everywhere": 1
         }
        }
       ]
@@ -245,7 +243,13 @@
      }
     ]
    }
+  ],
+  "attachments_everywhere": [
+   {
+    "name": "Kompensator",
+    "not_in": []
+   }
   ]
  },
- "block_md": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n- ![Ausrüstung](/api/static/uploads/bild-o1.png) ++Ohne Klasse++ *nicht in Suchen & Zerstören*\n\n![Klassen-Symbol](/api/static/uploads/klasse-sturm.png) *Sturmgewehr*\n- ![Ausrüstung](/api/static/uploads/bild-w1.png) ++Blitz 9++ alle passenden Aufsätze erlaubt, außer: Kompensator\n- ![Ausrüstung](/api/static/uploads/bild-w2.png) ++Donner 4++ alle passenden Aufsätze erlaubt, außer: Kompensator, Rotpunkt, Holo (nur in Suchen & Zerstören)\n- ++Kar mit einem wirklich sehr langen Namen, der nirgends hineinpasst++ *nur in Suchen & Zerstören* alle passenden Aufsätze erlaubt, außer: Kompensator\n\n![Klassen-Symbol](/api/static/uploads/klasse-schrot.png) *Schrotflinte* · **nicht erlaubt** (Bö, Hagel)\n\n*Pistole mit einem wirklich sehr langen Namen, der nirgends hineinpasst* · alle erlaubt\n- ![Ausrüstung](/api/static/uploads/bild-p1.png) ++Funke++ alle passenden Aufsätze erlaubt\n\n**Perks**\n\n- ![Ausrüstung](/api/static/uploads/bild-k2.png) ++Kaltblut++\n- ![Ausrüstung](/api/static/uploads/bild-k1.png) ++Leise Sohlen++"
+ "block_md": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n- ![Ausrüstung](/api/static/uploads/bild-o1.png) ++Ohne Klasse++ *nicht in Suchen & Zerstören*\n\n![Klassen-Symbol](/api/static/uploads/klasse-sturm.png) *Sturmgewehr*\n- ![Ausrüstung](/api/static/uploads/bild-w1.png) ++Blitz 9++ alle passenden Aufsätze erlaubt\n- ![Ausrüstung](/api/static/uploads/bild-w2.png) ++Donner 4++ alle passenden Aufsätze erlaubt, außer: Rotpunkt, Holo (nur in Suchen & Zerstören)\n- ++Kar mit einem wirklich sehr langen Namen, der nirgends hineinpasst++ *nur in Suchen & Zerstören* alle passenden Aufsätze erlaubt\n\n![Klassen-Symbol](/api/static/uploads/klasse-schrot.png) *Schrotflinte* · **nicht erlaubt** (Bö, Hagel)\n\n*Pistole mit einem wirklich sehr langen Namen, der nirgends hineinpasst* · alle erlaubt\n- ![Ausrüstung](/api/static/uploads/bild-p1.png) ++Funke++ alle passenden Aufsätze erlaubt\n\n**An keiner Waffe erlaubt:** Kompensator\n\n**Perks**\n\n- ![Ausrüstung](/api/static/uploads/bild-k2.png) ++Kaltblut++\n- ![Ausrüstung](/api/static/uploads/bild-k1.png) ++Leise Sohlen++"
 }

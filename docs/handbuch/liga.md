@@ -147,7 +147,9 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
    erlaubt ist**: alle **aktiven** Einträge der Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild. Nur in einzelnen
    Modi gesperrt, steht ein Eintrag mit „nicht in …“ da – ist er in **mehr Modi der Season gesperrt als erlaubt**, mit „nur in …“ (etwa „nur
    in Suchen & Zerstören“; bei Gleichstand „nicht in …“). **Aufsätze stehen an der Waffe**, nicht als eigene Liste: Im Web trägt jede Waffe
-   den Satz „alle passenden Aufsätze erlaubt“ bzw. „…, außer: A, B (nur in …)“; ohne erlaubten Aufsatz „keine Aufsätze erlaubt (…)“. Eine
+   den Satz „alle passenden Aufsätze erlaubt“ bzw. „…, außer: A, B (nur in …)“; ohne erlaubten Aufsatz „keine Aufsätze erlaubt (…)“. Ist
+   ein Aufsatz an **jeder** passenden Waffe gleich gesperrt (etwa über **An allen Waffen sperren**), steht er nur einmal unter den Waffen:
+   „**An keiner Waffe erlaubt:** Kompensator“ (mit Hinweis, wenn nur in Modi); an der Waffe zählt er bei „K gesperrt“ weiter mit. Eine
    ganz gesperrte Klasse ist nur eine Zeile „Schrotflinte · nicht erlaubt“ (mit den Namen in Klammern), eine ohne jede Einschränkung sagt
    „alle erlaubt“. Inaktive und archivierte Einträge fehlen. Im **PDF** steht je Waffe eine Zeile „M4 – alle passenden Aufsätze erlaubt,
    außer: …“, die übrige Ausrüstung als Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen. Weil der

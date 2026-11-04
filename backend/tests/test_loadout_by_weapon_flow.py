@@ -106,6 +106,32 @@ async def test_the_league_page_shows_attachments_at_the_weapon_and_only_in(flow)
     assert lauf not in json.dumps(data), "nur Klartext, keine Kennungen"
 
 
+@pytest.mark.asyncio
+async def test_an_attachment_banned_at_every_weapon_stands_once(flow):
+    """Fabian, 04.11.: Griff passt zu Blitz 9 und Donner 4 und ist überall gesperrt - Ligaseite, Regelwerk und PDF nennen ihn einmal in „An
+    keiner Waffe erlaubt“; die Karte zählt ihn bei „K gesperrt“ weiter mit."""
+    import pymupdf
+
+    w = await ready(flow)
+    ok(await save_bans(flow, w, [item(w, "Griff"), attachments(w, "Donner 4", ["Lauf"])]))
+    flow.act_as(None)
+    data = ok(await flow.get(public_url(w)))["allowed_equipment"]
+    assert data["attachments_everywhere"] == [{"name": "Griff", "not_in": []}]
+    blitz, donner = weapons(data)["Blitz 9"]["attachments"], weapons(data)["Donner 4"]["attachments"]
+    assert (blitz["count"], blitz["banned"], blitz["banned_everywhere"]) == (2, [], 1)
+    assert (donner["count"], donner["banned"], donner["banned_everywhere"]) == (2, ["Lauf"], 1)
+    version = await publish(flow, w, body=BODY, annexes=ANNEX)
+    flow.act_as(None)
+    page = ok(await flow.get(f"{season_page(w)}?version={version['id']}"))
+    annex = next(row["body_md"] for row in page["sections"] if row["anchor"] == "anlage-a")
+    assert "**An keiner Waffe erlaubt:** Griff" in annex and "außer: Griff" not in annex
+    pdf = await flow.get(f"{season_page(w)}/versions/{version['id']}/pdf")
+    words = " ".join(" ".join(sheet.get_text() for sheet in pymupdf.open(stream=pdf.content, filetype="pdf")).split())
+    # An Donner 4 bleibt nach Griff (überall) und Lauf (nur hier) keiner übrig.
+    assert "An keiner Waffe erlaubt: Griff" in words and "Donner 4 – keine Aufsätze erlaubt (Lauf)" in words
+    assert "Blitz 9 – alle passenden Aufsätze erlaubt" in words
+
+
 # ---------------------------------------------------------------- Regelwerk
 
 @pytest.mark.asyncio

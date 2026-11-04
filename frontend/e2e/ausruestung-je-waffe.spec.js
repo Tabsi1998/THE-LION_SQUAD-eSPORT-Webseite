@@ -182,7 +182,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(panel.getByTestId("allowed-slot")).toHaveCount(2);
       await expect(panel.getByTestId("allowed-slot").first()).toContainText("Mündung");
       await expect(panel.getByTestId("allowed-attachment").filter({ hasText: "Holo" }).getByTestId("allowed-note")).toHaveText("nur in Suchen & Zerstören");
-      await expect(panel.getByTestId("allowed-attachments-banned")).toHaveText("Gesperrt: Kompensator, Rotpunkt");
+      // Kompensator ist an keiner Waffe erlaubt (Fabian, 04.11.): einmal unter den Waffen, am Kasten nur gezählt.
+      await expect(panel.getByTestId("allowed-attachments-banned")).toHaveText("Gesperrt: Rotpunkt · dazu 1 Aufsatz, der an keiner Waffe erlaubt ist");
+      await expect(block.getByTestId("allowed-nowhere")).toHaveText("An keiner Waffe erlaubtKompensator");
+      await expect(block.getByTestId("allowed-nowhere")).toHaveCount(1);
       // Der Kasten steht unter der Zeile über die ganze Breite des Rasters.
       const grid = await panel.locator("xpath=..").boundingBox();
       const box = await panel.boundingBox();
@@ -191,7 +194,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       expect(Math.abs(box.width - grid.width)).toBeLessThanOrEqual(2);
       await noSideScroll(page);
       await panel.scrollIntoViewIfNeeded();
-      await shot(block, `ligaseite-aufgeklappt-${width}.png`);
+      await shot(block, `ligaseite-aufgeklappt-${width}${process.env.SHOTS_SUFFIX || ""}.png`);
       await page.keyboard.press(" ");
       await expect(block.getByTestId("allowed-attachments")).toHaveCount(0);
     });
@@ -201,10 +204,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await mock(page);
       await page.goto("/liga/probe-liga/season-1/regeln");
       const annex = page.locator("[id='anlage-a']");
-      await expect(annex.getByText("alle passenden Aufsätze erlaubt, außer: Kompensator, Rotpunkt, Holo (nur in Suchen & Zerstören)")).toBeVisible();
+      await expect(annex.getByText("alle passenden Aufsätze erlaubt, außer: Rotpunkt, Holo (nur in Suchen & Zerstören)")).toBeVisible();
+      await expect(annex.locator("p").filter({ hasText: "An keiner Waffe erlaubt:" })).toHaveText("An keiner Waffe erlaubt: Kompensator");
+      await expect(annex.getByText("außer: Kompensator")).toHaveCount(0);
       await expect(annex.locator("em").filter({ hasText: "nur in Suchen & Zerstören" }).first()).toBeVisible();
       const heads = await annex.locator("p > strong:only-child").allTextContents();
-      expect(heads).toEqual(["Waffen", "Perks"]);
+      // Die Zeile „An keiner Waffe erlaubt“ beginnt fett (einziges Element im Absatz) - sie steht nach der letzten Waffen-Kategorie.
+      expect(heads).toEqual(["Waffen", "An keiner Waffe erlaubt:", "Perks"]);
       const lists = annex.locator("ul").filter({ has: page.locator("u") });
       expect(await lists.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).display))).toEqual(Array(4).fill("grid"));
       // Der Satz ist kleiner und leiser als der Name.

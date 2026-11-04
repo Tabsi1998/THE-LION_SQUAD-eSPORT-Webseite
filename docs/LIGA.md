@@ -1657,7 +1657,12 @@ neue Darstellung kommt wie jede Datenänderung über „Regelwerk muss freigegeb
   Bibliothek, ohne Unterkategorie zuerst. `not_in` eines Aufsatzes führt eigene Sperre, Klasse und die Sperre an dieser Waffe zusammen;
   `not_in` der Gruppe ist die der Klasse. `not_at` gibt es nicht mehr. Ein Aufsatz ohne passende Waffe erscheint nirgends
   (`unusable_attachments` bleibt).
-- **„nur in …“:** Grundlage sind die **Modi der Season** (`league_rule_facts.season_mode_keys`: geltender Pool, dann Modusfolge, sonst die
+- **An keiner Waffe erlaubt (Fabian 04.11.):** Ist ein Aufsatz an **jeder** erlaubten Waffe, zu der er passt (mindestens zwei), gleich
+  gesperrt (gleiche Modi bzw. alle), steht er einmal in `attachments_everywhere: [{name, not_in, only_in?}]` (oberste Ebene, nur wenn nicht
+  leer; ganz gesperrte zuerst). An der Waffe fehlt er dann in `banned` und zählt in `banned_everywhere` (Zahl, nur wenn > 0) - „K gesperrt“
+  bleibt ehrlich; nur in Modi gesperrt bleibt er in der Gruppe mit `everywhere: true`, der Satz zur Waffe nennt ihn nicht. Web und PDF: eine
+  Zeile „**An keiner Waffe erlaubt:** Kompensator, Holo (nur in …)“ nach der letzten Kategorie mit Waffen; Liga- und Matchseite ebenso.
+- **„nur in …“:** Grundlage sind die **Modi der Season** (`game_modes.season_mode_keys`: geltender Pool, dann Modusfolge, sonst die
   nicht archivierten Modi des Spiels; Matchseite: die Season der Staffel). Ist ein Eintrag, ein Abschnitt oder ein Aufsatz in **mehr** Modi
   der Season gesperrt als erlaubt, steht zusätzlich `only_in` (Namen der erlaubten Modi der Season) und der Hinweis lautet „nur in …“, sonst
   „nicht in …“. Gleichstand, keine Modi der Season oder kein erlaubter Modus mehr: kein `only_in`. Ganz gesperrt (alle Modi) bleibt ganz
