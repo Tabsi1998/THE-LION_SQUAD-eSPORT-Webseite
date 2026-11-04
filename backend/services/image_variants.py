@@ -77,20 +77,61 @@ def _drop_empty(path: Path) -> None:
         pass
 
 
-def remove_empty_variants(root: Path) -> int:
-    """Leere Fassungen unter ``root`` löschen (beim Start): nginx liefert, was auf der Platte liegt, auch eine leere Datei.
-    Beim nächsten Abruf baut das Backend sie neu. Liefert die Zahl der gelöschten."""
+TEMP_PATTERN = ".*.tmp"
+# Zwischendateien älter als das gelten als Rest eines abgebrochenen Laufs - ein laufender Build braucht Sekunden.
+TEMP_STALE_SECONDS = 3600
+CHECKED_MARKER = ".fassungen-geprueft-1"
+
+
+def _loads(path: Path) -> bool:
+    """Lässt sich die Fassung vollständig lesen? Eine abgebrochene Datei kann auch mit Inhalt unvollständig sein."""
+    try:
+        with Image.open(path) as image:
+            image.load()
+        return True
+    except Exception:  # noqa: BLE001 - jede Art kaputter Datei zählt gleich
+        return False
+
+
+def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None = None) -> int:
+    """Kaputte Fassungen unter ``root`` löschen (beim Start, im Hintergrund): nginx liefert, was auf der Platte liegt, auch eine
+    leere oder abgebrochene Datei. Immer: leere Fassungen und liegengebliebene Zwischendateien. ``deep``: zusätzlich jede Fassung
+    lesen - abgebrochene Dateien mit Inhalt aus der Zeit vor dem atomaren Schreiben. Beim nächsten Abruf baut das Backend sie neu.
+    Liefert die Zahl der gelöschten."""
+    import time
+
+    limit = (now if now is not None else time.time()) - TEMP_STALE_SECONDS
     removed = 0
     for folder in root.rglob(VARIANT_DIR_NAME):
         if not folder.is_dir():
             continue
-        for path in folder.glob("*.webp"):
+        for path in folder.glob(TEMP_PATTERN):
             try:
-                if path.stat().st_size == 0:
+                if path.stat().st_mtime < limit:
                     path.unlink()
                     removed += 1
             except OSError:
                 continue
+        for path in folder.glob("*.webp"):
+            try:
+                if path.stat().st_size == 0 or (deep and not _loads(path)):
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                continue
+    return removed
+
+
+def sweep_variants(root: Path) -> int:
+    """Der Aufräumlauf beim Start: das gründliche Lesen nur einmal (Merker im Upload-Ordner), danach nur noch Leeres und Reste."""
+    marker = root / CHECKED_MARKER
+    deep = not marker.exists()
+    removed = remove_broken_variants(root, deep=deep)
+    if deep:
+        try:
+            marker.touch()
+        except OSError:
+            pass
     return removed
 
 
@@ -134,11 +175,13 @@ def _write_variant(image: "Image.Image", source: Path, width: int) -> Path | Non
         os.replace(temp, target)
     except (OSError, ValueError) as exc:
         logger.warning("[media] variant %s@%s failed: %s", source.name, width, exc)
+        return None
+    finally:
+        # Auch bei jedem anderen Fehler bleibt keine Zwischendatei liegen (nach dem Umbenennen gibt es sie nicht mehr).
         try:
             temp.unlink()
         except OSError:
             pass
-        return None
     return target
 
 

@@ -170,16 +170,59 @@ def test_a_failed_write_leaves_no_empty_variant_behind(bild, monkeypatch):
     assert not ordner.exists() or list(ordner.iterdir()) == []
 
 
-def test_empty_variants_are_cleared_at_start_so_nginx_never_serves_them(bild, tmp_path):
-    from services.image_variants import remove_empty_variants
+def test_any_other_error_while_writing_leaves_no_temp_file(bild, monkeypatch):
+    quelle = bild(width=1280, height=480, name="waffe.png")
+
+    def kaputt(self, fp, *args, **kwargs):
+        open(fp, "wb").write(b"halb")
+        raise RuntimeError("unerwartet")
+
+    monkeypatch.setattr(Image.Image, "save", kaputt)
+
+    with pytest.raises(RuntimeError):
+        build_variant(quelle, 160)
+    ordner = variant_path(quelle, 160).parent
+    assert list(ordner.iterdir()) == [], "keine Zwischendatei, keine Fassung"
+
+
+def test_the_start_sweep_clears_empty_variants_and_stale_temps(bild, tmp_path):
+    """nginx liefert, was auf der Platte liegt - darum räumt der Start leere Fassungen und alte Zwischendateien weg."""
+    import os
+    import time
+
+    from services.image_variants import remove_broken_variants
 
     quelle = bild(width=1280, height=480, name="waffe.png")
     gut = build_variant(quelle, 320)
     leer = variant_path(quelle, 160)
     leer.write_bytes(b"")
+    alt = gut.parent / ".waffe-400.abc.tmp"
+    alt.write_bytes(b"x")
+    os.utime(alt, (time.time() - 7200, time.time() - 7200))
+    frisch = gut.parent / ".waffe-800.def.tmp"
+    frisch.write_bytes(b"x")
 
-    assert remove_empty_variants(tmp_path) == 1
-    assert not leer.exists() and gut.stat().st_size > 0
+    assert remove_broken_variants(tmp_path) == 2
+    assert not leer.exists() and not alt.exists()
+    assert frisch.exists(), "eine laufende Zwischendatei bleibt"
+    assert gut.stat().st_size > 0
+
+
+def test_the_deep_sweep_also_clears_cut_off_variants_with_content(bild, tmp_path):
+    """Vor dem atomaren Schreiben konnte eine Fassung auch mit Inhalt abgebrochen sein. Das gründliche Lesen läuft einmal."""
+    from services.image_variants import CHECKED_MARKER, remove_broken_variants, sweep_variants
+
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    gut = build_variant(quelle, 320)
+    halb = build_variant(quelle, 400)
+    halb.write_bytes(halb.read_bytes()[:40])
+
+    assert remove_broken_variants(tmp_path) == 0, "ohne gründliches Lesen bleibt sie"
+    assert sweep_variants(tmp_path) == 1
+    assert not halb.exists() and gut.is_file()
+    assert (tmp_path / CHECKED_MARKER).exists()
+    halb.write_bytes(b"kaputt")
+    assert sweep_variants(tmp_path) == 0, "das gründliche Lesen läuft nur einmal"
 
 
 def test_a_picture_smaller_than_the_request_is_left_alone(bild):
