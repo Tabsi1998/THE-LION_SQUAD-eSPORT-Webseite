@@ -54,6 +54,9 @@ def test_every_way_to_a_new_time_unsets_the_extension_and_raises_the_revision():
     assert checkin_rules.new_time_change({"id": "t"}, plain) == plain and "$inc" not in checkin_rules.new_time_change(staffel(checkin_rules=None), plain)
     assert checkin_rules.new_time_inc({"id": "t"}) == {}
     assert checkin_rules.new_time_change(staffel(), None) == {"$unset": {"no_show_extended_until": ""}, "$inc": {"flow.schedule_rev": 1}}
+    # „Neu ansetzen“ setzt das Feld selbst: kein zweiter Operator auf demselben Pfad (echtes MongoDB: Fehler 40).
+    again = checkin_rules.new_time_change(staffel(), {"$set": {"no_show_extended_until": None, "status": "scheduled"}})
+    assert again == {"$set": {"no_show_extended_until": None, "status": "scheduled"}, "$inc": {"flow.schedule_rev": 1}}
 
 
 def test_undoing_the_revision_restores_exactly_the_state_before():

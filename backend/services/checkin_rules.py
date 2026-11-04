@@ -172,6 +172,9 @@ def new_time_change(tournament: dict | None, change: dict | None = None) -> dict
     bleibt ein Turnier ohne Liga oder ohne Check-in genau bei seiner Änderung."""
     out = {key: dict(value) if isinstance(value, dict) else value for key, value in (change or {}).items()}
     unset, inc = new_time_unset(tournament), new_time_inc(tournament)
+    # Setzt die Änderung ein Feld schon selbst (etwa „Neu ansetzen“ mit ``no_show_extended_until: None``), kommt es nicht zusätzlich ins
+    # ``$unset`` - echtes MongoDB lehnt dasselbe Feld in zwei Operatoren ab (Fehler 40), mongomock nicht.
+    unset = {key: value for key, value in unset.items() if key not in (out.get("$set") or {})}
     if unset:
         out["$unset"] = {**out.get("$unset", {}), **unset}
     if inc:
