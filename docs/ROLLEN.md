@@ -359,7 +359,7 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | Kader, Captain, Vertreter, Status, Löschen, solange das Co-Team in einer nicht beendeten Staffel spielt (#2203) | ja, „Kader prüfen“ | ja | nein | nein | nein |
 | Dasselbe bei allen anderen Co-Teams | Team-Admin-Rollen wie bisher | ja | nein | nein | nein |
 | Die eigene Rolle abgeben („Rolle abgeben“, #2110) | – | – | ja | ja | nein |
-| Termin vorschlagen, annehmen; einchecken | ja | nur ohne Captain und Vertreter | ja | ja | nein |
+| Termin vorschlagen, annehmen; einchecken (Anwesende wählen) und das Spiel starten (#1652) | ja, „Spiele betreuen“ – im Notfall für eine Seite mit Grund, nicht im eigenen Spiel (Befangenheit) | nur ohne Captain und Vertreter | ja | ja | nein |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur ohne Captain und Vertreter | ja | ja | nein |
 | Matchchat schreiben, Spiel-Hinweise (Aufruf, Erinnerung, Ergebnis) | ja | ja | ja | ja | ja |
 

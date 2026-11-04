@@ -201,6 +201,40 @@ def _mode_settings_images(data: dict) -> list[str]:
     return _icons(data.get("rows"))
 
 
+# ---------------------------------------------------------------- Check-in (D.2, #1652)
+
+NO_CHECKIN = "*In dieser Season gibt es keinen Check-in.*"
+
+
+async def _checkin(db, league: dict, season: dict) -> dict:
+    """Check-in der Season: Fenster und Mindestzahl - eingefroren werden nur die Zahlen, der Satz entsteht beim Darstellen."""
+    from services import checkin_rules
+
+    raw = season.get("checkin_rules")
+    if not isinstance(raw, dict):
+        return {"source": {"checkin_rules": None}, "data": {"rules": None}}
+    try:
+        rules = checkin_rules.normalize({key: value for key, value in raw.items() if key in checkin_rules.DEFAULTS})
+    except checkin_rules.FlowProblem:
+        rules = dict(checkin_rules.DEFAULTS)
+    return {"source": {"checkin_rules": rules}, "data": {"rules": rules}}
+
+
+def _checkin_text(data: dict, variant: str = MARKDOWN) -> str:
+    rules = data.get("rules") if isinstance(data.get("rules"), dict) else None
+    if not rules:
+        return NO_CHECKIN
+    lines = [
+        f"- Der Check-in öffnet {int(rules.get('opens_minutes_before') or 0)} Minuten vor dem Termin und schließt "
+        f"{int(rules.get('closes_minutes_after') or 0)} Minuten danach.",
+        f"- Gültig ist er mit mindestens {int(rules.get('min_present') or 1)} anwesenden, spielberechtigten Spielern je Team; bis zum "
+        "Ende des Fensters lässt sich ergänzen.",
+        "- Sobald beide Teams eingecheckt sind, kann das Spiel beginnen - auch vor dem Termin.",
+        "- Fehlt ein Team nach dem Fenster, entscheidet die Liga-Leitung; eine Wertung gibt es nie von selbst.",
+    ]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------- Sperrliste (#2218)
 
 async def _loadout_bans(db, league: dict, season: dict) -> dict:
@@ -241,6 +275,7 @@ class Block:
 BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("map_pool", "Map-Pool", "Die Maps je Modus aus dem Map-Pool der Season.", _map_pool, pool_table, _pool_images),
     Block("mode_order", "Modusfolge", "Die Modi je Map aus den Vorgaben der Season.", _mode_order, _mode_order_text, _mode_order_images),
+    Block("checkin", "Check-in", "Fenster und Mindestzahl des Check-ins aus den Vorgaben der Season (D.2).", _checkin, _checkin_text),
     Block("loadout_bans", "Sperrliste", "Gesperrte Waffen, Aufsätze und Ausrüstung der Season, mit Bildern (Anlage A).", _loadout_bans,
           _loadout_text, _loadout_images),
     Block("mode_settings", "Einstellungen je Modus", "Zeitlimit, Zeit je Runde, Einstellungen und Regeltext je Modus aus der Season.",

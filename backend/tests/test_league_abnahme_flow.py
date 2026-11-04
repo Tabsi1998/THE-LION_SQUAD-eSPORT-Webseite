@@ -20,7 +20,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import OLD_RULES, without_score_duty  # noqa: E402
+from league_match_world import OLD_RULES, checked_in, without_score_duty  # noqa: E402
 from squad_world import make_team  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
@@ -310,8 +310,10 @@ async def test_results_reach_the_table_and_a_correction_after_a_dispute_moves_th
     assert len(day_one) == 4
     confirmed, automatic, disputed, entered = day_one
 
-    # 1) Melden und Bestätigen: Heimseite meldet 2:0, die Gegenseite bestätigt (im Web mit eigener Aufstellung).
+    # 1) Melden und Bestätigen: beide Seiten sind eingecheckt (D.2, #1652), die Heimseite meldet 2:0, die Gegenseite bestätigt
+    #    (im Web mit eigener Aufstellung).
     home, away = sides(confirmed)
+    await checked_in(flow, confirmed["id"])
     flow.act_as(captain(world, home))
     ok(await flow.post(f"/api/matches/{confirmed['id']}/report", json=report_body(world, home, away, (2, 0), side=home)))
     assert (await stored(flow, confirmed))["status"] != "completed", "erst die Gegenseite macht es fest"
@@ -321,6 +323,7 @@ async def test_results_reach_the_table_and_a_correction_after_a_dispute_moves_th
 
     # 2) Ohne Antwort: nach 48 Stunden gilt die Meldung (Fristen-Job).
     a_home, a_away = sides(automatic)
+    await checked_in(flow, automatic["id"])
     flow.act_as(vice(world, a_away))
     ok(await flow.post(f"/api/matches/{automatic['id']}/report",
                        json=report_body(world, a_away, a_home, (2, 1), side=a_away)))
@@ -333,6 +336,7 @@ async def test_results_reach_the_table_and_a_correction_after_a_dispute_moves_th
 
     # 3) Einspruch: die Gegenseite widerspricht der Meldung, die Turnierleitung korrigiert mit Grund.
     d_home, d_away = sides(disputed)
+    await checked_in(flow, disputed["id"])
     flow.act_as(captain(world, d_home))
     ok(await flow.post(f"/api/matches/{disputed['id']}/report", json=report_body(world, d_home, d_away, (2, 0), side=d_home)))
     flow.act_as(captain(world, d_away))
@@ -405,6 +409,7 @@ async def test_maps_and_lineups_from_report_to_app_confirmation_amendment_and_le
 
     # Melden mit Maps und eigener Aufstellung, Bestätigen aus der App ohne Maps: die Gegenseite fehlt noch.
     home, away = sides(app_confirmed)
+    await checked_in(flow, app_confirmed["id"])
     flow.act_as(captain(world, home))
     ok(await flow.post(f"/api/matches/{app_confirmed['id']}/report",
                        json=report_body(world, home, away, (2, 1), side=home)))
@@ -425,6 +430,7 @@ async def test_maps_and_lineups_from_report_to_app_confirmation_amendment_and_le
 
     # 48-h-Automatik: die Meldung gilt mit ihren Maps, die stumme Seite trägt nach.
     a_home, a_away = sides(automatic)
+    await checked_in(flow, automatic["id"])
     flow.act_as(captain(world, a_home))
     ok(await flow.post(f"/api/matches/{automatic['id']}/report",
                        json=report_body(world, a_home, a_away, (2, 0), side=a_home)))
@@ -437,6 +443,7 @@ async def test_maps_and_lineups_from_report_to_app_confirmation_amendment_and_le
 
     # Andere Maps beim Bestätigen: 409 mit Hinweis auf den Einspruch, dann Einspruch und Korrektur mit Maps.
     o_home, o_away = sides(other_maps)
+    await checked_in(flow, other_maps["id"])
     flow.act_as(captain(world, o_home))
     ok(await flow.post(f"/api/matches/{other_maps['id']}/report",
                        json=report_body(world, o_home, o_away, (2, 0), side=o_home)))

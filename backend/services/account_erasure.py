@@ -594,6 +594,10 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     from services import league_schedule
 
     await league_schedule.scrub_person(db, user_id)
+    # Liga-Check-in (#1652): Check-ins und Start bleiben am Spiel, die Kennung der Handelnden fällt heraus.
+    from services import match_flow
+
+    await match_flow.scrub_person(db, user_id)
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.

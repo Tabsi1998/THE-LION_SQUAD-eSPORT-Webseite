@@ -50,6 +50,7 @@ from routes.league_rules_routes import admin_router as league_rules_admin_router
 from routes.league_table_routes import admin_router as league_table_admin_router
 from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
 from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
+from routes.league_checkin_routes import admin_router as league_checkin_admin_router, router as league_checkin_router
 from routes.league_platform_routes import admin_router as league_platform_admin_router
 from routes.league_loadout_routes import router as league_loadout_router
 from routes.game_server_routes import router as game_server_router
@@ -371,6 +372,8 @@ app.include_router(league_result_rule_admin_router)  # Ergebnisregeln der Season
 app.include_router(league_schedule_admin_router)  # Terminregeln je Season (#2194)
 app.include_router(league_loadout_router)  # Sperrliste je Season (#2218)
 app.include_router(league_schedule_router)  # Verschiebung am Spiel (#2194)
+app.include_router(league_checkin_admin_router)  # Check-in-Regeln je Season (docs/LIGA.md, D.2, #1652)
+app.include_router(league_checkin_router)  # Check-in und Start am Spiel (#1652)
 app.include_router(league_platform_admin_router)  # Plattform je Season (#2270)
 app.include_router(game_server_router)
 app.include_router(access_link_router)

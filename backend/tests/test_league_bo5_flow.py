@@ -21,7 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import OLD_RULES, without_score_duty  # noqa: E402
+from league_match_world import OLD_RULES, checked_in, without_score_duty  # noqa: E402
 from squad_world import make_team  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
@@ -140,9 +140,10 @@ def series(home: str, away: str, score: tuple[int, int]) -> list[str]:
 
 
 async def play(flow, world: dict, match: dict, score: tuple[int, int]) -> None:
-    """Melden und Bestätigen durch beide Captains."""
+    """Melden und Bestätigen durch beide Captains - nach dem Check-in beider Seiten (D.2, #1652)."""
     home, away = sides(match)
     order = series(home, away, score)
+    await checked_in(flow, match["id"])
     flow.act_as(captain(world, home))
     ok(await flow.post(f"/api/matches/{match['id']}/report", json=report(world, home, away, score, home, order)))
     flow.act_as(captain(world, away))
@@ -216,6 +217,7 @@ async def test_three_valid_series_with_confirmation_reach_the_table_with_points_
     for match, score in zip(day_one, [(3, 0), (3, 1), (3, 2)]):
         home, away = sides(match)
         order = series(home, away, score)
+        await checked_in(flow, match["id"])
         flow.act_as(captain(world, home))
         ok(await flow.post(f"/api/matches/{match['id']}/report", json=report(world, home, away, score, home, order)))
         assert (await stored(flow, match))["status"] != "completed", "erst die Gegenseite macht es fest"
@@ -252,6 +254,7 @@ async def test_invalid_reports_are_refused_and_leave_the_match_untouched(flow):
     matches = await start(flow, world)
     match = matches[0]
     home, away = sides(match)
+    await checked_in(flow, match["id"])
     flow.act_as(captain(world, home))
     url = f"/api/matches/{match['id']}/report"
 
@@ -341,6 +344,7 @@ async def test_a_new_pool_version_locks_a_map_for_new_matches_only(flow):
     before = await stored(flow, finished)
     held_home, held_away = sides(held)
     order = series(held_home, held_away, (3, 0))
+    await checked_in(flow, held["id"])
     flow.act_as(captain(world, held_home))
     ok(await flow.post(f"/api/matches/{held['id']}/report", json=report(world, held_home, held_away, (3, 0), held_home, order)))
 
@@ -362,6 +366,7 @@ async def test_a_new_pool_version_locks_a_map_for_new_matches_only(flow):
 
     # Ein neues Spiel kann die gesperrte Map nicht mehr melden, mit dem neuen Pool geht es.
     home, away = sides(fresh)
+    await checked_in(flow, fresh["id"])
     flow.act_as(captain(world, home))
     url = f"/api/matches/{fresh['id']}/report"
     locked = await flow.post(url, json=report(world, home, away, (3, 0), home, series(home, away, (3, 0))))

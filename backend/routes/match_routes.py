@@ -9,6 +9,7 @@ from database import get_db
 from services.chat_attachments import register_chat_access
 from services import league_permissions
 from services.league_permissions import READ
+from services import checkin_rules
 from services.permissions import is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
@@ -77,6 +78,7 @@ from services.v2_result_submission import submit_v2_result
 from services import league_games
 from services import league_result_rules
 from services import league_schedule
+from services import match_flow
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -701,6 +703,18 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
         # Befangen (auch der Superadmin): das Feld fehlt hier - die Notausnahme mit Grund geht über den Matchplan.
         can_lead_set=plans_as_lead and not conflict, proposals=proposals)
+    # Liga-Check-in (#1652, D.2): Stand, Fenster, Anwesende, Hinweise - nur Beteiligte und Leitung; die Leitung trägt im Notfall
+    # für eine Seite ein (befangen nur der Superadmin mit Grund).
+    checkin_block = await match_flow.page_block(
+        db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
+        can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None)
+    # Erst einchecken, dann melden (D.2): der Satz, den auch /report gäbe - die Seite zeigt ihn statt des Meldeformulars.
+    report_hint = None
+    if can_player_report and checkin_block:
+        rows = checkin_block.get("sides") or []
+        report_hint = match_flow.report_refusal(
+            match, tournament, own_id=acting_reg["id"], names={row["registration_id"]: row["name"] for row in rows},
+            consent={row["registration_id"]: {"open": True, "rules_url": row.get("rules_url")} for row in rows if row.get("consent_open")})
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
@@ -778,6 +792,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "call": call,
         "result_entry": result_entry,
         "report_entry": report_entry_info if can_player_report else None,
+        "report_hint": report_hint,
         "can_forfeit": can_decide and await _can_forfeit_match(match, user),
         "can_decide_dispute": can_decide and bool(user) and await has_match_result_permission(user, match, capability="disputes"),
         "conflict": conflict,
@@ -790,6 +805,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "matchday_label": matchday_label,
         "league": league_block,
         "schedule_block": schedule_block,
+        "checkin": checkin_block,
     }
 
 
@@ -1020,7 +1036,9 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "schedule_written_at": now_iso,
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
-        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})  # Der Termin steht: keine Frist mehr.
+        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": "",  # Der Termin steht: keine Frist mehr.
+                      # Liga-Check-in (D.2, #1652): eine Verlängerung gehört zum alten Fenster.
+                      **checkin_rules.new_time_unset(tournament)}})
         # Liga-Termine (#2194): Einigung in die Historie; mit Regeln schließen die übrigen offenen Vorschläge.
         await league_schedule.after_agreement(db, match, tournament, proposal, me, (acting_reg or {}).get("id"))
         await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
@@ -1365,6 +1383,14 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         station_moved = "station_id" in updates and updates["station_id"] != v2_match.get("station_id")
         if v2_match.get("called_at") and (status_moved or station_moved):
             change["$unset"] = {"called_at": ""}
+        if (v2_match.get("no_show_extended_until") and "scheduled_at" in updates
+                and _moment(updates["scheduled_at"]) != _moment(v2_match.get("scheduled_at"))):
+            # Liga-Check-in (D.2, #1652): eine Verlängerung der Leitung gehört zum alten Fenster - der neue Termin bringt sein eigenes.
+            tournament_scope = await db.tournaments.find_one({"id": v2_match["tournament_id"]},
+                                                             {"_id": 0, "league_context": 1, "checkin_rules": 1})
+            change.setdefault("$unset", {}).update(checkin_rules.new_time_unset(tournament_scope))
+            if not change["$unset"]:
+                del change["$unset"]
         before = await db.matches_v2.find_one_and_update({"id": match_id}, change, projection={"_id": 0},
                                                          return_document=ReturnDocument.BEFORE) or v2_match
         if new_station and not await station_open_for_matches(db, new_station):
@@ -1433,6 +1459,15 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         raise HTTPException(status_code=409, detail="Dieses Spiel ist in Klärung – die Turnierleitung entscheidet.")
     if status in REPORT_CLOSED_STATUSES:
         raise HTTPException(status_code=409, detail="Dieses Spiel ist schon entschieden.")
+    # Liga-Check-in (D.2, #1652): mit Check-in-Regeln melden die Captains erst, wenn beide Seiten für diesen Termin eingecheckt
+    # sind und keine Regelfassung offen ist - der Satz sagt, wer fehlt. Die Leitung trägt über /result weiter ohne Check-in ein.
+    checkin_sides = None
+    if match_flow.rules_of(tournament):
+        checkin_sides = await match_flow.sides(db, match, tournament)
+        refusal = match_flow.report_refusal(match, tournament, own_id=my_registration["id"], names=checkin_sides.names,
+                                            consent=checkin_sides.consent)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
     # Jede Meldung wird geprüft wie ein Ergebnis der Turnierleitung: alle Teilnehmer genau einmal, Plätze passend
     # zum Spielstand. So vergleicht der Server zwei Meldungen inhaltlich - nicht nur ihre Schreibweise.
@@ -1466,6 +1501,9 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         entry[league_result_rules.SNAPSHOT_KEY] = league.rule_snapshot()
     if lineup:
         entry["lineup"] = lineup
+    if checkin_sides is not None:
+        # Fehlte nur der Start-Klick, setzt die erste gültige Meldung den Start nach - einmal (D.2, #1652).
+        await match_flow.start_by_report(db, match, tournament, user=me, registration_id=my_registration["id"])
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},

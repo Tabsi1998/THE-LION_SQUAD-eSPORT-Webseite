@@ -7,7 +7,8 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // Der Liga-Ablauf schreibend gegen den echten Server (#2200) - ohne nachgestellte API. Stand aus
 // scripts/seed_abnahme_liga.py: eigene „Liga-Probelauf“ mit Staffel A im Entwurf, fünf Co-Teams zugeteilt. Die Turnierleitung
 // teilt das sechste zu und startet; danach bei 390 und 1440 px je ein eigenes Spiel: Terminvorschlag und Annahme durch zwei
-// Captains, Melden mit Maps und Aufstellung, Bestätigen, Tabelle und Ligaseite; dann Einspruch und Korrektur der Leitung. Die
+// Captains, Check-in beider Seiten (D.2, #1652 - ohne ihn kein Meldeformular), Melden mit Maps und Aufstellung, Bestätigen,
+// Tabelle und Ligaseite; dann Einspruch und Korrektur der Leitung. Die
 // Zeit-Jobs (Standardtermin, Erinnerung, 48-Stunden-Automatik) stößt die Spec gezielt für diese Staffel an, der Stand lässt sie
 // sonst aus. Keine Konsolenfehler, keine Antwort 4xx/5xx, kein seitliches Scrollen.
 
@@ -81,6 +82,27 @@ async function proposeAndAccept(home, away, matchId, when) {
   await expect(accept).toHaveCount(1);
   await accept.click();
   await expect(away.page.locator('[data-testid^="match-proposal-status-"]').first()).toContainText("angenommen");
+}
+
+/** Schreibende Aufrufe außerhalb des Browsers (mit CSRF-Kopf) - die Wache zählt sie nicht. */
+async function api(page, method, url, data) {
+  const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token")?.value || "";
+  return page.request.fetch(url, { method, headers: { "X-CSRF-Token": decodeURIComponent(csrf) }, data });
+}
+
+/** Erst einchecken, dann melden (D.2, #1652): jede Seite hakt ihre ersten Anwesenden an - das Fenster ist um den Termin offen. */
+async function checkIn(person, matchId) {
+  const page = await (await person.page.request.get(`/api/matches/${matchId}/page`)).json();
+  const roster = page.checkin.roster.filter((row) => !row.blocked).slice(0, page.checkin.min_present);
+  const done = await api(person.page, "POST", `/api/matches/${matchId}/checkin`, { present: roster.map((row) => row.id) });
+  expect(done.status(), await done.text()).toBe(200);
+}
+
+/** Ohne Terminabsprache legt die Leitung den Termin auf gleich, damit das Check-in-Fenster offen ist. */
+async function timeNow(lead, matchId) {
+  const moved = await api(lead.page, "PATCH", `/api/matches/${matchId}`, {
+    scheduled_at: new Date(Date.now() + 5 * 60_000).toISOString(), schedule_reason: "Abnahme: Termin jetzt" });
+  expect(moved.status(), await moved.text()).toBe(200);
 }
 
 /** Melden im Web: je Map die erste Map aus dem Pool und der Sieger, dann einmal die Teilnehmerliste der eigenen Seite (#2204). */
@@ -178,6 +200,13 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       const inbox = await (await away.page.request.get("/api/admin/notifications")).json();
       expect(JSON.stringify(inbox)).toContain("Match startet in 10 Minuten");
 
+      // Erst einchecken, dann melden (#1652): ohne Check-in steht statt des Formulars der Satz, wer fehlt.
+      await home.page.goto(`/matches/${match.id}`);
+      await expect(home.page.getByTestId("match-report-hint")).toContainText("noch nicht eingecheckt");
+      await expect(home.page.getByTestId("match-report-form")).toHaveCount(0);
+      await checkIn(home, match.id);
+      await checkIn(away, match.id);
+
       // Melden mit Maps und Teilnehmerliste, die Gegenseite bestätigt mit ihrer Liste.
       await report(home.page, match.id, match.home, MAPS_OF_SERIES());
       await shot(home.page, `ablauf-gemeldet-${width}.png`);
@@ -217,7 +246,10 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       const home = await as(browser, testInfo, match.homeRole, viewport);
       const away = await as(browser, testInfo, match.awayRole, viewport);
 
-      // Die Heimseite meldet 2:0, die Gegenseite sagt „Stimmt nicht“.
+      // Termin auf gleich, beide checken ein (#1652); die Heimseite meldet 2:0, die Gegenseite sagt „Stimmt nicht“.
+      await timeNow(lead, match.id);
+      await checkIn(home, match.id);
+      await checkIn(away, match.id);
       await report(home.page, match.id, match.home, MAPS_OF_SERIES());
       await away.page.goto(`/matches/${match.id}`);
       await away.page.getByTestId("match-report-wrong").click();
@@ -304,6 +336,10 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
     const lead = await as(browser, testInfo, "lead", viewport);
     const match = await matchOfRound(lead.page, 3);
     const home = await as(browser, testInfo, match.homeRole, viewport);
+    const away = await as(browser, testInfo, match.awayRole, viewport);
+    await timeNow(lead, match.id);
+    await checkIn(home, match.id);
+    await checkIn(away, match.id);
     await report(home.page, match.id, match.home, MAPS_OF_SERIES());
 
     expect(runJob("match_deadlines", 47).confirmed).toBe(0);
@@ -315,7 +351,6 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
     expect(row.status).toBe("completed");
 
     // Die Gegenseite hat nicht geantwortet: Das Ergebnis gilt, ihr Captain trägt die Teilnehmerliste im Web nach (#2204).
-    const away = await as(browser, testInfo, match.awayRole, viewport);
     await away.page.goto(`/matches/${match.id}`);
     await expect(away.page.getByTestId(`league-participants-${match.away}`)).toContainText("Teilnehmerliste fehlt noch");
     await expect(away.page.getByTestId("league-lineup-amend")).toContainText("Das Ergebnis gilt");

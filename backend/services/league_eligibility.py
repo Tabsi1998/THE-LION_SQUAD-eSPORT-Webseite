@@ -185,15 +185,16 @@ def statuses(ctx: EligibilityContext | None, user_ids, squad_id: str | None = No
     return {user_id: status(ctx, user_id, squad_id) for user_id in user_ids or [] if user_id}
 
 
-def check_participants(rows: dict[str, dict], user_ids, *, minimum: int, roster: set[str], side: str, kept=frozenset()) -> list[str]:
-    """Die Liste, wer gespielt hat (oder beim Check-in anwesend ist): mindestens ``minimum``, nach oben offen, jede Person einmal,
-    nur aus dem Kader, nur spielberechtigt. ``kept``: wer auf der Liste dieser Seite schon steht, hält keine Korrektur auf.
-    Liefert die Liste, wirft ``EligibilityError``."""
+def check_participants(rows: dict[str, dict], user_ids, *, minimum: int, roster: set[str], side: str, kept=frozenset(),
+                       action: str = "gespielt haben") -> list[str]:
+    """Die Liste, wer gespielt hat (oder beim Check-in anwesend ist, D.2: ``action="anwesend sind"``): mindestens ``minimum``, nach oben
+    offen, jede Person einmal, nur aus dem Kader, nur spielberechtigt. ``kept``: wer auf der Liste dieser Seite schon steht, hält keine
+    Korrektur auf. Liefert die Liste, wirft ``EligibilityError``."""
     ids = [str(item).strip() for item in user_ids or [] if str(item or "").strip()]
     if len(set(ids)) != len(ids):
         raise EligibilityError(f"Auf der Liste von {side} steht jede Person nur einmal.")
     if len(ids) < minimum:
-        raise EligibilityError(f"Bitte für {side} mindestens {minimum} Personen ankreuzen, die gespielt haben.")
+        raise EligibilityError(f"Bitte für {side} mindestens {minimum} Personen ankreuzen, die {action}.")
     if any(user_id not in roster for user_id in ids):
         raise EligibilityError(f"Auf die Liste von {side} kommt nur, wer im Kader steht.")
     for user_id in ids:

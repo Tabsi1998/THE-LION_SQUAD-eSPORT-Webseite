@@ -145,8 +145,9 @@ async def test_a_locked_staffel_still_takes_rules_text_but_keeps_its_calendar(fl
     assert {item["group"]: item["reason"] for item in result["skipped"]} == {
         # Seit #2106 auch die Antwortfrist auf Terminvorschläge (läuft sonst auch nach dem Start).
         "running": "Die Staffel ist gesperrt.", "before_start": "Die Staffel ist gesperrt.",
-        # Seit #2194 die Terminregeln einer neuen Season (eigene Gruppe, wie die Antwortfrist).
+        # Seit #2194 die Terminregeln einer neuen Season (eigene Gruppe, wie die Antwortfrist), seit #1652 der Check-in.
         "schedule": "Die Staffel ist gesperrt.",
+        "checkin": "Die Staffel ist gesperrt.",
         "before_result": "Die Staffel ist gesperrt.",
         # Seit C.3 (#1617) auch die Ergebnisregeln - eine gesperrte Staffel behält ihre.
         "result_rules": "Die Staffel ist gesperrt."}

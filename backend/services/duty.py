@@ -162,7 +162,15 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         # Nach dem Ende noch „Live“ (#2194) und überfällige Liga-Spiele (Nr. 28): Hinweise für die Leitung.
         "ended_live": await ended_live_rows(db, user, now=now),
         "overdue_matches": await overdue_match_rows(db, user),
+        # Check-in abgelaufen (#1652, § 8.4): der Vorschlag „nicht erschienen“ - entschieden wird nur von Hand.
+        "checkin_proposals": await checkin_proposal_rows(db, user),
     }
+
+
+async def checkin_proposal_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    from services.match_flow import proposal_rows
+
+    return await proposal_rows(db, user, limit)
 
 
 async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[dict]:

@@ -159,7 +159,7 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 | **Überblick** | Ablauf der Season, **Was fehlt noch?**, Name, Sichtbarkeit, Stand, Gestaltung und Gewinne | `…/seasons/<id>` |
 | **Spielbetrieb** | Modi der Season mit Maps, Mindestgröße, Ergebnisregeln, Serie (Best of, Teamgröße, Modus je Map, Map-Wiederholung), Fristen nach dem Spiel | `#spielbetrieb` |
 | **Termine** | Kalender, Standardtermin, Sperrzeiten, Antwortfrist, Terminregeln (2.7a) | `#termine` |
-| **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7b), Eingang der Anmeldungen, Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#kader` |
+| **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7c), Eingang der Anmeldungen, Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#kader` |
 | **Tabelle** | Punkte, Gleichstand, Ausscheiden, Gleichstände der Staffeln (3.5) | `#tabelle` |
 | **Regelwerk und Sperrliste** | Stand des Regelwerks mit Weg dorthin (2.11), Sperrliste (2.1a) | `#regelwerk`, `#sperrliste` |
 | **Ligen und Staffeln** | Liga 1, 2 …, Staffeln, Staffelgröße, Vorgaben übertragen (2.3, 2.7) | `#ligen` |
@@ -239,7 +239,7 @@ keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier sp
 | | **Wer gespielt hat**, **Mindestens auf der Liste** | Teilnehmerliste einmal je Spiel, 3 |
 | | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
 | | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
-| | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7b) | nach Regelwerk |
+| | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7c) | nach Regelwerk |
 | Tabelle | **Punkte Sieg / Remis / Niederlage** | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
 | | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
 | | **Direkter Vergleich (Mini-Tabelle)** – erscheint mit dem direkten Vergleich | Punkte, Map-Differenz, Gewonnene Maps |
@@ -383,6 +383,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
 | Terminregeln (Kasten „Termine und Verschiebungen“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
+| Check-in (Kasten „Check-in vor dem Spiel“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 
 ### 2.7a Termine und Verschiebungen (Regelwerk § 7)
 
@@ -402,7 +403,23 @@ Verschiebung, bis ihr einmal speichert.
 
 Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), legt die Liga-Leitung fest – siehe 3.1.
 
-### 2.7b Plattform und Eingabegerät
+### 2.7b Check-in vor dem Spiel (Regelwerk § 8)
+
+Auf der Season-Seite im Reiter **Termine** steht unter den Terminregeln der Kasten **Check-in vor dem Spiel** (Zuständigkeit „Season
+konfigurieren“), mit eigenem **Check-in speichern**; er gilt sofort für alle Staffeln der Season. Neue Seasons bekommen die Vorgaben; eine ältere Season sagt
+„Diese Season ist älter als der Check-in“ – dort gibt es keinen Check-in und keinen Vorschlag „nicht erschienen“, bis ihr einmal
+speichert.
+
+| Feld | Vorgabe | Wirkung |
+| --- | --- | --- |
+| **Öffnet (Minuten vor dem Termin)** | 15 | Nr. 19: ab dann checken Captain oder Vertreter ihre Seite ein |
+| **Schließt (Minuten nach dem Termin)** | 15 | danach kein Check-in mehr durch die Seiten – ihr könnt nachtragen oder verlängern |
+| **Mindestens Anwesende je Seite** | 3 (aus Teilnehmerliste oder Teamgröße − 1) | Nr. 46: nur Spieler aus dem Kader, nur wer spielen darf (3.9); bis zum Schluss lässt sich ergänzen |
+| **Erinnerung vor Schluss (Minuten)** | 5 | zweite Nachricht an Seiten ohne Check-in; 0 = keine |
+
+Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
+
+### 2.7c Plattform und Eingabegerät
 
 Eine Season kann nur für PC, nur für PlayStation, für mehrere oder alle Plattformen sein. Im Reiter **Anmeldung und Kader** steht dafür
 der Kasten **Plattform und Eingabegerät** (Zuständigkeit „Season konfigurieren“, Adresse `#plattform`) mit eigenem **Plattform
@@ -522,7 +539,7 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 | **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
 | **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
 | **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
-| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben |
+| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b) |
 | **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
 | **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
 | **Strafen** | Vorgesehen, kommt später |
@@ -635,6 +652,34 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
   Entscheiden heißt: Ergebnis eintragen, kampflos werten oder einen neuen Termin festlegen. Ohne Entscheidung schließt
   die Season später nicht ab.
 
+### 3.1b Check-in und Start (Regelwerk § 8)
+
+Mit dem Kasten aus 2.7b läuft jedes Spiel so, alles auf der **Matchseite** im Block **Check-in**:
+
+- **Fenster:** öffnet 15 Minuten vor dem Termin, schließt 15 Minuten danach (Vorgaben). Die Seite zählt herunter und sagt in einem
+  Satz, was zu tun ist. Beide Seiten bekommen bei der Öffnung eine Nachricht („Check-in offen“, Push wie „Du bist dran“), Seiten
+  ohne Check-in kurz vor Schluss noch eine.
+- **Einchecken:** Captain oder Vertreter haken an, wer da ist – mindestens die Mindestzahl, nur Spieler aus dem Kader, nur wer
+  spielen darf (gesperrt, Wartezeit, fehlende ID stehen grau mit Grund). Bis zum Schluss lassen sich Anwesende ergänzen. Die
+  Gegenseite sieht, dass und mit wie vielen eingecheckt wurde.
+- **Regelwerks-Sperre:** Hat das Co-Team einer neuen Regelversion mit Zustimmungspflicht nicht zugestimmt, geht für dieses Team kein
+  Check-in und kein Start – die Seite sagt „Das Regelwerk hat sich geändert – bitte erst zustimmen“ mit Weg zur Fassung. Das gilt
+  auch, wenn ihr für die Seite eintragen wollt, und auch, wenn die neue Fassung erst zwischen Check-in und Start kommt.
+- **Start:** Sind beide Seiten eingecheckt, steht **Spiel starten – Map 1 läuft**; eine Seite tippt, auch vor dem Termin. Ab dann
+  gilt das Spiel als begonnen (Spielzeit, kein Verschieben, kein „nicht erschienen“ mehr). Ihr könnt mit „Spiele betreuen“ ebenfalls
+  starten. Das Veto (D.3) kommt später zwischen Check-in und Start.
+- **Erst einchecken, dann melden:** Die Captains können das Ergebnis erst melden, wenn beide Seiten eingecheckt sind – die Matchseite
+  sagt sonst, wer fehlt (in der App kommt der Satz als Antwort auf die Meldung). Hat niemand auf **Spiel starten** getippt, gilt das Spiel
+  mit der ersten Meldung als begonnen. Ihr selbst tragt über **Ergebnis eintragen** weiter ohne Check-in ein.
+- **Fehlt eine Seite nach dem Fenster:** Der Server wertet **nie** von selbst. Es entsteht ein Vorschlag „Nicht erschienen?“ – als
+  Nachricht an euch, unter **Mein Dienst → Braucht deine Entscheidung** („Check-in abgelaufen“) und als Karte in der
+  Leitungsansicht der Staffel. Dort entscheidet ihr: **<Team> nicht erschienen** (kampflos über den bekannten Weg, Teamstrafe wie in
+  3.2), **+5 Min. verlängern** (das Fenster geht wieder auf) – oder ihr tragt die Seite auf der Matchseite unter **Für eine Seite
+  eintragen (Liga-Leitung)** mit Grund nach, etwa wenn der Captain ohne Netz anruft; dann ist der Vorschlag erledigt. Im eigenen
+  Spiel macht das eine zweite Person (Befangenheit, 2.11).
+- **Ohne Check-in** (ältere Season oder Kasten nie gespeichert) bleibt alles wie vorher: kein Vorschlag, „Ergebnis fehlt“ meldet
+  sich, ihr wertet von Hand.
+
 ### 3.1a Turnier nach dem Ende noch „Live“
 
 Gilt für alle Turniere: Steht ein Turnier nach seinem eingetragenen Ende noch auf **Live**, sagt es euch **Mein Dienst**
@@ -660,9 +705,10 @@ was dabei geprüft wird, steht für die Captains in
   Begründung). Beide verlieren, keine Punkte, keine Maps, je Seite ein Eintrag „nicht erschienen“; im Spielplan steht
   „beide nicht erschienen“. Wollt ihr das Spiel doch nachholen: am selben Spiel **Neu ansetzen** mit Grund – das Spiel ist
   wieder offen, den Termin setzt ihr wie gewohnt. Recht: **Ergebnisse korrigieren**, nicht im eigenen Spiel.
-- **Kein automatisches „Nicht erschienen?“**: Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war. Deshalb gibt
-  es in der Liga diesen Vorschlag nicht – fehlt ein Ergebnis, meldet sich **Ergebnis fehlt**. Klärt es mit beiden Seiten
-  und wertet dann selbst. Das kommt mit dem Check-in (#1652) neu.
+- **„Nicht erschienen?“ nur als Vorschlag**: Mit Check-in (2.7b, 3.1b) schlägt der Server nach dem Fenster vor, wenn eine Seite
+  fehlt – gewertet wird nie von selbst, ihr entscheidet (kampflos, nachtragen, verlängern; fehlen beide: **Beide nicht
+  erschienen**). Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war: Dann gibt es keinen Vorschlag, **Ergebnis
+  fehlt** meldet sich, klärt es mit beiden Seiten und wertet selbst.
 
 ### 3.3 Teilnehmerliste nachtragen
 
@@ -808,7 +854,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | **Transferfenster** | Die Teamleitung beantragt im Fenster, ihr entscheidet. Nach der Genehmigung wartet die Person ab der Kaderaufnahme die volle Wartezeit, immer und auch wenn sie das alte Co-Team schon verlassen hatte |
 | **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum keine Anmeldung und keine Aufnahme. Ihr seht nur „Alter erfüllt“, „Geburtsdatum fehlt“ oder „Altersvorgabe nicht erfüllt“, die Liga nennt nie ein Datum oder Alter |
 | **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Zahnrad → Spiel-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
-| **Plattform** (2.7b) | Bei der Anmeldung zählt nicht als spielberechtigt, wer eine andere oder keine Plattform angibt: Er steht als Warnung da, und unter dem Mindestkader geht die Anmeldung nicht. Weil die Liga dort noch nicht feststeht, gilt die weiteste Regel aller Liga N. Beim Zuteilen gilt die Liga N der Staffel: Bleiben ohne Spieler anderer Plattformen zu wenige übrig, geht es nicht, sonst steht ein Hinweis im Dialog. Auf die Teilnehmerliste kommt niemand mit anderer Plattform. Die Aufnahme in den Kader prüft die Plattform nicht |
+| **Plattform** (2.7c) | Bei der Anmeldung zählt nicht als spielberechtigt, wer eine andere oder keine Plattform angibt: Er steht als Warnung da, und unter dem Mindestkader geht die Anmeldung nicht. Weil die Liga dort noch nicht feststeht, gilt die weiteste Regel aller Liga N. Beim Zuteilen gilt die Liga N der Staffel: Bleiben ohne Spieler anderer Plattformen zu wenige übrig, geht es nicht, sonst steht ein Hinweis im Dialog. Auf die Teilnehmerliste kommt niemand mit anderer Plattform. Die Aufnahme in den Kader prüft die Plattform nicht |
 
 **Wartezeit aufheben:** Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
 
@@ -840,7 +886,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | „Für diese Season ist noch kein gültiges Regelwerk veröffentlicht.“ | Fenster offen, aber keine gültige Version | Regelwerk veröffentlichen (2.11), „Gültig ab“ darf nicht in der Zukunft liegen |
 | „Diese Season ist nur für PC – angegeben ist PlayStation.“ (oder „Liga 2 ist nur für …“) | Spieler auf einer nicht erlaubten Plattform | Andere Spieler aufstellen; stimmt die Angabe nicht, ändert sie die Person im Profil (festgehalten: Freigabe wie bei der Spiel-ID, 3.7) |
 | „… Nur 2 Spieler sind auf einer erlaubten Plattform …“ beim Zuteilen | Ohne Spieler anderer Plattformen fehlt der Mindestkader | Kader ergänzen oder Co-Team in eine Liga mit passender Plattform |
-| „Bitte zuerst das Feld wählen, in dem die Plattform steht …“ / „Eigene Plattformen einer Liga N brauchen bei der Season das Feld …“ | Plattformen ohne Feld eingegrenzt | Im Kasten **Plattform und Eingabegerät** das Feld wählen (2.7b) |
+| „Bitte zuerst das Feld wählen, in dem die Plattform steht …“ / „Eigene Plattformen einer Liga N brauchen bei der Season das Feld …“ | Plattformen ohne Feld eingegrenzt | Im Kasten **Plattform und Eingabegerät** das Feld wählen (2.7c) |
 | „Dieses Feld gibt es am Spiel nicht, oder es hat keine Auswahl.“ | Feld ohne Auswahlwerte | Am Spiel unter **Spiel-IDs** Auswahlwerte eintragen |
 | „Alle Startplätze sind vergeben.“ beim Annehmen | Plätze voll, auch über 2.5 Zugeteilte zählen | Warteliste, oder **Startplätze** an der Season erhöhen |
 | „Eine Liga-Staffel hat keine Anmeldung – Co-Teams teilt die Turnierleitung zu.“ | Zugangslink mit Anmelderecht für eine Staffel | Link nur zum Ansehen anlegen, Co-Team zuteilen |
@@ -884,8 +930,9 @@ Team spielfrei.
 Im Kader ja, aber nicht am selben Spieltag in zwei Aufstellungen derselben Season.
 
 **Was, wenn ein Team nicht antritt?**
-Die Turnierleitung wertet das Spiel kampflos (Ergebnis-Fenster → **Nicht erschienen** auf der fehlenden Seite). Von
-selbst schlägt der Server das in der Liga nicht vor (3.2).
+Mit Check-in (3.1b) kommt nach dem Fenster der Vorschlag „Nicht erschienen?“ an euch – ihr wertet kampflos, tragt die Seite
+nach oder verlängert; von selbst wertet der Server nie. Ohne Check-in wertet ihr im Ergebnis-Fenster (**Nicht erschienen** auf
+der fehlenden Seite), ein Vorschlag entsteht dann nicht (3.2).
 
 **Zählt die Aufstellung für die Tabelle?**
 Nein, nur das Ergebnis. Die Aufstellung ist für Doppel-Einsatz und spätere Statistik da.
