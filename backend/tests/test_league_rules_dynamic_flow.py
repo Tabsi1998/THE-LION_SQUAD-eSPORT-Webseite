@@ -137,6 +137,8 @@ async def test_a_preset_variable_only_asks_for_a_release_when_the_version_uses_i
     sid = w["season"]["id"]
     if used:
         assert version["frozen_vars"][sid]["protest.hours"]["value"] == "48 Stunden", "eingefroren mit der Vorgabe"
+    else:
+        assert not {"protest.hours", "match.break_minutes"} & set(version["frozen_vars"][sid]), "nur, was der Text nutzt"
     flow.act_as(w["lead"])
     assert ok(await flow.get(season_scope(w)))["data_changes"] is None
 
@@ -154,6 +156,18 @@ async def test_a_preset_variable_only_asks_for_a_release_when_the_version_uses_i
     assert (rows["match.break_minutes"]["before"], rows["match.break_minutes"]["after"]) == ("5 Min.", "10 Min.")
     assert "Frist 72 Stunden, Pause 10 Min. nach Map 2." in body_of(view["proposal"])
     assert ok(await flow.get("/api/users/me/duty"))["rules_pending"][0]["kind"] == "changed"
+
+    # Der Fingerabdruck deckt die neuen Werte: Ändert sich das Feld nach dem Vorschlag noch einmal, lehnt die Freigabe ab;
+    # mit dem frischen Vorschlag geht sie durch und friert den neuen Wert ein.
+    stale = view["proposal"]["fingerprint"]
+    await flow.db.league_seasons.update_one({"id": sid}, {"$set": {"protest_hours": 96}})
+    release = {"base_version_id": version["id"], "valid_from": today(), "change_reason": "Protestfrist", "requires_consent": False}
+    refused = await flow.post(f"{season_scope(w)}/proposal/publish", json={**release, "fingerprint": stale})
+    assert refused.status_code == 409
+    fresh = ok(await flow.get(season_scope(w)))["proposal"]["fingerprint"]
+    assert fresh != stale
+    released = ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={**release, "fingerprint": fresh}))
+    assert released["frozen_vars"][sid]["protest.hours"]["value"] == "96 Stunden"
 
 
 @pytest.mark.asyncio
