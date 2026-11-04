@@ -564,6 +564,22 @@ async def test_every_way_to_a_new_time_raises_the_revision(flow):
 
 
 @pytest.mark.asyncio
+async def test_releasing_the_schedule_raises_the_revision(flow):
+    """Codex-Nachprüfung: „Terminplan freigeben“ nimmt den Termin weg - auch das ist ein Terminweg: alte Check-ins und das Veto
+    zählen nicht mehr, nach dem nächsten Termin und erneutem Check-in beginnt es neu."""
+    world = await veto_world(flow, rules=veto_rules(), **WEEK)
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(60), "schedule_source": "manual"}})
+    await seat(flow, world)
+    flow.act_as(world["lead"])
+    freed = await flow.post(f"/api/tournaments/{world['tournament']['id']}/schedule/release", json={"scope": "all"})
+    assert freed.status_code == 200 and freed.json()["released"] == 1, freed.text
+    stored = await flow.reload(world["match"])
+    assert stored["scheduled_at"] is None and rev_of(stored) == 1, "Terminplan freigeben erhöht die Revision"
+    assert match_flow.missing_sides(stored) == [world["reg_a"]["id"], world["reg_h"]["id"]] and league_veto.rules_mod.veto_of(stored) is None
+    assert (await page(flow, world, "Kapitaen"))["checkin"]["state"] != "veto"
+
+
+@pytest.mark.asyncio
 async def test_a_locked_staffel_is_only_read(flow):
     """Codex zu D.3: Bei einer gesperrten Staffel schreibt der Seitenaufruf nichts - kein Start, keine Frist wird aufgelöst."""
     world = await veto_world(flow, rules=veto_rules(step_seconds=30))
