@@ -424,10 +424,11 @@ Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:c
 
 Auf der Season-Seite im Reiter **Spielbetrieb** steht direkt unter **Serie** der Kasten **Veto** (Zuständigkeit „Season konfigurieren“),
 mit eigenem **Veto speichern**; er gilt sofort für alle Staffeln der Season, ein gerade laufendes Veto behält seinen Stand. Neue Seasons
-beginnen mit **Veto an** und einer Vorlage aus „Modus je Map“ und Best of; sobald der Map-Pool steht, einmal **Vorschlag aus Modusfolge
-und Pools** drücken und speichern – bis dahin nennt **Was fehlt noch?** im Überblick, was mit dem Pool nicht aufgeht. Ältere Seasons
-ohne Kasten bleiben aus – dort tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b): Es
-beginnt, sobald beide Seiten eingecheckt sind, Map 1 folgt direkt danach.
+beginnen mit **Veto an**: Die Vorlage folgt dem Map-Pool automatisch (wie **Vorschlag aus Modusfolge und Pools**) – bei jedem Speichern
+des Pools und bei „Map aus dem Pool nehmen“ –, bis ihr den Kasten das erste Mal speichert; der Kasten sagt das, solange es gilt. Danach
+bleibt die Vorlage, wie ihr sie gespeichert habt, und **Was fehlt noch?** im Überblick nennt, was mit dem Pool nicht mehr aufgeht. Ältere
+Seasons ohne Kasten bleiben aus – dort tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b):
+Es beginnt, sobald beide Seiten eingecheckt sind, Map 1 folgt direkt danach.
 
 | Feld | Vorgabe | Wirkung |
 | --- | --- | --- |

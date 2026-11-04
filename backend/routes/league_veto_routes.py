@@ -18,7 +18,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from auth import get_current_user
 from database import get_db
-from models import new_id, now_utc
 from routes.match_routes import (
     _acting_registration_for_match,
     _assert_match_visible,
@@ -115,7 +114,9 @@ def _answer(season: dict, rules: dict | None, context: dict, **extra) -> dict:
     return {"veto_rules": rules, "active": bool(rules and rules.get("enabled") and rules.get("steps")),
             "defaults": league_veto_rules.defaults(), "problems": _problems(rules, context), "modes": context["modes"],
             "best_of": context["best_of"], "game_mode_order": context["order"], "map_repeat": context["repeat"],
-            "has_checkin": isinstance(season.get("checkin_rules"), dict), **extra}
+            "has_checkin": isinstance(season.get("checkin_rules"), dict),
+            # Nr. 108: unberührt - folgt dem Pool, bis die Leitung hier das erste Mal speichert.
+            "auto": league_veto_rules.is_auto(season.get("veto_rules")), **extra}
 
 
 @admin_router.get("/seasons/{season_id}/veto-rules")
@@ -151,19 +152,10 @@ async def put_veto_rules(season_id: str, body: VetoRulesBody, me: dict = Depends
     problems = _problems(rules, context)
     if problems:
         raise HTTPException(status_code=422, detail=f"Die Vorlage passt noch nicht: {' '.join(problems)}")
-    before = season.get("veto_rules")
-    now = now_utc().isoformat()
-    if before != rules:
-        await db.league_seasons.update_one({"id": season_id}, {"$set": {"veto_rules": rules, "updated_at": now}})
+    # Von Hand gespeichert: ohne den Merker „unberührt“ (Nr. 108) - ab jetzt bleibt die Vorlage, auch wenn der Pool sich ändert.
     # Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen nach dem Entsperren mit).
-    staffeln = await db.tournaments.update_many(
-        {"league_context.season_id": season_id, "locked_at": None, "veto_rules": {"$ne": rules}},
-        {"$set": {"veto_rules": rules, "updated_at": now}})
-    if before != rules:
-        await db.audit_logs.insert_one({
-            "id": new_id(), "action": "league.season.veto_rules", "target_id": season_id, "actor_id": me.get("id"),
-            "data": {"from": before, "to": rules, "staffeln": staffeln.modified_count}, "created_at": now})
-    return _answer(season, rules, context, staffeln_updated=staffeln.modified_count)
+    staffeln = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
+    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln)
 
 
 async def _context(match_id: str, user: dict):

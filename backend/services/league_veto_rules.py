@@ -37,6 +37,15 @@ def defaults() -> dict:
     return {"enabled": False, "team_a": HOME, "step_seconds": 60, "steps": []}
 
 
+# Merker „unberührt“ (Fabian Nr. 108): neue Seasons tragen ihn, das erste Speichern von Hand nimmt ihn weg. Solange er steht, zieht die
+# Vorlage beim Speichern des Pools nach (``league_veto.follow_pool``). ``normalize`` übergeht ihn - er ist kein Teil der Vorlage.
+AUTO = "auto"
+
+
+def is_auto(raw) -> bool:
+    return isinstance(raw, dict) and raw.get(AUTO) is True
+
+
 class VetoProblem(Exception):
     """Etwas an der Vorlage oder einem Zug passt nicht - mit deutscher Meldung und HTTP-Status (Vorgabe 422)."""
 
@@ -61,7 +70,7 @@ def normalize(raw) -> dict:
     Modusfolge passt, sagt ``template_problems``."""
     if not isinstance(raw, dict):
         raise VetoProblem("Die Veto-Vorlage fehlt.")
-    if set(raw) - set(defaults()):
+    if set(raw) - set(defaults()) - {AUTO}:
         raise VetoProblem("Die Veto-Vorlage enthält ein unbekanntes Feld.")
     enabled = raw.get("enabled", False)
     if not isinstance(enabled, bool):

@@ -244,7 +244,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
 | Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
 | Plattform: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (#2270, B.3) | Season (Feld), Liga N überschreibt den Rest | keines · alle · keine Angabe · keine Angabe |
-| Veto: an/aus, Team A (Heim oder Los), Zeit je Schritt, Schrittfolge (D.3, #1618) | Season (`veto_rules`) | an · Heim · 60 s · Vorschlag aus Modusfolge und Best of (ältere Seasons ohne Feld: aus) |
+| Veto: an/aus, Team A (Heim oder Los), Zeit je Schritt, Schrittfolge (D.3, #1618) | Season (`veto_rules`) | an · Heim · 60 s · Vorschlag aus Modusfolge und Best of, zieht mit dem Pool nach, bis einmal von Hand gespeichert (ältere Seasons ohne Feld: aus) |
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
@@ -1956,8 +1956,11 @@ Verspätung zählt nur beim Check-in.
 `GET|PUT /api/admin/leagues/seasons/{id}/veto-rules` (Zuständigkeit `season`, lesen jede Zuständigkeit); das Speichern schreibt sofort auf
 alle nicht gesperrten Staffeln der Season (eigene Gruppe `veto` beim Übertragen, wirkt wie `checkin`; `staffel_fields` beim Anlegen).
 Neue Seasons bekommen das Objekt mit `enabled: true` und der Vorlage aus `propose` (Modusfolge und Best of; ein Pool fehlt beim Anlegen
-noch, also nur Wahlen und Decider – `season_readiness` nennt mit `veto_invalid`, was mit dem Pool nicht aufgeht; Fabian Nr. 105).
-Bestehende Seasons ohne Feld bleiben aus, keine Migration. Pflicht im System, je Season abschaltbar (Nr. 21). Liga N weicht nicht ab
+noch, also nur Wahlen und Decider; Fabian Nr. 105) und dem Merker `auto: true` – **unberührt** (Nr. 108): Solange er steht, schlägt
+`league_veto.follow_pool` die Vorlage bei jeder Änderung des Season-Pools (`PUT …/map-pool`, „Map aus dem Pool nehmen“) neu vor und
+speichert sie wie von Hand (Season, Staffeln, Protokoll mit `via: "auto"`). Das erste Speichern über `PUT …/veto-rules` nimmt den Merker
+weg; ab dann bleibt die Vorlage, und `season_readiness` nennt mit `veto_invalid`, was mit dem Pool nicht aufgeht. `normalize` übergeht den
+Merker, die Antwort von `GET …/veto-rules` nennt ihn als `auto`. Bestehende Seasons ohne Feld bleiben aus, keine Migration. Pflicht im System, je Season abschaltbar (Nr. 21). Liga N weicht nicht ab
 (kein `overrides`-Eintrag; mit anderem Best of läuft dort kein Veto, Warnung – Nr. 106). Protokoll `league.season.veto_rules` mit altem und
 neuem Wert.
 

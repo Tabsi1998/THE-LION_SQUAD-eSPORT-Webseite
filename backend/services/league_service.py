@@ -770,8 +770,9 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     # Check-in (#1652, docs/LIGA.md D.2): ebenso, die Mindestzahl aus Teilnehmerliste oder Teamgröße; gepflegt über …/checkin-rules.
     doc.setdefault("checkin_rules", checkin_rules.defaults_for_season(doc))
     # Veto (#1618, docs/LIGA.md D.3; Fabian Nr. 105): neue Seasons mit Veto an, die Vorlage aus Modusfolge und Best of vorbelegt - der
-    # Pool kommt erst später, „Was fehlt noch?“ nennt dann, was nicht aufgeht. Je Season abschaltbar, gepflegt über …/veto-rules.
-    doc.setdefault("veto_rules", {**league_veto_rules.defaults(), "enabled": True,
+    # Pool kommt erst später; bis zum ersten Speichern von Hand (Merker ``auto``, Nr. 108) zieht sie mit dem Pool nach. Je Season
+    # abschaltbar, gepflegt über …/veto-rules.
+    doc.setdefault("veto_rules", {**league_veto_rules.defaults(), "enabled": True, league_veto_rules.AUTO: True,
                                   "steps": league_veto_rules.propose(order=doc.get("game_mode_order"), pool=None, best_of=doc.get("best_of"))})
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})

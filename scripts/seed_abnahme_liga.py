@@ -99,19 +99,6 @@ async def publish_season(admin: "Session", season_id: str, visibility: str) -> N
     await admin.call("PATCH", f"/api/admin/leagues/seasons/{season_id}", json={"visibility": visibility, **SEED_OVERRIDE})
 
 
-async def fit_veto(admin: "Session", season_id: str) -> None:
-    """Neue Seasons beginnen mit Veto an und einer Vorlage ohne Pool (D.3, #1618, Nr. 105); mit dem Pool passt sie meist nicht mehr und
-    „Was fehlt noch?“ hält die Veröffentlichung auf. Wie die Leitung: einmal „Vorschlag aus Modusfolge und Pools“ und speichern."""
-    stored = await admin.call("GET", f"/api/admin/leagues/seasons/{season_id}/veto-rules")
-    rules = stored.get("veto_rules") or {}
-    if not rules.get("enabled") or not stored.get("problems"):
-        return
-    proposal = await admin.call("GET", f"/api/admin/leagues/seasons/{season_id}/veto-rules/proposal")
-    steps = [{key: step.get(key) for key in ("kind", "mode", "team", "position")} for step in proposal["steps"]]
-    await admin.call("PUT", f"/api/admin/leagues/seasons/{season_id}/veto-rules",
-                     json={"enabled": True, "team_a": rules.get("team_a") or "home", "step_seconds": rules.get("step_seconds") or 60, "steps": steps})
-
-
 # Die Liga der Selbstanmeldung (#2205): je Lauf eine neue Season, Anträge bleiben als Nachweis stehen.
 ANMELDUNG_LEAGUE = "Liga-Anmeldung"
 ANMELDUNG_RULES = "# Fairplay\n\nFair spielen, immer. Platzhalter der lokalen Abnahme, erfunden.\n"
@@ -416,7 +403,6 @@ async def ensure_league(admin: Session, game: dict, maps: dict) -> tuple[dict, d
     if not view.get("map_pool"):
         await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
             {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
-    await fit_veto(admin, season["id"])
     division = next((row for row in view["divisions"] if row.get("level") == 1), None)
     if not division:
         division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
@@ -479,7 +465,6 @@ async def ensure_ablauf(admin: Session, db, game: dict, maps: dict, squads: list
         staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
         tid = staffel["tournament_id"]
         await publish_season(admin, season["id"], ABLAUF_SEASON["visibility"])
-    await fit_veto(admin, season["id"])
     for row in squads[:ABLAUF_ASSIGNED]:
         if not await db.tournament_registrations.find_one({"tournament_id": tid, "squad_id": row["squad"]["id"]}, {"_id": 1}):
             await admin.call("POST", f"/api/tournaments/{tid}/squad-registrations",
@@ -502,7 +487,6 @@ async def ensure_anmeldung(admin: Session, db, game: dict, maps: dict) -> dict:
         **hidden(ABLAUF_SEASON), **season_dates(), "number": number, "name": f"Anmeldung {number}", "slug": f"anmeldung-{number}"})
     await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
         {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
-    await fit_veto(admin, season["id"])
     division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
     staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
     scope = f"/api/admin/league-rules/league_season/{season['id']}"

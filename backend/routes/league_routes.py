@@ -39,6 +39,7 @@ from services import league_platform
 from services import league_pool_check
 from services import league_readiness
 from services import league_service as leagues
+from services import league_veto
 from services.league_permissions import (
     ANY,
     CAPABILITIES,
@@ -428,6 +429,8 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=POOL_BUSY) from None
     await _audit(db, "league.season.map_pool.save", me, season_id, {"version": doc["version"], "pool_id": doc["id"]})
+    # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem neuen Pool nach.
+    await league_veto.follow_pool(db, season, actor_id=me.get("id"))
     # Mindestgröße je Modus (#2207): nur Warnung - die Prüfung vor der Veröffentlichung nennt es als Problem.
     warnings = league_pool_check.pool_problems(season, await league_pool_check.divisions_of(db, season_id), doc, game)
     return {**map_pools.saved_view(doc, "league_season", admin=True), "warnings": warnings}
@@ -490,6 +493,9 @@ async def admin_season_pool_remove_map(season_id: str, body: LeagueMapRemove,
         "reason": reason, "map_id": body.map_id, "map_name": name, "mode": body.mode, "version": doc["version"],
         "pool_id": doc["id"], "from_version": (previous or {}).get("version"), "new_version": created,
         "staffeln": [{"tournament_id": entry["tournament_id"], "applied": entry["applied"]} for entry in results]})
+    if created:
+        # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem kleineren Pool nach.
+        await league_veto.follow_pool(db, fresh, actor_id=me.get("id"))
     divisions = await league_pool_check.divisions_of(db, season_id)
     warnings = league_pool_check.pool_problems(fresh, divisions, doc, game)
     return {"pool": map_pools.saved_view(doc, "league_season", admin=True), "staffeln": results, "warnings": warnings,

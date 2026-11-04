@@ -50,6 +50,50 @@ STARTED_DETAIL = "Das Spiel läuft schon – am Veto ändert sich nichts mehr."
 REPORT_VETO_DETAIL = "Erst das Veto abschließen – dann melden."
 
 
+# ---------------------------------------------------------------- Vorlage der Season
+
+async def store_template(db, season: dict, rules: dict, *, actor_id: str | None, via: str = SIDE) -> int:
+    """Die Vorlage der Season speichern und sofort auf ihre Staffeln legen - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen
+    nach dem Entsperren mit). Protokoll ``league.season.veto_rules`` mit altem und neuem Wert; ``via: "auto"`` beim Nachziehen (Nr. 108).
+    Gibt die Zahl der geänderten Staffeln zurück."""
+    before = season.get("veto_rules")
+    now_iso = now_utc().isoformat()
+    if before != rules:
+        await db.league_seasons.update_one({"id": season["id"]}, {"$set": {"veto_rules": rules, "updated_at": now_iso}})
+    staffeln = await db.tournaments.update_many(
+        {"league_context.season_id": season["id"], "locked_at": None, "veto_rules": {"$ne": rules}},
+        {"$set": {"veto_rules": rules, "updated_at": now_iso}})
+    if before != rules:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "league.season.veto_rules", "target_id": season["id"], "actor_id": actor_id,
+            "data": {"from": before, "to": rules, "staffeln": staffeln.modified_count, "via": via}, "created_at": now_iso})
+    return staffeln.modified_count
+
+
+async def follow_pool(db, season: dict, *, actor_id: str | None) -> dict | None:
+    """Fabian Nr. 108: Solange die Vorlage unberührt ist (Merker ``veto_rules.auto``), zieht sie nach, sobald der Pool der Season sich
+    ändert - neu vorgeschlagen aus Modusfolge, Pool und Best of und gespeichert wie von Hand. Ohne Merker (einmal von Hand gespeichert),
+    ohne Pool oder ohne Vorschlag passiert nichts. Gibt die geltende Vorlage zurück."""
+    raw = season.get("veto_rules")
+    if not rules_mod.is_auto(raw) or not raw.get("enabled"):
+        return None
+    try:
+        rules = rules_mod.normalize(raw)
+    except VetoProblem:
+        return None
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "game_id": 1}) or {}
+    pool = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
+    if not pool:
+        return None
+    steps = rules_mod.propose(order=season.get("game_mode_order"), pool=pool, best_of=int(season.get("best_of") or 1))
+    if not steps:
+        return None
+    fresh = {**rules, "steps": steps, rules_mod.AUTO: True}
+    if fresh != raw:
+        await store_template(db, season, fresh, actor_id=actor_id, via=AUTO)
+    return fresh
+
+
 # ---------------------------------------------------------------- Hilfen
 
 def _clean_reason(reason: str | None) -> str:

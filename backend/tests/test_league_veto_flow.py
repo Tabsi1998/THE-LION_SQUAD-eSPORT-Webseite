@@ -776,21 +776,59 @@ async def season_world(flow, *, best_of: int = 5, order=ORDER, pool: dict | None
     return world
 
 
+def pool_body(w: dict, names: dict) -> dict:
+    return {"modes": [{"mode": mode, "map_ids": [w["maps"][name]["id"] for name in rows]} for mode, rows in names.items()]}
+
+
+@pytest.mark.asyncio
+async def test_an_untouched_template_follows_the_pool_until_the_lead_saves_it(flow):
+    """Fabian Nr. 108: Solange die Vorlage nie von Hand gespeichert wurde, zieht sie beim Speichern des Pools nach - die Leitung muss
+    nichts drücken, Veröffentlichen geht. Nach dem ersten Speichern bleibt sie, wie sie ist, und „Was fehlt noch?“ nennt den Rest."""
+    w = await season_world(flow, pool={})
+    sid = w["season"]["id"]
+    fresh = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
+    # Beim Anlegen (Nr. 105) gibt es noch keinen Pool: nur Wahlen und Decider aus Modusfolge und Best of, Merker „unberührt“.
+    assert fresh["auto"] is True and fresh["veto_rules"]["enabled"] is True and fresh["veto_rules"]["steps"] == [
+        step("pick", HP, "A", 1), step("pick", HP, "B", 4), step("pick", SND, "B", 2), step("pick", SND, "A", 5), step("decider", CTL, None, 3)]
+    full = {HP: ["Hafen", "Nebel", "Turm", "Glut"], SND: ["Nebel", "Turm", "Kai", "Werk"], CTL: ["Hafen", "Kai", "Ruine"]}
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/map-pool", json=pool_body(w, full)))
+    after = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
+    assert after["veto_rules"]["steps"] == ANLAGE_B and after["problems"] == [] and after["auto"] is True
+    assert (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["steps"] == ANLAGE_B
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.veto_rules", "target_id": sid, "data.via": "auto"}) == 1
+    assert not [row for row in ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))["problems"] if row["code"].startswith("veto")]
+    assert (await flow.patch(f"{ADMIN}/seasons/{sid}", json={"visibility": "public"})).status_code == 200, "Veröffentlichen ohne Extra-Klick"
+    # „Map aus dem Pool nehmen“ ändert den Pool genauso - die unberührte Vorlage zieht wieder nach.
+    taken = await flow.post(f"{ADMIN}/seasons/{sid}/map-pool/remove-map", json={"map_id": w["maps"]["Glut"]["id"], "mode": HP, "reason": "Glut ist kaputt"})
+    assert taken.status_code == 200, taken.text
+    moved = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
+    assert moved["problems"] == [] and moved["veto_rules"]["steps"] != ANLAGE_B and moved["auto"] is True
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.veto_rules", "target_id": sid, "data.via": "auto"}) == 2
+    # Von Hand gespeichert: der Merker fällt weg, ab jetzt bleibt die Vorlage - auch wenn der Pool sich ändert.
+    custom = [step("ban", HP, "A"), step("pick", HP, "A", 4), step("pick", HP, "B", 1), *ANLAGE_B[4:]]
+    saved = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json={"enabled": True, "team_a": "home", "step_seconds": 60, "steps": custom}))
+    assert saved["auto"] is False and saved["problems"] == []
+    smaller = {**full, HP: ["Hafen", "Nebel", "Turm"], SND: ["Nebel", "Turm", "Kai"]}
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/map-pool", json=pool_body(w, smaller)))
+    kept = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
+    assert kept["veto_rules"]["steps"] == custom and kept["auto"] is False
+    assert kept["problems"] == ["Suchen: 2 Sperren und 2 Wahlen brauchen 4 Maps – der Pool hat 3."]
+    assert [row["code"] for row in ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))["problems"] if row["code"].startswith("veto")] == ["veto_invalid"]
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.veto_rules", "target_id": sid, "data.via": "auto"}) == 2
+
+
 @pytest.mark.asyncio
 async def test_the_season_template_is_checked_proposed_saved_and_transferred(flow):
     w = await season_world(flow)
     sid = w["season"]["id"]
     before = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
-    # Neue Seasons (Fabian Nr. 105): Veto an, die Vorlage aus Modusfolge und Pools vorbelegt - beim Anlegen gibt es noch keinen Pool,
-    # also nur Wahlen und Decider; „Was fehlt noch?“ nennt, was mit dem Pool nicht aufgeht.
-    assert before["veto_rules"] == {"enabled": True, "team_a": "home", "step_seconds": 60, "steps": [
-        step("pick", HP, "A", 1), step("pick", HP, "B", 4), step("pick", SND, "B", 2), step("pick", SND, "A", 5), step("decider", CTL, None, 3)]}
+    # Neue Seasons (Fabian Nr. 105/108): Veto an; die Vorlage vom Anlegen ist mit dem Pool nachgezogen (unberührt) und passt.
+    assert before["veto_rules"] == {"enabled": True, "team_a": "home", "step_seconds": 60, "steps": ANLAGE_B} and before["auto"] is True
     assert before["active"] is True and before["best_of"] == 5 and before["game_mode_order"] == ORDER and before["has_checkin"] is True
-    assert before["problems"] == ["Kontrolle: Der Decider braucht genau eine übrige Map – nach 0 Sperren und 0 Wahlen bleiben 3."]
+    assert before["problems"] == []
     assert {row["mode"]: row["maps"] for row in before["modes"]} == {HP: 4, SND: 4, CTL: 3}
-    assert (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["enabled"] is True
-    unready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))
-    assert [row["text"] for row in unready["problems"] if row["code"] == "veto_invalid"] == [f"Veto: {before['problems'][0]}"]
+    assert (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["steps"] == ANLAGE_B
+    assert not [row for row in ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))["problems"] if row["code"].startswith("veto")]
     # Bestehende Seasons ohne Feld bleiben aus - keine Migration.
     await flow.db.league_seasons.update_one({"id": sid}, {"$unset": {"veto_rules": ""}})
     legacy = ok(await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules"))
@@ -826,7 +864,9 @@ async def test_the_season_template_is_checked_proposed_saved_and_transferred(flo
     log = await flow.db.audit_logs.find({"action": "league.season.veto_rules"}, {"_id": 0}).to_list(10)
     assert log[-1]["data"]["to"]["team_a"] == "draw" and log[-1]["data"]["staffeln"] == 1
     again = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=saved["veto_rules"]))
-    assert again["staffeln_updated"] == 0 and await flow.db.audit_logs.count_documents({"action": "league.season.veto_rules"}) == 2
+    # Drei Einträge: das Nachziehen mit dem Pool (via auto), der Entwurf, „draw/90“ - die Wiederholung schreibt nichts.
+    assert again["staffeln_updated"] == 0 and await flow.db.audit_logs.count_documents({"action": "league.season.veto_rules"}) == 3
+    assert saved["auto"] is False and (await flow.db.audit_logs.find_one({"action": "league.season.veto_rules", "data.via": "auto"}))["data"]["to"]["steps"] == ANLAGE_B
 
     # Prüfung vor der Veröffentlichung: der Pool schrumpft, die Vorlage geht nicht mehr auf; ohne Check-in fehlt die Vorbedingung.
     ready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))

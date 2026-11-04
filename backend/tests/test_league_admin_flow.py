@@ -103,8 +103,9 @@ async def test_a_season_starts_with_the_documented_defaults(flow):
     assert view["calendar"]["max_teams_per_staffel"] == 8
     assert view["map_pool"]["origin"] == "league_season"
     assert view["divisions"][0]["label"] == "Liga 1"
+    # Nach dem Pool zieht die unberührte Veto-Vorlage nach (D.3, Nr. 108) - ein eigener Eintrag mit via "auto".
     assert await audit_actions(flow) == ["league.create", "league.season.create", "league.season.map_pool.save",
-                                         "league.division.create"]
+                                         "league.season.veto_rules", "league.division.create"]
 
 
 @pytest.mark.asyncio
