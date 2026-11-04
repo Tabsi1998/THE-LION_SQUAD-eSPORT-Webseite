@@ -68,9 +68,9 @@ test("je Modus sperren, an einer Waffe einzelne Aufsätze, speichern als neue Ve
   // An Donner 4 passt Griff (zugeordnet), Rotpunkt nicht, Kompensator ohne Waffe zu keiner (Obmann, 03.11.).
   fireEvent.click(screen.getByTestId("season-bans-open-w2"));
   const donner = screen.getByTestId("season-bans-attachments-w2");
-  expect(within(donner).queryByLabelText("Rotpunkt")).not.toBeInTheDocument();
-  expect(within(donner).queryByLabelText("Kompensator")).not.toBeInTheDocument();
-  fireEvent.click(within(donner).getByLabelText("Griff"));
+  expect(within(donner).queryByLabelText("Rotpunkt an Donner 4 sperren")).not.toBeInTheDocument();
+  expect(within(donner).queryByLabelText("Kompensator an Donner 4 sperren")).not.toBeInTheDocument();
+  fireEvent.click(within(donner).getByLabelText("Griff an Donner 4 sperren"));
   // Inaktiv und nicht auf der Liste: nicht neu sperrbar.
   expect(screen.getByTestId("season-bans-toggle-p1")).toBeDisabled();
   fireEvent.click(screen.getByTestId("season-bans-save"));
@@ -153,7 +153,7 @@ test("ganze Klasse sperren: je Modus, in allen Modi mitgesperrt, leere Klasse an
   expect(screen.getByTestId("season-bans-section-leer")).toHaveTextContent("gilt ab dem ersten");
   // Der Laser passt über die Klasse zu Hagel.
   fireEvent.click(screen.getByTestId("season-bans-open-s1"));
-  expect(within(screen.getByTestId("season-bans-attachments-s1")).getByLabelText("Laser")).toBeInTheDocument();
+  expect(within(screen.getByTestId("season-bans-attachments-s1")).getByLabelText("Laser an Hagel sperren")).toBeInTheDocument();
   // In allen Modi: Hagel ist mitgesperrt und nicht mehr einzeln wählbar.
   fireEvent.click(within(head).getByLabelText("allen Modi"));
   expect(screen.getByTestId("season-bans-via-class-s1")).toHaveTextContent("Mit der ganzen Klasse gesperrt");
@@ -169,6 +169,84 @@ test("ganze Klasse sperren: je Modus, in allen Modi mitgesperrt, leere Klasse an
       { item_id: "w1", kind: "item", modes: [], attachment_ids: [] },
     ],
   }));
+});
+
+// #2299: an der Waffe nur die passenden Aufsätze je Slot, Modi je Aufsatz, „für die Klasse übernehmen“, „an allen Waffen sperren“.
+const BY_SLOT = {
+  ...BODY,
+  categories: [
+    { key: "waffen", label: "Waffen", role: "weapon", subcategories: [{ key: "sturm", label: "Sturmgewehr", icon_url: null }] },
+    { key: "aufsaetze", label: "Aufsätze", role: "attachment", subcategories: [{ key: "optik", label: "Optik", icon_url: "/api/static/uploads/optik.png" }] },
+  ],
+  library: [
+    { id: "w1", category: "waffen", subcategory: "sturm", name: "Blitz 9", status: "active", weapon_ids: [] },
+    { id: "w2", category: "waffen", subcategory: "sturm", name: "Donner 4", status: "active", weapon_ids: [] },
+    { id: "a1", category: "aufsaetze", subcategory: "optik", name: "Rotpunkt", status: "active", weapon_ids: [], weapon_class_ids: ["sturm"] },
+    { id: "a2", category: "aufsaetze", name: "Griff", status: "active", weapon_ids: ["w1"], weapon_class_ids: [] },
+    { id: "a3", category: "aufsaetze", subcategory: "optik", name: "Holo", status: "active", weapon_ids: [], weapon_class_ids: ["sturm"] },
+  ],
+  list: null,
+  versions: [],
+};
+
+test("Aufsätze je Slot an der Waffe: je Aufsatz Modi, für die Klasse übernehmen, an allen Waffen sperren", async () => {
+  apiMock.get.mockResolvedValue({ data: BY_SLOT });
+  renderPanel();
+  fireEvent.click(await screen.findByTestId("season-bans-open-w1"));
+  const panel = screen.getByTestId("season-bans-attachments-w1");
+  expect(within(panel).getAllByTestId("season-bans-slot-w1").map((slot) => slot.querySelector("p").textContent))
+    .toEqual(["Ohne Unterkategorie", "Optik"]);
+  fireEvent.click(within(panel).getByLabelText("Rotpunkt an Blitz 9 sperren"));
+  fireEvent.click(within(screen.getByTestId("season-bans-attachment-w1-a1")).getByLabelText("Suchen"));
+  fireEvent.click(within(panel).getByLabelText("Griff an Blitz 9 sperren"));
+  expect(screen.getByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 2 gesperrt");
+
+  fireEvent.click(screen.getByTestId("season-bans-copy-class-w1"));
+  expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Auf 1 weitere Waffe übernommen"));
+  expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 1 gesperrt");
+
+  fireEvent.click(within(panel).getByLabelText("Holo an Blitz 9 sperren"));
+  fireEvent.click(screen.getByTestId("season-bans-everywhere-w1-a3"));
+  expect(within(screen.getByTestId("season-bans-attachment-w1-a3")).getByText("An allen Waffen gesperrt")).toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a3")).toBeDisabled();
+
+  fireEvent.click(screen.getByTestId("season-bans-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/loadout-bans", {
+    expected_version: 0,
+    entries: [
+      { item_id: "a3", kind: "item", modes: [], attachment_ids: [] },
+      { item_id: "w1", kind: "attachments", modes: [], attachment_ids: ["a1", "a2"], attachment_modes: { a1: ["suchen"] } },
+      { item_id: "w2", kind: "attachments", modes: ["suchen"], attachment_ids: ["a1"] },
+    ],
+  }));
+});
+
+// Codex zu #2299: „K gesperrt“ zählt auch, was über die Zeile des Aufsatzes oder seine ganz gesperrte Klasse überall gesperrt ist.
+const banList = (...entries) => ({ id: "v1", version: 1, saved_at: "2026-11-04T10:00:00+00:00", stale: false, outdated_item_ids: [],
+  class_new_items: [], entries });
+
+test("„K gesperrt“ zählt einen überall gesperrten Aufsatz mit", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BY_SLOT, list: banList(
+    { kind: "item", item_id: "a1", name: "Rotpunkt", category: "aufsaetze", subcategory: "optik", modes: [], mode_labels: [], attachments: [] },
+    { kind: "item", item_id: "a3", name: "Holo", category: "aufsaetze", subcategory: "optik", modes: ["suchen"], mode_labels: ["Suchen"], attachments: [] },
+  ) } });
+  renderPanel();
+  // Rotpunkt in allen Modi gesperrt zählt, Holo nur in Suchen (nicht angehakt) nicht.
+  expect(await screen.findByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 1 gesperrt");
+  expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 1 gesperrt");
+  fireEvent.click(screen.getByTestId("season-bans-open-w1"));
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a1")).toBeChecked();
+});
+
+test("„K gesperrt“ zählt die Aufsätze einer ganz gesperrten Aufsatzklasse mit, jeden nur einmal", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BY_SLOT, list: banList(
+    { kind: "class", item_id: null, name: "Optik", category: "aufsaetze", subcategory: "optik", modes: [], mode_labels: [], attachments: [], items: [] },
+    { kind: "attachments", item_id: "w1", name: "Blitz 9", category: "waffen", subcategory: "sturm", modes: [], mode_labels: [],
+      attachments: [{ item_id: "a2", name: "Griff", image_url: null }] },
+  ) } });
+  renderPanel();
+  expect(await screen.findByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 3 gesperrt");
+  expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 2 gesperrt");
 });
 
 test("Aufsätze ohne erlaubte Waffe werden genannt (Nr. 81)", async () => {

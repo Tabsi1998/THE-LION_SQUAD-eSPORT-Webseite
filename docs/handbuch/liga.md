@@ -130,8 +130,11 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
    Waffe dieser Klasse passt dann sofort. Ohne Waffe und ohne Klasse passt ein Aufsatz weiter zu keiner. **Aus Spiel übernehmen** legt
    fehlende Unterkategorien an („neu“ in der Vorschau); ist kein Platz mehr, kommt der Eintrag ohne Unterkategorie und die Meldung sagt es.
 5. **Sperrliste der Season:** auf der Season-Seite im Reiter **Regelwerk und Sperrliste** (`#sperrliste`). Haken bei **sperren**, darunter **Gilt in**: allen Modi oder
-   einzelnen. Bei einer Waffe öffnet **Aufsätze einzeln sperren** die passenden Aufsätze – die Waffe bleibt erlaubt, nur diese Aufsätze nicht.
-   Ein Aufsatz in seiner eigenen Kategorie gesperrt gilt an jeder Waffe. **Nur gesperrte** zeigt, was schon auf der Liste steht.
+   einzelnen. Bei einer Waffe klappt der Knopf **„N Aufsätze · K gesperrt“** die **passenden** Aufsätze auf, je Slot (Unterkategorie, etwa
+   Mündung, Optik). Haken heißt **gesperrt an dieser Waffe** – die Waffe bleibt erlaubt; darunter je Aufsatz **Gilt in** (alle Modi oder
+   einzelne). **An allen Waffen sperren** setzt den Aufsatz selbst auf die Liste (gleich wie in seiner eigenen Kategorie), **Für alle
+   Sturmgewehr übernehmen** gibt jeder anderen Waffe der Klasse dieselben Sperren mit denselben Modi, soweit die Aufsätze dort passen. Beides
+   gilt erst mit **Speichern**. **Nur gesperrte** zeigt, was schon auf der Liste steht.
    Je Unterkategorie gibt es den Schalter **Ganze Klasse sperren**, auch nur für einzelne Modi. Er gilt für **alle Einträge der Klasse, auch
    für später angelegte** – eine neue Schrotflinte in einer gesperrten Klasse „Schrotflinte“ ist sofort mitgesperrt (Ligaseite, Matchseite) und
    das Regelwerk meldet **Regelwerk muss freigegeben werden** (2.11). In allen Modi gesperrt, sind die Einträge der Klasse mit „Mit der ganzen
@@ -142,18 +145,26 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
    gesperrt, geändert und wieder erlaubt.
 7. **Regelwerk:** Der Baustein heißt **Erlaubte Ausrüstung** (`[[baustein:loadout_bans]]`). Er zeigt nicht die Sperren, sondern **was
    erlaubt ist**: alle **aktiven** Einträge der Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild. Nur in einzelnen
-   Modi gesperrt, steht ein Eintrag mit „nicht in …“ da, ein an einzelnen Waffen gesperrter Aufsatz mit „nicht an …“. Eine ganz gesperrte
-   Klasse ist nur eine Zeile „Schrotflinte · nicht erlaubt“ (mit den Namen in Klammern), eine ohne jede Einschränkung sagt „alle erlaubt“.
-   Inaktive und archivierte Einträge fehlen. Im PDF steht eine Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen. Weil der
+   Modi gesperrt, steht ein Eintrag mit „nicht in …“ da – ist er in **mehr Modi der Season gesperrt als erlaubt**, mit „nur in …“ (etwa „nur
+   in Suchen & Zerstören“; bei Gleichstand „nicht in …“). **Aufsätze stehen an der Waffe**, nicht als eigene Liste: Im Web trägt jede Waffe
+   den Satz „alle passenden Aufsätze erlaubt“ bzw. „…, außer: A, B (nur in …)“; ohne erlaubten Aufsatz „keine Aufsätze erlaubt (…)“. Ist
+   ein Aufsatz an **jeder** passenden Waffe gleich gesperrt (etwa über **An allen Waffen sperren**), steht er nur einmal unter den Waffen:
+   „**An keiner Waffe erlaubt:** Kompensator“ (mit Hinweis, wenn nur in Modi); an der Waffe zählt er bei „K gesperrt“ weiter mit. Eine
+   ganz gesperrte Klasse ist nur eine Zeile „Schrotflinte · nicht erlaubt“ (mit den Namen in Klammern), eine ohne jede Einschränkung sagt
+   „alle erlaubt“. Inaktive und archivierte Einträge fehlen. Im **PDF** steht je Waffe eine Zeile „M4 – alle passenden Aufsätze erlaubt,
+   außer: …“, die übrige Ausrüstung als Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen. Weil der
    Baustein die Bibliothek von heute liest, meldet **jeder neue aktive Eintrag** (auch einer in einer gesperrten Klasse) und jede neue
    Version der Sperrliste **Regelwerk muss freigegeben werden**. Steht der Baustein im Regelwerk, sagt der Abschnitt Sperrliste, ob die
    letzte Fassung noch den alten Stand zeigt; **Neue Version vorbereiten** führt ins Regelwerk, dort sind die Unterschiede markiert, du gibst
    frei und wählst, ob neu zugestimmt werden muss (2.11). Jede Fassung friert ihre Liste ein; ältere Fassungen mit der Sperrliste bleiben,
-   wie sie veröffentlicht wurden.
+   wie sie veröffentlicht wurden – auch die mit der eigenen Aufsatz-Liste („nicht an …“). Die neue Darstellung je Waffe kommt einmal als
+   Vorschlag **Regelwerk muss freigegeben werden**.
 
 Öffentlich steht auf der Ligaseite unter dem Map-Pool **Erlaubte Ausrüstung** – genau die Sicht des Regelwerks, nur wenn die Season
-sichtbar ist und das Spiel eine Bibliothek hat. Auf der **Matchseite** eines Ligaspiels steht sie unten aufklappbar, aus der Liste, die für
-dieses Spiel gilt (nach dem Ergebnis die festgehaltene). Rechte: Bibliothek wie Maps (Bereich
+sichtbar ist und das Spiel eine Bibliothek hat. Jede Waffe mit passenden Aufsätzen zeigt „N Aufsätze · K gesperrt“; ein Klick (oder Enter)
+klappt darunter die **erlaubten Aufsätze je Slot mit Bild** auf, darunter „Gesperrt: …“. Auf der **Matchseite** eines Ligaspiels steht sie
+unten aufklappbar, aus der Liste, die für dieses Spiel gilt (nach dem Ergebnis die festgehaltene, ältere Spiele so, wie sie damals
+aussah). Rechte: Bibliothek wie Maps (Bereich
 Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständigkeit der Liga).
 
 <table>
@@ -167,14 +178,15 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 </tr>
 <tr>
 <td><img src="../assets/liga/ausruestung-unterkategorien.png" alt="Bibliothek mit Unterkategorien: Gruppen Sturmgewehr und Schrotflinte mit Zähler, Knöpfe Unterkategorien und Auswählen" width="560"></td>
-<td><img src="../assets/liga/erlaubte-ausruestung-handy.png" alt="Ligaseite am Handy: Erlaubte Ausrüstung je Unterkategorie, Hinweis nicht in Stellung, Schrotflinte nicht erlaubt" width="220"></td>
+<td><img src="../assets/liga/erlaubte-ausruestung-handy.png" alt="Ligaseite am Handy: Waffe Donner 4 aufgeklappt mit den erlaubten Aufsätzen je Slot, Holo nur in Suchen und Zerstören, darunter Gesperrt" width="220"></td>
 </tr>
 <tr>
 <td><img src="../assets/liga/sperrliste-klassen.png" alt="Sperrliste der Season: je Unterkategorie der Schalter Ganze Klasse sperren, Hinweis auf neu hinzugekommene Einträge" width="560"></td>
-<td><img src="../assets/liga/regelwerk-erlaubte-ausruestung-pdf.png" alt="PDF des Regelwerks: Tabelle Kategorie, Unterkategorie, Erlaubt, Einschränkungen" width="220"></td>
+<td><img src="../assets/liga/sperrliste-aufsaetze-je-waffe.png" alt="Sperrliste der Season: Waffe aufgeklappt, passende Aufsätze je Slot mit Häkchen gesperrt und Modi je Aufsatz, Knopf Für alle Sturmgewehr übernehmen" width="280"></td>
 </tr>
 <tr>
-<td colspan="2"><img src="../assets/liga/regelwerk-erlaubte-ausruestung.png" alt="Regelwerk im Web: Anlage Erlaubte Ausrüstung mit Karten je Unterkategorie und der Zeile Schrotflinte nicht erlaubt" width="560"></td>
+<td><img src="../assets/liga/regelwerk-erlaubte-ausruestung.png" alt="Regelwerk im Web: Waffenkarten mit dem Satz alle passenden Aufsätze erlaubt, außer, und der Zeile Schrotflinte nicht erlaubt" width="560"></td>
+<td><img src="../assets/liga/regelwerk-erlaubte-ausruestung-pdf.png" alt="PDF des Regelwerks: je Waffe eine Zeile mit den Aufsätzen, die übrige Ausrüstung als Tabelle" width="280"></td>
 </tr>
 </table>
 
@@ -647,7 +659,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Modusfolge | `[[baustein:mode_order]]` | Modus je Map | Season → Spielbetrieb → Serie |
    | Check-in | `[[baustein:checkin]]` | Fenster (öffnet und schließt, Minuten um den Termin), Mindestens Anwesende je Seite, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen (2.7b); ohne Check-in ein Satz | Season → Termine → Check-in vor dem Spiel |
    | Veto | `[[baustein:veto]]` | Team A (Heim oder Los), Zeit je Schritt, Start nach dem Check-in und die Schrittfolge nummeriert („1. Team A sperrt eine Map (Stellung)“, 2.7d); ohne Veto ein Satz | Season → Spielbetrieb → Veto |
-   | Erlaubte Ausrüstung | `[[baustein:loadout_bans]]` | was erlaubt ist: aktive Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild, Hinweise „nicht in …“ und „nicht an …“, ganz gesperrte Klasse als Zeile „nicht erlaubt“ (PDF: Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen; gedacht für Anlage A, 2.1a) | Spiel → Ausrüstung, Season → Regelwerk und Sperrliste |
+   | Erlaubte Ausrüstung | `[[baustein:loadout_bans]]` | was erlaubt ist: aktive Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild, Hinweise „nicht in …“ bzw. „nur in …“, Aufsätze an der Waffe („alle passenden Aufsätze erlaubt, außer: …“), ganz gesperrte Klasse als Zeile „nicht erlaubt“ (PDF: je Waffe eine Zeile, übrige Ausrüstung als Tabelle; gedacht für Anlage A, 2.1a) | Spiel → Ausrüstung, Season → Regelwerk und Sperrliste |
    | Einstellungen je Modus | `[[baustein:mode_settings]]` | je Modus Zeitlimit, Zeit je Runde, Einstellungen (Tabelle), Regeltext | Spiel → Modi, Season → Ergebnisregeln |
    | Modi der Season | `[[baustein:modes]]` | Tabelle Modus (mit Symbol) · Ergebnisregel in Klartext (Ziel, Runden, Verlängerung, Remis) · Zeit · Spieler je Seite | Season → Spielbetrieb → Modi, Ergebnisregeln |
    | Spielformat | `[[baustein:format]]` | Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste; Abweichungen je Liga N | Season → Spielbetrieb → Serie, Anmeldung und Kader, Ligen |
@@ -694,7 +706,9 @@ werden**: im Season-Überblick, in **Mein Dienst** (für wer „Regeln veröffen
 Bausteine und Variablen sich geändert haben (alt durchgestrichen, neu unterstrichen), und darunter der **Vorschlag**: die neue Fassung mit
 den Werten von heute, geänderte Paragrafen markiert. Du prüfst, setzt **Gültig ab** und **Änderungsgrund** (vorbelegt mit den geänderten
 Stellen), wählst, ob **die Teams neu zustimmen** müssen, und klickst **Freigeben und veröffentlichen**. Willst du den Text vorher anpassen:
-**Text vorher anpassen** legt den Entwurf an. Bis zur Freigabe gilt und zeigt die alte Version.
+**Text vorher anpassen** legt den Entwurf an. Bis zur Freigabe gilt und zeigt die alte Version. Auch eine neue **Darstellung** eines
+Bausteins kommt so: Seit die erlaubte Ausrüstung die Aufsätze an der Waffe zeigt und „nur in …“ kennt (2.1a), schlägt die Verwaltung für
+jede Season mit diesem Baustein einmal eine neue Fassung vor; die veröffentlichte bleibt bis dahin Wort für Wort, wie sie war.
 
 **Zustimmung:** Verlangt eine Version Zustimmung, sehen Captain und Vertreter (ohne beide die Leitung des Hauptteams) **Neue Fassung, bitte
 zustimmen** - als Aufgabe auf der Startseite, auf der Regelseite, auf der Ligaseite, auf der Team-Seite (Spielberechtigung des Co-Teams) und auf

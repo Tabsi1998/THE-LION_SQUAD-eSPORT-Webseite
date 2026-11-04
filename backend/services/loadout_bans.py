@@ -19,9 +19,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, new_id, now_utc
@@ -53,6 +53,15 @@ class BanEntryIn(BaseModel):
     kind: Literal["item", "attachments", "class"] = ITEM
     modes: List[str] = Field(default_factory=list, max_length=GAME_MODES_MAX)
     attachment_ids: List[str] = Field(default_factory=list, max_length=ATTACHMENTS_MAX)
+    # Modi je Aufsatz an der Waffe (#2299): Kennung des Aufsatzes → Modi; fehlt oder leer = die Modi der Zeile.
+    attachment_modes: Dict[str, List[str]] = Field(default_factory=dict)
+
+    @field_validator("attachment_modes")
+    @classmethod
+    def _attachment_modes_size(cls, value: dict) -> dict:
+        if len(value) > ATTACHMENTS_MAX or any(len(key) > 64 or len(modes) > GAME_MODES_MAX for key, modes in value.items()):
+            raise ValueError("Zu viele Angaben bei den Modi je Aufsatz.")
+        return value
 
 
 class LoadoutBansSave(BaseModel):
@@ -83,10 +92,20 @@ def _small(items) -> list[dict]:
     return [{key: item.get(key) for key in ("item_id", "name", "image_url")} for item in items or []]
 
 
+def _small_attachments(items) -> list[dict]:
+    """Aufsätze an einer Waffe - eigene Modi (#2299) nur, wenn gesetzt."""
+    out = []
+    for item, small in zip(items or [], _small(items)):
+        if item.get("modes") or item.get("mode_labels"):
+            small.update(modes=list(item.get("modes") or []), mode_labels=list(item.get("mode_labels") or []))
+        out.append(small)
+    return out
+
+
 def _entry_view(entry: dict) -> dict:
     out = {**{key: entry.get(key) for key in SNAPSHOT_KEYS}, "kind": entry.get("kind") or ITEM,
            "modes": list(entry.get("modes") or []), "mode_labels": list(entry.get("mode_labels") or []),
-           "attachments": _small(entry.get("attachments"))}
+           "attachments": _small_attachments(entry.get("attachments"))}
     if out["kind"] == CLASS:
         out["items"] = _small(entry.get("items"))
     return out
@@ -220,6 +239,8 @@ def _kept(previous: dict | None, game: dict) -> tuple[set, set, set]:
         modes.update(entry.get("modes") or [])
         rows.add((entry.get("kind") or ITEM, entry.get("item_id")))
         attached.update((entry.get("item_id"), item.get("item_id")) for item in entry.get("attachments") or [])
+        for item in entry.get("attachments") or []:
+            modes.update(item.get("modes") or [])
     return modes, rows, attached
 
 
@@ -326,7 +347,8 @@ async def _snapshot(db, game: dict, body: LoadoutBansSave, previous: dict | None
                     **_sub_fields(row, subs), "modes": modes, "mode_labels": labels, "attachments": []}
         if entry.kind == ATTACHMENTS:
             snapshot["attachments"] = _attachments(row, category, entry, rows, by_key, kept_attached)
-        elif entry.attachment_ids:
+            _attachment_modes(game, entry, snapshot["attachments"], kept_modes)
+        elif entry.attachment_ids or entry.attachment_modes:
             raise EquipmentProblem(f"„{row.get('name')}“: Aufsätze lassen sich nur an einer Waffe einzeln sperren.")
         out.append(snapshot)
     for snapshot in out:
@@ -367,6 +389,19 @@ def _attachments(weapon: dict, category: dict, entry: BanEntryIn, rows: dict, by
             raise EquipmentProblem(problem)
         out.append({"item_id": item["id"], "name": item.get("name"), "image_url": item.get("image_url")})
     return sorted(out, key=lambda row: library.name_key(row["name"]))
+
+
+def _attachment_modes(game: dict, entry: BanEntryIn, snapshots: list[dict], kept_modes: set) -> None:
+    """Modi je Aufsatz (#2299) an den Schnappschuss - nur für Aufsätze der Zeile und nur, wenn welche gewählt sind."""
+    chosen = {snapshot["item_id"] for snapshot in snapshots}
+    if any(key not in chosen for key in entry.attachment_modes):
+        raise EquipmentProblem("Modi stehen bei einem Aufsatz, der an dieser Waffe nicht gesperrt ist - bitte neu laden.")
+    for snapshot in snapshots:
+        wanted = entry.attachment_modes.get(snapshot["item_id"]) or []
+        if wanted:
+            modes, labels = _clean_modes(game, wanted, kept_modes)
+            if modes:
+                snapshot.update(modes=modes, mode_labels=labels)
 
 
 def _current_version(previous: dict | None) -> int:
@@ -430,17 +465,29 @@ def _rows(doc: dict | None) -> dict:
     return {_row_key(entry): entry for entry in doc.get("entries") or []}
 
 
+def _attachment_name(item: dict) -> str:
+    """Name eines Aufsatzes im Vergleich - mit eigenen Modi (#2299) in Klammern."""
+    labels = item.get("mode_labels") or []
+    return f"{item.get('name')} (in {', '.join(labels)})" if labels else item.get("name")
+
+
 def _short(entry: dict) -> dict:
     return {"kind": entry.get("kind") or ITEM, "item_id": entry.get("item_id"), "subcategory": entry.get("subcategory"),
             "name": entry.get("name"), "category_label": entry.get("category_label"), "subcategory_label": entry.get("subcategory_label"),
             "modes": list(entry.get("mode_labels") or []) or [ALL_MODES],
-            "attachments": [item.get("name") for item in entry.get("attachments") or []]}
+            "attachments": [_attachment_name(item) for item in entry.get("attachments") or []]}
+
+
+def _effective_attachments(entry: dict) -> list:
+    """Je Aufsatz die Modi, die gelten (#2299: eigene, sonst die der Zeile) - so zählt nur die Wirkung, nicht die Schreibweise."""
+    row = list(entry.get("modes") or [])
+    return sorted((item.get("item_id"), tuple(sorted(item.get("modes") or row))) for item in entry.get("attachments") or [])
 
 
 def _same(old: dict, new: dict) -> bool:
-    return (sorted(old.get("modes") or []) == sorted(new.get("modes") or [])
-            and sorted(item.get("item_id") for item in old.get("attachments") or [])
-            == sorted(item.get("item_id") for item in new.get("attachments") or []))
+    if (new.get("kind") or ITEM) == ATTACHMENTS:
+        return _effective_attachments(old) == _effective_attachments(new)
+    return sorted(old.get("modes") or []) == sorted(new.get("modes") or [])
 
 
 def compare(base: dict | None, target: dict | None) -> dict:
@@ -469,8 +516,9 @@ async def copy_to_staffel(db, season: dict, tournament: dict, user: dict) -> Non
 
 
 def _rows_key(doc: dict | None) -> list:
-    return sorted((key[0], key[1], tuple(sorted(entry.get("modes") or [])),
-                   tuple(sorted(item.get("item_id") for item in entry.get("attachments") or [])))
+    """Was eine Liste sperrt - Aufsätze an einer Waffe mit ihren geltenden Modi (#2299)."""
+    return sorted((key[0], key[1], () if key[0] == ATTACHMENTS else tuple(sorted(entry.get("modes") or [])),
+                   tuple(_effective_attachments(entry)))
                   for key, entry in _rows(doc).items())
 
 
@@ -517,7 +565,7 @@ async def match_stamp(db, match: dict) -> dict:
     # Fehler gehen hier nicht still verloren (Review C.4): Ein fehlender Vermerk ließe später eine andere Liste gelten.
     doc = valid_for(await current(db, TOURNAMENT, tournament["id"]), tournament.get("game_id"))
     # Erlaubte Ausrüstung (#2287): was in diesem Moment erlaubt ist, als Schnappschuss - ein späterer Eintrag ändert das Spiel nicht mehr.
-    allowed = await public_allowed(db, tournament.get("game_id"), doc)
+    allowed = await public_allowed(db, tournament.get("game_id"), doc, await season_of(db, tournament))
     # Auch „keine Liste“ wird festgehalten (``None``) - eine später übertragene Liste gilt für dieses Spiel nicht.
     return {STAMP: doc["id"] if doc else None, ALLOWED_STAMP: await hold_allowed(db, tournament.get("game_id"), allowed) if allowed else None}
 
@@ -550,7 +598,7 @@ async def match_allowed(db, tournament: dict | None, match: dict | None) -> dict
     if not knows_list(match):
         return None
     doc, _held = await effective_doc(db, tournament, match)
-    return await public_allowed(db, (tournament or {}).get("game_id"), doc)
+    return await public_allowed(db, (tournament or {}).get("game_id"), doc, await season_of(db, tournament))
 
 
 # ---------------------------------------------------------------- Regelwerk-Baustein
@@ -606,21 +654,35 @@ def block_data(doc: dict | None) -> dict:
 
 # ---------------------------------------------------------------- Erlaubte Ausrüstung (#2287, Nr. 99)
 
-def _merge_modes(old: list[str], new: list[str]) -> list[str]:
+def _merge_modes(old: list, new: list) -> list:
     """Zwei Sperren desselben Eintrags: leer heißt alle Modi."""
     return [] if not old or not new else [*old, *(mode for mode in new if mode not in old)]
 
 
+def _mode_pairs(row: dict) -> list[tuple[str, str]]:
+    """Die Modi einer Sperre als (Kennung, Name). Ohne passende Kennungen (Altbestand, erfundene Daten) zählt der Name als Kennung."""
+    keys, labels = list(row.get("modes") or []), list(row.get("mode_labels") or [])
+    if len(keys) != len(labels):
+        keys = labels
+    return list(zip(keys, labels))
+
+
+def _attachment_pairs(item: dict, row_pairs: list) -> list:
+    """Modi eines Aufsatzes an seiner Waffe (#2299): eigene, wenn gesetzt, sonst die der Zeile."""
+    return _mode_pairs(item) if item.get("modes") or item.get("mode_labels") else row_pairs
+
+
 def _bans_of(doc: dict | None) -> tuple[dict, dict, dict]:
-    """Die Sperren einer Version: je Eintrag und je Klasse die Modi (leer = alle), je Aufsatz die Waffen, an denen er gesperrt ist."""
-    items: dict[str, list[str]] = {}
-    classes: dict[str, list[str]] = {}
+    """Die Sperren einer Version: je Eintrag und je Klasse die Modi (leer = alle), je Aufsatz die Waffen, an denen er gesperrt ist - Modi als
+    (Kennung, Name)."""
+    items: dict[str, list] = {}
+    classes: dict[str, list] = {}
     at_weapons: dict[str, list[dict]] = {}
     if not doc or doc.get("cleared"):
         return items, classes, at_weapons
     for entry in doc.get("entries") or []:
         kind = entry.get("kind") or ITEM
-        modes = list(entry.get("mode_labels") or [])
+        modes = _mode_pairs(entry)
         if kind == CLASS and entry.get("subcategory"):
             classes[entry["subcategory"]] = _merge_modes(classes[entry["subcategory"]], modes) if entry["subcategory"] in classes else modes
         elif kind == ITEM and entry.get("item_id"):
@@ -628,8 +690,30 @@ def _bans_of(doc: dict | None) -> tuple[dict, dict, dict]:
         elif kind == ATTACHMENTS:
             for item in entry.get("attachments") or []:
                 at_weapons.setdefault(item.get("item_id"), []).append({"id": entry.get("item_id"), "name": entry.get("name") or "",
-                                                                       "modes": modes})
+                                                                       "modes": _attachment_pairs(item, modes)})
     return items, classes, at_weapons
+
+
+def _restriction(pairs: list, season: list) -> dict:
+    """``not_in`` (Namen der gesperrten Modi) und - #2298 - ``only_in``, wenn der Eintrag in **mehr** Modi der Season gesperrt ist als
+    erlaubt: die erlaubten Modi der Season. Gleichstand, keine Modi der Season oder kein erlaubter mehr: nur ``not_in``."""
+    out: dict = {"not_in": [label for _key, label in pairs]}
+    if pairs and season:
+        banned = {key for key, _label in pairs}
+        inside = [key for key, _label in season if key in banned]
+        allowed = [label for key, label in season if key not in banned]
+        if allowed and len(inside) > len(allowed):
+            out["only_in"] = allowed
+    return out
+
+
+def _combined(*parts) -> list | None:
+    """Mehrere Sperren desselben Eintrags zusammen: ``None`` = keine, ``[]`` = alle Modi."""
+    out = None
+    for pairs in parts:
+        if pairs is not None:
+            out = list(pairs) if out is None else _merge_modes(out, pairs)
+    return out
 
 
 class _Usability:
@@ -677,22 +761,129 @@ def unusable_attachments(categories: list[dict], items: list[dict], doc: dict | 
     return out
 
 
-def allowed_block(categories: list[dict], items: list[dict], doc: dict | None) -> dict:
-    """Die erlaubte Ausrüstung (Fabian, 04.11., Nr. 99): je Kategorie und Unterkategorie die **aktiven** Einträge der Bibliothek ohne die
-    Sperren der Version. Strukturiert im Klartext, so wird eingefroren:
+LAYOUT = 4
+# Fassungen der erlaubten Ausrüstung: 3 (#2287, Aufsätze als eigene Liste mit „nicht an …“) bleibt eingefroren lesbar, 4 (#2299) ist neu.
+LAYOUTS = (3, LAYOUT)
 
-    ``{"list", "layout": 3, "categories": [{label, sections: [{label | None, icon_url?, state, not_in, banned, entries: [{name,
-    image_url, not_in, not_at}]}]}]}`` - ``state``: ``all`` (alle erlaubt), ``some`` (mit Einschränkungen oder einzeln gesperrten) oder
-    ``banned`` (ganze Klasse nicht erlaubt, dann nur ``banned``: die Namen der Einträge, die darunter fallen). ``not_in``: Modi, in denen
-    ein Eintrag (bzw. die ganze Klasse) nicht erlaubt ist; ``not_at``: Waffen, an denen ein Aufsatz nicht erlaubt ist (mit Modi). Inaktive
-    und archivierte Einträge fehlen, leere Unterkategorien entfallen. Ein Aufsatz zählt nur, wenn er an einer erlaubten Waffe passt
-    (``_Usability``, Nr. 81)."""
-    bans = _bans_of(doc)
+
+def _slot_index(categories: list[dict]) -> dict:
+    """Je Kategorie der Art Aufsatz und Unterkategorie (Slot) die Stelle in der Bibliothek, ohne Unterkategorie zuerst."""
+    out = {}
+    attachment_cats = [category for category in categories if category["role"] == ATTACHMENT]
+    for cat_index, category in enumerate(attachment_cats):
+        none_label = category["label"] if len(attachment_cats) > 1 else None
+        out[(category["key"], None)] = ((cat_index, -1), {"label": none_label})
+        for sub_index, sub in enumerate(category.get("subcategories") or []):
+            out[(category["key"], sub["key"])] = ((cat_index, sub_index), sub)
+    return out
+
+
+def _slot_key(row: dict, slots: dict) -> str | None:
+    return row.get("subcategory") if (row.get("category"), row.get("subcategory")) in slots else None
+
+
+def _pairs_at(row: dict, weapon: dict, slots: dict, bans: tuple) -> list | None:
+    """Die Sperre eines Aufsatzes an einer Waffe: eigene, die seiner Klasse und die an dieser Waffe zusammen (``None`` = keine)."""
     item_bans, class_bans, at_weapons = bans
-    active = _active(items)
-    usability = _Usability(categories, active, bans)
+    sub_key = _slot_key(row, slots)
+    here = [found["modes"] for found in at_weapons.get(row["id"], []) if found["id"] == weapon["id"]]
+    return _combined(class_bans.get(sub_key) if sub_key else None, item_bans.get(row["id"]), *here)
+
+
+def _modes_key(pairs: list) -> tuple:
+    return tuple(sorted(key for key, _label in pairs))
+
+
+def _everywhere(weapons: list[dict], attachments: list[dict], slots: dict, bans: tuple) -> dict[str, list]:
+    """Aufsätze, die an **jeder** erlaubten Waffe, zu der sie passen, gleich gesperrt sind (Fabian, 04.11.): je Kennung die Sperre. Erst ab
+    zwei passenden Waffen - an einer einzigen ist es eine Ausnahme dieser Waffe."""
+    out = {}
+    for row in attachments:
+        found = [_pairs_at(row, weapon, slots, bans) for weapon in weapons if library.fits(row, weapon)]
+        if len(found) >= 2 and all(pairs is not None for pairs in found) and len({_modes_key(pairs) for pairs in found}) == 1:
+            out[row["id"]] = found[0]
+    return out
+
+
+def _weapon_attachments(weapon: dict, attachments: list[dict], slots: dict, bans: tuple, season: list,
+                        everywhere: dict | None = None) -> dict | None:
+    """Die Aufsätze einer erlaubten Waffe (#2299): ``{count, banned, banned_everywhere?, groups}`` - ``None``, wenn keiner passt. Was an
+    allen Waffen gleich gesperrt ist (``everywhere``), steht einmal oben: ganz gesperrt zählt nur in ``banned_everywhere`` (für „K gesperrt“),
+    nur in Modi gesperrt bleibt in der Gruppe, mit ``everywhere: True`` - der Satz zur Waffe nennt es nicht noch einmal."""
+    class_bans = bans[1]
+    everywhere = everywhere or {}
+    fitting = [row for row in attachments if library.fits(row, weapon)]
+    if not fitting:
+        return None
+    banned, groups, elsewhere = [], {}, 0
+    for row in fitting:
+        sub_key = _slot_key(row, slots)
+        klass = class_bans.get(sub_key) if sub_key else None
+        pairs = _pairs_at(row, weapon, slots, bans)
+        if pairs == []:
+            if row["id"] in everywhere:
+                elsewhere += 1
+            else:
+                banned.append(row.get("name") or "")
+            continue
+        position, sub = slots[(row.get("category"), sub_key)]
+        group = groups.get(position)
+        if group is None:
+            group = {"label": sub.get("label")}
+            if sub_key and sub.get("icon_url"):
+                group["icon_url"] = sub["icon_url"]
+            group.update(_restriction(klass or [], season))
+            group["entries"] = []
+            groups[position] = group
+        entry = {"name": row.get("name") or "", "image_url": row.get("image_url"), **_restriction(pairs or [], season)}
+        if row["id"] in everywhere:
+            entry["everywhere"] = True
+        group["entries"].append(entry)
+    out = {"count": len(fitting), "banned": banned, "groups": [groups[key] for key in sorted(groups)]}
+    if elsewhere:
+        out["banned_everywhere"] = elsewhere
+    return out
+
+
+def _allowed_weapons(categories: list[dict], active: list[dict], bans: tuple) -> list[dict]:
+    """Die erlaubten Waffen: aktiv, nicht ganz gesperrt, auch nicht über ihre Klasse - dieselbe Regel wie in ``allowed_block``."""
+    item_bans, class_bans, _at = bans
     out = []
     for category in categories:
+        if category["role"] != WEAPON:
+            continue
+        known = {sub["key"] for sub in category.get("subcategories") or []}
+        for row in active:
+            sub = row.get("subcategory") if row.get("subcategory") in known else None
+            if row.get("category") == category["key"] and item_bans.get(row["id"]) != [] and (not sub or class_bans.get(sub) != []):
+                out.append(row)
+    return out
+
+
+def allowed_block(categories: list[dict], items: list[dict], doc: dict | None, season_modes: list | None = None) -> dict:
+    """Die erlaubte Ausrüstung (Fabian, 04.11., Nr. 99; Aufsätze je Waffe #2299): je Kategorie und Unterkategorie die **aktiven** Einträge
+    der Bibliothek ohne die Sperren der Version. Strukturiert im Klartext, so wird eingefroren:
+
+    ``{"list", "layout": 4, "categories": [{label, role, sections: [{label | None, icon_url?, state, not_in, only_in?, banned, entries:
+    [{name, image_url, not_in, only_in?, attachments?}]}]}]}`` - ``state``: ``all`` (alle erlaubt), ``some`` (mit Einschränkungen oder
+    einzeln gesperrten) oder ``banned`` (ganze Klasse nicht erlaubt, dann nur ``banned``: die Namen der Einträge, die darunter fallen).
+    ``not_in``: Modi, in denen ein Eintrag (bzw. die ganze Klasse) nicht erlaubt ist; ``only_in`` (#2298): die erlaubten Modi der Season,
+    wenn das kürzer ist (``season_modes``: ``[(Kennung, Name)]``). Kategorien der Art Aufsatz entfallen - die Aufsätze stehen an der Waffe
+    (``_weapon_attachments``). Inaktive und archivierte Einträge fehlen, leere Unterkategorien entfallen. ``attachments_everywhere``
+    (nur wenn nicht leer): ``[{name, not_in, only_in?}]`` - Aufsätze, die an jeder passenden Waffe gleich gesperrt sind
+    (``not_in`` leer = in allen Modi)."""
+    bans = _bans_of(doc)
+    item_bans, class_bans, _at_weapons = bans
+    season = list(season_modes or [])
+    active = _active(items)
+    attachment_keys = {row["key"] for row in categories if row["role"] == ATTACHMENT}
+    attachments = [row for row in active if row.get("category") in attachment_keys]
+    slots = _slot_index(categories)
+    everywhere = _everywhere(_allowed_weapons(categories, active, bans), attachments, slots, bans)
+    out = []
+    for category in categories:
+        if category["role"] == ATTACHMENT:
+            continue
         subs = category.get("subcategories") or []
         known = {sub["key"] for sub in subs}
         members = [row for row in active if row.get("category") == category["key"]]
@@ -711,27 +902,59 @@ def allowed_block(categories: list[dict], items: list[dict], doc: dict | None) -
             entries, blocked = [], 0
             for row in rows:
                 own = item_bans.get(row["id"])
-                if own == [] or (usability.is_attachment(row) and usability.reason(row)):
+                if own == []:
                     blocked += 1
                     continue
-                not_in = _merge_modes(klass, own) if klass and own else list(klass or own or [])
-                not_at = [{"name": weapon["name"], "modes": list(weapon["modes"])} for weapon in at_weapons.get(row["id"], [])]
-                entries.append({"name": row.get("name") or "", "image_url": row.get("image_url"), "not_in": not_in, "not_at": not_at})
+                entry = {"name": row.get("name") or "", "image_url": row.get("image_url"),
+                         **_restriction(_combined(klass, own) or [], season)}
+                if category["role"] == WEAPON:
+                    fitted = _weapon_attachments(row, attachments, slots, bans, season, everywhere)
+                    if fitted:
+                        entry["attachments"] = fitted
+                entries.append(entry)
             if not entries:
                 if sub and rows:
                     sections.append({**section, "state": "banned", "not_in": [], "banned": [row.get("name") or "" for row in rows],
                                      "entries": []})
                 continue
-            free = not klass and not blocked and not any(entry["not_in"] or entry["not_at"] for entry in entries)
-            sections.append({**section, "state": "all" if free else "some", "not_in": list(klass or []), "banned": [], "entries": entries})
+            free = not klass and not blocked and not any(entry["not_in"] for entry in entries)
+            sections.append({**section, "state": "all" if free else "some", **_restriction(klass or [], season), "banned": [],
+                             "entries": entries})
         if sections:
-            out.append({"label": category["label"], "sections": sections})
-    return {"list": bool(doc and not doc.get("cleared")), "layout": 3, "categories": out}
+            out.append({"label": category["label"], "role": category["role"], "sections": sections})
+    data = {"list": bool(doc and not doc.get("cleared")), "layout": LAYOUT, "categories": out}
+    # „An keiner Waffe erlaubt“ (Fabian, 04.11.): einmal oben statt an jeder Waffe - nur, wenn es Einträge gibt.
+    # Ganz gesperrte zuerst, dann die mit Modus-Hinweis - je nach Namen.
+    rows = sorted((row for row in attachments if row["id"] in everywhere), key=lambda row: bool(everywhere[row["id"]]))
+    if rows:
+        data["attachments_everywhere"] = [{"name": row.get("name") or "", **_restriction(everywhere[row["id"]], season)} for row in rows]
+    return data
 
 
-async def allowed_data(db, game_id: str | None, doc: dict | None) -> dict:
+async def season_mode_pairs(db, game_id: str | None, season: dict | None) -> list[tuple[str, str]]:
+    """Die Modi der Season (#2298) als (Kennung, Name): dieselbe Regel wie der Baustein „Modi der Season“ - geltender Pool, dann
+    Modusfolge, sonst die nicht archivierten Modi des Spiels."""
+    if not season or not game_id:
+        return []
+    from services import map_pools
+
+    game = await db.games.find_one({"id": game_id}, {"_id": 0})
+    if not game:
+        return []
+    pool = map_pools.valid_for(await map_pools.current(db, SEASON, season["id"]), game_id)
+    labels = {row["mode"]: row["label"] for row in game_maps.game_modes(game)}
+    return [(key, labels.get(key, key)) for key in game_modes.season_mode_keys(season, game, pool)]
+
+
+async def season_of(db, tournament: dict | None) -> dict | None:
+    """Die Season einer Staffel - für die Modi der Season auf der Matchseite."""
+    season_id = ((tournament or {}).get("league_context") or {}).get("season_id")
+    return await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) if season_id else None
+
+
+async def allowed_data(db, game_id: str | None, doc: dict | None, season: dict | None = None) -> dict:
     """Der Baustein mit dem heutigen Stand der Bibliothek. Ohne Bibliothek (keine aktiven Einträge) bleibt er wie bisher - ohne Liste der
-    Satz „alles ist erlaubt“."""
+    Satz „alles ist erlaubt“. ``season``: ihre Modi entscheiden „nur in …“ (#2298)."""
     if not game_id:
         return block_data(doc)
     rows = await db.game_equipment.find({"game_id": game_id, "status": {"$nin": [library.INACTIVE, library.ARCHIVED]}},
@@ -739,13 +962,13 @@ async def allowed_data(db, game_id: str | None, doc: dict | None) -> dict:
                                          "weapon_ids": 1, "weapon_class_ids": 1}).to_list(library.ITEMS_PER_GAME_MAX + 50)
     if not rows:
         return block_data(doc)
-    return allowed_block(await library.categories_of(db, game_id), rows, doc)
+    return allowed_block(await library.categories_of(db, game_id), rows, doc, await season_mode_pairs(db, game_id, season))
 
 
-async def public_allowed(db, game_id: str | None, doc: dict | None) -> dict | None:
+async def public_allowed(db, game_id: str | None, doc: dict | None, season: dict | None = None) -> dict | None:
     """Für Liga- und Matchseite: dieselbe Sicht wie das Regelwerk - ``None``, wenn das Spiel keine Bibliothek hat."""
-    data = await allowed_data(db, game_id, doc)
-    return data if data.get("layout") == 3 else None
+    data = await allowed_data(db, game_id, doc, season)
+    return data if data.get("layout") in LAYOUTS else None
 
 
 def block_source(doc: dict | None) -> dict:
@@ -757,7 +980,7 @@ def block_source(doc: dict | None) -> dict:
 def render_block(data: dict, variant: str = "markdown") -> str:
     """Markdown fürs Darstellen: ``markdown`` mit Bildern (Web), ``text`` ohne (PDF, Vergleich). Namen als Bausteinwerte geschützt
     (``text_cell``) - das ist nur Darstellungs-Zwischenformat, gespeichert wird ``block_data``."""
-    if data.get("layout") == 3:
+    if data.get("layout") in LAYOUTS:
         return _render_allowed(data, variant)
     if not data.get("list"):
         return NO_LIST
@@ -798,11 +1021,19 @@ def _weapon_text(weapon: dict) -> str:
     return f"{weapon.get('name') or ''} (in {', '.join(modes)})" if modes else weapon.get("name") or ""
 
 
+def modes_text(entry: dict) -> str:
+    """Der Modus-Hinweis (#2298): „nur in …“, wenn ``only_in`` steht, sonst „nicht in …“ - leer ohne Einschränkung."""
+    if entry.get("only_in"):
+        return f"nur in {', '.join(entry['only_in'])}"
+    return f"nicht in {', '.join(entry['not_in'])}" if entry.get("not_in") else ""
+
+
 def restriction_parts(entry: dict) -> list[str]:
-    """Die Einschränkungen eines erlaubten Eintrags als Klartext: „nicht in Suchen“, „nicht an Blitz 9, Donner 4 (in Suchen)“."""
+    """Die Einschränkungen eines erlaubten Eintrags als Klartext: „nicht in Suchen“ bzw. „nur in Suchen“ (#2298), in Fassungen mit
+    ``layout: 3`` auch „nicht an Blitz 9, Donner 4 (in Suchen)“."""
     parts = []
-    if entry.get("not_in"):
-        parts.append(f"nicht in {', '.join(entry['not_in'])}")
+    if modes_text(entry):
+        parts.append(modes_text(entry))
     if entry.get("not_at"):
         parts.append(f"nicht an {', '.join(_weapon_text(weapon) for weapon in entry['not_at'])}")
     return parts
@@ -811,30 +1042,85 @@ def restriction_parts(entry: dict) -> list[str]:
 def _own_parts(entry: dict, section: dict) -> list[str]:
     """Was die Karte selbst sagt: ohne die Einschränkung, die schon für die ganze Klasse im Kopf steht."""
     if section.get("not_in") and entry.get("not_in") == section.get("not_in"):
-        return restriction_parts({**entry, "not_in": []})
+        return restriction_parts({**entry, "not_in": [], "only_in": []})
     return restriction_parts(entry)
+
+
+ALL_ATTACHMENTS = "alle passenden Aufsätze erlaubt"
+NO_ATTACHMENTS = "keine Aufsätze erlaubt"
+
+
+def attachments_text(attachments: dict) -> str:
+    """Der Satz zu den Aufsätzen einer Waffe (#2299, PDF und Regelwerk im Web): „alle passenden Aufsätze erlaubt“, mit Ausnahmen „…, außer:
+    A, B, C (nur in Suchen)“ - ganz gesperrte ohne, nur in Modi gesperrte mit ihrem Hinweis. Namen geschützt (``text_cell``)."""
+    parts = [_cell(name) for name in attachments.get("banned") or []]
+    if not any(group.get("entries") for group in attachments.get("groups") or []):
+        return f"{NO_ATTACHMENTS} ({', '.join(parts)})" if parts else NO_ATTACHMENTS
+    for group in attachments.get("groups") or []:
+        for entry in group.get("entries") or []:
+            # An allen Waffen gleich eingeschränkt (Fabian, 04.11.): steht einmal in „An keiner Waffe erlaubt“.
+            if entry.get("everywhere"):
+                continue
+            note = "; ".join(restriction_parts(entry))
+            if note:
+                parts.append(f"{_cell(entry.get('name'))} ({_cell(note)})")
+    return f"{ALL_ATTACHMENTS}, außer: {', '.join(parts)}" if parts else ALL_ATTACHMENTS
+
+
+NOWHERE_TITLE = "An keiner Waffe erlaubt"
+
+
+def everywhere_text(data: dict) -> str:
+    """„**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)“ - leer ohne solche Aufsätze (Fabian, 04.11.)."""
+    rows = data.get("attachments_everywhere") or []
+    if not rows:
+        return ""
+    names = []
+    for row in rows:
+        note = "; ".join(restriction_parts(row))
+        names.append(f"{_cell(row.get('name'))} ({_cell(note)})" if note else _cell(row.get("name")))
+    return f"**{NOWHERE_TITLE}:** {', '.join(names)}"
 
 
 def _allowed_card(entry: dict, section: dict) -> str:
     image = f"![{CARD_ALT}]({entry['image_url']}) " if entry.get("image_url") else ""
     parts = _own_parts(entry, section)
     note = f" *{_cell(' · '.join(parts))}*" if parts else ""
+    # Aufsätze je Waffe (#2299): Das Regelwerk im Web kann nicht aufklappen (``markdownLite`` kennt kein ``<details>``) - der Satz steht
+    # ohne Auszeichnung unter Name und Hinweis (``rules.css``).
+    tail = f" {attachments_text(entry['attachments'])}" if entry.get("attachments") else ""
     # Der Name als Marke (``++…++``, im Web ``<u>``, Codex Runde 1): So erkennt das Web jede Kartenliste, auch ohne ein einziges Bild, und
     # stellt alle Kategorien gleich dar (``rules.css``).
-    return f"- {image}++{_cell(entry.get('name'))}++{note}"
+    return f"- {image}++{_cell(entry.get('name'))}++{note}{tail}"
 
 
-def _allowed_head(section: dict) -> str:
-    icon = f"![{CLASS_ICON_ALT}]({section['icon_url']}) " if section.get("icon_url") else ""
+def _allowed_head(section: dict, variant: str = "markdown") -> str:
+    icon = f"![{CLASS_ICON_ALT}]({section['icon_url']}) " if section.get("icon_url") and variant != "text" else ""
     head = f"{icon}*{_cell(section.get('label'))}*"
     if section.get("state") == "banned":
         names = ", ".join(_cell(name) for name in section.get("banned") or [])
         return f"{head} · **{NOT_ALLOWED}**" + (f" ({names})" if names else "")
     if section.get("state") == "all":
         return f"{head} · {ALL_ALLOWED}"
-    if section.get("not_in"):
-        return f"{head} · nicht in {_cell(', '.join(section['not_in']))}"
+    if modes_text(section):
+        return f"{head} · {_cell(modes_text(section))}"
     return head
+
+
+def _weapon_lines(category: dict) -> list[str]:
+    """PDF und Vergleich (#2299): Waffen als Liste - je Unterkategorie die Kopfzeile, je Waffe eine Zeile mit dem Satz zu den Aufsätzen."""
+    lines = ["", f"**{_cell(category.get('label'))}**"]
+    for section in category.get("sections") or []:
+        lines.append("")
+        if section.get("label"):
+            lines.append(_allowed_head(section, "text"))
+        for entry in section.get("entries") or []:
+            parts = _own_parts(entry, section)
+            line = f"- {_cell(entry.get('name'))}" + (f" ({_cell('; '.join(parts))})" if parts else "")
+            if entry.get("attachments"):
+                line += f" – {attachments_text(entry['attachments'])}"
+            lines.append(line)
+    return lines
 
 
 def _allowed_rows(category: dict) -> list[str]:
@@ -862,28 +1148,51 @@ def _render_allowed(data: dict, variant: str) -> str:
     lines = [ALLOWED_INTRO if data.get("list") else ALLOWED_NO_LIST]
     if not categories:
         return "\n".join([*lines, "", ALLOWED_EMPTY])
+    # „An keiner Waffe erlaubt“ (Fabian, 04.11., nur layout 4) steht einmal nach der letzten Kategorie mit Waffen.
+    nowhere = everywhere_text(data)
+    last_weapons = max((index for index, row in enumerate(categories) if row.get("role") == WEAPON), default=None)
     if variant != "text":
-        for category in categories:
+        for index, category in enumerate(categories):
             lines += ["", f"**{_cell(category.get('label'))}**"]
             for section in category.get("sections") or []:
                 lines.append("")
                 if section.get("label"):
                     lines.append(_allowed_head(section))
                 lines += [_allowed_card(entry, section) for entry in section.get("entries") or []]
+            if nowhere and index == last_weapons:
+                lines += ["", nowhere]
         return "\n".join(lines)
-    lines += ["", "| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |", "| --- | --- | --- | --- |"]
-    for category in categories:
-        lines += _allowed_rows(category)
+    # Waffen (``role``, erst ab layout 4) als Liste je Waffe, alles andere als Tabelle - ältere Fassungen sind ganz Tabelle.
+    table: list[str] = []
+    for index, category in enumerate(categories):
+        if category.get("role") == WEAPON:
+            if table:
+                lines += ["", *TABLE_HEAD, *table]
+                table = []
+            lines += _weapon_lines(category)
+            if nowhere and index == last_weapons:
+                lines += ["", nowhere]
+        else:
+            table += _allowed_rows(category)
+    if table:
+        lines += ["", *TABLE_HEAD, *table]
     return "\n".join(lines)
 
 
+TABLE_HEAD = ("| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |", "| --- | --- | --- | --- |")
+
+
 def block_images(data: dict) -> list[str]:
-    if data.get("layout") == 3:
+    if data.get("layout") in LAYOUTS:
         urls = []
         for category in data.get("categories") or []:
             for section in category.get("sections") or []:
                 urls.append(section.get("icon_url"))
-                urls += [row.get("image_url") for row in section.get("entries") or []]
+                for row in section.get("entries") or []:
+                    urls.append(row.get("image_url"))
+                    for group in (row.get("attachments") or {}).get("groups") or []:
+                        urls.append(group.get("icon_url"))
+                        urls += [item.get("image_url") for item in group.get("entries") or []]
         return list(dict.fromkeys(url for url in urls if url))
     rows = [row for group in data.get("groups") or [] for row in group.get("entries") or []] + list(data.get("weapons") or [])
     return [row["image_url"] for row in rows if row.get("image_url")]

@@ -166,15 +166,16 @@ async def test_the_block_shows_images_on_the_web_and_a_clean_list_in_the_pdf(flo
     frozen = version["frozen"][w["season"]["id"]]["loadout_bans"]
     # Eingefroren wird strukturiert im Klartext; Markdown entsteht erst beim Darstellen (Folge-Review #2218). Gezeigt wird, was
     # erlaubt ist (Nr. 99): Blitz 9 ist ganz gesperrt und fehlt, Leise Sohlen ist erlaubt außer in „Suchen“.
-    assert "markdown" not in frozen and frozen["data"]["layout"] == 3
+    assert "markdown" not in frozen and frozen["data"]["layout"] == 4
     perks = frozen["data"]["categories"][-1]["sections"][0]["entries"]
-    assert perks == [{"name": "Leise Sohlen", "image_url": PERK_IMAGE, "not_in": ["Suchen"], "not_at": []}]
+    assert perks == [{"name": "Leise Sohlen", "image_url": PERK_IMAGE, "not_in": ["Suchen"]}]
     web, pdf_text = (league_rule_blocks.plain_value("loadout_bans", frozen, variant) for variant in ("markdown", "text"))
     assert f"- ![Ausrüstung]({PERK_IMAGE}) ++Leise Sohlen++ *nicht in Suchen*" in web and "Blitz 9" not in web
     assert "![" not in pdf_text and "| Perks | – | Leise Sohlen | nicht in Suchen |" in pdf_text
     # Nr. 81 (Codex Runde 1): Griff und Lauf passen nur zu Blitz 9 (gesperrt) und Donner 4 (dort gesperrt), Rotpunkt nur zu Blitz 9,
-    # der Kompensator zu keiner Waffe - keiner davon ist erlaubt.
-    assert "Aufsätze" not in pdf_text and "Griff" not in pdf_text
+    # der Kompensator zu keiner Waffe - keiner davon ist erlaubt. An der Waffe (#2299): Donner 4 ohne erlaubten Aufsatz.
+    assert "- Donner 4 – keine Aufsätze erlaubt (Griff, Lauf)" in pdf_text
+    assert "Rotpunkt" not in pdf_text and "Kompensator" not in pdf_text
     assert frozen["source"]["loadout_ban_version"] == 1
     assert PERK_IMAGE in version["frozen_images"] and IMAGE not in version["frozen_images"]
 
@@ -202,9 +203,10 @@ async def test_without_a_list_the_block_says_everything_is_allowed(flow):
 
     frozen = version["frozen"][w["season"]["id"]]["loadout_bans"]
     # Mit Bibliothek (Nr. 99): die ganze aktive Ausrüstung als erlaubt.
-    assert frozen["data"]["list"] is False and frozen["data"]["layout"] == 3
+    assert frozen["data"]["list"] is False and frozen["data"]["layout"] == 4
     assert "nichts gesperrt" in league_rule_blocks.value("loadout_bans", frozen)
-    assert "| Waffen | – | alle: Blitz 9, Donner 4 | – |" in league_rule_blocks.plain_value("loadout_bans", frozen, "text")
+    text = league_rule_blocks.plain_value("loadout_bans", frozen, "text")
+    assert "- Blitz 9 – alle passenden Aufsätze erlaubt\n- Donner 4 – alle passenden Aufsätze erlaubt" in text
     assert version["frozen_images"] == [IMAGE, PERK_IMAGE]
 
 

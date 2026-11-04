@@ -13,8 +13,8 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField } from "@/components/tls/FormFields";
 import { EquipmentThumb, LoadoutBansView, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import {
-  classRow, countText, fitsWeapon, formPayload, formProblem, groupByCategory, groupBySubcategory, listToForm, matchesSearch, NO_SUBCATEGORY,
-  rowKey, sameRows, statusOf,
+  attachmentModes, attachmentSlots, banAttachmentEverywhere, bannedAttachmentCount, classRow, copyAttachmentsToClass, countText, fitsWeapon, formPayload, formProblem,
+  groupByCategory, groupBySubcategory, listToForm, matchesSearch, NO_SUBCATEGORY, rowKey, sameRows, statusOf, subcategoryOf,
 } from "@/lib/loadoutBans";
 import { viennaDate } from "@/lib/vienna";
 import { toast } from "sonner";
@@ -115,26 +115,84 @@ function RulesHint({ rules }) {
   );
 }
 
-function WeaponAttachments({ weapon, attachments, row, keptIds, modes, onChange }) {
-  const chosen = row?.attachment_ids || [];
-  const toggle = (id) => onChange({ attachment_ids: chosen.includes(id) ? chosen.filter((key) => key !== id) : [...chosen, id] });
+// Ein Aufsatz an der Waffe (#2299): Häkchen „gesperrt“, darunter seine Modi und „An allen Waffen sperren“. Ist er überall gesperrt (eigene
+// Zeile oder ganze Klasse in allen Modi), steht das nur da.
+function AttachmentLine({ item, weapon, row, everywhere, viaClass, kept, modes, onToggle, onModes, onEverywhere }) {
+  const chosen = (row?.attachment_ids || []).includes(item.id);
+  const fixed = Boolean((everywhere && !everywhere.modes.length) || viaClass);
+  const blocked = statusOf(item) === "inactive" && !kept;
+  const value = attachmentModes(row, item.id);
   return (
-    <div className="mt-2 space-y-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-2.5" data-testid={`season-bans-attachments-${weapon.id}`}>
-      <p className="text-[11px] text-white/60">An „{weapon.name}“ gesperrte Aufsätze – alle anderen bleiben erlaubt.</p>
-      {attachments.length ? (
-        <div className="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto pr-1">
-          {attachments.map((item) => {
-            const blocked = statusOf(item) === "inactive" && !keptIds.has(item.id);
-            return (
-              <label key={item.id} className={`${CHIP} ${chosen.includes(item.id) ? ON : OFF} ${blocked ? "cursor-not-allowed opacity-50" : ""}`}>
-                <input type="checkbox" checked={chosen.includes(item.id)} disabled={blocked && !chosen.includes(item.id)} onChange={() => toggle(item.id)} className="accent-[#29B6E8]" />
-                <span className="break-words">{item.name}{statusOf(item) === "inactive" ? " (inaktiv)" : ""}</span>
-              </label>
-            );
-          })}
+    <li className={`rounded-sm border px-2.5 py-2 ${chosen || fixed ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-attachment-${weapon.id}-${item.id}`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <label className={`flex min-w-0 items-center gap-2.5 ${fixed || (blocked && !chosen) ? "cursor-not-allowed text-white/70" : "cursor-pointer text-white"}`}>
+          <input type="checkbox" checked={chosen || fixed} disabled={fixed || (blocked && !chosen)} onChange={onToggle} className="accent-[#FF9F0A]"
+            aria-label={`${item.name} an ${weapon.name} sperren`} data-testid={`season-bans-attachment-toggle-${weapon.id}-${item.id}`} />
+          <EquipmentThumb src={item.image_url} sizes="56px" className="w-14 shrink-0" />
+          <span className="min-w-0 text-sm font-semibold leading-snug break-words">
+            {item.name}
+            {statusOf(item) === "inactive" ? <span className="ml-1.5 text-[11px] font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
+          </span>
+        </label>
+        {chosen && !fixed && statusOf(item) === "active" ? (
+          <button type="button" onClick={() => onEverywhere(value)} data-testid={`season-bans-everywhere-${weapon.id}-${item.id}`}
+            className="tls-btn tls-btn--quiet rounded-sm px-2 py-1 text-[11px] font-semibold">
+            An allen Waffen sperren
+          </button>
+        ) : null}
+      </div>
+      {viaClass ? <p className="mt-1 text-[11px] text-warn">Mit der ganzen Klasse gesperrt</p> : null}
+      {everywhere && !viaClass ? (
+        <p className="mt-1 text-[11px] text-warn">{everywhere.modes.length ? `An allen Waffen gesperrt in ${modeNames(everywhere.modes, modes)}` : "An allen Waffen gesperrt"}</p>
+      ) : null}
+      {chosen && !fixed && modes.length ? (
+        <div className="mt-1.5"><ModePicker modes={modes} value={value} onChange={onModes} label={`Modi für ${item.name} an ${weapon.name}`} /></div>
+      ) : null}
+    </li>
+  );
+}
+
+function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds, modes, onChange, onCopyToClass, onEverywhere }) {
+  const chosen = row?.attachment_ids || [];
+  const own = row?.attachment_modes || {};
+  const slots = attachmentSlots(attachments, categories);
+  const classLabel = weapon.subcategory ? subcategoryOf(categories, weapon.subcategory)?.label : null;
+  const toggle = (id) => {
+    if (chosen.includes(id)) {
+      const rest = { ...own };
+      delete rest[id];
+      onChange({ attachment_ids: chosen.filter((key) => key !== id), attachment_modes: rest });
+    } else onChange({ attachment_ids: [...chosen, id] });
+  };
+  const setModes = (id, value) => onChange({ attachment_modes: { ...own, [id]: value } });
+  return (
+    <div className="mt-2 space-y-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-2.5" data-testid={`season-bans-attachments-${weapon.id}`}>
+      <p className="text-[11px] text-white/60">Passende Aufsätze an „{weapon.name}“ – angehakt ist gesperrt, alle anderen bleiben erlaubt.</p>
+      {!slots.length ? <p className="text-xs text-white/60">Zu dieser Waffe passt noch kein Aufsatz.</p> : null}
+      {slots.map((slot) => (
+        <div key={slot.key} data-testid={`season-bans-slot-${weapon.id}`}>
+          <p className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+            <SubcategoryIcon src={slot.icon_url} className="h-4 w-4" />
+            <span className="break-words">{slot.label || NO_SUBCATEGORY}</span>
+          </p>
+          <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {slot.items.map((item) => {
+              const klass = classRow(rows, item.subcategory);
+              return (
+                <AttachmentLine key={item.id} item={item} weapon={weapon} row={row} everywhere={rows[rowKey("item", item.id)]}
+                  viaClass={Boolean(klass && !klass.modes.length)} kept={keptIds.has(item.id)} modes={modes}
+                  onToggle={() => toggle(item.id)} onModes={(value) => setModes(item.id, value)} onEverywhere={(value) => onEverywhere(item.id, value)} />
+              );
+            })}
+          </ul>
         </div>
-      ) : <p className="text-xs text-white/60">Zu dieser Waffe passt noch kein Aufsatz.</p>}
-      {chosen.length && modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onChange({ modes: value })} label={`Modi für die Aufsätze an ${weapon.name}`} /> : null}
+      ))}
+      {classLabel ? (
+        <button type="button" onClick={onCopyToClass} data-testid={`season-bans-copy-class-${weapon.id}`}
+          className="tls-btn tls-btn--secondary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
+          Für alle {classLabel} übernehmen
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -170,13 +228,15 @@ function modeNames(keys, modes) {
   return keys.map((key) => modes.find((mode) => mode.mode === key)?.label || key).join(", ");
 }
 
-function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept, keptAttached, modes, open, onToggleOpen, onItem, onAttachments }) {
+function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept, keptAttached, modes, open, onToggleOpen, onItem, onAttachments,
+  categories, rows, onCopyToClass, onEverywhere }) {
   // Ganze Klasse in allen Modi gesperrt (#2287): der Eintrag ist mitgesperrt, einzeln gibt es nichts mehr zu tun.
   const viaClass = Boolean(classBan && !classBan.modes.length);
   const banned = !!row || viaClass;
   const blocked = statusOf(item) === "inactive" && !kept.has(rowKey("item", item.id));
   const fullyBanned = (row && !row.modes.length) || viaClass;
-  const attachmentCount = attachmentRow?.attachment_ids?.length || 0;
+  // K zählt, was aufgeklappt als gesperrt angehakt erscheint - auch über die Zeile des Aufsatzes oder seine Klasse (Codex zu #2299).
+  const attachmentCount = bannedAttachmentCount(rows, item.id, attachments);
   return (
     <li className={`rounded-sm border p-2.5 ${banned ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-item-${item.id}`}>
       <div className="flex items-start gap-3">
@@ -199,13 +259,14 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
             <button type="button" onClick={onToggleOpen} aria-expanded={open} data-testid={`season-bans-open-${item.id}`}
               className="inline-flex items-center gap-1 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
-              Aufsätze {attachmentCount ? `· ${attachmentCount} gesperrt` : "einzeln sperren"}
+              {countText(attachments.length, "Aufsatz", "Aufsätze")}{attachmentCount ? ` · ${attachmentCount} gesperrt` : ""}
             </button>
           ) : null}
         </div>
       </div>
       {role === "weapon" && open && !fullyBanned ? (
-        <WeaponAttachments weapon={item} attachments={attachments} row={attachmentRow} keptIds={keptAttached} modes={modes} onChange={onAttachments} />
+        <WeaponAttachments weapon={item} attachments={attachments} categories={categories} rows={rows} row={attachmentRow} keptIds={keptAttached}
+          modes={modes} onChange={onAttachments} onCopyToClass={onCopyToClass} onEverywhere={onEverywhere} />
       ) : null}
     </li>
   );
@@ -294,6 +355,13 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
     else delete next[key];
     return next;
   });
+  // „Für alle <Waffenklasse> übernehmen“ (#2299): nur im Formular, gespeichert wird wie immer als neue Version.
+  const copyToClass = (weaponId) => {
+    const result = copyAttachmentsToClass(rows, saved, weaponId, library);
+    setRows(result.rows);
+    if (result.count) toast.success(`Auf ${countText(result.count, "weitere Waffe", "weitere Waffen")} übernommen – noch nicht gespeichert.`);
+    else toast("In dieser Klasse gibt es keine weitere Waffe, an der das geht.");
+  };
 
   const save = async () => {
     const problem = formProblem(rows, library, categories);
@@ -432,9 +500,11 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                           {items.map((item) => (
                             <ItemLine key={item.id} item={item} role={category.role} row={rows[rowKey("item", item.id)]} classBan={classRow(rows, item.subcategory)}
                               attachmentRow={rows[rowKey("attachments", item.id)]} attachments={category.role === "weapon" ? attachmentsByWeapon(item) : []}
-                              kept={kept} keptAttached={keptAttached(item.id)} modes={modes} open={!!open[item.id] || !!rows[rowKey("attachments", item.id)]}
+                              kept={kept} keptAttached={keptAttached(item.id)} modes={modes} open={!!open[item.id]}
                               onToggleOpen={() => setOpen((current) => ({ ...current, [item.id]: !current[item.id] }))}
-                              onItem={(patch) => setItem(item.id, patch)} onAttachments={(patch) => setAttachments(item.id, patch)} />
+                              onItem={(patch) => setItem(item.id, patch)} onAttachments={(patch) => setAttachments(item.id, patch)}
+                              categories={categories} rows={rows} onCopyToClass={() => copyToClass(item.id)}
+                              onEverywhere={(attachmentId, value) => setRows((current) => banAttachmentEverywhere(current, attachmentId, value))} />
                           ))}
                         </ul>
                       ) : (
@@ -451,7 +521,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
           </div>
           <p className="text-xs text-white/60">
             Eine ganze Klasse gesperrt gilt für alle ihre Einträge, auch später angelegte. Ein Aufsatz in seiner Kategorie gesperrt gilt an
-            jeder Waffe; an einer einzelnen Waffe sperrst du ihn über „Aufsätze einzeln sperren“.
+            jeder Waffe; an einer einzelnen Waffe sperrst du ihn, indem du bei der Waffe die Aufsätze aufklappst.
           </p>
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#121212]/95 px-4 py-3 md:-mx-5 md:px-5">
             <button type="button" onClick={save} disabled={saving || !changed} data-testid={`${testId}-save`}

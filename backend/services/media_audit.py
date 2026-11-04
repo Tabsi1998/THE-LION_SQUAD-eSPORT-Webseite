@@ -89,7 +89,10 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # Symbol einer Unterkategorie der Ausrüstung (#2287).
     ("game_equipment_categories", ["categories.subcategories.icon_url"]),
     # Erlaubte Ausrüstung am Spiel (#2287): Schnappschuss beim Ergebnis, unveränderlich wie die Sperrliste.
-    ("loadout_allowed", ["data.categories.sections.entries.image_url", "data.categories.sections.icon_url"]),
+    # Aufsätze je Waffe (#2299): Bilder der Aufsätze und Symbole der Slots an der Waffe.
+    ("loadout_allowed", ["data.categories.sections.entries.image_url", "data.categories.sections.icon_url",
+                         "data.categories.sections.entries.attachments.groups.entries.image_url",
+                         "data.categories.sections.entries.attachments.groups.icon_url"]),
     # Bilder in eingefrorenen Bausteinen einer Regelwerk-Fassung (#2218) - unveränderlich wie der Text (``is_frozen``).
     ("league_rules", ["frozen_images"]),
     # Gewinnbilder der Liga (#2107) je Season und Liga N.
@@ -137,6 +140,8 @@ FIELD_LABELS = {
     "entries.items.image_url": "Bild eines Eintrags einer gesperrten Klasse", "entries.subcategory_icon_url": "Symbol einer Unterkategorie",
     "categories.subcategories.icon_url": "Symbol einer Unterkategorie",
     "data.categories.sections.entries.image_url": "Bild eines erlaubten Eintrags", "data.categories.sections.icon_url": "Symbol einer Unterkategorie",
+    "data.categories.sections.entries.attachments.groups.entries.image_url": "Bild eines erlaubten Aufsatzes",
+    "data.categories.sections.entries.attachments.groups.icon_url": "Symbol eines Slots",
     "frozen_images": "Bild in einem Baustein",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"

@@ -5,6 +5,7 @@ Der Baustein zeigt, was ERLAUBT ist: je Kategorie und Unterkategorie die aktiven
 Zeile „nicht erlaubt“. Web mit Karten, PDF als Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen. Ältere Fassungen (Sperren,
 ohne ``layout``) bleiben Wort für Wort. Erfundene Namen.
 """
+import json
 import pathlib
 import sys
 
@@ -75,27 +76,20 @@ def sections(data: dict, label: str) -> dict:
     return {row["label"]: row for row in category["sections"]}
 
 
-def test_the_block_lists_what_is_allowed_with_hints():
-    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
-    assert data["layout"] == 3 and data["list"] is True
-    weapons = sections(data, "Waffen")
-    assert list(weapons) == [None, "Sturmgewehr", "Schrotflinte", "Pistole"], "leere Klasse entfällt, ohne Unterkategorie zuerst"
-    assert weapons[None]["state"] == "all" and [row["name"] for row in weapons[None]["entries"]] == ["Ohne Klasse"]
-    rifles = weapons["Sturmgewehr"]
-    assert rifles["state"] == "some" and rifles["icon_url"] == ICON
-    assert [(row["name"], row["not_in"]) for row in rifles["entries"]] == [("Blitz 9", []), ("Donner 4", ["Suchen"])], "inaktiv fehlt"
-    assert weapons["Schrotflinte"] == {"label": "Schrotflinte", "state": "banned", "not_in": [], "banned": ["Bö", "Hagel"], "entries": []}
-    pistols = weapons["Pistole"]
-    assert pistols["not_in"] == ["Suchen"]
-    assert [(row["name"], row["not_in"]) for row in pistols["entries"]] == [("Funke", ["Suchen"]), ("Zunder", ["Suchen", "Stellung"])]
+# Eingefrorene Fassungen mit ``layout: 3`` (#2287): so hat der Baustein bis #2299 für CATEGORIES/ITEMS mit DOC bzw. ohne Liste
+# ausgesehen. Sie werden weiter Wort für Wort dargestellt - der neue Aufbau (layout 4) steht in test_loadout_allowed_by_weapon_unit.
+V3 = json.loads((pathlib.Path(__file__).resolve().parent / "golden" / "loadout_allowed_v3.json").read_text(encoding="utf-8"))
+
+
+def test_frozen_layout_3_keeps_its_structure():
+    data = V3["DOC"]
+    assert data["layout"] == 3 and [row["label"] for row in data["categories"]] == ["Waffen", "Aufsätze", "Perks"]
     sight = sections(data, "Aufsätze")["Optik"]["entries"][0]
     assert sight["not_at"] == [{"name": "Blitz 9", "modes": []}, {"name": "Donner 4", "modes": ["Suchen"]}]
-    perks = sections(data, "Perks")[None]
-    assert perks["state"] == "some" and [row["name"] for row in perks["entries"]] == ["Leise Sohlen"], "ganz gesperrt und archiviert fehlen"
 
 
 def test_web_shows_cards_and_short_lines_the_pdf_a_table():
-    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
+    data = V3["DOC"]
     web = markdown_text.plain(loadout_bans.render_block(data, "markdown"))
     assert web.startswith("*Erlaubt ist die Ausrüstung, die hier steht")
     assert "**Waffen**" in web and "- ++Ohne Klasse++" in web
@@ -118,7 +112,7 @@ def test_web_shows_cards_and_short_lines_the_pdf_a_table():
 
 
 def test_without_a_list_everything_active_is_allowed_and_a_class_says_all():
-    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, None)
+    data = V3["NONE"]
     assert data["list"] is False and sections(data, "Waffen")["Schrotflinte"]["state"] == "all"
     web = loadout_bans.render_block(data, "markdown")
     assert "nichts gesperrt" in web and "*Schrotflinte* · alle erlaubt" in markdown_text.plain(web)
@@ -138,11 +132,11 @@ TRICKY = "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad"
 def test_every_card_carries_its_marker_also_without_image():
     """Codex Runde 1: Jede Karte trägt ihren Namen als Marke (++Name++, im Web <u>), auch ohne Bild - so stehen alle Kategorien gleich im
     Raster, nicht nur die mit Bildern."""
-    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, None)
-    web = loadout_bans.render_block(data, "markdown")
-    cards = [line for line in web.splitlines() if line.startswith("- ")]
-    assert cards and all("++" in line for line in cards)
-    assert "++" not in loadout_bans.render_block(data, "text"), "das PDF bleibt eine Tabelle"
+    for data in (V3["NONE"], loadout_bans.allowed_block(CATEGORIES, ITEMS, None)):
+        web = loadout_bans.render_block(data, "markdown")
+        cards = [line for line in web.splitlines() if line.startswith("- ")]
+        assert cards and all("++" in line for line in cards)
+        assert "++" not in loadout_bans.render_block(data, "text"), "das PDF zeigt keine Karten"
 
 
 def test_names_in_the_block_stay_text():
@@ -174,8 +168,10 @@ def test_attachments_only_count_as_allowed_where_they_fit_an_allowed_weapon():
     doc = {"entries": [ban("class", subcategory="schrot"), ban("item", item_id="o1"),
                        ban("attachments", item_id="w1", name="Blitz 9", attachments=[{"item_id": "a5", "name": "Laser"}])]}
     data = loadout_bans.allowed_block(CATEGORIES, items, doc)
-    shown = [entry["name"] for section in sections(data, "Aufsätze").values() for entry in section["entries"]]
-    assert shown == ["Griff", "Rotpunkt"], "nur, was an einer erlaubten Waffe passt"
+    assert [row["label"] for row in data["categories"]] == ["Waffen"], "Aufsätze stehen nur an der Waffe (#2299)"
+    blitz = sections(data, "Waffen")["Sturmgewehr"]["entries"][0]["attachments"]
+    shown = [entry["name"] for group in blitz["groups"] for entry in group["entries"]]
+    assert shown == ["Griff", "Rotpunkt"] and blitz["banned"] == ["Laser"], "nur, was zur erlaubten Waffe passt"
     unusable = loadout_bans.unusable_attachments(CATEGORIES, items, doc)
     assert [(row["name"], row["reason"]) for row in unusable] == [
         ("Choke", "passt nur zu gesperrten Waffen"), ("Kompensator", "keiner Waffe zugeordnet"), ("Laser", "an jeder passenden Waffe gesperrt"),

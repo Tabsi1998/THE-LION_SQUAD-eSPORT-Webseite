@@ -1577,12 +1577,15 @@ festgehaltener Version (`loadout_ban_id`) zeigt die Einträge seines Snapshots. 
 | `kind` | `item`: der Eintrag ist gesperrt. `attachments`: nur bei Waffen – die Waffe bleibt erlaubt, die genannten Aufsätze sind an ihr gesperrt |
 | `item_id`, `name`, `category`, `category_label`, `role`, `image_url` | Schnappschuss des Eintrags von damals |
 | `modes`, `mode_labels` | Modi, in denen die Sperre gilt; leer = alle Modi |
-| `attachments[]` | nur bei `attachments`: `{item_id, name, image_url}`, mindestens einer |
+| `attachments[]` | nur bei `attachments`: `{item_id, name, image_url}`, mindestens einer. Seit #2299 optional je Aufsatz eigene `modes`, `mode_labels` (nur wenn gesetzt; sonst gelten die Modi der Zeile) |
 
 Je Eintrag höchstens eine Zeile je Art, höchstens 500 Zeilen. Prüfung beim Speichern (422 mit deutschem Satz): Eintrag gehört zum Spiel,
 Zustand wie oben, Modi des Spiels (`game_modes.choice_problem`, ein schon gesetzter inaktiver Modus bleibt), `attachments` nur an Waffen,
 jeder Aufsatz ist der Waffe zugeordnet (`weapon_ids` mit der Waffe; leer: „keiner Waffe zugeordnet“), keine Aufsatz-Zeile an einer Waffe, die in allen Modi ganz gesperrt
 ist. Leere Liste: 422 „… oder die Sperrliste entfernen“. `expected_version` schützt wie beim Pool (0 = bisher keine).
+**Modi je Aufsatz (#2299):** Eine Zeile `attachments` nimmt zusätzlich `attachment_modes: {Aufsatz-Kennung: [Modi]}` an (optional, nur
+Aufsätze der Zeile, sonst 422; Modi geprüft wie oben). Leer oder fehlend heißt: die Modi der Zeile. Ältere Versionen ohne das Feld gelten
+unverändert, **keine Migration**. Vergleich, Übertragen auf Staffeln (`_rows_key`) und die Ansicht der Liste zählen die Modi je Aufsatz mit.
 
 **Season → Staffel → Spiel:** Eine neue Staffel bekommt die geltende Version als eigene (`copy_version`, unter der Pool-Sperre der
 Season). „Vorgaben auf Staffeln übertragen“ überträgt sie immer, auch auf gesperrte und laufende Staffeln (eigene Gruppe `loadout_bans`
@@ -1640,6 +1643,41 @@ Matchseite (dort aus der Liste, die für das Spiel gilt). Beim ersten Festschrei
 `loadout_allowed` (`{id = sha256 des Inhalts, game_id, data, created_at}`, viele Spiele teilen sie; Vereinsinhalt, Bilder als Verwendung in
 der Mediathek). Danach liefert die Matchseite nur noch diesen Schnappschuss; „Rückgängig“ nimmt ihn mit, ältere Spiele ohne ihn rechnen wie
 bisher (Codex Runde 1).
+
+**Aufsätze je Waffe (#2299) und „nur in …“ (#2298, Fabian 04.11.):** Neu gebaut wird der Baustein als `layout: 4` - `layout: 3` (und
+älter) bleibt eingefroren und wird Wort für Wort weiter dargestellt, in Regelwerk, Liga- und Matchseite (`loadout_allowed` von damals). Die
+neue Darstellung kommt wie jede Datenänderung über „Regelwerk muss freigegeben werden“.
+
+- **Daten:** `{list, layout: 4, categories: [{label, role, sections: [{label | null, icon_url?, state, not_in, only_in?, banned, entries:
+  [{name, image_url, not_in, only_in?, attachments?}]}]}]}`. Kategorien der Art **Aufsatz entfallen** - Aufsätze stehen nur noch an der
+  Waffe. `attachments` (nur an einer erlaubten Waffe mit mindestens einem passenden aktiven Aufsatz): `{count, banned: [Namen], groups:
+  [{label | null, icon_url?, not_in, only_in?, entries: [{name, image_url, not_in, only_in?}]}]}`. `count`: aktive Aufsätze, die zur Waffe
+  passen (`game_equipment.fits`: über die Waffe oder ihre Waffenklasse); `banned`: davon die, die **an dieser Waffe** in allen Modi nicht
+  erlaubt sind (eigene Sperre, ganze Klasse oder an dieser Waffe); `groups`: die übrigen je Unterkategorie (Slot) in der Reihenfolge der
+  Bibliothek, ohne Unterkategorie zuerst. `not_in` eines Aufsatzes führt eigene Sperre, Klasse und die Sperre an dieser Waffe zusammen;
+  `not_in` der Gruppe ist die der Klasse. `not_at` gibt es nicht mehr. Ein Aufsatz ohne passende Waffe erscheint nirgends
+  (`unusable_attachments` bleibt).
+- **An keiner Waffe erlaubt (Fabian 04.11.):** Ist ein Aufsatz an **jeder** erlaubten Waffe, zu der er passt (mindestens zwei), gleich
+  gesperrt (gleiche Modi bzw. alle), steht er einmal in `attachments_everywhere: [{name, not_in, only_in?}]` (oberste Ebene, nur wenn nicht
+  leer; ganz gesperrte zuerst). An der Waffe fehlt er dann in `banned` und zählt in `banned_everywhere` (Zahl, nur wenn > 0) - „K gesperrt“
+  bleibt ehrlich; nur in Modi gesperrt bleibt er in der Gruppe mit `everywhere: true`, der Satz zur Waffe nennt ihn nicht. Web und PDF: eine
+  Zeile „**An keiner Waffe erlaubt:** Kompensator, Holo (nur in …)“ nach der letzten Kategorie mit Waffen; Liga- und Matchseite ebenso.
+- **„nur in …“:** Grundlage sind die **Modi der Season** (`game_modes.season_mode_keys`: geltender Pool, dann Modusfolge, sonst die
+  nicht archivierten Modi des Spiels; Matchseite: die Season der Staffel). Ist ein Eintrag, ein Abschnitt oder ein Aufsatz in **mehr** Modi
+  der Season gesperrt als erlaubt, steht zusätzlich `only_in` (Namen der erlaubten Modi der Season) und der Hinweis lautet „nur in …“, sonst
+  „nicht in …“. Gleichstand, keine Modi der Season oder kein erlaubter Modus mehr: kein `only_in`. Ganz gesperrt (alle Modi) bleibt ganz
+  gesperrt. Gleich in Web, PDF, Liga- und Matchseite.
+- **Liga- und Matchseite:** je Waffe eine Karte mit „N Aufsätze · K gesperrt“; ein Knopf (`aria-expanded`) klappt darunter über die ganze
+  Breite die erlaubten Aufsätze je Slot mit Bild und Hinweis auf, darunter „Gesperrt: …“.
+- **Regelwerk Web (`markdown`):** `markdownLite` kennt kein `<details>` (rohes HTML wird maskiert, auch im PDF-Weg) - darum je Waffe die
+  Karte wie bisher, darunter der Satz zu den Aufsätzen (ohne Kursiv, daran erkennt ihn `rules.css`).
+- **PDF und Vergleich (`text`):** Kategorien der Art Waffe als Liste: je Unterkategorie die Kopfzeile wie im Web, je Waffe eine Zeile
+  „<Waffe> (Hinweis) – alle passenden Aufsätze erlaubt“ bzw. „…, außer: A, B, C (nur in S&D)“ (ganz gesperrte ohne, nur in Modi gesperrte mit
+  Hinweis in Klammern); eine Waffe ohne passende Aufsätze nur mit Namen. Die übrigen Kategorien als Tabelle wie bisher.
+- **Verwaltung (Season-Sperrliste):** „Aufsätze“ an einer Waffe zeigt nur die passenden, je Slot, mit Häkchen „gesperrt“ und je Aufsatz den
+  Modi (`attachment_modes`). „Für alle <Waffenklasse> übernehmen“ setzt an jeder anderen Waffe der Klasse dieselben Aufsätze (soweit sie
+  passen und neu sperrbar sind) mit denselben Modi; „Aufsatz an allen Waffen sperren“ macht daraus eine Zeile `item` des Aufsatzes mit
+  seinen Modi. Beides ändert nur das Formular, gespeichert wird wie bisher als neue Version.
 
 **Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
 

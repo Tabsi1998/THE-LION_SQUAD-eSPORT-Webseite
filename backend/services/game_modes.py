@@ -28,6 +28,22 @@ def _modes(game: dict | None) -> list[dict]:
     return [mode for mode in modes if isinstance(mode, dict) and mode.get("mode")]
 
 
+def season_mode_keys(season: dict, game: dict | None, pool: dict | None) -> list[str]:
+    """Die Modi der Season: die des geltenden Pools (in seiner Reihenfolge), dann die der Modusfolge; ohne beides alle nicht
+    archivierten Modi des Spiels. Hier im Blatt-Modul, weil Regelwerk-Bausteine und Sperrliste (#2298 „nur in …“) sie brauchen."""
+    keys: list[str] = []
+    for group in (pool or {}).get("modes") or []:
+        if group.get("mode") and group["mode"] not in keys:
+            keys.append(group["mode"])
+    for key in season.get("game_mode_order") or []:
+        if key and key not in keys:
+            keys.append(key)
+    if not keys:
+        docs = {mode["mode"]: mode for mode in _modes(game)}
+        keys = [key for key, mode in docs.items() if mode.get("status") != ARCHIVED]
+    return keys
+
+
 def status_of(mode: dict | None) -> str:
     """Der Zustand eines Modus - alles Unbekannte und ein fehlendes Feld heißen aktiv."""
     value = (mode or {}).get("status")

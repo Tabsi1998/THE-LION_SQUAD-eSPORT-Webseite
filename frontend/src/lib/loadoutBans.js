@@ -169,10 +169,34 @@ export function listToForm(list, library = [], modes = [], categories = []) {
     });
     if (entry.kind === "attachments" && !attachments.length) continue;
     const kept = (entry.modes || []).filter((mode) => modeKeys.has(mode));
-    rows[rowKey(entry.kind, entry.item_id)] = { kind: entry.kind, item_id: entry.item_id, modes: kept,
-      attachment_ids: attachments.map((item) => item.item_id) };
+    const row = { kind: entry.kind, item_id: entry.item_id, modes: kept, attachment_ids: attachments.map((item) => item.item_id) };
+    if (entry.kind === "attachments") {
+      // Modi je Aufsatz (#2299): im Formular trägt jeder Aufsatz die Modi, die für ihn gelten - eigene, sonst die der Zeile.
+      const own = Object.fromEntries(attachments
+        .map((item) => [item.item_id, (item.modes?.length ? item.modes : kept).filter((mode) => modeKeys.has(mode))])
+        .filter(([, modes]) => modes.length));
+      row.modes = [];
+      if (Object.keys(own).length) row.attachment_modes = own;
+    }
+    rows[rowKey(entry.kind, entry.item_id)] = row;
   }
   return { rows, dropped: [...new Set(dropped)] };
+}
+
+/** Die Modi, in denen ein Aufsatz an der Waffe gesperrt ist (#2299) - leer heißt alle. */
+export function attachmentModes(row, id) {
+  return row?.attachment_modes?.[id] || row?.modes || [];
+}
+
+/** Die Zeile einer Waffe für die Anfrage: gleiche Modi bei allen Aufsätzen als Modi der Zeile (wie bisher), sonst je Aufsatz. */
+function attachmentsPayload(row) {
+  const effective = row.attachment_ids.map((id) => attachmentModes(row, id));
+  const key = (modes) => [...modes].sort().join("|");
+  if (effective.every((modes) => key(modes) === key(effective[0]))) {
+    return { item_id: row.item_id, kind: "attachments", modes: [...effective[0]], attachment_ids: row.attachment_ids };
+  }
+  const own = Object.fromEntries(row.attachment_ids.map((id, index) => [id, effective[index]]).filter(([, modes]) => modes.length));
+  return { item_id: row.item_id, kind: "attachments", modes: [], attachment_ids: row.attachment_ids, attachment_modes: own };
 }
 
 const KIND_ORDER = { class: 0, item: 1, attachments: 2 };
@@ -186,17 +210,102 @@ export function formPayload(rows, library = [], categories = []) {
   return Object.values(rows)
     .filter(isActiveRow)
     .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || position(a) - position(b))
-    .map((row) => (row.kind === "class"
-      ? { kind: "class", subcategory: row.subcategory, modes: row.modes, attachment_ids: [] }
-      : { item_id: row.item_id, kind: row.kind, modes: row.modes, attachment_ids: row.kind === "attachments" ? row.attachment_ids : [] }));
+    .map((row) => {
+      if (row.kind === "class") return { kind: "class", subcategory: row.subcategory, modes: row.modes, attachment_ids: [] };
+      if (row.kind === "attachments") return attachmentsPayload(row);
+      return { item_id: row.item_id, kind: row.kind, modes: row.modes, attachment_ids: [] };
+    });
 }
 
-/** Gleiche Zeilen (Art, Eintrag bzw. Klasse, Modi, Aufsätze) - für „nichts geändert“. */
+/** Gleiche Zeilen (Art, Eintrag bzw. Klasse, Modi, Aufsätze mit ihren Modi) - für „nichts geändert“. */
 export function sameRows(a = {}, b = {}) {
+  const attached = (row) => [...row.attachment_ids].sort()
+    .map((id) => (row.kind === "attachments" ? `${id}:${[...attachmentModes(row, id)].sort().join(",")}` : id));
   const norm = (rows) => JSON.stringify(Object.values(rows)
     .filter(isActiveRow)
-    .map((row) => [row.kind, row.kind === "class" ? row.subcategory : row.item_id, [...row.modes].sort(), [...row.attachment_ids].sort()]).sort());
+    .map((row) => [row.kind, row.kind === "class" ? row.subcategory : row.item_id, row.kind === "attachments" ? [] : [...row.modes].sort(),
+      attached(row)]).sort());
   return norm(a) === norm(b);
+}
+
+// ---------------------------------------------------------------- Aufsätze je Waffe in der Verwaltung (#2299)
+
+/**
+ * Die passenden Aufsätze einer Waffe je Slot (Unterkategorie einer Kategorie der Art Aufsatz), in der Reihenfolge der Bibliothek, ohne
+ * Slot zuerst. `attachments`: die Einträge, die schon zur Waffe passen.
+ */
+export function attachmentSlots(attachments = [], categories = []) {
+  const slots = [];
+  for (const category of categories.filter((row) => row.role === "attachment")) {
+    for (const { sub, items } of groupBySubcategory(attachments.filter((item) => item.category === category.key), category)) {
+      if (items.length) slots.push({ key: `${category.key}:${sub?.key || ""}`, label: sub?.label || null, icon_url: sub?.icon_url || null, items });
+    }
+  }
+  return slots;
+}
+
+const fullyBanned = (rows, item) => (rows[rowKey("item", item.id)] && !rows[rowKey("item", item.id)].modes.length)
+  || (item.subcategory && rows[rowKey("class", item.subcategory)] && !rows[rowKey("class", item.subcategory)].modes.length);
+
+/**
+ * „K gesperrt“ am Knopf einer Waffe in der Verwaltung: die passenden Aufsätze, die aufgeklappt als gesperrt angehakt sind - an dieser Waffe
+ * (auch nur in Modi) oder überall in allen Modi über die Zeile des Aufsatzes bzw. seine ganz gesperrte Klasse (wie `AttachmentLine`).
+ */
+export function bannedAttachmentCount(rows = {}, weaponId, attachments = []) {
+  const local = new Set(rows[rowKey("attachments", weaponId)]?.attachment_ids || []);
+  return attachments.filter((item) => local.has(item.id) || Boolean(fullyBanned(rows, item))).length;
+}
+
+/**
+ * „Für alle <Waffenklasse> übernehmen“: jede andere aktive Waffe derselben Klasse sperrt danach dieselben Aufsätze mit denselben Modi -
+ * soweit sie zu ihr passen und dort neu sperrbar sind (inaktive nur, wo sie schon standen). Ganz gesperrte Waffen bleiben, wie sie sind.
+ * Gibt die neuen Zeilen und die Zahl der Waffen zurück.
+ */
+export function copyAttachmentsToClass(rows, saved, weaponId, library = []) {
+  const weapon = library.find((item) => item.id === weaponId);
+  const source = rows[rowKey("attachments", weaponId)];
+  if (!weapon?.subcategory) return { rows, count: 0 };
+  const byId = new Map(library.map((item) => [item.id, item]));
+  const next = { ...rows };
+  let count = 0;
+  for (const other of library) {
+    if (other.id === weaponId || other.category !== weapon.category || other.subcategory !== weapon.subcategory) continue;
+    const key = rowKey("attachments", other.id);
+    // Archiviert, ganz gesperrt oder inaktiv ohne eigene Zeile: der Server nähme dort keine (neue) Aufsatz-Zeile an.
+    if (statusOf(other) === "archived" || fullyBanned(rows, other) || (statusOf(other) === "inactive" && !saved?.[key])) continue;
+    const kept = new Set(saved?.[key]?.attachment_ids || []);
+    const ids = (source?.attachment_ids || []).filter((id) => {
+      const attachment = byId.get(id);
+      return attachment && fitsWeapon(attachment, other) && (statusOf(attachment) === "active" || kept.has(id));
+    });
+    if (ids.length) {
+      const own = Object.fromEntries(ids.map((id) => [id, attachmentModes(source, id)]).filter(([, modes]) => modes.length));
+      next[key] = { kind: "attachments", item_id: other.id, modes: [], attachment_ids: ids, ...(Object.keys(own).length ? { attachment_modes: own } : {}) };
+    } else delete next[key];
+    count += 1;
+  }
+  return { rows: next, count };
+}
+
+/**
+ * „Aufsatz an allen Waffen sperren“: der Aufsatz selbst kommt auf die Liste (Zeile `item`) mit den Modi, die an dieser Waffe gelten. In
+ * allen Modi gesperrt, fällt er aus den Zeilen der einzelnen Waffen (dort braucht es ihn nicht mehr).
+ */
+export function banAttachmentEverywhere(rows, attachmentId, modes = []) {
+  const key = rowKey("item", attachmentId);
+  const next = { ...rows, [key]: { kind: "item", item_id: attachmentId, modes: rows[key] ? mergeModes(rows[key].modes, modes) : [...modes], attachment_ids: [] } };
+  if (next[key].modes.length) return next;
+  for (const [rowId, row] of Object.entries(next)) {
+    if (row.kind !== "attachments" || !row.attachment_ids.includes(attachmentId)) continue;
+    const rest = row.attachment_ids.filter((id) => id !== attachmentId);
+    if (!rest.length) delete next[rowId];
+    else {
+      const own = { ...(row.attachment_modes || {}) };
+      delete own[attachmentId];
+      next[rowId] = { ...row, attachment_ids: rest, attachment_modes: own };
+    }
+  }
+  return next;
 }
 
 /** Ist die Klasse (Unterkategorie) in allen Modi ganz gesperrt? Dann braucht es keine Einzelzeile darin. */
@@ -279,10 +388,16 @@ function weaponText(weapon) {
   return weapon?.modes?.length ? `${weapon.name} (in ${weapon.modes.join(", ")})` : weapon?.name || "";
 }
 
-/** Die Einschränkungen eines erlaubten Eintrags: „nicht in Suchen“, „nicht an Blitz 9, Donner 4 (in Suchen)“. */
+/** Der Modus-Hinweis (#2298): „nur in …“, wenn der Server `only_in` setzt (mehr Modi der Season gesperrt als erlaubt), sonst „nicht in …“. */
+export function modesNote(entry) {
+  if (entry?.only_in?.length) return `nur in ${entry.only_in.join(", ")}`;
+  return entry?.not_in?.length ? `nicht in ${entry.not_in.join(", ")}` : "";
+}
+
+/** Die Einschränkungen eines erlaubten Eintrags: „nicht in Suchen“ bzw. „nur in Suchen“, in älteren Fassungen „nicht an Blitz 9 (in Suchen)“. */
 export function restrictionParts(entry) {
   const parts = [];
-  if (entry?.not_in?.length) parts.push(`nicht in ${entry.not_in.join(", ")}`);
+  if (modesNote(entry)) parts.push(modesNote(entry));
   if (entry?.not_at?.length) parts.push(`nicht an ${entry.not_at.map(weaponText).join(", ")}`);
   return parts;
 }
@@ -290,8 +405,21 @@ export function restrictionParts(entry) {
 /** Was die Karte selbst sagt - ohne die Einschränkung, die schon im Kopf der Unterkategorie steht. */
 export function ownRestrictionParts(entry, section) {
   const sectionModes = section?.not_in || [];
-  if (sectionModes.length && (entry?.not_in || []).join("|") === sectionModes.join("|")) return restrictionParts({ ...entry, not_in: [] });
+  if (sectionModes.length && (entry?.not_in || []).join("|") === sectionModes.join("|")) return restrictionParts({ ...entry, not_in: [], only_in: [] });
   return restrictionParts(entry);
+}
+
+/** „Kompensator, Holo (nur in Suchen)“ - die Aufsätze, die an keiner Waffe erlaubt sind (Fabian, 04.11.); leer ohne solche. */
+export function everywhereText(data) {
+  return (data?.attachments_everywhere || []).map((row) => (modesNote(row) ? `${row.name} (${modesNote(row)})` : row.name)).join(", ");
+}
+
+/** „14 Aufsätze · 2 gesperrt“ (#2299) - die Zahl der passenden und davon an dieser Waffe gesperrten. */
+export function attachmentsSummary(attachments) {
+  const count = attachments?.count || 0;
+  // Auch die, die an keiner Waffe erlaubt sind und darum oben in einer Zeile stehen (Fabian, 04.11.) - die Zahl bleibt ehrlich.
+  const banned = (attachments?.banned?.length || 0) + (attachments?.banned_everywhere || 0);
+  return `${countText(count, "Aufsatz", "Aufsätze")}${banned ? ` · ${banned} gesperrt` : ""}`;
 }
 
 export function allowedCount(category) {

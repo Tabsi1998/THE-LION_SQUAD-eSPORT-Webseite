@@ -170,15 +170,18 @@
   padding: 0;
   list-style: none;
 }
+/* Text ohne Auszeichnung in der Karte ist der Satz zu den Aufsätzen einer Waffe (#2299, loadout_bans.attachments_text): klein und leise
+   unter Name und Hinweis. Name (u) und Hinweis (em) tragen eigene Größe und Farbe. */
 .tls-rules-doc .prose-cms ul:has(> li > u) > li {
   min-width: 0;
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   line-height: 1.35;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.62);
 }
 .tls-rules-doc .prose-cms ul:has(> li > u) > li > u {
   display: block;
+  font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
   color: #fff;
