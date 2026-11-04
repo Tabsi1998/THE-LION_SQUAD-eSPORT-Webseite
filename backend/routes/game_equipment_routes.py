@@ -10,8 +10,8 @@ from database import get_db
 from models import new_id, now_utc
 from routes.game_routes import _enrich_games
 from services import game_equipment, game_modes
-from services.game_equipment import (CategoriesSave, EquipmentCreate, EquipmentImport, EquipmentProblem, EquipmentUpdate,
-                                     EquipmentWeapons)
+from services.game_equipment import (CategoriesSave, EquipmentCreate, EquipmentImport, EquipmentMove, EquipmentProblem,
+                                     EquipmentUpdate, EquipmentWeapons, SubcategoriesSave)
 
 router = APIRouter(prefix="/api/games", tags=["game-equipment"])
 
@@ -57,6 +57,10 @@ async def list_game_equipment(game_id: str, me: dict = Depends(require_admin()))
         "limit": game_equipment.ITEMS_PER_GAME_MAX,
         "categories_limit": game_equipment.CATEGORIES_MAX,
         "suggested_categories": [dict(row) for row in game_equipment.SUGGESTED_CATEGORIES],
+        # Unterkategorien (#2287): je Kennung die Zahl der Einträge, Grenze und Vorschlag je Art.
+        "subcategory_counts": await game_equipment.subcategory_counts(db, game["id"]),
+        "subcategories_limit": game_equipment.SUBCATEGORIES_MAX,
+        "suggested_subcategories": {role: list(words) for role, words in game_equipment.SUGGESTED_SUBCATEGORIES.items()},
     }
 
 
@@ -72,16 +76,44 @@ async def save_equipment_categories(game_id: str, body: CategoriesSave, me: dict
     return {"categories": saved}
 
 
-@router.post("/{game_id}/equipment/assign-weapons")
-async def assign_equipment_weapons(game_id: str, body: EquipmentWeapons, me: dict = Depends(require_admin())):
-    """Sammelaktion: Aufsätze ohne Waffe bekommen die gewählten Waffen (wie „Maps ohne Modus“)."""
+@router.put("/{game_id}/equipment/categories/{category_key}/subcategories")
+async def save_equipment_subcategories(game_id: str, category_key: str, body: SubcategoriesSave, me: dict = Depends(require_admin())):
+    """Unterkategorien einer Kategorie (#2287): anlegen, umbenennen, ordnen, entfernen - die ganze Liste auf einmal."""
     db = get_db()
     game = await _game(db, game_id)
     try:
-        updated = await game_equipment.assign_weapons(db, game, body.weapon_ids, me)
+        saved = await game_equipment.save_subcategories(db, game, category_key, body, me)
     except EquipmentProblem as problem:
         raise _refuse(problem) from None
-    await _audit(db, "game.equipment.assign_weapons", me, game["id"], {"weapons": len(body.weapon_ids), "updated": updated})
+    await _audit(db, "game.equipment.subcategories", me, game["id"],
+                 {"category": category_key, "keys": [row["key"] for row in saved]})
+    return {"category": category_key, "subcategories": saved}
+
+
+@router.post("/{game_id}/equipment/move")
+async def move_game_equipment(game_id: str, body: EquipmentMove, me: dict = Depends(require_admin())):
+    """Mehrere Einträge einer Kategorie in eine Unterkategorie verschieben (#2287); ``subcategory: null`` = ohne."""
+    db = get_db()
+    game = await _game(db, game_id)
+    try:
+        updated = await game_equipment.move_items(db, game, body, me)
+    except EquipmentProblem as problem:
+        raise _refuse(problem) from None
+    await _audit(db, "game.equipment.move", me, game["id"], {"items": updated})
+    return {"updated": updated}
+
+
+@router.post("/{game_id}/equipment/assign-weapons")
+async def assign_equipment_weapons(game_id: str, body: EquipmentWeapons, me: dict = Depends(require_admin())):
+    """Sammelaktion: Aufsätze ohne Waffe bekommen die gewählten Waffen und Waffenklassen (wie „Maps ohne Modus“)."""
+    db = get_db()
+    game = await _game(db, game_id)
+    try:
+        updated = await game_equipment.assign_weapons(db, game, body.weapon_ids, me, body.weapon_class_ids)
+    except EquipmentProblem as problem:
+        raise _refuse(problem) from None
+    await _audit(db, "game.equipment.assign_weapons", me, game["id"],
+                 {"weapons": len(body.weapon_ids), "classes": len(body.weapon_class_ids), "updated": updated})
     return {"updated": updated}
 
 

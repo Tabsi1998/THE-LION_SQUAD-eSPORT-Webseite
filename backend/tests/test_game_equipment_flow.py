@@ -73,7 +73,7 @@ async def test_categories_keep_their_key_when_renamed_and_adopt_it_by_name(flow)
     renamed = ok(await flow.put(url(w, "/categories"), json={"categories": [
         {"key": key, "label": "Primärwaffen", "role": "weapon"}, {"label": "aufsätze", "role": "attachment"},
         {"label": "Perks", "role": "item"}]}))["categories"]
-    assert renamed[0] == {"key": key, "label": "Primärwaffen", "role": "weapon"}
+    assert renamed[0] == {"key": key, "label": "Primärwaffen", "role": "weapon", "subcategories": []}
     assert renamed[1]["key"] == w["cats"]["Aufsätze"], "gleicher Name ohne Kennung behält die Kennung"
     audit = await flow.db.audit_logs.find_one({"action": "game.equipment.categories"}, {"_id": 0})
     assert audit["target_id"] == w["game"]["id"] and "label" not in str(audit["data"])
