@@ -693,7 +693,8 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
     station = {"id": new_id(), "name": "Tisch 1", "device_type": "pc", "tournament_id": third["tournament"]["id"], "status": "free",
                "current_match_id": None, "notes": None}
     await flow.db.stations.insert_one(dict(station))
-    plan = {"assignments": [{"match_id": mid(third), "changed": True, "scheduled_at": at(3 * 60), "schedule_source": "planner",
+    planned_at = at(3 * 60)
+    plan = {"assignments": [{"match_id": mid(third), "changed": True, "scheduled_at": planned_at, "schedule_source": "planner",
                              "station_id": station["id"], "forecast": False,
                              "previous": {"scheduled_at": stored["scheduled_at"], "schedule_source": None, "status": stored["status"],
                                           "station_id": None}}]}
@@ -706,7 +707,7 @@ async def test_every_new_time_drops_the_extension_of_the_old_window(flow):
     await flow.db.stations.update_one({"id": station["id"]}, {"$unset": {"deleting": ""}})
     assert (await apply_plan(flow.db, await tournament_of(flow, third), plan))["written"] == 1
     planned = await flow.reload(third["match"])
-    assert planned["station_id"] == station["id"] and planned["scheduled_at"] == at(3 * 60)
+    assert planned["station_id"] == station["id"] and planned["scheduled_at"] == planned_at
     assert not planned.get("no_show_extended_until"), "Stationsplan"
 
 
