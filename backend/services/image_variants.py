@@ -93,16 +93,18 @@ def _loads(path: Path) -> bool:
         return False
 
 
-def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None = None) -> int:
+def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None = None, stop=None) -> int:
     """Kaputte Fassungen unter ``root`` löschen (beim Start, im Hintergrund): nginx liefert, was auf der Platte liegt, auch eine
     leere oder abgebrochene Datei. Immer: leere Fassungen und liegengebliebene Zwischendateien. ``deep``: zusätzlich jede Fassung
     lesen - abgebrochene Dateien mit Inhalt aus der Zeit vor dem atomaren Schreiben. Beim nächsten Abruf baut das Backend sie neu.
-    Liefert die Zahl der gelöschten."""
+    Liefert die Zahl der gelöschten. ``stop`` (ein ``threading.Event``): beim Herunterfahren gesetzt, der Lauf hört dann auf."""
     import time
 
     limit = (now if now is not None else time.time()) - TEMP_STALE_SECONDS
     removed = 0
     for folder in root.rglob(VARIANT_DIR_NAME):
+        if stop is not None and stop.is_set():
+            break
         if not folder.is_dir():
             continue
         for path in folder.glob(TEMP_PATTERN):
@@ -113,6 +115,8 @@ def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None 
             except OSError:
                 continue
         for path in folder.glob("*.webp"):
+            if stop is not None and stop.is_set():
+                break
             try:
                 if path.stat().st_size == 0 or (deep and not _loads(path)):
                     path.unlink()
@@ -122,12 +126,14 @@ def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None 
     return removed
 
 
-def sweep_variants(root: Path) -> int:
-    """Der Aufräumlauf beim Start: das gründliche Lesen nur einmal (Merker im Upload-Ordner), danach nur noch Leeres und Reste."""
+def sweep_variants(root: Path, stop=None) -> int:
+    """Der Aufräumlauf beim Start: das gründliche Lesen nur einmal (Merker im Upload-Ordner), danach nur noch Leeres und Reste.
+    Ein abgebrochener Lauf setzt den Merker nicht - beim nächsten Start geht es gründlich weiter. Das Backend läuft mit genau einem
+    Prozess (``docker-entrypoint.py``: ``--workers 1``), zwei gleichzeitige Läufe gibt es nicht."""
     marker = root / CHECKED_MARKER
     deep = not marker.exists()
-    removed = remove_broken_variants(root, deep=deep)
-    if deep:
+    removed = remove_broken_variants(root, deep=deep, stop=stop)
+    if deep and not (stop is not None and stop.is_set()):
         try:
             marker.touch()
         except OSError:

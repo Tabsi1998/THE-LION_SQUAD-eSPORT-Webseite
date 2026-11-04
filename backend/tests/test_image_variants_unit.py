@@ -208,6 +208,50 @@ def test_the_start_sweep_clears_empty_variants_and_stale_temps(bild, tmp_path):
     assert gut.stat().st_size > 0
 
 
+def test_a_stopped_sweep_ends_early_and_keeps_the_deep_check_for_next_time(bild, tmp_path):
+    """Beim Herunterfahren hört der Lauf auf; der Merker bleibt weg, damit der nächste Start gründlich weitermacht."""
+    import threading
+
+    from services.image_variants import CHECKED_MARKER, sweep_variants
+
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    leer = variant_path(quelle, 160)
+    leer.parent.mkdir(parents=True, exist_ok=True)
+    leer.write_bytes(b"")
+    stop = threading.Event()
+    stop.set()
+
+    assert sweep_variants(tmp_path, stop) == 0
+    assert leer.exists() and not (tmp_path / CHECKED_MARKER).exists()
+
+
+def test_erasing_an_upload_also_removes_temp_files_of_its_variants(bild, tmp_path, monkeypatch):
+    """Zwischendateien eines abgebrochenen Builds gehören zum Bild der Person - die Kontolöschung nimmt sie mit, fremde nicht."""
+    from services import account_erasure
+
+    monkeypatch.setattr(account_erasure, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(account_erasure, "UPLOAD_DIR", tmp_path / "andere")
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    build_variant(quelle, 320)
+    ordner = variant_path(quelle, 160).parent
+    eigene = ordner / ".waffe-160.abc.tmp"
+    eigene.write_bytes(b"x")
+    fremde = ordner / ".schild-160.abc.tmp"
+    fremde.write_bytes(b"x")
+
+    class Sammlung:
+        async def delete_many(self, query):
+            return None
+
+    class Db:
+        media_uploads = Sammlung()
+        media_scans = Sammlung()
+
+    assert asyncio.run(account_erasure._remove(Db(), "waffe.png", [])) is None
+    assert not eigene.exists() and not quelle.exists() and not variant_path(quelle, 320).exists()
+    assert fremde.exists()
+
+
 def test_the_deep_sweep_also_clears_cut_off_variants_with_content(bild, tmp_path):
     """Vor dem atomaren Schreiben konnte eine Fassung auch mit Inhalt abgebrochen sein. Das gründliche Lesen läuft einmal."""
     from services.image_variants import CHECKED_MARKER, remove_broken_variants, sweep_variants
