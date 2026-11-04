@@ -2,7 +2,8 @@
 // und Poolgrößen - die Suche bei „jede Map nur einmal je Serie“ und der Abgleich mit dem gespeicherten Pool kommen vom Server) und die
 // Sätze des Veto-Blocks auf der Matchseite. Der Server bleibt maßgeblich; hier geht es darum, dass man nichts Falsches eingibt.
 
-export const KIND_OPTIONS = [["ban", "Sperren"], ["pick", "Wählen"], ["decider", "Decider (übrige Map)"]];
+// Kurz, damit die Art in der Zeile je Schritt nicht abgeschnitten wird; was der Decider ist, erklärt der Kasten darüber.
+export const KIND_OPTIONS = [["ban", "Sperren"], ["pick", "Wählen"], ["decider", "Decider"]];
 export const TEAM_OPTIONS = [["A", "Team A"], ["B", "Team B"]];
 export const TEAM_A_OPTIONS = [["home", "Heimteam laut Spielplan"], ["draw", "Los je Spiel"]];
 export const SECONDS = [10, 600];

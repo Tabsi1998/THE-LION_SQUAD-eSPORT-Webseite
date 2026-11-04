@@ -166,7 +166,7 @@ export function SeasonVetoRulesPanel({ seasonId }) {
             </button>
           </div>
         </div>
-        <p className="text-xs text-white/50">Sperren und Wählen gehören einem Team und einem Modus, eine Wahl und der Decider bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
+        <p className="text-xs text-white/50">Sperren und Wählen gehören einem Team und einem Modus; eine Wahl und der Decider (die übrige Map, vom System gesetzt) bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
         {form.steps.length ? (
           <div className="hidden text-[10px] font-bold uppercase tracking-widest text-white/45 sm:flex sm:items-center sm:gap-1.5 sm:px-2" aria-hidden="true">
             <span className="w-7">Nr.</span><span className="w-[7.5rem]">Art</span><span className="min-w-[8rem] flex-1">Modus</span>
