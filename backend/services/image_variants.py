@@ -108,6 +108,8 @@ def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None 
         if not folder.is_dir():
             continue
         for path in folder.glob(TEMP_PATTERN):
+            if stop is not None and stop.is_set():
+                break
             try:
                 if path.stat().st_mtime < limit:
                     path.unlink()
@@ -129,7 +131,8 @@ def remove_broken_variants(root: Path, *, deep: bool = False, now: float | None 
 def sweep_variants(root: Path, stop=None) -> int:
     """Der Aufräumlauf beim Start: das gründliche Lesen nur einmal (Merker im Upload-Ordner), danach nur noch Leeres und Reste.
     Ein abgebrochener Lauf setzt den Merker nicht - beim nächsten Start geht es gründlich weiter. Das Backend läuft mit genau einem
-    Prozess (``docker-entrypoint.py``: ``--workers 1``), zwei gleichzeitige Läufe gibt es nicht."""
+    Prozess (``docker-entrypoint.py``: ``--workers 1``). Liefen doch zwei Läufe gleichzeitig, kostete das nur doppelte Arbeit: Löschen
+    ist wiederholbar, Fassungen entstehen atomar (``os.replace``) - ein Lauf sieht immer die alte oder die neue Datei, nie eine halbe."""
     marker = root / CHECKED_MARKER
     deep = not marker.exists()
     removed = remove_broken_variants(root, deep=deep, stop=stop)

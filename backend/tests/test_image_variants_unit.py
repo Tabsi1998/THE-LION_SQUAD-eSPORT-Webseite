@@ -225,6 +225,62 @@ def test_a_stopped_sweep_ends_early_and_keeps_the_deep_check_for_next_time(bild,
     assert leer.exists() and not (tmp_path / CHECKED_MARKER).exists()
 
 
+def test_a_running_sweep_stops_after_the_current_file(bild, tmp_path, monkeypatch):
+    """Das Signal kommt mitten im Lauf: nach der aktuellen Datei ist Schluss, kein Merker."""
+    import threading
+
+    from services import image_variants
+    from services.image_variants import CHECKED_MARKER, sweep_variants
+
+    for name in ("a.png", "b.png", "c.png"):
+        quelle = bild(width=1280, height=480, name=name)
+        build_variant(quelle, 320)
+    stop = threading.Event()
+    gelesen = []
+
+    def lesen(path):
+        gelesen.append(path.name)
+        stop.set()
+        return True
+
+    monkeypatch.setattr(image_variants, "_loads", lesen)
+
+    assert sweep_variants(tmp_path, stop) == 0
+    assert len(gelesen) == 1, "nach der ersten Datei hört der Lauf auf"
+    assert not (tmp_path / CHECKED_MARKER).exists()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_signals_the_sweep_and_waits_for_it(monkeypatch):
+    """Der Lifespan setzt beim Herunterfahren das Signal und wartet, bis der Lauf zu Ende ist."""
+    import pathlib
+    import sys
+    import threading
+
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from flow_harness import make_flow
+
+    instance, shutdown = make_flow()
+    try:
+        import server
+
+        stop = threading.Event()
+        fertig = []
+
+        async def lauf():
+            while not stop.is_set():
+                await asyncio.sleep(0.01)
+            fertig.append(True)
+
+        monkeypatch.setattr(server, "_variant_sweep_stop", stop)
+        monkeypatch.setattr(server, "_variant_sweep_task", asyncio.get_running_loop().create_task(lauf()))
+        await server._stop_variant_sweep()
+
+        assert stop.is_set() and fertig == [True]
+    finally:
+        await shutdown()
+
+
 def test_erasing_an_upload_also_removes_temp_files_of_its_variants(bild, tmp_path, monkeypatch):
     """Zwischendateien eines abgebrochenen Builds gehören zum Bild der Person - die Kontolöschung nimmt sie mit, fremde nicht."""
     from services import account_erasure
