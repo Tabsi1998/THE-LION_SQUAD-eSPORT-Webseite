@@ -1,41 +1,38 @@
 # Changelog
 
-## [1.69.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.68.0...v1.69.0) (2026-11-04)
-
+## 1.69.0 (04.11.2026)
 
 ### Neu
 
-* Ausrüstung: Aufsätze passen zu ganzen Waffenklassen, neue Waffen der Klasse sofort ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Ausrüstung: Bibliothek gruppiert nach Unterkategorien, einklappbar mit Zählern ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Ausrüstung: mehrere Einträge auswählen und in eine Unterkategorie verschieben ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Ausrüstung: Übernehmen aus einem anderen Spiel bringt Unterkategorien mit ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Ausrüstung: Unterkategorien je Kategorie anlegen, umbenennen, ordnen und mit Symbol versehen ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Liga: Eingriffe der Leitung ins Veto – Pause, Fortsetzen, Schritt zurück, Neustart mit Grund und Befangenheit ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Kasten „Veto“ im Reiter Spielbetrieb mit kompakter Schrittliste, Prüfung live, Vorschlag aus Modusfolge und Pools ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Meldeformular übernimmt die Maps laut Veto, Server prüft die Meldung der Captains dagegen ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Neue Seasons beginnen mit Veto an; eine unberührte Vorlage folgt dem Map-Pool automatisch ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Prüfung vor der Veröffentlichung nennt eine Vorlage, die nicht aufgeht ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Regelwerk-Baustein Veto und Variablen veto.step_seconds, veto.team_a – geänderte Vorlage löst die Freigabe aus ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Veto am Spiel startet nach dem Check-in; Züge mit Versionsnummer, Decider automatisch, Zufallswahl nach Ablauf ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Veto auf der Matchseite – wer am Zug ist, Countdown, Maps je Modus, Verlauf, Spielreihenfolge ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Veto je Season – Vorlage mit Sperren, Wählen und Decider je Modus, Team A Heim oder Los, Zeit je Schritt, an/aus ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Ligaseite und Matchseite zeigen die erlaubte Ausrüstung wie das Regelwerk, fertige Spiele halten sie fest ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Regelwerk: Baustein „Erlaubte Ausrüstung“ zeigt, was erlaubt ist, im Web mit Karten und im PDF als Tabelle ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Regelwerk: neuer Eintrag in der Bibliothek meldet „Regelwerk muss freigegeben werden“ ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Sperrliste: ganze Klasse sperren, auch je Modus, gilt auch für später angelegte Einträge ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-
+* Ausrüstung: Aufsätze passen zu ganzen Waffenklassen, neue Waffen der Klasse sofort (#2287)
+* Ausrüstung: Bibliothek gruppiert nach Unterkategorien, einklappbar mit Zählern (#2287)
+* Ausrüstung: mehrere Einträge auswählen und in eine Unterkategorie verschieben (#2287)
+* Ausrüstung: Übernehmen aus einem anderen Spiel bringt Unterkategorien mit (#2287)
+* Ausrüstung: Unterkategorien je Kategorie anlegen, umbenennen, ordnen und mit Symbol versehen (#2287)
+* Liga: Eingriffe der Leitung ins Veto – Pause, Fortsetzen, Schritt zurück, Neustart mit Grund und Befangenheit (#1618)
+* Liga: Kasten „Veto“ im Reiter Spielbetrieb mit kompakter Schrittliste, Prüfung live, Vorschlag aus Modusfolge und Pools (#1618)
+* Liga: Meldeformular übernimmt die Maps laut Veto, Server prüft die Meldung der Captains dagegen (#1618)
+* Liga: Neue Seasons beginnen mit Veto an; eine unberührte Vorlage folgt dem Map-Pool automatisch (#1618)
+* Liga: Prüfung vor der Veröffentlichung nennt eine Vorlage, die nicht aufgeht (#1618)
+* Liga: Regelwerk-Baustein Veto und Variablen veto.step_seconds, veto.team_a – geänderte Vorlage löst die Freigabe aus (#1618)
+* Liga: Veto am Spiel startet nach dem Check-in; Züge mit Versionsnummer, Decider automatisch, Zufallswahl nach Ablauf (#1618)
+* Liga: Veto auf der Matchseite – wer am Zug ist, Countdown, Maps je Modus, Verlauf, Spielreihenfolge (#1618)
+* Liga: Veto je Season – Vorlage mit Sperren, Wählen und Decider je Modus, Team A Heim oder Los, Zeit je Schritt, an/aus (#1618)
+* Ligaseite und Matchseite zeigen die erlaubte Ausrüstung wie das Regelwerk, fertige Spiele halten sie fest (#2287)
+* Regelwerk: Baustein „Erlaubte Ausrüstung“ zeigt, was erlaubt ist, im Web mit Karten und im PDF als Tabelle (#2287)
+* Regelwerk: neuer Eintrag in der Bibliothek meldet „Regelwerk muss freigegeben werden“ (#2287)
+* Sperrliste: ganze Klasse sperren, auch je Modus, gilt auch für später angelegte Einträge (#2287)
 
 ### Fehlerbehebungen
 
-* Aufsätze ohne erlaubte Waffe erscheinen nicht als erlaubt, die Sperrliste nennt sie ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Hinweis „Aufsätze ohne Waffe“ mit zugeklappter Auswahl und Suche ([#2287](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2287)) ([73f362f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/73f362f13efd60623bc45341ed0342640dd6fb71))
-* Liga: Bei gesperrter Staffel startet der Seitenaufruf kein Veto und löst keine Frist auf ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-* Liga: Jeder neue Termin – auch zurück auf den alten und „Terminplan freigeben“ – setzt Check-in und Veto zurück ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
-
+* Aufsätze ohne erlaubte Waffe erscheinen nicht als erlaubt, die Sperrliste nennt sie (#2287)
+* Hinweis „Aufsätze ohne Waffe“ mit zugeklappter Auswahl und Suche (#2287)
+* Liga: Bei gesperrter Staffel startet der Seitenaufruf kein Veto und löst keine Frist auf (#1618)
+* Liga: Jeder neue Termin – auch zurück auf den alten und „Terminplan freigeben“ – setzt Check-in und Veto zurück (#1618)
 
 ### Dokumentation
 
-* Liga D.3 im Vertrag, Handbuch Veto einrichten und durchführen, Rollen und Routen-Inventar ([#1618](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1618)) ([cc34ed5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cc34ed5201dc80b0f5de08b2ac5f4af6096de992))
+* Liga D.3 im Vertrag, Handbuch Veto einrichten und durchführen, Rollen und Routen-Inventar (#1618)
 
 ## 1.68.0 (04.11.2026)
 
