@@ -424,12 +424,14 @@ Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:c
 
 Auf der Season-Seite im Reiter **Spielbetrieb** steht direkt unter **Serie** der Kasten **Veto** (Zuständigkeit „Season konfigurieren“),
 mit eigenem **Veto speichern**; er gilt sofort für alle Staffeln der Season, ein gerade laufendes Veto behält seinen Stand. Neue Seasons
-beginnen mit **Veto aus** – dann tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b): Es
+beginnen mit **Veto an** und einer Vorlage aus „Modus je Map“ und Best of; sobald der Map-Pool steht, einmal **Vorschlag aus Modusfolge
+und Pools** drücken und speichern – bis dahin nennt **Was fehlt noch?** im Überblick, was mit dem Pool nicht aufgeht. Ältere Seasons
+ohne Kasten bleiben aus – dort tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b): Es
 beginnt, sobald beide Seiten eingecheckt sind, Map 1 folgt direkt danach.
 
 | Feld | Vorgabe | Wirkung |
 | --- | --- | --- |
-| **Veto in dieser Season** | aus | an: nach dem Check-in sperren und wählen die Teams nach der Schrittfolge |
+| **Veto in dieser Season** | an (neue Seasons) | an: nach dem Check-in sperren und wählen die Teams nach der Schrittfolge; aus: Maps beim Ergebnis |
 | **Team A** | Heimteam laut Spielplan | Nr. 22: Team A beginnt laut Vorlage, Team B ist die andere Seite. „Los je Spiel“: der Server lost je Spiel einmal, nie neu beim Neuladen |
 | **Zeit je Schritt (Sekunden)** | 60 | Nr. 23: läuft die Zeit ab, wählt das System zufällig aus den noch zulässigen Maps – das Veto bleibt nie stehen |
 | **Schrittfolge** | leer | je Schritt: **Sperren** oder **Wählen** durch Team A oder B in einem Modus, oder **Decider** (die übrige Map des Modus, setzt das System); Wahl und Decider bekommen ihre **Position** in der Serie (Map 1 bis Best of). Die Reihenfolge der Schritte ist die des Vetos, nicht die Spielreihenfolge |
@@ -773,8 +775,10 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   **Pausieren** (die Restzeit bleibt stehen), **Fortsetzen**, **Letzten Schritt zurück** (ein automatischer Decider geht mit dem Zug davor),
   **Neu starten** (Team A bleibt, ein Los wird nicht neu gezogen). Nach dem Start von Map 1 ändert sich am Veto nichts mehr. Im eigenen
   Spiel macht das eine zweite Person (Befangenheit, 2.11).
-- **Neuer Termin:** Setzt ihr einen anderen Termin, zählen Check-in und Veto neu – nach erneutem Check-in beider Seiten beginnt das Veto
-  von vorn.
+- **Neuer Termin:** Jeder neue Termin (auch zurück auf den alten, auch „Neu ansetzen“) setzt Check-in und Veto zurück – nach erneutem
+  Check-in beider Seiten beginnt das Veto von vorn.
+- **Gesperrte Staffel:** Solange die Staffel gesperrt ist, läuft nichts weiter – kein Start, keine Zufallswahl, kein Zug; nach dem
+  Entsperren geht es beim nächsten Aufruf weiter.
 - **Ohne Veto** (Kasten aus, ältere Season, Liga N mit anderem Best of): Die Seite sagt es, nach dem Check-in kommt gleich der Start, die
   Maps werden beim Ergebnis eingetragen.
 
