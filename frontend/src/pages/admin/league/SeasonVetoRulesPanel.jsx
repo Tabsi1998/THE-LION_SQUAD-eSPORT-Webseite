@@ -33,30 +33,41 @@ function Toggle({ label, hint, checked, onChange, testId }) {
   );
 }
 
+// Eine Zeile je Schritt (Fabian: übersichtlich): Nr. · Art · Modus · Wer · Position · Pfeile/Löschen; bei 390 px bricht sie in zwei
+// saubere Zeilen (Nr., Art, Modus / Wer, Position, Knöpfe). Die Felder tragen ihre Beschriftung für Vorleser, der Satz steht nur dort.
+const FIELD = "min-h-9 w-full rounded-sm border border-white/10 bg-[#121212] px-2 py-1 text-sm text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
+
 function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemove }) {
   const set = (patch) => onChange({ ...step, ...patch });
+  const number = index + 1;
   return (
-    <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`veto-step-${index}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 text-xs font-bold uppercase tracking-widest text-[#29B6E8]">Schritt {index + 1}</div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button type="button" className={ICON} onClick={() => onMove(-1)} disabled={index === 0} aria-label={`Schritt ${index + 1} nach oben`} data-testid={`veto-step-${index}-up`}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-          <button type="button" className={ICON} onClick={() => onMove(1)} disabled={index === count - 1} aria-label={`Schritt ${index + 1} nach unten`} data-testid={`veto-step-${index}-down`}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-          <button type="button" className={`${ICON} hover:text-live`} onClick={onRemove} aria-label={`Schritt ${index + 1} entfernen`} data-testid={`veto-step-${index}-remove`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
-        </div>
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <SelectField label="Art" value={step.kind} onChange={(kind) => set({ kind, team: kind === "decider" ? null : step.team || "A", position: kind === "ban" ? "" : step.position })}
-          options={KIND_OPTIONS} testId={`veto-step-${index}-kind`} />
-        <SelectField label="Modus" value={step.mode} onChange={(mode) => set({ mode })} options={[["", "bitte wählen"], ...modes.map((row) => [row.mode, row.label])]} testId={`veto-step-${index}-mode`} />
+    <li className="rounded-sm border border-white/10 bg-[#0A0A0A] px-2 py-1.5" data-testid={`veto-step-${index}`}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="w-7 shrink-0 text-xs font-bold tabular-nums text-[#29B6E8]">{number}.</span>
+        <select aria-label={`Schritt ${number}: Art`} className={`${FIELD} w-[7.5rem] shrink-0`} value={step.kind} data-testid={`veto-step-${index}-kind`}
+          onChange={(event) => set({ kind: event.target.value, team: event.target.value === "decider" ? null : step.team || "A", position: event.target.value === "ban" ? "" : step.position })}>
+          {KIND_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select aria-label={`Schritt ${number}: Modus`} className={`${FIELD} min-w-[8rem] flex-1`} value={step.mode} onChange={(event) => set({ mode: event.target.value })} data-testid={`veto-step-${index}-mode`}>
+          <option value="">Modus wählen</option>
+          {modes.map((row) => <option key={row.mode} value={row.mode}>{row.label}</option>)}
+        </select>
         {step.kind !== "decider" ? (
-          <SelectField label="Wer" value={step.team || ""} onChange={(team) => set({ team })} options={TEAM_OPTIONS} testId={`veto-step-${index}-team`} />
-        ) : <div className="text-xs text-white/50 self-end pb-2">Wer: das System</div>}
+          <select aria-label={`Schritt ${number}: Wer`} className={`${FIELD} w-[6.5rem] shrink-0`} value={step.team || ""} onChange={(event) => set({ team: event.target.value })} data-testid={`veto-step-${index}-team`}>
+            {TEAM_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        ) : <span className="inline-flex min-h-9 w-[6.5rem] shrink-0 items-center px-2 text-xs text-white/50">System</span>}
         {step.kind !== "ban" ? (
-          <TextField label="Position (Map Nr.)" type="number" min={1} max={9} value={step.position} onChange={(position) => set({ position })} testId={`veto-step-${index}-position`} />
-        ) : <div className="text-xs text-white/50 self-end pb-2">Position: keine (Sperre)</div>}
+          <input aria-label={`Schritt ${number}: Position (Map Nr.)`} type="number" min={1} max={9} inputMode="numeric" className={`${FIELD} w-[5rem] shrink-0 tabular-nums`}
+            value={step.position} onChange={(event) => set({ position: event.target.value })} placeholder="Map" data-testid={`veto-step-${index}-position`} />
+        ) : <span className="inline-flex min-h-9 w-[5rem] shrink-0 items-center px-2 text-xs text-white/40">keine Map</span>}
+        <span className="ml-auto flex shrink-0 items-center gap-0.5">
+          <button type="button" className={ICON} onClick={() => onMove(-1)} disabled={index === 0} aria-label={`Schritt ${number} nach oben`} data-testid={`veto-step-${index}-up`}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" className={ICON} onClick={() => onMove(1)} disabled={index === count - 1} aria-label={`Schritt ${number} nach unten`} data-testid={`veto-step-${index}-down`}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" className={`${ICON} hover:text-live`} onClick={onRemove} aria-label={`Schritt ${number} entfernen`} data-testid={`veto-step-${index}-remove`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+        </span>
       </div>
-      <p className="mt-2 text-xs text-white/60" data-testid={`veto-step-${index}-sentence`}>{stepSentence(step, labelOf)}</p>
+      <p className="sr-only" data-testid={`veto-step-${index}-sentence`}>{stepSentence(step, labelOf)}</p>
     </li>
   );
 }
@@ -156,7 +167,13 @@ export function SeasonVetoRulesPanel({ seasonId }) {
         </div>
         <p className="text-xs text-white/50">Sperren und Wählen gehören einem Team und einem Modus, eine Wahl und der Decider bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
         {form.steps.length ? (
-          <ol className="space-y-2" data-testid="veto-rules-steps">
+          <div className="hidden text-[10px] font-bold uppercase tracking-widest text-white/45 sm:flex sm:items-center sm:gap-1.5 sm:px-2" aria-hidden="true">
+            <span className="w-7">Nr.</span><span className="w-[7.5rem]">Art</span><span className="min-w-[8rem] flex-1">Modus</span>
+            <span className="w-[6.5rem]">Wer</span><span className="w-[5rem]">Position</span><span className="ml-auto w-[7rem]" />
+          </div>
+        ) : null}
+        {form.steps.length ? (
+          <ol className="space-y-1" data-testid="veto-rules-steps">
             {form.steps.map((step, index) => (
               <StepRow key={index} step={step} index={index} count={form.steps.length} modes={modes} labelOf={labelOf}
                 onChange={(next) => setSteps(form.steps.map((row, at) => (at === index ? next : row)))}
