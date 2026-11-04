@@ -223,6 +223,16 @@ export function orderPoolHints(order, poolModes, labelOf = (mode) => mode) {
   return [...missing, ...unused];
 }
 
+/** „1 Baustein, 2 Variablen“ - was sich seit der letzten Fassung geändert hat (Zeilen aus ``data_changes``, #2269). */
+export function changedPlaces(rows = []) {
+  const variables = rows.filter((row) => row.kind === "variable").length;
+  const blocks = rows.length - variables;
+  const parts = [];
+  if (blocks) parts.push(blocks === 1 ? "1 Baustein" : `${blocks} Bausteine`);
+  if (variables) parts.push(variables === 1 ? "1 Variable" : `${variables} Variablen`);
+  return parts.join(", ");
+}
+
 /**
  * Muss das Regelwerk freigegeben werden? ``view`` ist die Verwaltung des Regelwerks (nur mit „Regeln veröffentlichen“ lesbar, sonst
  * null), ``readiness`` die Prüfung. ``null``: alles in Ordnung.
@@ -230,8 +240,7 @@ export function orderPoolHints(order, poolModes, labelOf = (mode) => mode) {
 export function rulesNotice(view, readiness) {
   const codes = (readiness?.problems || []).map((row) => row.code);
   if (view?.data_changes?.rows?.length) {
-    const count = view.data_changes.rows.length;
-    return { kind: "changed", text: `Seit ${view.data_changes.label} haben sich Werte geändert, die im Regelwerk stehen (${count === 1 ? "1 Baustein" : `${count} Bausteine`}). Eine neue Fassung muss freigegeben werden.` };
+    return { kind: "changed", text: `Seit ${view.data_changes.label} haben sich Werte geändert, die im Regelwerk stehen (${changedPlaces(view.data_changes.rows)}). Eine neue Fassung muss freigegeben werden.` };
   }
   if (view?.draft) return { kind: "draft", text: "Im Regelwerk liegt ein Entwurf, der noch nicht freigegeben ist." };
   // „missing“ meldet auch die Prüfung - der Überblick zeigt dann nur ihren Punkt, nicht denselben Satz zweimal.

@@ -1,55 +1,197 @@
-// Regelwerk pflegen (docs/LIGA.md, #1646) unter /admin/leagues/rules/<league|league_season>/<id>: Entwurf in Markdown mit Anlagen und
-// Bausteinen, Vorschau wie auf der Seite, Veröffentlichen mit Gültig-ab und Grund. Eine veröffentlichte Fassung ändert niemand mehr; ändern sich
-// Daten eines Bausteins, schlägt die Seite eine neue Version vor, ohne etwas zu veröffentlichen.
-import { useCallback, useEffect, useState } from "react";
+// Regelwerk pflegen (docs/LIGA.md, #1646) unter /admin/leagues/rules/<league|league_season>/<id>: Entwurf in Markdown mit Anlagen,
+// Bausteinen und Variablen (#2269), Vorschau wie auf der Seite, Veröffentlichen mit Gültig-ab und Grund. Eine veröffentlichte Fassung
+// ändert niemand mehr; ändern sich Einstellungen, die im Regelwerk stehen, zeigt die Seite „Regelwerk muss freigegeben werden“ mit dem
+// Vorschlag der neuen Fassung und den markierten Unterschieden - die Leitung prüft, gibt frei und wählt, ob die Teams neu zustimmen.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { API, api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { FormSection } from "@/components/tls/AdminForm";
 import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { MarkdownEditor, appendText } from "@/components/tls/MarkdownEditor";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { RuleOps, RulesChanges, RulesDocument } from "@/components/tls/league/rules/RulesDocument";
-import { RULES_MARKDOWN, addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, removeAnnex, rulesApiPath, rulesMediaProps } from "@/lib/leagueRules";
+import {
+  CHANGE_KIND_WORDS, RULES_MARKDOWN, addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, proposedReason, removeAnnex, rulesApiPath,
+  rulesMediaProps, variableGroups, variableValueText,
+} from "@/lib/leagueRules";
+import { changedPlaces, seasonAnchorUrl } from "@/lib/seasonTabs";
 import { viennaDate } from "@/lib/vienna";
-import { seasonAnchorUrl } from "@/lib/seasonTabs";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
 const PRIMARY = "tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-[11px] font-black uppercase tracking-wider disabled:opacity-50";
 const REASON_MIN = 5;
 const ICON_BUTTON = "p-1.5 text-white/60 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm disabled:opacity-30";
+const SUMMARY = "tls-hit flex min-h-[40px] cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden";
 
 function formOf(draft) {
   return { title: draft?.title || "", body_md: draft?.body_md || "", annexes: (draft?.annexes || []).map(({ title, body_md }) => ({ title: title || "", body_md: body_md || "" })) };
 }
 
-function DataChanges({ changes, hasDraft, busy, onPrepare }) {
+function VarAlerts({ unknown = [], empty = [], testId }) {
   return (
-    <section className="mb-6 rounded-sm border border-warn/30 bg-warn/5 p-4" data-testid="rules-data-changes" aria-label="Daten geändert">
-      <h2 className="font-bold text-warn">Daten geändert, neue Version vorbereiten</h2>
-      <p className="mt-1 text-sm text-white/75">
-        {changes.label} zeigt die Listen von damals. Das bleibt so, bis du eine neue Version veröffentlichst. Von selbst geht nichts raus.
-      </p>
-      <div className="mt-3 space-y-3">
+    <>
+      {unknown.length ? (
+        <p role="alert" className="mb-3 break-words text-sm text-warn" data-testid={`${testId}-unknown`}>
+          Unbekannte Variable: {unknown.map((name) => `{{${name}}}`).join(", ")}. So lässt sich nichts veröffentlichen - bitte aus der Liste einfügen.
+        </p>
+      ) : null}
+      {empty.length ? (
+        <p role="status" className="mb-3 break-words text-sm text-white/70" data-testid={`${testId}-empty`}>
+          Ohne Wert in dieser Season, im Text steht „(nicht festgelegt)“: {empty.map((name) => `{{${name}}}`).join(", ")}.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** „Regelwerk muss freigegeben werden“: die geänderten Stellen, der Vorschlag mit markierten Unterschieden und die Freigabe. */
+function PendingRelease({ changes, proposal, hasDraft, busy, today, onPrepare, onApprove }) {
+  const [release, setRelease] = useState({ valid_from: today || "", change_reason: proposedReason(changes), requires_consent: true });
+  const canApprove = release.change_reason.trim().length >= REASON_MIN && release.valid_from && !busy && !proposal?.unknown_vars?.length;
+  return (
+    <section className="mb-6 rounded-sm border border-warn/40 bg-warn/5 p-4" data-testid="rules-data-changes" aria-labelledby="rules-pending-title">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h2 id="rules-pending-title" className="font-heading text-lg font-black uppercase text-white">Regelwerk muss freigegeben werden</h2>
+          <p className="mt-1 text-sm text-white/75">
+            Seit {changes.label} haben sich Werte geändert, die im Regelwerk stehen ({changedPlaces(changes.rows)}). {changes.label} zeigt weiter den Stand von damals,
+            bis du eine neue Fassung freigibst. Von selbst geht nichts raus.
+          </p>
+        </div>
+      </div>
+      <ul className="mt-4 space-y-3">
         {changes.rows.map((row) => (
-          <div key={`${row.season_id}-${row.block}`} className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3">
-            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-white/70">
-              {row.label} · {row.season_name}{row.status === "missing" ? " · noch nicht festgehalten" : ""}
+          <li key={`${row.season_id}-${row.kind}-${row.block}`} className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`rules-change-${row.kind || "block"}-${row.block}`}>
+            <p className="mb-1 flex flex-wrap items-center gap-x-2 text-xs font-bold text-white/70">
+              <span className="rounded-sm border border-white/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-white/55">{CHANGE_KIND_WORDS[row.kind] || CHANGE_KIND_WORDS.block}</span>
+              {/* Die Marke einer Variable bleibt, wie sie im Text steht - nicht in Großbuchstaben. */}
+              <span className={`min-w-0 break-words ${row.kind === "variable" ? "font-mono font-normal text-white/85" : "uppercase tracking-wider"}`}>{row.label}</span>
+              <span className="text-white/45">· {row.season_name}{row.status === "missing" ? " · noch nicht festgehalten" : ""}</span>
             </p>
             <div className="tls-rules"><RuleOps ops={row.ops} /></div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
       {hasDraft ? (
-        <p className="mt-3 text-sm text-white/75">Der Entwurf unten nimmt beim Veröffentlichen den neuen Stand.</p>
-      ) : (
+        <p className="mt-4 text-sm text-white/75" data-testid="rules-pending-draft">Der Entwurf unten nimmt beim Veröffentlichen den neuen Stand - prüfen, dann veröffentlichen.</p>
+      ) : null}
+      {!hasDraft && proposal ? (
+        <div className="mt-5 space-y-4" data-testid="rules-proposal">
+          {/* Erst die Freigabe, darunter die ganze neue Fassung zum Prüfen - bei langen Regelwerken sonst ein weiter Weg zum Knopf. */}
+          <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="rules-approve">
+            <p className="text-sm font-semibold text-white">Prüfen und freigeben</p>
+            <p className="mt-1 text-sm text-white/65">
+              Die neue Fassung übernimmt den Text von {changes.label} und die Werte von heute - sie steht darunter zum Prüfen, geänderte Abschnitte sind markiert.
+              Zum Anpassen des Texts vorher „Text vorher anpassen“.
+            </p>
+            <VarAlerts unknown={proposal.unknown_vars} empty={proposal.empty_vars} testId="rules-proposal" />
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <TextField label="Gültig ab" type="date" value={release.valid_from} min={today} onChange={(value) => setRelease((row) => ({ ...row, valid_from: value }))} testId="rules-approve-valid-from" />
+              <TextAreaField label="Änderungsgrund" value={release.change_reason} onChange={(value) => setRelease((row) => ({ ...row, change_reason: value }))} rows={2}
+                hint="Steht öffentlich bei der Fassung, mindestens fünf Zeichen." testId="rules-approve-reason" />
+            </div>
+            <CheckField className="mt-3" label="Die Teams müssen der neuen Fassung zustimmen" checked={release.requires_consent} onChange={(value) => setRelease((row) => ({ ...row, requires_consent: value }))}
+              hint="Captain und Vertreter sehen „Neue Fassung, bitte zustimmen“ - auf Startseite, Regelseite, Team-Seite und Matchseite." testId="rules-approve-consent" />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" className={PRIMARY} disabled={!canApprove} onClick={() => onApprove({ ...release, base_version_id: proposal.base.id })} data-testid="rules-approve-publish">Freigeben und veröffentlichen</button>
+              <button type="button" className={QUIET} disabled={busy} onClick={onPrepare} data-testid="rules-prepare">Text vorher anpassen</button>
+            </div>
+          </div>
+          <details open className="group rounded-sm border border-white/10 bg-[#0A0A0A]">
+            <summary className={`${SUMMARY} px-4 py-2`}>Vorschlag: die neue Fassung mit den Werten von heute</summary>
+            <div className="tls-rules border-t border-white/10 p-4 md:p-6">
+              <RulesChanges changes={proposal.changes} versionLabel="der neuen Fassung" testId="rules-proposal-changes" />
+              <RulesDocument sections={proposal.sections} versionLabel="der neuen Fassung" testId="rules-proposal-document" />
+            </div>
+          </details>
+        </div>
+      ) : null}
+      {!hasDraft && !proposal ? (
         <button type="button" className={`${PRIMARY} mt-3`} disabled={busy} onClick={onPrepare} data-testid="rules-prepare">Neue Version vorbereiten</button>
-      )}
+      ) : null}
     </section>
+  );
+}
+
+/** Variablen einfügen: Liste mit Bezeichnung, Marke und dem Wert von heute, nach Gruppen, mit Suche. */
+function VariablePalette({ variables, onInsert }) {
+  const [query, setQuery] = useState("");
+  const groups = useMemo(() => variableGroups(variables, query), [variables, query]);
+  if (!variables?.length) return null;
+  return (
+    <details className="group rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="rules-variables">
+      <summary className={`${SUMMARY} px-3`}>Variable einfügen <span className="font-normal normal-case tracking-normal text-white/50">- mit dem Wert von heute</span></summary>
+      <div className="border-t border-white/10 p-3">
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Suchen: Name, Bezeichnung oder Wert" aria-label="Variablen durchsuchen"
+          className="mb-3 w-full rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8] focus:outline-none" data-testid="rules-variables-search" />
+        {groups.length ? groups.map((group) => (
+          <div key={group.name} className="mb-3 last:mb-0">
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-white/50">{group.name}</p>
+            <ul className="grid gap-1.5 sm:grid-cols-2">
+              {group.rows.map((row) => (
+                <li key={row.name}>
+                  <button type="button" onClick={() => onInsert(row.token)} title={row.hint || row.label} data-testid={`rules-var-${row.name}`}
+                    className="tls-hit flex w-full min-w-0 flex-col items-start rounded-sm border border-white/10 px-2.5 py-1.5 text-left hover:border-[#29B6E8]/60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                    <span className="text-sm text-white">{row.label}</span>
+                    <span className="font-mono text-[11px] text-white/45">{row.token}</span>
+                    <span className={`break-words text-xs ${row.value == null ? "text-warn" : "text-[#29B6E8]"}`}>{variableValueText(row)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )) : <p className="text-sm text-white/50">Keine Variable passt zur Suche.</p>}
+      </div>
+    </details>
+  );
+}
+
+/** Die Hilfe: alle Bausteine und Variablen auf einen Blick, mit dem heutigen Wert. */
+function RulesHelp({ blocks, variables }) {
+  return (
+    <details className="group rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="rules-help">
+      <summary className={`${SUMMARY} px-3`}>Hilfe: alle Bausteine und Variablen</summary>
+      <div className="space-y-4 border-t border-white/10 p-3 text-sm">
+        <p className="text-white/70">
+          Ein Baustein steht als eigener Absatz (Tabelle oder Liste), eine Variable mitten im Satz. Beide kommen aus den Einstellungen der Season und werden beim
+          Veröffentlichen eingefroren. Ändert sich danach eine Einstellung, bleibt die Fassung, wie sie ist, und die Seite zeigt „Regelwerk muss freigegeben werden“.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead><tr className="text-white/50"><th className="py-1 pr-3 font-bold uppercase tracking-wider">Baustein</th><th className="py-1 pr-3 font-bold uppercase tracking-wider">Marke</th><th className="py-1 font-bold uppercase tracking-wider">Inhalt</th></tr></thead>
+            <tbody>
+              {blocks.map((block) => (
+                <tr key={block.key} className="border-t border-white/5 align-top">
+                  <td className="py-1.5 pr-3 text-white">{block.label}</td>
+                  <td className="py-1.5 pr-3 font-mono text-white/60">{block.token}</td>
+                  <td className="py-1.5 text-white/70">{block.hint}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead><tr className="text-white/50"><th className="py-1 pr-3 font-bold uppercase tracking-wider">Variable</th><th className="py-1 pr-3 font-bold uppercase tracking-wider">Marke</th><th className="py-1 font-bold uppercase tracking-wider">Wert heute</th></tr></thead>
+            <tbody>
+              {(variables || []).map((row) => (
+                <tr key={row.name} className="border-t border-white/5 align-top">
+                  <td className="py-1.5 pr-3 text-white">{row.label}</td>
+                  <td className="py-1.5 pr-3 font-mono text-white/60">{row.token}</td>
+                  <td className={`py-1.5 ${row.value == null ? "text-white/45" : "text-white/80"}`}>{variableValueText(row)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -111,6 +253,10 @@ export default function AdminLeagueRulesPage() {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
   const [publish, setPublish] = useState({ valid_from: "", change_reason: "", requires_consent: false });
+  // Wohin ein Baustein oder eine Variable geht: der zuletzt benutzte Editor (Haupttext oder eine Anlage).
+  const [target, setTarget] = useState("body");
+  const bodyRef = useRef(null);
+  const annexRefs = useRef([]);
   const base = `/admin/league-rules/${scope}/${scopeId}`;
 
   const applyDraft = useCallback((draft) => {
@@ -139,6 +285,20 @@ export default function AdminLeagueRulesPage() {
   };
   const changeAnnex = (index, patch) => change({ annexes: form.annexes.map((row, position) => (position === index ? { ...row, ...patch } : row)) });
 
+  /** Baustein (eigener Absatz) oder Variable (im Satz) in den zuletzt benutzten Editor - an der Schreibmarke, sonst ans Ende. */
+  const insert = (token, { block }) => {
+    const editor = target === "body" ? bodyRef.current : annexRefs.current[target];
+    if (editor?.insertText) {
+      editor.insertText(token, { block });
+      setDirty(true);
+      return;
+    }
+    const current = target === "body" ? form.body_md : form.annexes[target]?.body_md;
+    const next = block ? insertBlock(current, token) : appendText(current, token);
+    if (target === "body") change({ body_md: next });
+    else changeAnnex(target, { body_md: next });
+  };
+
   const save = async () => {
     const { data } = await api.put(`${base}/draft`, { ...form, ...(revision ? { revision } : {}) });
     setRevision(data.revision);
@@ -158,6 +318,12 @@ export default function AdminLeagueRulesPage() {
   const onSave = () => run(async () => { await save(); toast.success("Entwurf gespeichert."); });
   const onPreview = () => run(async () => { const { data } = await api.post(`${base}/preview`, form); setPreview(data); });
   const onPrepare = () => run(async () => { await api.post(`${base}/draft/from-version`, {}); toast.success("Entwurf vorbereitet."); await load(); });
+  const onApprove = (body) => run(async () => {
+    if (!await confirm({ title: "Neue Fassung freigeben?", description: "Der Text der letzten Fassung mit den Werten von heute wird veröffentlicht. Danach lässt sie sich nicht mehr ändern.", confirmLabel: "Freigeben" })) return;
+    await api.post(`${base}/proposal/publish`, body);
+    toast.success("Neue Fassung freigegeben.");
+    await load();
+  });
   const onDiscard = () => run(async () => {
     if (!await confirm({ title: "Entwurf verwerfen?", description: "Der Text des Entwurfs ist danach weg. Veröffentlichte Fassungen bleiben.", confirmLabel: "Verwerfen" })) return;
     await api.delete(`${base}/draft`);
@@ -165,7 +331,7 @@ export default function AdminLeagueRulesPage() {
     await load();
   });
   const onPublish = () => run(async () => {
-    if (!await confirm({ title: "Version veröffentlichen?", description: "Danach lässt sie sich nicht mehr ändern. Bausteine werden mit dem heutigen Stand eingefroren.", confirmLabel: "Veröffentlichen" })) return;
+    if (!await confirm({ title: "Version veröffentlichen?", description: "Danach lässt sie sich nicht mehr ändern. Bausteine und Variablen werden mit dem heutigen Stand eingefroren.", confirmLabel: "Veröffentlichen" })) return;
     const current = dirty || !revision ? (await save()).revision : revision;
     await api.post(`${base}/publish`, { revision: current, ...publish });
     toast.success("Version veröffentlicht.");
@@ -195,7 +361,10 @@ export default function AdminLeagueRulesPage() {
             <a href={view.public_url} target="_blank" rel="noopener noreferrer" className={QUIET} data-testid="rules-open-page">Seite öffnen <ExternalLink className="h-3 w-3" aria-hidden="true" /></a>
           </div>
 
-          {view.data_changes ? <DataChanges changes={view.data_changes} hasDraft={!!view.draft || editing} busy={busy} onPrepare={onPrepare} /> : null}
+          {view.data_changes ? (
+            <PendingRelease key={`${view.data_changes.version_id}-${view.data_changes.rows.length}`} changes={view.data_changes} proposal={view.proposal}
+              hasDraft={!!view.draft || editing} busy={busy} today={view.today} onPrepare={onPrepare} onApprove={onApprove} />
+          ) : null}
 
           {view.inherited && !editing ? (
             <section className="mb-6 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="rules-inherited">
@@ -226,19 +395,23 @@ export default function AdminLeagueRulesPage() {
                     <div className="flex flex-wrap gap-2">
                       {view.blocks.map((block) => (
                         <button key={block.key} type="button" title={block.hint} className={QUIET} data-testid={`rules-block-${block.key}`}
-                          onClick={() => change({ body_md: insertBlock(form.body_md, block.token) })}>{block.label}</button>
+                          onClick={() => insert(block.token, { block: true })}>{block.label}</button>
                       ))}
                     </div>
-                    <p className="mt-1.5 text-xs text-white/50">Der Inhalt kommt aus den Daten der Season und wird beim Veröffentlichen eingefroren.</p>
+                    <p className="mt-1.5 text-xs text-white/50">Der Inhalt kommt aus den Einstellungen der Season und wird beim Veröffentlichen eingefroren. Eingefügt wird in den zuletzt benutzten Editor.</p>
                   </div>
-                  <MarkdownEditor value={form.body_md} onChange={(value) => change({ body_md: value })} testId="rules-body" rows={18} mentionsEnabled={false} previewOptions={RULES_MARKDOWN} {...media}
-                    placeholder="# § 1 Geltung" helperText="Markdown. Rohes HTML wird nicht übernommen." />
+                  <VariablePalette variables={view.variables} onInsert={(token) => insert(token, { block: false })} />
+                  <RulesHelp blocks={view.blocks} variables={view.variables} />
+                  <div onFocusCapture={() => setTarget("body")}>
+                    <MarkdownEditor ref={bodyRef} value={form.body_md} onChange={(value) => change({ body_md: value })} testId="rules-body" rows={18} mentionsEnabled={false} previewOptions={RULES_MARKDOWN} {...media}
+                      placeholder="# § 1 Geltung" helperText="Markdown. Rohes HTML wird nicht übernommen. Variablen wie {{best_of}} und Bausteine wie [[baustein:modes]] füllt der Server." />
+                  </div>
                 </FormSection>
 
                 <FormSection title="Anlagen" hint="Eigene Abschnitte im Inhaltsverzeichnis und im PDF. Der Buchstabe folgt der Reihenfolge." testId="rules-annexes">
                   {form.annexes.map((annex, index) => (
                     // Anlagen haben keine eigene Kennung, die Reihenfolge ist ihr Schlüssel.
-                    <div key={index} className="rounded-sm border border-white/10 p-3" data-testid={`rules-annex-${index}`}>
+                    <div key={index} className="rounded-sm border border-white/10 p-3" data-testid={`rules-annex-${index}`} onFocusCapture={() => setTarget(index)}>
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <span className="font-bold text-white">{annexLabel(index)}</span>
                         <span className="flex gap-1">
@@ -249,8 +422,8 @@ export default function AdminLeagueRulesPage() {
                       </div>
                       <div className="space-y-3">
                         <TextField label="Titel der Anlage" value={annex.title} onChange={(value) => changeAnnex(index, { title: value })} maxLength={160} testId={`rules-annex-title-${index}`} />
-                        <MarkdownEditor value={annex.body_md} onChange={(value) => changeAnnex(index, { body_md: value })} testId={`rules-annex-body-${index}`} rows={8} mentionsEnabled={false} previewOptions={RULES_MARKDOWN} {...media}
-                          helperText="Markdown wie im Haupttext, auch mit Bausteinen." />
+                        <MarkdownEditor ref={(node) => { annexRefs.current[index] = node; }} value={annex.body_md} onChange={(value) => changeAnnex(index, { body_md: value })} testId={`rules-annex-body-${index}`} rows={8} mentionsEnabled={false} previewOptions={RULES_MARKDOWN} {...media}
+                          helperText="Markdown wie im Haupttext, auch mit Bausteinen und Variablen." />
                       </div>
                     </div>
                   ))}
@@ -272,6 +445,7 @@ export default function AdminLeagueRulesPage() {
                     {preview.unknown_blocks?.length ? (
                       <p role="alert" className="mb-4 text-sm text-warn">Unbekannter Baustein: {preview.unknown_blocks.join(", ")}. So lässt sich nichts veröffentlichen.</p>
                     ) : null}
+                    <VarAlerts unknown={preview.unknown_vars} empty={preview.empty_vars} testId="rules-preview-vars" />
                     {preview.foreign_images?.length ? (
                       <p role="alert" className="mb-4 break-words text-sm text-warn" data-testid="rules-preview-foreign">Fremde Bilder lassen sich nicht speichern: {preview.foreign_images.join(", ")}. Bitte über „Hochladen“ oder die Mediathek wählen.</p>
                     ) : null}

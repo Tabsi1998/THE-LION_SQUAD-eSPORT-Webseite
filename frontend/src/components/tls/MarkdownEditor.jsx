@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -211,7 +211,18 @@ function MediaThumb({ item, onSelect }) {
   );
 }
 
-export function MarkdownEditor({
+/** Text in die gespeicherte Fassung setzen, wenn keine Schreibmarke zu haben ist (Markdown- und Vorschau-Ansicht): als eigener Absatz
+ * oder mit einem Leerzeichen angehängt. */
+export function appendText(value, text, { block = false } = {}) {
+  const current = String(value || "");
+  if (block) {
+    const trimmed = current.trimEnd();
+    return `${trimmed}${trimmed ? "\n\n" : ""}${text}\n`;
+  }
+  return `${current}${current && !/\s$/.test(current) ? " " : ""}${text}`;
+}
+
+export const MarkdownEditor = forwardRef(function MarkdownEditor({
   value = "",
   onChange,
   rows = 12,
@@ -226,7 +237,7 @@ export function MarkdownEditor({
   mentionScope,
   mentionScopeId,
   previewOptions,
-}) {
+}, ref) {
   const [mode, setMode] = useState("visual");
   const [htmlInput, setHtmlInput] = useState("");
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -365,6 +376,18 @@ export function MarkdownEditor({
     if (!editor || editor.isDestroyed) return;
     command(editor.chain().focus()).run();
   };
+
+  // Von außen einfügen (Bausteine und Variablen des Regelwerks, #2269): im Editor an der Schreibmarke, sonst ans Ende des Texts.
+  useImperativeHandle(ref, () => ({
+    insertText(text, { block = false } = {}) {
+      if (mode === "visual" && editor && !editor.isDestroyed) {
+        const content = block ? { type: "paragraph", content: [{ type: "text", text }] } : text;
+        editor.chain().focus().insertContent(content).run();
+        return;
+      }
+      onChange(appendText(value, text, { block }));
+    },
+  }), [editor, mode, onChange, value]);
 
   const setLink = async () => {
     if (!editor || editor.isDestroyed) return;
@@ -581,4 +604,4 @@ export function MarkdownEditor({
       )}
     </div>
   );
-}
+});
