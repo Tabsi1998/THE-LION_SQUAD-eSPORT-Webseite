@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from models import now_utc
+from services import league_veto_rules
 from services.league_scope import is_league_staffel
 
 # Wiener Zeit nur für Texte (wie matchday_schedule.LOCAL_TZ) - hier eigens, damit dieses Modul ein Blatt bleibt und der
@@ -202,8 +203,9 @@ def has_report(match: dict | None) -> bool:
 
 
 def veto_pending(match: dict | None, tournament: dict | None) -> bool:
-    """Haken für D.3: Ist zwischen „beide eingecheckt“ und dem Start ein Veto offen? Heute gibt es keins."""
-    return False
+    """Ist zwischen „beide eingecheckt“ und dem Start ein Veto offen (D.3, #1618)? Ohne Vorlage an der Staffel nie; mit Vorlage, solange
+    zum geltenden Termin keins da ist (es beginnt beim nächsten Lesen oder Zug) oder es läuft bzw. pausiert."""
+    return league_veto_rules.veto_pending(match, tournament)
 
 
 def state(match: dict | None, tournament: dict | None, now: datetime | None = None) -> str:

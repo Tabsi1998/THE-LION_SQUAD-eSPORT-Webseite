@@ -166,6 +166,9 @@ async def init_indexes():
     await db.matches_v2.create_index("lineup_user_ids", sparse=True)
     # Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110): Spiele je Seite ohne Aufstellung (Mehrfachwert).
     await db.matches_v2.create_index("lineups_missing", sparse=True)
+    # Veto (#1618, D.3): der Zeit-Job fragt nur laufende Vetos mit abgelaufener Frist.
+    await db.matches_v2.create_index([("flow.veto.deadline_at", 1)], name="veto_deadline",
+                                     partialFilterExpression={"flow.veto.status": "running"})
     # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
     await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
     await db.league_rosters.create_index("user_id")
