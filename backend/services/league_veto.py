@@ -164,7 +164,8 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
     """Das Veto beginnen, sobald beide Seiten eingecheckt sind - genau einmal je Termin (Bedingung: kein Veto für diesen Termin).
     Gibt das Spiel zurück, bei einem Start den frischen Stand. Ohne Vorlage, mit Veto oder ohne „beide da“ passiert nichts."""
     rules = rules_mod.rules_of(tournament)
-    if not rules or veto_of(match) is not None or not _can_run(match):
+    # Gesperrte Staffel (Codex zu D.3): nur lesen - kein Start aus einem Seitenaufruf, der Scheduler lässt sie ohnehin aus.
+    if not rules or tournament.get("locked_at") or veto_of(match) is not None or not _can_run(match):
         return match
     now = now or now_utc()
     now_iso = now.isoformat()
@@ -289,6 +290,9 @@ async def settle_due(db, match: dict, tournament: dict | None, *, now: datetime 
     """Fällige Decider setzen und abgelaufene Fristen auflösen (Zufall, gleichverteilt) - so oft, bis nichts mehr fällig ist. Idempotent:
     jedes Schreiben trägt die Bedingung auf die Version; verliert dieser Aufruf, liest er neu und prüft wieder."""
     now = now or now_utc()
+    # Gesperrte Staffel (Codex zu D.3): nur lesen - Job und Seitenaufruf lassen die Frist stehen.
+    if (tournament or {}).get("locked_at"):
+        return match
     for _ in range(rules_mod.STEPS_MAX + 1):
         veto = veto_of(match)
         if not veto or veto.get("status") != RUNNING or match.get("started_at"):

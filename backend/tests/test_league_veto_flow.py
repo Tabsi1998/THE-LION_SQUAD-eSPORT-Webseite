@@ -563,6 +563,30 @@ async def test_every_way_to_a_new_time_raises_the_revision(flow):
     await expect_reset(flow, third, "Stationsplan", 1)
 
 
+@pytest.mark.asyncio
+async def test_a_locked_staffel_is_only_read(flow):
+    """Codex zu D.3: Bei einer gesperrten Staffel schreibt der Seitenaufruf nichts - kein Start, keine Frist wird aufgelöst."""
+    world = await veto_world(flow, rules=veto_rules(step_seconds=30))
+    await checked_in(flow, mid(world))
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {"locked_at": now_utc().isoformat()}})
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    assert block["veto"]["status"] == "waiting" and "veto" not in (await flow.reload(world["match"]))["flow"], "gesperrt: kein Start"
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$unset": {"locked_at": ""}})
+    assert (await page(flow, world, "Kapitaen"))["checkin"]["veto"]["status"] == "running", "entsperrt: der nächste Aufruf startet"
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {"locked_at": now_utc().isoformat()}})
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"flow.veto.deadline_at": (now_utc() - timedelta(seconds=1)).isoformat()}})
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    assert block["veto"]["history"] == [] and block["veto"]["current"]["number"] == 1, "gesperrt: keine Zufallswahl beim Lesen"
+    tournament = await tournament_of(flow, world)
+    assert await league_veto_sweep.sweep(flow.db, [tournament]) == {"auto": 0}, "der Job schreibt bei Sperre nichts"
+    settled = await league_veto.settle_due(flow.db, await flow.reload(world["match"]), tournament)
+    assert (settled["flow"]["veto"].get("steps") or []) == []
+    flow.act_as(world["users"]["Kapitaen"])
+    assert (await flow.post(f"/api/matches/{mid(world)}/veto/pick", json={"map_id": "map-hafen", "version": 1})).status_code == 423
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$unset": {"locked_at": ""}})
+    assert len((await page(flow, world, "Kapitaen"))["checkin"]["veto"]["history"]) == 1, "entsperrt: die Frist wird aufgelöst"
+
+
 # ---------------------------------------------------------------- Ergebnis nach dem Veto
 
 @pytest.mark.asyncio
