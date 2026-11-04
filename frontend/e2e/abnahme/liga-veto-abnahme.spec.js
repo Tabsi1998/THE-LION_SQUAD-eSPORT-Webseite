@@ -75,8 +75,10 @@ test.describe("Abnahme: Liga-Veto gegen den echten Server", () => {
     await shot(lead.page, "veto-verwaltung-1440.png");
     await lead.page.getByTestId("veto-rules-save").click();
     await expect(lead.page.getByTestId("veto-rules-error")).toHaveCount(0);
-    const rules = await (await lead.page.request.get(`/api/admin/leagues/seasons/${ablauf.season.id}/veto-rules`)).json();
-    expect(rules.active).toBe(true);
+    // Erst, wenn der Server den Stand hat - der Klick kommt vor der Antwort zurück.
+    const readRules = async () => (await lead.page.request.get(`/api/admin/leagues/seasons/${ablauf.season.id}/veto-rules`)).json();
+    await expect.poll(async () => (await readRules()).active, { timeout: 15_000 }).toBe(true);
+    const rules = await readRules();
     expect(rules.problems).toEqual([]);
 
     await lead.page.goto(`/admin/tournaments/${tid}`);
@@ -136,11 +138,14 @@ test.describe("Abnahme: Liga-Veto gegen den echten Server", () => {
       const actor = people[block.current.registration_id];
       await actor.page.goto(`/matches/${play.id}`);
       await expect(actor.page.getByTestId("veto-panel")).toHaveAttribute("data-own-turn", "true");
-      if (banned) {
-        const refused = await api(actor.page, "POST", `/api/matches/${play.id}/veto/pick`, { map_id: banned, version: block.version });
-        if (block.current.mode === banned.mode) expect(refused.status()).toBe(422);
-        banned = null;
+      // Eine im selben Modus gesperrte Map lehnt der Server ab (über die API, damit die Wache sie nicht zählt). In einem anderen Modus
+      // wäre dieselbe Map ein gültiger Zug - dort bleibt der Aufruf weg.
+      if (banned && block.current.mode === banned.mode) {
+        const refused = await api(actor.page, "POST", `/api/matches/${play.id}/veto/pick`, { map_id: banned.map_id, version: block.version });
+        expect(refused.status()).toBe(422);
+        expect((await refused.json()).detail).toContain("gesperrt");
       }
+      banned = null;
       const option = block.options.find((row) => row.allowed);
       expect(option, `Schritt ${block.current.number}: eine wählbare Map`).toBeTruthy();
       if (guard === 0) {
@@ -149,7 +154,7 @@ test.describe("Abnahme: Liga-Veto gegen den echten Server", () => {
       }
       await actor.page.getByTestId(`veto-option-${option.map_id}`).click();
       await expect.poll(async () => (await (await actor.page.request.get(`/api/matches/${play.id}/page`)).json()).checkin.veto.version).toBeGreaterThan(block.version);
-      if (block.current.kind === "ban") banned = { ...option, mode: block.current.mode }.map_id;
+      if (block.current.kind === "ban") banned = { map_id: option.map_id, mode: block.current.mode };
       block = (await (await actor.page.request.get(`/api/matches/${play.id}/page`)).json()).checkin.veto;
     }
     expect(block.status).toBe("done");
