@@ -115,7 +115,11 @@ export function LoadoutBansView({ list, title = "Sperrliste", className = "mt-14
                     <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-white/45">Gesperrte Aufsätze</p>
                     <ul className="mt-1 flex flex-wrap gap-1.5">
                       {(entry.attachments || []).map((item) => (
-                        <li key={item.item_id || item.name} className="max-w-full rounded-sm border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/85 break-words">{item.name}</li>
+                        <li key={item.item_id || item.name} className="max-w-full rounded-sm border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/85 break-words">
+                          {item.name}
+                          {/* Eigene Modi je Aufsatz (#2299). */}
+                          {item.mode_labels?.length ? <span className="text-warn"> · nur {item.mode_labels.join(", ")}</span> : null}
+                        </li>
                       ))}
                     </ul>
                   </div>
