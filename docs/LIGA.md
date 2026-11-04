@@ -867,6 +867,8 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `eligibility.min_age`, `eligibility.wait_days`, `eligibility.roster_deadline`, `eligibility.transfer_windows`, `eligibility.entry_policy`, `eligibility.id_fields` | B.3-Werte in Worten |
 | `eligibility.platform`, `eligibility.crossplay`, `eligibility.input_device` | Plattform je Season (#2270): „PC und PlayStation“ / „alle Plattformen“, „an“ / „aus“, Eingabegerät in Worten; ohne Plattform-Feld „(nicht festgelegt)“ |
 | `application.opens`, `application.closes`, `application.slots` | Anmeldefenster (Wiener Zeit) und Startplätze (B.4) |
+| `protest.hours`, `appeal.hours`, `evidence.keep_days` | **Vorab angelegt:** Season-Felder `protest_hours` (Vorgabe 48), `appeal_hours` (48), `evidence_keep_days` (30). Ohne Feld gilt die Vorgabe (`league_rule_vars.PRESETS`). Die Einstellung kommt mit E.2 (Proteste) bzw. E.3 (Strafen) und schreibt **genau diese Felder**, Texte passen sich dann über den Vorschlag an |
+| `match.break_after_map`, `match.break_minutes` | **Vorab angelegt:** Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5); Einstellung mit D.5 (Vorfälle) |
 | `mode:<kennung>.name`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus des Spiels: Name, Ergebnisregel in Klartext, Ziel, Rundenlimit, Zeitlimit („10 Min.“), Zeit je Runde, Spieler je Seite, „ja“/„nein“ |
 
 **Ablauf bei Änderungen** (Obmann 03.11.): Ändert sich eine Einstellung, vergleicht die Verwaltung wie bisher die letzte Fassung mit
