@@ -1,10 +1,13 @@
 // Spielberechtigung in der Liga (docs/LIGA.md, B.3, #2204): nur die Darstellung, geprüft wird im Server
 // (services/league_eligibility.py). Ein Geburtsdatum kommt hier nie an, nur „erfüllt“ oder „fehlt“.
+import { platformLines } from "@/lib/leaguePlatform";
 
 export const ELIGIBILITY_LABELS = {
   other_team: "in zwei Co-Teams",
   age_missing: "Geburtsdatum fehlt",
   age_not_met: "Altersvorgabe nicht erfüllt",
+  platform_not_allowed: "Plattform nicht erlaubt",
+  platform_missing: "Plattform fehlt",
   waiting: "Wartezeit",
   banned: "gesperrt",
   late: "wartet auf Freigabe",
@@ -57,7 +60,7 @@ export function rulesLines(rules) {
     if (!windows.length) lines.push("Transfers gibt es in dieser Season nicht.");
     else lines.push(`Transferfenster: ${windows.map(windowText).join("; ")}${rules.transfer_open ? " (gerade offen)" : ""}.`);
   }
-  return lines;
+  return [...lines, ...platformLines(rules.platform)];
 }
 
 /** Der Hinweis im Kader-Dialog: was die Season beim Aufnehmen verlangt. */
@@ -85,5 +88,5 @@ export function eligibilityNotice(item) {
 
 /** Darf die Kaderübersicht eine vollständige Liste zeigen, auch wenn das Spiel keine Pflicht-ID hat? */
 export function hasSeasonRules(rules) {
-  return Boolean(rules && (rules.one_team_per_season || rules.min_age || rules.new_player_wait_days));
+  return Boolean(rules && (rules.one_team_per_season || rules.min_age || rules.new_player_wait_days || rules.platform?.allowed?.length));
 }

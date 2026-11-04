@@ -69,6 +69,9 @@ ROUTES = [
     # Check-in (D.2, #1652): Regeln je Season
     route("GET", "/api/admin/leagues/seasons/{season}/checkin-rules", ANY),
     route("PUT", "/api/admin/leagues/seasons/{season}/checkin-rules", "season", {"min_present": 2}),
+    # Plattform je Season (#2270)
+    route("GET", "/api/admin/leagues/seasons/{season}/platform", ANY),
+    route("PATCH", "/api/admin/leagues/seasons/{season}", "season", {"crossplay": True}),
     route("POST", "/api/admin/leagues/seasons/{season}/divisions", "season", {"level": 7}),
     route("PATCH", "/api/admin/leagues/divisions/{division}", "season", {"nickname": "Neu"}),
     route("GET", "/api/admin/leagues/divisions/{division}/delete-plan", "season"),

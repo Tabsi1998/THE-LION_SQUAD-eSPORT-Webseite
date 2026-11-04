@@ -11,11 +11,11 @@ nach außen kommen ``met``, ``missing`` oder der Stand ``age_not_met``. Keine Me
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 from models import now_utc
-from services import league_roster
+from services import league_platform, league_roster
 from services.dolibarr_policy import club_today
 from services.matchday_schedule import LOCAL_TZ
 
@@ -38,11 +38,14 @@ class EligibilityError(Exception):
 
 @dataclass
 class EligibilityContext:
-    """Was die Prüfung einer Season braucht: der Kader-Kontext, das Altersergebnis und wer in welchem Co-Team steht."""
+    """Was die Prüfung einer Season braucht: der Kader-Kontext, das Altersergebnis, wer in welchem Co-Team steht und die
+    Plattform-Regel (#2270: in einer Staffel die ihrer Liga N, sonst die weiteste aller aktiven Liga N)."""
 
     roster: league_roster.RosterContext | None
     ages: dict[str, str] = field(default_factory=dict)
     memberships: dict[str, set[str]] = field(default_factory=dict)
+    platform: league_platform.PlatformRule | None = None
+    division: dict | None = None
 
     @property
     def season(self) -> dict:
@@ -111,20 +114,43 @@ async def _memberships(db, season: dict | None) -> dict[str, set[str]]:
 
 
 async def context_for_tournament(db, tournament: dict | None, user_ids) -> EligibilityContext | None:
-    """Für eine Staffel - ``None`` bei Turnieren ohne Liga-Rahmen."""
+    """Für eine Staffel - ``None`` bei Turnieren ohne Liga-Rahmen. Die Plattform gilt wie in ihrer Liga N."""
     roster = await league_roster.context_for_tournament(db, tournament, user_ids)
-    return await _with_rules(db, roster, user_ids) if roster else None
+    if not roster:
+        return None
+    ctx = await _with_rules(db, roster, user_ids)
+    division_id = ((tournament or {}).get("league_context") or {}).get("division_id")
+    ctx.division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0}) if division_id else None
+    if (roster.season or {}).get(league_platform.FIELD):
+        ctx.platform = league_platform.rule_for(roster.season, ctx.division, roster.game)
+    return ctx
 
 
 async def context_for_season(db, season: dict, user_ids) -> EligibilityContext | None:
+    """Für die Season ohne Staffel (Prüfung der Anmeldung): Die Liga N steht noch nicht fest, es gilt die weiteste Plattform-Regel."""
     roster = await league_roster.context_for_season(db, season, user_ids)
-    return await _with_rules(db, roster, user_ids) if roster else None
+    if not roster:
+        return None
+    ctx = await _with_rules(db, roster, user_ids)
+    if season.get(league_platform.FIELD):
+        ctx.platform = league_platform.lenient_rule(season, await league_platform.divisions_of(db, season["id"]), roster.game)
+    return ctx
 
 
 async def _with_rules(db, roster: league_roster.RosterContext, user_ids) -> EligibilityContext:
     wanted = {user_id for user_id in user_ids or [] if user_id}
     return EligibilityContext(roster=roster, ages=await _ages(db, roster.season, wanted),
                               memberships=await _memberships(db, roster.season))
+
+
+def platform_state(ctx: EligibilityContext | None, user_id: str) -> tuple[str, str, str] | None:
+    """``(Stand, Satz, Plattform)``, wenn die Plattform-Regel gegen die Person spricht - sonst ``None`` (#2270)."""
+    rule = ctx.platform if ctx else None
+    if not rule or not ctx.roster:
+        return None
+    value = league_platform.value_of(rule, ctx.roster.people.get(user_id), ctx.roster.entries.get(user_id), ctx.roster.game)
+    found = league_platform.check(rule, value)
+    return (*found, value) if found else None
 
 
 def status(ctx: EligibilityContext | None, user_id: str, squad_id: str | None = None) -> dict:
@@ -142,6 +168,11 @@ def status(ctx: EligibilityContext | None, user_id: str, squad_id: str | None = 
         return {**out, "state": AGE_MISSING, "ok": False, "reason": AGE_MISSING_REASON}
     if age == AGE_NOT_MET_STATE:
         return {**out, "state": AGE_NOT_MET_STATE, "ok": False, "reason": AGE_NOT_MET}
+    # Die Plattform (#2270) erst, wenn die Spiel-ID passt: Ein fehlerhafter ID-Stand (missing, late, format, taken) bleibt stehen -
+    # er sagt, was zu tun ist, und zählt beim Zuteilen als Hinweis statt als andere Plattform.
+    platform = platform_state(ctx, user_id) if out["ok"] else None
+    if platform:
+        return {**out, "state": platform[0], "ok": False, "reason": platform[1]}
     until = league_roster.wait_until(ctx.roster, user_id, squad_id)
     if until and now_utc() < until:
         text = until.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M")
@@ -187,10 +218,12 @@ def open_window(season: dict | None, today: str | None = None) -> dict | None:
     return None
 
 
-def rules_view(season: dict | None) -> dict:
-    """Die Regeln einer Season für die Anzeige - fehlt ein Feld, gibt es die Regel nicht."""
+def rules_view(season: dict | None, platform: dict | None = None) -> dict:
+    """Die Regeln einer Season für die Anzeige - fehlt ein Feld, gibt es die Regel nicht. ``platform``: was an Plattform gilt
+    (``league_platform.view``, #2270)."""
     season = season or {}
     return {
+        "platform": platform,
         "min_squad_size": season.get("min_squad_size"),
         "max_squad_size": season.get("max_squad_size"),
         "one_team_per_season": bool(season.get("one_team_per_season")),
@@ -234,10 +267,11 @@ async def squad_view(db, team: dict, squad: dict, *, can_edit: bool, transfers) 
         members = [uid for uid in squad.get("member_ids") or [] if uid]
         ctx = await context_for_tournament(db, tournament, members)
         players = sorted((public_row(row) for row in statuses(ctx, members, squad["id"]).values()), key=lambda row: row["name"].lower())
+        platform = league_platform.view(season, ctx.division, ctx.roster.game) if ctx else None
         seasons.append({
             "season_id": season["id"],
             "title": season.get("name"),
-            "rules": {**rules_view(season), "min_squad_size": league_roster.min_squad_size(tournament)},
+            "rules": {**rules_view(season, platform), "min_squad_size": league_roster.min_squad_size(tournament)},
             "players": players,
             "candidates": await _candidate_rows(db, season, tournament, squad, team) if can_edit else [],
             "transfers": await transfers(db, squad["id"], season["id"]),
@@ -252,15 +286,29 @@ async def season_overview(db, season: dict) -> dict:
     overview = await league_roster.season_overview(db, season)
     members = {player["id"] for row in overview["squads"] for player in row["players"]}
     ctx = await context_for_season(db, season, members)
+    by_staffel = await _platform_by_staffel(db, season, ctx)
     waiting = age = 0
     for row in overview["squads"]:
+        row_ctx = by_staffel.get(row.get("tournament_id"), ctx)
         for player in row["players"]:
-            player["eligibility"] = public_row(status(ctx, player["id"], row.get("squad_id")))
+            player["eligibility"] = public_row(status(row_ctx, player["id"], row.get("squad_id")))
             waiting += 1 if player["eligibility"]["state"] == WAITING else 0
             age += 1 if player["eligibility"]["state"] in (AGE_MISSING, AGE_NOT_MET_STATE) else 0
     overview["counts"].update({"waiting": waiting, "age": age})
-    overview["rules"] = rules_view(season)
+    overview["rules"] = rules_view(season, league_platform.view(season, None, ctx.roster.game) if ctx else None)
     return overview
+
+
+async def _platform_by_staffel(db, season: dict, ctx: EligibilityContext | None) -> dict[str, EligibilityContext]:
+    """Je Staffel der Kontext mit der Plattform-Regel ihrer Liga N (#2270) - nur, wenn die Season ein Plattform-Feld trägt."""
+    if not ctx or not season.get(league_platform.FIELD):
+        return {}
+    divisions = {row["id"]: row for row in await league_platform.divisions_of(db, season["id"])}
+    out = {}
+    async for row in db.tournaments.find({"league_context.season_id": season["id"]}, {"_id": 0, "id": 1, "league_context": 1}):
+        division = divisions.get((row.get("league_context") or {}).get("division_id"))
+        out[row["id"]] = replace(ctx, platform=league_platform.rule_for(season, division, ctx.roster.game), division=division)
+    return out
 
 
 async def my_status(db, user: dict) -> list[dict]:
@@ -403,9 +451,10 @@ async def waive_wait(db, season: dict, user_id: str, squad_id: str | None, reaso
     return status(await context_for_season(db, season, [user_id]), user_id, squad_id)
 
 
-def registration_problems(ctx: EligibilityContext | None, squad: dict) -> list[tuple[int, str]]:
+def registration_problems(ctx: EligibilityContext | None, squad: dict, *, minimum: int | None = None) -> list[tuple[int, str]]:
     """Für die Anmeldung eines Co-Teams: was an seinem Kader gegen die Season spricht. Der Kontext enthält alle Mitglieder.
-    Fehlende Spiel-IDs bleiben ein Hinweis (#2108), die Leitung kann trotzdem zuteilen."""
+    Fehlende Spiel-IDs bleiben ein Hinweis (#2108), die Leitung kann trotzdem zuteilen. ``minimum`` (Zuteilen, #2270): Bleiben ohne
+    die Spieler auf einer nicht erlaubten Plattform weniger übrig, hält es das Zuteilen auf - sonst steht es in ``platform_notes``."""
     if not ctx:
         return []
     season = ctx.season
@@ -429,4 +478,23 @@ def registration_problems(ctx: EligibilityContext | None, squad: dict) -> list[t
     if too_young:
         problems.append((400, f"{name}: {', '.join(names[uid] for uid in too_young)} {'erfüllt' if len(too_young) == 1 else 'erfüllen'} die "
                               "Altersvorgabe dieser Season nicht."))
+    if minimum and ctx.platform:
+        # Dieselbe Reihenfolge wie ``status``: Wer an der Spiel-ID scheitert, zählt hier nicht als andere Plattform.
+        rows = statuses(ctx, members, squad.get("id"))
+        other = {uid: found[2] for uid in members
+                 if rows[uid]["state"] == league_platform.NOT_ALLOWED and (found := platform_state(ctx, uid))}
+        left = len(members) - len(other)
+        if other and len(members) >= minimum > left:
+            listed = ", ".join(f"{names[uid]} ({value})" for uid, value in other.items())
+            problems.append((400, f"{name}: Nur {left} Spieler sind auf einer erlaubten Plattform ({league_platform.words(ctx.platform.allowed)}), "
+                                  f"die Staffel verlangt mindestens {minimum}. Nicht erlaubt: {listed}."))
     return problems
+
+
+def platform_notes(ctx: EligibilityContext | None, squad: dict) -> list[str]:
+    """Der Hinweis beim Zuteilen (#2270): wer im Kader auf einer nicht erlaubten Plattform spielt oder keine angibt. Hält nichts auf."""
+    if not ctx or not ctx.platform:
+        return []
+    rows = statuses(ctx, [uid for uid in squad.get("member_ids") or [] if uid], squad.get("id"))
+    wanted = (league_platform.NOT_ALLOWED, league_platform.MISSING)
+    return sorted(f"{row['name']}: {row['reason']}" for row in rows.values() if row["state"] in wanted)

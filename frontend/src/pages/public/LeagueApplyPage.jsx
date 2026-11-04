@@ -11,6 +11,7 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { isSelectable } from "@/lib/leagueApplications";
+import { platformLines, platformShort } from "@/lib/leaguePlatform";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
 
@@ -57,10 +58,29 @@ function SquadChoice({ rows, chosen, onChoose }) {
   );
 }
 
-function CheckStep({ row, seasonProblems }) {
+/** Plattform je Season (#2270): was gilt, bevor die Liga feststeht - eine Liga N mit eigener Regel steht darunter. */
+function PlatformNote({ platform }) {
+  const lines = platformLines(platform);
+  const own = (platform?.divisions || []).filter((division) => division.differs);
+  if (!lines.length && !own.length) return null;
+  return (
+    <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 text-sm text-white/75" data-testid="apply-platform">
+      <p className="font-semibold text-white/85">Plattform in dieser Season</p>
+      {lines.length ? <ul className="mt-1 space-y-0.5">{lines.map((line) => <li key={line} className="[overflow-wrap:anywhere]">{line}</li>)}</ul> : null}
+      {own.length ? (
+        <p className="mt-1 text-xs text-white/55 [overflow-wrap:anywhere]">
+          Abweichend: {own.map((division) => `${division.label}: ${platformShort(division)}`).join(" · ")}. In welche Liga das Co-Team kommt, entscheidet die Liga-Leitung.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function CheckStep({ row, seasonProblems, platform }) {
   const problems = [...seasonProblems, ...(row.problems || [])];
   return (
     <div className="space-y-4">
+      <PlatformNote platform={platform} />
       {problems.length ? (
         <div className="rounded-sm border border-warn/40 bg-warn/5 p-3" data-testid="apply-problems">
           <p className="font-semibold text-warn">Das fehlt noch:</p>
@@ -207,7 +227,7 @@ export default function LeagueApplyPage() {
       <section key={step} className="tls-apply-step mt-6" aria-labelledby="apply-step-title">
         <h2 id="apply-step-title" ref={heading} tabIndex={-1} className="mb-3 font-heading text-xl font-bold uppercase outline-none">{titles[step]}</h2>
         {step === 0 ? <SquadChoice rows={rows} chosen={chosen} onChoose={setChosen} /> : null}
-        {step === 1 && row ? <CheckStep row={row} seasonProblems={view.season_problems || []} /> : null}
+        {step === 1 && row ? <CheckStep row={row} seasonProblems={view.season_problems || []} platform={view.platform} /> : null}
         {step === 2 && view.rules ? <ConsentStep rules={view.rules} privacy={view.privacy} acceptRules={acceptRules} acceptPrivacy={acceptPrivacy} onRules={setAcceptRules} onPrivacy={setAcceptPrivacy} /> : null}
         {step === 3 && row ? <Summary row={row} rules={view.rules} /> : null}
       </section>

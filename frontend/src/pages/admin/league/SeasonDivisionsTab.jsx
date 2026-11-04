@@ -11,6 +11,7 @@ import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
 import { nicknameRepeatsLevel } from "@/lib/seasonTabs";
 import { PrizeEditor } from "./LeagueLookFields";
+import { DivisionPlatformFields } from "./DivisionPlatformFields";
 import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
 
@@ -81,6 +82,7 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
           onChange={(value) => set("match_schedule_response_hours", value)} testId="override-response"
           placeholder={season.match_schedule_response_hours ? `wie Season (${season.match_schedule_response_hours})` : "wie Season"} />
       </FormGrid>
+      <DivisionPlatformFields form={form} set={set} seasonId={season.id} />
       <FormGrid cols={3}>
         <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} placeholder={String(points.win ?? 3)} testId="override-points-win" />
         <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} placeholder={String(points.draw ?? 1)} testId="override-points-draw" />
