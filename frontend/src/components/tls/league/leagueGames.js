@@ -91,7 +91,14 @@ export function modeIcon(pool, mode) {
   return (pool?.modes || []).find((row) => row.mode === mode)?.icon_url || "";
 }
 
+/** Die Map, die das Veto für diese Position festgelegt hat (#1618, D.3) - sonst `null`. */
+export function plannedFor(position, league) {
+  return (league?.planned_games || []).find((row) => Number(row.position) === Number(position)) || null;
+}
+
 export function emptyGame(position, league) {
+  const plan = plannedFor(position, league);
+  if (plan) return { position, mode: plan.mode || "", map_id: plan.map_id, winner: "", scores: {}, lineup: [], planned: true };
   return { position, mode: modeFor(position, league), map_id: "", winner: "", scores: {}, lineup: [] };
 }
 

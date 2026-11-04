@@ -12,6 +12,7 @@ import {
   STATE_LABELS, clock, countdownLabel, countdownTarget, otherSide, ownSide, remainingText, ringShare, rulesSentences,
   selectionText, sideStatusText, stateText,
 } from "@/lib/leagueCheckin";
+import { VetoPanel } from "./VetoPanel";
 
 const RING = 100;
 const REASON_MIN = 5;
@@ -256,9 +257,11 @@ function LeadEntry({ block, matchId, busy, run, onChanged }) {
   );
 }
 
-export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, leadUrl }) {
+export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, leadUrl, onPoll }) {
   if (!block) return null;
   const other = otherSide(block);
+  // Veto (#1618, D.3): solange es läuft, steht statt des Start-Knopfs der Veto-Block - der Start kommt danach.
+  const vetoRunning = block.state === "veto";
   const tone = { ready: "border-[#00D26A]/50", veto: "border-[#00D26A]/50", running: "border-[#29B6E8]/50", closed: "border-warn/50" }[block.state] || "border-[#29B6E8]/35";
   return (
     <section className={`mt-6 rounded-sm border bg-[#0F1D23] p-5 ${tone}`} data-testid="checkin-panel" data-state={block.state}>
@@ -285,7 +288,8 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
       ) : null}
 
       <OwnCheckin key={`${block.state}-${ownSide(block)?.updated_at || ""}`} block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} onAskLead={onAskLead} />
-      <StartBlock block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} />
+      <VetoPanel block={block.veto} matchId={matchId} busy={busy} run={run} onChanged={onChanged} onPoll={onPoll} />
+      {vetoRunning ? null : <StartBlock block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} />}
       {block.state === "open" && other && !other.checked_in && ownSide(block)?.checked_in ? (
         <p className="mt-3 text-xs text-white/55" data-testid="checkin-waiting">Die Seite aktualisiert sich von selbst, sobald {other.name} eingecheckt hat.</p>
       ) : null}
