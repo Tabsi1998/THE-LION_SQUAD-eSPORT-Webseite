@@ -580,6 +580,33 @@ async def test_releasing_the_schedule_raises_the_revision(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_lead_time_change_rolled_back_at_a_deleted_station_keeps_the_revision(flow, monkeypatch):
+    """Codex-Nachprüfung: Termin und Station in einem PATCH, die Station wird zwischen Prüfung und Schreiben gelöscht - der Termin geht
+    exakt zurück, also auch die Revision: alte Check-ins und das laufende Veto gelten weiter."""
+    from routes import match_routes
+
+    world = await veto_world(flow, rules=veto_rules(), **WEEK)
+    await seat(flow, world)
+    stored = await flow.reload(world["match"])
+    station = {"id": new_id(), "name": "Tisch 1", "device_type": "pc", "tournament_id": world["tournament"]["id"], "status": "free",
+               "current_match_id": None, "notes": None}
+    await flow.db.stations.insert_one(dict(station))
+    original = match_routes.ensure_station_open
+
+    async def delete_in_between(db, station_id):
+        await original(db, station_id)
+        await flow.db.stations.update_one({"id": station_id}, {"$set": {"deleting": True}})
+
+    monkeypatch.setattr(match_routes, "ensure_station_open", delete_in_between)
+    flow.act_as(world["lead"])
+    refused = await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(120), "station_id": station["id"], "schedule_reason": "Umzug"})
+    assert refused.status_code == 409, refused.text
+    assert await flow.reload(world["match"]) == stored, "exakt der Vorzustand, samt Termin-Revision"
+    assert not match_flow.missing_sides(stored) and league_veto.rules_mod.veto_of(stored) is not None
+    assert (await page(flow, world, "Kapitaen"))["checkin"]["state"] == "veto"
+
+
+@pytest.mark.asyncio
 async def test_a_locked_staffel_is_only_read(flow):
     """Codex zu D.3: Bei einer gesperrten Staffel schreibt der Seitenaufruf nichts - kein Start, keine Frist wird aufgelöst."""
     world = await veto_world(flow, rules=veto_rules(step_seconds=30))
