@@ -169,9 +169,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       // Waffe 1 nur in „Stellung“ sperren, an Waffe 2 einen weiteren Aufsatz.
       await panel.getByTestId("season-bans-toggle-w0").check();
       await panel.getByTestId("season-bans-item-w0").getByRole("checkbox", { name: "Stellung" }).check();
+      // Zu (#2299): Die Zahl am Knopf sagt, wie viele gesperrt sind; aufgeklappt die passenden Aufsätze.
+      await expect(panel.getByTestId("season-bans-open-w1")).toContainText("· 2 gesperrt");
+      await panel.getByTestId("season-bans-open-w1").click();
       const second = panel.getByTestId("season-bans-attachments-w1");
       await expect(second).toBeVisible();
-      await second.getByRole("checkbox", { name: "Aufsatz 2", exact: true }).check();
+      await second.getByRole("checkbox", { name: "Aufsatz 2 an Waffe 2 sperren", exact: true }).check();
       await noSideScroll(page);
       await panel.getByTestId("season-bans-save").click();
       await expect.poll(() => calls.put.length).toBe(1);
