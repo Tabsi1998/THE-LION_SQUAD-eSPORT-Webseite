@@ -76,12 +76,21 @@ def restore_change(before: dict, keys) -> dict:
 
 def undo_revision(before: dict, change: dict, rollback: dict) -> dict:
     """Die Termin-Revision (``flow.schedule_rev``, D.3 #1618) nach einem Rollback exakt wie vorher: ein ``$inc`` zählt wieder herunter,
-    ein Feld, das es vorher nicht gab, fällt weg. Ergänzt ``rollback`` und gibt es zurück."""
+    ein Feld, das es vorher nicht gab, fällt weg - fehlte schon das ganze ``flow`` (Altbestand), fällt ``flow`` weg statt eines leeren
+    ``flow: {}``. Ergänzt ``rollback`` und gibt es zurück."""
     for key, value in (change.get("$inc") or {}).items():
         head, _, tail = key.partition(".")
         existed = (tail in before[head]) if tail and isinstance(before.get(head), dict) else (not tail and key in before)
         if existed:
             rollback.setdefault("$inc", {})[key] = -value
+        elif tail and head not in before:
+            # Kein Pfad unter ``head`` darf daneben stehen, sonst lehnt MongoDB das Update als Konflikt ab.
+            for part in ("$set", "$unset", "$inc"):
+                for other in [path for path in (rollback.get(part) or {}) if path.startswith(f"{head}.")]:
+                    del rollback[part][other]
+                if part in rollback and not rollback[part]:
+                    del rollback[part]
+            rollback.setdefault("$unset", {})[head] = ""
         else:
             rollback.setdefault("$unset", {})[key] = ""
     return rollback
