@@ -343,7 +343,8 @@ im Verlauf des Antrags und im Protokoll.
 [`LIGA.md`](LIGA.md), Abschnitt 12. Code: `services/league_permissions.py`.
 
 **Ausrüstung und Sperrliste (#2218):** Die Bibliothek (Waffen, Aufsätze, Ausrüstung je Spiel) pflegt wie die Maps die **Turnierleitung**
-(`tournaments`). Die Sperrliste einer Season speichert und entfernt, wer **Season konfigurieren** hat oder den Bereich Ligen; lesen und
+(`tournaments`) - auch Unterkategorien und das Verschieben von Einträgen (#2287, `…/equipment/categories/{key}/subcategories`,
+`…/equipment/move`). Die Sperrliste einer Season speichert und entfernt, wer **Season konfigurieren** hat oder den Bereich Ligen; lesen und
 Versionen vergleichen darf jede Zuständigkeit der Liga. Öffentlich steht sie nur auf der Ligaseite einer sichtbaren Season und im Regelwerk.
 
 ## Liga: Co-Team mit Captain und Vertreter (#1649)
