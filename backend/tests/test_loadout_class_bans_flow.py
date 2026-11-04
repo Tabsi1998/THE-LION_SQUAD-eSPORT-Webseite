@@ -360,3 +360,32 @@ async def test_a_finished_match_keeps_its_allowed_list(flow):
     assert ok(await flow.get(f"/api/matches/{w['match']['id']}/page"))["league"]["allowed_equipment"] == held
     later = await duel(flow, w["tournament"], w["reg_a"], w["reg_h"], matchday=2)
     assert allowed_names(ok(await flow.get(f"/api/matches/{later['id']}/page"))) == ["Blitz 10", "Neu"]
+
+@pytest.mark.asyncio
+async def test_deleting_a_subcategory_while_banning_it_leaves_no_retired_key(flow, monkeypatch):
+    """Codex Runde 1, Fund 2: Löscht A eine leere Unterkategorie, während B sie als ganze Klasse sperrt, steht danach nie eine Sperrliste mit
+    der entfernten Kennung da."""
+    import asyncio
+
+    from services import game_equipment
+
+    w = await ready(flow)
+    original = game_equipment._refuse_banned_class
+
+    async def slow_refuse(db, game_id, key, label):
+        await original(db, game_id, key, label)
+        await asyncio.sleep(0.3)  # das Fenster zwischen Prüfen und Schreiben
+
+    monkeypatch.setattr(game_equipment, "_refuse_banned_class", slow_refuse)
+    # Die Sperre lebt vom eindeutigen Index (init_indexes) - im Speicher-Mongo hier von Hand.
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    flow.act_as(w["lead"])
+    keep = [{"key": w["subs"][label], "label": label} for label in ("Sturmgewehr", "Schrotflinte")]
+    remove, banned = await asyncio.gather(
+        flow.put(f"{w['library_url']}/categories/{w['cats']['Waffen']}/subcategories", json={"subcategories": keep}),
+        flow.put(bans_url(w), json={"entries": [klass(w, "Raketenwerfer")]}))
+    doc = await flow.db.game_equipment_categories.find_one({"game_id": w["game"]["id"]}, {"_id": 0})
+    retired = set(doc.get("retired_subcategory_keys") or [])
+    used = {entry.get("subcategory") async for version in flow.db.loadout_bans.find({}, {"_id": 0}) for entry in version["entries"]}
+    assert not used & retired, (remove.text, banned.text)
+    assert sorted([remove.status_code, banned.status_code]) in ([200, 409], [200, 422])

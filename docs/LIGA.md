@@ -1534,7 +1534,10 @@ Pistole, Raketenwerfer, Nahkampf; Aufsatz: Mündung, Lauf, Unterlauf, Optik, Mag
 erst auf Knopfdruck. Gespeichert wird je Kategorie die ganze Liste (`PUT …/categories/{key}/subcategories`). Entfernen nur ohne Einträge
 (archivierte zählen mit; 409 „… hat noch N Einträge“) und wenn keine Version einer Sperrliste die Klasse ganz sperrt (409); Aufsätze
 verlieren die entfernte Klasse aus `weapon_class_ids`. Das Speichern der Kategorien lässt ihre Unterkategorien unberührt; eine entfernte
-(leere) Kategorie nimmt ihre mit, die Kennungen bleiben vergeben.
+(leere) Kategorie nimmt ihre mit, die Kennungen bleiben vergeben. **Sperre:** Alles Schreiben in die Bibliothek eines Spiels (Kategorien,
+Unterkategorien, Eintrag anlegen und ändern, Verschieben, Zuordnen, Übernehmen) und das Speichern einer Sperrliste (nach der Pool-Sperre der
+Season) läuft unter `mutation_lock.game_equipment_resource(game_id)` nacheinander und prüft erst darunter - so schreibt nie jemand eine eben
+entfernte Kennung an einen Eintrag oder in eine Klassensperre (Codex Runde 1). Besetzt: 409, bitte gleich noch einmal.
 
 Neue Felder an `game_equipment`:
 

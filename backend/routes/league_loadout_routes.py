@@ -6,6 +6,8 @@ erscheint die Liste nur über die Ligaseite der Season und den Baustein im Regel
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from database import get_db
@@ -17,7 +19,7 @@ from services.league_permissions import ANY, capabilities_of, require_league
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.loadout_bans import LoadoutBansSave
-from services.mutation_lock import MutationLockBusy, league_season_pool_resource, mutation_lock
+from services.mutation_lock import MutationLockBusy, game_equipment_resource, league_season_pool_resource, mutation_lock
 
 router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 BUSY = "Die Season wird gerade bearbeitet – bitte gleich noch einmal."
@@ -74,9 +76,11 @@ async def save_season_loadout_bans(season_id: str, body: LoadoutBansSave,
     db = get_db()
     season, league, game = await _context(db, season_id)
     try:
-        # Dieselbe Sperre wie Map-Pool und neue Staffel: Eine Staffel entsteht nie mitten in einem Speichern.
+        # Dieselbe Sperre wie Map-Pool und neue Staffel: Eine Staffel entsteht nie mitten in einem Speichern. Danach die der Bibliothek
+        # (#2287): Eine ganze Klasse wird nie gespeichert, während jemand genau diese Unterkategorie entfernt.
         async with mutation_lock(db, league_season_pool_resource(season_id)):
-            doc = await loadout_bans.save(db, scope=loadout_bans.SEASON, scope_id=season_id, game=game, body=body, user=me)
+            async with (mutation_lock(db, game_equipment_resource(game["id"])) if game else nullcontext()):
+                doc = await loadout_bans.save(db, scope=loadout_bans.SEASON, scope_id=season_id, game=game, body=body, user=me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=BUSY) from None
     except EquipmentProblem as problem:

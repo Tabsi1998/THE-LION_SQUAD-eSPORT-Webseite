@@ -298,3 +298,35 @@ async def test_the_icon_of_a_subcategory_is_a_usage_in_the_media_library(flow):
     places = {(collection, field) async for collection, _doc, field, _name, _text in media_audit.iter_usages(flow.db, {"klasse-1.png"})}
     assert ("game_equipment_categories", "categories.subcategories.icon_url") in places
     assert await media_audit.still_referenced(flow.db, {"klasse-1.png"}) == {"klasse-1.png"}
+
+
+# ---------------------------------------------------------------- Gleichzeitig (Codex Runde 1, Fund 2)
+
+@pytest.mark.asyncio
+async def test_deleting_a_subcategory_while_moving_into_it_leaves_no_retired_key(flow, monkeypatch):
+    """Löscht A eine leere Unterkategorie, während B Einträge dorthin verschiebt, darf B nie die entfernte Kennung schreiben - eine Seite
+    bekommt eine Absage."""
+    import asyncio
+
+    from services import game_equipment
+
+    w = await setup(flow)
+    keys = {row["label"]: row["key"] for row in ok(await save_subs(flow, w, "Waffen", [{"label": "Sturmgewehr"}, {"label": "Pistole"}]))["subcategories"]}
+    blitz = await add(flow, w, "Waffen", "Blitz 9")
+    original = game_equipment.subcategory_counts
+
+    async def slow_counts(db, game_id):
+        counts = await original(db, game_id)
+        await asyncio.sleep(0.3)  # das Fenster zwischen Prüfen und Schreiben
+        return counts
+
+    monkeypatch.setattr(game_equipment, "subcategory_counts", slow_counts)
+    # Die Sperre lebt vom eindeutigen Index (init_indexes) - im Speicher-Mongo hier von Hand.
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    remove, move = await asyncio.gather(
+        save_subs(flow, w, "Waffen", [{"key": keys["Sturmgewehr"], "label": "Sturmgewehr"}]),
+        flow.post(url(w, "/move"), json={"item_ids": [blitz["id"]], "subcategory": keys["Pistole"]}))
+    doc = await flow.db.game_equipment_categories.find_one({"game_id": w["game"]["id"]}, {"_id": 0})
+    stored = await flow.db.game_equipment.find_one({"id": blitz["id"]}, {"_id": 0})
+    assert stored.get("subcategory") not in (doc.get("retired_subcategory_keys") or []), (remove.text, move.text)
+    assert sorted([remove.status_code, move.status_code]) in ([200, 409], [200, 422])

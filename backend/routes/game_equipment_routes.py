@@ -10,6 +10,7 @@ from database import get_db
 from models import new_id, now_utc
 from routes.game_routes import _enrich_games
 from services import game_equipment, game_modes
+from services.mutation_lock import MutationLockBusy, game_equipment_resource, mutation_lock
 from services.game_equipment import (CategoriesSave, EquipmentCreate, EquipmentImport, EquipmentMove, EquipmentProblem,
                                      EquipmentUpdate, EquipmentWeapons, SubcategoriesSave)
 
@@ -32,6 +33,21 @@ async def _item(db, game: dict, item_id: str) -> dict:
 
 def _refuse(problem: EquipmentProblem) -> HTTPException:
     return HTTPException(status_code=problem.status, detail=problem.message)
+
+
+BUSY = "Die Ausrüstung dieses Spiels wird gerade bearbeitet – bitte gleich noch einmal."
+
+
+async def _locked(db, game: dict, action):
+    """Schreiben unter der Sperre der Bibliothek (#2287, Codex Runde 1): Entfernen einer Unterkategorie, Verschieben, Anlegen, Ändern,
+    Übernehmen und eine Klassensperre laufen nacheinander - geprüft wird erst unter der Sperre, also gegen den Stand, der gilt."""
+    try:
+        async with mutation_lock(db, game_equipment_resource(game["id"])):
+            return await action()
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=BUSY) from None
+    except EquipmentProblem as problem:
+        raise _refuse(problem) from None
 
 
 async def _audit(db, action: str, me: dict, target_id: str, data: dict | None = None) -> None:
@@ -68,10 +84,7 @@ async def list_game_equipment(game_id: str, me: dict = Depends(require_admin()))
 async def save_equipment_categories(game_id: str, body: CategoriesSave, me: dict = Depends(require_admin())):
     db = get_db()
     game = await _game(db, game_id)
-    try:
-        saved = await game_equipment.save_categories(db, game, body, me)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    saved = await _locked(db, game, lambda: game_equipment.save_categories(db, game, body, me))
     await _audit(db, "game.equipment.categories", me, game["id"], {"keys": [row["key"] for row in saved]})
     return {"categories": saved}
 
@@ -81,10 +94,7 @@ async def save_equipment_subcategories(game_id: str, category_key: str, body: Su
     """Unterkategorien einer Kategorie (#2287): anlegen, umbenennen, ordnen, entfernen - die ganze Liste auf einmal."""
     db = get_db()
     game = await _game(db, game_id)
-    try:
-        saved = await game_equipment.save_subcategories(db, game, category_key, body, me)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    saved = await _locked(db, game, lambda: game_equipment.save_subcategories(db, game, category_key, body, me))
     await _audit(db, "game.equipment.subcategories", me, game["id"],
                  {"category": category_key, "keys": [row["key"] for row in saved]})
     return {"category": category_key, "subcategories": saved}
@@ -95,10 +105,7 @@ async def move_game_equipment(game_id: str, body: EquipmentMove, me: dict = Depe
     """Mehrere Einträge einer Kategorie in eine Unterkategorie verschieben (#2287); ``subcategory: null`` = ohne."""
     db = get_db()
     game = await _game(db, game_id)
-    try:
-        updated = await game_equipment.move_items(db, game, body, me)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    updated = await _locked(db, game, lambda: game_equipment.move_items(db, game, body, me))
     await _audit(db, "game.equipment.move", me, game["id"], {"items": updated})
     return {"updated": updated}
 
@@ -108,10 +115,7 @@ async def assign_equipment_weapons(game_id: str, body: EquipmentWeapons, me: dic
     """Sammelaktion: Aufsätze ohne Waffe bekommen die gewählten Waffen und Waffenklassen (wie „Maps ohne Modus“)."""
     db = get_db()
     game = await _game(db, game_id)
-    try:
-        updated = await game_equipment.assign_weapons(db, game, body.weapon_ids, me, body.weapon_class_ids)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    updated = await _locked(db, game, lambda: game_equipment.assign_weapons(db, game, body.weapon_ids, me, body.weapon_class_ids))
     await _audit(db, "game.equipment.assign_weapons", me, game["id"],
                  {"weapons": len(body.weapon_ids), "classes": len(body.weapon_class_ids), "updated": updated})
     return {"updated": updated}
@@ -150,10 +154,7 @@ async def import_game_equipment(game_id: str, body: EquipmentImport, me: dict = 
     if body.source_game_id == game["id"]:
         raise HTTPException(status_code=422, detail="Bitte ein anderes Spiel als Quelle wählen.")
     source = await _game(db, body.source_game_id)
-    try:
-        result = await game_equipment.import_items(db, game, source, body.item_ids, me, new_id)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    result = await _locked(db, game, lambda: game_equipment.import_items(db, game, source, body.item_ids, me, new_id))
     await _audit(db, "game.equipment.import", me, game["id"], {"source_game_id": source["id"], "created": len(result["created"]),
                                                                "skipped": len(result["skipped"])})
     return result
@@ -163,10 +164,7 @@ async def import_game_equipment(game_id: str, body: EquipmentImport, me: dict = 
 async def create_game_equipment(game_id: str, body: EquipmentCreate, me: dict = Depends(require_admin())):
     db = get_db()
     game = await _game(db, game_id)
-    try:
-        doc = await game_equipment.create(db, game, body, me, new_id())
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    doc = await _locked(db, game, lambda: game_equipment.create(db, game, body, me, new_id()))
     await _audit(db, "game.equipment.create", me, doc["id"], {"game_id": game["id"], "category": doc["category"]})
     return {**doc, "in_lists": 0}
 
@@ -176,10 +174,7 @@ async def update_game_equipment(game_id: str, item_id: str, body: EquipmentUpdat
     db = get_db()
     game = await _game(db, game_id)
     current = await _item(db, game, item_id)
-    try:
-        saved = await game_equipment.update(db, game, current, body, me)
-    except EquipmentProblem as problem:
-        raise _refuse(problem) from None
+    saved = await _locked(db, game, lambda: game_equipment.update(db, game, current, body, me))
     await _audit(db, "game.equipment.update", me, current["id"],
                  {"game_id": game["id"], "fields": sorted(body.model_dump(exclude_unset=True))})
     return {**saved, "in_lists": (await game_equipment.usage_counts(db, game["id"])).get(current["id"], 0)}
