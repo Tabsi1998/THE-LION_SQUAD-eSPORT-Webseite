@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.71.0 (05.11.2026)
+
+### Neu
+
+* Sperrliste: Notiz der Ausrüstung steht klein unter dem Namen bei Waffen, Aufsätzen und allen Kategorien, nur in der Verwaltung (#2302)
+
 ## 1.70.0 (04.11.2026)
 
 ### Neu
