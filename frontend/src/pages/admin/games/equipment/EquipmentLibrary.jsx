@@ -72,7 +72,7 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
       {weapons.length || classes.length ? (
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="equipment-assign-choice"
           data-testid="equipment-assign-open"
-          className="inline-flex items-center gap-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+          className="flex w-fit items-center gap-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
           <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           Waffen wählen{picked ? ` · ${picked} gewählt` : ""}
         </button>
