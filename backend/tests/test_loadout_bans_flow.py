@@ -257,6 +257,25 @@ async def test_the_public_season_shows_the_list_without_internals(flow):
     assert (await flow.get(url)).status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_the_note_of_an_entry_shows_only_in_the_admin_editor(flow):
+    # #2302: Die Notiz der Bibliothek erscheint im Editor der Sperrliste, nie in Schnappschuss, Ligaseite oder erlaubter Ausrüstung.
+    w = await ready(flow)
+    flow.act_as(w["lead"])
+    ok(await flow.patch(f"{w['library_url']}/{w['items']['Blitz 9']['id']}", json={"note": "Nur im Ranked-Modus"}))
+    ok(await flow.patch(f"{w['library_url']}/{w['items']['Griff']['id']}", json={"note": "Schwer zu bekommen"}))
+    ok(await save_bans(flow, w, standard(w)))
+    library = {row["name"]: row for row in ok(await flow.get(bans_url(w)))["library"]}
+    assert library["Blitz 9"]["note"] == "Nur im Ranked-Modus" and library["Griff"]["note"] == "Schwer zu bekommen"
+    assert library["Donner 4"]["note"] is None
+    stored = await flow.db.loadout_bans.find_one({"scope": "league_season"}, {"_id": 0})
+    assert "Ranked" not in str(stored) and "Schwer" not in str(stored)
+    flow.act_as(None)
+    public = ok(await flow.get(f"/api/leagues/{w['league']['slug']}/{w['season']['slug']}"))
+    assert "Ranked" not in str(public["loadout_bans"]) and "Schwer" not in str(public["loadout_bans"])
+    assert "Ranked" not in str(public["allowed_equipment"]) and "Schwer" not in str(public["allowed_equipment"])
+
+
 # ---------------------------------------------------------------- Das Spiel hält seine Version fest
 
 async def bans_version(flow, tournament: dict, version: int, name: str) -> dict:

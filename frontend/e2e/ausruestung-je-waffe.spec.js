@@ -28,11 +28,12 @@ const CATEGORIES = [
 const item = (id, category, name, extra = {}) => ({ id, category, name, image_url: IMG(`bild-${id}`), status: "active", weapon_ids: [], weapon_class_ids: [],
   subcategory: null, ...extra });
 const LIBRARY = [
-  item("w1", "waffen", "Blitz 9", { subcategory: "sturm" }), item("w2", "waffen", "Donner 4", { subcategory: "sturm" }),
+  item("w1", "waffen", "Blitz 9", { subcategory: "sturm" }),
+  item("w2", "waffen", "Donner 4", { subcategory: "sturm", note: "Nur in Ranked-Spielen erlaubt, Ausnahmen klärt die Liga-Leitung" }),
   item("w3", "waffen", `Kar ${LONG}`, { subcategory: "sturm", image_url: null }),
   item("s1", "waffen", "Hagel", { subcategory: "schrot" }), item("s2", "waffen", "Bö", { subcategory: "schrot" }),
   item("p1", "waffen", "Funke", { subcategory: "pistole" }), item("o1", "waffen", "Ohne Klasse"),
-  item("a1", "aufsaetze", "Rotpunkt", { subcategory: "optik", weapon_class_ids: ["sturm"] }),
+  item("a1", "aufsaetze", "Rotpunkt", { subcategory: "optik", weapon_class_ids: ["sturm"], note: `Erst ab Season 2 ${LONG} und ohne Leerzeichen-Lücken` }),
   item("a4", "aufsaetze", "Holo", { subcategory: "optik", weapon_class_ids: ["sturm"] }),
   item("a5", "aufsaetze", "Schalldämpfer", { subcategory: "muendung", weapon_class_ids: ["sturm"], weapon_ids: ["p1"] }),
   item("a6", "aufsaetze", "Kompensator", { subcategory: "muendung", weapon_class_ids: ["sturm"] }),
@@ -237,6 +238,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const holo = panel.getByTestId("season-bans-attachment-w2-a4");
       await expect(holo.getByRole("checkbox", { name: "Stellung" })).toBeChecked();
       await expect(holo.getByRole("checkbox", { name: "Kapern" })).toBeChecked();
+      // Notiz (#2302): klein unter dem Namen, bei der Waffe und beim Aufsatz; ohne Notiz kein Element.
+      await expect(panel.getByTestId("season-bans-item-w2").getByTestId("season-bans-note-w2")).toContainText("Nur in Ranked-Spielen");
+      await expect(weapon.getByTestId("season-bans-note-a1")).toContainText("Erst ab Season 2");
+      await expect(weapon.getByTestId("season-bans-note-a4")).toHaveCount(0);
       await noSideScroll(page);
       await panel.getByTestId("season-bans-item-w2").scrollIntoViewIfNeeded();
       await shot(panel.getByTestId("season-bans-item-w2"), `verwaltung-aufgeklappt-${width}.png`);

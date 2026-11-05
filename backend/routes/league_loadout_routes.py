@@ -56,6 +56,8 @@ async def season_loadout_bans(season_id: str, me: dict = Depends(require_league(
     rows = await game_equipment.items_of(db, game["id"], usable_only=True, categories=categories) if game else []
     library = [{**{key: row.get(key) for key in ("id", "category", "name", "image_url", "weapon_ids")},
                 # Unterkategorie und Waffenklassen (#2287): Gruppen, Klassensperre und „passt zu“ im Editor.
+                # Notiz (#2302): nur hier im Editor der Verwaltung, nie in Schnappschüssen oder öffentlichen Antworten.
+                "note": row.get("note") or None,
                 "subcategory": row.get("subcategory") or None, "weapon_class_ids": list(row.get("weapon_class_ids") or []),
                 "status": game_equipment.status_of(row)}
                for row in rows]

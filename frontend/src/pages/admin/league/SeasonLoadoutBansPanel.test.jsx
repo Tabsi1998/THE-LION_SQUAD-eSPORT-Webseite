@@ -84,6 +84,23 @@ test("je Modus sperren, an einer Waffe einzelne Aufsätze, speichern als neue Ve
   expect(onSaved).toHaveBeenCalledWith(2);
 });
 
+test("die Notiz der Bibliothek steht klein unter dem Namen - bei Waffe, Aufsatz und Perk; ohne Notiz kein Element (#2302)", async () => {
+  const notes = { w2: "Nur im Ranked-Modus", a2: "Schwer zu bekommen, dafür sehr lang notiert", p1: "Inaktiv bis Season 2" };
+  apiMock.get.mockResolvedValue({ data: { ...BODY, library: BODY.library.map((row) => (notes[row.id] ? { ...row, note: notes[row.id] } : { ...row, note: null })) } });
+  renderPanel();
+  const donner = await screen.findByTestId("season-bans-item-w2");
+  expect(within(donner).getByTestId("season-bans-note-w2")).toHaveTextContent("Nur im Ranked-Modus");
+  expect(within(donner).getByTestId("season-bans-note-w2")).toHaveClass("italic", "break-words");
+  expect(screen.getByTestId("season-bans-note-p1")).toHaveTextContent("Inaktiv bis Season 2");
+  // Ohne Notiz: kein Element.
+  expect(within(screen.getByTestId("season-bans-item-w1")).queryByTestId("season-bans-note-w1")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("season-bans-note-a1")).not.toBeInTheDocument();
+  // Aufsatz im aufgeklappten Bereich der Waffe.
+  fireEvent.click(screen.getByTestId("season-bans-open-w2"));
+  const line = within(screen.getByTestId("season-bans-attachments-w2")).getByTestId("season-bans-attachment-w2-a2");
+  expect(within(line).getByTestId("season-bans-note-a2")).toHaveTextContent("Schwer zu bekommen");
+});
+
 test("eine Waffe in allen Modi gesperrt bietet keine einzelnen Aufsätze an; ganz entsperren geht", async () => {
   renderPanel();
   await screen.findByTestId("season-bans-item-w1");

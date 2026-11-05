@@ -46,6 +46,12 @@ function ModePicker({ modes, value, onChange, label }) {
   );
 }
 
+// Notiz des Eintrags aus der Bibliothek (#2302): klein und leise unter dem Namen, nur in der Verwaltung; leer = nichts.
+function ItemNote({ item, className = "" }) {
+  if (!item.note) return null;
+  return <p className={`${className} text-[11px] italic text-white/50 break-words`} data-testid={`season-bans-note-${item.id}`}>{item.note}</p>;
+}
+
 function versionLabel(row) {
   const day = row.saved_at ? ` · ${viennaDate(row.saved_at, DAY)}` : "";
   return `Version ${row.version}${day}${row.cleared ? " · entfernt" : ` · ${countText(row.entries, "Eintrag", "Einträge")}`}`;
@@ -141,6 +147,7 @@ function AttachmentLine({ item, weapon, row, everywhere, viaClass, kept, modes, 
           </button>
         ) : null}
       </div>
+      <ItemNote item={item} className="mt-1" />
       {viaClass ? <p className="mt-1 text-[11px] text-warn">Mit der ganzen Klasse gesperrt</p> : null}
       {everywhere && !viaClass ? (
         <p className="mt-1 text-[11px] text-warn">{everywhere.modes.length ? `An allen Waffen gesperrt in ${modeNames(everywhere.modes, modes)}` : "An allen Waffen gesperrt"}</p>
@@ -250,6 +257,7 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
               {statusOf(item) === "inactive" ? <span className="ml-1.5 text-[11px] font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
             </span>
           </label>
+          <ItemNote item={item} />
           {viaClass ? <p className="text-[11px] text-warn" data-testid={`season-bans-via-class-${item.id}`}>Mit der ganzen Klasse gesperrt</p> : null}
           {classBan && !viaClass ? (
             <p className="text-[11px] text-white/60" data-testid={`season-bans-via-class-${item.id}`}>Klasse gesperrt in {modeNames(classBan.modes, modes)} – einzeln zusätzlich möglich</p>
