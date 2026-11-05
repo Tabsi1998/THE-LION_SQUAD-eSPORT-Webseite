@@ -81,6 +81,8 @@ test("je Waffe „N Aufsätze · K gesperrt“, aufgeklappt die erlaubten je Slo
   expect(within(panel).getByTestId("allowed-slot")).toHaveTextContent("Optik");
   expect(within(panel).getAllByTestId("allowed-attachment").map((tile) => tile.textContent)).toEqual(["Rotpunkt", "Holonur in Suchen"]);
   expect(within(panel).getByTestId("allowed-attachments-banned")).toHaveTextContent("Gesperrt: Laser, Griff");
+  // Auch bei layout 4 steht „Gesperrt“ ganz oben im Kasten (#2305).
+  expect(panel.children[1]).toBe(within(panel).getByTestId("allowed-attachments-banned"));
   await user.keyboard(" ");
   expect(screen.queryByTestId("allowed-attachments")).toBeNull();
 
@@ -125,8 +127,14 @@ test("layout 5: Slots ohne erlaubten Aufsatz fallen im Kasten weg, ohne erlaubte
   await user.click(falke);
   const panel = screen.getByTestId("allowed-attachments");
   expect(within(panel).getAllByTestId("allowed-slot").map((slot) => slot.querySelector("p").textContent)).toEqual(["Optik", "Mündung"]);
-  expect(within(panel).getByTestId("allowed-attachments-banned")).toHaveTextContent("Gesperrt: Optik A, Optik B, Lauf A");
+  const banned = within(panel).getByTestId("allowed-attachments-banned");
+  expect(banned).toHaveTextContent("Gesperrt: Optik A, Optik B, Lauf A");
   expect(within(panel).queryByText("nur erlaubt", { exact: false })).toBeNull();
+  // Fabian, 05.11.: „Gesperrt“ steht ganz oben - direkt unter dem Anfang des Kastens, vor allen Slots.
+  expect(panel.children[1]).toBe(banned);
+  for (const slot of within(panel).getAllByTestId("allowed-slot")) {
+    expect(banned.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
   await user.click(falke);
   await user.click(habicht);
   expect(within(screen.getByTestId("allowed-attachments")).getByText("Keine Aufsätze erlaubt.")).toBeInTheDocument();

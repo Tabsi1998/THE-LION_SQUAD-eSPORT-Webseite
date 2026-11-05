@@ -87,6 +87,16 @@ function AttachmentsPanel({ entry, id }) {
     <li id={id} className="col-span-full min-w-0 rounded-sm border border-[#29B6E8]/30 bg-[#0A0A0A] p-3 sm:p-4" data-testid="allowed-attachments"
       aria-label={`Aufsätze für ${entry.name}`}>
       <p className="text-[11px] font-bold uppercase tracking-widest text-white/60">Erlaubte Aufsätze für <span className="text-white">{entry.name}</span></p>
+      {/* „Gesperrt: …“ ganz oben, vor den Slots (Fabian, 05.11., #2305) - das will man zuerst wissen. */}
+      {banned.length || entry.attachments?.banned_everywhere ? (
+        <p className="mt-2.5 border-b border-white/10 pb-2.5 text-xs text-white/70 break-words" data-testid="allowed-attachments-banned">
+          {banned.length ? <><span className="font-semibold text-warn">Gesperrt:</span> {banned.join(", ")}</> : null}
+          {/* Die an keiner Waffe erlaubten stehen einmal unter den Waffen (Fabian, 04.11.) - hier nur die Zahl, damit „K gesperrt“ aufgeht. */}
+          {entry.attachments?.banned_everywhere ? (
+            <span data-testid="allowed-attachments-everywhere">{banned.length ? " · " : ""}dazu {entry.attachments.banned_everywhere === 1 ? "1 Aufsatz, der an keiner Waffe erlaubt ist" : `${entry.attachments.banned_everywhere} Aufsätze, die an keiner Waffe erlaubt sind`}</span>
+          ) : null}
+        </p>
+      ) : null}
       {!groups.length ? <p className="mt-2 text-sm text-white/70">Keine Aufsätze erlaubt.</p> : null}
       <div className="mt-3 space-y-4">
         {groups.map((group) => (
@@ -110,15 +120,6 @@ function AttachmentsPanel({ entry, id }) {
           </div>
         ))}
       </div>
-      {banned.length || entry.attachments?.banned_everywhere ? (
-        <p className="mt-4 border-t border-white/10 pt-2.5 text-xs text-white/60 break-words" data-testid="allowed-attachments-banned">
-          {banned.length ? <><span className="font-semibold text-warn">Gesperrt:</span> {banned.join(", ")}</> : null}
-          {/* Die an keiner Waffe erlaubten stehen einmal unter den Waffen (Fabian, 04.11.) - hier nur die Zahl, damit „K gesperrt“ aufgeht. */}
-          {entry.attachments?.banned_everywhere ? (
-            <span data-testid="allowed-attachments-everywhere">{banned.length ? " · " : ""}dazu {entry.attachments.banned_everywhere === 1 ? "1 Aufsatz, der an keiner Waffe erlaubt ist" : `${entry.attachments.banned_everywhere} Aufsätze, die an keiner Waffe erlaubt sind`}</span>
-          ) : null}
-        </p>
-      ) : null}
     </li>
   );
 }
