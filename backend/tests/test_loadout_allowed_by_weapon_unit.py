@@ -1,8 +1,9 @@
 """Erlaubte Ausrüstung: Aufsätze je Waffe (#2299) und „nur in …“ (#2298) - ohne Datenbank (docs/LIGA.md, C.4).
 
-Der Baustein (``layout: 4``) nennt die Aufsätze nur noch an der Waffe: je Waffe die passenden (über die Waffe oder ihre Waffenklasse),
-davon gesperrt und je Slot die erlaubten. Ist ein Eintrag in mehr Modi der Season gesperrt als erlaubt, heißt der Hinweis „nur in …“.
-PDF: je Waffe eine Zeile „… – alle passenden Aufsätze erlaubt, außer: …“. Erfundene Namen.
+Der Baustein nennt die Aufsätze nur an der Waffe: je Waffe die passenden (über die Waffe oder ihre Waffenklasse), davon gesperrt und je
+Slot die erlaubten - ab ``layout: 5`` (#2305) je Slot auch die gesperrten. Ist ein Eintrag in mehr Modi der Season gesperrt als erlaubt,
+heißt der Hinweis „nur in …“. Die Darstellung von layout 4 steht in test_loadout_allowed_v4_golden_unit, die von layout 5 (Tabelle) in
+test_loadout_allowed_table_unit. Erfundene Namen.
 """
 import pathlib
 import sys
@@ -32,17 +33,19 @@ def weapon(data: dict, section: str, name: str) -> dict:
 
 def test_attachments_stand_at_their_weapon_by_slot():
     data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
-    assert data["layout"] == 4 and data["list"] is True
+    assert data["layout"] == 5 and data["list"] is True
     assert [(row["label"], row["role"]) for row in data["categories"]] == [("Waffen", "weapon"), ("Perks", "item")], \
         "keine eigene Aufsatz-Liste mehr"
     blitz, donner = sections(data, "Waffen")["Sturmgewehr"]["entries"]
-    # Blitz 9: Rotpunkt über die Klasse Sturmgewehr (an Blitz 9 gesperrt), Griff über die Waffe selbst.
+    # Blitz 9: Rotpunkt über die Klasse Sturmgewehr (an Blitz 9 gesperrt), Griff über die Waffe selbst. Der Slot Optik steht ab layout 5
+    # auch ohne erlaubten Aufsatz da - mit seinem gesperrten.
     assert blitz == {"name": "Blitz 9", "image_url": IMAGE, "not_in": [], "attachments": {
-        "count": 2, "banned": ["Rotpunkt"], "groups": [{"label": None, "not_in": [], "entries": [{"name": "Griff", "image_url": None,
-                                                                                                   "not_in": []}]}]}}
+        "count": 2, "banned": ["Rotpunkt"], "groups": [
+            {"label": None, "not_in": [], "banned": [], "entries": [{"name": "Griff", "image_url": None, "not_in": []}]},
+            {"label": "Optik", "not_in": [], "banned": ["Rotpunkt"], "entries": []}]}}, "1 gesperrt, 1 erlaubt: keine Umkehrung"
     # Donner 4: nur Rotpunkt passt (über die Klasse), an Donner 4 nur in Suchen gesperrt.
     assert donner["attachments"] == {"count": 1, "banned": [], "groups": [
-        {"label": "Optik", "not_in": [], "entries": [{"name": "Rotpunkt", "image_url": None, "not_in": ["Suchen"]}]}]}
+        {"label": "Optik", "not_in": [], "banned": [], "entries": [{"name": "Rotpunkt", "image_url": None, "not_in": ["Suchen"]}]}]}
     assert "attachments" not in weapon(data, None, "Ohne Klasse"), "ohne passenden Aufsatz kein Feld"
     assert "attachments" not in weapon(data, "Pistole", "Funke")
     assert sections(data, "Waffen")["Schrotflinte"]["state"] == "banned"
@@ -90,8 +93,10 @@ def test_bans_of_an_attachment_class_an_attachment_and_one_at_a_weapon():
         "ganz gesperrte zuerst"
     blitz = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]
     assert blitz["count"] == 4 and blitz["banned"] == ["Laser"] and blitz["banned_everywhere"] == 1, "K zählt Griff weiter mit"
-    [optik] = blitz["groups"]
+    loose, optik = blitz["groups"]
+    assert (loose["label"], loose["banned"], loose["entries"]) == (None, ["Laser"], []), "ganz gesperrt steht an seinem Slot"
     assert optik["label"] == "Optik" and optik["not_in"] == ["Suchen"], "die Klasse steht am Slot"
+    assert optik["banned"] == [], "Griff (an keiner Waffe erlaubt) zählt nur in banned_everywhere"
     assert [(entry["name"], entry["not_in"], entry.get("everywhere")) for entry in optik["entries"]] == [
         ("Holo", ["Suchen"], True), ("Rotpunkt", ["Suchen", "Stellung"], None)]
     donner = weapon(data, "Sturmgewehr", "Donner 4")["attachments"]
@@ -128,13 +133,11 @@ def test_nowhere_allowed_stands_once_and_only_where_it_is_the_same_everywhere():
     blitz = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]
     assert (blitz["count"], blitz["banned"], blitz["banned_everywhere"]) == (4, ["Laser"], 1)
     text = markdown_text.plain(loadout_bans.render_block(data, "text"))
-    assert "- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Laser, Rotpunkt (nicht in Suchen)\n" in text
-    assert "- Donner 4 – alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Stellung)\n" in text
-    assert "**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)" in text
-    web = markdown_text.plain(loadout_bans.render_block(data, "markdown"))
-    assert web.endswith("\n\n**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)")
-    assert "außer: Kompensator" not in web and "Holo (nur" not in web.split("**An keiner")[0]
-    for line in loadout_bans.render_block(data, "text").splitlines():
+    assert "| **Blitz 9** | **gesperrt:** Laser · **eingeschränkt:** *Optik:* Rotpunkt (nicht in Suchen) |" in text, \
+        "2 gesperrt (Laser, Kompensator) zu 2 erlaubt: Gleichstand bleibt gesperrt; Kompensator und Holo stehen nur einmal unten"
+    assert "| **Donner 4** | **eingeschränkt:** *Optik:* Rotpunkt (nicht in Stellung) |" in text
+    assert text.endswith("\n\n**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)")
+    for line in loadout_bans.render_block(data, "pdf").splitlines():
         assert "<a " not in pdf_service.pdf_rules_inline(line)
     # Ohne solche Aufsätze kein Feld.
     assert "attachments_everywhere" not in loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
@@ -144,8 +147,10 @@ def test_a_weapon_whose_attachments_are_all_banned_everywhere_says_none_allowed(
     items = [item("w1", "waffen", "Blitz 9", "sturm"), item("w2", "waffen", "Donner 4", "sturm"),
              item("a1", "aufsaetze", "Kompensator", weapon_class_ids=["sturm"])]
     data = loadout_bans.allowed_block(CATEGORIES[:2], items, {"entries": [ban("item", item_id="a1")]})
+    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"] == {"count": 1, "banned": [], "groups": [], "banned_everywhere": 1,
+                                                                      "only_allowed": True}
     text = markdown_text.plain(loadout_bans.render_block(data, "text"))
-    assert "- Blitz 9 – keine Aufsätze erlaubt\n" in text and "**An keiner Waffe erlaubt:** Kompensator" in text
+    assert "| **Blitz 9** | **keine Aufsätze erlaubt** |" in text and "**An keiner Waffe erlaubt:** Kompensator" in text
 
 
 # ---------------------------------------------------------------- „nur in …“ (#2298)
@@ -203,27 +208,10 @@ def test_only_in_also_for_an_attachment_at_a_weapon():
     entry = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]["groups"][0]["entries"][0]
     assert entry["only_in"] == ["Suchen"]
     text = markdown_text.plain(loadout_bans.render_block(data, "text"))
-    assert "- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Rotpunkt (nur in Suchen)" in text
+    assert "| **Blitz 9** | **eingeschränkt:** *Optik:* Rotpunkt (nur in Suchen) |" in text
 
 
 # ---------------------------------------------------------------- Darstellung
-
-def test_the_pdf_has_one_line_per_weapon():
-    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
-    text = markdown_text.plain(loadout_bans.render_block(data, "text"))
-    assert "![" not in text and "++" not in text
-    assert "**Waffen**" in text and "- Ohne Klasse\n" in text, "ohne passende Aufsätze nur der Name"
-    assert "*Sturmgewehr*\n- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Rotpunkt\n" in text
-    assert "- Donner 4 (nicht in Suchen) – alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Suchen)" in text
-    assert "*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)" in text
-    assert "*Pistole* · nicht in Suchen\n- Funke\n- Zunder (nicht in Suchen, Stellung)" in text
-    assert "| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |" in text and "| Perks | – | Leise Sohlen | – |" in text
-    assert "Aufsätze |" not in text and "nicht an" not in text
-    free = markdown_text.plain(loadout_bans.render_block(loadout_bans.allowed_block(CATEGORIES, ITEMS, None), "text"))
-    assert "- Blitz 9 – alle passenden Aufsätze erlaubt\n" in free and "*Sturmgewehr* · alle erlaubt" in free
-    for line in text.splitlines():
-        assert "<u>" not in pdf_service.pdf_rules_inline(line)
-
 
 def test_a_weapon_without_an_allowed_attachment_says_so():
     items = [item("w1", "waffen", "Blitz 9", "sturm"), item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_ids=["w1"]),
@@ -231,17 +219,10 @@ def test_a_weapon_without_an_allowed_attachment_says_so():
     doc = {"entries": [ban("attachments", item_id="w1", name="Blitz 9", attachments=[{"item_id": "a1", "name": "Rotpunkt"},
                                                                                     {"item_id": "a2", "name": "Griff"}])]}
     data = loadout_bans.allowed_block(CATEGORIES[:2], items, doc)
-    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"] == {"count": 2, "banned": ["Griff", "Rotpunkt"], "groups": []}
-    assert "- Blitz 9 – keine Aufsätze erlaubt (Griff, Rotpunkt)" in markdown_text.plain(loadout_bans.render_block(data, "text"))
-
-
-def test_the_web_card_names_the_attachments_under_the_weapon():
-    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
-    web = markdown_text.plain(loadout_bans.render_block(data, "markdown"))
-    assert f"- ![Ausrüstung]({IMAGE}) ++Blitz 9++ alle passenden Aufsätze erlaubt, außer: Rotpunkt\n" in web
-    assert "- ++Donner 4++ *nicht in Suchen* alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Suchen)" in web
-    assert web.count("++Ohne Klasse++\n") == 1 and "**Aufsätze**" not in web and "nicht an" not in web
-    assert f"![Klassen-Symbol]({ICON}) *Sturmgewehr*" in web
+    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"] == {"count": 2, "banned": ["Griff", "Rotpunkt"], "only_allowed": True,
+                                                                      "groups": [{"label": None, "not_in": [], "banned": ["Griff"], "entries": []},
+                                                                                 {"label": "Optik", "not_in": [], "banned": ["Rotpunkt"], "entries": []}]}
+    assert "| **Blitz 9** | **keine Aufsätze erlaubt** |" in markdown_text.plain(loadout_bans.render_block(data, "text"))
 
 
 def test_images_of_attachments_and_slots_are_named():
@@ -284,10 +265,11 @@ def test_names_of_attachments_and_slots_stay_text():
         {"item_id": "a1", "name": TRICKY}, {"item_id": "a2", "name": f"{TRICKY} 2", "modes": ["x"], "mode_labels": [TRICKY]}])]}
     data = loadout_bans.allowed_block(categories, items, doc)
     assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]["banned"] == [TRICKY], "Daten sind Klartext"
-    for variant in ("markdown", "text"):
+    safe = TRICKY.replace("|", "/")
+    for variant in ("markdown", "text", "pdf"):
         shown = loadout_bans.render_block(data, variant)
         assert "[Klick](https://" not in shown and "**fett**" not in shown and "\\" not in shown
-        assert f"außer: {TRICKY.replace('|', '/')}, {TRICKY.replace('|', '/')} 2 (nicht in {TRICKY.replace('|', '/')})" in \
-            markdown_text.plain(shown)
-    for line in loadout_bans.render_block(data, "text").splitlines():
+        plain = markdown_text.plain(shown)
+        assert f"*{safe}:* {safe}" in plain and f"*{safe}:* {safe} 2 (nicht in {safe})" in plain, "Slot und Namen bleiben Text"
+    for line in loadout_bans.render_block(data, "pdf").splitlines():
         assert "<a " not in pdf_service.pdf_rules_inline(line) and "<b>fett" not in pdf_service.pdf_rules_inline(line)

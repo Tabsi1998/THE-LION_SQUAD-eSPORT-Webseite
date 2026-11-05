@@ -1,0 +1,576 @@
+{
+ "DOC": {
+  "data": {
+   "list": true,
+   "layout": 4,
+   "categories": [
+    {
+     "label": "Waffen",
+     "role": "weapon",
+     "sections": [
+      {
+       "label": null,
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Ohne Klasse",
+         "image_url": null,
+         "not_in": []
+        }
+       ]
+      },
+      {
+       "label": "Sturmgewehr",
+       "icon_url": "/api/static/uploads/klasse-1.png",
+       "state": "some",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Blitz 9",
+         "image_url": "/api/static/uploads/blitz-1.webp",
+         "not_in": [],
+         "attachments": {
+          "count": 2,
+          "banned": [
+           "Rotpunkt"
+          ],
+          "groups": [
+           {
+            "label": null,
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Griff",
+              "image_url": null,
+              "not_in": []
+             }
+            ]
+           }
+          ]
+         }
+        },
+        {
+         "name": "Donner 4",
+         "image_url": null,
+         "not_in": [
+          "Suchen"
+         ],
+         "attachments": {
+          "count": 1,
+          "banned": [],
+          "groups": [
+           {
+            "label": "Optik",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Rotpunkt",
+              "image_url": null,
+              "not_in": [
+               "Suchen"
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "label": "Schrotflinte",
+       "state": "banned",
+       "not_in": [],
+       "banned": [
+        "Bö",
+        "Hagel"
+       ],
+       "entries": []
+      },
+      {
+       "label": "Pistole",
+       "state": "some",
+       "not_in": [
+        "Suchen"
+       ],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Funke",
+         "image_url": null,
+         "not_in": [
+          "Suchen"
+         ]
+        },
+        {
+         "name": "Zunder",
+         "image_url": null,
+         "not_in": [
+          "Suchen",
+          "Stellung"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Perks",
+     "role": "item",
+     "sections": [
+      {
+       "label": null,
+       "state": "some",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Leise Sohlen",
+         "image_url": null,
+         "not_in": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "markdown": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n- ++Ohne Klasse++\n\n![Klassen-Symbol](/api/static/uploads/klasse-1.png) *Sturmgewehr*\n- ![Ausrüstung](/api/static/uploads/blitz-1.webp) ++Blitz 9++ alle passenden Aufsätze erlaubt, außer: Rotpunkt\n- ++Donner 4++ *nicht in Suchen* alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Suchen)\n\n*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)\n\n*Pistole* · nicht in Suchen\n- ++Funke++\n- ++Zunder++ *nicht in Suchen, Stellung*\n\n**Perks**\n\n- ++Leise Sohlen++",
+  "text": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n- Ohne Klasse\n\n*Sturmgewehr*\n- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Rotpunkt\n- Donner 4 (nicht in Suchen) – alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Suchen)\n\n*Schrotflinte* · **nicht erlaubt** (Bö, Hagel)\n\n*Pistole* · nicht in Suchen\n- Funke\n- Zunder (nicht in Suchen, Stellung)\n\n| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |\n| --- | --- | --- | --- |\n| Perks | – | Leise Sohlen | – |",
+  "images": [
+   "/api/static/uploads/klasse-1.png",
+   "/api/static/uploads/blitz-1.webp"
+  ]
+ },
+ "NONE": {
+  "data": {
+   "list": false,
+   "layout": 4,
+   "categories": [
+    {
+     "label": "Waffen",
+     "role": "weapon",
+     "sections": [
+      {
+       "label": null,
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Ohne Klasse",
+         "image_url": null,
+         "not_in": []
+        }
+       ]
+      },
+      {
+       "label": "Sturmgewehr",
+       "icon_url": "/api/static/uploads/klasse-1.png",
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Blitz 9",
+         "image_url": "/api/static/uploads/blitz-1.webp",
+         "not_in": [],
+         "attachments": {
+          "count": 2,
+          "banned": [],
+          "groups": [
+           {
+            "label": null,
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Griff",
+              "image_url": null,
+              "not_in": []
+             }
+            ]
+           },
+           {
+            "label": "Optik",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Rotpunkt",
+              "image_url": null,
+              "not_in": []
+             }
+            ]
+           }
+          ]
+         }
+        },
+        {
+         "name": "Donner 4",
+         "image_url": null,
+         "not_in": [],
+         "attachments": {
+          "count": 1,
+          "banned": [],
+          "groups": [
+           {
+            "label": "Optik",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Rotpunkt",
+              "image_url": null,
+              "not_in": []
+             }
+            ]
+           }
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "label": "Schrotflinte",
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Bö",
+         "image_url": null,
+         "not_in": []
+        },
+        {
+         "name": "Hagel",
+         "image_url": null,
+         "not_in": []
+        }
+       ]
+      },
+      {
+       "label": "Pistole",
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Funke",
+         "image_url": null,
+         "not_in": []
+        },
+        {
+         "name": "Zunder",
+         "image_url": null,
+         "not_in": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "label": "Perks",
+     "role": "item",
+     "sections": [
+      {
+       "label": null,
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Kaltblut",
+         "image_url": null,
+         "not_in": []
+        },
+        {
+         "name": "Leise Sohlen",
+         "image_url": null,
+         "not_in": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "markdown": "*Für diese Season ist nichts gesperrt – erlaubt ist die ganze Ausrüstung, die hier steht.*\n\n**Waffen**\n\n- ++Ohne Klasse++\n\n![Klassen-Symbol](/api/static/uploads/klasse-1.png) *Sturmgewehr* · alle erlaubt\n- ![Ausrüstung](/api/static/uploads/blitz-1.webp) ++Blitz 9++ alle passenden Aufsätze erlaubt\n- ++Donner 4++ alle passenden Aufsätze erlaubt\n\n*Schrotflinte* · alle erlaubt\n- ++Bö++\n- ++Hagel++\n\n*Pistole* · alle erlaubt\n- ++Funke++\n- ++Zunder++\n\n**Perks**\n\n- ++Kaltblut++\n- ++Leise Sohlen++",
+  "text": "*Für diese Season ist nichts gesperrt – erlaubt ist die ganze Ausrüstung, die hier steht.*\n\n**Waffen**\n\n- Ohne Klasse\n\n*Sturmgewehr* · alle erlaubt\n- Blitz 9 – alle passenden Aufsätze erlaubt\n- Donner 4 – alle passenden Aufsätze erlaubt\n\n*Schrotflinte* · alle erlaubt\n- Bö\n- Hagel\n\n*Pistole* · alle erlaubt\n- Funke\n- Zunder\n\n| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |\n| --- | --- | --- | --- |\n| Perks | – | alle: Kaltblut, Leise Sohlen | – |",
+  "images": [
+   "/api/static/uploads/klasse-1.png",
+   "/api/static/uploads/blitz-1.webp"
+  ]
+ },
+ "NOWHERE": {
+  "data": {
+   "list": true,
+   "layout": 4,
+   "categories": [
+    {
+     "label": "Waffen",
+     "role": "weapon",
+     "sections": [
+      {
+       "label": "Sturmgewehr",
+       "icon_url": "/api/static/uploads/klasse-1.png",
+       "state": "some",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Blitz 9",
+         "image_url": null,
+         "not_in": [],
+         "attachments": {
+          "count": 4,
+          "banned": [
+           "Laser"
+          ],
+          "groups": [
+           {
+            "label": "Optik",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Holo",
+              "image_url": null,
+              "not_in": [
+               "Stellung",
+               "Kapern"
+              ],
+              "only_in": [
+               "Suchen"
+              ],
+              "everywhere": true
+             },
+             {
+              "name": "Rotpunkt",
+              "image_url": null,
+              "not_in": [
+               "Suchen"
+              ]
+             }
+            ]
+           }
+          ],
+          "banned_everywhere": 1
+         }
+        },
+        {
+         "name": "Donner 4",
+         "image_url": null,
+         "not_in": [],
+         "attachments": {
+          "count": 3,
+          "banned": [],
+          "groups": [
+           {
+            "label": "Optik",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Holo",
+              "image_url": null,
+              "not_in": [
+               "Kapern",
+               "Stellung"
+              ],
+              "only_in": [
+               "Suchen"
+              ],
+              "everywhere": true
+             },
+             {
+              "name": "Rotpunkt",
+              "image_url": null,
+              "not_in": [
+               "Stellung"
+              ]
+             }
+            ]
+           }
+          ],
+          "banned_everywhere": 1
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "attachments_everywhere": [
+    {
+     "name": "Kompensator",
+     "not_in": []
+    },
+    {
+     "name": "Holo",
+     "not_in": [
+      "Stellung",
+      "Kapern"
+     ],
+     "only_in": [
+      "Suchen"
+     ]
+    }
+   ]
+  },
+  "markdown": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n![Klassen-Symbol](/api/static/uploads/klasse-1.png) *Sturmgewehr*\n- ++Blitz 9++ alle passenden Aufsätze erlaubt, außer: Laser, Rotpunkt (nicht in Suchen)\n- ++Donner 4++ alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Stellung)\n\n**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)",
+  "text": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n*Sturmgewehr*\n- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Laser, Rotpunkt (nicht in Suchen)\n- Donner 4 – alle passenden Aufsätze erlaubt, außer: Rotpunkt (nicht in Stellung)\n\n**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)",
+  "images": [
+   "/api/static/uploads/klasse-1.png"
+  ]
+ },
+ "NONE_ALLOWED": {
+  "data": {
+   "list": true,
+   "layout": 4,
+   "categories": [
+    {
+     "label": "Waffen",
+     "role": "weapon",
+     "sections": [
+      {
+       "label": "Sturmgewehr",
+       "icon_url": "/api/static/uploads/klasse-1.png",
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Blitz 9",
+         "image_url": null,
+         "not_in": [],
+         "attachments": {
+          "count": 2,
+          "banned": [
+           "Griff",
+           "Rotpunkt"
+          ],
+          "groups": []
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "markdown": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n![Klassen-Symbol](/api/static/uploads/klasse-1.png) *Sturmgewehr* · alle erlaubt\n- ++Blitz 9++ keine Aufsätze erlaubt (Griff, Rotpunkt)",
+  "text": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n*Sturmgewehr* · alle erlaubt\n- Blitz 9 – keine Aufsätze erlaubt (Griff, Rotpunkt)",
+  "images": [
+   "/api/static/uploads/klasse-1.png"
+  ]
+ },
+ "ONLY_IN": {
+  "data": {
+   "list": true,
+   "layout": 4,
+   "categories": [
+    {
+     "label": "Waffen",
+     "role": "weapon",
+     "sections": [
+      {
+       "label": "Sturmgewehr",
+       "icon_url": "/api/static/uploads/klasse-1.png",
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Blitz 9",
+         "image_url": null,
+         "not_in": [],
+         "attachments": {
+          "count": 1,
+          "banned": [],
+          "groups": [
+           {
+            "label": "Optik",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "Rotpunkt",
+              "image_url": null,
+              "not_in": [
+               "Stellung",
+               "Kapern"
+              ],
+              "only_in": [
+               "Suchen"
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "markdown": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n![Klassen-Symbol](/api/static/uploads/klasse-1.png) *Sturmgewehr* · alle erlaubt\n- ++Blitz 9++ alle passenden Aufsätze erlaubt, außer: Rotpunkt (nur in Suchen)",
+  "text": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n*Sturmgewehr* · alle erlaubt\n- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Rotpunkt (nur in Suchen)",
+  "images": [
+   "/api/static/uploads/klasse-1.png"
+  ]
+ },
+ "TRICKY": {
+  "data": {
+   "list": true,
+   "layout": 4,
+   "categories": [
+    {
+     "label": "Waffen",
+     "role": "weapon",
+     "sections": [
+      {
+       "label": "Sturmgewehr",
+       "icon_url": "/api/static/uploads/klasse-1.png",
+       "state": "all",
+       "not_in": [],
+       "banned": [],
+       "entries": [
+        {
+         "name": "Blitz 9",
+         "image_url": null,
+         "not_in": [],
+         "attachments": {
+          "count": 2,
+          "banned": [
+           "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad"
+          ],
+          "groups": [
+           {
+            "label": "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad",
+            "not_in": [],
+            "entries": [
+             {
+              "name": "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad 2",
+              "image_url": null,
+              "not_in": [
+               "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad"
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "markdown": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n![Klassen-Symbol](/api/static/uploads/klasse-1.png) *Sturmgewehr* · alle erlaubt\n- ++Blitz 9++ alle passenden Aufsätze erlaubt, außer: Klickhttps://example.test/x fett code /Rohr/ pfad, Klickhttps://example.test/x fett code /Rohr/ pfad 2 (nicht in Klickhttps://example.test/x fett code /Rohr/ pfad)",
+  "text": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n*Sturmgewehr* · alle erlaubt\n- Blitz 9 – alle passenden Aufsätze erlaubt, außer: Klickhttps://example.test/x fett code /Rohr/ pfad, Klickhttps://example.test/x fett code /Rohr/ pfad 2 (nicht in Klickhttps://example.test/x fett code /Rohr/ pfad)",
+  "images": [
+   "/api/static/uploads/klasse-1.png"
+  ]
+ }
+}

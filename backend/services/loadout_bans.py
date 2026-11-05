@@ -761,9 +761,12 @@ def unusable_attachments(categories: list[dict], items: list[dict], doc: dict | 
     return out
 
 
-LAYOUT = 4
-# Fassungen der erlaubten Ausrüstung: 3 (#2287, Aufsätze als eigene Liste mit „nicht an …“) bleibt eingefroren lesbar, 4 (#2299) ist neu.
-LAYOUTS = (3, LAYOUT)
+LAYOUT = 5
+# Fassungen der erlaubten Ausrüstung: 3 (#2287, Aufsätze als eigene Liste mit „nicht an …“) und 4 (#2299, je Waffe ein Satz „alle passenden
+# Aufsätze erlaubt, außer: …“) bleiben eingefroren lesbar, Wort für Wort. 5 (#2305) ist neu: Waffen als Tabelle je Kategorie, die
+# Ausnahmen nach Slot, „nur erlaubt: …“, wenn das kürzer ist.
+LAYOUTS = (3, 4, LAYOUT)
+TABLE_LAYOUT = 5
 
 
 def _slot_index(categories: list[dict]) -> dict:
@@ -807,9 +810,13 @@ def _everywhere(weapons: list[dict], attachments: list[dict], slots: dict, bans:
 
 def _weapon_attachments(weapon: dict, attachments: list[dict], slots: dict, bans: tuple, season: list,
                         everywhere: dict | None = None) -> dict | None:
-    """Die Aufsätze einer erlaubten Waffe (#2299): ``{count, banned, banned_everywhere?, groups}`` - ``None``, wenn keiner passt. Was an
-    allen Waffen gleich gesperrt ist (``everywhere``), steht einmal oben: ganz gesperrt zählt nur in ``banned_everywhere`` (für „K gesperrt“),
-    nur in Modi gesperrt bleibt in der Gruppe, mit ``everywhere: True`` - der Satz zur Waffe nennt es nicht noch einmal."""
+    """Die Aufsätze einer erlaubten Waffe (#2299): ``{count, banned, banned_everywhere?, only_allowed?, groups}`` - ``None``, wenn keiner
+    passt. Was an allen Waffen gleich gesperrt ist (``everywhere``), steht einmal oben: ganz gesperrt zählt nur in ``banned_everywhere`` (für
+    „K gesperrt“), nur in Modi gesperrt bleibt in der Gruppe, mit ``everywhere: True`` - der Satz zur Waffe nennt es nicht noch einmal.
+
+    Ab layout 5 (#2305) trägt jede Gruppe (Slot) auch ihre ganz gesperrten (``banned``, ohne die an keiner Waffe erlaubten) - eine Gruppe kann
+    so ohne ``entries`` sein. ``only_allowed``: An der Waffe sind mehr passende Aufsätze ganz gesperrt als erlaubt (nur in Modi gesperrte
+    zählen als erlaubt) - dann nennt das Regelwerk die erlaubten. Gleichstand bleibt „gesperrt“, wie ``only_in`` (#2298)."""
     class_bans = bans[1]
     everywhere = everywhere or {}
     fitting = [row for row in attachments if library.fits(row, weapon)]
@@ -820,11 +827,8 @@ def _weapon_attachments(weapon: dict, attachments: list[dict], slots: dict, bans
         sub_key = _slot_key(row, slots)
         klass = class_bans.get(sub_key) if sub_key else None
         pairs = _pairs_at(row, weapon, slots, bans)
-        if pairs == []:
-            if row["id"] in everywhere:
-                elsewhere += 1
-            else:
-                banned.append(row.get("name") or "")
+        if pairs == [] and row["id"] in everywhere:
+            elsewhere += 1
             continue
         position, sub = slots[(row.get("category"), sub_key)]
         group = groups.get(position)
@@ -833,8 +837,12 @@ def _weapon_attachments(weapon: dict, attachments: list[dict], slots: dict, bans
             if sub_key and sub.get("icon_url"):
                 group["icon_url"] = sub["icon_url"]
             group.update(_restriction(klass or [], season))
-            group["entries"] = []
+            group.update(banned=[], entries=[])
             groups[position] = group
+        if pairs == []:
+            banned.append(row.get("name") or "")
+            group["banned"].append(row.get("name") or "")
+            continue
         entry = {"name": row.get("name") or "", "image_url": row.get("image_url"), **_restriction(pairs or [], season)}
         if row["id"] in everywhere:
             entry["everywhere"] = True
@@ -842,6 +850,9 @@ def _weapon_attachments(weapon: dict, attachments: list[dict], slots: dict, bans
     out = {"count": len(fitting), "banned": banned, "groups": [groups[key] for key in sorted(groups)]}
     if elsewhere:
         out["banned_everywhere"] = elsewhere
+    blocked = len(banned) + elsewhere
+    if blocked > len(fitting) - blocked:
+        out["only_allowed"] = True
     return out
 
 
@@ -864,14 +875,15 @@ def allowed_block(categories: list[dict], items: list[dict], doc: dict | None, s
     """Die erlaubte Ausrüstung (Fabian, 04.11., Nr. 99; Aufsätze je Waffe #2299): je Kategorie und Unterkategorie die **aktiven** Einträge
     der Bibliothek ohne die Sperren der Version. Strukturiert im Klartext, so wird eingefroren:
 
-    ``{"list", "layout": 4, "categories": [{label, role, sections: [{label | None, icon_url?, state, not_in, only_in?, banned, entries:
+    ``{"list", "layout": 5, "categories": [{label, role, sections: [{label | None, icon_url?, state, not_in, only_in?, banned, entries:
     [{name, image_url, not_in, only_in?, attachments?}]}]}]}`` - ``state``: ``all`` (alle erlaubt), ``some`` (mit Einschränkungen oder
     einzeln gesperrten) oder ``banned`` (ganze Klasse nicht erlaubt, dann nur ``banned``: die Namen der Einträge, die darunter fallen).
     ``not_in``: Modi, in denen ein Eintrag (bzw. die ganze Klasse) nicht erlaubt ist; ``only_in`` (#2298): die erlaubten Modi der Season,
     wenn das kürzer ist (``season_modes``: ``[(Kennung, Name)]``). Kategorien der Art Aufsatz entfallen - die Aufsätze stehen an der Waffe
     (``_weapon_attachments``). Inaktive und archivierte Einträge fehlen, leere Unterkategorien entfallen. ``attachments_everywhere``
     (nur wenn nicht leer): ``[{name, not_in, only_in?}]`` - Aufsätze, die an jeder passenden Waffe gleich gesperrt sind
-    (``not_in`` leer = in allen Modi)."""
+    (``not_in`` leer = in allen Modi). Ab ``layout: 5`` (#2305) tragen die Aufsätze einer Waffe auch die ganz gesperrten je Slot und
+    ``only_allowed`` (``_weapon_attachments``)."""
     bans = _bans_of(doc)
     item_bans, class_bans, _at_weapons = bans
     season = list(season_modes or [])
@@ -977,14 +989,18 @@ def block_source(doc: dict | None) -> dict:
     return {"loadout_ban_id": doc.get("id"), "loadout_ban_version": doc.get("version")}
 
 
-def render_block(data: dict, variant: str = "markdown") -> str:
-    """Markdown fürs Darstellen: ``markdown`` mit Bildern (Web), ``text`` ohne (PDF, Vergleich). Namen als Bausteinwerte geschützt
-    (``text_cell``) - das ist nur Darstellungs-Zwischenformat, gespeichert wird ``block_data``."""
+WEB, TEXT, PDF = "markdown", "text", "pdf"
+
+
+def render_block(data: dict, variant: str = WEB) -> str:
+    """Markdown fürs Darstellen: ``markdown`` mit Bildern (Web), ``text`` ohne (Vergleich, bis layout 4 auch das PDF), ``pdf`` wie ``text``,
+    nur ab layout 5 mit dem kleinen Bild je Waffe in der Tabelle (#2305). Namen als Bausteinwerte geschützt (``text_cell``) - das ist nur
+    Darstellungs-Zwischenformat, gespeichert wird ``block_data``."""
     if data.get("layout") in LAYOUTS:
         return _render_allowed(data, variant)
     if not data.get("list"):
         return NO_LIST
-    web = variant != "text"
+    web = variant == WEB
     lines = [INTRO]
     for group in data.get("groups") or []:
         lines += ["", f"**{_cell(group.get('label'))}**", ""]
@@ -1095,7 +1111,7 @@ def _allowed_card(entry: dict, section: dict) -> str:
 
 
 def _allowed_head(section: dict, variant: str = "markdown") -> str:
-    icon = f"![{CLASS_ICON_ALT}]({section['icon_url']}) " if section.get("icon_url") and variant != "text" else ""
+    icon = f"![{CLASS_ICON_ALT}]({section['icon_url']}) " if section.get("icon_url") and variant == WEB else ""
     head = f"{icon}*{_cell(section.get('label'))}*"
     if section.get("state") == "banned":
         names = ", ".join(_cell(name) for name in section.get("banned") or [])
@@ -1151,7 +1167,9 @@ def _render_allowed(data: dict, variant: str) -> str:
     # „An keiner Waffe erlaubt“ (Fabian, 04.11., nur layout 4) steht einmal nach der letzten Kategorie mit Waffen.
     nowhere = everywhere_text(data)
     last_weapons = max((index for index, row in enumerate(categories) if row.get("role") == WEAPON), default=None)
-    if variant != "text":
+    if data.get("layout", 0) >= TABLE_LAYOUT:
+        return "\n".join(_render_tables(data, variant, lines, nowhere, last_weapons))
+    if variant == WEB:
         for index, category in enumerate(categories):
             lines += ["", f"**{_cell(category.get('label'))}**"]
             for section in category.get("sections") or []:
@@ -1180,6 +1198,131 @@ def _render_allowed(data: dict, variant: str) -> str:
 
 
 TABLE_HEAD = ("| Kategorie | Unterkategorie | Erlaubt | Einschränkungen |", "| --- | --- | --- | --- |")
+
+# ---------------------------------------------------------------- Tabelle je Kategorie (layout 5, #2305)
+
+# Kopf der Waffen-Tabelle: Das PDF erkennt sie daran (``pdf_service._RULES_GEAR_HEAD``), das Web an der Marke ``++Waffe++`` (``rules.css``).
+GEAR_HEAD = ("Bild", "Waffe", "Aufsätze")
+# Zeilenwechsel in einer Zelle - nur in der Fassung ``pdf`` (``pdf_service._RULES_CELL_BREAK``); kein Name kann ihn enthalten (``text_cell``
+# fasst Leerraum zusammen).
+CELL_BREAK = " "
+BANNED_LEAD, RESTRICTED_LEAD, ONLY_LEAD = "gesperrt:", "eingeschränkt:", "nur erlaubt:"
+NO_SLOT = "Ohne Slot"
+
+
+def _entry_name(entry: dict) -> str:
+    """Ein Aufsatz mit seinem Hinweis: „Holo (nur in Suchen)“."""
+    note = "; ".join(restriction_parts(entry))
+    return f"{_cell(entry.get('name'))} ({_cell(note)})" if note else _cell(entry.get("name"))
+
+
+def _slot_lines(groups: list[dict], pick) -> list[tuple[str | None, list[str]]]:
+    """Je Slot (in der Reihenfolge der Bibliothek) die Namen, die ``pick`` wählt - leere Slots fallen weg. Ein Slot ohne Namen heißt
+    „Ohne Slot“, sobald es mehr als eine Zeile gibt."""
+    rows = [(group.get("label"), names) for group in groups for names in [pick(group)] if names]
+    return [(label if label or len(rows) == 1 else NO_SLOT, names) for label, names in rows]
+
+
+def attachment_blocks(attachments: dict) -> list[tuple[str, list[tuple[str | None, list[str]]]]] | None:
+    """Die Ausnahmen einer Waffe (#2305) als Blöcke ``(Wort, [(Slot, Namen)])`` - ``[]``: alle passenden erlaubt, ``None``: keiner erlaubt.
+
+    - mehr ganz gesperrt als erlaubt (``only_allowed``): „nur erlaubt:“ mit allen erlaubten, nur in Modi gesperrte mit Hinweis;
+    - sonst „gesperrt:“ (ganz gesperrte) und „eingeschränkt:“ (nur in Modi gesperrte mit Hinweis) - ohne die an keiner Waffe erlaubten, die
+      stehen einmal unter den Waffen. Der Hinweis sagt wie überall, wo der Aufsatz erlaubt ist („nur in …“, „nicht in …“); darum steht er
+      nie unter „gesperrt:“."""
+    groups = attachments.get("groups") or []
+    if attachments.get("only_allowed"):
+        if not any(group.get("entries") for group in groups):
+            return None
+        return [(ONLY_LEAD, _slot_lines(groups, lambda group: [_entry_name(entry) for entry in group.get("entries") or []]))]
+    blocks = []
+    banned = _slot_lines(groups, lambda group: [_cell(name) for name in group.get("banned") or []])
+    if banned:
+        blocks.append((BANNED_LEAD, banned))
+    restricted = _slot_lines(groups, lambda group: [_entry_name(entry) for entry in group.get("entries") or []
+                                                    if not entry.get("everywhere") and restriction_parts(entry)])
+    if restricted:
+        blocks.append((RESTRICTED_LEAD, restricted))
+    return blocks
+
+
+def _attachments_cell(attachments: dict | None, variant: str) -> str:
+    """Die dritte Spalte: im Web je Slot eine Marke ``++…++`` (eigene Zeile über ``rules.css``), im PDF Zeilen mit ``CELL_BREAK``, im
+    Klartext eine Zeile mit „·“."""
+    if not attachments:
+        return ""
+    blocks = attachment_blocks(attachments)
+    if blocks is None:
+        return f"**{NO_ATTACHMENTS}**"
+    if not blocks:
+        return f"*{ALL_ATTACHMENTS}*" if variant == WEB else ALL_ATTACHMENTS
+    out = []
+    for lead, rows in blocks:
+        lines = [(f"*{_cell(label)}:* " if label else "") + ", ".join(names) for label, names in rows]
+        if variant == WEB:
+            # „nur erlaubt“ kursiv (im Web grün), „gesperrt“ und „eingeschränkt“ fett (orange) - je Slot eine Marke.
+            out.append(" ".join([f"*{lead}*" if lead == ONLY_LEAD else f"**{lead}**", *(f"++{line}++" for line in lines)]))
+        elif variant == PDF:
+            out.append(CELL_BREAK.join([f"**{lead}**", *lines]))
+        else:
+            out.append(f"**{lead}** {' · '.join(lines)}")
+    return (" " if variant == WEB else CELL_BREAK if variant == PDF else " · ").join(out)
+
+
+def _name_cell(entry: dict, section: dict, variant: str) -> str:
+    parts = _own_parts(entry, section)
+    note = f" *{_cell(' · '.join(parts))}*" if parts else ""
+    return f"++{_cell(entry.get('name'))}++{note}" if variant == WEB else f"**{_cell(entry.get('name'))}**{note}"
+
+
+def _weapon_table(category: dict, variant: str) -> list[str]:
+    """Eine Kategorie mit Waffen als Tabelle (#2305): je Unterkategorie eine Zeile mit ihrem Kopf, je Waffe Bild · Name · Ausnahmen. Der
+    Klartext (Vergleich) hat keine Bildspalte."""
+    image = variant != TEXT
+    head = [f"++{GEAR_HEAD[1]}++" if variant == WEB else GEAR_HEAD[1], GEAR_HEAD[2]]
+    if image:
+        head.insert(0, GEAR_HEAD[0])
+    rows = [head, ["---"] * len(head)]
+    for section in category.get("sections") or []:
+        if section.get("label"):
+            text = _allowed_head(section, TEXT)
+            if variant == WEB:
+                icon = f"![{CLASS_ICON_ALT}]({section['icon_url']})" if section.get("icon_url") else ""
+                rows.append([icon, text, ""])
+            else:
+                rows.append([text, *[""] * (len(head) - 1)])
+        for entry in section.get("entries") or []:
+            cells = [_name_cell(entry, section, variant), _attachments_cell(entry.get("attachments"), variant)]
+            if image:
+                cells.insert(0, f"![{CARD_ALT}]({entry['image_url']})" if entry.get("image_url") else "")
+            rows.append(cells)
+    return ["", f"**{_cell(category.get('label'))}**", "", *(f"| {' | '.join(row)} |" for row in rows)]
+
+
+def _render_tables(data: dict, variant: str, lines: list[str], nowhere: str, last_weapons: int | None) -> list[str]:
+    """Ab layout 5: Waffen als Tabelle je Kategorie, alles andere wie in layout 4 - im Web Karten, im PDF und Klartext die Tabelle
+    Kategorie · Unterkategorie · Erlaubt · Einschränkungen."""
+    table: list[str] = []
+    for index, category in enumerate(data.get("categories") or []):
+        if category.get("role") == WEAPON:
+            if table:
+                lines += ["", *TABLE_HEAD, *table]
+                table = []
+            lines += _weapon_table(category, variant)
+            if nowhere and index == last_weapons:
+                lines += ["", nowhere]
+        elif variant == WEB:
+            lines += ["", f"**{_cell(category.get('label'))}**"]
+            for section in category.get("sections") or []:
+                lines.append("")
+                if section.get("label"):
+                    lines.append(_allowed_head(section))
+                lines += [_allowed_card(entry, section) for entry in section.get("entries") or []]
+        else:
+            table += _allowed_rows(category)
+    if table:
+        lines += ["", *TABLE_HEAD, *table]
+    return lines
 
 
 def block_images(data: dict) -> list[str]:

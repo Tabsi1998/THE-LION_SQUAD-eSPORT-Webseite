@@ -4,13 +4,16 @@
 // Liga- und Matchseite nutzen sie, damit Spieler überall dasselbe lesen.
 // Aufsätze je Waffe (#2299, `layout: 4`): Die Waffenkarte sagt „14 Aufsätze · 2 gesperrt“ und klappt darunter über die ganze Breite die
 // erlaubten Aufsätze je Slot auf. Ältere Schnappschüsse (`layout: 3`, Aufsätze als eigene Liste mit „nicht an …“) zeigt sie wie damals.
+// Ab `layout: 5` (#2305) tragen die Slots auch ihre ganz gesperrten Aufsätze (fürs Regelwerk) - ein Slot ohne erlaubten fällt hier weg. Die
+// Zeile „Gesperrt: …“ steht ganz oben im Kasten, weil man das zuerst wissen will (Fabian, 05.11.); eine Umkehrung „nur erlaubt“ braucht es
+// hier nicht, der Kasten zeigt die erlaubten ohnehin mit Bild.
 import { useState } from "react";
 import { Ban, Check, ChevronDown, ShieldCheck } from "lucide-react";
 import { EquipmentThumb, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 import { allowedCount, attachmentsSummary, countText, everywhereText, modesNote, ownRestrictionParts } from "@/lib/loadoutBans";
 
-const LAYOUTS = [3, 4];
+const LAYOUTS = [3, 4, 5];
 // Kleine Kacheln der Aufsätze: drei Spalten am Handy, bis sechs am PC.
 const SMALL_TILE = "(min-width: 1024px) 140px, (min-width: 640px) 22vw, 30vw";
 
@@ -78,7 +81,8 @@ function WeaponTile({ entry, section, open, panelId, onToggle }) {
 }
 
 function AttachmentsPanel({ entry, id }) {
-  const { groups = [], banned = [] } = entry.attachments || {};
+  const { banned = [] } = entry.attachments || {};
+  const groups = (entry.attachments?.groups || []).filter((group) => group.entries?.length);
   return (
     <li id={id} className="col-span-full min-w-0 rounded-sm border border-[#29B6E8]/30 bg-[#0A0A0A] p-3 sm:p-4" data-testid="allowed-attachments"
       aria-label={`Aufsätze für ${entry.name}`}>

@@ -105,6 +105,34 @@ test("„An keiner Waffe erlaubt“ einmal unter den Waffen, „K gesperrt“ z�
   expect(screen.getByTestId("allowed-attachments-banned")).toHaveTextContent("Gesperrt: Laser · dazu 1 Aufsatz, der an keiner Waffe erlaubt ist");
 });
 
+// #2305 (layout 5): Die Slots tragen auch ihre ganz gesperrten (fürs Regelwerk) - ein Slot ohne erlaubten fällt im Kasten weg.
+const TABLE = { list: true, layout: 5, categories: [
+  { label: "Waffen", role: "weapon", sections: [{ label: "Scharfschützengewehr", state: "some", not_in: [], banned: [], entries: [
+    { name: "Falke 50", image_url: null, not_in: [], attachments: { count: 5, banned: ["Optik A", "Optik B", "Lauf A"], only_allowed: true, groups: [
+      { label: "Optik", not_in: [], banned: ["Optik A", "Optik B"], entries: [{ name: "Optik C", image_url: null, not_in: [] }] },
+      { label: "Lauf", not_in: [], banned: ["Lauf A"], entries: [] },
+      { label: "Mündung", not_in: [], banned: [], entries: [{ name: "Mündung A", image_url: null, not_in: ["Suchen"] }] }] } },
+    { name: "Habicht 7", image_url: null, not_in: [], attachments: { count: 1, banned: ["Lauf A"], only_allowed: true, groups: [
+      { label: "Lauf", not_in: [], banned: ["Lauf A"], entries: [] }] } },
+  ] }] },
+] };
+
+test("layout 5: Slots ohne erlaubten Aufsatz fallen im Kasten weg, ohne erlaubten „Keine Aufsätze erlaubt“", async () => {
+  const user = userEvent.setup();
+  render(<AllowedEquipmentView data={TABLE} />);
+  const [falke, habicht] = screen.getAllByTestId("allowed-weapon-toggle");
+  expect(within(falke).getByTestId("allowed-weapon-summary")).toHaveTextContent("5 Aufsätze · 3 gesperrt");
+  await user.click(falke);
+  const panel = screen.getByTestId("allowed-attachments");
+  expect(within(panel).getAllByTestId("allowed-slot").map((slot) => slot.querySelector("p").textContent)).toEqual(["Optik", "Mündung"]);
+  expect(within(panel).getByTestId("allowed-attachments-banned")).toHaveTextContent("Gesperrt: Optik A, Optik B, Lauf A");
+  expect(within(panel).queryByText("nur erlaubt", { exact: false })).toBeNull();
+  await user.click(falke);
+  await user.click(habicht);
+  expect(within(screen.getByTestId("allowed-attachments")).getByText("Keine Aufsätze erlaubt.")).toBeInTheDocument();
+  expect(within(screen.getByTestId("allowed-attachments")).queryAllByTestId("allowed-slot")).toHaveLength(0);
+});
+
 test("ohne Sperrliste: alles erlaubt, „Alle erlaubt“ an der Klasse", () => {
   render(<AllowedEquipmentView data={{ list: false, layout: 3, categories: [{ label: "Waffen", sections: [
     { label: "Schrotflinte", state: "all", not_in: [], banned: [], entries: [{ name: "Hagel", image_url: null, not_in: [], not_at: [] }] }] }] }} />);
