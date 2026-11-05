@@ -194,6 +194,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const calls = await mock(page);
       await page.goto("/admin/games/g1#ausruestung");
       const weapons = page.getByTestId("equipment-group-waffen");
+      // Einklappen (#2306): anfangs zu - „Alle aufklappen“ zeigt die Gruppen.
+      await expect(weapons.getByTestId("equipment-sub-ohne")).toHaveCount(0);
+      await page.getByTestId("equipment-open-all").click();
       await expect(weapons.getByTestId("equipment-sub-ohne")).toContainText("Ohne Unterkategorie");
       await expect(weapons.getByTestId("equipment-sub-sturm").getByTestId("equipment-sub-count")).toHaveText("3");
       await expect(weapons.getByTestId("equipment-sub-werfer")).toContainText("Noch kein Eintrag");
@@ -228,6 +231,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const calls = await mock(page);
       await page.goto("/admin/leagues/seasons/s1#sperrliste");
       const panel = page.getByTestId("season-bans");
+      // Einklappen (#2306): mit Sperren ist alles zu; die Kopfzeile der Klasse sagt, wie viel gesperrt ist.
+      await panel.getByTestId("season-bans-fold-waffen").click();
+      await expect(panel.getByTestId("season-bans-class-schrot-count")).toContainText("gesperrt");
+      await panel.getByTestId("season-bans-open-all").click();
       await expect(panel.getByTestId("season-bans-class-schrot-toggle")).toBeChecked();
       await expect(panel.getByTestId("season-bans-via-class-s1")).toHaveText("Mit der ganzen Klasse gesperrt");
       await expect(panel.getByTestId("season-bans-class-new")).toContainText("Sturm 12");
