@@ -137,6 +137,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(waffen).toHaveAttribute("aria-expanded", "true");
       await page.getByTestId("equipment-open-all").click();
       await expect(page.getByTestId("equipment-group-waffen").getByRole("listitem")).toHaveCount(24);
+      // Aufklappen blendet leise ein (tls-reveal); ohne „Bewegung reduzieren“ mit Dauer.
+      const duration = await page.locator("[id='equipment-body-waffen']").evaluate((node) => parseFloat(getComputedStyle(node).animationDuration));
+      expect(duration).toBeGreaterThan(0.1);
       await expect(page.getByTestId("equipment-row-w0")).toContainText("auf 1 Sperrliste");
       await expect(page.getByTestId("equipment-delete-w0")).toBeDisabled();
       await expect(page.getByTestId("equipment-without-weapon")).toContainText("Aufsatz 30");
@@ -180,7 +183,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const panel = page.getByTestId("season-bans");
       await expect(panel.getByTestId("season-bans-head")).toContainText("Version 1 · 3 Zeilen");
       await expect(panel.getByTestId("season-bans-rules-outdated")).toContainText("Version 2");
-      // Einklappen (#2306): mit Sperren ist alles zu; je Kategorie Anzahl und „K gesperrt“.
+      // Einklappen (#2306): mit Sperren ist alles zu; je Kategorie Anzahl und „K gesperrt“. Ohne Bewegung für ruhige Bilder.
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await expect(panel.getByTestId("season-bans-fold-waffen")).toHaveAttribute("aria-expanded", "false");
       await expect(panel.getByTestId("season-bans-count-waffen")).toHaveText("24 Einträge · 1 gesperrt");
       await expect(panel.getByTestId("season-bans-count-perks")).toHaveText("11 Einträge · 1 gesperrt");

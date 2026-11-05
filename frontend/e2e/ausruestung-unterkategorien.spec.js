@@ -194,9 +194,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const calls = await mock(page);
       await page.goto("/admin/games/g1#ausruestung");
       const weapons = page.getByTestId("equipment-group-waffen");
-      // Einklappen (#2306): anfangs zu - „Alle aufklappen“ zeigt die Gruppen.
+      // Einklappen (#2306): anfangs zu - „Alle aufklappen“ zeigt die Gruppen. Mit „Bewegung reduzieren“ ohne Animation.
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await expect(weapons.getByTestId("equipment-sub-ohne")).toHaveCount(0);
       await page.getByTestId("equipment-open-all").click();
+      const duration = await page.locator("[id='equipment-body-waffen']").evaluate((node) => parseFloat(getComputedStyle(node).animationDuration));
+      expect(duration).toBeLessThan(0.001);
       await expect(weapons.getByTestId("equipment-sub-ohne")).toContainText("Ohne Unterkategorie");
       await expect(weapons.getByTestId("equipment-sub-sturm").getByTestId("equipment-sub-count")).toHaveText("3");
       await expect(weapons.getByTestId("equipment-sub-werfer")).toContainText("Noch kein Eintrag");
@@ -231,7 +234,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const calls = await mock(page);
       await page.goto("/admin/leagues/seasons/s1#sperrliste");
       const panel = page.getByTestId("season-bans");
-      // Einklappen (#2306): mit Sperren ist alles zu; die Kopfzeile der Klasse sagt, wie viel gesperrt ist.
+      // Einklappen (#2306): mit Sperren ist alles zu; die Kopfzeile der Klasse sagt, wie viel gesperrt ist. Ohne Bewegung für das Bild.
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await panel.getByTestId("season-bans-fold-waffen").click();
       await expect(panel.getByTestId("season-bans-class-schrot-count")).toContainText("gesperrt");
       await panel.getByTestId("season-bans-open-all").click();
