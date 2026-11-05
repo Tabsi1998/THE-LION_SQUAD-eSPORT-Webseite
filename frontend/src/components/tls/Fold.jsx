@@ -13,7 +13,8 @@ export function FoldButton({ open, onToggle, controls, testId, className = "", c
       className={`group flex min-w-0 items-center gap-2 rounded-sm text-left ${FOCUS} ${className}`}>
       <ChevronDown className={`h-4 w-4 shrink-0 text-white/50 transition-[transform,color] duration-fast group-hover:text-white ${open ? "" : "-rotate-90"}`}
         aria-hidden="true" />
-      {children}
+      {/* Name und Anzahl brechen gemeinsam um - der Pfeil bleibt vorn, auch bei langen Namen am Handy. */}
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">{children}</span>
     </button>
   );
 }

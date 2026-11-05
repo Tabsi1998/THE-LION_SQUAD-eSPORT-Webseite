@@ -397,7 +397,7 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
                   <div className={`${catOpen ? "mb-3" : ""} flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2`}>
                     <h2 className="min-w-0 flex-1 font-heading text-lg font-bold uppercase">
                       <FoldButton open={catOpen} onToggle={() => fold.toggle(catKey, catBase)} controls={bodyId} testId={`equipment-fold-${category.key}`}
-                        className="w-full flex-wrap gap-y-0.5">
+                        className="w-full">
                         <span className="min-w-0 break-words">{category.label}</span>
                         <span className="text-[11px] font-semibold normal-case tracking-normal text-white/50 tabular-nums" data-testid={`equipment-count-${category.key}`}>
                           {ROLE_LABELS[category.role]} · {searching && rows.length !== all.length ? `${rows.length} von ${all.length}` : countText(all.length, "Eintrag", "Einträge")}

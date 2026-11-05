@@ -199,7 +199,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
         return (
           <div key={slot.key} data-testid={`season-bans-slot-${weapon.id}`}>
             <FoldButton open={open} onToggle={() => fold.toggle(key, single)} controls={bodyId} testId={`season-bans-slot-toggle-${weapon.id}-${slot.key}`}
-              className="w-full flex-wrap py-1">
+              className="w-full py-1">
               <SubcategoryIcon src={slot.icon_url} className="h-4 w-4" />
               <span className="min-w-0 break-words text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]" data-testid="season-bans-slot-label">
                 {slot.label || NO_SUBCATEGORY}
@@ -242,7 +242,7 @@ function ClassHead({ sub, count, shown, banned, filtering, row, modes, open, onT
   return (
     <div className={`${open ? "mb-2" : ""} rounded-sm border px-2.5 py-2 ${on ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#0D0D0D]"}`} data-testid={testId}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <FoldButton open={open} onToggle={onToggle} controls={controls} testId={`${testId}-fold`} className="flex-1 flex-wrap py-0.5">
+        <FoldButton open={open} onToggle={onToggle} controls={controls} testId={`${testId}-fold`} className="flex-1 py-0.5">
           <SubcategoryIcon src={sub.icon_url} />
           <span className="min-w-0 break-words text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{sub.label}</span>
           <span className="text-[11px] font-semibold tabular-nums text-white/50" data-testid={`${testId}-count`}>
@@ -574,7 +574,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                 <div key={category.key} data-testid={`${testId}-group-${category.key}`}>
                   <h3 className={`${catOpen ? "mb-3" : ""} border-b border-white/10 pb-2 font-heading text-base font-bold uppercase text-white`}>
                     <FoldButton open={catOpen} onToggle={() => fold.toggle(catKey, catBase)} controls={bodyId} testId={`${testId}-fold-${category.key}`}
-                      className="w-full flex-wrap gap-y-0.5">
+                      className="w-full">
                       <span className="min-w-0 break-words">{category.label}</span>
                       <span className="text-[11px] font-semibold normal-case tracking-normal tabular-nums text-white/50" data-testid={`${testId}-count-${category.key}`}>
                         {amountText(shown, all.length, "Eintrag", "Einträge", filtering)}<BannedNote count={bannedIn(all)} />
@@ -599,7 +599,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                             ) : (
                               <div className={`${secOpen ? "mb-2" : ""} rounded-sm border border-white/10 bg-[#0D0D0D] px-2.5 py-2`}>
                                 <FoldButton open={secOpen} onToggle={() => fold.toggle(secKey)} controls={secId} testId={`${testId}-fold-${category.key}-ohne`}
-                                  className="w-full flex-wrap py-0.5">
+                                  className="w-full py-0.5">
                                   <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">{NO_SUBCATEGORY}</span>
                                   <span className="text-[11px] font-semibold tabular-nums text-white/50">
                                     {amountText(items.length, members.length, "Eintrag", "Einträge", filtering)}<BannedNote count={bannedIn(members)} />
