@@ -1,11 +1,10 @@
 # Changelog
 
-## [1.71.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.70.0...v1.71.0) (2026-11-05)
-
+## 1.71.0 (05.11.2026)
 
 ### Neu
 
-* Sperrliste: Notiz der Ausrüstung steht klein unter dem Namen bei Waffen, Aufsätzen und allen Kategorien, nur in der Verwaltung ([#2302](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2302)) ([fc9076a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fc9076a3d867802727577424c4e357fdff7723ed))
+* Sperrliste: Notiz der Ausrüstung steht klein unter dem Namen bei Waffen, Aufsätzen und allen Kategorien, nur in der Verwaltung (#2302)
 
 ## 1.70.0 (04.11.2026)
 
