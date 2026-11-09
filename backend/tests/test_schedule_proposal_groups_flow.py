@@ -124,6 +124,19 @@ async def test_a_double_click_saves_nothing_twice(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_subset_of_an_open_group_is_a_new_proposal_not_a_replay(flow):
+    world = await live_world(flow)
+    first = (await propose(flow, world, "Kapitaen", [50, 80, 110])).json()
+    subset = await propose(flow, world, "Kapitaen", [50, 80])
+    assert subset.status_code == 200, subset.text
+    assert subset.json()["idempotent_replay"] is False and subset.json()["group_id"] != first["group_id"]
+    assert len(subset.json()["proposals"]) == 2
+    other_note = await propose(flow, world, "Kapitaen", [50, 80, 110], note="Anderer Text")
+    assert other_note.json()["idempotent_replay"] is False
+    assert len(await rows(flow, world)) == 8
+
+
+@pytest.mark.asyncio
 async def test_every_time_is_checked_and_nothing_is_half_saved(flow):
     world = await live_world(flow, blocked_periods=[])
     past = await propose(flow, world, "Kapitaen", [50, -2, 80])

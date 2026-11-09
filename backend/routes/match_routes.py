@@ -1016,14 +1016,14 @@ async def _mark_proposed(db, match: dict, collection: str, tournament: dict | No
 
 
 async def _replayed_group(db, query: dict, isos: list[str]) -> list[dict] | None:
-    """Doppelt gesendet (#2325, wie beim einzelnen Vorschlag): dieselben Termine mit derselben Notiz liegen schon offen."""
-    rows = await db.match_schedule_proposals.find(
+    """Doppelt gesendet (#2325, wie beim einzelnen Vorschlag): eine offene Gruppe derselben Person mit derselben Notiz, deren
+    offene Termine genau die gesendeten sind - nicht mehr und nicht weniger."""
+    hits = await db.match_schedule_proposals.find(
         {**query, "status": "pending", "group_id": {"$exists": True}, "scheduled_at": {"$in": isos}},
-        {"_id": 0, "match_collection": 0}).to_list(50)
-    groups: dict[str, list[dict]] = {}
-    for row in rows:
-        groups.setdefault(row["group_id"], []).append(row)
-    for members in groups.values():
+        {"_id": 0, "group_id": 1}).to_list(50)
+    for group_id in dict.fromkeys(row["group_id"] for row in hits):
+        members = await db.match_schedule_proposals.find(
+            {**query, "status": "pending", "group_id": group_id}, {"_id": 0, "match_collection": 0}).to_list(50)
         if sorted(row["scheduled_at"] for row in members) == sorted(isos):
             return sorted(members, key=lambda row: row["scheduled_at"])
     return None
