@@ -142,7 +142,8 @@ async def test_submitting_reminds_the_person_and_the_captain_once(flow):
     by_user = {note["user_id"]: note for note in notes}
     assert set(by_user) == {side["member"]["id"], side["captain"]["id"], side["vice"]["id"]}
     person = by_user[side["member"]["id"]]
-    assert person["url"] == "/profile?tab=basic" and "Geburtsdatum fehlt" in person["body"] and "nicht einchecken" in person["body"]
+    assert person["url"] == "/profile?tab=basic" and "Dein Geburtsdatum fehlt im Profil." in person["body"] and "nicht einchecken" in person["body"]
+    assert "Die Person" not in person["body"], "die Person selbst wird direkt angesprochen"
     assert "TeamA S3 (Geburtsdatum fehlt)" in by_user[side["captain"]["id"]]["body"]
     assert all(note["meta"]["dedupe_key"].endswith(f":submit:{note['user_id']}") for note in notes)
 
@@ -194,7 +195,7 @@ async def test_missing_entry_registers_is_admitted_blocks_check_in_and_then_chec
 
     flow.act_as(home["member"])
     mine = ok(await flow.get(f"/api/matches/{match['id']}/page"))["checkin"]
-    assert mine["me"]["fix_url"] == "/profile?tab=basic" and "Geburtsdatum fehlt" in mine["me"]["reason"]
+    assert mine["me"] == {"reason": "Dein Geburtsdatum fehlt im Profil.", "state": "age_missing", "fix_url": "/profile?tab=basic"}
     flow.act_as(home["captain"])
     block = ok(await flow.get(f"/api/matches/{match['id']}/page"))["checkin"]
     assert block["eligible_count"] == 3 and block["can_checkin"] is False

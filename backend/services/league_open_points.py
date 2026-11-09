@@ -45,7 +45,8 @@ def season_title(league: dict | None, season: dict | None) -> str:
 
 
 def person_text(title: str, row: dict) -> str:
-    return f"Für {title} fehlt bei dir noch: {' '.join(row['reasons'])} {LOCKED_OUT}"
+    reasons = [league_eligibility.self_reason(row["state"], text) if text == row["reason"] else text for text in row["reasons"]]
+    return f"Für {title} fehlt bei dir noch: {' '.join(reasons)} {LOCKED_OUT}"
 
 
 def team_text(title: str, name: str, points: dict) -> str:

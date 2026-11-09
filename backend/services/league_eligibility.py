@@ -491,6 +491,14 @@ def fix_url(state: str | None) -> str | None:
     return BASIC_TAB if state == AGE_MISSING else GAMING_TAB
 
 
+AGE_MISSING_SELF = "Dein Geburtsdatum fehlt im Profil."
+
+
+def self_reason(state: str | None, reason: str | None) -> str | None:
+    """Der Grund in der Ansprache an die Person selbst (Matchseite, Erinnerung) - „Die Person trägt …“ passt dort nicht."""
+    return AGE_MISSING_SELF if state == AGE_MISSING else reason
+
+
 def _reasons(row: dict) -> list[str]:
     """Alle offenen Gründe einer Person: der Stand und, wenn er vom Alter kommt, dazu eine fehlerhafte Spiel-ID."""
     reasons = [row["reason"]] if row.get("reason") else []

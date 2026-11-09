@@ -411,7 +411,8 @@ def own_block(setup: Sides, viewer_id: str | None) -> dict | None:
     for reg in setup.registrations:
         row = (setup.rows.get(reg["id"]) or {}).get(viewer_id)
         if viewer_id in (setup.rosters.get(reg["id"]) or set()) and row and not row.get("ok", True):
-            return {"reason": row.get("reason"), "state": row.get("state"), "fix_url": league_eligibility.fix_url(row.get("state"))}
+            return {"reason": league_eligibility.self_reason(row.get("state"), row.get("reason")), "state": row.get("state"),
+                    "fix_url": league_eligibility.fix_url(row.get("state"))}
     return None
 
 
