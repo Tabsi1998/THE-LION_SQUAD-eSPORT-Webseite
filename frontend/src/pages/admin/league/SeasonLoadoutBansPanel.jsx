@@ -17,7 +17,7 @@ import { FoldAll, FoldBody, FoldButton } from "@/components/tls/Fold";
 import { SelectField } from "@/components/tls/FormFields";
 import { EquipmentThumb, LoadoutBansView, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import {
-  attachmentModes, attachmentSlots, banAttachmentEverywhere, bannedAttachmentCount, classRow, copyAttachmentsToClass, countText, fitsWeapon, formPayload, formProblem,
+  attachmentModes, attachmentSlots, banAttachmentEverywhere, bannedAttachmentCount, classRow, copyAttachmentsToClass, countText, effectiveRows, fitsWeapon, formPayload, formProblem,
   groupByCategory, groupBySubcategory, listToForm, matchesSearch, NO_SUBCATEGORY, rowKey, sameRows, statusOf, subcategoryOf,
 } from "@/lib/loadoutBans";
 import { viennaDate } from "@/lib/vienna";
@@ -127,16 +127,18 @@ function RulesHint({ rules }) {
 
 // Ein Aufsatz an der Waffe (#2299): Häkchen „gesperrt“, darunter seine Modi und „An allen Waffen sperren“. Ist er überall gesperrt (eigene
 // Zeile oder ganze Klasse in allen Modi), steht das nur da.
-function AttachmentLine({ item, weapon, row, everywhere, viaClass, kept, modes, onToggle, onModes, onEverywhere }) {
+function AttachmentLine({ item, weapon, row, everywhere, viaClass, kept, modes, locked = false, onToggle, onModes, onEverywhere }) {
   const chosen = (row?.attachment_ids || []).includes(item.id);
-  const fixed = Boolean((everywhere && !everywhere.modes.length) || viaClass);
+  // Ganz gesperrte Waffe (`locked`): die Häkchen bleiben im Formular stehen, gelten aber nicht und entfallen beim Speichern.
+  const fixed = Boolean((everywhere && !everywhere.modes.length) || viaClass || locked);
   const blocked = statusOf(item) === "inactive" && !kept;
   const value = attachmentModes(row, item.id);
   return (
-    <li className={`rounded-sm border px-2.5 py-2 ${chosen || fixed ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-attachment-${weapon.id}-${item.id}`}>
+    <li className={`rounded-sm border px-2.5 py-2 ${locked ? "border-white/10 bg-[#121212] opacity-50" : chosen || fixed ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`}
+      data-testid={`season-bans-attachment-${weapon.id}-${item.id}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <label className={`flex min-w-0 items-center gap-2.5 ${fixed || (blocked && !chosen) ? "cursor-not-allowed text-white/70" : "cursor-pointer text-white"}`}>
-          <input type="checkbox" checked={chosen || fixed} disabled={fixed || (blocked && !chosen)} onChange={onToggle} className="accent-[#FF9F0A]"
+          <input type="checkbox" checked={chosen || (fixed && !locked)} disabled={fixed || (blocked && !chosen)} onChange={onToggle} className="accent-[#FF9F0A]"
             aria-label={`${item.name} an ${weapon.name} sperren`} data-testid={`season-bans-attachment-toggle-${weapon.id}-${item.id}`} />
           <EquipmentThumb src={item.image_url} sizes="56px" className="w-14 shrink-0" />
           <span className="min-w-0 text-sm font-semibold leading-snug break-words">
@@ -173,7 +175,7 @@ function amountText(shown, total, one, many, filtering) {
   return filtering && shown !== total ? `${shown} von ${total}` : countText(total, one, many);
 }
 
-function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds, modes, fold, onChange, onCopyToClass, onEverywhere }) {
+function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds, modes, fold, lockedText = "", onChange, onCopyToClass, onEverywhere }) {
   const chosen = row?.attachment_ids || [];
   const own = row?.attachment_modes || {};
   const slots = attachmentSlots(attachments, categories);
@@ -188,6 +190,9 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
   const setModes = (id, value) => onChange({ attachment_modes: { ...own, [id]: value } });
   return (
     <div className="mt-2 space-y-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-2.5" data-testid={`season-bans-attachments-${weapon.id}`}>
+      {lockedText ? (
+        <p className="text-[11px] text-warn" role="status" data-testid={`season-bans-attachments-locked-${weapon.id}`}>{lockedText}</p>
+      ) : null}
       <p className="text-[11px] text-white/60">Passende Aufsätze an „{weapon.name}“ – angehakt ist gesperrt, alle anderen bleiben erlaubt.</p>
       {!slots.length ? <p className="text-xs text-white/60">Zu dieser Waffe passt noch kein Aufsatz.</p> : null}
       {slots.map((slot) => {
@@ -205,7 +210,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
                 {slot.label || NO_SUBCATEGORY}
               </span>
               <span className="text-[11px] tabular-nums text-white/50">
-                {countText(slot.items.length, "Aufsatz", "Aufsätze")}<BannedNote count={bannedAttachmentCount(rows, weapon.id, slot.items)} />
+                {countText(slot.items.length, "Aufsatz", "Aufsätze")}<BannedNote count={bannedAttachmentCount(rows, weapon.id, slot.items, weapon)} />
               </span>
             </FoldButton>
             <FoldBody id={bodyId} open={open} className="pb-1 pt-1">
@@ -214,7 +219,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
                     const klass = classRow(rows, item.subcategory);
                     return (
                       <AttachmentLine key={item.id} item={item} weapon={weapon} row={row} everywhere={rows[rowKey("item", item.id)]}
-                        viaClass={Boolean(klass && !klass.modes.length)} kept={keptIds.has(item.id)} modes={modes}
+                        viaClass={Boolean(klass && !klass.modes.length)} kept={keptIds.has(item.id)} modes={modes} locked={Boolean(lockedText)}
                         onToggle={() => toggle(item.id)} onModes={(value) => setModes(item.id, value)} onEverywhere={(value) => onEverywhere(item.id, value)} />
                     );
                   })}
@@ -223,7 +228,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
           </div>
         );
       })}
-      {classLabel ? (
+      {classLabel && !lockedText ? (
         <button type="button" onClick={onCopyToClass} data-testid={`season-bans-copy-class-${weapon.id}`}
           className="tls-btn tls-btn--secondary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
           Für alle {classLabel} übernehmen
@@ -275,7 +280,11 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
   const blocked = statusOf(item) === "inactive" && !kept.has(rowKey("item", item.id));
   const fullyBanned = (row && !row.modes.length) || viaClass;
   // K zählt, was aufgeklappt als gesperrt angehakt erscheint - auch über die Zeile des Aufsatzes oder seine Klasse (Codex zu #2299).
-  const attachmentCount = bannedAttachmentCount(rows, item.id, attachments);
+  const attachmentCount = bannedAttachmentCount(rows, item.id, attachments, item);
+  // Die Aufsatz-Häkchen bleiben im Formular, gelten aber nicht: bei einer ganz gesperrten Waffe entfallen sie beim Speichern.
+  const lockedText = viaClass
+    ? "Die Klasse der Waffe ist in allen Modi gesperrt – Aufsatz-Sperren entfallen beim Speichern."
+    : "Die Waffe ist in allen Modi gesperrt – Aufsatz-Sperren entfallen beim Speichern.";
   const boxId = `season-bans-box-${item.id}`;
   return (
     <li className={`rounded-sm border p-2.5 ${banned ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-item-${item.id}`}>
@@ -291,12 +300,16 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
             </span>
           </label>
           <ItemNote item={item} />
-          {viaClass ? <p className="text-[11px] text-warn" data-testid={`season-bans-via-class-${item.id}`}>Mit der ganzen Klasse gesperrt</p> : null}
+          {viaClass ? (
+            <p className="text-[11px] text-warn" data-testid={`season-bans-via-class-${item.id}`}>
+              Mit der ganzen Klasse gesperrt{row ? " – die Einzel-Sperre entfällt beim Speichern" : ""}
+            </p>
+          ) : null}
           {classBan && !viaClass ? (
             <p className="text-[11px] text-white/60" data-testid={`season-bans-via-class-${item.id}`}>Klasse gesperrt in {modeNames(classBan.modes, modes)} – einzeln zusätzlich möglich</p>
           ) : null}
           {row && !viaClass && modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onItem({ modes: value })} label={`Modi für ${item.name}`} /> : null}
-          {role === "weapon" && !fullyBanned && !viaClass ? (
+          {role === "weapon" ? (
             <button type="button" onClick={onToggleOpen} aria-expanded={open} aria-controls={boxId} data-testid={`season-bans-open-${item.id}`}
               className="inline-flex items-center gap-1 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -306,10 +319,10 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
         </div>
       </div>
       {/* Kasten der Aufsätze (#2306): Behälter mit fester ID für `aria-controls`, zugeklappt verborgen. */}
-      {role === "weapon" && !fullyBanned ? (
+      {role === "weapon" ? (
         <FoldBody id={boxId} open={open}>
           <WeaponAttachments weapon={item} attachments={attachments} categories={categories} rows={rows} row={attachmentRow} keptIds={keptAttached}
-            modes={modes} fold={fold} onChange={onAttachments} onCopyToClass={onCopyToClass} onEverywhere={onEverywhere} />
+            modes={modes} fold={fold} lockedText={fullyBanned ? lockedText : ""} onChange={onAttachments} onCopyToClass={onCopyToClass} onEverywhere={onEverywhere} />
         </FoldBody>
       ) : null}
     </li>
@@ -369,10 +382,11 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   if (error) return <p className="text-sm text-warn" role="alert" data-testid={`${testId}-error`}>{error}</p>;
   if (!data) return null;
   const list = data.list;
-  const changed = !sameRows(rows, saved) || dropped.length > 0;
-  const bannedCount = Object.values(rows).filter((row) => row.kind !== "attachments" || row.attachment_ids.length).length;
+  const changed = !sameRows(rows, saved, library) || dropped.length > 0;
+  const bannedCount = Object.values(effectiveRows(rows, library)).filter((row) => row.kind !== "attachments" || row.attachment_ids.length).length;
 
-  // Ganze Klasse (#2287): an oder aus, dazu die Modi. In allen Modi gesperrt, entfallen Einzelzeilen darin (der Server nähme sie nicht).
+  // Ganze Klasse (#2287): an oder aus, dazu die Modi. In allen Modi gesperrt, entfallen Einzelzeilen darin beim Speichern (`formPayload`) -
+  // im Formular bleiben sie stehen, damit sie bei „aus“ wieder da sind.
   const setClass = (subKey, patch) => setRows((current) => {
     const key = rowKey("class", subKey);
     const next = { ...current };
@@ -381,18 +395,6 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
       return next;
     }
     next[key] = { kind: "class", subcategory: subKey, modes: [], attachment_ids: [], ...current[key], ...patch };
-    if (!next[key].modes.length) {
-      const members = new Set(library.filter((item) => item.subcategory === subKey).map((item) => item.id));
-      for (const [rowId, row] of Object.entries(next)) {
-        if (row.kind === "class") continue;
-        if (members.has(row.item_id)) delete next[rowId];
-        else if (row.kind === "attachments" && row.attachment_ids.some((id) => members.has(id))) {
-          const rest = row.attachment_ids.filter((id) => !members.has(id));
-          if (rest.length) next[rowId] = { ...row, attachment_ids: rest };
-          else delete next[rowId];
-        }
-      }
-    }
     return next;
   });
 
@@ -420,7 +422,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   };
 
   const save = async () => {
-    const problem = formProblem(rows, library, categories);
+    const problem = formProblem(rows, library);
     if (problem) {
       toast.error(problem);
       return;

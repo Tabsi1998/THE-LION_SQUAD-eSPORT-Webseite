@@ -119,16 +119,43 @@ test("die Notiz der Bibliothek steht klein unter dem Namen - bei Waffe, Aufsatz 
   expect(within(line).getByTestId("season-bans-note-a2")).toHaveTextContent("Schwer zu bekommen");
 });
 
-test("eine Waffe in allen Modi gesperrt bietet keine einzelnen Aufsätze an; ganz entsperren geht", async () => {
+test("ganz gesperrte Waffe mit Aufsätzen: speichern geht, die Aufsatz-Zeile fehlt in der Anfrage, Entsperren bringt die Häkchen zurück", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, list: banList(
+    { kind: "attachments", item_id: "w1", name: "Blitz 9", category: "waffen", modes: [], mode_labels: [],
+      attachments: [{ item_id: "a1", name: "Rotpunkt", image_url: null }] },
+    { kind: "item", item_id: "w2", name: "Donner 4", category: "waffen", modes: ["suchen"], mode_labels: ["Suchen"], attachments: [] },
+  ) } });
   renderPanel();
   await openAll();
   await screen.findByTestId("season-bans-item-w1");
-  expect(screen.queryByTestId("season-bans-open-w1")).not.toBeInTheDocument();
+  // Blitz 9 jetzt ganz sperren: die Aufsatz-Sperre bleibt im Formular, ist aber ausgegraut.
   fireEvent.click(screen.getByTestId("season-bans-toggle-w1"));
-  expect(screen.getByTestId("season-bans-open-w1")).toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-open-w1")).toHaveTextContent("2 Aufsätze");
+  expect(screen.getByTestId("season-bans-open-w1")).not.toHaveTextContent("gesperrt");
+  fireEvent.click(screen.getByTestId("season-bans-open-w1"));
+  expect(screen.getByTestId("season-bans-attachments-locked-w1")).toHaveTextContent("Die Waffe ist in allen Modi gesperrt – Aufsatz-Sperren entfallen beim Speichern.");
+  const rotpunkt = screen.getByTestId("season-bans-attachment-toggle-w1-a1");
+  expect(rotpunkt).toBeDisabled();
+  expect(rotpunkt).toBeChecked();
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a2")).toBeDisabled();
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a2")).not.toBeChecked();
+  // Wieder entsperren: Häkchen sind da und bedienbar.
+  fireEvent.click(screen.getByTestId("season-bans-toggle-w1"));
+  expect(screen.queryByTestId("season-bans-attachments-locked-w1")).not.toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a1")).toBeEnabled();
+  expect(screen.getByTestId("season-bans-attachment-toggle-w1-a1")).toBeChecked();
+  expect(screen.getByTestId("season-bans-open-w1")).toHaveTextContent("1 gesperrt");
+  // Erneut ganz sperren und speichern: kein Fehler, nur die Waffe in der Anfrage.
+  fireEvent.click(screen.getByTestId("season-bans-toggle-w1"));
   fireEvent.click(screen.getByTestId("season-bans-save"));
-  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("mindestens einen Eintrag"));
-  expect(apiMock.put).not.toHaveBeenCalled();
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/loadout-bans", {
+    expected_version: 1,
+    entries: [
+      { item_id: "w1", kind: "item", modes: [], attachment_ids: [] },
+      { item_id: "w2", kind: "item", modes: ["suchen"], attachment_ids: [] },
+    ],
+  }));
+  expect(toastMock.error).not.toHaveBeenCalled();
 });
 
 test("Suche und „nur gesperrte“ grenzen die Bibliothek ein; Entfernen fragt nach", async () => {
@@ -195,7 +222,9 @@ test("ganze Klasse sperren: je Modus, in allen Modi mitgesperrt, leere Klasse an
   fireEvent.click(within(head).getByLabelText("allen Modi"));
   expect(screen.getByTestId("season-bans-via-class-s1")).toHaveTextContent("Mit der ganzen Klasse gesperrt");
   expect(screen.getByTestId("season-bans-toggle-s1")).toBeDisabled();
-  expect(screen.queryByTestId("season-bans-open-s1")).not.toBeInTheDocument();
+  // Die Aufsatz-Sperren der Waffe entfallen beim Speichern: Hinweis statt Fehler, aufklappen geht.
+  expect(screen.getByTestId("season-bans-attachments-locked-s1")).toHaveTextContent("Die Klasse der Waffe ist in allen Modi gesperrt");
+  expect(screen.getByLabelText("Laser an Hagel sperren")).toBeDisabled();
   fireEvent.click(screen.getByTestId("season-bans-class-leer-toggle"));
   fireEvent.click(screen.getByTestId("season-bans-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/loadout-bans", {
