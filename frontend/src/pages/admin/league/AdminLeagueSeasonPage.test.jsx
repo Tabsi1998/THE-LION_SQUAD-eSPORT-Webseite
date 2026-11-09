@@ -157,6 +157,31 @@ test("Rückfrage beim Reiterwechsel: „Jetzt speichern“ speichert den Reiter 
   await waitFor(() => expect(screen.getByTestId("season-tab-ligen")).toHaveAttribute("aria-selected", "true"));
 });
 
+test("Punkte nach gewonnenen Maps (#2312): Wechsel schlägt Reihenfolge und kampflos 3:0 vor, beides bleibt änderbar", async () => {
+  renderPage("#tabelle");
+  const mode = await screen.findByTestId("season-form-points-mode");
+  expect(mode).toHaveValue("result");
+  fireEvent.change(mode, { target: { value: "maps" } });
+  expect(screen.queryByTestId("season-form-points-win")).toBeNull();
+  expect(screen.getByTestId("season-form-forfeit-score")).toBeDisabled();
+  expect(screen.getByTestId("tiebreaker-wins")).toBeChecked();
+
+  // Zurück auf Sieg/Remis/Niederlage: nur die Art, die Reihenfolge bleibt.
+  fireEvent.change(screen.getByTestId("season-form-points-mode"), { target: { value: "result" } });
+  expect(screen.getByTestId("season-form-points-win")).toHaveValue(3);
+  expect(screen.getByTestId("tiebreaker-wins")).toBeChecked();
+  expect(screen.getByTestId("season-form-forfeit-score")).not.toBeDisabled();
+
+  // Wieder auf Map-Punkte und änderbar: „Entscheid der Leitung“ abwählen, dann speichern.
+  fireEvent.change(screen.getByTestId("season-form-points-mode"), { target: { value: "maps" } });
+  fireEvent.click(screen.getByTestId("tiebreaker-lead_decision"));
+  fireEvent.click(within(panel("tabelle")).getByTestId("season-save-tabelle"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const rules = apiMock.patch.mock.calls[0][1].scoring_rules;
+  expect(rules).toMatchObject({ match_points_mode: "maps", table_tiebreakers: ["wins", "head_to_head", "score_diff"], forfeit_score: "best_of" });
+  expect(rules.match_points).toEqual({ win: 3, draw: 1, loss: 0 });
+});
+
 test("Verwerfen setzt nur den Reiter zurück", async () => {
   renderPage("#termine");
   fireEvent.change(await screen.findByTestId("season-form-weeks"), { target: { value: "12" } });
