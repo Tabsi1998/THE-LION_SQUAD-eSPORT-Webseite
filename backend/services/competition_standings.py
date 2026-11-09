@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from services.match_winner import won_by
 from services.round_labels import TABLE_FORMATS, section_kind
-from services.scoring_rules import rank_with_ties
+from services.scoring_rules import maps_mode, rank_with_ties
 
 
 TERMINAL_MATCH_STATUSES = {"completed", "forfeit"}
@@ -360,7 +360,8 @@ def _league_matches(matches: list[dict], registrations: list[dict], rules: dict,
     """
     exits = {row["id"]: exit_of(row) for row in registrations if row.get("id")}
     for_opponents = rules.get("exit_rule") == "all_for_opponents"
-    best_of_maps = rules.get("forfeit_score") == "best_of"
+    # Mit Map-Punkten (#2312) zählt kampflos immer mit den Maps des Best of - sonst bekäme der Sieger 0 Punkte.
+    best_of_maps = rules.get("forfeit_score") == "best_of" or maps_mode(rules)
     out: list[dict] = []
     for match in matches:
         slot_a, slot_b, result_a, result_b = _duel_entries(match)
@@ -408,6 +409,7 @@ def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, co
     kampflos, Punktabzug, Ausscheiden und die Reihenfolge nach ``table_tiebreakers`` (``_rank_league``)."""
     points = rules.get("match_points") or {"win": 3, "draw": 1, "loss": 0}
     win_points, draw_points, loss_points = points.get("win", 3), points.get("draw", 1), points.get("loss", 0)
+    by_maps = maps_mode(rules)
     stats = {}
     for registration in registrations:
         if not registration.get("id"):
@@ -422,10 +424,11 @@ def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, co
             "exit": exit_of(registration), "tiebreak": None, "lead_decision": None,
         }
 
-    def lose(registration_id: str | None) -> None:
+    def lose(registration_id: str | None, maps=0) -> None:
         if registration_id in stats:
             stats[registration_id]["lost"] += 1
-            stats[registration_id]["points"] += loss_points
+            # Map-Punkte (#2312): auch der Verlierer bekommt seine gewonnenen Maps (3:2 ergibt 3 und 2).
+            stats[registration_id]["points"] += maps if by_maps else loss_points
 
     for match in matches:
         if match.get("status") not in TERMINAL_MATCH_STATUSES:
@@ -452,17 +455,17 @@ def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, co
         winner_id = _sole_winner(match)
         if winner_id == registration_a and registration_a in stats:
             stats[registration_a]["won"] += 1
-            stats[registration_a]["points"] += win_points
-            lose(registration_b)
+            stats[registration_a]["points"] += score_a if by_maps else win_points
+            lose(registration_b, score_b)
         elif winner_id == registration_b and registration_b in stats:
             stats[registration_b]["won"] += 1
-            stats[registration_b]["points"] += win_points
-            lose(registration_a)
+            stats[registration_b]["points"] += score_b if by_maps else win_points
+            lose(registration_a, score_a)
         else:
-            for own in (registration_a, registration_b):
+            for own, own_score in ((registration_a, score_a), (registration_b, score_b)):
                 if own in stats:
                     stats[own]["drawn"] += 1
-                    stats[own]["points"] += draw_points
+                    stats[own]["points"] += own_score if by_maps else draw_points
             continue
         if forfeit_loser:
             if forfeit_loser in stats:
@@ -500,6 +503,7 @@ def _mini_table(group: list[dict], matches: list[dict], rules: dict) -> dict[str
     """Mini-Tabelle (Nr. 42): nur die Spiele der Gruppe untereinander, sortiert nach ``head_to_head_criteria``."""
     ids = {row["registration_id"] for row in group}
     points = rules.get("match_points") or {"win": 3, "draw": 1, "loss": 0}
+    by_maps = maps_mode(rules)
     mini = {registration_id: {"points": 0, "score_for": 0, "score_against": 0} for registration_id in ids}
     for match in matches:
         if match.get("status") not in TERMINAL_MATCH_STATUSES:
@@ -515,8 +519,14 @@ def _mini_table(group: list[dict], matches: list[dict], rules: dict) -> dict[str
             mini[own]["score_for"] += own_score if isinstance(own_score, (int, float)) else 0
             mini[own]["score_against"] += other_score if isinstance(other_score, (int, float)) else 0
         if match.get("table_double_loss"):
-            mini[side_a]["points"] += points.get("loss", 0)
-            mini[side_b]["points"] += points.get("loss", 0)
+            mini[side_a]["points"] += 0 if by_maps else points.get("loss", 0)
+            mini[side_b]["points"] += 0 if by_maps else points.get("loss", 0)
+            continue
+        if by_maps:
+            # Map-Punkte (#2312): auch im direkten Vergleich zählen die gewonnenen Maps der Spiele untereinander.
+            for own, own_result in ((side_a, result_a), (side_b, result_b)):
+                own_score = (own_result or {}).get("score")
+                mini[own]["points"] += own_score if isinstance(own_score, (int, float)) else 0
             continue
         winner_id = _sole_winner(match)
         if winner_id in (side_a, side_b):

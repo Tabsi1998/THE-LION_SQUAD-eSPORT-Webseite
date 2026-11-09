@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { hidesDraws, standingNotes, tableRulesPayload, tableRulesToForm, tiebreakOrder } from "./leagueTable";
+import {
+  MAPS_TIEBREAKERS, byMaps, hidesDraws, pointsModeChange, pointsNote, pointsSummary, standingNotes, tableRulesPayload, tableRulesToForm, tiebreakOrder,
+} from "./leagueTable";
 
 describe("Tabelle der Liga-Staffel (E.1, #1625)", () => {
   it("nennt, was den Gleichstand entschied - mit Grund beim Entscheid der Leitung", () => {
@@ -26,11 +28,39 @@ describe("Tabelle der Liga-Staffel (E.1, #1625)", () => {
   });
 
   it("liest ältere Seasons wie der Server und schreibt alle Felder zurück", () => {
-    expect(tableRulesToForm({})).toEqual({ table_tiebreakers: ["score_diff", "score_for"], head_to_head_criteria: ["points", "score_diff", "score_for"],
-      allow_draws: true, forfeit_score: "recorded", exit_rule: "half" });
+    // #2312: die Punkteart fehlt bei älteren Seasons - dann Sieg/Remis/Niederlage, wie der Server rechnet.
+    expect(tableRulesToForm({})).toEqual({ match_points_mode: "result", table_tiebreakers: ["score_diff", "score_for"],
+      head_to_head_criteria: ["points", "score_diff", "score_for"], allow_draws: true, forfeit_score: "recorded", exit_rule: "half" });
     const form = tableRulesToForm({ table_tiebreakers: ["head_to_head", "lead_decision"], allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents" });
-    expect(tableRulesPayload(form)).toEqual({ table_tiebreakers: ["head_to_head", "lead_decision"], head_to_head_criteria: ["points", "score_diff", "score_for"],
-      allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents" });
+    expect(tableRulesPayload(form)).toEqual({ match_points_mode: "result", table_tiebreakers: ["head_to_head", "lead_decision"],
+      head_to_head_criteria: ["points", "score_diff", "score_for"], allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents" });
     expect(tiebreakOrder(["head_to_head", "score_diff", "lead_decision"])).toBe("Punkte → Direkter Vergleich → Map-Differenz → Entscheid der Leitung");
+  });
+});
+
+describe("Punkte nach gewonnenen Maps (#2312)", () => {
+  it("schlägt beim Wechsel die Reihenfolge und kampflos 3:0 vor, zurück nur die Art", () => {
+    expect(pointsModeChange("maps")).toEqual({ match_points_mode: "maps", table_tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"],
+      forfeit_score: "best_of" });
+    expect(pointsModeChange("result")).toEqual({ match_points_mode: "result" });
+    expect(pointsModeChange("maps").table_tiebreakers).not.toBe(MAPS_TIEBREAKERS);
+    expect(tiebreakOrder(MAPS_TIEBREAKERS)).toBe("Punkte → Mehr Siege → Direkter Vergleich → Map-Differenz → Entscheid der Leitung");
+  });
+
+  it("liest und schreibt die Art", () => {
+    const form = tableRulesToForm({ match_points_mode: "maps", table_tiebreakers: [...MAPS_TIEBREAKERS] });
+    expect(form.match_points_mode).toBe("maps");
+    expect(tableRulesPayload(form).match_points_mode).toBe("maps");
+    expect(tableRulesToForm({ match_points_mode: "unsinn" }).match_points_mode).toBe("result");
+  });
+
+  it("sagt öffentlich, was die Punkte zählen", () => {
+    expect(byMaps({ match_points_mode: "maps" })).toBe(true);
+    expect(byMaps(null)).toBe(false);
+    expect(pointsNote({ match_points_mode: "maps" })).toBe("Punkte = gewonnene Maps (3:2 ergibt 3 und 2, kampflos 3:0)");
+    expect(pointsNote({ match_points_mode: "result" })).toBe("");
+    expect(pointsSummary({ match_points_mode: "maps", match_points: { win: 3, draw: 0, loss: 0 } })).toBe("Punkte je gewonnene Map");
+    expect(pointsSummary({ match_points: { win: 3, draw: 1, loss: 0 } })).toBe("Sieg / Remis / Niederlage: 3 / 1 / 0");
+    expect(pointsSummary({})).toBe("");
   });
 });

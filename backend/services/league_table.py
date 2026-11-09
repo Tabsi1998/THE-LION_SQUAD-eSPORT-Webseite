@@ -49,7 +49,8 @@ def public_rules(tournament: dict | None) -> dict | None:
         return None
     return {"allow_draws": rules["allow_draws"], "tiebreakers": list(rules["table_tiebreakers"]),
             "head_to_head_criteria": list(rules["head_to_head_criteria"]), "forfeit_score": rules["forfeit_score"],
-            "exit_rule": rules["exit_rule"], "match_points": dict(rules["match_points"])}
+            "exit_rule": rules["exit_rule"], "match_points": dict(rules["match_points"]),
+            "match_points_mode": rules["match_points_mode"]}
 
 
 def ties(rows: list[dict]) -> list[dict]:

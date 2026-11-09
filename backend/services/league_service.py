@@ -38,7 +38,7 @@ from services.mutation_lock import (MutationLockBusy, league_resource, league_se
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
-from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, league_default_rules, normalize_rules
+from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, division_rules, league_default_rules, maps_mode, normalize_rules
 from services.slug_utils import slugify, unique_slug
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -377,18 +377,32 @@ def clean_overrides(raw: dict | None, season: dict) -> dict:
     allowed = (*OVERRIDE_FIELDS, *league_platform.DIVISION_KEYS)
     out = {key: value for key, value in (raw or {}).items() if key in allowed and value is not None}
     if "scoring_rules" in out:
-        out["scoring_rules"] = _scoring(out["scoring_rules"])
+        points = _division_points(out.pop("scoring_rules"), season)
+        if points:
+            out["scoring_rules"] = points
     merged = effective_settings(season, {"overrides": out})
     _check_squad(merged, "Liga N")
     return out
 
 
+def _division_points(raw, season: dict) -> dict | None:
+    """Die eigenen Punkte einer Liga N (#2312, #2318): nur ``match_points``, alles andere an der Tabelle kommt von der Season.
+    In einer Season mit Punkten nach gewonnenen Maps gibt es keine eigenen Punkte."""
+    points = raw.get("match_points") if isinstance(raw, dict) else None
+    if not points:
+        return None
+    if maps_mode(season.get("scoring_rules")):
+        raise LeagueProblem("Diese Season vergibt Punkte nach gewonnenen Maps - eine Liga N legt dann keine eigenen Punkte fest.")
+    return {"match_points": _scoring({"match_points": points})["match_points"]}
+
+
 def effective_settings(season: dict, division: dict | None) -> dict:
-    """Die geltenden Vorgaben einer Liga N: Season plus ihre Abweichungen (``overrides``)."""
+    """Die geltenden Vorgaben einer Liga N: Season plus ihre Abweichungen (``overrides``). Bei der Tabelle legen sich nur die
+    eigenen Punkte über die Regeln der Season (``scoring_rules.division_rules``, #2318)."""
     merged = {**SEASON_DEFAULTS, **{key: value for key, value in season.items() if value is not None}}
     for key, value in ((division or {}).get("overrides") or {}).items():
         if key in OVERRIDE_FIELDS and value is not None:
-            merged[key] = value
+            merged[key] = division_rules(season.get("scoring_rules"), value) if key == "scoring_rules" else value
     merged["team_size"] = int(merged.get("team_size") or 1)
     own_min = ((division or {}).get("overrides") or {}).get("min_squad_size")
     if merged.get("min_squad_size") is None or (
@@ -504,7 +518,24 @@ SYNC_GROUP_LABELS = {
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
     "loadout_bans": loadout_bans.SYNC_LABEL,
+    "table_points": "Punkteart der Tabelle",
 }
+# Punkteart (#2312, docs/LIGA.md E.1): wechselt sie, geht sie mit ihrer Reihenfolge bei Punktgleichheit und der Wertung
+# kampflos auch in eine laufende Staffel - nicht in gesperrte oder beendete (deren Endstand bleibt).
+TABLE_POINTS_KEYS = ("match_points_mode", "table_tiebreakers", "forfeit_score")
+FINISHED_STAFFEL_STATUSES = frozenset({"completed", "results_published", "archived", "cancelled"})
+# Eine abgeschlossene oder archivierte Season bekommt keine neue Punkteart mehr - ihr Endstand bleibt.
+CLOSED_SEASON_STATUSES = frozenset({"completed", "archived"})
+
+
+def table_points_update(tournament: dict, wanted: dict) -> dict | None:
+    """Die ``scoring_rules`` einer Staffel mit der Punkteart der Season (#2312) - ``None``, wenn die Punkteart gleich ist."""
+    own, target = tournament.get("scoring_rules"), wanted.get("scoring_rules")
+    if not isinstance(own, dict) or not isinstance(target, dict):
+        return None
+    if (own.get("match_points_mode") or "result") == (target.get("match_points_mode") or "result"):
+        return None
+    return {**own, **{key: copy.deepcopy(target[key]) for key in TABLE_POINTS_KEYS if key in target}}
 
 
 # ---------------------------------------------------------------- Lesen
@@ -1225,6 +1256,13 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
                 continue
         updates.update({key: wanted[key] for key in keys if key in wanted})
         applied.append(group)
+    if (has_result and not locked and tournament.get("status") not in FINISHED_STAFFEL_STATUSES
+            and season.get("status") not in CLOSED_SEASON_STATUSES):
+        # Punkteart (#2312): auch nach dem ersten Ergebnis, aber nur, wenn sie wechselt.
+        switched = table_points_update(tournament, wanted)
+        if switched is not None:
+            updates["scoring_rules"] = switched
+            applied.append("table_points")
     changed = sorted(key for key, value in updates.items() if tournament.get(key) != value)
     if changed:
         await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {**{key: updates[key] for key in changed},
@@ -1375,6 +1413,7 @@ def public_season(season: dict) -> dict:
     out = {key: season.get(key) for key in PUBLIC_SEASON_FIELDS}
     rules = season.get("scoring_rules") or normalize_rules({})
     out["match_points"] = rules.get("match_points")
+    out["match_points_mode"] = rules.get("match_points_mode") or "result"
     out["table_tiebreakers"] = rules.get("table_tiebreakers")
     out["blocked_weeks"] = blocked_weeks(season)
     out["end_date"] = season_end(season)

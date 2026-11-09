@@ -6,7 +6,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormSection } from "@/components/tls/AdminForm";
 import { TextAreaField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { tiebreakOrder } from "@/lib/leagueTable";
+import { byMaps, tiebreakOrder } from "@/lib/leagueTable";
 import { viennaDateTime } from "@/lib/vienna";
 import { ConflictReasonField, CONFLICT_REASON_MIN, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 
@@ -151,7 +151,9 @@ function StaffelTies({ staffel, canDecide, version }) {
     <div className="space-y-2" data-testid={`season-ties-${staffel.tournament_id}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-bold text-white">{staffel.label}</h3>
-        {data.rules?.tiebreakers ? <span className="text-[11px] text-white/45">{tiebreakOrder(data.rules.tiebreakers)}</span> : null}
+        {data.rules?.tiebreakers ? (
+          <span className="text-[11px] text-white/45">{byMaps(data.rules) ? "Punkte = gewonnene Maps · " : ""}{tiebreakOrder(data.rules.tiebreakers)}</span>
+        ) : null}
       </div>
       {!ties.length ? <p className="text-xs text-white/55">Kein offener Gleichstand.</p> : null}
       {ties.map((tie) => (

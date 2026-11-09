@@ -374,6 +374,13 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     await _record_readiness_override(db, me, season_id, passed)
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
+    before_mode = (season.get("scoring_rules") or {}).get("match_points_mode") or "result"
+    after_mode = (doc.get("scoring_rules") or {}).get("match_points_mode") or "result"
+    if before_mode != after_mode:
+        # Punkteart der Tabelle (#2312): vorher und nachher, dazu die Reihenfolge bei Punktgleichheit.
+        await _audit(db, "league.season.table_points", me, season_id, {
+            "season_id": season_id, "before": before_mode, "after": after_mode,
+            "tiebreakers": list((doc.get("scoring_rules") or {}).get("table_tiebreakers") or [])})
     if set(changed) & set(league_platform.SEASON_KEYS):
         # Plattform je Season (#2270): vorher und nachher - nur Auswahlwerte des Spiels, keine Personen.
         await _audit(db, "league.season.platform", me, season_id, {"season_id": season_id, "before": league_platform.settings_of(season),

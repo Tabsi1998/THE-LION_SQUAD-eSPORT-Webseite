@@ -40,6 +40,19 @@ test("die Tabelle sagt, was entschied, und zeigt das Tabellenende", async () => 
   expect(screen.getByTestId("league-match-m1")).toHaveTextContent("beide nicht erschienen");
 });
 
+test("Punkte nach gewonnenen Maps (#2312): Hinweis unter der Tabelle, „S“ auch am Handy, Pkt sagt, was zählt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...DATA, staffel: { tournament_id: "t1", staffel: "A",
+    table_rules: { allow_draws: false, match_points_mode: "maps", tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"] } },
+  standings: [row("a", 1, { points: 5, score_for: 5, score_against: 3 }), row("b", 2, { points: 4, won: 0 })] } });
+  render(<MemoryRouter><StaffelPanel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
+  const table = await screen.findByRole("table", { name: "Tabelle Staffel A" });
+  expect(screen.getByTestId("league-points-note-A")).toHaveTextContent("Punkte = gewonnene Maps (3:2 ergibt 3 und 2, kampflos 3:0)");
+  expect(screen.getByTestId("league-tiebreak-order-A")).toHaveTextContent("Punkte → Mehr Siege → Direkter Vergleich → Map-Differenz → Entscheid der Leitung");
+  const won = within(table).getByTitle("Siege");
+  expect(won.className).not.toContain("hidden");
+  expect(within(table).getByText("Pkt")).toHaveAttribute("title", "Punkte = gewonnene Maps");
+});
+
 test("mit Remis bleibt die Spalte, ohne die neuen Felder bleibt die Zeile wie bisher", async () => {
   apiMock.get.mockResolvedValue({ data: { ...DATA, staffel: { tournament_id: "t1", staffel: "A", table_rules: null },
     standings: [row("a", 1)] } });
@@ -48,4 +61,7 @@ test("mit Remis bleibt die Spalte, ohne die neuen Felder bleibt die Zeile wie bi
   expect(within(table).getByText("U")).toBeInTheDocument();
   expect(screen.queryByTestId("standing-notes-a")).toBeNull();
   expect(screen.queryByTestId("league-tiebreak-order-A")).toBeNull();
+  expect(screen.queryByTestId("league-points-note-A")).toBeNull();
+  expect(within(table).getByTitle("Siege").className).toContain("hidden");
+  expect(within(table).getByText("Pkt")).toHaveAttribute("title", "Punkte");
 });

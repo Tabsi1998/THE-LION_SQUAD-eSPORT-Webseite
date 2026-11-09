@@ -16,8 +16,7 @@ import { ArrowLeft, Trash2, X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminTabBar } from "@/components/tls/AdminTabBar";
-import { FormGrid, FormSection } from "@/components/tls/AdminForm";
-import { TextField } from "@/components/tls/FormFields";
+import { FormSection } from "@/components/tls/AdminForm";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useNavigationGuard } from "@/lib/navigationGuard";
@@ -38,7 +37,7 @@ import { SeasonPlayTab } from "./SeasonPlayTab";
 import { useSeasonReadiness } from "./SeasonReadinessPanel";
 import { SeasonRulesTab } from "./SeasonRulesTab";
 import { SeasonTablePanel } from "./SeasonTablePanel";
-import { SeasonTableRules } from "./SeasonTableRules";
+import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
 
@@ -338,11 +337,7 @@ export default function AdminLeagueSeasonPage() {
           <SeasonTabForm {...formProps("tabelle")}>
             <FormSection title="Punkte und Gleichstand" id="punkte" className="scroll-mt-24" testId="season-points"
               hint="Wie die Tabelle rechnet. Liga N kann die Punkte abweichend festlegen.">
-              <FormGrid cols={3}>
-                <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} testId="season-form-points-win" />
-                <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} testId="season-form-points-draw" />
-                <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} testId="season-form-points-loss" />
-              </FormGrid>
+              <SeasonPointsFields form={form} set={set} />
               <SeasonTableRules form={form} set={set} />
             </FormSection>
           </SeasonTabForm>

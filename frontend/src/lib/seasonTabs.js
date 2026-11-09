@@ -86,7 +86,7 @@ export const TAB_FIELDS = {
     "application_waitlist_note", "application_privacy_text", "entry_policy", "sibling_squads_in_staffel", "had_application", "registration_deadline",
     "min_squad_size", "max_squad_size", "had_rules", "one_team_per_season", "new_player_wait_days", "min_age", "unique_game_ids", "lineup_mode",
     "lineup_min_players", "transfer_windows", "platform_field", "allowed_platforms", "crossplay", "input_device"],
-  tabelle: ["points_win", "points_draw", "points_loss", "table_tiebreakers", "head_to_head_criteria", "allow_draws", "forfeit_score", "exit_rule",
+  tabelle: ["match_points_mode", "points_win", "points_draw", "points_loss", "table_tiebreakers", "head_to_head_criteria", "allow_draws", "forfeit_score", "exit_rule",
     "scoring_rules"],
   regelwerk: ["rules_text"],
   ligen: ["max_staffel_size"],

@@ -236,6 +236,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Runden (1 = Hinrunde, 2 = Hin/Rück) | Season | 1 |
 | Staffelgröße max., Best of, Teamgröße, Mindestkader | Season, Liga N überschreibt | 8 · 3 · 4 · 4 |
 | Punkte Sieg/Remis/Niederlage, Gleichstand, Remis, Default-Win, Ausscheiden (E.1) | Season (`scoring_rules`), Liga N überschreibt | neue Seasons 3/0/0 · direkter Vergleich, Differenz, Maps, Leitung · kein Remis · Best of · alle Spiele für die Gegner (ältere: 3/1/0 · `score_diff`, `score_for`) |
+| Punkteart: Sieg/Remis/Niederlage oder gewonnene Maps (E.1, #2312) | Season (`scoring_rules.match_points_mode`) | Sieg/Remis/Niederlage (`result`) |
 | Modus je Position | Season | frei |
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
@@ -255,6 +256,8 @@ und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich untersche
 behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
 **laufend** (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln) `match_schedule_response_hours` – sie gilt nur
 für neue Terminvorschläge; trägt weder Season noch Liga N den Wert (Seasons von vor #2106), bleibt der der Staffel;
+**Punkteart** (Gruppe `table_points`, #2312, E.1): nach dem ersten Ergebnis nur, wenn sich `match_points_mode` von der
+Staffel unterscheidet, dann mit `table_tiebreakers` und `forfeit_score` – nicht bei gesperrten oder beendeten Staffeln;
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
 `default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
 wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
@@ -836,7 +839,7 @@ Darstellung erst beim Lesen, jeder Wert über `markdown_text.text_cell`:
 | `[[baustein:veto]]` „Veto“ (D.3, #1618) | `veto_rules` der Season (`league_veto_rules.normalize`, `facts.veto_rules_of`: nur mit `enabled` und Schritten), Namen der Modi vom Spiel | `{enabled: false}` oder `{enabled: true, team_a, step_seconds, steps: [{kind, mode, mode_label, team, position}]}` | Liste: Team-A-Regel (Heim oder Los), Zeit je Schritt mit Zufallswahl nach Ablauf, Start nach dem Check-in; dann die Schritte nummeriert („1. Team A sperrt eine Map (Stellung)“, „11. Die übrige Map wird Map 3 (Kontrolle)“); aus heißt „In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.“ |
 | `[[baustein:modes]]` „Modi der Season“ | Modi des geltenden Pools und der Modusfolge (ohne beides: alle nicht archivierten Modi des Spiels); Regel aus `result_rules` der Season, sonst des Spiels; Symbol, `players_per_side` und Beschreibung vom Spiel | `{rows: [{mode, label, icon_url?, players_per_side, description, rule: {kind, target, round_limit, time_limit_seconds, round_time_seconds, overtime, draw_allowed} \| null}]}` | Tabelle Modus · Ergebnisregel (Klartext: „Punkte bis zum Ziel 250 · Verlängerung bei Gleichstand · kein Remis“) · Zeit („10 Min. je Map · 1:30 Min. je Runde“) · Spieler je Seite; Symbol nur in `markdown` |
 | `[[baustein:format]]` „Spielformat“ | `best_of`, `team_size`, `min_squad_size`, `max_squad_size`, `map_repeat`, `lineup_mode`, `lineup_min_players` der Season (`effective_settings`), dazu je Liga N die Abweichungen (`overrides`) | `{best_of, maps_to_win, team_size, min_squad_size, max_squad_size, map_repeat, lineup_mode, lineup_min_players, divisions: [{label, best_of, team_size, min_squad_size}]}` | Liste: Serie, Teamgröße, Kader, Map-Wiederholung, Teilnehmerliste; danach „Abweichend in Liga N: …“ |
-| `[[baustein:table]]` „Tabelle und Wertung“ | `scoring_rules` der Season (`normalize_rules`, Altbestand mit seinen Vorgaben), dazu Liga N mit eigenen `scoring_rules` | `{points: {win, draw, loss}, allow_draws, tiebreakers, head_to_head, forfeit_score, exit_rule, divisions: [{label, …dieselben Felder}]}` | Liste: Punkte, Remis, Reihenfolge bei Punktgleichheit, Kampflos, Beide nicht erschienen, Ausscheiden (E.1) |
+| `[[baustein:table]]` „Tabelle und Wertung“ | `scoring_rules` der Season (`normalize_rules`, Altbestand mit seinen Vorgaben), dazu Liga N mit eigenen `scoring_rules` | `{points: {win, draw, loss}, points_mode, allow_draws, tiebreakers, head_to_head, forfeit_score, exit_rule, divisions: [{label, …dieselben Felder}]}` (`points_mode` `result` oder `maps`, #2312; eingefrorene Fassungen ohne das Feld gelten als `result`) | Liste: Punkte (mit `maps`: „je gewonnene Map ein Punkt, 3:2 ergibt 3 und 2“), Remis, Reihenfolge bei Punktgleichheit, Kampflos, Beide nicht erschienen, Ausscheiden (E.1) |
 | `[[baustein:schedule]]` „Termine“ | Kalender der Season (`start_date`, `weeks_total`, `matchday_days`, Standardtermin, `blocked_periods`), `match_schedule_response_hours`, `schedule_rules` (D.1) | `{weeks_total, start_day, end_day, matchday_days, weekday_from, weekday_to, default_weekday, default_time, blocked_periods: [{label, start_date, end_date}], response_hours, rules: {…D.1} \| null}` | Liste: Season und Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig; ohne `schedule_rules` ein Satz, dass Verschiebungen die Leitung entscheidet |
 | `[[baustein:eligibility]]` „Spielberechtigung“ | B.3-Felder der Season (`league_eligibility.rules_view`), `entry_policy`, `unique_game_ids`, die Spiel-ID-Felder des Spiels (`player_id_fields[].label`), die Plattform je Season (#2270, `league_platform.season_block` → `values`) | `{min_age, one_team_per_season, new_player_wait_days, roster_deadline, transfer_windows: [{label, start_date, end_date}], entry_policy, unique_game_ids, id_fields: [label], platform: {field, platforms, crossplay, input_device, divisions: [{label, platforms, crossplay, input_device}]} \| null}` | Liste: Zulassung, Mindestalter, Spiel-IDs, Plattform (Feld, erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster |
 
@@ -866,6 +869,7 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `schedule.response_hours`, `schedule.blocked_periods` | Antwortfrist auf Terminvorschläge, Sperrzeiten („Weihnachtspause 21.12.2026–03.01.2027“) |
 | `schedule.home_rule_hours`, `schedule.reschedule_max`, `schedule.reschedule_notice_hours`, `schedule.result_reminder_hours`, `schedule.result_overdue_hours` | D.1-Regeln; ohne `schedule_rules` an der Season „(nicht festgelegt)“ |
 | `table.points_win`, `table.points_draw`, `table.points_loss`, `table.draws` | Punkte, „möglich“ / „nicht möglich“ |
+| `table.points` (#2312) | Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ bzw. „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2)“ |
 | `table.tiebreakers`, `table.head_to_head`, `table.forfeit_score`, `table.exit_rule` | Reihenfolge bei Punktgleichheit in Worten, Kriterien des direkten Vergleichs, Wertung kampflos, Regel beim Ausscheiden |
 | `eligibility.min_age`, `eligibility.wait_days`, `eligibility.roster_deadline`, `eligibility.transfer_windows`, `eligibility.entry_policy`, `eligibility.id_fields` | B.3-Werte in Worten |
 | `eligibility.platform`, `eligibility.crossplay`, `eligibility.input_device` | Plattform je Season (#2270): „PC und PlayStation“ / „alle Plattformen“, „an“ / „aus“, Eingabegerät in Worten; ohne Plattform-Feld „(nicht festgelegt)“ |
@@ -1756,6 +1760,38 @@ App (`/api/tournaments/{id}/standings`), Plätze (`placements_for_structure`) un
 | `forfeit_score` | `recorded` \| `best_of` | `recorded` (wie eingetragen) | `best_of`: Sieger bekommt ⌊Best of/2⌋+1 Maps, der andere 0 (BO5 3:0, Nr. 26) |
 | `exit_rule` | `half` \| `all_for_opponents` | `half` (50-%-Regel) | `all_for_opponents` (Kommentar 02.11., Nr. 43, Nr. 48) |
 | `match_points` | wie bisher | 3/1/0 | 3/0/0 |
+| `match_points_mode` (#2312) | `result` \| `maps` | `result` | `result` (die Tiroler Liga stellt auf `maps` um) |
+
+**Punkteart (`match_points_mode`, #2312):** `result` vergibt die Punkte aus `match_points` für Sieg, Remis und
+Niederlage (wie bisher). `maps` („Punkte nach gewonnenen Maps“) gibt jeder Seite so viele Punkte, wie sie Maps gewonnen
+hat (`score` am Ergebnis, in der Liga-Staffel die gewonnenen Maps aus `games[]`, `league_games.derived_results`): 3:2
+ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0; `match_points` bleibt gespeichert, zählt dann aber nicht. Siege, Remis und
+Niederlagen zählt die Tabelle weiter (`won`, `drawn`, `lost`). Bei gerader Länge (Best of 2, 4) zählen auch bei einem
+Remis die Maps (2:2 ergibt je 2). Kampflos zählt mit `maps` immer wie `forfeit_score: best_of` (BO5 3:0), auch bei
+`recorded` – sonst bekäme der Sieger 0 Punkte. Ebenso ein Spiel, das ein ausgeschiedenes Team mit `all_for_opponents` für
+den Gegner zählt. „Beide nicht erschienen“ gibt beiden 0 Punkte. Die Mini-Tabelle des direkten Vergleichs rechnet ihr
+Kriterium `points` mit derselben Punkteart, also mit den Maps der Spiele untereinander. Punktabzug wie bisher.
+**Vorschlag beim Wechsel:** Die Verwaltung setzt beim Umstellen auf `maps` die Reihenfolge bei Punktgleichheit auf
+`wins`, `head_to_head`, `score_diff`, `lead_decision` (mehr gewonnene Spiele → direkter Vergleich → Map-Differenz →
+Entscheid der Leitung, `scoring_rules.MAPS_TABLE_TIEBREAKERS`) und `forfeit_score` auf `best_of`; beides bleibt änderbar.
+Zurück auf `result` bleibt die Reihenfolge, wie sie ist. **Laufende Seasons:** Unterscheidet sich die Punkteart der
+Staffel von der Season, überträgt „Vorgaben auf Staffeln übertragen“ auch nach dem ersten Ergebnis `match_points_mode`,
+`table_tiebreakers` und `forfeit_score` in die `scoring_rules` der Staffel (Gruppe `table_points`, nicht bei gesperrten
+und nicht bei beendeten Staffeln – `completed`, `results_published`, `archived`, `cancelled`); alles andere an
+`scoring_rules` bleibt „vor dem ersten Ergebnis“. Eine abgeschlossene oder archivierte Season (`completed`, `archived`)
+bekommt gar nichts davon – ihre Tabellen rechnen weiter mit der alten Punkteart; einen gespeicherten Endstand
+(`league_final_tables`) gibt es erst mit F.1. **Liga N (#2318):** Eine Liga N legt bei der Tabelle nur eigene Punkte
+(`overrides.scoring_rules.match_points`) über die Regeln der Season (`scoring_rules.division_rules`); direkter Vergleich,
+Remis-Regel, kampflos, Ausscheiden und die Punkteart kommen immer von der Season, auch bei älteren Abweichungen mit
+vollständigen Regeln. In einer Season mit `maps` gibt es keine eigenen Punkte: Die Verwaltung blendet die Felder aus, der
+Server lehnt sie mit 422 ab, eine ältere Abweichung zählt nicht. Altbestand: Hätte eine Liga N vor #2318 vollständige
+Regeln gespeichert und schon Ergebnisse, meldete das Regelwerk einmalig „Daten geändert“, und ihre laufenden Staffeln
+rechneten weiter mit den alten Regeln. Zum Stand 09.11.2026 gibt es keine Liga N mit eigenen Punkten (Fabian), deshalb
+fängt der Code diesen Fall nicht eigens ab. Jede
+Umstellung schreibt zusätzlich `league.season.table_points` mit vorher und nachher ins Protokoll. Antworten: Die Staffel
+der Ligaseite trägt `table_rules.match_points_mode`, die Season `match_points_mode`; die Tabelle zeigt dann „Punkte =
+gewonnene Maps“. Regelwerk: Baustein „Tabelle und Wertung“ und Variable `table.points` beschreiben die Punkteart;
+ein Wechsel ändert den Baustein und schlägt damit eine neue Freigabe vor.
 
 Punkte zählen immer zuerst. `points`, `score_diff`, `score_for` und `wins` meinen Punkte, Map-Differenz, gewonnene Maps und Siege.
 
@@ -1832,7 +1868,8 @@ sonst `ready`), Protokoll `match.forfeit.double.undo`; den Termin setzt die Leit
 **Antworten (nur zusätzlich, die App bleibt ohne Build lauffähig):** Jede Zeile einer Staffel-Tabelle trägt dazu `tiebreak`
 (`head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` oder `null`), `forfeit_won`, `forfeit_lost`,
 `deducted_points`, `exit` (`{kind, at}` oder `null`) und `lead_decision`. Die Staffel der Ligaseite trägt `table_rules`
-(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`).
+(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`, `match_points`,
+`match_points_mode`).
 
 **Darstellung (Entscheidung 15.10.):** Platz und Zone, kein öffentliches Rating, Hervorhebung in Cyan (Gold bleibt dem
 Season-Meister, F.1). Bei Gleichstand ein kleiner Hinweis, was entschied („Direkter Vergleich“, „Map-Differenz“, „Mehr Maps“,

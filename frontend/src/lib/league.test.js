@@ -74,6 +74,15 @@ test("Liga N: nur abweichende Werte, leer heißt wie die Season", () => {
   expect(overridesToForm({ team_size: 5 }).team_size).toBe("5");
 });
 
+// #2312, #2318: In einer Season mit Punkten nach gewonnenen Maps gibt es keine eigenen Punkte - ein alter Wert fällt beim Speichern weg.
+test("Liga N in einer Map-Season: keine eigenen Punkte, Kurztext nennt die Punkteart", () => {
+  const form = { ...overridesToForm({ scoring_rules: { match_points: { win: 2, draw: 0, loss: 0 } } }), best_of: "5" };
+  expect(overridesPayload(form, { mapPoints: true })).toEqual({ best_of: 5 });
+  expect(overridesPayload(form)).toEqual({ best_of: 5, scoring_rules: { match_points: { win: 2, draw: 0, loss: 0 } } });
+  expect(settingsLine({ best_of: 5, scoring_rules: { match_points_mode: "maps", match_points: { win: 3, draw: 0, loss: 0 } } }))
+    .toBe("Best of 5 · Punkte je gewonnene Map");
+});
+
 test("Liga N: die Plattform-Abweichung bleibt beim Speichern anderer Werte erhalten (#2270)", () => {
   const saved = { best_of: 5, allowed_platforms: ["PlayStation"], crossplay: false, input_device: "controller" };
   expect(overridesPayload(overridesToForm(saved))).toEqual(saved);
