@@ -883,6 +883,86 @@ def reached_labels(matches: list[dict], stages: list[dict] = (), tournament: dic
     return labels
 
 
+# Wann ein Turnier sein Ergebnis hat - erst dann sagt der Weg „raus“ (vorher könnte noch ein Spiel kommen).
+FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
+
+
+def _round_phrase(label: str) -> str:
+    """„im Halbfinale“, „im Grand Final“ - aber „in Runde 2“, „in Loser Runde 3“."""
+    first = label.split(" ")[0].lower()
+    second = (label.split(" ")[1:2] or [""])[0].lower()
+    if first == "runde" or (first in {"winner", "loser"} and second == "runde"):
+        return f"in {label}"
+    return f"im {label}"
+
+
+def place_paths(matches: list[dict], stages: list[dict] = (), tournament: dict | None = None) -> dict[str, str]:
+    """Wie der Platz im Baum zustande kam (#2336): „Finale gewonnen“, „im Finale“, „Spiel um Platz 3 gewonnen“, „im
+    Halbfinale raus“. Im K.-o. entscheidet die erreichte Runde den Platz, nicht die Zahl der Siege - das Podest sagt
+    deshalb, wo jemand zuletzt spielte und ob er dieses Spiel gewann.
+
+    Nur aus Fakten: das späteste echte Spiel (Phase, dann Runde; ein Freilos zählt nicht) mit seinem Ergebnis für die
+    Anmeldung, nur in einer Phase mit Duell-Baum (keine Läufe, keine Tabelle) und nur, wenn das Turnier beendet ist.
+    Fehlt etwas davon, steht für die Anmeldung nichts da - das Podest zeigt dann wie bisher die Siege."""
+    from services.round_labels import attach_round_labels, rounds_by_section, stage_kind
+
+    if (tournament or {}).get("status") not in FINISHED_TOURNAMENT_STATUSES:
+        return {}
+    playable = [dict(match) for match in matches
+                if match.get("status") != "cancelled" and match.get("source", {}).get("engine") == "stage"]
+    if not playable:
+        return {}
+    attach_round_labels(playable, list(stages or []), tournament)
+    rounds = rounds_by_section(playable)
+    stage_types = {stage.get("id"): stage.get("stage_type") for stage in stages or [] if isinstance(stage, dict)}
+    tournament_format = (tournament or {}).get("format")
+    furthest: dict[str, tuple[tuple[int, int], dict]] = {}
+    for match in playable:
+        if is_bye(match):
+            continue
+        position = (_safe_int(match.get("stage_number")), _safe_int(match.get("round")))
+        for slot in match.get("slots") or []:
+            registration_id = slot.get("registration_id")
+            if registration_id and (registration_id not in furthest or position > furthest[registration_id][0]):
+                furthest[registration_id] = (position, match)
+    paths: dict[str, str] = {}
+    for registration_id, (_position, match) in furthest.items():
+        kind = stage_kind(stage_types.get(match.get("stage_id")) or match.get("stage_type"), tournament_format,
+                          match.get("match_type"))
+        if kind != "knockout" or match.get("status") not in TERMINAL_MATCH_STATUSES:
+            continue
+        results = [row for row in match.get("results") or [] if row.get("registration_id")]
+        own = next((row for row in results if row.get("registration_id") == registration_id), None)
+        if not own:
+            continue
+        firsts = [row for row in results if _safe_int(row.get("rank"), 999) == 1 or row.get("outcome") == "winner"]
+        if len(firsts) != 1:
+            continue  # Unentschieden oder kein Sieger: kein Weg, der sich sicher sagen lässt.
+        won = firsts[0].get("registration_id") == registration_id
+        label = str(match.get("round_label") or "").strip()
+        if not label:
+            continue
+        section = section_kind(match.get("section"))
+        main_rounds = rounds.get((match.get("stage_id"), "main")) or []
+        final_like = section in {"grand_final", "bronze"} or (
+            section == "main" and main_rounds and _safe_int(match.get("round")) == main_rounds[-1])
+        if won:
+            paths[registration_id] = f"{label} gewonnen"
+        elif final_like:
+            paths[registration_id] = _round_phrase(label)
+        else:
+            paths[registration_id] = f"{_round_phrase(label)} raus"
+    return paths
+
+
+def games_won_text(won) -> str:
+    """„4 Spiele gewonnen“, „1 Spiel gewonnen“, „kein Spiel gewonnen“ - die zweite Zeile unter dem Weg (#2336)."""
+    count = _safe_int(won)
+    if count <= 0:
+        return "kein Spiel gewonnen"
+    return f"{count} {'Spiel' if count == 1 else 'Spiele'} gewonnen"
+
+
 def public_standings(
     tournament: dict,
     snapshot: dict,
@@ -905,9 +985,13 @@ def public_standings(
         return []
     rows = standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
     labels = reached_labels(matches, stages, tournament)
+    paths = place_paths(matches, stages, tournament)
     for row in rows:
         if row.get("registration_id") in labels:
             row["reached"] = labels[row["registration_id"]]
+        # Wie der Platz zustande kam (#2336) - nur im beendeten Duell-Baum.
+        if row.get("registration_id") in paths:
+            row["place_path"] = paths[row["registration_id"]]
     return rows
 
 

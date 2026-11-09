@@ -12,7 +12,7 @@ from services.access_links import public_access_link_payload, touch_access_link,
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.competition_read import load_competition_read_model, observe_structure_read
-from services.competition_standings import standings_for_structure
+from services.competition_standings import games_won_text, place_paths, standings_for_structure
 from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
@@ -253,6 +253,8 @@ async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
         or row.get("won")
         or row.get("losses")
     ]
+    # Im Baum (#2336) steht zuerst, wie der Platz zustande kam - dieselbe Rechnung wie Rangliste und Rückblick-Seite.
+    paths = place_paths(structure.get("matches") or [], read_model.stages, tournament)
     podium = []
     for index, row in enumerate(rows[:3], start=1):
         reg = reg_map.get(row.get("registration_id"))
@@ -260,6 +262,10 @@ async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
             continue
         detail_bits = []
         wins = row.get("wins") if row.get("wins") is not None else row.get("won")
+        path = paths.get(row.get("registration_id"))
+        if path:
+            podium.append({"rank": index, "name": _registration_name(reg), "detail": f"{path}, {games_won_text(wins)}"})
+            continue
         if wins:
             detail_bits.append(f"{wins} {'Sieg' if wins == 1 else 'Siege'}")
         points = row.get("points")
