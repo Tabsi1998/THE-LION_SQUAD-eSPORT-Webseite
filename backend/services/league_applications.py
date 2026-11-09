@@ -182,18 +182,12 @@ async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *
         outsiders = await _non_members(db, squad)
         if outsiders:
             problems.append((400, f"{squad.get('name')}: Diese Season ist nur für Mitglieder. Keine Mitglieder: {', '.join(sorted(outsiders))}."))
+    # Fehlende Angaben und zu wenige Spielberechtigte halten die Anmeldung nicht auf (#2313, ersetzt Nr. 74): nur Hinweis, gesperrt wird
+    # erst beim Check-in und bei der Aufstellung. Andere Co-Teams stehen schon oben als Grund.
     rows = league_eligibility.statuses(ctx, members, squad["id"])
-    ready = [row for row in rows.values() if row["ok"]]
-    if len(members) >= minimum and len(ready) < minimum:
-        # Was zu tun ist, sagt der Grund: andere Plattform (#2270) heißt andere Spieler, sonst fehlt meist die Spiel-ID.
-        states = {row["state"] for row in rows.values() if not row["ok"]}
-        todo = ("Wer auf einer anderen Plattform spielt, zählt nicht mit – die Gründe stehen bei den Spielern."
-                if states <= {league_platform.NOT_ALLOWED} else "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein.")
-        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. {todo}"))
-    # Alter und andere Co-Teams stehen schon oben als Grund.
-    named = (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE, league_eligibility.OTHER_TEAM)
-    warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] not in named]
-    return {"problems": problems, "warnings": sorted(warnings)}
+    warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] != league_eligibility.OTHER_TEAM]
+    shortfall = league_eligibility.open_points(ctx, squad, minimum=minimum)["shortfall"]
+    return {"problems": problems, "warnings": sorted(warnings), "shortfall": shortfall}
 
 
 # ---------------------------------------------------------------- Wer darf
@@ -771,7 +765,7 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
                "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone))}
         if can_apply:
             check = await check_squad(db, league, season, team, squad) if state == OPEN and not active else {"problems": [], "warnings": []}
-            row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"],
+            row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"], shortfall=check.get("shortfall"),
                        can_submit=not active and not blocked and not check["problems"])
         elif user["id"] in _leads(team) and not (squad.get("captain_id") or squad.get("vice_captain_id")) and not hint:
             hint = f"Anmelden dürfen Captain und Vertreter. {squad.get('name')} hat noch keinen: Trag ihn unter Teams beim Co-Team ein."
@@ -863,7 +857,7 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "assignment": {**row["assignment"], "left": row["id"] in gone} if row.get("assignment") else None,
             "member_count": len([uid for uid in (squad or {}).get("member_ids") or [] if uid]),
             "captain_name": names.get((squad or {}).get("captain_id")), "vice_name": names.get((squad or {}).get("vice_captain_id")),
-            "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"],
+            "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"], "shortfall": check.get("shortfall"),
             "shared_with": shared,
             "own_team": belongs_to_side(user, sides[row["id"]], side_teams.get(row["team_id"])),
             "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": names.get(step.get("by")) or "Gelöschter User", "reason": step.get("reason"),

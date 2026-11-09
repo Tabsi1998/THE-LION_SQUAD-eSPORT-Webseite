@@ -344,7 +344,8 @@ async def assign_b(flow, w: dict):
 @pytest.mark.parametrize(("season_rules", "change", "code", "text"), [
     ({"max_squad_size": 2}, None, 400, "höchstens 2"),
     ({"one_team_per_season": True}, None, 409, "schon in einem anderen Co-Team"),
-    ({"min_age": 18}, "Ida", 400, "Geburtsdatum fehlt bei Ida"),
+    # Seit #2313: ein fehlendes Geburtsdatum hält das Zuteilen nicht auf, es sperrt erst Check-in und Aufstellung.
+    ({"min_age": 18}, "Ida", 200, None),
     ({}, None, 200, None),
 ])
 async def test_assigning_checks_the_season(flow, season_rules, change, code, text):
@@ -371,4 +372,5 @@ async def test_the_assign_dialog_shows_the_same_reasons_without_a_date(flow):
     assert response.status_code == 200, response.text
     assert "2015" not in response.text
     squads = {squad["name"]: squad for team in response.json()["teams"] for squad in team["squads"]}
-    assert any("Altersvorgabe" in text for text in squads["Rudel B"]["problems"])
+    assert squads["Rudel B"]["problems"] == []
+    assert any("Altersvorgabe" in text for text in squads["Rudel B"]["notes"])
