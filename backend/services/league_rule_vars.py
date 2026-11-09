@@ -85,6 +85,21 @@ def _rules(ctx: Context) -> dict | None:
     return ctx.schedule.get("rules") if ctx.schedule else None
 
 
+MAP_POINTS_VALUE = "– (Punkte je gewonnene Map)"
+
+
+def _fixed_points(key: str) -> Callable[[Context], str | None]:
+    """Punkte je Sieg, Remis oder Niederlage - mit Punkten nach gewonnenen Maps (#2312) gibt es sie nicht. Dann ein eigener Wert, damit
+    ein Text mit der Variable als geändert gilt und das Regelwerk eine neue Freigabe vorschlägt."""
+    def value(ctx: Context) -> str | None:
+        if not ctx.table:
+            return None
+        if ctx.table.get("points_mode") == "maps":
+            return MAP_POINTS_VALUE
+        return _count((ctx.table.get("points") or {}).get(key))
+    return value
+
+
 def _rule_hours(key: str) -> Callable[[Context], str | None]:
     return lambda ctx: facts.hours((_rules(ctx) or {}).get(key)) if _rules(ctx) else None
 
@@ -175,9 +190,9 @@ def _static() -> list[Variable]:
                  _rule_hours("result_overdue_hours")),
         Variable("table.points", "Punktevergabe", "Sieg/Remis/Niederlage oder je gewonnene Map.", "Tabelle",
                  lambda ctx: facts.points_sentence(ctx.table) if ctx.table else None),
-        Variable("table.points_win", "Punkte je Sieg", "", "Tabelle", lambda ctx: _count((ctx.table.get("points") or {}).get("win")) if ctx.table else None),
-        Variable("table.points_draw", "Punkte je Remis", "", "Tabelle", lambda ctx: _count((ctx.table.get("points") or {}).get("draw")) if ctx.table else None),
-        Variable("table.points_loss", "Punkte je Niederlage", "", "Tabelle", lambda ctx: _count((ctx.table.get("points") or {}).get("loss")) if ctx.table else None),
+        Variable("table.points_win", "Punkte je Sieg", "Bei Punkten nach gewonnenen Maps „– (Punkte je gewonnene Map)“.", "Tabelle", _fixed_points("win")),
+        Variable("table.points_draw", "Punkte je Remis", "Bei Punkten nach gewonnenen Maps „– (Punkte je gewonnene Map)“.", "Tabelle", _fixed_points("draw")),
+        Variable("table.points_loss", "Punkte je Niederlage", "Bei Punkten nach gewonnenen Maps „– (Punkte je gewonnene Map)“.", "Tabelle", _fixed_points("loss")),
         Variable("table.draws", "Remis", "„möglich“ oder „nicht möglich“.", "Tabelle",
                  lambda ctx: ("möglich" if ctx.table.get("allow_draws") else "nicht möglich") if ctx.table else None),
         Variable("table.tiebreakers", "Reihenfolge bei Punktgleichheit", "Die Kriterien in Worten.", "Tabelle",
