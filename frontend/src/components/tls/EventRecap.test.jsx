@@ -49,6 +49,21 @@ test("mit Daten: Du warst dabei, Zahlen, Treppchen je Turnier und Fast Lap, Beri
   expect(screen.getByTestId("event-recap-report")).toHaveAttribute("href", "/news/rueckblick");
 });
 
+test("Baum (#2336): Weg zum Platz über den gewonnenen Spielen, der Satz nur, wenn die Siege nicht passen", async () => {
+  const podium = [
+    { rank: 1, name: "NeonFalke", team: false, path: "Finale gewonnen", won: 4, detail: "4 Spiele gewonnen" },
+    { rank: 2, name: "LunaByte", team: false, path: "im Finale", won: 1, detail: "1 Spiel gewonnen" },
+    { rank: 3, name: "KartKönigin", team: false, path: "Spiel um Platz 3 gewonnen", won: 3, detail: "3 Spiele gewonnen" },
+  ];
+  apiMock.get.mockResolvedValue({ data: { ...RECAP, winners: [{ ...RECAP.winners[0], podium }] } });
+  renderRecap();
+  expect(await screen.findByTestId("event-recap-podium-t-mk-2-path")).toHaveTextContent("im Finale");
+  expect(screen.getByTestId("event-recap-podium-t-mk-2")).toHaveAttribute("aria-label", "Platz 2: LunaByte, im Finale, 1 Spiel gewonnen");
+  expect(screen.getByTestId("event-recap-podium-t-mk-note")).toHaveTextContent("erreichte Runde");
+  // Ohne Weg (Liga, FFA, Fast Lap) kein Satz.
+  expect(screen.queryByTestId("event-recap-podium-f-spa-note")).toBeNull();
+});
+
 test("ohne Teilnahme kein „Du warst dabei“", async () => {
   apiMock.get.mockResolvedValue({ data: { ...RECAP, mine: null } });
   renderRecap();

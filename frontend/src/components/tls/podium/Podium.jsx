@@ -4,7 +4,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { resolveMediaUrl } from "@/lib/api";
 import { motionAllowed } from "@/lib/motion";
 import { initials } from "@/lib/slotSource";
-import { podiumPlaces } from "@/lib/placementMoment";
+import { gamesWonText, podiumPlaces, podiumRoundNote, podiumWins } from "@/lib/placementMoment";
 
 /**
  * Podest (#1339): ein echtes Treppchen - Platz 1 in der Mitte und 24 px höher mit kleiner Krone, links 2, rechts 3; je
@@ -62,6 +62,7 @@ function usePlayOnce(ref) {
 
 export function Podium({ rows, registrations = [], className = "" }) {
   const places = useMemo(() => podiumPlaces(rows), [rows]);
+  const note = useMemo(() => podiumRoundNote(places.flatMap((place) => place.rows)), [places]);
   const regMap = useMemo(() => new Map((registrations || []).map((reg) => [reg.id, reg])), [registrations]);
   const ref = useRef(null);
   const play = usePlayOnce(ref);
@@ -95,7 +96,13 @@ export function Podium({ rows, registrations = [], className = "" }) {
                     <Avatar name={row.display_name} src={src} />
                     {/* Nie mitten im Wort brechen: mehrere Wörter dürfen zwei Zeilen nehmen, ein langes Wort endet mit „…“. */}
                     <span className={`tls-podium__name ${/\s/.test((row.display_name || "").trim()) ? "" : "tls-podium__name--word"}`} title={row.display_name || undefined}>{row.display_name || "Teilnehmer"}</span>
-                    {valueText(row) && <span className="tls-podium__value">{valueText(row)}</span>}
+                    {row.place_path ? (
+                      // Im Baum (#2336): wie der Platz zustande kam, die gewonnenen Spiele klein darunter.
+                      <span className="tls-podium__path" data-testid="podium-path">
+                        <span className="tls-podium__value">{row.place_path}</span>
+                        <span className="tls-podium__games">{gamesWonText(podiumWins(row))}</span>
+                      </span>
+                    ) : valueText(row) && <span className="tls-podium__value">{valueText(row)}</span>}
                   </div>
                 );
               }) : <div className="tls-podium__empty">–</div>}
@@ -106,6 +113,7 @@ export function Podium({ rows, registrations = [], className = "" }) {
           </li>
         ))}
       </ol>
+      {note ? <p className="tls-podium__note" data-testid="podium-note">{note}</p> : null}
     </div>
   );
 }

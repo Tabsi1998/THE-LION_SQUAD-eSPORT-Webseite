@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Award, CheckCircle, Flag, Newspaper, Trophy } from "lucide-react";
 import { api } from "@/lib/api";
 import { numberTiles, ownResultLine, podiumOrder } from "@/lib/eventRecap";
+import { podiumRoundNote } from "@/lib/placementMoment";
 
 // Rückblick nach dem Event (#1187): ersetzt nach dem letzten Event-Tag den Satz „Das Event ist vorbei“ (#1221) oben auf
 // der Event-Seite. Reihenfolge wie in der App (EventRecapCard): „Du warst dabei“ mit dem eigenen Ergebnis, die Zahlen,
@@ -23,15 +24,20 @@ function itemPath(item) {
 // Plätze über die Beschriftung jeder Stufe. Wird durch den Baustein `Podium` aus #1339 ersetzt, sobald es ihn gibt.
 function MiniPodium({ podium, testId }) {
   if (!podium?.length) return <p className="text-sm text-white/50">Noch keine Ergebnisse.</p>;
+  // Im Baum (#2336) steht zuerst, wie der Platz zustande kam; der Satz darunter nur, wenn Siege und Platz nicht passen.
+  const note = podiumRoundNote(podium);
   return (
+    <>
     <ol className="grid grid-cols-3 items-end gap-2" data-testid={testId}>
       {podiumOrder(podium).map((entry, index) => {
         const rank = [2, 1, 3][index];
         const style = PLACE_STYLE[rank];
         if (!entry) return <li key={rank} aria-hidden="true" />;
+        const spoken = [entry.path, entry.detail].filter(Boolean).join(", ");
         return (
-          <li key={rank} className="min-w-0 text-center" aria-label={`Platz ${rank}: ${entry.name}${entry.detail ? `, ${entry.detail}` : ""}`} data-testid={`${testId}-${rank}`}>
+          <li key={rank} className="min-w-0 text-center" aria-label={`Platz ${rank}: ${entry.name}${spoken ? `, ${spoken}` : ""}`} data-testid={`${testId}-${rank}`}>
             <div className={`text-sm font-bold leading-tight break-words ${rank === 1 ? "text-white" : "text-white/85"}`}>{entry.name}</div>
+            {entry.path ? <div className="text-xs font-semibold leading-tight text-white/80 break-words" data-testid={`${testId}-${rank}-path`}>{entry.path}</div> : null}
             {entry.detail ? <div className="text-[11px] text-white/55 tabular-nums break-words">{entry.detail}</div> : null}
             <div className={`mt-1.5 rounded-t-sm border border-b-0 flex items-start justify-center pt-1 ${style.bar}`}>
               <span className={`font-heading text-lg font-black ${style.text}`} aria-hidden="true">{rank}</span>
@@ -40,6 +46,8 @@ function MiniPodium({ podium, testId }) {
         );
       })}
     </ol>
+    {note ? <p className="mt-2 text-xs leading-snug text-white/55" data-testid={`${testId}-note`}>{note}</p> : null}
+    </>
   );
 }
 
