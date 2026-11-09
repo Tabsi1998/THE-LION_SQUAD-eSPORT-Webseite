@@ -61,10 +61,18 @@ function Notes({ row }) {
  * `rows`: Zeilen einer Tabelle; `kind`: league, swiss, ffa oder knockout (lib/standingsTable.tableKind); `changed`: Schlüssel
  * frisch geänderter Zeilen; `registerRow`: useFlipRows - Zeilen gleiten an ihren neuen Platz; `certificateHref`: Link
  * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile; `nameLabel`: Kopf der Namensspalte („Team“
- * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable).
+ * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable);
+ * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit).
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false }) {
-  const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league).filter((column) => !(hideDraws && column.key === "drawn"));
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false }) {
+  const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league)
+    .filter((column) => !(hideDraws && column.key === "drawn"))
+    .map((column) => {
+      if (!mapPoints) return column;
+      if (column.key === "won") return { ...column, wide: false };
+      if (column.key === "points") return { ...column, title: "Punkte = gewonnene Maps" };
+      return column;
+    });
   const span = columns.length + 2 + (certificateHref ? 1 : 0);
   return (
     // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.

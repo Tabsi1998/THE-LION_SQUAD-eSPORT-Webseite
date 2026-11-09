@@ -13,7 +13,7 @@ import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
 import { standingSignature } from "@/lib/liveChanges";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
-import { hidesDraws, tiebreakOrder } from "@/lib/leagueTable";
+import { byMaps, hidesDraws, pointsNote, tiebreakOrder } from "@/lib/leagueTable";
 import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
@@ -176,10 +176,14 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel }) {
       <div className="min-w-0 space-y-6">
         <StaggerIn className="tls-league-table" aria-label={`Tabelle Staffel ${staffel.staffel}`}>
           <StandingsTable rows={rows} kind="team_league" changed={changed} registerRow={registerRow}
-            label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" hideDraws={hidesDraws(tableRules, rows)} />
+            label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" hideDraws={hidesDraws(tableRules, rows)} mapPoints={byMaps(tableRules)} />
           {/* Reihenfolge bei Punktgleichheit (E.1, #1625) - dieselbe, nach der der Server sortiert. */}
+          {/* Punkte nach gewonnenen Maps (#2312): sagt, was die Spalte „Pkt“ zählt. */}
+          {pointsNote(tableRules) ? (
+            <p className="mt-2 text-[11px] text-white/55" data-testid={`league-points-note-${staffel.staffel}`}>{pointsNote(tableRules)}</p>
+          ) : null}
           {tableRules?.tiebreakers?.length ? (
-            <p className="mt-2 text-[11px] text-white/45" data-testid={`league-tiebreak-order-${staffel.staffel}`}>
+            <p className={`${pointsNote(tableRules) ? "mt-1" : "mt-2"} text-[11px] text-white/45`} data-testid={`league-tiebreak-order-${staffel.staffel}`}>
               Reihenfolge: {tiebreakOrder(tableRules.tiebreakers)}
             </p>
           ) : null}

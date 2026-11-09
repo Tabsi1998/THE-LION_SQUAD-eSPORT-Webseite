@@ -16,7 +16,8 @@ import { LeagueApplicationPanel } from "@/components/tls/league/application/Leag
 import { accentStyle } from "@/lib/leagueLook";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
-import { blockedLines, defaultSlot, pointsLine, seasonPeriod, weekSpan } from "@/lib/leaguePage";
+import { blockedLines, defaultSlot, seasonPeriod, weekSpan } from "@/lib/leaguePage";
+import { pointsSummary } from "@/lib/leagueTable";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 
 function Fact({ icon: Icon, label, children, testId }) {
@@ -162,7 +163,7 @@ export default function LeagueSeasonPage() {
             <Fact icon={CalendarClock} label="Zeitraum" testId="league-fact-period">{seasonPeriod(season)}</Fact>
             <Fact icon={Timer} label={weekSpan(season)} testId="league-fact-week">Ohne Einigung: {defaultSlot(season)}</Fact>
             <Fact icon={ListOrdered} label="Punkte" testId="league-fact-points">
-              Sieg / Remis / Niederlage: {pointsLine(season)} · Best of {season.best_of} · {season.team_size} gegen {season.team_size}
+              {pointsSummary(season)} · Best of {season.best_of} · {season.team_size} gegen {season.team_size}
             </Fact>
             <Fact icon={Coffee} label="Pausen" testId="league-fact-breaks">
               {blocked.length ? blocked.map((row) => <span key={row.key} className="block">{row.label} {row.range}</span>) : "keine"}
