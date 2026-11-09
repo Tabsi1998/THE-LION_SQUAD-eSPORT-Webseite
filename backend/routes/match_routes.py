@@ -971,10 +971,10 @@ def _public_proposal(doc: dict) -> dict:
     return {key: value for key, value in doc.items() if key not in {"_id", "match_collection"}}
 
 
-async def _insert_proposal_group(db, match: dict, collection: str, tournament: dict | None, me: dict,
+async def _insert_proposal_group(db, match: dict, collection: str, me: dict,
                                  acting_reg: dict | None, moments: list[datetime], note: str | None, *,
                                  kind: str = "proposal", parent: dict | None = None) -> list[dict]:
-    """Alle Termine einer Gruppe auf einmal - entweder alle oder keiner. Danach wartet das Spiel auf eine Antwort."""
+    """Alle Termine einer Gruppe auf einmal - entweder alle oder keiner. Das Spiel schreibt danach ``_mark_proposed``."""
     now_iso = now_utc().isoformat()
     group_id = new_id()
     docs = []
@@ -993,16 +993,26 @@ async def _insert_proposal_group(db, match: dict, collection: str, tournament: d
         docs.append(doc)
     try:
         await db.match_schedule_proposals.insert_many([dict(doc) for doc in docs], ordered=True)
-    except Exception:
-        # Nichts halb gespeichert: was schon drin ist, geht wieder raus.
-        await db.match_schedule_proposals.delete_many({"group_id": group_id})
+    except BaseException:
+        # Nichts halb gespeichert - auch nicht, wenn die Anfrage mittendrin abbricht (CancelledError): was schon drin ist,
+        # geht wieder raus.
+        await _drop_group(db, group_id)
         raise
+    return [_public_proposal(doc) for doc in docs]
+
+
+async def _drop_group(db, group_id: str) -> None:
+    await db.match_schedule_proposals.delete_many({"group_id": group_id, "status": "pending"})
+
+
+async def _mark_proposed(db, match: dict, collection: str, tournament: dict | None) -> None:
+    """Das Spiel wartet auf eine Antwort, mit neuer Frist - erst, wenn alle Termine (und beim Gegenvorschlag das Schließen der
+    alten) gespeichert sind; ein gescheiterter Versuch lässt keine verlängerte Frist zurück."""
     await getattr(db, collection).update_one({"id": match["id"]}, {"$set": {
         "schedule_status": "proposed",
         "schedule_deadline_at": _schedule_deadline(match, tournament),
-        "updated_at": now_iso,
+        "updated_at": now_utc().isoformat(),
     }, "$unset": {"schedule_escalated_at": ""}})
-    return [_public_proposal(doc) for doc in docs]
 
 
 async def _replayed_group(db, query: dict, isos: list[str]) -> list[dict] | None:
@@ -1035,7 +1045,8 @@ async def create_schedule_proposal_group(match_id: str, body: MatchSchedulePropo
     if replay:
         return {"group_id": replay[0]["group_id"], "proposals": replay, "idempotent_replay": True}
     _refuse_time_problems(_proposal_time_problems(tournament, match, body.scheduled_ats), len(isos))
-    docs = await _insert_proposal_group(db, match, collection, tournament, me, acting_reg, body.scheduled_ats, note)
+    docs = await _insert_proposal_group(db, match, collection, me, acting_reg, body.scheduled_ats, note)
+    await _mark_proposed(db, match, collection, tournament)
     await _tell_schedule(db, match, "proposed", docs[0], me, docs[0]["actor_registration_id"], note, group=docs)
     return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False,
             "hints": _proposal_time_hints(tournament, match, body.scheduled_ats)}
@@ -1103,13 +1114,21 @@ async def decide_schedule_proposal_group(match_id: str, proposal_id: str, body: 
     actor_reg_id = (acting_reg or {}).get("id")
     if body.action == "counter":
         # Erst die neuen Termine, dann die alten schließen - scheitert das, gehen die neuen wieder raus (alle oder keiner).
-        docs = await _insert_proposal_group(db, match, collection, tournament, me, acting_reg, body.scheduled_ats, note,
+        docs = await _insert_proposal_group(db, match, collection, me, acting_reg, body.scheduled_ats, note,
                                             kind="counter", parent=proposal)
         try:
             await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
-        except Exception:
-            await db.match_schedule_proposals.delete_many({"group_id": docs[0]["group_id"]})
+        except BaseException:
+            # Alle oder keiner: die neuen Termine wieder raus, schon geschlossene alte wieder offen.
+            await _drop_group(db, docs[0]["group_id"])
+            try:
+                await db.match_schedule_proposals.update_many(
+                    {"id": {"$in": member_ids}, "status": completed, "decision_user_id": me["id"], "updated_at": now_iso},
+                    {"$set": {"status": "pending"}, "$unset": {"decision_user_id": "", "decision_note": ""}})
+            except Exception:  # noqa: BLE001 - der ursprüngliche Fehler zählt, er geht gleich weiter
+                logger.warning("[match] Gegenvorschlag für %s nicht ganz zurückgebaut", _log_safe(match.get("id")), exc_info=True)
             raise
+        await _mark_proposed(db, match, collection, tournament)
         await _tell_schedule(db, match, "countered", docs[0], me, actor_reg_id, note, group=docs)
         return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False,
                 "hints": _proposal_time_hints(tournament, match, body.scheduled_ats)}

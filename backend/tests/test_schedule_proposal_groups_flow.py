@@ -296,6 +296,32 @@ async def test_a_counter_with_two_times_answers_the_whole_group(flow):
     assert replay.json()["idempotent_replay"] is True and len(await rows(flow, world)) == 5
 
 
+@pytest.mark.asyncio
+async def test_a_counter_that_fails_while_closing_leaves_nothing_behind(flow, monkeypatch):
+    """Alle oder keiner: scheitert das Schließen der alten Termine, gehen die neuen wieder raus, und das Spiel behält seine Frist."""
+    world = await live_world(flow)
+    group = (await propose(flow, world, "Kapitaen", [50, 80])).json()["proposals"]
+    before = await flow.reload(world["match"])
+    collection_type = type(flow.db.match_schedule_proposals)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Verbindung weg")
+
+    monkeypatch.setattr(collection_type, "update_many", broken)
+    try:
+        answer = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [60])
+    except RuntimeError:
+        answer = None
+    monkeypatch.undo()
+    assert answer is None or answer.status_code >= 500
+    stored = await rows(flow, world)
+    assert sorted(row["id"] for row in stored.values()) == sorted(row["id"] for row in group), "keine neuen Termine übrig"
+    assert {row["status"] for row in stored.values()} == {"pending"}
+    after = await flow.reload(world["match"])
+    assert after["schedule_deadline_at"] == before["schedule_deadline_at"], "keine verlängerte Frist"
+    assert await notes(flow, "schedule_countered") == []
+
+
 # ---------------------------------------------------------------- 72-h-Regel
 
 @pytest.mark.asyncio
