@@ -236,6 +236,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Runden (1 = Hinrunde, 2 = Hin/Rück) | Season | 1 |
 | Staffelgröße max., Best of, Teamgröße, Mindestkader | Season, Liga N überschreibt | 8 · 3 · 4 · 4 |
 | Punkte Sieg/Remis/Niederlage, Gleichstand, Remis, Default-Win, Ausscheiden (E.1) | Season (`scoring_rules`), Liga N überschreibt | neue Seasons 3/0/0 · direkter Vergleich, Differenz, Maps, Leitung · kein Remis · Best of · alle Spiele für die Gegner (ältere: 3/1/0 · `score_diff`, `score_for`) |
+| Punkteart: Sieg/Remis/Niederlage oder gewonnene Maps (E.1, #2312) | Season (`scoring_rules.match_points_mode`) | Sieg/Remis/Niederlage (`result`) |
 | Modus je Position | Season | frei |
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
@@ -255,6 +256,8 @@ und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich untersche
 behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
 **laufend** (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln) `match_schedule_response_hours` – sie gilt nur
 für neue Terminvorschläge; trägt weder Season noch Liga N den Wert (Seasons von vor #2106), bleibt der der Staffel;
+**Punkteart** (Gruppe `table_points`, #2312, E.1): nach dem ersten Ergebnis nur, wenn sich `match_points_mode` von der
+Staffel unterscheidet, dann mit `table_tiebreakers` und `forfeit_score` – nicht bei gesperrten oder beendeten Staffeln;
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
 `default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
 wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
@@ -1731,6 +1734,29 @@ App (`/api/tournaments/{id}/standings`), Plätze (`placements_for_structure`) un
 | `forfeit_score` | `recorded` \| `best_of` | `recorded` (wie eingetragen) | `best_of`: Sieger bekommt ⌊Best of/2⌋+1 Maps, der andere 0 (BO5 3:0, Nr. 26) |
 | `exit_rule` | `half` \| `all_for_opponents` | `half` (50-%-Regel) | `all_for_opponents` (Kommentar 02.11., Nr. 43, Nr. 48) |
 | `match_points` | wie bisher | 3/1/0 | 3/0/0 |
+| `match_points_mode` (#2312) | `result` \| `maps` | `result` | `result` (die Tiroler Liga stellt auf `maps` um) |
+
+**Punkteart (`match_points_mode`, #2312):** `result` vergibt die Punkte aus `match_points` für Sieg, Remis und
+Niederlage (wie bisher). `maps` („Punkte nach gewonnenen Maps“) gibt jeder Seite so viele Punkte, wie sie Maps gewonnen
+hat (`score` am Ergebnis, in der Liga-Staffel die gewonnenen Maps aus `games[]`, `league_games.derived_results`): 3:2
+ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0; `match_points` bleibt gespeichert, zählt dann aber nicht. Siege, Remis und
+Niederlagen zählt die Tabelle weiter (`won`, `drawn`, `lost`). Bei gerader Länge (Best of 2, 4) zählen auch bei einem
+Remis die Maps (2:2 ergibt je 2). Kampflos zählt mit `maps` immer wie `forfeit_score: best_of` (BO5 3:0), auch bei
+`recorded` – sonst bekäme der Sieger 0 Punkte. Ebenso ein Spiel, das ein ausgeschiedenes Team mit `all_for_opponents` für
+den Gegner zählt. „Beide nicht erschienen“ gibt beiden 0 Punkte. Die Mini-Tabelle des direkten Vergleichs rechnet ihr
+Kriterium `points` mit derselben Punkteart, also mit den Maps der Spiele untereinander. Punktabzug wie bisher.
+**Vorschlag beim Wechsel:** Die Verwaltung setzt beim Umstellen auf `maps` die Reihenfolge bei Punktgleichheit auf
+`wins`, `head_to_head`, `score_diff`, `lead_decision` (mehr gewonnene Spiele → direkter Vergleich → Map-Differenz →
+Entscheid der Leitung, `scoring_rules.MAPS_TABLE_TIEBREAKERS`) und `forfeit_score` auf `best_of`; beides bleibt änderbar.
+Zurück auf `result` bleibt die Reihenfolge, wie sie ist. **Laufende Seasons:** Unterscheidet sich die Punkteart der
+Staffel von der Season, überträgt „Vorgaben auf Staffeln übertragen“ auch nach dem ersten Ergebnis `match_points_mode`,
+`table_tiebreakers` und `forfeit_score` in die `scoring_rules` der Staffel (Gruppe `table_points`, nicht bei gesperrten
+und nicht bei beendeten Staffeln – `completed`, `results_published`, `archived`, `cancelled`); alles andere an
+`scoring_rules` bleibt „vor dem ersten Ergebnis“. Fertige Endstände (`league_final_tables`) bleiben unverändert. Jede
+Umstellung schreibt zusätzlich `league.season.table_points` mit vorher und nachher ins Protokoll. Antworten: Die Staffel
+der Ligaseite trägt `table_rules.match_points_mode`, die Season `match_points_mode`; die Tabelle zeigt dann „Punkte =
+gewonnene Maps“. Regelwerk: Baustein „Tabelle und Wertung“ und Variable `table.points` beschreiben die Punkteart;
+ein Wechsel ändert den Baustein und schlägt damit eine neue Freigabe vor.
 
 Punkte zählen immer zuerst. `points`, `score_diff`, `score_for` und `wins` meinen Punkte, Map-Differenz, gewonnene Maps und Siege.
 
@@ -1807,7 +1833,8 @@ sonst `ready`), Protokoll `match.forfeit.double.undo`; den Termin setzt die Leit
 **Antworten (nur zusätzlich, die App bleibt ohne Build lauffähig):** Jede Zeile einer Staffel-Tabelle trägt dazu `tiebreak`
 (`head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` oder `null`), `forfeit_won`, `forfeit_lost`,
 `deducted_points`, `exit` (`{kind, at}` oder `null`) und `lead_decision`. Die Staffel der Ligaseite trägt `table_rules`
-(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`).
+(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`, `match_points`,
+`match_points_mode`).
 
 **Darstellung (Entscheidung 15.10.):** Platz und Zone, kein öffentliches Rating, Hervorhebung in Cyan (Gold bleibt dem
 Season-Meister, F.1). Bei Gleichstand ein kleiner Hinweis, was entschied („Direkter Vergleich“, „Map-Differenz“, „Mehr Maps“,
