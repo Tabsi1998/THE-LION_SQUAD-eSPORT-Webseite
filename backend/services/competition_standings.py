@@ -56,6 +56,16 @@ def _section_kind(match: dict) -> str:
     return section_kind(match.get("section"))
 
 
+def is_bye(match: dict) -> bool:
+    """Ein Freilos: ein Spiel mit höchstens einer Anmeldung - beim Bau oder nach einem Ausfall kampflos entschieden."""
+    if (match.get("result_meta") or {}).get("source") == "auto_bye":
+        return True
+    slots = match.get("slots") or []
+    filled = {slot.get("registration_id") for slot in slots if slot.get("registration_id")}
+    # Ohne Plätze (Altbestand, nur Ergebnisse) ist es kein Freilos - dann zählen die Ergebnisse wie bisher.
+    return bool(slots) and len(filled) < 2
+
+
 def decided_places(matches: list[dict]) -> dict[str, int]:
     """Welche Plätze der Baum selbst schon vergeben hat (#1549): das entscheidende Spiel schlägt jede Zählung.
 
@@ -137,12 +147,17 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
     for match in matches:
         if match.get("status") not in TERMINAL_MATCH_STATUSES:
             continue
+        # Ein Freilos ist kein Spiel und kein Sieg (#2336, wie #1796): es bringt nur in die nächste Runde.
+        bye = is_bye(match)
         for result in match.get("results") or []:
             registration_id = result.get("registration_id")
             if registration_id not in rank_map:
                 continue
             rank = _safe_int(result.get("rank"), 999)
             row = rank_map[registration_id]
+            if bye:
+                row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")))
+                continue
             row["played"] += 1
             row["rank_sum"] += rank
             row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")))
