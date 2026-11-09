@@ -433,10 +433,10 @@ function MatchPageView() {
         <div className="mt-8 border border-[#29B6E8]/35 bg-[#0F1D23] rounded-sm p-5" data-testid="match-result-card">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis
+              <div className="flex items-center gap-2">
+                <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
                 {!over ? <HelpLink thema={data.league ? "liga-captains" : "turniere"} schritt="ergebnis-melden" /> : null}
-              </h2>
+              </div>
               {!over && <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -591,10 +591,10 @@ function MatchPageView() {
           <div className="space-y-6">
             {!over && (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
-              <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2">
-                <CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung
+              <div className="flex items-center gap-2">
+                <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
                 {data.league ? <HelpLink thema="liga-captains" schritt="termin-vorschlagen" /> : null}
-              </h2>
+              </div>
               {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                   <Field label="Vorschlag">

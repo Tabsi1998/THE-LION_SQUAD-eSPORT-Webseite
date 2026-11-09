@@ -119,10 +119,12 @@ export function ScheduleChangePanel({ block, matchId, busy, run, onChanged, onAs
 
   return (
     <section className="mt-6 border-t border-white/10 pt-5" data-testid="schedule-change">
-      <h3 className="font-heading text-base font-black uppercase flex items-center gap-2">
-        <CalendarClock className="w-4 h-4 text-[#29B6E8]" aria-hidden="true" /> Termin und Verschiebung
+      <div className="flex items-center gap-2">
+        <h3 className="font-heading text-base font-black uppercase flex items-center gap-2">
+          <CalendarClock className="w-4 h-4 text-[#29B6E8]" aria-hidden="true" /> Termin und Verschiebung
+        </h3>
         <HelpLink thema="liga-captains" schritt="verschieben" />
-      </h3>
+      </div>
       {limit ? <p className="mt-2 text-sm text-white/80" data-testid="schedule-limit">{limit}</p> : null}
       {homeRule ? <p className="mt-1 text-sm text-[#FFD700]" data-testid="schedule-home-rule">{homeRule}</p> : null}
       {week ? <p className="mt-1 text-xs text-white/50" data-testid="schedule-week">Spielwoche: {week}</p> : null}

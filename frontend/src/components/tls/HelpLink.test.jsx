@@ -34,6 +34,18 @@ test("alle festen Ziele im Code gibt es in der Hilfe", () => {
   for (const [thema, schritt, file] of targets) expect(helpTarget(thema, schritt), `${thema}#${schritt} in ${file}`).not.toBeNull();
 });
 
+test("das „?“ steht neben einer Überschrift, nie darin - sonst gehört „Hilfe: …“ zum Namen der Überschrift", () => {
+  const inside = [];
+  for (const file of sources(SRC)) {
+    const text = readFileSync(file, "utf8");
+    if (!text.includes("<HelpLink")) continue;
+    for (const match of text.matchAll(/<h([1-6])\b[\s\S]*?<\/h\1>/g)) {
+      if (match[0].includes("<HelpLink")) inside.push(`${file}: ${match[0].slice(0, 80)}`);
+    }
+  }
+  expect(inside).toEqual([]);
+});
+
 test("die Schritte der Liga-Anmeldung zeigen auf die Hilfe", () => {
   const text = readFileSync(resolve(SRC, "pages/public/LeagueApplyPage.jsx"), "utf8");
   const steps = JSON.parse(text.match(/const HELP_STEPS = (\[[^\]]+\]);/)[1]);
