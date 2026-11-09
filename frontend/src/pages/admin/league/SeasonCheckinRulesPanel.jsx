@@ -7,7 +7,7 @@ import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
 
-const NUMBERS = ["opens_minutes_before", "closes_minutes_after", "min_present", "remind_minutes_before_close"];
+const NUMBERS = ["opens_minutes_before", "closes_minutes_after", "min_present", "remind_minutes_before_close", "open_points_remind_hours"];
 
 /** Die Eingabe als Werte für den Server: ganze Zahlen, leer heißt Vorgabe. */
 export function checkinRulesPayload(form) {
@@ -71,6 +71,9 @@ export function SeasonCheckinRulesPanel({ seasonId }) {
           onChange={(value) => set("min_present", value)} hint="Nr. 46: nur Kader, nur spielberechtigt; Vorgabe aus Teilnehmerliste oder Teamgröße − 1" testId="checkin-rules-min" />
         <TextField label="Erinnerung vor Schluss (Minuten)" type="number" min={0} max={60} value={form.remind_minutes_before_close}
           onChange={(value) => set("remind_minutes_before_close", value)} hint="0 = keine zweite Erinnerung" testId="checkin-rules-remind" />
+        {/* #2313: Fehlende Angaben halten die Anmeldung nicht auf - vor dem ersten Spiel erinnert die Seite Spieler und Captain. */}
+        <TextField label="Erinnerung an fehlende Angaben (Stunden vor dem ersten Spiel)" type="number" min={0} max={168} value={form.open_points_remind_hours ?? ""}
+          onChange={(value) => set("open_points_remind_hours", value)} hint="Geburtsdatum, Spiel-ID, Plattform – an Spieler und Captain; 0 = keine, Vorgabe 48" testId="checkin-rules-open-points" />
       </FormGrid>
       {error ? <p className="text-sm text-warn" role="alert" data-testid="checkin-rules-error">{error}</p> : null}
       <button type="button" onClick={save} disabled={saving} data-testid="checkin-rules-save"
