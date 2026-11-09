@@ -14,6 +14,7 @@ import { MascotBadge } from "@/components/tls/Logo";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { HomeTodayStrip } from "@/components/tls/HomeTodayStrip";
+import { HomeLeaguePromo } from "@/components/tls/HomeLeaguePromo";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { TwitchClips } from "@/components/tls/TwitchClips";
@@ -133,6 +134,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Liga-Anmeldung offen (#2324): direkt unter dem Kopf, solange das Fenster offen ist - danach fehlt der Block ganz. */}
+      {state?.leagues?.length > 0 && <HomeLeaguePromo leagues={state.leagues} />}
 
       <ClubNumbers numbers={state?.club_numbers} shown={state?.club_numbers_shown} />
       {/* Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget. */}
