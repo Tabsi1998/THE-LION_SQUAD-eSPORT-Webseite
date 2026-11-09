@@ -22,7 +22,7 @@ from typing import Awaitable, Callable
 
 from models import rule_time_limit_seconds
 from services import game_maps, game_modes, league_rule_facts as facts, map_pools, mode_icons
-from services.league_rule_facts import ICON_ALT, MARKDOWN, TEXT, duration, icon_markdown  # noqa: F401 - weiter von hier gelesen
+from services.league_rule_facts import ICON_ALT, MARKDOWN, PDF, TEXT, duration, icon_markdown  # noqa: F401 - weiter von hier gelesen
 from services.markdown_text import plain, text_cell
 
 # Steht, wo ein Baustein zu einer Season gehört, die Seite aber keine hat oder die Season erst später dazukam.
@@ -274,8 +274,8 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("veto", "Veto", "Team-A-Regel, Zeit je Schritt und die Schrittfolge des Map-Vetos aus den Vorgaben der Season (D.3).",
           facts.build_veto, facts.render_veto),
     Block("loadout_bans", "Erlaubte Ausrüstung", "Was gespielt werden darf: die aktive Bibliothek ohne die Sperrliste der Season, je "
-          "Kategorie und Unterkategorie mit Bildern und Einschränkungen („nicht in …“ bzw. „nur in …“), die Aufsätze je Waffe; ganz "
-          "gesperrte Klassen als „nicht erlaubt“ (Anlage A).", _loadout_bans,
+          "Kategorie und Unterkategorie mit Bildern und Einschränkungen („nicht in …“ bzw. „nur in …“), Waffen als Tabelle mit den "
+          "Aufsätzen nach Slot („nur erlaubt“, wenn das kürzer ist); ganz gesperrte Klassen als „nicht erlaubt“ (Anlage A).", _loadout_bans,
           _loadout_text, _loadout_images),
     Block("mode_settings", "Einstellungen je Modus", "Zeitlimit, Zeit je Runde, Einstellungen und Regeltext je Modus aus der Season.",
           _mode_settings, render_mode_settings, _mode_settings_images),
@@ -296,12 +296,13 @@ _IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
 
 def value(key: str, row: dict | None, variant: str = MARKDOWN) -> str:
     """Ein Baustein zum Darstellen (Markdown mit geschützten Namen). Neu eingefroren: aus ``data``; ältere Fassungen: das gespeicherte
-    ``markdown`` bzw. ``text``."""
+    ``markdown`` bzw. ``text`` (``pdf`` liest dort ``text``, #2305)."""
     row = row or {}
     block = BLOCKS.get(key)
     if "data" in row and block:
         return block.render(row.get("data") or {}, variant)
-    stored = row.get(variant) if row.get(variant) is not None else row.get(MARKDOWN)
+    kept = TEXT if variant == PDF else variant
+    stored = row.get(kept) if row.get(kept) is not None else row.get(MARKDOWN)
     return str(stored or "")
 
 

@@ -1,0 +1,699 @@
+{
+ "allowed": {
+  "list": true,
+  "layout": 5,
+  "categories": [
+   {
+    "label": "Waffen",
+    "role": "weapon",
+    "sections": [
+     {
+      "label": "Sturmgewehr",
+      "icon_url": "/api/static/uploads/klasse-sturm.png",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Blitz 9",
+        "image_url": "/api/static/uploads/bild-w1.png",
+        "not_in": [],
+        "attachments": {
+         "count": 24,
+         "banned": [],
+         "groups": [
+          {
+           "label": "Mündung",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Flammendämpfer",
+             "image_url": "/api/static/uploads/bild-a-muendung-4.png",
+             "not_in": []
+            },
+            {
+             "name": "Mündungsbremse",
+             "image_url": "/api/static/uploads/bild-a-muendung-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schalldämpfer leicht",
+             "image_url": "/api/static/uploads/bild-a-muendung-2.png",
+             "not_in": []
+            },
+            {
+             "name": "Schalldämpfer schwer",
+             "image_url": "/api/static/uploads/bild-a-muendung-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Lauf",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Kurzer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Langer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Präzisionslauf 30 Zoll",
+             "image_url": "/api/static/uploads/bild-a-lauf-3.png",
+             "not_in": []
+            },
+            {
+             "name": "Schwerer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Holo-Visier",
+             "image_url": "/api/static/uploads/bild-a-optik-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Rotpunkt",
+             "image_url": "/api/static/uploads/bild-a-optik-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Thermalvisier",
+             "image_url": "/api/static/uploads/bild-a-optik-5.png",
+             "not_in": []
+            },
+            {
+             "name": "Zielfernrohr 12x Variabel",
+             "image_url": "/api/static/uploads/bild-a-optik-4.png",
+             "not_in": []
+            },
+            {
+             "name": "Zielfernrohr 4x",
+             "image_url": "/api/static/uploads/bild-a-optik-2.png",
+             "not_in": []
+            },
+            {
+             "name": "Zielfernrohr 8x",
+             "image_url": "/api/static/uploads/bild-a-optik-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Schaft",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Kein Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Leichter Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schwerer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-3.png",
+             "not_in": []
+            },
+            {
+             "name": "Taktischer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Magazin",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Erweitertes Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Kleines Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Trommelmagazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Unterlauf",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Griff",
+             "image_url": "/api/static/uploads/bild-a-unterlauf-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Zweibein",
+             "image_url": "/api/static/uploads/bild-a-unterlauf-1.png",
+             "not_in": []
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1
+        }
+       },
+       {
+        "name": "Donner 4",
+        "image_url": "/api/static/uploads/bild-w2.png",
+        "not_in": [],
+        "attachments": {
+         "count": 24,
+         "banned": [
+          "Präzisionslauf 30 Zoll",
+          "Zielfernrohr 12x Variabel",
+          "Zielfernrohr 8x",
+          "Zweibein"
+         ],
+         "groups": [
+          {
+           "label": "Mündung",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Flammendämpfer",
+             "image_url": "/api/static/uploads/bild-a-muendung-4.png",
+             "not_in": []
+            },
+            {
+             "name": "Mündungsbremse",
+             "image_url": "/api/static/uploads/bild-a-muendung-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schalldämpfer leicht",
+             "image_url": "/api/static/uploads/bild-a-muendung-2.png",
+             "not_in": []
+            },
+            {
+             "name": "Schalldämpfer schwer",
+             "image_url": "/api/static/uploads/bild-a-muendung-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Lauf",
+           "not_in": [],
+           "banned": [
+            "Präzisionslauf 30 Zoll"
+           ],
+           "entries": [
+            {
+             "name": "Kurzer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Langer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schwerer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "not_in": [],
+           "banned": [
+            "Zielfernrohr 12x Variabel",
+            "Zielfernrohr 8x"
+           ],
+           "entries": [
+            {
+             "name": "Holo-Visier",
+             "image_url": "/api/static/uploads/bild-a-optik-1.png",
+             "not_in": [
+              "Kapern"
+             ]
+            },
+            {
+             "name": "Rotpunkt",
+             "image_url": "/api/static/uploads/bild-a-optik-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Thermalvisier",
+             "image_url": "/api/static/uploads/bild-a-optik-5.png",
+             "not_in": []
+            },
+            {
+             "name": "Zielfernrohr 4x",
+             "image_url": "/api/static/uploads/bild-a-optik-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Schaft",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Kein Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Leichter Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schwerer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-3.png",
+             "not_in": []
+            },
+            {
+             "name": "Taktischer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Magazin",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Erweitertes Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Kleines Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Trommelmagazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Unterlauf",
+           "not_in": [],
+           "banned": [
+            "Zweibein"
+           ],
+           "entries": [
+            {
+             "name": "Griff",
+             "image_url": "/api/static/uploads/bild-a-unterlauf-0.png",
+             "not_in": []
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1
+        }
+       }
+      ]
+     },
+     {
+      "label": "Scharfschützengewehr",
+      "icon_url": "/api/static/uploads/klasse-sniper.png",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Falke 50 Präzisionsgewehr mit langem Namen",
+        "image_url": "/api/static/uploads/bild-w3.png",
+        "not_in": [],
+        "attachments": {
+         "count": 24,
+         "banned": [
+          "Flammendämpfer",
+          "Griff",
+          "Holo-Visier",
+          "Kein Schaft",
+          "Kleines Magazin",
+          "Kurzer Lauf",
+          "Langer Lauf",
+          "Leichter Schaft",
+          "Mündungsbremse",
+          "Rotpunkt",
+          "Schalldämpfer schwer",
+          "Schwerer Lauf",
+          "Taktischer Schaft",
+          "Thermalvisier",
+          "Trommelmagazin",
+          "Zielfernrohr 4x"
+         ],
+         "groups": [
+          {
+           "label": "Mündung",
+           "not_in": [],
+           "banned": [
+            "Flammendämpfer",
+            "Mündungsbremse",
+            "Schalldämpfer schwer"
+           ],
+           "entries": [
+            {
+             "name": "Schalldämpfer leicht",
+             "image_url": "/api/static/uploads/bild-a-muendung-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Lauf",
+           "not_in": [],
+           "banned": [
+            "Kurzer Lauf",
+            "Langer Lauf",
+            "Schwerer Lauf"
+           ],
+           "entries": [
+            {
+             "name": "Präzisionslauf 30 Zoll",
+             "image_url": "/api/static/uploads/bild-a-lauf-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "not_in": [],
+           "banned": [
+            "Holo-Visier",
+            "Rotpunkt",
+            "Thermalvisier",
+            "Zielfernrohr 4x"
+           ],
+           "entries": [
+            {
+             "name": "Zielfernrohr 12x Variabel",
+             "image_url": "/api/static/uploads/bild-a-optik-4.png",
+             "not_in": [
+              "Stellung",
+              "Kapern"
+             ],
+             "only_in": [
+              "Suchen & Zerstören"
+             ]
+            },
+            {
+             "name": "Zielfernrohr 8x",
+             "image_url": "/api/static/uploads/bild-a-optik-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Schaft",
+           "not_in": [],
+           "banned": [
+            "Kein Schaft",
+            "Leichter Schaft",
+            "Taktischer Schaft"
+           ],
+           "entries": [
+            {
+             "name": "Schwerer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Magazin",
+           "not_in": [],
+           "banned": [
+            "Kleines Magazin",
+            "Trommelmagazin"
+           ],
+           "entries": [
+            {
+             "name": "Erweitertes Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-1.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Unterlauf",
+           "not_in": [],
+           "banned": [
+            "Griff"
+           ],
+           "entries": [
+            {
+             "name": "Zweibein",
+             "image_url": "/api/static/uploads/bild-a-unterlauf-1.png",
+             "not_in": []
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1,
+         "only_allowed": true
+        }
+       },
+       {
+        "name": "Habicht 7",
+        "image_url": null,
+        "not_in": [],
+        "attachments": {
+         "count": 24,
+         "banned": [
+          "Holo-Visier",
+          "Kein Schaft",
+          "Kurzer Lauf",
+          "Rotpunkt",
+          "Trommelmagazin"
+         ],
+         "groups": [
+          {
+           "label": "Mündung",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Flammendämpfer",
+             "image_url": "/api/static/uploads/bild-a-muendung-4.png",
+             "not_in": []
+            },
+            {
+             "name": "Mündungsbremse",
+             "image_url": "/api/static/uploads/bild-a-muendung-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schalldämpfer leicht",
+             "image_url": "/api/static/uploads/bild-a-muendung-2.png",
+             "not_in": []
+            },
+            {
+             "name": "Schalldämpfer schwer",
+             "image_url": "/api/static/uploads/bild-a-muendung-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Lauf",
+           "not_in": [],
+           "banned": [
+            "Kurzer Lauf"
+           ],
+           "entries": [
+            {
+             "name": "Langer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Präzisionslauf 30 Zoll",
+             "image_url": "/api/static/uploads/bild-a-lauf-3.png",
+             "not_in": []
+            },
+            {
+             "name": "Schwerer Lauf",
+             "image_url": "/api/static/uploads/bild-a-lauf-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "not_in": [],
+           "banned": [
+            "Holo-Visier",
+            "Rotpunkt"
+           ],
+           "entries": [
+            {
+             "name": "Thermalvisier",
+             "image_url": "/api/static/uploads/bild-a-optik-5.png",
+             "not_in": [
+              "Suchen & Zerstören"
+             ]
+            },
+            {
+             "name": "Zielfernrohr 12x Variabel",
+             "image_url": "/api/static/uploads/bild-a-optik-4.png",
+             "not_in": []
+            },
+            {
+             "name": "Zielfernrohr 4x",
+             "image_url": "/api/static/uploads/bild-a-optik-2.png",
+             "not_in": []
+            },
+            {
+             "name": "Zielfernrohr 8x",
+             "image_url": "/api/static/uploads/bild-a-optik-3.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Schaft",
+           "not_in": [],
+           "banned": [
+            "Kein Schaft"
+           ],
+           "entries": [
+            {
+             "name": "Leichter Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Schwerer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-3.png",
+             "not_in": []
+            },
+            {
+             "name": "Taktischer Schaft",
+             "image_url": "/api/static/uploads/bild-a-schaft-2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Magazin",
+           "not_in": [],
+           "banned": [
+            "Trommelmagazin"
+           ],
+           "entries": [
+            {
+             "name": "Erweitertes Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-1.png",
+             "not_in": []
+            },
+            {
+             "name": "Kleines Magazin",
+             "image_url": "/api/static/uploads/bild-a-magazin-0.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Unterlauf",
+           "not_in": [],
+           "banned": [],
+           "entries": [
+            {
+             "name": "Griff",
+             "image_url": "/api/static/uploads/bild-a-unterlauf-0.png",
+             "not_in": []
+            },
+            {
+             "name": "Zweibein",
+             "image_url": "/api/static/uploads/bild-a-unterlauf-1.png",
+             "not_in": []
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1
+        }
+       }
+      ]
+     },
+     {
+      "label": "Schrotflinte",
+      "icon_url": "/api/static/uploads/klasse-schrot.png",
+      "state": "banned",
+      "not_in": [],
+      "banned": [
+       "Bö",
+       "Hagel"
+      ],
+      "entries": []
+     }
+    ]
+   },
+   {
+    "label": "Perks",
+    "role": "item",
+    "sections": [
+     {
+      "label": null,
+      "state": "some",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Leise Sohlen",
+        "image_url": "/api/static/uploads/bild-k1.png",
+        "not_in": [
+         "Suchen & Zerstören"
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "attachments_everywhere": [
+   {
+    "name": "Kompensator",
+    "not_in": []
+   }
+  ]
+ },
+ "block_md": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n| Bild | ++Waffe++ | Aufsätze |\n| --- | --- | --- |\n| ![Klassen-Symbol](/api/static/uploads/klasse-sturm.png) | *Sturmgewehr* · alle erlaubt |  |\n| ![Ausrüstung](/api/static/uploads/bild-w1.png) | ++Blitz 9++ | *alle passenden Aufsätze erlaubt* |\n| ![Ausrüstung](/api/static/uploads/bild-w2.png) | ++Donner 4++ | **gesperrt:** ++*Lauf:* Präzisionslauf 30 Zoll++ ++*Optik:* Zielfernrohr 12x Variabel, Zielfernrohr 8x++ ++*Unterlauf:* Zweibein++ **eingeschränkt:** ++*Optik:* Holo-Visier (nicht in Kapern)++ |\n| ![Klassen-Symbol](/api/static/uploads/klasse-sniper.png) | *Scharfschützengewehr* · alle erlaubt |  |\n| ![Ausrüstung](/api/static/uploads/bild-w3.png) | ++Falke 50 Präzisionsgewehr mit langem Namen++ | *nur erlaubt:* ++*Mündung:* Schalldämpfer leicht++ ++*Lauf:* Präzisionslauf 30 Zoll++ ++*Optik:* Zielfernrohr 12x Variabel (nur in Suchen & Zerstören), Zielfernrohr 8x++ ++*Schaft:* Schwerer Schaft++ ++*Magazin:* Erweitertes Magazin++ ++*Unterlauf:* Zweibein++ |\n|  | ++Habicht 7++ | **gesperrt:** ++*Lauf:* Kurzer Lauf++ ++*Optik:* Holo-Visier, Rotpunkt++ ++*Schaft:* Kein Schaft++ ++*Magazin:* Trommelmagazin++ **eingeschränkt:** ++*Optik:* Thermalvisier (nicht in Suchen & Zerstören)++ |\n| ![Klassen-Symbol](/api/static/uploads/klasse-schrot.png) | *Schrotflinte* · **nicht erlaubt** (Bö, Hagel) |  |\n\n**An keiner Waffe erlaubt:** Kompensator\n\n**Perks**\n\n- ![Ausrüstung](/api/static/uploads/bild-k1.png) ++Leise Sohlen++ *nicht in Suchen & Zerstören*"
+}

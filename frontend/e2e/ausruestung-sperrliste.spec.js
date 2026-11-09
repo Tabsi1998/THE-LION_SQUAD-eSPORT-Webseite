@@ -1,8 +1,15 @@
+const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 
 // Ausrüstung und Sperrliste (#2218) im echten Browser, Server nachgestellt: Bibliothek eines Spiels mit vielen Einträgen und langen
 // Namen, Sperrliste der Season (je Modus, Aufsätze an einer Waffe, neue Version), öffentliche Ligaseite. Bei 390 und 1440 px ohne
-// seitliches Scrollen. Nur erfundene Namen.
+// seitliches Scrollen. Einklappen (#2306): beide Seiten starten zugeklappt. Nur erfundene Namen. `SHOTS_DIR` legt die Bilder der
+// Verwaltung zusätzlich dort ab.
+
+async function pageShot(page, name) {
+  await page.screenshot({ path: test.info().outputPath(name) });
+  if (process.env.SHOTS_DIR) await page.screenshot({ path: path.join(process.env.SHOTS_DIR, name) });
+}
 
 const CONSENT = () => window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
   essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
@@ -118,7 +125,21 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page).toHaveURL(/\/admin\/games\/g1#ausruestung$/);
       await expect(page.getByTestId("game-page-title")).toHaveText("Probe Shooter");
       await expect(page.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+      // Einklappen (#2306): anfangs zu, die Kopfzeile nennt die Anzahl.
+      const waffen = page.getByTestId("equipment-fold-waffen");
+      await expect(waffen).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByTestId("equipment-count-waffen")).toHaveText("Waffe · 24 Einträge");
+      await expect(page.getByTestId("equipment-row-w0")).toHaveCount(0);
+      await noSideScroll(page);
+      await pageShot(page, `bibliothek-eingeklappt-${width}.png`);
+      await waffen.focus();
+      await page.keyboard.press("Enter");
+      await expect(waffen).toHaveAttribute("aria-expanded", "true");
+      await page.getByTestId("equipment-open-all").click();
       await expect(page.getByTestId("equipment-group-waffen").getByRole("listitem")).toHaveCount(24);
+      // Aufklappen blendet leise ein (tls-reveal); ohne „Bewegung reduzieren“ mit Dauer.
+      const duration = await page.locator("[id='equipment-body-waffen']").evaluate((node) => parseFloat(getComputedStyle(node).animationDuration));
+      expect(duration).toBeGreaterThan(0.1);
       await expect(page.getByTestId("equipment-row-w0")).toContainText("auf 1 Sperrliste");
       await expect(page.getByTestId("equipment-delete-w0")).toBeDisabled();
       await expect(page.getByTestId("equipment-without-weapon")).toContainText("Aufsatz 30");
@@ -162,9 +183,26 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const panel = page.getByTestId("season-bans");
       await expect(panel.getByTestId("season-bans-head")).toContainText("Version 1 · 3 Zeilen");
       await expect(panel.getByTestId("season-bans-rules-outdated")).toContainText("Version 2");
+      // Einklappen (#2306): mit Sperren ist alles zu; je Kategorie Anzahl und „K gesperrt“. Ohne Bewegung für ruhige Bilder.
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await expect(panel.getByTestId("season-bans-fold-waffen")).toHaveAttribute("aria-expanded", "false");
+      await expect(panel.getByTestId("season-bans-count-waffen")).toHaveText("24 Einträge · 1 gesperrt");
+      await expect(panel.getByTestId("season-bans-count-perks")).toHaveText("11 Einträge · 1 gesperrt");
+      await expect(panel.getByTestId("season-bans-item-w0")).toHaveCount(0);
       await panel.getByTestId("season-bans-head").evaluate((node) => node.scrollIntoView({ block: "start" }));
       await noSideScroll(page);
-      await page.screenshot({ path: test.info().outputPath(`season-sperrliste-${width}.png`) });
+      await pageShot(page, `sperrliste-eingeklappt-${width}.png`);
+      // Suche: der Treffer-Bereich klappt auf, die Kopfzeile zählt „x von y“.
+      await panel.getByTestId("season-bans-search").fill("rotpunkt");
+      await expect(panel.getByTestId("season-bans-fold-aufsaetze")).toHaveAttribute("aria-expanded", "true");
+      await expect(panel.getByTestId("season-bans-count-aufsaetze")).toHaveText("1 von 30");
+      await expect(panel.getByTestId("season-bans-item-a0")).toBeVisible();
+      await noSideScroll(page);
+      await panel.getByTestId("season-bans-search").evaluate((node) => node.scrollIntoView({ block: "start" }));
+      await pageShot(page, `sperrliste-suche-${width}.png`);
+      await panel.getByTestId("season-bans-search").fill("");
+      await expect(panel.getByTestId("season-bans-item-a0")).toHaveCount(0);
+      await panel.getByTestId("season-bans-open-all").click();
 
       // Waffe 1 nur in „Stellung“ sperren, an Waffe 2 einen weiteren Aufsatz.
       await panel.getByTestId("season-bans-toggle-w0").check();

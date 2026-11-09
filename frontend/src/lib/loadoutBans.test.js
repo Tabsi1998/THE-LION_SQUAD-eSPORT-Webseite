@@ -93,8 +93,16 @@ test("eine ganze Klasse im Formular: laden, schicken, Einzelzeilen darin werden 
   expect(formProblem({ ...rows, "item:s1": { kind: "item", item_id: "s1", modes: [], attachment_ids: [] } }, library, CATEGORIES)).toBe("");
   const full = { "class:schrot": { kind: "class", subcategory: "schrot", modes: [], attachment_ids: [] },
     "item:s1": { kind: "item", item_id: "s1", modes: ["suchen"], attachment_ids: [] } };
-  expect(formProblem(full, library, CATEGORIES)).toContain("„Hagel“ gehört zu „Schrotflinte“");
-  expect(formProblem({ "class:schrot": full["class:schrot"] }, library, CATEGORIES)).toBe("");
+  // Eine Einzelzeile in der ganz gesperrten Klasse ist kein Fehler mehr, sie fällt aus der Anfrage.
+  expect(formProblem(full, library)).toBe("");
+  expect(formPayload(full, library, CATEGORIES)).toEqual([{ kind: "class", subcategory: "schrot", modes: [], attachment_ids: [] }]);
+  expect(sameRows(full, { "class:schrot": full["class:schrot"] }, library)).toBe(true);
+  // Klasse nur in einzelnen Modi gesperrt: die Einzelzeile bleibt.
+  const partial = { "class:schrot": { ...full["class:schrot"], modes: ["stellung"] }, "item:s1": full["item:s1"] };
+  expect(formPayload(partial, library, CATEGORIES)).toHaveLength(2);
+  // Auch ein Aufsatz-Eintrag an einer Waffe der ganz gesperrten Klasse entfällt.
+  const withAttachments = { ...full, "attachments:s1": { kind: "attachments", item_id: "s1", modes: [], attachment_ids: ["a1"] } };
+  expect(formPayload(withAttachments, library, CATEGORIES)).toHaveLength(1);
 });
 
 test("öffentlich gruppiert: Kategorie, ohne Unterkategorie zuerst, ganze Klasse mit den Einträgen von heute", () => {
@@ -146,12 +154,36 @@ test("die Anfrage folgt der Bibliothek: erst ganze Sperren, dann Aufsätze; leer
   expect(sameRows(rows, { "item:w1": rows["item:w1"] })).toBe(false);
 });
 
-test("vor dem Speichern: leer und eine ganz gesperrte Waffe mit Aufsätzen werden genannt", () => {
+test("vor dem Speichern: leer wird genannt; eine ganz gesperrte Waffe mit Aufsätzen ist kein Fehler, die Aufsatz-Zeile fällt weg", () => {
   expect(formProblem({}, LIBRARY)).toContain("mindestens einen Eintrag");
-  expect(formProblem({ "item:w1": { kind: "item", item_id: "w1", modes: [], attachment_ids: [] },
-    "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1"] } }, LIBRARY)).toContain("„Blitz 9“");
-  expect(formProblem({ "item:w1": { kind: "item", item_id: "w1", modes: ["stellung"], attachment_ids: [] },
-    "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1"] } }, LIBRARY)).toBe("");
+  const full = { "item:w1": { kind: "item", item_id: "w1", modes: [], attachment_ids: [] },
+    "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1"] } };
+  expect(formProblem(full, LIBRARY)).toBe("");
+  expect(formPayload(full, LIBRARY)).toEqual([{ item_id: "w1", kind: "item", modes: [], attachment_ids: [] }]);
+  // Die Formularzeilen bleiben unberührt (Häkchen kommen beim Entsperren zurück), und nur Aufsätze ändern nichts am Gespeicherten.
+  expect(full["attachments:w1"].attachment_ids).toEqual(["a1"]);
+  expect(sameRows(full, { "item:w1": full["item:w1"] }, LIBRARY)).toBe(true);
+  // Nur in einzelnen Modi gesperrt: die Aufsätze bleiben.
+  const partial = { "item:w1": { kind: "item", item_id: "w1", modes: ["stellung"], attachment_ids: [] }, "attachments:w1": full["attachments:w1"] };
+  expect(formProblem(partial, LIBRARY)).toBe("");
+  expect(formPayload(partial, LIBRARY)).toEqual([
+    { item_id: "w1", kind: "item", modes: ["stellung"], attachment_ids: [] },
+    { item_id: "w1", kind: "attachments", modes: [], attachment_ids: ["a1"] },
+  ]);
+});
+
+test("ein Aufsatz in ganz gesperrter eigener Klasse fällt aus der Waffen-Zeile; „K gesperrt“ zählt bei ganz gesperrter Waffe nichts", () => {
+  const library = [{ id: "w1", category: "waffen", subcategory: "sturm", name: "Blitz 9" },
+    { id: "a1", category: "aufsaetze", subcategory: "optik", name: "Rotpunkt" }, { id: "a2", category: "aufsaetze", name: "Griff" }];
+  const rows = { "class:optik": { kind: "class", subcategory: "optik", modes: [], attachment_ids: [] },
+    "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1", "a2"], attachment_modes: { a1: ["x"] } } };
+  expect(formPayload(rows, library)).toEqual([{ kind: "class", subcategory: "optik", modes: [], attachment_ids: [] },
+    { item_id: "w1", kind: "attachments", modes: [], attachment_ids: ["a2"] }]);
+  const banned = { "attachments:w1": { kind: "attachments", item_id: "w1", modes: [], attachment_ids: ["a1", "a2"] },
+    "item:w1": { kind: "item", item_id: "w1", modes: [], attachment_ids: [] } };
+  expect(bannedAttachmentCount(banned, "w1", [library[1], library[2]], library[0])).toBe(0);
+  expect(bannedAttachmentCount(banned, "w1", [library[1], library[2]])).toBe(2);
+  expect(bannedAttachmentCount({ "attachments:w1": banned["attachments:w1"] }, "w1", [library[1], library[2]], library[0])).toBe(2);
 });
 
 // #2299: Modi je Aufsatz, Slots, „für die Klasse übernehmen“ und „an allen Waffen sperren“.
