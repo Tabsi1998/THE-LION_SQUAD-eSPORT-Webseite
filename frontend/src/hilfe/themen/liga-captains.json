@@ -149,7 +149,7 @@
         {
           "id": "ergebnis-melden",
           "titel": "Ergebnis melden",
-          "text": "Trag für jede Map Modus, Map und Sieger ein. Verlangt die Season Punkte, trägst du auch den Endstand ein. Tippe dann auf Ergebnis melden.",
+          "text": "Wähl für jede Map Modus und Map und trag die Punkte beider Seiten ein. Wer mehr Punkte hat, steht automatisch als Sieger da. Tippe dann auf Ergebnis melden.",
           "hinweis": "Melden geht erst, wenn beide Seiten eingecheckt sind.",
           "bild": true
         },

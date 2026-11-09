@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Check, ClipboardCheck, IdCard, Users, X } from "lucide-react";
+import { Check, ClipboardCheck, IdCard, Trophy, Users, X } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { REPORT_STATE_TEXT } from "@/lib/matchReport";
@@ -19,10 +19,13 @@ import {
   poolModes,
   repeatedMap,
   reportPayload,
+  scoresTied,
+  scoreWinner,
   seriesSentence,
   settleGames,
   startGames,
   toggleLineup,
+  withScores,
 } from "./leagueGames";
 import { ruleFor, ruleHint } from "./leagueResultRules";
 
@@ -99,6 +102,50 @@ export function LineupPicker({ roster = [], value = [], size = 1, minimum = null
   );
 }
 
+/**
+ * Sieger einer Map: Stehen die Punkte beider Seiten da, ergibt er sich daraus - niemand muss ein Team antippen. Antippen
+ * gibt es nur, wo Punkte freiwillig und nicht eingetragen sind, bei Gleichstand und bei kampflos gewerteten Maps.
+ */
+function MapWinner({ game, league, onPick }) {
+  const auto = scoreWinner(game, league);
+  const awarded = game.decision === "awarded";
+  const tied = scoresTied(game, league);
+  const testId = `league-game-${game.position}-winner`;
+  if (auto && game.winner === auto && !awarded) {
+    const name = league.sides.find((side) => side.registration_id === auto)?.name;
+    return (
+      <p className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-honor/50 bg-honor/10 px-3 py-2 text-sm font-bold text-honor" data-testid={`${testId}-auto`}>
+        <Trophy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        {/* Lange Teamnamen brechen um statt abgeschnitten zu werden - der Sieger muss ganz lesbar sein. */}
+        <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+          Sieger: {name}
+          <span className="block text-xs font-normal text-white/55">aus den Punkten</span>
+        </span>
+      </p>
+    );
+  }
+  if (league.scores_required && !tied && !awarded) {
+    return <p className="text-xs text-white/50" data-testid={`${testId}-pending`}>Den Sieger ergeben die Punkte – einfach beide eintragen.</p>;
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-white/55" aria-hidden="true">
+        {tied ? `Gleichstand – wer hat Map ${game.position} gewonnen?` : `Wer hat Map ${game.position} gewonnen?`}
+      </p>
+      <div role="group" aria-label={`Sieger Map ${game.position}`} className="grid grid-cols-2 gap-2">
+        {league.sides.map((side) => (
+          <button key={side.registration_id} type="button" aria-pressed={game.winner === side.registration_id}
+            onClick={() => onPick(side.registration_id)}
+            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${game.winner === side.registration_id ? "border-honor bg-honor/15 text-honor" : "border-white/15 text-white/70 hover:border-white/35"}`}
+            data-testid={`${testId}-${side.registration_id}`}>
+            <span className="block truncate">{game.winner === side.registration_id ? "Sieger: " : ""}{side.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function GameEditor({ game, league, onChange, index, staff = false, games = [] }) {
   const modes = poolModes(league.pool);
   // Veto (#1618, D.3): Modus und Map der Position stehen fest - die Captains tragen nur Sieger, Punkte und Aufstellung ein.
@@ -159,22 +206,12 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           })}
         </div>
       )}
-      <div role="group" aria-label={`Sieger Map ${game.position}`} className="grid grid-cols-2 gap-2">
-        {league.sides.map((side) => (
-          <button key={side.registration_id} type="button" aria-pressed={game.winner === side.registration_id}
-            onClick={() => set({ winner: side.registration_id })}
-            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${game.winner === side.registration_id ? "border-honor bg-honor/15 text-honor" : "border-white/15 text-white/70 hover:border-white/35"}`}
-            data-testid={`league-game-${game.position}-winner-${side.registration_id}`}>
-            <span className="block truncate">{game.winner === side.registration_id ? "Sieger: " : ""}{side.name}</span>
-          </button>
-        ))}
-      </div>
       {showScores ? (
         <div className="grid grid-cols-2 gap-2">
           {league.sides.map((side) => (
             <label key={side.registration_id} className="block min-w-0 text-xs text-white/55">
               <span className="block truncate">{league.scores_required ? "Punkte (Pflicht)" : "Punkte"} {side.name}</span>
-              <input inputMode="numeric" value={game.scores?.[side.registration_id] ?? ""} onChange={(event) => set({ scores: { ...game.scores, [side.registration_id]: event.target.value } })}
+              <input inputMode="numeric" value={game.scores?.[side.registration_id] ?? ""} onChange={(event) => onChange(withScores(game, { ...game.scores, [side.registration_id]: event.target.value }, league))}
                 className="input mt-1 w-full" data-testid={`league-game-${game.position}-score-${side.registration_id}`} />
             </label>
           ))}
@@ -184,6 +221,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           Punkte eintragen (freiwillig)
         </button>
       )}
+      <MapWinner game={game} league={league} onPick={(winner) => set({ winner })} />
       {isSeries(league) ? null : staff ? (
         // Turnierleitung (#1650): Aufstellungen beider Seiten, je Seite freiwillig.
         league.sides.map((side) => (

@@ -146,6 +146,43 @@ function scoreValue(value) {
   return Number.isFinite(number) && number >= 0 ? number : undefined;
 }
 
+/** Beide Punkte einer Map als Zahl - sonst `null` (fehlt eine Seite oder ist keine Zahl). */
+function bothScores(game, league) {
+  const sides = (league?.sides || []).map((side) => side.registration_id);
+  if (sides.length !== 2) return null;
+  const values = sides.map((id) => scoreValue(game?.scores?.[id]));
+  return values.every((value) => typeof value === "number") ? { sides, values } : null;
+}
+
+/**
+ * Sieger einer Map aus den Punkten: Wer mehr hat, hat gewonnen - in allen Ergebnisregeln (Punkte, Runden, höherer
+ * Endstand) gewinnt der höhere Stand. `null`, solange eine Seite fehlt oder beide gleich viel haben.
+ */
+export function scoreWinner(game, league) {
+  const both = bothScores(game, league);
+  if (!both || both.values[0] === both.values[1]) return null;
+  return both.values[0] > both.values[1] ? both.sides[0] : both.sides[1];
+}
+
+/** Gleich viele Punkte auf beiden Seiten - dann muss jemand den Sieger antippen. */
+export function scoresTied(game, league) {
+  const both = bothScores(game, league);
+  return Boolean(both) && both.values[0] === both.values[1];
+}
+
+/**
+ * Neue Punkte einer Map: Stehen beide da und sind verschieden, setzt das den Sieger. Bei Gleichstand ist er offen; fehlt
+ * eine Seite, bleibt ein angetippter Sieger stehen - nur einer, der aus den alten Punkten kam, fällt weg.
+ */
+export function withScores(game, scores, league) {
+  const next = { ...game, scores };
+  const auto = scoreWinner(next, league);
+  if (auto) return { ...next, winner: auto };
+  if (scoresTied(next, league)) return { ...next, winner: "" };
+  const before = scoreWinner(game, league);
+  return { ...next, winner: before && game.winner === before ? "" : game.winner };
+}
+
 /**
  * Darf diese Map an dieser Position noch gewählt werden (Season-Vorgabe „Map-Wiederholung in einer Serie“, #2096)?
  * Gibt die frühere Map zurück, mit der sie sich beißt - sonst `null`. „other_mode“ (Vorgabe): dieselbe Map nur in
@@ -171,7 +208,12 @@ export function gamesProblem(games, league, { withLineup = true, needMaps = true
           ? `${label}: diese Map lief schon als Map ${earlier.position} – jede Map nur einmal je Serie.`
           : `${label}: diese Map lief schon als Map ${earlier.position} im selben Modus – bitte eine andere wählen.`;
       }
-      if (!game.winner) return `${label}: bitte antippen, wer die Map gewonnen hat.`;
+      if (!game.winner) {
+        if (scoresTied(game, league)) return `${label}: Gleichstand – bitte antippen, wer die Map gewonnen hat.`;
+        return league?.scores_required
+          ? `${label}: bitte die Punkte beider Seiten eintragen – daraus ergibt sich der Sieger.`
+          : `${label}: bitte antippen, wer die Map gewonnen hat.`;
+      }
       for (const value of Object.values(game.scores || {})) {
         if (scoreValue(value) === undefined) return `${label}: Punkte bitte als Zahl ab 0.`;
       }
