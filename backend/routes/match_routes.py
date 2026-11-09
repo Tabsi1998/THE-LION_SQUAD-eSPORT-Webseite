@@ -1302,6 +1302,12 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         "decision_note": normalized_note,
         "updated_at": now_iso,
     }})
+    if proposal.get("group_id"):
+        # Gegenvorschlag aus der App zu einem Termin einer Gruppe (#2325): er antwortet auf die ganze Gruppe - sonst bliebe
+        # der Rest offen, und die 72-h-Regel setzte trotz Gegenvorschlag den Heimtermin.
+        await db.match_schedule_proposals.update_many(
+            {"match_id": match_id, "group_id": proposal["group_id"], "status": "pending", "id": {"$ne": proposal_id}},
+            {"$set": {"status": "countered", "decision_user_id": me["id"], "decision_note": normalized_note, "updated_at": now_iso}})
     counter = {
         "id": new_id(),
         "match_id": match_id,
@@ -1318,6 +1324,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         "created_at": now_iso,
         "updated_at": now_iso,
     }
+    if proposal.get("group_id"):
+        counter["parent_group_id"] = proposal["group_id"]
     await db.match_schedule_proposals.insert_one(counter)
     await getattr(db, collection).update_one({"id": match_id}, {"$set": {
         "schedule_status": "proposed",

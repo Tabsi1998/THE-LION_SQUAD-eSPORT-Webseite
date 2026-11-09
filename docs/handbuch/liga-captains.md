@@ -60,8 +60,10 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 
 <img src="../assets/liga/termine-mehrere-vorschlagen-390.png" alt="Terminabstimmung am Handy: drei Termine untereinander, je mit X zum Entfernen, darunter die Notiz und der Knopf 3 Termine vorschlagen" width="300"> <img src="../assets/liga/termine-mehrere-auswahl-390.png" alt="Ansicht der Gegenseite am Handy: 3 Termine zur Auswahl mit Wochentag, je ein Knopf Annehmen, darunter Gegenvorschlag und Alle ablehnen" width="300">
 
-In der **App** stehen die Termine einzeln untereinander; dort nimmt man einen an (die übrigen schließen mit) oder lehnt
-einzeln ab. Mehrere Termine auf einmal vorschlagen geht nur im Web.
+In der **App** stehen die Termine einzeln untereinander. Nimmst du dort einen an, schließen die übrigen mit; ein
+Gegenvorschlag gilt ebenfalls für alle. **Lehnst du in der App nur einen Termin ab, bleiben die anderen offen – die
+72-h-Regel kann dann noch greifen.** Alle auf einmal ablehnen geht im Web mit **Alle ablehnen**. Mehrere Termine auf
+einmal vorschlagen geht nur im Web.
 
 Die Turnierleitung entscheidet einen Einspruch und korrigiert das Ergebnis; beide Seiten bekommen Bescheid. Ändert sie
 Termin oder Best of eures Spiels, bekommt ihr ebenfalls eine Nachricht.

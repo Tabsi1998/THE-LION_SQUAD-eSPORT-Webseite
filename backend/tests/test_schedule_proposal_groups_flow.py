@@ -332,6 +332,28 @@ async def test_the_home_rule_takes_the_earliest_of_a_group(flow):
         assert stored[other]["status"] == "declined" and stored[other]["decision_rule"] == "home_rule"
 
 
+@pytest.mark.asyncio
+async def test_an_app_counter_to_one_time_answers_the_whole_group(flow):
+    """Gegenvorschlag aus der App (``/decision``) zu einem Termin einer Gruppe: die übrigen sind damit beantwortet - die 72-h-Regel
+    setzt danach keinen Heimtermin mehr."""
+    world = await live_world(flow)
+    group = (await propose(flow, world, "Kapitaen", [100, 110, 120])).json()["proposals"]
+    flow.act_as(world["users"]["Falke1"])
+    counter = await flow.post(f"{base_url(world)}/{group[0]['id']}/decision",
+                              json={"action": "counter", "scheduled_at": at(60), "note": "Lieber früher"})
+    assert counter.status_code == 200, counter.text
+    assert counter.json()["parent_group_id"] == group[0]["group_id"]
+    stored = await rows(flow, world)
+    for row in group:
+        assert stored[row["id"]]["status"] == "countered"
+        assert stored[row["id"]]["decision_user_id"] == world["users"]["Falke1"]["id"]
+        assert stored[row["id"]]["decision_note"] == "Lieber früher"
+    counts = await league_schedule_sweep.sweep(flow.db, [await tournament_of(flow, world)], now=now_utc() + timedelta(hours=73))
+    assert counts["home_rule"] == 0
+    match = await flow.reload(world["match"])
+    assert match.get("schedule_source") != "accepted" and match.get("scheduled_at") is None
+
+
 # ---------------------------------------------------------------- App (#2325, Gesamtpaket)
 
 @pytest.mark.asyncio
