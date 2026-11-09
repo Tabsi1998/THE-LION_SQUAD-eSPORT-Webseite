@@ -943,8 +943,8 @@ Website stehen sie nicht, im Profil und auf der Teamseite gekennzeichnet als „
 In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teamleitung) – auf der Matchseite im Web:
 
 1. **Melden:** je gespielter Map den Modus (steht fest, wenn die Season eine Reihenfolge vorgibt), die **Map aus dem
-   Pool** antippen, den **Sieger** antippen und den **Endstand** der Map eintragen (in neuen Seasons Pflicht, sonst
-   freiwillig). An jeder Map steht, wie sie gewertet wird, etwa „Gewertet: bis 250 Punkte · 10 Min.“ oder „6 Runden,
+   Pool** antippen und den **Endstand** der Map eintragen (in neuen Seasons Pflicht, sonst freiwillig). Den **Sieger**
+   ergeben die Punkte; antippen muss man ihn nur bei Gleichstand oder wenn keine Punkte eingetragen sind. An jeder Map steht, wie sie gewertet wird, etwa „Gewertet: bis 250 Punkte · 10 Min.“ oder „6 Runden,
    höchstens 11“. Passt ein Endstand nicht dazu oder nicht zum Sieger, steht das gleich unter den Maps, etwa „Map 2: höchstens
    11 Runden – 7:5 sind 12.“ Die nächste Map erscheint, sobald die letzte einen Sieger hat – bis die
    Serie entschieden ist. Am Schluss einmal ankreuzen, **wer bei euch gespielt hat** (mindestens 3, bei Wechseln auch mehr; ältere Staffeln stellen stattdessen je Map auf).

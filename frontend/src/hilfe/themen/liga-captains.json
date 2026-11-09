@@ -150,7 +150,7 @@
           "id": "ergebnis-melden",
           "titel": "Ergebnis melden",
           "text": "Wähl für jede Map Modus und Map und trag die Punkte beider Seiten ein. Wer mehr Punkte hat, steht automatisch als Sieger da. Tippe dann auf Ergebnis melden.",
-          "hinweis": "Melden geht erst, wenn beide Seiten eingecheckt sind.",
+          "hinweis": "Melden geht erst, wenn beide Seiten eingecheckt sind. Nur bei Gleichstand oder ohne Punkte tippst du den Sieger selbst an.",
           "bild": true
         },
         {

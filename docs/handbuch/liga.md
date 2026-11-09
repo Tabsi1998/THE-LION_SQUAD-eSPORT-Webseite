@@ -922,7 +922,9 @@ was dabei geprüft wird, steht für die Captains in
 [Spickzettel](liga-captains.md). Für die Turnierleitung dazu:
 
 - **Selbst eintragen**: Reiter **Spiele** → **Ergebnis eintragen** – Stand, auf Wunsch Maps und die Teilnehmerlisten
-  beider Seiten; eine fehlende Seite trägt ihre Liste danach selbst nach. Siehe
+  beider Seiten; eine fehlende Seite trägt ihre Liste danach selbst nach. Je Map wählen die Punkte den Sieger vor; die
+  Sieger-Knöpfe bleiben für euch trotzdem da (etwa beim Übergehen einer Regel mit Grund). Passen Sieger und Punkte nicht
+  zusammen, steht das an der Map, mit **Sieger aus den Punkten übernehmen**. Siehe
   [Turniere, 3.6](turniere.md#36-ergebnisse-melden-eintragen-korrigieren).
 - **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite. Schon eingetragene Maps fallen dabei
   weg, der alte Stand bleibt im Verlauf des Spiels. Die Wertung ist eine Teamstrafe: Captain, Vertreter und die Leitung

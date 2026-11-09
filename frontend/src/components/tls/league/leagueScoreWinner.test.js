@@ -1,4 +1,4 @@
-import { gamesProblem, scoresTied, scoreWinner, withScores } from "./leagueGames";
+import { changeGame, gamesProblem, rememberGames, scoresTied, scoreWinner, settleGames, withScores } from "./leagueGames";
 
 // Sieger aus den Punkten (Fabian 09.11.2026): Wer mehr Punkte hat, gewinnt die Map - niemand tippt ein Team an. Erfundene Namen.
 
@@ -39,4 +39,41 @@ test("was noch fehlt: bei Punktepflicht die Punkte, bei Gleichstand das Antippen
   expect(gamesProblem([{ ...GAME, scores: { a: "6", b: "6" } }], { ...LEAGUE, scores_required: true })).toBe("Map 1: Gleichstand – bitte antippen, wer die Map gewonnen hat.");
   expect(gamesProblem([GAME], LEAGUE)).toBe("Map 1: bitte antippen, wer die Map gewonnen hat.");
   expect(gamesProblem([withScores(GAME, { a: "250", b: "180" }, LEAGUE)], LEAGUE)).toBeNull();
+});
+
+const BO3 = {
+  ...LEAGUE, best_of: 3, needed: 2,
+  pool: { id: "pool", modes: [{ mode: "stellung", label: "Stellung", maps: ["m1", "m2", "m3"].map((id) => ({ map_id: id, name: id })) }] },
+};
+
+test("Zeichen für Zeichen tippen: ein Zwischenstand entscheidet kurz die Serie, Map 3 kommt mit ihren Angaben zurück", () => {
+  let games = [
+    { ...GAME, map_id: "m1", scores: { a: "100", b: "50" }, winner: "a" },
+    { ...GAME, position: 2, map_id: "m2", scores: { a: "100", b: "150" }, winner: "b" },
+    { ...GAME, position: 3, map_id: "m3", scores: { a: "6", b: "2" }, winner: "a", proof_id: "p1" },
+  ];
+  let memory = {};
+  for (const value of ["", "1", "16", "160"]) {
+    const changed = changeGame(games, 2, withScores(games[1], { a: "100", b: value }, BO3));
+    memory = rememberGames(memory, changed);
+    games = settleGames(changed, BO3, memory);
+  }
+  expect(games.map((game) => `${game.position}:${game.map_id}:${game.winner}`)).toEqual(["1:m1:a", "2:m2:b", "3:m3:a"]);
+  expect(games[2]).toMatchObject({ scores: { a: "6", b: "2" }, proof_id: "p1" });
+});
+
+test("ohne Gedächtnis wie bisher: nach einer offenen Map kommt nichts, nach einem Sieger eine leere", () => {
+  expect(settleGames([{ ...GAME, map_id: "m1" }], BO3)).toHaveLength(1);
+  const next = settleGames([{ ...GAME, map_id: "m1", winner: "a" }], BO3);
+  expect(next).toHaveLength(2);
+  expect(next[1]).toMatchObject({ position: 2, map_id: "", winner: "" });
+});
+
+test("ungültige Zahl vor fehlendem Sieger, Gleichstand ohne Remis nennt gleich die Regel", () => {
+  const required = { ...LEAGUE, scores_required: true };
+  expect(gamesProblem([{ ...GAME, scores: { a: "-5", b: "3" } }], required)).toBe("Map 1: Punkte bitte als Zahl ab 0.");
+  const ruled = { ...required, result_rules: { stellung: { kind: "score", target: 250 } } };
+  expect(gamesProblem([{ ...GAME, scores: { a: "250", b: "250" } }], ruled)).toContain("Gleichstand (250:250) gibt es in diesem Modus nicht");
+  expect(gamesProblem([{ ...GAME, scores: { a: "250", b: "250" } }], ruled, { skipRules: true })).toBe("Map 1: Gleichstand – bitte antippen, wer die Map gewonnen hat.");
+  expect(gamesProblem([GAME], required, { skipRules: true })).toBe("Map 1: bitte antippen, wer die Map gewonnen hat.");
 });

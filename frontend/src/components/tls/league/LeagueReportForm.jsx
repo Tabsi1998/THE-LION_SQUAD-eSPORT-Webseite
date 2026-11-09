@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Check, ClipboardCheck, IdCard, Trophy, Users, X } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
@@ -18,6 +18,7 @@ import {
   plannedFor,
   poolModes,
   repeatedMap,
+  rememberGames,
   reportPayload,
   scoresTied,
   scoreWinner,
@@ -106,33 +107,53 @@ export function LineupPicker({ roster = [], value = [], size = 1, minimum = null
  * Sieger einer Map: Stehen die Punkte beider Seiten da, ergibt er sich daraus - niemand muss ein Team antippen. Antippen
  * gibt es nur, wo Punkte freiwillig und nicht eingetragen sind, bei Gleichstand und bei kampflos gewerteten Maps.
  */
-function MapWinner({ game, league, onPick }) {
+function MapWinner({ game, league, onPick, staff = false }) {
   const auto = scoreWinner(game, league);
   const awarded = game.decision === "awarded";
   const tied = scoresTied(game, league);
+  const rule = ruleFor(league, game.mode);
   const testId = `league-game-${game.position}-winner`;
-  if (auto && game.winner === auto && !awarded) {
-    const name = league.sides.find((side) => side.registration_id === auto)?.name;
+  const nameOf = (id) => league.sides.find((side) => side.registration_id === id)?.name;
+  const fromScores = Boolean(auto) && game.winner === auto && !awarded;
+  // Sieger und Punkte widersprechen sich (ältere Einträge, Korrektur der Leitung): sagen und anbieten, ihn zu übernehmen.
+  const mismatch = Boolean(auto) && Boolean(game.winner) && game.winner !== auto && !awarded;
+  if (!staff && fromScores) {
     return (
-      <p className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-honor/50 bg-honor/10 px-3 py-2 text-sm font-bold text-honor" data-testid={`${testId}-auto`}>
+      <p role="status" className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-honor/50 bg-honor/10 px-3 py-2 text-sm font-bold text-honor" data-testid={`${testId}-auto`}>
         <Trophy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         {/* Lange Teamnamen brechen um statt abgeschnitten zu werden - der Sieger muss ganz lesbar sein. */}
         <span className="min-w-0 break-words [overflow-wrap:anywhere]">
-          Sieger: {name}
+          Sieger: {nameOf(auto)}
           <span className="block text-xs font-normal text-white/55">aus den Punkten</span>
         </span>
       </p>
     );
   }
-  if (league.scores_required && !tied && !awarded) {
-    return <p className="text-xs text-white/50" data-testid={`${testId}-pending`}>Den Sieger ergeben die Punkte – einfach beide eintragen.</p>;
+  if (!staff && !mismatch && !awarded) {
+    if (tied && rule && !rule.draw_allowed) {
+      return <p role="status" className="text-xs text-warn" data-testid={`${testId}-no-draw`}>Gleichstand gibt es in diesem Modus nicht – bitte die Punkte prüfen.</p>;
+    }
+    if (league.scores_required && !tied) {
+      return <p className="text-xs text-white/50" data-testid={`${testId}-pending`}>Den Sieger ergeben die Punkte – einfach beide eintragen.</p>;
+    }
   }
+  // Leitung (Ergebnis-Fenster): Die Knöpfe bleiben immer - zum Übergehen einer Regel mit Grund und für Altdaten. Der Sieger
+  // aus den Punkten ist vorgewählt.
+  const question = tied ? `Gleichstand – wer hat Map ${game.position} gewonnen?` : `Wer hat Map ${game.position} gewonnen?`;
   return (
     <div className="space-y-1.5">
+      {mismatch ? (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-white" data-testid={`${testId}-mismatch`}>
+          <span className="min-w-0 break-words [overflow-wrap:anywhere]">Der Sieger passt nicht zu den Punkten – mehr Punkte hat {nameOf(auto)}.</span>
+          <button type="button" onClick={() => onPick(auto)} className="font-bold underline underline-offset-2 hover:text-white" data-testid={`${testId}-adopt`}>
+            Sieger aus den Punkten übernehmen
+          </button>
+        </div>
+      ) : null}
       <p className="text-[11px] font-bold uppercase tracking-widest text-white/55" aria-hidden="true">
-        {tied ? `Gleichstand – wer hat Map ${game.position} gewonnen?` : `Wer hat Map ${game.position} gewonnen?`}
+        {question}{fromScores ? " · aus den Punkten" : ""}
       </p>
-      <div role="group" aria-label={`Sieger Map ${game.position}`} className="grid grid-cols-2 gap-2">
+      <div role="group" aria-label={tied ? `Gleichstand – Sieger Map ${game.position}` : `Sieger Map ${game.position}`} className="grid grid-cols-2 gap-2">
         {league.sides.map((side) => (
           <button key={side.registration_id} type="button" aria-pressed={game.winner === side.registration_id}
             onClick={() => onPick(side.registration_id)}
@@ -221,7 +242,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           Punkte eintragen (freiwillig)
         </button>
       )}
-      <MapWinner game={game} league={league} onPick={(winner) => set({ winner })} />
+      <MapWinner game={game} league={league} staff={staff} onPick={(winner) => set({ winner })} />
       {isSeries(league) ? null : staff ? (
         // Turnierleitung (#1650): Aufstellungen beider Seiten, je Seite freiwillig.
         league.sides.map((side) => (
@@ -322,7 +343,14 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
   const problem = series ? gamesProblem(games, league, { withLineup: false }) || participantsProblem(list, league) : gamesProblem(games, league);
   const sentence = seriesSentence(games, league);
 
-  const change = (position, game) => setGames((current) => settleGames(changeGame(current, position, game), league));
+  // Gedächtnis je Map (#2334): Ein Zwischenstand beim Tippen der Punkte („1“ auf dem Weg zu „160“) kann die Serie kurz
+  // entscheiden - weggefallene Maps kommen mit ihren Angaben zurück, sobald sie wieder offen ist.
+  const memory = useRef({});
+  const change = (position, game) => {
+    const changed = changeGame(games, position, game);
+    memory.current = rememberGames(memory.current, changed);
+    setGames(settleGames(changed, league, memory.current));
+  };
 
   const submit = async (event) => {
     event.preventDefault();
