@@ -80,16 +80,15 @@ async def tell(db, points: dict, *, title: str, name: str, responsible: set[str]
     return sent
 
 
-async def after_submit(db, league: dict, season: dict, application: dict, squad: dict, *, minimum: int) -> int:
-    """Erinnerung beim Einreichen der Selbstanmeldung (Schlüssel ``league-open-points:<antrag>:submit:<user>``)."""
-    from services.league_applications import responsible_of
-
+async def after_submit(db, league: dict, season: dict, application: dict, squad: dict, *, minimum: int, responsible: set[str]) -> int:
+    """Erinnerung beim Einreichen der Selbstanmeldung (Schlüssel ``league-open-points:<antrag>:submit:<user>``). ``responsible``: Captain
+    und Vertreter, ohne beide die Hauptteam-Leitung - gibt ``league_applications`` mit (kein Import nach oben)."""
     try:
         members = [uid for uid in squad.get("member_ids") or [] if uid]
         ctx = await league_eligibility.context_for_season(db, season, members)
         points = league_eligibility.open_points(ctx, squad, minimum=minimum)
         return await tell(db, points, title=season_title(league, season), name=application.get("display_name") or squad.get("name") or "Euer Co-Team",
-                          responsible=await responsible_of(db, squad), team_url=f"/liga/{league.get('slug')}/{season.get('slug')}",
+                          responsible=responsible, team_url=f"/liga/{league.get('slug')}/{season.get('slug')}",
                           key=f"league-open-points:{application['id']}:submit")
     except Exception:  # noqa: BLE001 - die Anmeldung ist schon gespeichert
         logger.warning("[league_open_points] Erinnerung zum Antrag %s nicht verschickt", log_safe(application.get("id")), exc_info=True)

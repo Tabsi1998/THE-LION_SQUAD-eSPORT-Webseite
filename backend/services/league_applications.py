@@ -202,9 +202,6 @@ async def _responsible(db, squad: dict) -> set[str]:
     return responsible_ids(side, (await teams_by_id(db, [side])).get(squad.get("team_id") or ""))
 
 
-responsible_of = _responsible  # für die Erinnerung an fehlende Angaben (league_open_points, #2313)
-
-
 async def may_apply(db, user: dict, squad: dict) -> bool:
     """Nur Captain und Vertreter, soweit sie noch im Hauptteam und nicht gesperrt sind. Die Hauptteam-Leitung ersetzt sie hier nicht."""
     if user.get("id") not in {squad.get("captain_id"), squad.get("vice_captain_id")}:
@@ -287,7 +284,8 @@ async def submit(db, league: dict, season: dict, body: dict, user: dict) -> dict
     # Fehlende Angaben (#2313): Die Anmeldung ging durch, die Betroffenen und Captain und Vertreter hören, was bis zum ersten Spiel fehlt.
     from services import league_open_points
 
-    await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _min_size(db, fresh))
+    await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _min_size(db, fresh),
+                                          responsible=await _responsible(db, squad))
     return application
 
 
