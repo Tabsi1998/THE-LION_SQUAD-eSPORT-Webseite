@@ -68,6 +68,8 @@ SEASON_DEFAULTS: dict = {
     "registration_deadline": None,
     "visibility": "off",
     "status": "draft",
+    # Startseite (#2324): in „Nächste Termine“ und als Hinweis bei offener Anmeldung - Vorgabe an, je Season abschaltbar.
+    "promote_on_home": True,
 }
 # Spielberechtigung (#2204, docs/LIGA.md Abschnitt 12): Vorgaben nur für **neue** Seasons. Seasons von vorher tragen die Felder nicht
 # und prüfen nichts Neues - darum stehen sie nicht in SEASON_DEFAULTS, die jeder Lesevorgang darüberlegt.
@@ -832,7 +834,7 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     for key in ("name", "slug", "number", "start_date", "weeks_total", "matchday_days", "default_match_weekday",
                 "default_match_time", "round_robin_legs", "max_staffel_size", "best_of", "team_size",
                 "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat",
-                RESPONSE_HOURS, *SEASON_RULE_DEFAULTS):
+                RESPONSE_HOURS, "promote_on_home", *SEASON_RULE_DEFAULTS):
         if key in fields and fields[key] is None:
             fields.pop(key)  # Pflichtfelder bleiben, wie sie sind
     if "scoring_rules" in fields and fields["scoring_rules"] is None:
