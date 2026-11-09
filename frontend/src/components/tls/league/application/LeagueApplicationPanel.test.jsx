@@ -98,7 +98,8 @@ test("der Stand einer laufenden Anmeldung nennt die offenen Punkte (#2313)", asy
   renderPanel();
 
   const open = await screen.findByTestId("league-application-open-s1");
-  expect(open).toHaveTextContent("sonst kein Check-in");
+  expect(open).toHaveTextContent("Die Anmeldung zählt");
+    expect(open).toHaveTextContent("nicht einchecken und nicht aufgestellt werden");
   expect(open).toHaveTextContent("Mila: Geburtsdatum fehlt");
   expect(screen.queryByTestId("league-application-open-s2")).toBeNull();
 });

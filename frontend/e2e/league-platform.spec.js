@@ -37,7 +37,7 @@ const SEASON_PAGE = {
 const SQUAD = { squad_id: "sq1", squad_name: "Rudel Alpha", team_id: "t1", team_name: "Loewen", display_name: "Loewen · Rudel Alpha", member_count: 4, can_apply: true, state: "open",
   // Seit #2313 nur ein Hinweis: Die Anmeldung geht, gesperrt wird beim Check-in.
   application: null, problems: [],
-  shortfall: "Nur 3 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 4. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.",
+  shortfall: "Nur 3 von 4 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 4. Bis zum ersten Spiel im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.",
   warnings: ["Tom Beispiel: Diese Season ist nur für PC – angegeben ist PlayStation."], can_submit: true };
 const MINE = {
   application: { state: "open", slots: 8, slots_free: 3, waitlist: false }, season_problems: [], hint: null, squads: [SQUAD],

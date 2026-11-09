@@ -2767,6 +2767,8 @@ class LeagueSeasonFields(LeagueLookFields):
     registration_deadline: Optional[str] = None
     visibility: Optional[LeagueVisibility] = None
     status: Optional[LeagueSeasonStatus] = None
+    # Startseite (#2324): „Nächste Termine“ und Hinweis bei offener Anmeldung; Vorgabe an.
+    promote_on_home: Optional[bool] = None
 
     # Mindestgröße je Modus im Map-Pool (#2207, C.2): überschreibt die Ableitung; ``mode: null`` bei Spielen ohne Modi.
     pool_min_maps: Optional[List[LeaguePoolMinimum]] = Field(default=None, max_length=GAME_MODES_MAX)

@@ -99,7 +99,7 @@ test("Spiel-ID je Spieler (#2108): fehlt sie, warnt der Dialog mit Namen – zut
 test("Plattform je Season (#2270): wer nicht spielen darf, steht als Hinweis da – zuteilen geht trotzdem", async () => {
   const notes = ["Tom: Diese Season ist nur für PC – angegeben ist PlayStation."];
   // Seit #2313 auch unter dem Mindestkader nur ein Hinweis.
-  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 3.";
+  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 3.";
   apiMock.get.mockResolvedValue({ data: { ...CANDIDATES, teams: [{ ...CANDIDATES.teams[0], squads: [{ ...CANDIDATES.teams[0].squads[0], notes, shortfall }, CANDIDATES.teams[0].squads[1]] }] } });
   render(<SquadAssignDialog tournament={TOURNAMENT} onAssigned={vi.fn()} />);
   fireEvent.click(screen.getByTestId("squad-assign-open"));

@@ -87,6 +87,8 @@ export function seasonToForm(season = {}) {
     registration_deadline: season.registration_deadline || "",
     visibility: season.visibility || "off",
     status: season.status || "draft",
+    // Startseite (#2324): Vorgabe an - auch für Seasons, die das Feld noch nicht tragen.
+    promote_on_home: season.promote_on_home !== false,
     blocked_periods: (season.blocked_periods || []).map((period) => ({ ...period })),
     scoring_rules: rules,
     // Gestaltung (#2107): leer heißt „wie die Liga“; Gewinne der Season.
@@ -169,6 +171,7 @@ export function seasonPayload(form, maps = form.best_of, savedOrder = undefined)
     registration_deadline: form.registration_deadline || null,
     visibility: form.visibility,
     status: form.status,
+    promote_on_home: form.promote_on_home !== false,
     blocked_periods: (form.blocked_periods || []).filter((period) => period.start_date && period.end_date)
       .map((period) => ({ start_date: period.start_date, end_date: period.end_date, label: (period.label || "").trim() })),
     emblem_url: form.emblem_url || null,

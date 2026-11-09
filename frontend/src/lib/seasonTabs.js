@@ -78,7 +78,7 @@ export function tabLabelOf(anchor) {
 // Welche Felder des Formulars (seasonToForm) zu welchem Reiter gehören. Die Merker `had_*` und `scoring_rules` halten nur fest, was
 // gespeichert war, und reisen mit ihrem Reiter.
 export const TAB_FIELDS = {
-  ueberblick: ["name", "visibility", "status", "emblem_url", "banner_url", "banner_focus", "prizes"],
+  ueberblick: ["name", "visibility", "status", "promote_on_home", "emblem_url", "banner_url", "banner_focus", "prizes"],
   spielbetrieb: ["best_of", "team_size", "game_mode_order", "map_repeat", "result_confirm_hours", "lineup_amend_hours"],
   termine: ["start_day", "weeks_total", "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs", "blocked_periods",
     "match_schedule_response_hours"],
@@ -94,7 +94,7 @@ export const TAB_FIELDS = {
 
 // Welche Felder der Anfrage (seasonPayload) ein Reiter schickt.
 export const TAB_PAYLOAD_KEYS = {
-  ueberblick: ["name", "visibility", "status", "emblem_url", "banner_url", "banner_focus", "prizes"],
+  ueberblick: ["name", "visibility", "status", "promote_on_home", "emblem_url", "banner_url", "banner_focus", "prizes"],
   spielbetrieb: ["best_of", "team_size", "game_mode_order", "map_repeat", "result_confirm_hours", "lineup_amend_hours"],
   termine: ["start_date", "weeks_total", "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs", "blocked_periods",
     "match_schedule_response_hours"],

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 
 from models import now_utc
-from services import league_platform, league_roster
+from services import checkin_rules, league_platform, league_roster
 from services.dolibarr_policy import club_today
 from services.matchday_schedule import LOCAL_TZ
 
@@ -503,6 +503,13 @@ def _reasons(row: dict) -> list[str]:
     return reasons
 
 
+def ready_minimum(tournament: dict) -> int:
+    """Wie viele Spielberechtigte ein Team einer Staffel zum Spielen braucht (#2322): die Mindestzahl Anwesender aus den
+    Check-in-Regeln (bei 4 gegen 4 also 3), ohne Check-in-Regeln der Mindestkader. Maß für ``open_points`` überall."""
+    rules = checkin_rules.rules_of(tournament)
+    return int(rules["min_present"]) if rules else league_roster.min_squad_size(tournament)
+
+
 def open_points(ctx: EligibilityContext | None, squad: dict, *, minimum: int | None) -> dict:
     """Die offenen Punkte eines Co-Teams (#2313): ``players`` (wer so noch nicht spielen darf, mit Grund und Weg ins Profil) und
     ``shortfall`` (Satz, wenn weniger als ``minimum`` spielberechtigt sind). Hält nichts auf - nur Hinweis, Eingang und Erinnerung."""
@@ -520,8 +527,9 @@ def open_points(ctx: EligibilityContext | None, squad: dict, *, minimum: int | N
     ready = sum(1 for row in rows.values() if row["ok"])
     shortfall = None
     if minimum and ready < minimum <= len(members):
-        shortfall = (f"Nur {ready} von {len(members)} Spielern sind spielberechtigt, die Season verlangt mindestens {minimum}. Bis zum ersten Spiel "
-                     "im Profil nachtragen – sonst kann das Team nicht einchecken.")
+        shortfall = (f"Nur {ready} von {len(members)} Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens {minimum}. Bis zum ersten Spiel "
+                     "im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die "
+                     "Liga-Leitung kann das Spiel dann kampflos werten.")
     return {"players": sorted(players, key=lambda row: str(row["name"]).casefold()), "shortfall": shortfall}
 
 

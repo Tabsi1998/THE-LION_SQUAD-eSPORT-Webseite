@@ -120,7 +120,7 @@ test("Gründe, Warnungen und das eigene Team stehen im Klartext da", async () =>
 });
 
 test("offene Punkte je Team stehen da, und die Leitung lässt trotzdem zu (#2313)", async () => {
-  const shortfall = "Nur 2 von 5 Spielern sind spielberechtigt, die Season verlangt mindestens 3. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.";
+  const shortfall = "Nur 2 von 5 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 3. Bis zum ersten Spiel im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.";
   apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, shortfall, warnings: ["Mila: Geburtsdatum fehlt.", "Tom: Spiel-ID fehlt.", "Ida: Erfüllt die Altersvorgabe dieser Season nicht."] }] } });
   renderPanel();
 

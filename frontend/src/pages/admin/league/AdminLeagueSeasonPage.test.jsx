@@ -107,6 +107,16 @@ test("Überblick: Ablaufleiste, Sichtbarkeit und Stand mit einem Satz, was sie b
   expect(screen.getByTestId("season-status-effect")).toHaveTextContent("Nur jetzt lässt sich die Season noch löschen");
 });
 
+test("#2324: „Auf der Startseite bewerben“ steht im Überblick, Vorgabe an, ausgeschaltet geht false mit", async () => {
+  renderPage();
+  const toggle = await screen.findByTestId("season-form-promote-home");
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  fireEvent.click(screen.getByTestId("season-save-ueberblick"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1].promote_on_home).toBe(false);
+});
+
 test("die Prüfung steht im Überblick, jeder Punkt springt in seinen Reiter, der Grund der Notausnahme geht mit dem Veröffentlichen mit", async () => {
   renderPage();
   expect(await screen.findByTestId("season-readiness-problems")).toHaveTextContent("keinen Map-Pool");
@@ -114,8 +124,9 @@ test("die Prüfung steht im Überblick, jeder Punkt springt in seinen Reiter, de
   fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "members" } });
   fireEvent.click(screen.getByTestId("season-save-ueberblick"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
-  expect(apiMock.patch.mock.calls[0][1]).toEqual({ name: "Season 1", visibility: "members", status: "draft", emblem_url: null, banner_url: null,
-    banner_focus: null, prizes: null, readiness_override_reason: "Saisonstart trotz Lücke" });
+  // „Auf der Startseite bewerben“ (#2324) gehört zum Überblick - Vorgabe an.
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ name: "Season 1", visibility: "members", status: "draft", promote_on_home: true, emblem_url: null,
+    banner_url: null, banner_focus: null, prizes: null, readiness_override_reason: "Saisonstart trotz Lücke" });
 
   fireEvent.click(screen.getByTestId("season-readiness-problems-go-pool_missing"));
   await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/seasons/s1#modi"));
