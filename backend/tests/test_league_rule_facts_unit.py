@@ -113,6 +113,33 @@ def test_table_block_speaks_e1_and_the_old_defaults():
     assert "Gewertet wird, was die Liga-Leitung einträgt." in old and "annulliert" in old
 
 
+MAPS_SEASON = {**SEASON, "scoring_rules": {**SEASON["scoring_rules"], "match_points_mode": "maps", "forfeit_score": "recorded",
+                                           "table_tiebreakers": ["wins", "head_to_head", "score_diff", "lead_decision"]}}
+
+
+def test_table_block_speaks_map_points_and_marks_the_change():
+    """#2312: Punkte nach gewonnenen Maps - der Satz zur Punktvergabe stimmt, kampflos immer wie 3:0, und der Wechsel ändert den Baustein
+    (so schlägt das Regelwerk eine neue Freigabe vor). Eingefrorene Fassungen ohne ``points_mode`` lesen sich wie bisher."""
+    data = facts.table_data(MAPS_SEASON, [])
+    assert data["points_mode"] == "maps"
+    out = facts.render_table(data)
+    assert "- Punkte: je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)." in out
+    assert "Sieg 3" not in out
+    assert "- Bei Punktgleichheit entscheidet der Reihe nach: mehr Siege, direkter Vergleich (Punkte, Map-Differenz, gewonnene Maps), " \
+           "Map-Differenz, Entscheid der Liga-Leitung." in out
+    assert "wie zum Sieg der Serie nötig sind, der andere 0." in out, "kampflos wie 3:0, auch bei „wie eingetragen“"
+    assert "Beide Teams verlieren - keine Punkte, keine Maps." in out
+    before = facts.table_data(SEASON, [])
+    assert before["points_mode"] == "result"
+    assert blocks.value("table", {"data": before}) != blocks.value("table", {"data": data})
+    frozen = {key: value for key, value in before.items() if key != "points_mode"}
+    assert blocks.value("table", {"data": frozen}) == blocks.value("table", {"data": before}), "ältere Fassung bleibt gleich"
+    ctx = context()
+    ctx.table = data
+    assert variables.value_of("table.points", ctx) == "je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)"
+    assert variables.value_of("table.points", context()) == "Sieg 3, Niederlage 0 Punkte"
+
+
 # ---------------------------------------------------------------- Termine, Spielberechtigung
 
 def test_schedule_block_with_and_without_d1_rules():

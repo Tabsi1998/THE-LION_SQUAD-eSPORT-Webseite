@@ -262,12 +262,13 @@ async def build_format(db, league: dict, season: dict) -> dict:
 
 # ---------------------------------------------------------------- Tabelle und Wertung
 
-TABLE_KEYS = ("points", "allow_draws", "tiebreakers", "head_to_head", "forfeit_score", "exit_rule")
+TABLE_KEYS = ("points", "points_mode", "allow_draws", "tiebreakers", "head_to_head", "forfeit_score", "exit_rule")
 
 
 def _table_rules(raw) -> dict:
     rules = normalize_rules(raw if isinstance(raw, dict) else {})
-    return {"points": {key: rules["match_points"].get(key) for key in ("win", "draw", "loss")}, "allow_draws": bool(rules.get("allow_draws")),
+    return {"points": {key: rules["match_points"].get(key) for key in ("win", "draw", "loss")},
+            "points_mode": rules.get("match_points_mode") or "result", "allow_draws": bool(rules.get("allow_draws")),
             "tiebreakers": list(rules.get("table_tiebreakers") or []), "head_to_head": list(rules.get("head_to_head_criteria") or []),
             "forfeit_score": rules.get("forfeit_score") or "recorded", "exit_rule": rules.get("exit_rule") or "half"}
 
@@ -295,8 +296,23 @@ def tiebreakers_sentence(rules: dict) -> str:
     return ", ".join(words) or "Teams teilen sich den Platz"
 
 
+def _by_maps(rules: dict) -> bool:
+    """Punkte nach gewonnenen Maps (#2312)? Eingefrorene Fassungen ohne ``points_mode`` zählen Sieg/Remis/Niederlage."""
+    return rules.get("points_mode") == "maps"
+
+
+def points_sentence(rules: dict) -> str:
+    """Die Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder je gewonnene Map ein Punkt (#2312)."""
+    if _by_maps(rules):
+        return "je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)"
+    points = rules.get("points") or {}
+    if rules.get("allow_draws"):
+        return f"Sieg {number(points.get('win'))}, Remis {number(points.get('draw'))}, Niederlage {number(points.get('loss'))} Punkte"
+    return f"Sieg {number(points.get('win'))}, Niederlage {number(points.get('loss'))} Punkte"
+
+
 def forfeit_sentence(rules: dict) -> str:
-    if rules.get("forfeit_score") == "best_of":
+    if rules.get("forfeit_score") == "best_of" or _by_maps(rules):
         return "Der Sieger bekommt so viele Maps, wie zum Sieg der Serie nötig sind, der andere 0."
     return "Gewertet wird, was die Liga-Leitung einträgt."
 
@@ -310,17 +326,15 @@ def exit_sentence(rules: dict) -> str:
 
 
 def _table_lines(rules: dict) -> list[str]:
-    points = rules.get("points") or {}
     if rules.get("allow_draws"):
-        scored = f"Sieg {number(points.get('win'))}, Remis {number(points.get('draw'))}, Niederlage {number(points.get('loss'))} Punkte"
-        draws = "Eine Serie darf unentschieden enden."
+        draws = "Eine Serie darf unentschieden enden." + (" Auch dann zählen die gewonnenen Maps." if _by_maps(rules) else "")
     else:
-        scored = f"Sieg {number(points.get('win'))}, Niederlage {number(points.get('loss'))} Punkte"
         draws = "Jede Serie hat einen Sieger - ein Remis gibt es nicht."
-    return [f"- Punkte: {scored}.", f"- Remis: {draws}",
+    both_out = "keine Punkte, keine Maps" if _by_maps(rules) else "Niederlagenpunkte, keine Maps"
+    return [f"- Punkte: {points_sentence(rules)}.", f"- Remis: {draws}",
             f"- Bei Punktgleichheit entscheidet der Reihe nach: {tiebreakers_sentence(rules)}.",
             f"- Kampflos (Default-Win): {forfeit_sentence(rules)}",
-            "- Beide nicht erschienen: Beide Teams verlieren - Niederlagenpunkte, keine Maps.",
+            f"- Beide nicht erschienen: Beide Teams verlieren - {both_out}.",
             f"- Ausscheiden: {exit_sentence(rules)}"]
 
 

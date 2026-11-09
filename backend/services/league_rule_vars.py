@@ -173,6 +173,8 @@ def _static() -> list[Variable]:
                  _rule_hours("result_reminder_hours")),
         Variable("schedule.result_overdue_hours", "Überfällig nach", "Stunden nach dem Termin, bis das Spiel bei der Leitung liegt.", "Termine",
                  _rule_hours("result_overdue_hours")),
+        Variable("table.points", "Punktevergabe", "Sieg/Remis/Niederlage oder je gewonnene Map.", "Tabelle",
+                 lambda ctx: facts.points_sentence(ctx.table) if ctx.table else None),
         Variable("table.points_win", "Punkte je Sieg", "", "Tabelle", lambda ctx: _count((ctx.table.get("points") or {}).get("win")) if ctx.table else None),
         Variable("table.points_draw", "Punkte je Remis", "", "Tabelle", lambda ctx: _count((ctx.table.get("points") or {}).get("draw")) if ctx.table else None),
         Variable("table.points_loss", "Punkte je Niederlage", "", "Tabelle", lambda ctx: _count((ctx.table.get("points") or {}).get("loss")) if ctx.table else None),
