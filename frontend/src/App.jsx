@@ -116,6 +116,9 @@ const ImprintPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) 
 const TermsPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 // „Neu auf der Website“ (#1240): die letzten Neuerungen aus src/whatsnew.json.
 const WhatsNewPage = lazyPage(() => import("@/pages/public/WhatsNewPage"));
+// Hilfe für Spieler und Captains (#2295)
+const HelpIndexPage = lazyPage(() => import("@/pages/public/HelpIndexPage"));
+const HelpTopicPage = lazyPage(() => import("@/pages/public/HelpTopicPage"));
 
 const DashboardPage = lazyPage(() => import("@/pages/user/DashboardPage"));
 const YearReviewPage = lazyPage(() => import("@/pages/user/YearReviewPage"));
@@ -344,6 +347,8 @@ function App() {
           <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/neu" element={<WhatsNewPage />} />
+          <Route path="/hilfe" element={<HelpIndexPage />} />
+          <Route path="/hilfe/:thema" element={<HelpTopicPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

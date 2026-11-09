@@ -6,6 +6,7 @@ import { AlertTriangle, ClipboardCheck, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, windowLine } from "@/lib/leagueApplications";
 
@@ -87,9 +88,13 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
     <section className="tls-league-application mt-10 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby="league-application-title" data-testid="league-application">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="league-application-title" className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase">
-            <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
-          </h2>
+          {/* Das „?“ steht neben der Überschrift, nicht darin - sie benennt den Abschnitt (aria-labelledby). */}
+          <div className="flex items-center gap-2">
+            <h2 id="league-application-title" className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase">
+              <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
+            </h2>
+            <HelpLink thema="liga-captains" schritt="anmeldung-starten" />
+          </div>
           <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">{windowLine(current)}</p>
           {seats ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-seats">{seats}</p> : null}
           {current.entry_policy === "members" ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}
