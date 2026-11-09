@@ -281,16 +281,13 @@ async def test_the_person_must_be_in_the_main_team(flow):
 
 
 @pytest.mark.asyncio
-async def test_approval_checks_age_size_and_roles_again(flow):
+async def test_approval_checks_size_and_roles_again_but_not_the_age(flow):
+    """#2313 (Fabian 09.11.): Ein fehlendes Geburtsdatum hält die Genehmigung nicht auf - die Person darf danach nur nicht spielen."""
     w = await transfer_world(flow, min_age=18, max_squad_size=4)
     row = (await ask(flow, w)).json()
     flow.act_as(w["staff"])
     approve = f"{admin_url(w)}/{row['id']}/approve"
-
     await born(flow, w, "Ida", None)
-    no_date = await flow.post(approve, json={})
-    assert no_date.status_code == 422 and "Geburtsdatum fehlt" in no_date.json()["detail"]
-    await born(flow, w, "Ida", ADULT)
 
     await rules(flow, w, max_squad_size=3)
     too_many = await flow.post(approve, json={})
@@ -302,7 +299,10 @@ async def test_approval_checks_age_size_and_roles_again(flow):
     assert captain.status_code == 409 and "Captain" in captain.json()["detail"]
     await flow.db.team_squads.update_one({"id": w["squad_b"]["id"]}, {"$unset": {"captain_id": ""}})
 
-    assert (await flow.post(approve, json={})).status_code == 200
+    approved = await flow.post(approve, json={})
+    assert approved.status_code == 200, approved.text
+    stored = await flow.db.league_transfers.find_one({"id": row["id"]}, {"_id": 0})
+    assert stored["status"] == "approved"
 
 
 @pytest.mark.asyncio

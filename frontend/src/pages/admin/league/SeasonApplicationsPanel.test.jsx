@@ -119,6 +119,20 @@ test("Gründe, Warnungen und das eigene Team stehen im Klartext da", async () =>
   expect(row).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
 });
 
+test("offene Punkte je Team stehen da, und die Leitung lässt trotzdem zu (#2313)", async () => {
+  const shortfall = "Nur 2 von 5 Spielern sind spielberechtigt, die Season verlangt mindestens 3. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.";
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, shortfall, warnings: ["Mila: Geburtsdatum fehlt.", "Tom: Spiel-ID fehlt.", "Ida: Erfüllt die Altersvorgabe dieser Season nicht."] }] } });
+  renderPanel();
+
+  const open = await screen.findByTestId("application-open-points-a1");
+  expect(open).toHaveTextContent("Offene Punkte · 3 Spieler");
+  expect(open).toHaveTextContent("Nur 2 von 5 Spielern");
+  expect(open).toHaveTextContent("Zulassen geht trotzdem.");
+  expect(screen.queryByTestId("application-problems-a1")).toBeNull();
+  fireEvent.click(screen.getByTestId("application-accept-a1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/accept", {}));
+});
+
 // Befangenheit (#2245): Über das eigene Team entscheidet eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
 test("beim eigenen Team stehen statt der Knöpfe ein Satz", async () => {
   apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, own_team: true }, { ...ROW, id: "a2", squad_id: "s2", own_team: false }] } });

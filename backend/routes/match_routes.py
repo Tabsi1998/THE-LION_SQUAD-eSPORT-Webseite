@@ -708,7 +708,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     # für eine Seite ein (befangen nur der Superadmin mit Grund).
     checkin_block = await match_flow.page_block(
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
-        can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None)
+        can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None,
+        viewer_id=(user or {}).get("id"))
     # Erst einchecken, dann melden (D.2): der Satz, den auch /report gäbe - die Seite zeigt ihn statt des Meldeformulars.
     report_hint = None
     if can_player_report and checkin_block:

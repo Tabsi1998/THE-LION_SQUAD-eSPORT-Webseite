@@ -40,3 +40,14 @@ test("leere Zahlen bleiben weg", () => {
   expect(checkinRulesPayload({ ...DEFAULTS, opens_minutes_before: "", remind_minutes_before_close: "0" }))
     .toEqual({ closes_minutes_after: 15, min_present: 3, remind_minutes_before_close: 0 });
 });
+
+test("die Erinnerung an fehlende Angaben ist einstellbar (#2313)", async () => {
+  const rules = { ...DEFAULTS, open_points_remind_hours: 48 };
+  apiMock.get.mockResolvedValue({ data: { checkin_rules: rules, active: true, defaults: rules } });
+  apiMock.put.mockResolvedValue({ data: { checkin_rules: { ...rules, open_points_remind_hours: 72 }, active: true, defaults: rules } });
+  render(<SeasonCheckinRulesPanel seasonId="s1" />);
+  expect(await screen.findByTestId("checkin-rules-open-points")).toHaveValue(48);
+  fireEvent.change(screen.getByTestId("checkin-rules-open-points"), { target: { value: "72" } });
+  fireEvent.click(screen.getByTestId("checkin-rules-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/checkin-rules", { ...DEFAULTS, open_points_remind_hours: 72 }));
+});

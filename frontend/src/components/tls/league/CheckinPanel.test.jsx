@@ -182,3 +182,32 @@ test("ohne Block nichts", () => {
   const { container } = renderPanel(null);
   expect(container).toBeEmptyDOMElement();
 });
+
+// Fehlende Angaben sperren erst beim Spielen (#2313): der eigene Grund mit Weg ins Profil, zu wenige Spielberechtigte als Satz.
+test("wer selbst nicht spielen darf, liest den Grund und kommt ins eigene Profil", () => {
+  renderPanel({ ...BLOCK, own_registration_id: null, roster: [], can_checkin: false,
+    me: { reason: "Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein.", state: "age_missing", fix_url: "/profile?tab=basic" } });
+
+  expect(screen.getByTestId("checkin-me")).toHaveTextContent("Du kannst so nicht einchecken: Geburtsdatum fehlt.");
+  expect(screen.getByTestId("checkin-me-fix")).toHaveAttribute("href", "/profile?tab=basic");
+});
+
+test("ohne Weg ins Profil steht nur der Grund da", () => {
+  renderPanel({ ...BLOCK, me: { reason: "Erfüllt die Altersvorgabe dieser Season nicht.", state: "age_not_met", fix_url: null } });
+
+  expect(screen.getByTestId("checkin-me")).toHaveTextContent("Altersvorgabe");
+  expect(screen.queryByTestId("checkin-me-fix")).toBeNull();
+});
+
+test("zu wenige Spielberechtigte: kein Einchecken, der Satz steht schon vor dem Fenster", () => {
+  const short = "Nur 1 Spieler darf aus eurem Kader gerade spielen, mindestens 2 müssen anwesend sein – so könnt ihr nicht einchecken.";
+  const { unmount } = renderPanel({ ...BLOCK, can_checkin: false, checkin_hint: short, roster_hint: short, eligible_count: 1 });
+  expect(screen.getByTestId("checkin-hint")).toHaveTextContent("Nur 1 Spieler");
+  expect(screen.queryByTestId("checkin-submit")).toBeNull();
+  expect(screen.queryByTestId("checkin-roster-hint")).toBeNull();
+  unmount();
+
+  renderPanel({ ...BLOCK, state: "waiting", can_checkin: false, checkin_hint: "Der Check-in öffnet erst um 20:00.", roster_hint: short, eligible_count: 1 });
+  expect(screen.getByTestId("checkin-hint")).toHaveTextContent("öffnet erst");
+  expect(screen.getByTestId("checkin-roster-hint")).toHaveTextContent("Nur 1 Spieler");
+});

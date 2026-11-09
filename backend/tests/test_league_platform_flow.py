@@ -499,18 +499,18 @@ async def test_registration_with_pc_players_goes_through(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_playstation_player_below_the_minimum_blocks_and_is_named(flow):
+async def test_a_playstation_player_below_the_minimum_is_a_hint_and_is_named(flow):
+    """Seit #2313 (ersetzt Nr. 74): unter dem Mindestkader nur ein Hinweis, die Anmeldung geht."""
     w = await apply_world(flow, min_squad_size=4)
     side = w["teams"][0]
     await flow.db.users.update_one({"id": side["member"]["id"]}, {"$set": {f"game_ids.{w['game']['slug']}.platform": "PlayStation"}})
 
     row = await check_of(flow, w)
 
-    assert any("Nur 3 Spieler sind spielberechtigt" in text and "anderen Plattform" in text and "Spiel-ID" not in text
-               for text in row["problems"]), row
+    assert row["problems"] == [], row
+    assert row["shortfall"].startswith("Nur 3 von 4 Spielern sind spielberechtigt")
     assert "TeamA S3: Diese Season ist nur für PC – angegeben ist PlayStation." in row["warnings"]
-    refused = await submit(flow, w, side)
-    assert refused.status_code == 400 and "spielberechtigt" in refused.json()["detail"]
+    assert (await submit(flow, w, side)).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -540,7 +540,8 @@ async def test_the_application_view_names_the_platform(flow):
 
 
 @pytest.mark.asyncio
-async def test_assigning_warns_beyond_and_refuses_below_the_minimum(flow):
+async def test_assigning_warns_beyond_and_below_the_minimum(flow):
+    """Seit #2313: auch unter dem Mindestkader nur Hinweis (``notes``, ``shortfall``), das Zuteilen geht."""
     w = await apply_world(flow, min_squad_size=3)
     side = w["teams"][0]
     slug = w["game"]["slug"]
@@ -555,10 +556,13 @@ async def test_assigning_warns_beyond_and_refuses_below_the_minimum(flow):
     await flow.db.users.update_one({"id": side["people"][2]["id"]}, {"$set": {f"game_ids.{slug}.platform": "Xbox"}})
     candidates = ok(await flow.get(f"/api/tournaments/{w['tid']}/squad-candidates"))
     squad = next(row for team in candidates["teams"] for row in team["squads"] if row["id"] == side["squad"]["id"])
-    assert any("Nur 2 Spieler" in text and "TeamA S3 (PlayStation)" in text and "TeamA S2 (Xbox)" in text for text in squad["problems"]), squad
+    assert squad["problems"] == [], squad
+    assert squad["shortfall"].startswith("Nur 2 von 4 Spielern sind spielberechtigt")
+    assert squad["notes"] == ["TeamA S2: Diese Season ist nur für PC – angegeben ist Xbox.",
+                              "TeamA S3: Diese Season ist nur für PC – angegeben ist PlayStation."]
 
-    refused = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
-    assert refused.status_code == 400 and "erlaubten Plattform" in refused.json()["detail"]
+    assigned = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
+    assert assigned.status_code == 200, assigned.text
 
 
 @pytest.mark.asyncio

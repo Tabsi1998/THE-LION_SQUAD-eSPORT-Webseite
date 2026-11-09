@@ -206,6 +206,8 @@ async def _checkin(db, league: dict, season: dict) -> dict:
         rules = checkin_rules.normalize({key: value for key, value in raw.items() if key in checkin_rules.DEFAULTS})
     except checkin_rules.FlowProblem:
         rules = dict(checkin_rules.DEFAULTS)
+    # Die Erinnerung an fehlende Angaben (#2313) steht nicht im Regelwerk - sie macht keine veröffentlichte Fassung veraltet.
+    rules.pop("open_points_remind_hours", None)
     return {"source": {"checkin_rules": rules}, "data": {"rules": rules}}
 
 

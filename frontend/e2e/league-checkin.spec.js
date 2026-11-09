@@ -115,6 +115,25 @@ test.describe("Liga: Check-in und Start", () => {
       await testInfo.attach(`checkin-regelwerk-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
     });
 
+    // Fehlende Angaben sperren erst beim Spielen (#2313): eigener Grund mit Weg ins Profil, zu wenige Spielberechtigte als Satz.
+    test(`gesperrt: eigener Grund mit Weg ins Profil, zu wenige spielberechtigt bei ${width} px`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const short = "Nur 2 Spieler dürfen aus eurem Kader gerade spielen, mindestens 3 müssen anwesend sein – so könnt ihr nicht einchecken. "
+        + "Wer grau steht, trägt die fehlende Angabe im eigenen Profil nach, dann geht es sofort.";
+      const roster = [{ ...ROSTER[0], blocked: "Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein." }, ...ROSTER.slice(1)];
+      const locked = { ...OPEN, can_checkin: false, checkin_hint: short, roster_hint: short, eligible_count: 2, roster,
+        me: { reason: "Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein.", state: "age_missing", fix_url: "/profile?tab=basic" } };
+      await setup(page, CAPTAIN, { ...PAGE, checkin: locked });
+      await page.goto("/matches/m1");
+      await expect(page.getByTestId("checkin-me")).toContainText("Du kannst so nicht einchecken");
+      await expect(page.getByTestId("checkin-me-fix")).toHaveAttribute("href", "/profile?tab=basic");
+      await expect(page.getByTestId("checkin-hint")).toContainText("Nur 2 Spieler");
+      await expect(page.getByTestId("checkin-roster-u1")).toBeDisabled();
+      await expect(page.getByTestId("checkin-submit")).toHaveCount(0);
+      await expectNoSideScroll(page);
+      await testInfo.attach(`checkin-gesperrt-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+    });
+
     test(`Leitung: abgelaufen mit Vorschlag, Notfall-Eintrag und „Mein Dienst“ bei ${width} px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
       const posts = [];

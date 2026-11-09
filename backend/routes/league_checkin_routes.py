@@ -42,6 +42,9 @@ class CheckinRulesBody(BaseModel):
     closes_minutes_after: Optional[int] = None
     min_present: Optional[int] = None
     remind_minutes_before_close: Optional[int] = None
+    # #2313: Erinnerung an fehlende Angaben vor dem ersten Spiel. Die Grenzen (0 bis 168) prüft checkin_rules.normalize mit deutschem
+    # Satz (422), wie bei den anderen Feldern.
+    open_points_remind_hours: Optional[int] = None
 
 
 class CheckinBody(BaseModel):

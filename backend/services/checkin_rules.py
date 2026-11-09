@@ -25,6 +25,7 @@ DEFAULTS: dict = {
     "closes_minutes_after": 15,
     "min_present": 3,
     "remind_minutes_before_close": 5,
+    "open_points_remind_hours": 48,
 }
 # Ganze Zahlen: (kleinster, größter Wert, Name in der Meldung).
 NUMBERS: dict[str, tuple[int, int, str]] = {
@@ -32,6 +33,8 @@ NUMBERS: dict[str, tuple[int, int, str]] = {
     "closes_minutes_after": (0, 240, "Check-in schließt (Minuten nach dem Termin)"),
     "min_present": (1, 50, "Mindestens Anwesende je Seite"),
     "remind_minutes_before_close": (0, 60, "Erinnerung vor Schluss (Minuten)"),
+    # #2313: Erinnerung an fehlende Angaben vor dem ersten Spiel (league_open_points), 0 = keine.
+    "open_points_remind_hours": (0, 168, "Erinnerung an fehlende Angaben (Stunden vor dem ersten Spiel)"),
 }
 
 # Die Stände (docs/LIGA.md D.2) - abgeleitet, nie gespeichert.

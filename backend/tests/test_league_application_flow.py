@@ -312,15 +312,17 @@ async def test_a_smaller_minimum_of_liga_n_counts_for_the_application(flow):
 
 
 @pytest.mark.asyncio
-async def test_missing_birth_dates_block_without_any_date_in_the_answer(flow):
+async def test_missing_birth_dates_only_warn_without_any_date_in_the_answer(flow):
+    """Seit #2313 (ersetzt Nr. 74): Die Anmeldung geht, gesperrt wird erst beim Check-in und bei der Aufstellung."""
     w = await application_world(flow, min_age=18)
     side = w["teams"][0]
 
     row = await problems_of(flow, w, side)
 
-    assert any("Geburtsdatum fehlt" in text for text in row["problems"])
+    assert row["problems"] == [], row
+    assert any("Geburtsdatum fehlt" in text for text in row["warnings"])
     assert "birth_date" not in str(row)
-    assert (await submit(flow, w, side)).status_code in (400, 409)
+    assert (await submit(flow, w, side)).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -358,16 +360,20 @@ async def test_a_squad_already_in_the_season_cannot_apply(flow):
 
 
 @pytest.mark.asyncio
-async def test_too_few_players_with_a_valid_id_block_and_the_others_are_warnings(flow):
+async def test_too_few_players_with_a_valid_id_are_a_hint_not_a_block(flow):
+    """Seit #2313 (ersetzt Nr. 74): zu wenige Spielberechtigte stehen als ``shortfall`` da, die Anmeldung geht."""
     w = await application_world(flow, min_squad_size=4)
     await flow.db.games.update_one({"id": w["game"]["id"]}, {"$set": {"player_id_fields": [{"key": "probe_id", "label": "Probe-ID", "required": True}]}})
     side = w["teams"][0]
 
     row = await problems_of(flow, w, side)
-    assert any("spielberechtigt" in text for text in row["problems"])
+    assert row["problems"] == [], row
+    assert "Nur 0 von 4 Spielern sind spielberechtigt" in row["shortfall"]
+    assert len(row["warnings"]) == 4
 
     await flow.db.games.update_one({"id": w["game"]["id"]}, {"$set": {"player_id_fields": []}})
-    assert (await problems_of(flow, w, side))["problems"] == []
+    row = await problems_of(flow, w, side)
+    assert row["problems"] == [] and row["shortfall"] is None
 
 
 @pytest.mark.asyncio

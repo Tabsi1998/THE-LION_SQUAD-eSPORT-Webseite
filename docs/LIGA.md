@@ -976,9 +976,9 @@ Ein fehlerhafter ID-Stand (`late`, `missing`, `format`, `taken`) bleibt stehen u
 **Welche Regel gilt:** In einer Staffel Season plus ihre Liga N. Wo die Liga noch nicht feststeht (Prüfung der Selbstanmeldung, B.4), die weiteste aller aktiven
 Liga N: die Vereinigung ihrer erlaubten Plattformen, eine Liga N ohne Grenze hebt die Prüfung auf (wie beim Mindestkader). Die Kaderübersicht prüft je Co-Team mit der Liga N seiner Staffel.
 
-**Wirkung:** Selbstanmeldung (B.4): Wer auf einer nicht erlaubten Plattform spielt oder keine angibt, zählt nicht als spielberechtigt, steht als Warnung da, und unter
-dem Mindestkader hält es die Anmeldung auf. Zuteilen (auch aus einem Antrag): Sind ohne die Spieler mit `platform_not_allowed` weniger als der Mindestkader der Staffel
-übrig, 400 mit Namen und Plattform; sonst steht im Dialog ein Hinweis (`squad-candidates`: `notes` je Co-Team). Teilnehmerliste, Aufstellung je Map und später der
+**Wirkung:** Selbstanmeldung (B.4): Wer auf einer nicht erlaubten Plattform spielt oder keine angibt, zählt nicht als spielberechtigt und steht als Hinweis da.
+Zuteilen (auch aus einem Antrag): Hinweis im Dialog (`squad-candidates`: `notes` je Co-Team), auch wenn danach weniger als der Mindestkader übrig sind – das hält
+seit #2313 weder Anmeldung noch Zuteilen auf (siehe „Fehlende Angaben“ unten). Teilnehmerliste, Aufstellung je Map und der
 Check-in lesen `status`. Die Aufnahme in einen Kader prüft die Plattform nicht. Normale Turniere kennen die Einstellung nicht.
 
 **Antworten:** `GET /api/leagues/{liga}/{season}` trägt `platform` (`null` ohne jede Angabe): `{field_label, allowed, crossplay, input_device, input_device_label,
@@ -1010,7 +1010,7 @@ unter `rules.platform` der Team-Seite, für die Season unter `rules.platform` de
 | `max_squad_size` | Zuteilen, Aufnahme, Transfer (422) | wie viele erlaubt sind |
 | `min_squad_size` | Zuteilen (wie bisher). Abgang bleibt möglich, Warnung und Aufgabe aus #2202 | wie viele fehlen |
 | `one_team_per_season` | Zuteilen, Aufnahme (409): schon in einem anderen Co-Team oder dort gestanden, solange dieses in der Season angemeldet ist. Teilnehmerliste: aktuell in zwei Co-Teams | dass ein Transfer nötig ist |
-| `min_age` | Zuteilen, Aufnahme, Transfer (422), Teilnehmerliste | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
+| `min_age` | Teilnehmerliste, Aufstellung, Check-in. Anmeldung, Zuteilen, Aufnahme und Transfer nur Hinweis (#2313) | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
 | `new_player_wait_days` | Teilnehmerliste, Check-in. Aufnahme bleibt möglich, Hinweis an Person und Verantwortliche. Neuzugang erst nach dem Ende von Spieltag 1, Transfer immer | bis wann gewartet wird |
 | Spiel-ID, Format, Eindeutigkeit | Festhalten, Freigabe, Teilnehmerliste. Eine schon festgehaltene ID bleibt gültig. Meldung nennt nie, wem die ID gehört | was zu tun ist |
 | Transferfenster | Antrag (409 außerhalb). Entscheidung auch nach dem Fenster | wann es offen ist |
@@ -1022,7 +1022,7 @@ Ein gewöhnlicher Neuzugang spielt bis zum Ende von Spieltag 1 sofort, danach wa
 **Transfers:** `POST /api/teams/{tid}/squads/{sid}/transfers` mit `user_id` (Recht wie Kader ändern, 409 außerhalb des Fensters, Person muss im Hauptteam
 stehen), `GET` dasselbe, `DELETE …/transfers/{id}` zieht zurück. Leitung: `GET /api/admin/leagues/seasons/{id}/transfers`,
 `POST …/transfers/{id}/approve`, `…/reject` mit `reason`, Recht `roster`. Genehmigen läuft unter der Season-Sperre `league_season:{id}:squads`:
-prüft Alter, Höchstkader und Rolle im alten Co-Team, nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
+prüft Höchstkader und Rolle im alten Co-Team (das Alter seit #2313 nicht mehr: ohne passendes Geburtsdatum geht der Wechsel, die Person spielt nur nicht), nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
 `.reject`, `.withdraw`. Ein Transfer ist nur nötig, wenn `one_team_per_season` gilt.
 
 **Teilnehmerliste** (`lineup_mode: series`):
@@ -1056,7 +1056,33 @@ Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `p
 **Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`,
 `league.season.platform` (#2270).
 
-**Noch nicht gebaut, liest diese Prüfung später:** Check-in (D.2 ruft `check_participants`), Strafen (E.3 ergänzt den Stand).
+**Fehlende Angaben sperren erst beim Spielen (#2313, ersetzt Entscheidung Nr. 74).** Eine fehlende oder unpassende Angabe im Profil hält weder die
+Selbstanmeldung (B.4) noch das Annehmen und Zuteilen durch die Leitung auf. Gemeint sind die Stände `age_missing`, `age_not_met` (Geburtsdatum da, Alter
+darunter: wie „fehlt“), `platform_missing`, `platform_not_allowed` und die ID-Stände `missing`, `format`, `taken`, `late`, dazu „weniger spielberechtigte Spieler
+als der Mindestkader“. Gesperrt wird erst, wo gespielt wird: Wer nicht `ok` ist, kann nicht eingecheckt (D.2) und nicht aufgestellt werden (Teilnehmerliste,
+Aufstellung je Map, `check_participants`). Ein Team mit weniger spielberechtigten Spielern als `min_present` kann nicht einchecken; nach dem Fenster gibt es wie
+bisher nur den Vorschlag „nicht erschienen“ an die Leitung, nie eine Wertung. Inhaltliche Gründe bleiben Sperren: Fenster, Startplätze, offener Antrag,
+Kadergröße (Mitglieder, nicht Eignung), Höchstkader, ein Co-Team je Season, Spiel des Co-Teams, `entry_policy`, gültiges Regelwerk und die Zustimmung.
+Auch die **Aufnahme in einen Kader** einer laufenden Season und die **Genehmigung eines Transfers** gehen ohne oder mit zu jungem Geburtsdatum durch
+(Fabian 09.11., `roster_addition_problem`): Die Person steht dann im Kader, ist aber nicht spielberechtigt. Die Team-Seite führt sie bei den möglichen
+Neuzugängen als „aufnehmbar, spielen erst mit der fehlenden Angabe“ (`can_add: true` mit `reason`). Höchstkader, ein Co-Team je Season und das Transferfenster
+bleiben Sperren.
+
+`league_eligibility.open_points(ctx, squad, minimum=…)` liefert die offenen Punkte eines Co-Teams: `players` (je nicht spielberechtigter Person `id`, `name`,
+`state`, `reason`, `fixable`: selbst im Profil behebbar) und `shortfall` (Satz oder `null`, wenn weniger als `minimum` spielberechtigt sind). Selbst behebbar
+(`FIXABLE_STATES`): `age_missing`, `platform_missing`, `platform_not_allowed`, `missing`, `format`, `taken`.
+
+**Erinnerungen** (`services/league_open_points.py`, Art `tournament_registration`, `meta.reason` `league_open_points`, nur Postfach und Push): an jede
+betroffene Person mit behebbarem Stand („Für <Season> fehlt bei dir noch: <Grund>“, Link ins eigene Profil: Geburtsdatum `/profile?tab=basic`, sonst
+`/profile?tab=gaming`) und an Captain und Vertreter (ohne beide die Hauptteam-Leitung) eine Übersicht mit Namen, Ständen und `shortfall`, Link zur Ligaseite.
+Zweimal je Co-Team: beim Einreichen (Schlüssel `league-open-points:<antrag>:submit:player|team:<user>`) und vor dem ersten Spiel der Staffel
+(`league-open-points:<anmeldung>:first-match:player|team:<user>`). `player` ist die eigene Angabe, `team` die Übersicht - getrennt, damit ein Captain mit eigenem
+offenem Punkt beides bekommt. Das zweite läuft im Job `match_reminders` (alle fünf Minuten): Staffeln mit einem offenen Spiel der Seite
+innerhalb von `checkin_rules.open_points_remind_hours` (Vorgabe 48, 0 = aus; ohne Check-in-Regeln 48), nur für Anmeldungen mit aktivem Status
+(`pending`, `approved`, `checked_in`, `waitlist`; nicht zurückgezogen oder disqualifiziert) und nur solange die Anmeldung noch kein begonnenes oder
+entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der Antrag gespeichert (Fehler nur im Log). Ein zweiter Lauf findet den Schlüssel und schickt nichts. Nie ein Datum oder Alter in Texten.
+
+**Noch nicht gebaut, liest diese Prüfung später:** Strafen (E.3 ergänzt den Stand).
 
 ### B.4 Selbstanmeldung (#2205, #1623, #1665)
 
@@ -1113,8 +1139,11 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste.
 
 **Prüfung** (`league_applications.check_squad`, derselbe Text für Captain und Leitung): Fenster offen, Season weder beendet noch archiviert, gültige Fassung des Regelwerks, Platz oder Warteliste frei,
-kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`, mindestens Mindestkader spielberechtigte Spieler (`league_eligibility.status`). Spieler ohne gültige ID stehen als Warnung da.
-Mindestkader ist hier der kleinste aller aktiven Liga N. Beim Zuteilen zählt der genaue Wert der Staffel.
+kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`. Das sind die `problems`.
+**Fehlende Angaben halten nichts auf (#2313, ersetzt Nr. 74):** Wer nicht spielberechtigt ist (Geburtsdatum, Alter, Spiel-ID, Plattform, Wartezeit), steht in
+`warnings` („Name: Grund“); sind weniger als der Mindestkader spielberechtigt, sagt es `shortfall` („Nur 2 von 5 Spielern sind spielberechtigt, die Season verlangt
+mindestens 3. …“). Beides zeigt die Strecke als Hinweis, der Eingang der Leitung als offene Punkte; Einreichen, Annehmen und Zuteilen gehen trotzdem.
+Mindestkader ist hier der kleinste aller aktiven Liga N. Beim Zuteilen zählt der genaue Wert der Staffel. Nach dem Einreichen gehen die Erinnerungen aus B.3.
 
 **Zustimmung:** Beim Einreichen schickt das Web `rule_version_id` (die Fassung, die es zeigt), `accept_rules` und `accept_privacy`. Passt die Fassung nicht mehr: 409. `rules_text` gilt hier nicht als Regelwerk, weil dazu keine Version existiert: Ohne gültige Fassung geht keine Anmeldung, die Prüfung nennt es.
 Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` und `accepted_privacy` auf `true`, `registered_via: "league_application"`, `source: "league_application"`, `application_id`. Das Zuteilen ohne Antrag schreibt weiter `false`.
@@ -1131,11 +1160,11 @@ Weil das Zuteilen hier über den Antrag entscheidet, gilt die Befangenheit (sieh
 | Route | Wer | Zweck |
 | --- | --- | --- |
 | `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy}` oder `null`. Keine Personen |
-| `GET /api/leagues/{liga}/{season}/application` | angemeldet, Season sichtbar | `application`, `rules`, `privacy`, `season_problems`, `squads[]`: die eigenen Co-Teams des Spiels mit `can_apply`, `state`, `application`, nur für Captain und Vertreter dazu `problems`, `warnings`. `hint`, wenn das Co-Team keinen Captain hat |
+| `GET /api/leagues/{liga}/{season}/application` | angemeldet, Season sichtbar | `application`, `rules`, `privacy`, `season_problems`, `squads[]`: die eigenen Co-Teams des Spiels mit `can_apply`, `state`, `application`, nur für Captain und Vertreter dazu `problems`, `warnings`, `shortfall`. `hint`, wenn das Co-Team keinen Captain hat |
 | `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403 |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
-| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `history[].conflict_reason`), `superadmin`, `stats`, `divisions[]` |
+| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `history[].conflict_reason`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
 | `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
 | `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404 |
 
@@ -2001,6 +2030,7 @@ Vorgabe, ältere nichts, bis die Leitung einmal speichert. Protokoll `league.sea
 | `closes_minutes_after` | int 0–240 | 15 | und schließt so viele Minuten nach dem Termin |
 | `min_present` | int 1–50 | 3 | Nr. 46: mindestens so viele berechtigte Anwesende je Seite. Vorgabe einer neuen Season: `lineup_min_players` (Teilnehmerliste), sonst Teamgröße − 1, mindestens 1 |
 | `remind_minutes_before_close` | int 0–60 | 5 | zweite Erinnerung an Seiten ohne Check-in, so viele Minuten vor Schluss; 0 = keine |
+| `open_points_remind_hours` | int 0–168 | 48 | #2313: so viele Stunden vor dem ersten Spiel erinnert der Job an fehlende Angaben (B.3); 0 = keine. Ohne Regeln gilt 48 |
 
 **Fenster** (`match_flow.window_of`): nur mit `scheduled_at`; öffnet `scheduled_at − opens_minutes_before`, schließt
 `scheduled_at + closes_minutes_after`. „Verlängern“ der Leitung (`no_show_extended_until`, bestehender Knopf) schiebt das Ende. Gerechnet wird
@@ -2030,6 +2060,8 @@ schreibt wie der Stationsstart `in_progress` – App und TV zeigen „Läuft“ 
 - Prüfungen mit deutschem Satz: Staffel mit Regeln und zwei Seiten (409), nicht begonnen und keine Meldung (409), Fenster offen – „Der Check-in
   öffnet erst um …“ bzw. „Der Check-in ist seit … geschlossen – das entscheidet die Liga-Leitung“ (409, nur Seiten); Anwesende: nur Kader,
   jede Person einmal, mindestens `min_present`, nur spielberechtigt (`league_eligibility.check_participants`, Grund im Klartext, 422).
+  Hier greift die Sperre für fehlende Angaben (B.3, #2313): Die Anmeldung ließ sie durch, eingecheckt wird nur, wer `ok` ist. Trägt die Person die Angabe nach,
+  geht der Check-in sofort, ohne Zutun der Leitung. Auch die Leitung trägt niemanden ein, der nicht spielberechtigt ist.
 - **Regelwerks-Sperre:** Hat das Co-Team der Seite der geforderten Fassung (B.2, `requires_consent`) nicht zugestimmt, gibt es keinen Check-in
   – auch nicht durch die Leitung (Entscheidung Nr. 86): 409 „Das Regelwerk hat sich geändert – bitte erst zustimmen.“ mit dem Weg zur Fassung
   (`rules_url`). Die Matchseite zeigt denselben Satz vor dem Klick.
@@ -2094,7 +2126,10 @@ In einer Sperrzeit läuft nichts.
 {opens_at, closes_at}`, `ready_at`, `started_at`, `sides[]` je Seite `{registration_id, name, own, checked_in, at, via, present: [{id, name}],
 present_count, consent_open, rules_url, lead_reason}` (die Anwesenden sehen beide Seiten mit Namen und die Leitung, wie Aufstellungen –
 Entscheidung Nr. 85; einen Eignungsgrund sieht nur die eigene Seite), `own_registration_id`, `can_checkin`, `checkin_hint` (warum nicht), `roster[]` der eigenen Seite
-`{id, name, blocked}` (Grund im Klartext, nicht wählbar), `min_present`, `can_start`, `start_hint`, `proposal` (`{due_at, missing: [name]}` oder
+`{id, name, blocked}` (Grund im Klartext, nicht wählbar), `eligible_count` (spielberechtigt im eigenen Kader; unter `min_present`: `can_checkin` falsch,
+`checkin_hint` „Nur 2 Spieler aus eurem Kader dürfen gerade spielen, mindestens 3 müssen anwesend sein …“, #2313), `me` (nur wer selbst in einem Kader des
+Spiels steht und nicht spielberechtigt ist: `{reason, fix_url}`, `fix_url` ins eigene Profil bei behebbarem Stand, sonst `null`; sonst `me: null`),
+`min_present`, `can_start`, `start_hint`, `proposal` (`{due_at, missing: [name]}` oder
 `null`), `lead {can_enter, conflict, rosters: {registration_id: [{id, name, blocked}]}}` für die Leitung.
 
 **Aufgabe** `me.actions[]` `type: "match_checkin"` („Jetzt einchecken“, `target_type: "match"`) für die Verantwortlichen einer Seite ohne

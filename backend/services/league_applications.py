@@ -182,18 +182,12 @@ async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *
         outsiders = await _non_members(db, squad)
         if outsiders:
             problems.append((400, f"{squad.get('name')}: Diese Season ist nur für Mitglieder. Keine Mitglieder: {', '.join(sorted(outsiders))}."))
+    # Fehlende Angaben und zu wenige Spielberechtigte halten die Anmeldung nicht auf (#2313, ersetzt Nr. 74): nur Hinweis, gesperrt wird
+    # erst beim Check-in und bei der Aufstellung. Andere Co-Teams stehen schon oben als Grund.
     rows = league_eligibility.statuses(ctx, members, squad["id"])
-    ready = [row for row in rows.values() if row["ok"]]
-    if len(members) >= minimum and len(ready) < minimum:
-        # Was zu tun ist, sagt der Grund: andere Plattform (#2270) heißt andere Spieler, sonst fehlt meist die Spiel-ID.
-        states = {row["state"] for row in rows.values() if not row["ok"]}
-        todo = ("Wer auf einer anderen Plattform spielt, zählt nicht mit – die Gründe stehen bei den Spielern."
-                if states <= {league_platform.NOT_ALLOWED} else "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein.")
-        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. {todo}"))
-    # Alter und andere Co-Teams stehen schon oben als Grund.
-    named = (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE, league_eligibility.OTHER_TEAM)
-    warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] not in named]
-    return {"problems": problems, "warnings": sorted(warnings)}
+    warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] != league_eligibility.OTHER_TEAM]
+    shortfall = league_eligibility.open_points(ctx, squad, minimum=minimum)["shortfall"]
+    return {"problems": problems, "warnings": sorted(warnings), "shortfall": shortfall}
 
 
 # ---------------------------------------------------------------- Wer darf
@@ -287,6 +281,14 @@ async def submit(db, league: dict, season: dict, body: dict, user: dict) -> dict
         application = await _write(db, league, fresh, version, team, squad, user)
     await _audit(db, "submit", application, user["id"], version=version.get("version"))
     await _tell_status(db, league, season, application, SUBMITTED, squad=squad)
+    # Fehlende Angaben (#2313): Die Anmeldung ging durch, die Betroffenen und Captain und Vertreter hören, was bis zum ersten Spiel fehlt.
+    from services import league_open_points
+
+    try:
+        await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _min_size(db, fresh),
+                                              responsible=await _responsible(db, squad))
+    except Exception:  # noqa: BLE001 - der Antrag ist schon gespeichert, eine Erinnerung hält ihn nie auf
+        logger.warning("[liga] Erinnerung an fehlende Angaben nicht verschickt: %s", log_safe(application.get("id")), exc_info=True)
     return application
 
 
@@ -770,8 +772,14 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
                "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone))}
         if can_apply:
-            check = await check_squad(db, league, season, team, squad) if state == OPEN and not active else {"problems": [], "warnings": []}
-            row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"],
+            check = {"problems": [], "warnings": [], "shortfall": None}
+            if state == OPEN and not active:
+                check = await check_squad(db, league, season, team, squad)
+            elif active:
+                # Stand der Anmeldung (#2313): Was noch fehlt, bleibt nach dem Einreichen sichtbar - nur als offene Punkte.
+                found = await check_squad(db, league, season, team, squad, application=application)
+                check = {**check, "warnings": found["warnings"], "shortfall": found["shortfall"]}
+            row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"], shortfall=check.get("shortfall"),
                        can_submit=not active and not blocked and not check["problems"])
         elif user["id"] in _leads(team) and not (squad.get("captain_id") or squad.get("vice_captain_id")) and not hint:
             hint = f"Anmelden dürfen Captain und Vertreter. {squad.get('name')} hat noch keinen: Trag ihn unter Teams beim Co-Team ein."
@@ -863,7 +871,7 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "assignment": {**row["assignment"], "left": row["id"] in gone} if row.get("assignment") else None,
             "member_count": len([uid for uid in (squad or {}).get("member_ids") or [] if uid]),
             "captain_name": names.get((squad or {}).get("captain_id")), "vice_name": names.get((squad or {}).get("vice_captain_id")),
-            "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"],
+            "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"], "shortfall": check.get("shortfall"),
             "shared_with": shared,
             "own_team": belongs_to_side(user, sides[row["id"]], side_teams.get(row["team_id"])),
             "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": names.get(step.get("by")) or "Gelöschter User", "reason": step.get("reason"),

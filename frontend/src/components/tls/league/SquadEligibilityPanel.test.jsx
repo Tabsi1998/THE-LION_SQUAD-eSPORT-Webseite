@@ -27,7 +27,9 @@ const VIEW = {
     ],
     candidates: [
       { id: "u3", name: "Ida", can_add: false, needs_transfer: true, reason: "Steht oder stand in dieser Season in einem anderen Co-Team. Ein Wechsel geht nur als Transfer." },
-      { id: "u4", name: "Ben", can_add: false, needs_transfer: false, reason: "Geburtsdatum fehlt." },
+      // #2313: aufnehmbar, nur spielen erst mit Geburtsdatum.
+      { id: "u4", name: "Ben", can_add: true, needs_transfer: false, reason: "Geburtsdatum fehlt." },
+      { id: "u6", name: "Rio", can_add: false, needs_transfer: false, reason: "Gesperrt." },
       { id: "u5", name: "Tara", can_add: true, needs_transfer: false, reason: null },
     ],
     transfers: [{ id: "t1", user_id: "u9", user_name: "Rio", status: "pending" }],
@@ -54,6 +56,8 @@ test("zeigt Regeln und Stand, das Panel öffnet sich, wenn jemand nicht spielen 
   expect(screen.getByTestId("squad-eligibility-player-u2").textContent).toContain("Geburtsdatum fehlt");
   expect(screen.getByTestId("squad-eligibility-player-u1").textContent).toContain("Alter erfüllt");
   expect(panel.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  // #2313: die Sperre greift beim Spielen, nicht bei der Anmeldung.
+  expect(screen.getByTestId("squad-eligibility-lock-s1")).toHaveTextContent("kann nicht einchecken und nicht aufgestellt werden");
 });
 
 // Regelwerk (#2269): gültige Fassung und der Stand der Zustimmung dieses Co-Teams auf der Team-Seite.
@@ -82,7 +86,9 @@ test("beantragt den Transfer und lädt neu", async () => {
 
   await waitFor(() => expect(post).toHaveBeenCalledWith("/teams/team/squads/sq/transfers", { user_id: "u3" }));
   await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId("squad-candidate-u4").textContent).toContain("Geburtsdatum fehlt");
+  expect(screen.getByTestId("squad-candidates-later")).toHaveTextContent("Aufnehmbar, spielen erst mit der fehlenden Angabe");
+  expect(screen.getByTestId("squad-candidates-later")).toHaveTextContent("Ben: Geburtsdatum fehlt");
+  expect(screen.getByTestId("squad-candidate-u6").textContent).toContain("Gesperrt");
   expect(screen.queryByTestId("squad-candidate-u5")).toBeNull();
 });
 

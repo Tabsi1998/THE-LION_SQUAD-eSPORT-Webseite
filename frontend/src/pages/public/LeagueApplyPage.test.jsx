@@ -92,6 +92,24 @@ test("Warnungen halten nicht auf", async () => {
   expect(screen.getByTestId("apply-next")).toBeEnabled();
 });
 
+test("fehlende Angaben und zu wenige Spielberechtigte sind nur ein Hinweis, die Anmeldung geht weiter (#2313)", async () => {
+  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 3. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.";
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, squads: [{ ...SQUAD, shortfall, warnings: ["Mila: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein.", "Tom: Probe-ID fehlt im Profil."] }] } });
+  renderPage();
+
+  fireEvent.click(await screen.findByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-check-ok")).toHaveTextContent("Loewen · Rudel kann angemeldet werden.");
+  expect(screen.queryByTestId("apply-problems")).toBeNull();
+  expect(screen.queryByText(/Das fehlt noch/)).toBeNull();
+  const hints = screen.getByTestId("apply-warnings");
+  expect(hints).toHaveTextContent("Die Anmeldung geht trotzdem.");
+  expect(hints).toHaveTextContent("Geburtsdatum fehlt");
+  expect(hints).toHaveTextContent("kann nicht einchecken");
+  expect(screen.getByTestId("apply-shortfall")).toHaveTextContent("Nur 2 von 4 Spielern");
+  expect(screen.getByTestId("apply-next")).toBeEnabled();
+});
+
 test("die Prüfung nennt die Plattform der Season und abweichende Ligen (#2270)", async () => {
   const platform = { field_label: "Plattform", allowed: ["PC"], crossplay: false, input_device: null, divisions: [
     { id: "d1", label: "Liga 1", allowed: ["PC"], crossplay: false, input_device: null, differs: false },

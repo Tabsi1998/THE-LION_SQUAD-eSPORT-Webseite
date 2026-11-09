@@ -2,7 +2,7 @@
 // Datenschutz zustimmen, einreichen. Danach zeigt die Ligaseite den Stand. Geprüft wird beim Einreichen noch einmal auf dem Server.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, Check, ExternalLink, FileText } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
 import { API, api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -76,14 +76,36 @@ function PlatformNote({ platform }) {
   );
 }
 
+/** Offene Punkte (#2313): fehlende Angaben halten die Anmeldung nicht auf - gesperrt wird erst beim Check-in und bei der Aufstellung. */
+function OpenPoints({ row }) {
+  const warnings = row.warnings || [];
+  if (!warnings.length && !row.shortfall) return null;
+  return (
+    <div className="rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-3" data-testid="apply-warnings">
+      <p className="flex items-start gap-2 text-sm font-semibold text-white/90">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
+        <span>Die Anmeldung geht trotzdem. Bis zum ersten Spiel noch nachtragen:</span>
+      </p>
+      {row.shortfall ? <p className="mt-2 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid="apply-shortfall">{row.shortfall}</p> : null}
+      {warnings.length ? (
+        <ul className="mt-2 space-y-1 text-sm text-white/75">{warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul>
+      ) : null}
+      <p className="mt-2 text-xs text-white/60">
+        Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden. Jeder trägt es im eigenen Profil nach. Wir erinnern die Spieler und dich jetzt und noch einmal vor dem ersten Spiel.
+      </p>
+    </div>
+  );
+}
+
 function CheckStep({ row, seasonProblems, platform }) {
   const problems = [...seasonProblems, ...(row.problems || [])];
+  const open = Boolean(row.warnings?.length || row.shortfall);
   return (
     <div className="space-y-4">
       <PlatformNote platform={platform} />
       {problems.length ? (
         <div className="rounded-sm border border-warn/40 bg-warn/5 p-3" data-testid="apply-problems">
-          <p className="font-semibold text-warn">Das fehlt noch:</p>
+          <p className="font-semibold text-warn">So geht die Anmeldung noch nicht:</p>
           <ul className="mt-2 space-y-2 text-sm text-white/85">
             {problems.map((text) => <li key={text} className="flex gap-2 [overflow-wrap:anywhere]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" /> <span>{text}</span></li>)}
           </ul>
@@ -91,15 +113,10 @@ function CheckStep({ row, seasonProblems, platform }) {
         </div>
       ) : (
         <p className="flex items-center gap-2 rounded-sm border border-ok/40 bg-ok/5 p-3 text-sm text-white/90" data-testid="apply-check-ok">
-          <Check className="h-4 w-4 shrink-0 text-ok" aria-hidden="true" /> {row.display_name} erfüllt die Vorgaben dieser Season.
+          <Check className="h-4 w-4 shrink-0 text-ok" aria-hidden="true" /> {open ? `${row.display_name} kann angemeldet werden.` : `${row.display_name} erfüllt die Vorgaben dieser Season.`}
         </p>
       )}
-      {row.warnings?.length ? (
-        <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="apply-warnings">
-          <p className="text-sm font-semibold text-white/85">Geht trotzdem, aber diese Spieler dürfen so noch nicht spielen:</p>
-          <ul className="mt-2 space-y-1 text-sm text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul>
-        </div>
-      ) : null}
+      <OpenPoints row={row} />
     </div>
   );
 }

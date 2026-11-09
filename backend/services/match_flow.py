@@ -394,8 +394,31 @@ def _pick(user_id: str, people: dict[str, dict], rows: dict[str, dict], *, with_
     return {**(people.get(user_id) or {"id": user_id, "name": row.get("name") or "Spieler"}), "blocked": blocked}
 
 
+def short_roster_hint(eligible: int, minimum: int) -> str:
+    """Zu wenige Spielberechtigte im eigenen Kader (#2313) - kein Check-in, bis genug Angaben nachgetragen sind."""
+    who = "Spieler darf" if eligible == 1 else "Spieler dürfen"
+    return (f"Nur {eligible} {who} aus eurem Kader gerade spielen, mindestens {minimum} müssen anwesend sein – so könnt ihr nicht "
+            "einchecken. Wer grau steht, trägt die fehlende Angabe im eigenen Profil nach, dann geht es sofort.")
+
+
+def own_block(setup: Sides, viewer_id: str | None) -> dict | None:
+    """Der eigene Stand der Person, die die Seite ansieht (#2313): nur wenn sie in einem Kader des Spiels steht und nicht spielen darf.
+    ``fix_url`` führt ins eigene Profil, wenn sie es selbst beheben kann."""
+    from services import league_eligibility
+
+    if not viewer_id:
+        return None
+    for reg in setup.registrations:
+        row = (setup.rows.get(reg["id"]) or {}).get(viewer_id)
+        if viewer_id in (setup.rosters.get(reg["id"]) or set()) and row and not row.get("ok", True):
+            return {"reason": league_eligibility.self_reason(row.get("state"), row.get("reason")), "state": row.get("state"),
+                    "fix_url": league_eligibility.fix_url(row.get("state"))}
+    return None
+
+
 async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: dict | None, involved: bool, lead: bool,
-                     can_lead_enter: bool, conflict: dict | None, now: datetime | None = None) -> dict | None:
+                     can_lead_enter: bool, conflict: dict | None, now: datetime | None = None,
+                     viewer_id: str | None = None) -> dict | None:
     """Der Block ``checkin`` der Matchseite - nur Staffeln mit Regeln, nur Beteiligte und Leitung."""
     rules = rules_of(tournament)
     if not rules or not (involved or lead):
@@ -424,6 +447,16 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
     hint = refusal
     if own_id and not refusal and own_consent and own_consent.get("open"):
         hint = rules_changed_detail(own_consent)
+    # Zu wenige Spielberechtigte (#2313): Die Anmeldung ließ das Team durch, einchecken geht erst, wenn genug Angaben nachgetragen sind.
+    # Der Satz steht schon vor dem Fenster da, damit das Team rechtzeitig nachträgt.
+    eligible_count = None
+    roster_hint = None
+    if own_id:
+        own_rows = setup.rows.get(own_id) or {}
+        eligible_count = sum(1 for user_id in setup.rosters.get(own_id) or set() if (own_rows.get(user_id) or {}).get("ok", True))
+        if eligible_count < int(rules["min_present"]):
+            roster_hint = short_roster_hint(eligible_count, int(rules["min_present"]))
+            hint = hint or roster_hint
     can_checkin = bool(own_id) and hint is None
     start_hint = None
     if current != READY:
@@ -468,6 +501,9 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
         "own_registration_id": own_id,
         "can_checkin": can_checkin,
         "checkin_hint": hint if own_id else None,
+        "eligible_count": eligible_count,
+        "roster_hint": roster_hint,
+        "me": own_block(setup, viewer_id),
         "roster": sorted((_pick(user_id, people, setup.rows.get(own_id) or {}, with_reason=True) for user_id in setup.rosters.get(own_id) or set()),
                          key=lambda row: row["name"].casefold()) if own_id else [],
         "min_present": int(rules["min_present"]),

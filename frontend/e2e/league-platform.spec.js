@@ -35,8 +35,10 @@ const SEASON_PAGE = {
   calendar: { weeks: [], blocked_weeks: [], active_weeks: 10, max_teams_per_staffel: 8, rounds_needed: 7 },
 };
 const SQUAD = { squad_id: "sq1", squad_name: "Rudel Alpha", team_id: "t1", team_name: "Loewen", display_name: "Loewen · Rudel Alpha", member_count: 4, can_apply: true, state: "open",
-  application: null, problems: ["Rudel Alpha: Nur 3 Spieler sind spielberechtigt, die Season verlangt mindestens 4. Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein."],
-  warnings: ["Tom Beispiel: Diese Season ist nur für PC – angegeben ist PlayStation."], can_submit: false };
+  // Seit #2313 nur ein Hinweis: Die Anmeldung geht, gesperrt wird beim Check-in.
+  application: null, problems: [],
+  shortfall: "Nur 3 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 4. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.",
+  warnings: ["Tom Beispiel: Diese Season ist nur für PC – angegeben ist PlayStation."], can_submit: true };
 const MINE = {
   application: { state: "open", slots: 8, slots_free: 3, waitlist: false }, season_problems: [], hint: null, squads: [SQUAD],
   platform: { field_label: "Plattform", allowed: ["PC"], crossplay: false, input_device: "controller", divisions: [
@@ -138,9 +140,10 @@ for (const [width, height] of WIDTHS) {
       await expect(note).toContainText("Plattform: nur PC.");
       await expect(note).toContainText("Eingabegerät: Controller.");
       await expect(note).toContainText("Liga 2 · Offen für alle mit langem Beinamen: alle Plattformen · Crossplay an · Controller");
-      await expect(page.getByTestId("apply-problems")).toContainText("Nur 3 Spieler sind spielberechtigt");
+      await expect(page.getByTestId("apply-shortfall")).toContainText("Nur 3 von 4 Spielern sind spielberechtigt");
       await expect(page.getByTestId("apply-warnings")).toContainText("Diese Season ist nur für PC – angegeben ist PlayStation.");
-      await expect(page.getByTestId("apply-next")).toBeDisabled();
+      await expect(page.getByTestId("apply-problems")).toHaveCount(0);
+      await expect(page.getByTestId("apply-next")).toBeEnabled();
       await noSideScroll(page);
     });
   });

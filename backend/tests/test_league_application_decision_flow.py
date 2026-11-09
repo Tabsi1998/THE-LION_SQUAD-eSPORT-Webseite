@@ -504,7 +504,8 @@ async def test_inbox_shows_consent_people_and_staffeln_without_birth_dates(flow)
     assert row["rules_version"] == w["rule"]["version"] and row["rules_at"] and row["privacy_at"]
     assert row["applied_by_name"] == "TeamB S0" and row["captain_name"] == "TeamB S0" and row["vice_name"] == "TeamB S1"
     assert row["member_count"] == 5
-    assert any("Geburtsdatum fehlt" in text for text in row["problems"])
+    # Seit #2313 ein offener Punkt, kein Halt: Die Leitung darf trotzdem zulassen.
+    assert row["problems"] == [] and any("Geburtsdatum fehlt" in text for text in row["warnings"])
     assert "1990" not in str(body)
     assert [staffel["staffel"] for staffel in body["divisions"][0]["staffeln"]] == ["A"]
     assert [step["status"] for step in row["history"]] == ["submitted"]
