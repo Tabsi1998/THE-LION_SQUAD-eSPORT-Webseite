@@ -78,6 +78,10 @@ async def test_a_missing_birth_date_is_a_hint_and_the_registration_goes_through(
     assert "1990" not in str(row) and "birth_date" not in str(row)
     assert (await submit(flow, w, side)).status_code == 200
 
+    status = await row_of(flow, w, side)
+    assert status["state"] == "submitted" and status["problems"] == [] and status["can_submit"] is False
+    assert any("Geburtsdatum fehlt" in text for text in status["warnings"]), "der Stand auf der Ligaseite nennt die offenen Punkte weiter"
+
 
 @pytest.mark.asyncio
 async def test_too_few_eligible_players_are_a_hint_and_the_registration_goes_through(flow):

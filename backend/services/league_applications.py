@@ -771,7 +771,13 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
                "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone))}
         if can_apply:
-            check = await check_squad(db, league, season, team, squad) if state == OPEN and not active else {"problems": [], "warnings": []}
+            check = {"problems": [], "warnings": [], "shortfall": None}
+            if state == OPEN and not active:
+                check = await check_squad(db, league, season, team, squad)
+            elif active:
+                # Stand der Anmeldung (#2313): Was noch fehlt, bleibt nach dem Einreichen sichtbar - nur als offene Punkte.
+                found = await check_squad(db, league, season, team, squad, application=application)
+                check = {**check, "warnings": found["warnings"], "shortfall": found["shortfall"]}
             row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"], shortfall=check.get("shortfall"),
                        can_submit=not active and not blocked and not check["problems"])
         elif user["id"] in _leads(team) and not (squad.get("captain_id") or squad.get("vice_captain_id")) and not hint:
