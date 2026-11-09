@@ -4,7 +4,8 @@ Eine Seite für **Captain und Vertreter** eines Co-Teams in der CoD-Liga (Season
 auf der **Matchseite** eures Spiels: Ligaseite → euer Spiel, oder über die Benachrichtigung. Ohne Captain und
 Vertreter macht das die Teamleitung. Melden, Bestätigen und Nachtragen ausführlich:
 [Turniere, 3.16 Ergebnis je Map melden](turniere.md#316-liga-ergebnis-je-map-melden-für-captains); für die
-Turnierleitung: [Liga leiten](liga.md).
+Turnierleitung: [Liga leiten](liga.md). Zum Verschicken an Captains gibt es dieselben Schritte kürzer und mit Bildern
+auf der Website unter `/hilfe/liga-captains` ([Hilfe für Spieler und Captains](hilfe.md)).
 
 ## Anmelden
 
