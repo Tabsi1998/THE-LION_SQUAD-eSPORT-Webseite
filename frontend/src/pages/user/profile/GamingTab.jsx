@@ -1,4 +1,5 @@
 import { MultiSelect } from "@/components/tls/MultiSelect";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { INPUT_DEVICES, PLATFORMS, SUBSCRIPTIONS } from "./constants";
 import { Field, Input, Row, Section } from "./fields";
 import { PROFILE_LIMITS } from "./form";
@@ -30,7 +31,7 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                   {gameIdGroups.length > 0 && (
                     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-4">
                       <div>
-                        <h3 className="font-heading font-black uppercase">Spiel-IDs</h3>
+                        <h3 className="font-heading font-black uppercase flex items-center gap-1">Spiel-IDs <HelpLink thema="konto-und-profil" schritt="spiel-ids" className="-my-2" /></h3>
                         <p className="text-xs text-white/50 mt-1">IDs können für Hauptspiele gelten und automatisch bei passenden Spielversionen verwendet werden, z.B. Activision ID für Call of Duty und BO6/BO7.</p>
                       </div>
                       {/* Liga (#2108): welche ID in einer laufenden Season gilt - live zum Formular. */}

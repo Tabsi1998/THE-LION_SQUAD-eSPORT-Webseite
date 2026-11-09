@@ -8,7 +8,7 @@ import { ProofPhotoPicker } from "@/components/tls/results/ProofPhotoPicker";
 // Wunsch ein Foto. Die Turnierleitung bekommt es sofort und entscheidet; die Gegenseite erfährt nur, dass geprüft wird
 // (ohne den Text). Geht in jedem Modus - bei „Nur Turnierleitung“ direkt an die Turnierleitung.
 
-export function ProblemReportForm({ matchId, until = null, busy = false, initialCategory = "", onSubmit, separated = false }) {
+export function ProblemReportForm({ matchId, until = null, busy = false, initialCategory = "", onSubmit, separated = false, help = null }) {
   const [category, setCategory] = useState(initialCategory);
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState(null);
@@ -33,7 +33,7 @@ export function ProblemReportForm({ matchId, until = null, busy = false, initial
 
   return (
     <form onSubmit={submit} className={`space-y-3 ${separated ? "border-t border-white/10 pt-5" : ""}`} data-testid="match-dispute-form" noValidate>
-      <div className="text-xs text-[#FF6B60] font-bold uppercase tracking-wider flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden</div>
+      <div className="text-xs text-[#FF6B60] font-bold uppercase tracking-wider flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
       <div className="text-sm text-white/60">Was stimmt nicht?</div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Grund">
         {DISPUTE_REASONS.map(([key, label]) => (

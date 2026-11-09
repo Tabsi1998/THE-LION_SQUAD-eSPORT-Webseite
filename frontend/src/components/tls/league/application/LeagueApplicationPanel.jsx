@@ -6,6 +6,7 @@ import { AlertTriangle, ClipboardCheck, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, windowLine } from "@/lib/leagueApplications";
 
@@ -87,6 +88,7 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
         <div className="min-w-0">
           <h2 id="league-application-title" className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase">
             <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
+            <HelpLink thema="liga-captains" schritt="anmeldung-starten" />
           </h2>
           <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">{windowLine(current)}</p>
           {seats ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-seats">{seats}</p> : null}

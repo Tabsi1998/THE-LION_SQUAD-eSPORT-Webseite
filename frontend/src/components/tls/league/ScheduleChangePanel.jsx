@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CalendarClock, Check, History, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { fromViennaInput, viennaInputValue } from "@/lib/vienna";
 import { historyLine, homeRuleText, limitText, requestStatusLabel, rulesSentences, shortWhen, weekText } from "@/lib/leagueSchedule";
 
@@ -120,6 +121,7 @@ export function ScheduleChangePanel({ block, matchId, busy, run, onChanged, onAs
     <section className="mt-6 border-t border-white/10 pt-5" data-testid="schedule-change">
       <h3 className="font-heading text-base font-black uppercase flex items-center gap-2">
         <CalendarClock className="w-4 h-4 text-[#29B6E8]" aria-hidden="true" /> Termin und Verschiebung
+        <HelpLink thema="liga-captains" schritt="verschieben" />
       </h3>
       {limit ? <p className="mt-2 text-sm text-white/80" data-testid="schedule-limit">{limit}</p> : null}
       {homeRule ? <p className="mt-1 text-sm text-[#FFD700]" data-testid="schedule-home-rule">{homeRule}</p> : null}

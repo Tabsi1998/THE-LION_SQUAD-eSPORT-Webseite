@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { Reveal } from "@/components/tls/Reveal";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -390,6 +391,8 @@ function TeamDetail({ id }) {
             ) : null}
             {/* Teilen (#1154): für alle, auch Gäste. */}
             <ShareButton kind="team" id={team.id} title={team.tag ? `${team.name} [${team.tag}]` : team.name} detail="Team" />
+            {/* Hilfe (#2295): Wer einlädt, findet dort Link, QR-Code und Beitrittscode erklärt; alle anderen den Weg zum Beitreten. */}
+            <HelpLink thema="team-und-co-team" schritt={canEdit ? "einladen" : "beitreten"} className="self-center" />
           </>
         )}
       >
