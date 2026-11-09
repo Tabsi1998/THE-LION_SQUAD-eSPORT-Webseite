@@ -1141,9 +1141,12 @@ Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zug
 **Prüfung** (`league_applications.check_squad`, derselbe Text für Captain und Leitung): Fenster offen, Season weder beendet noch archiviert, gültige Fassung des Regelwerks, Platz oder Warteliste frei,
 kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`. Das sind die `problems`.
 **Fehlende Angaben halten nichts auf (#2313, ersetzt Nr. 74):** Wer nicht spielberechtigt ist (Geburtsdatum, Alter, Spiel-ID, Plattform, Wartezeit), steht in
-`warnings` („Name: Grund“); sind weniger als der Mindestkader spielberechtigt, sagt es `shortfall` („Nur 2 von 5 Spielern sind spielberechtigt, die Season verlangt
-mindestens 3. …“). Beides zeigt die Strecke als Hinweis, der Eingang der Leitung als offene Punkte; Einreichen, Annehmen und Zuteilen gehen trotzdem.
-Mindestkader ist hier der kleinste aller aktiven Liga N. Beim Zuteilen zählt der genaue Wert der Staffel. Nach dem Einreichen gehen die Erinnerungen aus B.3.
+`warnings` („Name: Grund“); sind weniger spielberechtigt als zum Einchecken nötig, sagt es `shortfall` („Nur 2 von 5 Spielern sind spielberechtigt, für ein Spiel
+braucht ein Team mindestens 3. …“). Beides zeigt die Strecke als Hinweis, der Eingang der Leitung als offene Punkte; Einreichen, Annehmen und Zuteilen gehen trotzdem.
+Maßstab für `shortfall` ist die Mindestzahl Anwesender aus den Check-in-Regeln der Season (`checkin_rules.min_present`, bei 4 gegen 4 also 3), nicht der
+Mindestkader (#2322): Mit 3 Spielberechtigten kann ein Team antreten, auch wenn sein Kader mindestens 4 Personen haben muss. Ohne Check-in-Regeln gilt der
+kleinste Mindestkader aller aktiven Liga N. Der Mindestkader selbst (Personen im Kader) bleibt eine Sperre der Anmeldung. Nach dem Einreichen gehen die
+Erinnerungen aus B.3; vor dem ersten Spiel zählt dort die Mindestzahl der Staffel.
 
 **Zustimmung:** Beim Einreichen schickt das Web `rule_version_id` (die Fassung, die es zeigt), `accept_rules` und `accept_privacy`. Passt die Fassung nicht mehr: 409. `rules_text` gilt hier nicht als Regelwerk, weil dazu keine Version existiert: Ohne gültige Fassung geht keine Anmeldung, die Prüfung nennt es.
 Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` und `accepted_privacy` auf `true`, `registered_via: "league_application"`, `source: "league_application"`, `application_id`. Das Zuteilen ohne Antrag schreibt weiter `false`.

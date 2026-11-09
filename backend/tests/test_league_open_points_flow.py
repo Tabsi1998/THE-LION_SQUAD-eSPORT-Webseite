@@ -89,12 +89,20 @@ async def test_too_few_eligible_players_are_a_hint_and_the_registration_goes_thr
     w = await ready_world(flow, min_squad_size=4, team_size=4)
     side = w["teams"][0]
     slug = w["game"]["slug"]
-    await flow.db.users.update_one({"id": side["member"]["id"]}, {"$unset": {f"game_ids.{slug}.probe_id": ""}})
+    # Zum Einchecken reichen 3 (Check-in-Regeln der Season, 4 gegen 4), der Mindestkader von 4 zählt dafür nicht (#2322).
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {"checkin_rules.min_present": 3}})
+    unready = [user for user in side["people"] if user["id"] != side["captain"]["id"]][:2]
+    await flow.db.users.update_one({"id": unready[0]["id"]}, {"$unset": {f"game_ids.{slug}.probe_id": ""}})
 
     row = await row_of(flow, w, side)
-
     assert row["problems"] == [], row
-    assert row["shortfall"].startswith("Nur 3 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 4.")
+    assert row["shortfall"] is None, "3 Spielberechtigte reichen zum Einchecken, auch wenn der Mindestkader 4 ist"
+    assert any("Probe-ID" in text for text in row["warnings"]), row
+
+    await flow.db.users.update_one({"id": unready[1]["id"]}, {"$unset": {f"game_ids.{slug}.probe_id": ""}})
+    row = await row_of(flow, w, side)
+    assert row["problems"] == [], row
+    assert row["shortfall"].startswith(f"Nur 2 von {len(side['people'])} Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 3.")
     answer = await submit(flow, w, side)
     assert answer.status_code == 200, answer.text
 

@@ -18,7 +18,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
+from services import checkin_rules, league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
 from services.league_permissions import belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
@@ -159,6 +159,16 @@ async def _min_size(db, season: dict) -> int:
     return min(league_roster.min_squad_size(row) for row in rows)
 
 
+async def _ready_minimum(db, season: dict) -> int:
+    """Wie viele Spielberechtigte ein Team zum Einchecken braucht (#2322): die Mindestzahl Anwesender aus den Check-in-Regeln der
+    Season (bei 4 gegen 4 also 3), nicht der Mindestkader. Ohne Check-in-Regeln gilt wie bisher der Mindestkader."""
+    raw = season.get("checkin_rules")
+    if isinstance(raw, dict):
+        with contextlib.suppress(checkin_rules.FlowProblem):
+            return int(checkin_rules.normalize({key: value for key, value in raw.items() if key in checkin_rules.DEFAULTS})["min_present"])
+    return await _min_size(db, season)
+
+
 async def _non_members(db, squad: dict) -> list[str]:
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     rows = await db.users.find({"id": {"$in": members}}, {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_club_member": 1, "display_name": 1, "username": 1}).to_list(len(members) + 1)
@@ -186,7 +196,7 @@ async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *
     # erst beim Check-in und bei der Aufstellung. Andere Co-Teams stehen schon oben als Grund.
     rows = league_eligibility.statuses(ctx, members, squad["id"])
     warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] != league_eligibility.OTHER_TEAM]
-    shortfall = league_eligibility.open_points(ctx, squad, minimum=minimum)["shortfall"]
+    shortfall = league_eligibility.open_points(ctx, squad, minimum=await _ready_minimum(db, season))["shortfall"]
     return {"problems": problems, "warnings": sorted(warnings), "shortfall": shortfall}
 
 
@@ -285,7 +295,7 @@ async def submit(db, league: dict, season: dict, body: dict, user: dict) -> dict
     from services import league_open_points
 
     try:
-        await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _min_size(db, fresh),
+        await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _ready_minimum(db, fresh),
                                               responsible=await _responsible(db, squad))
     except Exception:  # noqa: BLE001 - der Antrag ist schon gespeichert, eine Erinnerung hält ihn nie auf
         logger.warning("[liga] Erinnerung an fehlende Angaben nicht verschickt: %s", log_safe(application.get("id")), exc_info=True)
