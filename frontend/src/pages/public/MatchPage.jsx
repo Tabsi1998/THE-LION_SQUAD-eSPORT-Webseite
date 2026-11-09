@@ -228,9 +228,9 @@ function MatchPageView() {
 
   /** Termine prüfen und senden (#2325): erst jeder einzeln hier, dann der Server - seine Fehler kommen an dieselbe Stelle.
    * Antwort `{ ok, errors }`; gespeichert sind entweder alle oder keiner. */
-  const sendTimes = async (values, send, fallback) => {
+  const sendTimes = async (values, send, fallback, offered = []) => {
     const iso = values.map(fromLocalInput);
-    const local = proposalTimeErrors(iso);
+    const local = proposalTimeErrors(iso, { offered });
     setActionError("");
     // Fehler zu einem Termin stehen am Feld (role="alert"); oben nur die Meldung als Toast, nicht ein zweites Mal im Kasten.
     if (local.some(Boolean)) {
@@ -259,11 +259,11 @@ function MatchPageView() {
   };
 
   // Spielwoche (#2325): nur ein Hinweis am Termin, er hält nichts auf - wie der einzelne Vorschlag aus der App.
-  const timeHints = (values) => {
+  const timeHints = (values, offered = []) => {
     const block = data?.schedule_block;
     const week = block?.window || null;
     // Die 72-h-Regel nur nennen, wenn sie in der Staffel an ist.
-    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week), homeRule: block?.rules?.home_rule !== false });
+    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week), homeRule: block?.rules?.home_rule !== false, offered });
   };
 
   const changeProposalTimes = (next) => {
@@ -285,12 +285,13 @@ function MatchPageView() {
     await load();
   }, "Terminentscheidung konnte nicht gespeichert werden.");
 
-  // Gegenvorschlag mit bis zu drei Terminen - für einen Vorschlag oder die ganze Gruppe (#2325).
-  const counterPropose = (proposal, values, note) => sendTimes(values, async (scheduled_ats) => {
+  // Gegenvorschlag mit bis zu drei Terminen - für einen Vorschlag oder die ganze Gruppe (#2325). `offered`: was schon zur Auswahl
+  // steht - so ein Termin ist eine Annahme und hält den Gegenvorschlag auf (wie der Server).
+  const counterPropose = (proposal, values, note, offered = []) => sendTimes(values, async (scheduled_ats) => {
     await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action: "counter", scheduled_ats, note: note || null });
     toast.success(DECISION_TOASTS.counter);
     await load();
-  }, "Gegenvorschlag konnte nicht gesendet werden.");
+  }, "Gegenvorschlag konnte nicht gesendet werden.", offered);
 
   // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
   const submitReport = async (payload) => runAction(async () => {

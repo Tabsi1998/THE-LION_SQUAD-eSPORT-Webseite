@@ -77,7 +77,7 @@ export function ProposalTimesEditor({ values, onChange, errors = [], hints = [],
 }
 
 /** Gegenvorschlag zu einem Vorschlag oder einer ganzen Gruppe: bis zu drei Termine, eine Antwort, ein Knopf. */
-function CounterForm({ bundleKey, min, busy, onCounter, onClose, hintsFor }) {
+function CounterForm({ bundleKey, min, busy, onCounter, onClose, hintsFor, offered = [] }) {
   // Leer beginnen: der vorgeschlagene Termin steht ja schon zur Auswahl - „Annehmen“ statt ihn zurückzuschicken.
   const [times, setTimes] = useState([""]);
   const [note, setNote] = useState("");
@@ -87,14 +87,14 @@ function CounterForm({ bundleKey, min, busy, onCounter, onClose, hintsFor }) {
     setErrors([]);
   };
   const submit = async () => {
-    const result = await onCounter(times, note);
+    const result = await onCounter(times, note, offered);
     if (result?.errors) setErrors(result.errors);
     if (result?.ok) onClose();
   };
   return (
     <div className="mt-3 border-t border-white/10 pt-3 space-y-3" data-testid={`match-counter-${bundleKey}`}>
       <p className="text-xs text-white/55">Euer Gegenvorschlag – bis zu {MAX_PROPOSAL_TIMES} Termine.</p>
-      <ProposalTimesEditor values={times} onChange={change} errors={errors} hints={hintsFor ? hintsFor(times) : []} min={min} label="Gegenvorschlag" testId={`match-counter-at-${bundleKey}`} disabled={busy} />
+      <ProposalTimesEditor values={times} onChange={change} errors={errors} hints={hintsFor ? hintsFor(times, offered) : []} min={min} label="Gegenvorschlag" testId={`match-counter-at-${bundleKey}`} disabled={busy} />
       <input aria-label="Antwort oder Grund" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="input" placeholder="Antwort / Grund (optional)" />
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={submit} data-testid={`match-counter-send-${bundleKey}`} className="tls-btn tls-btn--secondary min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">{proposeButtonLabel(times.length, true)}</button>
@@ -149,7 +149,8 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
     const declineOpen = answer && panel?.key === bundle.key && panel.kind === "decline";
     const counter = counterOpen ? (
       <CounterForm bundleKey={bundle.key} min={min} busy={busy} onClose={close} hintsFor={hintsFor}
-        onCounter={(times, note) => onCounter(first, times, note)} />
+        offered={bundle.proposals.map((proposal) => proposal.scheduled_at)}
+        onCounter={(times, note, offered) => onCounter(first, times, note, offered)} />
     ) : null;
     const decline = declineOpen ? (
       <DeclineForm bundleKey={bundle.key} busy={busy} all={bundle.group} onClose={close}

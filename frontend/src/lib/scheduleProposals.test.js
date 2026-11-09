@@ -1,6 +1,7 @@
 import {
   DUPLICATE_TIME_TEXT,
   MISSING_TIME_TEXT,
+  OFFERED_TIME_TEXT,
   PAST_PROPOSAL_TEXT,
   bundleProposals,
   isOwnProposal,
@@ -48,6 +49,10 @@ test("proposalTimeHints: außerhalb der Spielwoche nur ein Hinweis, ohne Woche k
   expect(hints[1]).toBeNull();
   expect(hints[2]).toBe("Liegt außerhalb der Spielwoche (Mo 01.03. 01:00 bis So 07.03. 23:59) – gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.");
   expect(proposalTimeHints(["2027-03-09T19:00:00Z"])).toEqual([null]);
+  // Im Gegenvorschlag: ein angebotener Termin ist beim Eingeben ein Hinweis und beim Absenden ein Fehler.
+  const offered = ["2027-03-09T19:00:00+00:00"];
+  expect(proposalTimeHints(["2027-03-09T19:00:00Z", "2027-03-10T19:00:00Z"], { offered })).toEqual([OFFERED_TIME_TEXT, null]);
+  expect(proposalTimeErrors(["2027-03-09T19:00:00Z", "2027-03-10T19:00:00Z"], { now: NOW, offered })).toEqual([OFFERED_TIME_TEXT, null]);
   // Ist die 72-h-Regel in der Staffel aus, nennt der Hinweis sie nicht.
   expect(proposalTimeHints(["2027-03-09T19:00:00Z"], { window, homeRule: false })).toEqual([
     "Liegt außerhalb der Spielwoche – gilt nur, wenn die Gegenseite annimmt.",

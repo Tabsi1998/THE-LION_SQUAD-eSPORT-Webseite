@@ -180,6 +180,23 @@ test("einzelner Vorschlag: Ablehnen fragt nach einem Grund, ohne Grund geht es a
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/f1/decision", { action: "decline", note: null }));
 });
 
+test("Gegenvorschlag mit einem angebotenen Termin: Hinweis schon beim Eingeben, nichts geht an den Server", async () => {
+  const pad = (n) => String(n).padStart(2, "0");
+  const offered = new Date(THEIRS[1].scheduled_at);
+  const asInput = `${offered.getFullYear()}-${pad(offered.getMonth() + 1)}-${pad(offered.getDate())}T${pad(offered.getHours())}:${pad(offered.getMinutes())}`;
+  renderMatch({ ...BASE, match: { ...BASE.match, schedule_status: "proposed" }, schedule_proposals: THEIRS });
+  const card = await screen.findByTestId("match-proposal-group-g-falken");
+  fireEvent.click(within(card).getByTestId("match-counter-open-gruppe-g-falken"));
+  fireEvent.change(within(card).getByTestId("match-counter-at-gruppe-g-falken"), { target: { value: "2027-03-13T20:00" } });
+  fireEvent.click(within(card).getByTestId("match-counter-at-gruppe-g-falken-weiter"));
+  fireEvent.change(within(card).getByTestId("match-counter-at-gruppe-g-falken-2"), { target: { value: asInput } });
+  expect(within(card).getByTestId("match-counter-at-gruppe-g-falken-hinweis-2")).toHaveTextContent("Steht schon zur Auswahl");
+  expect(within(card).queryByTestId("match-counter-at-gruppe-g-falken-hinweis-1")).toBeNull();
+  fireEvent.click(within(card).getByTestId("match-counter-send-gruppe-g-falken"));
+  expect(await within(card).findByTestId("match-counter-at-gruppe-g-falken-fehler-2")).toHaveTextContent("einfach „Annehmen“ tippen");
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
 test("eigene Gruppe: wartet auf die Gegenseite, Zurückziehen nimmt alle zurück", async () => {
   const own = THEIRS.map((row) => ({ ...row, group_id: "g-own", actor_registration_id: "a", actor_user_id: "c1", actor: { display_name: "Kapitaen" } }));
   renderMatch({ ...BASE, match: { ...BASE.match, schedule_status: "proposed" }, schedule_proposals: own });

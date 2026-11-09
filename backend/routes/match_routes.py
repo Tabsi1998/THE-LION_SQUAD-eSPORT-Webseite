@@ -522,7 +522,7 @@ def _refuse_blocked_moment(tournament: dict | None, moment) -> None:
 
 
 DUPLICATE_TIME_DETAIL = "Diesen Termin hast du schon eingetragen – bitte einen anderen wählen."
-SAME_TIMES_DETAIL = "Diese Termine stehen schon zur Auswahl – passt einer, einfach „Annehmen“ tippen."
+OFFERED_TIME_DETAIL = "Steht schon zur Auswahl – passt er, einfach „Annehmen“ tippen; sonst einen anderen Termin wählen."
 
 
 def _proposal_time_problems(tournament: dict | None, match: dict, moments: list[datetime]) -> list[dict]:
@@ -1108,11 +1108,14 @@ async def decide_schedule_proposal_group(match_id: str, proposal_id: str, body: 
             raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
         if league_schedule.blocks_proposals(tournament, match):
             raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
-        _refuse_time_problems(_proposal_time_problems(tournament, match, body.scheduled_ats), len(body.scheduled_ats))
-        # Nur Termine, die schon zur Auswahl stehen: das ist kein Gegenvorschlag, sondern eine Annahme.
+        # Ein Termin, der schon zur Auswahl steht, ist kein Gegenvorschlag, sondern eine Annahme - am Termin selbst gesagt, sonst
+        # schlösse der Gegenvorschlag genau den Termin, der passt (#2325).
+        problems = _proposal_time_problems(tournament, match, body.scheduled_ats)
         offered = {_moment(row.get("scheduled_at")) for row in members}
-        if all((raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)) in offered for raw in body.scheduled_ats):
-            raise HTTPException(status_code=422, detail=SAME_TIMES_DETAIL)
+        flagged = {row["index"] for row in problems}
+        problems += [{"index": index, "detail": OFFERED_TIME_DETAIL} for index, raw in enumerate(body.scheduled_ats)
+                     if index not in flagged and (raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)) in offered]
+        _refuse_time_problems(sorted(problems, key=lambda row: row["index"]), len(body.scheduled_ats))
     now_iso = now_utc().isoformat()
     member_ids = [row["id"] for row in members]
     change = {"status": completed, "decision_user_id": me["id"], "updated_at": now_iso}

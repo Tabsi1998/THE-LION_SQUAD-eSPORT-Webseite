@@ -75,30 +75,41 @@ export function bundleProposals(proposals) {
 /**
  * Jeder Termin einzeln (#2325): `values` sind Zeitpunkte (ISO) oder `null` für ein leeres Feld. Antwort: je Termin ein Satz
  * oder `null`. Prüft leer, zu früh und doppelt - Sperrzeiten kennt erst der Server, er antwortet mit derselben Stelle.
- * Die Spielwoche hält nichts auf, dazu `proposalTimeHints`.
+ * Die Spielwoche hält nichts auf, dazu `proposalTimeHints`. Im Gegenvorschlag (`offered`: die offenen Termine, auf die man
+ * antwortet) ist ein angebotener Termin ein Fehler - er ist eine Annahme, kein Gegenvorschlag. Wie der Server.
  */
-export function proposalTimeErrors(values, { now = Date.now() } = {}) {
+export function proposalTimeErrors(values, { now = Date.now(), offered = [] } = {}) {
   const seen = new Set();
+  const already = offeredMoments(offered);
   return (values || []).map((value) => {
     const moment = value ? new Date(value).getTime() : Number.NaN;
     if (Number.isNaN(moment)) return MISSING_TIME_TEXT;
     if (moment < now + PROPOSAL_LEAD_MS) return PAST_PROPOSAL_TEXT;
     if (seen.has(moment)) return DUPLICATE_TIME_TEXT;
     seen.add(moment);
-    return null;
+    return already.has(moment) ? OFFERED_TIME_TEXT : null;
   });
 }
 
+export const OFFERED_TIME_TEXT = "Steht schon zur Auswahl – passt er, einfach „Annehmen“ tippen; sonst einen anderen Termin wählen.";
+
+function offeredMoments(offered) {
+  return new Set((offered || []).map((value) => new Date(value).getTime()).filter((moment) => !Number.isNaN(moment)));
+}
+
 /**
- * Hinweise, die nichts aufhalten (#2325): In einer Staffel mit Terminregeln (`window` aus `schedule_block`) zählt ein Termin
- * außerhalb der Spielwoche nicht für die 72-h-Regel - er gilt nur, wenn die Gegenseite annimmt. Die 72-h-Regel nennt der Satz nur,
- * wenn sie an ist (`homeRule` aus `schedule_block.rules.home_rule`). Derselbe Satz wie am Server.
+ * Hinweise schon beim Eingeben (#2325): In einer Staffel mit Terminregeln (`window` aus `schedule_block`) zählt ein Termin
+ * außerhalb der Spielwoche nicht für die 72-h-Regel - er gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel nennt der Satz nur,
+ * wenn sie an ist (`homeRule` aus `schedule_block.rules.home_rule`). Im Gegenvorschlag steht bei einem angebotenen Termin
+ * (`offered`) schon vor dem Absenden, dass er zur Auswahl steht. Dieselben Sätze wie am Server.
  */
-export function proposalTimeHints(values, { window = null, weekLabel = "", homeRule = true } = {}) {
+export function proposalTimeHints(values, { window = null, weekLabel = "", homeRule = true, offered = [] } = {}) {
   const start = window?.start ? new Date(window.start).getTime() : null;
   const end = window?.end ? new Date(window.end).getTime() : null;
+  const already = offeredMoments(offered);
   return (values || []).map((value) => {
     const moment = value ? new Date(value).getTime() : Number.NaN;
+    if (!Number.isNaN(moment) && already.has(moment)) return OFFERED_TIME_TEXT;
     if (Number.isNaN(moment) || start === null || end === null || (moment >= start && moment < end)) return null;
     const week = weekLabel ? ` (${weekLabel})` : "";
     return `Liegt außerhalb der Spielwoche${week} – gilt nur, wenn die Gegenseite annimmt${homeRule ? "; die 72-h-Regel greift hier nicht." : "."}`;

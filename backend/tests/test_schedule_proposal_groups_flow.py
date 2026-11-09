@@ -337,15 +337,23 @@ async def test_a_counter_with_two_times_answers_the_whole_group(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_counter_with_only_the_offered_times_is_refused(flow):
+async def test_an_offered_time_in_a_counter_is_named_at_its_place(flow):
+    """Ein angebotener Termin im Gegenvorschlag ist eine Annahme: 422 an genau dieser Stelle - sonst schlösse der Gegenvorschlag den
+    Termin, der passt. Gespeichert wird nichts."""
     world = await live_world(flow)
     group = (await propose(flow, world, "Kapitaen", [50, 80, 110])).json()["proposals"]
     same = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [80, 50])
     assert same.status_code == 422
-    assert "stehen schon zur Auswahl" in same.json()["detail"]
-    assert {row["status"] for row in (await rows(flow, world)).values()} == {"pending"}
-    mixed = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [50, 60])
-    assert mixed.status_code == 200, "ein neuer Termin dabei: das ist ein Gegenvorschlag"
+    assert [row["index"] for row in same.json()["detail"]["errors"]] == [0, 1]
+    mixed = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [60, 80])
+    assert mixed.status_code == 422
+    errors = mixed.json()["detail"]["errors"]
+    assert errors == [{"index": 1, "detail": errors[0]["detail"]}] and "Steht schon zur Auswahl" in errors[0]["detail"]
+    assert mixed.json()["detail"]["message"].startswith("Termin 2:")
+    stored = await rows(flow, world)
+    assert len(stored) == 3 and {row["status"] for row in stored.values()} == {"pending"}, "nichts gespeichert, nichts geschlossen"
+    fresh = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [60, 90])
+    assert fresh.status_code == 200, "nur neue Termine: das ist ein Gegenvorschlag"
 
 
 @pytest.mark.asyncio
