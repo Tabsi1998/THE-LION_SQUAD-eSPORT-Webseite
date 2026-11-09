@@ -91,16 +91,17 @@ export function proposalTimeErrors(values, { now = Date.now() } = {}) {
 
 /**
  * Hinweise, die nichts aufhalten (#2325): In einer Staffel mit Terminregeln (`window` aus `schedule_block`) zählt ein Termin
- * außerhalb der Spielwoche nicht für die 72-h-Regel - er gilt nur, wenn die Gegenseite annimmt. Derselbe Satz wie am Server.
+ * außerhalb der Spielwoche nicht für die 72-h-Regel - er gilt nur, wenn die Gegenseite annimmt. Die 72-h-Regel nennt der Satz nur,
+ * wenn sie an ist (`homeRule` aus `schedule_block.rules.home_rule`). Derselbe Satz wie am Server.
  */
-export function proposalTimeHints(values, { window = null, weekLabel = "" } = {}) {
+export function proposalTimeHints(values, { window = null, weekLabel = "", homeRule = true } = {}) {
   const start = window?.start ? new Date(window.start).getTime() : null;
   const end = window?.end ? new Date(window.end).getTime() : null;
   return (values || []).map((value) => {
     const moment = value ? new Date(value).getTime() : Number.NaN;
-    if (start === null || end === null || Number.isNaN(moment) || (moment >= start && moment < end)) return null;
+    if (Number.isNaN(moment) || start === null || end === null || (moment >= start && moment < end)) return null;
     const week = weekLabel ? ` (${weekLabel})` : "";
-    return `Liegt außerhalb der Spielwoche${week} – gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.`;
+    return `Liegt außerhalb der Spielwoche${week} – gilt nur, wenn die Gegenseite annimmt${homeRule ? "; die 72-h-Regel greift hier nicht." : "."}`;
   });
 }
 

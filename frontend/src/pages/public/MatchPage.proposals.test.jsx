@@ -92,6 +92,14 @@ test("doppelter Termin: Fehler am zweiten, nichts geht an den Server", async () 
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 
+test("Liga ohne 72-h-Regel: der Hinweis zur Spielwoche nennt sie nicht", async () => {
+  renderMatch({ ...BASE, schedule_block: { fixed: false, window: { start: "2027-03-08T23:00:00Z", end: "2027-03-15T23:00:00Z" }, rules: { home_rule: false }, requests: [], history: [] } });
+  fireEvent.change(await screen.findByTestId("match-proposal-at"), { target: { value: "2027-03-20T20:00" } });
+  const hint = screen.getByTestId("match-proposal-at-hinweis-1");
+  expect(hint).toHaveTextContent("außerhalb der Spielwoche");
+  expect(hint).not.toHaveTextContent("72-h-Regel");
+});
+
 test("Liga: ein Termin außerhalb der Spielwoche bekommt einen Hinweis und geht trotzdem raus", async () => {
   renderMatch({ ...BASE, schedule_block: { fixed: false, window: { start: "2027-03-08T23:00:00Z", end: "2027-03-15T23:00:00Z" }, rules: {}, requests: [], history: [] } });
   fireEvent.change(await screen.findByTestId("match-proposal-at"), { target: { value: "2027-03-10T20:00" } });

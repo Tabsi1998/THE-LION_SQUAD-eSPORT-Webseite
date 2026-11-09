@@ -170,6 +170,19 @@ async def test_outside_the_week_is_a_hint_not_a_refusal(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_week_hint_leaves_out_a_switched_off_home_rule(flow):
+    world = await live_world(flow, rules={**DEFAULTS, "home_rule": False})
+    outside = await propose(flow, world, "Kapitaen", [175])
+    assert outside.status_code == 200, outside.text
+    detail = outside.json()["hints"][0]["detail"]
+    assert "außerhalb der Spielwoche" in detail and detail.endswith("gilt nur, wenn die Gegenseite annimmt.")
+    assert "72-h-Regel" not in detail
+    flow.act_as(world["users"]["Kapitaen"])
+    page = (await flow.get(f"/api/matches/{world['match']['id']}/page")).json()
+    assert page["schedule_block"]["rules"]["home_rule"] is False, "das Web liest die Regel aus dem Block"
+
+
+@pytest.mark.asyncio
 async def test_a_blocked_period_is_named_at_its_time(flow):
     world = await live_world(flow, rules=None)
     day = (now_utc() + timedelta(days=3)).date().isoformat()

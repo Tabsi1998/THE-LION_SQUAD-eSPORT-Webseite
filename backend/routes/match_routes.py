@@ -548,13 +548,15 @@ def _proposal_time_problems(tournament: dict | None, match: dict, moments: list[
 
 def _proposal_time_hints(tournament: dict | None, match: dict, moments: list[datetime]) -> list[dict]:
     """Hinweise je Termin (#2325), die nichts aufhalten: In einer Staffel mit Terminregeln zählt ein Termin außerhalb der
-    Spielwoche nicht für die 72-h-Regel (``home_rule_at``) - er gilt nur, wenn die Gegenseite annimmt."""
-    window = league_schedule.window_of(tournament, match) if league_schedule.rules_of(tournament) else None
+    Spielwoche nicht für die 72-h-Regel (``home_rule_at``) - er gilt nur, wenn die Gegenseite annimmt. Die 72-h-Regel nennt der
+    Satz nur, wenn sie in der Staffel an ist."""
+    rules = league_schedule.rules_of(tournament)
+    window = league_schedule.window_of(tournament, match) if rules else None
     if not window:
         return []
     last = window.end - timedelta(minutes=1)
     text = (f"Liegt außerhalb der Spielwoche ({league_schedule.when_text(window.start)} bis {league_schedule.when_text(last)}) – "
-            "gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.")
+            "gilt nur, wenn die Gegenseite annimmt" + ("; die 72-h-Regel greift hier nicht." if rules.get("home_rule") else "."))
     return [{"index": index, "detail": text} for index, raw in enumerate(moments)
             if not window.contains(raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc))]
 

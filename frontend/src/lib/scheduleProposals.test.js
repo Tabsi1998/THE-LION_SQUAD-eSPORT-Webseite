@@ -48,6 +48,10 @@ test("proposalTimeHints: außerhalb der Spielwoche nur ein Hinweis, ohne Woche k
   expect(hints[1]).toBeNull();
   expect(hints[2]).toBe("Liegt außerhalb der Spielwoche (Mo 01.03. 01:00 bis So 07.03. 23:59) – gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.");
   expect(proposalTimeHints(["2027-03-09T19:00:00Z"])).toEqual([null]);
+  // Ist die 72-h-Regel in der Staffel aus, nennt der Hinweis sie nicht.
+  expect(proposalTimeHints(["2027-03-09T19:00:00Z"], { window, homeRule: false })).toEqual([
+    "Liegt außerhalb der Spielwoche – gilt nur, wenn die Gegenseite annimmt.",
+  ]);
 });
 
 test("serverTimeErrors legt die Sätze des Servers an ihre Stelle", () => {

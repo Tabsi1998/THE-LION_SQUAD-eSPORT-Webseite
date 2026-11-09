@@ -260,8 +260,10 @@ function MatchPageView() {
 
   // Spielwoche (#2325): nur ein Hinweis am Termin, er hält nichts auf - wie der einzelne Vorschlag aus der App.
   const timeHints = (values) => {
-    const week = data?.schedule_block?.window || null;
-    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week) });
+    const block = data?.schedule_block;
+    const week = block?.window || null;
+    // Die 72-h-Regel nur nennen, wenn sie in der Staffel an ist.
+    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week), homeRule: block?.rules?.home_rule !== false });
   };
 
   const changeProposalTimes = (next) => {
