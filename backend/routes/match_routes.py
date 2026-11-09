@@ -1092,20 +1092,26 @@ async def decide_schedule_proposal_group(match_id: str, proposal_id: str, body: 
     change = {"status": completed, "decision_user_id": me["id"], "updated_at": now_iso}
     if body.action != "withdraw":
         change["decision_note"] = note
-    await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
     actor_reg_id = (acting_reg or {}).get("id")
+    if body.action == "counter":
+        # Erst die neuen Termine, dann die alten schließen - scheitert das, gehen die neuen wieder raus (alle oder keiner).
+        docs = await _insert_proposal_group(db, match, collection, tournament, me, acting_reg, body.scheduled_ats, note,
+                                            kind="counter", parent=proposal)
+        try:
+            await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
+        except Exception:
+            await db.match_schedule_proposals.delete_many({"group_id": docs[0]["group_id"]})
+            raise
+        await _tell_schedule(db, match, "countered", docs[0], me, actor_reg_id, note, group=docs)
+        return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False}
+    await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
     if body.action == "withdraw":
         await _after_withdraw(db, match, collection, now_iso)
         await _tell_schedule(db, match, "withdrawn", members[0], me, actor_reg_id, group=members)
         return {"ok": True, "status": "withdrawn", "count": len(members), "idempotent_replay": False}
-    if body.action == "decline":
-        await _status_after_decline(db, match, collection, tournament, stage, now_iso)
-        await _tell_schedule(db, match, "declined", members[0], me, actor_reg_id, note, group=members)
-        return {"ok": True, "status": "declined", "count": len(members), "idempotent_replay": False}
-    docs = await _insert_proposal_group(db, match, collection, tournament, me, acting_reg, body.scheduled_ats, note,
-                                        kind="counter", parent=proposal)
-    await _tell_schedule(db, match, "countered", docs[0], me, actor_reg_id, note, group=docs)
-    return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False}
+    await _status_after_decline(db, match, collection, tournament, stage, now_iso)
+    await _tell_schedule(db, match, "declined", members[0], me, actor_reg_id, note, group=members)
+    return {"ok": True, "status": "declined", "count": len(members), "idempotent_replay": False}
 
 
 async def _tell_schedule(db, match: dict, event: str, proposal: dict, me: dict, actor_registration_id: str | None,
