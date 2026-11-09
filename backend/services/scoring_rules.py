@@ -16,7 +16,8 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
 - **Vorrang bei Gleichstand** (``tiebreakers``): ``wins``, ``podiums``, ``countback`` (mehr Siege, dann mehr zweite
   Plätze …), ``best_place`` und ``latest_result`` (besseres Ergebnis in der letzten gemeinsamen Runde, dann davor).
   Entscheidet keines, teilen sich beide den Platz (``rank_with_ties``: 1, 2, 2, 4).
-- **Team-Liga:** Punkte für Sieg, Unentschieden und Niederlage (``match_points``) statt fest 3/1/0, Tabelle mit
+- **Team-Liga:** Punkte für Sieg, Unentschieden und Niederlage (``match_points``) statt fest 3/1/0 oder je gewonnene Map
+  (``match_points_mode: maps``, #2312), Tabelle mit
   ``table_tiebreakers`` (``score_diff``, ``score_for``, ``wins``; in der Liga-Staffel auch ``head_to_head`` und
   ``lead_decision``). Nur für die Liga-Staffel (E.1, #1625, docs/LIGA.md): ``head_to_head_criteria``, ``allow_draws``,
   ``forfeit_score``, ``exit_rule``; Vorgaben neuer Liga-Seasons in ``LEAGUE_TABLE_DEFAULTS``.
@@ -51,6 +52,10 @@ TABLE_TIEBREAKERS = ("score_diff", "score_for", "wins", "head_to_head", "lead_de
 HEAD_TO_HEAD_CRITERIA = ("points", "score_diff", "score_for")
 FORFEIT_SCORES = ("recorded", "best_of")
 EXIT_RULES = ("half", "all_for_opponents")
+# Punkteart der Team-Liga (#2312): Punkte aus ``match_points`` für Sieg/Remis/Niederlage oder je gewonnene Map (3:2 = 3 und 2).
+MATCH_POINTS_MODES = ("result", "maps")
+# Vorschlag der Reihenfolge bei Punktgleichheit für Map-Punkte (#2312): mehr Siege, direkter Vergleich, Map-Differenz, Leitung.
+MAPS_TABLE_TIEBREAKERS = ("wins", "head_to_head", "score_diff", "lead_decision")
 MARKS = ("dnf", "dns", "dsq", "fastest_lap", "pole", "left")
 BONUS_MARKS = ("fastest_lap", "pole")
 POINT_SOURCES = ("scheme", "organizer", "manual")
@@ -86,6 +91,7 @@ DEFAULT_RULES: dict = {
     # Mindestzahl Teilnehmer je Termin (#1960): darunter warnt das Eintragen - der Termin bleibt dann ohne Wertung.
     "min_participants": None,
     "match_points": {"win": 3, "draw": 1, "loss": 0},
+    "match_points_mode": "result",
     "table_tiebreakers": ["score_diff", "score_for"],
     # E.1 (#1625): ohne Feld wie bisher - Mini-Tabelle nach Punkten, Differenz, Maps; Remis erlaubt; kampflos wie
     # eingetragen; Ausscheiden nach der 50-%-Regel.
@@ -225,6 +231,7 @@ def normalize_rules(raw: dict | None) -> dict:
     rules["min_participants"] = _whole(rules["min_participants"], "min_participants", allow_none=True, minimum=1)
     points = {**DEFAULT_RULES["match_points"], **(raw.get("match_points") or {})}
     rules["match_points"] = {key: _number(points.get(key), f"match_points.{key}") for key in ("win", "draw", "loss")}
+    rules["match_points_mode"] = _choice(rules["match_points_mode"] or "result", "match_points_mode", MATCH_POINTS_MODES)
     rules["table_tiebreakers"] = _criteria(rules["table_tiebreakers"], "table_tiebreakers", TABLE_TIEBREAKERS)
     rules["head_to_head_criteria"] = _criteria(rules["head_to_head_criteria"], "head_to_head_criteria",
                                                HEAD_TO_HEAD_CRITERIA)
@@ -442,10 +449,16 @@ def counted_results(results: list[dict], rules: dict, total_rounds: int) -> tupl
 
 
 # ---------------------------------------------------------------- Team-Liga
+def maps_mode(rules: dict | None) -> bool:
+    """Punkte nach gewonnenen Maps (#2312, ``match_points_mode: maps``)?"""
+    return (rules or {}).get("match_points_mode") == "maps"
+
+
 def match_points(score_for, score_against, rules: dict) -> tuple[str, float]:
-    """Ausgang und Punkte eines Spiels aus eigener Sicht: ``("win" | "draw" | "loss", Punkte)``."""
+    """Ausgang und Punkte eines Spiels aus eigener Sicht: ``("win" | "draw" | "loss", Punkte)``. Mit Map-Punkten (#2312)
+    sind die Punkte die eigenen gewonnenen Maps."""
     outcome = "win" if score_for > score_against else "loss" if score_for < score_against else "draw"
-    return outcome, rules["match_points"][outcome]
+    return outcome, (score_for if maps_mode(rules) else rules["match_points"][outcome])
 
 
 def _score(value) -> float:
