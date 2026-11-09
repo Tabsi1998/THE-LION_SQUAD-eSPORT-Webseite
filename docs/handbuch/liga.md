@@ -779,6 +779,11 @@ der Matchseite, je mit Version, Stand und PDF.
 
 Captain oder Vertreter schlagen auf der Matchseite unter **Terminabstimmung** einen Termin vor, die Gegenseite nimmt
 an (Haken), lehnt ab (X) oder macht einen **Gegenvorschlag**. Ohne Einigung gilt der Standardtermin der Spielwoche.
+Im Web gehen **bis zu 3 Termine auf einmal** (**+ weiteren Termin**, eine Notiz, ein Knopf): Jeder wird einzeln geprüft,
+gespeichert werden alle oder keiner, die Gegenseite bekommt **eine** Nachricht und nimmt einen davon an – die übrigen
+schließen als „erledigt – anderer Termin steht“, in jeder Staffel und in jedem Turnier. **Alle ablehnen**, **Zurückziehen**
+und ein **Gegenvorschlag** (bis zu 3 Termine) gelten für alle Termine zusammen. Die 72-h-Regel nimmt wie bisher den
+frühesten gültigen Vorschlag der Heimseite.
 Ein Vorschlag in einer Sperrzeit wird abgelehnt („In dieser Zeit wird nicht gespielt (Weihnachtspause, …)“). Termin-,
 Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenster nicht (siehe 1.).
 
