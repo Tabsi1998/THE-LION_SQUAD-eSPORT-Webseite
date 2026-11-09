@@ -1,29 +1,27 @@
 # Changelog
 
-## [1.73.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.72.0...v1.73.0) (2026-11-09)
-
+## 1.73.0 (09.11.2026)
 
 ### Neu
 
-* Anmeldestrecke „Passt alles?“ zeigt fehlende Angaben und zu wenige Spielberechtigte als Hinweis ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Check-in auf der Matchseite nennt den eigenen Grund mit Link ins Profil und warnt bei zu wenigen Spielberechtigten ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Eingang der Leitung zeigt offene Punkte je Team, Zulassen geht trotzdem ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Erinnerung an fehlende Angaben an Spieler und Captain beim Einreichen und vor dem ersten Spiel ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Kader-Aufnahme und Transfer gehen ohne oder mit zu jungem Geburtsdatum – die Person spielt erst mit passender Angabe ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Liga-Tabelle rechnet auf Wunsch Punkte nach gewonnenen Maps (3:2 ergibt 3 und 2, kampflos 3:0) ([#2312](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2312)) ([60df45a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60df45a0b58eebba02c3279fcee5cb155f04afa8))
-* Ligaseite nennt die offenen Punkte einer laufenden Anmeldung ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Neue Punkteart lässt sich auf laufende Staffeln übertragen und wird protokolliert ([#2312](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2312)) ([60df45a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60df45a0b58eebba02c3279fcee5cb155f04afa8))
-* Punkteart in der Season-Einstellung zur Tabelle wählbar, mit vorgeschlagener Reihenfolge Siege, direkter Vergleich, Map-Differenz, Leitung ([#2312](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2312)) ([60df45a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60df45a0b58eebba02c3279fcee5cb155f04afa8))
-* Regelwerk-Baustein Tabelle und Variable table.points beschreiben die Punkteart ([#2312](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2312)) ([60df45a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60df45a0b58eebba02c3279fcee5cb155f04afa8))
-* Staffel-Tabelle und Season-Seite zeigen, dass die Punkte gewonnene Maps sind ([#2312](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2312)) ([60df45a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60df45a0b58eebba02c3279fcee5cb155f04afa8))
-* Teamseite sagt, dass nicht Spielberechtigte nicht einchecken und nicht aufgestellt werden können ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-* Vorlauf der Erinnerung an fehlende Angaben je Season einstellbar ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
-
+* Anmeldestrecke „Passt alles?“ zeigt fehlende Angaben und zu wenige Spielberechtigte als Hinweis (#2313)
+* Check-in auf der Matchseite nennt den eigenen Grund mit Link ins Profil und warnt bei zu wenigen Spielberechtigten (#2313)
+* Eingang der Leitung zeigt offene Punkte je Team, Zulassen geht trotzdem (#2313)
+* Erinnerung an fehlende Angaben an Spieler und Captain beim Einreichen und vor dem ersten Spiel (#2313)
+* Kader-Aufnahme und Transfer gehen ohne oder mit zu jungem Geburtsdatum – die Person spielt erst mit passender Angabe (#2313)
+* Liga-Tabelle rechnet auf Wunsch Punkte nach gewonnenen Maps (3:2 ergibt 3 und 2, kampflos 3:0) (#2312)
+* Ligaseite nennt die offenen Punkte einer laufenden Anmeldung (#2313)
+* Neue Punkteart lässt sich auf laufende Staffeln übertragen und wird protokolliert (#2312)
+* Punkteart in der Season-Einstellung zur Tabelle wählbar, mit vorgeschlagener Reihenfolge Siege, direkter Vergleich, Map-Differenz, Leitung (#2312)
+* Regelwerk-Baustein Tabelle und Variable table.points beschreiben die Punkteart (#2312)
+* Staffel-Tabelle und Season-Seite zeigen, dass die Punkte gewonnene Maps sind (#2312)
+* Teamseite sagt, dass nicht Spielberechtigte nicht einchecken und nicht aufgestellt werden können (#2313)
+* Vorlauf der Erinnerung an fehlende Angaben je Season einstellbar (#2313)
 
 ### Fehlerbehebungen
 
-* Liga N mit eigenen Punkten behält direkten Vergleich, Remis-Regel und kampflos der Season ([#2318](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2318)) ([60df45a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60df45a0b58eebba02c3279fcee5cb155f04afa8))
-* Liga-Anmeldung und Zuteilen gehen trotz fehlender Angaben – gesperrt wird erst beim Check-in und bei der Aufstellung ([#2313](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2313)) ([7f66370](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f663704f0402b3d06ad6e985a3cb819e8945119))
+* Liga N mit eigenen Punkten behält direkten Vergleich, Remis-Regel und kampflos der Season (#2318)
+* Liga-Anmeldung und Zuteilen gehen trotz fehlender Angaben – gesperrt wird erst beim Check-in und bei der Aufstellung (#2313)
 
 ## 1.72.0 (09.11.2026)
 
