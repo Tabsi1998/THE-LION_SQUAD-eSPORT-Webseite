@@ -132,7 +132,9 @@ async function frame(page, marks, area, form) {
 async function photograph(page, key, marks, area, pad, form, each = false) {
   await marks[0].first().evaluate((node) => node.scrollIntoView({ block: "center", inline: "nearest" }));
   await page.waitForTimeout(250);
-  let { markBox, box } = await frame(page, marks, area, form);
+  // Erst nur die Größe - die Markierung zählt nach dem Anpassen des Fensters (unten neu vermessen).
+  let { box } = await frame(page, marks, area, form);
+  let markBox;
   const before = page.viewportSize();
   let header = await headerBottom(page);
   const need = Math.ceil(box.bottom - box.top + 2 * pad + header + 24);
@@ -192,7 +194,13 @@ async function photograph(page, key, marks, area, pad, form, each = false) {
 function saveSizes() {
   if (!SHOTS || !Object.keys(sizes).length) return;
   const file = path.join(ROOT, "bilder", "masse.json");
-  const current = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+  // Direkt lesen statt erst nachzusehen (kein Wettlauf zwischen Prüfen und Lesen); fehlt die Datei, fangen wir leer an.
+  let current = {};
+  try {
+    current = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   const merged = { ...current, ...sizes };
   // Eine Zeile je Bild, sortiert - ruhige Diffs beim Neuerzeugen.
   const lines = Object.keys(merged).sort().map((key) => `  ${JSON.stringify(key)}: [${merged[key].join(", ")}]`);
