@@ -57,6 +57,7 @@ export const NAV_STRUCTURE = [
       { to: "/teams", label: "Teams" },
       { to: "/seasons/current", label: "Jahreswertung" },
       { to: "/achievements", label: "Erfolge" },
+      { to: "/hilfe", label: "Hilfe" },
     ],
   },
   { key: "contact", to: "/contact", label: "Kontakt" },

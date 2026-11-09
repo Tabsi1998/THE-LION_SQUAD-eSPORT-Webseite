@@ -760,6 +760,8 @@ DEFAULT_NAV = {
             {"key": "community_teams", "to": "/teams", "label": "Teams", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
             {"key": "achievements", "to": "/achievements", "label": "Erfolge", "visible": True},
+            # Hilfe (#2295, Fabian 09.11.): Anleitungen für Spieler und Captains; gespeicherte Menüs bekommen den Punkt dazu.
+            {"key": "help", "to": "/hilfe", "label": "Hilfe", "visible": True},
         ]},
         {"key": "contact", "to": "/contact", "label": "Kontakt", "visible": True, "order": 6},
     ],

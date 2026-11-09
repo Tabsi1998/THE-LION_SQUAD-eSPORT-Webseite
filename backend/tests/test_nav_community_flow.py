@@ -63,3 +63,17 @@ async def test_a_stored_menu_moves_both_entries_without_doubles(flow):
     # Eigene Beschriftungen des Vereins bleiben.
     assert next(child for child in children(nav, "community") if child["key"] == "players")["label"] == "Spieler"
     assert all(child["label"] != "Achievements" for item in nav["items"] for child in item.get("children") or [])
+    # Hilfe (#2295) kommt in ein gespeichertes Menü ohne sie von selbst dazu, genau einmal.
+    assert community.count("/hilfe") == 1
+
+
+@pytest.mark.asyncio
+async def test_a_hidden_help_entry_stays_hidden(flow):
+    """Blendet der Verein die Hilfe im Menü-Editor aus, bleibt sie draußen (#2295)."""
+    await flow.db.cms_nav.insert_one({"id": "main_nav", "items": [
+        {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
+            {"key": "help", "to": "/hilfe", "label": "Hilfe", "visible": False},
+        ]},
+    ]})
+    nav = (await flow.get("/api/nav")).json()
+    assert "/hilfe" not in [child["to"] for child in children(nav, "community")]
