@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 
 from models import now_utc
-from services import league_platform, league_roster
+from services import checkin_rules, league_platform, league_roster
 from services.dolibarr_policy import club_today
 from services.matchday_schedule import LOCAL_TZ
 
@@ -501,6 +501,13 @@ def _reasons(row: dict) -> list[str]:
     if row["state"] in (AGE_MISSING, AGE_NOT_MET_STATE) and not row.get("id_ok", True) and row.get("id_reason"):
         reasons.append(row["id_reason"])
     return reasons
+
+
+def ready_minimum(tournament: dict) -> int:
+    """Wie viele Spielberechtigte ein Team einer Staffel zum Spielen braucht (#2322): die Mindestzahl Anwesender aus den
+    Check-in-Regeln (bei 4 gegen 4 also 3), ohne Check-in-Regeln der Mindestkader. Maß für ``open_points`` überall."""
+    rules = checkin_rules.rules_of(tournament)
+    return int(rules["min_present"]) if rules else league_roster.min_squad_size(tournament)
 
 
 def open_points(ctx: EligibilityContext | None, squad: dict, *, minimum: int | None) -> dict:

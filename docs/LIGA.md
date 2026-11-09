@@ -977,8 +977,9 @@ Ein fehlerhafter ID-Stand (`late`, `missing`, `format`, `taken`) bleibt stehen u
 Liga N: die Vereinigung ihrer erlaubten Plattformen, eine Liga N ohne Grenze hebt die Prüfung auf (wie beim Mindestkader). Die Kaderübersicht prüft je Co-Team mit der Liga N seiner Staffel.
 
 **Wirkung:** Selbstanmeldung (B.4): Wer auf einer nicht erlaubten Plattform spielt oder keine angibt, zählt nicht als spielberechtigt und steht als Hinweis da.
-Zuteilen (auch aus einem Antrag): Hinweis im Dialog (`squad-candidates`: `notes` je Co-Team), auch wenn danach weniger als der Mindestkader übrig sind – das hält
-seit #2313 weder Anmeldung noch Zuteilen auf (siehe „Fehlende Angaben“ unten). Teilnehmerliste, Aufstellung je Map und der
+Zuteilen (auch aus einem Antrag): Hinweis im Dialog (`squad-candidates`: `notes` je Co-Team, dazu `shortfall`, wenn weniger spielberechtigt sind als
+die Check-in-Mindestzahl der Staffel, `league_eligibility.ready_minimum`, #2322) – das hält seit #2313 weder Anmeldung noch Zuteilen auf (siehe
+„Fehlende Angaben“ unten). Teilnehmerliste, Aufstellung je Map und der
 Check-in lesen `status`. Die Aufnahme in einen Kader prüft die Plattform nicht. Normale Turniere kennen die Einstellung nicht.
 
 **Antworten:** `GET /api/leagues/{liga}/{season}` trägt `platform` (`null` ohne jede Angabe): `{field_label, allowed, crossplay, input_device, input_device_label,
