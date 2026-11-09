@@ -6,7 +6,7 @@ import { contactLines, footerButtons, footerColumns } from "./siteFooter";
 test("drei Spalten; Discord nur mit Link; Mitglieder sehen den Mitgliederbereich statt Mitglied werden", () => {
   const plain = footerColumns({});
   expect(plain.map((column) => column.title)).toEqual(["Verein", "eSports", "Mitmachen"]);
-  expect(plain[2].links.map((link) => link.label)).toEqual(["Community", "Kalender", "Mitglied werden", "Kontakt"]);
+  expect(plain[2].links.map((link) => link.label)).toEqual(["Community", "Kalender", "Mitglied werden", "Hilfe", "Kontakt"]);
 
   const withDiscord = footerColumns({ discord_invite_url: "https://discord.gg/lions" }, { isMember: true });
   expect(withDiscord[2].links.find((link) => link.label === "Discord")).toEqual({ href: "https://discord.gg/lions", label: "Discord", external: true });
