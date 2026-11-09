@@ -4,7 +4,7 @@
 // „Bewegung reduzieren“ steht der Ring, nur die Zahl zählt. Die Liga-Leitung trägt im Notfall für eine Seite ein.
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlarmClock, Check, ClipboardCheck, Play, ScrollText, ShieldAlert } from "lucide-react";
+import { AlarmClock, Check, ClipboardCheck, Play, ScrollText, ShieldAlert, UserRoundPen } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { motionAllowed } from "@/lib/motion";
@@ -88,6 +88,25 @@ function SideCard({ side }) {
   );
 }
 
+/** Der eigene Stand (#2313): Wer selbst nicht spielen darf, liest den Grund im Klartext und kommt mit einem Klick ins eigene Profil. */
+function MyEligibility({ me }) {
+  if (!me?.reason) return null;
+  return (
+    <div className="mt-4 flex flex-col gap-2 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2.5 text-sm text-white/85 sm:flex-row sm:items-center sm:justify-between" data-testid="checkin-me">
+      <p className="flex min-w-0 items-start gap-2">
+        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+        <span className="[overflow-wrap:anywhere]"><strong>Du kannst so nicht einchecken:</strong> {me.reason}</span>
+      </p>
+      {me.fix_url ? (
+        <Link to={me.fix_url} data-testid="checkin-me-fix"
+          className="tls-btn tls-btn--secondary inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+          <UserRoundPen className="h-4 w-4" aria-hidden="true" /> Im Profil nachtragen
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 function RosterPicker({ roster, selected, onToggle, testId, minimum }) {
   return (
     <>
@@ -128,9 +147,12 @@ function OwnCheckin({ block, matchId, busy, run, onChanged, onAskLead }) {
   const hint = block.checkin_hint;
   const consent = own.consent_open;
   const asksLead = Boolean(hint && hint.includes("@leitung"));
+  // Zu wenige Spielberechtigte (#2313): steht schon vor dem Fenster da, damit das Team rechtzeitig nachträgt.
+  const rosterHint = block.roster_hint && block.roster_hint !== hint ? block.roster_hint : null;
+  const warn = consent || (hint && hint === block.roster_hint);
   // Geht es gerade nicht, steht der Grund vor der Liste - niemand hakt erst an und sucht dann den Knopf.
   const hintBox = !block.can_checkin && hint ? (
-    <p className={`mt-3 rounded-sm border px-3 py-2 text-sm text-white/80 ${consent ? "border-warn/40 bg-warn/10" : "border-white/10 bg-white/[0.03]"}`} data-testid="checkin-hint">
+    <p className={`mt-3 rounded-sm border px-3 py-2 text-sm text-white/80 ${warn ? "border-warn/40 bg-warn/10" : "border-white/10 bg-white/[0.03]"}`} data-testid="checkin-hint">
       {hint}{" "}
       {consent && own.rules_url ? <Link to={own.rules_url} className="tls-hit font-bold text-[#29B6E8] underline underline-offset-2" data-testid="checkin-rules-link">Zur neuen Fassung</Link> : null}
       {asksLead && onAskLead ? <button type="button" onClick={onAskLead} className="tls-btn tls-btn--quiet tls-hit ml-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider">@leitung schreiben</button> : null}
@@ -141,6 +163,7 @@ function OwnCheckin({ block, matchId, busy, run, onChanged, onAskLead }) {
       <h3 className="text-xs font-bold uppercase tracking-widest text-[#29B6E8]">{own.checked_in ? "Eure Anwesenden" : "Wer ist da?"}</h3>
       <p className="mt-1 text-xs text-white/60">Nur Spieler aus eurem Kader, nur wer spielen darf – wer nicht wählbar ist, steht grau mit Grund da.</p>
       {hintBox}
+      {rosterHint ? <p className="mt-3 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/80" data-testid="checkin-roster-hint">{rosterHint}</p> : null}
       <RosterPicker roster={block.roster || []} selected={selected} onToggle={toggle} testId="checkin-roster" minimum={minimum} />
       {block.can_checkin ? (
         <button type="button" disabled={busy || !enough} onClick={submit} data-testid="checkin-submit"
@@ -284,6 +307,8 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
         </div>
         {vetoRunning ? null : <CountdownRing block={block} />}
       </div>
+
+      {vetoRunning ? null : <MyEligibility me={block.me} />}
 
       {vetoRunning ? null : (
         <ul className="mt-4 grid gap-3 sm:grid-cols-2" data-testid="checkin-sides">
