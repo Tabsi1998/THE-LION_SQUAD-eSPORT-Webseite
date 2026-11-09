@@ -122,17 +122,20 @@ async def test_the_same_person_may_play_for_another_team_in_another_season(flow)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("birth", "code", "text"), [(ADULT, 200, None), (None, 422, "Geburtsdatum fehlt"), ("2015-01-01", 422, "Altersvorgabe")])
-async def test_the_age_rule_at_the_squad(flow, birth, code, text):
+@pytest.mark.parametrize(("birth", "state"), [(ADULT, None), (None, "age_missing"), ("2015-01-01", "age_not_met")])
+async def test_the_age_rule_at_the_squad_only_blocks_playing(flow, birth, state):
+    """#2313 (Fabian 09.11.): Ohne oder mit zu jungem Geburtsdatum geht die Aufnahme, die Person darf nur nicht spielen."""
     w = await rule_world(flow, min_age=18)
     await born(flow, w, "Ida", birth)
 
     added = await set_members(flow, w, "squad_a", "Kapitaen", "Mila", "Tom", "Ida")
 
-    assert added.status_code == code, added.text
-    if text:
-        assert text in added.json()["detail"]
-        assert "2015" not in added.json()["detail"], "das Datum bleibt im Server"
+    assert added.status_code == 200, added.text
+    view = await flow.get(f"/api/teams/{w['lions']['id']}/squads/{w['squad_a']['id']}/eligibility")
+    assert view.status_code == 200, view.text
+    ida = next(row for season in view.json()["seasons"] for row in season["players"] if row["id"] == w["users"]["Ida"]["id"])
+    assert ida["ok"] is (state is None) and (state is None or ida["state"] == state), ida
+    assert "2015" not in view.text, "das Datum bleibt im Server"
 
 
 @pytest.mark.asyncio

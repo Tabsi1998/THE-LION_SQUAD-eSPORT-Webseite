@@ -42,6 +42,7 @@ test("der Hinweis im Kader-Dialog nennt nur, was die Season trägt", () => {
   const text = requirementHint({ min_size: 3, max_size: 50, min_age: 18, transfers_open: false });
   expect(text).toContain("höchstens 50");
   expect(text).toContain("Geburtsdatum");
+  expect(text).toContain("aufnehmen geht trotzdem");
   expect(text).toContain("Transfer");
 });
 

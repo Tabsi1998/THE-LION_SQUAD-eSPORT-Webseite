@@ -255,7 +255,8 @@ async def _candidate_rows(db, season: dict, tournament: dict, squad: dict, team:
             reason = AGE_MISSING_REASON
         elif ctx.ages.get(user_id) == AGE_NOT_MET_STATE:
             reason = AGE_NOT_MET
-        rows.append({"id": user_id, "name": league_roster.person_name(ctx.roster.people.get(user_id)), "can_add": reason is None,
+        # Alter (#2313, Fabian 09.11.): Aufnahme geht, die Person darf nur noch nicht spielen - ``reason`` bleibt als Hinweis.
+        rows.append({"id": user_id, "name": league_roster.person_name(ctx.roster.people.get(user_id)), "can_add": user_id not in others,
                      "needs_transfer": user_id in others, "reason": reason})
     return sorted(rows, key=lambda row: row["name"].lower())
 
@@ -399,8 +400,9 @@ async def _other_squad_ids(db, season: dict, squad_id: str, user_ids, entries: d
 
 async def roster_addition_problem(db, season: dict, tournament: dict, squad_id: str, added: list[str], size_after: int,
                                   *, transfer: bool = False) -> tuple[int, str] | None:
-    """Darf diese Person jetzt in den Kader? Der erste Grund dagegen als ``(Statuscode, Satz)``. Eine fehlende Spiel-ID ist kein
-    Grund: Die Person steht dann im Kader und kann noch nicht spielen. ``transfer``: Der Wechsel selbst ist genehmigt."""
+    """Darf diese Person jetzt in den Kader? Der erste Grund dagegen als ``(Statuscode, Satz)``. Fehlende Angaben sind kein Grund -
+    weder Spiel-ID noch Geburtsdatum noch ein Alter unter der Grenze (#2313, Fabian 09.11.): Die Person steht dann im Kader, ist aber
+    nicht spielberechtigt (kein Check-in, keine Aufstellung). ``transfer``: Der Wechsel selbst ist genehmigt."""
     problem = _too_many(season, size_after)
     if problem:
         return 422, problem
@@ -413,12 +415,6 @@ async def roster_addition_problem(db, season: dict, tournament: dict, squad_id: 
         for user_id in added:
             if user_id in others:
                 return 409, f"{names[user_id]} steht oder stand in dieser Season schon in einem anderen Co-Team. {TRANSFER_NEEDED}"
-    for user_id in added:
-        if ctx.ages.get(user_id) == AGE_NO_DATE:
-            return 422, (f"{names[user_id]}: Geburtsdatum fehlt. Die Season verlangt eine Altersangabe. {names[user_id]} trägt "
-                         "es im eigenen Profil ein, dann geht die Aufnahme.")
-        if ctx.ages.get(user_id) == AGE_NOT_MET_STATE:
-            return 422, f"{names[user_id]} erfüllt die Altersvorgabe dieser Season nicht."
     return None
 
 

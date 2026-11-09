@@ -66,7 +66,9 @@ function Candidates({ rows, rules, teamId, squadId, transfers, onChanged }) {
   const open = new Set(transfers.filter((row) => row.status === "pending").map((row) => row.user_id));
   const movers = rows.filter((row) => row.needs_transfer);
   const blocked = rows.filter((row) => !row.needs_transfer && !row.can_add);
-  if (!movers.length && !blocked.length) return null;
+  // #2313: Aufnahme geht, gespielt wird erst mit der fehlenden Angabe (etwa Geburtsdatum).
+  const later = rows.filter((row) => row.can_add && row.reason);
+  if (!movers.length && !blocked.length && !later.length) return null;
   const ask = async (row) => {
     setBusy(row.id);
     try {
@@ -79,24 +81,36 @@ function Candidates({ rows, rules, teamId, squadId, transfers, onChanged }) {
     setBusy("");
   };
   return (
-    <div>
-      <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Aus dem Team, noch nicht aufnehmbar</p>
-      <ul className="mt-1 space-y-1.5 text-sm">
-        {movers.map((row) => (
-          <li key={row.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2" data-testid={`squad-candidate-${row.id}`}>
-            <span className="min-w-0 text-white/80 [overflow-wrap:anywhere]">{row.name}: {row.reason}</span>
-            {open.has(row.id) ? <span className="text-xs text-white/50">Antrag läuft</span> : (
-              <button type="button" disabled={!rules.transfer_open || busy === row.id} onClick={() => ask(row)} title={rules.transfer_open ? undefined : "Das Transferfenster ist gerade zu."}
-                className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`squad-transfer-ask-${row.id}`}>
-                <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" /> Transfer beantragen
-              </button>
-            )}
-          </li>
-        ))}
-        {blocked.map((row) => (
-          <li key={row.id} className="min-w-0 text-white/70 [overflow-wrap:anywhere]" data-testid={`squad-candidate-${row.id}`}>{row.name}: {row.reason}</li>
-        ))}
-      </ul>
+    <div className="space-y-3">
+      {later.length ? (
+        <div data-testid="squad-candidates-later">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Aufnehmbar, spielen erst mit der fehlenden Angabe</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {later.map((row) => <li key={row.id} className="min-w-0 text-white/70 [overflow-wrap:anywhere]" data-testid={`squad-candidate-${row.id}`}>{row.name}: {row.reason}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {movers.length || blocked.length ? (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Aus dem Team, noch nicht aufnehmbar</p>
+          <ul className="mt-1 space-y-1.5 text-sm">
+            {movers.map((row) => (
+              <li key={row.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2" data-testid={`squad-candidate-${row.id}`}>
+                <span className="min-w-0 text-white/80 [overflow-wrap:anywhere]">{row.name}: {row.reason}</span>
+                {open.has(row.id) ? <span className="text-xs text-white/50">Antrag läuft</span> : (
+                  <button type="button" disabled={!rules.transfer_open || busy === row.id} onClick={() => ask(row)} title={rules.transfer_open ? undefined : "Das Transferfenster ist gerade zu."}
+                    className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`squad-transfer-ask-${row.id}`}>
+                    <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" /> Transfer beantragen
+                  </button>
+                )}
+              </li>
+            ))}
+            {blocked.map((row) => (
+              <li key={row.id} className="min-w-0 text-white/70 [overflow-wrap:anywhere]" data-testid={`squad-candidate-${row.id}`}>{row.name}: {row.reason}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

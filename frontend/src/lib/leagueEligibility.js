@@ -68,7 +68,8 @@ export function requirementHint(requirement) {
   if (!requirement) return "";
   const parts = [];
   if (requirement.max_size) parts.push(`höchstens ${requirement.max_size} Spieler`);
-  if (requirement.min_age) parts.push(`neue Spieler brauchen ein Geburtsdatum im Profil (mindestens ${requirement.min_age} Jahre)`);
+  // #2313: Aufnehmen geht immer, spielen erst mit passendem Geburtsdatum.
+  if (requirement.min_age) parts.push(`spielen dürfen neue Spieler erst mit Geburtsdatum im Profil (mindestens ${requirement.min_age} Jahre), aufnehmen geht trotzdem`);
   if (requirement.transfers_open !== undefined) parts.push("wer schon in einem anderen Co-Team der Season steht, kommt nur per Transfer");
   return parts.length ? `Diese Season verlangt: ${parts.join(", ")}.` : "";
 }
