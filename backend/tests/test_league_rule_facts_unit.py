@@ -107,8 +107,16 @@ def test_table_block_speaks_e1_and_the_old_defaults():
             "gewonnene Maps, Entscheid der Liga-Leitung.") in out
     assert "wie zum Sieg der Serie nötig sind, der andere 0." in out and "Best of 3" not in out, "kein festes Beispiel in einer BO5-Liga"
     assert "Beide nicht erschienen" in out and "steht am Tabellenende" in out
-    assert "**Abweichend in Liga 1 · Elite**" in plain(out) and "Sieg 3, Remis 1, Niederlage 0 Punkte" in out
-    old = facts.render_table(facts.table_data({"scoring_rules": {"match_points": {"win": 3, "draw": 1, "loss": 0}}}, []))
+    # Liga N (#2318): Die ältere Abweichung trägt Remis erlaubt - es zählen nur ihre Punkte, und Remis-Punkte ohne Remis ändern nichts.
+    assert "Abweichend" not in out and "Remis 1" not in out
+    own = [{"id": "d1", "level": 1, "nickname": "Elite", "overrides": {"scoring_rules": {"match_points": {"win": 2, "draw": 0, "loss": 0}, "allow_draws": True}}}]
+    divided = facts.table_data(SEASON, own)
+    assert divided["divisions"][0]["points"]["win"] == 2 and divided["divisions"][0]["allow_draws"] is False
+    assert divided["divisions"][0]["tiebreakers"] == SEASON["scoring_rules"]["table_tiebreakers"]
+    assert "**Abweichend in Liga 1 · Elite**" in plain(facts.render_table(divided)) and "- Punkte: Sieg 2, Niederlage 0 Punkte." in facts.render_table(divided)
+    maps_divided = facts.table_data(MAPS_SEASON, own)
+    assert maps_divided["divisions"] == [], "mit Map-Punkten gibt es keine eigenen Punkte einer Liga N"
+    old =facts.render_table(facts.table_data({"scoring_rules": {"match_points": {"win": 3, "draw": 1, "loss": 0}}}, []))
     assert "Sieg 3, Remis 1, Niederlage 0" in old and "Map-Differenz, gewonnene Maps." in old
     assert "Gewertet wird, was die Liga-Leitung einträgt." in old and "annulliert" in old
 
@@ -138,6 +146,10 @@ def test_table_block_speaks_map_points_and_marks_the_change():
     ctx.table = data
     assert variables.value_of("table.points", ctx) == "je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)"
     assert variables.value_of("table.points", context()) == "Sieg 3, Niederlage 0 Punkte"
+    # Punkte je Sieg/Remis/Niederlage gibt es mit Map-Punkten nicht - ein eigener Wert, damit ein Text damit als geändert gilt.
+    for name in ("table.points_win", "table.points_draw", "table.points_loss"):
+        assert variables.value_of(name, ctx) == "– (Punkte je gewonnene Map)", name
+    assert variables.value_of("table.points_win", context()) == "3"
 
 
 # ---------------------------------------------------------------- Termine, Spielberechtigung

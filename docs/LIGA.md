@@ -1753,7 +1753,13 @@ Zurück auf `result` bleibt die Reihenfolge, wie sie ist. **Laufende Seasons:** 
 Staffel von der Season, überträgt „Vorgaben auf Staffeln übertragen“ auch nach dem ersten Ergebnis `match_points_mode`,
 `table_tiebreakers` und `forfeit_score` in die `scoring_rules` der Staffel (Gruppe `table_points`, nicht bei gesperrten
 und nicht bei beendeten Staffeln – `completed`, `results_published`, `archived`, `cancelled`); alles andere an
-`scoring_rules` bleibt „vor dem ersten Ergebnis“. Fertige Endstände (`league_final_tables`) bleiben unverändert. Jede
+`scoring_rules` bleibt „vor dem ersten Ergebnis“. Eine abgeschlossene oder archivierte Season (`completed`, `archived`)
+bekommt gar nichts davon – ihre Tabellen rechnen weiter mit der alten Punkteart; einen gespeicherten Endstand
+(`league_final_tables`) gibt es erst mit F.1. **Liga N (#2318):** Eine Liga N legt bei der Tabelle nur eigene Punkte
+(`overrides.scoring_rules.match_points`) über die Regeln der Season (`scoring_rules.division_rules`); direkter Vergleich,
+Remis-Regel, kampflos, Ausscheiden und die Punkteart kommen immer von der Season, auch bei älteren Abweichungen mit
+vollständigen Regeln. In einer Season mit `maps` gibt es keine eigenen Punkte: Die Verwaltung blendet die Felder aus, der
+Server lehnt sie mit 422 ab, eine ältere Abweichung zählt nicht. Jede
 Umstellung schreibt zusätzlich `league.season.table_points` mit vorher und nachher ins Protokoll. Antworten: Die Staffel
 der Ligaseite trägt `table_rules.match_points_mode`, die Season `match_points_mode`; die Tabelle zeigt dann „Punkte =
 gewonnene Maps“. Regelwerk: Baustein „Tabelle und Wertung“ und Variable `table.points` beschreiben die Punkteart;

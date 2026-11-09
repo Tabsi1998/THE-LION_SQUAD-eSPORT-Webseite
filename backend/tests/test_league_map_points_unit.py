@@ -14,6 +14,7 @@ from services.competition_standings import round_robin_standings, table_rules  #
 from services.scoring_rules import (  # noqa: E402
     LEAGUE_TABLE_DEFAULTS,
     MAPS_TABLE_TIEBREAKERS,
+    division_rules,
     league_default_rules,
     league_table,
     match_points,
@@ -131,6 +132,34 @@ def test_point_deduction_still_applies():
     rows = by_id(standings([duel("a", "b", 3, 2)], regs("a", "b"),
                            point_deductions=[{"registration_id": "a", "points": 1}]))
     assert rows["a"]["points"] == 2 and rows["a"]["deducted_points"] == 1
+
+
+def test_exit_half_with_map_points():
+    """``exit_rule: half``: kein Umschreiben gespielter Spiele - x behält sein 3:2 gegen a, das offene Spiel gegen b hat das
+    Ausscheiden kampflos verloren gewertet (BO5 3:0). x steht nach Punkten, nicht am Tabellenende."""
+    forfeit = {**duel("b", "x", 0, 0, round_number=2, forfeit="x"), "status": "forfeit"}
+    forfeit["results"][0].update({"rank": 1, "outcome": "winner"})
+    rows = standings([duel("x", "a", 3, 2), forfeit], regs("a", "b", "x", x="withdrawn"), maps_rules(exit_rule="half"))
+    found = by_id(rows)
+    assert (found["x"]["points"], found["a"]["points"], found["b"]["points"]) == (3, 2, 3)
+    assert found["x"]["forfeit_lost"] == 1 and found["b"]["forfeit_won"] == 1
+    assert order(rows).index("x") < order(rows).index("a"), "mit der 50-%-Regel kein Tabellenende"
+
+
+# ---------------------------------------------------------------- Liga N (#2318)
+
+def test_division_rules_keep_the_season_and_take_only_points():
+    season = copy.deepcopy(LEAGUE_TABLE_DEFAULTS)
+    # Ältere Abweichung: vollständige Regeln mit den alten Vorgaben - nur die Punkte zählen.
+    legacy = normalize_rules({"match_points": {"win": 2, "draw": 1, "loss": 0}})
+    merged = division_rules(season, legacy)
+    assert merged["match_points"] == {"win": 2, "draw": 1, "loss": 0}
+    assert merged["table_tiebreakers"] == LEAGUE_TABLE_DEFAULTS["table_tiebreakers"]
+    assert (merged["allow_draws"], merged["forfeit_score"], merged["exit_rule"]) == (False, "best_of", "all_for_opponents")
+    maps = {**season, "match_points_mode": "maps"}
+    merged = division_rules(maps, {"match_points": {"win": 2, "draw": 1, "loss": 0}})
+    assert merged["match_points_mode"] == "maps" and merged["match_points"] == {"win": 3, "draw": 0, "loss": 0}
+    assert division_rules(season, None) is season and division_rules(season, {}) is season
 
 
 # ---------------------------------------------------------------- Gleichstand

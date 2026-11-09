@@ -312,6 +312,23 @@ LEAGUE_TABLE_DEFAULTS: dict = {
 }
 
 
+def division_rules(season_rules: dict | None, own: dict | None) -> dict | None:
+    """Die Tabellenregeln einer Liga N (#2312, #2318): die der Season, darüber nur die eigenen Punkte (``match_points``). Die
+    Punkteart kommt immer von der Season - mit Punkten nach gewonnenen Maps gelten keine eigenen Punkte. Ältere Abweichungen
+    trugen vollständige Regeln mit den alten Vorgaben; auch von ihnen zählen nur die Punkte, sonst fielen direkter Vergleich,
+    Remis-Regel und kampflos der Season still weg."""
+    points = own.get("match_points") if isinstance(own, dict) else None
+    if not isinstance(points, dict):
+        return season_rules
+    try:
+        base = normalize_rules(copy.deepcopy(season_rules) if isinstance(season_rules, dict) else {})
+        if not maps_mode(base):
+            base["match_points"] = normalize_rules({"match_points": points})["match_points"]
+    except ValueError:
+        return season_rules
+    return base
+
+
 def league_default_rules() -> dict:
     """Die vollständigen Regeln einer neuen Liga-Season (``normalize_rules`` mit ``LEAGUE_TABLE_DEFAULTS``)."""
     return normalize_rules(copy.deepcopy(LEAGUE_TABLE_DEFAULTS))

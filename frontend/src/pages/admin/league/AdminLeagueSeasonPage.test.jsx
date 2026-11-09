@@ -528,6 +528,20 @@ test("Plattform je Season (#2270): Liga N weicht im Blatt ab und behält die Abw
     { nickname: null, overrides: { best_of: 5, allowed_platforms: ["PlayStation"], crossplay: false }, status: "active" }));
 });
 
+test("Liga N in einer Map-Season (#2312, #2318): keine eigenen Punkte, ein alter Wert fällt beim Speichern weg", async () => {
+  const mapRules = { ...RULES, match_points_mode: "maps" };
+  body = { ...BODY, season: { ...SEASON, scoring_rules: mapRules },
+    divisions: [{ ...BODY.divisions[0], overrides: { scoring_rules: { match_points: { win: 2, draw: 0, loss: 0 } } }, settings: { ...BODY.divisions[0].settings, scoring_rules: mapRules } }] };
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).queryByTestId("override-points-win")).toBeNull();
+  expect(within(sheet).getByTestId("override-points-maps")).toHaveTextContent("je gewonnene Map ein Punkt");
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", { nickname: null, overrides: {}, status: "active" }));
+});
+
 test("Fehler beim Anlegen der Staffel steht als Meldung da", async () => {
   apiMock.post.mockRejectedValueOnce({ response: { data: { detail: "Mit bis zu 9 Teams braucht die Staffel 9 Spielwochen" } } });
   renderPage("#ligen");

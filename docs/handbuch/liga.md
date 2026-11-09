@@ -302,8 +302,11 @@ bekommt so viele Punkte, wie sie Maps gewonnen hat – bei 3:2 der Sieger 3, der
 Punktgleichheit auf **Mehr Siege → Direkter Vergleich → Map-Differenz → Entscheid der Leitung**; das ist ein Vorschlag, du kannst sie
 danach ändern. Der direkte Vergleich rechnet dann auch mit den Maps der Spiele untereinander. Gespeichert wird die Umstellung im
 Protokoll („Punkteart“ mit vorher und nachher). Eine **laufende** Season bekommt die neue Punkteart über **Vorgaben übertragen**
-auch nach dem ersten Ergebnis (siehe Tabelle unten); beendete Staffeln und fertige Endstände bleiben, wie sie sind. Danach schlägt
-das Regelwerk eine neue Freigabe vor, weil sich der Baustein „Tabelle und Wertung“ geändert hat.
+auch nach dem ersten Ergebnis (siehe Tabelle unten); beendete Staffeln sowie abgeschlossene oder archivierte Seasons bleiben, wie
+sie sind. Danach schlägt das Regelwerk eine neue Freigabe vor, weil sich der Baustein „Tabelle und Wertung“ geändert hat.
+Eine **Liga N** übernimmt die Punkteart immer von der Season. Mit Map-Punkten gibt es im Blatt der Liga N keine eigenen Punkte für
+Sieg, Remis und Niederlage. Sonst legt sie nur ihre eigenen Punkte über die Season; direkter Vergleich, Remis-Regel, kampflos und
+Ausscheiden gelten wie in der Season.
 
 <img src="../assets/liga/liga-season-mappunkte-pc.png" alt="Reiter Tabelle mit Punkteart Punkte nach gewonnenen Maps, darunter die vorgeschlagene Reihenfolge Mehr Siege, Direkter Vergleich, Map-Differenz, Entscheid der Leitung und das gesperrte Feld Kampflos" width="560">
 

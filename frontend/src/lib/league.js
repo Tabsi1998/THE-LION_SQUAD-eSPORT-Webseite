@@ -4,7 +4,7 @@ import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { divisionPlatformPayload, divisionPlatformToForm, platformPayload, platformToForm } from "@/lib/leaguePlatform";
-import { tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
+import { byMaps, tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
@@ -206,13 +206,14 @@ export function leagueLookChanges(form, saved = {}) {
   return out;
 }
 
-/** Welche Werte eine Liga N anders hat als ihre Season - nur geänderte Felder, leer heißt „wie die Season“. */
-export function overridesPayload(form) {
+/** Welche Werte eine Liga N anders hat als ihre Season - nur geänderte Felder, leer heißt „wie die Season“. ``mapPoints``: Die
+ *  Season vergibt Punkte nach gewonnenen Maps (#2312) - dann gibt es keine eigenen Punkte, ein alter Wert fällt beim Speichern weg. */
+export function overridesPayload(form, { mapPoints = false } = {}) {
   const out = {};
   for (const key of ["best_of", "team_size", "min_squad_size", "max_staffel_size", "match_schedule_response_hours"]) {
     if (form[key] !== "" && form[key] != null) out[key] = Number(form[key]);
   }
-  if (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "") {
+  if (!mapPoints && (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "")) {
     out.scoring_rules = { match_points: { win: number(form.points_win) ?? 3, draw: number(form.points_draw) ?? 1, loss: number(form.points_loss) ?? 0 } };
   }
   // Plattform je Season (#2270): mitschicken, sonst ginge die Abweichung der Liga N beim nächsten Speichern verloren.
@@ -241,7 +242,8 @@ export function settingsLine(settings = {}) {
   if (settings.team_size) parts.push(`${settings.team_size} gegen ${settings.team_size}`);
   if (settings.max_staffel_size) parts.push(`bis ${settings.max_staffel_size} Teams je Staffel`);
   const points = settings.scoring_rules?.match_points;
-  if (points) parts.push(`Punkte ${points.win}/${points.draw}/${points.loss}`);
+  if (byMaps(settings.scoring_rules)) parts.push("Punkte je gewonnene Map");
+  else if (points) parts.push(`Punkte ${points.win}/${points.draw}/${points.loss}`);
   return parts.join(" · ");
 }
 

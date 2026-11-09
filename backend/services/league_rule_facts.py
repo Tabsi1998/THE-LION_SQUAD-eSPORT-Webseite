@@ -14,7 +14,7 @@ from models import normalize_rule, rule_time_limit_seconds
 from services import game_maps, game_modes, league_platform, league_veto_rules, map_pools, mode_icons
 from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS, ScheduleProblem, normalize as normalize_schedule
 from services.markdown_text import text_cell
-from services.scoring_rules import normalize_rules
+from services.scoring_rules import division_rules, normalize_rules
 
 MARKDOWN, TEXT = "markdown", "text"
 # Symbol eines Modus (#2266): ein Markdown-Bild mit genau diesem Text vor dem Namen, nur in ``markdown``. Das Web zeigt es klein (rules.css).
@@ -279,8 +279,10 @@ def table_data(season: dict, divisions: list[dict]) -> dict:
     for division in divisions:
         own = (division.get("overrides") or {}).get("scoring_rules")
         if isinstance(own, dict):
-            merged = _table_rules(own)
-            if any(merged.get(key) != base.get(key) for key in TABLE_KEYS):
+            # Nur die eigenen Punkte legen sich über die Season (#2318); mit Map-Punkten gelten keine eigenen.
+            merged = _table_rules(division_rules(season.get("scoring_rules"), own))
+            # Nur, was sich im Text unterscheidet: Remis-Punkte einer Liga N ohne Remis ändern nichts am Satz.
+            if _table_lines(merged) != _table_lines(base):
                 data["divisions"].append({"label": _division_label(division), **merged})
     return data
 

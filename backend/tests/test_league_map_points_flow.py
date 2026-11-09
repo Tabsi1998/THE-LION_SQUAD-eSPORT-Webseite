@@ -79,9 +79,78 @@ async def test_switch_running_season_to_map_points(flow):
     overview = (await flow.get(f"{TABLE}/{staffel['id']}/table")).json()
     assert overview["rules"]["match_points_mode"] == "maps"
 
+    sync_audit = await flow.db.audit_logs.find_one({"action": "league.staffel.sync", "target_id": staffel["id"]}, {"_id": 0})
+    assert "table_points" in sync_audit["data"]["applied"] and "scoring_rules" in sync_audit["data"]["changed"]
+
     # Ein zweites Übertragen ändert nichts mehr.
     again = await sync(flow, season_id, staffel["id"])
     assert "table_points" not in again["applied"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("closed", ["locked", "season_completed", "season_archived"])
+async def test_locked_staffel_or_closed_season_keeps_its_points(flow, closed):
+    _admin, _league, staffel = await setup(flow)
+    season_id = staffel["league_context"]["season_id"]
+    for match in await matches_of(flow, staffel, 1):
+        await result(flow, match, 3, 1)
+    await switch(flow, season_id, "maps", MAPS_ORDER)
+    if closed == "locked":
+        await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"locked_at": "2026-11-20T10:00:00+00:00"}})
+    else:
+        await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"status": closed.removeprefix("season_")}})
+    row = await sync(flow, season_id, staffel["id"])
+    assert "table_points" not in row["applied"]
+    stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "scoring_rules": 1})
+    assert stored["scoring_rules"]["match_points_mode"] == "result"
+
+
+async def division_of(flow, staffel):
+    return await flow.db.league_divisions.find_one({"id": staffel["league_context"]["division_id"]}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+async def test_division_in_a_map_season_has_no_own_points(flow):
+    """#2318: Eine ältere Abweichung der Liga N mit Punkten (vollständige Regeln, alte Vorgaben) zählt in einer Map-Season nicht -
+    die Staffel rechnet `maps`. Neue eigene Punkte lehnt der Server dort ab."""
+    _admin, _league, staffel = await setup(flow)
+    season_id = staffel["league_context"]["season_id"]
+    division = await division_of(flow, staffel)
+    legacy = {"match_points": {"win": 2, "draw": 1, "loss": 0}, "table_tiebreakers": ["score_diff", "score_for"], "allow_draws": True,
+              "forfeit_score": "recorded", "exit_rule": "half", "match_points_mode": "result"}
+    await flow.db.league_divisions.update_one({"id": division["id"]}, {"$set": {"overrides.scoring_rules": legacy}})
+    await switch(flow, season_id, "maps", MAPS_ORDER)
+    row = await sync(flow, season_id, staffel["id"])
+    assert "before_result" in row["applied"]
+    rules = (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "scoring_rules": 1}))["scoring_rules"]
+    assert rules["match_points_mode"] == "maps" and rules["table_tiebreakers"] == MAPS_ORDER
+    assert (rules["allow_draws"], rules["exit_rule"]) == (False, "all_for_opponents")
+    for match in await matches_of(flow, staffel, 1):
+        await result(flow, match, 3, 2)
+    assert sorted(row["points"] for row in (await page(flow, staffel))["standings"]) == [2, 2, 3, 3]
+
+    refused = await flow.patch(f"{ADMIN}/divisions/{division['id']}", json={"overrides": {"scoring_rules": {"match_points": {"win": 2, "draw": 0, "loss": 0}}}})
+    assert refused.status_code == 422, refused.text
+    assert "Punkte nach gewonnenen Maps" in refused.text
+
+
+@pytest.mark.asyncio
+async def test_division_points_keep_the_season_table_rules(flow):
+    """#2318: Eigene Punkte einer Liga N legen sich nur über die Season - direkter Vergleich, Remis-Regel und kampflos bleiben."""
+    _admin, _league, staffel = await setup(flow)
+    season_id = staffel["league_context"]["season_id"]
+    division = await division_of(flow, staffel)
+    response = await flow.patch(f"{ADMIN}/divisions/{division['id']}", json={"overrides": {"scoring_rules": {"match_points": {"win": 2, "draw": 0, "loss": 0}}}})
+    assert response.status_code == 200, response.text
+    assert (await division_of(flow, staffel))["overrides"]["scoring_rules"] == {"match_points": {"win": 2, "draw": 0, "loss": 0}}
+    row = await sync(flow, season_id, staffel["id"])
+    assert "before_result" in row["applied"]
+    rules = (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "scoring_rules": 1}))["scoring_rules"]
+    season = await flow.db.league_seasons.find_one({"id": season_id}, {"_id": 0, "scoring_rules": 1})
+    assert rules["match_points"] == {"win": 2, "draw": 0, "loss": 0}
+    for key in ("table_tiebreakers", "head_to_head_criteria", "allow_draws", "forfeit_score", "exit_rule", "match_points_mode"):
+        assert rules[key] == season["scoring_rules"][key], key
+    assert rules["table_tiebreakers"][0] == "head_to_head" and rules["forfeit_score"] == "best_of" and rules["allow_draws"] is False
 
 
 @pytest.mark.asyncio

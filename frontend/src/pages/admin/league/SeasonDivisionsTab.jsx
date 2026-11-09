@@ -10,6 +10,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
 import { nicknameRepeatsLevel } from "@/lib/seasonTabs";
+import { byMaps } from "@/lib/leagueTable";
 import { PrizeEditor } from "./LeagueLookFields";
 import { DivisionPlatformFields } from "./DivisionPlatformFields";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -37,7 +38,7 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
     setSaving(true);
     try {
       // Der Stand (#2106): die API kannte ihn, das Formular schickt ihn jetzt mit - archiviert fällt aus der Ligaseite.
-      const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form), ...(division ? { status } : {}) };
+      const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form, { mapPoints: byMaps(season.scoring_rules) }), ...(division ? { status } : {}) };
       // Eigene Gewinne (#2107) nur, wenn sie sich ändern - leer heißt wieder „wie die Season“.
       const ownPrizes = prizesPayload(prizes);
       if (JSON.stringify(ownPrizes) !== JSON.stringify(prizesPayload(prizesToForm(division?.prizes)))) body.prizes = ownPrizes;
@@ -52,6 +53,8 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
     }
   };
   const points = season.scoring_rules?.match_points || {};
+  // Punkte nach gewonnenen Maps (#2312): Die Punkteart kommt immer von der Season, eine Liga N legt dann keine eigenen Punkte fest.
+  const mapPoints = byMaps(season.scoring_rules);
   return (
     <AdminSheet title={division ? `${division.label} bearbeiten` : `Liga ${level} anlegen`} eyebrow={season.name} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={division ? "Speichern" : "Anlegen"} submitTestId="division-save" testId="division-sheet">
@@ -83,11 +86,17 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
           placeholder={season.match_schedule_response_hours ? `wie Season (${season.match_schedule_response_hours})` : "wie Season"} />
       </FormGrid>
       <DivisionPlatformFields form={form} set={set} seasonId={season.id} />
+      {mapPoints ? (
+        <p className="text-xs text-white/55" data-testid="override-points-maps">
+          Punkte: wie die Season – je gewonnene Map ein Punkt. Eigene Punkte für Sieg, Remis und Niederlage gibt es dann nicht.
+        </p>
+      ) : (
       <FormGrid cols={3}>
         <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} placeholder={String(points.win ?? 3)} testId="override-points-win" />
         <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} placeholder={String(points.draw ?? 1)} testId="override-points-draw" />
         <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} placeholder={String(points.loss ?? 0)} testId="override-points-loss" />
       </FormGrid>
+      )}
       <PrizeEditor rows={prizes} onChange={setPrizes} testId="division-prizes"
         emptyHint={season.prizes?.length ? `Wie die Season: ${season.prizes.map((row) => `${row.place}. ${row.text}`).join(" · ")}` : "Wie die Season – dort sind noch keine Gewinne eingetragen."} />
     </AdminSheet>
