@@ -464,6 +464,40 @@ async def test_the_home_rule_takes_the_earliest_of_a_group(flow):
 
 
 @pytest.mark.asyncio
+async def test_an_app_counter_that_fails_while_closing_leaves_nothing_behind(flow, monkeypatch):
+    """App-Weg wie im Web: erst der Gegenvorschlag, dann schließen - scheitert das Schließen der Gruppe, gibt es keinen
+    Gegenvorschlag, der schon geschlossene Termin ist wieder offen, und die Frist bleibt."""
+    world = await live_world(flow)
+    group = (await propose(flow, world, "Kapitaen", [100, 110, 120])).json()["proposals"]
+    before = await flow.reload(world["match"])
+    collection_type = type(flow.db.match_schedule_proposals)
+    original = collection_type.update_many
+    calls = {"n": 0}
+
+    async def broken_first(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("Verbindung weg")
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(collection_type, "update_many", broken_first)
+    flow.act_as(world["users"]["Falke1"])
+    try:
+        answer = await flow.post(f"{base_url(world)}/{group[0]['id']}/decision", json={"action": "counter", "scheduled_at": at(60)})
+    except RuntimeError:
+        answer = None
+    monkeypatch.undo()
+    assert answer is None or answer.status_code >= 500
+    stored = await rows(flow, world)
+    assert sorted(stored) == sorted(row["id"] for row in group), "kein Gegenvorschlag übrig"
+    assert {row["status"] for row in stored.values()} == {"pending"}, "der beantwortete Termin ist wieder offen"
+    assert "decision_user_id" not in stored[group[0]["id"]]
+    after = await flow.reload(world["match"])
+    assert after["schedule_deadline_at"] == before["schedule_deadline_at"]
+    assert await notes(flow, "schedule_countered") == []
+
+
+@pytest.mark.asyncio
 async def test_an_app_counter_to_one_time_answers_the_whole_group(flow):
     """Gegenvorschlag aus der App (``/decision``) zu einem Termin einer Gruppe: die übrigen sind damit beantwortet - die 72-h-Regel
     setzt danach keinen Heimtermin mehr."""

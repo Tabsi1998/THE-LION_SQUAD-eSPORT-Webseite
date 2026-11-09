@@ -1328,18 +1328,6 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
     _refuse_blocked_moment(tournament, body.scheduled_at)
     refuse_past_proposal(body.scheduled_at)
-    await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
-        "status": "countered",
-        "decision_user_id": me["id"],
-        "decision_note": normalized_note,
-        "updated_at": now_iso,
-    }})
-    if proposal.get("group_id"):
-        # Gegenvorschlag aus der App zu einem Termin einer Gruppe (#2325): er antwortet auf die ganze Gruppe - sonst bliebe
-        # der Rest offen, und die 72-h-Regel setzte trotz Gegenvorschlag den Heimtermin.
-        await db.match_schedule_proposals.update_many(
-            {"match_id": match_id, "group_id": proposal["group_id"], "status": "pending", "id": {"$ne": proposal_id}},
-            {"$set": {"status": "countered", "decision_user_id": me["id"], "decision_note": normalized_note, "updated_at": now_iso}})
     counter = {
         "id": new_id(),
         "match_id": match_id,
@@ -1358,12 +1346,29 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     }
     if proposal.get("group_id"):
         counter["parent_group_id"] = proposal["group_id"]
-    await db.match_schedule_proposals.insert_one(counter)
-    await getattr(db, collection).update_one({"id": match_id}, {"$set": {
-        "schedule_status": "proposed",
-        "schedule_deadline_at": _schedule_deadline(match, tournament),
-        "updated_at": now_iso,
-    }, "$unset": {"schedule_escalated_at": ""}})
+    # Wie im Web (#2325): erst der Gegenvorschlag, dann den beantworteten Vorschlag schließen - scheitert das, geht der
+    # Gegenvorschlag wieder raus und schon geschlossene sind wieder offen. Das Spiel schreibt erst danach.
+    await db.match_schedule_proposals.insert_one(dict(counter))
+    closed = {"status": "countered", "decision_user_id": me["id"], "decision_note": normalized_note, "updated_at": now_iso}
+    try:
+        await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": closed})
+        if proposal.get("group_id"):
+            # Gegenvorschlag aus der App zu einem Termin einer Gruppe: er antwortet auf die ganze Gruppe - sonst bliebe der Rest
+            # offen, und die 72-h-Regel setzte trotz Gegenvorschlag den Heimtermin.
+            await db.match_schedule_proposals.update_many(
+                {"match_id": match_id, "group_id": proposal["group_id"], "status": "pending", "id": {"$ne": proposal_id}},
+                {"$set": closed})
+    except BaseException:
+        await db.match_schedule_proposals.delete_one({"id": counter["id"], "status": "pending"})
+        try:
+            await db.match_schedule_proposals.update_many(
+                {"match_id": match_id, "status": "countered", "decision_user_id": me["id"], "updated_at": now_iso,
+                 "$or": [{"id": proposal_id}, *([{"group_id": proposal["group_id"]}] if proposal.get("group_id") else [])]},
+                {"$set": {"status": "pending"}, "$unset": {"decision_user_id": "", "decision_note": ""}})
+        except Exception:  # noqa: BLE001 - der ursprüngliche Fehler zählt, er geht gleich weiter
+            logger.warning("[match] Gegenvorschlag für %s nicht ganz zurückgebaut", _log_safe(match_id), exc_info=True)
+        raise
+    await _mark_proposed(db, match, collection, tournament)
     counter.pop("_id", None)
     counter.pop("match_collection", None)
     counter["idempotent_replay"] = False
