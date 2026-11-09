@@ -24,7 +24,8 @@ import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { isCountdownDue } from "@/lib/countdownRule";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, ListOrdered, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
+import { leagueSeatsLine, leagueSortTime, leagueTimelineItem, periodLine } from "@/lib/leagueHome";
 import { formatAgo, formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
 import { withoutRepeatedBanners } from "@/lib/newsCards";
@@ -403,7 +404,8 @@ function NextUp({ items }) {
   const changed = useChangedKeys(items, timelineKey, timelineSignature);
   // Der große Countdown nur, wenn es bald so weit ist (#1264): innerhalb der Schwelle (Vorgabe 14 Tage, Branding).
   const days = useCountdownDays();
-  const next = nextCountdownTarget(items);
+  // Eine Liga (#2324) läuft wochenlang - ihr Anmeldeschluss steht in der Plakette, der große Countdown bleibt Events und Turnieren.
+  const next = nextCountdownTarget(items.filter((item) => item.kind !== "league"));
   const target = next && isCountdownDue(next.targetMs, { days }) ? next : null;
   const countdown = useCountdown(target?.targetMs || null, days);
   if (!items.length) return (
@@ -432,7 +434,10 @@ function NextUp({ items }) {
         {items.map((item) => {
           const key = timelineKey(item);
           const isChanged = changed.has(key);
-          const counts = liveCountLine(item);
+          const league = item.kind === "league";
+          // Liga (#2324): freie Startplätze statt Live-Zahlen, der Zeitraum der Season statt eines Termins.
+          const counts = league ? leagueSeatsLine(item) : liveCountLine(item);
+          const when = league ? periodLine(item) : item.start_date && (scheduleLine(item.schedule) || formatWhen(item.start_date));
           return (
             <Link
               key={key}
@@ -442,7 +447,7 @@ function NextUp({ items }) {
               className={`flex flex-col sm:flex-row sm:items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 hover:bg-white/[0.03] focus-visible:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition duration-300 min-w-0 ${isChanged ? "tls-changed" : ""}`}
             >
               <div className="flex items-center gap-3 min-w-0 w-full">
-                <KindIcon kind={item.kind} />
+                <KindIcon kind={item.kind} accent={item.accent_color} />
                 <div className="min-w-0 flex-1">
                   <div className="font-heading font-bold leading-tight line-clamp-2 flex items-center gap-2 flex-wrap">
                     <span>{item.label}</span>
@@ -458,7 +463,7 @@ function NextUp({ items }) {
               </div>
               {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}
               <div className="w-full sm:w-auto sm:shrink-0 sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
-                {item.start_date && <div className="text-xs text-white/45">{scheduleLine(item.schedule) || formatWhen(item.start_date)}</div>}
+                {when && <div className="text-xs text-white/45" data-testid={league ? `home-next-period-${item.slug}` : undefined}>{when}</div>}
                 {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full sm:whitespace-nowrap" />}
               </div>
             </Link>
@@ -548,8 +553,10 @@ function timelineKey(item) {
   return `${item.kind}-${item.id || item.slug}`;
 }
 
-function KindIcon({ kind }) {
-  // Farbe je Art (#1305): Turnier Cyan, Fast Lap Türkis, Event Violett - wie im Kalender.
+function KindIcon({ kind, accent }) {
+  // Farbe je Art (#1305): Turnier Cyan, Fast Lap Türkis, Event Violett - wie im Kalender. Liga (#2324): das Liga-Zeichen
+  // in der Akzentfarbe der Liga, ohne sie in der Turnierfarbe.
+  if (kind === "league") return <ListOrdered className="w-3.5 h-3.5" style={{ color: accent || KIND_COLORS.tournament }} />;
   if (kind === "tournament") return <Trophy className="w-3.5 h-3.5" style={{ color: KIND_COLORS.tournament }} />;
   if (kind === "fastlap") return <Flag className="w-3.5 h-3.5" style={{ color: KIND_COLORS.fastlap }} />;
   return <Calendar className="w-3.5 h-3.5" style={{ color: KIND_COLORS.event }} />;
@@ -602,12 +609,18 @@ function buildHomeTimeline(state) {
       }
     }
   }
+  // Liga-Seasons (#2324): wie ein Event, einsortiert nach dem nächsten Datum, das zählt (Anmeldeschluss, Start, Spielwoche).
+  for (const row of state.leagues || []) {
+    const item = leagueTimelineItem(row);
+    byKey.set(`${item.kind}-${item.id}`, item);
+  }
+  const sortTime = (item) => (item.kind === "league" ? leagueSortTime(item) : eventSortTime(item));
   return [...byKey.values()].sort((a, b) => {
     const liveRankA = a.public_phase?.state === "live" ? 0 : 1;
     const liveRankB = b.public_phase?.state === "live" ? 0 : 1;
     if (liveRankA !== liveRankB) return liveRankA - liveRankB;
-    const da = eventSortTime(a);
-    const db = eventSortTime(b);
+    const da = sortTime(a);
+    const db = sortTime(b);
     if (da !== db) return da - db;
     return a.sourcePriority - b.sourcePriority;
   });
