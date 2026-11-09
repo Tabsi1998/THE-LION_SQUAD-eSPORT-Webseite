@@ -347,8 +347,11 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
   // entscheiden - weggefallene Maps kommen mit ihren Angaben zurück, sobald sie wieder offen ist.
   const memory = useRef({});
   const change = (position, game) => {
-    const changed = changeGame(games, position, game);
-    memory.current = rememberGames(memory.current, changed);
+    // Auch gemerkte, gerade ausgeblendete Maps ziehen bei einer Aufstellung mit - sonst kämen sie mit der alten zurück.
+    const all = Object.values(rememberGames(memory.current, games)).sort((a, b) => a.position - b.position);
+    const changedAll = changeGame(all, position, game);
+    memory.current = rememberGames({}, changedAll);
+    const changed = changedAll.filter((row) => games.some((shown) => shown.position === row.position));
     setGames(settleGames(changed, league, memory.current));
   };
 

@@ -60,8 +60,11 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const mapMemory = useRef({ entryId: entry?.id, games: {} });
   const changeMap = (position, next) => {
     if (mapMemory.current.entryId !== entry?.id) mapMemory.current = { entryId: entry?.id, games: {} };
-    const changed = changeStaffGame(mapGames, position, next);
-    mapMemory.current.games = rememberGames(mapMemory.current.games, changed);
+    // Auch gemerkte, gerade ausgeblendete Maps ziehen bei einer Aufstellung mit - sonst kämen sie mit der alten zurück.
+    const all = Object.values(rememberGames(mapMemory.current.games, mapGames)).sort((a, b) => a.position - b.position);
+    const changedAll = changeStaffGame(all, position, next);
+    mapMemory.current.games = rememberGames({}, changedAll);
+    const changed = changedAll.filter((row) => mapGames.some((shown) => shown.position === row.position));
     setMapGames(settleStaffGames(changed, league, mapMemory.current.games));
   };
   const kind = withMaps ? "maps" : inputKind(entry, heatMode);
