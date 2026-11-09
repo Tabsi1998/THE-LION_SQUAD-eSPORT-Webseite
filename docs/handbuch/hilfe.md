@@ -24,15 +24,13 @@ Discord und WhatsApp zeigen eine Vorschau mit Titel und Kurztext des Themas.
 
 ## Wo die Hilfe auf der Website auftaucht
 
+- **Hauptmenü:** **Community → Hilfe**. Ausblenden oder umbenennen geht im Admin unter **Content → Navigation**.
 - **Fußzeile:** Spalte „Mitmachen“ → **Hilfe**.
 - **„?“ an den Stellen, an denen man hängen bleibt:** Anmeldung auf der Ligaseite und jeder Schritt der Liga-Anmeldung,
   auf der Matchseite bei Terminabstimmung, Termin und Verschiebung, Check-in (während des Vetos beim Veto), Ergebnis
   und Problem melden, auf der Teamseite neben Teilen (Einladen bzw. Beitreten), unter **Teams → Deine Teams** beim
   Co-Team und in den Einstellungen bei **Gaming → Spiel-IDs**. Das „?“ öffnet die Hilfe in einem neuen Tab, ein halb
   ausgefülltes Formular bleibt also stehen.
-
-Im Hauptmenü steht die Hilfe noch nicht: Eigene Menüpunkte gibt es im Navigations-Editor bewusst nicht, ein neuer
-Standardpunkt wäre eine eigene Entscheidung.
 
 ## Aktuell halten
 
