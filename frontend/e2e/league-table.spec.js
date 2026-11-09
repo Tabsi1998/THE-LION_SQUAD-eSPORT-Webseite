@@ -86,7 +86,8 @@ async function noSideScroll(page) {
 async function screenshot(locator, name, width, only) {
   const dir = process.env.E2E_SCREENS_DIR;
   if (!dir || width !== only) return;
-  await locator.screenshot({ path: path.join(dir, `${name}-${width === 390 ? "handy" : "pc"}.png`), animations: "disabled" });
+  // Die Leiste unten am Handy liegt fest über der Seite - fürs Bild ausblenden, sonst verdeckt sie das Ende der Tabelle.
+  await locator.screenshot({ path: path.join(dir, `${name}-${width === 390 ? "handy" : "pc"}.png`), animations: "disabled", style: ".tls-bottom-nav { display: none !important; }" });
 }
 
 for (const [width, height] of [[390, 844], [1440, 900]]) {
@@ -132,5 +133,57 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await sheet.getByTestId("table-decision-save").click();
     await expect.poll(() => sent).toEqual({ registration_ids: ["r5", "r4"], reason: "Losentscheid vor beiden Captains am 20.11." });
     await noSideScroll(page);
+  });
+
+  // Punkte nach gewonnenen Maps (#2312): 3:2 ergibt 3 und 2. Nordlicht und Falken stehen mit 11 Punkten gleich, Nordlicht hat mehr Siege.
+  const MAP_ROWS = [
+    row(1, { points: 11, played: 4, won: 3, lost: 1, score_for: 11, score_against: 6, score_diff: 5, tiebreak: "wins" }),
+    row(2, { points: 11, played: 4, won: 2, lost: 2, score_for: 11, score_against: 8, score_diff: 3, form: ["W", "L", "L", "W"] }),
+    row(3, { points: 9, played: 4, won: 2, lost: 2, score_for: 9, score_against: 9, score_diff: 0, forfeit_won: 1, form: ["L", "W", "W", "L"] }),
+    row(4, { points: 7, played: 4, won: 1, lost: 3, score_for: 7, score_against: 10, score_diff: -3, form: ["L", "L", "W", "L"] }),
+    row(5, { points: 5, played: 4, won: 0, lost: 4, score_for: 5, score_against: 12, score_diff: -7, form: ["L", "L", "L", "L"] }),
+  ];
+  const MAP_RULES = { allow_draws: false, match_points_mode: "maps", tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"] };
+
+  test(`Punkte nach gewonnenen Maps (${width} px): Hinweis, Spalte S auch am Handy, Season-Seite nennt die Punkteart`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockServer(page);
+    await page.route("**/api/leagues/probe-liga/season-1", json({ ...SEASON, season: { ...SEASON.season, best_of: 5, match_points_mode: "maps" } }));
+    await page.route("**/api/leagues/probe-liga/season-1/staffeln/**", json({ ...STAFFEL, standings: MAP_ROWS, weeks: [],
+      staffel: { ...STAFFEL.staffel, table_rules: MAP_RULES } }));
+    await page.goto("/liga/probe-liga/season-1");
+    const staffel = page.getByTestId("league-staffel-A");
+    const table = staffel.getByRole("table", { name: "Tabelle Staffel A" });
+    await expect(table.getByTestId("standing-row-r1")).toContainText("11");
+    await expect(staffel.getByTestId("league-points-note-A")).toHaveText("Punkte = gewonnene Maps (3:2 ergibt 3 und 2, kampflos 3:0)");
+    await expect(staffel.getByTestId("league-tiebreak-order-A")).toHaveText("Reihenfolge: Punkte → Mehr Siege → Direkter Vergleich → Map-Differenz → Entscheid der Leitung");
+    await expect(table.getByRole("columnheader", { name: "S", exact: true })).toBeVisible();
+    await expect(table.getByRole("columnheader", { name: "Pkt", exact: true })).toHaveAttribute("title", "Punkte = gewonnene Maps");
+    await expect(page.getByTestId("league-fact-points")).toContainText("Punkte je gewonnene Map · Best of 5");
+    await noSideScroll(page);
+    await screenshot(staffel.locator(".tls-league-table"), "liga-tabelle-mappunkte", width, width);
+  });
+
+  test(`Season-Verwaltung (${width} px): Punkteart wechseln schlägt die Reihenfolge vor`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockServer(page, { admin: true });
+    let sent = null;
+    await page.route("**/api/admin/leagues/seasons/s1", (route) => {
+      if (route.request().method() !== "PATCH") return json(SEASON_PAGE)(route);
+      sent = route.request().postDataJSON();
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...SEASON_PAGE.season, changed: ["scoring_rules"] }) });
+    });
+    await page.goto("/admin/leagues/seasons/s1#tabelle");
+    const mode = page.getByTestId("season-form-points-mode");
+    await expect(mode).toHaveValue("result");
+    await mode.selectOption("maps");
+    await expect(page.getByTestId("season-form-points-win")).toHaveCount(0);
+    await expect(page.getByTestId("tiebreaker-wins")).toBeChecked();
+    await expect(page.getByTestId("season-form-forfeit-score")).toBeDisabled();
+    await noSideScroll(page);
+    await screenshot(page.getByTestId("season-points"), "liga-season-mappunkte", width, 1440);
+    await page.getByTestId("season-save-tabelle").click();
+    await expect.poll(() => sent?.scoring_rules?.match_points_mode).toBe("maps");
+    expect(sent.scoring_rules.table_tiebreakers).toEqual(["wins", "head_to_head", "score_diff", "lead_decision"]);
   });
 }
