@@ -504,7 +504,22 @@ SYNC_GROUP_LABELS = {
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
     "loadout_bans": loadout_bans.SYNC_LABEL,
+    "table_points": "Punkteart der Tabelle",
 }
+# Punkteart (#2312, docs/LIGA.md E.1): wechselt sie, geht sie mit ihrer Reihenfolge bei Punktgleichheit und der Wertung
+# kampflos auch in eine laufende Staffel - nicht in gesperrte oder beendete (deren Endstand bleibt).
+TABLE_POINTS_KEYS = ("match_points_mode", "table_tiebreakers", "forfeit_score")
+FINISHED_STAFFEL_STATUSES = frozenset({"completed", "results_published", "archived", "cancelled"})
+
+
+def table_points_update(tournament: dict, wanted: dict) -> dict | None:
+    """Die ``scoring_rules`` einer Staffel mit der Punkteart der Season (#2312) - ``None``, wenn die Punkteart gleich ist."""
+    own, target = tournament.get("scoring_rules"), wanted.get("scoring_rules")
+    if not isinstance(own, dict) or not isinstance(target, dict):
+        return None
+    if (own.get("match_points_mode") or "result") == (target.get("match_points_mode") or "result"):
+        return None
+    return {**own, **{key: copy.deepcopy(target[key]) for key in TABLE_POINTS_KEYS if key in target}}
 
 
 # ---------------------------------------------------------------- Lesen
@@ -1225,6 +1240,12 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
                 continue
         updates.update({key: wanted[key] for key in keys if key in wanted})
         applied.append(group)
+    if has_result and not locked and tournament.get("status") not in FINISHED_STAFFEL_STATUSES:
+        # Punkteart (#2312): auch nach dem ersten Ergebnis, aber nur, wenn sie wechselt.
+        switched = table_points_update(tournament, wanted)
+        if switched is not None:
+            updates["scoring_rules"] = switched
+            applied.append("table_points")
     changed = sorted(key for key, value in updates.items() if tournament.get(key) != value)
     if changed:
         await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {**{key: updates[key] for key in changed},
@@ -1375,6 +1396,7 @@ def public_season(season: dict) -> dict:
     out = {key: season.get(key) for key in PUBLIC_SEASON_FIELDS}
     rules = season.get("scoring_rules") or normalize_rules({})
     out["match_points"] = rules.get("match_points")
+    out["match_points_mode"] = rules.get("match_points_mode") or "result"
     out["table_tiebreakers"] = rules.get("table_tiebreakers")
     out["blocked_weeks"] = blocked_weeks(season)
     out["end_date"] = season_end(season)
