@@ -26,21 +26,21 @@ function PromoCard({ row, index, compact }) {
   const banner = row.banner?.url ? row.banner : null;
   const period = periodLine(row);
   return (
-    <article className="tls-league-promo tls-reveal-item" data-compact={compact ? "true" : "false"}
+    <article className="tls-league-promo tls-reveal-item" data-compact={compact ? "true" : "false"} data-banner={banner ? "true" : "false"}
       style={{ ...accentStyle(row.accent_color), "--tls-i": index + 1 }} data-testid={`home-league-promo-${row.slug}`}>
       {banner ? (
         <div className="tls-league-promo__banner" style={bannerFocus(banner)} aria-hidden="true">
-          <LazyImg src={banner.url} alt="" sizes="(min-width: 1024px) 520px, 100vw" className="tls-league-promo__img" />
+          <LazyImg src={banner.url} alt="" sizes="(min-width: 1024px) 560px, 100vw" className="tls-league-promo__img" />
         </div>
       ) : null}
       <div className="tls-league-promo__body">
-        <LeagueEmblem src={row.emblem_url} size={compact ? 52 : 72} testId={`home-league-promo-emblem-${row.slug}`} />
+        <LeagueEmblem src={row.emblem_url} size={compact ? 56 : 72} className="tls-league-promo__emblem" testId={`home-league-promo-emblem-${row.slug}`} />
         <div className="min-w-0 flex-1">
           <p className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-ok">
             <span className="h-2 w-2 shrink-0 rounded-full bg-ok motion-safe:animate-pulse" aria-hidden="true" />
             Liga · Anmeldung offen
           </p>
-          <h2 className={`mt-1.5 font-heading font-black uppercase leading-[0.95] text-white break-words ${compact ? "text-xl md:text-2xl" : "text-2xl md:text-4xl"}`}>
+          <h2 className={`mt-1.5 font-heading font-black uppercase leading-[0.95] text-white break-words [text-wrap:balance] ${compact ? "text-xl md:text-2xl" : "text-2xl md:text-4xl"}`}>
             {row.title}
           </h2>
           <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-white/80">
@@ -59,18 +59,18 @@ function PromoCard({ row, index, compact }) {
               {[period ? `Season ${period}` : "", block.entry_policy === "members" ? "Nur für Vereinsmitglieder" : ""].filter(Boolean).join(" · ")}
             </p>
           ) : null}
-        </div>
-        <div className="tls-league-promo__actions">
-          {!isFull(block) ? (
-            <Link to={row.apply_url} data-testid={`home-league-promo-apply-${row.slug}`}
-              className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
-              Mit Co-Team anmelden
+          <div className="tls-league-promo__actions">
+            {!isFull(block) ? (
+              <Link to={row.apply_url} data-testid={`home-league-promo-apply-${row.slug}`}
+                className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+                Mit Co-Team anmelden
+              </Link>
+            ) : null}
+            <Link to={row.url} data-testid={`home-league-promo-page-${row.slug}`}
+              className="group/more tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+              Zur Ligaseite <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 motion-safe:group-hover/more:translate-x-0.5" aria-hidden="true" />
             </Link>
-          ) : null}
-          <Link to={row.url} data-testid={`home-league-promo-page-${row.slug}`}
-            className="group/more tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
-            Zur Ligaseite <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 motion-safe:group-hover/more:translate-x-0.5" aria-hidden="true" />
-          </Link>
+          </div>
         </div>
       </div>
     </article>
