@@ -90,7 +90,8 @@ function Step({ slug, schritt, active }) {
 }
 
 export default function HelpTopicPage() {
-  const { thema: slug } = useParams();
+  // Groß/klein egal wie beim Server (Teilen-Karte): /hilfe/Liga-Captains zeigt dasselbe Thema.
+  const slug = useParams().thema?.toLowerCase();
   const { hash } = useLocation();
   const thema = hilfeThema(slug);
   const active = decodeURIComponent(hash.replace(/^#/, ""));

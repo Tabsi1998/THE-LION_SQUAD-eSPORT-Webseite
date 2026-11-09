@@ -86,6 +86,12 @@ test("Anker im Link: der Schritt ist hervorgehoben und wird angesprungen", () =>
   expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
 });
 
+test("Groß- und Kleinschreibung in der Adresse ist egal", () => {
+  show("/hilfe/Liga-Captains#check-in");
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Liga für Captains");
+  expect(screen.getByTestId("help-step-check-in")).toHaveAttribute("data-active", "true");
+});
+
 test("unbekanntes Thema: Hinweis und Weg zur Übersicht, nicht in Suchmaschinen", () => {
   show("/hilfe/gibt-es-nicht");
   expect(screen.getByTestId("help-missing")).toHaveTextContent("Thema nicht gefunden");
