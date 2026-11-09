@@ -1,0 +1,109 @@
+{
+  "slug": "team-und-co-team",
+  "titel": "Team und Co-Team",
+  "kurz": "Team erstellen, Leute einladen oder beitreten, ein Co-Team für ein Spiel anlegen und Captain und Vertreter festlegen.",
+  "zielgruppe": "Für Teamleitung und Spieler",
+  "suchbegriffe": ["clan", "squad", "kader", "einladung", "beitrittscode", "qr", "link", "captain", "vertreter", "teamleitung", "co-leitung"],
+  "videos": [
+    { "id": "team-und-co-team", "titel": "Team und Co-Team anlegen im Video", "abschnitt": "neues-team" }
+  ],
+  "abschnitte": [
+    {
+      "id": "neues-team",
+      "titel": "Team erstellen",
+      "schritte": [
+        {
+          "id": "team-erstellen",
+          "titel": "Team erstellen öffnen",
+          "text": "Öffne Teams und tippe auf Team erstellen. Dafür musst du eingeloggt sein.",
+          "bild": true,
+          "link": { "to": "/teams", "label": "Zu den Teams" }
+        },
+        {
+          "id": "team-daten",
+          "titel": "Name und Kürzel",
+          "text": "Gib den Namen und ein Kürzel mit 2 bis 8 Zeichen ein. Tippe auf Speichern. Du bist dann die Teamleitung.",
+          "hinweis": "Logo, Banner und Discord-Link kannst du auch später ergänzen.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "mitglieder",
+      "titel": "Leute einladen und beitreten",
+      "schritte": [
+        {
+          "id": "einladen",
+          "titel": "Einladungs-Link teilen",
+          "text": "Öffne eure Teamseite und tippe auf Einladen. Teile den Link oder zeig den QR-Code. Wer ihn öffnet, kann sofort beitreten.",
+          "hinweis": "Einladen dürfen Teamleitung und Co-Leitung. Mit Neuen Link erzeugen wird der alte Link ungültig.",
+          "bild": true
+        },
+        {
+          "id": "beitrittscode",
+          "titel": "Beitrittscode weitergeben",
+          "text": "Im selben Fenster steht der Beitrittscode. Wer ihn hat, öffnet eure Teamseite und gibt ihn unter Team beitreten ein.",
+          "bild": true
+        },
+        {
+          "id": "persoenlich-einladen",
+          "titel": "Gezielt einladen",
+          "text": "Such unter Persönlich einladen nach dem Benutzernamen und tippe auf Einladen. Die Person sieht die Einladung bei den Benachrichtigungen und unter Teams.",
+          "bild": true
+        },
+        {
+          "id": "beitreten",
+          "titel": "Einladung annehmen",
+          "text": "Hast du einen Link bekommen? Öffne ihn und tippe auf Beitreten. Ohne Konto meldest du dich zuerst an.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "co-team",
+      "titel": "Co-Team anlegen",
+      "schritte": [
+        {
+          "id": "co-team-anlegen",
+          "titel": "Was ist ein Co-Team?",
+          "text": "Dein Team ist eure Organisation. Ein Co-Team ist die feste Aufstellung für ein Spiel. Öffne Teams, wähle unter Deine Teams dein Team und tippe auf Co-Team.",
+          "hinweis": "Co-Teams anlegen dürfen Teamleitung und Co-Leitung.",
+          "bild": true,
+          "link": { "to": "/teams", "label": "Zu Deine Teams" }
+        },
+        {
+          "id": "co-team-kader",
+          "titel": "Name, Spiel und Kader",
+          "text": "Gib dem Co-Team einen Namen und wähle das Spiel. Hake alle Spieler an, die zum Kader gehören.",
+          "bild": true
+        },
+        {
+          "id": "captain-vertreter",
+          "titel": "Captain und Vertreter",
+          "text": "Wähle Captain und Vertreter aus dem Kader. Die beiden machen in der Liga Termine aus und melden und bestätigen Ergebnisse. Tippe auf Speichern.",
+          "hinweis": "Gibt es keinen Captain und keinen Vertreter, macht das die Teamleitung.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "rollen",
+      "titel": "Rollen im Team",
+      "schritte": [
+        {
+          "id": "rollen-team",
+          "titel": "Teamleitung und Co-Leitung",
+          "text": "Auf der Teamseite unter Mitglieder verwalten vergibt die Teamleitung die Rollen. Co-Leitungen pflegen die Teamdaten, laden ein und verwalten Co-Teams.",
+          "hinweis": "Die Teamleitung kann die Leitung auch an jemand anderen übergeben.",
+          "bild": true
+        },
+        {
+          "id": "rolle-abgeben",
+          "titel": "Rolle als Captain abgeben",
+          "text": "Willst du nicht mehr Captain oder Vertreter sein? Tippe beim Co-Team auf Rolle abgeben. Die Teamleitung vergibt sie dann neu.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}
