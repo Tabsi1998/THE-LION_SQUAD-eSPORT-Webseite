@@ -16,7 +16,7 @@ const rowOf = (root, name) => [...root.querySelectorAll("tr")].find((row) => row
 
 test("layout 5: eine Tabelle je Kategorie mit Waffen, Ausnahmen je Slot, „nur erlaubt“ an der langen Zeile", () => {
   const root = annex(TABLE.block_md);
-  const tables = [...root.querySelectorAll(".prose-cms-table")].filter((node) => node.querySelector("th > u"));
+  const tables = [...root.querySelectorAll(".prose-cms-table[data-gear-table]")];
   expect(tables).toHaveLength(1);
   expect([...tables[0].querySelectorAll("th")].map((cell) => cell.textContent)).toEqual(["Bild", "Waffe", "Aufsätze"]);
 
@@ -53,4 +53,12 @@ test("layout 4 bleibt bei den Karten mit dem Satz je Waffe", () => {
   expect(root.querySelector("th > u")).toBeNull();
   expect(root.textContent).toContain("alle passenden Aufsätze erlaubt, außer:");
   expect(root.querySelectorAll("ul > li > u").length).toBeGreaterThan(3);
+  expect(root.querySelector("[data-gear-table]")).toBeNull();
+});
+
+test("eine andere Tabelle mit unterstrichenem Kopf bleibt eine normale Tabelle (Codex zu #2305)", () => {
+  const root = annex("| ++Status++ | Bild | ++Waffe++ |\n| --- | --- | --- |\n| offen | – | Blitz 9 |\n\n| Bild | ++Waffe++ |\n| --- | --- |\n| – | Blitz 9 |");
+  expect(root.querySelectorAll(".prose-cms-table")).toHaveLength(2);
+  expect(root.querySelectorAll("th > u")).toHaveLength(3);
+  expect(root.querySelector("[data-gear-table]")).toBeNull();
 });

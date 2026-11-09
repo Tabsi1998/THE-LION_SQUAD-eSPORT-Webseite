@@ -25,7 +25,9 @@ const RULES_PAGE = {
   league: { slug: "probe-liga", name: "Probe-Liga" }, season: { id: "s1", slug: "season-1", name: "Season 1", number: 1, status: "active" }, look: {}, public: true,
   source: "rules", version: V3, versions: [V3], upcoming: null, seasons: [], fallback_text: null, consent: null, changes: null,
   sections: [
-    { anchor: "einleitung", title: null, level: 0, kind: "main", body_md: "Vorwort der Probe-Liga.", mark: null },
+    // Eine normale Tabelle mit unterstrichenem Kopf (Codex zu #2305): bleibt eine Tabelle, wird keine Ausrüstungstabelle.
+    { anchor: "einleitung", title: null, level: 0, kind: "main", mark: null,
+      body_md: "Vorwort der Probe-Liga.\n\n| ++Status++ | Bild | ++Waffe++ |\n| --- | --- | --- |\n| offen | – | Blitz 9 |" },
     { anchor: "anlage-a", title: "Anlage A: Erlaubte Ausrüstung", level: 1, kind: "annex", body_md: FIXTURE.block_md, mark: null },
   ],
 };
@@ -102,8 +104,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await mock(page);
       await page.goto("/liga/probe-liga/season-1/regeln");
       const annex = page.locator("[id='anlage-a']");
-      const table = annex.locator(".prose-cms-table").filter({ has: page.locator("th u") });
+      const table = annex.locator(".prose-cms-table[data-gear-table]");
       await expect(table).toHaveCount(1);
+      const other = page.locator("[id='einleitung'] .prose-cms-table");
+      await expect(other).not.toHaveAttribute("data-gear-table");
+      await expect(other.locator("table")).toHaveCSS("display", "table");
+      await expect(other.locator("thead")).toBeVisible();
+      await expect(other.locator("td")).toHaveCount(3);
       const sniper = table.locator("tr").filter({ hasText: SNIPER });
       const cells = sniper.locator("td");
       await expect(cells.nth(0).locator("img[alt='Ausrüstung']")).toBeVisible();
