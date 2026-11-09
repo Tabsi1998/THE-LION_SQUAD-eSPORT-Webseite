@@ -304,9 +304,11 @@ async def compare_view(db, league: dict, season: dict | None, base_id: str | Non
 
 
 def _pdf_document(league: dict, season: dict | None, version: dict, previous: dict | None, marks: bool) -> dict:
-    """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt. Bausteine in ihrer Fassung ohne Bilder (#2218)."""
-    sections = _sections(version, season, blocks.TEXT)
-    result = text.compare(_sections(previous, season, blocks.TEXT) if previous else None, sections)
+    """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt. Bausteine in ihrer Fassung ohne Bilder (#2218),
+    nur die Waffen-Tabelle der erlaubten Ausrüstung zeigt ihr kleines Bild (``pdf``, #2305). Markiert wird wie im Wort-Vergleich: im
+    Klartext ohne Bilder."""
+    sections = _sections(version, season, blocks.PDF)
+    result = text.compare(_sections(previous, season, blocks.TEXT) if previous else None, _sections(version, season, blocks.TEXT))
     names = _names_of(version, league, season)
     return {
         "title": version.get("title") or "Regelwerk",
