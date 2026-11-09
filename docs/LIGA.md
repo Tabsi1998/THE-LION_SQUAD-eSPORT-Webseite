@@ -1759,7 +1759,10 @@ bekommt gar nichts davon – ihre Tabellen rechnen weiter mit der alten Punktear
 (`overrides.scoring_rules.match_points`) über die Regeln der Season (`scoring_rules.division_rules`); direkter Vergleich,
 Remis-Regel, kampflos, Ausscheiden und die Punkteart kommen immer von der Season, auch bei älteren Abweichungen mit
 vollständigen Regeln. In einer Season mit `maps` gibt es keine eigenen Punkte: Die Verwaltung blendet die Felder aus, der
-Server lehnt sie mit 422 ab, eine ältere Abweichung zählt nicht. Jede
+Server lehnt sie mit 422 ab, eine ältere Abweichung zählt nicht. Altbestand: Hätte eine Liga N vor #2318 vollständige
+Regeln gespeichert und schon Ergebnisse, meldete das Regelwerk einmalig „Daten geändert“, und ihre laufenden Staffeln
+rechneten weiter mit den alten Regeln. Zum Stand 09.11.2026 gibt es keine Liga N mit eigenen Punkten (Fabian), deshalb
+fängt der Code diesen Fall nicht eigens ab. Jede
 Umstellung schreibt zusätzlich `league.season.table_points` mit vorher und nachher ins Protokoll. Antworten: Die Staffel
 der Ligaseite trägt `table_rules.match_points_mode`, die Season `match_points_mode`; die Tabelle zeigt dann „Punkte =
 gewonnene Maps“. Regelwerk: Baustein „Tabelle und Wertung“ und Variable `table.points` beschreiben die Punkteart;
