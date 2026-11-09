@@ -101,11 +101,6 @@ def remind_hours(tournament: dict) -> int:
     return int(rules["open_points_remind_hours"]) if rules else DEFAULT_HOURS
 
 
-def _minimum(tournament: dict) -> int:
-    rules = checkin_rules.rules_of(tournament)
-    return int(rules["min_present"]) if rules else league_roster.min_squad_size(tournament)
-
-
 async def _played(db, tournament_id: str, registration_id: str) -> bool:
     """Hat diese Anmeldung schon ein begonnenes oder entschiedenes Spiel? Dann war das erste Spiel schon."""
     return bool(await db.matches_v2.find_one(
@@ -127,7 +122,7 @@ async def _remind_side(db, tournament: dict, match: dict, registration: dict, ti
         return 0
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     ctx = await league_eligibility.context_for_tournament(db, tournament, members)
-    points = league_eligibility.open_points(ctx, squad, minimum=_minimum(tournament))
+    points = league_eligibility.open_points(ctx, squad, minimum=league_eligibility.ready_minimum(tournament))
     if not points["players"] and not points["shortfall"]:
         return 0
     responsible = responsible_ids(registration, (await teams_by_id(db, [registration])).get(registration.get("team_id") or ""))

@@ -508,7 +508,8 @@ async def test_a_playstation_player_below_the_minimum_is_a_hint_and_is_named(flo
     row = await check_of(flow, w)
 
     assert row["problems"] == [], row
-    assert row["shortfall"].startswith("Nur 3 von 4 Spielern sind spielberechtigt")
+    # 3 Spielberechtigte reichen bei 4 gegen 4 zum Einchecken (Mindestzahl 3), auch unter dem Mindestkader 4 (#2322).
+    assert row["shortfall"] is None, row
     assert "TeamA S3: Diese Season ist nur für PC – angegeben ist PlayStation." in row["warnings"]
     assert (await submit(flow, w, side)).status_code == 200
 
@@ -557,9 +558,16 @@ async def test_assigning_warns_beyond_and_below_the_minimum(flow):
     candidates = ok(await flow.get(f"/api/tournaments/{w['tid']}/squad-candidates"))
     squad = next(row for team in candidates["teams"] for row in team["squads"] if row["id"] == side["squad"]["id"])
     assert squad["problems"] == [], squad
-    assert squad["shortfall"].startswith("Nur 2 von 4 Spielern sind spielberechtigt")
+    # 3 gegen 3: zum Einchecken reichen 2 (#2322), der Mindestkader 3 ist dafür nicht das Maß.
+    assert squad["shortfall"] is None, squad
     assert squad["notes"] == ["TeamA S2: Diese Season ist nur für PC – angegeben ist Xbox.",
                               "TeamA S3: Diese Season ist nur für PC – angegeben ist PlayStation."]
+
+    await flow.db.users.update_one({"id": side["people"][1]["id"]}, {"$set": {f"game_ids.{slug}.platform": "Xbox"}})
+    candidates = ok(await flow.get(f"/api/tournaments/{w['tid']}/squad-candidates"))
+    squad = next(row for team in candidates["teams"] for row in team["squads"] if row["id"] == side["squad"]["id"])
+    assert squad["problems"] == [], squad
+    assert squad["shortfall"].startswith("Nur 1 von 4 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 2.")
 
     assigned = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]})
     assert assigned.status_code == 200, assigned.text

@@ -351,7 +351,8 @@ async def candidates(db, tournament: dict) -> dict:
                 "problems": [text for _code, text in problems],
                 # Alter und Plattform (#2270, #2313): wer so noch nicht spielen darf, ohne das Zuteilen aufzuhalten - auch unter dem Mindestkader.
                 "notes": league_eligibility.assign_notes(eligibility, squad),
-                "shortfall": league_eligibility.open_points(eligibility, squad, minimum=min_size)["shortfall"],
+                # Maß ist die Check-in-Mindestzahl, nicht der Mindestkader (#2322): mit 3 von 4 geht ein 4-gegen-4-Spiel.
+                "shortfall": league_eligibility.open_points(eligibility, squad, minimum=league_eligibility.ready_minimum(tournament))["shortfall"],
                 "players": (
                     _id_players(squad, league_roster.statuses(roster_ctx, squad.get("member_ids"), squad.get("id")))
                     if roster_ctx and roster_ctx.fields

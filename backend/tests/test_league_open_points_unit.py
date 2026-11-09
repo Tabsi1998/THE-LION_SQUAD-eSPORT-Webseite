@@ -69,8 +69,9 @@ def test_too_few_eligible_players_are_a_hint_at_registration_and_block_the_start
 
     assert le.registration_problems(ctx, SQUAD) == []
     points = le.open_points(ctx, SQUAD, minimum=3)
-    assert points["shortfall"] == ("Nur 2 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 3. Bis zum ersten Spiel im Profil "
-                                   "nachtragen – sonst kann das Team nicht einchecken.")
+    assert points["shortfall"] == ("Nur 2 von 4 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 3. Bis zum ersten Spiel im Profil "
+                                   "nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht "
+                                   "angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.")
     assert [row["id"] for row in points["players"]] == ["u3", "u4"]
     rows = le.statuses(ctx, SQUAD["member_ids"], "sq1")
     with pytest.raises(le.EligibilityError):

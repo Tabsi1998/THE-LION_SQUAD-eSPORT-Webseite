@@ -28,7 +28,7 @@ const ROW = {
   id: "a1", status: "submitted", squad_id: "sq1", team_id: "t1", display_name: "Loewen Langername · Rudel Alpha mit sehr langem Namen", submitted_at: "2026-11-02T18:00:00+00:00", applied_by_name: "Mila Mustermann", rules_version: 2, rules_at: "2026-11-02T18:00:00+00:00",
   // Seit #2313 offene Punkte statt Sperre: Die Leitung lässt trotzdem zu.
   privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: [],
-  shortfall: "Nur 3 von 5 Spielern sind spielberechtigt, die Season verlangt mindestens 4. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.",
+  shortfall: "Nur 3 von 5 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 4. Bis zum ersten Spiel im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.",
   warnings: ["Ida: Die Spiel-ID fehlt im Profil.", "Tom Beispiel: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."], shared_with: [], own_team: false,
   history: [{ status: "submitted", at: "2026-11-02T18:00:00+00:00", by_name: "Mila Mustermann" }, { status: "in_review", at: "2026-11-02T19:00:00+00:00", by_name: "Leitung" }],
 };
