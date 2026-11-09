@@ -60,6 +60,7 @@
           "id": "ergebnis-bestaetigen",
           "titel": "Ergebnis bestätigen",
           "text": "Hat die Gegenseite zuerst gemeldet, steht ihr Ergebnis da. Tippe auf Stimmt oder auf Stimmt nicht.",
+          "hinweis": "Bei Online-Turnieren gilt die Meldung nach einer kurzen Frist, wenn du nicht widersprichst. Vor Ort bestätigt die Turnierleitung.",
           "bild": true
         }
       ]
