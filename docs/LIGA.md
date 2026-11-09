@@ -1006,7 +1006,7 @@ unter `rules.platform` der Team-Seite, für die Season unter `rules.platform` de
 | `max_squad_size` | Zuteilen, Aufnahme, Transfer (422) | wie viele erlaubt sind |
 | `min_squad_size` | Zuteilen (wie bisher). Abgang bleibt möglich, Warnung und Aufgabe aus #2202 | wie viele fehlen |
 | `one_team_per_season` | Zuteilen, Aufnahme (409): schon in einem anderen Co-Team oder dort gestanden, solange dieses in der Season angemeldet ist. Teilnehmerliste: aktuell in zwei Co-Teams | dass ein Transfer nötig ist |
-| `min_age` | Aufnahme, Transfer (422), Teilnehmerliste, Check-in. Anmeldung und Zuteilen nur Hinweis (#2313) | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
+| `min_age` | Teilnehmerliste, Aufstellung, Check-in. Anmeldung, Zuteilen, Aufnahme und Transfer nur Hinweis (#2313) | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
 | `new_player_wait_days` | Teilnehmerliste, Check-in. Aufnahme bleibt möglich, Hinweis an Person und Verantwortliche. Neuzugang erst nach dem Ende von Spieltag 1, Transfer immer | bis wann gewartet wird |
 | Spiel-ID, Format, Eindeutigkeit | Festhalten, Freigabe, Teilnehmerliste. Eine schon festgehaltene ID bleibt gültig. Meldung nennt nie, wem die ID gehört | was zu tun ist |
 | Transferfenster | Antrag (409 außerhalb). Entscheidung auch nach dem Fenster | wann es offen ist |
@@ -1018,7 +1018,7 @@ Ein gewöhnlicher Neuzugang spielt bis zum Ende von Spieltag 1 sofort, danach wa
 **Transfers:** `POST /api/teams/{tid}/squads/{sid}/transfers` mit `user_id` (Recht wie Kader ändern, 409 außerhalb des Fensters, Person muss im Hauptteam
 stehen), `GET` dasselbe, `DELETE …/transfers/{id}` zieht zurück. Leitung: `GET /api/admin/leagues/seasons/{id}/transfers`,
 `POST …/transfers/{id}/approve`, `…/reject` mit `reason`, Recht `roster`. Genehmigen läuft unter der Season-Sperre `league_season:{id}:squads`:
-prüft Alter, Höchstkader und Rolle im alten Co-Team, nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
+prüft Höchstkader und Rolle im alten Co-Team (das Alter seit #2313 nicht mehr: ohne passendes Geburtsdatum geht der Wechsel, die Person spielt nur nicht), nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
 `.reject`, `.withdraw`. Ein Transfer ist nur nötig, wenn `one_team_per_season` gilt.
 
 **Teilnehmerliste** (`lineup_mode: series`):
@@ -1059,7 +1059,10 @@ als der Mindestkader“. Gesperrt wird erst, wo gespielt wird: Wer nicht `ok` is
 Aufstellung je Map, `check_participants`). Ein Team mit weniger spielberechtigten Spielern als `min_present` kann nicht einchecken; nach dem Fenster gibt es wie
 bisher nur den Vorschlag „nicht erschienen“ an die Leitung, nie eine Wertung. Inhaltliche Gründe bleiben Sperren: Fenster, Startplätze, offener Antrag,
 Kadergröße (Mitglieder, nicht Eignung), Höchstkader, ein Co-Team je Season, Spiel des Co-Teams, `entry_policy`, gültiges Regelwerk und die Zustimmung.
-Die Aufnahme in einen Kader und der Transfer prüfen das Alter weiter wie in der Tabelle oben.
+Auch die **Aufnahme in einen Kader** einer laufenden Season und die **Genehmigung eines Transfers** gehen ohne oder mit zu jungem Geburtsdatum durch
+(Fabian 09.11., `roster_addition_problem`): Die Person steht dann im Kader, ist aber nicht spielberechtigt. Die Team-Seite führt sie bei den möglichen
+Neuzugängen als „aufnehmbar, spielen erst mit der fehlenden Angabe“ (`can_add: true` mit `reason`). Höchstkader, ein Co-Team je Season und das Transferfenster
+bleiben Sperren.
 
 `league_eligibility.open_points(ctx, squad, minimum=…)` liefert die offenen Punkte eines Co-Teams: `players` (je nicht spielberechtigter Person `id`, `name`,
 `state`, `reason`, `fixable`: selbst im Profil behebbar) und `shortfall` (Satz oder `null`, wenn weniger als `minimum` spielberechtigt sind). Selbst behebbar
@@ -1068,10 +1071,12 @@ Die Aufnahme in einen Kader und der Transfer prüfen das Alter weiter wie in der
 **Erinnerungen** (`services/league_open_points.py`, Art `tournament_registration`, `meta.reason` `league_open_points`, nur Postfach und Push): an jede
 betroffene Person mit behebbarem Stand („Für <Season> fehlt bei dir noch: <Grund>“, Link ins eigene Profil: Geburtsdatum `/profile?tab=basic`, sonst
 `/profile?tab=gaming`) und an Captain und Vertreter (ohne beide die Hauptteam-Leitung) eine Übersicht mit Namen, Ständen und `shortfall`, Link zur Ligaseite.
-Zweimal je Co-Team: beim Einreichen (Schlüssel `league-open-points:<antrag>:submit:<user>`) und vor dem ersten Spiel der Staffel
-(`league-open-points:<anmeldung>:first-match:<user>`). Das zweite läuft im Job `match_reminders` (alle fünf Minuten): Staffeln mit einem offenen Spiel der Seite
-innerhalb von `checkin_rules.open_points_remind_hours` (Vorgabe 48, 0 = aus; ohne Check-in-Regeln 48), nur solange die Anmeldung noch kein begonnenes oder
-entschiedenes Spiel hat. Ein zweiter Lauf findet den Schlüssel und schickt nichts. Nie ein Datum oder Alter in Texten.
+Zweimal je Co-Team: beim Einreichen (Schlüssel `league-open-points:<antrag>:submit:player|team:<user>`) und vor dem ersten Spiel der Staffel
+(`league-open-points:<anmeldung>:first-match:player|team:<user>`). `player` ist die eigene Angabe, `team` die Übersicht - getrennt, damit ein Captain mit eigenem
+offenem Punkt beides bekommt. Das zweite läuft im Job `match_reminders` (alle fünf Minuten): Staffeln mit einem offenen Spiel der Seite
+innerhalb von `checkin_rules.open_points_remind_hours` (Vorgabe 48, 0 = aus; ohne Check-in-Regeln 48), nur für Anmeldungen mit aktivem Status
+(`pending`, `approved`, `checked_in`, `waitlist`; nicht zurückgezogen oder disqualifiziert) und nur solange die Anmeldung noch kein begonnenes oder
+entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der Antrag gespeichert (Fehler nur im Log). Ein zweiter Lauf findet den Schlüssel und schickt nichts. Nie ein Datum oder Alter in Texten.
 
 **Noch nicht gebaut, liest diese Prüfung später:** Strafen (E.3 ergänzt den Stand).
 
