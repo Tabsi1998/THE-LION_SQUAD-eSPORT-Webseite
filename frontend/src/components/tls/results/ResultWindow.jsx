@@ -5,7 +5,7 @@ import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, res
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
 import { GameEditor, ParticipantsPicker } from "@/components/tls/league/LeagueReportForm";
 import { sidesInSlotOrder } from "@/components/tls/league/leagueGames";
-import { changeStaffGame, isSeries, seriesSentence, settleStaffGames, staffListsStart, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
+import { changeStaffGame, isSeries, rememberGames, seriesSentence, settleStaffGames, staffListsStart, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
 
 // Das eine Ergebnis-Fenster (#1156, #1370): Turnierleitung am Handy, Matchplan, Stationen und Matchseite öffnen es -
 // dieselben Felder, dieselben Wörter („Nicht erschienen“, „Aufgegeben“), derselbe Satz vor dem Speichern und danach
@@ -55,6 +55,18 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const panelRef = useRef(null);
+  // Gedächtnis je Map (#2334): Ein Zwischenstand beim Tippen der Punkte kann die Serie kurz entscheiden - die Maps danach
+  // kommen mit ihren Angaben zurück, sobald sie wieder offen ist. Je Spiel neu.
+  const mapMemory = useRef({ entryId: entry?.id, games: {} });
+  const changeMap = (position, next) => {
+    if (mapMemory.current.entryId !== entry?.id) mapMemory.current = { entryId: entry?.id, games: {} };
+    // Auch gemerkte, gerade ausgeblendete Maps ziehen bei einer Aufstellung mit - sonst kämen sie mit der alten zurück.
+    const all = Object.values(rememberGames(mapMemory.current.games, mapGames)).sort((a, b) => a.position - b.position);
+    const changedAll = changeStaffGame(all, position, next);
+    mapMemory.current.games = rememberGames({}, changedAll);
+    const changed = changedAll.filter((row) => mapGames.some((shown) => shown.position === row.position));
+    setMapGames(settleStaffGames(changed, league, mapMemory.current.games));
+  };
   const kind = withMaps ? "maps" : inputKind(entry, heatMode);
   const outcome = useMemo(() => {
     if (!withMaps) return resultsFor(entry, kind, state);
@@ -191,7 +203,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           ) : null}
           {withMaps && mapGames.map((game, index) => (
             <GameEditor key={game.position} staff index={index} game={game} games={mapGames} league={league}
-              onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
+              onChange={(next) => changeMap(game.position, next)} />
           ))}
           {withMaps && isSeries(league) ? league.sides.map((side) => (
             <ParticipantsPicker key={side.registration_id} roster={league.rosters?.[side.registration_id] || []} value={mapLists[side.registration_id] || []} league={league}

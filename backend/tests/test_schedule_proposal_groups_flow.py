@@ -5,6 +5,7 @@ import os
 import pathlib
 import sys
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
@@ -185,7 +186,8 @@ async def test_the_week_hint_leaves_out_a_switched_off_home_rule(flow):
 @pytest.mark.asyncio
 async def test_a_blocked_period_is_named_at_its_time(flow):
     world = await live_world(flow, rules=None)
-    day = (now_utc() + timedelta(days=3)).date().isoformat()
+    # Sperrtage gelten nach Wiener Datum: kurz nach Mitternacht in Wien ist es in UTC noch der Vortag (CI lief um 00:16).
+    day = (now_utc() + timedelta(hours=72)).astimezone(ZoneInfo("Europe/Vienna")).date().isoformat()
     await flow.db.tournaments.update_one({"id": world["tournament"]["id"]},
                                          {"$set": {"blocked_periods": [{"start_date": day, "end_date": day, "label": "Turnierpause"}]}})
     refused = await propose(flow, world, "Kapitaen", [24, 72])

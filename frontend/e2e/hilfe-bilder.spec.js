@@ -177,7 +177,7 @@ async function liga(page, cam, state) {
   await page.goto("/matches/m1");
   await page.getByTestId("match-proposal-at").fill("2036-11-15T20:00");
   await noSideScroll(page);
-  await cam.shot("termin-vorschlagen", [page.getByTestId("match-proposal-at"), page.getByRole("button", { name: "Vorschlagen" })]);
+  await cam.shot("termin-vorschlagen", [page.getByTestId("match-proposal-at"), page.getByRole("button", { name: "Vorschlagen" })], { area: page.getByTestId("match-proposal-form") });
   await cam.shot("termin-antworten", [page.getByTestId("match-proposal-accept-p-theirs"), page.getByTestId("match-proposal-decline-p-theirs")], { area: page.getByTestId("match-proposal-p-theirs") });
 
   match = D.MATCH_FIXED;
@@ -200,7 +200,6 @@ async function liga(page, cam, state) {
   match = D.REPORT_PAGE;
   await page.reload();
   await page.getByTestId("league-game-1-map-hafen").click();
-  await page.getByTestId("league-game-1-winner-a").click();
   await page.getByTestId("league-game-1-score-a").fill("250");
   await page.getByTestId("league-game-1-score-b").fill("180");
   await noSideScroll(page);
@@ -373,7 +372,6 @@ test.describe("Hilfe: Videos", () => {
       await page.getByTestId("league-game-1").scrollIntoViewIfNeeded();
       await step(page, say(slug, "ergebnis-melden"), 2500);
       await showClick(page, page.getByTestId("league-game-1-map-hafen"));
-      await showClick(page, page.getByTestId("league-game-1-winner-a"));
       await showClick(page, page.getByTestId("league-game-1-score-a"));
       await page.keyboard.type("250", { delay: 120 });
       await showClick(page, page.getByTestId("league-game-1-score-b"));

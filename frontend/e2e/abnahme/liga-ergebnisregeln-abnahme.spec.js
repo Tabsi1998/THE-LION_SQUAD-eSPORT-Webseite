@@ -137,7 +137,6 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
       for (const [index, mapId] of maps.entries()) {
         const position = index + 1;
         await home.page.getByTestId(`league-game-${position}-map-${mapId}`).click();
-        await home.page.getByTestId(`league-game-${position}-winner-${match.home}`).click();
         await home.page.getByTestId(`league-game-${position}-score-${match.home}`).fill(scores[index][0]);
         await home.page.getByTestId(`league-game-${position}-score-${match.away}`).fill(scores[index][1]);
       }

@@ -1,7 +1,7 @@
 // Ergebnis je Map mit Aufstellung (docs/LIGA.md, #1650): was das Melde-Formular der Liga rechnet. Der Server prüft
 // alles noch einmal (services/league_games.py) - hier geht es darum, dass man gar nicht erst etwas Falsches eingibt.
 import { viennaDay, viennaTime } from "@/lib/vienna";
-import { mapRuleProblem } from "./leagueResultRules";
+import { mapRuleProblem, ruleFor } from "./leagueResultRules";
 
 const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 // Zusatzfelder einer Map (docs/LIGA.md, C.3): Stand, Wiederholung, Wertung, Seite, Nachweis.
@@ -117,20 +117,42 @@ export function seriesWinner(games, league) {
   return Object.keys(wins).find((side) => wins[side] >= (league?.needed || 1)) || null;
 }
 
+/** Trägt die Map schon etwas (Map, Sieger, Punkte)? */
+function hasEntries(game) {
+  return Boolean(game?.map_id || game?.winner || Object.values(game?.scores || {}).some((value) => String(value ?? "").trim()));
+}
+
+/** Das Gedächtnis des Formulars: je Position die zuletzt bearbeitete Map, auch wenn sie gerade ausgeblendet ist. */
+export function rememberGames(memory, games) {
+  const out = { ...(memory || {}) };
+  for (const game of games || []) out[game.position] = game;
+  return out;
+}
+
 /**
  * Nach einer Änderung: nur so viele Maps, wie gespielt wurden. Ist die Serie entschieden, fallen Maps danach weg;
- * hat die letzte Map einen Sieger und ist noch nichts entschieden, kommt die nächste dazu.
+ * hat die letzte Map einen Sieger und ist noch nichts entschieden, kommt die nächste dazu. `memory` (Position → Map):
+ * Eine weggefallene Map kommt mit ihren Angaben zurück, sobald die Serie wieder offen ist - beim Tippen von Punkten
+ * kann ein Zwischenstand („1“ statt „160“) die Serie kurz entscheiden, ohne dass Map 3 verloren geht (#2334).
  */
-export function settleGames(games, league) {
+export function settleGames(games, league, memory = {}) {
   const out = [];
   for (const game of games) {
     out.push(game);
     if (seriesWinner(out, league)) return out;
   }
-  const last = out[out.length - 1];
-  if ((!last || last.winner) && out.length < (league?.best_of || 1)) {
-    const previous = last?.lineup || [];
-    return [...out, { ...emptyGame(out.length + 1, league), lineup: [...previous] }];
+  const bestOf = league?.best_of || 1;
+  while (out.length < bestOf) {
+    const last = out[out.length - 1];
+    if (last && !last.winner) break;
+    const kept = memory?.[out.length + 1];
+    if (hasEntries(kept)) {
+      out.push(kept);
+      if (seriesWinner(out, league)) break;
+      continue;
+    }
+    out.push({ ...emptyGame(out.length + 1, league), lineup: [...(last?.lineup || [])] });
+    break;
   }
   return out;
 }
@@ -144,6 +166,43 @@ function scoreValue(value) {
   if (!text) return null;
   const number = Number(text);
   return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+/** Beide Punkte einer Map als Zahl - sonst `null` (fehlt eine Seite oder ist keine Zahl). */
+function bothScores(game, league) {
+  const sides = (league?.sides || []).map((side) => side.registration_id);
+  if (sides.length !== 2) return null;
+  const values = sides.map((id) => scoreValue(game?.scores?.[id]));
+  return values.every((value) => typeof value === "number") ? { sides, values } : null;
+}
+
+/**
+ * Sieger einer Map aus den Punkten: Wer mehr hat, hat gewonnen - in allen Ergebnisregeln (Punkte, Runden, höherer
+ * Endstand) gewinnt der höhere Stand. `null`, solange eine Seite fehlt oder beide gleich viel haben.
+ */
+export function scoreWinner(game, league) {
+  const both = bothScores(game, league);
+  if (!both || both.values[0] === both.values[1]) return null;
+  return both.values[0] > both.values[1] ? both.sides[0] : both.sides[1];
+}
+
+/** Gleich viele Punkte auf beiden Seiten - dann muss jemand den Sieger antippen. */
+export function scoresTied(game, league) {
+  const both = bothScores(game, league);
+  return Boolean(both) && both.values[0] === both.values[1];
+}
+
+/**
+ * Neue Punkte einer Map: Stehen beide da und sind verschieden, setzt das den Sieger. Bei Gleichstand ist er offen; fehlt
+ * eine Seite, bleibt ein angetippter Sieger stehen - nur einer, der aus den alten Punkten kam, fällt weg.
+ */
+export function withScores(game, scores, league) {
+  const next = { ...game, scores };
+  const auto = scoreWinner(next, league);
+  if (auto) return { ...next, winner: auto };
+  if (scoresTied(next, league)) return { ...next, winner: "" };
+  const before = scoreWinner(game, league);
+  return { ...next, winner: before && game.winner === before ? "" : game.winner };
 }
 
 /**
@@ -171,9 +230,18 @@ export function gamesProblem(games, league, { withLineup = true, needMaps = true
           ? `${label}: diese Map lief schon als Map ${earlier.position} – jede Map nur einmal je Serie.`
           : `${label}: diese Map lief schon als Map ${earlier.position} im selben Modus – bitte eine andere wählen.`;
       }
-      if (!game.winner) return `${label}: bitte antippen, wer die Map gewonnen hat.`;
       for (const value of Object.values(game.scores || {})) {
         if (scoreValue(value) === undefined) return `${label}: Punkte bitte als Zahl ab 0.`;
+      }
+      if (!game.winner) {
+        if (scoresTied(game, league)) {
+          const rule = ruleFor(league, game.mode);
+          if (rule && !rule.draw_allowed && !skipRules) return mapRuleProblem({ ...game, winner: league.sides[0].registration_id }, league);
+          return `${label}: Gleichstand – bitte antippen, wer die Map gewonnen hat.`;
+        }
+        return league?.scores_required && !skipRules
+          ? `${label}: bitte die Punkte beider Seiten eintragen – daraus ergibt sich der Sieger.`
+          : `${label}: bitte antippen, wer die Map gewonnen hat.`;
       }
       // Ergebnisregel und Punktepflicht (C.3, #1617) - übergehen darf nur der Superadmin mit Grund.
       const ruleProblem = skipRules ? null : mapRuleProblem(game, league);
@@ -290,8 +358,8 @@ export function staffStart(league) {
 }
 
 /** Wie `settleGames` - eine neue Map übernimmt die Aufstellungen beider Seiten aus der Map davor. */
-export function settleStaffGames(games, league) {
-  const settled = settleGames(games, league);
+export function settleStaffGames(games, league, memory = {}) {
+  const settled = settleGames(games, league, memory);
   return settled.map((game, index) => (game.lineups ? game : { ...game, lineups: { ...(settled[index - 1]?.lineups || {}) } }));
 }
 

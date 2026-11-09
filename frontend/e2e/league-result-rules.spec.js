@@ -66,17 +66,18 @@ test.describe("Liga: Ergebnisregeln im Meldeformular", () => {
 
       await expect(page.getByTestId("league-game-1-rule")).toHaveText("Gewertet: bis 250 Punkte · 10 Min.");
       await page.getByTestId("league-game-1-map-hafen").click();
-      await page.getByTestId("league-game-1-winner-a").click();
       await page.getByTestId("league-game-1-lineup-u1").click();
       await page.getByTestId("league-game-1-score-a").fill("100");
       await page.getByTestId("league-game-1-score-b").fill("250");
-      await expect(page.getByTestId("match-report-sentence")).toContainText("Map 1: Der Endstand 100:250 passt nicht zum Sieger");
+      // Den Sieger ergeben die Punkte - kein Team zum Antippen.
+      await expect(page.getByTestId("league-game-1-winner-b")).toHaveCount(0);
+      await expect(page.getByTestId("league-game-1-winner-auto")).toContainText("Falken mit sehr langem Namen");
       await page.getByTestId("league-game-1-score-a").fill("250");
       await page.getByTestId("league-game-1-score-b").fill("180");
+      await expect(page.getByTestId("league-game-1-winner-auto")).toContainText("Loewen Langername");
 
       await expect(page.getByTestId("league-game-2-rule")).toHaveText("Gewertet: 6 Runden, höchstens 11");
       await page.getByTestId("league-game-2-map-turm").click();
-      await page.getByTestId("league-game-2-winner-a").click();
       await page.getByTestId("league-game-2-score-a").fill("7");
       await page.getByTestId("league-game-2-score-b").fill("5");
       await page.getByTestId("match-report-submit").click();

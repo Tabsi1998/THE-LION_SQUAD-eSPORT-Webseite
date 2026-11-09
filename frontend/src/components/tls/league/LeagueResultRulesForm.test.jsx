@@ -28,15 +28,17 @@ test("zeigt die Regel je Map, Punkte sind Pflicht und 7:5 wird vorab abgelehnt",
   expect(screen.queryByText("Punkte eintragen (freiwillig)")).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByTestId("league-game-1-map-hafen"));
-  fireEvent.click(screen.getByTestId("league-game-1-winner-a"));
   fireEvent.click(screen.getByTestId("league-game-1-lineup-u1"));
-  fireEvent.click(screen.getByTestId("league-game-2-map-turm"));
-  fireEvent.click(screen.getByTestId("league-game-2-winner-a"));
-  expect(screen.getByTestId("league-game-2-rule")).toHaveTextContent("6 Runden, höchstens 11");
-  expect(screen.getByTestId("match-report-sentence")).toHaveTextContent("Map 1: bitte die Punkte beider Seiten eintragen – in dieser Liga sind sie Pflicht.");
+  // Bei Punktepflicht gibt es kein Team zum Antippen - den Sieger ergeben die Punkte.
+  expect(screen.queryByTestId("league-game-1-winner-a")).not.toBeInTheDocument();
+  expect(screen.getByTestId("league-game-1-winner-pending")).toHaveTextContent("Den Sieger ergeben die Punkte");
+  expect(screen.getByTestId("match-report-sentence")).toHaveTextContent("Map 1: bitte die Punkte beider Seiten eintragen – daraus ergibt sich der Sieger.");
 
   fireEvent.change(screen.getByTestId("league-game-1-score-a"), { target: { value: "250" } });
   fireEvent.change(screen.getByTestId("league-game-1-score-b"), { target: { value: "180" } });
+  expect(screen.getByTestId("league-game-1-winner-auto")).toHaveTextContent("Sieger: Rudel A");
+  fireEvent.click(screen.getByTestId("league-game-2-map-turm"));
+  expect(screen.getByTestId("league-game-2-rule")).toHaveTextContent("6 Runden, höchstens 11");
   fireEvent.change(screen.getByTestId("league-game-2-score-a"), { target: { value: "7" } });
   fireEvent.change(screen.getByTestId("league-game-2-score-b"), { target: { value: "5" } });
   fireEvent.click(screen.getByTestId("match-report-submit"));
@@ -47,6 +49,42 @@ test("zeigt die Regel je Map, Punkte sind Pflicht und 7:5 wird vorab abgelehnt",
   fireEvent.click(screen.getByTestId("match-report-submit"));
   await waitFor(() => expect(onReport).toHaveBeenCalled());
   expect(onReport.mock.calls[0][0].games[1].scores).toEqual({ a: 6, b: 5 });
+});
+
+test("die Punkte setzen den Sieger, ein Wechsel dreht ihn um, Gleichstand fragt nach", () => {
+  render(<LeagueReportForm league={{ ...LEAGUE, result_rules: {} }} state={{ status: "open" }} onReport={vi.fn()} />);
+  const score = (side, value) => fireEvent.change(screen.getByTestId(`league-game-1-score-${side}`), { target: { value } });
+
+  score("a", "120");
+  expect(screen.getByTestId("league-game-1-winner-pending")).toBeInTheDocument();
+  score("b", "250");
+  expect(screen.getByTestId("league-game-1-winner-auto")).toHaveTextContent("Sieger: Horst");
+  score("a", "260");
+  expect(screen.getByTestId("league-game-1-winner-auto")).toHaveTextContent("Sieger: Rudel A");
+
+  score("b", "260");
+  expect(screen.queryByTestId("league-game-1-winner-auto")).not.toBeInTheDocument();
+  expect(screen.getByText("Gleichstand – wer hat Map 1 gewonnen?")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("league-game-1-winner-b"));
+  expect(screen.getByTestId("league-game-1-winner-b")).toHaveAttribute("aria-pressed", "true");
+
+  // Feld geleert: der Sieger aus den Punkten fällt weg, die Map wartet wieder auf beide Punkte.
+  score("b", "100");
+  score("b", "");
+  expect(screen.getByTestId("league-game-1-winner-pending")).toBeInTheDocument();
+  expect(screen.queryByTestId("league-game-1-winner-auto")).not.toBeInTheDocument();
+});
+
+test("ohne Pflicht: ohne Punkte wird angetippt, mit Punkten übernimmt der Endstand", () => {
+  render(<LeagueReportForm league={{ ...LEAGUE, result_rules: {}, scores_required: false }} state={{ status: "open" }} onReport={vi.fn()} />);
+  expect(screen.getByText("Wer hat Map 1 gewonnen?")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("league-game-1-winner-a"));
+  fireEvent.click(screen.getAllByText("Punkte eintragen (freiwillig)")[0]);
+  fireEvent.change(screen.getByTestId("league-game-1-score-a"), { target: { value: "3" } });
+  // Eine Seite allein ändert den angetippten Sieger nicht.
+  expect(screen.getByTestId("league-game-1-winner-a")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.change(screen.getByTestId("league-game-1-score-b"), { target: { value: "6" } });
+  expect(screen.getByTestId("league-game-1-winner-auto")).toHaveTextContent("Sieger: Horst");
 });
 
 test("ohne Regel und Pflicht bleibt das Formular wie vorher", () => {

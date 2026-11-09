@@ -1468,6 +1468,17 @@ Mit `overtime` dürfen Ziel und Rundenlimit überschritten werden. Gleichstand m
 trotzdem einen Sieger der Map (Datenmodell ohne Map-Remis, offene Fachfrage). Beispiele: S&D mit Ziel 6 und Limit 11: 6:5 geht,
 7:5 nicht.
 
+**Sieger aus den Punkten (Fabian 09.11.2026):** Im Meldeformular (Captains und Leitung, `GameEditor`) setzen die Punkte den
+Sieger einer Map: Stehen beide Seiten da und sind verschieden, ist Sieger, wer mehr hat (`scoreWinner` in `leagueGames.js`; in
+allen Regelarten gewinnt der höhere Stand). Antippen gibt es nur noch ohne Punkte (Season ohne Punktepflicht), bei Gleichstand
+und bei kampflos gewerteten Maps. Bei Punktepflicht steht statt der Team-Knöpfe „Den Sieger ergeben die Punkte“; Gleichstand in
+einem Modus ohne Remis nennt gleich die Regel. Die Leitung (`staff`) behält die Knöpfe, mit dem Sieger aus den Punkten vorgewählt,
+damit sie eine Regel mit Grund übergehen kann; widersprechen sich Sieger und Punkte (Altdaten), steht „Sieger aus den Punkten
+übernehmen“ an der Map. Beim Tippen kann ein Zwischenstand die Serie kurz entscheiden: Weggefallene Maps merkt sich das
+Formular (`rememberGames`, `settleGames(games, league, memory)`) und bringt sie mit ihren Angaben zurück. Der Server bleibt
+unverändert: `winner_registration_id` wird weiter geschickt; gegen den Endstand geprüft wird er nur in Modi mit Ergebnisregel
+und ohne Übergehen (`check_map`).
+
 - **Bestätigen:** Es zählen die Punkte der ersten Meldung (unverändert). Schickt die bestätigende Seite keine Punkte, prüft der
   Server mit denen der Gegenseite – sonst scheiterte jede Bestätigung an der Punktepflicht. Die App bestätigt ohne Maps wie bisher.
 - **Regelstand der Erstmeldung:** Jede Meldung mit Maps hält fest, mit welchem Regelstand sie geprüft wurde

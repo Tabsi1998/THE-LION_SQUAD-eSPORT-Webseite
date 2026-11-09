@@ -50,3 +50,27 @@ test("die Liga-Leitung übergeht die Regel mit Grund, Zusatzfelder der Map bleib
   expect(body.rule_override_reason).toBe("Server stürzte ab");
   expect(body.games[0]).toMatchObject({ scores: { a: 7, b: 5 }, status: "replayed", replay_reason: "Verbindung brach ab" });
 });
+
+// Sieger aus den Punkten (#2334): Die Leitung behält die Knöpfe - vorgewählt aus den Punkten, übergehen bleibt möglich.
+test("Leitung: Punkte wählen den Sieger vor, die Knöpfe bleiben, ein Widerspruch wird angezeigt", () => {
+  const games = [{ ...LEAGUE.games[0], winner_registration_id: "b", scores: { a: 6, b: 4 }, status: undefined, replay_reason: undefined }];
+  render(<ResultWindow entry={ENTRY} league={{ ...LEAGUE, games }} onClose={() => {}} onSaved={vi.fn()} />);
+  expect(screen.getByTestId("league-game-1-winner-mismatch")).toHaveTextContent("Der Sieger passt nicht zu den Punkten – mehr Punkte hat Rudel A.");
+  fireEvent.click(screen.getByTestId("league-game-1-winner-adopt"));
+  expect(screen.getByTestId("league-game-1-winner-a")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByTestId("league-game-1-winner-mismatch")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("league-game-1-score-b"), { target: { value: "6" } });
+  fireEvent.change(screen.getByTestId("league-game-1-score-a"), { target: { value: "3" } });
+  expect(screen.getByTestId("league-game-1-winner-b")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Leitung: mit Grund übergangen geht ein Sieger auch ohne Punkte", async () => {
+  const games = [{ position: 1, mode: "suchen", map_id: "turm", winner_registration_id: "", scores: {}, lineups: {} }];
+  render(<ResultWindow entry={ENTRY} league={{ ...LEAGUE, games, can_override_rules: true }} onClose={() => {}} onSaved={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("league-game-1-winner-b"));
+  fireEvent.change(screen.getByTestId("result-reason"), { target: { value: "Stand korrigiert" } });
+  fireEvent.change(screen.getByTestId("result-rule-override-reason"), { target: { value: "Endstand nicht mehr bekannt" } });
+  fireEvent.click(screen.getByTestId("result-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls[0][1].games[0]).toMatchObject({ winner_registration_id: "b" });
+});
