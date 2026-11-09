@@ -19,8 +19,9 @@ export function FoldButton({ open, onToggle, controls, testId, className = "", c
   );
 }
 
-export function FoldBody({ id, className = "", children }) {
-  return <div id={id} className={`tls-reveal ${className}`.trim()}>{children}</div>;
+// Der Behälter mit der `id` steht immer da (Ziel von `aria-controls`), zugeklappt mit `hidden`; der Inhalt nur, wenn offen.
+export function FoldBody({ id, open, className = "", children }) {
+  return <div id={id} hidden={!open} className={`tls-reveal ${className}`.trim()}>{open ? children : null}</div>;
 }
 
 /** „Alle aufklappen“ und „Alle zuklappen“ oben neben der Suche. */

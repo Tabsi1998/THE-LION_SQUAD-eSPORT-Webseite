@@ -208,8 +208,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
                 {countText(slot.items.length, "Aufsatz", "Aufsätze")}<BannedNote count={bannedAttachmentCount(rows, weapon.id, slot.items)} />
               </span>
             </FoldButton>
-            {open ? (
-              <FoldBody id={bodyId} className="pb-1 pt-1">
+            <FoldBody id={bodyId} open={open} className="pb-1 pt-1">
                 <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   {slot.items.map((item) => {
                     const klass = classRow(rows, item.subcategory);
@@ -220,8 +219,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
                     );
                   })}
                 </ul>
-              </FoldBody>
-            ) : null}
+            </FoldBody>
           </div>
         );
       })}
@@ -278,6 +276,7 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
   const fullyBanned = (row && !row.modes.length) || viaClass;
   // K zählt, was aufgeklappt als gesperrt angehakt erscheint - auch über die Zeile des Aufsatzes oder seine Klasse (Codex zu #2299).
   const attachmentCount = bannedAttachmentCount(rows, item.id, attachments);
+  const boxId = `season-bans-box-${item.id}`;
   return (
     <li className={`rounded-sm border p-2.5 ${banned ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`season-bans-item-${item.id}`}>
       <div className="flex items-start gap-3">
@@ -298,7 +297,7 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
           ) : null}
           {row && !viaClass && modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onItem({ modes: value })} label={`Modi für ${item.name}`} /> : null}
           {role === "weapon" && !fullyBanned && !viaClass ? (
-            <button type="button" onClick={onToggleOpen} aria-expanded={open} data-testid={`season-bans-open-${item.id}`}
+            <button type="button" onClick={onToggleOpen} aria-expanded={open} aria-controls={boxId} data-testid={`season-bans-open-${item.id}`}
               className="inline-flex items-center gap-1 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
               {countText(attachments.length, "Aufsatz", "Aufsätze")}{attachmentCount ? ` · ${attachmentCount} gesperrt` : ""}
@@ -306,9 +305,12 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
           ) : null}
         </div>
       </div>
-      {role === "weapon" && open && !fullyBanned ? (
-        <WeaponAttachments weapon={item} attachments={attachments} categories={categories} rows={rows} row={attachmentRow} keptIds={keptAttached}
-          modes={modes} fold={fold} onChange={onAttachments} onCopyToClass={onCopyToClass} onEverywhere={onEverywhere} />
+      {/* Kasten der Aufsätze (#2306): Behälter mit fester ID für `aria-controls`, zugeklappt verborgen. */}
+      {role === "weapon" && !fullyBanned ? (
+        <FoldBody id={boxId} open={open}>
+          <WeaponAttachments weapon={item} attachments={attachments} categories={categories} rows={rows} row={attachmentRow} keptIds={keptAttached}
+            modes={modes} fold={fold} onChange={onAttachments} onCopyToClass={onCopyToClass} onEverywhere={onEverywhere} />
+        </FoldBody>
       ) : null}
     </li>
   );
@@ -563,7 +565,8 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
           <div className="space-y-3" data-testid={`${testId}-groups`}>
             {groups.map(({ category, sections }) => {
               const catKey = `cat:${category.key}`;
-              // Mit gewählter oder nur einer Kategorie ist sie gleich offen.
+              // Mit gewählter oder nur einer Kategorie ist sie gleich offen - bei nur einer Kategorie wäre Zuklappen ein sinnloser Klick (gewollt,
+              // Codex zu #2306); zuklappen lässt sie sich trotzdem.
               const catBase = Boolean(only) || categories.length === 1;
               const catOpen = fold.isOpen(catKey, catBase);
               const all = library.filter((item) => item.category === category.key);
@@ -581,8 +584,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                       </span>
                     </FoldButton>
                   </h3>
-                  {catOpen ? (
-                    <FoldBody id={bodyId} className="space-y-2 pb-4">
+                  <FoldBody id={bodyId} open={catOpen} className="space-y-2 pb-4">
                       {sections.map(({ sub, items }) => {
                         if (!withSubs) return <div key="ohne" data-testid={`${testId}-section-${category.key}-ohne`}>{itemList(category, items)}</div>;
                         const secKey = `sec:${category.key}:${sub?.key || ""}`;
@@ -607,12 +609,11 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                                 </FoldButton>
                               </div>
                             )}
-                            {secOpen ? <FoldBody id={secId} className="pb-3">{itemList(category, items)}</FoldBody> : null}
+                            <FoldBody id={secId} open={secOpen} className="pb-3">{itemList(category, items)}</FoldBody>
                           </div>
                         );
                       })}
-                    </FoldBody>
-                  ) : null}
+                  </FoldBody>
                 </div>
               );
             })}

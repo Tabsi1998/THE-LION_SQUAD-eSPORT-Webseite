@@ -77,8 +77,9 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
           Waffen wählen{picked ? ` · ${picked} gewählt` : ""}
         </button>
       ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
-      {open ? (
-        <div id="equipment-assign-choice" className="space-y-2">
+      {/* Ziel von aria-controls: der Behälter steht immer da, zugeklappt verborgen (Codex zu #2306). */}
+      <div id="equipment-assign-choice" hidden={!open} className="space-y-2">
+        {open ? (<>
           {weapons.length + classes.length > 1 ? (
             <label className="relative block">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" aria-hidden="true" />
@@ -100,8 +101,8 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
             </div>
           ) : null}
           {!shownClasses.length && !shownWeapons.length ? <p className="text-xs text-white/60">Nichts gefunden.</p> : null}
-        </div>
-      ) : null}
+        </>) : null}
+      </div>
       <button type="button" disabled={!picked} onClick={() => onAssign(chosen, chosenClasses)} data-testid="equipment-assign"
         className="tls-btn tls-btn--primary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
         {rows.length === 1 ? "Dem Aufsatz zuordnen" : `Allen ${rows.length} Aufsätzen zuordnen`}
@@ -182,15 +183,13 @@ function SubGroup({ id, sub, rows, total, open, onToggle, onAdd, full, searching
           </button>
         ) : null}
       </div>
-      {open ? (
-        <FoldBody id={id} className="border-t border-white/10 p-2.5">
+      <FoldBody id={id} open={open} className="border-t border-white/10 p-2.5">
           {rows.length ? children : (
             <p className="text-xs text-white/55">
               {searching ? "Nichts gefunden." : "Noch kein Eintrag – über „Hinzufügen“ oder „Auswählen“ und „Verschieben“ zuordnen."}
             </p>
           )}
-        </FoldBody>
-      ) : null}
+      </FoldBody>
     </div>
   );
 }
@@ -387,7 +386,8 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
               const subs = category.subcategories || [];
               const all = listed.filter((item) => item.category === category.key);
               const sections = groupBySubcategory(rows, category).filter((group) => !searching || group.items.length);
-              // Mit gewählter oder nur einer Kategorie ist sie gleich offen.
+              // Mit gewählter oder nur einer Kategorie ist sie gleich offen - bei nur einer Kategorie wäre Zuklappen ein sinnloser Klick (gewollt,
+              // Codex zu #2306); zuklappen lässt sie sich trotzdem.
               const catKey = `cat:${category.key}`;
               const catBase = Boolean(only) || categories.length === 1;
               const catOpen = fold.isOpen(catKey, catBase);
@@ -414,8 +414,8 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
                       </button>
                     </div>
                   </div>
-                  {!catOpen ? null : !subs.length ? (
-                    <FoldBody id={bodyId} className="pb-6">
+                  {!subs.length ? (
+                    <FoldBody id={bodyId} open={catOpen} className="pb-6">
                       {rows.length ? <ItemGrid rows={rows}>{rows.map((item) => itemRow(category, item))}</ItemGrid> : (
                         <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">
                           {searching ? "Nichts gefunden." : "Noch kein Eintrag."}
@@ -423,11 +423,11 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
                       )}
                     </FoldBody>
                   ) : !sections.length ? (
-                    <FoldBody id={bodyId} className="pb-6">
+                    <FoldBody id={bodyId} open={catOpen} className="pb-6">
                       <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">Nichts gefunden.</p>
                     </FoldBody>
                   ) : (
-                    <FoldBody id={bodyId} className="space-y-2 pb-6">
+                    <FoldBody id={bodyId} open={catOpen} className="space-y-2 pb-6">
                       {sections.map(({ sub, items: subRows }) => {
                         const key = `sub:${category.key}:${sub ? sub.key : ""}`;
                         const total = all.filter((item) => (sub ? item.subcategory === sub.key : !subs.some((entry) => entry.key === item.subcategory))).length;

@@ -49,6 +49,17 @@ async function openAll() {
   fireEvent.click(await screen.findByTestId("season-bans-open-all"));
 }
 
+// Jedes `aria-controls` zeigt auf genau ein vorhandenes Element - auch zugeklappt (Codex zu #2306).
+function expectControlsResolve() {
+  const buttons = [...document.querySelectorAll("[aria-controls]")];
+  expect(buttons.length).toBeGreaterThan(0);
+  const ids = [...document.querySelectorAll("[id]")].map((node) => node.id);
+  for (const button of buttons) {
+    const target = button.getAttribute("aria-controls");
+    expect(ids.filter((id) => id === target), `aria-controls="${target}"`).toHaveLength(1);
+  }
+}
+
 function renderPanel(props = {}) {
   const onSaved = vi.fn();
   render(<MemoryRouter><SeasonLoadoutBansPanel seasonId="s1" canEdit onSaved={onSaved} {...props} /></MemoryRouter>);
@@ -377,4 +388,29 @@ test("Klasse und Slots im Kasten der Waffe einklappbar; „Ganze Klasse sperren�
   fireEvent.click(screen.getByTestId("season-bans-open-w2"));
   expect(screen.getByTestId("season-bans-slot-toggle-w2-aufsaetze:optik")).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByLabelText("Holo an Donner 4 sperren")).toBeInTheDocument();
+});
+
+test("aria-controls zeigt immer auf genau einen Behälter - zugeklappt verborgen, auch der Kasten einer Waffe", async () => {
+  apiMock.get.mockResolvedValue({ data: BY_SLOT });
+  renderPanel();
+  const fold = await screen.findByTestId("season-bans-class-sturm-fold");
+  expectControlsResolve();
+  // Zugeklappt: der Behälter steht da, ist aber verborgen und leer.
+  const body = document.getElementById(fold.getAttribute("aria-controls"));
+  expect(body).toHaveAttribute("hidden");
+  expect(body).toBeEmptyDOMElement();
+  fireEvent.click(fold);
+  expect(body).not.toHaveAttribute("hidden");
+  // Der Knopf der Waffe steuert ihren Kasten der Aufsätze.
+  const open = screen.getByTestId("season-bans-open-w1");
+  expect(open).toHaveAttribute("aria-controls", "season-bans-box-w1");
+  expect(document.getElementById("season-bans-box-w1")).toHaveAttribute("hidden");
+  fireEvent.click(open);
+  expect(document.getElementById("season-bans-box-w1")).not.toHaveAttribute("hidden");
+  expect(within(document.getElementById("season-bans-box-w1")).getByTestId("season-bans-attachments-w1")).toBeInTheDocument();
+  expectControlsResolve();
+  await openAll();
+  expectControlsResolve();
+  fireEvent.click(screen.getByTestId("season-bans-close-all"));
+  expectControlsResolve();
 });

@@ -47,6 +47,17 @@ async function openAll() {
   fireEvent.click(await screen.findByTestId("equipment-open-all"));
 }
 
+// Jedes `aria-controls` zeigt auf genau ein vorhandenes Element - auch zugeklappt (Codex zu #2306).
+function expectControlsResolve() {
+  const buttons = [...document.querySelectorAll("[aria-controls]")];
+  expect(buttons.length).toBeGreaterThan(0);
+  const ids = [...document.querySelectorAll("[id]")].map((node) => node.id);
+  for (const button of buttons) {
+    const target = button.getAttribute("aria-controls");
+    expect(ids.filter((id) => id === target), `aria-controls="${target}"`).toHaveLength(1);
+  }
+}
+
 function renderPage() {
   return render(
     <MemoryRouter><EquipmentLibrary gameId="g1" /></MemoryRouter>,
@@ -328,4 +339,25 @@ test("die Auswahl zum Verschieben bleibt beim Zuklappen erhalten", async () => {
   expect(screen.getByTestId("equipment-move-bar")).toHaveTextContent("1 Eintrag gewählt");
   fireEvent.click(screen.getByTestId("equipment-fold-waffen"));
   expect(screen.getByTestId("equipment-select-w2")).toBeChecked();
+});
+
+test("aria-controls zeigt immer auf genau einen Behälter - zugeklappt verborgen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...GROUPED, attachments_without_weapon: [{ id: "a3", name: "Kompensator" }] } });
+  renderPage();
+  const fold = await screen.findByTestId("equipment-fold-waffen");
+  expectControlsResolve();
+  const body = document.getElementById(fold.getAttribute("aria-controls"));
+  expect(body).toHaveAttribute("hidden");
+  expect(body).toBeEmptyDOMElement();
+  expect(document.getElementById("equipment-assign-choice")).toHaveAttribute("hidden");
+  fireEvent.click(fold);
+  expect(body).not.toHaveAttribute("hidden");
+  expect(document.getElementById(screen.getByTestId("equipment-sub-toggle-sturm").getAttribute("aria-controls"))).toHaveAttribute("hidden");
+  expectControlsResolve();
+  await openAll();
+  fireEvent.click(screen.getByTestId("equipment-assign-open"));
+  expect(document.getElementById("equipment-assign-choice")).not.toHaveAttribute("hidden");
+  expectControlsResolve();
+  fireEvent.click(screen.getByTestId("equipment-close-all"));
+  expectControlsResolve();
 });
