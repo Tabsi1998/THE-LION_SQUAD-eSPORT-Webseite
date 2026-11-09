@@ -175,8 +175,17 @@ async def schedule_match_reminders() -> dict:
                     queued += 1
     if queued or notifications:
         logger.info(f"[match-reminders] queued {queued} mails, created {notifications} web notifications")
+    # Liga (#2313): vor dem ersten Spiel an fehlende Angaben erinnern - eigener Vorlauf je Staffel, einmal je Seite.
+    open_points = 0
+    try:
+        from services import league_open_points
+
+        open_points = await league_open_points.remind_before_first_match(db, now=now)
+    except Exception:  # noqa: BLE001 - die Spiel-Erinnerungen sind schon raus
+        logger.warning("[match-reminders] Erinnerung an fehlende Angaben nicht gelaufen", exc_info=True)
     return {
         "queued": queued,
         "notifications": notifications,
         "actual_start_only": actual_start_only,
+        "open_points": open_points,
     }
