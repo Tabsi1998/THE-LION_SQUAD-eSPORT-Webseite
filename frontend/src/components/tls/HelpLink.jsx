@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
 import { CircleHelp } from "lucide-react";
-import { hilfePfad, hilfeSchritte, hilfeThema } from "@/hilfe";
+import anker from "@/hilfe/anker.json";
 
 // „?“ an Stellen, an denen jemand hängen bleiben kann (#2295): führt zum passenden Schritt im Hilfe-Bereich. Öffnet
 // einen neuen Tab, damit ein halb ausgefülltes Formular stehen bleibt. Ein unbekannter Schritt zeigt nichts - ein
-// Test prüft alle Ziele gegen die Hilfe-Daten (HelpLink.test.jsx).
+// Test prüft alle Ziele gegen die Hilfe-Daten (HelpLink.test.jsx). Gelesen wird nur der schlanke Index anker.json
+// (Thema → Schritt → Titel), nicht die ganzen Texte; src/hilfe/index.test.js hält ihn gleich mit den Themen.
 
 export function helpTarget(thema, schritt) {
-  const data = hilfeThema(thema);
-  const step = hilfeSchritte(data).find((row) => row.id === schritt);
-  return step ? { to: hilfePfad(thema, schritt), label: step.titel } : null;
+  const label = anker[thema]?.[schritt];
+  return label ? { to: `/hilfe/${thema}#${schritt}`, label } : null;
 }
 
 export function HelpLink({ thema, schritt, className = "" }) {

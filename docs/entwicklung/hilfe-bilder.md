@@ -49,7 +49,8 @@ Kennung umbenannt). Dann Ablauf in der Spec anpassen, Text im JSON prüfen und d
    Rahmen, `area` (optional) ist der Bildausschnitt.
 3. Neues Thema: Datei in `themen/`, in `src/hilfe/index.js` und `backend/services/help_topics.py` eintragen, Ablauf in
    `FLOWS` der Spec.
-4. Bilder erzeugen, `npx vitest run src/hilfe src/components/tls/HelpLink.test.jsx`.
+4. `node scripts/hilfe-anker.mjs` (schlanker Index `src/hilfe/anker.json` für die „?“-Links), Bilder erzeugen,
+   `npx vitest run src/hilfe src/components/tls/HelpLink.test.jsx`.
 
 „?“-Links an der Oberfläche: `<HelpLink thema="…" schritt="…" />` (`components/tls/HelpLink.jsx`). Der Test
 `HelpLink.test.jsx` sucht alle Ziele im Code und prüft sie gegen die JSON-Dateien.

@@ -1,12 +1,19 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import masse from "./bilder/masse.json";
+import anker from "./anker.json";
 import { FORMEN, THEMEN, hilfeBild, hilfeNormal, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo, sucheHilfe } from "./index";
 
 // Hilfe-Daten (#2295): eindeutige Anker, jedes Bild für Handy und PC vorhanden, Verweise zeigen auf echte Schritte,
 // kurze Sätze für Leser ohne Vorwissen, und die Suche findet auch ohne Umlaute.
 
 const ROOT = resolve(__dirname);
+
+test("anker.json (Index für die „?“-Links) passt zu den Themen", () => {
+  const expected = Object.fromEntries(THEMEN.map((thema) => [thema.slug, Object.fromEntries(hilfeSchritte(thema).map((schritt) => [schritt.id, schritt.titel]))]));
+  // Neu erzeugen: siehe docs/entwicklung/hilfe-bilder.md, Abschnitt „Neues Thema oder neuer Schritt“.
+  expect(anker).toEqual(expected);
+});
 
 test("jedes Thema liegt als Datei in themen/ und steht in der Liste", () => {
   const files = readdirSync(resolve(ROOT, "themen")).filter((name) => name.endsWith(".json")).map((name) => name.replace(/\.json$/, ""));
