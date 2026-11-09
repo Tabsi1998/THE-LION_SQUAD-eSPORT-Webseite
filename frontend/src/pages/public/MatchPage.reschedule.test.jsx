@@ -107,7 +107,9 @@ test("fester Termin: alter offener Vorschlag lässt sich ablehnen, aber nicht an
   expect(screen.queryByTestId("match-proposal-accept-p-old")).toBeNull();
   expect(screen.queryByText("Gegenvorschlag")).toBeNull();
   expect(screen.getByTestId("match-proposal-withdraw-p-own")).toBeInTheDocument();
+  // Ablehnen fragt nach einem Grund (optional, #2325) - erst der zweite Knopf schickt ab.
   fireEvent.click(screen.getByTestId("match-proposal-decline-p-old"));
+  fireEvent.click(screen.getByTestId("match-decline-send-p-old"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/p-old/decision", expect.objectContaining({ action: "decline" })));
 });
 

@@ -269,22 +269,19 @@ function MatchPageView() {
     setProposalErrors([]);
   };
 
-  const decide = async (proposal, action) => {
-    await runAction(async () => {
-      await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, { action, note: null });
-      toast.success(DECISION_TOASTS[action] || "Gespeichert.");
-      await load();
-    }, "Terminentscheidung konnte nicht gespeichert werden.");
-  };
+  // Ablehnen mit optionalem Grund (#2325): er geht als Notiz an die Gegenseite. Antwort `true`, wenn es geklappt hat.
+  const decide = (proposal, action, note = null) => runAction(async () => {
+    await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, { action, note: note || null });
+    toast.success(DECISION_TOASTS[action] || "Gespeichert.");
+    await load();
+  }, "Terminentscheidung konnte nicht gespeichert werden.");
 
   // Alle Termine einer Gruppe auf einmal ablehnen oder zurückziehen (#2325).
-  const decideGroup = async (proposal, action) => {
-    await runAction(async () => {
-      await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action, note: null });
-      toast.success(action === "withdraw" ? "Vorschläge zurückgezogen." : "Alle Termine abgelehnt.");
-      await load();
-    }, "Terminentscheidung konnte nicht gespeichert werden.");
-  };
+  const decideGroup = (proposal, action, note = null) => runAction(async () => {
+    await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action, note: note || null });
+    toast.success(action === "withdraw" ? "Vorschläge zurückgezogen." : "Alle Termine abgelehnt.");
+    await load();
+  }, "Terminentscheidung konnte nicht gespeichert werden.");
 
   // Gegenvorschlag mit bis zu drei Terminen - für einen Vorschlag oder die ganze Gruppe (#2325).
   const counterPropose = (proposal, values, note) => sendTimes(values, async (scheduled_ats) => {

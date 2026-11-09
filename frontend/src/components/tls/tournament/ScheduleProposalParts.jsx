@@ -104,17 +104,38 @@ function CounterForm({ bundleKey, min, busy, onCounter, onClose, hintsFor }) {
   );
 }
 
+/** Ablehnen mit optionalem Grund (#2325) - der Grund geht als Notiz an die Gegenseite. */
+function DeclineForm({ bundleKey, busy, all, onDecline, onClose }) {
+  const [note, setNote] = useState("");
+  const submit = async () => {
+    const done = await onDecline(note.trim() || null);
+    if (done) onClose();
+  };
+  return (
+    <div className="mt-3 border-t border-white/10 pt-3 space-y-3" data-testid={`match-decline-${bundleKey}`}>
+      <input aria-label="Grund für die Ablehnung" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="input"
+        placeholder="Grund (optional), z.B. unter der Woche geht es nicht" data-testid={`match-decline-note-${bundleKey}`} />
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={submit} data-testid={`match-decline-send-${bundleKey}`} className={`${TEXT_BUTTON} tls-btn--danger`}>{all ? "Alle ablehnen" : "Ablehnen"}</button>
+        <button type="button" disabled={busy} onClick={onClose} className={`${TEXT_BUTTON} tls-btn--quiet`}>Abbrechen</button>
+      </div>
+    </div>
+  );
+}
+
 function actorName(proposal) {
   return proposal?.actor?.display_name || proposal?.actor?.username || "Teilnehmer";
 }
 
 /**
  * Alle Vorschläge des Spiels: offene einer Gruppe als eine Karte (#2325), alles andere wie bisher je Zeile.
- * `onDecide(proposal, action)` für annehmen, ablehnen und zurückziehen eines einzelnen; `onGroupDecide(proposal, action)` für
- * alle ablehnen und alle zurückziehen; `onCounter(proposal, times, note)` mit Antwort `{ ok, errors }`.
+ * `onDecide(proposal, action, note)` für annehmen, ablehnen und zurückziehen eines einzelnen; `onGroupDecide(proposal, action, note)`
+ * für alle ablehnen und alle zurückziehen (beide antworten mit `true`, wenn es geklappt hat); `onCounter(proposal, times, note)` mit
+ * Antwort `{ ok, errors }`. Gegenvorschlag und Ablehnen öffnen je Karte ein Feld - immer nur eins.
  */
 export function ScheduleProposalList({ proposals, page, userId, canManage, fixedTime, busy, min, formatDateTime, onDecide, onGroupDecide, onCounter, hintsFor }) {
-  const [counterFor, setCounterFor] = useState(null);
+  const [panel, setPanel] = useState(null);
+  const close = () => setPanel(null);
   const bundles = bundleProposals(proposals);
   return bundles.map((bundle) => {
     const first = bundle.proposals[0];
@@ -124,15 +145,18 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
     const answer = canManage && open && !own;
     // Fester Termin (#2194): ein alter Vorschlag lässt sich nur noch ablehnen - Annehmen und Gegenvorschlag gehen über die Verschiebung.
     const agree = answer && !fixedTime;
-    const counterOpen = agree && counterFor === bundle.key;
-    const counter = agree && (
-      counterOpen ? (
-        <CounterForm bundleKey={bundle.key} min={min} busy={busy} onClose={() => setCounterFor(null)} hintsFor={hintsFor}
-          onCounter={(times, note) => onCounter(first, times, note)} />
-      ) : null
-    );
+    const counterOpen = agree && panel?.key === bundle.key && panel.kind === "counter";
+    const declineOpen = answer && panel?.key === bundle.key && panel.kind === "decline";
+    const counter = counterOpen ? (
+      <CounterForm bundleKey={bundle.key} min={min} busy={busy} onClose={close} hintsFor={hintsFor}
+        onCounter={(times, note) => onCounter(first, times, note)} />
+    ) : null;
+    const decline = declineOpen ? (
+      <DeclineForm bundleKey={bundle.key} busy={busy} all={bundle.group} onClose={close}
+        onDecline={(note) => (bundle.group ? onGroupDecide(first, "decline", note) : onDecide(first, "decline", note))} />
+    ) : null;
     const counterToggle = agree && !counterOpen && (
-      <button type="button" disabled={busy} onClick={() => setCounterFor(bundle.key)} aria-expanded="false"
+      <button type="button" disabled={busy} onClick={() => setPanel({ key: bundle.key, kind: "counter" })} aria-expanded="false"
         data-testid={`match-counter-open-${bundle.key}`} className={`${TEXT_BUTTON} tls-btn--secondary`}>Gegenvorschlag</button>
     );
     if (bundle.group) {
@@ -168,11 +192,14 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
           {answer && (
             <div className="mt-3 flex flex-wrap gap-2">
               {counterToggle}
-              <button type="button" disabled={busy} onClick={() => onGroupDecide(first, "decline")} data-testid={`match-proposal-group-decline-${bundle.groupId}`}
-                className={`${TEXT_BUTTON} tls-btn--danger`}>Alle ablehnen</button>
+              {!declineOpen && (
+                <button type="button" disabled={busy} onClick={() => setPanel({ key: bundle.key, kind: "decline" })} aria-expanded="false"
+                  data-testid={`match-proposal-group-decline-${bundle.groupId}`} className={`${TEXT_BUTTON} tls-btn--danger`}>Alle ablehnen</button>
+              )}
             </div>
           )}
           {counter}
+          {decline}
         </div>
       );
     }
@@ -190,7 +217,7 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
           {answer && (
             <div className="flex gap-1 shrink-0">
               {agree && <button type="button" disabled={busy} onClick={() => onDecide(p, "accept")} aria-label="Termin annehmen" title="Annehmen" data-testid={`match-proposal-accept-${p.id}`} className={`${ROW_BUTTON} ${ACCEPT}`}><Check className="w-3.5 h-3.5" /></button>}
-              <button type="button" disabled={busy} onClick={() => onDecide(p, "decline")} aria-label="Termin ablehnen" title="Ablehnen" data-testid={`match-proposal-decline-${p.id}`} className={`${ROW_BUTTON} ${DECLINE}`}><X className="w-3.5 h-3.5" /></button>
+              <button type="button" disabled={busy} onClick={() => setPanel({ key: bundle.key, kind: "decline" })} aria-expanded={declineOpen} aria-label="Termin ablehnen" title="Ablehnen" data-testid={`match-proposal-decline-${p.id}`} className={`${ROW_BUTTON} ${DECLINE}`}><X className="w-3.5 h-3.5" /></button>
             </div>
           )}
           {own && canManage && (
@@ -199,6 +226,7 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
         </div>
         {counterToggle && <div className="mt-3">{counterToggle}</div>}
         {counter}
+        {decline}
       </div>
     );
   });

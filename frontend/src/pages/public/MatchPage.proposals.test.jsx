@@ -138,7 +138,11 @@ test("Gegenseite: alle ablehnen und Gegenvorschlag mit zwei Terminen gehen an di
   renderMatch({ ...BASE, match: { ...BASE.match, schedule_status: "proposed" }, schedule_proposals: THEIRS });
   const card = await screen.findByTestId("match-proposal-group-g-falken");
   fireEvent.click(within(card).getByTestId("match-proposal-group-decline-g-falken"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/f1/group-decision", { action: "decline", note: null }));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(within(card).getByLabelText("Grund für die Ablehnung"), { target: { value: "Diese Woche keine Zeit" } });
+  fireEvent.click(within(card).getByTestId("match-decline-send-gruppe-g-falken"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/f1/group-decision", { action: "decline", note: "Diese Woche keine Zeit" }));
+  await waitFor(() => expect(within(card).queryByTestId("match-decline-gruppe-g-falken")).toBeNull());
 
   fireEvent.click(within(card).getByTestId("match-counter-open-gruppe-g-falken"));
   const counter = within(card).getByTestId("match-counter-gruppe-g-falken");
@@ -152,6 +156,20 @@ test("Gegenseite: alle ablehnen und Gegenvorschlag mit zwei Terminen gehen an di
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/f1/group-decision", {
     action: "counter", scheduled_ats: [local("2027-03-13T20:00"), local("2027-03-14T19:00")], note: "Wochenende besser",
   }));
+});
+
+test("einzelner Vorschlag: Ablehnen fragt nach einem Grund, ohne Grund geht es auch", async () => {
+  const single = { ...THEIRS[0], group_id: undefined };
+  renderMatch({ ...BASE, match: { ...BASE.match, schedule_status: "proposed" }, schedule_proposals: [single] });
+  fireEvent.click(await screen.findByTestId("match-proposal-decline-f1"));
+  fireEvent.change(screen.getByLabelText("Grund für die Ablehnung"), { target: { value: "  Sonntag geht nicht  " } });
+  fireEvent.click(screen.getByTestId("match-decline-send-f1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/f1/decision", { action: "decline", note: "Sonntag geht nicht" }));
+
+  apiMock.post.mockClear();
+  fireEvent.click(screen.getByTestId("match-proposal-decline-f1"));
+  fireEvent.click(screen.getByTestId("match-decline-send-f1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/f1/decision", { action: "decline", note: null }));
 });
 
 test("eigene Gruppe: wartet auf die Gegenseite, Zurückziehen nimmt alle zurück", async () => {
