@@ -214,7 +214,10 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
                           {row.problems.map((text) => (
                             <span key={text} className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]">{text}</span>
                           ))}
-                          {/* Plattform je Season (#2270): wer hier nicht spielen darf - ein Hinweis, das Zuteilen geht trotzdem. */}
+                          {/* Alter und Plattform (#2270, #2313): wer hier nicht spielen darf - ein Hinweis, das Zuteilen geht trotzdem. */}
+                          {!blocked && row.shortfall ? (
+                            <span className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]" data-testid={`squad-assign-shortfall-${row.id}`}>{row.shortfall}</span>
+                          ) : null}
                           {!blocked && row.notes?.length ? (
                             <span className="mt-1 block text-xs text-warn" data-testid={`squad-assign-notes-${row.id}`}>
                               {row.notes.map((text) => <span key={text} className="block break-words [overflow-wrap:anywhere]">{text}</span>)}

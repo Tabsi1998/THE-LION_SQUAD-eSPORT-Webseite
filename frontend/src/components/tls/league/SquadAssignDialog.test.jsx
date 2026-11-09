@@ -98,13 +98,16 @@ test("Spiel-ID je Spieler (#2108): fehlt sie, warnt der Dialog mit Namen – zut
 
 test("Plattform je Season (#2270): wer nicht spielen darf, steht als Hinweis da – zuteilen geht trotzdem", async () => {
   const notes = ["Tom: Diese Season ist nur für PC – angegeben ist PlayStation."];
-  apiMock.get.mockResolvedValue({ data: { ...CANDIDATES, teams: [{ ...CANDIDATES.teams[0], squads: [{ ...CANDIDATES.teams[0].squads[0], notes }, CANDIDATES.teams[0].squads[1]] }] } });
+  // Seit #2313 auch unter dem Mindestkader nur ein Hinweis.
+  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 3.";
+  apiMock.get.mockResolvedValue({ data: { ...CANDIDATES, teams: [{ ...CANDIDATES.teams[0], squads: [{ ...CANDIDATES.teams[0].squads[0], notes, shortfall }, CANDIDATES.teams[0].squads[1]] }] } });
   render(<SquadAssignDialog tournament={TOURNAMENT} onAssigned={vi.fn()} />);
   fireEvent.click(screen.getByTestId("squad-assign-open"));
   await waitFor(() => expect(screen.getByTestId("squad-assign-team-t-loewen")).toBeInTheDocument());
   fireEvent.click(screen.getByTestId("squad-assign-team-t-loewen"));
 
   expect(screen.getByTestId("squad-assign-notes-s-a")).toHaveTextContent("Tom: Diese Season ist nur für PC – angegeben ist PlayStation.");
+  expect(screen.getByTestId("squad-assign-shortfall-s-a")).toHaveTextContent("Nur 2 von 4 Spielern");
   expect(screen.getByTestId("squad-assign-squad-s-a")).not.toBeDisabled();
   expect(screen.queryByTestId("squad-assign-notes-s-c")).toBeNull();
 });

@@ -39,7 +39,17 @@ function Notes({ row }) {
           {row.problems.map((text) => <li key={text} className="flex gap-2 [overflow-wrap:anywhere]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span>{text}</span></li>)}
         </ul>
       ) : null}
-      {row.warnings?.length ? <ul className="mt-2 space-y-0.5 text-xs text-white/60">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+      {/* Offene Punkte (#2313): fehlende Angaben halten nichts auf - Zulassen geht, gesperrt wird beim Check-in. */}
+      {row.warnings?.length || row.shortfall ? (
+        <div className="mt-2 rounded-sm border border-white/10 bg-white/[0.03] p-2" data-testid={`application-open-points-${row.id}`}>
+          <p className="text-xs font-bold uppercase tracking-wider text-white/70">
+            Offene Punkte{row.warnings?.length ? ` · ${row.warnings.length} Spieler` : ""}
+          </p>
+          {row.shortfall ? <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
+          {row.warnings?.length ? <ul className="mt-1 space-y-0.5 text-xs text-white/65">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+          <p className="mt-1 text-xs text-white/50">Zulassen geht trotzdem. Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden; das Team wird erinnert.</p>
+        </div>
+      ) : null}
       {row.shared_with?.length ? <p className="mt-2 text-xs text-white/60 [overflow-wrap:anywhere]">Gleiche Spieler stehen auch im Antrag von: {row.shared_with.join(", ")}.</p> : null}
     </>
   );
