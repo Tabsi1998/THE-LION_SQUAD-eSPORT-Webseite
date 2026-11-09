@@ -97,13 +97,14 @@
           "id": "termin-vorschlagen",
           "titel": "Termin vorschlagen",
           "text": "Wähle unter Terminabstimmung Datum und Uhrzeit und tippe auf Vorschlagen. Die Gegenseite bekommt eine Nachricht.",
-          "hinweis": "Einigt ihr euch nicht, gilt der Termin, den die Season vorgibt.",
+          "hinweis": "Je nach Season gilt ein unbeantworteter Vorschlag der Heimseite nach einer Frist. Sie steht unter „So laufen Termine in dieser Season“. Sonst gilt ohne Einigung der Standardtermin.",
           "bild": true
         },
         {
           "id": "termin-antworten",
           "titel": "Auf einen Vorschlag antworten",
-          "text": "Hat die Gegenseite etwas vorgeschlagen? Tippe auf den Haken zum Annehmen oder auf das X zum Ablehnen. Du kannst auch einen Gegenvorschlag machen.",
+          "text": "Hat die Gegenseite etwas vorgeschlagen? Nimm einen Vorschlag mit dem Haken an oder lehne ihn mit dem X ab. Du kannst auch einen Gegenvorschlag machen.",
+          "hinweis": "Antworte rechtzeitig. Sonst kann der Vorschlag der Heimseite gelten.",
           "bild": true
         },
         {
