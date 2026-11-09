@@ -20,7 +20,7 @@ function OwnSquadRow({ row, onWithdraw }) {
   const application = row.application;
   return (
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-white/10 py-3 first:border-t-0" data-testid={`league-application-row-${row.squad_id}`}>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-64">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
           <ApplicationStateBadge state={row.state} />
@@ -29,12 +29,14 @@ function OwnSquadRow({ row, onWithdraw }) {
         {row.state === "accepted" && !application?.staffel ? <p className="mt-1 text-sm text-white/75">Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
         {application?.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
-        {/* Offene Punkte (#2313): Die Anmeldung läuft, gesperrt wird erst beim Check-in - bis dahin bleibt sichtbar, was fehlt. */}
+        {/* Offene Punkte (#2313): Die Anmeldung läuft, gesperrt wird erst beim Check-in - bis dahin bleibt sichtbar, was fehlt.
+            Der Kasten sagt zuerst, dass die Anmeldung zählt (#2322); die Folge beim Spiel steht im Satz vom Server. */}
         {application && (row.shortfall || row.warnings?.length) ? (
           <div className="mt-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-2 text-sm text-white/80" data-testid={`league-application-open-${row.squad_id}`}>
-            <p className="font-semibold text-white/90">Bis zum ersten Spiel nachtragen – sonst kein Check-in für diese Spieler:</p>
+            <p className="font-semibold text-white/90">Die Anmeldung zählt – fehlende Angaben halten euch nicht aus der Liga.</p>
             {row.shortfall ? <p className="mt-1 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
             {row.warnings?.length ? <ul className="mt-1 space-y-0.5 text-xs text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+            {row.warnings?.length ? <p className="mt-1 text-xs text-white/60">Wer bis zum ersten Spiel nichts im Profil nachträgt, kann nicht einchecken und nicht aufgestellt werden.</p> : null}
           </div>
         ) : null}
       </div>

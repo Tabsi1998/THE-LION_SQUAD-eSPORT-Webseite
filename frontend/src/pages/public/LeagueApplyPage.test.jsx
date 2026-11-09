@@ -93,7 +93,7 @@ test("Warnungen halten nicht auf", async () => {
 });
 
 test("fehlende Angaben und zu wenige Spielberechtigte sind nur ein Hinweis, die Anmeldung geht weiter (#2313)", async () => {
-  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 3. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.";
+  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 3. Bis zum ersten Spiel im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.";
   apiMock.get.mockResolvedValue({ data: { ...VIEW, squads: [{ ...SQUAD, shortfall, warnings: ["Mila: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein.", "Tom: Probe-ID fehlt im Profil."] }] } });
   renderPage();
 

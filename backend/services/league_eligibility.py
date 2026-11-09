@@ -520,8 +520,9 @@ def open_points(ctx: EligibilityContext | None, squad: dict, *, minimum: int | N
     ready = sum(1 for row in rows.values() if row["ok"])
     shortfall = None
     if minimum and ready < minimum <= len(members):
-        shortfall = (f"Nur {ready} von {len(members)} Spielern sind spielberechtigt, die Season verlangt mindestens {minimum}. Bis zum ersten Spiel "
-                     "im Profil nachtragen – sonst kann das Team nicht einchecken.")
+        shortfall = (f"Nur {ready} von {len(members)} Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens {minimum}. Bis zum ersten Spiel "
+                     "im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die "
+                     "Liga-Leitung kann das Spiel dann kampflos werten.")
     return {"players": sorted(players, key=lambda row: str(row["name"]).casefold()), "shortfall": shortfall}
 
 
