@@ -348,7 +348,7 @@ Unter jedem Co-Team, das in einer Staffel spielt, zeigt **Spielberechtigung** di
 
 1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
-3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein oder zu groß, Team schon in der Staffel, Staffel voll, Geburtsdatum fehlt, jemand steht schon in einem anderen Co-Team der Season …).
+3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein oder zu groß, Team schon in der Staffel, Staffel voll, jemand steht schon in einem anderen Co-Team der Season …). Fehlende Geburtsdaten, ein zu junges Mitglied, eine andere Plattform oder zu wenige Spielberechtigte stehen nur als Hinweis da: Zuteilen geht, gesperrt wird beim Check-in (3.9).
 4. Bei jedem Co-Team steht je Spieler die **Spiel-ID** (Haken) bzw. **keine ID** (gelb), darunter „Ohne gültige
    Activision-ID: …“ mit den Namen. Zuteilen geht trotzdem; diese Spieler können erst aufgestellt werden, wenn die ID
    im Profil steht. Sie und die Verantwortlichen des Co-Teams bekommen eine Nachricht.
@@ -372,6 +372,10 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
 
 **Entscheiden** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**, Zuständigkeit „Teams freigeben“). Bei jeder neuen Anmeldung bekommst du eine Nachricht mit Link; er öffnet den Reiter gleich an dieser Stelle. Je Anmeldung steht da, wer eingereicht hat, welcher Regelversion und wann zugestimmt wurde und was der Kader gerade nicht erfüllt.
+
+**Offene Punkte** (#2313): Fehlen im Kader Angaben (Geburtsdatum, Spiel-ID, Plattform, Alter) oder sind zu wenige spielberechtigt, steht das im Kasten **Offene Punkte** – mit Zahl und Namen. Das hält nichts auf, du darfst trotzdem annehmen und zuteilen. Gesperrt wird erst beim Check-in und bei der Aufstellung (3.9), das Team wird erinnert.
+
+<img src="../assets/liga/liga-eingang-offene-punkte-1440.png" alt="Eingang der Anmeldungen mit dem Kasten Offene Punkte und freien Knöpfen zum Annehmen" width="640">
 
 | Knopf | Was passiert |
 | --- | --- |
@@ -463,6 +467,7 @@ speichert.
 | **Schließt (Minuten nach dem Termin)** | 15 | danach kein Check-in mehr durch die Seiten – ihr könnt nachtragen oder verlängern |
 | **Mindestens Anwesende je Seite** | 3 (aus Teilnehmerliste oder Teamgröße − 1) | Nr. 46: nur Spieler aus dem Kader, nur wer spielen darf (3.9); bis zum Schluss lässt sich ergänzen |
 | **Erinnerung vor Schluss (Minuten)** | 5 | zweite Nachricht an Seiten ohne Check-in; 0 = keine |
+| **Erinnerung an fehlende Angaben (Stunden vor dem ersten Spiel)** | 48 | einmal je Team vor dem ersten Spiel: an jeden, dem Geburtsdatum, Spiel-ID oder Plattform fehlt, und an Captain und Vertreter (3.9); 0 = keine. Steht nicht im Regelwerk |
 
 Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
 
@@ -787,6 +792,11 @@ Mit dem Kasten aus 2.7b läuft jedes Spiel so, alles auf der **Matchseite** im B
 - **Einchecken:** Captain oder Vertreter haken an, wer da ist – mindestens die Mindestzahl, nur Spieler aus dem Kader, nur wer
   spielen darf (gesperrt, Wartezeit, fehlende ID stehen grau mit Grund). Bis zum Schluss lassen sich Anwesende ergänzen. Die
   Gegenseite sieht, dass und mit wie vielen eingecheckt wurde.
+- **Fehlende Angaben** (3.9): Hier greift die Sperre. Wer selbst nicht spielen darf, sieht oben im Block „Du kannst so nicht
+  einchecken“ mit dem Grund und dem Knopf **Im Profil nachtragen**. Reichen die Spielberechtigten nicht für die Mindestzahl, sagt
+  die Seite das schon vor dem Fenster, und Einchecken geht nicht. Ist die Angabe nachgetragen, geht der Check-in sofort, ohne euch.
+
+  <img src="../assets/liga/liga-checkin-gesperrt-390.png" alt="Check-in mit dem eigenen Grund, dem Knopf Im Profil nachtragen und dem Satz zu wenigen Spielberechtigten am Handy" width="300">
 - **Regelwerks-Sperre:** Hat das Co-Team einer neuen Regelversion mit Zustimmungspflicht nicht zugestimmt, geht für dieses Team kein
   Check-in und kein Start – die Seite sagt „Das Regelwerk hat sich geändert – bitte erst zustimmen“ mit Weg zur Fassung. Das gilt
   auch, wenn ihr für die Seite eintragen wollt, und auch, wenn die neue Fassung erst zwischen Check-in und Start kommt.
@@ -996,7 +1006,9 @@ Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
 
 ### 3.9 Spielberechtigung: Regeln je Season
 
-Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an einer Stelle: beim Zuteilen, bei der Aufnahme in den Kader, auf der Teilnehmerliste und später beim Check-in. Ältere Seasons tragen die Felder nicht und prüfen nichts Neues.
+Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an einer Stelle: beim Zuteilen, bei der Aufnahme in den Kader, auf der Teilnehmerliste und beim Check-in. Ältere Seasons tragen die Felder nicht und prüfen nichts Neues.
+
+**Fehlende Angaben sperren erst beim Spielen** (#2313): Fehlen Geburtsdatum, Spiel-ID oder Plattform, ist jemand zu jung oder sind zu wenige spielberechtigt, geht die Anmeldung trotzdem, und ihr dürft trotzdem annehmen und zuteilen. Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden; ein Team mit zu wenigen Spielberechtigten kann nicht einchecken. Danach gibt es wie immer nur den Vorschlag „nicht erschienen“, gewertet wird nie von selbst. Die Betroffenen sowie Captain und Vertreter bekommen beim Einreichen und vor dem ersten Spiel eine Nachricht (Vorlauf in 2.7b).
 
 | Regel | Was passiert |
 | --- | --- |
@@ -1005,9 +1017,9 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | **Wartezeit** | Bis zum Ende von Spieltag 1 spielen Neue sofort. Danach warten sie ab der Aufnahme so viele Tage, auch wenn der Kader dadurch zu klein ist. Wer ins selbe Co-Team zurückkommt, startet keine neue Wartezeit. Das Zuteilen eines Co-Teams durch euch startet keine. **Ein Transfer wartet immer**, auch vor dem Ende von Spieltag 1 |
 | **Stichtag** | Optional in der Kaderübersicht: Neue warten auf eure Freigabe, Abgänge bleiben frei (3.7) |
 | **Transferfenster** | Die Teamleitung beantragt im Fenster, ihr entscheidet. Nach der Genehmigung wartet die Person ab der Kaderaufnahme die volle Wartezeit, immer und auch wenn sie das alte Co-Team schon verlassen hatte |
-| **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum keine Anmeldung und keine Aufnahme. Ihr seht nur „Alter erfüllt“, „Geburtsdatum fehlt“ oder „Altersvorgabe nicht erfüllt“, die Liga nennt nie ein Datum oder Alter |
+| **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum oder zu jung: Anmeldung und Zuteilen gehen, aber kein Check-in und keine Aufstellung; die Aufnahme in einen Kader einer laufenden Staffel geht nicht. Ihr seht nur „Alter erfüllt“, „Geburtsdatum fehlt“ oder „Altersvorgabe nicht erfüllt“, die Liga nennt nie ein Datum oder Alter |
 | **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Zahnrad → Spiel-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
-| **Plattform** (2.7c) | Bei der Anmeldung zählt nicht als spielberechtigt, wer eine andere oder keine Plattform angibt: Er steht als Warnung da, und unter dem Mindestkader geht die Anmeldung nicht. Weil die Liga dort noch nicht feststeht, gilt die weiteste Regel aller Liga N. Beim Zuteilen gilt die Liga N der Staffel: Bleiben ohne Spieler anderer Plattformen zu wenige übrig, geht es nicht, sonst steht ein Hinweis im Dialog. Auf die Teilnehmerliste kommt niemand mit anderer Plattform. Die Aufnahme in den Kader prüft die Plattform nicht |
+| **Plattform** (2.7c) | Bei der Anmeldung zählt nicht als spielberechtigt, wer eine andere oder keine Plattform angibt: Er steht als Hinweis da, auch unter dem Mindestkader geht die Anmeldung. Weil die Liga dort noch nicht feststeht, gilt die weiteste Regel aller Liga N. Beim Zuteilen gilt die Liga N der Staffel; wer nicht passt und ob zu wenige übrig bleiben, steht als Hinweis im Dialog. Auf die Teilnehmerliste kommt niemand mit anderer Plattform. Die Aufnahme in den Kader prüft die Plattform nicht |
 
 **Wartezeit aufheben:** Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
 
