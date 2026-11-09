@@ -286,7 +286,8 @@ keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier sp
 | | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
 | | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
 | | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7c) | nach Regelwerk |
-| Tabelle | **Punkte Sieg / Remis / Niederlage** | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
+| Tabelle | **Punkteart**: *Sieg, Remis, Niederlage* oder *Punkte nach gewonnenen Maps* (3:2 ergibt 3 und 2) | Sieg, Remis, Niederlage |
+| | **Punkte Sieg / Remis / Niederlage** – nur bei *Sieg, Remis, Niederlage* | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
 | | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
 | | **Direkter Vergleich (Mini-Tabelle)** – erscheint mit dem direkten Vergleich | Punkte, Map-Differenz, Gewonnene Maps |
 | | **Kampflos (Default-Win)** | Maps des Best of (BO3 2:0, BO5 3:0) |
@@ -294,6 +295,17 @@ keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier sp
 | | **Remis erlaubt** | aus |
 | Ligen und Staffeln | **Teams je Staffel höchstens** | 8 |
 | Überblick | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
+
+**Punkte nach gewonnenen Maps:** Im Reiter **Tabelle** unter **Punkteart** *Punkte nach gewonnenen Maps* wählen. Jede Seite
+bekommt so viele Punkte, wie sie Maps gewonnen hat – bei 3:2 der Sieger 3, der Verlierer 2. Kampflos zählt immer wie 3:0 (das Feld
+**Kampflos** ist dann gesperrt), „beide nicht erschienen“ gibt beiden 0. Beim Wechsel setzt die Seite die Reihenfolge bei
+Punktgleichheit auf **Mehr Siege → Direkter Vergleich → Map-Differenz → Entscheid der Leitung**; das ist ein Vorschlag, du kannst sie
+danach ändern. Der direkte Vergleich rechnet dann auch mit den Maps der Spiele untereinander. Gespeichert wird die Umstellung im
+Protokoll („Punkteart“ mit vorher und nachher). Eine **laufende** Season bekommt die neue Punkteart über **Vorgaben übertragen**
+auch nach dem ersten Ergebnis (siehe Tabelle unten); beendete Staffeln und fertige Endstände bleiben, wie sie sind. Danach schlägt
+das Regelwerk eine neue Freigabe vor, weil sich der Baustein „Tabelle und Wertung“ geändert hat.
+
+<img src="../assets/liga/liga-season-mappunkte-pc.png" alt="Reiter Tabelle mit Punkteart Punkte nach gewonnenen Maps, darunter die vorgeschlagene Reihenfolge Mehr Siege, Direkter Vergleich, Map-Differenz, Entscheid der Leitung und das gesperrte Feld Kampflos" width="560">
 
 Im Reiter **Termine** steht unter den Sperrzeiten nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel
 höchstens fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
@@ -427,6 +439,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Ergebnisregeln und Punktepflicht | auch während der Season – gilt für neue Meldungen, fertige Ergebnisse bleiben; nicht bei gesperrten Staffeln |
 | Termine und Kalender (Beginn, Wochen, Sperrzeiten, Standardtermin, Runden, Staffelgröße) | nur vor dem Start |
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
+| Punkteart (Sieg/Remis/Niederlage oder gewonnene Maps) mit Reihenfolge bei Punktgleichheit und Kampflos | auch während der Season, wenn sich die Punkteart ändert; nicht bei gesperrten oder beendeten Staffeln |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
 | Terminregeln (Kasten „Termine und Verschiebungen“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 | Check-in (Kasten „Check-in vor dem Spiel“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
@@ -684,6 +697,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{veto.step_seconds}}`, `{{veto.team_a}}` | Veto (2.7d): „60 Sekunden“ je Schritt, „das Heimteam laut Spielplan“ oder „per Los je Spiel“; ohne Veto „(nicht festgelegt)“ |
    | `{{schedule.matchday_days}}`, `{{schedule.default_weekday}}`, `{{schedule.default_time}}`, `{{schedule.default_slot}}`, `{{schedule.response_hours}}`, `{{schedule.blocked_periods}}` | Spielwoche, Standardtermin („Sonntag, 20:00 Uhr“), Antwortfrist, Sperrzeiten |
    | `{{schedule.home_rule_hours}}`, `{{schedule.reschedule_max}}`, `{{schedule.reschedule_notice_hours}}`, `{{schedule.result_reminder_hours}}`, `{{schedule.result_overdue_hours}}` | Terminregeln (2.7a) |
+   | `{{table.points}}` | Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)“ |
    | `{{table.points_win}}`, `{{table.points_draw}}`, `{{table.points_loss}}`, `{{table.draws}}`, `{{table.tiebreakers}}`, `{{table.head_to_head}}`, `{{table.forfeit_score}}`, `{{table.exit_rule}}` | Punkte, Remis, Reihenfolge bei Punktgleichheit, direkter Vergleich, kampflos, Ausscheiden |
    | `{{eligibility.min_age}}`, `{{eligibility.wait_days}}`, `{{eligibility.roster_deadline}}`, `{{eligibility.transfer_windows}}`, `{{eligibility.entry_policy}}`, `{{eligibility.id_fields}}` | Spielberechtigung (3.9) |
    | `{{eligibility.platform}}`, `{{eligibility.crossplay}}`, `{{eligibility.input_device}}` | Plattform je Season (2.7c): „PC und PlayStation“ oder „alle Plattformen“, Crossplay „an“/„aus“, Eingabegerät; ohne Plattform-Feld „(nicht festgelegt)“ |
@@ -915,6 +929,17 @@ Reihenfolge.
 Unter dem Namen steht klein, was den Platz entschied („Direkter Vergleich“, „Map-Differenz“ …), dazu
 „kampflos gewonnen/verloren“ und am Ende der Tabelle **Ausgetreten** bzw. **Disqualifiziert**. Unter der Tabelle steht
 die Reihenfolge der Kriterien.
+
+**Punkte nach gewonnenen Maps:** Rechnet die Season so (2.2), steht unter der Tabelle „Punkte = gewonnene Maps (3:2 ergibt 3 und 2,
+kampflos 3:0)“, und die Spalte **S** (Siege) bleibt auch am Handy sichtbar, weil mehr Siege bei Punktgleichheit zuerst zählen. Die
+Spalte **Maps** (gewonnen:verloren) gibt es am PC. App und TV zeigen dieselben Punkte, weil sie vom Server kommen.
+
+<table>
+<tr>
+<td><img src="../assets/liga/liga-tabelle-mappunkte-pc.png" alt="Staffel-Tabelle mit Punkten nach gewonnenen Maps am PC: Spalten Sp, S, N, Maps, Diff, Form, Pkt, darunter Punkte = gewonnene Maps und die Reihenfolge" width="420"></td>
+<td><img src="../assets/liga/liga-tabelle-mappunkte-handy.png" alt="Dieselbe Tabelle am Handy mit Spalte S" width="200"></td>
+</tr>
+</table>
 
 **Entscheid der Leitung:** Admin → Liga → Season → Reiter **Tabelle** → **Tabelle und Gleichstand**. Je gestarteter Staffel stehen dort die
 geteilten Plätze. **Reihenfolge festlegen** → mit den Pfeilen sortieren → **Grund** (mindestens fünf Zeichen, steht
