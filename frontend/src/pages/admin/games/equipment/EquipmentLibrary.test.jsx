@@ -42,6 +42,22 @@ beforeEach(() => {
   apiMock.delete.mockResolvedValue({ data: { ok: true } });
 });
 
+// Einklappen (#2306): Kategorien und Unterkategorien sind anfangs zu - die älteren Prüfungen klappen erst alles auf.
+async function openAll() {
+  fireEvent.click(await screen.findByTestId("equipment-open-all"));
+}
+
+// Jedes `aria-controls` zeigt auf genau ein vorhandenes Element - auch zugeklappt (Codex zu #2306).
+function expectControlsResolve() {
+  const buttons = [...document.querySelectorAll("[aria-controls]")];
+  expect(buttons.length).toBeGreaterThan(0);
+  const ids = [...document.querySelectorAll("[id]")].map((node) => node.id);
+  for (const button of buttons) {
+    const target = button.getAttribute("aria-controls");
+    expect(ids.filter((id) => id === target), `aria-controls="${target}"`).toHaveLength(1);
+  }
+}
+
 function renderPage() {
   return render(
     <MemoryRouter><EquipmentLibrary gameId="g1" /></MemoryRouter>,
@@ -51,6 +67,7 @@ function renderPage() {
 test("je Kategorie die Einträge mit Zustand, Sperrlisten und bei Aufsätzen den Waffen", async () => {
   renderPage();
   expect(await screen.findByTestId("equipment-library")).toBeInTheDocument();
+  await openAll();
   const weapons = screen.getByTestId("equipment-group-waffen");
   expect(within(weapons).getByTestId("equipment-row-w1")).toHaveTextContent("auf 2 Sperrlisten");
   expect(within(weapons).getByTestId("equipment-row-w2")).toHaveTextContent("Inaktiv · auf keiner Sperrliste");
@@ -110,6 +127,7 @@ test("ein Aufsatz wird mit Kategorie, Bild und Waffen angelegt", async () => {
 
 test("bearbeiten ändert keine Kategorie, deaktivieren und archivieren setzen den Zustand", async () => {
   renderPage();
+  await openAll();
   fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
   const sheet = screen.getByTestId("equipment-sheet");
   expect(within(sheet).getByTestId("equipment-category-fixed")).toBeDisabled();
@@ -167,6 +185,7 @@ const GROUPED = {
 test("gruppiert je Unterkategorie mit Zähler, ohne Unterkategorie zuerst, einklappbar", async () => {
   apiMock.get.mockResolvedValue({ data: GROUPED });
   renderPage();
+  await openAll();
   const weapons = await screen.findByTestId("equipment-group-waffen");
   const subs = within(weapons).getAllByTestId(/^equipment-sub-(ohne|sturm|schrot)$/);
   expect(subs.map((row) => row.dataset.testid)).toEqual(["equipment-sub-ohne", "equipment-sub-sturm", "equipment-sub-schrot"]);
@@ -206,6 +225,7 @@ test("Unterkategorien pflegen: Vorschlag einfügen, umbenennen, eine mit Einträ
 test("ein Eintrag bekommt seine Unterkategorie, ein Aufsatz Waffenklassen", async () => {
   apiMock.get.mockResolvedValue({ data: GROUPED });
   renderPage();
+  await openAll();
   fireEvent.click(await screen.findByTestId("equipment-sub-add-schrot"));
   let sheet = screen.getByTestId("equipment-sheet");
   expect(within(sheet).getByTestId("equipment-subcategory")).toHaveValue("schrot");
@@ -231,6 +251,7 @@ test("mehrere Einträge auswählen und verschieben - nur innerhalb einer Kategor
   apiMock.get.mockResolvedValue({ data: GROUPED });
   apiMock.post.mockResolvedValue({ data: { updated: 1 } });
   renderPage();
+  await openAll();
   fireEvent.click(await screen.findByTestId("equipment-select-mode"));
   fireEvent.click(screen.getByTestId("equipment-select-w2"));
   fireEvent.click(screen.getByTestId("equipment-select-p1"));
@@ -246,6 +267,7 @@ test("mehrere Einträge auswählen und verschieben - nur innerhalb einer Kategor
 test("ein Aufsatz über seine Klasse nennt sie, ohne Waffe und Klasse passt er zu keiner", async () => {
   apiMock.get.mockResolvedValue({ data: { ...GROUPED, items: [...GROUPED.items, { id: "a9", category: "aufsaetze", name: "Laser", status: "active", in_lists: 0, weapon_ids: [], weapon_class_ids: ["schrot"] }] } });
   renderPage();
+  await openAll();
   expect(await screen.findByTestId("equipment-row-a9")).toHaveTextContent("passt zu Schrotflinte (Klasse)");
 });
 
@@ -261,4 +283,81 @@ test("Aufsätze ohne Waffe: Auswahl zugeklappt, mit Suche", async () => {
   expect(within(notice).queryByTestId("equipment-assign-w1")).not.toBeInTheDocument();
   fireEvent.click(within(notice).getByTestId("equipment-assign-w2"));
   expect(within(notice).getByTestId("equipment-assign-open")).toHaveTextContent("1 gewählt");
+});
+
+// #2306: Kategorien und Unterkategorien sind anfangs zu, mit Anzahl in der Kopfzeile; Suche und „Alle auf/zu“.
+test("anfangs zu: Kopfzeile mit Anzahl, Klick klappt auf", async () => {
+  apiMock.get.mockResolvedValue({ data: GROUPED });
+  renderPage();
+  const fold = await screen.findByTestId("equipment-fold-waffen");
+  expect(fold).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTestId("equipment-count-waffen")).toHaveTextContent("Waffe · 2 Einträge · 2 Unterkategorien");
+  expect(screen.queryByTestId("equipment-sub-sturm")).not.toBeInTheDocument();
+  // Die Knöpfe der Kopfzeile bleiben zugeklappt bedienbar.
+  expect(screen.getByTestId("equipment-add-waffen")).toBeInTheDocument();
+  fireEvent.click(fold);
+  expect(fold).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("equipment-sub-toggle-sturm")).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("equipment-row-w1")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("equipment-sub-toggle-sturm"));
+  expect(screen.getByTestId("equipment-row-w1")).toBeInTheDocument();
+  expect(screen.queryByTestId("equipment-row-p1")).not.toBeInTheDocument();
+});
+
+test("die Suche klappt Treffer auf, „x von y“; danach ist der Stand von vorher wieder da", async () => {
+  apiMock.get.mockResolvedValue({ data: GROUPED });
+  renderPage();
+  fireEvent.change(await screen.findByTestId("equipment-search"), { target: { value: "blitz" } });
+  expect(screen.getByTestId("equipment-fold-waffen")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("equipment-row-w1")).toBeInTheDocument();
+  expect(screen.getByTestId("equipment-count-waffen")).toHaveTextContent("1 von 2");
+  fireEvent.change(screen.getByTestId("equipment-search"), { target: { value: "" } });
+  expect(screen.getByTestId("equipment-fold-waffen")).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("equipment-row-w1")).not.toBeInTheDocument();
+});
+
+test("„Alle aufklappen“ und „Alle zuklappen“", async () => {
+  apiMock.get.mockResolvedValue({ data: GROUPED });
+  renderPage();
+  await openAll();
+  for (const key of ["waffen", "aufsaetze", "perks"]) expect(screen.getByTestId(`equipment-fold-${key}`)).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("equipment-sub-toggle-sturm")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("equipment-row-p1")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("equipment-close-all"));
+  for (const key of ["waffen", "aufsaetze", "perks"]) expect(screen.getByTestId(`equipment-fold-${key}`)).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("equipment-row-p1")).not.toBeInTheDocument();
+});
+
+test("die Auswahl zum Verschieben bleibt beim Zuklappen erhalten", async () => {
+  apiMock.get.mockResolvedValue({ data: GROUPED });
+  renderPage();
+  await openAll();
+  fireEvent.click(screen.getByTestId("equipment-select-mode"));
+  fireEvent.click(screen.getByTestId("equipment-select-w2"));
+  fireEvent.click(screen.getByTestId("equipment-fold-waffen"));
+  expect(screen.queryByTestId("equipment-select-w2")).not.toBeInTheDocument();
+  expect(screen.getByTestId("equipment-move-bar")).toHaveTextContent("1 Eintrag gewählt");
+  fireEvent.click(screen.getByTestId("equipment-fold-waffen"));
+  expect(screen.getByTestId("equipment-select-w2")).toBeChecked();
+});
+
+test("aria-controls zeigt immer auf genau einen Behälter - zugeklappt verborgen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...GROUPED, attachments_without_weapon: [{ id: "a3", name: "Kompensator" }] } });
+  renderPage();
+  const fold = await screen.findByTestId("equipment-fold-waffen");
+  expectControlsResolve();
+  const body = document.getElementById(fold.getAttribute("aria-controls"));
+  expect(body).toHaveAttribute("hidden");
+  expect(body).toBeEmptyDOMElement();
+  expect(document.getElementById("equipment-assign-choice")).toHaveAttribute("hidden");
+  fireEvent.click(fold);
+  expect(body).not.toHaveAttribute("hidden");
+  expect(document.getElementById(screen.getByTestId("equipment-sub-toggle-sturm").getAttribute("aria-controls"))).toHaveAttribute("hidden");
+  expectControlsResolve();
+  await openAll();
+  fireEvent.click(screen.getByTestId("equipment-assign-open"));
+  expect(document.getElementById("equipment-assign-choice")).not.toHaveAttribute("hidden");
+  expectControlsResolve();
+  fireEvent.click(screen.getByTestId("equipment-close-all"));
+  expectControlsResolve();
 });

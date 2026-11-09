@@ -64,7 +64,16 @@ const SECTION_MARKDOWN = { ...RULES_MARKDOWN, escapes: true };
 
 /** Ein Abschnitt der Regelseite oder der Vorschau aus `sections[].body_md`. */
 export function renderRulesSection(markdown) {
-  return renderMarkdownLite(markdown, SECTION_MARKDOWN);
+  return markGearTables(renderMarkdownLite(markdown, SECTION_MARKDOWN));
+}
+
+// Erlaubte Ausrüstung ab layout 5 (#2305, loadout_bans.GEAR_HEAD): Nur eine Tabelle mit genau diesem Kopf wird als Ausrüstungstabelle
+// markiert (`data-gear-table`, rules.css) - eine andere Tabelle mit unterstrichenem Kopf (`++Status++`) bleibt eine normale Tabelle.
+const TABLE_OPEN = "<div class=\"prose-cms-table\">";
+const GEAR_HEAD = "<table><thead><tr><th>Bild</th><th><u>Waffe</u></th><th>Aufsätze</th></tr></thead>";
+
+function markGearTables(html) {
+  return html.split(`${TABLE_OPEN}${GEAR_HEAD}`).join(`<div class="prose-cms-table" data-gear-table="">${GEAR_HEAD}`);
 }
 
 // ---------------------------------------------------------------- Suche in der Seite

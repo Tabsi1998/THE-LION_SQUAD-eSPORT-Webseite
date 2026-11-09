@@ -4,13 +4,17 @@
 // archivieren - die Liste behält Name und Bild von damals. Keine Werte eines Titels: Kategorien und Einträge legt die Verwaltung an.
 // Unterkategorien (#2287): je Kategorie einklappbare Gruppen mit Zähler, eigenes Blatt zum Pflegen, mehrere Einträge auf einmal
 // verschieben.
+// Einklappen (#2306): Kategorien und Unterkategorien sind anfangs zu, die Kopfzeile nennt die Anzahl. „Alle aufklappen“/„Alle
+// zuklappen“ oben; die Suche klappt die Treffer auf.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive, ArchiveRestore, ChevronDown, Copy, FolderInput, Layers, ListChecks, ListTree, Pencil, Plus, Power, Search, Trash2, X,
 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { FoldAll, FoldBody, FoldButton } from "@/components/tls/Fold";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useFold } from "@/hooks/useFold";
 import { EquipmentThumb, SubcategoryIcon } from "@/components/tls/league/LoadoutBansView";
 import {
   countText, groupByCategory, groupBySubcategory, matchesSearch, NO_SUBCATEGORY, ROLE_LABELS, statusOf, weaponClasses,
@@ -68,13 +72,14 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
       {weapons.length || classes.length ? (
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="equipment-assign-choice"
           data-testid="equipment-assign-open"
-          className="inline-flex items-center gap-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+          className="flex w-fit items-center gap-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
           <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           Waffen wählen{picked ? ` · ${picked} gewählt` : ""}
         </button>
       ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
-      {open ? (
-        <div id="equipment-assign-choice" className="space-y-2">
+      {/* Ziel von aria-controls: der Behälter steht immer da, zugeklappt verborgen (Codex zu #2306). */}
+      <div id="equipment-assign-choice" hidden={!open} className="space-y-2">
+        {open ? (<>
           {weapons.length + classes.length > 1 ? (
             <label className="relative block">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" aria-hidden="true" />
@@ -96,8 +101,8 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
             </div>
           ) : null}
           {!shownClasses.length && !shownWeapons.length ? <p className="text-xs text-white/60">Nichts gefunden.</p> : null}
-        </div>
-      ) : null}
+        </>) : null}
+      </div>
       <button type="button" disabled={!picked} onClick={() => onAssign(chosen, chosenClasses)} data-testid="equipment-assign"
         className="tls-btn tls-btn--primary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
         {rows.length === 1 ? "Dem Aufsatz zuordnen" : `Allen ${rows.length} Aufsätzen zuordnen`}
@@ -165,30 +170,26 @@ function SubGroup({ id, sub, rows, total, open, onToggle, onAdd, full, searching
         {selecting && rows.length ? (
           <input type="checkbox" checked={allSelected} onChange={() => onSelectAll(rows)} aria-label={`Alle in ${label} auswählen`} className="h-4 w-4 accent-[#29B6E8]" />
         ) : null}
-        <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={id} data-testid={`equipment-sub-toggle-${sub ? sub.key : "ohne"}`}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
-          <ChevronDown className={`h-4 w-4 shrink-0 text-white/50 transition-transform duration-fast ${open ? "" : "-rotate-90"}`} aria-hidden="true" />
+        <FoldButton open={open} onToggle={onToggle} controls={id} testId={`equipment-sub-toggle-${sub ? sub.key : "ohne"}`} className="flex-1">
           <SubcategoryIcon src={sub?.icon_url} />
           <span className={`min-w-0 break-words text-xs font-bold uppercase tracking-widest ${sub ? "text-[#29B6E8]" : "text-white/60"}`}>{label}</span>
           <span className="shrink-0 text-[11px] tabular-nums text-white/50" data-testid="equipment-sub-count">
             {searching && rows.length !== total ? `${rows.length} von ${total}` : total}
           </span>
-        </button>
+        </FoldButton>
         {sub ? (
           <button type="button" onClick={onAdd} disabled={full} className={SMALL_BUTTON} aria-label={`Eintrag in ${label} hinzufügen`} data-testid={`equipment-sub-add-${sub.key}`}>
             <Plus className="h-3 w-3" aria-hidden="true" /> Hinzufügen
           </button>
         ) : null}
       </div>
-      {open ? (
-        <div id={id} className="border-t border-white/10 p-2.5">
+      <FoldBody id={id} open={open} className="border-t border-white/10 p-2.5">
           {rows.length ? children : (
             <p className="text-xs text-white/55">
               {searching ? "Nichts gefunden." : "Noch kein Eintrag – über „Hinzufügen“ oder „Auswählen“ und „Verschieben“ zuordnen."}
             </p>
           )}
-        </div>
-      ) : null}
+      </FoldBody>
     </div>
   );
 }
@@ -237,7 +238,7 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [subsFor, setSubsFor] = useState(null);
   const [importing, setImporting] = useState(false);
-  const [closed, setClosed] = useState({});
+  const fold = useFold(search.trim());
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState([]);
   const confirm = useConfirm();
@@ -365,6 +366,7 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
               className={`tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider ${selecting ? "text-[#29B6E8]" : ""}`}>
               <ListChecks className="h-3.5 w-3.5" aria-hidden="true" /> {selecting ? "Auswahl beenden" : "Auswählen"}
             </button>
+            <FoldAll onAll={fold.setAll} testId="equipment" />
           </div>
           <div className="tls-swipe mt-3 flex gap-2 pb-1" role="group" aria-label="Kategorie wählen" data-testid="equipment-filter">
             <button type="button" onClick={() => setOnly("")} aria-pressed={!only}
@@ -379,19 +381,29 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
               </button>
             ))}
           </div>
-          <div className="mt-6 space-y-9">
+          <div className="mt-6 space-y-3" data-testid="equipment-groups">
             {groups.map(({ category, items: rows }) => {
               const subs = category.subcategories || [];
               const all = listed.filter((item) => item.category === category.key);
               const sections = groupBySubcategory(rows, category).filter((group) => !searching || group.items.length);
+              // Mit gewählter oder nur einer Kategorie ist sie gleich offen - bei nur einer Kategorie wäre Zuklappen ein sinnloser Klick (gewollt,
+              // Codex zu #2306); zuklappen lässt sie sich trotzdem.
+              const catKey = `cat:${category.key}`;
+              const catBase = Boolean(only) || categories.length === 1;
+              const catOpen = fold.isOpen(catKey, catBase);
+              const bodyId = `equipment-body-${category.key}`;
               return (
                 <div key={category.key} data-testid={`equipment-group-${category.key}`}>
-                  <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
-                    <h2 className="flex min-w-0 items-baseline gap-2 font-heading text-lg font-bold uppercase">
-                      <span className="break-words">{category.label}</span>
-                      <span className="text-[11px] font-semibold normal-case tracking-normal text-white/50 tabular-nums">
-                        {ROLE_LABELS[category.role]} · {countText(rows.length, "Eintrag", "Einträge")}{subs.length ? ` · ${countText(subs.length, "Unterkategorie", "Unterkategorien")}` : ""}
-                      </span>
+                  <div className={`${catOpen ? "mb-3" : ""} flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2`}>
+                    <h2 className="min-w-0 flex-1 font-heading text-lg font-bold uppercase">
+                      <FoldButton open={catOpen} onToggle={() => fold.toggle(catKey, catBase)} controls={bodyId} testId={`equipment-fold-${category.key}`}
+                        className="w-full">
+                        <span className="min-w-0 break-words">{category.label}</span>
+                        <span className="text-[11px] font-semibold normal-case tracking-normal text-white/50 tabular-nums" data-testid={`equipment-count-${category.key}`}>
+                          {ROLE_LABELS[category.role]} · {searching && rows.length !== all.length ? `${rows.length} von ${all.length}` : countText(all.length, "Eintrag", "Einträge")}
+                          {subs.length ? ` · ${countText(subs.length, "Unterkategorie", "Unterkategorien")}` : ""}
+                        </span>
+                      </FoldButton>
                     </h2>
                     <div className="flex flex-wrap items-center gap-2">
                       <button type="button" onClick={() => setSubsFor(category.key)} className={SMALL_BUTTON} data-testid={`equipment-subcategories-${category.key}`}>
@@ -403,28 +415,32 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
                     </div>
                   </div>
                   {!subs.length ? (
-                    rows.length ? <ItemGrid rows={rows}>{rows.map((item) => itemRow(category, item))}</ItemGrid> : (
-                      <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">
-                        {searching ? "Nichts gefunden." : "Noch kein Eintrag."}
-                      </p>
-                    )
+                    <FoldBody id={bodyId} open={catOpen} className="pb-6">
+                      {rows.length ? <ItemGrid rows={rows}>{rows.map((item) => itemRow(category, item))}</ItemGrid> : (
+                        <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">
+                          {searching ? "Nichts gefunden." : "Noch kein Eintrag."}
+                        </p>
+                      )}
+                    </FoldBody>
                   ) : !sections.length ? (
-                    <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">Nichts gefunden.</p>
+                    <FoldBody id={bodyId} open={catOpen} className="pb-6">
+                      <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">Nichts gefunden.</p>
+                    </FoldBody>
                   ) : (
-                    <div className="space-y-2">
+                    <FoldBody id={bodyId} open={catOpen} className="space-y-2 pb-6">
                       {sections.map(({ sub, items: subRows }) => {
-                        const key = `${category.key}:${sub ? sub.key : ""}`;
+                        const key = `sub:${category.key}:${sub ? sub.key : ""}`;
                         const total = all.filter((item) => (sub ? item.subcategory === sub.key : !subs.some((entry) => entry.key === item.subcategory))).length;
                         return (
                           <SubGroup key={key} id={`equipment-sub-body-${category.key}-${sub ? sub.key : "ohne"}`} sub={sub} rows={subRows} total={total}
-                            open={searching || !closed[key]} onToggle={() => setClosed((state) => ({ ...state, [key]: !state[key] }))}
+                            open={fold.isOpen(key)} onToggle={() => fold.toggle(key)}
                             onAdd={() => setEditing({ category: category.key, subcategory: sub?.key || "" })} full={full} searching={searching}
                             selecting={selecting} onSelectAll={toggleAll} allSelected={subRows.length > 0 && subRows.every((item) => selected.some((entry) => entry.id === item.id))}>
                             <ItemGrid rows={subRows}>{subRows.map((item) => itemRow(category, item))}</ItemGrid>
                           </SubGroup>
                         );
                       })}
-                    </div>
+                    </FoldBody>
                   )}
                 </div>
               );

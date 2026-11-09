@@ -17,6 +17,8 @@ from services.markdown_text import text_cell
 from services.scoring_rules import division_rules, normalize_rules
 
 MARKDOWN, TEXT = "markdown", "text"
+# Fassung fürs PDF (#2305): wie ``text``; nur die erlaubte Ausrüstung ab layout 5 zeigt darin ein kleines Bild je Waffe in der Tabelle.
+PDF = "pdf"
 # Symbol eines Modus (#2266): ein Markdown-Bild mit genau diesem Text vor dem Namen, nur in ``markdown``. Das Web zeigt es klein (rules.css).
 ICON_ALT = "Modus-Symbol"
 NO_MODES = "*Für diese Season sind noch keine Modi festgelegt.*"

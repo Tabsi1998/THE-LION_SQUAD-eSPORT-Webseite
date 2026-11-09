@@ -227,12 +227,20 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const calls = await mock(page);
       await page.goto("/admin/leagues/seasons/s1#sperrliste");
       const panel = page.getByTestId("season-bans");
+      // Einklappen (#2306): Kategorie Waffen und Klasse Sturmgewehr aufklappen; die Slots im Kasten sind dann zu.
+      await panel.getByTestId("season-bans-fold-waffen").click();
+      await panel.getByTestId("season-bans-class-sturm-fold").click();
       const open = panel.getByTestId("season-bans-open-w2");
       // Rotpunkt und Holo an dieser Waffe (Holo nur in Modi - angehakt), Kompensator überall (Codex zu #2299).
       await expect(open).toHaveText("4 Aufsätze · 3 gesperrt");
       await open.click();
       const weapon = panel.getByTestId("season-bans-attachments-w2");
       await expect(weapon.getByTestId("season-bans-slot-w2")).toHaveCount(2);
+      const optik = weapon.getByTestId("season-bans-slot-toggle-w2-aufsaetze:optik");
+      await expect(optik).toHaveAttribute("aria-expanded", "false");
+      await expect(optik).toContainText("2 Aufsätze · 2 gesperrt");
+      await optik.click();
+      await weapon.getByTestId("season-bans-slot-toggle-w2-aufsaetze:muendung").click();
       await expect(weapon.getByLabel("Griff an Donner 4 sperren")).toHaveCount(0);
       await expect(weapon.getByLabel("Kompensator an Donner 4 sperren")).toBeDisabled();
       const holo = panel.getByTestId("season-bans-attachment-w2-a4");

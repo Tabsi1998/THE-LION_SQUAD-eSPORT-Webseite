@@ -1672,7 +1672,8 @@ neue Darstellung kommt wie jede Datenänderung über „Regelwerk muss freigegeb
   „nicht in …“. Gleichstand, keine Modi der Season oder kein erlaubter Modus mehr: kein `only_in`. Ganz gesperrt (alle Modi) bleibt ganz
   gesperrt. Gleich in Web, PDF, Liga- und Matchseite.
 - **Liga- und Matchseite:** je Waffe eine Karte mit „N Aufsätze · K gesperrt“; ein Knopf (`aria-expanded`) klappt darunter über die ganze
-  Breite die erlaubten Aufsätze je Slot mit Bild und Hinweis auf, darunter „Gesperrt: …“.
+  Breite die erlaubten Aufsätze je Slot mit Bild und Hinweis auf. Die Zeile „Gesperrt: … · dazu N Aufsätze, die an keiner Waffe erlaubt
+  sind“ steht seit #2305 **ganz oben** im Kasten, vor den Slots (Fabian 05.11.); eine Umkehrung „nur erlaubt“ gibt es dort nicht.
 - **Regelwerk Web (`markdown`):** `markdownLite` kennt kein `<details>` (rohes HTML wird maskiert, auch im PDF-Weg) - darum je Waffe die
   Karte wie bisher, darunter der Satz zu den Aufsätzen (ohne Kursiv, daran erkennt ihn `rules.css`).
 - **PDF und Vergleich (`text`):** Kategorien der Art Waffe als Liste: je Unterkategorie die Kopfzeile wie im Web, je Waffe eine Zeile
@@ -1682,6 +1683,30 @@ neue Darstellung kommt wie jede Datenänderung über „Regelwerk muss freigegeb
   Modi (`attachment_modes`). „Für alle <Waffenklasse> übernehmen“ setzt an jeder anderen Waffe der Klasse dieselben Aufsätze (soweit sie
   passen und neu sperrbar sind) mit denselben Modi; „Aufsatz an allen Waffen sperren“ macht daraus eine Zeile `item` des Aufsatzes mit
   seinen Modi. Beides ändert nur das Formular, gespeichert wird wie bisher als neue Version.
+
+**Tabelle je Kategorie (#2305, Fabian 05.11.):** Neu gebaut wird der Baustein als `layout: 5`. `layout: 3` und `layout: 4` bleiben
+eingefroren und werden Wort für Wort dargestellt (Web, PDF, Liga- und Matchseite; Prüfung: `backend/tests/golden/loadout_allowed_v4.json`).
+Die neue Darstellung kommt über „Regelwerk muss freigegeben werden“.
+
+- **Daten:** wie `layout: 4`; an einer Waffe trägt jede Gruppe (Slot) zusätzlich `banned` (ganz gesperrte an dieser Waffe, ohne die an
+  keiner Waffe erlaubten) - eine Gruppe kann so ohne `entries` sein. `only_allowed: true`, wenn an der Waffe **mehr passende Aufsätze ganz
+  gesperrt sind als erlaubt** (die an keiner Waffe erlaubten zählen mit; nur in Modi gesperrte zählen als erlaubt). Gleichstand bleibt
+  „gesperrt“ - dieselbe Regel wie `only_in` (#2298).
+- **Darstellung:** Je Kategorie mit Waffen **eine Tabelle** Bild · Waffe · Aufsätze; je Unterkategorie eine Kopfzeile (Symbol, Name,
+  „alle erlaubt“ / „nicht in …“ / „**nicht erlaubt** (…)“), je Waffe eine Zeile: kleines Bild, Name mit Modus-Hinweis, Ausnahmen **nach
+  Slot** („Optik: A, B“, je Slot eine Zeile, Reihenfolge der Bibliothek; ein Aufsatz ohne Unterkategorie heißt „Ohne Slot“, sobald es
+  weitere Slots gibt). Ohne Ausnahme „alle passenden Aufsätze erlaubt“, ohne erlaubten „**keine Aufsätze erlaubt**“. Sonst „**gesperrt:**“
+  (ganz gesperrte) und „**eingeschränkt:**“ (nur in Modi gesperrte mit „(nur in …)“ bzw. „(nicht in …)“ - der Hinweis sagt, wo der Aufsatz
+  erlaubt ist, darum steht er nie unter „gesperrt“); bei `only_allowed` stattdessen „**nur erlaubt:**“ mit allen erlaubten je Slot, nur in
+  Modi gesperrte mit Hinweis. Was an keiner Waffe erlaubt ist, steht wie bisher einmal unter der Tabelle („An keiner Waffe erlaubt: …“);
+  in „gesperrt“/„eingeschränkt“ fehlt es, in „nur erlaubt“ steht ein dort nur in Modi gesperrter mit Hinweis. Kategorien ohne Waffen bleiben
+  wie in `layout: 4` (Web Karten, PDF Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen).
+- **Fassungen:** `markdown` (Web): Kopf `| Bild | ++Waffe++ | Aufsätze |` - an der Marke erkennt `rules.css` die Tabelle; je Slot eine
+  Marke `++…++` (eigene Zeile). Am Handy (< 640 px) stapelt jede Zeile (Bild und Name nebeneinander, die Aufsätze darunter), nichts scrollt
+  seitlich. `pdf` (neu, `league_rule_facts.PDF`): wie `text`, nur diese Tabelle mit Bild (`pdf_service._rules_gear_table`: erkannt am Kopf
+  Bild · Waffe · Aufsätze, Bild verkleinert eingebettet, Zeilen je Slot über U+2028, Kopf der Klasse über die ganze Breite); jede andere
+  Tabelle und jede ältere Fassung bleibt im PDF wie bisher. `text` (Vergleich, „Regelwerk muss freigegeben werden“, Markierung im PDF):
+  ohne Bildspalte, Slots mit „·“ getrennt.
 
 **Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
 

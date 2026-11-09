@@ -96,10 +96,10 @@ async def test_the_league_page_shows_attachments_at_the_weapon_and_only_in(flow)
         {**attachments(w, "Donner 4", ["Lauf", "Griff"]), "attachment_modes": {griff: ["stellung", "kapern"]}}]))
     flow.act_as(None)
     data = ok(await flow.get(public_url(w)))["allowed_equipment"]
-    assert data["layout"] == 4 and [row["label"] for row in data["categories"]] == ["Waffen", "Perks"]
+    assert data["layout"] == 5 and [row["label"] for row in data["categories"]] == ["Waffen", "Perks"]
     blitz, donner = weapons(data)["Blitz 9"], weapons(data)["Donner 4"]
     assert blitz["attachments"]["count"] == 2 and blitz["attachments"]["banned"] == ["Rotpunkt"]
-    assert donner["attachments"] == {"count": 2, "banned": ["Lauf"], "groups": [{"label": None, "not_in": [], "entries": [
+    assert donner["attachments"] == {"count": 2, "banned": ["Lauf"], "groups": [{"label": None, "not_in": [], "banned": ["Lauf"], "entries": [
         {"name": "Griff", "image_url": None, "not_in": ["Stellung", "Kapern"], "only_in": ["Suchen"]}]}]}
     perk = data["categories"][1]["sections"][0]["entries"][0]
     assert perk["not_in"] == ["Suchen"] and "only_in" not in perk
@@ -128,8 +128,8 @@ async def test_an_attachment_banned_at_every_weapon_stands_once(flow):
     pdf = await flow.get(f"{season_page(w)}/versions/{version['id']}/pdf")
     words = " ".join(" ".join(sheet.get_text() for sheet in pymupdf.open(stream=pdf.content, filetype="pdf")).split())
     # An Donner 4 bleibt nach Griff (überall) und Lauf (nur hier) keiner übrig.
-    assert "An keiner Waffe erlaubt: Griff" in words and "Donner 4 – keine Aufsätze erlaubt (Lauf)" in words
-    assert "Blitz 9 – alle passenden Aufsätze erlaubt" in words
+    assert "An keiner Waffe erlaubt: Griff" in words and "Donner 4 keine Aufsätze erlaubt" in words
+    assert "Blitz 9 alle passenden Aufsätze erlaubt" in words
 
 
 # ---------------------------------------------------------------- Regelwerk
@@ -137,7 +137,7 @@ async def test_an_attachment_banned_at_every_weapon_stands_once(flow):
 @pytest.mark.asyncio
 async def test_a_published_layout_3_stays_and_the_new_view_asks_for_release(flow):
     """Eine Fassung mit ``layout: 3`` (vor #2299) zeigt ihre Aufsatz-Liste mit „nicht an …“ weiter Wort für Wort, im Web und im PDF. Der
-    Baustein von heute ist layout 4 - die Verwaltung schlägt eine neue Fassung vor; die neue zeigt die Aufsätze an der Waffe."""
+    Baustein von heute ist layout 5 (#2305) - die Verwaltung schlägt eine neue Fassung vor; die neue zeigt die Aufsätze an der Waffe."""
     import pymupdf
 
     w = await ready(flow)
@@ -156,17 +156,16 @@ async def test_a_published_layout_3_stays_and_the_new_view_asks_for_release(flow
     flow.act_as(w["lead"])
     admin = ok(await flow.get(season_scope(w)))
     row = next(row for row in admin["data_changes"]["rows"] if row["block"] == "loadout_bans")
-    assert "alle passenden Aufsätze erlaubt, außer: Griff" in row["after"] and "nicht an" in row["before"]
+    assert "| **Donner 4** | **gesperrt:** Griff |" in row["after"] and "nicht an" in row["before"]
     released = ok(await flow.post(f"{season_scope(w)}/proposal/publish", json={
         "base_version_id": first["id"], "fingerprint": admin["proposal"]["fingerprint"], "valid_from": first["valid_from"],
         "change_reason": "Aufsätze je Waffe", "requires_consent": False}))
     data = released["frozen"][w["season"]["id"]]["loadout_bans"]["data"]
-    assert data["layout"] == 4 and weapons(data)["Donner 4"]["attachments"]["banned"] == ["Griff"]
+    assert data["layout"] == 5 and weapons(data)["Donner 4"]["attachments"]["banned"] == ["Griff"]
     flow.act_as(None)
     pdf = await flow.get(f"{season_page(w)}/versions/{released['id']}/pdf")
     words = " ".join(" ".join(sheet.get_text() for sheet in pymupdf.open(stream=pdf.content, filetype="pdf")).split())
-    assert "Donner 4 – alle passenden Aufsätze erlaubt, außer: Griff" in words
-    assert "Blitz 9 – alle passenden Aufsätze erlaubt" in words
+    assert "Donner 4 gesperrt: Griff" in words and "Blitz 9 alle passenden Aufsätze erlaubt" in words
     # Die erste Fassung bleibt, wie sie war.
     page = ok(await flow.get(f"{season_page(w)}?version={first['id']}"))
     assert "nicht an Blitz 9" in next(row["body_md"] for row in page["sections"] if row["anchor"] == "anlage-a")
