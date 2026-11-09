@@ -116,6 +116,9 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
 2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek; ohne Medienrechte nur eigene Bilder), bei Aufsätzen
    **Passt zu**: Ein Aufsatz passt nur zu den gewählten Waffen, **ohne Wahl zu keiner**. Aufsätze ohne Waffe nennt oben ein gelber Hinweis;
    dort Waffen anhaken und **Allen … Aufsätzen zuordnen** (wie „Maps ohne Modus“). Suche und Kategorie-Knöpfe helfen bei vielen Einträgen.
+   Kategorien und Unterkategorien sind anfangs **zugeklappt**: Die Kopfzeile nennt Art und Anzahl, ein Klick (oder Enter) klappt auf,
+   **Unterkategorien** und **Hinzufügen** daneben gehen auch zugeklappt. **Alle aufklappen** und **Alle zuklappen** stehen neben der
+   Suche; die Suche klappt die Bereiche mit Treffern auf und zählt „1 von 30“. Ist nur eine Kategorie gewählt, ist sie gleich offen.
    **Aus Spiel übernehmen** holt Einträge einer anderen Spielversion, fehlende Kategorien kommen mit, Aufsätze finden ihre Waffen über den
    Namen (Waffen also mit übernehmen, sonst kommen sie ohne Waffe).
 3. **Zustand:** *Deaktivieren* (Ein/Aus-Symbol): kommt auf keine neue Sperrliste, wo er steht, bleibt er. *Archivieren*: zusätzlich
@@ -135,6 +138,11 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
    einzelne). **An allen Waffen sperren** setzt den Aufsatz selbst auf die Liste (gleich wie in seiner eigenen Kategorie), **Für alle
    Sturmgewehr übernehmen** gibt jeder anderen Waffe der Klasse dieselben Sperren mit denselben Modi, soweit die Aufsätze dort passen. Beides
    gilt erst mit **Speichern**. **Nur gesperrte** zeigt, was schon auf der Liste steht.
+   **Einklappen:** Kategorien, Unterkategorien und die Slots im Kasten einer Waffe sind anfangs zu. Die Kopfzeile nennt die Anzahl und
+   **„K gesperrt“**, ein Klick (oder Enter) klappt auf; **Ganze Klasse sperren** geht auch zugeklappt. Hat die Season noch keine Sperren,
+   ist die erste Kategorie offen; hat eine Waffe nur einen Slot, ist er offen. **Alle aufklappen** und **Alle zuklappen** stehen neben
+   der Suche (zuklappen schließt auch die Kästen der Waffen). Suche und **Nur gesperrte** klappen die Bereiche mit Treffern auf. Was du
+   angehakt hast, bleibt beim Zuklappen stehen, bis du speicherst; die Seite merkt sich nicht, was offen war.
    Je Unterkategorie gibt es den Schalter **Ganze Klasse sperren**, auch nur für einzelne Modi. Er gilt für **alle Einträge der Klasse, auch
    für später angelegte** – eine neue Schrotflinte in einer gesperrten Klasse „Schrotflinte“ ist sofort mitgesperrt (Ligaseite, Matchseite) und
    das Regelwerk meldet **Regelwerk muss freigegeben werden** (2.11). In allen Modi gesperrt, sind die Einträge der Klasse mit „Mit der ganzen
@@ -174,11 +182,15 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 
 <table>
 <tr>
-<td><img src="../assets/liga/ausruestung-bibliothek.png" alt="Bibliothek Ausrüstung: Kategorie-Knöpfe, Suche, je Kategorie Einträge mit Bild, Zustand und „auf N Sperrlisten“" width="560"></td>
-<td><img src="../assets/liga/ausruestung-bibliothek-handy.png" alt="Dieselbe Bibliothek am Handy mit 390 px, lange Namen brechen um" width="220"></td>
+<td><img src="../assets/liga/ausruestung-bibliothek.png" alt="Bibliothek Ausrüstung zugeklappt: Suche, Alle aufklappen und Alle zuklappen, je Kategorie eine Kopfzeile mit Art und Anzahl, daneben Unterkategorien und Hinzufügen" width="560"></td>
+<td><img src="../assets/liga/ausruestung-bibliothek-handy.png" alt="Dieselbe Bibliothek am Handy mit 390 px, zugeklappt" width="220"></td>
 </tr>
 <tr>
-<td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season: Hinweis aufs Regelwerk, gesperrte Waffe mit Modus, Aufsätze an einer Waffe" width="560"></td>
+<td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season zugeklappt: Hinweis aufs Regelwerk, Suche, Alle aufklappen und Alle zuklappen, je Kategorie Anzahl und K gesperrt" width="560"></td>
+<td><img src="../assets/liga/sperrliste-season-handy.png" alt="Dieselbe Sperrliste am Handy mit 390 px, lange Kategorienamen brechen hinter dem Pfeil um" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/sperrliste-suche.png" alt="Sperrliste mit der Suche rotpunkt: nur die Kategorie Aufsätze ist aufgeklappt, Kopfzeile 1 von 30, darunter der Treffer" width="560"></td>
 <td><img src="../assets/liga/sperrliste-ligaseite-handy.png" alt="Ligaseite am Handy: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen" width="220"></td>
 </tr>
 <tr>
@@ -186,8 +198,8 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 <td><img src="../assets/liga/erlaubte-ausruestung-handy.png" alt="Ligaseite am Handy: Waffe Habicht 7 aufgeklappt, ganz oben Gesperrt mit den gesperrten Aufsätzen, darunter die erlaubten je Slot mit Bild" width="220"></td>
 </tr>
 <tr>
-<td><img src="../assets/liga/sperrliste-klassen.png" alt="Sperrliste der Season: je Unterkategorie der Schalter Ganze Klasse sperren, Hinweis auf neu hinzugekommene Einträge" width="560"></td>
-<td><img src="../assets/liga/sperrliste-aufsaetze-je-waffe.png" alt="Sperrliste der Season: Waffe aufgeklappt, passende Aufsätze je Slot mit Häkchen gesperrt und Modi je Aufsatz, Knopf Für alle Sturmgewehr übernehmen" width="280"></td>
+<td><img src="../assets/liga/sperrliste-klassen.png" alt="Sperrliste der Season aufgeklappt: je Unterkategorie eine Kopfzeile mit Anzahl, K gesperrt und dem Schalter Ganze Klasse sperren" width="560"></td>
+<td><img src="../assets/liga/sperrliste-aufsaetze-je-waffe.png" alt="Sperrliste der Season: Waffe aufgeklappt, je Slot eine Kopfzeile mit Anzahl und K gesperrt, Aufsätze mit Häkchen gesperrt und Modi je Aufsatz, Knopf Für alle Sturmgewehr übernehmen" width="280"></td>
 </tr>
 <tr>
 <td><img src="../assets/liga/regelwerk-erlaubte-ausruestung.png" alt="Regelwerk im Web: Tabelle Bild, Waffe, Aufsätze; je Klasse eine Kopfzeile, je Waffe die Ausnahmen nach Slot, beim Scharfschützengewehr nur erlaubt, Schrotflinte nicht erlaubt" width="560"></td>

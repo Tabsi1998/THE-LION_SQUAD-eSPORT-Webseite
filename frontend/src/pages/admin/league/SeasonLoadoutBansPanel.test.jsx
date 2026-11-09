@@ -44,6 +44,22 @@ beforeEach(() => {
   apiMock.delete.mockResolvedValue({ data: { ok: true, staffeln_to_sync: 2 } });
 });
 
+// Einklappen (#2306): Die Bereiche sind anfangs zu - die älteren Prüfungen klappen erst alles auf.
+async function openAll() {
+  fireEvent.click(await screen.findByTestId("season-bans-open-all"));
+}
+
+// Jedes `aria-controls` zeigt auf genau ein vorhandenes Element - auch zugeklappt (Codex zu #2306).
+function expectControlsResolve() {
+  const buttons = [...document.querySelectorAll("[aria-controls]")];
+  expect(buttons.length).toBeGreaterThan(0);
+  const ids = [...document.querySelectorAll("[id]")].map((node) => node.id);
+  for (const button of buttons) {
+    const target = button.getAttribute("aria-controls");
+    expect(ids.filter((id) => id === target), `aria-controls="${target}"`).toHaveLength(1);
+  }
+}
+
 function renderPanel(props = {}) {
   const onSaved = vi.fn();
   render(<MemoryRouter><SeasonLoadoutBansPanel seasonId="s1" canEdit onSaved={onSaved} {...props} /></MemoryRouter>);
@@ -62,6 +78,7 @@ test("Kopf, Hinweis aufs Regelwerk und was beim Speichern wegfällt", async () =
 
 test("je Modus sperren, an einer Waffe einzelne Aufsätze, speichern als neue Version", async () => {
   const onSaved = renderPanel();
+  await openAll();
   const blitz = await screen.findByTestId("season-bans-item-w1");
   // Blitz 9 nur noch in „Suchen“ gesperrt.
   fireEvent.click(within(blitz).getByLabelText("Suchen"));
@@ -88,6 +105,7 @@ test("die Notiz der Bibliothek steht klein unter dem Namen - bei Waffe, Aufsatz 
   const notes = { w2: "Nur im Ranked-Modus", a2: "Schwer zu bekommen, dafür sehr lang notiert", p1: "Inaktiv bis Season 2" };
   apiMock.get.mockResolvedValue({ data: { ...BODY, library: BODY.library.map((row) => (notes[row.id] ? { ...row, note: notes[row.id] } : { ...row, note: null })) } });
   renderPanel();
+  await openAll();
   const donner = await screen.findByTestId("season-bans-item-w2");
   expect(within(donner).getByTestId("season-bans-note-w2")).toHaveTextContent("Nur im Ranked-Modus");
   expect(within(donner).getByTestId("season-bans-note-w2")).toHaveClass("italic", "break-words");
@@ -108,6 +126,7 @@ test("ganz gesperrte Waffe mit Aufsätzen: speichern geht, die Aufsatz-Zeile feh
     { kind: "item", item_id: "w2", name: "Donner 4", category: "waffen", modes: ["suchen"], mode_labels: ["Suchen"], attachments: [] },
   ) } });
   renderPanel();
+  await openAll();
   await screen.findByTestId("season-bans-item-w1");
   // Blitz 9 jetzt ganz sperren: die Aufsatz-Sperre bleibt im Formular, ist aber ausgegraut.
   fireEvent.click(screen.getByTestId("season-bans-toggle-w1"));
@@ -189,6 +208,7 @@ const CLASSES = {
 test("ganze Klasse sperren: je Modus, in allen Modi mitgesperrt, leere Klasse angeboten", async () => {
   apiMock.get.mockResolvedValue({ data: CLASSES });
   renderPanel();
+  await openAll();
   const head = await screen.findByTestId("season-bans-class-schrot");
   expect(within(head).getByTestId("season-bans-class-schrot-toggle")).toBeChecked();
   expect(screen.getByTestId("season-bans-via-class-s1")).toHaveTextContent("Klasse gesperrt in Suchen");
@@ -238,9 +258,10 @@ const BY_SLOT = {
 test("Aufsätze je Slot an der Waffe: je Aufsatz Modi, für die Klasse übernehmen, an allen Waffen sperren", async () => {
   apiMock.get.mockResolvedValue({ data: BY_SLOT });
   renderPanel();
+  await openAll();
   fireEvent.click(await screen.findByTestId("season-bans-open-w1"));
   const panel = screen.getByTestId("season-bans-attachments-w1");
-  expect(within(panel).getAllByTestId("season-bans-slot-w1").map((slot) => slot.querySelector("p").textContent))
+  expect(within(panel).getAllByTestId("season-bans-slot-label").map((slot) => slot.textContent))
     .toEqual(["Ohne Unterkategorie", "Optik"]);
   fireEvent.click(within(panel).getByLabelText("Rotpunkt an Blitz 9 sperren"));
   fireEvent.click(within(screen.getByTestId("season-bans-attachment-w1-a1")).getByLabelText("Suchen"));
@@ -277,6 +298,7 @@ test("„K gesperrt“ zählt einen überall gesperrten Aufsatz mit", async () =
     { kind: "item", item_id: "a3", name: "Holo", category: "aufsaetze", subcategory: "optik", modes: ["suchen"], mode_labels: ["Suchen"], attachments: [] },
   ) } });
   renderPanel();
+  await openAll();
   // Rotpunkt in allen Modi gesperrt zählt, Holo nur in Suchen (nicht angehakt) nicht.
   expect(await screen.findByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 1 gesperrt");
   expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 1 gesperrt");
@@ -291,6 +313,7 @@ test("„K gesperrt“ zählt die Aufsätze einer ganz gesperrten Aufsatzklasse 
       attachments: [{ item_id: "a2", name: "Griff", image_url: null }] },
   ) } });
   renderPanel();
+  await openAll();
   expect(await screen.findByTestId("season-bans-open-w1")).toHaveTextContent("3 Aufsätze · 3 gesperrt");
   expect(screen.getByTestId("season-bans-open-w2")).toHaveTextContent("2 Aufsätze · 2 gesperrt");
 });
@@ -300,4 +323,123 @@ test("Aufsätze ohne erlaubte Waffe werden genannt (Nr. 81)", async () => {
     { id: "a1", name: "Rotpunkt", reason: "passt nur zu gesperrten Waffen" }] } });
   renderPanel();
   expect(await screen.findByTestId("season-bans-unusable")).toHaveTextContent("Kompensator (keiner Waffe zugeordnet), Rotpunkt (passt nur zu gesperrten Waffen)");
+});
+
+// #2306: Kategorien, Klassen und Slots einklappbar; Vorgabe zu, ohne Sperren die erste Kategorie offen; Suche klappt Treffer auf.
+test("mit Sperren ist alles zu; die Kopfzeile nennt Anzahl und „K gesperrt“", async () => {
+  renderPanel();
+  const waffen = await screen.findByTestId("season-bans-fold-waffen");
+  expect(waffen).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTestId("season-bans-fold-perks")).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTestId("season-bans-count-waffen")).toHaveTextContent("2 Einträge · 1 gesperrt");
+  expect(screen.getByTestId("season-bans-count-aufsaetze")).toHaveTextContent("3 Einträge");
+  expect(screen.getByTestId("season-bans-count-aufsaetze")).not.toHaveTextContent("gesperrt");
+  expect(screen.queryByTestId("season-bans-item-w1")).not.toBeInTheDocument();
+  fireEvent.click(waffen);
+  expect(waffen).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("season-bans-item-w1")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-bans-item-p1")).not.toBeInTheDocument();
+});
+
+test("ohne Sperren ist die erste Kategorie offen, die übrigen zu", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, list: null, versions: [] } });
+  renderPanel();
+  expect(await screen.findByTestId("season-bans-fold-waffen")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("season-bans-item-w2")).toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-fold-aufsaetze")).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("season-bans-item-a1")).not.toBeInTheDocument();
+});
+
+test("die Suche klappt die Treffer auf und zählt „x von y“; ohne Suche wieder zu", async () => {
+  renderPanel();
+  fireEvent.change(await screen.findByTestId("season-bans-search"), { target: { value: "rotpunkt" } });
+  expect(screen.getByTestId("season-bans-fold-aufsaetze")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("season-bans-item-a1")).toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-count-aufsaetze")).toHaveTextContent("1 von 3");
+  // Ein Treffer-Bereich lässt sich auch beim Suchen zuklappen.
+  fireEvent.click(screen.getByTestId("season-bans-fold-aufsaetze"));
+  expect(screen.queryByTestId("season-bans-item-a1")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("season-bans-search"), { target: { value: "" } });
+  expect(screen.getByTestId("season-bans-fold-aufsaetze")).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("season-bans-item-a1")).not.toBeInTheDocument();
+});
+
+test("„Alle aufklappen“ und „Alle zuklappen“ - zuklappen schließt auch den Kasten einer Waffe", async () => {
+  renderPanel();
+  await openAll();
+  for (const key of ["waffen", "aufsaetze", "perks"]) expect(screen.getByTestId(`season-bans-fold-${key}`)).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(screen.getByTestId("season-bans-open-w2"));
+  expect(screen.getByTestId("season-bans-attachments-w2")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("season-bans-close-all"));
+  for (const key of ["waffen", "aufsaetze", "perks"]) expect(screen.getByTestId(`season-bans-fold-${key}`)).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(screen.getByTestId("season-bans-fold-waffen"));
+  expect(screen.queryByTestId("season-bans-attachments-w2")).not.toBeInTheDocument();
+});
+
+test("ein Häkchen bleibt nach dem Zuklappen erhalten und wird gespeichert", async () => {
+  renderPanel();
+  fireEvent.click(await screen.findByTestId("season-bans-fold-waffen"));
+  fireEvent.click(screen.getByTestId("season-bans-toggle-w2"));
+  fireEvent.click(screen.getByTestId("season-bans-fold-waffen"));
+  expect(screen.queryByTestId("season-bans-toggle-w2")).not.toBeInTheDocument();
+  expect(screen.getByTestId("season-bans-count-waffen")).toHaveTextContent("2 gesperrt");
+  fireEvent.click(screen.getByTestId("season-bans-fold-waffen"));
+  expect(screen.getByTestId("season-bans-toggle-w2")).toBeChecked();
+  fireEvent.click(screen.getByTestId("season-bans-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalled());
+  expect(apiMock.put.mock.calls[0][1].entries).toContainEqual({ item_id: "w2", kind: "item", modes: [], attachment_ids: [] });
+});
+
+test("Klasse und Slots im Kasten der Waffe einklappbar; „Ganze Klasse sperren“ geht auch zugeklappt", async () => {
+  apiMock.get.mockResolvedValue({ data: BY_SLOT });
+  renderPanel();
+  // Ohne Sperren: Waffen offen, die Klasse darin zu - ihr Schalter bleibt bedienbar.
+  const fold = await screen.findByTestId("season-bans-class-sturm-fold");
+  expect(fold).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTestId("season-bans-class-sturm-count")).toHaveTextContent("2 Einträge");
+  fireEvent.click(screen.getByTestId("season-bans-class-sturm-toggle"));
+  expect(screen.getByTestId("season-bans-class-sturm-count")).toHaveTextContent("2 Einträge · 2 gesperrt");
+  fireEvent.click(screen.getByTestId("season-bans-class-sturm-toggle"));
+  fireEvent.click(fold);
+  // Zwei Slots an Blitz 9: beide zu, je mit Anzahl.
+  fireEvent.click(screen.getByTestId("season-bans-open-w1"));
+  const optik = screen.getByTestId("season-bans-slot-toggle-w1-aufsaetze:optik");
+  expect(optik).toHaveAttribute("aria-expanded", "false");
+  expect(optik).toHaveTextContent("Optik2 Aufsätze");
+  expect(screen.queryByLabelText("Rotpunkt an Blitz 9 sperren")).not.toBeInTheDocument();
+  fireEvent.click(optik);
+  fireEvent.click(screen.getByLabelText("Rotpunkt an Blitz 9 sperren"));
+  fireEvent.click(optik);
+  expect(optik).toHaveTextContent("2 Aufsätze · 1 gesperrt");
+  fireEvent.click(optik);
+  expect(screen.getByLabelText("Rotpunkt an Blitz 9 sperren")).toBeChecked();
+  // Nur ein Slot an Donner 4: gleich offen.
+  fireEvent.click(screen.getByTestId("season-bans-open-w2"));
+  expect(screen.getByTestId("season-bans-slot-toggle-w2-aufsaetze:optik")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByLabelText("Holo an Donner 4 sperren")).toBeInTheDocument();
+});
+
+test("aria-controls zeigt immer auf genau einen Behälter - zugeklappt verborgen, auch der Kasten einer Waffe", async () => {
+  apiMock.get.mockResolvedValue({ data: BY_SLOT });
+  renderPanel();
+  const fold = await screen.findByTestId("season-bans-class-sturm-fold");
+  expectControlsResolve();
+  // Zugeklappt: der Behälter steht da, ist aber verborgen und leer.
+  const body = document.getElementById(fold.getAttribute("aria-controls"));
+  expect(body).toHaveAttribute("hidden");
+  expect(body).toBeEmptyDOMElement();
+  fireEvent.click(fold);
+  expect(body).not.toHaveAttribute("hidden");
+  // Der Knopf der Waffe steuert ihren Kasten der Aufsätze.
+  const open = screen.getByTestId("season-bans-open-w1");
+  expect(open).toHaveAttribute("aria-controls", "season-bans-box-w1");
+  expect(document.getElementById("season-bans-box-w1")).toHaveAttribute("hidden");
+  fireEvent.click(open);
+  expect(document.getElementById("season-bans-box-w1")).not.toHaveAttribute("hidden");
+  expect(within(document.getElementById("season-bans-box-w1")).getByTestId("season-bans-attachments-w1")).toBeInTheDocument();
+  expectControlsResolve();
+  await openAll();
+  expectControlsResolve();
+  fireEvent.click(screen.getByTestId("season-bans-close-all"));
+  expectControlsResolve();
 });
