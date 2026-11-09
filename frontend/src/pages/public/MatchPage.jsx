@@ -651,7 +651,7 @@ function MatchPageView() {
               <div className="mt-5 space-y-3">
                 {/* Vorschläge der Gegenseite als Liste (#2325): ein Klick nimmt einen Termin an, die übrigen der Gruppe schließen. */}
                 <ScheduleProposalList proposals={data.schedule_proposals} page={data} userId={user?.id} canManage={canManageSchedule}
-                  fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime} toLocal={toLocalInput}
+                  fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime}
                   onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} hintsFor={timeHints} />
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>

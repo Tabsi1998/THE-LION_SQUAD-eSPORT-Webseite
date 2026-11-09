@@ -77,8 +77,9 @@ export function ProposalTimesEditor({ values, onChange, errors = [], hints = [],
 }
 
 /** Gegenvorschlag zu einem Vorschlag oder einer ganzen Gruppe: bis zu drei Termine, eine Antwort, ein Knopf. */
-function CounterForm({ bundleKey, min, busy, onCounter, onClose, initial, hintsFor }) {
-  const [times, setTimes] = useState([initial || ""]);
+function CounterForm({ bundleKey, min, busy, onCounter, onClose, hintsFor }) {
+  // Leer beginnen: der vorgeschlagene Termin steht ja schon zur Auswahl - „Annehmen“ statt ihn zurückzuschicken.
+  const [times, setTimes] = useState([""]);
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState([]);
   const change = (next) => {
@@ -112,7 +113,7 @@ function actorName(proposal) {
  * `onDecide(proposal, action)` für annehmen, ablehnen und zurückziehen eines einzelnen; `onGroupDecide(proposal, action)` für
  * alle ablehnen und alle zurückziehen; `onCounter(proposal, times, note)` mit Antwort `{ ok, errors }`.
  */
-export function ScheduleProposalList({ proposals, page, userId, canManage, fixedTime, busy, min, formatDateTime, onDecide, onGroupDecide, onCounter, toLocal, hintsFor }) {
+export function ScheduleProposalList({ proposals, page, userId, canManage, fixedTime, busy, min, formatDateTime, onDecide, onGroupDecide, onCounter, hintsFor }) {
   const [counterFor, setCounterFor] = useState(null);
   const bundles = bundleProposals(proposals);
   return bundles.map((bundle) => {
@@ -126,7 +127,7 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
     const counterOpen = agree && counterFor === bundle.key;
     const counter = agree && (
       counterOpen ? (
-        <CounterForm bundleKey={bundle.key} min={min} busy={busy} initial={toLocal?.(first.scheduled_at)} onClose={() => setCounterFor(null)} hintsFor={hintsFor}
+        <CounterForm bundleKey={bundle.key} min={min} busy={busy} onClose={() => setCounterFor(null)} hintsFor={hintsFor}
           onCounter={(times, note) => onCounter(first, times, note)} />
       ) : null
     );

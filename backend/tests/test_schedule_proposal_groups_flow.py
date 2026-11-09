@@ -324,6 +324,63 @@ async def test_a_counter_with_two_times_answers_the_whole_group(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_counter_with_only_the_offered_times_is_refused(flow):
+    world = await live_world(flow)
+    group = (await propose(flow, world, "Kapitaen", [50, 80, 110])).json()["proposals"]
+    same = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [80, 50])
+    assert same.status_code == 422
+    assert "stehen schon zur Auswahl" in same.json()["detail"]
+    assert {row["status"] for row in (await rows(flow, world)).values()} == {"pending"}
+    mixed = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [50, 60])
+    assert mixed.status_code == 200, "ein neuer Termin dabei: das ist ein Gegenvorschlag"
+
+
+@pytest.mark.asyncio
+async def test_the_lead_declines_and_withdraws_whole_groups(flow):
+    world = await live_world(flow)
+    first = (await propose(flow, world, "Kapitaen", [50, 80])).json()["proposals"]
+    flow.act_as(world["staff"])
+    declined = await flow.post(f"{base_url(world)}/{first[0]['id']}/group-decision", json={"action": "decline"})
+    assert declined.status_code == 200, declined.text
+    second = (await propose(flow, world, "Kapitaen", [60, 90])).json()["proposals"]
+    flow.act_as(world["staff"])
+    withdrawn = await flow.post(f"{base_url(world)}/{second[0]['id']}/group-decision", json={"action": "withdraw"})
+    assert withdrawn.status_code == 200, withdrawn.text
+    stored = await rows(flow, world)
+    assert {stored[row["id"]]["status"] for row in first} == {"declined"}
+    assert {stored[row["id"]]["status"] for row in second} == {"withdrawn"}
+    sent = await notes(flow, "schedule_withdrawn")
+    assert {row["user_id"] for row in sent} == {world["users"]["Kapitaen"]["id"], world["users"]["Falke1"]["id"]}, \
+        "handelt die Leitung, erfahren es beide Seiten"
+
+
+@pytest.mark.asyncio
+async def test_a_counter_on_a_fixed_league_time_is_refused(flow):
+    world = await live_world(flow)
+    group = (await propose(flow, world, "Kapitaen", [50, 80])).json()["proposals"]
+    # Die Leitung legt den Termin fest - die Gruppe ist noch offen.
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]},
+                                        {"$set": {"scheduled_at": at(90), "schedule_source": "manual"}})
+    refused = await group_decision(flow, world, "Falke1", group[0]["id"], "counter", [100])
+    assert refused.status_code == 409 and "Verschiebung" in refused.json()["detail"]
+    declined = await group_decision(flow, world, "Falke1", group[0]["id"], "decline")
+    assert declined.status_code == 200, "ablehnen geht auch bei festem Termin"
+
+
+@pytest.mark.asyncio
+async def test_a_proposal_of_another_match_is_not_found(flow):
+    world = await live_world(flow)
+    group = (await propose(flow, world, "Kapitaen", [50, 80])).json()["proposals"]
+    second_match = {**world["match"], "id": "zweites-spiel"}
+    await flow.db.matches_v2.insert_one({**second_match, "scheduled_at": None, "status": "ready"})
+    flow.act_as(world["users"]["Falke1"])
+    answer = await flow.post(f"/api/matches/zweites-spiel/schedule-proposals/{group[0]['id']}/group-decision",
+                             json={"action": "decline"})
+    assert answer.status_code == 404
+    assert {row["status"] for row in (await rows(flow, world)).values()} == {"pending"}
+
+
+@pytest.mark.asyncio
 async def test_a_counter_that_fails_while_closing_leaves_nothing_behind(flow, monkeypatch):
     """Alle oder keiner: scheitert das Schließen der alten Termine, gehen die neuen wieder raus, und das Spiel behält seine Frist."""
     world = await live_world(flow)

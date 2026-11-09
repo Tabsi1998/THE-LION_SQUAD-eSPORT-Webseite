@@ -142,6 +142,7 @@ test("Gegenseite: alle ablehnen und Gegenvorschlag mit zwei Terminen gehen an di
 
   fireEvent.click(within(card).getByTestId("match-counter-open-gruppe-g-falken"));
   const counter = within(card).getByTestId("match-counter-gruppe-g-falken");
+  expect(within(counter).getByTestId("match-counter-at-gruppe-g-falken")).toHaveValue("");
   fireEvent.change(within(counter).getByTestId("match-counter-at-gruppe-g-falken"), { target: { value: "2027-03-13T20:00" } });
   fireEvent.click(within(counter).getByTestId("match-counter-at-gruppe-g-falken-weiter"));
   fireEvent.change(within(counter).getByTestId("match-counter-at-gruppe-g-falken-2"), { target: { value: "2027-03-14T19:00" } });
