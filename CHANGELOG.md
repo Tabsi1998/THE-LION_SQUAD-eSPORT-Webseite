@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.74.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.73.0...v1.74.0) (2026-11-09)
+
+
+### Neu
+
+* Hinweis auf offene Liga-Anmeldung auf der Startseite mit Anmeldeschluss und „Mit Co-Team anmelden“ ([#2324](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2324)) ([c8250db](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c8250db595eacd5d6abc14f43ef2220d63d271b5))
+* Liga-Seasons stehen in „Nächste Termine“ auf der Startseite mit Zeitraum, freien Plätzen und Stand ([#2324](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2324)) ([c8250db](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c8250db595eacd5d6abc14f43ef2220d63d271b5))
+* Schalter „Auf der Startseite bewerben“ je Season in der Liga-Verwaltung ([#2324](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2324)) ([c8250db](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c8250db595eacd5d6abc14f43ef2220d63d271b5))
+* Teilen-Vorschau der Ligaseite nennt Anmeldeschluss und freie Plätze, ohne Banner mit Emblem ([#2324](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2324)) ([c8250db](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c8250db595eacd5d6abc14f43ef2220d63d271b5))
+
+
+### Fehlerbehebungen
+
+* Hinweis zu offenen Punkten sagt, dass die Anmeldung zählt und was beim Spiel passiert ([#2322](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2322)) ([1eb328c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1eb328c7c10e837a8e579270f02ad56593a4df4e))
+* Liga-Anmeldung misst Spielberechtigte an der Check-in-Mindestzahl statt am Mindestkader – mit 3 von 4 kein falscher Hinweis mehr ([#2322](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2322)) ([1eb328c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1eb328c7c10e837a8e579270f02ad56593a4df4e))
+* Zuteilen-Dialog nennt zu wenige Spielberechtigte erst unter der Check-in-Mindestzahl ([#2322](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2322)) ([1eb328c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1eb328c7c10e837a8e579270f02ad56593a4df4e))
+
 ## 1.73.0 (09.11.2026)
 
 ### Neu
