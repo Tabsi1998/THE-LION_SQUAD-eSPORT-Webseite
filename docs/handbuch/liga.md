@@ -69,8 +69,8 @@ der Aufstellung und die Antwortfrist auf einen Terminvorschlag laufen erst danac
 nicht** – es bleibt bei 30 Minuten nach dem Ergebnis (nach der 48-Stunden-Regel bis zum Ende der Spielwoche).
 
 Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für Teilnahme und Podest und die Team-Stufe;
-gespielte und gewonnene Spiele zählen weiter. Startseite, öffentlicher Kalender und Turnierliste zeigen sie nicht –
-dafür gibt es die Ligaseite, den Menüpunkt **Liga** und die Kachel **Liga** auf der eSports-Übersicht (`/esports`, mit
+gespielte und gewonnene Spiele zählen weiter. Startseite, öffentlicher Kalender und Turnierliste zeigen die Staffeln nicht –
+die Startseite zeigt stattdessen die **Season** (2.8a). Dazu gibt es die Ligaseite, den Menüpunkt **Liga** und die Kachel **Liga** auf der eSports-Übersicht (`/esports`, mit
 „Start am …“ oder „Läuft“). Menüpunkt und Kachel erscheinen nur, solange eine Season sichtbar ist. Name, Stelle und
 Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Navigation** ein.
 
@@ -579,6 +579,25 @@ Solange es Probleme gibt, lässt sich die Sichtbarkeit aber nicht auf **Nur Mitg
 noch von der Vorschau aus; das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
 kann im Notfall trotzdem veröffentlichen: Er trägt im Abschnitt einen **Grund für die Notausnahme** ein (mindestens 5 Zeichen) und
 tippt **Überblick speichern**; der Grund steht im Protokoll. Von *Nur Mitglieder* weiter auf *Öffentlich* prüft nichts mehr.
+
+### 2.8a Startseite und Teilen-Vorschau
+
+Eine sichtbare Season steht auf der Startseite, ohne dass du etwas tun musst (#2324). Wer sie dort sieht, richtet sich nach der
+**Sichtbarkeit** (2.8), nicht nach dem Stand: Eine *öffentliche* Season im Stand *Entwurf* steht drin, *Aus* und *Nur Liga-Leitung*
+nie, *Nur Mitglieder* nur für angemeldete Mitglieder.
+
+- **Hinweis unter dem Kopf**, solange das Anmeldefenster offen ist: Emblem, Banner, Anmeldeschluss, freie Startplätze und die
+  Knöpfe **Mit Co-Team anmelden** und **Zur Ligaseite**. Nach dem Anmeldeschluss verschwindet er von selbst. Mehrere offene Seasons
+  stehen kompakt nebeneinander. Sind alle Plätze weg und gibt es keine Warteliste, bleibt nur **Zur Ligaseite**.
+- **Nächste Termine:** die Season wie ein Event mit Zeitraum, freien Plätzen und Plakette – „Anmeldung öffnet“, „Anmeldung offen ·
+  endet am …“, „Anmeldung geschlossen“ bzw. „Angekündigt · startet …“, während der Season „Spielwoche 3 von 10“ oder „Spielpause“.
+  Einsortiert nach dem nächsten Datum, das zählt. Nach dem Ende der Season fällt sie heraus.
+- **Abschalten:** Reiter **Überblick** → **Auf der Startseite bewerben** (Vorgabe an) → **Überblick speichern**. Die Ligaseite
+  bleibt davon unberührt.
+- **Teilen-Vorschau** (Discord, WhatsApp): Bei offenem Fenster heißt die Karte „… · Anmeldung offen“ und nennt Anmeldeschluss und
+  freie Plätze. Als Bild nimmt sie das Banner der Season bzw. Liga, sonst das Emblem.
+
+<img src="../assets/liga/startseite-liga-hinweis-1440.png" alt="Startseite: Hinweis „Liga · Anmeldung offen“ mit Emblem, Banner, Anmeldeschluss, freien Startplätzen und den Knöpfen Mit Co-Team anmelden und Zur Ligaseite" width="640">
 
 ### 2.9 Korrigieren, archivieren, löschen
 

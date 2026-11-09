@@ -549,9 +549,25 @@ async def league_rules_meta(db, league_slug: str, season_slug: str | None, base:
     return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 
 
+async def league_signup_details(db, season: dict) -> list[str]:
+    """Bei offener Anmeldung (#2324): „Anmeldung bis …“ und die freien Startplätze - sonst nichts."""
+    from services import league_applications
+    from services.calendar_items import vienna
+
+    block = await league_applications.public_block(db, season)
+    if not block or block["state"] != league_applications.OPEN:
+        return []
+    details = [f"Anmeldung bis {vienna(block['closes_at'])}"]
+    if block.get("slots"):
+        details.append(f"{block['slots_free']} von {block['slots']} Startplätzen frei" if block.get("slots_free")
+                       else "Alle Startplätze vergeben")
+    return details
+
+
 async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:
     """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ als neutrale Karte ohne Index;
     „aus“, „Nur Turnierleitung“ und Unbekanntes 404."""
+    from services.league_look import effective as effective_look
     from services.league_look import effective_banner_url
     from services.league_service import season_end
 
@@ -565,17 +581,23 @@ async def league_season_meta(db, league_slug: str, season_slug: str, base: dict,
     title = f"{league.get('name')} {season.get('name')}"
     if season.get("visibility") != "public":
         return restricted_meta("league", season, base, origin, canonical)
+    # Teilen-Karte bei offener Anmeldung (#2324): Anmeldeschluss und freie Plätze stehen vorn - so wirbt der Link in Discord
+    # und WhatsApp für die Anmeldung.
+    signup = await league_signup_details(db, season)
     description = seo_description(
         season.get("rules_text") or title,
         prefix="Liga",
-        details=[format_date_label(season.get("start_date")), format_date_label(season_end(season))],
+        details=[*signup, format_date_label(season.get("start_date")), format_date_label(season_end(season))],
     )
-    meta = {**base, "title": f"{title} · {base['site_name']}", "description": description, "url": canonical,
+    shown_title = f"{title} · Anmeldung offen" if signup else title
+    meta = {**base, "title": f"{shown_title} · {base['site_name']}", "description": description, "url": canonical,
             "canonical": canonical, "type": "website"}
-    # Gestaltung (#2107): die Vorschaukarte zeigt das Banner der Season bzw. Liga, sonst das Bild der Seite.
-    banner = effective_banner_url(league, season)
-    if banner:
-        meta["image"] = absolute_url(banner, origin)
+    # Gestaltung (#2107): die Vorschaukarte zeigt das Banner der Season bzw. Liga, sonst das Emblem (#2324), sonst das Bild
+    # der Seite.
+    look = effective_look(league, season)
+    picture = effective_banner_url(league, season) or look.get("emblem_url")
+    if picture:
+        meta["image"] = absolute_url(picture, origin)
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 

@@ -194,7 +194,11 @@ async def test_team_page_and_seo_show_the_look(flow):
     base = {"site_name": "Probe", "image": "/logo.png", "title": "Probe", "description": ""}
     meta = await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
     assert meta["image"] == f"https://example.test{BANNER_LEAGUE}"
+    # Ohne Banner das Emblem (#2324), ohne beides das Bild der Seite.
     await flow.patch(f"{ADMIN}/{league['id']}", json={"banner_url": None})
+    meta = await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
+    assert meta["image"] == f"https://example.test{EMBLEM_LEAGUE}"
+    await flow.patch(f"{ADMIN}/{league['id']}", json={"emblem_url": None})
     meta = await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
     assert meta["image"].endswith("/logo.png")
 

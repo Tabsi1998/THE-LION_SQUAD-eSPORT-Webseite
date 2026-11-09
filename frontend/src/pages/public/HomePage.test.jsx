@@ -264,6 +264,68 @@ test("Heute im Einsatz: Streifen über dem Kopf nur mit heutigem Termin", async 
   expect(screen.queryByTestId("home-today")).toBeNull();
 });
 
+// Liga auf der Startseite (#2324): offene Anmeldung als Hinweis unter dem Kopf und als Zeile in „Nächste Termine“.
+function leagueRow(overrides = {}) {
+  return {
+    id: "s1", kind: "league", slug: "tirol-season-1", title: "Tiroler Liga · Season 1", league_name: "Tiroler Liga", season_name: "Season 1",
+    url: "/liga/tirol/season-1", apply_url: "/liga/tirol/season-1/anmelden",
+    start_date: "2026-10-04T22:00:00+00:00", end_date: "2026-12-13T22:59:59+00:00", sort_at: "2026-09-30T21:59:00+00:00",
+    public_phase: { state: "registration_open", label: "Anmeldung offen", target_at: "2026-09-30T21:59:00+00:00", countdown_kind: "registration_closes" },
+    application: { state: "open", opens_at: "2026-09-01T00:00:00+00:00", closes_at: "2026-09-30T21:59:00+00:00", slots: 16, slots_free: 3,
+      waitlist: true, waitlist_full: false, entry_policy: "all" },
+    emblem_url: null, banner: null, accent_color: null,
+    ...overrides,
+  };
+}
+
+test("#2324: offene Liga-Anmeldung als Hinweis und in „Nächste Termine“, nach dem nächsten Datum einsortiert", async () => {
+  const announced = leagueRow({ id: "s2", slug: "tirol-season-2", title: "Tiroler Liga · Season 2", url: "/liga/tirol/season-2",
+    apply_url: "/liga/tirol/season-2/anmelden", sort_at: "2026-11-01T23:00:00+00:00", application: null,
+    public_phase: { state: "announced", label: "Angekündigt", target_at: "2026-11-01T23:00:00+00:00", countdown_kind: "starts" } });
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/home/state" ? { ...stateWith(4), leagues: [leagueRow(), announced] } : [] }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+
+  const promo = await screen.findByTestId("home-league-promo-tirol-season-1");
+  expect(promo).toHaveTextContent("Tiroler Liga · Season 1");
+  expect(screen.getByTestId("home-league-promo-deadline-tirol-season-1")).toHaveTextContent(/30\.09\.2026, 23:59 Uhr/);
+  expect(screen.getByTestId("home-league-promo-seats-tirol-season-1")).toHaveTextContent("3 von 16 Startplätzen frei");
+  expect(screen.getByTestId("home-league-promo-apply-tirol-season-1")).toHaveAttribute("href", "/liga/tirol/season-1/anmelden");
+  expect(screen.getByTestId("home-league-promo-page-tirol-season-1")).toHaveAttribute("href", "/liga/tirol/season-1");
+  // Nur offene Fenster werben - die angekündigte Season steht nur in der Liste.
+  expect(screen.queryByTestId("home-league-promo-tirol-season-2")).toBeNull();
+
+  const row = screen.getByTestId("home-next-league-tirol-season-1");
+  expect(row).toHaveAttribute("href", "/liga/tirol/season-1");
+  expect(row).toHaveTextContent("Anmeldung offen · endet");
+  expect(row).toHaveTextContent("3 von 16 Startplätzen frei");
+  expect(screen.getByTestId("home-next-period-tirol-season-1")).toHaveTextContent("05.10.2026 – 13.12.2026");
+  expect(screen.getByTestId("home-next-league-tirol-season-2")).toHaveTextContent("Angekündigt · startet");
+  // Turnier am 25.09., Anmeldeschluss am 30.09., Season 2 im November - der große Countdown bleibt beim Turnier.
+  const order = screen.getAllByTestId(/^home-next-(tournament|league)-/).map((node) => node.dataset.testid);
+  expect(order).toEqual(["home-next-tournament-cup", "home-next-league-tirol-season-1", "home-next-league-tirol-season-2"]);
+  expect(screen.getByTestId("home-countdown")).toHaveTextContent("Herbst-Cup");
+  // Der Hinweis steht direkt unter dem Kopf, vor den Terminen.
+  expect(screen.getByTestId("home-hero-grain").compareDocumentPosition(promo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("#2324: der Hinweis verschwindet nach dem Anmeldeschluss von selbst, voll ohne Warteliste kein Anmelde-Knopf", async () => {
+  const soon = "2026-09-22T10:05:00+00:00";
+  const full = leagueRow({ id: "s3", slug: "voll", title: "Volle Liga · Season 1",
+    application: { ...leagueRow().application, slots_free: 0, waitlist: false } });
+  const closing = leagueRow({ application: { ...leagueRow().application, closes_at: soon }, public_phase: { ...leagueRow().public_phase, target_at: soon } });
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/home/state" ? { ...stateWith(4), leagues: [closing, full] } : [] }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+
+  expect(await screen.findByTestId("home-league-promo-tirol-season-1")).toBeInTheDocument();
+  expect(screen.getByTestId("home-league-promo-voll").dataset.compact).toBe("true");
+  expect(screen.queryByTestId("home-league-promo-apply-voll")).toBeNull();
+  expect(screen.getByTestId("home-league-promo-seats-voll")).toHaveTextContent("Alle 16 Startplätze vergeben");
+
+  await act(async () => { vi.advanceTimersByTime(6 * 60 * 1000); });
+  await waitFor(() => expect(screen.queryByTestId("home-league-promo-tirol-season-1")).toBeNull());
+  expect(screen.getByTestId("home-league-promo-voll").dataset.compact).toBe("false");
+});
+
 // Kopf der Startseite (#2122 NW9): pflegbar, leere Felder und der erste Moment zeigen die Vorgabe.
 test("Kopf aus dem Stand, sonst die Vorgabe", async () => {
   apiMock.get.mockImplementation(async (url) => (url === "/home/state"

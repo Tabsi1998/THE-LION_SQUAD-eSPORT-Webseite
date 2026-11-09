@@ -87,7 +87,15 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <Link to="/teams" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Teams</Link>
         <div className="relative mt-3 h-[120px] md:h-[140px] lg:h-[160px] rounded-sm overflow-hidden border border-white/10" style={{ background: bandBackground(hex) }} data-testid="team-band">
-          <MascotBadge className="absolute -right-8 top-1/2 -translate-y-1/2 h-[190%] w-auto opacity-[0.14] pointer-events-none select-none" />
+          {/* Eigenes Banner (#2328) statt Farbverlauf; unten leicht abgedunkelt, damit Wappen und Name lesbar bleiben. */}
+          {team.banner_url ? (
+            <>
+              <img src={resolveMediaUrl(team.banner_url)} alt="" decoding="async" className="absolute inset-0 w-full h-full object-cover" data-testid="team-band-banner" />
+              <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
+            </>
+          ) : (
+            <MascotBadge className="absolute -right-8 top-1/2 -translate-y-1/2 h-[190%] w-auto opacity-[0.14] pointer-events-none select-none" />
+          )}
         </div>
         <div className="relative -mt-9 md:-mt-12 flex flex-col items-center text-center">
           <TeamCrest team={team} hex={hex} />
