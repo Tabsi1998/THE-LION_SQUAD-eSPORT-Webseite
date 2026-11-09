@@ -26,7 +26,10 @@ const MINE = {
 };
 const ROW = {
   id: "a1", status: "submitted", squad_id: "sq1", team_id: "t1", display_name: "Loewen Langername · Rudel Alpha mit sehr langem Namen", submitted_at: "2026-11-02T18:00:00+00:00", applied_by_name: "Mila Mustermann", rules_version: 2, rules_at: "2026-11-02T18:00:00+00:00",
-  privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: ["Rudel Alpha: Geburtsdatum fehlt bei Tom Beispiel. Bitte im eigenen Profil eintragen, dann geht die Anmeldung."], warnings: ["Ida: Die Spiel-ID fehlt im Profil."], shared_with: [], own_team: false,
+  // Seit #2313 offene Punkte statt Sperre: Die Leitung lässt trotzdem zu.
+  privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: [],
+  shortfall: "Nur 3 von 5 Spielern sind spielberechtigt, die Season verlangt mindestens 4. Bis zum ersten Spiel im Profil nachtragen – sonst kann das Team nicht einchecken.",
+  warnings: ["Ida: Die Spiel-ID fehlt im Profil.", "Tom Beispiel: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."], shared_with: [], own_team: false,
   history: [{ status: "submitted", at: "2026-11-02T18:00:00+00:00", by_name: "Mila Mustermann" }, { status: "in_review", at: "2026-11-02T19:00:00+00:00", by_name: "Leitung" }],
 };
 const INBOX = {
@@ -105,8 +108,10 @@ for (const [width, height] of WIDTHS) {
 
       await page.getByTestId("apply-squad-sq1").check();
       await page.getByTestId("apply-next").click();
-      await expect(page.getByTestId("apply-check-ok")).toBeVisible();
+      await expect(page.getByTestId("apply-check-ok")).toContainText("kann angemeldet werden");
       await expect(page.getByTestId("apply-warnings")).toContainText("Spiel-ID fehlt");
+      await expect(page.getByTestId("apply-warnings")).toContainText("Die Anmeldung geht trotzdem");
+      await expect(page.getByTestId("apply-next")).toBeEnabled();
       await noSideScroll(page);
       await page.getByTestId("apply-next").click();
 
@@ -146,8 +151,9 @@ for (const [width, height] of WIDTHS) {
       // Die Marke aus den Nachrichten des Servers öffnet seit #2267 den Reiter „Anmeldung und Kader“.
       await expect(page.getByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("season-applications-stats")).toContainText("5 von 8 Startplätzen belegt");
-      await expect(page.getByTestId("application-a1")).toContainText("Geburtsdatum fehlt");
-      await expect(page.getByTestId("application-accept-a1")).toBeVisible();
+      await expect(page.getByTestId("application-open-points-a1")).toContainText("Geburtsdatum fehlt");
+      await expect(page.getByTestId("application-open-points-a1")).toContainText("Zulassen geht trotzdem");
+      await expect(page.getByTestId("application-accept-a1")).toBeEnabled();
       await expect(page.getByTestId("application-assign-a3")).toBeDisabled();
       await page.getByTestId("application-reject-open-a1").click();
       await expect(page.getByTestId("application-reject-send-a1")).toBeDisabled();
