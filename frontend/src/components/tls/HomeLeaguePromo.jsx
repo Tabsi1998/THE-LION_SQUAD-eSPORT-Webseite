@@ -87,7 +87,7 @@ export function HomeLeaguePromo({ leagues }) {
     if (!next) return undefined;
     const timer = setTimeout(() => setNow(Date.now()), Math.min(MAX_TIMER_MS, Math.max(0, next - Date.now()) + 500));
     return () => clearTimeout(timer);
-  }, [next]);
+  }, [next, now]); // ``now`` dazu: Nach einem 24,8-Tage-Teilschritt stellt sich der Timer neu.
 
   if (!rows.length) return null;
   const compact = rows.length > 1;

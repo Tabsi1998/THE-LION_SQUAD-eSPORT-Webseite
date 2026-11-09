@@ -93,6 +93,29 @@ async def test_the_switch_takes_a_season_off_the_home_page(flow):
     assert len(await home_leagues(flow)) == 1
 
 
+@pytest.mark.asyncio
+async def test_a_season_with_broken_data_never_breaks_the_home_page(flow):
+    """Altdaten oder Handänderung: ein Anmeldefenster ohne Zeitzone - die Season fehlt, die Startseite bleibt stehen (Prüfung #2324)."""
+    w = await application_world(flow, teams=0)
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {"application_opens_at": "2026-11-01T00:00:00"}})
+
+    flow.act_as(None)
+    answer = await flow.get("/api/home/state")
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["leagues"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_closed_window_sends_only_its_state_without_seat_counts(flow):
+    w = await application_world(flow, teams=0)
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {
+        "application_opens_at": "2026-10-01T00:00:00+00:00", "application_closes_at": "2026-10-02T00:00:00+00:00"}})
+
+    flow.act_as(None)
+    [row] = await home_leagues(flow)
+    assert row["application"] == {"state": "closed"}
+
+
 # ---------------------------------------------------------------- Stand je Season
 
 def _season(**fields) -> dict:

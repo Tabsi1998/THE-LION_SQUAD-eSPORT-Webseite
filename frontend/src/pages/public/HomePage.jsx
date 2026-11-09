@@ -590,6 +590,8 @@ function normalizeTimelineItem(item, kind, source, sourcePriority) {
   return { ...item, kind, source, sourcePriority, url, label };
 }
 
+const MAX_LEAGUE_ROWS = 2;
+
 function buildHomeTimeline(state) {
   if (!state) return [];
   const groups = [
@@ -614,7 +616,10 @@ function buildHomeTimeline(state) {
     }
   }
   // Liga-Seasons (#2324): wie ein Event, einsortiert nach dem nächsten Datum, das zählt (Anmeldeschluss, Start, Spielwoche).
-  for (const row of state.leagues || []) {
+  // Höchstens zwei, damit laufende Seasons Events und Turniere nicht verdrängen; offene Anmeldungen zuerst.
+  const signupFirst = (row) => (["open", "upcoming"].includes(row?.application?.state) ? 0 : 1);
+  const leagueRows = [...(state.leagues || [])].sort((a, b) => signupFirst(a) - signupFirst(b)).slice(0, MAX_LEAGUE_ROWS);
+  for (const row of leagueRows) {
     const item = leagueTimelineItem(row);
     byKey.set(`${item.kind}-${item.id}`, item);
   }

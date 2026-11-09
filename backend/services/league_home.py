@@ -14,12 +14,16 @@ Keine Personen, keine Anträge - nur Fenster und freie Plätze aus ``league_appl
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
 from services import league_applications, league_look
 from services import league_service as leagues
+from services.log_safe import log_safe
 from services.public_phase import STATUS_LABELS
+
+logger = logging.getLogger("tls.league_home")
 
 PROMOTE = "promote_on_home"
 # Diese Seasons sind vorbei - sie stehen nicht mehr auf der Startseite.
@@ -90,31 +94,52 @@ def _title(league: dict, season: dict) -> str:
     return " · ".join(part for part in (league.get("name"), season.get("name")) if part)
 
 
+async def _application(db, season: dict, now: datetime) -> dict | None:
+    """Fenster und freie Plätze nur, solange sie etwas sagen (offen oder bald offen) - sonst nur der Stand, ohne Zählabfragen."""
+    window = league_applications.window_state(season, now)
+    if window in (league_applications.OPEN, league_applications.UPCOMING):
+        return await league_applications.public_block(db, season)
+    return {"state": window} if window else None
+
+
+async def _row(db, league: dict, season: dict, now: datetime) -> dict | None:
+    state = season_state(season, now)
+    if not state:
+        return None
+    phase, sort_at = state
+    path = f"/liga/{league['slug']}/{season['slug']}"
+    look = league_look.effective(league, season)
+    return {
+        "id": season["id"], "kind": "league", "slug": f"{league['slug']}-{season['slug']}",
+        "title": _title(league, season), "league_name": league.get("name"), "season_name": season.get("name"),
+        "url": path, "apply_url": f"{path}/anmelden",
+        "start_date": _iso(season.get("start_date")), "end_date": leagues.season_end(season),
+        "sort_at": sort_at, "public_phase": phase,
+        "application": await _application(db, season, now),
+        "emblem_url": look["emblem_url"], "banner": look["banner"], "accent_color": look["accent_color"],
+    }
+
+
 async def home_seasons(db, user: dict | None, now: datetime | None = None) -> list[dict]:
-    """Die Seasons für die Startseite, sortiert nach ``sort_at``. ``application`` ist ``None`` ohne Selbstanmeldung."""
+    """Die Seasons für die Startseite, sortiert nach ``sort_at``. ``application`` ist ``None`` ohne Selbstanmeldung.
+    Eine Season mit kaputten Daten fehlt nur selbst - die Startseite bleibt für alle anderen stehen."""
     now = now or now_utc()
+    by_id = {league["id"]: league for league in await db.leagues.find({"status": "active"}, {"_id": 0}).to_list(200)}
+    if not by_id:
+        return []
+    seasons = await db.league_seasons.find({"league_id": {"$in": list(by_id)}, "visibility": {"$ne": "off"},
+                                            "status": {"$nin": list(FINISHED_STATUSES)}}, {"_id": 0}).to_list(500)
     out = []
-    for league in await db.leagues.find({"status": "active"}, {"_id": 0}).to_list(200):
-        seasons = await db.league_seasons.find({"league_id": league["id"], "visibility": {"$ne": "off"},
-                                                "status": {"$nin": list(FINISHED_STATUSES)}}, {"_id": 0}).to_list(200)
-        for season in seasons:
+    for season in seasons:
+        try:
             if not promoted(season) or not await leagues.can_see_season(user, season):
                 continue
-            state = season_state(season, now)
-            if not state:
-                continue
-            phase, sort_at = state
-            path = f"/liga/{league['slug']}/{season['slug']}"
-            look = league_look.effective(league, season)
-            out.append({
-                "id": season["id"], "kind": "league", "slug": f"{league['slug']}-{season['slug']}",
-                "title": _title(league, season), "league_name": league.get("name"), "season_name": season.get("name"),
-                "url": path, "apply_url": f"{path}/anmelden",
-                "start_date": _iso(season.get("start_date")), "end_date": leagues.season_end(season),
-                "sort_at": sort_at, "public_phase": phase,
-                "application": await league_applications.public_block(db, season),
-                "emblem_url": look["emblem_url"], "banner": look["banner"], "accent_color": look["accent_color"],
-            })
+            row = await _row(db, by_id[season["league_id"]], season, now)
+        except Exception:  # noqa: BLE001 - eine kaputte Season darf die Startseite nie kaputt machen
+            logger.exception("[liga] Season %s für die Startseite übersprungen", log_safe(season.get("id")))
+            continue
+        if row:
+            out.append(row)
     far = (now + timedelta(days=36500)).isoformat()
     out.sort(key=lambda row: (row["sort_at"] or far, row["title"]))
     return out
