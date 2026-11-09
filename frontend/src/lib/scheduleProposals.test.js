@@ -6,6 +6,7 @@ import {
   isOwnProposal,
   proposalStatusLabel,
   proposalTimeErrors,
+  proposalTimeHints,
   proposeButtonLabel,
   serverTimeErrors,
   waitingForOtherSide,
@@ -31,20 +32,22 @@ test("bundleProposals: offene einer Gruppe stehen als eine Karte, früheste zuer
   expect(bundleProposals(null)).toEqual([]);
 });
 
-test("proposalTimeErrors prüft jeden Termin einzeln: leer, zu früh, außerhalb der Spielwoche, doppelt", () => {
-  const window = { start: "2027-03-01T00:00:00Z", end: "2027-03-08T00:00:00Z" };
+test("proposalTimeErrors prüft jeden Termin einzeln: leer, zu früh, doppelt - die Spielwoche hält nichts auf", () => {
   const errors = proposalTimeErrors(
     [null, "2027-03-01T10:02:00Z", "2027-03-09T19:00:00Z", "2027-03-03T19:00:00Z", "2027-03-03T19:00:00Z"],
-    { now: NOW, window, weekLabel: "Mo 01.03. 01:00 bis So 07.03. 23:59" },
+    { now: NOW },
   );
-  expect(errors).toEqual([
-    MISSING_TIME_TEXT,
-    PAST_PROPOSAL_TEXT,
-    "Der Termin muss in der Spielwoche liegen (Mo 01.03. 01:00 bis So 07.03. 23:59).",
-    null,
-    DUPLICATE_TIME_TEXT,
-  ]);
+  expect(errors).toEqual([MISSING_TIME_TEXT, PAST_PROPOSAL_TEXT, null, null, DUPLICATE_TIME_TEXT]);
   expect(proposalTimeErrors(["2027-03-20T19:00:00Z"], { now: NOW })).toEqual([null]);
+});
+
+test("proposalTimeHints: außerhalb der Spielwoche nur ein Hinweis, ohne Woche keiner", () => {
+  const window = { start: "2027-03-01T00:00:00Z", end: "2027-03-08T00:00:00Z" };
+  const hints = proposalTimeHints([null, "2027-03-03T19:00:00Z", "2027-03-09T19:00:00Z"], { window, weekLabel: "Mo 01.03. 01:00 bis So 07.03. 23:59" });
+  expect(hints[0]).toBeNull();
+  expect(hints[1]).toBeNull();
+  expect(hints[2]).toBe("Liegt außerhalb der Spielwoche (Mo 01.03. 01:00 bis So 07.03. 23:59) – gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.");
+  expect(proposalTimeHints(["2027-03-09T19:00:00Z"])).toEqual([null]);
 });
 
 test("serverTimeErrors legt die Sätze des Servers an ihre Stelle", () => {

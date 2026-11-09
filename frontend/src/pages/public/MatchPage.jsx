@@ -38,7 +38,7 @@ import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { DoubleNoShowAction } from "@/components/tls/league/DoubleNoShowAction";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
-import { PROPOSAL_LEAD_MS, proposalTimeErrors, proposeButtonLabel, serverTimeErrors, waitingForOtherSide } from "@/lib/scheduleProposals";
+import { PROPOSAL_LEAD_MS, proposalTimeErrors, proposalTimeHints, proposeButtonLabel, serverTimeErrors, waitingForOtherSide } from "@/lib/scheduleProposals";
 import { weekText } from "@/lib/leagueSchedule";
 import { ProposalTimesEditor, ScheduleProposalList } from "@/components/tls/tournament/ScheduleProposalParts";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
@@ -230,8 +230,7 @@ function MatchPageView() {
    * Antwort `{ ok, errors }`; gespeichert sind entweder alle oder keiner. */
   const sendTimes = async (values, send, fallback) => {
     const iso = values.map(fromLocalInput);
-    const week = data?.schedule_block?.window || null;
-    const local = proposalTimeErrors(iso, { window: week, weekLabel: weekText(week) });
+    const local = proposalTimeErrors(iso);
     setActionError("");
     // Fehler zu einem Termin stehen am Feld (role="alert"); oben nur die Meldung als Toast, nicht ein zweites Mal im Kasten.
     if (local.some(Boolean)) {
@@ -257,6 +256,12 @@ function MatchPageView() {
       await load({ preserveDrafts: false });
     }, "Terminvorschlag konnte nicht gesendet werden.");
     setProposalErrors(result.errors || []);
+  };
+
+  // Spielwoche (#2325): nur ein Hinweis am Termin, er hält nichts auf - wie der einzelne Vorschlag aus der App.
+  const timeHints = (values) => {
+    const week = data?.schedule_block?.window || null;
+    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week) });
   };
 
   const changeProposalTimes = (next) => {
@@ -629,7 +634,7 @@ function MatchPageView() {
                   <div className="grid gap-3 md:grid-cols-2 md:items-start">
                     <div>
                       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5" aria-hidden="true">{proposalTimes.length > 1 ? "Termine" : "Termin"}</div>
-                      <ProposalTimesEditor values={proposalTimes} onChange={changeProposalTimes} errors={proposalErrors} min={earliestProposalInput()} label="Termin" testId="match-proposal-at" disabled={busy} />
+                      <ProposalTimesEditor values={proposalTimes} onChange={changeProposalTimes} errors={proposalErrors} hints={timeHints(proposalTimes)} min={earliestProposalInput()} label="Termin" testId="match-proposal-at" disabled={busy} />
                     </div>
                     <Field label="Notiz (für alle Termine)">
                       <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
@@ -647,7 +652,7 @@ function MatchPageView() {
                 {/* Vorschläge der Gegenseite als Liste (#2325): ein Klick nimmt einen Termin an, die übrigen der Gruppe schließen. */}
                 <ScheduleProposalList proposals={data.schedule_proposals} page={data} userId={user?.id} canManage={canManageSchedule}
                   fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime} toLocal={toLocalInput}
-                  onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} />
+                  onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} hintsFor={timeHints} />
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
               {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}

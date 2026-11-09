@@ -92,14 +92,18 @@ test("doppelter Termin: Fehler am zweiten, nichts geht an den Server", async () 
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 
-test("Liga: ein Termin außerhalb der Spielwoche bleibt hier hängen", async () => {
+test("Liga: ein Termin außerhalb der Spielwoche bekommt einen Hinweis und geht trotzdem raus", async () => {
   renderMatch({ ...BASE, schedule_block: { fixed: false, window: { start: "2027-03-08T23:00:00Z", end: "2027-03-15T23:00:00Z" }, rules: {}, requests: [], history: [] } });
   fireEvent.change(await screen.findByTestId("match-proposal-at"), { target: { value: "2027-03-10T20:00" } });
   fireEvent.click(screen.getByTestId("match-proposal-at-weiter"));
   fireEvent.change(screen.getByTestId("match-proposal-at-2"), { target: { value: "2027-03-20T20:00" } });
+  expect(screen.getByTestId("match-proposal-at-hinweis-2")).toHaveTextContent("außerhalb der Spielwoche");
+  expect(screen.queryByTestId("match-proposal-at-hinweis-1")).toBeNull();
+  expect(screen.getByTestId("match-proposal-at-2")).toHaveAttribute("aria-invalid", "false");
   fireEvent.click(screen.getByTestId("match-proposal-send"));
-  expect(await screen.findByTestId("match-proposal-at-fehler-2")).toHaveTextContent("Spielwoche");
-  expect(apiMock.post).not.toHaveBeenCalled();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/group", expect.objectContaining({
+    scheduled_ats: [local("2027-03-10T20:00"), local("2027-03-20T20:00")],
+  })));
 });
 
 test("der Server nennt die Stelle: Sperrzeit am dritten Termin", async () => {

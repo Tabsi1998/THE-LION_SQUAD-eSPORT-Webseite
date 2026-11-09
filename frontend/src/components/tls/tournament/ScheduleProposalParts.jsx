@@ -23,7 +23,7 @@ const TEXT_BUTTON = "tls-btn shrink-0 min-h-11 px-3 py-2 rounded-sm text-[10px] 
  * Ein bis drei Felder für Datum und Uhrzeit, jedes mit eigenem Fehler. „+ weiteren Termin“ fügt eins hinzu, das X entfernt
  * eins (das letzte bleibt). Das erste Feld trägt `testId`, die weiteren `testId-2`, `testId-3`.
  */
-export function ProposalTimesEditor({ values, onChange, errors = [], min, label = "Termin", testId, disabled = false }) {
+export function ProposalTimesEditor({ values, onChange, errors = [], hints = [], min, label = "Termin", testId, disabled = false }) {
   const baseId = useId();
   const update = (index, value) => onChange(values.map((current, at) => (at === index ? value : current)));
   const remove = (index) => onChange(values.filter((_, at) => at !== index));
@@ -33,7 +33,10 @@ export function ProposalTimesEditor({ values, onChange, errors = [], min, label 
     <div className="space-y-2" data-testid={testId ? `${testId}-list` : undefined}>
       {values.map((value, index) => {
         const error = errors[index];
+        // Ein Hinweis hält nichts auf (Spielwoche) - er steht nur, solange kein Fehler da ist.
+        const hint = error ? null : hints[index];
         const errorId = `${baseId}-fehler-${index}`;
+        const hintId = `${baseId}-hinweis-${index}`;
         const name = many ? `${label} ${index + 1}` : label;
         return (
           // Die Stelle ist die Kennung: die Felder haben keine eigene, die Werte stehen im Zustand.
@@ -47,7 +50,7 @@ export function ProposalTimesEditor({ values, onChange, errors = [], min, label 
                 onChange={(event) => update(index, event.target.value)}
                 aria-label={`${name}: Datum und Uhrzeit`}
                 aria-invalid={Boolean(error)}
-                aria-describedby={error ? errorId : undefined}
+                aria-describedby={error ? errorId : hint ? hintId : undefined}
                 className={`input min-w-0 flex-1 ${error ? "border-warn focus:border-warn" : ""}`}
                 data-testid={index === 0 ? testId : `${testId}-${index + 1}`}
               />
@@ -59,6 +62,7 @@ export function ProposalTimesEditor({ values, onChange, errors = [], min, label 
               )}
             </div>
             {error && <p id={errorId} role="alert" className="mt-1 text-xs text-warn [overflow-wrap:anywhere]" data-testid={`${testId}-fehler-${index + 1}`}>{error}</p>}
+            {hint && <p id={hintId} className="mt-1 text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`${testId}-hinweis-${index + 1}`}>{hint}</p>}
           </div>
         );
       })}
@@ -73,7 +77,7 @@ export function ProposalTimesEditor({ values, onChange, errors = [], min, label 
 }
 
 /** Gegenvorschlag zu einem Vorschlag oder einer ganzen Gruppe: bis zu drei Termine, eine Antwort, ein Knopf. */
-function CounterForm({ bundleKey, min, busy, onCounter, onClose, initial }) {
+function CounterForm({ bundleKey, min, busy, onCounter, onClose, initial, hintsFor }) {
   const [times, setTimes] = useState([initial || ""]);
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState([]);
@@ -89,7 +93,7 @@ function CounterForm({ bundleKey, min, busy, onCounter, onClose, initial }) {
   return (
     <div className="mt-3 border-t border-white/10 pt-3 space-y-3" data-testid={`match-counter-${bundleKey}`}>
       <p className="text-xs text-white/55">Euer Gegenvorschlag – bis zu {MAX_PROPOSAL_TIMES} Termine.</p>
-      <ProposalTimesEditor values={times} onChange={change} errors={errors} min={min} label="Gegenvorschlag" testId={`match-counter-at-${bundleKey}`} disabled={busy} />
+      <ProposalTimesEditor values={times} onChange={change} errors={errors} hints={hintsFor ? hintsFor(times) : []} min={min} label="Gegenvorschlag" testId={`match-counter-at-${bundleKey}`} disabled={busy} />
       <input aria-label="Antwort oder Grund" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="input" placeholder="Antwort / Grund (optional)" />
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={submit} data-testid={`match-counter-send-${bundleKey}`} className="tls-btn tls-btn--secondary min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">{proposeButtonLabel(times.length, true)}</button>
@@ -108,7 +112,7 @@ function actorName(proposal) {
  * `onDecide(proposal, action)` für annehmen, ablehnen und zurückziehen eines einzelnen; `onGroupDecide(proposal, action)` für
  * alle ablehnen und alle zurückziehen; `onCounter(proposal, times, note)` mit Antwort `{ ok, errors }`.
  */
-export function ScheduleProposalList({ proposals, page, userId, canManage, fixedTime, busy, min, formatDateTime, onDecide, onGroupDecide, onCounter, toLocal }) {
+export function ScheduleProposalList({ proposals, page, userId, canManage, fixedTime, busy, min, formatDateTime, onDecide, onGroupDecide, onCounter, toLocal, hintsFor }) {
   const [counterFor, setCounterFor] = useState(null);
   const bundles = bundleProposals(proposals);
   return bundles.map((bundle) => {
@@ -122,7 +126,7 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
     const counterOpen = agree && counterFor === bundle.key;
     const counter = agree && (
       counterOpen ? (
-        <CounterForm bundleKey={bundle.key} min={min} busy={busy} initial={toLocal?.(first.scheduled_at)} onClose={() => setCounterFor(null)}
+        <CounterForm bundleKey={bundle.key} min={min} busy={busy} initial={toLocal?.(first.scheduled_at)} onClose={() => setCounterFor(null)} hintsFor={hintsFor}
           onCounter={(times, note) => onCounter(first, times, note)} />
       ) : null
     );

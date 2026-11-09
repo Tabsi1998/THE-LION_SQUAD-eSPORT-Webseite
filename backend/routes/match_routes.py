@@ -525,10 +525,9 @@ DUPLICATE_TIME_DETAIL = "Diesen Termin hast du schon eingetragen – bitte einen
 
 
 def _proposal_time_problems(tournament: dict | None, match: dict, moments: list[datetime]) -> list[dict]:
-    """Mehrere Termine auf einmal (#2325): jeder Termin einzeln - in der Zukunft, nicht in einer Sperrzeit, in einer Staffel
-    mit Terminregeln in der Spielwoche, nicht doppelt. Je Problem eine Zeile mit der Stelle in der Eingabe; leer: alle passen.
-    Dieselben Sätze wie beim einzelnen Vorschlag."""
-    window = league_schedule.window_of(tournament, match) if league_schedule.rules_of(tournament) else None
+    """Mehrere Termine auf einmal (#2325): jeder Termin einzeln - in der Zukunft, nicht in einer Sperrzeit, nicht doppelt.
+    Je Problem eine Zeile mit der Stelle in der Eingabe; leer: alle passen. Dieselben Sätze wie beim einzelnen Vorschlag -
+    und nicht strenger als er: die Spielwoche ist nur ein Hinweis (``_proposal_time_hints``)."""
     problems: list[dict] = []
     seen: list[datetime] = []
     for index, raw in enumerate(moments):
@@ -539,16 +538,24 @@ def _proposal_time_problems(tournament: dict | None, match: dict, moments: list[
         except HTTPException as refusal:
             problems.append({"index": index, "detail": refusal.detail})
             continue
-        if window and not window.contains(moment):
-            last = window.end - timedelta(minutes=1)
-            problems.append({"index": index, "detail": f"Der Termin muss in der Spielwoche liegen "
-                                                       f"({league_schedule.when_text(window.start)} bis {league_schedule.when_text(last)})."})
-            continue
         if moment in seen:
             problems.append({"index": index, "detail": DUPLICATE_TIME_DETAIL})
             continue
         seen.append(moment)
     return problems
+
+
+def _proposal_time_hints(tournament: dict | None, match: dict, moments: list[datetime]) -> list[dict]:
+    """Hinweise je Termin (#2325), die nichts aufhalten: In einer Staffel mit Terminregeln zählt ein Termin außerhalb der
+    Spielwoche nicht für die 72-h-Regel (``home_rule_at``) - er gilt nur, wenn die Gegenseite annimmt."""
+    window = league_schedule.window_of(tournament, match) if league_schedule.rules_of(tournament) else None
+    if not window:
+        return []
+    last = window.end - timedelta(minutes=1)
+    text = (f"Liegt außerhalb der Spielwoche ({league_schedule.when_text(window.start)} bis {league_schedule.when_text(last)}) – "
+            "gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.")
+    return [{"index": index, "detail": text} for index, raw in enumerate(moments)
+            if not window.contains(raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc))]
 
 
 def _refuse_time_problems(problems: list[dict], count: int) -> None:
@@ -1030,7 +1037,8 @@ async def create_schedule_proposal_group(match_id: str, body: MatchSchedulePropo
     _refuse_time_problems(_proposal_time_problems(tournament, match, body.scheduled_ats), len(isos))
     docs = await _insert_proposal_group(db, match, collection, tournament, me, acting_reg, body.scheduled_ats, note)
     await _tell_schedule(db, match, "proposed", docs[0], me, docs[0]["actor_registration_id"], note, group=docs)
-    return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False}
+    return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False,
+            "hints": _proposal_time_hints(tournament, match, body.scheduled_ats)}
 
 
 async def _open_group_members(db, proposal: dict) -> list[dict]:
@@ -1103,7 +1111,8 @@ async def decide_schedule_proposal_group(match_id: str, proposal_id: str, body: 
             await db.match_schedule_proposals.delete_many({"group_id": docs[0]["group_id"]})
             raise
         await _tell_schedule(db, match, "countered", docs[0], me, actor_reg_id, note, group=docs)
-        return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False}
+        return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False,
+                "hints": _proposal_time_hints(tournament, match, body.scheduled_ats)}
     await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
     if body.action == "withdraw":
         await _after_withdraw(db, match, collection, now_iso)

@@ -74,23 +74,33 @@ export function bundleProposals(proposals) {
 
 /**
  * Jeder Termin einzeln (#2325): `values` sind Zeitpunkte (ISO) oder `null` für ein leeres Feld. Antwort: je Termin ein Satz
- * oder `null`. Prüft leer, zu früh, außerhalb der Spielwoche (`window` aus `schedule_block`, nur in Staffeln mit Regeln) und
- * doppelt - Sperrzeiten kennt erst der Server, er antwortet mit derselben Stelle.
+ * oder `null`. Prüft leer, zu früh und doppelt - Sperrzeiten kennt erst der Server, er antwortet mit derselben Stelle.
+ * Die Spielwoche hält nichts auf, dazu `proposalTimeHints`.
  */
-export function proposalTimeErrors(values, { now = Date.now(), window = null, weekLabel = "" } = {}) {
+export function proposalTimeErrors(values, { now = Date.now() } = {}) {
   const seen = new Set();
-  const start = window?.start ? new Date(window.start).getTime() : null;
-  const end = window?.end ? new Date(window.end).getTime() : null;
   return (values || []).map((value) => {
     const moment = value ? new Date(value).getTime() : Number.NaN;
     if (Number.isNaN(moment)) return MISSING_TIME_TEXT;
     if (moment < now + PROPOSAL_LEAD_MS) return PAST_PROPOSAL_TEXT;
-    if (start !== null && end !== null && (moment < start || moment >= end)) {
-      return weekLabel ? `Der Termin muss in der Spielwoche liegen (${weekLabel}).` : "Der Termin muss in der Spielwoche liegen.";
-    }
     if (seen.has(moment)) return DUPLICATE_TIME_TEXT;
     seen.add(moment);
     return null;
+  });
+}
+
+/**
+ * Hinweise, die nichts aufhalten (#2325): In einer Staffel mit Terminregeln (`window` aus `schedule_block`) zählt ein Termin
+ * außerhalb der Spielwoche nicht für die 72-h-Regel - er gilt nur, wenn die Gegenseite annimmt. Derselbe Satz wie am Server.
+ */
+export function proposalTimeHints(values, { window = null, weekLabel = "" } = {}) {
+  const start = window?.start ? new Date(window.start).getTime() : null;
+  const end = window?.end ? new Date(window.end).getTime() : null;
+  return (values || []).map((value) => {
+    const moment = value ? new Date(value).getTime() : Number.NaN;
+    if (start === null || end === null || Number.isNaN(moment) || (moment >= start && moment < end)) return null;
+    const week = weekLabel ? ` (${weekLabel})` : "";
+    return `Liegt außerhalb der Spielwoche${week} – gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.`;
   });
 }
 

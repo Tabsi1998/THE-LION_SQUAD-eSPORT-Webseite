@@ -136,14 +136,24 @@ async def test_every_time_is_checked_and_nothing_is_half_saved(flow):
     assert twice.status_code == 422
     assert [row["index"] for row in twice.json()["detail"]["errors"]] == [1]
 
-    outside = await propose(flow, world, "Kapitaen", [50, 170])
-    assert outside.status_code == 422, "in der Liga mit Terminregeln liegt jeder Termin in der Spielwoche"
-    assert outside.json()["detail"]["errors"][0]["index"] == 1
-    assert "Spielwoche" in outside.json()["detail"]["errors"][0]["detail"]
-
     assert await rows(flow, world) == {}
     assert await notes(flow, "schedule_proposed") == []
     assert (await flow.reload(world["match"])).get("schedule_status") is None
+
+
+@pytest.mark.asyncio
+async def test_outside_the_week_is_a_hint_not_a_refusal(flow):
+    """Nicht strenger als der einzelne Vorschlag (App): ein Termin außerhalb der Spielwoche geht, mit Hinweis an seiner Stelle."""
+    world = await live_world(flow)
+    flow.act_as(world["users"]["Kapitaen"])
+    single = await flow.post(base_url(world), json={"scheduled_at": at(170)})
+    assert single.status_code == 200, "der einzelne Weg nimmt ihn an"
+    outside = await propose(flow, world, "Kapitaen", [50, 175])
+    assert outside.status_code == 200, outside.text
+    hints = outside.json()["hints"]
+    assert [row["index"] for row in hints] == [1]
+    assert "außerhalb der Spielwoche" in hints[0]["detail"] and "72-h-Regel" in hints[0]["detail"]
+    assert len(await rows(flow, world)) == 3
 
 
 @pytest.mark.asyncio
