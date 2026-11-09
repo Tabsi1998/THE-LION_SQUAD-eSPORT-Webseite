@@ -86,6 +86,23 @@ def test_a_person_with_two_open_entries_hears_both():
     assert row["fixable"] is True
 
 
+@pytest.mark.parametrize("hours", [None, 0, 48, 72])
+def test_the_reminder_setting_never_changes_the_checkin_block_of_the_rulebook(hours):
+    """Der Baustein ``[[baustein:checkin]]`` friert seine Quelle ein - die Erinnerung (#2313) darf keine Fassung veraltet machen."""
+    import asyncio
+
+    from services import league_rule_blocks
+
+    base = {"opens_minutes_before": 15, "closes_minutes_after": 15, "min_present": 3, "remind_minutes_before_close": 5}
+    rules = base if hours is None else {**base, "open_points_remind_hours": hours}
+
+    with_value = asyncio.run(league_rule_blocks._checkin(None, {}, {"checkin_rules": rules}))
+    without = asyncio.run(league_rule_blocks._checkin(None, {}, {"checkin_rules": base}))
+
+    assert with_value == without
+    assert "open_points_remind_hours" not in str(with_value)
+
+
 def test_other_rules_stay_blockers():
     ctx = context(ages={}, ids={})
     ctx.memberships = {"u2": {"sq-other"}}

@@ -59,7 +59,8 @@ def team_text(title: str, name: str, points: dict) -> str:
 
 
 async def tell(db, points: dict, *, title: str, name: str, responsible: set[str], team_url: str, key: str) -> int:
-    """Die Nachrichten zu ``open_points`` - ``key`` + ``:<user>`` ist der Schlüssel. Hält nie etwas auf."""
+    """Die Nachrichten zu ``open_points``. Schlüssel ``<key>:player:<user>`` für die eigene Angabe und ``<key>:team:<user>`` für die
+    Übersicht - getrennt, damit ein Captain mit eigenem offenen Punkt beides bekommt. Hält nie etwas auf."""
     from services.user_notifications import create_user_notification
 
     if not points["players"] and not points["shortfall"]:
@@ -70,18 +71,18 @@ async def tell(db, points: dict, *, title: str, name: str, responsible: set[str]
         if not row["fixable"]:
             continue
         if await create_user_notification(row["id"], "Angabe für die Liga fehlt", person_text(title, row), url=row["fix_url"], kind=KIND,
-                                          meta={**meta, "dedupe_key": f"{key}:{row['id']}"}):
+                                          meta={**meta, "dedupe_key": f"{key}:player:{row['id']}"}):
             sent += 1
     text = team_text(title, name, points)
     for user_id in sorted(responsible):
         if await create_user_notification(user_id, "Offene Punkte im Kader", text, url=team_url, kind=KIND,
-                                          meta={**meta, "dedupe_key": f"{key}:{user_id}"}):
+                                          meta={**meta, "dedupe_key": f"{key}:team:{user_id}"}):
             sent += 1
     return sent
 
 
 async def after_submit(db, league: dict, season: dict, application: dict, squad: dict, *, minimum: int, responsible: set[str]) -> int:
-    """Erinnerung beim Einreichen der Selbstanmeldung (Schlüssel ``league-open-points:<antrag>:submit:<user>``). ``responsible``: Captain
+    """Erinnerung beim Einreichen der Selbstanmeldung (Schlüssel ``league-open-points:<antrag>:submit:player|team:<user>``). ``responsible``: Captain
     und Vertreter, ohne beide die Hauptteam-Leitung - gibt ``league_applications`` mit (kein Import nach oben)."""
     try:
         members = [uid for uid in squad.get("member_ids") or [] if uid]
@@ -118,6 +119,9 @@ async def _played(db, tournament_id: str, registration_id: str) -> bool:
 async def _remind_side(db, tournament: dict, match: dict, registration: dict, title: str) -> int:
     from services.match_audience import responsible_ids, teams_by_id
 
+    # Nur Seiten, die noch dabei sind: zurückgezogen, disqualifiziert oder ausgetreten hört niemand mehr etwas.
+    if registration.get("status") not in league_roster.ACTIVE_REGISTRATION_STATUSES:
+        return 0
     squad = await db.team_squads.find_one({"id": registration.get("squad_id")}, {"_id": 0}) if registration.get("squad_id") else None
     if not squad or await _played(db, tournament["id"], registration["id"]):
         return 0

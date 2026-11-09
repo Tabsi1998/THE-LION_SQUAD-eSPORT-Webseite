@@ -76,7 +76,8 @@ async def test_a_missing_birth_date_is_a_hint_and_the_registration_goes_through(
     assert any("TeamA S3" in text and "Geburtsdatum fehlt" in text for text in row["warnings"]), row
     assert row["shortfall"] is None
     assert "1990" not in str(row) and "birth_date" not in str(row)
-    assert (await submit(flow, w, side)).status_code == 200
+    answer = await submit(flow, w, side)
+    assert answer.status_code == 200, answer.text
 
     status = await row_of(flow, w, side)
     assert status["state"] == "submitted" and status["problems"] == [] and status["can_submit"] is False
@@ -94,7 +95,8 @@ async def test_too_few_eligible_players_are_a_hint_and_the_registration_goes_thr
 
     assert row["problems"] == [], row
     assert row["shortfall"].startswith("Nur 3 von 4 Spielern sind spielberechtigt, die Season verlangt mindestens 4.")
-    assert (await submit(flow, w, side)).status_code == 200
+    answer = await submit(flow, w, side)
+    assert answer.status_code == 200, answer.text
 
 
 @pytest.mark.asyncio
@@ -105,7 +107,8 @@ async def test_too_young_counts_like_missing_and_only_the_captain_hears_it(flow)
 
     row = await row_of(flow, w, side)
     assert row["problems"] == [] and any("Altersvorgabe" in text for text in row["warnings"]), row
-    assert (await submit(flow, w, side)).status_code == 200
+    answer = await submit(flow, w, side)
+    assert answer.status_code == 200, answer.text
 
     notes = await open_point_notes(flow)
     assert {note["user_id"] for note in notes} == {side["captain"]["id"], side["vice"]["id"]}, "nichts zu beheben: keine Nachricht an die Person"
@@ -145,7 +148,39 @@ async def test_submitting_reminds_the_person_and_the_captain_once(flow):
     assert person["url"] == "/profile?tab=basic" and "Dein Geburtsdatum fehlt im Profil." in person["body"] and "nicht einchecken" in person["body"]
     assert "Die Person" not in person["body"], "die Person selbst wird direkt angesprochen"
     assert "TeamA S3 (Geburtsdatum fehlt)" in by_user[side["captain"]["id"]]["body"]
-    assert all(note["meta"]["dedupe_key"].endswith(f":submit:{note['user_id']}") for note in notes)
+    assert person["meta"]["dedupe_key"].endswith(f":submit:player:{side['member']['id']}")
+    assert by_user[side["captain"]["id"]]["meta"]["dedupe_key"].endswith(f":submit:team:{side['captain']['id']}")
+
+
+@pytest.mark.asyncio
+async def test_a_captain_with_an_own_open_point_gets_both_messages(flow):
+    """Eigene Angabe und Kader-Übersicht haben getrennte Schlüssel - die eine verdrängt die andere nicht."""
+    w = await ready_world(flow)
+    side = w["teams"][0]
+    await without_birth_date(flow, side["member"])
+    await without_birth_date(flow, side["captain"])
+
+    await submitted(flow, w, side)
+
+    titles = sorted(note["title"] for note in await open_point_notes(flow) if note["user_id"] == side["captain"]["id"])
+    assert titles == ["Angabe für die Liga fehlt", "Offene Punkte im Kader"]
+
+
+@pytest.mark.asyncio
+async def test_a_failing_reminder_never_fails_the_submission(flow, monkeypatch):
+    """Der ganze Erinnerungs-Schritt samt Mindestkader und Verantwortlichen steht im ``try`` - der Antrag ist dann schon gespeichert."""
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Probe: Erinnerung nicht möglich")
+
+    w = await ready_world(flow)
+    side = w["teams"][0]
+    await without_birth_date(flow, side["member"])
+    monkeypatch.setattr(league_open_points, "after_submit", broken)
+
+    answer = await submit(flow, w, side)
+
+    assert answer.status_code == 200, answer.text
+    assert await flow.db.league_applications.count_documents({"squad_id": side["squad"]["id"]}) == 1
 
 
 @pytest.mark.asyncio
@@ -243,7 +278,10 @@ async def test_before_the_first_match_the_job_reminds_once_even_when_it_runs_twi
     notes = await open_point_notes(flow)
     assert first == 3 and second == 0
     assert {note["user_id"] for note in notes} == {home["member"]["id"], home["captain"]["id"], home["vice"]["id"]}
-    assert all(note["meta"]["dedupe_key"].startswith(f"league-open-points:{reg_home['id']}:first-match:") for note in notes)
+    assert sorted(note["meta"]["dedupe_key"] for note in notes) == sorted([
+        f"league-open-points:{reg_home['id']}:first-match:player:{home['member']['id']}",
+        f"league-open-points:{reg_home['id']}:first-match:team:{home['captain']['id']}",
+        f"league-open-points:{reg_home['id']}:first-match:team:{home['vice']['id']}"])
     captain = next(note for note in notes if note["user_id"] == home["captain"]["id"])
     assert captain["url"] == f"/matches/{match['id']}"
 
@@ -252,12 +290,15 @@ async def test_before_the_first_match_the_job_reminds_once_even_when_it_runs_twi
 async def test_the_job_waits_until_the_lead_time_and_follows_the_setting(flow):
     w, match, _reg = await first_match_world(flow, hours=60)
 
-    assert await league_open_points.remind_before_first_match(flow.db) == 0
+    too_early = await league_open_points.remind_before_first_match(flow.db)
+    assert too_early == 0
     await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"checkin_rules": {**match_flow.DEFAULTS, "open_points_remind_hours": 72}}})
-    assert await league_open_points.remind_before_first_match(flow.db) == 3
+    longer = await league_open_points.remind_before_first_match(flow.db)
+    assert longer == 3
     await flow.db.notifications.delete_many({})
     await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"checkin_rules": {**match_flow.DEFAULTS, "open_points_remind_hours": 0}}})
-    assert await league_open_points.remind_before_first_match(flow.db) == 0
+    off = await league_open_points.remind_before_first_match(flow.db)
+    assert off == 0
 
 
 @pytest.mark.asyncio
@@ -267,4 +308,17 @@ async def test_after_a_played_match_the_job_stays_quiet(flow):
     played = await duel(flow, tournament, reg_home, {"id": "reg-probe-andere"})
     await flow.db.matches_v2.update_one({"id": played["id"]}, {"$set": {"status": "completed"}})
 
-    assert await league_open_points.remind_before_first_match(flow.db) == 0
+    sent = await league_open_points.remind_before_first_match(flow.db)
+    assert sent == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["withdrawn", "disqualified"])
+async def test_a_side_that_left_hears_nothing_before_the_first_match(flow, status):
+    w, match, reg_home = await first_match_world(flow, hours=30)
+    await flow.db.tournament_registrations.update_one({"id": reg_home["id"]}, {"$set": {"status": status}})
+
+    sent = await league_open_points.remind_before_first_match(flow.db)
+
+    assert sent == 0
+    assert await open_point_notes(flow) == []

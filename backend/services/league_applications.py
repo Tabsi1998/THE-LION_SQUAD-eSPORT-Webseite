@@ -284,8 +284,11 @@ async def submit(db, league: dict, season: dict, body: dict, user: dict) -> dict
     # Fehlende Angaben (#2313): Die Anmeldung ging durch, die Betroffenen und Captain und Vertreter hören, was bis zum ersten Spiel fehlt.
     from services import league_open_points
 
-    await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _min_size(db, fresh),
-                                          responsible=await _responsible(db, squad))
+    try:
+        await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _min_size(db, fresh),
+                                              responsible=await _responsible(db, squad))
+    except Exception:  # noqa: BLE001 - der Antrag ist schon gespeichert, eine Erinnerung hält ihn nie auf
+        logger.warning("[liga] Erinnerung an fehlende Angaben nicht verschickt: %s", log_safe(application.get("id")), exc_info=True)
     return application
 
 
