@@ -926,3 +926,27 @@ async def test_checkin_rules_per_season_write_through_to_the_staffeln(flow):
     assert (await flow.put(url, json={"min_present": 2, "closes_minutes_after": 10})).json()["staffeln_updated"] == 0
     assert (await flow.get(url)).json()["active"] is True
     assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200, "die Staffel hat jetzt einen Check-in"
+
+
+@pytest.mark.asyncio
+async def test_the_panel_sends_back_what_it_loaded_including_the_open_points_reminder(flow):
+    """#2313: Der Kasten schickt die geladenen Werte zurück, auch ``open_points_remind_hours`` - das darf nie 422 geben."""
+    world = await checkin_world(flow, rules=None)
+    now = now_utc().isoformat()
+    await flow.db.leagues.insert_one({"id": "liga", "name": "Probeliga", "slug": "probeliga", "status": "active", "created_at": now})
+    await flow.db.league_seasons.insert_one({"id": world["season_id"], "league_id": "liga", "name": "Season 1", "slug": "season-1",
+                                             "status": "active", "visibility": "public", "number": 1, "team_size": 4, "created_at": now})
+    url = f"/api/admin/leagues/seasons/{world['season_id']}/checkin-rules"
+    flow.act_as(world["staff"])
+    loaded = (await flow.get(url)).json()["defaults"]
+    assert loaded["open_points_remind_hours"] == 48
+
+    saved = await flow.put(url, json={**loaded, "open_points_remind_hours": 72})
+
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["checkin_rules"]["open_points_remind_hours"] == 72
+    assert (await tournament_of(flow, world))["checkin_rules"]["open_points_remind_hours"] == 72
+    again = await flow.put(url, json=saved.json()["checkin_rules"])
+    assert again.status_code == 200, again.text
+    too_long = await flow.put(url, json={**loaded, "open_points_remind_hours": 169})
+    assert too_long.status_code == 422 and "erlaubt sind 0 bis 168" in too_long.json()["detail"]
