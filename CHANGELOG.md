@@ -1,19 +1,17 @@
 # Changelog
 
-## [1.72.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.71.0...v1.72.0) (2026-11-09)
-
+## 1.72.0 (09.11.2026)
 
 ### Neu
 
-* **liga:** Erlaubte Ausrüstung im Regelwerk als Tabelle je Kategorie mit Bild, Name und Ausnahmen nach Slot, im Web und im PDF ([#2305](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2305)) ([2ca3b54](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2ca3b54ccc3665857f2cbd42276885967f3d9e57))
-* **liga:** Liga- und Matchseite zeigen die gesperrten Aufsätze ganz oben im aufgeklappten Kasten ([#2305](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2305)) ([2ca3b54](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2ca3b54ccc3665857f2cbd42276885967f3d9e57))
-* **liga:** Regelwerk nennt bei Waffen mit mehr gesperrten als erlaubten Aufsätzen nur noch die erlaubten ([#2305](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2305)) ([2ca3b54](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2ca3b54ccc3665857f2cbd42276885967f3d9e57))
-* **liga:** Regelwerk-Tabelle der Ausrüstung stapelt am Handy ohne seitliches Scrollen ([#2305](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2305)) ([2ca3b54](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2ca3b54ccc3665857f2cbd42276885967f3d9e57))
-
+* **liga:** Erlaubte Ausrüstung im Regelwerk als Tabelle je Kategorie mit Bild, Name und Ausnahmen nach Slot, im Web und im PDF (#2305)
+* **liga:** Liga- und Matchseite zeigen die gesperrten Aufsätze ganz oben im aufgeklappten Kasten (#2305)
+* **liga:** Regelwerk nennt bei Waffen mit mehr gesperrten als erlaubten Aufsätzen nur noch die erlaubten (#2305)
+* **liga:** Regelwerk-Tabelle der Ausrüstung stapelt am Handy ohne seitliches Scrollen (#2305)
 
 ### Fehlerbehebungen
 
-* Sperrliste der Season lässt sich auch speichern, wenn eine Waffe oder Klasse in allen Modi gesperrt ist – überflüssige Aufsatz- und Einzel-Sperren entfallen beim Speichern, ein Hinweis sagt es vorher ([83f8b67](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/83f8b677ef2c2e8422801a7fbe8cbe694a4f76f6))
+* Sperrliste der Season lässt sich auch speichern, wenn eine Waffe oder Klasse in allen Modi gesperrt ist – überflüssige Aufsatz- und Einzel-Sperren entfallen beim Speichern, ein Hinweis sagt es vorher
 
 ## 1.71.0 (05.11.2026)
 
