@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, Check, ChevronDown, Flag, MessageSquare, RefreshCw, Send, ShieldCheck, Trophy, X } from "lucide-react";
+import { CalendarClock, ChevronDown, Flag, MessageSquare, RefreshCw, Send, ShieldCheck, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -38,7 +38,9 @@ import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { DoubleNoShowAction } from "@/components/tls/league/DoubleNoShowAction";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
-import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
+import { PROPOSAL_LEAD_MS, proposalTimeErrors, proposeButtonLabel, serverTimeErrors, waitingForOtherSide } from "@/lib/scheduleProposals";
+import { weekText } from "@/lib/leagueSchedule";
+import { ProposalTimesEditor, ScheduleProposalList } from "@/components/tls/tournament/ScheduleProposalParts";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
@@ -116,15 +118,15 @@ function fromLocalInput(value) {
 
 // Terminvorschläge nur in der Zukunft (#2124): frühestens 5 Minuten ab jetzt - wie der Server
 // (services/schedule_proposal_time.py).
-const PROPOSAL_LEAD_MS = 5 * 60 * 1000;
-const PAST_PROPOSAL_TEXT = "Der Termin liegt in der Vergangenheit – bitte einen Zeitpunkt frühestens 5 Minuten ab jetzt wählen.";
-
 function earliestProposalInput(now = Date.now()) {
   return toLocalInput(new Date(now + PROPOSAL_LEAD_MS).toISOString());
 }
 
-function tooEarly(iso, now = Date.now()) {
-  return new Date(iso).getTime() < now + PROPOSAL_LEAD_MS;
+/** Der erste Satz für die Meldung oben - mit „Termin 2:“, wenn mehrere Felder da sind. */
+function firstTimeError(errors) {
+  const index = errors.findIndex(Boolean);
+  if (index < 0) return "";
+  return errors.length > 1 ? `Termin ${index + 1}: ${errors[index]}` : errors[index];
 }
 
 // Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
@@ -154,10 +156,10 @@ function MatchPageView() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [chat, setChat] = useState([]);
-  const [proposalAt, setProposalAt] = useState("");
+  // Bis zu drei Termine auf einmal (#2325), jeder mit eigenem Fehler.
+  const [proposalTimes, setProposalTimes] = useState([""]);
+  const [proposalErrors, setProposalErrors] = useState([]);
   const [proposalNote, setProposalNote] = useState("");
-  const [counterAt, setCounterAt] = useState("");
-  const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
   // Das eine Ergebnis-Fenster (#1370): dieselbe Eingabe wie in Turnierleitung, Matchplan und Stationen.
   const [resultOpen, setResultOpen] = useState(false);
@@ -175,9 +177,10 @@ function MatchPageView() {
     setChat(messages || []);
     const nextMatch = page.match || {};
     if (preserveDrafts) {
-      setProposalAt((current) => current || toLocalInput(nextMatch.scheduled_at));
+      setProposalTimes((current) => (current.some(Boolean) ? current : [toLocalInput(nextMatch.scheduled_at)]));
     } else {
-      setProposalAt(toLocalInput(nextMatch.scheduled_at));
+      setProposalTimes([toLocalInput(nextMatch.scheduled_at)]);
+      setProposalErrors([]);
     }
   }, [id]);
 
@@ -223,35 +226,67 @@ function MatchPageView() {
     return false;
   };
 
+  /** Termine prüfen und senden (#2325): erst jeder einzeln hier, dann der Server - seine Fehler kommen an dieselbe Stelle.
+   * Antwort `{ ok, errors }`; gespeichert sind entweder alle oder keiner. */
+  const sendTimes = async (values, send, fallback) => {
+    const iso = values.map(fromLocalInput);
+    const week = data?.schedule_block?.window || null;
+    const local = proposalTimeErrors(iso, { window: week, weekLabel: weekText(week) });
+    setActionError("");
+    // Fehler zu einem Termin stehen am Feld (role="alert"); oben nur die Meldung als Toast, nicht ein zweites Mal im Kasten.
+    if (local.some(Boolean)) {
+      toast.error(firstTimeError(local));
+      return { ok: false, errors: local };
+    }
+    const attempt = await submitOnce(() => send(iso));
+    if (!attempt.started) return { ok: false };
+    if (!attempt.error) return { ok: true };
+    const detail = attempt.error.response?.data?.detail;
+    const errors = serverTimeErrors(detail, values.length);
+    if (errors.some(Boolean)) toast.error(formatApiError(detail) || fallback);
+    else failAction(formatApiError(detail) || fallback);
+    return { ok: false, errors };
+  };
+
   const propose = async (e) => {
     e.preventDefault();
-    const scheduled_at = fromLocalInput(proposalAt);
-    if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit wählen.");
-    if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
-    await runAction(async () => {
-      await api.post(`/matches/${id}/schedule-proposals`, { scheduled_at, note: proposalNote || null });
-      toast.success("Terminvorschlag gesendet.");
+    const result = await sendTimes(proposalTimes, async (scheduled_ats) => {
+      await api.post(`/matches/${id}/schedule-proposals/group`, { scheduled_ats, note: proposalNote || null });
+      toast.success(scheduled_ats.length > 1 ? `${scheduled_ats.length} Terminvorschläge gesendet.` : "Terminvorschlag gesendet.");
       setProposalNote("");
-      await load();
+      await load({ preserveDrafts: false });
     }, "Terminvorschlag konnte nicht gesendet werden.");
+    setProposalErrors(result.errors || []);
+  };
+
+  const changeProposalTimes = (next) => {
+    setProposalTimes(next);
+    setProposalErrors([]);
   };
 
   const decide = async (proposal, action) => {
-    const payload = { action, note: decisionNote || null };
-    if (action === "counter") {
-      const scheduled_at = fromLocalInput(counterAt);
-      if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
-      if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
-      payload.scheduled_at = scheduled_at;
-    }
     await runAction(async () => {
-      await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, payload);
+      await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, { action, note: null });
       toast.success(DECISION_TOASTS[action] || "Gespeichert.");
-      setDecisionNote("");
-      setCounterAt("");
       await load();
     }, "Terminentscheidung konnte nicht gespeichert werden.");
   };
+
+  // Alle Termine einer Gruppe auf einmal ablehnen oder zurückziehen (#2325).
+  const decideGroup = async (proposal, action) => {
+    await runAction(async () => {
+      await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action, note: null });
+      toast.success(action === "withdraw" ? "Vorschläge zurückgezogen." : "Alle Termine abgelehnt.");
+      await load();
+    }, "Terminentscheidung konnte nicht gespeichert werden.");
+  };
+
+  // Gegenvorschlag mit bis zu drei Terminen - für einen Vorschlag oder die ganze Gruppe (#2325).
+  const counterPropose = (proposal, values, note) => sendTimes(values, async (scheduled_ats) => {
+    await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action: "counter", scheduled_ats, note: note || null });
+    toast.success(DECISION_TOASTS.counter);
+    await load();
+  }, "Gegenvorschlag konnte nicht gesendet werden.");
 
   // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
   const submitReport = async (payload) => runAction(async () => {
@@ -588,14 +623,19 @@ function MatchPageView() {
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
               {canProposeSchedule ? (
-                <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-                  <Field label="Vorschlag">
-                    <input type="datetime-local" min={earliestProposalInput()} value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" data-testid="match-proposal-at" />
-                  </Field>
-                  <Field label="Notiz">
-                    <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
-                  </Field>
-                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Vorschlagen</button>
+                <form onSubmit={propose} className="mt-4 space-y-3" data-testid="match-proposal-form" noValidate>
+                  {/* Mehrere Termine auf einmal (#2325): die Gegenseite nimmt einen davon an. */}
+                  <p className="text-xs text-white/55">Schlag bis zu 3 Termine vor – die Gegenseite nimmt einen davon an.</p>
+                  <div className="grid gap-3 md:grid-cols-2 md:items-start">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5" aria-hidden="true">{proposalTimes.length > 1 ? "Termine" : "Termin"}</div>
+                      <ProposalTimesEditor values={proposalTimes} onChange={changeProposalTimes} errors={proposalErrors} min={earliestProposalInput()} label="Termin" testId="match-proposal-at" disabled={busy} />
+                    </div>
+                    <Field label="Notiz (für alle Termine)">
+                      <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
+                    </Field>
+                  </div>
+                  <button disabled={busy} data-testid="match-proposal-send" className="tls-btn tls-btn--primary min-h-11 w-full sm:w-auto px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{proposeButtonLabel(proposalTimes.length)}</button>
                 </form>
               ) : showFixedScheduleNotice ? (
                 <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
@@ -604,43 +644,10 @@ function MatchPageView() {
               )}
 
               <div className="mt-5 space-y-3">
-                {(data.schedule_proposals || []).map((p, index) => {
-                  const open = p.status === "pending";
-                  // Der eigene Vorschlag (#2110): annehmen oder ablehnen kann nur die Gegenseite - hier „Zurückziehen“.
-                  const own = open && isOwnProposal(p, data, user?.id);
-                  const answer = canManageSchedule && open && !own;
-                  // Fester Termin (#2194): ein alter Vorschlag lässt sich nur noch ablehnen - Annehmen und Gegenvorschlag gehen über die Verschiebung.
-                  const agree = answer && !fixedTime;
-                  // Wer nicht zum Spiel gehört, bekommt keine Kennung (#2201) - dann zählt die Stelle in der Liste.
-                  const rowId = p.id || `zeile-${index}`;
-                  return (
-                  <div key={rowId} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-${rowId}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold">{formatDateTime(p.scheduled_at)}</div>
-                        <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${rowId}`}>{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
-                        {p.note && <div className="text-xs text-white/60 mt-2 [overflow-wrap:anywhere]">{p.note}</div>}
-                      </div>
-                      {answer && (
-                        <div className="flex gap-1 shrink-0">
-                          {agree && <button type="button" disabled={busy} onClick={() => decide(p, "accept")} aria-label="Termin annehmen" title="Annehmen" data-testid={`match-proposal-accept-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>}
-                          <button type="button" disabled={busy} onClick={() => decide(p, "decline")} aria-label="Termin ablehnen" title="Ablehnen" data-testid={`match-proposal-decline-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm disabled:opacity-50"><X className="w-3.5 h-3.5" /></button>
-                        </div>
-                      )}
-                      {own && canManageSchedule && (
-                        <button type="button" disabled={busy} onClick={() => decide(p, "withdraw")} data-testid={`match-proposal-withdraw-${p.id}`} className="tls-btn tls-btn--quiet shrink-0 min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Zurückziehen</button>
-                      )}
-                    </div>
-                    {agree && (
-                      <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                        <input type="datetime-local" min={earliestProposalInput()} aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
-                        <input aria-label="Antwort oder Grund" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
-                        <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
-                      </div>
-                    )}
-                  </div>
-                  );
-                })}
+                {/* Vorschläge der Gegenseite als Liste (#2325): ein Klick nimmt einen Termin an, die übrigen der Gruppe schließen. */}
+                <ScheduleProposalList proposals={data.schedule_proposals} page={data} userId={user?.id} canManage={canManageSchedule}
+                  fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime} toLocal={toLocalInput}
+                  onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} />
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
               {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}
