@@ -91,6 +91,18 @@ test("der Status zeigt Grund und Staffel und bietet das Zurückziehen", async ()
   expect(apiMock.get).toHaveBeenCalledTimes(2);
 });
 
+test("der Stand einer laufenden Anmeldung nennt die offenen Punkte (#2313)", async () => {
+  const submitted = { ...SQUAD, state: "submitted", application: { id: "a1", status: "submitted", can_withdraw: true },
+    warnings: ["Mila: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."], shortfall: null };
+  apiMock.get.mockResolvedValue({ data: view([submitted, { ...SQUAD, squad_id: "s2", warnings: ["Tom: Probe-ID fehlt im Profil."] }]) });
+  renderPanel();
+
+  const open = await screen.findByTestId("league-application-open-s1");
+  expect(open).toHaveTextContent("sonst kein Check-in");
+  expect(open).toHaveTextContent("Mila: Geburtsdatum fehlt");
+  expect(screen.queryByTestId("league-application-open-s2")).toBeNull();
+});
+
 test("ohne Regelwerk nennt die Seite den Grund statt des Knopfs", async () => {
   apiMock.get.mockResolvedValue({ data: view([{ ...SQUAD, can_submit: false }], { rules: null, season_problems: ["Für diese Season ist noch kein gültiges Regelwerk veröffentlicht."] }) });
   renderPanel();

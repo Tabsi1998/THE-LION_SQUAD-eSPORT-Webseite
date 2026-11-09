@@ -29,6 +29,14 @@ function OwnSquadRow({ row, onWithdraw }) {
         {row.state === "accepted" && !application?.staffel ? <p className="mt-1 text-sm text-white/75">Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
         {application?.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
+        {/* Offene Punkte (#2313): Die Anmeldung läuft, gesperrt wird erst beim Check-in - bis dahin bleibt sichtbar, was fehlt. */}
+        {application && (row.shortfall || row.warnings?.length) ? (
+          <div className="mt-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-2 text-sm text-white/80" data-testid={`league-application-open-${row.squad_id}`}>
+            <p className="font-semibold text-white/90">Bis zum ersten Spiel nachtragen – sonst kein Check-in für diese Spieler:</p>
+            {row.shortfall ? <p className="mt-1 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
+            {row.warnings?.length ? <ul className="mt-1 space-y-0.5 text-xs text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+          </div>
+        ) : null}
       </div>
       {application?.can_withdraw ? (
         <button type="button" onClick={() => onWithdraw(row)} data-testid={`league-application-withdraw-${row.squad_id}`}
