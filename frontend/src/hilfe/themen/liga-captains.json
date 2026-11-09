@@ -128,17 +128,17 @@
           "bild": true
         },
         {
-          "id": "spiel-starten",
-          "titel": "Spiel starten",
-          "text": "Sind beide Seiten eingecheckt, tippt eine Seite auf Spiel starten. Ab dann läuft die Spielzeit.",
-          "bild": true
-        },
-        {
           "id": "map-veto",
           "titel": "Map-Veto",
-          "text": "Hat eure Season ein Map-Veto, kommt es nach dem Check-in. Ihr sperrt oder wählt abwechselnd Maps. Seid ihr dran, tippst du eine Map an. Die Uhr zeigt, wie viel Zeit bleibt.",
+          "text": "Hat eure Season ein Map-Veto, kommt es nach dem Check-in beider Seiten. Ihr sperrt oder wählt abwechselnd Maps. Seid ihr dran, tippst du eine Map an. Die Uhr zeigt, wie viel Zeit bleibt.",
           "hinweis": "Nicht jede Season hat ein Veto. Ohne Veto fällt dieser Schritt weg.",
           "bild": false
+        },
+        {
+          "id": "spiel-starten",
+          "titel": "Spiel starten",
+          "text": "Sobald beide eingecheckt sind und das Veto fertig ist, falls es eins gibt, tippt eine Seite auf Spiel starten. Ab dann läuft die Spielzeit.",
+          "bild": true
         }
       ]
     },
