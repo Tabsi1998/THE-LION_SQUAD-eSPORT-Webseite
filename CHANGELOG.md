@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.72.0 (09.11.2026)
+
+### Neu
+
+* **liga:** Erlaubte Ausrüstung im Regelwerk als Tabelle je Kategorie mit Bild, Name und Ausnahmen nach Slot, im Web und im PDF (#2305)
+* **liga:** Liga- und Matchseite zeigen die gesperrten Aufsätze ganz oben im aufgeklappten Kasten (#2305)
+* **liga:** Regelwerk nennt bei Waffen mit mehr gesperrten als erlaubten Aufsätzen nur noch die erlaubten (#2305)
+* **liga:** Regelwerk-Tabelle der Ausrüstung stapelt am Handy ohne seitliches Scrollen (#2305)
+
+### Fehlerbehebungen
+
+* Sperrliste der Season lässt sich auch speichern, wenn eine Waffe oder Klasse in allen Modi gesperrt ist – überflüssige Aufsatz- und Einzel-Sperren entfallen beim Speichern, ein Hinweis sagt es vorher
+
 ## 1.71.0 (05.11.2026)
 
 ### Neu
