@@ -1386,6 +1386,27 @@ class MatchScheduleProposalDecision(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
 
 
+# Mehrere Termine auf einmal (#2325): höchstens so viele je Vorschlag oder Gegenvorschlag.
+SCHEDULE_PROPOSAL_MAX_TIMES = 3
+
+
+class MatchScheduleProposalGroupCreate(BaseModel):
+    """Bis zu drei Termine mit einer gemeinsamen Notiz - die Gegenseite nimmt einen davon an (#2325)."""
+    scheduled_ats: list[datetime] = Field(min_length=1, max_length=SCHEDULE_PROPOSAL_MAX_TIMES)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+# Für die ganze Gruppe: alle ablehnen, alle zurückziehen oder mit bis zu drei Terminen antworten. Angenommen wird ein
+# einzelner Termin über die bestehende Entscheidung.
+ScheduleProposalGroupAction = Literal["decline", "counter", "withdraw"]
+
+
+class MatchScheduleProposalGroupDecision(BaseModel):
+    action: ScheduleProposalGroupAction
+    scheduled_ats: list[datetime] = Field(default_factory=list, max_length=SCHEDULE_PROPOSAL_MAX_TIMES)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 class MatchChatCreate(BaseModel):
     message: str = Field(default="", max_length=1500)
     # Höchstens vier, wie services.chat_attachments.MAX_ATTACHMENTS_PER_MESSAGE.

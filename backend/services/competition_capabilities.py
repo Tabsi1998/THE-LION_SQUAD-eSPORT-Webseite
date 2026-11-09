@@ -166,7 +166,9 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("match.schedule", "Termin vorschlagen und entscheiden",
        ["GET /api/matches/{match_id}/schedule-proposals",
         "POST /api/matches/{match_id}/schedule-proposals",
-        "POST /api/matches/{match_id}/schedule-proposals/{proposal_id}/decision"], [CLASSIC, GRAPH]),
+        "POST /api/matches/{match_id}/schedule-proposals/group",
+        "POST /api/matches/{match_id}/schedule-proposals/{proposal_id}/decision",
+        "POST /api/matches/{match_id}/schedule-proposals/{proposal_id}/group-decision"], [CLASSIC, GRAPH]),
 
     # ---------- Ergebnisse schreiben ----------
     _c("result.staff_entry", "Ergebnis durch Turnierleitung eintragen",

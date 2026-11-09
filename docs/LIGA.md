@@ -1952,6 +1952,20 @@ fester Termin). Steht er fest, nimmt eine Staffel mit Regeln keinen neuen Vorsch
 Ablehnen und Zurückziehen gehen weiter. Wird ein Vorschlag angenommen, schließen die übrigen offenen dieses Spiels mit `declined`
 (`decision_rule: "agreed_elsewhere"`).
 
+**Mehrere Termine auf einmal (#2325):** `POST /api/matches/{id}/schedule-proposals/group` mit `{scheduled_ats: [1–3], note}` legt
+je Termin einen eigenen Vorschlag an, alle mit derselben `group_id`, Notiz und `created_at`. Geprüft wird jeder Termin einzeln
+(Zukunft, Sperrzeit, doppelt); bei einem Fehler 422 mit `detail.errors[{index, detail}]`, gespeichert wird dann keiner. Ein Termin
+außerhalb der Spielwoche (Staffel mit Terminregeln) ist kein Fehler – wie beim einzelnen Vorschlag –, sondern ein Hinweis in
+`hints[{index, detail}]` (er zählt nicht für die 72-h-Regel). Das Spiel bekommt `schedule_status`/Frist erst, wenn alles gespeichert
+ist; bricht es ab, wird zurückgebaut. Doppelt gesendet (genau dieselben offenen Termine und Notiz): dieselbe Gruppe mit
+`idempotent_replay`. Die Gegenseite bekommt eine Nachricht (`dedupe_key` `match-schedule-group:<gruppe>:proposed`).
+`POST …/schedule-proposals/{id}/group-decision` mit `decline`, `withdraw` oder `counter` (+ `scheduled_ats`) gilt für alle offenen
+der Gruppe; ein Gegenvorschlag ist wieder eine Gruppe mit `parent_proposal_id` und `parent_group_id` (nur schon angebotene Termine:
+422). Angenommen wird ein Termin über `/decision` – die übrigen der Gruppe schließen dann auch ohne Terminregeln mit
+`agreed_elsewhere`; ein Gegenvorschlag über `/decision` (App) schließt sie mit `countered`. Einzeln ablehnen über `/decision` lässt
+die übrigen offen. Der einzelne Vorschlag (`POST …/schedule-proposals`) bleibt für App und ältere Seiten; 72-h-Regel und
+`after_agreement` lesen die Vorschläge weiter einzeln.
+
 **72-h-Regel (Nr. 17)** im Fristen-Job (`match_deadline_sweep.sweep` ruft `league_schedule_sweep.sweep`): Ein offener Vorschlag der
 Heimseite (`slots[0]`) gilt, wenn `home_rule` an ist, die Frist ab `created_at` abgelaufen ist, der Termin in der Spielwoche liegt,
 nicht in einer Sperrzeit, noch in der Zukunft ist, und das Spiel noch keinen festen Termin hat und nicht begonnen ist. Dann:

@@ -1,4 +1,75 @@
-import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "./scheduleProposals";
+import {
+  DUPLICATE_TIME_TEXT,
+  MISSING_TIME_TEXT,
+  OFFERED_TIME_TEXT,
+  PAST_PROPOSAL_TEXT,
+  bundleProposals,
+  isOwnProposal,
+  proposalStatusLabel,
+  proposalTimeErrors,
+  proposalTimeHints,
+  proposeButtonLabel,
+  serverTimeErrors,
+  waitingForOtherSide,
+} from "./scheduleProposals";
+
+// Mehrere Termine auf einmal (#2325).
+const NOW = new Date("2027-03-01T10:00:00Z").getTime();
+
+test("bundleProposals: offene einer Gruppe stehen als eine Karte, früheste zuerst, an der Stelle der ersten", () => {
+  const rows = [
+    { id: "x", status: "pending", scheduled_at: "2027-03-05T19:00:00Z" },
+    { id: "g2", status: "pending", group_id: "g", scheduled_at: "2027-03-12T19:00:00Z" },
+    { id: "g1", status: "pending", group_id: "g", scheduled_at: "2027-03-10T19:00:00Z" },
+    { id: "alt", status: "declined", group_id: "h", scheduled_at: "2027-03-01T19:00:00Z" },
+    { id: "h2", status: "pending", group_id: "h", scheduled_at: "2027-03-02T19:00:00Z" },
+  ];
+  const bundles = bundleProposals(rows);
+  expect(bundles.map((bundle) => bundle.key)).toEqual(["x", "gruppe-g", "alt", "h2"]);
+  expect(bundles[1].group).toBe(true);
+  expect(bundles[1].proposals.map((row) => row.id)).toEqual(["g1", "g2"]);
+  expect(bundles[3].group).toBe(false);
+  expect(bundleProposals([{ status: "pending" }])[0].key).toBe("zeile-0");
+  expect(bundleProposals(null)).toEqual([]);
+});
+
+test("proposalTimeErrors prüft jeden Termin einzeln: leer, zu früh, doppelt - die Spielwoche hält nichts auf", () => {
+  const errors = proposalTimeErrors(
+    [null, "2027-03-01T10:02:00Z", "2027-03-09T19:00:00Z", "2027-03-03T19:00:00Z", "2027-03-03T19:00:00Z"],
+    { now: NOW },
+  );
+  expect(errors).toEqual([MISSING_TIME_TEXT, PAST_PROPOSAL_TEXT, null, null, DUPLICATE_TIME_TEXT]);
+  expect(proposalTimeErrors(["2027-03-20T19:00:00Z"], { now: NOW })).toEqual([null]);
+});
+
+test("proposalTimeHints: außerhalb der Spielwoche nur ein Hinweis, ohne Woche keiner", () => {
+  const window = { start: "2027-03-01T00:00:00Z", end: "2027-03-08T00:00:00Z" };
+  const hints = proposalTimeHints([null, "2027-03-03T19:00:00Z", "2027-03-09T19:00:00Z"], { window, weekLabel: "Mo 01.03. 01:00 bis So 07.03. 23:59" });
+  expect(hints[0]).toBeNull();
+  expect(hints[1]).toBeNull();
+  expect(hints[2]).toBe("Liegt außerhalb der Spielwoche (Mo 01.03. 01:00 bis So 07.03. 23:59) – gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel greift hier nicht.");
+  expect(proposalTimeHints(["2027-03-09T19:00:00Z"])).toEqual([null]);
+  // Im Gegenvorschlag: ein angebotener Termin ist beim Eingeben ein Hinweis und beim Absenden ein Fehler.
+  const offered = ["2027-03-09T19:00:00+00:00"];
+  expect(proposalTimeHints(["2027-03-09T19:00:00Z", "2027-03-10T19:00:00Z"], { offered })).toEqual([OFFERED_TIME_TEXT, null]);
+  expect(proposalTimeErrors(["2027-03-09T19:00:00Z", "2027-03-10T19:00:00Z"], { now: NOW, offered })).toEqual([OFFERED_TIME_TEXT, null]);
+  // Ist die 72-h-Regel in der Staffel aus, nennt der Hinweis sie nicht.
+  expect(proposalTimeHints(["2027-03-09T19:00:00Z"], { window, homeRule: false })).toEqual([
+    "Liegt außerhalb der Spielwoche – gilt nur, wenn die Gegenseite annimmt.",
+  ]);
+});
+
+test("serverTimeErrors legt die Sätze des Servers an ihre Stelle", () => {
+  expect(serverTimeErrors({ errors: [{ index: 2, detail: "Sperrzeit" }, { index: 9, detail: "weg" }] }, 3)).toEqual([null, null, "Sperrzeit"]);
+  expect(serverTimeErrors("Kein Recht", 2)).toEqual([null, null]);
+});
+
+test("proposeButtonLabel nennt die Zahl erst ab zwei Terminen", () => {
+  expect(proposeButtonLabel(1)).toBe("Vorschlagen");
+  expect(proposeButtonLabel(3)).toBe("3 Termine vorschlagen");
+  expect(proposeButtonLabel(1, true)).toBe("Gegenvorschlag senden");
+  expect(proposeButtonLabel(2, true)).toBe("2 Termine als Gegenvorschlag senden");
+});
 
 // Terminabstimmung (#2110, L-D7): Zustände auf Deutsch, eigener Vorschlag nach Seite - ohne Seite nach Person.
 
