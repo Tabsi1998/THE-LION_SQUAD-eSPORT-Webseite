@@ -8,6 +8,7 @@ import { API, api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { isSelectable } from "@/lib/leagueApplications";
@@ -16,6 +17,8 @@ import { dayNoon, viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
 
 const STEPS = ["Co-Team", "Prüfung", "Zustimmen", "Einreichen"];
+// Je Schritt der passende Abschnitt der Hilfe (#2295).
+const HELP_STEPS = ["co-team-auswahl", "passt-alles", "regelwerk", "einreichen"];
 const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider";
 const PRIMARY = "tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-5 py-2.5 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
@@ -242,7 +245,10 @@ export default function LeagueApplyPage() {
       <h1 className="font-heading text-3xl font-black uppercase">Mit Co-Team anmelden</h1>
       <Stepper step={step} />
       <section key={step} className="tls-apply-step mt-6" aria-labelledby="apply-step-title">
-        <h2 id="apply-step-title" ref={heading} tabIndex={-1} className="mb-3 font-heading text-xl font-bold uppercase outline-none">{titles[step]}</h2>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h2 id="apply-step-title" ref={heading} tabIndex={-1} className="font-heading text-xl font-bold uppercase outline-none">{titles[step]}</h2>
+          <HelpLink thema="liga-captains" schritt={HELP_STEPS[step]} />
+        </div>
         {step === 0 ? <SquadChoice rows={rows} chosen={chosen} onChoose={setChosen} /> : null}
         {step === 1 && row ? <CheckStep row={row} seasonProblems={view.season_problems || []} platform={view.platform} /> : null}
         {step === 2 && view.rules ? <ConsentStep rules={view.rules} privacy={view.privacy} acceptRules={acceptRules} acceptPrivacy={acceptPrivacy} onRules={setAcceptRules} onPrivacy={setAcceptPrivacy} /> : null}

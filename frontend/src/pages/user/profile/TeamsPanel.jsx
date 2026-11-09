@@ -3,6 +3,7 @@ import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { shortageAfter, shortageWarning } from "@/lib/squadShortage";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
@@ -292,7 +293,8 @@ export function TeamsPanel() {
                     <div className="text-xs text-white/50 mt-1">{activeTeam.members?.length || 0} Mitglieder · Deine Rolle: {TEAM_ROLE_LABELS[activeTeam.my_role] || activeTeam.my_role}</div>
                     {canEditSquads && <div className="mt-2 text-xs text-[#29B6E8]">Du kannst für dieses Team Co-Teams erstellen und bearbeiten.</div>}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    <HelpLink thema="team-und-co-team" schritt="co-team-anlegen" />
                     <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs uppercase font-bold">Teamseite</Link>
                     {canEditSquads && (
                       <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">

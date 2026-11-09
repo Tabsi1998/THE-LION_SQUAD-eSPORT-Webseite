@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { AlarmClock, Check, ClipboardCheck, Play, ScrollText, ShieldAlert, UserRoundPen } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { motionAllowed } from "@/lib/motion";
 import {
   STATE_LABELS, clock, countdownLabel, countdownTarget, otherSide, ownSide, remainingText, ringShare, rulesSentences,
@@ -292,7 +293,10 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
       {/* Am Handy steht der Ring unter dem Satz, am PC rechts neben der Überschrift - so bricht die Überschrift nie. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Check-in · Regelwerk § 8</div>
+          <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">
+            Check-in · Regelwerk § 8
+            <HelpLink thema="liga-captains" schritt={vetoRunning ? "map-veto" : "check-in"} className="-my-2" />
+          </div>
           {vetoRunning ? (
             <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]" data-testid="checkin-slim">
               <span className="font-bold text-[#00D26A]">Beide Seiten eingecheckt</span>

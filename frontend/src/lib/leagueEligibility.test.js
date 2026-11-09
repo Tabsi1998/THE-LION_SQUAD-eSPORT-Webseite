@@ -32,6 +32,8 @@ test("der eigene Hinweis sagt, was zu tun ist", () => {
   const missing = eligibilityNotice({ title: "Liga · Season 1", state: "age_missing", ok: false, min_age: 18 });
   expect(missing.tone).toBe("warn");
   expect(missing.text).toContain("Geburtsdatum");
+  // Der Reiter heißt „Grunddaten“ (Einstellungen → Konto) - einen Reiter „Persönliches“ gibt es nicht (#2295).
+  expect(missing.text).toContain("unter „Grunddaten“");
   expect(eligibilityNotice({ title: "L", state: "waiting", ok: false, reason: "Neu im Kader: darf ab 09.11.2026, 12:00 spielen." }).text).toContain("darf ab");
   expect(eligibilityNotice({ title: "L", state: "locked", ok: true, age: "met" })).toEqual({ tone: "info", text: "L: Altersvorgabe erfüllt." });
   expect(eligibilityNotice({ title: "L", state: "locked", ok: true, age: null })).toBeNull();

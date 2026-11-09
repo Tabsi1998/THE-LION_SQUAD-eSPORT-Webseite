@@ -298,9 +298,10 @@ export function PublicLayout({ children }) {
           </div>
           <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-8 min-w-0" data-testid="footer-columns">
             {footerColumns(branding, { isMember: isClubMember }).map((column) => (
-              <nav key={column.key} aria-label={column.title} data-testid={`footer-column-${column.key}`} className="min-w-0">
+              // „Mitmachen“ steht am Handy allein in seiner Zeile: über die ganze Breite, Links in zwei Spalten (#2295) - kürzer statt länger.
+              <nav key={column.key} aria-label={column.title} data-testid={`footer-column-${column.key}`} className={column.key === "join" ? "min-w-0 col-span-2 md:col-span-1" : "min-w-0"}>
                 <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{column.title}</div>
-                <ul className="mt-4 space-y-2 text-sm text-white/65">
+                <ul className={column.key === "join" ? "mt-4 grid grid-cols-2 md:grid-cols-1 gap-x-8 gap-y-2 text-sm text-white/65" : "mt-4 space-y-2 text-sm text-white/65"}>
                   {column.links.map((link) => (
                     <li key={link.label}>
                       {link.external ? (

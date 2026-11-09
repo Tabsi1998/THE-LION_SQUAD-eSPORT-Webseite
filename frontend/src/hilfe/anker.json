@@ -1,0 +1,59 @@
+{
+  "konto-und-profil": {
+    "registrieren": "Registrieren",
+    "zustimmen": "Zustimmen und Konto erstellen",
+    "email-bestaetigen": "E-Mail bestätigen",
+    "einstellungen": "Einstellungen öffnen",
+    "grunddaten": "Grunddaten",
+    "geburtsdatum": "Geburtsdatum eintragen",
+    "plattform": "Plattform wählen",
+    "spiel-ids": "Spiel-IDs eintragen",
+    "liga-hinweis": "Fehlt noch etwas für die Liga?"
+  },
+  "liga-captains": {
+    "anmeldung-starten": "Anmeldung starten",
+    "co-team-auswahl": "Co-Team wählen",
+    "passt-alles": "Passt alles?",
+    "offene-punkte": "Offene Punkte",
+    "regelwerk": "Regelwerk zustimmen",
+    "einreichen": "Anmeldung einreichen",
+    "stand": "Stand und offene Punkte",
+    "nachtragen": "Offene Punkte nachtragen",
+    "kader": "Kader im Blick",
+    "matchseite": "Die Matchseite",
+    "termin-vorschlagen": "Termin vorschlagen",
+    "termin-antworten": "Auf einen Vorschlag antworten",
+    "verschieben": "Termin verschieben",
+    "check-in": "Einchecken",
+    "map-veto": "Map-Veto",
+    "spiel-starten": "Spiel starten",
+    "ergebnis-melden": "Ergebnis melden",
+    "wer-hat-gespielt": "Wer hat gespielt?",
+    "bestaetigen": "Ergebnis bestätigen",
+    "teilnehmerliste-nachtragen": "Teilnehmerliste nachtragen",
+    "problem-melden": "Problem melden (Protest)"
+  },
+  "team-und-co-team": {
+    "team-erstellen": "Team erstellen öffnen",
+    "team-daten": "Name und Kürzel",
+    "einladen": "Einladungs-Link teilen",
+    "beitrittscode": "Beitrittscode weitergeben",
+    "persoenlich-einladen": "Gezielt einladen",
+    "beitreten": "Einladung annehmen",
+    "co-team-anlegen": "Was ist ein Co-Team?",
+    "co-team-kader": "Name, Spiel und Kader",
+    "captain-vertreter": "Captain und Vertreter",
+    "rollen-team": "Teamleitung und Co-Leitung",
+    "rolle-abgeben": "Rolle als Captain abgeben"
+  },
+  "turniere": {
+    "anmelden": "Zum Turnier anmelden",
+    "anmeldung-pruefen": "Prüfen und verbindlich anmelden",
+    "dein-stand": "Dein Stand",
+    "einchecken": "Check-in",
+    "ergebnis-melden": "Ergebnis melden",
+    "ergebnis-bestaetigen": "Ergebnis bestätigen",
+    "turnierbaum": "Dein Spiel im Turnierbaum",
+    "weg-zeigen": "Weg durch den Baum"
+  }
+}

@@ -79,7 +79,7 @@ export function eligibilityNotice(item) {
   if (!item) return null;
   const title = item.title || "Liga";
   if (item.state === "age_missing") {
-    return { tone: "warn", text: `${title}: Trag dein Geburtsdatum unter „Persönliches“ ein. Die Season verlangt mindestens ${item.min_age} Jahre – ohne Datum kannst du nicht spielen.` };
+    return { tone: "warn", text: `${title}: Trag dein Geburtsdatum unter „Grunddaten“ ein. Die Season verlangt mindestens ${item.min_age} Jahre – ohne Datum kannst du nicht spielen.` };
   }
   if (item.ok) {
     return item.age === "met" ? { tone: "info", text: `${title}: Altersvorgabe erfüllt.` } : null;

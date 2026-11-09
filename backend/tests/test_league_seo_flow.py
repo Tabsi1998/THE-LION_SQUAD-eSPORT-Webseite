@@ -66,7 +66,8 @@ async def test_seo_and_sitemap_only_for_public_seasons(flow):
     restricted = await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
     assert restricted["robots"] == "noindex, nofollow" and "Probe-Liga" not in restricted["title"]
     sitemap = (await flow.get("/api/sitemap.xml")).text
-    assert "/liga" not in sitemap
+    # Weder die Übersicht noch eine Ligaseite - /hilfe/liga-captains (#2295) zählt nicht.
+    assert "/liga</loc>" not in sitemap and "/liga/" not in sitemap
 
     from fastapi import HTTPException
 
@@ -77,7 +78,8 @@ async def test_seo_and_sitemap_only_for_public_seasons(flow):
             await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
         assert hidden.value.status_code == 404
         sitemap = (await flow.get("/api/sitemap.xml")).text
-        assert "/liga" not in sitemap
+        # Weder die Übersicht noch eine Ligaseite - /hilfe/liga-captains (#2295) zählt nicht.
+        assert "/liga</loc>" not in sitemap and "/liga/" not in sitemap
     with pytest.raises(HTTPException) as unknown:
         await league_season_meta(flow.db, "probe-shooter", "season-9", base, "https://example.test")
     assert unknown.value.status_code == 404
