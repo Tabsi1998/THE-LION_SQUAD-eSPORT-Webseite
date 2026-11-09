@@ -1200,7 +1200,10 @@ async def _status_after_decline(db, match: dict, collection: str, tournament: di
 
     target = getattr(db, collection)
     if not plays_in_matchdays(tournament or {}, stage):
-        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
+        # Ist noch ein anderer Vorschlag offen (etwa ein Termin einer Gruppe, #2325), wartet das Spiel weiter auf Antwort.
+        still_open = await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"})
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "proposed" if still_open else "declined",
+                                                               "updated_at": now_iso}})
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
         return
     if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"}):

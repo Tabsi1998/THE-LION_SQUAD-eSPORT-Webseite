@@ -237,6 +237,20 @@ async def test_without_league_rules_other_proposals_outside_the_group_stay_open(
 
 
 @pytest.mark.asyncio
+async def test_without_matchday_weeks_one_declined_time_keeps_the_match_waiting(flow):
+    """Turnier ohne Spielwochen: wird ein Termin abgelehnt und ist noch einer offen, steht das Spiel auf „proposed“, nicht „declined“."""
+    world = await live_world(flow, rules=None, format="single_elimination")
+    group = (await propose(flow, world, "Kapitaen", [50, 80])).json()["proposals"]
+    flow.act_as(world["users"]["Falke1"])
+    first = await flow.post(f"{base_url(world)}/{group[0]['id']}/decision", json={"action": "decline"})
+    assert first.status_code == 200, first.text
+    assert (await flow.reload(world["match"]))["schedule_status"] == "proposed"
+    last = await flow.post(f"{base_url(world)}/{group[1]['id']}/decision", json={"action": "decline"})
+    assert last.status_code == 200, last.text
+    assert (await flow.reload(world["match"]))["schedule_status"] == "declined"
+
+
+@pytest.mark.asyncio
 async def test_after_agreement_is_unchanged_with_a_group(flow):
     """Liga mit Regeln: genau ein Eintrag „Einigung“ mit dem angenommenen Vorschlag, alle übrigen offenen schließen - wie ohne Gruppe."""
     world = await live_world(flow)
