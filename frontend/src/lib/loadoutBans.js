@@ -202,8 +202,41 @@ function attachmentsPayload(row) {
 const KIND_ORDER = { class: 0, item: 1, attachments: 2 };
 const isActiveRow = (row) => row.kind !== "attachments" || row.attachment_ids.length;
 
+/**
+ * Was der Server wirklich bekommt: Zeilen, die er als überflüssig ablehnt, fallen weg - Einzelzeilen (auch Aufsätze) an Einträgen einer in
+ * allen Modi ganz gesperrten Klasse, Aufsatz-Zeilen einer in allen Modi gesperrten Waffe und Aufsätze, deren eigene Klasse ganz gesperrt ist.
+ * Das Formular behält sie, bis gespeichert ist: wer die Sperre wieder aufhebt, hat seine Häkchen zurück.
+ */
+export function effectiveRows(rows = {}, library = []) {
+  const items = new Map(library.map((item) => [item.id, item]));
+  const fullClasses = new Set(Object.values(rows).filter((row) => row.kind === "class" && !row.modes.length).map((row) => row.subcategory));
+  const fullItems = new Set(Object.values(rows).filter((row) => row.kind === "item" && !row.modes.length).map((row) => row.item_id));
+  const out = {};
+  for (const [key, row] of Object.entries(rows)) {
+    if (row.kind === "class") {
+      out[key] = row;
+      continue;
+    }
+    const item = items.get(row.item_id);
+    if (item?.subcategory && fullClasses.has(item.subcategory)) continue;
+    if (row.kind !== "attachments") {
+      out[key] = row;
+      continue;
+    }
+    if (fullItems.has(row.item_id)) continue;
+    const ids = row.attachment_ids.filter((id) => !fullClasses.has(items.get(id)?.subcategory));
+    if (ids.length === row.attachment_ids.length) out[key] = row;
+    else {
+      const own = Object.fromEntries(Object.entries(row.attachment_modes || {}).filter(([id]) => ids.includes(id)));
+      out[key] = { ...row, attachment_ids: ids, attachment_modes: own };
+    }
+  }
+  return out;
+}
+
 /** Das Formular als Anfrage - Klassen, dann ganze Einträge, dann Aufsätze, je in der Reihenfolge der Bibliothek. */
-export function formPayload(rows, library = [], categories = []) {
+export function formPayload(allRows, library = [], categories = []) {
+  const rows = effectiveRows(allRows, library);
   const order = new Map(library.map((item, index) => [item.id, index]));
   const subOrder = new Map(categories.flatMap((category) => (category.subcategories || []).map((sub) => sub.key)).map((key, index) => [key, index]));
   const position = (row) => (row.kind === "class" ? subOrder.get(row.subcategory) : order.get(row.item_id)) ?? 0;
@@ -218,14 +251,14 @@ export function formPayload(rows, library = [], categories = []) {
 }
 
 /** Gleiche Zeilen (Art, Eintrag bzw. Klasse, Modi, Aufsätze mit ihren Modi) - für „nichts geändert“. */
-export function sameRows(a = {}, b = {}) {
+export function sameRows(a = {}, b = {}, library = []) {
   const attached = (row) => [...row.attachment_ids].sort()
     .map((id) => (row.kind === "attachments" ? `${id}:${[...attachmentModes(row, id)].sort().join(",")}` : id));
   const norm = (rows) => JSON.stringify(Object.values(rows)
     .filter(isActiveRow)
     .map((row) => [row.kind, row.kind === "class" ? row.subcategory : row.item_id, row.kind === "attachments" ? [] : [...row.modes].sort(),
       attached(row)]).sort());
-  return norm(a) === norm(b);
+  return norm(effectiveRows(a, library)) === norm(effectiveRows(b, library));
 }
 
 // ---------------------------------------------------------------- Aufsätze je Waffe in der Verwaltung (#2299)
@@ -251,7 +284,9 @@ const fullyBanned = (rows, item) => (rows[rowKey("item", item.id)] && !rows[rowK
  * „K gesperrt“ am Knopf einer Waffe in der Verwaltung: die passenden Aufsätze, die aufgeklappt als gesperrt angehakt sind - an dieser Waffe
  * (auch nur in Modi) oder überall in allen Modi über die Zeile des Aufsatzes bzw. seine ganz gesperrte Klasse (wie `AttachmentLine`).
  */
-export function bannedAttachmentCount(rows = {}, weaponId, attachments = []) {
+export function bannedAttachmentCount(rows = {}, weaponId, attachments = [], weapon = null) {
+  // Eine ganz gesperrte Waffe (selbst oder über ihre Klasse): die Aufsatz-Sperren entfallen beim Speichern, es gibt nichts zu zählen.
+  if (weapon && fullyBanned(rows, weapon)) return 0;
   const local = new Set(rows[rowKey("attachments", weaponId)]?.attachment_ids || []);
   return attachments.filter((item) => local.has(item.id) || Boolean(fullyBanned(rows, item))).length;
 }
@@ -313,23 +348,12 @@ export function classRow(rows, subcategory) {
   return subcategory ? rows[rowKey("class", subcategory)] || null : null;
 }
 
-/** Probleme vor dem Speichern, wie der Server sie sähe - leer heißt gut. */
-export function formProblem(rows, library = [], categories = []) {
-  const items = new Map(library.map((item) => [item.id, item]));
-  const active = Object.values(rows).filter(isActiveRow);
-  if (!active.length) return "Bitte mindestens einen Eintrag sperren – oder die Sperrliste entfernen.";
-  for (const row of active) {
-    if (row.kind === "class") continue;
-    const item = items.get(row.item_id);
-    const klass = classRow(rows, item?.subcategory);
-    if (klass && !klass.modes.length) {
-      const label = subcategoryOf(categories, item.subcategory)?.label || "Die Klasse";
-      return `„${item.name}“ gehört zu „${label}“, die schon in allen Modi ganz gesperrt ist – einzeln braucht es das nicht.`;
-    }
-    if (row.kind !== "attachments") continue;
-    const full = rows[rowKey("item", row.item_id)];
-    if (full && !full.modes.length) return `„${item?.name || "Die Waffe"}“ ist schon in allen Modi gesperrt – einzelne Aufsätze dazu braucht es nicht.`;
-  }
+/**
+ * Probleme vor dem Speichern - leer heißt gut. Überflüssige Zeilen (ganz gesperrte Waffe mit Aufsätzen, Einzelzeilen in einer ganz
+ * gesperrten Klasse) sind kein Problem: `formPayload` lässt sie weg, der Server bleibt streng.
+ */
+export function formProblem(rows, library = []) {
+  if (!Object.values(effectiveRows(rows, library)).some(isActiveRow)) return "Bitte mindestens einen Eintrag sperren – oder die Sperrliste entfernen.";
   return "";
 }
 
