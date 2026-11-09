@@ -140,6 +140,12 @@ export function SquadEligibilityPanel({ teamId, squad }) {
             <ul className="divide-y divide-white/5">
               {season.players.map((player) => <PlayerLine key={player.id} player={player} />)}
             </ul>
+            {/* #2313: Fehlende Angaben halten die Anmeldung nicht auf, sie sperren Check-in und Aufstellung. */}
+            {season.players.some((player) => !player.ok) ? (
+              <p className="text-xs text-white/60" data-testid={`squad-eligibility-lock-${season.season_id}`}>
+                Wer nicht spielen darf, kann nicht einchecken und nicht aufgestellt werden. Fehlt eine Angabe, trägt die Person sie im eigenen Profil nach – dann geht es sofort.
+              </p>
+            ) : null}
             {season.players.some((player) => player.until) ? (
               <p className="text-xs text-white/50">Wartezeit endet: {season.players.filter((player) => player.until).map((player) => `${player.name} ${untilText(player.until)}`).join(", ")}</p>
             ) : null}
