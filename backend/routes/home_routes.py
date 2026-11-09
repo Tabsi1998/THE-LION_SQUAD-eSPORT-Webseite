@@ -23,6 +23,7 @@ from services.news_cards import attach_result_winners
 from services.news_publish import public_news
 from services import event_days
 from services.event_public import public_competition, public_event
+from services.league_home import home_seasons
 from services.league_scope import NOT_LEAGUE
 from services.public_phase import derive_public_phase
 
@@ -320,6 +321,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
     club_numbers_shown = about_texts.get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"])
 
     await _attach_live_counts(db, live, today, soon, upcoming)
+    # Liga (#2324): sichtbare Seasons für „Nächste Termine“ und den Hinweis bei offener Anmeldung - sichtbar wie die Ligaseite.
+    league_seasons = await home_seasons(db, user)
     has_live = any(len(v) > 0 for v in live.values())
     # Discord (#581) steht seit #854 im Block „Dabei sein“ im Footer jeder Seite - eigener Abruf `/api/home/discord`.
     return {
@@ -328,6 +331,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "today": today,
         "soon": soon,
         "upcoming": upcoming,
+        "leagues": league_seasons,
         "news": visible_news,
         "featured_news": [lead_news] if lead_news else [],
         "stats": stats,

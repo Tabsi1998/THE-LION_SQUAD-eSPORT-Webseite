@@ -114,6 +114,15 @@ export function SeasonOverviewTab({ data, form, set, setForm, saved, canSeason, 
               ) : null}
               <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
               <Effect testId="season-status-effect">{STATUS_EFFECT[form.status]}</Effect>
+              {/* Startseite (#2324): Vorgabe an. Wer die Season sieht, sagt weiter die Sichtbarkeit. */}
+              <label className="flex min-h-[44px] items-start gap-2 text-sm text-white/80">
+                <input type="checkbox" checked={Boolean(form.promote_on_home)} onChange={(event) => set("promote_on_home", event.target.checked)}
+                  className="mt-1 accent-[#29B6E8]" data-testid="season-form-promote-home" />
+                <span className="min-w-0">
+                  Auf der Startseite bewerben
+                  <span className="block text-xs text-white/50">In „Nächste Termine“ und, solange die Anmeldung offen ist, als Hinweis mit „Mit Co-Team anmelden“ oben auf der Startseite. Nur für alle, die die Season sehen dürfen.</span>
+                </span>
+              </label>
             </FormSection>
           </div>
           {/* Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, leer heißt „wie die Liga“. Die Farbe gehört der Liga (Stift in
