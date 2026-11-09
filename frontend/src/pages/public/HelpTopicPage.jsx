@@ -28,9 +28,19 @@ function StepImage({ slug, schritt }) {
   );
 }
 
+// Die Videos sind WebM (VP8) - ältere iPhones spielen das nicht. Dort fällt das Video weg, die Bilder bleiben. Eine
+// MP4-Fassung kann das Werkzeug von Playwright nicht erzeugen (kein H.264-Encoder dabei).
+function canPlayWebm() {
+  try {
+    return typeof document !== "undefined" && document.createElement("video").canPlayType?.('video/webm; codecs="vp8"') !== "";
+  } catch {
+    return false;
+  }
+}
+
 function StepVideo({ video }) {
   const src = hilfeVideo(video.id);
-  if (!src) return null;
+  if (!src || !canPlayWebm()) return null;
   return (
     <figure className="mt-4 rounded-sm border border-white/10 bg-[#0F0F10] p-3" data-testid={`help-video-${video.id}`}>
       <figcaption className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/85">

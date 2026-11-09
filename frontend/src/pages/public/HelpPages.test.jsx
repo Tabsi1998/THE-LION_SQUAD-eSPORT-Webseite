@@ -30,6 +30,8 @@ function show(path) {
 }
 
 beforeAll(() => { window.HTMLElement.prototype.scrollIntoView = vi.fn(); });
+// Der Browser kann WebM - außer im Test zu älteren iPhones unten.
+beforeEach(() => { window.HTMLMediaElement.prototype.canPlayType = () => "maybe"; });
 
 test("Übersicht: alle Themen als Karten, Suche filtert und steht in der Adresse", () => {
   show("/hilfe");
@@ -84,6 +86,13 @@ test("Anker im Link: der Schritt ist hervorgehoben und wird angesprungen", () =>
   show("/hilfe/turniere#einchecken");
   expect(screen.getByTestId("help-step-einchecken")).toHaveAttribute("data-active", "true");
   expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+});
+
+test("Browser ohne WebM (ältere iPhones): kein leeres Video, die Bilder bleiben", () => {
+  window.HTMLMediaElement.prototype.canPlayType = () => "";
+  show("/hilfe/liga-captains");
+  expect(screen.queryByTestId("help-video-liga-anmeldung")).toBeNull();
+  expect(screen.getByTestId("help-step-image-check-in")).toBeInTheDocument();
 });
 
 test("Groß- und Kleinschreibung in der Adresse ist egal", () => {
