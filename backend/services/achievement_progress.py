@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 
 from database import get_db
 from services.private_fields import private_projection
-from services.league_scope import league_tournament_ids
 from services.achievement_participation import load_participation
 
 
@@ -54,20 +53,21 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     db = get_db()
     p: dict[str, int] = {}
 
-    regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1, "id": 1}).to_list(2000)
-    # Spiele zählen aus allen Anmeldungen; Turnierzähler, Plätze und Pokale ohne Liga-Staffeln (docs/LIGA.md, 7).
-    league = await league_tournament_ids(db, [r.get("tournament_id") for r in regs])
-    regs = [r for r in regs if r.get("tournament_id") not in league]
-    p["tournaments_registered"] = len(regs)
-    tids = list({r["tournament_id"] for r in regs if r.get("tournament_id")})
-    games = await db.tournaments.distinct("game_id", {"id": {"$in": tids}}) if tids else []
-    p["distinct_games_registered"] = len([g for g in games if g])
-    formats = await db.tournaments.distinct("format", {"id": {"$in": tids}}) if tids else []
-    p["distinct_formats"] = len([f for f in formats if f])
-
-    # Spiele zählen für die, die gespielt haben (#2337) - auch im Team und in der Liga, nie ein Freilos.
+    # Eine Grundlage für Spiele, Teilnahmen und Plätze (#2337, services/achievement_participation): gezählt wird für die,
+    # die gespielt haben - auch im Team und in der Liga, nie ein Freilos. Turnierzähler, Plätze und Pokale ohne
+    # Liga-Staffeln (docs/LIGA.md, 7).
     participation = await load_participation(db, user_id)
+    # Turnierveteran, Multitalent, Formatvielfalt: Teilnahme statt Anmeldung - dieselbe Rechnung wie die Registry.
+    p["tournaments_registered"] = participation.tournaments_played()
+    p["distinct_games_registered"] = participation.distinct_games()
+    p["distinct_formats"] = participation.distinct_formats()
     p.update(participation.match_progress())
+    # Für „Saisons aktiv“ zählt weiter jede eigene Anmeldung zu einem Turnier.
+    tids = sorted({
+        registration["tournament_id"] for registration in participation.registrations.values()
+        if registration.get("user_id") == user_id and registration.get("tournament_id")
+        and not participation.is_league(registration["tournament_id"])
+    })
 
     # Champion, Podest und Holzmedaille (#2337): der gespeicherte Rang der Auszeichnung, nur aus abgeschlossenen Turnieren
     # (keine Liga-Staffel) - nicht mehr der Zwischenstand eines laufenden Turniers.

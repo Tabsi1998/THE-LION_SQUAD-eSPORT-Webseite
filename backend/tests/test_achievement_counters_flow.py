@@ -179,7 +179,19 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
         {"id": "team1", "name": "Löwen", "leader_id": user["id"], "member_ids": [user["id"], "u2", "u3"], "logo_url": "/l.png", "banner_url": "/b.png", "description": "Wir.", "created_at": (now_utc() - timedelta(days=40)).isoformat()},
         {"id": "team2", "name": "Zweit", "leader_id": "u9", "member_ids": [user["id"]], "created_at": now_utc().isoformat()},
     ])
-    await db.tournament_registrations.insert_one({"id": "rt", "tournament_id": "t9", "team_id": "team1", "created_at": now_utc().isoformat()})
+    # Gezählt wird die Teilnahme (#2337): Das Team hat sein Turnier auch gespielt, die Einzel-Anmeldung in t9 ebenso.
+    def played(match_id, tournament_id, first, second):
+        return {"id": match_id, "tournament_id": tournament_id, "stage_number": 1, "round": 1, "order": 1, "status": "completed",
+                "completed_at": "2026-05-03T18:00:00+00:00", "updated_at": "2026-05-03T18:00:00+00:00",
+                "slots": [{"slot": 1, "registration_id": first, "status": "filled"}, {"slot": 2, "registration_id": second, "status": "filled"}],
+                "results": [{"registration_id": first, "rank": 1}, {"registration_id": second, "rank": 2}]}
+    await db.tournaments.insert_one({"id": "t10", "title": "Team-Cup", "status": "completed", "is_public": True})
+    await db.tournament_registrations.insert_many([
+        {"id": "rt", "tournament_id": "t10", "team_id": "team1", "status": "approved", "created_at": now_utc().isoformat()},
+        {"id": "rh", "tournament_id": "t10", "user_id": "u-gegner", "status": "approved", "created_at": now_utc().isoformat()},
+        {"id": "rg", "tournament_id": "t9", "user_id": "u-gegner", "status": "checked_in", "created_at": "2026-05-01T19:00:00+00:00", "updated_at": "2026-05-02T11:00:00+00:00"},
+    ])
+    await db.matches_v2.insert_many([played("m-team", "t10", "rt", "rh"), played("m-solo", "t9", "rf", "rg")])
     await db.season_standings.insert_many([{"season_id": "s1", "user_id": user["id"], "rank": 1}, {"season_id": "s2", "user_id": user["id"], "rank": 7}, {"season_id": "s3", "user_id": user["id"], "rank": 30}])
     await db.events.insert_many([{"id": "e1", "created_by": user["id"], "status": "completed", "visibility": "public"}, {"id": "e2", "created_by": "x", "status": "completed", "visibility": "members"}])
     await db.event_registrations.insert_one({"id": "er1", "event_id": "e2", "user_id": user["id"], "status": "checked_in"})
