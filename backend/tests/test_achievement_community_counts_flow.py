@@ -294,6 +294,33 @@ async def test_captain_counts_from_the_takeover_not_from_the_founding(flow):
     assert response.json()["leader_since"] == response.json()["created_at"]
 
 
+@pytest.mark.asyncio
+async def test_captain_in_old_teams_falls_back_to_the_logged_handover_before_the_founding(flow):
+    """Altbestand ohne ``leader_since``: die letzte protokollierte Übergabe an diese Person, erst dann die Gründung."""
+    from datetime import timedelta
+
+    from models import now_utc
+
+    db = flow.db
+    lead = await flow.add_user(name="altbestand")
+    founded = (now_utc() - timedelta(days=500)).isoformat()
+    await db.teams.insert_one({"id": "tm-alt", "name": "Alt", "tag": "ALT", "leader_id": lead["id"], "co_leader_ids": [],
+                               "member_ids": [lead["id"]], "created_at": founded})
+    await db.audit_logs.insert_many([
+        {"id": "a1", "action": "team.transfer_leader", "target_id": "tm-alt", "data": {"old_leader": "x", "new_leader": lead["id"]},
+         "created_at": (now_utc() - timedelta(days=200)).isoformat()},
+        {"id": "a2", "action": "team.transfer_leader", "target_id": "tm-alt", "data": {"old_leader": lead["id"], "new_leader": "y"},
+         "created_at": (now_utc() - timedelta(days=150)).isoformat()},
+        {"id": "a3", "action": "team.transfer_leader", "target_id": "tm-alt", "data": {"old_leader": "y", "new_leader": lead["id"]},
+         "created_at": (now_utc() - timedelta(days=90)).isoformat()},
+        {"id": "a4", "action": "team.transfer_leader", "target_id": "anderes-team", "data": {"new_leader": lead["id"]},
+         "created_at": (now_utc() - timedelta(days=5)).isoformat()},
+    ])
+    assert (await team_values(lead["id"]))["captain_days"] == 90, "die letzte Übergabe an sie, nicht die Gründung"
+    await db.audit_logs.delete_many({"target_id": "tm-alt"})
+    assert (await team_values(lead["id"]))["captain_days"] == 500, "ohne Protokoll ab der Gründung"
+
+
 # ---------------------------------------------------------------- Gruselnacht (M5)
 
 @pytest.mark.asyncio

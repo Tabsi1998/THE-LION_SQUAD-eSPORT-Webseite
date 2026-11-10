@@ -753,16 +753,26 @@ async def _team_profile(ctx):
 
 @counter("captain_days", "team")
 async def _captain_days(ctx):
-    """Kapitän (#2338): Tage seit der Übernahme der Leitung (``leader_since``) - bei Teams von vor dieser Angabe ab der
-    Gründung."""
+    """Kapitän (#2338): Tage seit der Übernahme der Leitung (``leader_since``). Teams von vor dieser Angabe: die letzte
+    protokollierte Übergabe an diese Person (``team.transfer_leader``), erst ohne eine solche ab der Gründung."""
     days = 0
     for team in await ctx.teams():
         if team.get("leader_id") != ctx.user_id:
             continue
-        since = _parse(team.get("leader_since")) or _parse(team.get("created_at"))
+        since = _parse(team.get("leader_since")) or await _last_handover(ctx, team.get("id")) or _parse(team.get("created_at"))
         if since:
             days = max(days, (now_utc() - since).days)
     return days
+
+
+async def _last_handover(ctx, team_id: str | None) -> datetime | None:
+    """Wann die Person die Leitung dieses Teams zuletzt übergeben bekam - aus dem Protokoll."""
+    if not team_id:
+        return None
+    rows = await ctx.db.audit_logs.find(
+        {"action": "team.transfer_leader", "target_id": team_id, "data.new_leader": ctx.user_id},
+        {"_id": 0, "created_at": 1}).sort("created_at", -1).to_list(1)
+    return _parse(rows[0].get("created_at")) if rows else None
 
 
 @counter("team_level_max", "team")
