@@ -151,8 +151,14 @@ def test_teilnahme_braucht_ein_echtes_spiel_einen_gueltigen_status_und_ein_turni
     reg = {"id": "r1", "tournament_id": "t1", "user_id": "me", "status": "approved"}
     match = duel("m1", "r1", "rx", 10)
     assert not participation("me", [reg], []).entries(), "nur angemeldet"
-    for status in ("withdrawn", "disqualified", "rejected", "waitlist", "pending", "no_show"):
+    for status in ("rejected", "waitlist", "pending", "no_show"):
         assert not participation("me", [{**reg, "status": status}], [match]).entries(), status
+    # Review M5: Wer gespielt hat, hat teilgenommen - auch nach Austritt oder Disqualifikation. Bis zum Ende dabei war er nicht.
+    for status in ("withdrawn", "disqualified"):
+        left = participation("me", [{**reg, "status": status}], [match])
+        assert [row["id"] for row in left.entries()] == ["r1"] and not left.entries(still_in=True), status
+        assert left.tournaments_played() == 1 and not left.finished_entries(), status
+        assert not participation("me", [{**reg, "status": status}], []).entries(), "ohne Spiel keine Teilnahme"
     assert participation("me", [{**reg, "status": "checked_in"}], [match]).entries()
     cancelled = participation("me", [reg], [match])
     cancelled.tournaments["t1"]["status"] = "cancelled"

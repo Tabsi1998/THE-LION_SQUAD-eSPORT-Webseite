@@ -59,19 +59,30 @@ async def test_anmelden_allein_ist_keine_teilnahme(flow):
 
 
 @pytest.mark.asyncio
-async def test_abgelehnt_ausgetreten_und_abgesagt_zaehlen_nicht(flow):
+async def test_abgelehnt_und_abgesagt_zaehlen_nicht_ausgetreten_nach_dem_spiel_schon(flow):
+    """Review M5: Wer gespielt hat, hat teilgenommen - auch wenn er danach austritt oder disqualifiziert wird."""
     me, rival = await players(flow, 2)
     _first, first_regs = await play.played_cup(flow, [me, rival], game_id="mk8")
-    _second, second_regs = await play.played_cup(flow, [me, rival], game_id="fifa")
-    third, _third_regs = await play.played_cup(flow, [me, rival], game_id="tekken")
-    assert ((await values(me))["tournaments_registered"], (await values(me))["distinct_games_registered"]) == (3, 3)
+    _second, second_regs = await play.played_cup(flow, [me, rival], game_id="fifa", format="double_elim")
+    third, third_regs = await play.played_cup(flow, [me, rival], game_id="tekken")
+    fourth, _fourth_regs = await play.played_cup(flow, [me, rival], game_id="rocket")
+
+    async def triple(user: dict) -> tuple:
+        found = await values(user)
+        return found["tournaments_registered"], found["distinct_games_registered"], found["distinct_formats"]
+
+    assert await triple(me) == (4, 4, 2)
 
     await flow.db.tournament_registrations.update_one({"id": first_regs[0]["id"]}, {"$set": {"status": "withdrawn"}})
-    await flow.db.tournament_registrations.update_one({"id": second_regs[0]["id"]}, {"$set": {"status": "rejected"}})
-    assert ((await values(me))["tournaments_registered"], (await values(me))["distinct_games_registered"]) == (1, 1)
-    await flow.db.tournaments.update_one({"id": third["id"]}, {"$set": {"status": "cancelled"}})
-    assert ((await values(me))["tournaments_registered"], (await values(me))["distinct_games_registered"]) == (0, 0)
-    assert (await values(rival))["tournaments_registered"] == 2, "für die andere zählen die beiden Turniere, die stattfanden"
+    await flow.db.tournament_registrations.update_one({"id": second_regs[0]["id"]}, {"$set": {"status": "disqualified"}})
+    assert await triple(me) == (4, 4, 2), "ausgetreten oder disqualifiziert nach dem Spiel: teilgenommen"
+    assert (await values(me))["tournaments_completed_no_forfeit"] == 2, "durchgezogen hat sie nur die anderen beiden"
+
+    await flow.db.tournament_registrations.update_one({"id": third_regs[0]["id"]}, {"$set": {"status": "rejected"}})
+    assert await triple(me) == (3, 3, 2), "abgelehnt ist keine Teilnahme"
+    await flow.db.tournaments.update_one({"id": fourth["id"]}, {"$set": {"status": "cancelled"}})
+    assert await triple(me) == (2, 2, 2), "abgesagt"
+    assert (await values(rival))["tournaments_registered"] == 3, "für die andere zählen die drei Turniere, die stattfanden"
 
 
 @pytest.mark.asyncio
@@ -155,6 +166,9 @@ async def test_teamturnier_zaehlt_fuer_die_die_fuer_das_team_gespielt_haben(flow
     assert [await count(person, "team_tournaments_played") for person in (lead, member, bench)] == [1, 1, 0]
     rival = await flow.db.tournament_registrations.find_one({"id": rival_regs[0]["id"]}, {"_id": 0})
     assert await count({"id": rival["user_id"]}, "team_tournaments_played") == 0, "einzeln angetreten ist kein Teamturnier"
+    # Review M5: Tritt das Team nach seinen Spielen aus, bleibt es ein gespieltes Teamturnier.
+    await flow.db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"status": "withdrawn"}})
+    assert [await count(person, "team_tournaments_played") for person in (lead, member, bench)] == [1, 1, 0]
 
 
 # ---------------------------------------------------------------- Erster im Haus

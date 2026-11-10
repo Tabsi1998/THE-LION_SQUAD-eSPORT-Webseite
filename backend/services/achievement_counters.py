@@ -588,7 +588,7 @@ async def _seed_one(ctx):
     (Plätze im Baum) auch nicht."""
     participation = await ctx.participation()
     return len({
-        registration["tournament_id"] for registration in participation.tournament_entries()
+        registration["tournament_id"] for registration in participation.tournament_entries(still_in=True)
         if registration.get("seed") == 1 and participation.is_done(registration["tournament_id"])
         and participation.has_fixed_seeding(registration["tournament_id"])
     })
@@ -1094,7 +1094,7 @@ async def _streamed(ctx):
 @counter("tournaments_completed_no_forfeit", "tournament", "match")
 async def _completed_no_forfeit(ctx):
     """Durchzieher (#2337): abgeschlossenes Turnier, in dem die Person gespielt hat - ohne kampflose Niederlage. Wer
-    ausgetreten ist oder disqualifiziert wurde, ist keine Teilnahme mehr (``Participation.entries``)."""
+    ausgetreten ist oder disqualifiziert wurde, hat teilgenommen, aber nicht durchgezogen (``finished_entries``)."""
     participation = await ctx.participation()
     forfeited = {row.match.get("tournament_id") for row in participation.rows if row.no_show}
     finished = {tid for tid in participation.finished_entries() if tid not in forfeited}

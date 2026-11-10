@@ -40,6 +40,8 @@ MATCH_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, 
                 "section": 1, "bracket": 1, "round_name": 1, "group_id": 1, "stage_number": 1, "round": 1, "order": 1,
                 "match_type": 1, "is_preview": 1, "lineups": 1, "games.lineups": 1}
 
+# Wer gespielt hat und danach ausgetreten ist oder disqualifiziert wurde, hat trotzdem teilgenommen (Review zu #2337).
+LEFT_REGISTRATION_STATUSES = frozenset({"withdrawn", "disqualified"})
 # Topgesetzt und Riesentöter gelten nur bei fester Setzliste - nicht, wenn das Los die Nummer vergeben hat.
 FIXED_SEEDING_MODES = frozenset({"manual", "ranking"})
 # Formatvielfalt: „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (frontend/src/lib/tournamentLabels.js, TA5).
@@ -240,16 +242,19 @@ class Participation:
     def is_done(self, tournament_id: str | None) -> bool:
         return (self.tournaments.get(tournament_id) or {}).get("status") in DONE_TOURNAMENT_STATUSES
 
-    def entries(self) -> list[dict]:
-        """Die Teilnahmen: angenommen oder eingecheckt (ohne Status gilt älterer Bestand als angenommen), mindestens ein
-        echtes Spiel selbst gespielt, das Turnier nicht abgesagt. Liga-Staffeln sind dabei - wer sie nicht will, fragt
-        ``is_league``."""
+    def entries(self, *, still_in: bool = False) -> list[dict]:
+        """Die Teilnahmen: mindestens ein echtes Spiel selbst gespielt, das Turnier nicht abgesagt, die Anmeldung angenommen
+        oder eingecheckt (ohne Status gilt älterer Bestand als angenommen). Wer gespielt hat und danach ausgetreten ist oder
+        disqualifiziert wurde, hat trotzdem teilgenommen - ``still_in`` lässt ihn weg (Plätze, Durchzieher, Topgesetzt).
+        Abgelehnt, Warteliste und „nicht erschienen“ sind nie eine Teilnahme. Liga-Staffeln sind dabei - wer sie nicht
+        will, fragt ``is_league``."""
         played = self.played_registration_ids
+        allowed = STANDING_REGISTRATION_STATUSES if still_in else STANDING_REGISTRATION_STATUSES | LEFT_REGISTRATION_STATUSES
         out = []
         for registration in self.registrations.values():
             tournament = self.tournaments.get(registration.get("tournament_id"))
             if (registration.get("id") in played and tournament and tournament.get("status") != "cancelled"
-                    and (registration.get("status") or "approved") in STANDING_REGISTRATION_STATUSES):
+                    and (registration.get("status") or "approved") in allowed):
                 out.append(registration)
         return out
 
@@ -259,9 +264,9 @@ class Participation:
 
     # ------------------------------------------------ Teilnahme statt Anmeldung (Turnierveteran, Multitalent, Formatvielfalt)
 
-    def tournament_entries(self) -> list[dict]:
+    def tournament_entries(self, *, still_in: bool = False) -> list[dict]:
         """Die Teilnahmen an Turnieren - ohne Liga-Staffeln (docs/LIGA.md, Abschnitt 7: eine Staffel ist kein Turnier)."""
-        return [registration for registration in self.entries() if not self.is_league(registration.get("tournament_id"))]
+        return [registration for registration in self.entries(still_in=still_in) if not self.is_league(registration.get("tournament_id"))]
 
     def tournaments_played(self) -> int:
         return len({registration["tournament_id"] for registration in self.tournament_entries()})
@@ -288,9 +293,10 @@ class Participation:
     # ------------------------------------------------ Plätze und Finale: nur abgeschlossene Turniere, nie eine Liga-Staffel
 
     def finished_entries(self) -> dict[str, list[dict]]:
-        """Die Teilnahmen in abgeschlossenen Turnieren (keine Liga-Staffel), je Turnier."""
+        """Die Teilnahmen in abgeschlossenen Turnieren (keine Liga-Staffel), je Turnier - nur wer bis zum Ende dabei war:
+        Ausgetretene und Disqualifizierte haben keinen Platz und haben nicht durchgezogen."""
         out: dict[str, list[dict]] = {}
-        for registration in self.entries():
+        for registration in self.entries(still_in=True):
             tournament_id = registration.get("tournament_id")
             if self.is_done(tournament_id) and not self.is_league(tournament_id):
                 out.setdefault(tournament_id, []).append(registration)
