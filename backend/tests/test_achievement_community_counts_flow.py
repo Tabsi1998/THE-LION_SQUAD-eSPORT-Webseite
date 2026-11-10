@@ -294,6 +294,36 @@ async def test_captain_counts_from_the_takeover_not_from_the_founding(flow):
     assert response.json()["leader_since"] == response.json()["created_at"]
 
 
+# ---------------------------------------------------------------- Gruselnacht (M5)
+
+@pytest.mark.asyncio
+async def test_spooky_night_is_checked_by_the_server_in_vienna_time(flow, monkeypatch):
+    from datetime import datetime, timezone
+
+    from services import seasons
+
+    real_to_vienna = seasons.to_vienna
+    me = await flow.add_user(name="kuerbis")
+
+    def at(moment: datetime):
+        monkeypatch.setattr(seasons, "to_vienna", lambda now=None: real_to_vienna(now if now is not None else moment))
+        monkeypatch.setattr(counters, "now_utc", lambda: moment.astimezone(timezone.utc))
+
+    async def pumpkin(day: str | None = None) -> dict:
+        return await counters.record_signal(me["id"], "halloween_pumpkin", 1, day)
+
+    at(datetime(2026, 10, 28, 20, 0, tzinfo=counters.VIENNA))
+    assert await pumpkin() == {"accepted": False, "reason": "time"}, "Halloween-Woche, aber nicht der 31."
+    at(datetime(2026, 10, 31, 16, 59, tzinfo=timezone.utc))  # 17:59 in Wien (Winterzeit)
+    assert (await pumpkin())["reason"] == "time", "vor 18 Uhr Wiener Zeit"
+    at(datetime(2026, 10, 31, 17, 0, tzinfo=timezone.utc))  # 18:00 in Wien
+    assert (await pumpkin())["accepted"] is True
+    # Nachgemeldet: nur der 31. zählt - die Uhrzeit lässt sich dann nicht mehr prüfen.
+    at(datetime(2026, 11, 1, 10, 0, tzinfo=counters.VIENNA))
+    assert (await pumpkin("2026-10-30"))["reason"] == "time"
+    assert counters.in_signal_window({"month": 10, "day": 31, "from_hour": 18}, datetime(2026, 10, 31).date(), None)
+
+
 # ---------------------------------------------------------------- Verifizierter Streamer
 
 @pytest.mark.asyncio

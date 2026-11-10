@@ -915,6 +915,14 @@ def signal_day(value, today: date) -> tuple[date | None, str | None]:
     return day, None
 
 
+def in_signal_window(window: dict, day: date, moment: datetime | None) -> bool:
+    """Liegt die Meldung im Fenster des Signals (#2338)? Der Tag muss passen; die Stunde (Wien) nur, wenn die Meldung
+    jetzt kommt - ein nachgemeldeter Tag trägt keine Uhrzeit mehr."""
+    if (day.month, day.day) != (int(window["month"]), int(window["day"])):
+        return False
+    return moment is None or moment.hour >= int(window.get("from_hour") or 0)
+
+
 async def season_allows(name: str, day: date | None = None) -> bool:
     """Saisongebundene Signale zählen nur, während die Saison (und die Phase) wirklich läuft - Serverzeit. Für einen
     nachgemeldeten Tag zählt, ob die Saison an diesem Tag zu Mittag lief (die Fenster der Sammel-Saisonen sind ganze Tage)."""
@@ -943,7 +951,8 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
     rule = SIGNAL_RULES[name]
     if rule.get("server") and not trusted:
         return {"accepted": False, "reason": "unknown"}
-    today = now_utc().astimezone(VIENNA).date()
+    moment = now_utc().astimezone(VIENNA)
+    today = moment.date()
     when, problem = signal_day(day, today)
     if problem:
         return {"accepted": False, "reason": problem}
@@ -952,6 +961,8 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
         return {"accepted": False, "reason": "live"}
     if not await season_allows(name, when if replay else None):
         return {"accepted": False, "reason": "season"}
+    if rule.get("window") and not in_signal_window(rule["window"], when, None if replay else moment):
+        return {"accepted": False, "reason": "time"}
     db = get_db()
     day = when.isoformat()
     doc = await db[SIGNALS].find_one({"user_id": user_id, "name": name}, {"_id": 0}) or {}
