@@ -151,6 +151,23 @@ async def test_data_aware_also_counts_after_a_data_export(flow):
     assert entry and "profile" in entry["sources"]
 
 
+@pytest.mark.asyncio
+async def test_deleting_the_account_removes_the_privacy_timestamps(flow):
+    """Kontolöschung (#2338): wann jemand die Privatsphäre eingestellt oder den Export geholt hat, geht mit."""
+    from services import account_erasure
+
+    me = await flow.add_user(name="loeschmich")
+    flow.act_as(me)
+    assert (await flow.patch("/api/users/me", json={"dm_privacy": "friends"})).status_code == 200
+    assert (await flow.get("/api/dsgvo/export-my-data")).status_code == 200
+    stored = await flow.db.users.find_one({"id": me["id"]})
+    assert stored["privacy_reviewed_at"] and stored["data_exported_at"]
+    assert {"privacy_reviewed_at", "data_exported_at"} <= account_erasure.profile_fields_to_clear()
+    assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
+    gone = await flow.db.users.find_one({"id": me["id"]})
+    assert "privacy_reviewed_at" not in gone and "data_exported_at" not in gone
+
+
 # ---------------------------------------------------------------- Twitch (M4)
 
 def fake_twitch(monkeypatch, streams: list[dict]):
