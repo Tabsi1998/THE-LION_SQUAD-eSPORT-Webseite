@@ -75,6 +75,8 @@ EXPECTED = {
     "match_chat_messages": {"user_id_1_created_at_1"},
     "tournament_chat_messages": {"user_id_1_created_at_1"},
     "event_registrations": {"user_id_1"},
+    # Kapitän im Altbestand (#2338): letzte Übergabe je Team, neueste zuerst.
+    "audit_logs": {"action_1_target_id_1_created_at_-1"},
 }
 
 

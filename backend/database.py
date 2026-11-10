@@ -758,6 +758,8 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("match_chat_messages", [("user_id", 1), ("created_at", 1)]),
     ("tournament_chat_messages", [("user_id", 1), ("created_at", 1)]),
     ("event_registrations", "user_id"),
+    # Kapitän im Altbestand (#2338): die letzte Übergabe je Team aus dem Protokoll (achievement_counters._last_handover).
+    ("audit_logs", [("action", 1), ("target_id", 1), ("created_at", -1)]),
 )
 
 
