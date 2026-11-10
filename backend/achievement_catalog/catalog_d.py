@@ -40,7 +40,7 @@ CLUB = [
        "id-card", "member-card", "member_card_added", [1], "Mitgliedskarte hinzugefügt.", sort_order=911),
     _d("club_events", "Vereinsleben", "club", "Sei bei vereinsinternen Events dabei.", "Zu vereinsinternen Events anmelden und vor Ort einchecken lassen - Events nur für Mitglieder, Vereinsabende und interne Veranstaltungen. Jedes zählt einmal, abgesagte nicht.",
        "users", "club-house", "club_events_attended", [1, 5, 15, 30, 60], "{n} interne Events besucht.", sort_order=912),
-    _d("volunteer", "Ehrenamt", "club", "Pack im Verein mit an.", "Von Hand vergeben: Die Redaktion trägt ihn ein, wenn du dich ehrenamtlich im Verein einbringst - jeder Einsatz zählt einmal.",
+    _d("volunteer", "Ehrenamt", "club", "Pack im Verein mit an.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn du dich ehrenamtlich im Verein einbringst. Jeder Einsatz zählt einmal.",
        "heart-handshake", "volunteer", None, [1, 3, 7, 15, 30], "{n}-mal ehrenamtlich dabei.", sort_order=913, manual=True),
     _d("founding_member", "Gründungsmitglied", "club", "Von Anfang an dabei.", "Mitglied seit dem Gründungsjahr des Vereins - das lässt sich nicht nachholen.",
        "flag", "founding-flag", "member_since_founding_year", [1], "Seit dem Gründungsjahr dabei.", sort_order=914, materials=["gold"]),
@@ -64,15 +64,15 @@ CLUB = [
 ]
 
 SPECIAL = [
-    _special("ehrenloewe", "Ehrenlöwe", "Die höchste Ehrung des Vereins.", "Von Hand vergeben: Die Redaktion trägt ihn für besondere Verdienste um den Verein ein.", "crown", "honor-lion", None, sort_order=1010, manual=True, step="Ehrenlöwe des Vereins."),
+    _special("ehrenloewe", "Ehrenlöwe", "Die höchste Ehrung des Vereins.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - für besondere Verdienste um den Verein.", "crown", "honor-lion", None, sort_order=1010, manual=True, step="Ehrenlöwe des Vereins."),
     _special("gamers_heaven", "Gamers Heaven", "Live beim Gamers Heaven dabei gewesen.", "Von Hand vergeben: Nach dem Event trägt die Redaktion ihn bei allen ein, die beim Gamers Heaven dabei waren.", "rocket", "gamers-heaven", None, sort_order=1011, manual=True, step="Beim Gamers Heaven dabei."),
     _special("lan_founder", "LAN-Gründer", "Bei der ersten LAN mit dabei.", "Von Hand vergeben: Die Redaktion trägt ihn bei allen ein, die bei der ersten LAN des Vereins dabei waren.", "server", "lan-founder", None, sort_order=1012, manual=True, step="Bei der ersten LAN dabei."),
     _special("beta_tester", "Beta-Tester", "Die Plattform vor dem Start getestet.", "Von Hand vergeben: Die Redaktion trägt ihn bei allen ein, die die Plattform vor dem Start getestet haben.", "flask-conical", "beta", None, sort_order=1013, manual=True, step="Plattform vor dem Start getestet."),
     # Seit #2338 automatisch (Zähler streamer_verified) - und weiter von Hand vergebbar; Handvergaben bleiben.
     _special("streamer_verified", "Verifizierter Streamer", "Vom Verein bestätigter Kanal.", "Dein Twitch-Konto ist per Anmeldung verknüpft und der Verein führt dich als Streamer oder Creator.", "badge-check", "verified-stream", "streamer_verified", sort_order=1014, step="Kanal bestätigt."),
-    _special("sponsor_friend", "Sponsorenfreund", "Hat dem Verein einen Sponsor gebracht.", "Von Hand vergeben: Die Redaktion trägt ihn ein, wenn du dem Verein einen Sponsor vermittelt hast.", "handshake", "sponsor", None, sort_order=1015, manual=True, step="Sponsor vermittelt."),
-    _special("hall_of_fame", "Hall of Fame", "Ein Name, der bleibt.", "Von Hand vergeben: Die Redaktion trägt ihn für Menschen ein, die den Verein nachhaltig geprägt haben.", "landmark", "hall-of-fame", None, sort_order=1016, manual=True, step="In der Hall of Fame."),
-    _special("season_mvp", "Saison-MVP", "Die Spielerin oder der Spieler der Saison.", "Von Hand vergeben: Die Redaktion zeichnet je Saison die Spielerin oder den Spieler der Saison aus.", "star", "mvp", None, sort_order=1017, manual=True, step="MVP einer Saison."),
+    _special("sponsor_friend", "Sponsorenfreund", "Hat dem Verein einen Sponsor gebracht.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn du dem Verein einen Sponsor vermittelt hast.", "handshake", "sponsor", None, sort_order=1015, manual=True, step="Sponsor vermittelt."),
+    _special("hall_of_fame", "Hall of Fame", "Ein Name, der bleibt.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - für Menschen, die den Verein nachhaltig geprägt haben.", "landmark", "hall-of-fame", None, sort_order=1016, manual=True, step="In der Hall of Fame."),
+    _special("season_mvp", "Saison-MVP", "Die Spielerin oder der Spieler der Saison.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - je Saison für die Spielerin oder den Spieler der Saison.", "star", "mvp", None, sort_order=1017, manual=True, step="MVP einer Saison."),
     _special("pioneer", "Pionier", "Eines der ersten hundert Konten.", "Nur die ersten hundert Konten der Plattform - lässt sich nicht nachholen.", "compass", "pioneer", "pioneer_account", sort_order=1018, step="Unter den ersten hundert."),
     _special("grand_slam", "Grand Slam", "Drei Spiele in einer Saison gewonnen.", "Turniere in drei verschiedenen Spielen in ein und derselben Saison gewinnen.", "trophy", "grand-slam", "distinct_game_wins_one_season", sort_order=1019, target=3, step="Drei Spiele in einer Saison gewonnen."),
     _special("iron_lion", "Eiserner Löwe", "365 Tage in Folge angemeldet.", "Ein Jahr lang jeden Tag vorbeischauen.", "shield", "iron-lion", "login_streak_max", sort_order=1020, target=365, step="365 Tage in Folge angemeldet."),

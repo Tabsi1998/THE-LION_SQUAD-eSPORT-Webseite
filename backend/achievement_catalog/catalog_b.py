@@ -83,7 +83,7 @@ TEAM = [
        "users-round", "roster", "team_size_max", [3, 5, 10], "{n} Mitglieder im Team.", sort_order=516),
     _b("team_chat", "Teamgeist", "team", "Schreib im Team-Chat.", "Nachrichten im Team-Chat zählen - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
        "message-circle", "team-chat", "team_chat_messages_sent", [10, 50, 150, 500, 1500], "{n} Nachrichten im Team-Chat.", sort_order=517),
-    _b("team_identity", "Teamauftritt", "team", "Gib deinem Team ein Gesicht.", "Logo, Banner und Teambeschreibung deines Teams sind ausgefüllt – zählt für die Teamleitung und die Co-Leitung.",
+    _b("team_identity", "Teamauftritt", "team", "Gib deinem Team ein Gesicht.", "Logo, Banner und Teambeschreibung deines Teams sind ausgefüllt - zählt für die Teamleitung und die Co-Leitung.",
        "image", "emblem", "team_profile_complete", [1], "Teamprofil vollständig.", sort_order=518),
     _b("team_recruiter", "Rekrutierer", "team", "Hol neue Leute ins Team.", "Einladungen, die angenommen werden, zählen.",
        "user-plus", "handshake-team", "team_invites_accepted", [1, 3, 7, 15, 30], "{n} Einladungen angenommen.", sort_order=519),

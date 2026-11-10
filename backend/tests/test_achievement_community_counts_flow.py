@@ -406,15 +406,22 @@ async def test_spooky_night_is_checked_by_the_server_in_vienna_time(flow, monkey
 # ---------------------------------------------------------------- Texte
 
 def test_manual_achievements_name_their_criteria_and_who_awards_them():
-    """Einzeln vergeben darf, wer in der Verwaltung den Bereich Redaktion hat (badge_routes: require_area("content")) -
-    nicht nur der Vorstand. Die Texte sagen das und nennen ein Kriterium."""
+    """Einzeln vergeben darf, wer in der Verwaltung den Bereich Redaktion hat (badge_routes: require_area("content")).
+    Bei Ehrungen entscheidet der Vorstand, die Redaktion trägt ein; bei Teilnahmen trägt die Redaktion alle ein, die
+    dabei waren. Jeder Text nennt ein Kriterium."""
     import achievement_catalog as catalog
 
-    manual = [g for g in catalog.ACHIEVEMENT_GROUPS if g.get("manual_only") and not g.get("is_negative") and g.get("catalog") in ("C", "D")]
+    manual = {g["code"]: g for g in catalog.ACHIEVEMENT_GROUPS if g.get("manual_only") and not g.get("is_negative") and g.get("catalog") in ("C", "D")}
     assert len(manual) >= 10
-    for group in manual:
-        assert group["how_to"].startswith("Von Hand vergeben: ") and "Redaktion" in group["how_to"], group["code"]
-        assert "Vorstand" not in group["how_to"] and "Vereinsleitung" not in group["how_to"], group["code"]
+    board = {"ehrenloewe", "hall_of_fame", "season_mvp", "volunteer", "sponsor_friend", "community_helper", "mentor", "creator_spirit"}
+    for code, group in manual.items():
+        how_to = group["how_to"]
+        assert how_to.startswith("Von Hand vergeben: ") and "Redaktion" in how_to and "Vereinsleitung" not in how_to, code
+        if code in board:
+            assert how_to.startswith("Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - "), code
+        else:
+            assert "Vorstand" not in how_to and " bei allen ein, die " in how_to, code
+        assert "–" not in how_to, "Gedankenstrich wie im Katalog: ' - '"
 
 
 def test_explanations_name_the_rules():
@@ -429,7 +436,7 @@ def test_explanations_name_the_rules():
     for label in ("Profilbild", "Banner", "Über mich", "Land", "Ort", "Geburtsdatum", "Plattformen", "Eingabegeräte", "Lieblingsspiele", "Discord", "Twitch", "Sichtbarkeit"):
         assert label in steckbrief, label
     assert len(achievement_progress.PROFILE_FIELDS) == 12, "kommt ein Feld dazu, gehört es in den Text"
-    assert groups["team_identity"]["how_to"] == "Logo, Banner und Teambeschreibung deines Teams sind ausgefüllt – zählt für die Teamleitung und die Co-Leitung."
+    assert groups["team_identity"]["how_to"] == "Logo, Banner und Teambeschreibung deines Teams sind ausgefüllt - zählt für die Teamleitung und die Co-Leitung."
     assert groups["streamer_verified"]["how_to"] == "Dein Twitch-Konto ist per Anmeldung verknüpft und der Verein führt dich als Streamer oder Creator."
 
 

@@ -93,10 +93,11 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
 
 **Was genau zählt (Chat, Discord, Verein, Profil):**
 
-- **Chat** (Plauderer, Teamgeist, Turnier-Plauderer, Briefeschreiber, Sticker-Sammler): Zurückgehaltene, abgelehnte und gelöschte
-  Nachrichten zählen nie. Je Erfolg zählen höchstens **50 Nachrichten an einem Tag** (Wiener Zeit); schreiben lässt sich weiter
-  unbegrenzt. „Plauderer“ sind Turnier- und Match-Chat zusammen. Eine Nachricht wird über die Warteschlange ausgewertet, eine
-  später freigegebene ebenso.
+- **Chat** (Plauderer, Teamgeist, Turnier-Plauderer, Briefeschreiber): Zurückgehaltene, abgelehnte und gelöschte Nachrichten
+  zählen nie. Je Erfolg zählen höchstens **50 Nachrichten an einem Tag** (Wiener Zeit); schreiben lässt sich weiter unbegrenzt.
+  „Plauderer“ sind Turnier- und Match-Chat zusammen. Eine Nachricht wird über die Warteschlange ausgewertet, eine später
+  freigegebene ebenso. **Sticker-Sammler** zählt verschiedene Sticker, ebenfalls nur aus sichtbaren Nachrichten – ohne
+  Tageslimit.
 - **Discord:** Gezählt wird nur mit verknüpftem Discord-Konto und nur auf **eingeschalteten** Servern – das gilt für
   „Discord-Stimme“ und „Überall dabei“. Auf welchen Servern jemand ist, gleicht der Bot beim Verknüpfen und **jede Nacht um 03:50**
   ab; nach dem Trennen zählt nichts mehr. „Überall dabei“: Stufe I ein Server, Stufe II die Hälfte der eingeschalteten Server
@@ -146,8 +147,10 @@ bei Fehlern **nichts** und löscht nie etwas.
 
 Reiter **Vergeben**.
 
-**Einzelvergabe** (alle mit dem Bereich **Redaktion** – so steht es auch in den Texten der Hand-Erfolge: „Von Hand vergeben: Die
-Redaktion trägt ihn ein, wenn …“): Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann die Optionen:
+**Einzelvergabe** (alle mit dem Bereich **Redaktion**): Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann
+die Optionen. Die Texte der Hand-Erfolge sagen, wie es läuft: bei Ehrungen wie Ehrenlöwe, Hall of Fame, Saison-MVP oder
+Ehrenamt „Der Vorstand entscheidet, die Redaktion trägt ein“; bei Teilnahmen wie Gamers Heaven, LAN-Gründer oder Beta-Tester
+trägt die Redaktion alle ein, die dabei waren:
 
 - **Grund** (steht im Protokoll),
 - **Datum** – leer heißt jetzt, sonst rückwirkend,
