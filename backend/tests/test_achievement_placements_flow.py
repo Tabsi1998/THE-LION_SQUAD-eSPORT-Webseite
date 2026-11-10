@@ -217,6 +217,37 @@ async def test_ungeschlagen_trotz_freilos(flow):
     assert (champion["tournaments_won"], champion["tournaments_won_undefeated"], champion["finals_played"]) == (1, 1, 1)
 
 
+@pytest.mark.asyncio
+async def test_ungeschlagen_gilt_fuer_das_team_nicht_fuer_die_eigene_besetzung(flow):
+    """Doppel-K.-o.: Das Team verliert sein erstes Spiel in anderer Besetzung und gewinnt danach alles mit „Mitglied“.
+    Ungeschlagen war das Team nicht - auch wenn „Mitglied“ selbst kein Spiel verloren hat."""
+    staff, tournament, _team, registration, (lead, member, _bench), rival_regs = await play.team_cup(
+        flow, tournament_fields={"format": "double_elim"})
+    order = [registration["id"], *[reg["id"] for reg in rival_regs]]
+    lost_once = False
+    for _guard in range(64):
+        waiting = await play.open_matches(flow, tournament)
+        if not waiting:
+            break
+        match = waiting[0]
+        if registration["id"] not in play.sides(match):
+            await play.decide(flow, staff, match, min(play.sides(match), key=order.index))
+            continue
+        # Wer für das Team gespielt hat, steht am Spiel (Teilnehmerliste): erst die Leitung, danach das Mitglied.
+        opponent = next(side for side in play.sides(match) if side != registration["id"])
+        await play.decide(flow, staff, match, registration["id"] if lost_once else opponent)
+        await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"lineups": {registration["id"]: [member["id"] if lost_once else lead["id"]]}}})
+        lost_once = True
+    await play.finish(flow, staff, tournament)
+    award = await flow.db.tournament_awards.find_one({"registration_id": registration["id"]}, {"_id": 0})
+    assert award["rank"] == 1 and award["matches"]["won"] < award["matches"]["played"], "Turniersieg über die Verliererrunde"
+
+    own = await counters.compute(member["id"], {"matches_played", "matches_won", "tournaments_won", "tournaments_won_undefeated"})
+    assert own["matches_played"] == own["matches_won"] > 0, "das Mitglied selbst hat jedes seiner Spiele gewonnen"
+    assert (own["tournaments_won"], own["tournaments_won_undefeated"]) == (1, 0)
+    assert (await values(lead))["tournaments_won_undefeated"] == 0
+
+
 # ---------------------------------------------------------------- Team (K4)
 
 @pytest.mark.asyncio

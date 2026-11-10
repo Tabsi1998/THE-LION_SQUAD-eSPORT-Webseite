@@ -95,11 +95,15 @@ class Played:
 
 @dataclass(frozen=True)
 class Placement:
-    """Die Plätze der Person in einem abgeschlossenen Turnier (mehrere nur, wenn sie für mehrere Anmeldungen gespielt hat)
-    und die Größe des Teilnehmerfelds."""
+    """Die Plätze der Person in einem abgeschlossenen Turnier (mehrere nur, wenn sie für mehrere Anmeldungen gespielt hat),
+    die Größe des Teilnehmerfelds und der Platz je Anmeldung."""
 
     ranks: frozenset
     participants: int
+    by_registration: dict
+
+    def registrations_on(self, rank: int) -> set[str]:
+        return {reg_id for reg_id, place in self.by_registration.items() if place == rank}
 
 
 class TeamTimeline:
@@ -295,17 +299,28 @@ class Participation:
         for tournament_id, registrations in entries.items():
             own = [stored[registration["id"]] for registration in registrations if registration["id"] in stored]
             if own:
-                ranks = {row.get("rank") for row in own}
+                ranks = {row["registration_id"]: row.get("rank") for row in own}
                 field = max(int(row.get("participants") or 0) for row in own)
             elif await db.tournament_awards.count_documents({"tournament_id": tournament_id}, limit=1):
                 continue  # die Auszeichnungen stehen - für diese Anmeldung gibt es keine
             else:
                 tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
                 listed, _snapshot, current = await tournament_ranks(db, tournament, surface="achievements") if tournament else ([], {}, {})
-                ranks = {current.get(registration["id"]) for registration in registrations}
+                ranks = {registration["id"]: current.get(registration["id"]) for registration in registrations}
                 field = len(listed)
-            out[tournament_id] = Placement(frozenset(rank for rank in ranks if isinstance(rank, int) and rank > 0), field)
+            placed = {reg_id: rank for reg_id, rank in ranks.items() if isinstance(rank, int) and not isinstance(rank, bool) and rank > 0}
+            out[tournament_id] = Placement(frozenset(placed.values()), field, placed)
         return out
+
+    def beaten_registration_ids(self) -> set[str]:
+        """Die Anmeldungen (eigene und die der eigenen Teams), die ein echtes Spiel verloren haben - über **alle** ihre
+        Spiele, nicht nur die, in denen die Person selbst aufgestellt war. „Ungeschlagen“ gilt für die Anmeldung, mit der
+        man platziert ist: Verliert das Team ein Spiel in anderer Besetzung, war es nicht ungeschlagen."""
+        beaten: set[str] = set()
+        for match in self.matches:
+            if is_real_match(match):
+                beaten |= {reg_id for reg_id in participant_ids(match) & set(self.registrations) if lost_by(match, {reg_id})}
+        return beaten
 
     async def finals(self, db) -> set[str]:
         """Die abgeschlossenen Turniere, in deren Finale die Person stand (``competition_standings.final_participants``):

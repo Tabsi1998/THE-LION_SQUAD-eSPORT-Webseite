@@ -1122,10 +1122,11 @@ async def _lower_bracket_top4(ctx):
 
 @counter("tournaments_won_undefeated", "tournament", "match")
 async def _undefeated(ctx):
-    won_tournaments = {tid for tid, placement in (await ctx.placements()).items() if 1 in placement.ranks}
-    # Verloren hat nur, wer einem anderen Sieger gegenüberstand - auch kampflos; ein Freilos oder Unentschieden nicht.
-    lost_in = {row.match.get("tournament_id") for row in (await ctx.participation()).rows if row.lost}
-    return len(won_tournaments - lost_in)
+    """Turniersieg mit einer Anmeldung, die kein Spiel verloren hat (#2337) - auch keines, in dem die Person selbst nicht
+    aufgestellt war. Verloren hat nur, wer einem anderen Sieger gegenüberstand (auch kampflos); ein Freilos oder ein
+    Unentschieden ist keine Niederlage."""
+    beaten = (await ctx.participation()).beaten_registration_ids()
+    return sum(1 for placement in (await ctx.placements()).values() if placement.registrations_on(1) - beaten)
 
 
 @counter("group_stage_firsts", "tournament", "match")
