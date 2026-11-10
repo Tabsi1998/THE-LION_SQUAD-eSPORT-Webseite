@@ -38,7 +38,7 @@ COMMUNITY = [
        "message-square", "discord", "discord_linked", [1], "Discord verbunden.", sort_order=610),
     _c("discord_messages", "Discord-Stimme", "community", "Schreib auf dem Vereins-Discord.", "Jede Nachricht auf einem eingeschalteten Server des Vereins zählt - mit verknüpftem Discord-Konto.",
        "messages-square", "speech-wave", "discord_messages", [1, 100, 500, 2000, 5000, 10000, 25000], "{n} Nachrichten auf Discord.", sort_order=611),
-    _c("events_attended", "Eventgänger", "community", "Sei bei Events dabei.", "Melde dich zu Events an und check dort ein - jedes zählt einmal.",
+    _c("events_attended", "Eventgänger", "community", "Sei bei Events dabei.", "Melde dich zu Events an und lass dich vor Ort einchecken - jedes zählt einmal, abgesagte Events zählen nicht.",
        "calendar-check", "ticket-stub", "events_attended", [1, 5, 15, 30, 60, 100, 200], "{n} Events besucht.", sort_order=612),
     _c("events_hosted", "Gastgeber", "community", "Richte Events aus.", "Lege ein Event an und führ es bis zum Abschluss.",
        "party-popper", "host", "events_hosted_completed", [1, 5, 15, 40, 100], "{n} Events ausgerichtet.", sort_order=613),

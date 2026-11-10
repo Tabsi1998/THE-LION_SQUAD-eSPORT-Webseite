@@ -38,7 +38,7 @@ CLUB = [
        "crown", "membership-card", "membership_days", [1, 180, 365, 730, 1095, 1825, 3650], "{n} Mitglied.", sort_order=910, unit=" Tage"),
     _d("member_card", "Mitgliedskarte", "club", "Hol dir deine Mitgliedskarte aufs Handy.", "Karte in die Wallet oder in die LionsAPP legen.",
        "id-card", "member-card", "member_card_added", [1], "Mitgliedskarte hinzugefügt.", sort_order=911),
-    _d("club_events", "Vereinsleben", "club", "Sei bei vereinsinternen Events dabei.", "Zu internen Events anmelden und einchecken - jedes zählt einmal.",
+    _d("club_events", "Vereinsleben", "club", "Sei bei vereinsinternen Events dabei.", "Zu vereinsinternen Events anmelden und vor Ort einchecken lassen - Events nur für Mitglieder, Vereinsabende und interne Veranstaltungen. Jedes zählt einmal, abgesagte nicht.",
        "users", "club-house", "club_events_attended", [1, 5, 15, 30, 60], "{n} interne Events besucht.", sort_order=912),
     _d("volunteer", "Ehrenamt", "club", "Pack im Verein mit an.", "Wird vom Vorstand vergeben, wenn du dich ehrenamtlich einbringst.",
        "heart-handshake", "volunteer", None, [1, 3, 7, 15, 30], "{n}-mal ehrenamtlich dabei.", sort_order=913, manual=True),

@@ -782,10 +782,12 @@ async def _events_hosted(ctx):
 
 @counter("club_events_attended", "event", "club")
 async def _club_events(ctx):
-    event_ids = [row.get("event_id") async for row in ctx.db.event_registrations.find({"user_id": ctx.user_id, "$or": [{"status": "checked_in"}, {"checked_in": True}]}, {"_id": 0, "event_id": 1}) if row.get("event_id")]
+    """Vereinsleben (#2338): besuchte Events, die vereinsintern sind - nach Sichtbarkeit (Mitglieder, intern) oder Art
+    (Vereinsabend, intern). Anwesenheit und „abgesagt zählt nicht“ wie bei „Eventgänger“ (achievement_progress)."""
+    event_ids = await achievement_progress.attended_event_ids(ctx.db, ctx.user_id)
     if not event_ids:
         return 0
-    return await ctx.db.events.count_documents({"id": {"$in": event_ids}, "visibility": {"$in": ["members", "internal"]}})
+    return await ctx.db.events.count_documents({"id": {"$in": sorted(event_ids)}, **achievement_progress.INTERNAL_EVENT_QUERY})
 
 
 @counter("season_top10_finishes", "season")

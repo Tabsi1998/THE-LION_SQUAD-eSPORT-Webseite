@@ -142,13 +142,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
             pass  # unlesbares Beitrittsdatum: dann bleibt es bei 0 Tagen von oben
     p["membership_days"] = membership_days
 
-    if "event_registrations" in await db.list_collection_names():
-        p["events_attended"] = await db.event_registrations.count_documents({
-            "user_id": user_id,
-            "$or": [{"status": "checked_in"}, {"checked_in": True}],
-        })
-    else:
-        p["events_attended"] = 0
+    # Eventgänger (#2338): je Event einmal, abgesagte Events zählen nicht - dieselbe Rechnung wie „Vereinsleben“.
+    p["events_attended"] = len(await attended_event_ids(db, user_id))
 
     season_rows = await db.season_points.find({"user_id": user_id}, {"_id": 0, "total_points": 1}).to_list(2000)
     p["season_points_total"] = int(sum(float(r.get("total_points") or 0) for r in season_rows))
@@ -306,3 +301,23 @@ async def chat_counters(db, user_id: str) -> dict[str, int]:
         "tournament_chat_messages_sent": capped_total(days["tournament"]),
         "community_messages_sent": capped_total(days["tournament"] + days["match"]),
     }
+
+
+# ---------------- Events (#2338) ----------------
+# Anwesend ist, wen die Leitung unter „Anmeldungen & Einlass“ eingecheckt hat (Status „Da“; ältere Einträge tragen nur
+# checked_in). Einen Kartenscan am Event-Einlass gibt es nicht - die Mitgliedskarte wird nur bei der Generalversammlung
+# gescannt (eigener Erfolg „Versammlungsbesucher“). Abgesagte Events zählen bei keinem Event-Erfolg.
+ATTENDED_EVENT_QUERY = {"$or": [{"status": "checked_in"}, {"checked_in": True, "status": {"$nin": ["cancelled", "no_show"]}}]}
+# Vereinsintern ist ein Event, das nur Mitglieder sehen - oder eines, das seiner Art nach intern ist (models.EventType).
+INTERNAL_EVENT_VISIBILITY = ("members", "internal")
+INTERNAL_EVENT_TYPES = ("club_evening", "internal")
+INTERNAL_EVENT_QUERY = {"$or": [{"visibility": {"$in": list(INTERNAL_EVENT_VISIBILITY)}}, {"event_type": {"$in": list(INTERNAL_EVENT_TYPES)}}]}
+
+
+async def attended_event_ids(db, user_id: str) -> set[str]:
+    """Die Events, bei denen die Person eingecheckt war - je Event einmal, ohne abgesagte."""
+    ids = {row["event_id"] async for row in db.event_registrations.find({"user_id": user_id, **ATTENDED_EVENT_QUERY}, {"_id": 0, "event_id": 1}) if row.get("event_id")}
+    if not ids:
+        return set()
+    cancelled = set(await db.events.distinct("id", {"id": {"$in": sorted(ids)}, "status": "cancelled"}))
+    return ids - cancelled

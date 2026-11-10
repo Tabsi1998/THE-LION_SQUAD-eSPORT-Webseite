@@ -86,6 +86,33 @@ async def test_at_most_fifty_counted_messages_per_vienna_day(flow):
     assert values["community_messages_sent"] == 50, "Plauderer: ein Deckel für Turnier- und Match-Chat zusammen"
 
 
+# ---------------------------------------------------------------- Events (H12)
+
+@pytest.mark.asyncio
+async def test_club_events_are_internal_by_visibility_or_type_and_cancelled_events_never_count(flow):
+    me = await flow.add_user(name="vereinsmensch")
+    db = flow.db
+    await db.events.insert_many([
+        {"id": "e-members", "name": "Mitgliederabend", "visibility": "members", "event_type": "general", "status": "completed"},
+        {"id": "e-evening", "name": "Vereinsabend", "visibility": "public", "event_type": "club_evening", "status": "completed"},
+        {"id": "e-internal", "name": "Klausur", "visibility": "community", "event_type": "internal", "status": "completed"},
+        {"id": "e-public", "name": "LAN", "visibility": "public", "event_type": "lan_party", "status": "completed"},
+        {"id": "e-cancelled", "name": "Abgesagt", "visibility": "internal", "event_type": "club_evening", "status": "cancelled"},
+        {"id": "e-noshow", "name": "Nicht da", "visibility": "public", "event_type": "club_evening", "status": "completed"},
+    ])
+    await db.event_registrations.insert_many([
+        {"id": "r1", "event_id": "e-members", "user_id": me["id"], "status": "checked_in"},
+        {"id": "r2", "event_id": "e-evening", "user_id": me["id"], "status": "checked_in"},
+        {"id": "r3", "event_id": "e-internal", "user_id": me["id"], "checked_in": True, "status": "registered"},
+        {"id": "r4", "event_id": "e-public", "user_id": me["id"], "status": "checked_in"},
+        {"id": "r5", "event_id": "e-cancelled", "user_id": me["id"], "status": "checked_in"},
+        {"id": "r6", "event_id": "e-noshow", "user_id": me["id"], "checked_in": True, "status": "no_show"},
+    ])
+    values = await counters.compute(me["id"], {"club_events_attended", "events_attended"})
+    assert values["club_events_attended"] == 3, "Sichtbarkeit Mitglieder, Art Vereinsabend, Art intern"
+    assert values["events_attended"] == 4, "abgesagt und nicht erschienen zählen nicht"
+
+
 # ---------------------------------------------------------------- Discord (H11, M9)
 
 MAIN, SUB, OFF = "700000000000000001", "700000000000000002", "700000000000000009"
