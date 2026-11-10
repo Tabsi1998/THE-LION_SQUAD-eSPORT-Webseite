@@ -580,7 +580,7 @@ async def _staffed(ctx):
     return await ctx.db.tournaments.count_documents({"id": {"$in": list(ids)}, "status": {"$in": ["completed", "results_published", "archived"]}, **NOT_LEAGUE})
 
 
-@counter("seed_one_count", "tournament", "match")
+@counter("seed_one_count", "tournament")
 async def _seed_one(ctx):
     """Topgesetzt (#2337): Setznummer 1 der Anmeldung in einem abgeschlossenen Turnier mit fester Setzliste, in dem die
     Person gespielt hat - je Turnier einmal. Ausgelost, abgesagt, ausgetreten und Liga zählen nicht; die Nummern je Lauf
@@ -629,13 +629,13 @@ async def _first_checkins(ctx):
     return count
 
 
-@counter("top8_finishes", "tournament", "match")
+@counter("top8_finishes", "tournament")
 async def _top8(ctx):
     """Platz 1 bis 8 in einem abgeschlossenen Turnier - erst ab mehr als acht Teilnehmern, sonst wäre jeder dabei."""
     return sum(1 for placement in (await ctx.placements()).values() if placement.participants > 8 and any(rank <= 8 for rank in placement.ranks))
 
 
-@counter("finals_played", "tournament", "match")
+@counter("finals_played", "tournament")
 async def _finals(ctx):
     """Im Finale gestanden: Endspiel, Grand Final oder Finallauf - nicht „Platz 1 oder 2“ (Tabellen haben kein Finale)."""
     return len(await ctx.finals())
