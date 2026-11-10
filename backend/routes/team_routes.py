@@ -1,6 +1,7 @@
 """Team routes."""
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -231,6 +232,33 @@ async def _team_audit(db, action: str, team_id: str, actor_id: str | None, data:
         "id": new_id(), "action": action, "target_id": team_id, "actor_id": actor_id, "data": data,
         "created_at": now_utc().isoformat(),
     })
+
+
+async def _joined_at_for_missing_row(db, team: dict, user_id: str) -> str:
+    """Das Beitrittsdatum für eine Zeile in ``team_members``, die erst jetzt entsteht (#2337): Die Person steht schon im
+    Team (``member_ids``), die Zeile fehlt nur. Ohne Datum gälte sie für die Erfolge als „schon immer dabei“, mit „jetzt“
+    verlöre ein langjähriges Mitglied seine alten Teamspiele. Das genaueste Datum gewinnt: der letzte Beitritt der Person
+    zu diesem Team aus dem Protokoll (bei einem Wiedereintritt der letzte, nicht der erste), sonst das Gründungsdatum des
+    Teams, erst dann jetzt."""
+    now = now_utc()
+    joins = await db.audit_logs.find(
+        {"action": "team.join", "actor_id": user_id, "target_id": team.get("id")}, {"_id": 0, "created_at": 1},
+    ).to_list(200)
+    past = []
+    for row in joins:
+        try:
+            stamp = datetime.fromisoformat(str(row.get("created_at") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        stamp = stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+        if stamp <= now:
+            past.append(stamp)
+    if past:
+        return max(past).isoformat()
+    created = team.get("created_at")
+    if created:
+        return created.isoformat() if hasattr(created, "isoformat") else str(created)
+    return now.isoformat()
 
 
 async def _tell(user_id: str | None, **note) -> None:
@@ -1255,7 +1283,8 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
         )
     await db.team_members.update_one(
         {"team_id": team_id, "user_id": user_id},
-        {"$set": {"role": role, "updated_at": now_utc().isoformat()}},
+        {"$set": {"role": role, "updated_at": now_utc().isoformat()},
+         "$setOnInsert": {"joined_at": await _joined_at_for_missing_row(db, team, user_id)}},
         upsert=True,
     )
     await create_user_notification(
@@ -1304,12 +1333,14 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
         await db.teams.update_one({"id": team_id}, {"$addToSet": {"co_leader_ids": old_leader}})
         await db.team_members.update_one(
             {"team_id": team_id, "user_id": old_leader},
-            {"$set": {"role": "co_leader", "updated_at": now_utc().isoformat()}},
+            {"$set": {"role": "co_leader", "updated_at": now_utc().isoformat()},
+             "$setOnInsert": {"joined_at": await _joined_at_for_missing_row(db, team, old_leader)}},
             upsert=True,
         )
     await db.team_members.update_one(
         {"team_id": team_id, "user_id": new_leader_id},
-        {"$set": {"role": "leader", "updated_at": now_utc().isoformat()}},
+        {"$set": {"role": "leader", "updated_at": now_utc().isoformat()},
+         "$setOnInsert": {"joined_at": await _joined_at_for_missing_row(db, team, new_leader_id)}},
         upsert=True,
     )
     await create_user_notification(

@@ -1,0 +1,533 @@
+"""Wer hat gespielt (#2337): die eine Grundlage der Turnier- und Spiel-Erfolge einer Person.
+
+Früher zählte alles über ``tournament_registrations.user_id`` - bei einem Team also nur für die Person, die es angemeldet
+hat, und in einer Liga-Staffel (Anmeldung ohne Person) für niemanden. Jetzt gilt für jedes Spiel einzeln:
+
+- Einzel-Anmeldung: die Person selbst.
+- Team mit Teilnehmerliste am Spiel (Liga: ``lineups`` am Spiel bzw. an seinen Maps): wer darauf steht.
+- Team mit Aufstellung an der Anmeldung (Team am Spieltag, ``lineup``): die Aufgestellten.
+- Co-Team ohne beides: wer zum Zeitpunkt des Spiels nachweislich in seinem Kader stand - laut Liga-Kader der Season
+  (``league_rosters``: ``squad_ids``, ``squad_joined_at``) und dem Protokoll der Kaderwechsel (``league.squad.roster``,
+  ``league.transfer.approve``). Ein Transfer nimmt niemandem seine Spiele, und wer neu dazukommt, bekommt keine alten.
+  Führt die Season einen Liga-Kader, ist der heutige Kader (``team_squads``) kein Nachweis, die Mitgliedschaft im
+  Hauptteam nie: Fehlt jeder Nachweis, zählt das Spiel für niemanden. Nur in Seasons ganz ohne Liga-Kader (keine
+  Pflicht-IDs, keine Wartezeit, kein „ein Team je Season“, Bestand vor #2108) gilt der heutige Kader - für alle, die laut
+  Protokoll nicht erst nach dem Spiel aufgenommen wurden und damals schon im Hauptteam waren.
+- Team ohne Co-Team und ohne beides: alle, die zum Zeitpunkt des Spiels im Team waren - aus dem heutigen Stand (``teams``, ``team_members``) und dem
+  Protokoll (``team.join`` / ``team.leave`` / ``team.kick``), für aufgelöste Teams aus ``dissolved_teams``. Wer das Team
+  später verlässt, behält so, was er mit ihm gespielt hat.
+
+``Played`` ist ein Spiel aus Sicht der Person. Was als Spiel zählt (nie ein Freilos, kampflos nur für den Sieger), steht in
+``services.match_winner``. ``Participation.entries`` sind die Teilnahmen: angenommen oder eingecheckt, mindestens ein
+echtes Spiel selbst gespielt, Turnier nicht abgesagt.
+
+Der alte Zähler-Block und die Registry rechnen aus derselben ``Participation``; innerhalb eines Laufs (``shared``) wird sie
+je Person nur einmal geladen.
+"""
+from __future__ import annotations
+
+import contextlib
+import contextvars
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
+from services.competition_standings import STANDING_REGISTRATION_STATUSES, badge_match_progress
+from services.league_scope import is_league_staffel
+from services.match_winner import is_real_match, lost_by, no_show_ids, participant_ids, won_by
+
+# Ein Turnier ist abgeschlossen, wenn es beendet, veröffentlicht oder archiviert ist - erst dann stehen Plätze fest.
+DONE_TOURNAMENT_STATUSES = frozenset({"completed", "results_published", "archived"})
+TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "status": 1, "format": 1, "game_id": 1, "season_id": 1, "stream_url": 1, "is_public": 1,
+                     "registration_opens_at": 1, "registration_open_from": 1, "league_context": 1, "seeding_mode": 1, "start_date": 1}
+MATCH_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, "results": 1, "winner_id": 1, "completed_at": 1,
+                "updated_at": 1, "scheduled_at": 1, "best_of": 1, "map": 1, "maps": 1, "disputes": 1, "forfeit_registration_id": 1,
+                "section": 1, "bracket": 1, "round_name": 1, "group_id": 1, "stage_number": 1, "round": 1, "order": 1,
+                "match_type": 1, "is_preview": 1, "lineups": 1, "games.lineups": 1}
+
+# Wer gespielt hat und danach ausgetreten ist oder disqualifiziert wurde, hat trotzdem teilgenommen (Review zu #2337).
+LEFT_REGISTRATION_STATUSES = frozenset({"withdrawn", "disqualified"})
+# Topgesetzt und Riesentöter gelten nur bei fester Setzliste - nicht, wenn das Los die Nummer vergeben hat.
+FIXED_SEEDING_MODES = frozenset({"manual", "ranking"})
+# Formatvielfalt: „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (frontend/src/lib/tournamentLabels.js, TA5).
+FORMAT_ALIASES = {"battle_royale": "ffa"}
+
+_SHARED: contextvars.ContextVar[dict | None] = contextvars.ContextVar("achievement_participation", default=None)
+
+
+def format_key(tournament: dict | None) -> str | None:
+    """Das Format, wie Formatvielfalt es zählt: die Liga als eines - jede Vereinsliga-Staffel und das Turnierformat
+    „Jeder gegen jeden – Hin- und Rückrunde“ (``league``); ``battle_royale`` als ``ffa``."""
+    if is_league_staffel(tournament):
+        return "league"
+    key = str((tournament or {}).get("format") or "").strip()
+    return FORMAT_ALIASES.get(key, key) or None
+
+
+def parse_time(value) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def checked_in_at(registration: dict | None) -> datetime | None:
+    """Wann eine Anmeldung eingecheckt hat: ``checked_in_at`` (seit #2337 beim Check-in geschrieben). Älterer Bestand hat
+    das Feld nicht - dort gilt der letzte Stand der Anmeldung (``updated_at``), solange sie eingecheckt ist. Der liegt nie
+    vor dem Check-in, zählt also höchstens zu wenig. Wer nicht eingecheckt ist, hat keinen Zeitpunkt."""
+    registration = registration or {}
+    stamp = parse_time(registration.get("checked_in_at"))
+    if stamp or registration.get("status") != "checked_in":
+        return stamp
+    return parse_time(registration.get("updated_at"))
+
+
+@dataclass(frozen=True)
+class Played:
+    """Ein echtes Spiel aus Sicht der Person. ``no_show``: ihre Seite ist nicht angetreten - das Spiel zählt für sie nicht
+    als gespielt, ist aber eine Niederlage, wenn es einen Sieger gibt."""
+
+    match: dict
+    mine: frozenset
+    opponents: frozenset
+    when: datetime | None
+    won: bool
+    lost: bool
+    no_show: bool
+
+
+@dataclass(frozen=True)
+class Placement:
+    """Die Plätze der Person in einem abgeschlossenen Turnier (mehrere nur, wenn sie für mehrere Anmeldungen gespielt hat),
+    die Größe des Teilnehmerfelds, der Platz je Anmeldung - und das Finale mit den eigenen Anmeldungen, die darin standen."""
+
+    ranks: frozenset
+    participants: int
+    by_registration: dict
+    final_match_id: str | None = None
+    finalists: frozenset = frozenset()
+
+    def registrations_on(self, rank: int) -> set[str]:
+        return {reg_id for reg_id, place in self.by_registration.items() if place == rank}
+
+
+class TeamTimeline:
+    """Wann die Person in welchem Team war."""
+
+    def __init__(self) -> None:
+        self.joined: dict[str, datetime | None] = {}  # heute Mitglied: seit wann (None = unbekannt, also schon immer)
+        self.events: dict[str, list[tuple[datetime, str]]] = {}  # Beitritt und Austritt aus dem Protokoll
+        self.closed: dict[str, tuple[datetime | None, datetime | None]] = {}  # aufgelöste Teams: (seit, bis)
+
+    def team_ids(self) -> set[str]:
+        return set(self.joined) | set(self.events) | set(self.closed)
+
+    def knows(self, team_id: str | None) -> bool:
+        return team_id in self.joined or team_id in self.events or team_id in self.closed
+
+    def member_at(self, team_id: str | None, when: datetime | None) -> bool:
+        if team_id in self.joined:
+            since = self.joined[team_id]
+            if when is None or since is None or since <= when:
+                return True
+        if when is None:
+            return False
+        if team_id in self.closed:
+            since, until = self.closed[team_id]
+            if (since is None or since <= when) and (until is None or when <= until):
+                return True
+        events = self.events.get(team_id) or []
+        left_later = [stamp for stamp, kind in events if kind == "leave" and stamp >= when]
+        if not left_later:
+            return False
+        left = min(left_later)
+        joins = [stamp for stamp, kind in events if kind == "join" and stamp <= left]
+        # Ohne Beitritt im Protokoll (Gründung, älterer Bestand) war die Person vor dem Austritt schon immer dabei.
+        return not joins or max(joins) <= when
+
+
+EARLIEST = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def in_squad_at(events: list[tuple[datetime, str]], when: datetime | None) -> bool:
+    """Aus Aufnahmen („join“) und Abgängen („leave“): Stand die Person zu diesem Zeitpunkt im Kader? Es gilt das letzte
+    Ereignis davor. Liegt keines davor, war sie nur dabei, wenn als Nächstes ein Abgang folgt (wer geht, war vorher da) -
+    eine spätere Aufnahme gibt keine alten Spiele. Ohne Ereignisse gibt es keinen Nachweis."""
+    if not events:
+        return False
+    ordered = sorted(events, key=lambda event: event[0])
+    if when is None:
+        return ordered[-1][1] == "join"
+    before = [kind for stamp, kind in ordered if stamp <= when]
+    return before[-1] == "join" if before else ordered[0][1] == "leave"
+
+
+def lineup_of(match: dict, registration_id: str) -> set[str]:
+    """Die Teilnehmerliste einer Seite an diesem Spiel (Liga): am Spiel und an seinen Maps."""
+    listed = set((match.get("lineups") or {}).get(registration_id) or [])
+    for game in match.get("games") or []:
+        if isinstance(game, dict):
+            listed.update((game.get("lineups") or {}).get(registration_id) or [])
+    return {user_id for user_id in listed if user_id}
+
+
+class Participation:
+    """Anmeldungen, Turniere und Spiele einer Person - auch über ihre Teams."""
+
+    def __init__(self, user_id: str, registrations: dict[str, dict], tournaments: dict[str, dict], matches: list[dict],
+                 timeline: TeamTimeline, squad_events: dict[str, list[tuple[datetime, str]]] | None = None,
+                 rosters: dict[str, dict] | None = None, squads: dict[str, set[str]] | None = None,
+                 roster_seasons: set[str] | None = None):
+        self.user_id = user_id
+        self.registrations = registrations
+        self.tournaments = tournaments
+        self.matches = matches
+        self.timeline = timeline
+        # Co-Teams: die Kaderwechsel der Person aus dem Protokoll (Co-Team → Ereignisse) und ihr Liga-Kader je Season.
+        self.squad_events = squad_events or {}
+        self.rosters = rosters or {}
+        # Der heutige Kader der Co-Teams - Nachweis nur in Seasons, die gar keinen Liga-Kader führen (``roster_seasons``:
+        # die Seasons mit Einträgen in ``league_rosters``, von wem auch immer).
+        self.squads = squads or {}
+        self.roster_seasons = set(roster_seasons or ()) | set(self.rosters)
+        self.rows: list[Played] = [row for row in (self._row(match) for match in matches) if row]
+        self.played: list[Played] = [row for row in self.rows if not row.no_show]
+        self._placements: dict[str, Placement] | None = None
+        self._finals: set[str] | None = None
+
+    # ------------------------------------------------ wer zählt für eine Anmeldung in einem Spiel
+
+    def plays(self, registration: dict, match: dict, when: datetime | None) -> bool:
+        if not registration.get("team_id"):
+            return registration.get("user_id") == self.user_id
+        listed = lineup_of(match, registration["id"])
+        if listed:
+            return self.user_id in listed
+        lineup = [user_id for user_id in registration.get("lineup") or [] if user_id]
+        if lineup:
+            return self.user_id in lineup
+        if registration.get("squad_id"):
+            # Ein Co-Team fällt nie auf das Hauptteam zurück: Dessen Mitglieder standen nicht alle in diesem Kader.
+            return self._in_squad(registration, when)
+        team_id = registration["team_id"]
+        if self.timeline.member_at(team_id, when):
+            return True
+        # Ein Team, von dem es weder Mitglieder noch Protokoll gibt (älterer Bestand): dann zählt, wer es angemeldet hat.
+        return registration.get("user_id") == self.user_id and not self.timeline.knows(team_id)
+
+    def _in_squad(self, registration: dict, when: datetime | None) -> bool:
+        """Stand die Person zum Zeitpunkt des Spiels nachweislich im Kader des Co-Teams?
+
+        Nachweise: der Liga-Kader der Season dieser Staffel (``league_rosters``: das Co-Team steht in ``squad_ids``, seit
+        ``squad_joined_at``) und die Kaderwechsel aus dem Protokoll. Der heutige Kader zählt dann nicht - er sagt nichts
+        über damals (später aufgenommen, inzwischen geleert, Co-Team gelöscht). Ohne Nachweis hat die Person nicht gespielt.
+
+        Führt die Season gar keinen Liga-Kader, gäbe es so nie einen Nachweis. Dort gilt die Regel „ohne Aufstellung alle
+        Mitglieder zum Zeitpunkt des Spiels“ mit dem, was da ist: heute im Kader, laut Protokoll nicht erst nach dem Spiel
+        aufgenommen und damals schon im Hauptteam."""
+        squad_id = registration["squad_id"]
+        events = list(self.squad_events.get(squad_id) or [])
+        context = (self.tournaments.get(registration.get("tournament_id")) or {}).get("league_context") or {}
+        if (context.get("season_id") or "") not in self.roster_seasons and self.user_id in self.squads.get(squad_id, ()):
+            team_id = registration["team_id"]
+            in_team = self.timeline.member_at(team_id, when) or not self.timeline.knows(team_id)
+            return in_team and (in_squad_at(events, when) if events else True)
+        entry = self.rosters.get(context.get("season_id") or "")
+        if entry and squad_id in (entry.get("squad_ids") or []):
+            since = parse_time((entry.get("squad_joined_at") or {}).get(squad_id)) or parse_time(entry.get("added_at"))
+            events.append((since or EARLIEST, "join"))
+        return in_squad_at(events, when)
+
+    def _row(self, match: dict) -> Played | None:
+        if not is_real_match(match):
+            return None
+        sides = participant_ids(match)
+        candidates = sides & set(self.registrations)
+        if not candidates:
+            return None
+        tournament = self.tournaments.get(match.get("tournament_id")) or {}
+        when = parse_time(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at"))
+        mine = frozenset(reg_id for reg_id in candidates
+                         if self.plays(self.registrations[reg_id], match, when or parse_time(tournament.get("start_date"))))
+        if not mine:
+            return None
+        no_show = bool(mine & no_show_ids(match))
+        return Played(match=match, mine=mine, opponents=frozenset(sides - mine), when=when,
+                      won=not no_show and won_by(match, mine), lost=lost_by(match, mine), no_show=no_show)
+
+    # ------------------------------------------------ Sichten
+
+    @property
+    def registration_ids(self) -> set[str]:
+        """Alle Anmeldungen, an denen die Person hängt - die eigenen und die ihrer Teams."""
+        return set(self.registrations)
+
+    @property
+    def played_registration_ids(self) -> set[str]:
+        """Die Anmeldungen, für die die Person mindestens ein echtes Spiel selbst gespielt hat."""
+        return {reg_id for row in self.played for reg_id in row.mine}
+
+    def is_league(self, tournament_id: str | None) -> bool:
+        return is_league_staffel(self.tournaments.get(tournament_id))
+
+    def is_done(self, tournament_id: str | None) -> bool:
+        return (self.tournaments.get(tournament_id) or {}).get("status") in DONE_TOURNAMENT_STATUSES
+
+    def entries(self, *, still_in: bool = False) -> list[dict]:
+        """Die Teilnahmen: mindestens ein echtes Spiel selbst gespielt, das Turnier nicht abgesagt, die Anmeldung angenommen
+        oder eingecheckt (ohne Status gilt älterer Bestand als angenommen). Wer gespielt hat und danach ausgetreten ist oder
+        disqualifiziert wurde, hat trotzdem teilgenommen - ``still_in`` lässt ihn weg (Plätze, Durchzieher, Topgesetzt).
+        Abgelehnt, Warteliste und „nicht erschienen“ sind nie eine Teilnahme. Liga-Staffeln sind dabei - wer sie nicht
+        will, fragt ``is_league``."""
+        played = self.played_registration_ids
+        allowed = STANDING_REGISTRATION_STATUSES if still_in else STANDING_REGISTRATION_STATUSES | LEFT_REGISTRATION_STATUSES
+        out = []
+        for registration in self.registrations.values():
+            tournament = self.tournaments.get(registration.get("tournament_id"))
+            if (registration.get("id") in played and tournament and tournament.get("status") != "cancelled"
+                    and (registration.get("status") or "approved") in allowed):
+                out.append(registration)
+        return out
+
+    def match_progress(self) -> dict:
+        """Spielmacher, Sieger und Siegesserie (``competition_standings.badge_match_progress``)."""
+        return badge_match_progress((row.match, row.mine) for row in self.rows)
+
+    # ------------------------------------------------ Teilnahme statt Anmeldung (Turnierveteran, Multitalent, Formatvielfalt)
+
+    def tournament_entries(self, *, still_in: bool = False) -> list[dict]:
+        """Die Teilnahmen an Turnieren - ohne Liga-Staffeln (docs/LIGA.md, Abschnitt 7: eine Staffel ist kein Turnier)."""
+        return [registration for registration in self.entries(still_in=still_in) if not self.is_league(registration.get("tournament_id"))]
+
+    def tournaments_played(self) -> int:
+        return len({registration["tournament_id"] for registration in self.tournament_entries()})
+
+    def distinct_games(self) -> int:
+        games = {(self.tournaments[registration["tournament_id"]]).get("game_id") for registration in self.tournament_entries()}
+        return len({game for game in games if game})
+
+    def distinct_formats(self) -> int:
+        """Verschiedene Formate, in denen die Person gespielt hat - die Liga zählt als eines (``format_key``)."""
+        keys = {format_key(self.tournaments[registration["tournament_id"]]) for registration in self.entries()}
+        return len({key for key in keys if key})
+
+    def has_fixed_seeding(self, tournament_id: str | None) -> bool:
+        """Feste Setzliste: von Hand oder nach Rangliste gesetzt, nicht ausgelost. Eine Liga-Staffel hat keine."""
+        tournament = self.tournaments.get(tournament_id) or {}
+        return tournament.get("seeding_mode") in FIXED_SEEDING_MODES and not is_league_staffel(tournament)
+
+    def seed_of(self, registration_ids) -> int | None:
+        """Die beste Setznummer dieser eigenen Anmeldungen - die der Anmeldung, nicht der ausgeloste Platz im Baum."""
+        seeds = [(self.registrations.get(reg_id) or {}).get("seed") for reg_id in registration_ids]
+        return min((seed for seed in seeds if isinstance(seed, int) and not isinstance(seed, bool)), default=None)
+
+    # ------------------------------------------------ Plätze und Finale: nur abgeschlossene Turniere, nie eine Liga-Staffel
+
+    def finished_entries(self) -> dict[str, list[dict]]:
+        """Die Teilnahmen in abgeschlossenen Turnieren (keine Liga-Staffel), je Turnier - nur wer bis zum Ende dabei war:
+        Ausgetretene und Disqualifizierte haben keinen Platz und haben nicht durchgezogen."""
+        out: dict[str, list[dict]] = {}
+        for registration in self.entries(still_in=True):
+            tournament_id = registration.get("tournament_id")
+            if self.is_done(tournament_id) and not self.is_league(tournament_id):
+                out.setdefault(tournament_id, []).append(registration)
+        return out
+
+    async def placements(self, db) -> dict[str, Placement]:
+        """Der Platz je abgeschlossenem Turnier - der gespeicherte Rang der Auszeichnung (``tournament_awards.rank``), dazu
+        ob die Anmeldung im Finale stand (``finalist``).
+
+        Hat ein abgeschlossenes Turnier noch keine Auszeichnungen (beendet, aber nicht veröffentlicht) oder trägt älterer
+        Bestand kein ``finalist``, gilt, was die Auszeichnung festhalten würde - je Turnier einmal gerechnet und prozessweit
+        gemerkt (``awards.tournament_outcome``), nicht je Person. Solange ein Turnier läuft, gibt es keinen Platz."""
+        if self._placements is None:
+            self._placements = await self._load_placements(db)
+        return self._placements
+
+    async def _load_placements(self, db) -> dict[str, Placement]:
+        from services.awards import tournament_outcome
+
+        entries = self.finished_entries()
+        ids = sorted(registration["id"] for registrations in entries.values() for registration in registrations)
+        stored = {}
+        if ids:
+            fields = {"_id": 0, "tournament_id": 1, "registration_id": 1, "rank": 1, "participants": 1, "finalist": 1, "final_match_id": 1}
+            stored = {row["registration_id"]: row async for row in db.tournament_awards.find({"registration_id": {"$in": ids}}, fields)}
+        out: dict[str, Placement] = {}
+        for tournament_id, registrations in entries.items():
+            entered = {registration["id"] for registration in registrations}
+            own = [stored[reg_id] for reg_id in entered if reg_id in stored]
+            if own:
+                ranks = {row["registration_id"]: row.get("rank") for row in own}
+                field = max(int(row.get("participants") or 0) for row in own)
+                if all("finalist" in row for row in own):
+                    finalists = {row["registration_id"] for row in own if row.get("finalist")}
+                    final_id = next((row.get("final_match_id") for row in own if row.get("finalist")), None)
+                else:  # älterer Bestand: die Auszeichnung kennt das Finale noch nicht
+                    outcome = await tournament_outcome(db, tournament_id)
+                    finalists, final_id = outcome["finalists"] & entered, outcome["final_match_id"]
+            elif await db.tournament_awards.count_documents({"tournament_id": tournament_id}, limit=1):
+                continue  # die Auszeichnungen stehen - für diese Anmeldung gibt es keine
+            else:
+                outcome = await tournament_outcome(db, tournament_id)
+                ranks = {reg_id: outcome["ranks"].get(reg_id) for reg_id in entered}
+                field = outcome["participants"]
+                finalists, final_id = outcome["finalists"] & entered, outcome["final_match_id"]
+            placed = {reg_id: rank for reg_id, rank in ranks.items() if isinstance(rank, int) and not isinstance(rank, bool) and rank > 0}
+            out[tournament_id] = Placement(frozenset(placed.values()), field, placed, final_id, frozenset(finalists))
+        return out
+
+    def beaten_registration_ids(self) -> set[str]:
+        """Die Anmeldungen (eigene und die der eigenen Teams), die ein echtes Spiel verloren haben - über **alle** ihre
+        Spiele, nicht nur die, in denen die Person selbst aufgestellt war. „Ungeschlagen“ gilt für die Anmeldung, mit der
+        man platziert ist: Verliert das Team ein Spiel in anderer Besetzung, war es nicht ungeschlagen."""
+        beaten: set[str] = set()
+        for match in self.matches:
+            if is_real_match(match):
+                beaten |= {reg_id for reg_id in participant_ids(match) & set(self.registrations) if lost_by(match, {reg_id})}
+        return beaten
+
+    async def finals(self, db) -> set[str]:
+        """Die abgeschlossenen Turniere, in deren Finale die Person stand (``competition_standings.final_participants``):
+        Endspiel, Grand Final oder Finallauf - und sie hat dieses Spiel selbst gespielt. Welches Spiel das Finale war und
+        welche Anmeldungen darin standen, steht an der Auszeichnung (``placements``)."""
+        if self._finals is None:
+            found = set()
+            for tournament_id, placement in (await self.placements(db)).items():
+                if not placement.final_match_id or not placement.finalists:
+                    continue
+                on_stage = {reg_id for row in self.played if row.match.get("id") == placement.final_match_id for reg_id in row.mine}
+                if on_stage & placement.finalists:
+                    found.add(tournament_id)
+            self._finals = found
+        return self._finals
+
+
+# ---------------------------------------------------------------- Laden
+
+@contextlib.contextmanager
+def shared():
+    """Innerhalb dieses Blocks wird je Person nur einmal geladen (alter Block und Registry in einem Lauf)."""
+    token = _SHARED.set({})
+    try:
+        yield
+    finally:
+        _SHARED.reset(token)
+
+
+async def load_participation(db, user_id: str) -> Participation:
+    cache = _SHARED.get()
+    if cache is not None and user_id in cache:
+        return cache[user_id]
+    participation = await _load(db, user_id)
+    if cache is not None:
+        cache[user_id] = participation
+    return participation
+
+
+async def _timeline(db, user_id: str) -> TeamTimeline:
+    timeline = TeamTimeline()
+    async for row in db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1, "joined_at": 1}):
+        if row.get("team_id"):
+            timeline.joined[row["team_id"]] = parse_time(row.get("joined_at"))
+    async for team in db.teams.find({"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, {"_id": 0, "id": 1}):
+        if team.get("id"):
+            timeline.joined.setdefault(team["id"], None)
+    events = db.audit_logs.find({"$or": [
+        {"action": {"$in": ["team.join", "team.leave"]}, "actor_id": user_id},
+        {"action": "team.kick", "data.kicked_user_id": user_id},
+    ]}, {"_id": 0, "action": 1, "target_id": 1, "created_at": 1})
+    async for event in events:
+        stamp = parse_time(event.get("created_at"))
+        if stamp and event.get("target_id"):
+            kind = "join" if event.get("action") == "team.join" else "leave"
+            timeline.events.setdefault(event["target_id"], []).append((stamp, kind))
+    closed = db.dissolved_teams.find({"$or": [{"memberships.user_id": user_id}, {"member_ids": user_id}]},
+                                     {"_id": 0, "id": 1, "memberships": 1, "dissolved_at": 1})
+    async for team in closed:
+        own = next((row for row in team.get("memberships") or [] if row.get("user_id") == user_id), {})
+        if team.get("id"):
+            timeline.closed[team["id"]] = (parse_time(own.get("joined_at")), parse_time(team.get("dissolved_at")))
+    return timeline
+
+
+async def _squad_events(db, user_id: str) -> dict[str, list[tuple[datetime, str]]]:
+    """Die Kaderwechsel der Person aus dem Protokoll, je Co-Team: Kader geändert in einer laufenden Staffel
+    (``league.squad.roster``) und genehmigter Transfer (``league.transfer.approve``)."""
+    found: dict[str, list[tuple[datetime, str]]] = {}
+    events = db.audit_logs.find({"$or": [
+        {"action": "league.squad.roster", "data.added": user_id},
+        {"action": "league.squad.roster", "data.removed": user_id},
+        {"action": "league.transfer.approve", "data.user_id": user_id},
+    ]}, {"_id": 0, "action": 1, "data": 1, "created_at": 1})
+    async for event in events:
+        stamp = parse_time(event.get("created_at"))
+        data = event.get("data") or {}
+        if not stamp:
+            continue
+        if event.get("action") == "league.transfer.approve":
+            changes = [(data.get("from_squad_id"), "leave"), (data.get("to_squad_id"), "join")]
+        else:
+            changes = [(data.get("squad_id"), "join")] if user_id in (data.get("added") or []) else []
+            changes += [(data.get("squad_id"), "leave")] if user_id in (data.get("removed") or []) else []
+        for squad_id, kind in changes:
+            if squad_id:
+                found.setdefault(squad_id, []).append((stamp, kind))
+    return found
+
+
+async def _rosters(db, user_id: str) -> dict[str, dict]:
+    """Der Liga-Kader der Person je Season (``league_rosters``, geschrieben von ``league_roster.record_members`` beim
+    Zuteilen, bei der Aufnahme und beim Transfer): in welchen Co-Teams sie stand und seit wann."""
+    fields = {"_id": 0, "season_id": 1, "squad_ids": 1, "squad_joined_at": 1, "added_at": 1}
+    return {row["season_id"]: row async for row in db.league_rosters.find({"user_id": user_id}, fields) if row.get("season_id")}
+
+
+async def _load(db, user_id: str) -> Participation:
+    timeline = await _timeline(db, user_id)
+    registrations = {row["id"]: row async for row in db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}) if row.get("id")}
+    team_ids = sorted(timeline.team_ids())
+    if team_ids:
+        async for row in db.tournament_registrations.find({"team_id": {"$in": team_ids}}, {"_id": 0}):
+            if row.get("id"):
+                registrations.setdefault(row["id"], row)
+    # Liga: wer auf einer Teilnehmerliste steht, zählt auch dann, wenn die Mitgliedschaft nicht mehr nachzuvollziehen ist.
+    listed = set()
+    async for match in db.matches_v2.find({"lineup_user_ids": user_id}, {"_id": 0, "slots.registration_id": 1}):
+        listed |= {slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")}
+    missing = sorted(listed - set(registrations))
+    if missing:
+        async for row in db.tournament_registrations.find({"id": {"$in": missing}}, {"_id": 0}):
+            if row.get("id") and row.get("team_id"):
+                registrations[row["id"]] = row
+
+    tournament_ids = sorted({row.get("tournament_id") for row in registrations.values() if row.get("tournament_id")})
+    tournaments = {}
+    if tournament_ids:
+        tournaments = {row["id"]: row async for row in db.tournaments.find({"id": {"$in": tournament_ids}}, TOURNAMENT_FIELDS)}
+    matches = []
+    if registrations:
+        ids = sorted(registrations)
+        matches = await db.matches_v2.find(
+            {"tournament_id": {"$in": tournament_ids},
+             "$or": [{"slots.registration_id": {"$in": ids}}, {"results.registration_id": {"$in": ids}}]},
+            MATCH_FIELDS,
+        ).to_list(10000)
+    # Co-Teams: der heutige Kader und welche Seasons überhaupt einen Liga-Kader führen (siehe ``_in_squad``).
+    squad_regs = [row for row in registrations.values() if row.get("team_id") and row.get("squad_id")]
+    squads, roster_seasons = {}, set()
+    if squad_regs:
+        squad_ids = sorted({row["squad_id"] for row in squad_regs})
+        squads = {row["id"]: {member for member in row.get("member_ids") or [] if member}
+                  async for row in db.team_squads.find({"id": {"$in": squad_ids}}, {"_id": 0, "id": 1, "member_ids": 1})}
+        season_ids = sorted({((tournaments.get(row.get("tournament_id")) or {}).get("league_context") or {}).get("season_id") or ""
+                             for row in squad_regs} - {""})
+        if season_ids:
+            roster_seasons = set(await db.league_rosters.distinct("season_id", {"season_id": {"$in": season_ids}}))
+    return Participation(user_id, registrations, tournaments, matches, timeline, await _squad_events(db, user_id),
+                         await _rosters(db, user_id), squads, roster_seasons)

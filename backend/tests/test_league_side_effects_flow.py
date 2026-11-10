@@ -131,10 +131,19 @@ async def test_tournament_counters_skip_staffeln_but_keep_normal_tournaments(flo
 
     normal, staffel = await pair(flow, status="completed", game_id="spiel-1")
     player = await flow.add_user(name="Zaehlerin")
-    await flow.register(normal, player)
-    await flow.register(staffel, player)
+    rival = await flow.add_user(name="Gegnerin")
+    # Gezählt wird die Teilnahme (#2337): in beiden hat sie ein Spiel gespielt - die Staffel bleibt trotzdem außen vor.
+    for tournament in (normal, staffel):
+        own, other = await flow.register(tournament, player), await flow.register(tournament, rival)
+        await flow.db.matches_v2.insert_one({
+            "id": new_id(), "tournament_id": tournament["id"], "stage_number": 1, "round": 1, "order": 1, "status": "completed",
+            "completed_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+            "slots": [{"slot": 1, "registration_id": own["id"], "status": "filled"}, {"slot": 2, "registration_id": other["id"], "status": "filled"}],
+            "results": [{"registration_id": own["id"], "rank": 1}, {"registration_id": other["id"], "rank": 2}],
+        })
 
     progress = await achievement_progress.compute_user_progress(player["id"])
+    assert progress["matches_played"] == 2, "die Spiele zählen aus beiden"
     assert progress["tournaments_registered"] == 1
     ctx = Context(flow.db, player["id"])
     assert await REGISTRY["tournaments_registered"].compute(ctx) == 1

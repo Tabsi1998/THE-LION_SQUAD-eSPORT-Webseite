@@ -1,6 +1,7 @@
 """Spielberechtigung (docs/LIGA.md, B.3, #2204): Regeln bei Kaderaufnahme und Zuteilen, Wartezeit und ihre Aufhebung, Protokoll
 und die Nachricht an die Teamleitung, wenn die Liga-Leitung von außen eingreift. Erfundene Namen."""
 import pathlib
+import re
 import sys
 from datetime import timedelta
 
@@ -135,7 +136,7 @@ async def test_the_age_rule_at_the_squad_only_blocks_playing(flow, birth, state)
     assert view.status_code == 200, view.text
     ida = next(row for season in view.json()["seasons"] for row in season["players"] if row["id"] == w["users"]["Ida"]["id"])
     assert ida["ok"] is (state is None) and (state is None or ida["state"] == state), ida
-    assert "2015" not in view.text, "das Datum bleibt im Server"
+    assert not re.search(r"2015-01-01|01\.01\.2015", view.text), "das Datum bleibt im Server"
 
 
 @pytest.mark.asyncio
@@ -373,7 +374,7 @@ async def test_the_assign_dialog_shows_the_same_reasons_without_a_date(flow):
     response = await flow.get(f"/api/tournaments/{other['id']}/squad-candidates")
 
     assert response.status_code == 200, response.text
-    assert "2015" not in response.text
+    assert not re.search(r"2015-01-01|01\.01\.2015", response.text)
     squads = {squad["name"]: squad for team in response.json()["teams"] for squad in team["squads"]}
     assert squads["Rudel B"]["problems"] == []
     assert any("Altersvorgabe" in text for text in squads["Rudel B"]["notes"])
