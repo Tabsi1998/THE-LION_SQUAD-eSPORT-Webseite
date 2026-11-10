@@ -384,7 +384,7 @@ async def own_status(db, user_id: str, guild_ids: list[str], *, now=None) -> dic
     statuses: dict[str, bool | None] = {}
     stale = []
     for guild_id in guild_ids:
-        if _fresh(cached.get(guild_id), current):
+        if _fresh(cached.get(guild_id), current) and _same_account(cached[guild_id], discord_id):
             statuses[guild_id] = bool(cached[guild_id].get("member"))
         else:
             stale.append(guild_id)
@@ -392,9 +392,59 @@ async def own_status(db, user_id: str, guild_ids: list[str], *, now=None) -> dic
         for guild_id, member in (await bot.member_status(stale, discord_id)).items():
             statuses[guild_id] = member
             if member is not None:
-                await db.discord_memberships.update_one({"user_id": user_id, "guild_id": guild_id},
-                                                        {"$set": {"member": bool(member), "checked_at": current.isoformat()}}, upsert=True)
+                await _remember(db, user_id, guild_id, discord_id, member, current)
     return {"linked": True, "statuses": statuses}
+
+
+def _same_account(row: dict | None, discord_id: str) -> bool:
+    """Ein gemerkter Stand gilt nur für das Discord-Konto, für das er gemerkt wurde (#2338). Ältere Einträge ohne
+    Kennung gehören zum verknüpften Konto - beim Trennen werden sie gelöscht."""
+    stored = str((row or {}).get("discord_id") or "")
+    return not stored or stored == str(discord_id)
+
+
+async def _remember(db, user_id: str, guild_id: str, discord_id: str, member: bool, current) -> None:
+    await db.discord_memberships.update_one(
+        {"user_id": user_id, "guild_id": str(guild_id)},
+        {"$set": {"member": bool(member), "discord_id": str(discord_id), "checked_at": current.isoformat()}}, upsert=True)
+
+
+async def sync_memberships(db, user_id: str, *, now=None) -> dict:
+    """Abgleich für „Überall dabei“ (#2338): beim Verknüpfen und nachts fragt der Bot für alle eingeschalteten Server,
+    ob das verknüpfte Konto dort ist. Ohne Verknüpfung fällt der gemerkte Stand weg; Einträge eines früher verknüpften
+    anderen Kontos auch. Bot offline (unbekannt): nichts geändert. Ändert sich etwas, wird ausgewertet."""
+    from services.discord_runtime import bot
+    from services.discord_dm_basics import discord_link_id
+
+    discord_id = await discord_link_id(db, user_id)
+    if not discord_id:
+        removed = (await db.discord_memberships.delete_many({"user_id": user_id})).deleted_count
+        return {"linked": False, "checked": 0, "removed": removed}
+    removed = (await db.discord_memberships.delete_many({"user_id": user_id, "discord_id": {"$exists": True, "$ne": str(discord_id)}})).deleted_count
+    guild_ids = [row["guild_id"] for row in await list_guilds(db) if _usable(row)]
+    current = now or now_utc()
+    checked = 0
+    statuses = await bot.member_status(guild_ids, discord_id) if guild_ids else {}
+    for guild_id, member in statuses.items():
+        if member is None:
+            continue
+        await _remember(db, user_id, guild_id, discord_id, member, current)
+        checked += 1
+    if checked or removed:
+        from services.achievement_queue import request_evaluation
+
+        await request_evaluation([user_id], "discord_sync", sources={"discord"})
+    return {"linked": True, "checked": checked, "removed": removed}
+
+
+async def sync_all_memberships(db) -> dict:
+    """Nachts für alle mit verknüpftem Discord (#2338) - und die Einträge von Konten ohne Verknüpfung weg."""
+    linked = {row["user_id"] async for row in db.platform_links.find({"platform": "discord"}, {"_id": 0, "user_id": 1}) if row.get("user_id")}
+    orphaned = (await db.discord_memberships.delete_many({"user_id": {"$nin": sorted(linked)}})).deleted_count
+    checked = 0
+    for user_id in sorted(linked):
+        checked += (await sync_memberships(db, user_id))["checked"]
+    return {"users": len(linked), "checked": checked, "orphaned": orphaned}
 
 
 async def member_servers(db, user: dict, *, now=None) -> dict:
@@ -414,8 +464,7 @@ async def note_membership(db, guild_id: str, discord_id: str, member: bool) -> s
     link = await db.platform_links.find_one({"platform": "discord", "external_id": str(discord_id)}, {"_id": 0, "user_id": 1})
     if not link:
         return None
-    await db.discord_memberships.update_one({"user_id": link["user_id"], "guild_id": str(guild_id)},
-                                            {"$set": {"member": bool(member), "checked_at": now_utc().isoformat()}}, upsert=True)
+    await _remember(db, link["user_id"], guild_id, discord_id, member, now_utc())
     from services.achievement_queue import request_evaluation
 
     await request_evaluation([link["user_id"]], "discord_guild", sources={"discord"})

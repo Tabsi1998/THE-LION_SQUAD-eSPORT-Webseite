@@ -36,7 +36,7 @@ def _c(*args, **kwargs):
 COMMUNITY = [
     _c("discord_linked", "Discord verbunden", "community", "Verbinde dein Discord-Konto mit der Plattform.", "Konto → Verbindungen → Discord verknüpfen.",
        "message-square", "discord", "discord_linked", [1], "Discord verbunden.", sort_order=610),
-    _c("discord_messages", "Discord-Stimme", "community", "Schreib auf dem Vereins-Discord.", "Jede Nachricht auf dem Server zählt - mit verknüpftem Discord-Konto.",
+    _c("discord_messages", "Discord-Stimme", "community", "Schreib auf dem Vereins-Discord.", "Jede Nachricht auf einem eingeschalteten Server des Vereins zählt - mit verknüpftem Discord-Konto.",
        "messages-square", "speech-wave", "discord_messages", [1, 100, 500, 2000, 5000, 10000, 25000], "{n} Nachrichten auf Discord.", sort_order=611),
     _c("events_attended", "Eventgänger", "community", "Sei bei Events dabei.", "Melde dich zu Events an und check dort ein - jedes zählt einmal.",
        "calendar-check", "ticket-stub", "events_attended", [1, 5, 15, 30, 60, 100, 200], "{n} Events besucht.", sort_order=612),
@@ -70,10 +70,11 @@ COMMUNITY = [
     _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Wird von der Vereinsleitung vergeben, wenn du Neue einarbeitest oder coachst.",
        "graduation-cap", "mentor", None, [1, 3, 7, 15, 30], "{n} Menschen begleitet.", sort_order=626, manual=True),
     # „Überall dabei“ (#614, nachgezogen mit #615): eine Stufe je Schritt wie beim App-Nutzer, weil „alle Server“ kein
-    # festes Ziel ist. Das Motiv: drei verbundene Server (motifs/people.jsx).
-    _c("discord_servers", "Überall dabei", "community", "Sei auf den Discord-Servern des Vereins dabei.", "Mit verknüpftem Discord-Konto den Servern des Vereins beitreten - die Einladungen stehen unter „Über uns“ bei den Spielen und im Mitgliederbereich.",
+    # festes Ziel ist. Seit #2338 richten sich alle Stufen nach den eingeschalteten Servern (services/achievement_counters
+    # .servers_for_stage): einer, die Hälfte, alle - nie mehr, als es gibt. Das Motiv: drei verbundene Server.
+    _c("discord_servers", "Überall dabei", "community", "Sei auf den Discord-Servern des Vereins dabei.", "Mit verknüpftem Discord-Konto den Servern des Vereins beitreten - die Einladungen stehen unter „Über uns“ bei den Spielen und im Mitgliederbereich. Es zählen nur eingeschaltete Server; die Ziele wachsen und schrumpfen mit ihrer Zahl.",
        "server", "server-ring", "discord_servers_stage", [1, 2, 3], "", sort_order=627,
-       steps=["Auf einem Discord-Server des Vereins dabei.", "Auf drei Discord-Servern des Vereins dabei.", "Auf allen Discord-Servern des Vereins dabei."]),
+       steps=["Auf einem Discord-Server des Vereins dabei.", "Auf der Hälfte der Discord-Server des Vereins dabei.", "Auf allen Discord-Servern des Vereins dabei."]),
 ]
 
 CREATOR = [

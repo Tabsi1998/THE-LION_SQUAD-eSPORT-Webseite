@@ -1413,6 +1413,9 @@ async def unlink(db, user_id: str, platform: str) -> bool:
     # Getrennt heißt auch: aus der Mitgliederakte heraus, wenn es dort übernommen war (#846).
     from services.dolibarr_accounts import follow_platform
     await follow_platform(db, user_id, platform, linked=None)
+    if platform == "discord":
+        # Was der Bot für das getrennte Konto gesehen hat, zählt nicht mehr für „Überall dabei“ (#2338).
+        await db.discord_memberships.delete_many({"user_id": user_id})
     return result.deleted_count > 0
 
 

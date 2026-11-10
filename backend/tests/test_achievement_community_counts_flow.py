@@ -84,3 +84,149 @@ async def test_at_most_fifty_counted_messages_per_vienna_day(flow):
     assert values["team_chat_messages_sent"] == 50 + 3 + 2
     assert values["tournament_chat_messages_sent"] == 40 and values["match_chat_messages_sent"] == 40
     assert values["community_messages_sent"] == 50, "Plauderer: ein Deckel für Turnier- und Match-Chat zusammen"
+
+
+# ---------------------------------------------------------------- Discord (H11, M9)
+
+MAIN, SUB, OFF = "700000000000000001", "700000000000000002", "700000000000000009"
+
+
+async def discord_world(db):
+    await db.discord_guilds.insert_many([
+        {"guild_id": MAIN, "name": "Haupt", "role": "main", "enabled": True},
+        {"guild_id": SUB, "name": "Rocket League", "role": "sub", "enabled": True},
+        {"guild_id": OFF, "name": "Aus", "role": "sub", "enabled": False},
+    ])
+
+
+@pytest.fixture
+def bot(monkeypatch):
+    from services import discord_runtime
+
+    class FakeBot:
+        def __init__(self):
+            self.members: set[tuple[str, str]] = set()
+            self.online = True
+
+        async def member_status(self, guild_ids, discord_id):
+            if not self.online:
+                return {guild_id: None for guild_id in guild_ids}
+            return {guild_id: (guild_id, discord_id) in self.members for guild_id in guild_ids}
+
+    fake = FakeBot()
+    monkeypatch.setattr(discord_runtime.bot, "member_status", fake.member_status)
+    return fake
+
+
+async def stage(user_id: str) -> tuple[int, int]:
+    values = await counters.compute(user_id, {"discord_guilds_joined", "discord_servers_stage"}, legacy=False)
+    return values["discord_guilds_joined"], values["discord_servers_stage"]
+
+
+def test_stage_targets_never_exceed_the_number_of_servers():
+    for enabled in range(1, 12):
+        targets = [counters.servers_for_stage(level, enabled) for level in (1, 2, 3)]
+        assert targets == sorted(targets) and max(targets) <= enabled and targets[-1] == enabled, (enabled, targets)
+    assert [counters.servers_for_stage(level, 1) for level in (1, 2, 3)] == [1, 1, 1]
+    assert [counters.servers_for_stage(level, 2) for level in (1, 2, 3)] == [1, 2, 2]
+    assert [counters.servers_for_stage(level, 5) for level in (1, 2, 3)] == [1, 3, 5]
+
+
+@pytest.mark.asyncio
+async def test_linking_discord_syncs_the_servers_and_unlinking_stops_counting(flow, bot):
+    from services import discord_guilds, platform_links
+
+    me = await flow.add_user(name="discordlerin")
+    db = flow.db
+    await discord_world(db)
+    bot.members |= {(MAIN, "111"), (SUB, "111"), (OFF, "111")}
+    await platform_links.link_account(db, me["id"], "discord", {"external_id": "111", "handle": "lerin"})
+    result = await discord_guilds.sync_memberships(db, me["id"])
+    assert result["checked"] == 2, "nur eingeschaltete Server werden gefragt"
+    assert await stage(me["id"]) == (2, 3), "zwei von zwei eingeschalteten Servern: alle drei Stufen"
+    assert (await db.achievement_eval_queue.find_one({"user_id": me["id"]}, {"_id": 0}))["sources"], "danach ausgewertet"
+
+    await platform_links.unlink(db, me["id"], "discord")
+    assert await stage(me["id"]) == (0, 0), "getrennt zählt nichts mehr"
+    assert await db.discord_memberships.count_documents({"user_id": me["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_entries_of_a_previous_discord_account_do_not_count(flow, bot):
+    from services import discord_guilds
+
+    me = await flow.add_user(name="wechslerin")
+    db = flow.db
+    await discord_world(db)
+    await db.discord_memberships.insert_many([
+        {"user_id": me["id"], "guild_id": MAIN, "member": True, "discord_id": "old"},
+        {"user_id": me["id"], "guild_id": SUB, "member": True, "discord_id": "old"},
+    ])
+    await db.platform_links.insert_one({"id": "l-new", "user_id": me["id"], "platform": "discord", "external_id": "new"})
+    assert await stage(me["id"]) == (0, 0), "gemerkt für das alte Konto"
+    bot.members.add((SUB, "new"))
+    await discord_guilds.sync_memberships(db, me["id"])
+    assert await stage(me["id"]) == (1, 1)
+    assert await db.discord_memberships.count_documents({"user_id": me["id"], "discord_id": "old"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_nightly_sync_covers_everyone_linked_and_drops_orphans(flow, bot):
+    from services import discord_guilds
+
+    db = flow.db
+    await discord_world(db)
+    anna = await flow.add_user(name="anna")
+    bert = await flow.add_user(name="bert")
+    await db.platform_links.insert_many([
+        {"id": "l-a", "user_id": anna["id"], "platform": "discord", "external_id": "201"},
+        {"id": "l-b", "user_id": bert["id"], "platform": "discord", "external_id": "202"},
+    ])
+    await db.discord_memberships.insert_one({"user_id": "ohne-konto", "guild_id": MAIN, "member": True})
+    bot.members |= {(MAIN, "201"), (SUB, "202")}
+    result = await discord_guilds.sync_all_memberships(db)
+    assert result == {"users": 2, "checked": 4, "orphaned": 1}
+    assert await stage(anna["id"]) == (1, 1) and await stage(bert["id"]) == (1, 1)
+
+
+@pytest.mark.asyncio
+async def test_the_discord_sync_runs_every_night(monkeypatch):
+    from services import scheduler
+
+    monkeypatch.setattr(scheduler, "_scheduler", None)
+    monkeypatch.setenv("SCHEDULER_JOBS", "discord_memberships")
+    try:
+        jobs = {job.id: job for job in scheduler.start_scheduler().get_jobs()}
+    finally:
+        scheduler.stop_scheduler()
+    assert set(jobs) == {"discord_memberships"}
+    assert "hour='3'" in str(jobs["discord_memberships"].trigger), "nachts"
+
+
+@pytest.mark.asyncio
+async def test_bot_offline_changes_nothing(flow, bot):
+    from services import discord_guilds
+
+    me = await flow.add_user(name="offline")
+    db = flow.db
+    await discord_world(db)
+    await db.platform_links.insert_one({"id": "l-o", "user_id": me["id"], "platform": "discord", "external_id": "301"})
+    await db.discord_memberships.insert_one({"user_id": me["id"], "guild_id": MAIN, "member": True, "discord_id": "301"})
+    bot.online = False
+    assert (await discord_guilds.sync_memberships(db, me["id"]))["checked"] == 0
+    assert await stage(me["id"]) == (1, 1), "unbekannt heißt nicht „nein“"
+
+
+@pytest.mark.asyncio
+async def test_discord_messages_on_a_switched_off_server_do_not_count(flow):
+    from services import discord_bot
+
+    me = await flow.add_user(name="schreiberin")
+    db = flow.db
+    await discord_world(db)
+    await db.platform_links.insert_one({"id": "l-s", "user_id": me["id"], "platform": "discord", "external_id": "401"})
+    view = {"count_messages": True}
+    assert await discord_bot.handle_message(db, view, MAIN, "401", False) == me["id"]
+    assert await discord_bot.handle_message(db, view, OFF, "401", False) is None
+    assert await discord_bot.handle_message(db, view, "700000000000000077", "401", False) is None, "unbekannter Server"
+    assert (await db.users.find_one({"id": me["id"]}))["discord_messages_count"] == 1

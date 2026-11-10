@@ -152,12 +152,21 @@ class Context:
 
     async def club_servers(self) -> tuple[int, int]:
         """(Discord-Server des Vereins, auf denen die Person ist; eingeschaltete Server insgesamt) - wie der Bot es
-        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite."""
+        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite. Gezählt wird nur mit
+        verknüpftem Discord und nur, was für genau dieses Konto gemerkt ist (#2338) - nach dem Trennen nichts mehr."""
         async def load():
             enabled = [row["guild_id"] async for row in self.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
             if not enabled:
                 return 0, 0
-            return await self.db.discord_memberships.count_documents({"user_id": self.user_id, "member": True, "guild_id": {"$in": enabled}}), len(enabled)
+            link = await self.db.platform_links.find_one({"user_id": self.user_id, "platform": "discord"}, {"_id": 0, "external_id": 1}) or {}
+            discord_id = str(link.get("external_id") or "")
+            if not discord_id:
+                return 0, len(enabled)
+            joined = await self.db.discord_memberships.count_documents({
+                "user_id": self.user_id, "member": True, "guild_id": {"$in": enabled},
+                "$or": [{"discord_id": {"$exists": False}}, {"discord_id": discord_id}],
+            })
+            return joined, len(enabled)
         return await self._memo("club_servers", load)
 
     async def links(self) -> set[str]:
@@ -433,14 +442,22 @@ async def _discord_guilds_joined(ctx):
     return (await ctx.club_servers())[0]
 
 
+def servers_for_stage(stage: int, enabled: int) -> int:
+    """So viele eingeschaltete Server braucht Stufe 1, 2 oder 3 von „Überall dabei“ (#2338): einen, die Hälfte
+    (aufgerundet, mindestens zwei) und alle. Nie mehr, als es Server gibt - mit einem Server reicht er für alle drei."""
+    if enabled <= 0:
+        return 1
+    wanted = {1: 1, 2: max(2, -(-enabled // 2)), 3: enabled}[stage]
+    return min(wanted, enabled)
+
+
 @counter("discord_servers_stage", "discord")
 async def _discord_servers_stage(ctx):
-    """Überall dabei (#614, #615): 1 = auf einem Server des Vereins, 2 = auf drei, 3 = auf allen eingeschalteten.
-    „Alle“ ist kein festes Ziel - kommt ein Server dazu, wächst es mit; mit weniger als drei Servern bleibt es bei 1."""
+    """Überall dabei (#614, #615, #2338): die erreichte Stufe, gemessen an den eingeschalteten Servern - Stufe 1 auf
+    einem, Stufe 2 auf der Hälfte, Stufe 3 auf allen. Die Ziele wachsen und schrumpfen mit der Zahl der Server; sie
+    liegen nie über ihr."""
     joined, enabled = await ctx.club_servers()
-    if joined >= 3:
-        return 3 if joined >= enabled else 2
-    return 1 if joined else 0
+    return max((stage for stage in (1, 2, 3) if enabled and joined >= servers_for_stage(stage, enabled)), default=0)
 
 
 @counter("twitch_linked", "profile")
