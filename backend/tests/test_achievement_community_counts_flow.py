@@ -89,6 +89,32 @@ async def test_at_most_fifty_counted_messages_per_vienna_day(flow):
     assert values["community_messages_sent"] == 50, "Plauderer: ein Deckel für Turnier- und Match-Chat zusammen"
 
 
+@pytest.mark.asyncio
+async def test_the_daily_cap_follows_the_vienna_day_across_the_clock_change(flow):
+    """Ende der Sommerzeit am 25.10.2026: der Tag hat 25 Stunden. 00:30 Sommerzeit (22:30 UTC am Vortag) und 23:30
+    Winterzeit (22:30 UTC) sind derselbe Wiener Tag; 00:05 danach (23:05 UTC) ist schon der 26. Ein fester Versatz oder
+    der UTC-Tag käme auf 65."""
+    me = await flow.add_user(name="zeitumstellung")
+    early = [stamp("2026-10-24", 22, 30 + i) for i in range(30)]   # 25.10., 00:30 Sommerzeit
+    late = [stamp("2026-10-25", 22, i) for i in range(30)]          # 25.10., 23:00 Winterzeit
+    next_day = [stamp("2026-10-25", 23, 5 + i) for i in range(5)]   # 26.10., 00:05
+    await flow.db.team_chat_messages.insert_many([{"id": f"dst{i}", "team_id": "tm", "user_id": me["id"], "message": "x", "created_at": when}
+                                                  for i, when in enumerate(early + late + next_day)])
+    values = await counters.compute(me["id"], {"team_chat_messages_sent"}, legacy=False)
+    assert values["team_chat_messages_sent"] == 50 + 5
+
+
+@pytest.mark.asyncio
+async def test_noted_released_and_flagged_messages_count(flow):
+    """Nur zurückgehalten und abgelehnt zählen nicht - „gesehen“ (noted), freigegeben und markiert zählen."""
+    me = await flow.add_user(name="gesehen")
+    states = ["noted", "released", "flagged", "held", "rejected"]
+    await flow.db.match_chat_messages.insert_many([{"id": f"st-{state}", "match_id": "m", "user_id": me["id"], "message": "x",
+                                                    "moderation": {"state": state}, "created_at": stamp("2026-09-10", 12)} for state in states])
+    values = await counters.compute(me["id"], {"match_chat_messages_sent", "community_messages_sent"}, legacy=False)
+    assert values["match_chat_messages_sent"] == 3 and values["community_messages_sent"] == 3
+
+
 # ---------------------------------------------------------------- Events (H12)
 
 @pytest.mark.asyncio
