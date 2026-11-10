@@ -44,6 +44,12 @@ describe("Neuberechnung im Erfolge-Admin (#2340)", () => {
     expect(apiMock.get).toHaveBeenCalledWith("/admin/achievements/recount");
   });
 
+  it("nennt Konten, die sich im Abschluss nicht auswerten ließen", async () => {
+    apiMock.get.mockResolvedValue({ data: { ...ACTIVE, finish: { running: false, done: true, notified: 5, finished_at: "2026-11-12T08:05:00+00:00", errors: 2 } } });
+    render(<RecountPanel />);
+    expect(await screen.findByTestId("ach-recount-finish-errors")).toHaveTextContent("2 Konten ließen sich nicht auswerten");
+  });
+
   it("zeigt zusätzlich, was schon still vergeben ist", async () => {
     const recounted = { awards: 31, users: 14, tiers: [{ tier_code: "finalist_1", name: "Finalist I", group_name: "Finalist", material: "wood", count: 9 }] };
     apiMock.get.mockResolvedValue({ data: { ...ACTIVE, recounted, dry_run: DRY_DONE } });

@@ -346,6 +346,26 @@ async def test_an_interrupted_finish_resumes_where_it_stopped(flow, monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_accounts_that_fail_in_the_finish_are_counted(flow, monkeypatch):
+    people = [await flow.add_user(name=f"person-{n}") for n in range(3)]
+    for person in people:
+        await claims(flow, person, news=1)
+    await recount.begin()
+    broken = people[1]["id"]
+    real = badges.evaluate_user_progress
+
+    async def evaluate(user_id, *args, **kwargs):
+        if user_id == broken:
+            raise RuntimeError("kaputtes Konto")
+        return await real(user_id, *args, **kwargs)
+
+    monkeypatch.setattr(badges, "evaluate_user_progress", evaluate)
+    result = await recount.finish(batch=1)
+    assert result["status"] == "done" and result["errors"] == 1 and result["evaluated"] == 3
+    assert (await recount.status())["finish"]["errors"] == 1
+
+
+@pytest.mark.asyncio
 async def test_an_interrupted_evaluation_keeps_quiet_and_continues(flow, monkeypatch):
     people = [await flow.add_user(name=f"person-{n}") for n in range(2)]
     for person in people:

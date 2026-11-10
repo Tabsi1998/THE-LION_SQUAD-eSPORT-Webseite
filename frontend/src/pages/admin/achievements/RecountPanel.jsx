@@ -126,6 +126,12 @@ export function RecountPanel() {
         </dd>
         <dt className="text-white/45">Abschluss</dt>
         <dd data-testid="ach-recount-finish-state">{state.exists ? finishLabel(run) : "–"}</dd>
+        {run.errors > 0 && (
+          <>
+            <dt className="text-white/45">Fehler</dt>
+            <dd className="text-warn" data-testid="ach-recount-finish-errors">{plural(run.errors, "Konto ließ", "Konten ließen")} sich nicht auswerten – siehe Server-Protokoll</dd>
+          </>
+        )}
         {state.exists && (
           <>
             <dt className="text-white/45">Schon still vergeben</dt>

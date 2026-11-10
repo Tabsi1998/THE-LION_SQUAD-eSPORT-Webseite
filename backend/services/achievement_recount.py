@@ -427,7 +427,7 @@ async def finish(db=None, *, actor: dict | None = None, claimed: bool = False, b
 
 
 def _summary(run: dict) -> dict:
-    return {key: run.get(key) for key in ("evaluated", "awarded", "notified", "users_total", "started_at", "finished_at")}
+    return {key: run.get(key) for key in ("evaluated", "awarded", "errors", "notified", "users_total", "started_at", "finished_at")}
 
 
 FINALIST_MISSING = {"finalist": {"$exists": False}}
@@ -475,10 +475,10 @@ async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
         with quiet_scope():
             backfilled = await backfill_finalists(db, progress=progress)
         run = {"phase": "evaluate", "started_at": now_utc().isoformat(), "by": _actor(actor), "cursor": None, "finalists_backfilled": backfilled,
-               "evaluated": 0, "awarded": 0, "notified": 0, "users_total": await db.users.count_documents(ACCOUNTS)}
+               "evaluated": 0, "awarded": 0, "errors": 0, "notified": 0, "users_total": await db.users.count_documents(ACCOUNTS)}
         await db.settings.update_one({"id": SETTING_ID}, {"$set": {f"finish.{k}": v for k, v in run.items()}})
         await _extend(db, SETTING_ID, "finish.lease_until")
-    evaluated, awarded = int(run.get("evaluated") or 0), int(run.get("awarded") or 0)
+    evaluated, awarded, errors = int(run.get("evaluated") or 0), int(run.get("awarded") or 0), int(run.get("errors") or 0)
     total = int(run.get("users_total") or 0)
     async for ids in account_batches(db, run.get("cursor"), batch):
         with quiet_scope():
@@ -491,10 +491,12 @@ async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
                         gained = int(await evaluate(user_id, set(FOLLOW_UP_SOURCES), announce=()) or 0)
                         awarded += gained
                         rounds += 1
-                except Exception:  # noqa: BLE001 - ein Konto hält die anderen nicht auf
+                except Exception:  # noqa: BLE001 - ein Konto hält die anderen nicht auf; gezählt steht es auf der Tafel
+                    errors += 1
                     logger.warning("[achievements] Neuberechnung: ein Konto ließ sich nicht auswerten", exc_info=True)
                 evaluated += 1
-        await _extend(db, SETTING_ID, "finish.lease_until", {"finish.cursor": ids[-1], "finish.evaluated": evaluated, "finish.awarded": awarded})
+        await _extend(db, SETTING_ID, "finish.lease_until", {"finish.cursor": ids[-1], "finish.evaluated": evaluated, "finish.awarded": awarded,
+                                                             "finish.errors": errors})
         logger.info("[achievements] Neuberechnung: %d von %d Konten ausgewertet, %d Stufen still vergeben", evaluated, total, awarded)
         if progress:
             progress(f"{evaluated} von {total} Konten ausgewertet, {awarded} Stufen still vergeben")
@@ -509,7 +511,7 @@ async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
         await get_crowns(force=True)
     except Exception:  # noqa: BLE001 - Kronen halten den Abschluss nicht auf; der nächste Abgleich holt sie nach
         logger.warning("[achievements] Neuberechnung: Kronen nicht neu gerechnet", exc_info=True)
-    return {**run, "phase": "notify", "cursor": None, "evaluated": evaluated, "awarded": awarded}
+    return {**run, "phase": "notify", "cursor": None, "evaluated": evaluated, "awarded": awarded, "errors": errors}
 
 
 def notification_text(count: int) -> tuple[str, str]:
