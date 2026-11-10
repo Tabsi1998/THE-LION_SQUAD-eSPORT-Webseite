@@ -131,6 +131,10 @@ async def test_kein_riesentoeter_wenn_ausgelost_wurde(flow):
     staff, tournament, regs = await play.cup_for(flow, field, seeding_mode="random")
     for seed, reg in enumerate(regs, start=1):
         await flow.db.tournament_registrations.update_one({"id": reg["id"]}, {"$set": {"seed": seed}})
+    # Der ausgeloste Platz im Baum steht am Spiel (``slot.seed``) - hier fest: die spätere Siegerin auf dem schlechteren.
+    opening = next(match for match in await play.open_matches(flow, tournament) if regs[3]["id"] in play.sides(match))
+    slots = [{**slot, "seed": 2 if slot.get("registration_id") == regs[3]["id"] else 1} for slot in opening["slots"]]
+    await flow.db.matches_v2.update_one({"id": opening["id"]}, {"$set": {"slots": slots}})
     await play.play_out(flow, staff, tournament, [regs[3]["id"], *[reg["id"] for reg in regs[:3]]])
     assert (await counters.compute(field[3]["id"], {"matches_won"}))["matches_won"] == 2, "die Nummer 4 hat zwei besser Nummerierte geschlagen"
     assert [await count(person, "upsets") for person in field] == [0, 0, 0, 0]
