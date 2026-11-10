@@ -92,17 +92,24 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
   die Person, die das Team angemeldet hat. Wer das Team später wechselt, behält, was er mit ihm gespielt hat.
 - **Ein Freilos ist kein Spiel:** Es zählt nicht als gespielt oder gewonnen und unterbricht keine Serie.
 - **Kampflos gewertet** zählt für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt nichts.
+- **Siegesserie:** Siege in Folge. Ein Unentschieden oder eine Niederlage beendet sie.
+- **Zwei Dinge heißen „Liga“:** die **Vereinsliga** (Season und Staffeln, Admin → Liga) und das Turnierformat
+  **Jeder gegen jeden – Hin- und Rückrunde**. Spiele der Vereinsliga zählen für die Spiel-Erfolge (Spielmacher, Sieger,
+  Teamsieger …), ihre Staffeln aber nicht als Turnier. Ein Turnier im Format Hin- und Rückrunde ist ein normales Turnier.
 - **Plätze gibt es erst nach dem Abschluss.** Champion, Podest, Top 8, Finalist und die anderen Platz-Erfolge zählen nur
   aus Turnieren mit dem Status **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert**, nie aus einer
-  Liga-Staffel. Grundlage ist der gespeicherte Platz (derselbe wie auf dem Pokal). **Top 8** zählt erst ab mehr als
+  Staffel der Vereinsliga. Grundlage ist der gespeicherte Platz (derselbe wie auf dem Pokal). **Top 8** zählt erst ab mehr als
   acht Teilnehmern.
 - **Finalist** ist, wer im Finale stand: im Endspiel, im Grand Final oder im Finallauf (dort alle). Kein Finale haben
   Jeder gegen jeden (einfach und Hin- und Rückrunde), Schweizer System, reine Gruppenphase, die Vereinsliga, Zeitfahren
   und Rennserie – außerdem ein K.-o. mit nur zwei Teilnehmern und ein einzelner Mehrspieler-Lauf: Ein einziges Spiel ist
   kein Finale. Ein kampfloses Finale zählt auch nicht.
-- **Teilnahme statt Anmeldung:** Turnierveteran, Multitalent, Formatvielfalt, Durchzieher und Teamturniere zählen, wenn
-  die Anmeldung angenommen oder eingecheckt war und die Person mindestens ein echtes Spiel gespielt hat. Abgesagte
-  Turniere zählen nicht.
+- **Teilnahme statt Anmeldung:** Turnierveteran, Multitalent, Formatvielfalt und Teamturniere zählen, wenn die
+  Anmeldung angenommen oder eingecheckt war und die Person mindestens ein echtes Spiel gespielt hat – auch wenn sie
+  danach austritt oder disqualifiziert wird. Abgesagte Turniere zählen nicht, Staffeln der Vereinsliga auch nicht (nur
+  bei der Formatvielfalt zählt die Vereinsliga als „Hin- und Rückrunde“).
+- **Durchzieher** verlangt mehr: ein abgeschlossenes Turnier, gespielt, ohne kampflos zu verlieren, auszutreten oder
+  disqualifiziert zu werden.
 - **Topgesetzt und Riesentöter** gelten nur bei fester Setzliste (Setzliste **Manuell**, siehe
   [Turniere](turniere.md)), nicht bei **Zufall**. Es zählt die Setznummer der Anmeldung.
 - **Preisträger** zählt Preise aus Turnieren, die vorgemerkt, abholbereit oder abgeholt sind – keine verfallenen und

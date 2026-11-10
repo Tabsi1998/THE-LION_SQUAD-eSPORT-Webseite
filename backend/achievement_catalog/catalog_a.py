@@ -59,9 +59,10 @@ def _group(code: str, name: str, category: str, description: str, how_to: str, i
 
 
 # Die Formate, wie Formatvielfalt sie zählt (#2337, ``services.achievement_participation.format_key``) - mit den Namen
-# aus der Turnierverwaltung (frontend/src/lib/tournamentLabels.js). Die Liga ist ein Format: jede Staffel der Vereinsliga
-# und das Turnierformat „Jeder gegen jeden – Hin- und Rückrunde“. „Überlebensmodus“ ist „Mehrspieler frei“; Zeitfahren und
-# Rennserie bekommen nie Spiele und fehlen deshalb.
+# aus der Turnierverwaltung (frontend/src/lib/tournamentLabels.js). Zwei Dinge heißen im Haus „Liga“ und werden in den
+# Texten getrennt: die **Vereinsliga** (Season und Staffeln, Admin → Liga) und das Turnierformat „Jeder gegen jeden – Hin-
+# und Rückrunde“ (Schlüssel ``league``). Für die Formatvielfalt zählt eine Staffel der Vereinsliga als dieses Format.
+# „Überlebensmodus“ ist „Mehrspieler frei“; Zeitfahren und Rennserie bekommen nie Spiele und fehlen deshalb.
 FORMAT_NAMES: dict[str, str] = {
     "single_elim": "K.-o.",
     "double_elim": "Doppel-K.-o.",
@@ -71,19 +72,19 @@ FORMAT_NAMES: dict[str, str] = {
     "ffa": "Mehrspieler frei",
     "custom_bracket": "Freier Turnierbaum",
     "ffa_custom_bracket": "Mehrspieler freier Turnierbaum",
-    "league": "Liga",
+    "league": "Jeder gegen jeden – Hin- und Rückrunde",
 }
 FORMATS_HOW_TO = (
-    "Spiel in verschiedenen Formaten mit: " + ", ".join(name for key, name in FORMAT_NAMES.items() if key != "league")
-    + " und Liga (Vereinsliga oder Hin- und Rückrunde). Jedes Format zählt einmal."
+    "Spiel in verschiedenen Formaten mit: " + ", ".join(FORMAT_NAMES.values())
+    + ". Die Vereinsliga zählt als Hin- und Rückrunde. Jedes Format zählt einmal."
 )
 
 MATCH = [
-    _group("matches_played", "Spielmacher", "match", "Sammle gespielte Matches - Turnier für Turnier.", "Spiel Matches in Turnieren; jedes abgeschlossene Match zählt.",
+    _group("matches_played", "Spielmacher", "match", "Sammle gespielte Matches - Turnier für Turnier.", "Spiel Matches in Turnieren und in der Vereinsliga – jedes abgeschlossene Match zählt. Freilose und nicht angetretene Spiele zählen nicht, kampflose Siege schon.",
            "swords", "crossed-swords", "matches_played", [5, 25, 75, 200, 500, 1000, 2500], "{n} Matches gespielt.", sort_order=110),
     _group("matches_won", "Sieger", "match", "Gewinne Matches gegen echte Gegner.", "Gewinn Matches gegen echte Gegner – kampflose Siege zählen, Freilose und Unentschieden nicht.",
            "trophy", "laurel", "matches_won", [1, 10, 40, 100, 250, 600, 1500], "{n} Matches gewonnen.", sort_order=111),
-    _group("win_streak", "Siegesserie", "match", "Gewinne Matches in Folge - die längste Serie zählt.", "Verlier nicht: jede Serie ohne Niederlage zählt, die längste bleibt.",
+    _group("win_streak", "Siegesserie", "match", "Gewinne Matches in Folge - die längste Serie zählt.", "Siege in Folge – ein Unentschieden oder eine Niederlage beendet die Serie. Die längste Serie zählt, ein Freilos unterbricht sie nicht.",
            "flame", "flame", "match_streak_max", [3, 5, 8, 12, 16, 20, 30], "{n} Siege in Folge.", sort_order=112),
     _group("win_rate", "Effizienz", "match", "Halte eine hohe Siegquote - ab 30 Matches.", "Ab 30 gespielten Matches zählt deine Siegquote in Prozent.",
            "percent", "gauge", "win_rate_qualified", [55, 60, 65, 70, 75], "{n} Siegquote bei mindestens 30 Matches.", sort_order=113, unit=" %"),
@@ -122,20 +123,20 @@ MATCH = [
 ]
 
 TOURNAMENT = [
-    _group("tournaments_registered", "Turnierveteran", "tournament", "Spiel Turniere mit.", "Jedes Turnier, in dem du angenommen warst und mindestens ein Match gespielt hast, zählt – die Anmeldung allein nicht. Abgesagte Turniere und die Liga zählen nicht.",
+    _group("tournaments_registered", "Turnierveteran", "tournament", "Spiel Turniere mit.", "Jedes Turnier, in dem du mindestens ein Match gespielt hast, zählt – auch wenn du danach austrittst oder disqualifiziert wirst. Die Anmeldung allein zählt nicht, abgesagte Turniere und Staffeln der Vereinsliga auch nicht.",
            "ticket", "ticket", "tournaments_registered", [1, 5, 15, 40, 100, 200, 500], "{n} Turniere gespielt.", sort_order=210,
            singular="{n} Turnier gespielt."),
-    _group("tournaments_completed", "Durchzieher", "tournament", "Spiel Turniere bis zum Ende, ohne aufzugeben.", "Abgeschlossenes Turnier, in dem du gespielt hast, ohne kampflos zu verlieren, auszutreten oder disqualifiziert zu werden.",
+    _group("tournaments_completed", "Durchzieher", "tournament", "Spiel Turniere bis zum Ende, ohne aufzugeben.", "Zählt jedes abgeschlossene Turnier, in dem du gespielt hast, ohne kampflos zu verlieren, auszutreten oder disqualifiziert zu werden. Staffeln der Vereinsliga zählen nicht.",
            "flag-triangle-right", "finish-flag", "tournaments_completed_no_forfeit", [1, 5, 15, 40, 100, 200, 400], "{n} Turniere durchgezogen.", sort_order=211),
-    _group("tournaments_won", "Champion", "tournament", "Gewinne Turniere.", "Platz 1 in einem abgeschlossenen Turnier (keine Liga) – egal in welchem Spiel.",
+    _group("tournaments_won", "Champion", "tournament", "Gewinne Turniere.", "Platz 1 in einem abgeschlossenen Turnier (keine Vereinsliga) – egal in welchem Spiel.",
            "crown", "crown", "tournaments_won", [1, 3, 7, 15, 30, 60, 100], "{n} Turniere gewonnen.", sort_order=212),
-    _group("podium", "Podest", "tournament", "Lande unter den ersten Drei.", "Platz 1, 2 oder 3 in einem abgeschlossenen Turnier (keine Liga) zählt.",
+    _group("podium", "Podest", "tournament", "Lande unter den ersten Drei.", "Platz 1, 2 oder 3 in einem abgeschlossenen Turnier (keine Vereinsliga) zählt.",
            "medal", "podium", "podium_finishes", [1, 5, 15, 30, 60, 120, 250], "{n} Podestplätze.", sort_order=213),
     _group("finals", "Finalist", "tournament", "Erreich Finals.", "Du standest im Finale: im Endspiel, im Grand Final oder im Finallauf. Kein Finale haben Jeder gegen jeden (einfach und Hin- und Rückrunde), Schweizer System, reine Gruppenphase, Vereinsliga, Zeitfahren und Rennserie – außerdem ein K.-o. mit nur zwei Teilnehmern und ein einzelner Mehrspieler-Lauf.",
            "star", "star", "finals_played", [1, 5, 15, 40, 100], "{n} Finals gespielt.", sort_order=214),
-    _group("top8", "Top 8", "tournament", "Erreich die besten Acht.", "Platz 1 bis 8 in einem abgeschlossenen Turnier mit mehr als acht Teilnehmern (keine Liga) zählt.",
+    _group("top8", "Top 8", "tournament", "Erreich die besten Acht.", "Platz 1 bis 8 in einem abgeschlossenen Turnier mit mehr als acht Teilnehmern (keine Vereinsliga) zählt.",
            "list-ordered", "eight", "top8_finishes", [1, 10, 30, 75, 200], "{n}-mal in den Top 8.", sort_order=215),
-    _group("distinct_games", "Multitalent", "tournament", "Spiel Turniere in vielen Spielen.", "Spiel Turniere in verschiedenen Spielen mit – jedes Spiel zählt einmal, sobald du dort ein Match gespielt hast.",
+    _group("distinct_games", "Multitalent", "tournament", "Spiel Turniere in vielen Spielen.", "Spiel Turniere in verschiedenen Spielen mit – jedes Spiel zählt einmal, sobald du dort ein Match gespielt hast. Staffeln der Vereinsliga zählen nicht.",
            "gamepad-2", "gamepad", "distinct_games_registered", [2, 3, 5, 8, 10, 15, 20], "{n} verschiedene Spiele.", sort_order=216),
     _group("checkin_streak", "Immer eingecheckt", "tournament", "Check in Folge ein.", "Turnier für Turnier eingecheckt - die längste Folge zählt.",
            "check-check", "checkmark", "checkin_streak", [3, 10, 25, 50, 100], "{n} Turniere in Folge eingecheckt.", sort_order=217),
@@ -149,7 +150,7 @@ TOURNAMENT = [
            "shield", "shield-star", "tournaments_won_undefeated", [1, 3, 7, 15, 30], "{n} Turniere ungeschlagen gewonnen.", sort_order=221),
     _group("group_winner", "Gruppensieger", "tournament", "Gewinne Gruppenphasen.", "Platz 1 in deiner Gruppe einer Gruppenphase.",
            "layout-list", "group", "group_stage_firsts", [1, 5, 15, 40, 100], "{n} Gruppen gewonnen.", sort_order=222),
-    _group("featured_match", "Im Rampenlicht", "tournament", "Spiel in Turnieren, die gestreamt werden.", "Jedes Match, das du in einem Turnier mit hinterlegtem Stream spielst, zählt – auch wenn gerade ein anderes Match gezeigt wird. Freilose und die Liga zählen nicht.",
+    _group("featured_match", "Im Rampenlicht", "tournament", "Spiel in Turnieren, die gestreamt werden.", "Jedes Match, das du in einem Turnier mit hinterlegtem Stream spielst, zählt – auch wenn gerade ein anderes Match gezeigt wird. Freilose und die Vereinsliga zählen nicht.",
            "radio", "spotlight", "streamed_matches", [1, 5, 20], "{n} Matches im Rampenlicht.", sort_order=223),
     _group("tournament_staff", "Turnierleitung", "tournament", "Leite Turniere bis zum Ende.", "Als Turnierleitung ein Turnier abschließen.",
            "clipboard-list", "whistle", "tournaments_staffed_completed", [1, 5, 15, 40, 100], "{n} Turniere geleitet.", sort_order=224, staff_only=True),
@@ -159,7 +160,7 @@ TOURNAMENT = [
            "message-circle", "speech-bubble", "tournament_chat_messages_sent", [10, 50, 150, 500, 1500], "{n} Nachrichten im Turnier-Chat.", sort_order=226),
     _group("prize_winner", "Preisträger", "tournament", "Hol dir Preise.", "Ein vergebener Preis aus einem Turnier zählt.",
            "gift", "gift", "prizes_received", [1, 3, 7, 15, 30], "{n} Preise erhalten.", sort_order=227),
-    _group("top_seed", "Topgesetzt", "tournament", "Geh als Nummer eins ins Turnier.", "Setznummer 1 in einem Turnier mit fester Setzliste, das gespielt wurde – ausgelost, abgesagt und Liga zählen nicht.",
+    _group("top_seed", "Topgesetzt", "tournament", "Geh als Nummer eins ins Turnier.", "Setznummer 1 in einem Turnier mit fester Setzliste, das gespielt wurde – ausgelost, abgesagt und Vereinsliga zählen nicht.",
            "hash", "number-one", "seed_one_count", [1, 5, 15], "{n}-mal topgesetzt.", sort_order=228),
     _group("bracket_reset", "Bracket Reset", "tournament", "Gewinne das Grand Final aus dem Lower Bracket mit Reset.", "Aus dem Lower Bracket ins Grand Final, Reset erzwingen und gewinnen.",
            "rotate-ccw", "reset", "bracket_resets_won", [1], "{n} Bracket Reset gewonnen.", sort_order=229),

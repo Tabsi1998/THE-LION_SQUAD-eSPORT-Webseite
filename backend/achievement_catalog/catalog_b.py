@@ -73,7 +73,7 @@ TEAM = [
        "shield", "shield-heart", "team_days_max", [7, 30, 90, 180, 365, 730, 1500], "{n} im selben Team.", sort_order=511, unit=" Tage"),
     _b("team_wins", "Teamsieger", "team", "Gewinne Matches mit deinem Team.", "Ein Match, das dein Team gewinnt, während du dabei bist, zählt.",
        "trophy", "team-trophy", "team_match_wins", [1, 10, 40, 100, 250, 600, 1500], "{n} Team-Matches gewonnen.", sort_order=512),
-    _b("team_tournaments", "Teamturniere", "team", "Spiel Turniere im Team.", "Jedes Turnier, in dem du für dein Team gespielt hast, zählt einmal – laut Aufstellung, sonst als Mitglied zum Zeitpunkt des Spiels.",
+    _b("team_tournaments", "Teamturniere", "team", "Spiel Turniere im Team.", "Jedes Turnier, in dem du für dein Team gespielt hast, zählt einmal – laut Aufstellung, sonst als Mitglied zum Zeitpunkt des Spiels. Staffeln der Vereinsliga zählen nicht.",
        "ticket", "team-ticket", "team_tournaments_played", [1, 5, 15, 40, 100], "{n} Teamturniere.", sort_order=513),
     _b("team_level", "Team-Level", "team", "Bring dein Team auf ein hohes Level.", "Das höchste Level eines deiner Teams zählt.",
        "bar-chart-3", "level-bars", "team_level_max", [5, 10, 20, 30, 50], "Team-Level {n} erreicht.", sort_order=514),
