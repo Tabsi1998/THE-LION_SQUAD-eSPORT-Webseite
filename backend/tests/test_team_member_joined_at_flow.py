@@ -1,10 +1,10 @@
 """``team_members.joined_at`` beim Anlegen einer Zeile (#2337, Review N3).
 
 Rolle setzen und Teamleitung übergeben legen die Zeile in ``team_members`` an, wenn sie fehlt - bisher ohne ``joined_at``.
-Beide Wege verlangen, dass die Person schon im Team steht (``teams.member_ids``); wann sie kam, ist nicht bekannt. Die neue
-Zeile bekommt deshalb das Gründungsdatum des Teams, sonst den frühesten Beitritt der Person aus dem Protokoll, erst dann
-„jetzt“: So verliert ein langjähriges Mitglied keine alten Teamspiele, und das Feld ist nie leer. Eine vorhandene Zeile
-behält ihr Beitrittsdatum.
+Beide Wege verlangen, dass die Person schon im Team steht (``teams.member_ids``); es fehlt nur die Zeile. Das genaueste
+Datum gewinnt: der letzte Beitritt der Person zu diesem Team aus dem Protokoll (bei einem Wiedereintritt der letzte),
+sonst das Gründungsdatum des Teams, erst dann „jetzt“. So verliert ein langjähriges Mitglied keine alten Teamspiele, wer
+später kam, bekommt keine geschenkt, und das Feld ist nie leer. Eine vorhandene Zeile behält ihr Beitrittsdatum.
 """
 import pathlib
 import sys
@@ -59,27 +59,45 @@ async def test_rolle_setzen_legt_die_zeile_mit_dem_gruendungsdatum_an(flow):
     for person in (rowless, member):
         await set_role(flow, team, person)
     created = await row(flow, team, rowless)
-    assert (created["role"], created["joined_at"]) == ("co_leader", FOUNDED), "wann sie kam, weiß niemand: seit der Gründung"
+    assert (created["role"], created["joined_at"]) == ("co_leader", FOUNDED), "kein Beitritt im Protokoll: seit der Gründung"
     kept = await row(flow, team, member)
     assert (kept["role"], kept["joined_at"]) == ("co_leader", LATER), "eine vorhandene Zeile behält ihr Beitrittsdatum"
 
 
+def join(team_id: str, user: dict, when: str, via: str = "invite") -> dict:
+    """Ein Beitritt im Protokoll, wie ``_team_audit`` ihn schreibt."""
+    return {"id": new_id(), "action": "team.join", "target_id": team_id, "actor_id": user["id"], "data": {"via": via}, "created_at": when}
+
+
 @pytest.mark.asyncio
-async def test_ohne_gruendungsdatum_gilt_der_frueheste_beitritt_aus_dem_protokoll_sonst_jetzt(flow):
-    team, lead, _member, rowless = await team_with_rowless_member(flow)
-    unknown = await flow.add_user(name="Ohne Spur")
-    await flow.db.teams.update_one({"id": team["id"]}, {"$unset": {"created_at": ""}, "$addToSet": {"member_ids": unknown["id"]}})
+async def test_der_letzte_beitritt_aus_dem_protokoll_geht_vor_dem_gruendungsdatum(flow):
+    """Das genaueste Datum gewinnt: Bei einem Wiedereintritt zählt der letzte Beitritt, nicht der erste - und nie einer
+    zu einem anderen Team, eines anderen Mitglieds oder aus der Zukunft."""
+    team, lead, member, rowless = await team_with_rowless_member(flow)
     await flow.db.audit_logs.insert_many([
-        {"id": new_id(), "action": "team.join", "target_id": team["id"], "actor_id": rowless["id"], "data": {"via": "invite"}, "created_at": "2026-05-01T10:00:00+00:00"},
-        {"id": new_id(), "action": "team.join", "target_id": team["id"], "actor_id": rowless["id"], "data": {"via": "join_code"}, "created_at": "2026-02-01T10:00:00+00:00"},
-        {"id": new_id(), "action": "team.join", "target_id": "anderes-team", "actor_id": rowless["id"], "data": {}, "created_at": "2025-01-01T10:00:00+00:00"},
+        join(team["id"], rowless, "2026-02-01T10:00:00+00:00"),
+        join(team["id"], rowless, "2026-05-01T10:00:00+00:00", via="join_code"),
+        join(team["id"], rowless, "2999-01-01T00:00:00+00:00"),
+        join("anderes-team", rowless, "2026-06-01T10:00:00+00:00"),
+        join(team["id"], member, "2026-07-01T10:00:00+00:00"),
     ])
+    flow.act_as(lead)
+    await set_role(flow, team, rowless)
+    assert (await row(flow, team, rowless))["joined_at"] == "2026-05-01T10:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_ohne_beitritt_im_protokoll_und_ohne_gruendungsdatum_gilt_jetzt(flow):
+    team, lead, _member, rowless = await team_with_rowless_member(flow)
+    known = await flow.add_user(name="Mit Protokoll")
+    await flow.db.teams.update_one({"id": team["id"]}, {"$unset": {"created_at": ""}, "$addToSet": {"member_ids": known["id"]}})
+    await flow.db.audit_logs.insert_one(join(team["id"], known, "2026-02-01T10:00:00+00:00"))
     before = now_utc().isoformat()
     flow.act_as(lead)
-    for person in (rowless, unknown):
+    for person in (rowless, known):
         await set_role(flow, team, person)
-    assert (await row(flow, team, rowless))["joined_at"] == "2026-02-01T10:00:00+00:00", "der früheste Beitritt zu diesem Team"
-    assert (await row(flow, team, unknown))["joined_at"] >= before, "gar nichts bekannt: jetzt - aber nie leer"
+    assert (await row(flow, team, rowless))["joined_at"] >= before, "gar nichts bekannt: jetzt - aber nie leer"
+    assert (await row(flow, team, known))["joined_at"] == "2026-02-01T10:00:00+00:00", "das Protokoll reicht auch ohne Gründungsdatum"
 
 
 @pytest.mark.asyncio
@@ -114,3 +132,22 @@ async def test_langjaehriges_mitglied_ohne_zeile_behaelt_seine_alten_teamspiele(
     stored = await row(flow, team, veteran)
     assert stored["joined_at"] == team["created_at"]
     assert await team_games(veteran) == (1, 1), "die neue Zeile nimmt ihr das alte Spiel nicht"
+
+
+@pytest.mark.asyncio
+async def test_wer_laut_protokoll_erst_nach_dem_spiel_kam_bekommt_es_nicht(flow):
+    """Die Gegenrichtung: Der Beitritt steht im Protokoll und liegt nach dem Spiel. Mit dem Gründungsdatum bekäme die
+    Person das alte Spiel geschenkt - das genauere Datum verhindert das."""
+    staff, tournament, team, registration, (lead, _member, _bench), _rival_regs = await play.team_cup(flow)
+    opening = next(match for match in await play.open_matches(flow, tournament) if registration["id"] in play.sides(match))
+    await play.decide(flow, staff, opening, registration["id"])
+    newcomer = await flow.add_user(name="Gerade gekommen")
+    await flow.db.teams.update_one({"id": team["id"]}, {"$addToSet": {"member_ids": newcomer["id"]}})
+    joined = now_utc().isoformat()
+    await flow.db.audit_logs.insert_one(join(team["id"], newcomer, joined, via="join_code"))
+    flow.act_as(lead)
+    await set_role(flow, team, newcomer)
+
+    assert (await row(flow, team, newcomer))["joined_at"] == joined
+    found = await counters.compute(newcomer["id"], {"matches_played", "team_match_wins"})
+    assert (found["matches_played"], found["team_match_wins"]) == (0, 0), "das Spiel war vor ihrer Zeit"

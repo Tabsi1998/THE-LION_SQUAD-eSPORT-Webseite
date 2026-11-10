@@ -1,6 +1,7 @@
 """Team routes."""
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -235,17 +236,29 @@ async def _team_audit(db, action: str, team_id: str, actor_id: str | None, data:
 
 async def _joined_at_for_missing_row(db, team: dict, user_id: str) -> str:
     """Das Beitrittsdatum für eine Zeile in ``team_members``, die erst jetzt entsteht (#2337): Die Person steht schon im
-    Team (``member_ids``), wann sie kam, ist nicht bekannt. Ohne Datum gälte sie für die Erfolge als „schon immer dabei“,
-    mit „jetzt“ verlöre ein langjähriges Mitglied seine alten Teamspiele. Darum: das Gründungsdatum des Teams, sonst der
-    früheste Beitritt der Person aus dem Protokoll, erst dann jetzt."""
-    created = team.get("created_at")
-    if created:
-        return created.isoformat() if hasattr(created, "isoformat") else str(created)
+    Team (``member_ids``), die Zeile fehlt nur. Ohne Datum gälte sie für die Erfolge als „schon immer dabei“, mit „jetzt“
+    verlöre ein langjähriges Mitglied seine alten Teamspiele. Das genaueste Datum gewinnt: der letzte Beitritt der Person
+    zu diesem Team aus dem Protokoll (bei einem Wiedereintritt der letzte, nicht der erste), sonst das Gründungsdatum des
+    Teams, erst dann jetzt."""
+    now = now_utc()
     joins = await db.audit_logs.find(
         {"action": "team.join", "actor_id": user_id, "target_id": team.get("id")}, {"_id": 0, "created_at": 1},
     ).to_list(200)
-    stamps = sorted(str(row["created_at"]) for row in joins if row.get("created_at"))
-    return stamps[0] if stamps else now_utc().isoformat()
+    past = []
+    for row in joins:
+        try:
+            stamp = datetime.fromisoformat(str(row.get("created_at") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        stamp = stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+        if stamp <= now:
+            past.append(stamp)
+    if past:
+        return max(past).isoformat()
+    created = team.get("created_at")
+    if created:
+        return created.isoformat() if hasattr(created, "isoformat") else str(created)
+    return now.isoformat()
 
 
 async def _tell(user_id: str | None, **note) -> None:
