@@ -324,6 +324,36 @@ async def test_spooky_night_is_checked_by_the_server_in_vienna_time(flow, monkey
     assert counters.in_signal_window({"month": 10, "day": 31, "from_hour": 18}, datetime(2026, 10, 31).date(), None)
 
 
+# ---------------------------------------------------------------- Texte
+
+def test_manual_achievements_name_their_criteria_and_who_awards_them():
+    """Einzeln vergeben darf, wer in der Verwaltung den Bereich Redaktion hat (badge_routes: require_area("content")) -
+    nicht nur der Vorstand. Die Texte sagen das und nennen ein Kriterium."""
+    import achievement_catalog as catalog
+
+    manual = [g for g in catalog.ACHIEVEMENT_GROUPS if g.get("manual_only") and not g.get("is_negative") and g.get("catalog") in ("C", "D")]
+    assert len(manual) >= 10
+    for group in manual:
+        assert group["how_to"].startswith("Von Hand vergeben: ") and "Redaktion" in group["how_to"], group["code"]
+        assert "Vorstand" not in group["how_to"] and "Vereinsleitung" not in group["how_to"], group["code"]
+
+
+def test_explanations_name_the_rules():
+    import achievement_catalog as catalog
+
+    groups = catalog.GROUP_BY_CODE
+    for code in ("community_chat", "team_chat", "tournament_chat"):
+        assert "zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag" in groups[code]["how_to"], code
+    for code in ("twitch_sessions", "twitch_minutes", "clips"):
+        assert "per Anmeldung verknüpften Twitch-Kanal" in groups[code]["how_to"], code
+    steckbrief = groups["profile_completeness"]["how_to"]
+    for label in ("Profilbild", "Banner", "Über mich", "Land", "Ort", "Geburtsdatum", "Plattformen", "Eingabegeräte", "Lieblingsspiele", "Discord", "Twitch", "Sichtbarkeit"):
+        assert label in steckbrief, label
+    assert len(achievement_progress.PROFILE_FIELDS) == 12, "kommt ein Feld dazu, gehört es in den Text"
+    assert groups["team_identity"]["how_to"] == "Logo, Banner und Teambeschreibung deines Teams sind ausgefüllt – zählt für die Teamleitung und die Co-Leitung."
+    assert groups["streamer_verified"]["how_to"] == "Dein Twitch-Konto ist per Anmeldung verknüpft und der Verein führt dich als Streamer oder Creator."
+
+
 # ---------------------------------------------------------------- Dolibarr: Beitrittsdatum (M10)
 
 @pytest.mark.asyncio

@@ -65,9 +65,9 @@ COMMUNITY = [
     _c("app_user", "App-Nutzer", "community", "Nutz die LionsAPP.", "App öffnen, dranbleiben, Push einschalten.",
        "smartphone", "phone", "app_user_stage", [1, 2, 3], "", sort_order=624, materials=["silver", "gold", "diamond"],
        steps=["Die App genutzt.", "30 Tage mit der App.", "30 Tage mit der App und Push eingeschaltet."]),
-    _c("community_helper", "Helfende Hand", "community", "Hilf anderen in der Community.", "Wird von der Vereinsleitung vergeben, wenn du anderen weiterhilfst.",
+    _c("community_helper", "Helfende Hand", "community", "Hilf anderen in der Community.", "Von Hand vergeben: Die Redaktion trägt ihn ein, wenn du anderen in der Community weitergeholfen hast - jede Hilfe zählt einmal.",
        "hand-helping", "helping-hand", None, [1, 3, 7, 15, 30], "{n}-mal geholfen.", sort_order=625, manual=True),
-    _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Wird von der Vereinsleitung vergeben, wenn du Neue einarbeitest oder coachst.",
+    _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Von Hand vergeben: Die Redaktion trägt ihn ein, wenn du Neue einarbeitest oder coachst - jede begleitete Person zählt einmal.",
        "graduation-cap", "mentor", None, [1, 3, 7, 15, 30], "{n} Menschen begleitet.", sort_order=626, manual=True),
     # „Überall dabei“ (#614, nachgezogen mit #615): eine Stufe je Schritt wie beim App-Nutzer, weil „alle Server“ kein
     # festes Ziel ist. Seit #2338 richten sich alle Stufen nach den eingeschalteten Servern (services/achievement_counters
@@ -92,7 +92,7 @@ CREATOR = [
        "youtube", "youtube", "youtube_linked", [1], "YouTube verbunden.", sort_order=715),
     _c("tiktok_linked", "TikTok verbunden", "creator", "Verbinde dein TikTok-Profil.", "Konto → Verbindungen → TikTok verknüpfen.",
        "music-2", "tiktok", "tiktok_linked", [1], "TikTok verbunden.", sort_order=716),
-    _c("creator_spirit", "Kreativgeist", "creator", "Liefer Highlights und Clips für die Community.", "Wird von der Vereinsleitung vergeben, wenn deine Inhalte den Verein zeigen.",
+    _c("creator_spirit", "Kreativgeist", "creator", "Liefer Highlights und Clips für die Community.", "Von Hand vergeben: Die Redaktion trägt ihn ein, wenn deine Highlights, Clips oder Beiträge den Verein zeigen - jeder Beitrag zählt einmal.",
        "sparkles", "spark", None, [1, 3, 7, 15, 30], "{n} Beiträge für die Community.", sort_order=717, manual=True),
     _c("viewer", "Zuschauer", "creator", "Schau Streams auf der Seite.", "Ein Stream, der eine Minute offen ist, zählt einmal je Stream und Tag.",
        "eye", "eye", "streams_watched", [5, 25, 75, 200, 500], "{n} Streams geschaut.", sort_order=718),
@@ -101,7 +101,7 @@ CREATOR = [
 ]
 
 PROFILE = [
-    _c("profile_completeness", "Steckbrief", "profile", "Füll dein Profil aus.", "Avatar, Banner, Text, Plattformen, Links - je vollständiger, desto weiter.",
+    _c("profile_completeness", "Steckbrief", "profile", "Füll dein Profil aus.", "Profilbild, Banner, Über mich, Land, Ort, Geburtsdatum, Plattformen, Eingabegeräte, Lieblingsspiele, Discord, Twitch und die Sichtbarkeit deines Profils - je vollständiger, desto weiter.",
        "user-check", "profile-card", "profile_completeness", [25, 50, 75, 90, 100], "Profil zu {n} ausgefüllt.", sort_order=810, unit=" %"),
     _c("avatar_banner", "Auftritt", "profile", "Gib deinem Profil ein Gesicht.", "Avatar und Banner hochladen.",
        "image", "portrait", "avatar_and_banner", [1], "Avatar und Banner gesetzt.", sort_order=811),
