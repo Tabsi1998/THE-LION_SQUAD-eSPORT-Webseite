@@ -1,34 +1,32 @@
 # Changelog
 
-## [1.75.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.74.0...v1.75.0) (2026-11-10)
-
+## 1.75.0 (10.11.2026)
 
 ### Neu
 
-* „?“ an Ligaseite, Liga-Anmeldung, Matchseite, Teamseite und Spiel-IDs führt zum passenden Hilfe-Schritt ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Ergebnis melden – der Sieger jeder Map ergibt sich aus den Punkten, kein Team mehr zum Antippen ([#2334](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2334)) ([69ab0c9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/69ab0c9da1186c441bc6ed002c30bc3c137532dd))
-* Ergebnis-Fenster der Leitung – Sieger aus den Punkten vorgewählt, Hinweis mit „übernehmen“, wenn Sieger und Punkte nicht zusammenpassen ([#2334](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2334)) ([69ab0c9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/69ab0c9da1186c441bc6ed002c30bc3c137532dd))
-* Event-Rückblick nennt im K.-o. den Weg zum Platz statt nur der Siege ([#2336](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2336)) ([7721c68](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7721c6847626bd1b6141feed65715be0a9458683))
-* Hilfe im Community-Menü und in der Fußzeile ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Hilfe-Bereich /hilfe mit Suche und Anleitungen mit Bildern für Konto und Profil, Team und Co-Team, Liga für Captains und Turniere ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Jeder Hilfe-Schritt hat einen eigenen Link zum Weiterschicken, Vorschau in Discord und WhatsApp ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Kurze Videos zu Liga-Anmeldung, Ergebnis melden und Team mit Co-Team anlegen ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Podest zeigt im K.-o., wie der Platz zustande kam, mit gewonnenen Spielen und kurzer Erklärung ([#2336](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2336)) ([7721c68](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7721c6847626bd1b6141feed65715be0a9458683))
-* Terminabstimmung – alle Termine ablehnen (mit optionalem Grund), zurückziehen oder mit bis zu drei Terminen gegenvorschlagen ([#2325](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2325)) ([5cc8953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5cc8953ea689e2b66b999335c187156561831811))
-* Terminabstimmung – bis zu drei Termine auf einmal vorschlagen, Fehler direkt am betroffenen Termin, außerhalb der Spielwoche nur ein Hinweis ([#2325](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2325)) ([5cc8953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5cc8953ea689e2b66b999335c187156561831811))
-* Terminabstimmung – eine Nachricht mit allen vorgeschlagenen Terminen statt einer je Termin ([#2325](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2325)) ([5cc8953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5cc8953ea689e2b66b999335c187156561831811))
-* Terminabstimmung – Gegenseite sieht die Termine als Liste und nimmt mit einem Klick einen an, die übrigen schließen ([#2325](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2325)) ([5cc8953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5cc8953ea689e2b66b999335c187156561831811))
-
+* „?“ an Ligaseite, Liga-Anmeldung, Matchseite, Teamseite und Spiel-IDs führt zum passenden Hilfe-Schritt (#2295)
+* Ergebnis melden – der Sieger jeder Map ergibt sich aus den Punkten, kein Team mehr zum Antippen (#2334)
+* Ergebnis-Fenster der Leitung – Sieger aus den Punkten vorgewählt, Hinweis mit „übernehmen“, wenn Sieger und Punkte nicht zusammenpassen (#2334)
+* Event-Rückblick nennt im K.-o. den Weg zum Platz statt nur der Siege (#2336)
+* Hilfe im Community-Menü und in der Fußzeile (#2295)
+* Hilfe-Bereich /hilfe mit Suche und Anleitungen mit Bildern für Konto und Profil, Team und Co-Team, Liga für Captains und Turniere (#2295)
+* Jeder Hilfe-Schritt hat einen eigenen Link zum Weiterschicken, Vorschau in Discord und WhatsApp (#2295)
+* Kurze Videos zu Liga-Anmeldung, Ergebnis melden und Team mit Co-Team anlegen (#2295)
+* Podest zeigt im K.-o., wie der Platz zustande kam, mit gewonnenen Spielen und kurzer Erklärung (#2336)
+* Terminabstimmung – alle Termine ablehnen (mit optionalem Grund), zurückziehen oder mit bis zu drei Terminen gegenvorschlagen (#2325)
+* Terminabstimmung – bis zu drei Termine auf einmal vorschlagen, Fehler direkt am betroffenen Termin, außerhalb der Spielwoche nur ein Hinweis (#2325)
+* Terminabstimmung – eine Nachricht mit allen vorgeschlagenen Terminen statt einer je Termin (#2325)
+* Terminabstimmung – Gegenseite sieht die Termine als Liste und nimmt mit einem Klick einen an, die übrigen schließen (#2325)
 
 ### Fehlerbehebungen
 
-* Ergebnis melden – Gleichstand in einem Modus ohne Remis und ungültige Punkte werden gleich richtig benannt ([#2334](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2334)) ([69ab0c9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/69ab0c9da1186c441bc6ed002c30bc3c137532dd))
-* Freilos zählt in der Baum-Rangliste nicht mehr als Spiel und Sieg, die Plätze bleiben unverändert ([#2336](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2336)) ([7721c68](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7721c6847626bd1b6141feed65715be0a9458683))
-* Fußzeile am Handy zeigt „Mitmachen“ in zwei Spalten, die Seiten werden kürzer ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Gegenvorschlag aus der App beantwortet alle Termine einer Auswahl, die 72-h-Regel greift danach nicht mehr ([#2325](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2325)) ([5cc8953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5cc8953ea689e2b66b999335c187156561831811))
-* Hilfe – Bilder zur Terminabstimmung zeigen die Auswahl mit mehreren Terminen ([#2334](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2334)) ([69ab0c9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/69ab0c9da1186c441bc6ed002c30bc3c137532dd))
-* Liga-Hinweis im Profil nennt den richtigen Reiter „Grunddaten“ fürs Geburtsdatum ([#2295](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2295)) ([47a8b80](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/47a8b8027574accacbc15343ed93aa99afe8516f))
-* Turnier ohne Spielwochen bleibt nach einer Ablehnung auf „Terminvorschlag offen“, solange noch einer offen ist ([#2325](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2325)) ([5cc8953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5cc8953ea689e2b66b999335c187156561831811))
+* Ergebnis melden – Gleichstand in einem Modus ohne Remis und ungültige Punkte werden gleich richtig benannt (#2334)
+* Freilos zählt in der Baum-Rangliste nicht mehr als Spiel und Sieg, die Plätze bleiben unverändert (#2336)
+* Fußzeile am Handy zeigt „Mitmachen“ in zwei Spalten, die Seiten werden kürzer (#2295)
+* Gegenvorschlag aus der App beantwortet alle Termine einer Auswahl, die 72-h-Regel greift danach nicht mehr (#2325)
+* Hilfe – Bilder zur Terminabstimmung zeigen die Auswahl mit mehreren Terminen (#2334)
+* Liga-Hinweis im Profil nennt den richtigen Reiter „Grunddaten“ fürs Geburtsdatum (#2295)
+* Turnier ohne Spielwochen bleibt nach einer Ablehnung auf „Terminvorschlag offen“, solange noch einer offen ist (#2325)
 
 ## 1.74.0 (09.11.2026)
 
