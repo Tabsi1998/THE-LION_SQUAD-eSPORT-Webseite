@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.competition_standings import TERMINAL_MATCH_STATUSES  # noqa: E402
-from services.match_winner import DECIDED_STATUSES, is_duel, is_real_match, lost_by, match_winner_id, no_show_ids, won_by  # noqa: E402
+from services.match_winner import DECIDED_STATUSES, is_bye, is_duel, is_real_match, lost_by, match_winner_id, no_show_ids, won_by  # noqa: E402
 
 
 def duel(first: dict, second: dict, **extra) -> dict:
@@ -93,6 +93,22 @@ def test_freilos_ist_kein_spiel():
     lonely = {"status": "completed", "slots": [{"registration_id": "a"}, {"registration_id": "b"}], "results": [{"registration_id": "a", "rank": 1}]}
     assert not is_real_match(lonely)
     assert not lost_by(BYE, {"b"}) and not won_by(BYE, {"a"})
+
+
+def test_eine_freilos_definition_fuer_rangliste_podest_und_erfolge():
+    """#2336 und #2337 teilen sich ``is_bye``: Was die Rangliste nicht als Spiel zeigt, zählt auch für keinen Erfolg."""
+    from services import competition_standings, match_winner
+
+    assert competition_standings.is_bye is match_winner.is_bye
+    assert is_bye(BYE) and not is_real_match(BYE)
+    # Nach Ausschluss oder Rückzug ist der Platz geräumt: ein Freilos, auch wenn ein altes Ergebnis beide noch nennt.
+    vacated = {"status": "completed", "slots": [{"registration_id": "a"}, {"registration_id": None}],
+               "results": [{"registration_id": "a", "rank": 1}, {"registration_id": "b", "rank": 2}]}
+    assert is_bye(vacated) and not is_real_match(vacated) and match_winner_id(vacated) is None
+    # Älterer Bestand ohne Plätze ist kein Freilos - dort zählen die Seiten aus dem Ergebnis.
+    old = {"status": "completed", "results": [{"registration_id": "a", "rank": 1}, {"registration_id": "b", "rank": 2}]}
+    assert not is_bye(old) and is_real_match(old) and match_winner_id(old) == "a"
+    assert not is_bye(duel({"rank": 1}, {"rank": 2, "forfeit": True}, status="forfeit")), "Nichtantreten mit zwei Anmeldungen ist kein Freilos"
 
 
 def test_gespielt_heisst_abgeschlossen_oder_kampflos_gewertet():

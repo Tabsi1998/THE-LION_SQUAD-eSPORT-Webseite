@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from services.match_winner import is_real_match, no_show_ids, participant_ids, won_by
+# ``is_bye`` (#2336) steht bei der einen Regel für Spiele und Siege (services/match_winner, #2337) und bleibt hier importierbar.
+from services.match_winner import is_bye, is_real_match, no_show_ids, participant_ids, won_by
 from services.round_labels import TABLE_FORMATS, TABLE_STAGE_TYPES, section_kind
 from services.scoring_rules import maps_mode, rank_with_ties
 
@@ -54,16 +55,6 @@ def _duel_entries(match: dict) -> tuple[dict | None, dict | None, dict | None, d
 
 def _section_kind(match: dict) -> str:
     return section_kind(match.get("section"))
-
-
-def is_bye(match: dict) -> bool:
-    """Ein Freilos: ein Spiel mit höchstens einer Anmeldung auf seinen Plätzen - beim Bau oder nach Ausschluss bzw.
-    Rückzug kampflos entschieden (``resolve_walkovers``). Erkannt wird es nur an den Plätzen: ``result_meta`` kommt im
-    Snapshot nicht an. Ein gewertetes Nichtantreten mit zwei Anmeldungen ist kein Freilos."""
-    slots = match.get("slots") or []
-    filled = {slot.get("registration_id") for slot in slots if slot.get("registration_id")}
-    # Ohne Plätze (Altbestand, nur Ergebnisse) ist es kein Freilos - dann zählen die Ergebnisse wie bisher.
-    return bool(slots) and len(filled) < 2
 
 
 def decided_places(matches: list[dict]) -> dict[str, int]:

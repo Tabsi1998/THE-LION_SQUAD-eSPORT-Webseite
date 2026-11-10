@@ -38,6 +38,18 @@ def participant_ids(match: dict | None) -> set[str]:
     return {str(reg) for reg in ids if reg}
 
 
+def is_bye(match: dict | None) -> bool:
+    """Ein Freilos (#2336): ein Spiel mit höchstens einer Anmeldung auf seinen Plätzen - beim Bau oder nach Ausschluss bzw.
+    Rückzug kampflos entschieden (``resolve_walkovers``). Erkannt wird es nur an den Plätzen: ``result_meta`` kommt im
+    Snapshot nicht an. Ein gewertetes Nichtantreten mit zwei Anmeldungen ist kein Freilos.
+
+    Die eine Definition für Rangliste, Podest und Erfolge (#2337): ``match_winner_id`` und ``is_real_match`` fragen sie."""
+    slots = (match or {}).get("slots") or []
+    filled = {slot.get("registration_id") for slot in slots if isinstance(slot, dict) and slot.get("registration_id")}
+    # Ohne Plätze (Altbestand, nur Ergebnisse) ist es kein Freilos - dann zählen die Ergebnisse wie bisher.
+    return bool(slots) and len(filled) < 2
+
+
 def is_duel(match: dict | None) -> bool:
     """Genau zwei Seiten: Duell bzw. Bo-Serie. Nur dort gibt es Zu Null, Entscheider, Comeback, Favoritenschreck."""
     return len(participant_ids(match)) == 2
@@ -47,8 +59,8 @@ def match_winner_id(match: dict | None) -> str | None:
     """Die Anmeldung, die das Spiel gewonnen hat - ``None`` bei Unentschieden, Freilos oder ohne Ergebnis."""
     match = match or {}
     # Freilos bzw. kampflos ohne Gegner: weniger als zwei Seiten - auf keinem Weg ein Sieg, auch nicht mit
-    # ``outcome`` oder ``winner_id``.
-    if len(participant_ids(match)) < 2:
+    # ``outcome`` oder ``winner_id``. Älterer Bestand ohne Plätze zählt seine Seiten aus dem Ergebnis.
+    if is_bye(match) or len(participant_ids(match)) < 2:
         return None
     results = [row for row in match.get("results") or [] if isinstance(row, dict) and row.get("registration_id")]
     if any(row.get("outcome") for row in results):
@@ -88,10 +100,11 @@ def no_show_ids(match: dict | None) -> set[str]:
 
 
 def is_real_match(match: dict | None) -> bool:
-    """Ein Spiel gegen einen Gegner: abgeschlossen oder kampflos gewertet, mit mindestens zwei Seiten. Ein Freilos
-    (nur eine Seite bzw. nur ein einziges Ergebnis) ist nie ein Spiel - weder gespielt noch gewonnen noch verloren."""
+    """Ein Spiel gegen einen Gegner: abgeschlossen oder kampflos gewertet, kein Freilos (``is_bye``). Ein Freilos ist nie
+    ein Spiel - weder gespielt noch gewonnen noch verloren. Dasselbe gilt für älteren Bestand ohne Plätze, der nur eine
+    Seite bzw. nur ein einziges Ergebnis kennt."""
     match = match or {}
-    if match.get("status") not in DECIDED_STATUSES or len(participant_ids(match)) < 2:
+    if match.get("status") not in DECIDED_STATUSES or is_bye(match) or len(participant_ids(match)) < 2:
         return False
     placed = {row.get("registration_id") for row in match.get("results") or [] if isinstance(row, dict) and row.get("registration_id")}
     return len(placed) != 1
