@@ -546,9 +546,30 @@ async def _distinct_formats(ctx):
     return (await ctx.participation()).distinct_formats()
 
 
+# Preisträger (#2337): Preise aus Turnieren - nicht aus Fast Lap, Verlosung oder Eiersuche (``source_type``) -, die vergeben
+# sind: vorgemerkt, abholbereit oder abgeholt. Verfallene und nach einer Korrektur strittige („bitte prüfen“) zählen nicht.
+PRIZE_STATUSES = frozenset({"pending", "ready", "picked_up"})
+
+
 @counter("prizes_received", "tournament")
 async def _prizes(ctx):
-    return await ctx.db.prize_pickups.count_documents({"user_id": ctx.user_id})
+    """Ein Preis für die Person zählt für sie; ein Preis für ein Team für alle, die in dem Turnier für das Team gespielt
+    haben - nicht nur für die Person, die es angemeldet hat."""
+    participation = await ctx.participation()
+    played_for = {(registration["tournament_id"], registration["team_id"]) for registration in participation.entries() if registration.get("team_id")}
+    team_ids = sorted({team_id for _tournament_id, team_id in played_for})
+    query = {"$or": [{"user_id": ctx.user_id}, {"team_id": {"$in": team_ids}}]} if team_ids else {"user_id": ctx.user_id}
+    count = 0
+    async for pickup in ctx.db.prize_pickups.find(query, {"_id": 0, "tournament_id": 1, "user_id": 1, "team_id": 1, "status": 1, "source_type": 1, "needs_review": 1}):
+        if not pickup.get("tournament_id") or (pickup.get("source_type") or "tournament") != "tournament":
+            continue
+        if (pickup.get("status") or "pending") not in PRIZE_STATUSES or pickup.get("needs_review"):
+            continue
+        if pickup.get("team_id"):
+            count += int((pickup["tournament_id"], pickup["team_id"]) in played_for)
+        else:
+            count += int(pickup.get("user_id") == ctx.user_id)
+    return count
 
 
 @counter("tournaments_staffed_completed", "tournament")
