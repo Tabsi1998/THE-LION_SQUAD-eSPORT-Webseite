@@ -2,12 +2,13 @@
 
 Seit #1859 läuft die Auswertung nach der Antwort - sie rechnete aber weiter den ganzen alten Block (Spiele, Plätze,
 Mitgliedschaft, Profil) und belastete so den Server, während am Einlass weitere Gäste Codes einlösten und sich
-abmeldeten. Jetzt rechnet die Anmeldung nur die Zähler der Anmeldung (schnelle Anmeldung, Grand Prix, dazu Teilnahmen,
-Spiele und Formate). Kein Abzeichen geht verloren: Das Abzeichen der Anmeldung („Schnell dabei“) kommt sofort, alles
+abmeldeten. Jetzt rechnet die Anmeldung nur die Zähler der Anmeldung (schnelle Anmeldung, Grand Prix). Kein Abzeichen
+geht verloren: Das Abzeichen der Anmeldung („Schnell dabei“) kommt sofort, alles
 andere im vollen Lauf (nächtlicher Abgleich bzw. jede Auswertung ohne Quelle).
 
 Seit #2337 zählen Turnierveteran, Multitalent und Formatvielfalt die Teilnahme, nicht mehr die Anmeldung: Wer sich
-anmeldet, hat noch nicht gespielt.
+anmeldet, hat noch nicht gespielt. Diese drei Zähler rechnet der Anmelde-Pfad deshalb gar nicht mehr - sie laden Spiele
+und Teams und kommen mit dem ersten Ergebnis.
 """
 import pathlib
 import sys
@@ -24,6 +25,7 @@ import achievement_catalog as catalog  # noqa: E402
 import badges  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import achievement_counters as counters  # noqa: E402
+from services import achievement_participation  # noqa: E402
 from services import achievement_progress  # noqa: E402
 
 PARTICIPATION_KEYS = ("tournaments_registered", "distinct_games_registered", "distinct_formats")
@@ -85,8 +87,17 @@ async def test_registration_awards_its_badge_at_once_without_the_legacy_block(fl
         return await real_legacy(user_id)
 
     monkeypatch.setattr(achievement_progress, "compute_user_progress", counted)
+    loads = []
+    real_load = achievement_participation.load_participation
+
+    async def watched(db, user_id):
+        loads.append(user_id)
+        return await real_load(db, user_id)
+
+    monkeypatch.setattr(achievement_participation, "load_participation", watched)
 
     await badges.on_tournament_registered(anna["id"], tournament["id"])
+    assert loads == [], "die Anmeldung lädt weder Spiele noch Teams"
 
     mine = await earned(flow, anna)
     assert fast <= mine, f"das Abzeichen der Anmeldung kommt sofort: {sorted(mine)}"
@@ -120,8 +131,9 @@ async def test_first_played_match_brings_the_tournament_badge(flow):
 
 
 @pytest.mark.asyncio
-async def test_registration_counters_match_the_legacy_block(flow):
-    """Die leichten Zähler rechnen genau wie der alte Block - sonst sprängen die Werte zwischen An- und Nachtlauf."""
+async def test_participation_counters_match_the_legacy_block(flow):
+    """Die Zähler der Registry rechnen genau wie der alte Block - sonst sprängen die Werte zwischen Teil- und Nachtlauf.
+    Zum Anmelde-Pfad gehören sie nicht mehr; ein Ergebnis oder der Turnierabschluss rechnet sie."""
     anna, bert = await flow.add_user(name="Anna"), await flow.add_user(name="Bert")
     for game, fmt in (("mk8", "single_elim"), ("mk8", "double_elim"), ("fifa", "single_elim")):
         await play.played_cup(flow, [anna, bert], game_id=game, format=fmt)
@@ -131,9 +143,12 @@ async def test_registration_counters_match_the_legacy_block(flow):
         await flow.register(tournament, anna, status=status)
 
     legacy = await achievement_progress.compute_user_progress(anna["id"])
-    light = await counters.compute(anna["id"], counters.keys_for_sources({"registration"}), legacy=False)
+    on_registration = counters.keys_for_sources({"registration"})
+    assert on_registration == {"fast_registrations", "grand_prix_entries"}, "nur was eine Anmeldung ändert"
+    for source in ("match", "tournament"):
+        assert set(PARTICIPATION_KEYS) <= counters.keys_for_sources({source}), source
+    partial = await counters.compute(anna["id"], set(PARTICIPATION_KEYS), legacy=False)
 
     assert [legacy[key] for key in PARTICIPATION_KEYS] == [3, 2, 2]
     for key in PARTICIPATION_KEYS:
-        assert light[key] == legacy[key], key
-    assert {"fast_registrations", "grand_prix_entries"} <= set(light)
+        assert partial[key] == legacy[key], key

@@ -530,18 +530,19 @@ async def _categories(ctx):
 # Teilnahme statt Anmeldung (#2337): Turnierveteran, Multitalent und Formatvielfalt zählen, wo die Person angenommen
 # oder eingecheckt war und in mindestens einem echten Spiel angetreten ist - abgesagte Turniere nie. Die Schlüssel
 # heißen weiter „…_registered“; Katalog und gespeicherte Stände hängen daran. Dieselbe Rechnung wie im alten Block
-# (achievement_progress.compute_user_progress, #1871), damit leichter und voller Lauf dieselben Werte schreiben.
-@counter("tournaments_registered", "registration", "match", "tournament")
+# (achievement_progress.compute_user_progress), damit Teil- und voller Lauf dieselben Werte schreiben. Eine Anmeldung
+# ändert sie nicht mehr - deshalb hängen sie nicht an der Quelle „registration“: Der Anmelde-Pfad bleibt leicht (#1871).
+@counter("tournaments_registered", "match", "tournament")
 async def _tournaments_registered(ctx):
     return (await ctx.participation()).tournaments_played()
 
 
-@counter("distinct_games_registered", "registration", "match", "tournament")
+@counter("distinct_games_registered", "match", "tournament")
 async def _distinct_games_registered(ctx):
     return (await ctx.participation()).distinct_games()
 
 
-@counter("distinct_formats", "registration", "match", "tournament")
+@counter("distinct_formats", "match", "tournament")
 async def _distinct_formats(ctx):
     return (await ctx.participation()).distinct_formats()
 
