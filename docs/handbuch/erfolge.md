@@ -397,8 +397,12 @@ jede Stufe eine eigene Meldung kommt, gibt es den **stillen Modus**. Er schaltet
 - Was die regelmäßigen Läufe nachvergeben (alle 15 Minuten, nachts, **Alle jetzt auswerten**), wird ganz normal gespeichert –
   Stufe, Punkte, XP, Level. Es gibt aber **keine** Meldung im Postfach, keine Push, keine Discord-Nachricht, kein „Level erreicht“.
   Diese Stufen erscheinen auch nicht im Laufband, nicht als Erfolg der Woche und nicht im Wochenrückblick.
-- Was jemand **gerade selbst** erreicht (Ergebnis gemeldet, eingecheckt, Chat-Nachricht, Konto verknüpft …), wird wie immer gemeldet.
-  Schaltet so ein Ereignis nebenbei einen alten Anspruch aus einem anderen Bereich frei, kommt dieser still dazu.
+- Gleich nach dem Update werden **alle Konten** einmal still komplett ausgewertet (über die Warteschlange, je nach Größe in
+  einer Viertel- bis halben Stunde). Was ihnen schon zustand, haben sie danach – still.
+- Was jemand danach **gerade selbst** erreicht (Ergebnis gemeldet, eingecheckt, Chat-Nachricht, Konto verknüpft …), wird wie
+  immer gemeldet. Schaltet so ein Ereignis nebenbei etwas aus einem anderen Bereich frei, kommt das still dazu.
+- Ist eine Person noch nicht still ausgewertet, bleibt auch ihr eigenes Ereignis still – sonst könnte ein Check-in die alte
+  Finalist-Stufe laut melden. Diese Stufe zählt dann in der Sammel-Nachricht am Ende mit.
 
 **So schließt du die Neuberechnung ab** (Admin → Content → Erfolge → **Übersicht**, Tafel **Neuberechnung**, nur Superadmin mit
 Zwei-Faktor-Anmeldung):

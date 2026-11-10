@@ -144,3 +144,13 @@ def quiet_scope():
 
 def in_quiet_scope() -> bool:
     return _recount_quiet.get()
+
+
+# Der Eintrag des stillen Modus in ``settings`` - hier, damit auch die Kronen ihn lesen, ohne nach oben zu importieren.
+RECOUNT_SETTING_ID = "achievements_recount"
+
+
+async def recount_silent(db) -> bool:
+    """Ist der stille Modus der Neuberechnung gerade an?"""
+    doc = await db.settings.find_one({"id": RECOUNT_SETTING_ID}, {"_id": 0, "active": 1})
+    return bool(doc and doc.get("active"))

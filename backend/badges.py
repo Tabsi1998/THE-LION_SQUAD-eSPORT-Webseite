@@ -373,8 +373,9 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     und nur Stufen mit diesen Schlüsseln angesehen; ohne Quelle alles. ``legacy`` aus (#678, nur mit ``sources``):
     der alte Block bleibt liegen und nur die Stufen dieser Zähler werden geladen - leicht genug für jede Meldung.
     ``announce`` (#2340): die Quellen des auslösenden Ereignisses, ohne Angabe ``sources``. Im stillen Modus der
-    Neuberechnung meldet sich nur eine Stufe laut, deren Zähler zu ihnen gehört; alles andere kommt still und markiert.
-    Eine Auswertung ohne Quelle (Sweep, Nachtlauf, Profilbesuch) ist damit im stillen Modus ganz still."""
+    Neuberechnung meldet sich nur eine Stufe laut, deren Zähler zu ihnen gehört - und nur bei einer Person, die schon
+    einmal voll und still ausgewertet wurde; alles andere kommt still und markiert. Eine Auswertung ohne Quelle (Sweep,
+    Nachtlauf, Profilbesuch) ist im stillen Modus ganz still und setzt diese Marke."""
     db = get_db()
     from services import achievement_counters
     light = bool(sources) and not legacy
@@ -387,7 +388,7 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     if light:
         query["condition_key"] = {"$in": sorted(only_keys)}
     tiers = await db.achievements.find(query, {"_id": 0}).to_list(2000)
-    decide = recount.Decider(sources if announce is None else announce)
+    decide = recount.Decider(user_id, sources if announce is None else announce)
     # Mehrere Stufen auf einmal (#1296): eine Meldung „Level X erreicht“ mit dem erreichten Level, nicht eine je Aufstieg.
     async with xp.collected_level_ups():
         for t in due_tiers(tiers, counters, earned_codes, active_member=active_member, only_keys=only_keys):
@@ -395,6 +396,8 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
             context = {"auto_progress": True, "current": counters.get(ck), "target": t["progress_target"]}
             if await award_achievement(user_id, t["code"], context, recount_id=await decide.marker_for(ck)):
                 new_count += 1
+    if not sources:
+        await decide.after_full_evaluation()
     return new_count
 
 

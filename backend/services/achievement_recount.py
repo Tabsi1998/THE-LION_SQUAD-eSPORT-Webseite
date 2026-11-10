@@ -24,11 +24,11 @@ from datetime import timedelta
 
 from database import get_db
 from models import now_utc
-from services.achievement_core import due_tiers, in_quiet_scope, quiet_scope
+from services.achievement_core import RECOUNT_SETTING_ID, STATS, due_tiers, in_quiet_scope, quiet_scope
 
 logger = logging.getLogger("tls.achievements.recount")
 
-SETTING_ID = "achievements_recount"
+SETTING_ID = RECOUNT_SETTING_ID
 DRY_RUN_ID = "achievements_recount_dry_run"
 # Kennung dieser Neuberechnung: steht an jeder still vergebenen Stufe und im ``dedupe_key`` der Sammel-Nachricht.
 MARKER = "2340"
@@ -36,6 +36,7 @@ NOTIFY_KIND = "achievement_recount"
 NOTIFY_URL = "/profile?tab=achievements"
 BATCH = 50
 DRY_RUN_BATCH = 200
+QUEUE_BATCH = 500
 LEASE_MINUTES = 10
 # Folge-Stufen (Sammler, Kategorie-Meister, Level) nimmt der Abschluss gleich mit - danach ist der stille Modus aus, die
 # Warteschlange würde sie sonst laut melden.
@@ -82,11 +83,21 @@ _jobs: set[asyncio.Task] = set()
 # ``quiet_scope`` (aus dem Kern, services/achievement_core.py): alles darin gehört zur Neuberechnung - Aufstiege melden
 # sich nicht, Folge-Auswertungen sind still, und jede Auswertung vergibt im stillen Modus still, auch für ihre Quellen.
 
-async def active_marker(db=None) -> str | None:
-    """Die Kennung der laufenden Neuberechnung, solange der stille Modus an ist - sonst None."""
+async def silent_state(db=None) -> dict | None:
+    """Solange der stille Modus an ist: Kennung der Neuberechnung und die Marke, die eine nachgerechnete Person trägt
+    (``user_achievement_stats.recount_checked``) - sonst None. Die Marke enthält die Generation: ``recheck`` lässt alle
+    Marken verfallen, etwa wenn während des stillen Modus noch ein Korrektur-Paket kommt."""
     db = db if db is not None else get_db()
-    doc = await db.settings.find_one({"id": SETTING_ID}, {"_id": 0, "active": 1, "marker": 1})
-    return str(doc.get("marker") or MARKER) if doc and doc.get("active") else None
+    doc = await db.settings.find_one({"id": SETTING_ID}, {"_id": 0, "active": 1, "marker": 1, "generation": 1})
+    if not doc or not doc.get("active"):
+        return None
+    marker = str(doc.get("marker") or MARKER)
+    return {"marker": marker, "mark": f"{marker}:{int(doc.get('generation') or 1)}"}
+
+
+async def is_checked(db, user_id: str, mark: str) -> bool:
+    """Ist diese Person in dieser Generation schon einmal voll und still ausgewertet worden?"""
+    return bool(await db[STATS].find_one({"user_id": user_id, "recount_checked": mark}, {"_id": 1}))
 
 
 def loud_keys(announce) -> frozenset[str]:
@@ -103,24 +114,41 @@ def loud_keys(announce) -> frozenset[str]:
 
 class Decider:
     """Für eine Auswertung: welche Stufe still vergeben wird. Den stillen Modus fragt sie erst bei der ersten fälligen
-    Stufe ab - die meisten Auswertungen vergeben nichts und kosten so keinen Blick in die Einstellungen."""
+    Stufe ab - die meisten Auswertungen vergeben nichts und kosten so keinen Blick in die Einstellungen.
 
-    def __init__(self, announce):
+    Laut darf ein Ereignis nur Stufen seiner Quellen melden - und nur bei einer Person, die im stillen Modus schon einmal
+    voll und still ausgewertet wurde (Marke). Vorher könnte es Altansprüche derselben Quelle laut melden (ein Check-in
+    die alte Finalist-Stufe): dann ist alles still, und die frische Stufe kommt mit der Sammel-Nachricht."""
+
+    def __init__(self, user_id: str, announce):
+        self._user_id = user_id
         self._announce = tuple(announce or ())
-        self._checked = False
-        self._marker: str | None = None
+        self._state: dict | None = None
+        self._loaded = False
         self._loud: frozenset[str] = frozenset()
+
+    async def _load(self) -> None:
+        if self._loaded:
+            return
+        self._loaded = True
+        self._state = await silent_state()
+        if self._state and self._announce and not in_quiet_scope() and await is_checked(get_db(), self._user_id, self._state["mark"]):
+            self._loud = loud_keys(self._announce)
 
     async def marker_for(self, key: str | None) -> str | None:
         """Die Kennung der Neuberechnung, wenn diese Stufe still vergeben wird - None heißt: laut wie immer."""
-        if not self._checked:
-            self._checked = True
-            self._marker = await active_marker()
-            if self._marker and not in_quiet_scope():
-                self._loud = loud_keys(self._announce)
-        if not self._marker or key in self._loud:
+        await self._load()
+        if not self._state or key in self._loud:
             return None
-        return self._marker
+        return self._state["marker"]
+
+    async def after_full_evaluation(self) -> None:
+        """Nach einer vollen Auswertung im stillen Modus: Was der Person schon zustand, ist jetzt still vergeben - ab
+        jetzt darf ein Ereignis ihre frischen Stufen laut melden."""
+        await self._load()
+        if self._state:
+            await get_db()[STATS].update_one({"user_id": self._user_id, "recount_checked": {"$ne": self._state["mark"]}},
+                                             {"$set": {"recount_checked": self._state["mark"]}})
 
 
 # ------------------------------------------------------------------ Einschalten und Stand
@@ -135,10 +163,35 @@ async def begin(db=None, *, marker: str = MARKER) -> str:
         return "no accounts - nothing to recount"
     await db.settings.update_one(
         {"id": SETTING_ID},
-        {"$setOnInsert": {"id": SETTING_ID, "active": True, "marker": marker, "started_at": now_utc().isoformat()}},
+        {"$setOnInsert": {"id": SETTING_ID, "active": True, "marker": marker, "generation": 1, "started_at": now_utc().isoformat()}},
         upsert=True,
     )
-    return "silent mode on"
+    queued = await queue_everyone(db, "recount_start")
+    return f"silent mode on, {queued} accounts queued"
+
+
+async def queue_everyone(db, reason: str) -> int:
+    """Alle Konten für eine volle, stille Auswertung vormerken - in Stapeln über die Warteschlange. Danach trägt jede
+    Person die Marke, und ein echtes Ereignis darf ihre frischen Stufen laut melden."""
+    from services.achievement_queue import request_evaluation
+
+    queued = 0
+    async for ids in account_batches(db, None, QUEUE_BATCH):
+        queued += await request_evaluation(ids, reason)
+    logger.info("[achievements] Neuberechnung: %d Konten zur stillen Auswertung vorgemerkt", queued)
+    return queued
+
+
+async def recheck(db=None) -> str:
+    """Für ein weiteres Korrektur-Paket während des stillen Modus (etwa den Katalog, #2339): alle Marken verfallen (neue
+    Generation), alle Konten werden still neu ausgewertet. Bis dahin vergibt jedes Ereignis wieder alles still."""
+    db = db if db is not None else get_db()
+    doc = await db.settings.find_one({"id": SETTING_ID, "active": True}, {"_id": 0, "generation": 1})
+    if not doc:
+        return "silent mode off - nothing to recheck"
+    await db.settings.update_one({"id": SETTING_ID}, {"$set": {"generation": int(doc.get("generation") or 1) + 1}})
+    queued = await queue_everyone(db, "recount_recheck")
+    return f"recheck, {queued} accounts queued"
 
 
 async def ceremony_state(db=None) -> dict | None:

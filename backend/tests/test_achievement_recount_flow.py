@@ -89,7 +89,7 @@ async def test_sweep_and_night_run_store_quietly_and_announce_nothing(flow):
     max_ = await flow.add_user(name="max")
     await claims(flow, paula, news=1, passkey=True)
     await claims(flow, max_, news=1)
-    assert await recount.begin() == "silent mode on"
+    assert await recount.begin() == "silent mode on, 2 accounts queued"
 
     await achievement_queue.sweep(everyone=True)
     await achievement_queue.process_queue()
@@ -112,10 +112,13 @@ async def test_sweep_and_night_run_store_quietly_and_announce_nothing(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_real_event_announces_its_own_tiers_and_keeps_old_claims_quiet(flow):
+async def test_after_the_quiet_full_run_a_real_event_announces_its_fresh_tiers(flow):
     paula = await flow.add_user(name="paula")
-    await claims(flow, paula, passkey=True, commend=1)
     await recount.begin()
+    assert await recount.is_checked(flow.db, paula["id"], f"{recount.MARKER}:1") is False
+    await drain()   # die stille volle Auswertung, die begin() vorgemerkt hat
+    assert await recount.is_checked(flow.db, paula["id"], f"{recount.MARKER}:1") is True
+    await claims(flow, paula, passkey=True, commend=1)   # beides frisch, nach der Marke
 
     # Wie services/match_notifications.py nach einem bestätigten Ergebnis: voll auswerten, Spiel und Turnier laut.
     await achievement_queue.request_evaluation([paula["id"]], "match_result", announce={"match", "tournament"})
@@ -125,8 +128,8 @@ async def test_a_real_event_announces_its_own_tiers_and_keeps_old_claims_quiet(f
 
     got = await awards_of(flow, paula)
     assert set(got) == {"lob_1", "sicher_1"}
-    assert not got["lob_1"].get("recount"), "zum Ereignis passend: normal"
-    assert got["sicher_1"]["recount"] is True, "Altanspruch einer anderen Quelle: still"
+    assert not got["lob_1"].get("recount"), "zum Ereignis passend und frisch: normal"
+    assert got["sicher_1"]["recount"] is True, "andere Quelle: still"
     note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "achievement"}, {"_id": 0})
     assert note is not None and note["meta"]["tier_codes"] == ["lob_1"]
 
@@ -136,6 +139,77 @@ async def test_a_real_event_announces_its_own_tiers_and_keeps_old_claims_quiet(f
     assert not (await awards_of(flow, paula))["leser_1"].get("recount")
     await achievement_queue.flush_awards()
     assert await flow.db.notifications.count_documents({"user_id": paula["id"], "kind": "achievement"}) == 2
+
+
+def lob(target: int) -> dict:
+    base = next(t for t in TIERS if t["code"] == "lob_1")
+    return {**base, "code": f"lob_{target}", "id": f"lob_{target}", "name": f"Fairplay {target}", "progress_target": target, "rank": target, "level": 2}
+
+
+@pytest.mark.asyncio
+async def test_before_the_quiet_full_run_even_old_claims_of_the_same_source_stay_quiet(flow):
+    """Review zu #2340 (Vorlage test_review_same_source): fünfmal gelobt vor dem Deploy, die Stufen fehlen noch. Das erste
+    bestätigte Ergebnis danach hängt sich an den wartenden Eintrag aus begin() - die Person trägt noch keine Marke, also
+    bleibt alles still, auch Stufen der Quelle „match“. Erst danach meldet ein Ergebnis frische Stufen laut."""
+    await flow.db.achievements.insert_many([lob(5), lob(6)])
+    paula = await flow.add_user(name="paula")
+    await claims(flow, paula, commend=5)
+    await recount.begin()
+    await achievement_queue.request_evaluation([paula["id"]], "match_result", announce={"match", "tournament"})
+    entry = await flow.db.achievement_eval_queue.find_one({"user_id": paula["id"]}, {"_id": 0})
+    assert entry["full"] is True and entry["announce"] == ["match", "tournament"] and entry["reason"] == "match_result"
+    await drain()
+
+    got = await awards_of(flow, paula)
+    assert {code: bool(a.get("recount")) for code, a in got.items()} == {"lob_1": True, "lob_5": True}
+    assert await noisy(flow, paula) == 0, "keine Meldung - die Stufen kommen mit der Sammel-Nachricht"
+
+    # Die volle stille Auswertung hat die Marke gesetzt: jetzt ist ein frisch erreichtes Lob wieder laut.
+    await claims(flow, paula, commend=6)
+    await achievement_queue.request_evaluation([paula["id"]], "match_result", announce={"match", "tournament"})
+    await drain()
+    assert not (await awards_of(flow, paula))["lob_6"].get("recount")
+    note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "achievement"}, {"_id": 0})
+    assert note is not None and note["meta"]["tier_codes"] == ["lob_6"]
+
+
+@pytest.mark.asyncio
+async def test_a_check_in_keeps_an_old_finalist_tier_quiet(flow):
+    """Finalist im Herbst-Cup, die Stufe dafür kam erst mit #2337: ein Check-in (Quelle „tournament“) vor der stillen
+    vollen Auswertung meldet sie nicht laut."""
+    import achievement_play as play
+
+    players = [await flow.add_user(name=f"finalist-{n}") for n in range(4)]
+    tournament, _registrations = await play.played_cup(flow, players)
+    await flow.db.achievement_groups.insert_one({"code": "finale", "id": "finale", "name": "Finalist", "category": "tournament", "public": True,
+                                                 "is_negative": False, "sort_order": 9, **LOOK})
+    await flow.db.achievements.insert_one({"code": "finale_1", "id": "finale_1", "group_code": "finale", "name": "Finalist I",
+                                           "condition_key": "finals_played", "progress_target": 1, "points": 50, "material": "wood", "rank": 1, "level": 1})
+    await recount.begin()
+
+    await badges.on_checked_in(players[0]["id"], tournament["id"])
+
+    assert (await awards_of(flow, players[0]))["finale_1"]["recount"] is True
+    await achievement_queue.flush_awards()
+    assert await flow.db.achievement_outbox.count_documents({"user_id": players[0]["id"]}) == 0
+    assert await flow.db.notifications.count_documents({"user_id": players[0]["id"], "kind": "achievement"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_later_correction_package_lets_all_marks_expire(flow):
+    """recheck (für ein Korrektur-Paket während des stillen Modus, etwa #2339): neue Generation, alle wieder vorgemerkt -
+    bis zur nächsten stillen vollen Auswertung ist jedes Ereignis wieder ganz still."""
+    paula = await flow.add_user(name="paula")
+    await recount.begin()
+    await drain()
+    assert await recount.is_checked(flow.db, paula["id"], f"{recount.MARKER}:1")
+    assert await recount.recheck() == "recheck, 1 accounts queued"
+    assert (await recount.silent_state())["mark"] == f"{recount.MARKER}:2"
+    await claims(flow, paula, commend=1)
+    assert await badges.evaluate_user_progress(paula["id"], {"match"}) == 1
+    assert (await awards_of(flow, paula))["lob_1"]["recount"] is True, "Marke der alten Generation zählt nicht"
+    await recount.finish()
+    assert await recount.recheck() == "silent mode off - nothing to recheck"
 
 
 @pytest.mark.asyncio
@@ -164,6 +238,8 @@ async def test_the_dry_run_counts_per_tier_and_writes_nothing(flow):
     await recount.begin()
     watched = ("user_achievements", "xp_events", "user_xp", "user_achievement_stats", "achievement_eval_queue", "achievement_outbox", "notifications",
                "tournament_awards")
+    before = {name: [doc async for doc in flow.db[name].find({}, {"_id": 0})] for name in watched}
+    assert not before["user_achievements"] and len(before["achievement_eval_queue"]) == 3, "begin() hat nur vorgemerkt"
 
     result = await recount.dry_run()
 
@@ -171,7 +247,7 @@ async def test_the_dry_run_counts_per_tier_and_writes_nothing(flow):
     assert {row["tier_code"]: row["count"] for row in result["tiers"]} == {"leser_1": 2, "sicher_1": 1}
     assert result["tiers"][0]["name"] == "Leseratte I" and result["tiers"][0]["group_name"] == "Leseratte"
     for name in watched:
-        assert await flow.db[name].count_documents({}) == 0, f"{name} bleibt unberührt"
+        assert [doc async for doc in flow.db[name].find({}, {"_id": 0})] == before[name], f"{name} bleibt unberührt"
     state = await recount.status()
     assert state["dry_run"]["status"] == "done" and state["dry_run"]["affected_users"] == 2 and not state["dry_run"]["running"]
     assert state["active"] is True, "der Probelauf ändert den stillen Modus nicht"
@@ -477,10 +553,15 @@ async def test_migration_22_turns_the_silent_mode_on_once(flow):
     assert (22, "achievements_recount_silent", migrations.migrate_achievements_recount) in migrations.MIGRATIONS
     assert await migrations.migrate_achievements_recount(flow.db) == "no accounts - nothing to recount"
     assert await flow.db.settings.find_one({"id": recount.SETTING_ID}) is None
-    await flow.add_user(name="paula")
-    assert await migrations.migrate_achievements_recount(flow.db) == "silent mode on"
+    paula = await flow.add_user(name="paula")
+    banned = await flow.add_user(name="gesperrt")
+    await flow.db.users.update_one({"id": banned["id"]}, {"$set": {"is_banned": True}})
+    assert await migrations.migrate_achievements_recount(flow.db) == "silent mode on, 1 accounts queued"
     doc = await flow.db.settings.find_one({"id": recount.SETTING_ID}, {"_id": 0})
-    assert doc["active"] is True and doc["marker"] == recount.MARKER and doc["started_at"]
+    assert doc["active"] is True and doc["marker"] == recount.MARKER and doc["generation"] == 1 and doc["started_at"]
+    # Alle Konten stehen gleich für eine volle, stille Auswertung in der Schlange - danach tragen sie die Marke.
+    entry = await flow.db.achievement_eval_queue.find_one({"user_id": paula["id"]}, {"_id": 0})
+    assert entry["full"] is True and entry["reason"] == "recount_start" and not entry.get("announce")
     await recount.finish()
     assert await migrations.migrate_achievements_recount(flow.db) == "already present"
     assert (await recount.status())["active"] is False, "einmal abgeschlossen bleibt abgeschlossen"
