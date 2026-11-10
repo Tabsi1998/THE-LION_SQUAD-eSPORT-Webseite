@@ -196,9 +196,10 @@ async def test_pruefung_nennt_namen_und_die_uebersicht_sagt_wer_vorstand_ist(flo
     assert messages["group_description_missing"] == "Gruppe „Stille Gruppe“ hat keine Beschreibung."
     assert messages["tier_description_missing"] == "Stufe „Stille Stufe“ hat keine Beschreibung."
     assert all("ohne_text" not in m for m in messages.values()), "Namen statt Schlüssel"
-    assert (await flow.get("/api/admin/achievements/me")).json() == {"board": True}
+    # Die Neuberechnung (#2340) darf nur der Superadmin - die Seite blendet sie danach ein.
+    assert (await flow.get("/api/admin/achievements/me")).json() == {"board": True, "superadmin": True}
     flow.act_as(staff)
-    assert (await flow.get("/api/admin/achievements/me")).json() == {"board": False}
+    assert (await flow.get("/api/admin/achievements/me")).json() == {"board": False, "superadmin": False}
 
 
 @pytest.mark.asyncio

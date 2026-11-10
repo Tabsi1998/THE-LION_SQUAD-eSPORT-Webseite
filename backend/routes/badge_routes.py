@@ -28,6 +28,7 @@ Admin endpoints (prefix /api/admin/achievements):
   GET    /overview, /catalog/check, /catalog/export, POST /catalog/import, GET /events,
          /season/{id}/preview, /xp/caps, POST /xp/prestige-reset, GET /stats, /stats.csv   (E10)
   GET    /negative/awards                 — admin-only list of negative awards
+  GET    /recount, POST /recount/dry-run, POST /recount/finish — Neuberechnung (#2340, nur Superadmin)
 """
 import logging
 import re
@@ -43,7 +44,7 @@ from badges import (
     NEGATIVE_INCIDENTS,
 )
 from models import now_utc, new_id
-from services.permissions import is_confirmed_admin_role
+from services.permissions import is_confirmed_admin_role, is_superadmin
 from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, annotate_tier, category_v2
 from services import achievement_visibility as visibility
 from services import xp
@@ -231,6 +232,46 @@ async def evaluate_everyone(me: dict = Depends(require_area("content"))):
     result = await sweep(everyone=True)
     await _log(me, "evaluate_all", data=result if isinstance(result, dict) else {})
     return result
+
+
+# ---- Neuberechnung (#2340): stiller Modus, Probelauf, Abschluss - nur Superadmin ----
+def _require_superadmin(me: dict) -> None:
+    if not is_superadmin(me):
+        raise HTTPException(403, "Die Neuberechnung darf nur der Superadmin starten.")
+
+
+@admin_router.get("/recount")
+async def recount_state(me: dict = Depends(require_area("system"))):
+    _require_superadmin(me)
+    from services import achievement_recount
+    return await achievement_recount.status()
+
+
+@admin_router.post("/recount/dry-run")
+async def recount_dry_run(me: dict = Depends(require_area("system"))):
+    """Probelauf im Hintergrund: was dazukäme, je Stufe und Personen - ohne zu schreiben. Die Seite fragt den Stand ab."""
+    _require_superadmin(me)
+    from services import achievement_recount
+    if not await achievement_recount.start_dry_run(actor=me):
+        raise HTTPException(409, "Ein Probelauf läuft schon.")
+    await _log(me, "recount_dry_run")
+    return await achievement_recount.status()
+
+
+@admin_router.post("/recount/finish")
+async def recount_finish(me: dict = Depends(require_area("system"))):
+    """Neuberechnung abschließen, im Hintergrund: alle still auswerten, stiller Modus aus, je Person eine Sammel-Nachricht.
+    Ein zweiter Klick nach dem Ende tut nichts; nach einem Abbruch geht es beim Stand weiter."""
+    _require_superadmin(me)
+    from services import achievement_recount
+    outcome = await achievement_recount.start_finish(actor=me)
+    if outcome == "missing":
+        raise HTTPException(404, "Es gibt keine Neuberechnung zum Abschließen.")
+    if outcome == "running":
+        raise HTTPException(409, "Der Abschluss läuft schon.")
+    if outcome == "started":
+        await _log(me, "recount_finish")
+    return await achievement_recount.status()
 
 
 async def _log(me: dict, kind: str, **kwargs) -> None:
@@ -603,8 +644,9 @@ async def admin_overview(me: dict = Depends(require_area("content"))):
 
 @admin_router.get("/me")
 async def admin_rights(me: dict = Depends(require_area("content"))):
-    """Was diese Person im Erfolge-Admin darf: Massenvergabe, Import und XP-Eingriffe nur mit ``board``."""
-    return {"board": await _is_board(me)}
+    """Was diese Person im Erfolge-Admin darf: Massenvergabe, Import und XP-Eingriffe nur mit ``board``, die
+    Neuberechnung (#2340) nur mit ``superadmin``."""
+    return {"board": await _is_board(me), "superadmin": is_superadmin(me)}
 
 
 @admin_router.get("/users/{user_id}/awards")
