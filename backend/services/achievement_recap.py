@@ -39,17 +39,24 @@ async def recap_for(db, user: dict, start: datetime, end: datetime) -> dict | No
 
     user_id = user["id"]
     window = {"$gte": start.isoformat(), "$lt": end.isoformat()}
-    xp_week = 0
-    async for row in db.xp_events.find({"user_id": user_id, "at": window}, {"_id": 0, "amount": 1, "bonus": 1}):
-        xp_week += int(row.get("amount") or 0) + int(row.get("bonus") or 0)
     groups_by_code, tiers = await visibility._catalog(db)
     unlocked = []
+    # Nachgerechnete Stufen (#2340) stehen nicht im Rückblick, auch nicht ihre XP: Davon erzählt die Sammel-Nachricht.
+    recounted: set[str] = set()
     async for award in db.user_achievements.find({"user_id": user_id, "earned_at": window}, {"_id": 0}).sort("earned_at", 1):
+        if award.get("recount"):
+            recounted.add(str(award.get("tier_code")))
+            continue
         tier = tiers.get(award.get("tier_code"))
         group = groups_by_code.get(tier.get("group_code")) if tier else None
         if not tier or not group or group.get("is_negative") or award.get("silent"):
             continue
         unlocked.append(_material_label(tier))
+    xp_week = 0
+    async for row in db.xp_events.find({"user_id": user_id, "at": window}, {"_id": 0, "amount": 1, "bonus": 1, "source": 1, "ref": 1}):
+        if row.get("source") == "achievement" and str(row.get("ref")) in recounted:
+            continue
+        xp_week += int(row.get("amount") or 0) + int(row.get("bonus") or 0)
     if xp_week <= 0 and not unlocked:
         return None
     level = await xp.view(user_id)
