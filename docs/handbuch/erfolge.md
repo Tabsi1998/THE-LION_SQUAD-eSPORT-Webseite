@@ -85,6 +85,29 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
   Turniere mit veröffentlichten Ergebnissen neu ab – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht nichts;
   der Lauf meldet, wie viele Turniere und Pokale es sind, und steht im Protokoll.
 
+**So zählen die Turnier- und Spiel-Erfolge.** Der Text „So schaffst du es“ steht an jedem Erfolg; die Regeln dahinter sind für alle gleich:
+
+- **Wer gespielt hat, bekommt den Erfolg.** Im Team zählt ein Spiel für alle, die laut **Aufstellung** oder
+  **Teilnehmerliste** dabei waren. Gibt es keine, zählt es für alle, die zu dem Zeitpunkt im Team waren – nicht nur für
+  die Person, die das Team angemeldet hat. Wer das Team später wechselt, behält, was er mit ihm gespielt hat.
+- **Ein Freilos ist kein Spiel:** Es zählt nicht als gespielt oder gewonnen und unterbricht keine Serie.
+- **Kampflos gewertet** zählt für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt nichts.
+- **Plätze gibt es erst nach dem Abschluss.** Champion, Podest, Top 8, Finalist und die anderen Platz-Erfolge zählen nur
+  aus Turnieren mit dem Status **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert**, nie aus einer
+  Liga-Staffel. Grundlage ist der gespeicherte Platz (derselbe wie auf dem Pokal). **Top 8** zählt erst ab mehr als
+  acht Teilnehmern.
+- **Finalist** ist, wer im Finale stand: im Endspiel, im Grand Final oder im Finallauf (dort alle). Turniere ohne
+  Finale (Jeder gegen jeden, Schweizer System, reine Gruppenphase, Liga) zählen nicht, ein kampfloses Finale auch nicht.
+- **Teilnahme statt Anmeldung:** Turnierveteran, Multitalent, Formatvielfalt, Durchzieher und Teamturniere zählen, wenn
+  die Anmeldung angenommen oder eingecheckt war und die Person mindestens ein echtes Spiel gespielt hat. Abgesagte
+  Turniere zählen nicht.
+- **Topgesetzt und Riesentöter** gelten nur bei fester Setzliste (Setzliste **Manuell**, siehe
+  [Turniere](turniere.md)), nicht bei **Zufall**. Es zählt die Setznummer der Anmeldung.
+- **Preisträger** zählt Preise aus Turnieren, die vorgemerkt, abholbereit oder abgeholt sind – keine verfallenen und
+  keine aus Fast Lap oder Verlosungen.
+
+Ein einmal freigeschalteter Erfolg bleibt, auch wenn ein Ergebnis später korrigiert wird.
+
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
 [Mails und Benachrichtigungen](mails.md)). Dazu kommt eine Meldung im Thema **Erfolge** (In-App, Push, Discord; **nie** per Mail).
@@ -333,6 +356,8 @@ bekommen haben. Die Meldung geht **am Starttag einmal** an alle mit Aktivität (
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
 | Ein Erfolg kommt nicht | Die Warteschlange läuft alle 30 Sekunden; die Stufe ist **von Hand** oder **nur Mitglieder**; die Person ist kein aktives Mitglied | Übersicht → **Alle jetzt auswerten**; Bedingung im Katalog prüfen |
+| „Champion“ oder „Podest“ kommt nicht, obwohl das Finale gespielt ist | Plätze zählen erst, wenn das Turnier beendet ist | Turnier auf **Beendet** setzen bzw. Ergebnisse veröffentlichen ([Turniere](turniere.md)) |
+| Ein Teammitglied bekommt einen Team-Erfolg nicht | Es steht nicht in der Aufstellung bzw. Teilnehmerliste des Spiels | Aufstellung prüfen; ohne Aufstellung zählen alle, die damals im Team waren (3.1) |
 | Katalog zeigt „geplant“ bei einer Stufe | Die Automatik für diesen Zähler ist noch nicht angeschlossen | Stufe von Hand vergeben |
 | „… dürfen nur der Vorstand oder die Systemverwaltung“ | Massenvergabe, Import, XP-Korrektur und Prestige-Reset sind dafür vorbehalten | Vorstand oder System fragen |
 | Vergabe: „Diese Stufe ist nur für aktive Vereinsmitglieder“ | Die Person ist kein aktives Mitglied oder Ehrenmitglied | Mitgliedschaft klären ([Verein](verein.md)) |
