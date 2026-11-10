@@ -61,6 +61,11 @@ def render_status(state: dict) -> str:
                      f"Konten ausgewertet, {run.get('notified') or 0} Sammel-Nachrichten.")
     else:
         lines.append("Noch nicht abgeschlossen.")
+    recounted = state.get("recounted") or {}
+    lines.append(f"Schon still vergeben: {recounted.get('awards') or 0} Stufen an {recounted.get('users') or 0} Personen.")
+    for row in recounted.get("tiers") or []:
+        group = f" ({row['group_name']})" if row.get("group_name") else ""
+        lines.append(f"  {row['count']:>6}  {row['name']}{group}")
     return "\n".join(lines) + "\n"
 
 

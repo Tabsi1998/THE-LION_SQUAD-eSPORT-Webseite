@@ -18,6 +18,32 @@ function plural(count, one, many) {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/** Je Stufe die Zahl der Personen - für „schon still vergeben“ und für den Probelauf. */
+function TierTable({ rows, testPrefix }) {
+  return (
+    <div className="mt-2 tls-swipe pb-0">
+      <table className="w-full text-xs min-w-[300px]">
+        <thead className="text-[10px] uppercase tracking-widest text-white/45">
+          <tr>
+            <th className="text-left py-2 pr-3">Stufe</th>
+            <th className="text-left py-2 pr-3">Gruppe</th>
+            <th className="text-right py-2">Personen</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {rows.map((row) => (
+            <tr key={row.tier_code} data-testid={`${testPrefix}-${row.tier_code}`}>
+              <td className="py-2 pr-3">{row.name} {row.material && <MaterialChip tier={row} className="ml-1" />}</td>
+              <td className="py-2 pr-3 text-white/60">{row.group_name || "–"}{row.negative ? " · negativ" : ""}</td>
+              <td className="py-2 text-right tabular-nums font-semibold">{row.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** Was der Abschluss gerade tut - in Worten. */
 export function finishLabel(finish = {}) {
   if (finish.done) return `Abgeschlossen am ${formatWhen(finish.finished_at)} · ${plural(finish.notified || 0, "Sammel-Nachricht", "Sammel-Nachrichten")}`;
@@ -73,6 +99,7 @@ export function RecountPanel() {
   if (!state) return null;
   const dry = state.dry_run || {};
   const run = state.finish || {};
+  const recounted = state.recounted || {};
   const canFinish = state.exists && !run.done && !run.running && !busy;
 
   return (
@@ -99,6 +126,12 @@ export function RecountPanel() {
         </dd>
         <dt className="text-white/45">Abschluss</dt>
         <dd data-testid="ach-recount-finish-state">{state.exists ? finishLabel(run) : "–"}</dd>
+        {state.exists && (
+          <>
+            <dt className="text-white/45">Schon still vergeben</dt>
+            <dd data-testid="ach-recount-recounted">{plural(recounted.awards || 0, "Stufe", "Stufen")} an {plural(recounted.users || 0, "Person", "Personen")}</dd>
+          </>
+        )}
         <dt className="text-white/45">Probelauf</dt>
         <dd data-testid="ach-recount-dry-state">
           {dry.running ? `Läuft: ${dry.checked || 0} von ${dry.total || 0} Konten gerechnet`
@@ -107,33 +140,20 @@ export function RecountPanel() {
         </dd>
       </dl>
 
+      {recounted.tiers?.length > 0 && (
+        <div className="mt-4" data-testid="ach-recount-done">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-white/45">Schon still vergeben</h3>
+          <TierTable rows={recounted.tiers} testPrefix="ach-recount-done-row" />
+        </div>
+      )}
+
       {dry.status === "done" && !dry.running && (
         <div className="mt-4" data-testid="ach-recount-result">
-          <p className="text-sm text-white/80" data-testid="ach-recount-summary">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-white/45">Probelauf – was noch fehlt</h3>
+          <p className="mt-1 text-sm text-white/80" data-testid="ach-recount-summary">
             {plural(dry.affected_users || 0, "Person bekäme", "Personen bekämen")} {plural(dry.awards || 0, "Stufe", "Stufen")} neu dazu.
           </p>
-          {dry.tiers?.length ? (
-            <div className="mt-3 tls-swipe pb-0">
-              <table className="w-full text-xs min-w-[300px]">
-                <thead className="text-[10px] uppercase tracking-widest text-white/45">
-                  <tr>
-                    <th className="text-left py-2 pr-3">Stufe</th>
-                    <th className="text-left py-2 pr-3">Gruppe</th>
-                    <th className="text-right py-2">Personen</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {dry.tiers.map((row) => (
-                    <tr key={row.tier_code} data-testid={`ach-recount-row-${row.tier_code}`}>
-                      <td className="py-2 pr-3">{row.name} {row.material && <MaterialChip tier={row} className="ml-1" />}</td>
-                      <td className="py-2 pr-3 text-white/60">{row.group_name || "–"}{row.negative ? " · negativ" : ""}</td>
-                      <td className="py-2 text-right tabular-nums font-semibold">{row.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : <p className="mt-2 text-xs text-white/45">Niemand bekäme etwas dazu.</p>}
+          {dry.tiers?.length ? <TierTable rows={dry.tiers} testPrefix="ach-recount-row" /> : <p className="mt-2 text-xs text-white/45">Niemand bekäme etwas dazu.</p>}
           <p className="mt-2 text-[11px] text-white/40">
             Folge-Stufen wie Sammler entstehen erst durch Vergaben – die Zahl ist eine Untergrenze.
             {dry.errors ? ` ${plural(dry.errors, "Konto ließ", "Konten ließen")} sich nicht rechnen (siehe Server-Protokoll).` : ""}

@@ -109,6 +109,10 @@ async def test_sweep_and_night_run_store_quietly_and_announce_nothing(flow):
     # Gespeichert wie immer: XP je Stufe, das Level steigt - nur gemeldet wird es nicht.
     state = await flow.db.user_xp.find_one({"user_id": paula["id"]}, {"_id": 0})
     assert state["total"] == 1000 and state["level"] == levels.level_for_xp(1000) > 1
+    # Die Tafel zeigt den bisherigen Umfang: je Stufe die Zahl und die Personen.
+    recounted = (await recount.status())["recounted"]
+    assert (recounted["awards"], recounted["users"]) == (4, 2)
+    assert [(row["tier_code"], row["count"], row["group_name"]) for row in recounted["tiers"]] == [("sicher_1", 2, "Abgesichert"), ("leser_1", 2, "Leseratte")]
 
 
 @pytest.mark.asyncio
@@ -612,6 +616,7 @@ async def test_the_command_line_runs_dry_run_and_finish(flow):
     out = io.StringIO()
     assert await script.main(["--abschliessen"], out=out) == 0
     assert "Abschluss: done" in out.getvalue() and "Stiller Modus: aus" in out.getvalue()
+    assert "Schon still vergeben: 1 Stufen an 1 Personen." in out.getvalue() and "Leseratte I (Leseratte)" in out.getvalue()
     assert await flow.db.notifications.count_documents({"kind": recount.NOTIFY_KIND}) == 1
 
 

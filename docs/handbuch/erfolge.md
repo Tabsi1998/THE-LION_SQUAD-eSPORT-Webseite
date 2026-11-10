@@ -410,9 +410,11 @@ jede Stufe eine eigene Meldung kommt, gibt es den **stillen Modus**. Er schaltet
 Zwei-Faktor-Anmeldung):
 
 1. Warten, bis **alle** Korrekturen an den Erfolgen veröffentlicht sind. Was danach erst korrigiert wird, käme wieder einzeln.
-2. **Probelauf** klicken. Er rechnet für alle Konten aus, welche Stufen noch dazukämen, und vergibt dabei nichts. Nach ein paar
-   Minuten steht da „… Personen bekämen … Stufen neu dazu“ und eine Tabelle mit **Stufe**, **Gruppe** und **Personen**. Stufen wie
-   **Sammler**, die erst durch andere Erfolge entstehen, zählt der Probelauf nicht mit – es werden eher mehr.
+2. Den Umfang ansehen: **Schon still vergeben** zeigt, wie viele Stufen an wie viele Personen bisher still nachgekommen sind,
+   mit einer Tabelle je Stufe. **Probelauf** rechnet dazu aus, was **noch fehlt** – also was der Abschluss noch nachvergeben würde –
+   und vergibt dabei nichts. Nach ein paar Minuten steht da „… Personen bekämen … Stufen neu dazu“ mit einer Tabelle **Stufe**,
+   **Gruppe**, **Personen**. Kurz nach dem Update ist das noch viel; ist die stille Auswertung aller Konten durch, meist wenig.
+   Stufen wie **Sammler**, die erst durch andere Erfolge entstehen, zählt der Probelauf nicht mit – es werden eher mehr.
 3. **Neuberechnung abschließen** klicken und die Rückfrage mit **Abschließen** bestätigen. Der Lauf ergänzt zuerst an alten Pokalen
    nur, wer im Finale stand – Platz, Saison und alles andere daran bleibt, wie es ist, gelöscht wird nichts (anders als
    **Pokale nachtragen**). Dann wertet er alle Konten still aus, beendet den stillen Modus und schickt danach jeder Person mit nachgerechneten Erfolgen **eine** Nachricht: „Wir haben die Erfolge

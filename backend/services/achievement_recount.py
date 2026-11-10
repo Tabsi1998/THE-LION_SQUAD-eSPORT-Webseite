@@ -224,6 +224,7 @@ async def status(db=None) -> dict:
     return {
         "exists": bool(doc), "active": bool(doc.get("active")), "marker": doc.get("marker"),
         "started_at": doc.get("started_at"), "ended_at": doc.get("ended_at"),
+        "recounted": await recounted_so_far(db, str(doc.get("marker") or MARKER)) if doc else None,
         "dry_run": {**dry, "running": dry_running},
         "finish": {**run, "running": running, "done": phase == "done",
                    "interrupted": phase in ("evaluate", "notify") and not running},
@@ -336,10 +337,15 @@ async def _count_due(db, *, batch: int, total: int, progress=None) -> dict:
         logger.info("[achievements] Probelauf der Neuberechnung: %d von %d Konten, %d betroffen", checked, total, affected)
         if progress:
             progress(f"{checked} von {total} Konten gerechnet, {affected} betroffen")
-    by_code = {tier["code"]: tier for tier in tiers}
+    rows = tier_rows(counts, {tier["code"]: tier for tier in tiers}, groups)
+    return {"checked": checked, "affected_users": affected, "awards": sum(counts.values()), "errors": errors, "tiers": rows}
+
+
+def tier_rows(counts: dict[str, int], tiers: dict[str, dict], groups: dict[str, dict]) -> list[dict]:
+    """Je Stufe eine Zeile für Tafel und Kommando: Name, Gruppe, Material, Zahl - die meisten zuerst."""
     rows = []
     for code, count in counts.items():
-        tier = by_code.get(code) or {}
+        tier = tiers.get(code) or {}
         group = groups.get(tier.get("group_code")) or {}
         rows.append({
             "tier_code": code, "name": tier.get("name") or code, "group_code": tier.get("group_code"), "group_name": group.get("name"),
@@ -347,7 +353,21 @@ async def _count_due(db, *, batch: int, total: int, progress=None) -> dict:
             "count": count,
         })
     rows.sort(key=lambda row: (-row["count"], str(row.get("group_name") or ""), str(row["name"])))
-    return {"checked": checked, "affected_users": affected, "awards": sum(counts.values()), "errors": errors, "tiers": rows}
+    return rows
+
+
+async def recounted_so_far(db, marker: str) -> dict:
+    """Was die Neuberechnung bisher still vergeben hat (``recount_id``): je Stufe die Zahl, dazu die Personen. Der
+    Probelauf zeigt, was noch fehlt; das hier den bisherigen Umfang."""
+    counts: dict[str, int] = {}
+    people: set[str] = set()
+    async for row in db.user_achievements.find({"recount_id": marker}, {"_id": 0, "tier_code": 1, "user_id": 1}):
+        counts[row["tier_code"]] = counts.get(row["tier_code"], 0) + 1
+        people.add(row["user_id"])
+    tiers = {t["code"]: t async for t in db.achievements.find({"code": {"$in": sorted(counts)}}, {"_id": 0, "code": 1, "name": 1, "group_code": 1, "material": 1, "material_name": 1})}
+    group_codes = sorted({t.get("group_code") for t in tiers.values() if t.get("group_code")})
+    groups = {g["code"]: g async for g in db.achievement_groups.find({"code": {"$in": group_codes}}, {"_id": 0, "code": 1, "name": 1, "is_negative": 1})}
+    return {"awards": sum(counts.values()), "users": len(people), "tiers": tier_rows(counts, tiers, groups)}
 
 
 def render_dry_run(result: dict) -> str:

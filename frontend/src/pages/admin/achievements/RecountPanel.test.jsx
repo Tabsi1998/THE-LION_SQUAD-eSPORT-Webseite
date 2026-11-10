@@ -44,6 +44,15 @@ describe("Neuberechnung im Erfolge-Admin (#2340)", () => {
     expect(apiMock.get).toHaveBeenCalledWith("/admin/achievements/recount");
   });
 
+  it("zeigt zusätzlich, was schon still vergeben ist", async () => {
+    const recounted = { awards: 31, users: 14, tiers: [{ tier_code: "finalist_1", name: "Finalist I", group_name: "Finalist", material: "wood", count: 9 }] };
+    apiMock.get.mockResolvedValue({ data: { ...ACTIVE, recounted, dry_run: DRY_DONE } });
+    render(<RecountPanel />);
+    expect(await screen.findByTestId("ach-recount-recounted")).toHaveTextContent("31 Stufen an 14 Personen");
+    expect(screen.getByTestId("ach-recount-done-row-finalist_1")).toHaveTextContent("9");
+    expect(screen.getByTestId("ach-recount-summary")).toHaveTextContent("12 Personen bekämen 19 Stufen neu dazu.");
+  });
+
   it("startet den Probelauf und fragt nach, solange er läuft", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

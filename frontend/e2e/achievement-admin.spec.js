@@ -18,7 +18,10 @@ const PEOPLE = [
 ];
 
 // Neuberechnung (#2340): stiller Modus an, Probelauf fertig mit zwei Stufen, Abschluss läuft nach dem Klick.
-const RECOUNT = { exists: true, active: true, marker: "2340", started_at: "2026-11-10T08:00:00+00:00", ended_at: null, dry_run: { running: false }, finish: { running: false, done: false, interrupted: false } };
+const RECOUNT = {
+  exists: true, active: true, marker: "2340", started_at: "2026-11-10T08:00:00+00:00", ended_at: null, dry_run: { running: false }, finish: { running: false, done: false, interrupted: false },
+  recounted: { awards: 31, users: 14, tiers: [{ tier_code: "finalist_1", name: "Finalist I", group_name: "Finalist", material: "wood", count: 9 }] },
+};
 const RECOUNT_DRY = {
   status: "done", running: false, checked: 40, total: 40, affected_users: 12, awards: 19, errors: 0, finished_at: "2026-11-10T09:00:00+00:00",
   tiers: [
@@ -127,6 +130,7 @@ test.describe("Erfolge im Admin", () => {
     await mockAdmin(page, calls);
     await page.goto("/admin/achievements");
     await expect(page.getByTestId("ach-recount-mode")).toContainText("An seit");
+    await expect(page.getByTestId("ach-recount-recounted")).toHaveText("31 Stufen an 14 Personen");
     await page.getByTestId("ach-recount-dry-run").click();
     await expect(page.getByTestId("ach-recount-summary")).toHaveText("12 Personen bekämen 19 Stufen neu dazu.");
     await expect(page.getByTestId("ach-recount-row-finalist_1")).toContainText("Finalist I");
