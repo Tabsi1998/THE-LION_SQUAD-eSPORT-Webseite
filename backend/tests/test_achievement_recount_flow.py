@@ -200,6 +200,32 @@ async def test_a_check_in_keeps_an_old_finalist_tier_quiet(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_mark_waits_for_a_complete_evaluation(flow, monkeypatch):
+    """Fällt ein Zähler aus, rechnet die Auswertung mit 0 weiter - dann ist die Person noch nicht nachgerechnet."""
+    from services import achievement_counters as counters
+
+    paula = await flow.add_user(name="paula")
+    await claims(flow, paula, news=1, passkey=True)
+    await recount.begin()
+    working = counters.REGISTRY["passkey_registered"]
+
+    async def broken(ctx):
+        raise RuntimeError("Zähler kaputt")
+
+    monkeypatch.setitem(counters.REGISTRY, "passkey_registered", counters.Counter(working.key, working.sources, broken))
+    await drain()
+    got = await awards_of(flow, paula)
+    assert set(got) == {"leser_1"} and got["leser_1"]["recount"] is True, "was rechenbar war, kam still"
+    assert await recount.is_checked(flow.db, paula["id"], f"{recount.MARKER}:1") is False, "unvollständig: keine Marke"
+
+    monkeypatch.setitem(counters.REGISTRY, "passkey_registered", working)
+    await achievement_queue.sweep(everyone=True)
+    await drain()
+    assert (await awards_of(flow, paula))["sicher_1"]["recount"] is True
+    assert await recount.is_checked(flow.db, paula["id"], f"{recount.MARKER}:1") is True
+
+
+@pytest.mark.asyncio
 async def test_a_later_correction_package_lets_all_marks_expire(flow):
     """recheck (für ein Korrektur-Paket während des stillen Modus, etwa #2339): neue Generation, alle wieder vorgemerkt -
     bis zur nächsten stillen vollen Auswertung ist jedes Ereignis wieder ganz still."""

@@ -381,7 +381,8 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     db = get_db()
     from services import achievement_counters
     light = bool(sources) and not legacy
-    counters = await achievement_counters.refresh(user_id, sources, legacy=not light)
+    with achievement_counters.counting() as failed_counters:
+        counters = await achievement_counters.refresh(user_id, sources, legacy=not light)
     only_keys = None if not sources else (achievement_counters.keys_for_sources(sources) | (frozenset() if light else achievement_counters.LEGACY_KEYS))
     active_member = is_active_member(await get_membership(user_id))
     earned_codes = {a["tier_code"] async for a in db.user_achievements.find({"user_id": user_id})}
@@ -398,7 +399,8 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
             context = {"auto_progress": True, "current": counters.get(ck), "target": t["progress_target"]}
             if await award_achievement(user_id, t["code"], context, recount_id=await decide.marker_for(ck)):
                 new_count += 1
-    if not sources:
+    # Die Marke der Neuberechnung (#2340) nur nach einer vollständigen Auswertung - fiel ein Zähler aus, stand er auf 0.
+    if not sources and not failed_counters:
         await decide.after_full_evaluation()
     return new_count
 
