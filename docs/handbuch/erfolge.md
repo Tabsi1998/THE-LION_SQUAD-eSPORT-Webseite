@@ -46,6 +46,7 @@ Mit „Saison“ ist hier die **Jahreswertung** gemeint.
 | **Negativ und Vorfälle** | Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim | Erfolge → Negativ & Vorfälle |
 | **Vorschau** | Jede Zeremonie und jedes Abzeichen in jedem Material ansehen | Erfolge → Vorschau |
 | **Statistik** | Freischaltungen je Woche, die Besten, Seltenheit je Stufe | Erfolge → Statistik |
+| **Neuberechnung** | Nach Korrekturen an den Erfolgen Ansprüche still nachvergeben, zum Schluss eine Sammel-Nachricht je Person | Erfolge → Übersicht (nur Superadmin) |
 
 ---
 
@@ -84,6 +85,7 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
 - **Turnier-Pokale nachtragen** (nur Bereich **System**): Der Knopf **Pokale nachtragen** leitet Pokale und Banner aller
   Turniere mit veröffentlichten Ergebnissen neu ab – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht nichts;
   der Lauf meldet, wie viele Turniere und Pokale es sind, und steht im Protokoll.
+- **Neuberechnung** (nur **Superadmin**): Stand des stillen Modus, **Probelauf** und **Neuberechnung abschließen** (3.10).
 
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
@@ -326,6 +328,38 @@ bekommen haben. Die Meldung geht **am Starttag einmal** an alle mit Aktivität (
 
 **Vorschau mit deinen Zahlen** zeigt euch euren eigenen Rückblick schon vor dem Start.
 
+### 3.10 Neuberechnung
+
+Wenn Erfolge korrigiert werden (etwa wie Turnier-, Spiel- oder Chat-Erfolge gezählt werden), stehen vielen Personen auf einen
+Schlag Erfolge zu, die sie längst verdient haben – zum Beispiel **Finalist** für ein Turnier aus dem Vorjahr. Damit dann nicht für
+jede Stufe eine eigene Meldung kommt, gibt es den **stillen Modus**. Er schaltet sich mit dem Update von selbst ein.
+
+**Solange der stille Modus an ist:**
+
+- Was die regelmäßigen Läufe nachvergeben (alle 15 Minuten, nachts, **Alle jetzt auswerten**), wird ganz normal gespeichert –
+  Stufe, Punkte, XP, Level. Es gibt aber **keine** Meldung im Postfach, keine Push, keine Discord-Nachricht, kein „Level erreicht“.
+  Diese Stufen erscheinen auch nicht im Laufband, nicht als Erfolg der Woche und nicht im Wochenrückblick.
+- Was jemand **gerade selbst** erreicht (Ergebnis gemeldet, eingecheckt, Chat-Nachricht, Konto verknüpft …), wird wie immer gemeldet.
+  Schaltet so ein Ereignis nebenbei einen alten Anspruch aus einem anderen Bereich frei, kommt dieser still dazu.
+
+**So schließt du die Neuberechnung ab** (Admin → Content → Erfolge → **Übersicht**, Tafel **Neuberechnung**, nur Superadmin mit
+Zwei-Faktor-Anmeldung):
+
+1. Warten, bis **alle** Korrekturen an den Erfolgen veröffentlicht sind. Was danach erst korrigiert wird, käme wieder einzeln.
+2. **Probelauf** klicken. Er rechnet für alle Konten aus, welche Stufen noch dazukämen, und vergibt dabei nichts. Nach ein paar
+   Minuten steht da „… Personen bekämen … Stufen neu dazu“ und eine Tabelle mit **Stufe**, **Gruppe** und **Personen**. Stufen wie
+   **Sammler**, die erst durch andere Erfolge entstehen, zählt der Probelauf nicht mit – es werden eher mehr.
+3. **Neuberechnung abschließen** klicken und die Rückfrage mit **Abschließen** bestätigen. Der Lauf wertet alle Konten still aus,
+   beendet den stillen Modus und schickt danach jeder Person mit nachgerechneten Erfolgen **eine** Nachricht: „Wir haben die Erfolge
+   neu berechnet – du hast X neue.“ Sie kommt ins Postfach und als Push, nicht über Discord, und führt zu den eigenen Erfolgen.
+4. Die Tafel zeigt den Fortschritt. Am Ende steht „Abgeschlossen am … · N Sammel-Nachrichten“ und „Stiller Modus: Aus“. Ab jetzt
+   wird jeder Erfolg wieder einzeln gemeldet.
+
+Der Abschluss ist **gefahrlos wiederholbar**: Ein zweiter Klick nach dem Ende tut nichts, und niemand bekommt die Nachricht zweimal.
+Bricht der Lauf ab (etwa durch ein Update), steht bei **Abschluss** „Unterbrochen“ – ein neuer Klick macht dort weiter. Probelauf und
+Abschluss stehen im Protokoll unter **Vergeben**. Am Server geht beides auch per Kommando:
+`python -m scripts.achievements_recount --probelauf` bzw. `--abschliessen` (im Backend-Container, ohne Schalter zeigt es den Stand).
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -348,6 +382,8 @@ bekommen haben. Die Meldung geht **am Starttag einmal** an alle mit Aktivität (
 | Jemand sieht keinen Jahresrückblick | Die Person war im Jahr nicht aktiv, oder der Zeitraum läuft nicht | Zeitraum prüfen; **Vorschau** zeigt den eigenen |
 | Das Abzeichen zeigt nur ein Fragezeichen | Die Gruppe ist **versteckt** oder Fun-Erfolg | Gewollt bis zur Freischaltung |
 | Level springt nach einer Korrektur | XP-Korrektur oder Prestige-Reset | Protokoll unter **Vergeben** ansehen |
+| Jemand hat neue Erfolge, aber keine Meldung bekommen | Der stille Modus der **Neuberechnung** ist an (3.10) | Gewollt; die Sammel-Nachricht kommt mit **Neuberechnung abschließen** |
+| Keine Tafel **Neuberechnung** in der Übersicht | Nur der Superadmin sieht sie | Superadmin fragen |
 
 ---
 
@@ -367,6 +403,9 @@ Ja, mit dem Datumsfeld bei der Vergabe.
 
 **Werden Erfolge per Mail gemeldet?**
 Nein, nur In-App, Push und Discord. Eine Mail gibt es nur im Wochenrückblick.
+
+**Warum kam für nachgerechnete Erfolge keine Meldung?**
+Während der Neuberechnung kommen sie still; zum Schluss gibt es eine Sammel-Nachricht je Person (3.10).
 
 **Wie viel XP braucht Level 60?**
 Rund 683.000 XP; Prestige macht den Weg danach je Stern um ein Viertel länger.
