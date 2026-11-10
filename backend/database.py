@@ -337,6 +337,8 @@ async def init_indexes():
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")
+    # Erfolge (#2337): Team-Beitritte und -Austritte je Person (wer war wann im Team) und die eigenen Ergebnismeldungen.
+    await db.audit_logs.create_index([("action", 1), ("actor_id", 1)])
     # Cross-worker mutation leases.  These protect multi-document tournament
     # operations when multiple API workers receive the same action at once.
     await db.mutation_locks.create_index("resource", unique=True)
