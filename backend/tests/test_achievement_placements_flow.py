@@ -172,6 +172,27 @@ async def test_jeder_gegen_jeden_hat_kein_finale(flow):
 
 
 @pytest.mark.asyncio
+async def test_ko_mit_zwei_teilnehmern_hat_kein_finale(flow):
+    """Review N1: Ein einziges Spiel ist kein Finale - wie ein einzelner Mehrspieler-Lauf. Champion gibt es trotzdem."""
+    field = await players(flow, 2)
+    tournament, regs = await play.played_cup(flow, field)
+    assert len(await flow.matches(tournament)) == 1
+    stored = [doc async for doc in flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0})]
+    assert sorted(doc["rank"] for doc in stored) == [1, 2] and not any(doc["finalist"] for doc in stored)
+    winner, loser = await values(field[0]), await values(field[1])
+    assert (winner["tournaments_won"], winner["finals_played"]) == (1, 0)
+    assert (loser["podium_finishes"], loser["finals_played"]) == (1, 0)
+
+    lone = await players(flow, 3)
+    staff, heats, entries = await play.cup_for(flow, lone, format="ffa")
+    [heat] = await play.open_matches(flow, heats)
+    await play.rank(flow, staff, heat, play.sides(heat))
+    await play.finish(flow, staff, heats)
+    assert [(await values(person))["finals_played"] for person in lone] == [0, 0, 0], "ein einzelner Lauf"
+    assert (await values(lone[0]))["tournaments_won"] == 1
+
+
+@pytest.mark.asyncio
 async def test_doppel_ko_grand_final_und_lower_bracket_lauf(flow):
     field = await players(flow, 4)
     tournament, regs = await play.played_cup(flow, field, format="double_elim")

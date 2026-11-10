@@ -131,7 +131,7 @@ TOURNAMENT = [
            "crown", "crown", "tournaments_won", [1, 3, 7, 15, 30, 60, 100], "{n} Turniere gewonnen.", sort_order=212),
     _group("podium", "Podest", "tournament", "Lande unter den ersten Drei.", "Platz 1, 2 oder 3 in einem abgeschlossenen Turnier (keine Liga) zählt.",
            "medal", "podium", "podium_finishes", [1, 5, 15, 30, 60, 120, 250], "{n} Podestplätze.", sort_order=213),
-    _group("finals", "Finalist", "tournament", "Erreich Finals.", "Du standest im Finale: im Endspiel, im Grand Final oder im Finallauf. Turniere ohne Finale (Jeder gegen jeden, Schweizer System, reine Gruppenphase, Liga) zählen nicht.",
+    _group("finals", "Finalist", "tournament", "Erreich Finals.", "Du standest im Finale: im Endspiel, im Grand Final oder im Finallauf. Kein Finale haben Jeder gegen jeden (einfach und Hin- und Rückrunde), Schweizer System, reine Gruppenphase, Vereinsliga, Zeitfahren und Rennserie – außerdem ein K.-o. mit nur zwei Teilnehmern und ein einzelner Mehrspieler-Lauf.",
            "star", "star", "finals_played", [1, 5, 15, 40, 100], "{n} Finals gespielt.", sort_order=214),
     _group("top8", "Top 8", "tournament", "Erreich die besten Acht.", "Platz 1 bis 8 in einem abgeschlossenen Turnier mit mehr als acht Teilnehmern (keine Liga) zählt.",
            "list-ordered", "eight", "top8_finishes", [1, 10, 30, 75, 200], "{n}-mal in den Top 8.", sort_order=215),

@@ -23,11 +23,23 @@ def how_to(code: str) -> str:
 
 def test_vereinbarte_saetze():
     assert how_to("matches_won") == "Gewinn Matches gegen echte Gegner – kampflose Siege zählen, Freilose und Unentschieden nicht."
-    assert how_to("finals") == ("Du standest im Finale: im Endspiel, im Grand Final oder im Finallauf. Turniere ohne Finale "
-                                "(Jeder gegen jeden, Schweizer System, reine Gruppenphase, Liga) zählen nicht.")
     assert how_to("top_seed") == "Setznummer 1 in einem Turnier mit fester Setzliste, das gespielt wurde – ausgelost, abgesagt und Liga zählen nicht."
     assert how_to("tournaments_completed") == ("Abgeschlossenes Turnier, in dem du gespielt hast, ohne kampflos zu verlieren, auszutreten oder "
                                                "disqualifiziert zu werden.")
+
+
+def test_finalist_nennt_alle_faelle_ohne_finale():
+    """Review N1: die Liste ist vollständig - jedes Format ohne Finale aus der Zählung, dazu das K.-o. mit zwei Teilnehmern
+    und der einzelne Lauf."""
+    from services.competition_standings import NO_FINAL_FORMATS
+
+    text = how_to("finals")
+    assert text.startswith("Du standest im Finale: im Endspiel, im Grand Final oder im Finallauf.")
+    named = {"round_robin": "Jeder gegen jeden (einfach", "league": "Hin- und Rückrunde", "swiss": "Schweizer System",
+             "time_trial": "Zeitfahren", "grand_prix": "Rennserie"}
+    assert set(named) == set(NO_FINAL_FORMATS), "neues Format ohne Finale? Dann gehört es auch in den Text"
+    for phrase in (*named.values(), "reine Gruppenphase", "Vereinsliga", "K.-o. mit nur zwei Teilnehmern", "einzelner Mehrspieler-Lauf"):
+        assert phrase in text, phrase
 
 
 def test_champion_podest_und_riesentoeter_nennen_ihre_grenzen():

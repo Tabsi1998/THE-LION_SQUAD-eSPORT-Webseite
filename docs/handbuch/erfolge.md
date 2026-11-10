@@ -96,8 +96,10 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
   aus Turnieren mit dem Status **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert**, nie aus einer
   Liga-Staffel. Grundlage ist der gespeicherte Platz (derselbe wie auf dem Pokal). **Top 8** zählt erst ab mehr als
   acht Teilnehmern.
-- **Finalist** ist, wer im Finale stand: im Endspiel, im Grand Final oder im Finallauf (dort alle). Turniere ohne
-  Finale (Jeder gegen jeden, Schweizer System, reine Gruppenphase, Liga) zählen nicht, ein kampfloses Finale auch nicht.
+- **Finalist** ist, wer im Finale stand: im Endspiel, im Grand Final oder im Finallauf (dort alle). Kein Finale haben
+  Jeder gegen jeden (einfach und Hin- und Rückrunde), Schweizer System, reine Gruppenphase, die Vereinsliga, Zeitfahren
+  und Rennserie – außerdem ein K.-o. mit nur zwei Teilnehmern und ein einzelner Mehrspieler-Lauf: Ein einziges Spiel ist
+  kein Finale. Ein kampfloses Finale zählt auch nicht.
 - **Teilnahme statt Anmeldung:** Turnierveteran, Multitalent, Formatvielfalt, Durchzieher und Teamturniere zählen, wenn
   die Anmeldung angenommen oder eingecheckt war und die Person mindestens ein echtes Spiel gespielt hat. Abgesagte
   Turniere zählen nicht.
