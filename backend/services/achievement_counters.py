@@ -185,7 +185,7 @@ class Context:
         """Die Anmeldungen der Gegner aus allen eigenen Matches (Check-in-Zeiten, Status) - Katalog A."""
         async def load():
             ids = {reg_id for row in await self.played() for reg_id in row.opponents}
-            rows = await self.db.tournament_registrations.find({"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "status": 1, "checked_in_at": 1, "updated_at": 1, "user_id": 1, "team_id": 1}).to_list(5000) if ids else []
+            rows = await self.db.tournament_registrations.find({"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "status": 1, "checked_in_at": 1, "updated_at": 1, "user_id": 1, "team_id": 1, "seed": 1}).to_list(5000) if ids else []
             return {row["id"]: row for row in rows}
         return await self._memo("opponent_registrations", load)
 
@@ -563,10 +563,17 @@ async def _staffed(ctx):
     return await ctx.db.tournaments.count_documents({"id": {"$in": list(ids)}, "status": {"$in": ["completed", "results_published", "archived"]}, **NOT_LEAGUE})
 
 
-@counter("seed_one_count", "tournament")
+@counter("seed_one_count", "tournament", "match")
 async def _seed_one(ctx):
-    """Topgesetzt: je Turnier einmal, egal wie viele Anmeldungen dort auf Platz 1 gesetzt waren."""
-    return len({r.get("tournament_id") for r in await ctx.tournament_registrations() if r.get("seed") == 1 and r.get("tournament_id")})
+    """Topgesetzt (#2337): Setznummer 1 der Anmeldung in einem abgeschlossenen Turnier mit fester Setzliste, in dem die
+    Person gespielt hat - je Turnier einmal. Ausgelost, abgesagt, ausgetreten und Liga zählen nicht; die Nummern je Lauf
+    (Plätze im Baum) auch nicht."""
+    participation = await ctx.participation()
+    return len({
+        registration["tournament_id"] for registration in participation.tournament_entries()
+        if registration.get("seed") == 1 and participation.is_done(registration["tournament_id"])
+        and participation.has_fixed_seeding(registration["tournament_id"])
+    })
 
 
 @counter("tournaments_completed", "tournament")
@@ -651,16 +658,19 @@ async def _same_opponent(ctx):
 
 @counter("upsets", "match")
 async def _upsets(ctx):
-    """Sieg gegen einen besser gesetzten Gegner (kleinere Setznummer)."""
+    """Sieg gegen einen besser gesetzten Gegner (kleinere Setznummer) - die Setznummer der Anmeldung, nicht der Platz im
+    Baum, und nur bei fester Setzliste (#2337): Wo das Los die Nummern vergibt, gibt es keinen Favoriten."""
+    participation = await ctx.participation()
+    others = await ctx.opponent_registrations()
     count = 0
-    for row in await ctx.played():
-        match, mine = row.match, row.mine
+    for row in participation.played:
+        match = row.match
         # Favoritenschreck ist ein Duell-Erfolg (#1796): im FFA-Lauf schlägt Platz 1 nicht „den Gegner“.
-        if not row.won or not is_duel(match):
+        if not row.won or not is_duel(match) or not participation.has_fixed_seeding(match.get("tournament_id")):
             continue
-        seeds = {slot.get("registration_id"): slot.get("seed") for slot in match.get("slots") or [] if slot.get("registration_id")}
-        my_seed = min((int(seeds[r]) for r in seeds if r in mine and isinstance(seeds.get(r), int)), default=None)
-        their = min((int(seeds[r]) for r in seeds if r not in mine and isinstance(seeds.get(r), int)), default=None)
+        my_seed = participation.seed_of(row.mine)
+        seeds = [(others.get(reg_id) or {}).get("seed") for reg_id in row.opponents]
+        their = min((seed for seed in seeds if isinstance(seed, int) and not isinstance(seed, bool)), default=None)
         if my_seed is not None and their is not None and their < my_seed:
             count += 1
     return count

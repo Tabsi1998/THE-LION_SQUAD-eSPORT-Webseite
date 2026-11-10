@@ -38,7 +38,21 @@ MATCH_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, 
                 "section": 1, "bracket": 1, "round_name": 1, "group_id": 1, "stage_number": 1, "round": 1, "order": 1,
                 "match_type": 1, "is_preview": 1, "lineups": 1, "games.lineups": 1}
 
+# Topgesetzt und Riesentöter gelten nur bei fester Setzliste - nicht, wenn das Los die Nummer vergeben hat.
+FIXED_SEEDING_MODES = frozenset({"manual", "ranking"})
+# Formatvielfalt: „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (frontend/src/lib/tournamentLabels.js, TA5).
+FORMAT_ALIASES = {"battle_royale": "ffa"}
+
 _SHARED: contextvars.ContextVar[dict | None] = contextvars.ContextVar("achievement_participation", default=None)
+
+
+def format_key(tournament: dict | None) -> str | None:
+    """Das Format, wie Formatvielfalt es zählt: die Liga als eines - jede Vereinsliga-Staffel und das Turnierformat
+    „Jeder gegen jeden – Hin- und Rückrunde“ (``league``); ``battle_royale`` als ``ffa``."""
+    if is_league_staffel(tournament):
+        return "league"
+    key = str((tournament or {}).get("format") or "").strip()
+    return FORMAT_ALIASES.get(key, key) or None
 
 
 def parse_time(value) -> datetime | None:
@@ -208,6 +222,34 @@ class Participation:
     def match_progress(self) -> dict:
         """Spielmacher, Sieger und Siegesserie - dieselbe Rechnung wie ``registration_badge_match_progress``."""
         return badge_match_progress((row.match, row.mine) for row in self.rows)
+
+    # ------------------------------------------------ Teilnahme statt Anmeldung (Turnierveteran, Multitalent, Formatvielfalt)
+
+    def tournament_entries(self) -> list[dict]:
+        """Die Teilnahmen an Turnieren - ohne Liga-Staffeln (docs/LIGA.md, Abschnitt 7: eine Staffel ist kein Turnier)."""
+        return [registration for registration in self.entries() if not self.is_league(registration.get("tournament_id"))]
+
+    def tournaments_played(self) -> int:
+        return len({registration["tournament_id"] for registration in self.tournament_entries()})
+
+    def distinct_games(self) -> int:
+        games = {(self.tournaments[registration["tournament_id"]]).get("game_id") for registration in self.tournament_entries()}
+        return len({game for game in games if game})
+
+    def distinct_formats(self) -> int:
+        """Verschiedene Formate, in denen die Person gespielt hat - die Liga zählt als eines (``format_key``)."""
+        keys = {format_key(self.tournaments[registration["tournament_id"]]) for registration in self.entries()}
+        return len({key for key in keys if key})
+
+    def has_fixed_seeding(self, tournament_id: str | None) -> bool:
+        """Feste Setzliste: von Hand oder nach Rangliste gesetzt, nicht ausgelost. Eine Liga-Staffel hat keine."""
+        tournament = self.tournaments.get(tournament_id) or {}
+        return tournament.get("seeding_mode") in FIXED_SEEDING_MODES and not is_league_staffel(tournament)
+
+    def seed_of(self, registration_ids) -> int | None:
+        """Die beste Setznummer dieser eigenen Anmeldungen - die der Anmeldung, nicht der ausgeloste Platz im Baum."""
+        seeds = [(self.registrations.get(reg_id) or {}).get("seed") for reg_id in registration_ids]
+        return min((seed for seed in seeds if isinstance(seed, int) and not isinstance(seed, bool)), default=None)
 
     # ------------------------------------------------ Plätze und Finale: nur abgeschlossene Turniere, nie eine Liga-Staffel
 
