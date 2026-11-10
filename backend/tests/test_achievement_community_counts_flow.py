@@ -148,6 +148,99 @@ async def test_data_aware_also_counts_after_a_data_export(flow):
     assert entry and "profile" in entry["sources"]
 
 
+# ---------------------------------------------------------------- Twitch (M4)
+
+def fake_twitch(monkeypatch, streams: list[dict]):
+    from services import twitch_service
+
+    async def token(_creds):
+        return "token", ""
+
+    class Answer:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {"data": list(streams)}
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, *args, **kwargs):
+            return Answer()
+
+    monkeypatch.setattr(twitch_service, "_get_app_token", token)
+    monkeypatch.setattr(twitch_service.httpx, "AsyncClient", Client)
+
+
+@pytest.mark.asyncio
+async def test_twitch_sessions_and_minutes_only_count_for_the_linked_channel(flow, monkeypatch):
+    from datetime import timedelta
+
+    from models import now_utc
+    from services import twitch_service
+    from services.secret_store import encrypt_secret
+
+    db = flow.db
+    await db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "twitch_client_id": "cid", "twitch_client_secret": encrypt_secret("geheim")}}, upsert=True)
+    typed = await flow.add_user(name="getippt")
+    linked = await flow.add_user(name="verknuepft")
+    await db.users.update_one({"id": typed["id"]}, {"$set": {"twitch_handle": "fremderkanal"}})
+    await db.users.update_one({"id": linked["id"]}, {"$set": {"twitch_handle": "eigenerkanal", "platform_verified": {"twitch": True}}})
+    await db.platform_links.insert_one({"id": "tw-l", "user_id": linked["id"], "platform": "twitch", "external_id": "9001", "handle": "eigenerkanal"})
+    started = (now_utc() - timedelta(minutes=30)).isoformat()
+    fake_twitch(monkeypatch, [
+        {"id": "st-typed", "user_login": "fremderkanal", "started_at": started, "viewer_count": 3},
+        {"id": "st-linked", "user_login": "eigenerkanal", "started_at": started, "viewer_count": 3},
+    ])
+    await twitch_service.fetch_live_streams()
+    assert await db.live_streams.count_documents({}) == 2, "beide Streams stehen weiter auf der Seite"
+    fake_twitch(monkeypatch, [])
+    await twitch_service.fetch_live_streams()
+
+    stored_typed = await db.users.find_one({"id": typed["id"]})
+    stored_linked = await db.users.find_one({"id": linked["id"]})
+    assert not stored_typed.get("twitch_live_sessions_count") and not stored_typed.get("twitch_stream_minutes")
+    assert stored_linked["twitch_live_sessions_count"] == 1 and stored_linked["twitch_stream_minutes"] >= 30
+
+    # Auch ein schon gezählter Stand zählt nur mit Verknüpfung.
+    await db.users.update_one({"id": typed["id"]}, {"$set": {"twitch_live_sessions_count": 7, "twitch_stream_minutes": 600}})
+    keys = {"twitch_live_sessions", "twitch_stream_minutes"}
+    assert {k: v for k, v in (await counters.compute(typed["id"], keys)).items() if k in keys} == {"twitch_live_sessions": 0, "twitch_stream_minutes": 0}
+    mine = await counters.compute(linked["id"], keys)
+    assert mine["twitch_live_sessions"] == 1 and mine["twitch_stream_minutes"] >= 30
+
+
+@pytest.mark.asyncio
+async def test_clips_count_for_the_linked_twitch_account_not_a_typed_name(flow):
+    db = flow.db
+    typed = await flow.add_user(name="clipgetippt")
+    linked = await flow.add_user(name="clipverknuepft")
+    await db.users.update_one({"id": typed["id"]}, {"$set": {"twitch_handle": "clipper"}})
+    await db.platform_links.insert_one({"id": "tw-c", "user_id": linked["id"], "platform": "twitch", "external_id": "77", "handle": "echtername"})
+    await db.settings.insert_one({"id": "twitch_clips_state", "clips": [
+        {"id": "c1", "creator_name": "clipper", "creator_id": "55"},
+        {"id": "c2", "creator_name": "Anzeigename", "creator_id": "77"},
+        {"id": "c3", "creator_name": "EchterName"},
+    ]})
+    assert (await counters.compute(typed["id"], {"clips_synced"}, legacy=False))["clips_synced"] == 0
+    assert (await counters.compute(linked["id"], {"clips_synced"}, legacy=False))["clips_synced"] == 2, "an der Kennung, ältere am Namen"
+
+
+def test_fetched_clips_keep_the_creator_id():
+    from services import twitch_clips
+
+    picked = twitch_clips.pick_clips([{"id": "a", "creator_name": "Paula", "creator_id": 123, "view_count": 1}])
+    assert picked[0]["creator_id"] == "123"
+
+
 # ---------------------------------------------------------------- Discord (H11, M9)
 
 MAIN, SUB, OFF = "700000000000000001", "700000000000000002", "700000000000000009"

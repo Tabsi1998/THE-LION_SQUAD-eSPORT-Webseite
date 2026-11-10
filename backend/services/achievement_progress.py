@@ -213,8 +213,10 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
 
     # Phase E + Discord-Counter: discord_messages comes from manually maintained counter
     p["discord_messages"] = (user or {}).get("discord_messages_count", 0)
-    p["twitch_live_sessions"] = (user or {}).get("twitch_live_sessions_count", 0)
-    p["twitch_stream_minutes"] = (user or {}).get("twitch_stream_minutes", 0)
+    # Streamer und Sendezeit (#2338): nur mit per Anmeldung verknüpftem Twitch - ein getippter Name zählt nicht.
+    twitch = await linked_twitch(db, user_id)
+    p["twitch_live_sessions"] = int((user or {}).get("twitch_live_sessions_count") or 0) if twitch else 0
+    p["twitch_stream_minutes"] = int((user or {}).get("twitch_stream_minutes") or 0) if twitch else 0
     p["friends_count"] = await db.friendships.count_documents({
         "status": "accepted",
         "$or": [{"requester_id": user_id}, {"recipient_id": user_id}],
@@ -321,3 +323,14 @@ async def attended_event_ids(db, user_id: str) -> set[str]:
         return set()
     cancelled = set(await db.events.distinct("id", {"id": {"$in": sorted(ids)}, "status": "cancelled"}))
     return ids - cancelled
+
+
+# ---------------- Twitch (#2338) ----------------
+
+async def linked_twitch(db, user_id: str) -> dict | None:
+    """Das per Anmeldung (OAuth) verknüpfte Twitch-Konto: {external_id, login} - oder None. Der Name im Profilfeld
+    allein ist kein Nachweis; Streamer, Sendezeit, Clip-Macher und Verifizierter Streamer zählen nur damit."""
+    link = await db.platform_links.find_one({"user_id": user_id, "platform": "twitch"}, {"_id": 0, "external_id": 1, "handle": 1})
+    if not link:
+        return None
+    return {"external_id": str(link.get("external_id") or ""), "login": str(link.get("handle") or "").strip().lstrip("@").lower()}

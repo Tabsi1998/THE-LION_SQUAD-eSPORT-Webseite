@@ -1411,16 +1411,21 @@ async def _own_tournament_streams(ctx):
     return len([t for t in await ctx.db[ANNOUNCEMENTS].distinct("tournament_id", {"user_id": ctx.user_id}) if t])
 
 
-@counter("clips_synced", "stream")
+@counter("clips_synced", "stream", "profile")
 async def _clips(ctx):
-    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am Twitch-Namen aus dem Profil."""
-    user = await ctx.user()
-    handle = str(user.get("twitch_handle") or user.get("twitch_channel") or "").strip().lstrip("@").lower()
-    if not handle:
+    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am per Anmeldung verknüpften Twitch-Konto
+    (#2338): an der Twitch-Kennung, bei älteren Clips ohne Kennung am Namen. Ein getippter Name zählt nicht."""
+    twitch = await achievement_progress.linked_twitch(ctx.db, ctx.user_id)
+    if not twitch or not (twitch["external_id"] or twitch["login"]):
         return 0
     from services.twitch_clips import STATE_ID
     doc = await ctx.db.settings.find_one({"id": STATE_ID}, {"_id": 0, "clips": 1}) or {}
-    return sum(1 for clip in doc.get("clips") or [] if str(clip.get("creator_name") or "").strip().lstrip("@").lower() == handle)
+
+    def mine(clip: dict) -> bool:
+        if clip.get("creator_id"):
+            return str(clip["creator_id"]) == twitch["external_id"]
+        return bool(twitch["login"]) and str(clip.get("creator_name") or "").strip().lstrip("@").lower() == twitch["login"]
+    return sum(1 for clip in doc.get("clips") or [] if mine(clip))
 
 
 # ------------------------------------------------------------------ Katalog D (#615): Verein, Besonders, Geheim

@@ -139,6 +139,17 @@ async def _evaluate_streamer(user_id: str):
         logger.debug("[twitch] achievement evaluation failed for %s: %s", user_id, exc)
 
 
+async def _counts_for_achievements(db, user_id: str | None, login: str | None) -> bool:
+    """Streamer und Sendezeit (#2338) zählen nur den per Anmeldung verknüpften Twitch-Kanal - ein getippter Name
+    zeigt den Stream weiter auf der Seite, bringt aber keine Sessions und Minuten."""
+    if not user_id or not login:
+        return False
+    from services.achievement_progress import linked_twitch
+
+    twitch = await linked_twitch(db, user_id)
+    return bool(twitch) and twitch["login"] == str(login).strip().lstrip("@").lower()
+
+
 async def _close_offline_streams(db, active_logins: set[str], now_dt: datetime):
     offline = await db.live_streams.find(
         {"twitch_login": {"$nin": list(active_logins)}}, {"_id": 0}
@@ -160,7 +171,7 @@ async def _close_offline_streams(db, active_logins: set[str], now_dt: datetime):
                 }},
                 upsert=False,
             )
-        if duration_minutes and stream.get("user_id"):
+        if duration_minutes and await _counts_for_achievements(db, stream.get("user_id"), stream.get("twitch_login")):
             await db.users.update_one(
                 {"id": stream.get("user_id")},
                 {"$inc": {"twitch_stream_minutes": duration_minutes}},
@@ -260,10 +271,10 @@ async def fetch_live_streams() -> dict:
             upsert=True,
         )
         if new_session:
-            await db.users.update_one(
-                {"id": u["id"]},
-                {"$inc": {"twitch_live_sessions_count": 1}, "$set": {"last_twitch_live_at": now}},
-            )
+            update: dict = {"$set": {"last_twitch_live_at": now}}
+            if await _counts_for_achievements(db, u["id"], login):
+                update["$inc"] = {"twitch_live_sessions_count": 1}
+            await db.users.update_one({"id": u["id"]}, update)
             await _evaluate_streamer(u["id"])
         await db.live_streams.update_one(
             {"user_id": u["id"]},
