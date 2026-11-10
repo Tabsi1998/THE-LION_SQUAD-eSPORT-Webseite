@@ -753,6 +753,11 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("shop_products", "id"),
     ("shop_variants", "id"),
     ("shop_variants", "product_id"),
+    # Erfolge (#2338): Chat-Zähler je Person und Tag, besuchte Events je Person.
+    ("team_chat_messages", [("user_id", 1), ("created_at", 1)]),
+    ("match_chat_messages", [("user_id", 1), ("created_at", 1)]),
+    ("tournament_chat_messages", [("user_id", 1), ("created_at", 1)]),
+    ("event_registrations", "user_id"),
 )
 
 
