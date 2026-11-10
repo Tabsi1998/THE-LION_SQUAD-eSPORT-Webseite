@@ -57,9 +57,9 @@ def _section_kind(match: dict) -> str:
 
 
 def is_bye(match: dict) -> bool:
-    """Ein Freilos: ein Spiel mit höchstens einer Anmeldung - beim Bau oder nach einem Ausfall kampflos entschieden."""
-    if (match.get("result_meta") or {}).get("source") == "auto_bye":
-        return True
+    """Ein Freilos: ein Spiel mit höchstens einer Anmeldung auf seinen Plätzen - beim Bau oder nach Ausschluss bzw.
+    Rückzug kampflos entschieden (``resolve_walkovers``). Erkannt wird es nur an den Plätzen: ``result_meta`` kommt im
+    Snapshot nicht an. Ein gewertetes Nichtantreten mit zwei Anmeldungen ist kein Freilos."""
     slots = match.get("slots") or []
     filled = {slot.get("registration_id") for slot in slots if slot.get("registration_id")}
     # Ohne Plätze (Altbestand, nur Ergebnisse) ist es kein Freilos - dann zählen die Ergebnisse wie bisher.
@@ -140,14 +140,18 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
             "rank_sum": 0,
             "furthest_round": 0,
             "best_rank": None,
+            # Freilos-Spiele (#2336): stehen nicht in ``played``/``won``, zählen aber für die Reihenfolge wie bisher.
+            "byes": 0,
         }
         for registration in registrations
         if registration.get("id")
     }
+    # Siege samt Freilos - nur für die Sortierung, damit sich kein Platz verschiebt (Saisonpunkte, Preise, Pokale).
+    bye_wins: dict[str, int] = {}
     for match in matches:
         if match.get("status") not in TERMINAL_MATCH_STATUSES:
             continue
-        # Ein Freilos ist kein Spiel und kein Sieg (#2336, wie #1796): es bringt nur in die nächste Runde.
+        # Ein Freilos ist kein Spiel und kein Sieg (#2336, wie #1796): angezeigt wird es nicht als Spiel.
         bye = is_bye(match)
         for result in match.get("results") or []:
             registration_id = result.get("registration_id")
@@ -155,18 +159,20 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
                 continue
             rank = _safe_int(result.get("rank"), 999)
             row = rank_map[registration_id]
-            if bye:
-                row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")))
-                continue
-            row["played"] += 1
             row["rank_sum"] += rank
             row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")))
             row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
-            if rank == 1:
-                row["won"] += 1
+            if bye:
+                row["byes"] += 1
+                if rank == 1:
+                    bye_wins[registration_id] = bye_wins.get(registration_id, 0) + 1
             else:
-                # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
-                row["lost"] += 1
+                row["played"] += 1
+                if rank == 1:
+                    row["won"] += 1
+                else:
+                    # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
+                    row["lost"] += 1
             if rank <= 2:
                 row["top2"] += 1
             score = result.get("points")
@@ -176,13 +182,15 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
                 row["points"] += score
     rows = list(rank_map.values())
     for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
+        # Durchschnitt wie vor #2336 samt Freilos - er ist Teil der Reihenfolge.
+        entries = row["played"] + row["byes"]
+        row["avg_rank"] = round(row["rank_sum"] / entries, 2) if entries else None
     rows.sort(
         key=lambda row: (
-            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung.
+            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung - Siege samt Freilos (#2336).
             -places.get(row["registration_id"], 10_000),
             row["furthest_round"],
-            row["won"],
+            row["won"] + bye_wins.get(row["registration_id"], 0),
             row["top2"],
             row["points"],
             -(row["avg_rank"] or 999),
@@ -1082,7 +1090,8 @@ def placements_for_structure(
         registration_id = row.get("registration_id")
         rank = _safe_int(row.get("rank"))
         registration = registration_map.get(registration_id)
-        if not registration_id or not rank or not row.get("played") or not registration:
+        # Wer nur Freilose hatte, hat trotzdem einen Platz (#2336) - ``played`` zählt sie nicht mehr.
+        if not registration_id or not rank or not (row.get("played") or row.get("byes")) or not registration:
             continue
         placements.setdefault(rank, []).append({
             "registration_id": registration_id,
