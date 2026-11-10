@@ -580,6 +580,27 @@ async def test_the_backfill_with_the_real_outcome_of_2337_only_adds_who_played_t
     assert await recount.backfill_finalists() == {"tournaments": 0, "awards": 0}, "ein zweiter Lauf hat nichts mehr zu tun"
 
 
+def test_recounted_tiers_have_a_sparse_index():
+    """Stand „schon still vergeben“ und Sammel-Nachricht lesen nach ``recount_id`` - ein dünner Index, nur nachgerechnete Stufen."""
+    import asyncio
+
+    import database
+    from mongomock_motor import AsyncMongoMockClient
+
+    async def scenario():
+        db = AsyncMongoMockClient()["indizes_2340"]
+        original = database.get_db
+        database.get_db = lambda: db
+        try:
+            await database.init_indexes()
+        finally:
+            database.get_db = original
+        return await db.user_achievements.index_information()
+
+    indexes = asyncio.run(scenario())
+    assert indexes["recount_id_1"]["key"] == [("recount_id", 1)] and indexes["recount_id_1"].get("sparse") is True
+
+
 def test_the_legacy_sources_only_name_keys_of_the_legacy_block():
     from services import achievement_counters
 

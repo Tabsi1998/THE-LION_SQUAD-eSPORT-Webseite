@@ -474,6 +474,8 @@ async def init_indexes():
     await db.achievements.create_index([("group_code", 1), ("level", 1)])
     await db.user_achievements.create_index([("user_id", 1), ("tier_code", 1)], unique=True)
     await db.user_achievements.create_index([("user_id", 1), ("earned_at", -1)])
+    # Neuberechnung (#2340): Stand „schon still vergeben“ und Sammel-Nachricht lesen nur die nachgerechneten Stufen.
+    await db.user_achievements.create_index("recount_id", sparse=True)
     # Phase 8: Mail queue
     await db.mail_jobs.create_index("id", unique=True)
     await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])
