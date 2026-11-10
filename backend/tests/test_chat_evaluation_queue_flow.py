@@ -50,6 +50,35 @@ async def test_a_chat_message_is_evaluated_through_the_queue_not_in_the_request(
 
 
 @pytest.mark.asyncio
+async def test_the_queue_evaluates_chat_light_without_the_old_block(flow, monkeypatch):
+    """Eine Chat-Nachricht kostet wenig (#2338): die Warteschlange rechnet nur die Zähler aus Chat und Community - der alte
+    Block läuft nicht mit - und vergibt trotzdem die neue Stufe."""
+    from datetime import timedelta
+
+    import badges
+    from models import now_utc
+    from services import achievement_progress, achievement_queue
+
+    await badges.seed_badges()
+    me = await flow.add_user(name="leichtgewicht")
+    await flow.db.tournament_chat_messages.insert_one({"id": "tc-1", "tournament_id": "t", "user_id": me["id"], "message": "gl hf",
+                                                       "created_at": now_utc().isoformat()})
+    legacy_runs = []
+    real_legacy = achievement_progress.compute_user_progress
+
+    async def watched(user_id):
+        legacy_runs.append(user_id)
+        return await real_legacy(user_id)
+
+    monkeypatch.setattr(achievement_progress, "compute_user_progress", watched)
+    await achievement_queue.request_chat_evaluation(me["id"])
+    await flow.db.achievement_eval_queue.update_one({"user_id": me["id"]}, {"$set": {"due_at": (now_utc() - timedelta(seconds=1)).isoformat()}})
+    result = await achievement_queue.process_queue()
+    assert result["evaluated"] == 1 and legacy_runs == [], "leicht: ohne den alten Block"
+    assert await flow.db.user_achievements.find_one({"user_id": me["id"], "tier_code": "community_chat_1"}), "Plauderer I"
+
+
+@pytest.mark.asyncio
 async def test_a_released_message_queues_its_author(flow, no_direct_evaluation):
     """Zurückgehalten zählte sie nicht - freigegeben zählt sie, also wird der Absender vorgemerkt."""
     author = await flow.add_user(name="freigabe")

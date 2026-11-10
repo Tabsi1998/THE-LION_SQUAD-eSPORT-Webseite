@@ -211,8 +211,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["best_season_rank_inv"] = 0
     p["best_championship_rank_inv"] = 0
 
-    # Phase E + Discord-Counter: discord_messages comes from manually maintained counter
-    p["discord_messages"] = (user or {}).get("discord_messages_count", 0)
+    # Discord-Stimme und die Chat-Zähler (#2338) rechnet allein die Registry (achievement_counters) - leicht genug für die
+    # Warteschlange; hier stand früher je eine zweite Rechnung.
     # Streamer und Sendezeit (#2338): nur mit per Anmeldung verknüpftem Twitch - ein getippter Name zählt nicht.
     twitch = await linked_twitch(db, user_id)
     p["twitch_live_sessions"] = int((user or {}).get("twitch_live_sessions_count") or 0) if twitch else 0
@@ -221,8 +221,6 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         "status": "accepted",
         "$or": [{"requester_id": user_id}, {"recipient_id": user_id}],
     })
-    # Chat (#2338): die einzige Rechnung der Chat-Zähler - ohne Zurückgehaltenes und Gelöschtes, höchstens 50 am Tag.
-    p.update(await chat_counters(db, user_id))
 
     for k in [
         "checkins_in_a_row", "fast_registrations", "clutch_count",
@@ -234,9 +232,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         "offroad_count", "reverse_lap_count", "slowest_lap_count", "unproven_laps",
         "team_no_show_count", "team_kills", "team_late_count", "team_member_churn",
         "zero_eight_losses", "long_warmup_count", "long_break_count", "loss_streak",
-        "twitch_live_sessions", "twitch_stream_minutes",
-        "friends_count", "direct_messages_sent", "team_chat_messages_sent",
-        "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
+        "twitch_live_sessions", "twitch_stream_minutes", "friends_count",
     ]:
         p.setdefault(k, 0)
 

@@ -42,7 +42,10 @@ async def test_plauderer_has_one_definition_whatever_source_triggers_it(flow):
     community = await counters.refresh(me["id"], {"community"})
     full = await counters.refresh(me["id"])
     assert partial["community_messages_sent"] == community["community_messages_sent"] == full["community_messages_sent"] == 2
-    assert "community_messages_sent" not in counters.REGISTRY, "nur eine Rechnung"
+    # Nur eine Rechnung: seit dem Review in der Registry, nicht mehr im alten Block (#2338).
+    chat_keys = {"community_messages_sent", "direct_messages_sent", "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent"}
+    assert chat_keys <= set(counters.REGISTRY) and not chat_keys & counters.LEGACY_KEYS
+    assert not chat_keys & set(await achievement_progress.compute_user_progress(me["id"]))
     assert (full["direct_messages_sent"], full["team_chat_messages_sent"]) == (3, 2)
 
 

@@ -45,9 +45,9 @@ LEGACY_KEYS = frozenset({
     "match_streak_max", "tournaments_won", "podium_finishes", "rank_4_count", "fastlap_valid_count", "distinct_tracks",
     "pole_count", "membership_days", "events_attended", "season_points_total", "distinct_platforms", "seasons_active",
     "profile_completeness", "achievements_unlocked", "achievement_points", "teams_founded", "team_days_max",
-    "discord_messages", "twitch_live_sessions", "twitch_stream_minutes", "friends_count", "direct_messages_sent",
-    "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
+    "twitch_live_sessions", "twitch_stream_minutes", "friends_count",
 })
+# Discord-Stimme und die Chat-Zähler stehen seit #2338 nur in der Registry (eine Rechnung, leicht auswertbar).
 
 
 @dataclass(frozen=True)
@@ -1398,8 +1398,41 @@ async def _discord_messages(ctx):
     return int((await ctx.user()).get("discord_messages_count") or 0)
 
 
-# Die Chat-Zähler („Plauderer“, Team-, Turnier-, Match-Chat, Direktnachrichten) rechnet allein der alte Block
-# (achievement_progress.chat_counters, #2338) - hier stand früher eine zweite, abweichende Rechnung für „Plauderer“.
+# Chat (#2338): „Plauderer“, Team-, Turnier-, Match-Chat und Direktnachrichten - eine Rechnung
+# (achievement_progress.chat_counters: nichts Zurückgehaltenes oder Gelöschtes, höchstens 50 am Tag), je Auswertung
+# einmal geladen. Die Quellen decken jeden Chat ab; „chat“ und „community“ allein werten leicht aus (Warteschlange).
+CHAT_COUNTER_SOURCES = ("chat", "community", "team", "tournament", "match")
+
+
+async def _chat_value(ctx, key: str) -> int:
+    values = await ctx._memo("chat_counters", lambda: achievement_progress.chat_counters(ctx.db, ctx.user_id))
+    return int(values.get(key) or 0)
+
+
+@counter("community_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _community_messages(ctx):
+    """Plauderer: die offenen Chats - Turnier-Chat und Match-Chat mit einem gemeinsamen Tagesdeckel."""
+    return await _chat_value(ctx, "community_messages_sent")
+
+
+@counter("direct_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _direct_messages(ctx):
+    return await _chat_value(ctx, "direct_messages_sent")
+
+
+@counter("team_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _team_chat_messages(ctx):
+    return await _chat_value(ctx, "team_chat_messages_sent")
+
+
+@counter("match_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _match_chat_messages(ctx):
+    return await _chat_value(ctx, "match_chat_messages_sent")
+
+
+@counter("tournament_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _tournament_chat_messages(ctx):
+    return await _chat_value(ctx, "tournament_chat_messages_sent")
 
 
 @counter("gallery_uploads_approved", "community")

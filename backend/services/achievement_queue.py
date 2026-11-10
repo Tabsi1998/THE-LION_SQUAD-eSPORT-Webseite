@@ -29,8 +29,11 @@ BUNDLE_WINDOW_SECONDS = 60
 BATCH = 100
 SWEEP_ACTIVE_MINUTES = 20
 STATE_ID = "achievement_queue_state"
-# Quellen einer Chat-Nachricht (#2338): die Chat-Zähler selbst rechnet der alte Block bei jeder Auswertung mit.
+# Quellen einer Chat-Nachricht (#2338).
 CHAT_SOURCES = ("chat", "community")
+# Quellen, deren Zähler alle in der Registry stehen (#2338): ein Eintrag nur mit diesen Quellen wertet leicht aus - ohne
+# den alten Block, nur die Stufen dieser Zähler. Viele Chat- und Discord-Nachrichten kosten so wenig.
+LIGHT_SOURCES = frozenset({"chat", "community", "discord", "signal"})
 
 
 # ---------------------------------------------------------------- Auswerten
@@ -91,7 +94,10 @@ async def process_queue(limit: int = BATCH) -> dict:
         await db.achievement_eval_queue.delete_one({"user_id": entry["user_id"]})
         try:
             sources = None if entry.get("full") or not entry.get("sources") else set(entry["sources"])
-            awarded += await evaluate_user_progress(entry["user_id"], sources)
+            if sources and sources <= LIGHT_SOURCES:
+                awarded += await evaluate_user_progress(entry["user_id"], sources, legacy=False)
+            else:
+                awarded += await evaluate_user_progress(entry["user_id"], sources)
         except Exception:  # noqa: BLE001 - eine kaputte Auswertung hält die anderen nicht auf
             logger.warning("[achievements] evaluation failed", exc_info=True)
     if due:
