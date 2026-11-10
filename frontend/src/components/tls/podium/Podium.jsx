@@ -4,7 +4,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { resolveMediaUrl } from "@/lib/api";
 import { motionAllowed } from "@/lib/motion";
 import { initials } from "@/lib/slotSource";
-import { podiumPlaces } from "@/lib/placementMoment";
+import { gamesWonText, podiumPlaces, podiumRoundNote, podiumWins } from "@/lib/placementMoment";
 
 /**
  * Podest (#1339): ein echtes Treppchen - Platz 1 in der Mitte und 24 px höher mit kleiner Krone, links 2, rechts 3; je
@@ -24,6 +24,12 @@ function valueText(row) {
   if (wins != null) return `${wins} ${Number(wins) === 1 ? "Sieg" : "Siege"}`;
   if (row.points != null) return `${row.points} Pkt`;
   return "";
+}
+
+/** Vorgelesen je Name - im Baum (#2336) mit Weg und gewonnenen Spielen: „LunaByte, im Finale, 1 Spiel gewonnen“. */
+function spokenEntry(row) {
+  const name = row.display_name || "Teilnehmer";
+  return row.place_path ? `${name}, ${row.place_path}, ${gamesWonText(podiumWins(row))}` : row.display_name;
 }
 
 function Avatar({ name, src }) {
@@ -62,6 +68,7 @@ function usePlayOnce(ref) {
 
 export function Podium({ rows, registrations = [], className = "" }) {
   const places = useMemo(() => podiumPlaces(rows), [rows]);
+  const note = useMemo(() => podiumRoundNote(places.flatMap((place) => place.rows)), [places]);
   const regMap = useMemo(() => new Map((registrations || []).map((reg) => [reg.id, reg])), [registrations]);
   const ref = useRef(null);
   const play = usePlayOnce(ref);
@@ -79,7 +86,7 @@ export function Podium({ rows, registrations = [], className = "" }) {
             data-metal={place.metal}
             data-testid={`podium-place-${place.rank}`}
             style={{ "--tls-i": RISE_ORDER[place.rank] }}
-            aria-label={`${place.label}: ${place.rows.map((row) => row.display_name).join(", ") || "nicht vergeben"}`}
+            aria-label={`${place.label}: ${place.rows.map(spokenEntry).join(place.rows.some((row) => row.place_path) ? "; " : ", ") || "nicht vergeben"}`}
           >
             <div className="tls-podium__people">
               {place.rank === 1 && (
@@ -95,7 +102,13 @@ export function Podium({ rows, registrations = [], className = "" }) {
                     <Avatar name={row.display_name} src={src} />
                     {/* Nie mitten im Wort brechen: mehrere Wörter dürfen zwei Zeilen nehmen, ein langes Wort endet mit „…“. */}
                     <span className={`tls-podium__name ${/\s/.test((row.display_name || "").trim()) ? "" : "tls-podium__name--word"}`} title={row.display_name || undefined}>{row.display_name || "Teilnehmer"}</span>
-                    {valueText(row) && <span className="tls-podium__value">{valueText(row)}</span>}
+                    {row.place_path ? (
+                      // Im Baum (#2336): wie der Platz zustande kam, die gewonnenen Spiele klein darunter.
+                      <span className="tls-podium__path" data-testid="podium-path">
+                        <span className="tls-podium__value">{row.place_path}</span>
+                        <span className="tls-podium__games">{gamesWonText(podiumWins(row))}</span>
+                      </span>
+                    ) : valueText(row) && <span className="tls-podium__value">{valueText(row)}</span>}
                   </div>
                 );
               }) : <div className="tls-podium__empty">–</div>}
@@ -106,6 +119,7 @@ export function Podium({ rows, registrations = [], className = "" }) {
           </li>
         ))}
       </ol>
+      {note ? <p className="tls-podium__note" data-testid="podium-note">{note}</p> : null}
     </div>
   );
 }
