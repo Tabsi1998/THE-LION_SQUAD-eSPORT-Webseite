@@ -92,15 +92,18 @@ def roster(*squad_ids: str, since: int | None = None) -> dict:
     return {"s1": {"season_id": "s1", "squad_ids": list(squad_ids), "squad_joined_at": joined, "added_at": at(1).isoformat()}}
 
 
-def squad_participation(events: list | None = None, roster: dict | None = None, team_since=None) -> Participation:
+def squad_participation(events: list | None = None, roster: dict | None = None, team_since=None, today: set | None = None,
+                        season_has_roster: bool = False) -> Participation:
     """Ein Co-Team „S“ des Teams „T“ in Season „s1“ mit zwei Spielen ohne Teilnehmerliste: am 10. und am 20. Die Person
-    ist Mitglied des Hauptteams (``team_since``: seit wann, sonst schon immer)."""
+    ist Mitglied des Hauptteams (``team_since``: seit wann, sonst schon immer). ``today``: der heutige Kader von „S“;
+    ``season_has_roster``: die Season führt einen Liga-Kader (andere haben dort Einträge)."""
     timeline = TeamTimeline()
     timeline.joined["T"] = team_since
     squad = {"id": "rt", "tournament_id": "t1", "team_id": "T", "squad_id": "S", "user_id": None, "status": "approved"}
     tournaments = {"t1": {"id": "t1", "status": "live", "format": "league", "league_context": {"league_id": "l", "season_id": "s1"}}}
     matches = [duel("frueh", "rt", "rx", 10), duel("spaet", "rt", "rx", 20)]
-    return Participation("me", {"rt": squad}, tournaments, matches, timeline, {"S": events} if events else None, roster)
+    return Participation("me", {"rt": squad}, tournaments, matches, timeline, {"S": events} if events else None, roster,
+                         {"S": today} if today is not None else None, {"s1"} if season_has_roster else None)
 
 
 def played_ids(found: Participation) -> list[str]:
@@ -116,6 +119,27 @@ def test_co_team_ohne_nachweis_zaehlt_fuer_niemanden():
     other_season = {"s0": {**roster("S", since=1)["s1"], "season_id": "s0"}}
     assert played_ids(squad_participation(roster=other_season)) == [], "stand in einer anderen Season im Kader"
     assert played_ids(squad_participation(roster=roster("S", since=1))) == ["frueh", "spaet"], "mit Nachweis zählt es"
+
+
+def test_season_ohne_liga_kader_gilt_der_heutige_kader():
+    """Führt die Season gar keinen Liga-Kader, gäbe es nie einen Nachweis - dort gilt „ohne Aufstellung alle Mitglieder
+    zum Zeitpunkt des Spiels“: heute im Kader, laut Protokoll nicht erst nach dem Spiel aufgenommen, damals im Hauptteam."""
+    assert played_ids(squad_participation(today={"me", "anna"})) == ["frueh", "spaet"]
+    assert played_ids(squad_participation(today={"anna"})) == [], "nicht im Kader"
+    assert played_ids(squad_participation(today=set())) == []
+    # Laut Protokoll erst am 15. aufgenommen (Kader geändert bzw. Transfer): das frühe Spiel war vor ihrer Zeit.
+    assert played_ids(squad_participation([(at(15), "join")], today={"me"})) == ["spaet"]
+    # Erst am 15. ins Hauptteam gekommen: vorher kann sie nicht im Co-Team gespielt haben.
+    assert played_ids(squad_participation(today={"me"}, team_since=at(15))) == ["spaet"]
+    # Wer laut Protokoll ging, behält das Spiel davor - auch ohne Liga-Kader.
+    assert played_ids(squad_participation([(at(15), "leave")], today={"anna"})) == ["frueh"]
+
+
+def test_season_mit_liga_kader_bleibt_streng():
+    """Sobald die Season einen Liga-Kader führt (irgendjemand hat dort einen Eintrag), ist der heutige Kader kein Nachweis."""
+    assert played_ids(squad_participation(today={"me"}, season_has_roster=True)) == []
+    assert played_ids(squad_participation(today={"me"}, roster=roster("B", since=1))) == [], "eigener Eintrag nennt nur Co-Team B"
+    assert played_ids(squad_participation(today={"me"}, roster=roster("S", since=15))) == ["spaet"], "der Liga-Kader gilt, nicht der heutige"
 
 
 def test_kaderwechsel_im_co_team_wer_gespielt_hat_behaelt_seine_spiele():

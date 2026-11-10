@@ -219,16 +219,59 @@ async def test_wer_nie_im_kader_des_co_teams_stand_bekommt_dessen_spiele_nicht(f
 
 
 @pytest.mark.asyncio
-async def test_co_team_ohne_jeden_nachweis_zaehlt_fuer_niemanden(flow):
-    """Kein Liga-Kader, kein Protokoll, keine Teilnehmerliste: Dann weiß niemand, wer gespielt hat. Das Spiel zählt für
-    niemanden - lieber keiner als alle Mitglieder des Hauptteams."""
-    captain, anna, rival = [await flow.add_user(name=name) for name in ("Captain", "Anna", "Gegnerin")]
-    await play.squad_match(flow, leader=captain, squad_members=[captain, anna], others=[], away=rival)
-    await flow.db.league_rosters.delete_many({})
+async def test_season_mit_liga_kader_heutiger_kader_ohne_eintrag_zaehlt_nicht(flow):
+    """Die Season führt einen Liga-Kader (Captain und Anna stehen darin). Carl steht heute im Kader von A, hat aber keinen
+    Eintrag im Liga-Kader: streng wie bisher - kein Nachweis, kein Spiel."""
+    captain, anna, carl, rival = [await flow.add_user(name=name) for name in ("Captain", "Anna", "Carl", "Gegnerin")]
+    _team, squad, _home_reg, match = await play.squad_match(flow, leader=captain, squad_members=[captain, anna], others=[carl], away=rival)
+    await flow.db.team_squads.update_one({"id": squad["id"]}, {"$addToSet": {"member_ids": carl["id"]}})
+    season_id = (await flow.db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0}))["league_context"]["season_id"]
+    assert await flow.db.league_rosters.count_documents({"season_id": season_id}) == 2
+    assert await flow.db.league_rosters.count_documents({"user_id": carl["id"]}) == 0
+
+    assert (await values(carl))["matches_played"] == 0
+    assert (await values(anna))["matches_played"] == 1
+
+
+async def season_without_roster(flow):
+    """Co-Team A (Captain, Anna) gewinnt ein Spiel ohne Teilnehmerliste in einer Season, die keinen Liga-Kader führt:
+    keine Pflicht-IDs, keine Wartezeit, kein „ein Team je Season“. Bert ist im Hauptteam, nicht im Kader."""
+    captain, anna, bert, rival = [await flow.add_user(name=name) for name in ("Captain", "Anna", "Bert", "Gegnerin")]
+    team, squad, _home_reg, match = await play.squad_match(flow, leader=captain, squad_members=[captain, anna], others=[bert],
+                                                          away=rival, liga_kader=False)
+    assert await flow.db.league_rosters.count_documents({}) == 0, "der Weg schreibt in so einer Season keinen Liga-Kader"
+    return team, squad, match, (captain, anna, bert, rival)
+
+
+@pytest.mark.asyncio
+async def test_season_ohne_liga_kader_heutiges_kadermitglied_bekommt_das_spiel(flow):
+    """Fabians Regel: ohne Aufstellung alle Mitglieder zum Zeitpunkt des Spiels. Ohne Liga-Kader gäbe es sonst nie einen
+    Nachweis, und ein kampflos gewonnenes Spiel zählte für niemanden."""
+    _team, _squad, _match, (captain, anna, bert, rival) = await season_without_roster(flow)
     for person in (captain, anna):
         mine = await values(person)
-        assert (mine["matches_played"], mine["team_match_wins"]) == (0, 0), person["username"]
-    assert (await values(rival))["matches_played"] == 1, "die Gegnerin (Team ohne Co-Team) hat ihr Spiel"
+        assert (mine["matches_played"], mine["matches_won"], mine["team_match_wins"]) == (1, 1, 1), person["username"]
+    assert (await values(bert))["matches_played"] == 0, "im Hauptteam, aber nicht im Kader des Co-Teams"
+    assert (await values(rival))["matches_played"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("how", ["kader-geaendert", "transfer"])
+async def test_season_ohne_liga_kader_erst_nach_dem_spiel_aufgenommen_bekommt_es_nicht(flow, how):
+    """Bert kommt nach dem Spiel in den Kader - das steht im Protokoll, so wie die Routen es schreiben. Heute steht er im
+    Kader, das Spiel war aber vor seiner Zeit."""
+    team, squad, match, (captain, anna, bert, _rival) = await season_without_roster(flow)
+    await play.backdate(flow, match, minutes=120)
+    later = (now_utc() - timedelta(minutes=60)).isoformat()
+    await flow.db.team_squads.update_one({"id": squad["id"]}, {"$addToSet": {"member_ids": bert["id"]}})
+    event = ({"action": "league.squad.roster", "target_id": team["id"], "actor_id": captain["id"],
+              "data": {"squad_id": squad["id"], "added": [bert["id"]], "removed": []}} if how == "kader-geaendert" else
+             {"action": "league.transfer.approve", "target_id": "s1", "actor_id": "liga-leitung",
+              "data": {"transfer_id": new_id(), "user_id": bert["id"], "from_squad_id": "anderes-co-team", "to_squad_id": squad["id"]}})
+    await flow.db.audit_logs.insert_one({"id": new_id(), **event, "created_at": later})
+
+    assert (await values(bert))["matches_played"] == 0
+    assert (await values(anna))["matches_played"] == 1
 
 
 # ---------------------------------------------------------------- GG-Lob (K4)

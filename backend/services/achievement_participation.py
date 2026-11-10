@@ -9,8 +9,10 @@ hat, und in einer Liga-Staffel (Anmeldung ohne Person) für niemanden. Jetzt gil
 - Co-Team ohne beides: wer zum Zeitpunkt des Spiels nachweislich in seinem Kader stand - laut Liga-Kader der Season
   (``league_rosters``: ``squad_ids``, ``squad_joined_at``) und dem Protokoll der Kaderwechsel (``league.squad.roster``,
   ``league.transfer.approve``). Ein Transfer nimmt niemandem seine Spiele, und wer neu dazukommt, bekommt keine alten.
-  Der heutige Kader (``team_squads``) ist kein Nachweis, die Mitgliedschaft im Hauptteam auch nicht: Fehlt jeder
-  Nachweis, zählt das Spiel für niemanden.
+  Führt die Season einen Liga-Kader, ist der heutige Kader (``team_squads``) kein Nachweis, die Mitgliedschaft im
+  Hauptteam nie: Fehlt jeder Nachweis, zählt das Spiel für niemanden. Nur in Seasons ganz ohne Liga-Kader (keine
+  Pflicht-IDs, keine Wartezeit, kein „ein Team je Season“, Bestand vor #2108) gilt der heutige Kader - für alle, die laut
+  Protokoll nicht erst nach dem Spiel aufgenommen wurden und damals schon im Hauptteam waren.
 - Team ohne Co-Team und ohne beides: alle, die zum Zeitpunkt des Spiels im Team waren - aus dem heutigen Stand (``teams``, ``team_members``) und dem
   Protokoll (``team.join`` / ``team.leave`` / ``team.kick``), für aufgelöste Teams aus ``dissolved_teams``. Wer das Team
   später verlässt, behält so, was er mit ihm gespielt hat.
@@ -179,7 +181,8 @@ class Participation:
 
     def __init__(self, user_id: str, registrations: dict[str, dict], tournaments: dict[str, dict], matches: list[dict],
                  timeline: TeamTimeline, squad_events: dict[str, list[tuple[datetime, str]]] | None = None,
-                 rosters: dict[str, dict] | None = None):
+                 rosters: dict[str, dict] | None = None, squads: dict[str, set[str]] | None = None,
+                 roster_seasons: set[str] | None = None):
         self.user_id = user_id
         self.registrations = registrations
         self.tournaments = tournaments
@@ -188,6 +191,10 @@ class Participation:
         # Co-Teams: die Kaderwechsel der Person aus dem Protokoll (Co-Team → Ereignisse) und ihr Liga-Kader je Season.
         self.squad_events = squad_events or {}
         self.rosters = rosters or {}
+        # Der heutige Kader der Co-Teams - Nachweis nur in Seasons, die gar keinen Liga-Kader führen (``roster_seasons``:
+        # die Seasons mit Einträgen in ``league_rosters``, von wem auch immer).
+        self.squads = squads or {}
+        self.roster_seasons = set(roster_seasons or ()) | set(self.rosters)
         self.rows: list[Played] = [row for row in (self._row(match) for match in matches) if row]
         self.played: list[Played] = [row for row in self.rows if not row.no_show]
         self._placements: dict[str, Placement] | None = None
@@ -217,11 +224,19 @@ class Participation:
         """Stand die Person zum Zeitpunkt des Spiels nachweislich im Kader des Co-Teams?
 
         Nachweise: der Liga-Kader der Season dieser Staffel (``league_rosters``: das Co-Team steht in ``squad_ids``, seit
-        ``squad_joined_at``) und die Kaderwechsel aus dem Protokoll. Der heutige Kader zählt nicht - er sagt nichts über
-        damals (später aufgenommen, inzwischen geleert, Co-Team gelöscht). Ohne Nachweis hat die Person nicht gespielt."""
+        ``squad_joined_at``) und die Kaderwechsel aus dem Protokoll. Der heutige Kader zählt dann nicht - er sagt nichts
+        über damals (später aufgenommen, inzwischen geleert, Co-Team gelöscht). Ohne Nachweis hat die Person nicht gespielt.
+
+        Führt die Season gar keinen Liga-Kader, gäbe es so nie einen Nachweis. Dort gilt die Regel „ohne Aufstellung alle
+        Mitglieder zum Zeitpunkt des Spiels“ mit dem, was da ist: heute im Kader, laut Protokoll nicht erst nach dem Spiel
+        aufgenommen und damals schon im Hauptteam."""
         squad_id = registration["squad_id"]
         events = list(self.squad_events.get(squad_id) or [])
         context = (self.tournaments.get(registration.get("tournament_id")) or {}).get("league_context") or {}
+        if (context.get("season_id") or "") not in self.roster_seasons and self.user_id in self.squads.get(squad_id, ()):
+            team_id = registration["team_id"]
+            in_team = self.timeline.member_at(team_id, when) or not self.timeline.knows(team_id)
+            return in_team and (in_squad_at(events, when) if events else True)
         entry = self.rosters.get(context.get("season_id") or "")
         if entry and squad_id in (entry.get("squad_ids") or []):
             since = parse_time((entry.get("squad_joined_at") or {}).get(squad_id)) or parse_time(entry.get("added_at"))
@@ -503,5 +518,16 @@ async def _load(db, user_id: str) -> Participation:
              "$or": [{"slots.registration_id": {"$in": ids}}, {"results.registration_id": {"$in": ids}}]},
             MATCH_FIELDS,
         ).to_list(10000)
+    # Co-Teams: der heutige Kader und welche Seasons überhaupt einen Liga-Kader führen (siehe ``_in_squad``).
+    squad_regs = [row for row in registrations.values() if row.get("team_id") and row.get("squad_id")]
+    squads, roster_seasons = {}, set()
+    if squad_regs:
+        squad_ids = sorted({row["squad_id"] for row in squad_regs})
+        squads = {row["id"]: {member for member in row.get("member_ids") or [] if member}
+                  async for row in db.team_squads.find({"id": {"$in": squad_ids}}, {"_id": 0, "id": 1, "member_ids": 1})}
+        season_ids = sorted({((tournaments.get(row.get("tournament_id")) or {}).get("league_context") or {}).get("season_id") or ""
+                             for row in squad_regs} - {""})
+        if season_ids:
+            roster_seasons = set(await db.league_rosters.distinct("season_id", {"season_id": {"$in": season_ids}}))
     return Participation(user_id, registrations, tournaments, matches, timeline, await _squad_events(db, user_id),
-                         await _rosters(db, user_id))
+                         await _rosters(db, user_id), squads, roster_seasons)

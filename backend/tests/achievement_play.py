@@ -180,10 +180,12 @@ async def record_squad_members(flow, staffel: dict, squad_id: str, people: list[
 
 
 async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: list[dict], away: dict,
-                      status: str = "live") -> tuple[dict, dict, dict, dict]:
+                      status: str = "live", liga_kader: bool = True) -> tuple[dict, dict, dict, dict]:
     """Eine Liga-Staffel, in der ein Co-Team spielt - das Spiel (Heim gewinnt) trägt keine Teilnehmerliste, wie nach
     einer kampflosen Wertung. ``others`` sind im Hauptteam, aber nicht im Kader des Co-Teams. Die Season kennt „ein Team
     je Season“ - damit führt sie den Liga-Kader auch ohne Pflicht-ID des Spiels. Zugeteilt wurde zum Jahresbeginn.
+    ``liga_kader=False``: eine Season ohne Pflicht-IDs, Wartezeit und „ein Team je Season“ - dort schreibt derselbe Weg
+    keinen Liga-Kader (``league_rosters`` bleibt leer).
     Zurück: Hauptteam, Co-Team, Heim-Anmeldung, Spiel; die Staffel steht in ``match["tournament_id"]``."""
     from flow_harness import new_id
     from models import now_utc
@@ -195,7 +197,7 @@ async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: 
     guests = await add_team(flow, "Gast", away, [])
     season_id = new_id()
     await flow.db.league_seasons.insert_one({"id": season_id, "league_id": "l1", "name": "Season 1", "status": "active",
-                                              "one_team_per_season": True})
+                                              "one_team_per_season": liga_kader})
     staffel = await flow.create_tournament(format="league", status=status, team_mode="team",
                                            league_context={"league_id": "l1", "season_id": season_id, "staffel": "A"})
     home_reg = await register_team(flow, staffel, team, by=None, squad_id=squad["id"])
