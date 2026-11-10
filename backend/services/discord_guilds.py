@@ -409,42 +409,72 @@ async def _remember(db, user_id: str, guild_id: str, discord_id: str, member: bo
         {"$set": {"member": bool(member), "discord_id": str(discord_id), "checked_at": current.isoformat()}}, upsert=True)
 
 
-async def sync_memberships(db, user_id: str, *, now=None) -> dict:
-    """Abgleich für „Überall dabei“ (#2338): beim Verknüpfen und nachts fragt der Bot für alle eingeschalteten Server,
-    ob das verknüpfte Konto dort ist. Ohne Verknüpfung fällt der gemerkte Stand weg; Einträge eines früher verknüpften
-    anderen Kontos auch. Bot offline (unbekannt): nichts geändert. Ändert sich etwas, wird ausgewertet."""
+async def usable_guild_ids(db) -> list[str]:
+    """Die eingeschalteten, nicht verlassenen Server - für den Abgleich einmal je Lauf geladen."""
+    return [row["guild_id"] for row in await list_guilds(db) if _usable(row)]
+
+
+async def sync_memberships(db, user_id: str, *, now=None, guild_ids: list[str] | None = None) -> dict:
+    """Abgleich für „Überall dabei“ (#2338): der Bot fragt für alle eingeschalteten Server, ob das verknüpfte Konto dort
+    ist (``guild_ids``: die Server-Liste, sonst frisch geladen). Ohne Verknüpfung fällt der gemerkte Stand weg; Einträge
+    eines früher verknüpften anderen Kontos auch. Weiß der Bot es nicht (offline, Discord antwortet nicht: None), bleibt
+    der gemerkte Stand stehen - gelöscht wird dann nichts. Ausgewertet wird nur, wenn sich ein Stand geändert hat oder
+    etwas weggefallen ist."""
     from services.discord_runtime import bot
     from services.discord_dm_basics import discord_link_id
 
     discord_id = await discord_link_id(db, user_id)
     if not discord_id:
         removed = (await db.discord_memberships.delete_many({"user_id": user_id})).deleted_count
-        return {"linked": False, "checked": 0, "removed": removed}
+        return {"linked": False, "checked": 0, "changed": 0, "removed": removed}
     removed = (await db.discord_memberships.delete_many({"user_id": user_id, "discord_id": {"$exists": True, "$ne": str(discord_id)}})).deleted_count
-    guild_ids = [row["guild_id"] for row in await list_guilds(db) if _usable(row)]
+    if guild_ids is None:
+        guild_ids = await usable_guild_ids(db)
+    before = {row["guild_id"]: bool(row.get("member")) for row in await db.discord_memberships.find(
+        {"user_id": user_id, "guild_id": {"$in": list(guild_ids)}}, {"_id": 0, "guild_id": 1, "member": 1}).to_list(500)}
     current = now or now_utc()
-    checked = 0
+    checked = changed = 0
     statuses = await bot.member_status(guild_ids, discord_id) if guild_ids else {}
     for guild_id, member in statuses.items():
         if member is None:
             continue
-        await _remember(db, user_id, guild_id, discord_id, member, current)
         checked += 1
-    if checked or removed:
+        if before.get(str(guild_id)) != bool(member):  # neu gesehen zählt als Änderung
+            changed += 1
+        await _remember(db, user_id, guild_id, discord_id, member, current)
+    if changed or removed:
         from services.achievement_queue import request_evaluation
 
         await request_evaluation([user_id], "discord_sync", sources={"discord"})
-    return {"linked": True, "checked": checked, "removed": removed}
+    return {"linked": True, "checked": checked, "changed": changed, "removed": removed}
 
 
-async def sync_all_memberships(db) -> dict:
-    """Nachts für alle mit verknüpftem Discord (#2338) - und die Einträge von Konten ohne Verknüpfung weg."""
-    linked = {row["user_id"] async for row in db.platform_links.find({"platform": "discord"}, {"_id": 0, "user_id": 1}) if row.get("user_id")}
-    orphaned = (await db.discord_memberships.delete_many({"user_id": {"$nin": sorted(linked)}})).deleted_count
-    checked = 0
-    for user_id in sorted(linked):
-        checked += (await sync_memberships(db, user_id))["checked"]
-    return {"users": len(linked), "checked": checked, "orphaned": orphaned}
+SYNC_BATCH = 25
+SYNC_PAUSE_SECONDS = 0.5
+
+
+async def sync_all_memberships(db, *, batch: int = SYNC_BATCH, pause: float = SYNC_PAUSE_SECONDS) -> dict:
+    """Nachts für alle mit verknüpftem Discord (#2338): die Server-Liste einmal laden, dann je Person abgleichen - in
+    Gruppen mit kurzer Pause, damit der Bot Discord nicht überrennt. Vorgemerkt wird nur, wessen Stand sich geändert hat.
+    Zum Schluss fallen Einträge von Konten ohne Verknüpfung weg - nur solche, die älter sind als der Start des Laufs;
+    wer währenddessen verknüpft, behält, was der Abgleich beim Verknüpfen gerade geschrieben hat."""
+    import asyncio
+
+    started = now_utc().isoformat()
+    guild_ids = await usable_guild_ids(db)
+    linked = sorted({row["user_id"] async for row in db.platform_links.find({"platform": "discord"}, {"_id": 0, "user_id": 1}) if row.get("user_id")})
+    checked = changed = 0
+    for index, user_id in enumerate(linked, start=1):
+        result = await sync_memberships(db, user_id, guild_ids=guild_ids)
+        checked += result["checked"]
+        changed += result["changed"]
+        if batch and index % batch == 0 and index < len(linked):
+            await asyncio.sleep(pause)
+    orphaned = (await db.discord_memberships.delete_many({
+        "user_id": {"$nin": linked},
+        "$or": [{"checked_at": {"$lt": started}}, {"checked_at": {"$exists": False}}],
+    })).deleted_count
+    return {"users": len(linked), "checked": checked, "changed": changed, "orphaned": orphaned}
 
 
 async def member_servers(db, user: dict, *, now=None) -> dict:

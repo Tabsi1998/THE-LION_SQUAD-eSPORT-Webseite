@@ -141,7 +141,8 @@ async def _safe_achievements_reconcile():
 
 
 async def _safe_discord_memberships():
-    """Überall dabei (#2338): nachts für alle mit verknüpftem Discord abgleichen, auf welchen Servern sie sind."""
+    """Überall dabei (#2338): nachts für alle mit verknüpftem Discord abgleichen, auf welchen Servern sie sind - in
+    Gruppen mit Pause; ausgewertet wird nur, wessen Stand sich geändert hat."""
     try:
         from database import get_db
         from services.discord_guilds import sync_all_memberships

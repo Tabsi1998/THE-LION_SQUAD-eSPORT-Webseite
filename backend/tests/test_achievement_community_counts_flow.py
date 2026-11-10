@@ -562,11 +562,47 @@ async def test_nightly_sync_covers_everyone_linked_and_drops_orphans(flow, bot):
         {"id": "l-a", "user_id": anna["id"], "platform": "discord", "external_id": "201"},
         {"id": "l-b", "user_id": bert["id"], "platform": "discord", "external_id": "202"},
     ])
-    await db.discord_memberships.insert_one({"user_id": "ohne-konto", "guild_id": MAIN, "member": True})
+    await db.discord_memberships.insert_one({"user_id": "ohne-konto", "guild_id": MAIN, "member": True, "checked_at": "2026-01-01T00:00:00+00:00"})
+    # Wettlauf: ein Eintrag, der während des Laufs entsteht (jünger als der Start), bleibt stehen.
+    await db.discord_memberships.insert_one({"user_id": "verknuepft-gerade", "guild_id": MAIN, "member": True, "checked_at": "2999-01-01T00:00:00+00:00"})
     bot.members |= {(MAIN, "201"), (SUB, "202")}
-    result = await discord_guilds.sync_all_memberships(db)
-    assert result == {"users": 2, "checked": 4, "orphaned": 1}
+    result = await discord_guilds.sync_all_memberships(db, batch=1, pause=0)
+    assert result == {"users": 2, "checked": 4, "changed": 4, "orphaned": 1}
     assert await stage(anna["id"]) == (1, 1) and await stage(bert["id"]) == (1, 1)
+    assert await db.discord_memberships.count_documents({"user_id": "verknuepft-gerade"}) == 1
+    assert await db.achievement_eval_queue.count_documents({}) == 2
+
+    # Zweiter Lauf ohne Änderung: niemand wird vorgemerkt.
+    await db.achievement_eval_queue.delete_many({})
+    again = await discord_guilds.sync_all_memberships(db, pause=0)
+    assert (again["checked"], again["changed"]) == (4, 0)
+    assert await db.achievement_eval_queue.count_documents({}) == 0
+    # Bert tritt dem Hauptserver bei: nur er wird vorgemerkt.
+    bot.members.add((MAIN, "202"))
+    third = await discord_guilds.sync_all_memberships(db, pause=0)
+    assert third["changed"] == 1
+    assert [row["user_id"] async for row in db.achievement_eval_queue.find({}, {"_id": 0, "user_id": 1})] == [bert["id"]]
+
+
+@pytest.mark.asyncio
+async def test_nightly_sync_with_an_api_failure_deletes_nothing(flow, bot):
+    """Antwortet Discord nicht (None), bleibt jeder gemerkte Stand stehen - und niemand wird vorgemerkt."""
+    from services import discord_guilds
+
+    db = flow.db
+    await discord_world(db)
+    anna = await flow.add_user(name="anna-offline")
+    await db.platform_links.insert_one({"id": "l-ao", "user_id": anna["id"], "platform": "discord", "external_id": "501"})
+    await db.discord_memberships.insert_many([
+        {"user_id": anna["id"], "guild_id": MAIN, "member": True, "discord_id": "501", "checked_at": "2026-01-01T00:00:00+00:00"},
+        {"user_id": anna["id"], "guild_id": SUB, "member": True, "discord_id": "501", "checked_at": "2026-01-01T00:00:00+00:00"},
+    ])
+    bot.online = False
+    result = await discord_guilds.sync_all_memberships(db, pause=0)
+    assert (result["checked"], result["changed"], result["orphaned"]) == (0, 0, 0)
+    assert await db.discord_memberships.count_documents({"user_id": anna["id"]}) == 2
+    assert await stage(anna["id"]) == (2, 3)
+    assert await db.achievement_eval_queue.count_documents({}) == 0
 
 
 @pytest.mark.asyncio
