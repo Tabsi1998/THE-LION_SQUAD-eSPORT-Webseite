@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from services.match_winner import won_by
+from services.match_winner import is_real_match, no_show_ids, participant_ids, won_by
 from services.round_labels import TABLE_FORMATS, section_kind
 from services.scoring_rules import maps_mode, rank_with_ties
 
@@ -1004,23 +1004,14 @@ def placement_rows_for_structure(snapshot: dict, registrations: list[dict], *, t
 
 
 def registration_badge_match_progress(matches: list[dict], registration_ids: set[str]) -> dict:
-    """Return completed-match badge counters over canonical match shapes."""
+    """Return badge counters (played, won, longest win streak) over canonical match shapes.
 
-    relevant = []
-    for match in matches:
-        if match.get("status") != "completed":
-            continue
-        participants = {
-            slot.get("registration_id")
-            for slot in match.get("slots") or []
-            if slot.get("registration_id")
-        } | {
-            result.get("registration_id")
-            for result in match.get("results") or []
-            if result.get("registration_id")
-        }
-        if participants.intersection(registration_ids):
-            relevant.append(match)
+    Was als Spiel zählt, steht in ``services.match_winner`` (#2337): ein Freilos nie, ein kampflos gewertetes Spiel
+    (``forfeit``) für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt kein Spiel gezählt - die Serie
+    reißt trotzdem."""
+
+    own = {str(registration_id) for registration_id in registration_ids or () if registration_id}
+    relevant = [match for match in matches if is_real_match(match) and participant_ids(match) & own]
     relevant.sort(key=lambda match: (
         # Nach Abschluss, nicht nach der letzten Änderung: eine spätere Ergebniskorrektur verschiebt die Serie nicht.
         str(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at") or ""),
@@ -1030,20 +1021,23 @@ def registration_badge_match_progress(matches: list[dict], registration_ids: set
         str(match.get("id") or ""),
     ))
 
+    played = 0
     won = 0
     streak = 0
     streak_max = 0
     for match in relevant:
-        # Dieselbe Regel wie alle Sieg-Erfolge (#1796): ein Unentschieden (zwei Mal Platz 1) und ein Freilos sind
-        # kein Sieg - der Turnierbaum schreibt beides als „winner“.
-        if won_by(match, registration_ids):
+        showed_up = not (no_show_ids(match) & own)
+        played += int(showed_up)
+        # Dieselbe Regel wie alle Sieg-Erfolge (#1796): ein Unentschieden (zwei Mal Platz 1) ist kein Sieg - der
+        # Turnierbaum schreibt es als „winner“.
+        if showed_up and won_by(match, own):
             won += 1
             streak += 1
             streak_max = max(streak_max, streak)
         else:
             streak = 0
     return {
-        "matches_played": len(relevant),
+        "matches_played": played,
         "matches_won": won,
         "match_streak_max": streak_max,
     }
