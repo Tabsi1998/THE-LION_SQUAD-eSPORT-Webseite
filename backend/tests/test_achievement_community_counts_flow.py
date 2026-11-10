@@ -38,15 +38,27 @@ async def test_plauderer_has_one_definition_whatever_source_triggers_it(flow):
     await db.tournament_chat_messages.insert_one({"id": "tc", "tournament_id": "t", "user_id": me["id"], "message": "hi", "created_at": stamp("2026-09-01", 10)})
     await db.match_chat_messages.insert_one({"id": "mc", "match_id": "m", "user_id": me["id"], "message": "gg", "created_at": stamp("2026-09-01", 11)})
 
+    # Jeder Auslöser liefert dieselbe Zahl: der volle Lauf, Chat und Community rechnen sie; eine fremde Quelle (Team)
+    # rechnet sie nicht und lässt den gespeicherten Stand unverändert stehen.
+    full = await counters.refresh(me["id"])
     partial = await counters.refresh(me["id"], {"team"})
     community = await counters.refresh(me["id"], {"community"})
-    full = await counters.refresh(me["id"])
-    assert partial["community_messages_sent"] == community["community_messages_sent"] == full["community_messages_sent"] == 2
-    # Nur eine Rechnung: seit dem Review in der Registry, nicht mehr im alten Block (#2338).
+    chat = await counters.refresh(me["id"], {"chat"})
+    assert full["community_messages_sent"] == partial["community_messages_sent"] == community["community_messages_sent"] == chat["community_messages_sent"] == 2
+    # Nur eine Rechnung: in der Registry, nicht im alten Block (#2338) - und nur Chat und Community lösen sie aus.
     chat_keys = {"community_messages_sent", "direct_messages_sent", "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent"}
     assert chat_keys <= set(counters.REGISTRY) and not chat_keys & counters.LEGACY_KEYS
     assert not chat_keys & set(await achievement_progress.compute_user_progress(me["id"]))
+    assert all(counters.REGISTRY[key].sources == frozenset({"chat", "community"}) for key in chat_keys)
     assert (full["direct_messages_sent"], full["team_chat_messages_sent"]) == (3, 2)
+
+    # Eine neue Nachricht: eine fremde Quelle lässt den gespeicherten Wert stehen, Chat rechnet ihn neu.
+    await db.tournament_chat_messages.insert_one({"id": "tc2", "tournament_id": "t", "user_id": me["id"], "message": "gg", "created_at": stamp("2026-09-02", 10)})
+    assert (await counters.refresh(me["id"], {"team"}))["community_messages_sent"] == 2
+    stored = await db[counters.STATS].find_one({"user_id": me["id"]}, {"_id": 0, "values": 1})
+    assert stored["values"]["community_messages_sent"] == 2
+    assert (await counters.refresh(me["id"], {"chat"}))["community_messages_sent"] == 3
+    assert (await counters.refresh(me["id"]))["community_messages_sent"] == 3
 
 
 @pytest.mark.asyncio

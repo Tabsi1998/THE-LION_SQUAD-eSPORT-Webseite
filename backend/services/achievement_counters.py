@@ -1400,8 +1400,9 @@ async def _discord_messages(ctx):
 
 # Chat (#2338): „Plauderer“, Team-, Turnier-, Match-Chat und Direktnachrichten - eine Rechnung
 # (achievement_progress.chat_counters: nichts Zurückgehaltenes oder Gelöschtes, höchstens 50 am Tag), je Auswertung
-# einmal geladen. Die Quellen decken jeden Chat ab; „chat“ und „community“ allein werten leicht aus (Warteschlange).
-CHAT_COUNTER_SOURCES = ("chat", "community", "team", "tournament", "match")
+# einmal geladen. Neu gerechnet nach einer Chat-Nachricht (Quellen chat, community - leicht, über die Warteschlange) und
+# in jedem vollen Lauf; andere Quellen lassen den gespeicherten Stand stehen.
+CHAT_COUNTER_SOURCES = ("chat", "community")
 
 
 async def _chat_value(ctx, key: str) -> int:
