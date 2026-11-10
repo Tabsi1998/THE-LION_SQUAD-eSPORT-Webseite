@@ -1061,21 +1061,28 @@ def registration_badge_match_progress(matches: list[dict], registration_ids: set
     reißt trotzdem."""
 
     own = {str(registration_id) for registration_id in registration_ids or () if registration_id}
-    relevant = [match for match in matches if is_real_match(match) and participant_ids(match) & own]
-    relevant.sort(key=lambda match: (
+    return badge_match_progress((match, own) for match in matches)
+
+
+def badge_match_progress(pairs) -> dict:
+    """Dieselbe Rechnung über Paare (Spiel, eigene Anmeldungen in diesem Spiel) - für Erfolge, bei denen je Spiel
+    feststeht, für welche Anmeldung die Person angetreten ist (Team und Liga, ``services.achievement_participation``)."""
+
+    relevant = [(match, set(own)) for match, own in pairs if is_real_match(match) and participant_ids(match) & set(own)]
+    relevant.sort(key=lambda pair: (
         # Nach Abschluss, nicht nach der letzten Änderung: eine spätere Ergebniskorrektur verschiebt die Serie nicht.
-        str(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at") or ""),
-        _safe_int(match.get("stage_number")),
-        _safe_int(match.get("round")),
-        _safe_int(match.get("order")),
-        str(match.get("id") or ""),
+        str(pair[0].get("completed_at") or pair[0].get("updated_at") or pair[0].get("scheduled_at") or ""),
+        _safe_int(pair[0].get("stage_number")),
+        _safe_int(pair[0].get("round")),
+        _safe_int(pair[0].get("order")),
+        str(pair[0].get("id") or ""),
     ))
 
     played = 0
     won = 0
     streak = 0
     streak_max = 0
-    for match in relevant:
+    for match, own in relevant:
         showed_up = not (no_show_ids(match) & own)
         played += int(showed_up)
         # Dieselbe Regel wie alle Sieg-Erfolge (#1796): ein Unentschieden (zwei Mal Platz 1) ist kein Sieg - der

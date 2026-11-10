@@ -9,11 +9,9 @@ from datetime import datetime, timezone
 from database import get_db
 from services.private_fields import private_projection
 from services.league_scope import league_tournament_ids
-from services.competition_read import load_competition_read_model, load_registration_matches
-from services.competition_standings import (
-    registration_badge_match_progress,
-    registration_tournament_achievement_progress,
-)
+from services.achievement_participation import load_participation
+from services.competition_read import load_competition_read_model
+from services.competition_standings import registration_tournament_achievement_progress
 
 
 # ---------- Profile-Completeness (Phase C) ----------
@@ -60,7 +58,6 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
 
     regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1, "id": 1}).to_list(2000)
     # Spiele zählen aus allen Anmeldungen; Turnierzähler, Plätze und Pokale ohne Liga-Staffeln (docs/LIGA.md, 7).
-    reg_ids = {r["id"] for r in regs}
     league = await league_tournament_ids(db, [r.get("tournament_id") for r in regs])
     regs = [r for r in regs if r.get("tournament_id") not in league]
     p["tournaments_registered"] = len(regs)
@@ -70,8 +67,9 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     formats = await db.tournaments.distinct("format", {"id": {"$in": tids}}) if tids else []
     p["distinct_formats"] = len([f for f in formats if f])
 
-    canonical_matches = await load_registration_matches(db, reg_ids)
-    p.update(registration_badge_match_progress(canonical_matches, reg_ids))
+    # Spiele zählen für die, die gespielt haben (#2337) - auch im Team und in der Liga, nie ein Freilos.
+    participation = await load_participation(db, user_id)
+    p.update(participation.match_progress())
 
     placement_progress = {
         "tournaments_won": 0,
