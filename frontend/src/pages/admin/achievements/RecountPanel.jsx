@@ -22,8 +22,8 @@ function plural(count, one, many) {
 export function finishLabel(finish = {}) {
   if (finish.done) return `Abgeschlossen am ${formatWhen(finish.finished_at)} · ${plural(finish.notified || 0, "Sammel-Nachricht", "Sammel-Nachrichten")}`;
   if (finish.running) {
-    // Vor der Auswertung trägt der Abschluss die Pokale nach (wie „Pokale nachtragen“) - dann gibt es noch keinen Schritt.
-    if (!finish.phase) return "Läuft: Pokale werden nachgetragen";
+    // Vor der Auswertung ergänzt der Abschluss an alten Pokalen, wer im Finale stand - dann gibt es noch keinen Schritt.
+    if (!finish.phase) return "Läuft: Finalisten an alten Pokalen werden ergänzt";
     if (finish.phase === "notify") return `Läuft: Sammel-Nachrichten – ${finish.notified || 0} verschickt`;
     return `Läuft: ${finish.evaluated || 0} von ${finish.users_total || 0} Konten ausgewertet`;
   }

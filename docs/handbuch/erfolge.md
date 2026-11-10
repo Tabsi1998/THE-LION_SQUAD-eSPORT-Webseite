@@ -349,9 +349,9 @@ Zwei-Faktor-Anmeldung):
 2. **Probelauf** klicken. Er rechnet für alle Konten aus, welche Stufen noch dazukämen, und vergibt dabei nichts. Nach ein paar
    Minuten steht da „… Personen bekämen … Stufen neu dazu“ und eine Tabelle mit **Stufe**, **Gruppe** und **Personen**. Stufen wie
    **Sammler**, die erst durch andere Erfolge entstehen, zählt der Probelauf nicht mit – es werden eher mehr.
-3. **Neuberechnung abschließen** klicken und die Rückfrage mit **Abschließen** bestätigen. Der Lauf trägt zuerst still die Pokale
-   aller Turniere nach (wie **Pokale nachtragen**, damit auch alte Turniere die Finalisten kennen), wertet dann alle Konten still aus,
-   beendet den stillen Modus und schickt danach jeder Person mit nachgerechneten Erfolgen **eine** Nachricht: „Wir haben die Erfolge
+3. **Neuberechnung abschließen** klicken und die Rückfrage mit **Abschließen** bestätigen. Der Lauf ergänzt zuerst an alten Pokalen
+   nur, wer im Finale stand – Platz, Saison und alles andere daran bleibt, wie es ist, gelöscht wird nichts (anders als
+   **Pokale nachtragen**). Dann wertet er alle Konten still aus, beendet den stillen Modus und schickt danach jeder Person mit nachgerechneten Erfolgen **eine** Nachricht: „Wir haben die Erfolge
    neu berechnet – du hast X neue.“ Sie kommt ins Postfach und als Push, nicht über Discord, und führt zu den eigenen Erfolgen.
 4. Die Tafel zeigt den Fortschritt. Am Ende steht „Abgeschlossen am … · N Sammel-Nachrichten“ und „Stiller Modus: Aus“. Ab jetzt
    wird jeder Erfolg wieder einzeln gemeldet.

@@ -11,9 +11,10 @@ Discord je Paket. Solange der stille Modus an ist (``settings`` ``achievements_r
   Zähler zu seiner Quelle gehört (``announce``). Was es nebenbei an Altansprüchen freischaltet, geht still.
 
 Der **Probelauf** rechnet für alle aus, was neu dazukäme, und schreibt nichts außer seinem Ergebnis. Der **Abschluss**
-trägt zuerst die Pokale nach (wie „Pokale nachtragen“), wertet alle still aus, beendet den stillen Modus und schickt je
-Person EINE Sammel-Nachricht (Postfach, Push, kein Discord). Beide laufen in Stapeln unter einer Sperre; der Abschluss merkt sich seinen Stand, lässt sich nach einem
-Abbruch fortsetzen und schickt beim zweiten Lauf nichts doppelt (``dedupe_key``).
+ergänzt zuerst an alten Pokalen, wer im Finale stand (``backfill_finalists``), wertet alle still aus, beendet den stillen
+Modus und schickt je Person EINE Sammel-Nachricht (Postfach, Push, kein Discord). Beide laufen in Stapeln unter einer
+Sperre; der Abschluss merkt sich seinen Stand, lässt sich nach einem Abbruch fortsetzen und schickt beim zweiten Lauf
+nichts doppelt (``dedupe_key``).
 """
 from __future__ import annotations
 
@@ -220,9 +221,9 @@ async def start_dry_run(db=None, *, actor: dict | None = None) -> bool:
 
 async def dry_run(db=None, *, actor: dict | None = None, claimed: bool = False, batch: int = DRY_RUN_BATCH, progress=None) -> dict:
     """Für alle Konten ausrechnen, welche Stufen neu dazukämen - ohne Vergabe, ohne XP, ohne gespeicherte Zähler.
-    Folge-Stufen (Sammler, Kategorie-Meister) entstehen erst durch Vergaben: die Zahl ist eine Untergrenze. Pokale trägt
-    er nicht nach (er schreibt nichts); wo einer Auszeichnung ein Feld wie ``finalist`` fehlt, rechnen die Zähler selbst
-    nach, was sie festhalten würde (``awards.tournament_outcome``, #2337) - also so, als wäre es schon gesetzt."""
+    Folge-Stufen (Sammler, Kategorie-Meister) entstehen erst durch Vergaben: die Zahl ist eine Untergrenze. Finalisten
+    ergänzt er nicht an den Pokalen (er schreibt nichts); wo das Feld ``finalist`` fehlt, rechnen die Zähler selbst nach,
+    was es festhalten würde (``awards.tournament_outcome``, #2337) - also so, als wäre es schon gesetzt."""
     db = db if db is not None else get_db()
     if not claimed:
         await db.settings.update_one({"id": DRY_RUN_ID}, {"$setOnInsert": {"id": DRY_RUN_ID}}, upsert=True)
@@ -346,19 +347,38 @@ def _summary(run: dict) -> dict:
     return {key: run.get(key) for key in ("evaluated", "awarded", "notified", "users_total", "started_at", "finished_at")}
 
 
-async def _rebuild_awards(db, progress) -> dict:
-    """Schritt 0: Pokale und Banner aller Turniere mit veröffentlichten Ergebnissen neu ableiten (wie „Pokale nachtragen“),
-    damit älterer Bestand die Felder trägt, mit denen die Erfolge rechnen (etwa ``finalist`` seit #2337). Das schreibt
-    nur ``tournament_awards`` - keine Meldung, kein Discord; gefahrlos wiederholbar."""
-    from services.awards import rebuild_all_awards
+FINALIST_MISSING = {"finalist": {"$exists": False}}
 
-    with quiet_scope():
-        rebuilt = await rebuild_all_awards(db)
-    logger.info("[achievements] Neuberechnung: Pokale von %d Turnieren nachgetragen (%d Einträge)",
-                int(rebuilt.get("tournaments") or 0), int(rebuilt.get("awards") or 0))
+
+async def backfill_finalists(db=None, *, progress=None) -> dict:
+    """Schritt 0: an vorhandenen Pokalen nur ``finalist`` und ``final_match_id`` ergänzen, wo sie fehlen (seit #2337 stehen
+    sie an jeder neuen Auszeichnung) - mit derselben Rechnung wie dort, ``awards.tournament_outcome``. Bewusst nicht
+    „Pokale nachtragen“ (``rebuild_all_awards``): das stempelt die heutige Jahreswertung, leitet Ränge neu ab und löscht.
+    Hier bleiben Rang, Saison, Art, ``updated_at`` und der Bestand, wie sie sind; was das Feld schon trägt, wird nie
+    überschrieben. Keine Meldung, kein Discord, gefahrlos wiederholbar."""
+    db = db if db is not None else get_db()
+    try:
+        from services.awards import tournament_outcome
+    except ImportError:  # ohne #2337 gibt es das Feld nicht - dann ist nichts nachzutragen
+        logger.warning("[achievements] Neuberechnung: Finalisten-Nachtrag übersprungen - awards.tournament_outcome fehlt")
+        return {"tournaments": 0, "awards": 0, "skipped": True}
+    tournament_ids = sorted(await db.tournament_awards.distinct("tournament_id", FINALIST_MISSING))
+    changed = 0
+    for tournament_id in tournament_ids:
+        outcome = await tournament_outcome(db, tournament_id)
+        finalists = sorted(outcome.get("finalists") or ())
+        if finalists:
+            result = await db.tournament_awards.update_many(
+                {"tournament_id": tournament_id, "registration_id": {"$in": finalists}, **FINALIST_MISSING},
+                {"$set": {"finalist": True, "final_match_id": outcome.get("final_match_id")}})
+            changed += getattr(result, "modified_count", 0)
+        result = await db.tournament_awards.update_many(
+            {"tournament_id": tournament_id, **FINALIST_MISSING}, {"$set": {"finalist": False, "final_match_id": None}})
+        changed += getattr(result, "modified_count", 0)
+    logger.info("[achievements] Neuberechnung: Finalisten an %d Pokalen aus %d Turnieren ergänzt", changed, len(tournament_ids))
     if progress:
-        progress(f"Pokale nachgetragen: {rebuilt.get('tournaments', 0)} Turniere, {rebuilt.get('awards', 0)} Einträge")
-    return {"tournaments": int(rebuilt.get("tournaments") or 0), "awards": int(rebuilt.get("awards") or 0)}
+        progress(f"Finalisten ergänzt: {changed} Pokale aus {len(tournament_ids)} Turnieren")
+    return {"tournaments": len(tournament_ids), "awards": changed}
 
 
 async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
@@ -369,8 +389,9 @@ async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
     if not run.get("phase"):
         # Der stille Modus gilt, bis alle durch sind - auch wenn ihn jemand von Hand abgeschaltet hat.
         await db.settings.update_one({"id": SETTING_ID}, {"$set": {"active": True}})
-        rebuilt = await _rebuild_awards(db, progress)
-        run = {"phase": "evaluate", "started_at": now_utc().isoformat(), "by": _actor(actor), "cursor": None, "awards_rebuilt": rebuilt,
+        with quiet_scope():
+            backfilled = await backfill_finalists(db, progress=progress)
+        run = {"phase": "evaluate", "started_at": now_utc().isoformat(), "by": _actor(actor), "cursor": None, "finalists_backfilled": backfilled,
                "evaluated": 0, "awarded": 0, "notified": 0, "users_total": await db.users.count_documents(ACCOUNTS)}
         await db.settings.update_one({"id": SETTING_ID}, {"$set": {f"finish.{k}": v for k, v in run.items()}})
         await _extend(db, SETTING_ID, "finish.lease_until")

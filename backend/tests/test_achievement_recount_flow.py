@@ -275,7 +275,7 @@ async def test_an_interrupted_evaluation_keeps_quiet_and_continues(flow, monkeyp
 
     async def failing_once(db, doc_id, field, changes=None):
         calls.append(1)
-        # Der erste Aufruf folgt auf das Nachtragen der Pokale, der zweite auf den ersten Stapel Konten.
+        # Der erste Aufruf folgt auf den Finalisten-Nachtrag, der zweite auf den ersten Stapel Konten.
         if len(calls) == 2:
             raise RuntimeError("Server neu gestartet")
         return await real_extend(db, doc_id, field, changes)
@@ -302,35 +302,76 @@ async def published_tournament(flow, *people):
     ])
 
 
+OLD_SEASON = {"id": "s-2025", "name": "Saison 2025"}
+
+
+async def old_trophies(flow, paula, max_):
+    """Pokale von 2025 ohne ``finalist`` - einer davon für eine Anmeldung, die heute nicht mehr gilt; einer trägt das Feld
+    schon. „Pokale nachtragen“ würde die Saison umstempeln, Ränge neu ableiten und den ungültigen löschen."""
+    stamp = "2025-10-03T09:00:00+00:00"
+    base = {"tournament_id": "t-alt", "kind": "trophy", "participants": 4, "matches": {"played": 3, "won": 2}, "season": OLD_SEASON,
+            "tournament": {"id": "t-alt", "title": "Herbst-Cup", "status": "results_published"}, "created_at": stamp, "updated_at": stamp}
+    await flow.db.tournament_awards.insert_many([
+        {**base, "id": "a-sieg", "registration_id": "r-0", "user_id": paula["id"], "rank": 1},
+        {**base, "id": "a-zweit", "registration_id": "r-1", "user_id": max_["id"], "rank": 2},
+        {**base, "id": "a-weg", "registration_id": "r-weg", "user_id": "ehemalig", "rank": 3},
+        {**base, "id": "a-schon", "registration_id": "r-schon", "user_id": "jemand", "rank": 4, "finalist": False, "final_match_id": None},
+    ])
+    await flow.db.tournament_registrations.insert_one({"id": "r-weg", "tournament_id": "t-alt", "user_id": "ehemalig", "status": "cancelled"})
+
+
 @pytest.mark.asyncio
-async def test_finishing_first_rebuilds_the_trophies_quietly(flow, monkeypatch):
+async def test_finishing_first_adds_finalists_to_old_trophies_and_touches_nothing_else(flow, monkeypatch):
     from services import awards
 
     paula = await flow.add_user(name="paula")
     max_ = await flow.add_user(name="max")
     await claims(flow, paula, news=1)
     await published_tournament(flow, paula, max_)
+    await old_trophies(flow, paula, max_)
+    before = {doc["id"]: doc async for doc in flow.db.tournament_awards.find({}, {"_id": 0})}
     await recount.begin()
-    real = awards.rebuild_all_awards
-    seen: list[tuple[bool, int]] = []
+    seen: list[tuple[str, bool, int]] = []
 
-    async def watched(db):
-        # Vor der Auswertung aller Konten, und als Teil der Neuberechnung.
-        seen.append((recount.in_quiet_scope(), await flow.db.user_achievements.count_documents({})))
-        return await real(db)
+    async def outcome(db, tournament_id):
+        # Dieselbe Schnittstelle wie awards.tournament_outcome (#2337): wer im Finale stand und welches Spiel es war.
+        seen.append((tournament_id, recount.in_quiet_scope(), await flow.db.user_achievements.count_documents({})))
+        return {"ranks": {}, "participants": 4, "final_match_id": "m-finale", "finalists": frozenset({"r-0", "r-1", "r-schon"})}
 
-    monkeypatch.setattr(awards, "rebuild_all_awards", watched)
+    monkeypatch.setattr(awards, "tournament_outcome", outcome, raising=False)
     assert (await recount.finish(batch=1))["status"] == "done"
 
-    assert seen == [(True, 0)]
-    assert await flow.db.tournament_awards.count_documents({"tournament_id": "t-alt"}) == 2
-    assert (await recount.status())["finish"]["awards_rebuilt"] == {"tournaments": 1, "awards": 2}
+    assert seen == [("t-alt", True, 0)], "einmal je Turnier, vor der Auswertung, als Teil der Neuberechnung"
+    after = {doc["id"]: doc async for doc in flow.db.tournament_awards.find({}, {"_id": 0})}
+    assert set(after) == set(before), "nichts gelöscht, nichts dazu"
+    for award_id, doc in after.items():
+        untouched = {key: value for key, value in doc.items() if key not in ("finalist", "final_match_id")}
+        assert untouched == {key: value for key, value in before[award_id].items() if key not in ("finalist", "final_match_id")}, award_id
+    assert after["a-sieg"]["season"] == OLD_SEASON and after["a-sieg"]["rank"] == 1 and after["a-sieg"]["updated_at"] == before["a-sieg"]["updated_at"]
+    assert (after["a-sieg"]["finalist"], after["a-sieg"]["final_match_id"]) == (True, "m-finale")
+    assert (after["a-zweit"]["finalist"], after["a-zweit"]["final_match_id"]) == (True, "m-finale")
+    assert (after["a-weg"]["finalist"], after["a-weg"]["final_match_id"]) == (False, None)
+    assert (after["a-schon"]["finalist"], after["a-schon"]["final_match_id"]) == (False, None), "was schon dasteht, bleibt"
+    assert (await recount.status())["finish"]["finalists_backfilled"] == {"tournaments": 1, "awards": 3}
     for person in (paula, max_):
-        assert await noisy(flow, person) == 0, "Pokale nachtragen meldet nichts"
+        assert await noisy(flow, person) == 0
     assert await flow.db.notifications.count_documents({"kind": {"$ne": recount.NOTIFY_KIND}}) == 0
-    # Ein zweiter Lauf trägt nichts mehr nach - fertig ist fertig.
+    # Ein zweiter Lauf ergänzt nichts mehr - fertig ist fertig, und auch von Hand ist nichts mehr offen.
     await recount.finish()
+    assert await recount.backfill_finalists() == {"tournaments": 0, "awards": 0}
     assert len(seen) == 1
+
+
+@pytest.mark.asyncio
+async def test_without_the_outcome_of_2337_the_backfill_changes_nothing(flow, monkeypatch):
+    from services import awards
+
+    paula = await flow.add_user(name="paula")
+    max_ = await flow.add_user(name="max")
+    await old_trophies(flow, paula, max_)
+    monkeypatch.delattr(awards, "tournament_outcome", raising=False)
+    assert (await recount.backfill_finalists())["skipped"] is True
+    assert await flow.db.tournament_awards.count_documents({"finalist": {"$exists": True}}) == 1
 
 
 def test_the_legacy_sources_only_name_keys_of_the_legacy_block():
