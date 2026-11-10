@@ -375,6 +375,50 @@ async def test_without_the_outcome_of_2337_the_backfill_changes_nothing(flow, mo
     assert await flow.db.tournament_awards.count_documents({"finalist": {"$exists": True}}) == 1
 
 
+@pytest.mark.asyncio
+async def test_the_backfill_with_the_real_outcome_of_2337_only_adds_who_played_the_final(flow):
+    """Ein echt gespieltes K.-o.-Turnier (1 schlägt 4, 2 schlägt 3, Finale 1 gegen 2), dessen Pokale wie älterer Bestand
+    aussehen: ohne ``finalist``, mit alter Saison und altem ``updated_at`` - und mit dem Pokal einer Anmeldung, die heute
+    abgemeldet ist. Der Nachtrag rechnet über ``awards.tournament_outcome`` und ändert sonst nichts."""
+    import achievement_play as play
+    from services import awards
+
+    players = [await flow.add_user(name=f"spieler-{n}") for n in range(4)]
+    tournament, registrations = await play.played_cup(flow, players)
+    written = {doc["registration_id"]: doc async for doc in flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0})}
+    assert {reg for reg, doc in written.items() if doc.get("finalist")} == {registrations[0]["id"], registrations[1]["id"]}, "so schreibt #2337 neu"
+    final_id = written[registrations[0]["id"]]["final_match_id"]
+    assert final_id and written[registrations[1]["id"]]["final_match_id"] == final_id
+
+    # Älterer Bestand: das Feld fehlt, Saison und Zeitstempel sind alt, dazu der Pokal einer heute abgemeldeten Anmeldung.
+    await flow.db.tournament_awards.update_many({"tournament_id": tournament["id"]}, {
+        "$unset": {"finalist": "", "final_match_id": ""}, "$set": {"season": OLD_SEASON, "updated_at": "2025-10-03T09:00:00+00:00"}})
+    gone = dict(written[registrations[3]["id"]], id="a-abgemeldet", registration_id="r-abgemeldet", rank=5, season=OLD_SEASON,
+                updated_at="2025-10-03T09:00:00+00:00")
+    gone.pop("finalist", None)
+    gone.pop("final_match_id", None)
+    await flow.db.tournament_awards.insert_one(gone)
+    await flow.db.tournament_registrations.insert_one({"id": "r-abgemeldet", "tournament_id": tournament["id"], "user_id": "ehemalig", "status": "cancelled"})
+    awards.forget_outcome(flow.db)
+    before = {doc["id"]: doc async for doc in flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0})}
+
+    result = await recount.backfill_finalists()
+
+    after = {doc["id"]: doc async for doc in flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0})}
+    assert set(after) == set(before), "nichts gelöscht - auch nicht der Pokal der abgemeldeten Anmeldung"
+    for award_id, doc in after.items():
+        rest = {key: value for key, value in doc.items() if key not in ("finalist", "final_match_id")}
+        assert rest == before[award_id], f"{award_id}: Saison, Rang und updated_at bleiben"
+        assert rest["season"] == OLD_SEASON and rest["updated_at"] == "2025-10-03T09:00:00+00:00"
+    by_reg = {doc["registration_id"]: doc for doc in after.values()}
+    for reg in registrations[:2]:
+        assert (by_reg[reg["id"]]["finalist"], by_reg[reg["id"]]["final_match_id"]) == (True, final_id), "wie es #2337 schreibt"
+    for reg_id in (registrations[2]["id"], registrations[3]["id"], "r-abgemeldet"):
+        assert (by_reg[reg_id]["finalist"], by_reg[reg_id]["final_match_id"]) == (False, None)
+    assert result == {"tournaments": 1, "awards": 5}
+    assert await recount.backfill_finalists() == {"tournaments": 0, "awards": 0}, "ein zweiter Lauf hat nichts mehr zu tun"
+
+
 def test_the_legacy_sources_only_name_keys_of_the_legacy_block():
     from services import achievement_counters
 
