@@ -380,6 +380,11 @@ def test_the_legacy_sources_only_name_keys_of_the_legacy_block():
 
     assert set(recount.LEGACY_KEY_SOURCES) <= achievement_counters.LEGACY_KEYS
     assert all(sources <= set(achievement_counters.SOURCES) for sources in recount.LEGACY_KEY_SOURCES.values())
+    # Jeder Zähler des alten Blocks hat eine Quelle - hier oder in der Registry. Sonst bliebe seine Stufe im stillen Modus
+    # auch bei einem passenden Ereignis still.
+    assert achievement_counters.LEGACY_KEYS <= set(recount.LEGACY_KEY_SOURCES) | set(achievement_counters.REGISTRY)
+    # Was seit #2337/#2338 in der Registry steht, steht hier nicht doppelt.
+    assert not set(recount.LEGACY_KEY_SOURCES) & set(achievement_counters.REGISTRY)
 
 
 @pytest.mark.asyncio
