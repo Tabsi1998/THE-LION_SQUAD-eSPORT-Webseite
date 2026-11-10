@@ -8,7 +8,11 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.competition_snapshot import adapt_stage_matches  # noqa: E402
-from services.competition_standings import registration_badge_match_progress  # noqa: E402
+from services.competition_standings import badge_match_progress  # noqa: E402
+
+
+def progress(matches: list[dict], registration_id: str) -> dict:
+    return badge_match_progress((match, {registration_id}) for match in matches)
 
 
 def duel(match_id: str, winner: str, loser: str, when: str, **extra) -> dict:
@@ -35,12 +39,12 @@ def test_freilos_ist_kein_spiel_und_reisst_die_serie_nicht():
         bye("b", "r1", "2026-10-02T10:00:00+00:00"),
         duel("c", "r1", "r2", "2026-10-03T10:00:00+00:00"),
     ])
-    assert registration_badge_match_progress(stage, {"r1"}) == {"matches_played": 2, "matches_won": 2, "match_streak_max": 2}
+    assert progress(stage, "r1") == {"matches_played": 2, "matches_won": 2, "match_streak_max": 2}
 
 
 def test_nur_freilose_sind_gar_nichts():
     stage = adapt_stage_matches([bye("a", "r1", "2026-10-01T10:00:00+00:00"), bye("b", "r1", "2026-10-02T10:00:00+00:00")])
-    assert registration_badge_match_progress(stage, {"r1"}) == {"matches_played": 0, "matches_won": 0, "match_streak_max": 0}
+    assert progress(stage, "r1") == {"matches_played": 0, "matches_won": 0, "match_streak_max": 0}
 
 
 def test_kampflos_zaehlt_fuer_den_sieger_als_spiel_und_sieg():
@@ -51,9 +55,9 @@ def test_kampflos_zaehlt_fuer_den_sieger_als_spiel_und_sieg():
         walkover,
         duel("c", "r2", "r3", "2026-10-03T10:00:00+00:00"),
     ])
-    assert registration_badge_match_progress(stage, {"r1"}) == {"matches_played": 1, "matches_won": 1, "match_streak_max": 1}
+    assert progress(stage, "r1") == {"matches_played": 1, "matches_won": 1, "match_streak_max": 1}
     # Wer nicht erschienen ist, bekommt kein Spiel - die Serie davor und danach hängt trotzdem nicht zusammen.
-    assert registration_badge_match_progress(stage, {"r2"}) == {"matches_played": 2, "matches_won": 2, "match_streak_max": 1}
+    assert progress(stage, "r2") == {"matches_played": 2, "matches_won": 2, "match_streak_max": 1}
 
 
 def test_laufende_und_abgesagte_spiele_zaehlen_nicht():
@@ -62,4 +66,12 @@ def test_laufende_und_abgesagte_spiele_zaehlen_nicht():
         duel("b", "r1", "r2", "2026-10-02T10:00:00+00:00", status="disputed"),
         duel("c", "r1", "r2", "2026-10-03T10:00:00+00:00"),
     ])
-    assert registration_badge_match_progress(stage, {"r1"}) == {"matches_played": 1, "matches_won": 1, "match_streak_max": 1}
+    assert progress(stage, "r1") == {"matches_played": 1, "matches_won": 1, "match_streak_max": 1}
+
+
+def test_je_spiel_zaehlt_die_anmeldung_fuer_die_die_person_angetreten_ist():
+    """Zwei eigene Anmeldungen im selben Spiel (zwei Teams der Person): Es zählt die, für die sie gespielt hat."""
+    match = adapt_stage_matches([duel("a", "r1", "r2", "2026-10-01T10:00:00+00:00")])[0]
+    assert badge_match_progress([(match, {"r1"})])["matches_won"] == 1
+    assert badge_match_progress([(match, {"r2"})]) == {"matches_played": 1, "matches_won": 0, "match_streak_max": 0}
+    assert badge_match_progress([(match, {"r9"})]) == {"matches_played": 0, "matches_won": 0, "match_streak_max": 0}

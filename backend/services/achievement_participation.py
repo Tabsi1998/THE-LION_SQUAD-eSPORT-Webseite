@@ -259,7 +259,7 @@ class Participation:
         return out
 
     def match_progress(self) -> dict:
-        """Spielmacher, Sieger und Siegesserie - dieselbe Rechnung wie ``registration_badge_match_progress``."""
+        """Spielmacher, Sieger und Siegesserie (``competition_standings.badge_match_progress``)."""
         return badge_match_progress((row.match, row.mine) for row in self.rows)
 
     # ------------------------------------------------ Teilnahme statt Anmeldung (Turnierveteran, Multitalent, Formatvielfalt)

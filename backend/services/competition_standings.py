@@ -1195,20 +1195,13 @@ def final_participants(snapshot: dict, *, tournament: dict | None = None) -> set
     return present if len(present) >= 2 else set()
 
 
-def registration_badge_match_progress(matches: list[dict], registration_ids: set[str]) -> dict:
-    """Return badge counters (played, won, longest win streak) over canonical match shapes.
+def badge_match_progress(pairs) -> dict:
+    """Spielmacher, Sieger und längste Siegesserie über Paare (Spiel, eigene Anmeldungen in diesem Spiel) - je Spiel steht
+    fest, für welche Anmeldung die Person angetreten ist (Team und Liga, ``services.achievement_participation``).
 
     Was als Spiel zählt, steht in ``services.match_winner`` (#2337): ein Freilos nie, ein kampflos gewertetes Spiel
     (``forfeit``) für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt kein Spiel gezählt - die Serie
     reißt trotzdem."""
-
-    own = {str(registration_id) for registration_id in registration_ids or () if registration_id}
-    return badge_match_progress((match, own) for match in matches)
-
-
-def badge_match_progress(pairs) -> dict:
-    """Dieselbe Rechnung über Paare (Spiel, eigene Anmeldungen in diesem Spiel) - für Erfolge, bei denen je Spiel
-    feststeht, für welche Anmeldung die Person angetreten ist (Team und Liga, ``services.achievement_participation``)."""
 
     relevant = [(match, set(own)) for match, own in pairs if is_real_match(match) and participant_ids(match) & set(own)]
     relevant.sort(key=lambda pair: (
@@ -1239,38 +1232,6 @@ def badge_match_progress(pairs) -> dict:
         "matches_played": played,
         "matches_won": won,
         "match_streak_max": streak_max,
-    }
-
-
-def registration_tournament_achievement_progress(
-    snapshot: dict,
-    registrations: list[dict],
-    registration_ids: set[str],
-    *,
-    tournament: dict | None = None,
-) -> dict:
-    """Return one tournament's win/podium/fourth-place badge flags."""
-
-    ranks = {
-        rank
-        for rank, group in placements_for_structure(snapshot, registrations, tournament=tournament).items()
-        for placement in group
-        if placement.get("registration_id") in registration_ids
-    }
-    legacy_fourth = any(
-        _safe_int(match.get("final_position")) == 4
-        and any(
-            result.get("registration_id") in registration_ids
-            and result.get("outcome") == "loser"
-            for result in match.get("results") or []
-        )
-        for match in snapshot.get("matches") or []
-        if match.get("source", {}).get("engine") == "legacy"
-    )
-    return {
-        "tournaments_won": int(1 in ranks),
-        "podium_finishes": int(any(1 <= rank <= 3 for rank in ranks)),
-        "rank_4_count": int(4 in ranks or legacy_fourth),
     }
 
 
