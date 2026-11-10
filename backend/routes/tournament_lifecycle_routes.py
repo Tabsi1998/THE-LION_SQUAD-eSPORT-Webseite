@@ -541,7 +541,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             from services.achievement_queue import request_evaluation
             from services.match_notifications import _participant_user_ids
             regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0, "user_id": 1, "team_id": 1}).to_list(2000)
-            await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}")
+            # Im stillen Modus (#2340) laut nur, was zum Turnier und zur Jahreswertung gehört.
+            await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}", announce={"tournament", "season"})
         except Exception:
             import logging
             logging.getLogger("tls.tournament").warning("[achievements] Auswertung nach Turnierabschluss %s fehlgeschlagen", log_safe(tid), exc_info=True)

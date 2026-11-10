@@ -336,7 +336,8 @@ class CounterSetBody(BaseModel):
 async def _evaluate_discord_counter(user_id: str):
     try:
         from badges import evaluate_user_progress
-        await evaluate_user_progress(user_id)
+        # Im stillen Modus (#2340) melden sich die Discord-Stufen laut, Altansprüche still.
+        await evaluate_user_progress(user_id, announce={"discord", "community"})
     except Exception:
         logging.getLogger("tls.discord").warning("[achievements] Discord-Zähler von %s nicht ausgewertet", log_safe(user_id), exc_info=True)
 

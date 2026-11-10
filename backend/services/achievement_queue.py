@@ -21,6 +21,7 @@ from datetime import timedelta
 from database import get_db
 from models import new_id, now_utc
 from services.achievement_core import evaluator
+from services.achievement_recount import in_quiet_scope
 
 logger = logging.getLogger("tls.achievements.queue")
 
@@ -33,12 +34,15 @@ STATE_ID = "achievement_queue_state"
 
 # ---------------------------------------------------------------- Auswerten
 
-async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
+async def request_evaluation(user_ids, reason: str = "", sources=None, *, announce=None) -> int:
     """Betroffene vormerken. Idempotent: eine Person steht höchstens einmal in der Schlange. Mit ``sources``
-    (#616) merkt sich der Eintrag, welche Zähler dran sind; ohne Quelle wird alles gerechnet."""
+    (#616) merkt sich der Eintrag, welche Zähler dran sind; ohne Quelle wird alles gerechnet. ``announce`` (#2340):
+    welche Quellen dieses Ereignis im stillen Modus laut melden darf - ohne Angabe ``sources``; aus einer stillen
+    Vergabe heraus (Neuberechnung) keine."""
     db = get_db()
     due = (now_utc() + timedelta(seconds=EVAL_DELAY_SECONDS)).isoformat()
     ids = sorted({uid for uid in (user_ids or []) if uid})
+    loud = set() if in_quiet_scope() else set(sources or ()) if announce is None else set(announce)
 
     def update_for(user_id: str | None = None) -> dict:
         update = {"$set": {"reason": reason[:60], **({"user_id": user_id} if user_id else {})}, "$setOnInsert": {"due_at": due, "created_at": now_utc().isoformat()}}
@@ -46,6 +50,8 @@ async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
             update["$addToSet"] = {"sources": {"$each": sorted(set(sources))}}
         else:
             update["$set"]["full"] = True
+        if loud:
+            update.setdefault("$addToSet", {})["announce"] = {"$each": sorted(loud)}
         return update
 
     if len(ids) <= 1:
@@ -59,7 +65,8 @@ async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
         update.pop("$setOnInsert")
         await db.achievement_eval_queue.update_many({"user_id": {"$in": sorted(present)}}, update)
     stamp = now_utc().isoformat()
-    fresh = [{"user_id": uid, "reason": reason[:60], "due_at": due, "created_at": stamp, **({"sources": sorted(set(sources))} if sources else {"full": True})}
+    fresh = [{"user_id": uid, "reason": reason[:60], "due_at": due, "created_at": stamp, **({"sources": sorted(set(sources))} if sources else {"full": True}),
+              **({"announce": sorted(loud)} if loud else {})}
              for uid in ids if uid not in present]
     if fresh:
         from pymongo.errors import BulkWriteError
@@ -83,7 +90,8 @@ async def process_queue(limit: int = BATCH) -> dict:
         await db.achievement_eval_queue.delete_one({"user_id": entry["user_id"]})
         try:
             sources = None if entry.get("full") or not entry.get("sources") else set(entry["sources"])
-            awarded += await evaluate_user_progress(entry["user_id"], sources)
+            # Laut im stillen Modus (#2340) nur, was ein echtes Ereignis genannt hat - Sweep und Nachläufer bleiben still.
+            awarded += await evaluate_user_progress(entry["user_id"], sources, announce=tuple(entry.get("announce") or ()))
         except Exception:  # noqa: BLE001 - eine kaputte Auswertung hält die anderen nicht auf
             logger.warning("[achievements] evaluation failed", exc_info=True)
     if due:
