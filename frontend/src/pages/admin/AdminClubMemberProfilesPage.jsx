@@ -268,7 +268,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
         </FormGrid>
         <AccountBox form={form} set={set} profile={entry.profile} profiles={profiles} />
         {/* Streamer oder Creator des Vereins (#2338): mit per Anmeldung verknüpftem Twitch gibt es „Verifizierter Streamer“. */}
-        <CheckField label="Streamer oder Creator des Vereins" checked={form.creator} onChange={(v) => set("creator", v)} accent="#FFD700" testId="club-member-creator" hint="Zusammen mit einem per Anmeldung verknüpften Twitch-Konto bekommt die Person den Erfolg „Verifizierter Streamer“. Wird im Protokoll vermerkt." />
+        <CheckField label="Streamer oder Creator des Vereins" checked={form.creator} onChange={(v) => set("creator", v)} accent="var(--tls-honor)" testId="club-member-creator" hint="Zusammen mit einem per Anmeldung verknüpften Twitch-Konto bekommt die Person den Erfolg „Verifizierter Streamer“. Wird im Protokoll vermerkt." />
         <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
           Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
         </div>
