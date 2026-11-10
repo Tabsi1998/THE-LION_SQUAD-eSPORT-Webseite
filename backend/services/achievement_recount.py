@@ -19,12 +19,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import contextmanager
-from contextvars import ContextVar
 from datetime import timedelta
 
 from database import get_db
 from models import now_utc
+from services.achievement_core import due_tiers, in_quiet_scope, quiet_scope
 
 logger = logging.getLogger("tls.achievements.recount")
 
@@ -45,11 +44,10 @@ FOLLOW_UP_ROUNDS = 3
 ACCOUNTS = {"is_active": True, "is_banned": {"$ne": True}}
 
 # Die Zähler des alten Blocks (achievement_counters.LEGACY_KEYS) haben keine Quelle in der Registry - hier steht, welches
-# Ereignis sie ändert. Nur dafür, ob eine Stufe im stillen Modus laut gemeldet wird; gerechnet wird wie immer.
+# Ereignis sie ändert. Nur dafür, ob eine Stufe im stillen Modus laut gemeldet wird; gerechnet wird wie immer. Zähler,
+# die in die Registry umgezogen sind (Anmeldungen, Discord und Chat mit #2337/#2338), bringen ihre Quelle selbst mit und
+# stehen hier nicht - ein Test hält die Liste innerhalb von LEGACY_KEYS.
 LEGACY_KEY_SOURCES: dict[str, frozenset[str]] = {
-    "tournaments_registered": frozenset({"registration", "tournament"}),
-    "distinct_games_registered": frozenset({"registration", "tournament"}),
-    "distinct_formats": frozenset({"registration", "tournament"}),
     "seasons_active": frozenset({"registration", "tournament", "season"}),
     "matches_played": frozenset({"match"}),
     "matches_won": frozenset({"match"}),
@@ -69,39 +67,19 @@ LEGACY_KEY_SOURCES: dict[str, frozenset[str]] = {
     "achievement_points": frozenset({"achievement"}),
     "teams_founded": frozenset({"team"}),
     "team_days_max": frozenset({"team"}),
-    "discord_messages": frozenset({"discord"}),
     "twitch_live_sessions": frozenset({"stream"}),
     "twitch_stream_minutes": frozenset({"stream"}),
     "friends_count": frozenset({"friend"}),
-    "direct_messages_sent": frozenset({"chat"}),
-    "team_chat_messages_sent": frozenset({"chat"}),
-    "match_chat_messages_sent": frozenset({"chat"}),
-    "tournament_chat_messages_sent": frozenset({"chat"}),
-    "community_messages_sent": frozenset({"chat"}),
 }
 # Folge-Auswertungen nach einer Vergabe melden im stillen Modus nie laut - sie sind selbst schon Neuberechnung.
 DERIVED_SOURCES = frozenset({"achievement"})
 
-_quiet: ContextVar[bool] = ContextVar("achievement_recount_quiet", default=False)
 _jobs: set[asyncio.Task] = set()
 
 
 # ------------------------------------------------------------------ Still oder laut
-
-@contextmanager
-def quiet_scope():
-    """Alles darin gehört zur Neuberechnung: Aufstiege melden sich nicht, Folge-Auswertungen sind still, und jede
-    Auswertung vergibt im stillen Modus still - auch für die Quellen, die sie nennt."""
-    token = _quiet.set(True)
-    try:
-        yield
-    finally:
-        _quiet.reset(token)
-
-
-def in_quiet_scope() -> bool:
-    return _quiet.get()
-
+# ``quiet_scope`` (aus dem Kern, services/achievement_core.py): alles darin gehört zur Neuberechnung - Aufstiege melden
+# sich nicht, Folge-Auswertungen sind still, und jede Auswertung vergibt im stillen Modus still, auch für ihre Quellen.
 
 async def active_marker(db=None) -> str | None:
     """Die Kennung der laufenden Neuberechnung, solange der stille Modus an ist - sonst None."""
@@ -265,7 +243,6 @@ async def dry_run(db=None, *, actor: dict | None = None, claimed: bool = False, 
 
 
 async def _count_due(db, *, batch: int, total: int, progress=None) -> dict:
-    from badges import due_tiers
     from services import achievement_counters
     from services.membership_service import get_membership, is_active_member
 

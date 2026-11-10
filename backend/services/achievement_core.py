@@ -8,6 +8,8 @@ es einen klaren Fehler statt einer stillen Lücke.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Awaitable, Callable
 from zoneinfo import ZoneInfo
 
@@ -101,3 +103,42 @@ def evaluator() -> Evaluator:
     if _evaluator is None:
         raise RuntimeError("Erfolge-Auswertung nicht angemeldet - badges.py wurde nicht geladen")
     return _evaluator
+
+
+def due_tiers(tiers: list[dict], counters: dict, earned_codes: set, *, active_member: bool, only_keys=None) -> list[dict]:
+    """Die Stufen, die jetzt fällig sind: noch nicht vergeben, Zähler am Ziel, Mitglieder-Stufen nur für Mitglieder.
+    Dieselbe Prüfung für die Auswertung (badges) und den Probelauf der Neuberechnung (#2340)."""
+    due = []
+    for t in tiers:
+        if t["code"] in earned_codes:
+            continue
+        if t.get("member_only") and not active_member:
+            continue
+        ck = t.get("condition_key")
+        target = t.get("progress_target") or 0
+        if not ck or not target:
+            continue
+        if only_keys is not None and ck not in only_keys:
+            continue
+        if counters.get(ck, 0) >= target:
+            due.append(t)
+    return due
+
+
+# Neuberechnung (#2340, services/achievement_recount.py): was in ``quiet_scope`` geschieht, gehört zur Neuberechnung -
+# Aufstiege melden sich nicht, Folge-Auswertungen bleiben still. Hier im Kern, damit Warteschlange und XP es fragen
+# können, ohne nach oben zu importieren.
+_recount_quiet: ContextVar[bool] = ContextVar("achievement_recount_quiet", default=False)
+
+
+@contextmanager
+def quiet_scope():
+    token = _recount_quiet.set(True)
+    try:
+        yield
+    finally:
+        _recount_quiet.reset(token)
+
+
+def in_quiet_scope() -> bool:
+    return _recount_quiet.get()

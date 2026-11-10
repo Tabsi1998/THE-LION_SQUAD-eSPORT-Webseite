@@ -29,6 +29,7 @@ from services.membership_service import get_membership, is_active_member
 from services import achievement_core
 from services import achievement_recount as recount
 from services.achievement_core import NEGATIVE_INCIDENTS  # umgezogen (#1420), hier weiter erreichbar
+from services.achievement_core import due_tiers, quiet_scope
 from services.achievement_progress import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
     PROFILE_FIELDS,
     compute_profile_completeness,
@@ -159,7 +160,7 @@ async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: b
     Folge-Auswertung bleibt still. Negative Gruppen bringen nichts davon."""
     if group.get("is_negative") or not user_ids:
         return
-    with recount.quiet_scope() if quiet else nullcontext():
+    with quiet_scope() if quiet else nullcontext():
         # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code. Viele auf
         # einmal (Massenvergabe) gebündelt in wenigen Schreibzügen.
         try:
@@ -365,26 +366,6 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
 
 
 # ---------------- Auto-eval ----------------
-def due_tiers(tiers: list[dict], counters: dict, earned_codes: set, *, active_member: bool, only_keys=None) -> list[dict]:
-    """Die Stufen, die jetzt fällig sind: noch nicht vergeben, Zähler am Ziel, Mitglieder-Stufen nur für Mitglieder.
-    Dieselbe Prüfung für die Auswertung und den Probelauf der Neuberechnung (#2340)."""
-    due = []
-    for t in tiers:
-        if t["code"] in earned_codes:
-            continue
-        if t.get("member_only") and not active_member:
-            continue
-        ck = t.get("condition_key")
-        target = t.get("progress_target") or 0
-        if not ck or not target:
-            continue
-        if only_keys is not None and ck not in only_keys:
-            continue
-        if counters.get(ck, 0) >= target:
-            due.append(t)
-    return due
-
-
 async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True, *, announce=None) -> int:
     """Stufen prüfen und vergeben. Mit ``sources`` (#616) werden nur die betroffenen Zähler neu gerechnet
     und nur Stufen mit diesen Schlüsseln angesehen; ohne Quelle alles. ``legacy`` aus (#678, nur mit ``sources``):

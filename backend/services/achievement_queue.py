@@ -20,8 +20,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
-from services.achievement_core import evaluator
-from services.achievement_recount import in_quiet_scope
+from services.achievement_core import evaluator, in_quiet_scope
 
 logger = logging.getLogger("tls.achievements.queue")
 
