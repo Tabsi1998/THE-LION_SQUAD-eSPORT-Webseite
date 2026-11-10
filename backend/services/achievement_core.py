@@ -146,6 +146,28 @@ def in_quiet_scope() -> bool:
     return _recount_quiet.get()
 
 
+# Laut vergebene Stufen (#2340): Was der Server der Seite als „gerade vergeben“ meldet (Signale, Türchen, Ostereier,
+# „Erfolge prüfen“), zählt nur diese - sonst zeigte die Zeremonie die neuesten n Stufen, darunter längst gesehene.
+_loud_awards: ContextVar[list | None] = ContextVar("achievement_loud_awards", default=None)
+
+
+@contextmanager
+def loud_awards():
+    """Liefert die Liste der Stufen, die in dieser Klammer laut vergeben wurden."""
+    codes: list[str] = []
+    token = _loud_awards.set(codes)
+    try:
+        yield codes
+    finally:
+        _loud_awards.reset(token)
+
+
+def note_loud_award(code: str) -> None:
+    codes = _loud_awards.get()
+    if codes is not None:
+        codes.append(code)
+
+
 # Der Eintrag des stillen Modus in ``settings`` - hier, damit auch die Kronen ihn lesen, ohne nach oben zu importieren.
 RECOUNT_SETTING_ID = "achievements_recount"
 

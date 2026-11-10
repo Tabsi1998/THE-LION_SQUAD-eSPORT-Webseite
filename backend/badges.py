@@ -29,7 +29,7 @@ from services.membership_service import get_membership, is_active_member
 from services import achievement_core
 from services import achievement_recount as recount
 from services.achievement_core import NEGATIVE_INCIDENTS  # umgezogen (#1420), hier weiter erreichbar
-from services.achievement_core import due_tiers, quiet_scope
+from services.achievement_core import due_tiers, note_loud_award, quiet_scope
 from services.achievement_progress import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
     PROFILE_FIELDS,
     compute_profile_completeness,
@@ -397,8 +397,11 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
         for t in due_tiers(tiers, counters, earned_codes, active_member=active_member, only_keys=only_keys):
             ck = t["condition_key"]
             context = {"auto_progress": True, "current": counters.get(ck), "target": t["progress_target"]}
-            if await award_achievement(user_id, t["code"], context, recount_id=await decide.marker_for(ck)):
+            marker = await decide.marker_for(ck)
+            if await award_achievement(user_id, t["code"], context, recount_id=marker):
                 new_count += 1
+                if not marker:
+                    note_loud_award(t["code"])
     # Die Marke der Neuberechnung (#2340) nur nach einer vollständigen Auswertung - fiel ein Zähler aus, stand er auf 0.
     if not sources and not failed_counters:
         await decide.after_full_evaluation()

@@ -764,6 +764,47 @@ async def test_only_the_superadmin_may_run_the_recount(flow):
     assert await flow.db.notifications.count_documents({"kind": recount.NOTIFY_KIND}) == 1
 
 
+# ------------------------------------------------------------------ Was die Seite als „gerade vergeben“ hört
+
+SIGNAL_TIERS = [
+    {"code": "konami_1", "id": "konami_1", "group_code": "geheim", "name": "Konami", "condition_key": "konami_found", "progress_target": 1, "points": 10, "material": "wood", "rank": 1, "level": 1},
+    {"code": "verlaufen_1", "id": "verlaufen_1", "group_code": "geheim", "name": "Verlaufen", "condition_key": "lost_404", "progress_target": 1, "points": 10, "material": "wood", "rank": 1, "level": 1},
+    {"code": "tuer_1", "id": "tuer_1", "group_code": "geheim", "name": "Erstes Türchen", "condition_key": "advent_doors_opened", "progress_target": 1, "points": 10, "material": "wood", "rank": 1, "level": 1},
+]
+
+
+@pytest.mark.asyncio
+async def test_the_page_only_hears_about_loud_awards(flow):
+    """Signale, Türchen, Ostereier und „Erfolge prüfen“ melden der Seite als ``newly_awarded`` nur laut Vergebenes -
+    AchievementCatchUp feiert die neuesten n Stufen, still Nachgerechnetes käme sonst als längst Gesehenes noch einmal."""
+    from services import advent_calendar
+
+    await flow.db.achievement_groups.insert_one({"code": "geheim", "id": "geheim", "name": "Geheim", "category": "special", "public": True,
+                                                 "is_negative": False, "sort_order": 9, **LOOK})
+    await flow.db.achievements.insert_many([dict(t) for t in SIGNAL_TIERS])
+    paula = await flow.add_user(name="paula")
+    await claims(flow, paula, news=1)
+    flow.act_as(paula)
+    await recount.begin()
+
+    # Noch nicht nachgerechnet: alles still - die Seite hört nichts, obwohl vergeben wurde.
+    res = await flow.post("/api/achievements/signals", json={"items": [{"name": "konami", "count": 1}]})
+    assert res.status_code == 200 and res.json()["newly_awarded"] == 0
+    assert (await awards_of(flow, paula))["konami_1"]["recount"] is True
+    # Türchen (und Ostereier, derselbe Weg): still vergeben, nichts zu feiern.
+    await flow.db.advent_openings.insert_one({"user_id": paula["id"], "year": 2026, "door": 1})
+    assert await advent_calendar._count_for_achievements(paula["id"]) == 0
+    assert (await awards_of(flow, paula))["tuer_1"]["recount"] is True
+    res = await flow.post("/api/achievements/evaluate")
+    assert res.status_code == 200 and res.json()["newly_awarded"] == 0, "„Erfolge prüfen“ vergab Leseratte still"
+    assert (await awards_of(flow, paula))["leser_1"]["recount"] is True
+
+    # Nachgerechnet: das frische Signal ist laut und zählt.
+    await drain()
+    res = await flow.post("/api/achievements/signals", json={"items": [{"name": "lost_404", "count": 1}]})
+    assert res.json()["newly_awarded"] == 1 and not (await awards_of(flow, paula))["verlaufen_1"].get("recount")
+
+
 # ------------------------------------------------------------------ Auslöser aus #2337/#2338
 
 async def queued_announce(flow, user) -> list | None:

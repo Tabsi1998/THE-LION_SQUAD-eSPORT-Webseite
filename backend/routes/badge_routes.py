@@ -191,8 +191,11 @@ async def shared_award_card(award_id: str):
 
 @router.post("/evaluate")
 async def evaluate_self(user: dict = Depends(get_current_user)):
-    n = await evaluate_user_progress(user["id"])
-    return {"newly_awarded": n}
+    # Nur laut Vergebenes (#2340): „Erfolge prüfen“ feiert die neuesten n Stufen - still nachgerechnete kommen gesammelt.
+    from services.achievement_core import loud_awards
+    with loud_awards() as loud:
+        await evaluate_user_progress(user["id"])
+    return {"newly_awarded": len(loud)}
 
 
 @router.get("/leaderboard")

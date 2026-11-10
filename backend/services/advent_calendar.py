@@ -470,9 +470,12 @@ async def _count_for_achievements(user_id: str) -> int:
 
     try:
         await counters.record_signal(user_id, SIGNAL, 1, trusted=True)
-        from services.achievement_core import evaluator
+        from services.achievement_core import evaluator, loud_awards
 
-        return int(await evaluator()(user_id, {"signal"}, legacy=False) or 0)
+        # Nur laut Vergebenes (#2340) - die Seite feiert die neuesten n Stufen; still nachgerechnete zählen nicht.
+        with loud_awards() as loud:
+            await evaluator()(user_id, {"signal"}, legacy=False)
+        return len(loud)
     except Exception:  # noqa: BLE001 - ein Türchen scheitert nie an den Erfolgen
         import logging
 
