@@ -10,9 +10,18 @@ Einzelturnier ``user_id``.
 """
 from __future__ import annotations
 
+import time
+import weakref
+
 from models import new_id, now_utc
 from services.competition_read import load_competition_read_model, observe_structure_read
-from services.competition_standings import placements_for_structure, registration_match_summary, standings_for_structure
+from services.competition_standings import (
+    final_match,
+    final_participants,
+    placements_for_structure,
+    registration_match_summary,
+    standings_for_structure,
+)
 from services.league_scope import NOT_LEAGUE, is_league_staffel
 from services.season_service import _active_season
 from services.visibility import user_can_see
@@ -94,21 +103,20 @@ def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
 
 # ---------------------------------------------------------------- Vergabe
 
-async def record_tournament_awards(db, tournament_id: str) -> int:
-    """Beim Veröffentlichen der Ergebnisse: je Anmeldung ein Eintrag, alte werden überschrieben."""
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
-    if not tournament or is_league_staffel(tournament):
-        # Liga-Staffeln bringen keine Turnier-Pokale - Liga-Titel kommen eigens (docs/LIGA.md, #1638 ff.).
-        return 0
+async def tournament_ranks(db, tournament: dict, *, surface: str = "awards") -> tuple[list[dict], dict, dict[str, int | None]]:
+    """Der Platz je Anmeldung, wie die Auszeichnung ihn festhält: (Anmeldungen, Snapshot, Anmeldung → Platz).
+
+    Die eine Rechnung hinter ``record_tournament_awards`` - die Erfolge (#2337) nutzen sie für abgeschlossene Turniere,
+    deren Auszeichnungen noch nicht geschrieben sind, damit dort derselbe Platz gilt."""
+    tournament_id = tournament["id"]
     regs = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": {"$in": list(REGISTRATION_STATUSES)}}, {"_id": 0},
     ).to_list(1000)
     if not regs:
-        await db.tournament_awards.delete_many({"tournament_id": tournament_id})
-        return 0
+        return [], {}, {}
     read_model = await load_competition_read_model(db, tournament_id)
     snapshot = read_model.structure_snapshot()
-    observe_structure_read(snapshot, surface="awards")
+    observe_structure_read(snapshot, surface=surface)
     matches = snapshot.get("matches") or []
     placements = {}
     # Ein geteilter Platz (#1593) zählt für jeden, der ihn hält.
@@ -126,6 +134,87 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
         for row in rows:
             if row.get("registration_id") and row.get("rank"):
                 placements.setdefault(row["registration_id"], int(row["rank"]))
+    return regs, snapshot, {reg.get("id"): _rank_from_registration(reg) or placements.get(reg.get("id")) for reg in regs}
+
+
+def finalists_of(snapshot: dict, tournament: dict, regs: list[dict]) -> tuple[str | None, set[str]]:
+    """(Finale, Anmeldungen im Finale) - wer im Finale stand (``competition_standings.final_participants``), unter den
+    angenommenen und eingecheckten Anmeldungen. Ohne Finalisten gibt es auch kein Finale zu nennen."""
+    listed = {reg.get("id") for reg in regs}
+    finalists = final_participants(snapshot, tournament=tournament) & listed
+    final = final_match(snapshot, tournament=tournament) if finalists else None
+    return (final or {}).get("id"), finalists
+
+
+# Was die Erfolge aus einem abgeschlossenen Turnier brauchen (#2337), je Turnier einmal gerechnet statt je Person: Plätze,
+# Teilnehmerfeld, Finalisten. Gebraucht wird das nur, wo die Auszeichnung es nicht (oder noch nicht) trägt: beendet, aber
+# nicht veröffentlicht - und älterer Bestand ohne ``finalist``. Gemerktes gilt nur für den Stand, zu dem es gerechnet
+# wurde: Status und ``updated_at`` des Turniers. Wird ein Turnier wieder geöffnet, korrigiert und beendet, ändert sich
+# beides - dann wird neu gerechnet. „Beendet“ gilt außerdem nur kurz: Dort wird noch korrigiert, ohne dass sich am
+# Turnier selbst etwas ändert.
+OUTCOME_TTL_SECONDS = 600
+OUTCOME_CACHE_SIZE = 512
+EMPTY_OUTCOME: dict = {"ranks": {}, "participants": 0, "final_match_id": None, "finalists": frozenset()}
+_OUTCOMES: dict[int, tuple[weakref.ref, dict]] = {}
+
+
+def _outcome_cache(db) -> dict:
+    """Der Merkzettel dieser Datenbank - an das Objekt gebunden, nicht an seinen Namen (Tests bauen je Test eine neue)."""
+    entry = _OUTCOMES.get(id(db))
+    if entry and entry[0]() is db:
+        return entry[1]
+    for key in [key for key, (ref, _cache) in _OUTCOMES.items() if ref() is None]:
+        del _OUTCOMES[key]
+    cache: dict = {}
+    _OUTCOMES[id(db)] = (weakref.ref(db), cache)
+    return cache
+
+
+def forget_outcome(db, tournament_id: str | None = None) -> None:
+    """Gemerktes verwerfen - für ein Turnier (seine Auszeichnungen wurden neu geschrieben) oder ganz."""
+    cache = _outcome_cache(db)
+    if tournament_id is None:
+        cache.clear()
+    else:
+        cache.pop(tournament_id, None)
+
+
+async def tournament_outcome(db, tournament_id: str) -> dict:
+    """``{"ranks": Anmeldung → Platz, "participants": n, "final_match_id": …, "finalists": {…}}`` - derselbe Platz, den die
+    Auszeichnung festhält, und wer im Finale stand. Prozessweit gemerkt (siehe oben)."""
+    cache = _outcome_cache(db)
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    state = (tournament.get("status"), str(tournament.get("updated_at") or "")) if tournament else None
+    hit = cache.get(tournament_id)
+    now = time.monotonic()
+    if hit and hit[2] == state and (hit[0] is None or hit[0] > now):
+        return hit[1]
+    outcome = EMPTY_OUTCOME
+    if tournament:
+        regs, snapshot, ranks = await tournament_ranks(db, tournament, surface="achievements")
+        if regs:
+            final_id, finalists = finalists_of(snapshot, tournament, regs)
+            outcome = {"ranks": ranks, "participants": len(regs), "final_match_id": final_id, "finalists": frozenset(finalists)}
+    if len(cache) >= OUTCOME_CACHE_SIZE:
+        cache.clear()
+    cache[tournament_id] = (None if (tournament or {}).get("status") in AWARD_STATUSES else now + OUTCOME_TTL_SECONDS, outcome, state)
+    return outcome
+
+
+async def record_tournament_awards(db, tournament_id: str) -> int:
+    """Beim Veröffentlichen der Ergebnisse: je Anmeldung ein Eintrag, alte werden überschrieben."""
+    forget_outcome(db, tournament_id)
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament or is_league_staffel(tournament):
+        # Liga-Staffeln bringen keine Turnier-Pokale - Liga-Titel kommen eigens (docs/LIGA.md, #1638 ff.).
+        return 0
+    regs, snapshot, ranks = await tournament_ranks(db, tournament)
+    if not regs:
+        await db.tournament_awards.delete_many({"tournament_id": tournament_id})
+        return 0
+    matches = snapshot.get("matches") or []
+    # Wer im Finale stand (#2337), steht mit an der Auszeichnung - die Erfolge müssen den Baum dafür nicht je Person laden.
+    final_id, finalists = finalists_of(snapshot, tournament, regs)
 
     game = None
     if tournament.get("game_id"):
@@ -138,13 +227,14 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
     now = now_utc().isoformat()
     kept: list[str] = []
     for reg in regs:
-        rank = _rank_from_registration(reg) or placements.get(reg.get("id"))
+        rank = ranks.get(reg.get("id"))
         summary = registration_match_summary(matches, {reg.get("id")})
         team = teams.get(reg.get("team_id"))
         doc = {
             "tournament_id": tournament_id, "registration_id": reg.get("id"),
             "user_id": reg.get("user_id"), "team_id": reg.get("team_id"),
             "rank": rank, "kind": award_kind(rank), "participants": len(regs),
+            "finalist": reg.get("id") in finalists, "final_match_id": final_id if reg.get("id") in finalists else None,
             "matches": {"played": summary["matches_played"], "won": summary["matches_won"]},
             "tournament": {k: tournament.get(k) for k in ("id", "slug", "title", "start_date", "visibility", "is_public", "status")},
             "game": game, "season": season_view,

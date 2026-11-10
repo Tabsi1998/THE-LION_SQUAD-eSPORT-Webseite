@@ -15,6 +15,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+import achievement_play as play  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 import achievement_catalog as catalog  # noqa: E402
@@ -27,6 +28,7 @@ from services import seasons  # noqa: E402
 REAL_TO_VIENNA = seasons.to_vienna
 QUIET_DAY = datetime(2026, 9, 15, 12, 0, tzinfo=counters.VIENNA)
 HALLOWEEN_EVE = datetime(2026, 10, 30, 20, 0, tzinfo=counters.VIENNA)
+HALLOWEEN_NIGHT = datetime(2026, 10, 31, 20, 0, tzinfo=counters.VIENNA)
 
 
 def set_clock(monkeypatch, moment: datetime):
@@ -84,17 +86,20 @@ async def test_signale_mit_deckel_und_saison(flow, monkeypatch):
     res = await flow.post("/api/achievements/signal", json={"name": "logo_clicks", "count": 150})
     assert res.json()["count"] == 100, "Deckel 100 am Tag"
     # Saisongebunden: Halloween läuft im Test nicht → abgelehnt; erzwungen im Admin → angenommen.
-    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_pumpkin"})).json() == {"accepted": False, "reason": "season"}
+    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_bats_scared"})).json() == {"accepted": False, "reason": "season"}
     await flow.db.settings.insert_one({"id": "seasons", "seasons": {"halloween": {"mode": "force_on"}}})
-    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_pumpkin"})).json()["accepted"] is True
+    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_bats_scared"})).json()["accepted"] is True
+    # Der Kürbis der Gruselnacht zählt zusätzlich nur am 31.10. ab 18 Uhr (#2338) - auch bei erzwungener Saison.
+    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_pumpkin"})).json() == {"accepted": False, "reason": "time"}
     queued = await flow.db.achievement_eval_queue.find_one({"user_id": user["id"]}, {"_id": 0})
     assert "signal" in queued["sources"] and not queued.get("full")
     values = await counters.refresh(user["id"], {"signal"})
-    assert values["konami_found"] == 1 and values["logo_clicks"] == 100 and values["halloween_pumpkin"] == 1
+    assert values["konami_found"] == 1 and values["logo_clicks"] == 100 and values["halloween_bats_scared"] == 1 and values["halloween_pumpkin"] == 0
 
 
 async def seed_match(flow, a: dict, b: dict, *, when: str, winner: str, seed_a: int = 2, seed_b: int = 1, match_id: str = "m1"):
-    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"id": "t1", "title": "Cup", "status": "completed", "is_public": True}}, upsert=True)
+    # Feste Setzliste (#2337): nur dort zählen Topgesetzt und Riesentöter.
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"id": "t1", "title": "Cup", "status": "completed", "is_public": True, "seeding_mode": "manual"}}, upsert=True)
     for user, reg_id, seed in ((a, f"ra-{match_id}", seed_a), (b, f"rb-{match_id}", seed_b)):
         await flow.db.tournament_registrations.insert_one({"id": reg_id, "tournament_id": "t1", "user_id": user["id"], "seed": seed, "status": "checked_in", "created_at": when, "updated_at": when})
     await flow.db.matches_v2.insert_one({
@@ -168,7 +173,7 @@ async def test_gelesen_und_gesehen_je_einmal(flow):
 async def test_profil_team_saison_und_turnier_zaehler(flow):
     user = await flow.add_user(name="Vielseitig")
     db = flow.db
-    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/a.png", "banner_url": "/b.png", "bio": "Hallo", "website": "https://x.at", "email_verified": True, "notification_preferences": {"push": True}, "privacy_public_profile": True, "newsletter_consent": True, "created_at": (now_utc() - timedelta(days=800)).isoformat()}})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/a.png", "banner_url": "/b.png", "bio": "Hallo", "website": "https://x.at", "email_verified": True, "notification_preferences": {"push": True}, "privacy_public_profile": True, "privacy_reviewed_at": now_utc().isoformat(), "newsletter_consent": True, "created_at": (now_utc() - timedelta(days=800)).isoformat()}})
     await db.platform_links.insert_many([{"id": "l1", "user_id": user["id"], "platform": "discord", "external_id": "1"}, {"id": "l2", "user_id": user["id"], "platform": "youtube", "external_id": "2"}])
     await db.passkeys.insert_one({"user_id": user["id"], "rp_id": "lionsquad.at"})
     await db.mobile_push_tokens.insert_one({"user_id": user["id"], "token": "t"})
@@ -177,14 +182,31 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
         {"id": "team1", "name": "Löwen", "leader_id": user["id"], "member_ids": [user["id"], "u2", "u3"], "logo_url": "/l.png", "banner_url": "/b.png", "description": "Wir.", "created_at": (now_utc() - timedelta(days=40)).isoformat()},
         {"id": "team2", "name": "Zweit", "leader_id": "u9", "member_ids": [user["id"]], "created_at": now_utc().isoformat()},
     ])
-    await db.tournament_registrations.insert_one({"id": "rt", "tournament_id": "t9", "team_id": "team1", "created_at": now_utc().isoformat()})
+    # Gezählt wird die Teilnahme (#2337): Das Team hat sein Turnier auch gespielt, die Einzel-Anmeldung in t9 ebenso.
+    def played(match_id, tournament_id, first, second):
+        return {"id": match_id, "tournament_id": tournament_id, "stage_number": 1, "round": 1, "order": 1, "status": "completed",
+                "completed_at": "2026-05-03T18:00:00+00:00", "updated_at": "2026-05-03T18:00:00+00:00",
+                "slots": [{"slot": 1, "registration_id": first, "status": "filled"}, {"slot": 2, "registration_id": second, "status": "filled"}],
+                "results": [{"registration_id": first, "rank": 1}, {"registration_id": second, "rank": 2}]}
+    await db.tournaments.insert_one({"id": "t10", "title": "Team-Cup", "status": "completed", "is_public": True})
+    await db.tournament_registrations.insert_many([
+        {"id": "rt", "tournament_id": "t10", "team_id": "team1", "status": "approved", "created_at": now_utc().isoformat()},
+        {"id": "rh", "tournament_id": "t10", "user_id": "u-gegner", "status": "approved", "created_at": now_utc().isoformat()},
+        {"id": "rg", "tournament_id": "t9", "user_id": "u-gegner", "status": "checked_in", "created_at": "2026-05-01T19:00:00+00:00", "updated_at": "2026-05-02T11:00:00+00:00"},
+    ])
+    await db.matches_v2.insert_many([played("m-team", "t10", "rt", "rh"), played("m-solo", "t9", "rf", "rg")])
     await db.season_standings.insert_many([{"season_id": "s1", "user_id": user["id"], "rank": 1}, {"season_id": "s2", "user_id": user["id"], "rank": 7}, {"season_id": "s3", "user_id": user["id"], "rank": 30}])
     await db.events.insert_many([{"id": "e1", "created_by": user["id"], "status": "completed", "visibility": "public"}, {"id": "e2", "created_by": "x", "status": "completed", "visibility": "members"}])
     await db.event_registrations.insert_one({"id": "er1", "event_id": "e2", "user_id": user["id"], "status": "checked_in"})
     await db.tournament_staff_assignments.insert_one({"id": "sa1", "tournament_id": "t9", "user_id": user["id"], "role": "referee"})
     await db.tournaments.insert_one({"id": "t9", "title": "Staffed", "status": "completed", "is_public": True, "registration_opens_at": "2026-05-01T18:00:00+00:00"})
     await db.tournament_registrations.insert_one({"id": "rf", "tournament_id": "t9", "user_id": user["id"], "created_at": "2026-05-01T18:04:00+00:00", "status": "checked_in", "updated_at": "2026-05-02T10:00:00+00:00"})
-    await db.tournament_awards.insert_many([{"tournament_id": "t9", "registration_id": "rf", "place": 2}, {"tournament_id": "t8", "registration_id": "rf", "place": 6}])
+    # Platz 2 in einem echten Turnier mit neun Teilnehmern (#2337): gespielt, abgeschlossen, veröffentlicht - die Plätze hält
+    # ``record_tournament_awards`` fest. Das Finale verliert sie gegen die Nummer 1.
+    field = [await flow.add_user(name="Favoritin"), user, *[await flow.add_user(name=f"Feld {n}") for n in range(7)]]
+    cup, cup_regs = await play.played_cup(flow, field)
+    award = await db.tournament_awards.find_one({"tournament_id": cup["id"], "registration_id": cup_regs[1]["id"]}, {"_id": 0})
+    assert (award["rank"], award["participants"]) == (2, 9)
     await db.user_reports.insert_many([{"id": "r1", "reporter_id": user["id"], "status": "removed"}, {"id": "r2", "reporter_id": user["id"], "status": "open"}])
     values = await counters.compute(user["id"])
     expected = {
@@ -193,7 +215,7 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
         "login_streak_max": 12, "level": 10, "prestige_stars": 1, "birthday_logins": 2,
         "team_size_max": 3, "team_profile_complete": 1, "captain_days": 40, "team_tournaments_played": 1,
         "season_top10_finishes": 2, "season_wins": 1, "events_hosted_completed": 1, "club_events_attended": 1,
-        "tournaments_staffed_completed": 1, "fast_registrations": 1, "first_checkins": 1, "top8_finishes": 2, "finals_played": 1, "reports_actioned": 1,
+        "tournaments_staffed_completed": 1, "fast_registrations": 1, "first_checkins": 1, "top8_finishes": 1, "finals_played": 1, "reports_actioned": 1,
     }
     assert {key: values[key] for key in expected} == expected
 
@@ -423,7 +445,8 @@ async def test_fundstuecke_zaehler_und_uebersicht_fuer_das_eigene_profil(flow, m
     assert collectibles.total_of({"halloween_bats_scared": {"count": 4}, "logo_clicks": {"count": 90}, "easter_egg": {"count": 2}}) == 6
     assert collectibles.total_of({}) == 0
 
-    set_clock(monkeypatch, HALLOWEEN_EVE)
+    # Halloween-Abend: der Kürbis zählt nur am 31.10. ab 18 Uhr (#2338).
+    set_clock(monkeypatch, HALLOWEEN_NIGHT)
     user = await flow.add_user(name="Sammlerin")
     other = await flow.add_user(name="Andere")
     flow.act_as(None)
@@ -439,7 +462,7 @@ async def test_fundstuecke_zaehler_und_uebersicht_fuer_das_eigene_profil(flow, m
     winter = empty["seasons"][1]
     assert winter["active"] is False and winter["label"] == "Winter" and winter["next_start"].startswith("2026-11-29T00:00:00") and winter["ends_at"] is None
 
-    # Gesammelt: letztes Jahr (in den Daten), vorgestern (nachgemeldet) und heute.
+    # Gesammelt: letztes Jahr (in den Daten), vor drei Tagen (nachgemeldet) und heute.
     await flow.db[counters.SIGNALS].insert_one({"user_id": user["id"], "name": "halloween_bats_scared", "count": 20, "days": {"2025-10-31": 20}, "first_at": "2025-10-31T19:00:00+00:00", "last_at": "2025-10-31T19:30:00+00:00"})
     await flow.db[counters.SIGNALS].insert_one({"user_id": user["id"], "name": "snowflakes_clicked", "count": 60, "days": {"2025-12-24": 60}})
     await flow.db[counters.SIGNALS].insert_one({"user_id": other["id"], "name": "halloween_bats_scared", "count": 99, "days": {"2026-10-30": 99}})

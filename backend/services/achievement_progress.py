@@ -8,12 +8,7 @@ from datetime import datetime, timezone
 
 from database import get_db
 from services.private_fields import private_projection
-from services.league_scope import league_tournament_ids
-from services.competition_read import load_competition_read_model, load_registration_matches
-from services.competition_standings import (
-    registration_badge_match_progress,
-    registration_tournament_achievement_progress,
-)
+from services.achievement_participation import load_participation
 
 
 # ---------- Profile-Completeness (Phase C) ----------
@@ -58,58 +53,28 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     db = get_db()
     p: dict[str, int] = {}
 
-    regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1, "id": 1}).to_list(2000)
-    # Spiele zählen aus allen Anmeldungen; Turnierzähler, Plätze und Pokale ohne Liga-Staffeln (docs/LIGA.md, 7).
-    reg_ids = {r["id"] for r in regs}
-    league = await league_tournament_ids(db, [r.get("tournament_id") for r in regs])
-    regs = [r for r in regs if r.get("tournament_id") not in league]
-    p["tournaments_registered"] = len(regs)
-    tids = list({r["tournament_id"] for r in regs if r.get("tournament_id")})
-    games = await db.tournaments.distinct("game_id", {"id": {"$in": tids}}) if tids else []
-    p["distinct_games_registered"] = len([g for g in games if g])
-    formats = await db.tournaments.distinct("format", {"id": {"$in": tids}}) if tids else []
-    p["distinct_formats"] = len([f for f in formats if f])
+    # Eine Grundlage für Spiele, Teilnahmen und Plätze (#2337, services/achievement_participation): gezählt wird für die,
+    # die gespielt haben - auch im Team und in der Liga, nie ein Freilos. Turnierzähler, Plätze und Pokale ohne
+    # Liga-Staffeln (docs/LIGA.md, 7).
+    participation = await load_participation(db, user_id)
+    # Turnierveteran, Multitalent, Formatvielfalt: Teilnahme statt Anmeldung - dieselbe Rechnung wie die Registry.
+    p["tournaments_registered"] = participation.tournaments_played()
+    p["distinct_games_registered"] = participation.distinct_games()
+    p["distinct_formats"] = participation.distinct_formats()
+    p.update(participation.match_progress())
+    # Für „Saisons aktiv“ zählt weiter jede eigene Anmeldung zu einem Turnier.
+    tids = sorted({
+        registration["tournament_id"] for registration in participation.registrations.values()
+        if registration.get("user_id") == user_id and registration.get("tournament_id")
+        and not participation.is_league(registration["tournament_id"])
+    })
 
-    canonical_matches = await load_registration_matches(db, reg_ids)
-    p.update(registration_badge_match_progress(canonical_matches, reg_ids))
-
-    placement_progress = {
-        "tournaments_won": 0,
-        "podium_finishes": 0,
-        "rank_4_count": 0,
-    }
-    registrations_by_tournament: dict[str, list[dict]] = {}
-    if tids:
-        all_registrations = await db.tournament_registrations.find(
-            {"tournament_id": {"$in": tids}},
-            {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1},
-        ).to_list(10000)
-        for registration in all_registrations:
-            tournament_id = registration.get("tournament_id")
-            if tournament_id:
-                registrations_by_tournament.setdefault(tournament_id, []).append(registration)
-    # Das Format entscheidet, aus welcher Tabelle die Plätze kommen (geteilte Plätze in Liga und Swiss, #1593).
-    tournaments_by_id = {
-        row["id"]: row
-        for row in (await db.tournaments.find({"id": {"$in": tids}}, {"_id": 0, "id": 1, "format": 1}).to_list(10000) if tids else [])
-        if row.get("id")
-    }
-    own_registration_ids_by_tournament: dict[str, set[str]] = {}
-    for registration in regs:
-        tournament_id = registration.get("tournament_id")
-        if tournament_id and registration.get("id"):
-            own_registration_ids_by_tournament.setdefault(tournament_id, set()).add(registration["id"])
-    for tournament_id, own_registration_ids in own_registration_ids_by_tournament.items():
-        read_model = await load_competition_read_model(db, tournament_id)
-        summary = registration_tournament_achievement_progress(
-            read_model.structure_snapshot(),
-            registrations_by_tournament.get(tournament_id) or [],
-            own_registration_ids,
-            tournament=tournaments_by_id.get(tournament_id),
-        )
-        for key, value in summary.items():
-            placement_progress[key] += value
-    p.update(placement_progress)
+    # Champion, Podest und Holzmedaille (#2337): der gespeicherte Rang der Auszeichnung, nur aus abgeschlossenen Turnieren
+    # (keine Liga-Staffel) - nicht mehr der Zwischenstand eines laufenden Turniers.
+    placements = (await participation.placements(db)).values()
+    p["tournaments_won"] = sum(1 for placement in placements if 1 in placement.ranks)
+    p["podium_finishes"] = sum(1 for placement in placements if placement.ranks & {1, 2, 3})
+    p["rank_4_count"] = sum(1 for placement in placements if 4 in placement.ranks)
 
     official_lap_query = {
         "user_id": user_id,
@@ -142,13 +107,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
             pass  # unlesbares Beitrittsdatum: dann bleibt es bei 0 Tagen von oben
     p["membership_days"] = membership_days
 
-    if "event_registrations" in await db.list_collection_names():
-        p["events_attended"] = await db.event_registrations.count_documents({
-            "user_id": user_id,
-            "$or": [{"status": "checked_in"}, {"checked_in": True}],
-        })
-    else:
-        p["events_attended"] = 0
+    # Eventgänger (#2338): je Event einmal, abgesagte Events zählen nicht - dieselbe Rechnung wie „Vereinsleben“.
+    p["events_attended"] = len(await attended_event_ids(db, user_id))
 
     season_rows = await db.season_points.find({"user_id": user_id}, {"_id": 0, "total_points": 1}).to_list(2000)
     p["season_points_total"] = int(sum(float(r.get("total_points") or 0) for r in season_rows))
@@ -216,24 +176,16 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["best_season_rank_inv"] = 0
     p["best_championship_rank_inv"] = 0
 
-    # Phase E + Discord-Counter: discord_messages comes from manually maintained counter
-    p["discord_messages"] = (user or {}).get("discord_messages_count", 0)
-    p["twitch_live_sessions"] = (user or {}).get("twitch_live_sessions_count", 0)
-    p["twitch_stream_minutes"] = (user or {}).get("twitch_stream_minutes", 0)
+    # Discord-Stimme und die Chat-Zähler (#2338) rechnet allein die Registry (achievement_counters) - leicht genug für die
+    # Warteschlange; hier stand früher je eine zweite Rechnung.
+    # Streamer und Sendezeit (#2338): nur mit per Anmeldung verknüpftem Twitch - ein getippter Name zählt nicht.
+    twitch = await linked_twitch(db, user_id)
+    p["twitch_live_sessions"] = int((user or {}).get("twitch_live_sessions_count") or 0) if twitch else 0
+    p["twitch_stream_minutes"] = int((user or {}).get("twitch_stream_minutes") or 0) if twitch else 0
     p["friends_count"] = await db.friendships.count_documents({
         "status": "accepted",
         "$or": [{"requester_id": user_id}, {"recipient_id": user_id}],
     })
-    p["direct_messages_sent"] = await db.direct_messages.count_documents({"sender_id": user_id})
-    p["team_chat_messages_sent"] = await db.team_chat_messages.count_documents({"user_id": user_id})
-    p["match_chat_messages_sent"] = await db.match_chat_messages.count_documents({"user_id": user_id})
-    p["tournament_chat_messages_sent"] = await db.tournament_chat_messages.count_documents({"user_id": user_id})
-    p["community_messages_sent"] = (
-        p["direct_messages_sent"]
-        + p["team_chat_messages_sent"]
-        + p["match_chat_messages_sent"]
-        + p["tournament_chat_messages_sent"]
-    )
 
     for k in [
         "checkins_in_a_row", "fast_registrations", "clutch_count",
@@ -245,10 +197,101 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         "offroad_count", "reverse_lap_count", "slowest_lap_count", "unproven_laps",
         "team_no_show_count", "team_kills", "team_late_count", "team_member_churn",
         "zero_eight_losses", "long_warmup_count", "long_break_count", "loss_streak",
-        "twitch_live_sessions", "twitch_stream_minutes",
-        "friends_count", "direct_messages_sent", "team_chat_messages_sent",
-        "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
+        "twitch_live_sessions", "twitch_stream_minutes", "friends_count",
     ]:
         p.setdefault(k, 0)
 
     return p
+
+
+# ---------------- Chat (#2338) ----------------
+# Gezählt wird nur, was andere zu sehen bekommen: keine zurückgehaltenen oder abgelehnten Nachrichten (Wortfilter) und
+# keine gelöschten. Dazu ein Deckel je Zähler: höchstens CHAT_DAILY_CAP Nachrichten an einem Wiener Tag. Je Zähler, weil
+# sich das aus einer schlanken Abfrage je Chat rechnen lässt (nur created_at, gruppiert nach Tag) und kein Zähler vom
+# anderen abhängt. Schreiben selbst bleibt unbegrenzt.
+CHAT_DAILY_CAP = 50
+HIDDEN_CHAT_STATES = ("held", "rejected")
+# Art -> (Sammlung, Feld mit dem Absender).
+CHAT_COLLECTIONS = {
+    "direct": ("direct_messages", "sender_id"),
+    "team": ("team_chat_messages", "user_id"),
+    "match": ("match_chat_messages", "user_id"),
+    "tournament": ("tournament_chat_messages", "user_id"),
+}
+
+
+def counted_chat_query(field: str, user_id: str, **extra) -> dict:
+    """Die Nachrichten einer Person, die für Erfolge zählen dürfen."""
+    return {field: user_id, "deleted_at": {"$exists": False}, "moderation.state": {"$nin": list(HIDDEN_CHAT_STATES)}, **extra}
+
+
+def vienna_day(value):
+    """Der Wiener Kalendertag eines Zeitstempels - None, wenn er nicht lesbar ist."""
+    from services.achievement_core import VIENNA
+
+    try:
+        moment = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(VIENNA).date()
+
+
+async def chat_days(db, kind: str, user_id: str):
+    """Gezählte Nachrichten je Wiener Tag in einem Chat (ohne lesbares Datum ein eigener Topf, ebenfalls gedeckelt)."""
+    from collections import Counter
+
+    collection, field = CHAT_COLLECTIONS[kind]
+    days = Counter()
+    async for row in db[collection].find(counted_chat_query(field, user_id), {"_id": 0, "created_at": 1}):
+        days[vienna_day(row.get("created_at"))] += 1
+    return days
+
+
+def capped_total(days, cap: int = CHAT_DAILY_CAP) -> int:
+    return sum(min(count, cap) for count in days.values())
+
+
+async def chat_counters(db, user_id: str) -> dict[str, int]:
+    """Alle Chat-Zähler der Erfolge aus einer Rechnung. „Plauderer“ (community_messages_sent) sind laut Katalog die
+    offenen Chats: Turnier-Chat und Match-Chat zusammen, mit einem gemeinsamen Tagesdeckel."""
+    days = {kind: await chat_days(db, kind, user_id) for kind in CHAT_COLLECTIONS}
+    return {
+        "direct_messages_sent": capped_total(days["direct"]),
+        "team_chat_messages_sent": capped_total(days["team"]),
+        "match_chat_messages_sent": capped_total(days["match"]),
+        "tournament_chat_messages_sent": capped_total(days["tournament"]),
+        "community_messages_sent": capped_total(days["tournament"] + days["match"]),
+    }
+
+
+# ---------------- Events (#2338) ----------------
+# Anwesend ist, wen die Leitung unter „Anmeldungen & Einlass“ eingecheckt hat (Status „Da“; ältere Einträge tragen nur
+# checked_in). Einen Kartenscan am Event-Einlass gibt es nicht - die Mitgliedskarte wird nur bei der Generalversammlung
+# gescannt (eigener Erfolg „Versammlungsbesucher“). Abgesagte Events zählen bei keinem Event-Erfolg.
+ATTENDED_EVENT_QUERY = {"$or": [{"status": "checked_in"}, {"checked_in": True, "status": {"$nin": ["cancelled", "no_show"]}}]}
+# Vereinsintern ist ein Event, das nur Mitglieder sehen - oder eines, das seiner Art nach intern ist (models.EventType).
+INTERNAL_EVENT_VISIBILITY = ("members", "internal")
+INTERNAL_EVENT_TYPES = ("club_evening", "internal")
+INTERNAL_EVENT_QUERY = {"$or": [{"visibility": {"$in": list(INTERNAL_EVENT_VISIBILITY)}}, {"event_type": {"$in": list(INTERNAL_EVENT_TYPES)}}]}
+
+
+async def attended_event_ids(db, user_id: str) -> set[str]:
+    """Die Events, bei denen die Person eingecheckt war - je Event einmal, ohne abgesagte."""
+    ids = {row["event_id"] async for row in db.event_registrations.find({"user_id": user_id, **ATTENDED_EVENT_QUERY}, {"_id": 0, "event_id": 1}) if row.get("event_id")}
+    if not ids:
+        return set()
+    cancelled = set(await db.events.distinct("id", {"id": {"$in": sorted(ids)}, "status": "cancelled"}))
+    return ids - cancelled
+
+
+# ---------------- Twitch (#2338) ----------------
+
+async def linked_twitch(db, user_id: str) -> dict | None:
+    """Das per Anmeldung (OAuth) verknüpfte Twitch-Konto: {external_id, login} - oder None. Der Name im Profilfeld
+    allein ist kein Nachweis; Streamer, Sendezeit, Clip-Macher und Verifizierter Streamer zählen nur damit."""
+    link = await db.platform_links.find_one({"user_id": user_id, "platform": "twitch"}, {"_id": 0, "external_id": 1, "handle": 1})
+    if not link:
+        return None
+    return {"external_id": str(link.get("external_id") or ""), "login": str(link.get("handle") or "").strip().lstrip("@").lower()}

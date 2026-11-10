@@ -75,3 +75,25 @@ test("mit Konto: Name, Spielerprofil-Link und Lösen; Lösen schickt user_id nul
   await user.click(screen.getByTestId("club-member-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/membership/profiles/admin/p2", { user_id: null }));
 });
+
+// Streamer oder Creator (#2338): das Kennzeichen am Vereinsprofil - gespeichert wird nur die Änderung.
+test("Streamer oder Creator: Häkchen setzen schickt nur creator", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  const edit = (await screen.findAllByRole("button", { name: /Bearbeiten/ }))[1];
+  await user.click(edit);
+  const mark = await screen.findByTestId("club-member-creator");
+  expect(mark).not.toBeChecked();
+  expect(mark.closest("label")).toHaveTextContent("Verifizierter Streamer");
+  await user.click(mark);
+  await user.click(screen.getByTestId("club-member-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/membership/profiles/admin/p2", { creator: true }));
+});
+
+test("Streamer oder Creator: ein gesetztes Kennzeichen steht im Formular", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/membership/profiles/admin/all" ? { data: [{ ...PROFILES[1], creator: true }] } : { data: [] }));
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByRole("button", { name: /Bearbeiten/ }));
+  expect(await screen.findByTestId("club-member-creator")).toBeChecked();
+});

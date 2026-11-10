@@ -419,7 +419,12 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
 
 @dsgvo_router.get("/export-my-data")
 async def export_my_data(me: dict = Depends(get_current_user)):
-    sections = await _user_data_sections(get_db(), me["id"])
+    db = get_db()
+    sections = await _user_data_sections(db, me["id"])
+    # Datenbewusst (#2338): wer seine Daten holt, hat sich um seine Privatsphäre gekümmert.
+    await db.users.update_one({"id": me["id"]}, {"$set": {"data_exported_at": now_utc().isoformat()}})
+    from services.achievement_queue import request_evaluation
+    await request_evaluation([me["id"]], "data_export", sources={"profile"})
     return StreamingResponse(_stream(sections), media_type="application/json")
 
 

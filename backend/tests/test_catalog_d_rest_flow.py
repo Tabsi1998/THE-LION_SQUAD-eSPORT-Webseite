@@ -394,14 +394,18 @@ async def test_everywhere_means_every_server_and_grows_with_them(flow):
         + [{"guild_id": "600000000000000008", "name": "Aus", "role": "sub", "enabled": False},
            {"guild_id": "600000000000000009", "name": "Verlassen", "role": "sub", "enabled": True, "left_at": "2026-09-01T10:00:00+00:00"}])
 
+    # Gezählt wird nur mit verknüpftem Discord (#2338).
+    await flow.db.platform_links.insert_one({"id": "link-paula", "user_id": paula["id"], "platform": "discord", "external_id": "4242"})
+
     async def join(gid: str, here: bool = True) -> int:
         await flow.db.discord_memberships.update_one({"user_id": paula["id"], "guild_id": gid}, {"$set": {"member": here}}, upsert=True)
         return await value(paula, "discord_servers_stage")
 
+    # Stufen nach den eingeschalteten Servern (#2338): einer, die Hälfte (hier zwei), alle vier.
     assert await value(paula, "discord_servers_stage") == 0
     assert await join(servers[0]) == 1
-    assert await join(servers[1]) == 1, "zwei Server sind noch nicht drei"
-    assert await join("600000000000000008") == 1 and await join("600000000000000009") == 1, "ausgeschaltete und verlassene zählen nicht"
+    assert await join(servers[1]) == 2, "zwei von vier sind die Hälfte"
+    assert await join("600000000000000008") == 2 and await join("600000000000000009") == 2, "ausgeschaltete und verlassene zählen nicht"
     assert await join(servers[2]) == 2, "drei von vier"
     assert await join(servers[3]) == 3, "alle vier"
     assert await value(paula, "discord_guilds_joined") == 4
@@ -410,15 +414,15 @@ async def test_everywhere_means_every_server_and_grows_with_them(flow):
     assert await badges.evaluate_user_progress(paula["id"], {"discord"}) >= 3
     assert {"discord_servers_1", "discord_servers_2", "discord_servers_3"} <= await earned(flow, paula)
 
-    # „Alle“ wächst mit: kommt ein Server dazu, fehlt wieder einer - die vergebene Stufe bleibt.
+    # „Alle“ wächst mit: kommt ein Server dazu, fehlt wieder einer - die vergebene Stufe bleibt. Die Hälfte von fünf sind drei.
     await flow.db.discord_guilds.insert_one({"guild_id": "600000000000000005", "name": "Neu", "role": "sub", "enabled": True})
     assert await value(paula, "discord_servers_stage") == 2
     assert await join(servers[3], here=False) == 2 and await join(servers[2], here=False) == 1
     assert "discord_servers_3" in await earned(flow, paula)
 
-    # Mit weniger als drei Servern gibt es „überall“ noch nicht.
+    # Die Ziele liegen nie über der Zahl der Server (#2338): mit zwei eingeschalteten Servern sind beide „alle“.
     await flow.db.discord_guilds.update_many({"guild_id": {"$nin": servers[:2]}}, {"$set": {"enabled": False}})
-    assert await value(paula, "discord_guilds_joined") == 2 and await value(paula, "discord_servers_stage") == 1
+    assert await value(paula, "discord_guilds_joined") == 2 and await value(paula, "discord_servers_stage") == 3
 
 
 # ---------------------------------------------------------------- Katalog

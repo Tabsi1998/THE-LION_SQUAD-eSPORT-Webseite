@@ -46,7 +46,9 @@ COUNTER_KEYS_V2 = (
     "season_climbs_10", "seasons_fully_played", "season_openers_played", "team_match_wins", "team_invites_accepted",
     # Katalog C (#614): Community, Creator, Profil
     "discord_messages", "community_messages_sent", "gallery_uploads_approved", "stickers_collected", "app_user_stage",
-    "own_tournament_streams", "clips_synced",
+    "own_tournament_streams", "clips_synced", "streamer_verified",
+    # Chat-Zähler (#2338): aus dem alten Block in die Registry gezogen
+    "direct_messages_sent", "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent",
     # Katalog D (#615): Verein, Besonders, Geheim
     "member_since_founding_year", "pioneer_account", "distinct_game_wins_one_season", "all_visible_achievements",
     "witching_hour_matches", "lucky_seven_days", "palindrome_laps", "echo_results", "night_shift_nights", "full_moon_wins",

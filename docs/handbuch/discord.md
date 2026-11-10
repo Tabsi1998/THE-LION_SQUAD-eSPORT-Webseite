@@ -382,10 +382,15 @@ Servers (wie im Reiter „Server“ unter „Spiele auf diesem Server“):
 ### 4.8 Aktivität zählen
 
 **Reiter „Bot & Aktivität“ → „Nachrichten zählen“.** Jede Nachricht eines verknüpften Kontos zählt
-eins hoch – auf allen Servern, auf denen der Bot ist. Gezählt wird die **Zahl**, nie der Inhalt.
+eins hoch – auf allen **eingeschalteten** Servern, auf denen der Bot ist. Gezählt wird die **Zahl**, nie der Inhalt.
 Die Zähler stehen darunter und lassen sich je Person korrigieren. Sie zählen für die Erfolge
-„Discord-Aktiv“ – **ein Zähler je Person**, egal auf welchem Server sie schreibt. Derselbe Schalter
-speist die Statistik je Server (siehe 5.6).
+„Discord-Stimme“ – **ein Zähler je Person**, egal auf welchem Server sie schreibt. Ein ausgeschalteter Server zählt für keinen
+Discord-Erfolg; seine Statistik (siehe 5.6) läuft weiter.
+
+**Überall dabei:** Auf welchen eingeschalteten Servern ein verknüpftes Konto ist, merkt sich die Website beim Beitreten und
+Austreten, gleich nach dem Verknüpfen und **jede Nacht um 03:50** (Hintergrundjob `discord_memberships`, für alle mit verknüpftem
+Discord). Nach dem Trennen zählt nichts mehr. Die Stufen richten sich nach der Zahl der eingeschalteten Server: einer, die Hälfte
+(mindestens zwei), alle.
 
 ### 4.9 Persönliche Benachrichtigungen per Direktnachricht
 

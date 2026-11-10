@@ -87,11 +87,66 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
   der Lauf meldet, wie viele Turniere und Pokale es sind, und steht im Protokoll.
 - **Neuberechnung** (nur **Superadmin**): Stand des stillen Modus, **Probelauf** und **Neuberechnung abschließen** (3.10).
 
+**So zählen die Turnier- und Spiel-Erfolge.** Der Text „So schaffst du es“ steht an jedem Erfolg; die Regeln dahinter sind für alle gleich:
+
+- **Wer gespielt hat, bekommt den Erfolg.** Im Team zählt ein Spiel für alle, die laut **Aufstellung** oder
+  **Teilnehmerliste** dabei waren. Gibt es keine, zählt es für alle, die zu dem Zeitpunkt im Team waren – nicht nur für
+  die Person, die das Team angemeldet hat. Wer das Team später wechselt, behält, was er mit ihm gespielt hat.
+- **Ein Freilos ist kein Spiel:** Es zählt nicht als gespielt oder gewonnen und unterbricht keine Serie.
+- **Kampflos gewertet** zählt für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt nichts.
+- **Siegesserie:** Siege in Folge. Ein Unentschieden oder eine Niederlage beendet sie.
+- **Zwei Dinge heißen „Liga“:** die **Vereinsliga** (Season und Staffeln, Admin → Liga) und das Turnierformat
+  **Jeder gegen jeden – Hin- und Rückrunde**. Spiele der Vereinsliga zählen für die Spiel-Erfolge (Spielmacher, Sieger,
+  Teamsieger …), ihre Staffeln aber nicht als Turnier. Ein Turnier im Format Hin- und Rückrunde ist ein normales Turnier.
+- **Plätze gibt es erst nach dem Abschluss.** Champion, Podest, Top 8, Finalist und die anderen Platz-Erfolge zählen nur
+  aus Turnieren mit dem Status **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert**, nie aus einer
+  Staffel der Vereinsliga. Grundlage ist der gespeicherte Platz (derselbe wie auf dem Pokal). **Top 8** zählt erst ab mehr als
+  acht Teilnehmern.
+- **Finalist** ist, wer im Finale stand: im Endspiel, im Grand Final oder im Finallauf (dort alle). Kein Finale haben
+  Jeder gegen jeden (einfach und Hin- und Rückrunde), Schweizer System, reine Gruppenphase, die Vereinsliga, Zeitfahren
+  und Rennserie – außerdem ein K.-o. mit nur zwei Teilnehmern und ein einzelner Mehrspieler-Lauf: Ein einziges Spiel ist
+  kein Finale. Ein kampfloses Finale zählt auch nicht.
+- **Teilnahme statt Anmeldung:** Turnierveteran, Multitalent, Formatvielfalt und Teamturniere zählen, wenn die
+  Anmeldung angenommen oder eingecheckt war und die Person mindestens ein echtes Spiel gespielt hat – auch wenn sie
+  danach austritt oder disqualifiziert wird. Abgesagte Turniere zählen nicht, Staffeln der Vereinsliga auch nicht (nur
+  bei der Formatvielfalt zählt die Vereinsliga als „Hin- und Rückrunde“).
+- **Durchzieher** verlangt mehr: ein abgeschlossenes Turnier, gespielt, ohne kampflos zu verlieren, auszutreten oder
+  disqualifiziert zu werden.
+- **Topgesetzt und Riesentöter** gelten nur bei fester Setzliste (Setzliste **Manuell**, siehe
+  [Turniere](turniere.md)), nicht bei **Zufall**. Es zählt die Setznummer der Anmeldung.
+- **Preisträger** zählt Preise aus Turnieren, die vorgemerkt, abholbereit oder abgeholt sind – keine verfallenen und
+  keine aus Fast Lap oder Verlosungen.
+
+Ein einmal freigeschalteter Erfolg bleibt, auch wenn ein Ergebnis später korrigiert wird.
+
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
 [Mails und Benachrichtigungen](mails.md)). Dazu kommt eine Meldung im Thema **Erfolge** (In-App, Push, Discord; **nie** per Mail).
 Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg lässt sich teilen: Er hat eine eigene Seite
 (`/achievements/a/<id>`).
+
+**Was genau zählt (Chat, Discord, Verein, Profil):**
+
+- **Chat** (Plauderer, Teamgeist, Turnier-Plauderer, Briefeschreiber): Zurückgehaltene, abgelehnte und gelöschte Nachrichten
+  zählen nie. Je Erfolg zählen höchstens **50 Nachrichten an einem Tag** (Wiener Zeit); schreiben lässt sich weiter unbegrenzt.
+  „Plauderer“ sind Turnier- und Match-Chat zusammen. Eine Nachricht wird über die Warteschlange ausgewertet, eine später
+  freigegebene ebenso. **Sticker-Sammler** zählt verschiedene Sticker, ebenfalls nur aus sichtbaren Nachrichten – ohne
+  Tageslimit.
+- **Discord:** Gezählt wird nur mit verknüpftem Discord-Konto und nur auf **eingeschalteten** Servern – das gilt für
+  „Discord-Stimme“ und „Überall dabei“. Auf welchen Servern jemand ist, gleicht der Bot beim Verknüpfen und **jede Nacht um 03:50**
+  ab; nach dem Trennen zählt nichts mehr. „Überall dabei“: Stufe I ein Server, Stufe II die Hälfte der eingeschalteten Server
+  (mindestens zwei), Stufe III alle – nie mehr, als es Server gibt.
+- **Events:** „Eventgänger“ und „Vereinsleben“ zählen, wer unter **Anmeldungen & Einlass** eingecheckt ist (**Da**), je Event einmal;
+  **abgesagte Events** zählen nicht. Vereinsintern sind Events mit der Sichtbarkeit **Mitglieder** oder **intern** und Events der Art
+  **Vereinsabend** oder **intern**. Einen Kartenscan am Event-Einlass gibt es nicht.
+- **Datenbewusst:** erst, wenn die Person unter Einstellungen → Privatsphäre selbst etwas einstellt oder ihren Datenexport holt –
+  die Voreinstellung bei der Registrierung zählt nicht.
+- **Twitch** (Streamer, Sendezeit, Clip-Macher): nur mit **per Anmeldung verknüpftem** Twitch-Kanal; ein getippter Name zeigt den
+  Stream auf der Seite, zählt aber nicht. **Verifizierter Streamer** kommt von selbst, wenn Twitch so verknüpft ist und der Verein
+  die Person als Streamer oder Creator führt (Häkchen im Vereinsprofil, [Verein](verein.md) 3.10); von Hand vergeben geht weiter.
+- **Team:** „Teamauftritt“ braucht Logo, Banner und Teambeschreibung und zählt für Teamleitung und Co-Leitung – ausgewertet gleich
+  nach dem Speichern. „Kapitän“ zählt die Tage seit der Übernahme der Leitung (bei älteren Teams ohne diese Angabe ab der Gründung).
+- **Gruselnacht:** Der Kürbis zählt nur am **31.10. ab 18 Uhr** (Wiener Zeit) – das prüft der Server.
 
 ### 3.2 Der Katalog: Gruppen, Stufen, Materialien
 
@@ -126,7 +181,10 @@ bei Fehlern **nichts** und löscht nie etwas.
 
 Reiter **Vergeben**.
 
-**Einzelvergabe:** Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann die Optionen:
+**Einzelvergabe** (alle mit dem Bereich **Redaktion**): Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann
+die Optionen. Die Texte der Hand-Erfolge sagen, wie es läuft: bei Ehrungen wie Ehrenlöwe, Hall of Fame, Saison-MVP oder
+Ehrenamt „Der Vorstand entscheidet, die Redaktion trägt ein“; bei Teilnahmen wie Gamers Heaven, LAN-Gründer oder Beta-Tester
+trägt die Redaktion alle ein, die dabei waren:
 
 - **Grund** (steht im Protokoll),
 - **Datum** – leer heißt jetzt, sonst rückwirkend,
@@ -373,6 +431,8 @@ Abschluss stehen im Protokoll unter **Vergeben**. Am Server geht beides auch per
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
 | Ein Erfolg kommt nicht | Die Warteschlange läuft alle 30 Sekunden; die Stufe ist **von Hand** oder **nur Mitglieder**; die Person ist kein aktives Mitglied | Übersicht → **Alle jetzt auswerten**; Bedingung im Katalog prüfen |
+| „Champion“ oder „Podest“ kommt nicht, obwohl das Finale gespielt ist | Plätze zählen erst, wenn das Turnier beendet ist | Turnier auf **Beendet** setzen bzw. Ergebnisse veröffentlichen ([Turniere](turniere.md)) |
+| Ein Teammitglied bekommt einen Team-Erfolg nicht | Es steht nicht in der Aufstellung bzw. Teilnehmerliste des Spiels | Aufstellung prüfen; ohne Aufstellung zählen alle, die damals im Team waren (3.1) |
 | Katalog zeigt „geplant“ bei einer Stufe | Die Automatik für diesen Zähler ist noch nicht angeschlossen | Stufe von Hand vergeben |
 | „… dürfen nur der Vorstand oder die Systemverwaltung“ | Massenvergabe, Import, XP-Korrektur und Prestige-Reset sind dafür vorbehalten | Vorstand oder System fragen |
 | Vergabe: „Diese Stufe ist nur für aktive Vereinsmitglieder“ | Die Person ist kein aktives Mitglied oder Ehrenmitglied | Mitgliedschaft klären ([Verein](verein.md)) |

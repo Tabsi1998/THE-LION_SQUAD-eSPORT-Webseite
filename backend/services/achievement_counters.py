@@ -20,10 +20,10 @@ from typing import Awaitable, Callable
 
 from database import get_db
 from models import now_utc
-from services import achievement_progress
+from services import achievement_participation, achievement_progress
 from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
 from services.league_scope import NOT_LEAGUE, league_tournament_ids
-from services.match_winner import is_duel, match_winner_id, participant_ids, won_by
+from services.match_winner import DECIDED_STATUSES, is_duel, is_real_match, match_winner_id, participant_ids
 from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
@@ -45,9 +45,9 @@ LEGACY_KEYS = frozenset({
     "match_streak_max", "tournaments_won", "podium_finishes", "rank_4_count", "fastlap_valid_count", "distinct_tracks",
     "pole_count", "membership_days", "events_attended", "season_points_total", "distinct_platforms", "seasons_active",
     "profile_completeness", "achievements_unlocked", "achievement_points", "teams_founded", "team_days_max",
-    "discord_messages", "twitch_live_sessions", "twitch_stream_minutes", "friends_count", "direct_messages_sent",
-    "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
+    "twitch_live_sessions", "twitch_stream_minutes", "friends_count",
 })
+# Discord-Stimme und die Chat-Zähler stehen seit #2338 nur in der Registry (eine Rechnung, leicht auswertbar).
 
 
 @dataclass(frozen=True)
@@ -96,14 +96,13 @@ class Context:
         return await self._memo("user", lambda: self.db.users.find_one({"id": self.user_id}, private_projection())) or {}
 
     async def registrations(self) -> list[dict]:
+        """Die Anmeldungen, die die Person selbst abgegeben hat - für das, was sie beim Anmelden und Einchecken tut
+        (schnelle Anmeldung, Check-in-Serie, Saisonstart). Gespielt und platziert wird über ``participation``."""
         return await self._memo("registrations", lambda: self.db.tournament_registrations.find({"user_id": self.user_id}, {"_id": 0}).to_list(2000))
-
-    async def registration_ids(self) -> set[str]:
-        return {r["id"] for r in await self.registrations() if r.get("id")}
 
     async def tournaments(self) -> dict[str, dict]:
         """Die Turniere der eigenen Anmeldungen - ohne Liga-Staffeln (docs/LIGA.md, Abschnitt 7): eine Staffel ist kein
-        Turnier für die Turnierzähler; ihre Spiele zählen über ``matches`` weiter."""
+        Turnier für die Turnierzähler; ihre Spiele zählen über ``played`` weiter."""
         async def load():
             ids = list({r.get("tournament_id") for r in await self.registrations() if r.get("tournament_id")})
             rows = await self.db.tournaments.find({"id": {"$in": ids}, **NOT_LEAGUE}, {"_id": 0, "id": 1, "status": 1, "registration_opens_at": 1, "registration_open_from": 1, "is_public": 1, "game_id": 1, "season_id": 1, "stream_url": 1, "format": 1}).to_list(2000) if ids else []
@@ -118,14 +117,13 @@ class Context:
             return [r for r in regs if r.get("tournament_id") not in league]
         return await self._memo("tournament_registrations", load)
 
-    async def matches(self) -> list[dict]:
-        """Rohe Matches aus ``matches_v2`` - mit Zeitstempeln, die der kanonische Umbau nicht mitnimmt."""
-        async def load():
-            ids = list(await self.registration_ids())
-            if not ids:
-                return []
-            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}}, {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, "results": 1, "winner_id": 1, "completed_at": 1, "updated_at": 1, "scheduled_at": 1, "best_of": 1, "map": 1, "maps": 1, "disputes": 1, "forfeit_registration_id": 1, "section": 1, "bracket": 1, "round_name": 1, "group_id": 1}).to_list(5000)
-        return await self._memo("matches", load)
+    async def participation(self) -> achievement_participation.Participation:
+        """Wer hat gespielt (#2337): Anmeldungen, Turniere und Spiele der Person - auch über ihre Teams und die Liga."""
+        return await self._memo("participation", lambda: achievement_participation.load_participation(self.db, self.user_id))
+
+    async def played(self) -> list[achievement_participation.Played]:
+        """Die echten Spiele, in denen die Person selbst angetreten ist - nie ein Freilos, kampflos nur für den Sieger."""
+        return (await self.participation()).played
 
     async def awards(self) -> list[dict]:
         return await self._memo("awards", lambda: self.db.user_achievements.find({"user_id": self.user_id}, {"_id": 0}).to_list(2000))
@@ -152,12 +150,21 @@ class Context:
 
     async def club_servers(self) -> tuple[int, int]:
         """(Discord-Server des Vereins, auf denen die Person ist; eingeschaltete Server insgesamt) - wie der Bot es
-        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite."""
+        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite. Gezählt wird nur mit
+        verknüpftem Discord und nur, was für genau dieses Konto gemerkt ist (#2338) - nach dem Trennen nichts mehr."""
         async def load():
             enabled = [row["guild_id"] async for row in self.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
             if not enabled:
                 return 0, 0
-            return await self.db.discord_memberships.count_documents({"user_id": self.user_id, "member": True, "guild_id": {"$in": enabled}}), len(enabled)
+            link = await self.db.platform_links.find_one({"user_id": self.user_id, "platform": "discord"}, {"_id": 0, "external_id": 1}) or {}
+            discord_id = str(link.get("external_id") or "")
+            if not discord_id:
+                return 0, len(enabled)
+            joined = await self.db.discord_memberships.count_documents({
+                "user_id": self.user_id, "member": True, "guild_id": {"$in": enabled},
+                "$or": [{"discord_id": {"$exists": False}}, {"discord_id": discord_id}],
+            })
+            return joined, len(enabled)
         return await self._memo("club_servers", load)
 
     async def links(self) -> set[str]:
@@ -169,18 +176,19 @@ class Context:
     async def season_standings(self) -> list[dict]:
         return await self._memo("season_standings", lambda: self.db.season_standings.find({"user_id": self.user_id}, {"_id": 0, "rank": 1, "season_id": 1}).to_list(500))
 
-    async def awards_places(self) -> list[dict]:
-        async def load():
-            ids = list(await self.registration_ids())
-            return await self.db.tournament_awards.find({"registration_id": {"$in": ids}}, {"_id": 0, "tournament_id": 1, "place": 1}).to_list(2000) if ids else []
-        return await self._memo("awards_places", load)
+    async def placements(self) -> dict[str, achievement_participation.Placement]:
+        """Der Platz je abgeschlossenem Turnier (#2337) - der gespeicherte Rang der Auszeichnung, nie ein Zwischenstand."""
+        return await (await self.participation()).placements(self.db)
+
+    async def finals(self) -> set[str]:
+        """Die abgeschlossenen Turniere, in deren Finale die Person stand."""
+        return await (await self.participation()).finals(self.db)
 
     async def opponent_registrations(self) -> dict[str, dict]:
         """Die Anmeldungen der Gegner aus allen eigenen Matches (Check-in-Zeiten, Status) - Katalog A."""
         async def load():
-            mine = await self.registration_ids()
-            ids = {slot.get("registration_id") for match in await self.matches() for slot in match.get("slots") or [] if slot.get("registration_id") and slot.get("registration_id") not in mine}
-            rows = await self.db.tournament_registrations.find({"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "status": 1, "checked_in_at": 1, "updated_at": 1, "user_id": 1, "team_id": 1}).to_list(5000) if ids else []
+            ids = {reg_id for row in await self.played() for reg_id in row.opponents}
+            rows = await self.db.tournament_registrations.find({"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "status": 1, "checked_in_at": 1, "updated_at": 1, "user_id": 1, "team_id": 1, "seed": 1}).to_list(5000) if ids else []
             return {row["id"]: row for row in rows}
         return await self._memo("opponent_registrations", load)
 
@@ -197,7 +205,7 @@ class Context:
 
     async def group_matches(self, tournament_id: str, group_id: str) -> list[dict]:
         key = f"group:{tournament_id}:{group_id}"
-        return await self._memo(key, lambda: self.db.matches_v2.find({"tournament_id": tournament_id, "group_id": group_id, "status": "completed"}, {"_id": 0, "slots": 1, "results": 1, "winner_id": 1}).to_list(2000))
+        return await self._memo(key, lambda: self.db.matches_v2.find({"tournament_id": tournament_id, "group_id": group_id, "status": {"$in": sorted(DECIDED_STATUSES)}}, {"_id": 0, "status": 1, "slots": 1, "results": 1, "winner_id": 1}).to_list(2000))
 
     # ---- Katalog B (#613): Fast Lap, Saison, Team
 
@@ -257,34 +265,8 @@ class Context:
             return {row["id"]: row for row in rows}
         return await self._memo("season_tournaments", load)
 
-    async def team_memberships(self) -> dict[str, dict]:
-        async def load():
-            rows = await self.db.team_members.find({"user_id": self.user_id}, {"_id": 0, "team_id": 1, "joined_at": 1, "role": 1}).to_list(200)
-            return {row["team_id"]: row for row in rows if row.get("team_id")}
-        return await self._memo("team_memberships", load)
 
-    async def team_registrations(self) -> dict[str, dict]:
-        async def load():
-            ids = [team["id"] for team in await self.teams() if team.get("id")]
-            rows = await self.db.tournament_registrations.find({"team_id": {"$in": ids}}, {"_id": 0, "id": 1, "team_id": 1, "tournament_id": 1}).to_list(5000) if ids else []
-            return {row["id"]: row for row in rows}
-        return await self._memo("team_registrations", load)
-
-    async def team_matches(self) -> list[dict]:
-        async def load():
-            ids = list(await self.team_registrations())
-            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}, "status": "completed"}, {"_id": 0, "id": 1, "slots": 1, "results": 1, "winner_id": 1, "completed_at": 1, "updated_at": 1}).to_list(10000) if ids else []
-        return await self._memo("team_matches", load)
-
-
-def _parse(value) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+_parse = achievement_participation.parse_time
 
 
 def _signal_count(signals: dict, name: str) -> int:
@@ -433,14 +415,22 @@ async def _discord_guilds_joined(ctx):
     return (await ctx.club_servers())[0]
 
 
+def servers_for_stage(stage: int, enabled: int) -> int:
+    """So viele eingeschaltete Server braucht Stufe 1, 2 oder 3 von „Überall dabei“ (#2338): einen, die Hälfte
+    (aufgerundet, mindestens zwei) und alle. Nie mehr, als es Server gibt - mit einem Server reicht er für alle drei."""
+    if enabled <= 0:
+        return 1
+    wanted = {1: 1, 2: max(2, -(-enabled // 2)), 3: enabled}[stage]
+    return min(wanted, enabled)
+
+
 @counter("discord_servers_stage", "discord")
 async def _discord_servers_stage(ctx):
-    """Überall dabei (#614, #615): 1 = auf einem Server des Vereins, 2 = auf drei, 3 = auf allen eingeschalteten.
-    „Alle“ ist kein festes Ziel - kommt ein Server dazu, wächst es mit; mit weniger als drei Servern bleibt es bei 1."""
+    """Überall dabei (#614, #615, #2338): die erreichte Stufe, gemessen an den eingeschalteten Servern - Stufe 1 auf
+    einem, Stufe 2 auf der Hälfte, Stufe 3 auf allen. Die Ziele wachsen und schrumpfen mit der Zahl der Server; sie
+    liegen nie über ihr."""
     joined, enabled = await ctx.club_servers()
-    if joined >= 3:
-        return 3 if joined >= enabled else 2
-    return 1 if joined else 0
+    return max((stage for stage in (1, 2, 3) if enabled and joined >= servers_for_stage(stage, enabled)), default=0)
 
 
 @counter("twitch_linked", "profile")
@@ -494,8 +484,10 @@ async def _notification_prefs(ctx):
 
 @counter("privacy_reviewed", "profile")
 async def _privacy(ctx):
+    """Datenbewusst (#2338): eine selbst gespeicherte Privatsphäre-Einstellung oder ein geholter Datenexport. Die
+    Registrierung setzt die Felder schon - deren Wert allein zählt nicht mehr."""
     user = await ctx.user()
-    return 1 if isinstance(user.get("privacy_public_profile"), bool) or user.get("profile_visibility") else 0
+    return 1 if user.get("privacy_reviewed_at") or user.get("data_exported_at") else 0
 
 
 @counter("newsletter_subscribed", "profile", "community")
@@ -554,26 +546,50 @@ async def _categories(ctx):
 
 # ------------------------------------------------------------------ Turnier
 
-# Anmeldung (#1871): was eine Turnier-Anmeldung ändert, auch ohne den alten Block - dieselbe Rechnung wie dort
-# (achievement_progress.compute_user_progress), damit Anmeldung und voller Lauf dieselben Werte schreiben.
-@counter("tournaments_registered", "registration")
+# Teilnahme statt Anmeldung (#2337): Turnierveteran, Multitalent und Formatvielfalt zählen, wo die Person angenommen
+# oder eingecheckt war und in mindestens einem echten Spiel angetreten ist - abgesagte Turniere nie. Die Schlüssel
+# heißen weiter „…_registered“; Katalog und gespeicherte Stände hängen daran. Dieselbe Rechnung wie im alten Block
+# (achievement_progress.compute_user_progress), damit Teil- und voller Lauf dieselben Werte schreiben. Eine Anmeldung
+# ändert sie nicht mehr - deshalb hängen sie nicht an der Quelle „registration“: Der Anmelde-Pfad bleibt leicht (#1871).
+@counter("tournaments_registered", "match", "tournament")
 async def _tournaments_registered(ctx):
-    return len(await ctx.tournament_registrations())
+    return (await ctx.participation()).tournaments_played()
 
 
-@counter("distinct_games_registered", "registration")
+@counter("distinct_games_registered", "match", "tournament")
 async def _distinct_games_registered(ctx):
-    return len({t.get("game_id") for t in (await ctx.tournaments()).values() if t.get("game_id")})
+    return (await ctx.participation()).distinct_games()
 
 
-@counter("distinct_formats", "registration")
+@counter("distinct_formats", "match", "tournament")
 async def _distinct_formats(ctx):
-    return len({t.get("format") for t in (await ctx.tournaments()).values() if t.get("format")})
+    return (await ctx.participation()).distinct_formats()
+
+
+# Preisträger (#2337): Preise aus Turnieren - nicht aus Fast Lap, Verlosung oder Eiersuche (``source_type``) -, die vergeben
+# sind: vorgemerkt, abholbereit oder abgeholt. Verfallene und nach einer Korrektur strittige („bitte prüfen“) zählen nicht.
+PRIZE_STATUSES = frozenset({"pending", "ready", "picked_up"})
 
 
 @counter("prizes_received", "tournament")
 async def _prizes(ctx):
-    return await ctx.db.prize_pickups.count_documents({"user_id": ctx.user_id})
+    """Ein Preis für die Person zählt für sie; ein Preis für ein Team für alle, die in dem Turnier für das Team gespielt
+    haben - nicht nur für die Person, die es angemeldet hat."""
+    participation = await ctx.participation()
+    played_for = {(registration["tournament_id"], registration["team_id"]) for registration in participation.entries() if registration.get("team_id")}
+    team_ids = sorted({team_id for _tournament_id, team_id in played_for})
+    query = {"$or": [{"user_id": ctx.user_id}, {"team_id": {"$in": team_ids}}]} if team_ids else {"user_id": ctx.user_id}
+    count = 0
+    async for pickup in ctx.db.prize_pickups.find(query, {"_id": 0, "tournament_id": 1, "user_id": 1, "team_id": 1, "status": 1, "source_type": 1, "needs_review": 1}):
+        if not pickup.get("tournament_id") or (pickup.get("source_type") or "tournament") != "tournament":
+            continue
+        if (pickup.get("status") or "pending") not in PRIZE_STATUSES or pickup.get("needs_review"):
+            continue
+        if pickup.get("team_id"):
+            count += int((pickup["tournament_id"], pickup["team_id"]) in played_for)
+        else:
+            count += int(pickup.get("user_id") == ctx.user_id)
+    return count
 
 
 @counter("tournaments_staffed_completed", "tournament")
@@ -586,8 +602,15 @@ async def _staffed(ctx):
 
 @counter("seed_one_count", "tournament")
 async def _seed_one(ctx):
-    """Topgesetzt: je Turnier einmal, egal wie viele Anmeldungen dort auf Platz 1 gesetzt waren."""
-    return len({r.get("tournament_id") for r in await ctx.tournament_registrations() if r.get("seed") == 1 and r.get("tournament_id")})
+    """Topgesetzt (#2337): Setznummer 1 der Anmeldung in einem abgeschlossenen Turnier mit fester Setzliste, in dem die
+    Person gespielt hat - je Turnier einmal. Ausgelost, abgesagt, ausgetreten und Liga zählen nicht; die Nummern je Lauf
+    (Plätze im Baum) auch nicht."""
+    participation = await ctx.participation()
+    return len({
+        registration["tournament_id"] for registration in participation.tournament_entries(still_in=True)
+        if registration.get("seed") == 1 and participation.is_done(registration["tournament_id"])
+        and participation.has_fixed_seeding(registration["tournament_id"])
+    })
 
 
 @counter("tournaments_completed", "tournament")
@@ -612,8 +635,9 @@ async def _fast_registrations(ctx):
 
 @counter("first_checkins", "tournament")
 async def _first_checkins(ctx):
-    """Erster Check-in eines Turniers: der eigene Check-in-Zeitpunkt liegt vor allen anderen."""
-    mine = [r for r in await ctx.tournament_registrations() if r.get("status") == "checked_in" and r.get("tournament_id")]
+    """Erster Check-in eines Turniers: der eigene Check-in-Zeitpunkt liegt vor allen anderen - in einem Turnier, in dem
+    die Person dann auch gespielt hat (#2337); eingecheckt hat, wer die Anmeldung trägt."""
+    mine = [r for r in (await ctx.participation()).tournament_entries() if r.get("status") == "checked_in" and r.get("user_id") == ctx.user_id]
     count = 0
     for reg in mine:
         stamp = str(reg.get("checked_in_at") or reg.get("updated_at") or "")
@@ -627,58 +651,43 @@ async def _first_checkins(ctx):
 
 @counter("top8_finishes", "tournament")
 async def _top8(ctx):
-    return len({row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) <= 8})
+    """Platz 1 bis 8 in einem abgeschlossenen Turnier - erst ab mehr als acht Teilnehmern, sonst wäre jeder dabei."""
+    return sum(1 for placement in (await ctx.placements()).values() if placement.participants > 8 and any(rank <= 8 for rank in placement.ranks))
 
 
 @counter("finals_played", "tournament")
 async def _finals(ctx):
-    return len({row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) <= 2})
+    """Im Finale gestanden: Endspiel, Grand Final oder Finallauf - nicht „Platz 1 oder 2“ (Tabellen haben kein Finale)."""
+    return len(await ctx.finals())
 
 
 # ------------------------------------------------------------------ Match (Zeit, Gegner, Lob)
-
-def _completed_matches(matches: list[dict], registration_ids: set[str]) -> list[tuple[dict, bool, datetime | None, set[str]]]:
-    out = []
-    for match in matches:
-        if match.get("status") != "completed":
-            continue
-        slots = [slot for slot in match.get("slots") or [] if slot.get("registration_id")]
-        mine = {slot["registration_id"] for slot in slots} & registration_ids
-        if not mine:
-            continue
-        won = won_by(match, registration_ids)
-        when = _parse(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at"))
-        opponents = {slot["registration_id"] for slot in slots} - registration_ids
-        out.append((match, won, when, opponents))
-    return out
-
+# Alle Spiel-Zähler laufen über ``ctx.played()`` (#2337): echte Spiele, in denen die Person selbst angetreten ist - ein
+# Freilos nie, kampflos gewertet nur für den Sieger, im Team und in der Liga nach Aufstellung bzw. Mitgliedschaft.
 
 @counter("matches_before_9", "match")
 async def _before_9(ctx):
-    return sum(1 for _m, _w, when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if when and when.astimezone(VIENNA).hour < 9)
+    return sum(1 for row in await ctx.played() if row.when and row.when.astimezone(VIENNA).hour < 9)
 
 
 @counter("matches_after_23", "match")
 async def _after_23(ctx):
-    return sum(1 for _m, _w, when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if when and when.astimezone(VIENNA).hour >= 23)
+    return sum(1 for row in await ctx.played() if row.when and row.when.astimezone(VIENNA).hour >= 23)
 
 
 @counter("weekend_matches", "match")
 async def _weekend(ctx):
-    return sum(1 for _m, _w, when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if when and when.astimezone(VIENNA).weekday() >= 5)
+    return sum(1 for row in await ctx.played() if row.when and row.when.astimezone(VIENNA).weekday() >= 5)
 
 
 @counter("same_opponent_max", "match")
 async def _same_opponent(ctx):
-    rows = _completed_matches(await ctx.matches(), await ctx.registration_ids())
-    opponent_ids = {opp for _m, _w, _when, opponents in rows for opp in opponents}
-    if not opponent_ids:
-        return 0
-    regs = await ctx.db.tournament_registrations.find({"id": {"$in": list(opponent_ids)}}, {"_id": 0, "id": 1, "user_id": 1, "team_id": 1}).to_list(5000)
+    rows = await ctx.played()
+    regs = (await ctx.opponent_registrations()).values()
     owner = {r["id"]: r.get("user_id") or r.get("team_id") for r in regs}
     tally: dict[str, int] = {}
-    for _m, _w, _when, opponents in rows:
-        for opp in opponents:
+    for row in rows:
+        for opp in row.opponents:
             key = owner.get(opp)
             if key:
                 tally[key] = tally.get(key, 0) + 1
@@ -687,16 +696,19 @@ async def _same_opponent(ctx):
 
 @counter("upsets", "match")
 async def _upsets(ctx):
-    """Sieg gegen einen besser gesetzten Gegner (kleinere Setznummer)."""
+    """Sieg gegen einen besser gesetzten Gegner (kleinere Setznummer) - die Setznummer der Anmeldung, nicht der Platz im
+    Baum, und nur bei fester Setzliste (#2337): Wo das Los die Nummern vergibt, gibt es keinen Favoriten."""
+    participation = await ctx.participation()
+    others = await ctx.opponent_registrations()
     count = 0
-    mine = await ctx.registration_ids()
-    for match, won, _when, _opponents in _completed_matches(await ctx.matches(), mine):
+    for row in participation.played:
+        match = row.match
         # Favoritenschreck ist ein Duell-Erfolg (#1796): im FFA-Lauf schlägt Platz 1 nicht „den Gegner“.
-        if not won or not is_duel(match):
+        if not row.won or not is_duel(match) or not participation.has_fixed_seeding(match.get("tournament_id")):
             continue
-        seeds = {slot.get("registration_id"): slot.get("seed") for slot in match.get("slots") or [] if slot.get("registration_id")}
-        my_seed = min((int(seeds[r]) for r in seeds if r in mine and isinstance(seeds.get(r), int)), default=None)
-        their = min((int(seeds[r]) for r in seeds if r not in mine and isinstance(seeds.get(r), int)), default=None)
+        my_seed = participation.seed_of(row.mine)
+        seeds = [(others.get(reg_id) or {}).get("seed") for reg_id in row.opponents]
+        their = min((seed for seed in seeds if isinstance(seed, int) and not isinstance(seed, bool)), default=None)
         if my_seed is not None and their is not None and their < my_seed:
             count += 1
     return count
@@ -704,8 +716,13 @@ async def _upsets(ctx):
 
 @counter("commendations_received", "match")
 async def _gg_received(ctx):
-    ids = list(await ctx.registration_ids())
-    return await ctx.db.match_commendations.count_documents({"to_registration_id": {"$in": ids}}) if ids else 0
+    """GG-Lob für eine Seite zählt für die, die das Spiel für sie gespielt haben (#2337) - im Team nach Aufstellung."""
+    sides = {(row.match.get("id"), reg_id) for row in await ctx.played() for reg_id in row.mine}
+    match_ids = sorted({match_id for match_id, _reg in sides if match_id})
+    if not match_ids:
+        return 0
+    rows = ctx.db.match_commendations.find({"match_id": {"$in": match_ids}}, {"_id": 0, "match_id": 1, "to_registration_id": 1})
+    return sum([1 async for row in rows if (row.get("match_id"), row.get("to_registration_id")) in sides])
 
 
 @counter("commendations_given", "match")
@@ -720,21 +737,40 @@ async def _team_size(ctx):
     return max((len(team.get("member_ids") or []) for team in await ctx.teams()), default=0)
 
 
+def team_profile_complete(team: dict) -> bool:
+    """Teamauftritt (#2338): Logo, Banner und Beschreibung - die Beschreibung nicht leer nach dem Trimmen."""
+    return bool(str(team.get("logo_url") or "").strip() and str(team.get("banner_url") or "").strip() and str(team.get("description") or "").strip())
+
+
 @counter("team_profile_complete", "team")
 async def _team_profile(ctx):
-    return 1 if any(team.get("logo_url") and team.get("banner_url") and str(team.get("description") or "").strip() for team in await ctx.teams() if team.get("leader_id") == ctx.user_id) else 0
+    """Für die Teamleitung und die Co-Leitung eines Teams mit vollständigem Auftritt (#2338)."""
+    return 1 if any(team_profile_complete(team) for team in await ctx.teams()
+                    if team.get("leader_id") == ctx.user_id or ctx.user_id in (team.get("co_leader_ids") or [])) else 0
 
 
 @counter("captain_days", "team")
 async def _captain_days(ctx):
+    """Kapitän (#2338): Tage seit der Übernahme der Leitung (``leader_since``). Teams von vor dieser Angabe: die letzte
+    protokollierte Übergabe an diese Person (``team.transfer_leader``), erst ohne eine solche ab der Gründung."""
     days = 0
     for team in await ctx.teams():
         if team.get("leader_id") != ctx.user_id:
             continue
-        created = _parse(team.get("created_at"))
-        if created:
-            days = max(days, (now_utc() - created).days)
+        since = _parse(team.get("leader_since")) or await _last_handover(ctx, team.get("id")) or _parse(team.get("created_at"))
+        if since:
+            days = max(days, (now_utc() - since).days)
     return days
+
+
+async def _last_handover(ctx, team_id: str | None) -> datetime | None:
+    """Wann die Person die Leitung dieses Teams zuletzt übergeben bekam - aus dem Protokoll."""
+    if not team_id:
+        return None
+    rows = await ctx.db.audit_logs.find(
+        {"action": "team.transfer_leader", "target_id": team_id, "data.new_leader": ctx.user_id},
+        {"_id": 0, "created_at": 1}).sort("created_at", -1).to_list(1)
+    return _parse(rows[0].get("created_at")) if rows else None
 
 
 @counter("team_level_max", "team")
@@ -747,13 +783,10 @@ async def _team_level(ctx):
     return max((int((levels.get(team["id"]) or {}).get("level") or 0) for team in teams if team.get("id")), default=0)
 
 
-@counter("team_tournaments_played", "team", "tournament")
+@counter("team_tournaments_played", "team", "tournament", "match")
 async def _team_tournaments(ctx):
-    ids = [team["id"] for team in await ctx.teams() if team.get("id")]
-    if not ids:
-        return 0
-    played = await ctx.db.tournament_registrations.distinct("tournament_id", {"team_id": {"$in": ids}})
-    return len(set(played) - await league_tournament_ids(ctx.db, played))
+    """Turniere, in denen die Person für ein Team gespielt hat (#2337) - nicht jedes, zu dem ein Team angemeldet ist."""
+    return len({registration["tournament_id"] for registration in (await ctx.participation()).tournament_entries() if registration.get("team_id")})
 
 
 # ------------------------------------------------------------------ Events, Saison, Community
@@ -765,10 +798,12 @@ async def _events_hosted(ctx):
 
 @counter("club_events_attended", "event", "club")
 async def _club_events(ctx):
-    event_ids = [row.get("event_id") async for row in ctx.db.event_registrations.find({"user_id": ctx.user_id, "$or": [{"status": "checked_in"}, {"checked_in": True}]}, {"_id": 0, "event_id": 1}) if row.get("event_id")]
+    """Vereinsleben (#2338): besuchte Events, die vereinsintern sind - nach Sichtbarkeit (Mitglieder, intern) oder Art
+    (Vereinsabend, intern). Anwesenheit und „abgesagt zählt nicht“ wie bei „Eventgänger“ (achievement_progress)."""
+    event_ids = await achievement_progress.attended_event_ids(ctx.db, ctx.user_id)
     if not event_ids:
         return 0
-    return await ctx.db.events.count_documents({"id": {"$in": event_ids}, "visibility": {"$in": ["members", "internal"]}})
+    return await ctx.db.events.count_documents({"id": {"$in": sorted(event_ids)}, **achievement_progress.INTERNAL_EVENT_QUERY})
 
 
 @counter("season_top10_finishes", "season")
@@ -803,16 +838,18 @@ async def compute(user_id: str, keys: set[str] | None = None, legacy: bool = Tru
     dann werden wirklich nur diese Zähler gerechnet - für Signale, die nichts am alten Block ändern."""
     db = get_db()
     values: dict[str, int] = {}
-    if legacy or keys is None:
-        values = dict(await achievement_progress.compute_user_progress(user_id))
-    ctx = Context(db, user_id)
-    for key, item in REGISTRY.items():
-        if keys is not None and key not in keys:
-            continue
-        try:
-            values[key] = int(await item.compute(ctx) or 0)
-        except Exception:  # noqa: BLE001 - ein kaputter Zähler hält die anderen nicht auf
-            logger.warning("[achievements] counter %s failed for %s", key, _log_safe(user_id), exc_info=True)
+    # Alter Block und Registry rechnen aus denselben Anmeldungen und Spielen (#2337) - je Lauf einmal geladen.
+    with achievement_participation.shared():
+        if legacy or keys is None:
+            values = dict(await achievement_progress.compute_user_progress(user_id))
+        ctx = Context(db, user_id)
+        for key, item in REGISTRY.items():
+            if keys is not None and key not in keys:
+                continue
+            try:
+                values[key] = int(await item.compute(ctx) or 0)
+            except Exception:  # noqa: BLE001 - ein kaputter Zähler hält die anderen nicht auf
+                logger.warning("[achievements] counter %s failed for %s", key, _log_safe(user_id), exc_info=True)
     return values
 
 
@@ -885,6 +922,14 @@ def signal_day(value, today: date) -> tuple[date | None, str | None]:
     return day, None
 
 
+def in_signal_window(window: dict, day: date, moment: datetime | None) -> bool:
+    """Liegt die Meldung im Fenster des Signals (#2338)? Der Tag muss passen; die Stunde (Wien) nur, wenn die Meldung
+    jetzt kommt - ein nachgemeldeter Tag trägt keine Uhrzeit mehr."""
+    if (day.month, day.day) != (int(window["month"]), int(window["day"])):
+        return False
+    return moment is None or moment.hour >= int(window.get("from_hour") or 0)
+
+
 async def season_allows(name: str, day: date | None = None) -> bool:
     """Saisongebundene Signale zählen nur, während die Saison (und die Phase) wirklich läuft - Serverzeit. Für einen
     nachgemeldeten Tag zählt, ob die Saison an diesem Tag zu Mittag lief (die Fenster der Sammel-Saisonen sind ganze Tage)."""
@@ -913,7 +958,8 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
     rule = SIGNAL_RULES[name]
     if rule.get("server") and not trusted:
         return {"accepted": False, "reason": "unknown"}
-    today = now_utc().astimezone(VIENNA).date()
+    moment = now_utc().astimezone(VIENNA)
+    today = moment.date()
     when, problem = signal_day(day, today)
     if problem:
         return {"accepted": False, "reason": problem}
@@ -922,6 +968,8 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
         return {"accepted": False, "reason": "live"}
     if not await season_allows(name, when if replay else None):
         return {"accepted": False, "reason": "season"}
+    if rule.get("window") and not in_signal_window(rule["window"], when, None if replay else moment):
+        return {"accepted": False, "reason": "time"}
     db = get_db()
     day = when.isoformat()
     doc = await db[SIGNALS].find_one({"user_id": user_id, "name": name}, {"_id": 0}) or {}
@@ -978,61 +1026,58 @@ def _is_lower_section(match: dict) -> bool:
 @counter("win_rate_qualified", "match")
 async def _win_rate(ctx):
     """Siegquote in Prozent - erst ab 30 gespielten Matches, davor 0."""
-    rows = _completed_matches(await ctx.matches(), await ctx.registration_ids())
+    rows = await ctx.played()
     if len(rows) < 30:
         return 0
-    return round(100 * sum(1 for _m, won, _w, _o in rows if won) / len(rows))
+    return round(100 * sum(1 for row in rows if row.won) / len(rows))
 
 
 @counter("clean_sheets", "match")
 async def _clean_sheets(ctx):
-    mine = await ctx.registration_ids()
     count = 0
-    for match, won, _w, _o in _completed_matches(await ctx.matches(), mine):
-        pair = _score_pair(match, mine)
-        if won and pair and pair[1] == 0 and pair[0] > 0:
+    for row in await ctx.played():
+        pair = _score_pair(row.match, row.mine)
+        if row.won and pair and pair[1] == 0 and pair[0] > 0:
             count += 1
     return count
 
 
 @counter("full_distance_series", "match")
 async def _full_distance_series(ctx):
-    mine = await ctx.registration_ids()
-    return sum(1 for match, _w, _when, _o in _completed_matches(await ctx.matches(), mine) if _full_distance(match, mine))
+    return sum(1 for row in await ctx.played() if _full_distance(row.match, row.mine))
 
 
 @counter("deciders_won", "match")
 async def _deciders_won(ctx):
-    mine = await ctx.registration_ids()
-    return sum(1 for match, won, _when, _o in _completed_matches(await ctx.matches(), mine) if won and _full_distance(match, mine))
+    return sum(1 for row in await ctx.played() if row.won and _full_distance(row.match, row.mine))
 
 
 @counter("comebacks", "match")
 async def _comebacks(ctx):
     """Sieg nach 0:1 oder 0:2 - braucht die Kartenreihenfolge (match.maps mit winner_registration_id); ohne sie zählt nichts."""
-    mine = await ctx.registration_ids()
     count = 0
-    for match, won, _when, _o in _completed_matches(await ctx.matches(), mine):
+    for row in await ctx.played():
+        match = row.match
         maps = [m for m in (match.get("maps") or []) if isinstance(m, dict) and m.get("winner_registration_id")]
-        if won and is_duel(match) and maps and maps[0]["winner_registration_id"] not in mine:
+        if row.won and is_duel(match) and maps and maps[0]["winner_registration_id"] not in row.mine:
             count += 1
     return count
 
 
 @counter("distinct_maps", "match")
 async def _distinct_maps(ctx):
-    names = {str(match.get("map") or "").strip().lower() for match, _w, _when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids())}
+    names = {str(row.match.get("map") or "").strip().lower() for row in await ctx.played()}
     return len({name for name in names if name})
 
 
 @counter("matches_ready_on_time", "match")
 async def _ready_on_time(ctx):
     """Beide Seiten vor dem angesetzten Start eingecheckt, kein Forfeit."""
-    mine = await ctx.registration_ids()
-    own = {r["id"]: r for r in await ctx.registrations() if r.get("id")}
+    own = (await ctx.participation()).registrations
     others = await ctx.opponent_registrations()
     count = 0
-    for match, _won, _when, opponents in _completed_matches(await ctx.matches(), mine):
+    for row in await ctx.played():
+        match = row.match
         scheduled = _parse(match.get("scheduled_at"))
         if not scheduled or match.get("forfeit_registration_id"):
             continue
@@ -1040,7 +1085,7 @@ async def _ready_on_time(ctx):
         stamps = []
         for reg_id in slots:
             reg = own.get(reg_id) or others.get(reg_id)
-            stamp = _parse((reg or {}).get("checked_in_at"))
+            stamp = achievement_participation.checked_in_at(reg)
             if not stamp:
                 stamps = []
                 break
@@ -1053,17 +1098,17 @@ async def _ready_on_time(ctx):
 @counter("results_reported_accepted", "match")
 async def _results_reported(ctx):
     """Eigene Ergebnismeldungen zu Matches, die damit abgeschlossen wurden - je Match einmal."""
-    completed = {match["id"] for match, _w, _when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids())}
+    completed = {row.match["id"] for row in await ctx.played()}
     reported = {str((row.get("data") or {}).get("match_id") or "") for row in await ctx.result_submissions()}
     return len(reported & completed)
 
 
 @counter("dispute_free_streak", "match")
 async def _dispute_free_streak(ctx):
-    rows = sorted(_completed_matches(await ctx.matches(), await ctx.registration_ids()), key=lambda row: row[2] or datetime.min.replace(tzinfo=timezone.utc))
+    rows = sorted(await ctx.played(), key=lambda row: row.when or datetime.min.replace(tzinfo=timezone.utc))
     best = streak = 0
-    for match, _w, _when, _o in rows:
-        if match.get("disputes"):
+    for row in rows:
+        if row.match.get("disputes"):
             streak = 0
             continue
         streak += 1
@@ -1083,28 +1128,28 @@ def _forced_the_reset(match: dict, mine: set) -> bool:
 
 @counter("bracket_resets_won", "match")
 async def _bracket_resets(ctx):
-    mine = await ctx.registration_ids()
     return sum(
-        1 for match, won, _when, _o in _completed_matches(await ctx.matches(), mine)
-        if won and "reset" in str(match.get("round_name") or "").lower() and _forced_the_reset(match, mine)
+        1 for row in await ctx.played()
+        if row.won and "reset" in str(row.match.get("round_name") or "").lower() and _forced_the_reset(row.match, row.mine)
     )
 
 
 @counter("streamed_matches", "match", "tournament")
 async def _streamed(ctx):
-    tournaments = await ctx.tournaments()
-    with_stream = {tid for tid, t in tournaments.items() if str(t.get("stream_url") or "").strip()}
-    return sum(1 for match, _w, _when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if match.get("tournament_id") in with_stream)
+    participation = await ctx.participation()
+    with_stream = {tid for tid, t in participation.tournaments.items()
+                   if str(t.get("stream_url") or "").strip() and not participation.is_league(tid)}
+    return sum(1 for row in participation.played if row.match.get("tournament_id") in with_stream)
 
 
 @counter("tournaments_completed_no_forfeit", "tournament", "match")
 async def _completed_no_forfeit(ctx):
-    tournaments = await ctx.tournaments()
-    done = {tid for tid, t in tournaments.items() if t.get("status") in ("completed", "results_published", "archived")}
-    mine = await ctx.registration_ids()
-    forfeited = {match.get("tournament_id") for match in await ctx.matches() if match.get("forfeit_registration_id") in mine}
-    gave_up = {r.get("tournament_id") for r in await ctx.registrations() if r.get("status") in ("withdrawn", "disqualified", "no_show")}
-    return len({r.get("tournament_id") for r in await ctx.registrations() if r.get("tournament_id") in done and r.get("tournament_id") not in forfeited and r.get("tournament_id") not in gave_up})
+    """Durchzieher (#2337): abgeschlossenes Turnier, in dem die Person gespielt hat - ohne kampflose Niederlage. Wer
+    ausgetreten ist oder disqualifiziert wurde, hat teilgenommen, aber nicht durchgezogen (``finished_entries``)."""
+    participation = await ctx.participation()
+    forfeited = {row.match.get("tournament_id") for row in participation.rows if row.no_show}
+    finished = {tid for tid in participation.finished_entries() if tid not in forfeited}
+    return len(finished)
 
 
 @counter("checkin_streak", "tournament")
@@ -1123,28 +1168,32 @@ async def _checkin_streak(ctx):
 
 @counter("lower_bracket_top4", "tournament", "match")
 async def _lower_bracket_top4(ctx):
-    places = {row["tournament_id"]: int(row.get("place") or 99) for row in await ctx.awards_places() if row.get("tournament_id")}
-    lower = {match.get("tournament_id") for match in await ctx.matches() if match.get("status") == "completed" and _is_lower_section(match)}
-    return len({tid for tid, place in places.items() if place <= 4 and tid in lower})
+    lower = {row.match.get("tournament_id") for row in await ctx.played() if _is_lower_section(row.match)}
+    return sum(1 for tid, placement in (await ctx.placements()).items() if tid in lower and any(rank <= 4 for rank in placement.ranks))
 
 
 @counter("tournaments_won_undefeated", "tournament", "match")
 async def _undefeated(ctx):
-    mine = await ctx.registration_ids()
-    won_tournaments = {row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) == 1}
-    lost_in = {match.get("tournament_id") for match, won, _when, _o in _completed_matches(await ctx.matches(), mine) if not won}
-    return len(won_tournaments - lost_in)
+    """Turniersieg mit einer Anmeldung, die kein Spiel verloren hat (#2337) - auch keines, in dem die Person selbst nicht
+    aufgestellt war. Verloren hat nur, wer einem anderen Sieger gegenüberstand (auch kampflos); ein Freilos oder ein
+    Unentschieden ist keine Niederlage."""
+    beaten = (await ctx.participation()).beaten_registration_ids()
+    return sum(1 for placement in (await ctx.placements()).values() if placement.registrations_on(1) - beaten)
 
 
 @counter("group_stage_firsts", "tournament", "match")
 async def _group_firsts(ctx):
     """Platz 1 in einer Gruppe: die meisten Siege unter allen Anmeldungen der Gruppe (Gleichstand zählt)."""
-    mine = await ctx.registration_ids()
-    groups = {(match.get("tournament_id"), match.get("group_id")) for match in await ctx.matches() if match.get("group_id") and match.get("status") == "completed"}
+    groups: dict[tuple, set[str]] = {}
+    for row in await ctx.played():
+        if row.match.get("group_id"):
+            groups.setdefault((row.match.get("tournament_id"), row.match["group_id"]), set()).update(row.mine)
     count = 0
-    for tournament_id, group_id in groups:
+    for (tournament_id, group_id), mine in groups.items():
         wins: dict[str, int] = {}
         for match in await ctx.group_matches(tournament_id, group_id):
+            if not is_real_match(match):
+                continue
             winner = match_winner_id(match)
             for reg in participant_ids(match):
                 wins[reg] = wins.get(reg, 0) + (1 if reg == winner else 0)
@@ -1159,7 +1208,7 @@ async def _group_firsts(ctx):
 @counter("disputes_resolved_as_staff", "tournament", "match")
 async def _disputes_resolved(ctx):
     """Als Turnierleitung ein disputiertes Match mit einem Ergebnis abgeschlossen - je Match einmal."""
-    mine = await ctx.registration_ids()
+    mine = (await ctx.participation()).registration_ids
     ids = {str((row.get("data") or {}).get("match_id") or "") for row in await ctx.result_submissions()}
     matches = await ctx.matches_by_ids(ids)
     count = 0
@@ -1317,20 +1366,11 @@ async def _season_openers(ctx):
 
 @counter("team_match_wins", "team", "match")
 async def _team_match_wins(ctx):
-    """Matches, die ein Team der Person gewonnen hat, nachdem sie beigetreten war."""
-    registrations = await ctx.team_registrations()
-    memberships = await ctx.team_memberships()
-    wins = 0
-    for match in await ctx.team_matches():
-        when = _parse(match.get("completed_at") or match.get("updated_at"))
-        reg = registrations.get(match_winner_id(match))
-        if not reg:
-            continue
-        joined = _parse((memberships.get(reg.get("team_id")) or {}).get("joined_at"))
-        if joined and when and when < joined:
-            continue
-        wins += 1
-    return wins
+    """Matches, die ein Team gewonnen hat, während die Person dabei war (#2337): nach Aufstellung bzw. Teilnehmerliste,
+    ohne sie nach der Mitgliedschaft zum Zeitpunkt des Spiels - auch wenn sie das Team inzwischen verlassen hat."""
+    participation = await ctx.participation()
+    return sum(1 for row in participation.played
+               if row.won and (participation.registrations.get(match_winner_id(row.match)) or {}).get("team_id"))
 
 
 @counter("team_invites_accepted", "team")
@@ -1347,10 +1387,42 @@ async def _discord_messages(ctx):
     return int((await ctx.user()).get("discord_messages_count") or 0)
 
 
-@counter("community_messages_sent", "community", "tournament", "match")
+# Chat (#2338): „Plauderer“, Team-, Turnier-, Match-Chat und Direktnachrichten - eine Rechnung
+# (achievement_progress.chat_counters: nichts Zurückgehaltenes oder Gelöschtes, höchstens 50 am Tag), je Auswertung
+# einmal geladen. Neu gerechnet nach einer Chat-Nachricht (Quellen chat, community - leicht, über die Warteschlange) und
+# in jedem vollen Lauf; andere Quellen lassen den gespeicherten Stand stehen.
+CHAT_COUNTER_SOURCES = ("chat", "community")
+
+
+async def _chat_value(ctx, key: str) -> int:
+    values = await ctx._memo("chat_counters", lambda: achievement_progress.chat_counters(ctx.db, ctx.user_id))
+    return int(values.get(key) or 0)
+
+
+@counter("community_messages_sent", *CHAT_COUNTER_SOURCES)
 async def _community_messages(ctx):
-    """Nachrichten in den offenen Chats: Turnier-Chat und Match-Chat."""
-    return await ctx.db.tournament_chat_messages.count_documents({"user_id": ctx.user_id}) + await ctx.db.match_chat_messages.count_documents({"user_id": ctx.user_id})
+    """Plauderer: die offenen Chats - Turnier-Chat und Match-Chat mit einem gemeinsamen Tagesdeckel."""
+    return await _chat_value(ctx, "community_messages_sent")
+
+
+@counter("direct_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _direct_messages(ctx):
+    return await _chat_value(ctx, "direct_messages_sent")
+
+
+@counter("team_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _team_chat_messages(ctx):
+    return await _chat_value(ctx, "team_chat_messages_sent")
+
+
+@counter("match_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _match_chat_messages(ctx):
+    return await _chat_value(ctx, "match_chat_messages_sent")
+
+
+@counter("tournament_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _tournament_chat_messages(ctx):
+    return await _chat_value(ctx, "tournament_chat_messages_sent")
 
 
 @counter("gallery_uploads_approved", "community")
@@ -1361,10 +1433,12 @@ async def _gallery_uploads(ctx):
 
 @counter("stickers_collected", "community", "chat")
 async def _stickers(ctx):
-    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat."""
+    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat - wie bei den Chat-Zählern nur aus
+    Nachrichten, die nicht zurückgehalten, abgelehnt oder gelöscht sind (#2338)."""
     ids = set()
-    for name, field in (("direct_messages", "sender_id"), ("team_chat_messages", "user_id"), ("tournament_chat_messages", "user_id"), ("match_chat_messages", "user_id")):
-        async for row in ctx.db[name].find({field: ctx.user_id, "sticker.id": {"$exists": True}}, {"_id": 0, "sticker.id": 1}):
+    for name, field in achievement_progress.CHAT_COLLECTIONS.values():
+        query = achievement_progress.counted_chat_query(field, ctx.user_id, **{"sticker.id": {"$exists": True}})
+        async for row in ctx.db[name].find(query, {"_id": 0, "sticker.id": 1}):
             sticker_id = (row.get("sticker") or {}).get("id")
             if sticker_id:
                 ids.add(sticker_id)
@@ -1390,16 +1464,31 @@ async def _own_tournament_streams(ctx):
     return len([t for t in await ctx.db[ANNOUNCEMENTS].distinct("tournament_id", {"user_id": ctx.user_id}) if t])
 
 
-@counter("clips_synced", "stream")
+@counter("clips_synced", "stream", "profile")
 async def _clips(ctx):
-    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am Twitch-Namen aus dem Profil."""
-    user = await ctx.user()
-    handle = str(user.get("twitch_handle") or user.get("twitch_channel") or "").strip().lstrip("@").lower()
-    if not handle:
+    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am per Anmeldung verknüpften Twitch-Konto
+    (#2338): an der Twitch-Kennung, bei älteren Clips ohne Kennung am Namen. Ein getippter Name zählt nicht."""
+    twitch = await achievement_progress.linked_twitch(ctx.db, ctx.user_id)
+    if not twitch or not (twitch["external_id"] or twitch["login"]):
         return 0
     from services.twitch_clips import STATE_ID
     doc = await ctx.db.settings.find_one({"id": STATE_ID}, {"_id": 0, "clips": 1}) or {}
-    return sum(1 for clip in doc.get("clips") or [] if str(clip.get("creator_name") or "").strip().lstrip("@").lower() == handle)
+
+    def mine(clip: dict) -> bool:
+        if clip.get("creator_id"):
+            return str(clip["creator_id"]) == twitch["external_id"]
+        return bool(twitch["login"]) and str(clip.get("creator_name") or "").strip().lstrip("@").lower() == twitch["login"]
+    return sum(1 for clip in doc.get("clips") or [] if mine(clip))
+
+
+@counter("streamer_verified", "profile", "club", "stream")
+async def _streamer_verified(ctx):
+    """Verifizierter Streamer (#2338): Twitch per Anmeldung verknüpft und der Verein führt die Person als Streamer
+    oder Creator (Kennzeichen ``creator`` am Vereinsprofil, Mitgliederverwaltung → Öffentliche Profile). Von Hand
+    vergeben geht weiterhin."""
+    if not await achievement_progress.linked_twitch(ctx.db, ctx.user_id):
+        return 0
+    return 1 if await ctx.db.club_member_profiles.find_one({"user_id": ctx.user_id, "creator": True}, {"_id": 0, "id": 1}) else 0
 
 
 # ------------------------------------------------------------------ Katalog D (#615): Verein, Besonders, Geheim
@@ -1456,12 +1545,12 @@ async def _pioneer(ctx):
 @counter("distinct_game_wins_one_season", "tournament")
 async def _grand_slam(ctx):
     """Turniersiege in verschiedenen Spielen innerhalb einer Saison - das Maximum über die Saisons."""
-    tournaments = await ctx.tournaments()
+    tournaments = (await ctx.participation()).tournaments
     per_season: dict[str, set[str]] = {}
-    for award in await ctx.awards_places():
-        if award.get("place") != 1:
+    for tournament_id, placement in (await ctx.placements()).items():
+        if 1 not in placement.ranks:
             continue
-        tournament = tournaments.get(award.get("tournament_id")) or {}
+        tournament = tournaments.get(tournament_id) or {}
         if tournament.get("season_id") and tournament.get("game_id"):
             per_season.setdefault(tournament["season_id"], set()).add(tournament["game_id"])
     return max((len(games) for games in per_season.values()), default=0)
@@ -1486,8 +1575,8 @@ async def _completionist(ctx):
 async def _witching_hour(ctx):
     """Matches, die zwischen 00:00 und 00:15 (Wien) endeten."""
     count = 0
-    for _match, _won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()):
-        local = when.astimezone(VIENNA) if when else None
+    for row in await ctx.played():
+        local = row.when.astimezone(VIENNA) if row.when else None
         if local and local.hour == 0 and local.minute < 15:
             count += 1
     return count
@@ -1497,10 +1586,10 @@ async def _witching_hour(ctx):
 async def _lucky_seven(ctx):
     """Tage, die ein Siebter waren und sieben Siege brachten."""
     wins: dict = {}
-    for _match, won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()):
-        if not won or not when:
+    for row in await ctx.played():
+        if not row.won or not row.when:
             continue
-        local = when.astimezone(VIENNA)
+        local = row.when.astimezone(VIENNA)
         if local.day == 7:
             wins[local.date()] = wins.get(local.date(), 0) + 1
     return sum(1 for n in wins.values() if n >= 7)
@@ -1522,13 +1611,12 @@ async def _palindrome(ctx):
 @counter("echo_results", "match")
 async def _echo(ctx):
     """Dreimal hintereinander derselbe Kartenstand (in Spielreihenfolge)."""
-    mine = await ctx.registration_ids()
-    rows = sorted((entry for entry in _completed_matches(await ctx.matches(), mine) if entry[2]), key=lambda entry: entry[2])
+    rows = sorted((row for row in await ctx.played() if row.when), key=lambda row: row.when)
     count = 0
     streak = 0
     last = None
-    for match, _won, _when, _others in rows:
-        pair = _score_pair(match, mine)
+    for row in rows:
+        pair = _score_pair(row.match, row.mine)
         if pair is None:
             streak = 0
             last = None
@@ -1546,10 +1634,10 @@ async def _echo(ctx):
 async def _night_shift(ctx):
     """Nächte (22 Uhr bis 6 Uhr, Wien) mit mindestens fünf abgeschlossenen Matches."""
     nights: dict = {}
-    for _match, _won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()):
-        if not when:
+    for row in await ctx.played():
+        if not row.when:
             continue
-        local = when.astimezone(VIENNA)
+        local = row.when.astimezone(VIENNA)
         if local.hour >= 22:
             key = local.date()
         elif local.hour < 6:
@@ -1563,7 +1651,7 @@ async def _night_shift(ctx):
 @counter("full_moon_wins", "match")
 async def _full_moon(ctx):
     """Siege, während der Mond voll war (rund ein halber Tag zu jeder Seite)."""
-    return sum(1 for _match, won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if won and when and abs(moon_phase(when) - 0.5) <= FULL_MOON_WINDOW)
+    return sum(1 for row in await ctx.played() if row.won and row.when and abs(moon_phase(row.when) - 0.5) <= FULL_MOON_WINDOW)
 
 
 @counter("leap_day_logins", "profile", "xp")

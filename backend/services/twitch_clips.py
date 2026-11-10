@@ -58,7 +58,9 @@ def pick_clips(rows: list[dict], limit: int = MAX_CLIPS) -> list[dict]:
             continue
         cleaned.append({
             "id": clip_id, "url": row.get("url") or f"https://clips.twitch.tv/{clip_id}", "title": str(row.get("title") or "Clip")[:200],
-            "creator_name": row.get("creator_name") or "", "view_count": int(row.get("view_count") or 0), "created_at": row.get("created_at"),
+            # Die Twitch-Kennung des Erstellers (#2338): daran erkennt „Clip-Macher“ das verknüpfte Konto.
+            "creator_name": row.get("creator_name") or "", "creator_id": str(row.get("creator_id") or ""),
+            "view_count": int(row.get("view_count") or 0), "created_at": row.get("created_at"),
             "thumbnail_url": row.get("thumbnail_url") or "", "duration": float(row.get("duration") or 0), "game_id": row.get("game_id") or "",
         })
     cleaned.sort(key=lambda row: (-row["view_count"], row.get("created_at") or ""))

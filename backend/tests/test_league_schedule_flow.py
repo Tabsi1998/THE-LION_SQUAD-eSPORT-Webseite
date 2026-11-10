@@ -144,7 +144,7 @@ async def test_reschedule_needs_both_sides_and_a_reason(flow):
     entry = stored["schedule_history"][-1]
     assert entry["kind"] == "reschedule" and entry["reason"] == "Spieler im Nachtdienst" and entry["from"] == at(72)
     assert len(stored["reschedule_requests"][0]["approvals"]) == 2
-    audit = await flow.db.audit_logs.find({"action": {"$regex": "^match.reschedule"}}, {"_id": 0}).to_list(10)
+    audit = await flow.db.audit_logs.find({"action": {"$regex": "^match.reschedule"}}, {"_id": 0}).sort([("created_at", 1), ("_id", 1)]).to_list(10)
     assert [row["action"] for row in audit] == ["match.reschedule.request", "match.reschedule.accept"]
     assert "reschedule_requests" not in public_match_view(stored) and "schedule_history" not in public_match_view(stored)
 

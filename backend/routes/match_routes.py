@@ -1443,10 +1443,11 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         except Exception:
             logger.warning("[match] Chat-Benachrichtigung zu %s fehlgeschlagen", _log_safe(match_id), exc_info=True)
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
+        # Über die Warteschlange (#2338): eine Auswertung je Person und Takt, nicht eine volle je Nachricht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(me["id"])
     except Exception:
-        logger.warning("[achievements] Chatnachricht in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
+        logger.warning("[achievements] Chatnachricht in %s nicht vorgemerkt", _log_safe(match_id), exc_info=True)
     doc.pop("_id", None)
     doc["author"] = {
         "id": me.get("id"),

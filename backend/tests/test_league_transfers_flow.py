@@ -89,7 +89,7 @@ async def test_a_transfer_moves_the_player_after_the_approval(flow):
     assert ida in await squad_members(flow, w, "squad_a")
     assert ida not in await squad_members(flow, w, "squad_b")
     assert (await state_of(flow, w, "Ida"))["ok"] is True
-    actions = [log["action"] async for log in flow.db.audit_logs.find({"action": {"$regex": "^league.transfer"}}, {"_id": 0, "action": 1})]
+    actions = [log["action"] async for log in flow.db.audit_logs.find({"action": {"$regex": "^league.transfer"}}, {"_id": 0, "action": 1}).sort([("created_at", 1), ("_id", 1)])]
     assert actions == ["league.transfer.request", "league.transfer.approve"]
     told = {note["user_id"] async for note in flow.db.notifications.find({"meta.reason": "league_transfer_approved"}, {"_id": 0})}
     assert {ida, w["users"]["LoeLeitung"]["id"]} <= told

@@ -29,6 +29,11 @@ BUNDLE_WINDOW_SECONDS = 60
 BATCH = 100
 SWEEP_ACTIVE_MINUTES = 20
 STATE_ID = "achievement_queue_state"
+# Quellen einer Chat-Nachricht (#2338).
+CHAT_SOURCES = ("chat", "community")
+# Quellen, deren Zähler alle in der Registry stehen (#2338): ein Eintrag nur mit diesen Quellen wertet leicht aus - ohne
+# den alten Block, nur die Stufen dieser Zähler. Viele Chat- und Discord-Nachrichten kosten so wenig.
+LIGHT_SOURCES = frozenset({"chat", "community", "discord", "signal"})
 
 
 # ---------------------------------------------------------------- Auswerten
@@ -79,6 +84,12 @@ async def request_evaluation(user_ids, reason: str = "", sources=None, *, announ
     return len(ids)
 
 
+async def request_chat_evaluation(user_id: str | None) -> int:
+    """Nach einer Chat-Nachricht (#2338): vormerken statt sofort auswerten - viele Nachrichten hintereinander ergeben
+    eine Auswertung, und der Absender wartet nicht darauf."""
+    return await request_evaluation([user_id], "chat_message", sources=CHAT_SOURCES)
+
+
 async def process_queue(limit: int = BATCH) -> dict:
     evaluate_user_progress = evaluator()
     db = get_db()
@@ -89,8 +100,9 @@ async def process_queue(limit: int = BATCH) -> dict:
         await db.achievement_eval_queue.delete_one({"user_id": entry["user_id"]})
         try:
             sources = None if entry.get("full") or not entry.get("sources") else set(entry["sources"])
+            light = bool(sources) and sources <= LIGHT_SOURCES
             # Laut im stillen Modus (#2340) nur, was ein echtes Ereignis genannt hat - Sweep und Nachläufer bleiben still.
-            awarded += await evaluate_user_progress(entry["user_id"], sources, announce=tuple(entry.get("announce") or ()))
+            awarded += await evaluate_user_progress(entry["user_id"], sources, legacy=not light, announce=tuple(entry.get("announce") or ()))
         except Exception:  # noqa: BLE001 - eine kaputte Auswertung hält die anderen nicht auf
             logger.warning("[achievements] evaluation failed", exc_info=True)
     if due:

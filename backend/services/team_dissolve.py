@@ -289,6 +289,8 @@ async def _restore_locked(db, row: dict, actor: dict, tag: str | None) -> dict:
     team = {key: value for key, value in row.items() if key not in (*RESTORE_ONLY_FIELDS, "_id")}
     co_leaders = [user_id for user_id in row.get("co_leader_ids") or [] if user_id != leader_id]
     team.update({"tag": final_tag, "leader_id": leader_id, "co_leader_ids": co_leaders, "join_code": new_join_code(), "updated_at": now})
+    if leader_id != row.get("leader_id"):
+        team["leader_since"] = now  # Kapitän (#2338): wer neu führt, zählt ab heute
     # Das Team zuletzt und die Sicherung erst danach weg: Bricht es dazwischen ab, ist nichts verloren, und der nächste
     # Versuch beginnt mit Co-Teams und Mitgliederzeilen von vorn.
     await _remove_restored_parts(db, team_id)
