@@ -1428,6 +1428,16 @@ async def _clips(ctx):
     return sum(1 for clip in doc.get("clips") or [] if mine(clip))
 
 
+@counter("streamer_verified", "profile", "club", "stream")
+async def _streamer_verified(ctx):
+    """Verifizierter Streamer (#2338): Twitch per Anmeldung verknüpft und der Verein führt die Person als Streamer
+    oder Creator (Kennzeichen ``creator`` am Vereinsprofil, Mitgliederverwaltung → Öffentliche Profile). Von Hand
+    vergeben geht weiterhin."""
+    if not await achievement_progress.linked_twitch(ctx.db, ctx.user_id):
+        return 0
+    return 1 if await ctx.db.club_member_profiles.find_one({"user_id": ctx.user_id, "creator": True}, {"_id": 0, "id": 1}) else 0
+
+
 # ------------------------------------------------------------------ Katalog D (#615): Verein, Besonders, Geheim
 
 # Mondphase wie im Web (seasons/halloween/moon.js): mittlere Rechnung ab dem Neumond vom 6.1.2000, 18:14 UTC.

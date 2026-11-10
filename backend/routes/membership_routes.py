@@ -56,6 +56,9 @@ class ClubMemberProfileCreate(BaseModel):
     user_id: str | None = None
     order_index: int = 0
     is_active: bool = True
+    # Der Verein führt die Person als Streamer oder Creator (#2338) - mit per Anmeldung verknüpftem Twitch gibt das
+    # den Erfolg „Verifizierter Streamer“.
+    creator: bool = False
 
 
 class ClubMemberProfileUpdate(BaseModel):
@@ -77,6 +80,7 @@ class ClubMemberProfileUpdate(BaseModel):
     # Verzeichnis per Opt-in (#410): die Verwaltung kann einen Eintrag sperren - das Mitglied kann ihn
     # dann nicht wieder einschalten, bis die Sperre weg ist.
     directory_blocked: bool | None = None
+    creator: bool | None = None
 
 
 class DirectoryEntryUpdate(BaseModel):
@@ -200,6 +204,7 @@ def _admin_profile(doc: dict) -> dict:
         "user_id": doc.get("user_id"),
         "is_active": doc.get("is_active", True),
         "directory_blocked": bool(doc.get("directory_blocked")),
+        "creator": bool(doc.get("creator")),
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
         # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): warum ein Eintrag da oder offline ist.
@@ -1239,8 +1244,11 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
         "created_at": now_utc().isoformat(),
         "created_by": me["id"],
     }
+    doc["creator"] = bool(doc.get("creator"))
     await db.club_member_profiles.insert_one(doc)
-    await _audit(me["id"], "club_member_profile.create", doc["id"], {"display_name": name, "user_id": doc.get("user_id")})
+    await _audit(me["id"], "club_member_profile.create", doc["id"], {"display_name": name, "user_id": doc.get("user_id"), "creator": doc["creator"]})
+    if doc["creator"]:
+        await _evaluate_creator(doc.get("user_id"))
     doc.pop("_id", None)
     item = _admin_profile(doc)
     return (await _attach_linked_accounts(db, [doc], [item], public_only=False, admin=True))[0]
@@ -1301,8 +1309,17 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
     await db.club_member_profiles.update_one({"id": profile_id}, {"$set": update})
     await _audit(me["id"], "club_member_profile.update", profile_id, update)
     row = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0})
+    if row.get("creator") and ("creator" in update or "user_id" in update):
+        await _evaluate_creator(row.get("user_id"))
     item = _admin_profile(row)
     return (await _attach_linked_accounts(db, [row], [item], public_only=False, admin=True))[0]
+
+
+async def _evaluate_creator(user_id: str | None) -> None:
+    """Streamer oder Creator gesetzt (#2338): „Verifizierter Streamer“ gleich prüfen - mit verknüpftem Twitch kommt er."""
+    if user_id:
+        from services.achievement_queue import request_evaluation
+        await request_evaluation([user_id], "club_creator", sources={"club"})
 
 
 async def _board_posts_of_profile(db, profile: dict) -> list[str]:

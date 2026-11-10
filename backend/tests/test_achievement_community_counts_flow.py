@@ -241,6 +241,55 @@ def test_fetched_clips_keep_the_creator_id():
     assert picked[0]["creator_id"] == "123"
 
 
+# ---------------------------------------------------------------- Verifizierter Streamer
+
+@pytest.mark.asyncio
+async def test_verified_streamer_needs_linked_twitch_and_the_creator_mark(flow):
+    import badges
+
+    await badges.seed_badges()
+    db = flow.db
+    streamer = await flow.add_user(name="vereinsstreamerin")
+    await db.club_member_profiles.insert_one({"id": "p-s", "user_id": streamer["id"], "slug": "vereinsstreamerin", "display_name": "Vereinsstreamerin", "is_active": True})
+
+    async def verified() -> int:
+        return (await counters.compute(streamer["id"], {"streamer_verified"}, legacy=False))["streamer_verified"]
+
+    admin = await flow.add_staff("Vereinsverwaltung")
+    flow.act_as(admin)
+    response = await flow.patch("/api/membership/profiles/admin/p-s", json={"creator": True})
+    assert response.status_code == 200, response.text
+    assert response.json()["creator"] is True
+    log = await db.audit_logs.find_one({"action": "club_member_profile.update", "target_id": "p-s"}, {"_id": 0})
+    assert log["data"]["creator"] is True and log["actor_id"] == admin["id"], "im Protokoll wie die übrigen Felder"
+    assert await db.achievement_eval_queue.find_one({"user_id": streamer["id"]}), "gleich vorgemerkt"
+    assert await verified() == 0, "ohne Twitch per Anmeldung noch nicht"
+    await db.users.update_one({"id": streamer["id"]}, {"$set": {"twitch_handle": "getippt"}})
+    assert await verified() == 0, "ein getippter Name reicht nicht"
+
+    await db.platform_links.insert_one({"id": "tw-v", "user_id": streamer["id"], "platform": "twitch", "external_id": "31", "handle": "vereinsstreamerin"})
+    assert await verified() == 1
+    await badges.evaluate_user_progress(streamer["id"], {"club"})
+    assert await db.user_achievements.find_one({"user_id": streamer["id"], "tier_code": "streamer_verified_1"})
+
+    # Weiter von Hand vergebbar - auch ohne Kennzeichen und ohne Twitch.
+    other = await flow.add_user(name="handvergabe")
+    response = await flow.post("/api/admin/achievements/award", json={"user_id": other["id"], "tier_code": "streamer_verified_1", "note": "Partnerkanal"})
+    assert response.status_code == 200, response.text
+    assert response.json().get("newly_awarded") is True
+
+
+@pytest.mark.asyncio
+async def test_a_regular_member_cannot_set_the_creator_mark(flow):
+    db = flow.db
+    member = await flow.add_user(name="mitglied")
+    await db.club_member_profiles.insert_one({"id": "p-m", "user_id": member["id"], "slug": "mitglied", "display_name": "Mitglied", "is_active": True})
+    flow.act_as(member)
+    response = await flow.patch("/api/membership/profiles/admin/p-m", json={"creator": True})
+    assert response.status_code == 403
+    assert not (await db.club_member_profiles.find_one({"id": "p-m"})).get("creator")
+
+
 # ---------------------------------------------------------------- Konto verknüpfen (M14)
 
 @pytest.mark.asyncio
