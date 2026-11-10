@@ -85,7 +85,7 @@ export function RecountPanel() {
           <button type="button" onClick={startDryRun} disabled={busy || dry.running} data-testid="ach-recount-dry-run" className={`${BUTTON} border-[#29B6E8]/50 text-[#29B6E8]`}>
             <Play className="w-3.5 h-3.5" /> Probelauf
           </button>
-          <button type="button" onClick={finish} disabled={!canFinish} data-testid="ach-recount-finish" className={`${BUTTON} border-[#FFD700]/50 text-[#FFD700]`}>
+          <button type="button" onClick={finish} disabled={!canFinish} data-testid="ach-recount-finish" className={`${BUTTON} border-honor/50 text-honor`}>
             <CheckCircle2 className="w-3.5 h-3.5" /> Neuberechnung abschließen
           </button>
         </>
