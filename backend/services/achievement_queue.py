@@ -29,6 +29,8 @@ BUNDLE_WINDOW_SECONDS = 60
 BATCH = 100
 SWEEP_ACTIVE_MINUTES = 20
 STATE_ID = "achievement_queue_state"
+# Quellen einer Chat-Nachricht (#2338): die Chat-Zähler selbst rechnet der alte Block bei jeder Auswertung mit.
+CHAT_SOURCES = ("chat", "community")
 
 
 # ---------------------------------------------------------------- Auswerten
@@ -71,6 +73,12 @@ async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
                 uid = fresh[err["index"]]["user_id"]
                 await db.achievement_eval_queue.update_one({"user_id": uid}, update_for(uid), upsert=True)
     return len(ids)
+
+
+async def request_chat_evaluation(user_id: str | None) -> int:
+    """Nach einer Chat-Nachricht (#2338): vormerken statt sofort auswerten - viele Nachrichten hintereinander ergeben
+    eine Auswertung, und der Absender wartet nicht darauf."""
+    return await request_evaluation([user_id], "chat_message", sources=CHAT_SOURCES)
 
 
 async def process_queue(limit: int = BATCH) -> dict:

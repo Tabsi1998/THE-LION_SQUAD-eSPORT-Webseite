@@ -733,10 +733,11 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     mentioned_user_ids = await _notify_team_mentions(db, team, me, message)
     await _notify_team_chat_message(db, team, me, message, mentioned_user_ids)
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
+        # Über die Warteschlange (#2338): eine Auswertung je Person und Takt, nicht eine volle je Nachricht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(me["id"])
     except Exception:
-        logger.warning("[achievements] Teamchat-Nachricht in %s nicht ausgewertet", log_safe(team_id), exc_info=True)
+        logger.warning("[achievements] Teamchat-Nachricht in %s nicht vorgemerkt", log_safe(team_id), exc_info=True)
     message.pop("_id", None)
     enriched = await _enrich_team_chat([word_filter.public_moderation(message)])
     return enriched[0]
