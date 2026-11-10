@@ -324,6 +324,25 @@ async def test_spooky_night_is_checked_by_the_server_in_vienna_time(flow, monkey
     assert counters.in_signal_window({"month": 10, "day": 31, "from_hour": 18}, datetime(2026, 10, 31).date(), None)
 
 
+# ---------------------------------------------------------------- Dolibarr: Beitrittsdatum (M10)
+
+@pytest.mark.asyncio
+async def test_dolibarr_sync_never_overwrites_a_known_join_date_with_nothing(flow):
+    from dolibarr_fake import member
+    from services import dolibarr_sync
+
+    me = await flow.add_user(name="mitgliedseit")
+    settings = {"base_url": "https://dolibarr.example.test", "instance": "verein", "type_map": {"2": "ordinary"}}
+    link = {"user_id": me["id"]}
+    await dolibarr_sync.apply_summary(flow.db, settings, link, member(41, member_since="2023-01-01", updated_at="2026-09-01T00:00:00Z"))
+    assert (await flow.db.memberships.find_one({"user_id": me["id"]}))["member_since"] == "2023-01-01"
+    await dolibarr_sync.apply_summary(flow.db, settings, link, member(41, member_since="", updated_at="2026-09-02T00:00:00Z"))
+    stored = await flow.db.memberships.find_one({"user_id": me["id"]})
+    assert (stored["member_since"], stored["member_since_precision"]) == ("2023-01-01", "day"), "kein Datum heißt nicht: Datum löschen"
+    await dolibarr_sync.apply_summary(flow.db, settings, link, member(41, member_since="2022-05-01", updated_at="2026-09-03T00:00:00Z"))
+    assert (await flow.db.memberships.find_one({"user_id": me["id"]}))["member_since"] == "2022-05-01", "ein neues Datum gilt"
+
+
 # ---------------------------------------------------------------- Verifizierter Streamer
 
 @pytest.mark.asyncio
