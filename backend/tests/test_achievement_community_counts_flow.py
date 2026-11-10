@@ -241,6 +241,20 @@ def test_fetched_clips_keep_the_creator_id():
     assert picked[0]["creator_id"] == "123"
 
 
+# ---------------------------------------------------------------- Konto verknüpfen (M14)
+
+@pytest.mark.asyncio
+async def test_linking_an_account_queues_an_evaluation(flow):
+    from services import platform_links
+
+    me = await flow.add_user(name="verknuepferin")
+    await platform_links.link_account(flow.db, me["id"], "twitch", {"external_id": "4711", "handle": "kanal"})
+    entry = await flow.db.achievement_eval_queue.find_one({"user_id": me["id"]}, {"_id": 0})
+    assert entry and {"profile", "stream"} <= set(entry["sources"])
+    values = await counters.compute(me["id"], {"twitch_linked"}, legacy=False)
+    assert values["twitch_linked"] == 1
+
+
 # ---------------------------------------------------------------- Discord (H11, M9)
 
 MAIN, SUB, OFF = "700000000000000001", "700000000000000002", "700000000000000009"
