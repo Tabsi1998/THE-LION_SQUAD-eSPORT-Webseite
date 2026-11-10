@@ -1033,7 +1033,7 @@ async def _ready_on_time(ctx):
         stamps = []
         for reg_id in slots:
             reg = own.get(reg_id) or others.get(reg_id)
-            stamp = _parse((reg or {}).get("checked_in_at"))
+            stamp = achievement_participation.checked_in_at(reg)
             if not stamp:
                 stamps = []
                 break

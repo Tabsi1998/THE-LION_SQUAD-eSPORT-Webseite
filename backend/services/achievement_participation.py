@@ -68,6 +68,17 @@ def parse_time(value) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def checked_in_at(registration: dict | None) -> datetime | None:
+    """Wann eine Anmeldung eingecheckt hat: ``checked_in_at`` (seit #2337 beim Check-in geschrieben). Älterer Bestand hat
+    das Feld nicht - dort gilt der letzte Stand der Anmeldung (``updated_at``), solange sie eingecheckt ist. Der liegt nie
+    vor dem Check-in, zählt also höchstens zu wenig. Wer nicht eingecheckt ist, hat keinen Zeitpunkt."""
+    registration = registration or {}
+    stamp = parse_time(registration.get("checked_in_at"))
+    if stamp or registration.get("status") != "checked_in":
+        return stamp
+    return parse_time(registration.get("updated_at"))
+
+
 @dataclass(frozen=True)
 class Played:
     """Ein echtes Spiel aus Sicht der Person. ``no_show``: ihre Seite ist nicht angetreten - das Spiel zählt für sie nicht

@@ -127,7 +127,8 @@ LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
 # Was eine neue Anmeldung nach einer weggenommenen Ablehnung nicht mitnimmt (#2113): die Marke, die alte Bestätigung, den
 # alten Preis samt Beleg (den Preis friert erst die Freigabe neu ein) und die Aufstellung samt „Wer ist da“ von damals.
 REOPEN_CLEARS = ("rejection_dismissed_at", "notified_status", "price_snapshot", "billing_status", "invoice_ref", "invoice_status",
-                 "payment_state", "lineup", "substitutes", "lineup_updated_at", "lineup_updated_by", "presence", "presence_nudged_at")
+                 "payment_state", "lineup", "substitutes", "lineup_updated_at", "lineup_updated_by", "presence", "presence_nudged_at",
+                 "checked_in_at")
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
 # Wer nicht (mehr) mitspielt, hält keinen Setzplatz fest - ein Ersatz darf den Platz einer fehlenden Person übernehmen.
 SEED_FREE_STATUSES = ["rejected", "no_show", "withdrawn", "disqualified", "cancelled"]
@@ -139,6 +140,18 @@ DISQUALIFIED_STAYS = ("Eine Disqualifikation lässt sich nicht durch Abmelden au
                       "zurücknehmen.")
 REMOVAL_NOT_AT_CHECKIN = ("Austritt und Disqualifikation lassen sich beim Check-in nicht zurücknehmen. Das macht die "
                           "Turnierleitung über den Status in der Teilnehmerliste.")
+
+
+def _checkin_stamp(status: str | None, previous: str | None, now_iso: str) -> tuple[dict, dict]:
+    """``checked_in_at`` an der Anmeldung (#2337): wann eingecheckt wurde - ``updated_at`` ändert sich bei jeder späteren
+    Änderung und taugt dafür nicht. Die Erfolge „Pünktlich“, „Erster im Haus“ und „Immer eingecheckt“ lesen das Feld.
+    Zurück kommen (zu setzen, zu entfernen): gesetzt beim Wechsel auf eingecheckt, entfernt, wenn der Check-in hier
+    zurückgenommen wird. Austritt und Disqualifikation laufen nicht hierüber - wer eingecheckt gespielt hat, behält es."""
+    if status == "checked_in":
+        return ({} if previous == "checked_in" else {"checked_in_at": now_iso}), {}
+    if status and previous == "checked_in":
+        return {}, {"checked_in_at": ""}
+    return {}, {}
 
 
 async def _bracket_is_fixed(db, tid: str) -> bool:
@@ -1010,6 +1023,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         reg["identity_key"] = f"{tid}:team:{reg['team_id']}"
     elif reg.get("user_id"):
         reg["identity_key"] = f"{tid}:user:{reg['user_id']}"
+    reg.update(_checkin_stamp(reg["status"], None, reg["created_at"])[0])
     try:
         await db.tournament_registrations.insert_one(reg)
     except DuplicateKeyError:
@@ -1119,9 +1133,11 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
         await _sync_squad_key(db, reg, updates["status"], tournament_doc)
     updates["updated_at"] = now_utc().isoformat()
+    checkin_set, checkin_unset = _checkin_stamp(updates.get("status"), previous_status, updates["updated_at"])
+    updates.update(checkin_set)
     # Die Angaben zum Ausscheiden gelten nur, solange die Person ausgeschieden ist (die Ansicht liest ``removal``). Die Marke
     # einer weggenommenen Ablehnung (#2113) nur, solange sie abgelehnt ist - sonst sähe sie eine spätere Ablehnung nie.
-    clears = {**({"removal": ""} if lifts_removal else {}),
+    clears = {**({"removal": ""} if lifts_removal else {}), **checkin_unset,
               **({"rejection_dismissed_at": ""} if previous_status == "rejected" and updates.get("status") not in (None, "rejected") else {})}
     await db.tournament_registrations.update_one(
         {"id": reg_id, "tournament_id": tid},
@@ -1187,9 +1203,12 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
             await _require_seed_on_return(db, tournament_doc, reg, status)
             await _sync_squad_key(db, reg, status, tournament_doc)
 
+            now_iso = now_utc().isoformat()
+            checkin_set, checkin_unset = _checkin_stamp(status, reg.get("status"), now_iso)
             await db.tournament_registrations.update_one(
                 {"id": reg_id},
-                {"$set": {"status": status, "updated_at": now_utc().isoformat()}, "$unset": {"rejection_dismissed_at": ""}},
+                {"$set": {"status": status, "updated_at": now_iso, **checkin_set},
+                 "$unset": {"rejection_dismissed_at": "", **checkin_unset}},
             )
             if status == "checked_in" and reg.get("user_id"):
                 await _apply_late_checkin_hooks(db, tid, reg["user_id"])
@@ -1317,8 +1336,10 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
             # Unter der Sperre frisch gelesen: das Ende (der Job hält dieselbe Sperre) kann nicht dazwischenkommen.
             if _check_in_over(await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}):
                 raise HTTPException(status_code=409, detail="Der Check-in ist beendet – bitte bei der Turnierleitung melden.")
+            now_iso = now_utc().isoformat()
             stored = await db.tournament_registrations.update_one(
-                {"id": reg["id"], "status": "approved"}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
+                {"id": reg["id"], "status": "approved"},
+                {"$set": {"status": "checked_in", "updated_at": now_iso, **_checkin_stamp("checked_in", "approved", now_iso)[0]}})
             if not getattr(stored, "modified_count", 0):
                 return {"ok": True, "idempotent_replay": True}
             # Phase B v4.1: late check-in detection (check-in after start_date) → neg_late_checkin
