@@ -176,7 +176,7 @@ async def tournament_tables(db, tournaments: list[dict]) -> dict[str, dict]:
         tables[tid] = {"rows": rows, "registrations": {reg["id"]: reg for reg in own_regs}, "played": played,
                        "players": {reg["id"]: players.get(reg["id"], set()) for reg in own_regs},
                        # Wie der Platz im Baum zustande kam (#2336) - dieselbe Rechnung wie die Rangliste.
-                       "paths": place_paths(structure.get("matches") or [], own_stages, tournament)}
+                       "paths": place_paths(structure.get("matches") or [], own_stages, tournament, own_regs)}
     return tables
 
 

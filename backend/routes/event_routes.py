@@ -254,7 +254,7 @@ async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
         or row.get("losses")
     ]
     # Im Baum (#2336) steht zuerst, wie der Platz zustande kam - dieselbe Rechnung wie Rangliste und Rückblick-Seite.
-    paths = place_paths(structure.get("matches") or [], read_model.stages, tournament)
+    paths = place_paths(structure.get("matches") or [], read_model.stages, tournament, regs)
     podium = []
     for index, row in enumerate(rows[:3], start=1):
         reg = reg_map.get(row.get("registration_id"))
@@ -264,7 +264,7 @@ async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
         wins = row.get("wins") if row.get("wins") is not None else row.get("won")
         path = paths.get(row.get("registration_id"))
         if path:
-            podium.append({"rank": index, "name": _registration_name(reg), "detail": f"{path}, {games_won_text(wins)}"})
+            podium.append({"rank": index, "name": _registration_name(reg), "detail": f"{path} ({games_won_text(wins)})"})
             continue
         if wins:
             detail_bits.append(f"{wins} {'Sieg' if wins == 1 else 'Siege'}")
