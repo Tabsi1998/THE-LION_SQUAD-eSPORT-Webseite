@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Bars, CATEGORIES, Panel, Stat, errorText, formatWhen, materialColor } from "./shared";
+import { RecountPanel } from "./RecountPanel";
 
 const LEVEL_BUCKETS = ["1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60"];
 
@@ -13,7 +14,7 @@ export function OverviewTab() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
-  const { can } = useAuth();
+  const { can, isSuperAdmin } = useAuth();
   const canSystem = Boolean(can?.("system"));
   const load = useCallback(() => api.get("/admin/achievements/overview").then(({ data: next }) => setData(next)).catch((err) => toast.error(errorText(err))), []);
   useEffect(() => { load(); }, [load]);
@@ -118,6 +119,8 @@ export function OverviewTab() {
           <p className="text-xs text-white/45">Nur für System: der Lauf geht über alle Turniere und steht im Protokoll.</p>
         </Panel>
       )}
+      {/* Neuberechnung (#2340): Probelauf und Abschluss nur für den Superadmin. */}
+      {isSuperAdmin && <RecountPanel />}
       <p className="text-[11px] text-white/35">Katalog: {data.catalog?.groups ?? 0} Gruppen · {data.catalog?.tiers ?? 0} Stufen</p>
     </div>
   );

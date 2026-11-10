@@ -56,6 +56,7 @@ export const EVENT_KINDS = {
   season_award: "Saisonabschluss", import: "Katalog-Import", group_create: "Gruppe angelegt", group_update: "Gruppe geändert",
   group_delete: "Gruppe gelöscht", tier_create: "Stufe angelegt", tier_update: "Stufe geändert", tier_delete: "Stufe gelöscht",
   incident: "Vorfall", evaluate_all: "Alle ausgewertet",
+  recount_dry_run: "Probelauf Neuberechnung", recount_finish: "Neuberechnung abschließen",
 };
 
 export const XP_SOURCES = {
