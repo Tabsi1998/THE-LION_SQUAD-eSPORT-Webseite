@@ -178,6 +178,8 @@ def test_katalog_d_form():
     assert all(catalog.annotate_group(g).get("hidden") for g in hidden), "Geheim ist versteckt (Kennzeichen kommt aus der Kategorie beim Seed)"
     assert not any(catalog.annotate_group(g).get("hidden") for g in club + special)
     manual = {g["code"] for g in catalog.GROUPS_D if g["manual_only"]}
-    assert manual == {"volunteer", "ehrenloewe", "gamers_heaven", "lan_founder", "beta_tester", "streamer_verified", "sponsor_friend", "hall_of_fame", "season_mvp"}
+    # Verifizierter Streamer kommt seit #2338 automatisch (und bleibt von Hand vergebbar).
+    assert manual == {"volunteer", "ehrenloewe", "gamers_heaven", "lan_founder", "beta_tester", "sponsor_friend", "hall_of_fame", "season_mvp"}
+    assert catalog.GROUP_BY_CODE["streamer_verified"]["condition_key"] == "streamer_verified"
     assert "ehrenloewe_p" in catalog.REDEFINED_OLD_TIERS["ehrenloewe"]
     assert catalog.GROUP_BY_CODE["membership_tenure"]["catalog"] == "D"

@@ -206,6 +206,10 @@ async def review(db, item: dict, *, decision: str, moderator_id: str, note: str 
         from services.moderation_standing import add_strike
         await add_strike(db, item["user_id"], source="word_filter", kind=item.get("kind"), ref_id=item.get("ref_id"),
                          item_id=item["id"], moderator_id=moderator_id, note=note)
+    elif new_state == "released" and item.get("collection") in CHAT_COLLECTIONS.values() and item.get("user_id"):
+        # Freigegeben zählt die Nachricht für die Chat-Erfolge (#2338) - zurückgehalten zählte sie nicht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(item["user_id"])
     return await db.moderation_items.find_one({"id": item["id"]}, {"_id": 0})
 
 

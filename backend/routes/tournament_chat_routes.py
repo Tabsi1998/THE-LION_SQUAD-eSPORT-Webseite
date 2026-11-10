@@ -223,10 +223,11 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         mentioned_user_ids = await _notify_tournament_mentions(db, tournament, me, doc)
         await _notify_tournament_chat_message(db, tournament, me, doc, mentioned_user_ids)
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
+        # Über die Warteschlange (#2338): eine Auswertung je Person und Takt, nicht eine volle je Nachricht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(me["id"])
     except Exception:
-        logging.getLogger("tls.tournament").warning("[achievements] Turnierchat-Nachricht in %s nicht ausgewertet", log_safe(tid), exc_info=True)
+        logging.getLogger("tls.tournament").warning("[achievements] Turnierchat-Nachricht in %s nicht vorgemerkt", log_safe(tid), exc_info=True)
     doc.pop("_id", None)
     doc = word_filter.public_moderation(doc)
     doc["author"] = {

@@ -64,8 +64,10 @@ SIGNALS = "user_signals"
 # Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
 # ``live``: zählt nur im Augenblick selbst und lässt sich nicht nachmelden (Silvester um Mitternacht, App geöffnet).
 # ``server``: zählt nur der Server selbst, wenn er das Ereignis geprüft hat (Türchen geöffnet) - ein Client kann es nicht melden.
+# ``window``: zählt nur an diesem Tag ab dieser Stunde, Wiener Zeit (#2338, Gruselnacht: 31.10. ab 18 Uhr). Nachgemeldet
+# zählt nur dieser Tag - die Stunde lässt sich dann nicht mehr prüfen.
 SIGNAL_RULES: dict[str, dict] = {
-    "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
+    "halloween_pumpkin": {"per_day": 1, "season": "halloween", "window": {"month": 10, "day": 31, "from_hour": 18}},
     "halloween_bats_scared": {"per_day": 30, "season": "halloween"},
     "halloween_ghosts_freed": {"per_day": 20, "season": "halloween"},
     "halloween_cat_petted": {"per_day": 10, "season": "halloween"},

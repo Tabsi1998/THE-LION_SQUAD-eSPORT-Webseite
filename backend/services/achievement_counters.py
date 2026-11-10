@@ -45,9 +45,9 @@ LEGACY_KEYS = frozenset({
     "match_streak_max", "tournaments_won", "podium_finishes", "rank_4_count", "fastlap_valid_count", "distinct_tracks",
     "pole_count", "membership_days", "events_attended", "season_points_total", "distinct_platforms", "seasons_active",
     "profile_completeness", "achievements_unlocked", "achievement_points", "teams_founded", "team_days_max",
-    "discord_messages", "twitch_live_sessions", "twitch_stream_minutes", "friends_count", "direct_messages_sent",
-    "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
+    "twitch_live_sessions", "twitch_stream_minutes", "friends_count",
 })
+# Discord-Stimme und die Chat-Zähler stehen seit #2338 nur in der Registry (eine Rechnung, leicht auswertbar).
 
 
 @dataclass(frozen=True)
@@ -150,12 +150,21 @@ class Context:
 
     async def club_servers(self) -> tuple[int, int]:
         """(Discord-Server des Vereins, auf denen die Person ist; eingeschaltete Server insgesamt) - wie der Bot es
-        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite."""
+        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite. Gezählt wird nur mit
+        verknüpftem Discord und nur, was für genau dieses Konto gemerkt ist (#2338) - nach dem Trennen nichts mehr."""
         async def load():
             enabled = [row["guild_id"] async for row in self.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
             if not enabled:
                 return 0, 0
-            return await self.db.discord_memberships.count_documents({"user_id": self.user_id, "member": True, "guild_id": {"$in": enabled}}), len(enabled)
+            link = await self.db.platform_links.find_one({"user_id": self.user_id, "platform": "discord"}, {"_id": 0, "external_id": 1}) or {}
+            discord_id = str(link.get("external_id") or "")
+            if not discord_id:
+                return 0, len(enabled)
+            joined = await self.db.discord_memberships.count_documents({
+                "user_id": self.user_id, "member": True, "guild_id": {"$in": enabled},
+                "$or": [{"discord_id": {"$exists": False}}, {"discord_id": discord_id}],
+            })
+            return joined, len(enabled)
         return await self._memo("club_servers", load)
 
     async def links(self) -> set[str]:
@@ -406,14 +415,22 @@ async def _discord_guilds_joined(ctx):
     return (await ctx.club_servers())[0]
 
 
+def servers_for_stage(stage: int, enabled: int) -> int:
+    """So viele eingeschaltete Server braucht Stufe 1, 2 oder 3 von „Überall dabei“ (#2338): einen, die Hälfte
+    (aufgerundet, mindestens zwei) und alle. Nie mehr, als es Server gibt - mit einem Server reicht er für alle drei."""
+    if enabled <= 0:
+        return 1
+    wanted = {1: 1, 2: max(2, -(-enabled // 2)), 3: enabled}[stage]
+    return min(wanted, enabled)
+
+
 @counter("discord_servers_stage", "discord")
 async def _discord_servers_stage(ctx):
-    """Überall dabei (#614, #615): 1 = auf einem Server des Vereins, 2 = auf drei, 3 = auf allen eingeschalteten.
-    „Alle“ ist kein festes Ziel - kommt ein Server dazu, wächst es mit; mit weniger als drei Servern bleibt es bei 1."""
+    """Überall dabei (#614, #615, #2338): die erreichte Stufe, gemessen an den eingeschalteten Servern - Stufe 1 auf
+    einem, Stufe 2 auf der Hälfte, Stufe 3 auf allen. Die Ziele wachsen und schrumpfen mit der Zahl der Server; sie
+    liegen nie über ihr."""
     joined, enabled = await ctx.club_servers()
-    if joined >= 3:
-        return 3 if joined >= enabled else 2
-    return 1 if joined else 0
+    return max((stage for stage in (1, 2, 3) if enabled and joined >= servers_for_stage(stage, enabled)), default=0)
 
 
 @counter("twitch_linked", "profile")
@@ -467,8 +484,10 @@ async def _notification_prefs(ctx):
 
 @counter("privacy_reviewed", "profile")
 async def _privacy(ctx):
+    """Datenbewusst (#2338): eine selbst gespeicherte Privatsphäre-Einstellung oder ein geholter Datenexport. Die
+    Registrierung setzt die Felder schon - deren Wert allein zählt nicht mehr."""
     user = await ctx.user()
-    return 1 if isinstance(user.get("privacy_public_profile"), bool) or user.get("profile_visibility") else 0
+    return 1 if user.get("privacy_reviewed_at") or user.get("data_exported_at") else 0
 
 
 @counter("newsletter_subscribed", "profile", "community")
@@ -718,21 +737,40 @@ async def _team_size(ctx):
     return max((len(team.get("member_ids") or []) for team in await ctx.teams()), default=0)
 
 
+def team_profile_complete(team: dict) -> bool:
+    """Teamauftritt (#2338): Logo, Banner und Beschreibung - die Beschreibung nicht leer nach dem Trimmen."""
+    return bool(str(team.get("logo_url") or "").strip() and str(team.get("banner_url") or "").strip() and str(team.get("description") or "").strip())
+
+
 @counter("team_profile_complete", "team")
 async def _team_profile(ctx):
-    return 1 if any(team.get("logo_url") and team.get("banner_url") and str(team.get("description") or "").strip() for team in await ctx.teams() if team.get("leader_id") == ctx.user_id) else 0
+    """Für die Teamleitung und die Co-Leitung eines Teams mit vollständigem Auftritt (#2338)."""
+    return 1 if any(team_profile_complete(team) for team in await ctx.teams()
+                    if team.get("leader_id") == ctx.user_id or ctx.user_id in (team.get("co_leader_ids") or [])) else 0
 
 
 @counter("captain_days", "team")
 async def _captain_days(ctx):
+    """Kapitän (#2338): Tage seit der Übernahme der Leitung (``leader_since``). Teams von vor dieser Angabe: die letzte
+    protokollierte Übergabe an diese Person (``team.transfer_leader``), erst ohne eine solche ab der Gründung."""
     days = 0
     for team in await ctx.teams():
         if team.get("leader_id") != ctx.user_id:
             continue
-        created = _parse(team.get("created_at"))
-        if created:
-            days = max(days, (now_utc() - created).days)
+        since = _parse(team.get("leader_since")) or await _last_handover(ctx, team.get("id")) or _parse(team.get("created_at"))
+        if since:
+            days = max(days, (now_utc() - since).days)
     return days
+
+
+async def _last_handover(ctx, team_id: str | None) -> datetime | None:
+    """Wann die Person die Leitung dieses Teams zuletzt übergeben bekam - aus dem Protokoll."""
+    if not team_id:
+        return None
+    rows = await ctx.db.audit_logs.find(
+        {"action": "team.transfer_leader", "target_id": team_id, "data.new_leader": ctx.user_id},
+        {"_id": 0, "created_at": 1}).sort("created_at", -1).to_list(1)
+    return _parse(rows[0].get("created_at")) if rows else None
 
 
 @counter("team_level_max", "team")
@@ -760,10 +798,12 @@ async def _events_hosted(ctx):
 
 @counter("club_events_attended", "event", "club")
 async def _club_events(ctx):
-    event_ids = [row.get("event_id") async for row in ctx.db.event_registrations.find({"user_id": ctx.user_id, "$or": [{"status": "checked_in"}, {"checked_in": True}]}, {"_id": 0, "event_id": 1}) if row.get("event_id")]
+    """Vereinsleben (#2338): besuchte Events, die vereinsintern sind - nach Sichtbarkeit (Mitglieder, intern) oder Art
+    (Vereinsabend, intern). Anwesenheit und „abgesagt zählt nicht“ wie bei „Eventgänger“ (achievement_progress)."""
+    event_ids = await achievement_progress.attended_event_ids(ctx.db, ctx.user_id)
     if not event_ids:
         return 0
-    return await ctx.db.events.count_documents({"id": {"$in": event_ids}, "visibility": {"$in": ["members", "internal"]}})
+    return await ctx.db.events.count_documents({"id": {"$in": sorted(event_ids)}, **achievement_progress.INTERNAL_EVENT_QUERY})
 
 
 @counter("season_top10_finishes", "season")
@@ -882,6 +922,14 @@ def signal_day(value, today: date) -> tuple[date | None, str | None]:
     return day, None
 
 
+def in_signal_window(window: dict, day: date, moment: datetime | None) -> bool:
+    """Liegt die Meldung im Fenster des Signals (#2338)? Der Tag muss passen; die Stunde (Wien) nur, wenn die Meldung
+    jetzt kommt - ein nachgemeldeter Tag trägt keine Uhrzeit mehr."""
+    if (day.month, day.day) != (int(window["month"]), int(window["day"])):
+        return False
+    return moment is None or moment.hour >= int(window.get("from_hour") or 0)
+
+
 async def season_allows(name: str, day: date | None = None) -> bool:
     """Saisongebundene Signale zählen nur, während die Saison (und die Phase) wirklich läuft - Serverzeit. Für einen
     nachgemeldeten Tag zählt, ob die Saison an diesem Tag zu Mittag lief (die Fenster der Sammel-Saisonen sind ganze Tage)."""
@@ -910,7 +958,8 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
     rule = SIGNAL_RULES[name]
     if rule.get("server") and not trusted:
         return {"accepted": False, "reason": "unknown"}
-    today = now_utc().astimezone(VIENNA).date()
+    moment = now_utc().astimezone(VIENNA)
+    today = moment.date()
     when, problem = signal_day(day, today)
     if problem:
         return {"accepted": False, "reason": problem}
@@ -919,6 +968,8 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
         return {"accepted": False, "reason": "live"}
     if not await season_allows(name, when if replay else None):
         return {"accepted": False, "reason": "season"}
+    if rule.get("window") and not in_signal_window(rule["window"], when, None if replay else moment):
+        return {"accepted": False, "reason": "time"}
     db = get_db()
     day = when.isoformat()
     doc = await db[SIGNALS].find_one({"user_id": user_id, "name": name}, {"_id": 0}) or {}
@@ -1336,10 +1387,42 @@ async def _discord_messages(ctx):
     return int((await ctx.user()).get("discord_messages_count") or 0)
 
 
-@counter("community_messages_sent", "community", "tournament", "match")
+# Chat (#2338): „Plauderer“, Team-, Turnier-, Match-Chat und Direktnachrichten - eine Rechnung
+# (achievement_progress.chat_counters: nichts Zurückgehaltenes oder Gelöschtes, höchstens 50 am Tag), je Auswertung
+# einmal geladen. Neu gerechnet nach einer Chat-Nachricht (Quellen chat, community - leicht, über die Warteschlange) und
+# in jedem vollen Lauf; andere Quellen lassen den gespeicherten Stand stehen.
+CHAT_COUNTER_SOURCES = ("chat", "community")
+
+
+async def _chat_value(ctx, key: str) -> int:
+    values = await ctx._memo("chat_counters", lambda: achievement_progress.chat_counters(ctx.db, ctx.user_id))
+    return int(values.get(key) or 0)
+
+
+@counter("community_messages_sent", *CHAT_COUNTER_SOURCES)
 async def _community_messages(ctx):
-    """Nachrichten in den offenen Chats: Turnier-Chat und Match-Chat."""
-    return await ctx.db.tournament_chat_messages.count_documents({"user_id": ctx.user_id}) + await ctx.db.match_chat_messages.count_documents({"user_id": ctx.user_id})
+    """Plauderer: die offenen Chats - Turnier-Chat und Match-Chat mit einem gemeinsamen Tagesdeckel."""
+    return await _chat_value(ctx, "community_messages_sent")
+
+
+@counter("direct_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _direct_messages(ctx):
+    return await _chat_value(ctx, "direct_messages_sent")
+
+
+@counter("team_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _team_chat_messages(ctx):
+    return await _chat_value(ctx, "team_chat_messages_sent")
+
+
+@counter("match_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _match_chat_messages(ctx):
+    return await _chat_value(ctx, "match_chat_messages_sent")
+
+
+@counter("tournament_chat_messages_sent", *CHAT_COUNTER_SOURCES)
+async def _tournament_chat_messages(ctx):
+    return await _chat_value(ctx, "tournament_chat_messages_sent")
 
 
 @counter("gallery_uploads_approved", "community")
@@ -1350,10 +1433,12 @@ async def _gallery_uploads(ctx):
 
 @counter("stickers_collected", "community", "chat")
 async def _stickers(ctx):
-    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat."""
+    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat - wie bei den Chat-Zählern nur aus
+    Nachrichten, die nicht zurückgehalten, abgelehnt oder gelöscht sind (#2338)."""
     ids = set()
-    for name, field in (("direct_messages", "sender_id"), ("team_chat_messages", "user_id"), ("tournament_chat_messages", "user_id"), ("match_chat_messages", "user_id")):
-        async for row in ctx.db[name].find({field: ctx.user_id, "sticker.id": {"$exists": True}}, {"_id": 0, "sticker.id": 1}):
+    for name, field in achievement_progress.CHAT_COLLECTIONS.values():
+        query = achievement_progress.counted_chat_query(field, ctx.user_id, **{"sticker.id": {"$exists": True}})
+        async for row in ctx.db[name].find(query, {"_id": 0, "sticker.id": 1}):
             sticker_id = (row.get("sticker") or {}).get("id")
             if sticker_id:
                 ids.add(sticker_id)
@@ -1379,16 +1464,31 @@ async def _own_tournament_streams(ctx):
     return len([t for t in await ctx.db[ANNOUNCEMENTS].distinct("tournament_id", {"user_id": ctx.user_id}) if t])
 
 
-@counter("clips_synced", "stream")
+@counter("clips_synced", "stream", "profile")
 async def _clips(ctx):
-    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am Twitch-Namen aus dem Profil."""
-    user = await ctx.user()
-    handle = str(user.get("twitch_handle") or user.get("twitch_channel") or "").strip().lstrip("@").lower()
-    if not handle:
+    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am per Anmeldung verknüpften Twitch-Konto
+    (#2338): an der Twitch-Kennung, bei älteren Clips ohne Kennung am Namen. Ein getippter Name zählt nicht."""
+    twitch = await achievement_progress.linked_twitch(ctx.db, ctx.user_id)
+    if not twitch or not (twitch["external_id"] or twitch["login"]):
         return 0
     from services.twitch_clips import STATE_ID
     doc = await ctx.db.settings.find_one({"id": STATE_ID}, {"_id": 0, "clips": 1}) or {}
-    return sum(1 for clip in doc.get("clips") or [] if str(clip.get("creator_name") or "").strip().lstrip("@").lower() == handle)
+
+    def mine(clip: dict) -> bool:
+        if clip.get("creator_id"):
+            return str(clip["creator_id"]) == twitch["external_id"]
+        return bool(twitch["login"]) and str(clip.get("creator_name") or "").strip().lstrip("@").lower() == twitch["login"]
+    return sum(1 for clip in doc.get("clips") or [] if mine(clip))
+
+
+@counter("streamer_verified", "profile", "club", "stream")
+async def _streamer_verified(ctx):
+    """Verifizierter Streamer (#2338): Twitch per Anmeldung verknüpft und der Verein führt die Person als Streamer
+    oder Creator (Kennzeichen ``creator`` am Vereinsprofil, Mitgliederverwaltung → Öffentliche Profile). Von Hand
+    vergeben geht weiterhin."""
+    if not await achievement_progress.linked_twitch(ctx.db, ctx.user_id):
+        return 0
+    return 1 if await ctx.db.club_member_profiles.find_one({"user_id": ctx.user_id, "creator": True}, {"_id": 0, "id": 1}) else 0
 
 
 # ------------------------------------------------------------------ Katalog D (#615): Verein, Besonders, Geheim

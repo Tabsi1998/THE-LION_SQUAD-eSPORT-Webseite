@@ -1403,7 +1403,15 @@ async def link_account(db, user_id: str, platform: str, identity: dict) -> dict:
     # In die Mitgliederakte übernommen (#846)? Dann folgt der neue Name dorthin.
     from services.dolibarr_accounts import follow_platform
     await follow_platform(db, user_id, platform, linked=link)
+    await _request_link_evaluation(user_id, "platform_link")
     return link
+
+
+async def _request_link_evaluation(user_id: str, reason: str) -> None:
+    """Verknüpfen und Trennen ändern Erfolge (#2338): Konten, Twitch-Zähler, Clips, Verifizierter Streamer - die
+    Warteschlange wertet gleich danach aus."""
+    from services.achievement_queue import request_evaluation
+    await request_evaluation([user_id], reason, sources={"profile", "stream", "discord"})
 
 
 async def unlink(db, user_id: str, platform: str) -> bool:
@@ -1413,6 +1421,11 @@ async def unlink(db, user_id: str, platform: str) -> bool:
     # Getrennt heißt auch: aus der Mitgliederakte heraus, wenn es dort übernommen war (#846).
     from services.dolibarr_accounts import follow_platform
     await follow_platform(db, user_id, platform, linked=None)
+    if platform == "discord":
+        # Was der Bot für das getrennte Konto gesehen hat, zählt nicht mehr für „Überall dabei“ (#2338).
+        await db.discord_memberships.delete_many({"user_id": user_id})
+    if result.deleted_count:
+        await _request_link_evaluation(user_id, "platform_unlink")
     return result.deleted_count > 0
 
 

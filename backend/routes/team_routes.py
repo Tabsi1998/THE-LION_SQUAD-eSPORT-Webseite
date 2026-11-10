@@ -761,10 +761,11 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     mentioned_user_ids = await _notify_team_mentions(db, team, me, message)
     await _notify_team_chat_message(db, team, me, message, mentioned_user_ids)
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
+        # Über die Warteschlange (#2338): eine Auswertung je Person und Takt, nicht eine volle je Nachricht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(me["id"])
     except Exception:
-        logger.warning("[achievements] Teamchat-Nachricht in %s nicht ausgewertet", log_safe(team_id), exc_info=True)
+        logger.warning("[achievements] Teamchat-Nachricht in %s nicht vorgemerkt", log_safe(team_id), exc_info=True)
     message.pop("_id", None)
     enriched = await _enrich_team_chat([word_filter.public_moderation(message)])
     return enriched[0]
@@ -1000,6 +1001,7 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
         raise HTTPException(status_code=409, detail=TAG_TAKEN)
     team_id = new_id()
     await word_filter.screen_field(db, f"{body.name} {body.tag}", kind="team_name", user_id=me["id"], ref_id=team_id)
+    created_at = now_utc().isoformat()
     doc = {
         "id": team_id,
         "name": body.name,
@@ -1014,8 +1016,10 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
         "member_ids": [me["id"]],
         "join_code": new_join_code(),
         "is_public": True,
-        "created_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
+        # Seit wann die Teamleitung führt (#2338, Kapitän) - die Übergabe setzt es neu.
+        "leader_since": created_at,
+        "created_at": created_at,
+        "updated_at": created_at,
     }
     await db.teams.insert_one(doc)
     await db.team_members.update_one(
@@ -1078,9 +1082,23 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     if visibility_changes:
         await _team_audit(db, "team.visibility", team_id, me["id"], {"is_public": updates["is_public"]})
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    await _queue_team_leads(team, "team_update")
     if not _can_manage(team, me):
         team.pop("join_code", None)
     return team
+
+
+async def _queue_team_leads(team: dict | None, reason: str, user_ids=None) -> None:
+    """Teamauftritt und Kapitän (#2338): gleich beim Speichern bzw. bei einer Rollenänderung auswerten - für die
+    Teamleitung und die Co-Leitung (oder die genannten Personen)."""
+    if not team:
+        return
+    wanted = list(user_ids) if user_ids is not None else [team.get("leader_id"), *(team.get("co_leader_ids") or [])]
+    try:
+        from services.achievement_queue import request_evaluation
+        await request_evaluation([user_id for user_id in wanted if user_id], reason, sources={"team"})
+    except Exception:  # noqa: BLE001 - das Speichern des Teams ist schon geschehen
+        logger.warning("[achievements] Team %s nicht vorgemerkt", log_safe(team.get("id")), exc_info=True)
 
 
 @router.post("/{team_id}/join")
@@ -1300,6 +1318,9 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
         "actor_id": me["id"], "data": {"user_id": user_id, "role": role},
         "created_at": now_utc().isoformat(),
     })
+    if role == "co_leader":
+        # Teamauftritt zählt auch für die Co-Leitung (#2338).
+        await _queue_team_leads(team, "team_role", [user_id])
     return {"ok": True, "role": role}
 
 
@@ -1323,8 +1344,10 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
     if _account_gone(await db.users.find_one({"id": new_leader_id}, {"_id": 0, "id": 1, "is_active": 1, "anonymized_at": 1})):
         raise HTTPException(status_code=400, detail="Dieses Konto ist gelöscht oder abgeschaltet – bitte ein aktives Mitglied wählen.")
     old_leader = team.get("leader_id")
+    handed_over = now_utc().isoformat()
     await db.teams.update_one({"id": team_id}, {
-        "$set": {"leader_id": new_leader_id, "updated_at": now_utc().isoformat()},
+        # Kapitän zählt ab der Übernahme (#2338).
+        "$set": {"leader_id": new_leader_id, "leader_since": handed_over, "updated_at": handed_over},
         # Die neue Teamleitung ist nicht zugleich Co-Leitung; die bisherige wird es.
         "$pull": {"co_leader_ids": new_leader_id},
     })
@@ -1357,6 +1380,7 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
         "created_at": now_utc().isoformat(),
     })
     fresh = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    await _queue_team_leads(fresh, "team_transfer", [new_leader_id, old_leader])
     return fresh
 
 

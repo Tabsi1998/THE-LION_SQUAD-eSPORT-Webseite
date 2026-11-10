@@ -28,6 +28,7 @@ from services import seasons  # noqa: E402
 REAL_TO_VIENNA = seasons.to_vienna
 QUIET_DAY = datetime(2026, 9, 15, 12, 0, tzinfo=counters.VIENNA)
 HALLOWEEN_EVE = datetime(2026, 10, 30, 20, 0, tzinfo=counters.VIENNA)
+HALLOWEEN_NIGHT = datetime(2026, 10, 31, 20, 0, tzinfo=counters.VIENNA)
 
 
 def set_clock(monkeypatch, moment: datetime):
@@ -85,13 +86,15 @@ async def test_signale_mit_deckel_und_saison(flow, monkeypatch):
     res = await flow.post("/api/achievements/signal", json={"name": "logo_clicks", "count": 150})
     assert res.json()["count"] == 100, "Deckel 100 am Tag"
     # Saisongebunden: Halloween läuft im Test nicht → abgelehnt; erzwungen im Admin → angenommen.
-    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_pumpkin"})).json() == {"accepted": False, "reason": "season"}
+    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_bats_scared"})).json() == {"accepted": False, "reason": "season"}
     await flow.db.settings.insert_one({"id": "seasons", "seasons": {"halloween": {"mode": "force_on"}}})
-    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_pumpkin"})).json()["accepted"] is True
+    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_bats_scared"})).json()["accepted"] is True
+    # Der Kürbis der Gruselnacht zählt zusätzlich nur am 31.10. ab 18 Uhr (#2338) - auch bei erzwungener Saison.
+    assert (await flow.post("/api/achievements/signal", json={"name": "halloween_pumpkin"})).json() == {"accepted": False, "reason": "time"}
     queued = await flow.db.achievement_eval_queue.find_one({"user_id": user["id"]}, {"_id": 0})
     assert "signal" in queued["sources"] and not queued.get("full")
     values = await counters.refresh(user["id"], {"signal"})
-    assert values["konami_found"] == 1 and values["logo_clicks"] == 100 and values["halloween_pumpkin"] == 1
+    assert values["konami_found"] == 1 and values["logo_clicks"] == 100 and values["halloween_bats_scared"] == 1 and values["halloween_pumpkin"] == 0
 
 
 async def seed_match(flow, a: dict, b: dict, *, when: str, winner: str, seed_a: int = 2, seed_b: int = 1, match_id: str = "m1"):
@@ -170,7 +173,7 @@ async def test_gelesen_und_gesehen_je_einmal(flow):
 async def test_profil_team_saison_und_turnier_zaehler(flow):
     user = await flow.add_user(name="Vielseitig")
     db = flow.db
-    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/a.png", "banner_url": "/b.png", "bio": "Hallo", "website": "https://x.at", "email_verified": True, "notification_preferences": {"push": True}, "privacy_public_profile": True, "newsletter_consent": True, "created_at": (now_utc() - timedelta(days=800)).isoformat()}})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/a.png", "banner_url": "/b.png", "bio": "Hallo", "website": "https://x.at", "email_verified": True, "notification_preferences": {"push": True}, "privacy_public_profile": True, "privacy_reviewed_at": now_utc().isoformat(), "newsletter_consent": True, "created_at": (now_utc() - timedelta(days=800)).isoformat()}})
     await db.platform_links.insert_many([{"id": "l1", "user_id": user["id"], "platform": "discord", "external_id": "1"}, {"id": "l2", "user_id": user["id"], "platform": "youtube", "external_id": "2"}])
     await db.passkeys.insert_one({"user_id": user["id"], "rp_id": "lionsquad.at"})
     await db.mobile_push_tokens.insert_one({"user_id": user["id"], "token": "t"})
@@ -442,7 +445,8 @@ async def test_fundstuecke_zaehler_und_uebersicht_fuer_das_eigene_profil(flow, m
     assert collectibles.total_of({"halloween_bats_scared": {"count": 4}, "logo_clicks": {"count": 90}, "easter_egg": {"count": 2}}) == 6
     assert collectibles.total_of({}) == 0
 
-    set_clock(monkeypatch, HALLOWEEN_EVE)
+    # Halloween-Abend: der Kürbis zählt nur am 31.10. ab 18 Uhr (#2338).
+    set_clock(monkeypatch, HALLOWEEN_NIGHT)
     user = await flow.add_user(name="Sammlerin")
     other = await flow.add_user(name="Andere")
     flow.act_as(None)
@@ -458,7 +462,7 @@ async def test_fundstuecke_zaehler_und_uebersicht_fuer_das_eigene_profil(flow, m
     winter = empty["seasons"][1]
     assert winter["active"] is False and winter["label"] == "Winter" and winter["next_start"].startswith("2026-11-29T00:00:00") and winter["ends_at"] is None
 
-    # Gesammelt: letztes Jahr (in den Daten), vorgestern (nachgemeldet) und heute.
+    # Gesammelt: letztes Jahr (in den Daten), vor drei Tagen (nachgemeldet) und heute.
     await flow.db[counters.SIGNALS].insert_one({"user_id": user["id"], "name": "halloween_bats_scared", "count": 20, "days": {"2025-10-31": 20}, "first_at": "2025-10-31T19:00:00+00:00", "last_at": "2025-10-31T19:30:00+00:00"})
     await flow.db[counters.SIGNALS].insert_one({"user_id": user["id"], "name": "snowflakes_clicked", "count": 60, "days": {"2025-12-24": 60}})
     await flow.db[counters.SIGNALS].insert_one({"user_id": other["id"], "name": "halloween_bats_scared", "count": 99, "days": {"2026-10-30": 99}})

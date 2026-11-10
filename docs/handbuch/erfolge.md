@@ -123,6 +123,29 @@ Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, K
 Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg lässt sich teilen: Er hat eine eigene Seite
 (`/achievements/a/<id>`).
 
+**Was genau zählt (Chat, Discord, Verein, Profil):**
+
+- **Chat** (Plauderer, Teamgeist, Turnier-Plauderer, Briefeschreiber): Zurückgehaltene, abgelehnte und gelöschte Nachrichten
+  zählen nie. Je Erfolg zählen höchstens **50 Nachrichten an einem Tag** (Wiener Zeit); schreiben lässt sich weiter unbegrenzt.
+  „Plauderer“ sind Turnier- und Match-Chat zusammen. Eine Nachricht wird über die Warteschlange ausgewertet, eine später
+  freigegebene ebenso. **Sticker-Sammler** zählt verschiedene Sticker, ebenfalls nur aus sichtbaren Nachrichten – ohne
+  Tageslimit.
+- **Discord:** Gezählt wird nur mit verknüpftem Discord-Konto und nur auf **eingeschalteten** Servern – das gilt für
+  „Discord-Stimme“ und „Überall dabei“. Auf welchen Servern jemand ist, gleicht der Bot beim Verknüpfen und **jede Nacht um 03:50**
+  ab; nach dem Trennen zählt nichts mehr. „Überall dabei“: Stufe I ein Server, Stufe II die Hälfte der eingeschalteten Server
+  (mindestens zwei), Stufe III alle – nie mehr, als es Server gibt.
+- **Events:** „Eventgänger“ und „Vereinsleben“ zählen, wer unter **Anmeldungen & Einlass** eingecheckt ist (**Da**), je Event einmal;
+  **abgesagte Events** zählen nicht. Vereinsintern sind Events mit der Sichtbarkeit **Mitglieder** oder **intern** und Events der Art
+  **Vereinsabend** oder **intern**. Einen Kartenscan am Event-Einlass gibt es nicht.
+- **Datenbewusst:** erst, wenn die Person unter Einstellungen → Privatsphäre selbst etwas einstellt oder ihren Datenexport holt –
+  die Voreinstellung bei der Registrierung zählt nicht.
+- **Twitch** (Streamer, Sendezeit, Clip-Macher): nur mit **per Anmeldung verknüpftem** Twitch-Kanal; ein getippter Name zeigt den
+  Stream auf der Seite, zählt aber nicht. **Verifizierter Streamer** kommt von selbst, wenn Twitch so verknüpft ist und der Verein
+  die Person als Streamer oder Creator führt (Häkchen im Vereinsprofil, [Verein](verein.md) 3.10); von Hand vergeben geht weiter.
+- **Team:** „Teamauftritt“ braucht Logo, Banner und Teambeschreibung und zählt für Teamleitung und Co-Leitung – ausgewertet gleich
+  nach dem Speichern. „Kapitän“ zählt die Tage seit der Übernahme der Leitung (bei älteren Teams ohne diese Angabe ab der Gründung).
+- **Gruselnacht:** Der Kürbis zählt nur am **31.10. ab 18 Uhr** (Wiener Zeit) – das prüft der Server.
+
 ### 3.2 Der Katalog: Gruppen, Stufen, Materialien
 
 Reiter **Katalog**. Eine **Gruppe** ist ein Erfolg („Turniersieger“), eine **Stufe** ist seine Ausbaustufe. Gruppen stehen nach
@@ -156,7 +179,10 @@ bei Fehlern **nichts** und löscht nie etwas.
 
 Reiter **Vergeben**.
 
-**Einzelvergabe:** Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann die Optionen:
+**Einzelvergabe** (alle mit dem Bereich **Redaktion**): Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann
+die Optionen. Die Texte der Hand-Erfolge sagen, wie es läuft: bei Ehrungen wie Ehrenlöwe, Hall of Fame, Saison-MVP oder
+Ehrenamt „Der Vorstand entscheidet, die Redaktion trägt ein“; bei Teilnahmen wie Gamers Heaven, LAN-Gründer oder Beta-Tester
+trägt die Redaktion alle ein, die dabei waren:
 
 - **Grund** (steht im Protokoll),
 - **Datum** – leer heißt jetzt, sonst rückwirkend,

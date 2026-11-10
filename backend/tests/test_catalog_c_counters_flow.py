@@ -34,6 +34,8 @@ def sticker(sticker_id: str) -> dict:
 
 async def world(db, me: dict, other: dict):
     await db.users.update_one({"id": me["id"]}, {"$set": {"discord_messages_count": 120, "twitch_handle": "@LionStreamer"}})
+    # Clips zählen nur mit per Anmeldung verknüpftem Twitch (#2338).
+    await db.platform_links.insert_one({"id": "tw-me", "user_id": me["id"], "platform": "twitch", "external_id": "tw-1", "handle": "LionStreamer"})
     await db.tournament_chat_messages.insert_many([
         {"id": "tc1", "tournament_id": "t1", "user_id": me["id"], "text": "GL HF", "created_at": "2026-09-01T18:00:00+00:00"},
         {"id": "tc2", "tournament_id": "t1", "user_id": me["id"], "text": "", "sticker": sticker("s1"), "created_at": "2026-09-01T18:01:00+00:00"},
