@@ -25,7 +25,7 @@ import contextvars
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from services.competition_standings import STANDING_REGISTRATION_STATUSES, badge_match_progress, final_match, final_participants
+from services.competition_standings import STANDING_REGISTRATION_STATUSES, badge_match_progress
 from services.league_scope import is_league_staffel
 from services.match_winner import is_real_match, lost_by, no_show_ids, participant_ids, won_by
 
@@ -96,11 +96,13 @@ class Played:
 @dataclass(frozen=True)
 class Placement:
     """Die Plätze der Person in einem abgeschlossenen Turnier (mehrere nur, wenn sie für mehrere Anmeldungen gespielt hat),
-    die Größe des Teilnehmerfelds und der Platz je Anmeldung."""
+    die Größe des Teilnehmerfelds, der Platz je Anmeldung - und das Finale mit den eigenen Anmeldungen, die darin standen."""
 
     ranks: frozenset
     participants: int
     by_registration: dict
+    final_match_id: str | None = None
+    finalists: frozenset = frozenset()
 
     def registrations_on(self, rank: int) -> set[str]:
         return {reg_id for reg_id, place in self.by_registration.items() if place == rank}
@@ -278,38 +280,47 @@ class Participation:
         return out
 
     async def placements(self, db) -> dict[str, Placement]:
-        """Der Platz je abgeschlossenem Turnier - der gespeicherte Rang der Auszeichnung (``tournament_awards.rank``).
+        """Der Platz je abgeschlossenem Turnier - der gespeicherte Rang der Auszeichnung (``tournament_awards.rank``), dazu
+        ob die Anmeldung im Finale stand (``finalist``).
 
-        Hat ein abgeschlossenes Turnier noch keine Auszeichnungen (beendet, aber nicht veröffentlicht), gilt der Platz, den
-        die Auszeichnung festhalten würde (``awards.tournament_ranks``). Solange ein Turnier läuft, gibt es keinen Platz."""
+        Hat ein abgeschlossenes Turnier noch keine Auszeichnungen (beendet, aber nicht veröffentlicht) oder trägt älterer
+        Bestand kein ``finalist``, gilt, was die Auszeichnung festhalten würde - je Turnier einmal gerechnet und prozessweit
+        gemerkt (``awards.tournament_outcome``), nicht je Person. Solange ein Turnier läuft, gibt es keinen Platz."""
         if self._placements is None:
             self._placements = await self._load_placements(db)
         return self._placements
 
     async def _load_placements(self, db) -> dict[str, Placement]:
-        from services.awards import tournament_ranks
+        from services.awards import tournament_outcome
 
         entries = self.finished_entries()
         ids = sorted(registration["id"] for registrations in entries.values() for registration in registrations)
         stored = {}
         if ids:
-            fields = {"_id": 0, "tournament_id": 1, "registration_id": 1, "rank": 1, "participants": 1}
+            fields = {"_id": 0, "tournament_id": 1, "registration_id": 1, "rank": 1, "participants": 1, "finalist": 1, "final_match_id": 1}
             stored = {row["registration_id"]: row async for row in db.tournament_awards.find({"registration_id": {"$in": ids}}, fields)}
         out: dict[str, Placement] = {}
         for tournament_id, registrations in entries.items():
-            own = [stored[registration["id"]] for registration in registrations if registration["id"] in stored]
+            entered = {registration["id"] for registration in registrations}
+            own = [stored[reg_id] for reg_id in entered if reg_id in stored]
             if own:
                 ranks = {row["registration_id"]: row.get("rank") for row in own}
                 field = max(int(row.get("participants") or 0) for row in own)
+                if all("finalist" in row for row in own):
+                    finalists = {row["registration_id"] for row in own if row.get("finalist")}
+                    final_id = next((row.get("final_match_id") for row in own if row.get("finalist")), None)
+                else:  # älterer Bestand: die Auszeichnung kennt das Finale noch nicht
+                    outcome = await tournament_outcome(db, tournament_id)
+                    finalists, final_id = outcome["finalists"] & entered, outcome["final_match_id"]
             elif await db.tournament_awards.count_documents({"tournament_id": tournament_id}, limit=1):
                 continue  # die Auszeichnungen stehen - für diese Anmeldung gibt es keine
             else:
-                tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
-                listed, _snapshot, current = await tournament_ranks(db, tournament, surface="achievements") if tournament else ([], {}, {})
-                ranks = {registration["id"]: current.get(registration["id"]) for registration in registrations}
-                field = len(listed)
+                outcome = await tournament_outcome(db, tournament_id)
+                ranks = {reg_id: outcome["ranks"].get(reg_id) for reg_id in entered}
+                field = outcome["participants"]
+                finalists, final_id = outcome["finalists"] & entered, outcome["final_match_id"]
             placed = {reg_id: rank for reg_id, rank in ranks.items() if isinstance(rank, int) and not isinstance(rank, bool) and rank > 0}
-            out[tournament_id] = Placement(frozenset(placed.values()), field, placed)
+            out[tournament_id] = Placement(frozenset(placed.values()), field, placed, final_id, frozenset(finalists))
         return out
 
     def beaten_registration_ids(self) -> set[str]:
@@ -324,20 +335,15 @@ class Participation:
 
     async def finals(self, db) -> set[str]:
         """Die abgeschlossenen Turniere, in deren Finale die Person stand (``competition_standings.final_participants``):
-        Endspiel, Grand Final oder Finallauf - und sie hat dieses Spiel selbst gespielt."""
+        Endspiel, Grand Final oder Finallauf - und sie hat dieses Spiel selbst gespielt. Welches Spiel das Finale war und
+        welche Anmeldungen darin standen, steht an der Auszeichnung (``placements``)."""
         if self._finals is None:
-            from services.competition_read import load_competition_read_model
-
             found = set()
-            for tournament_id, registrations in self.finished_entries().items():
-                tournament = self.tournaments[tournament_id]
-                snapshot = (await load_competition_read_model(db, tournament_id)).structure_snapshot()
-                final = final_match(snapshot, tournament=tournament)
-                if not final:
+            for tournament_id, placement in (await self.placements(db)).items():
+                if not placement.final_match_id or not placement.finalists:
                     continue
-                on_stage = {reg_id for row in self.played if row.match.get("id") == final.get("id") for reg_id in row.mine}
-                entered = {registration["id"] for registration in registrations}
-                if on_stage & entered & final_participants(snapshot, tournament=tournament):
+                on_stage = {reg_id for row in self.played if row.match.get("id") == placement.final_match_id for reg_id in row.mine}
+                if on_stage & placement.finalists:
                     found.add(tournament_id)
             self._finals = found
         return self._finals
