@@ -139,15 +139,21 @@ async def _evaluate_streamer(user_id: str):
         logger.debug("[twitch] achievement evaluation failed for %s: %s", user_id, exc)
 
 
-async def _counts_for_achievements(db, user_id: str | None, login: str | None) -> bool:
+async def _counts_for_achievements(db, user_id: str | None, twitch_user_id: str | None, login: str | None = None) -> bool:
     """Streamer und Sendezeit (#2338) zählen nur den per Anmeldung verknüpften Twitch-Kanal - ein getippter Name
-    zeigt den Stream weiter auf der Seite, bringt aber keine Sessions und Minuten."""
-    if not user_id or not login:
+    zeigt den Stream weiter auf der Seite, bringt aber keine Sessions und Minuten. Verglichen wird die Twitch-Kennung
+    des Streams mit der Kennung der Verknüpfung (``external_id``) - eine Umbenennung bei Twitch ändert daran nichts.
+    Nur ein laufender Stream von vor dieser Kennung (ohne ``twitch_user_id``) fällt einmal auf den Login zurück."""
+    if not user_id:
         return False
     from services.achievement_progress import linked_twitch
 
     twitch = await linked_twitch(db, user_id)
-    return bool(twitch) and twitch["login"] == str(login).strip().lstrip("@").lower()
+    if not twitch:
+        return False
+    if twitch_user_id:
+        return bool(twitch["external_id"]) and str(twitch_user_id) == twitch["external_id"]
+    return bool(login) and twitch["login"] == str(login).strip().lstrip("@").lower()
 
 
 async def _close_offline_streams(db, active_logins: set[str], now_dt: datetime):
@@ -171,7 +177,7 @@ async def _close_offline_streams(db, active_logins: set[str], now_dt: datetime):
                 }},
                 upsert=False,
             )
-        if duration_minutes and await _counts_for_achievements(db, stream.get("user_id"), stream.get("twitch_login")):
+        if duration_minutes and await _counts_for_achievements(db, stream.get("user_id"), stream.get("twitch_user_id"), stream.get("twitch_login")):
             await db.users.update_one(
                 {"id": stream.get("user_id")},
                 {"$inc": {"twitch_stream_minutes": duration_minutes}},
@@ -239,6 +245,8 @@ async def fetch_live_streams() -> dict:
         if not u:
             continue
         thumb = (s.get("thumbnail_url") or "").replace("{width}", "640").replace("{height}", "360")
+        # Die Twitch-Kennung des Kanals (#2338): daran erkennen Streamer und Sendezeit das verknüpfte Konto.
+        twitch_user_id = str(s.get("user_id") or "")
         previous_session = await db.twitch_stream_sessions.find_one({"stream_id": stream_id}, {"viewer_count_peak": 1, "_id": 0}) or {}
         new_session = not previous_session
         session_doc = {
@@ -247,6 +255,7 @@ async def fetch_live_streams() -> dict:
             "username": u["username"],
             "display_name": u.get("display_name"),
             "twitch_login": login,
+            "twitch_user_id": twitch_user_id,
             "title": s.get("title"),
             "game_name": s.get("game_name"),
             "viewer_count_peak": int(s.get("viewer_count") or 0),
@@ -272,7 +281,7 @@ async def fetch_live_streams() -> dict:
         )
         if new_session:
             update: dict = {"$set": {"last_twitch_live_at": now}}
-            if await _counts_for_achievements(db, u["id"], login):
+            if await _counts_for_achievements(db, u["id"], twitch_user_id, login):
                 update["$inc"] = {"twitch_live_sessions_count": 1}
             await db.users.update_one({"id": u["id"]}, update)
             await _evaluate_streamer(u["id"])
@@ -284,6 +293,7 @@ async def fetch_live_streams() -> dict:
                 "display_name": u.get("display_name"),
                 "avatar_url": u.get("avatar_url"),
                 "twitch_login": login,
+                "twitch_user_id": twitch_user_id,
                 "stream_id": stream_id,
                 "title": s.get("title"),
                 "game_name": s.get("game_name"),

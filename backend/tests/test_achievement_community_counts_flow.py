@@ -217,8 +217,8 @@ async def test_twitch_sessions_and_minutes_only_count_for_the_linked_channel(flo
     await db.platform_links.insert_one({"id": "tw-l", "user_id": linked["id"], "platform": "twitch", "external_id": "9001", "handle": "eigenerkanal"})
     started = (now_utc() - timedelta(minutes=30)).isoformat()
     fake_twitch(monkeypatch, [
-        {"id": "st-typed", "user_login": "fremderkanal", "started_at": started, "viewer_count": 3},
-        {"id": "st-linked", "user_login": "eigenerkanal", "started_at": started, "viewer_count": 3},
+        {"id": "st-typed", "user_id": "8001", "user_login": "fremderkanal", "started_at": started, "viewer_count": 3},
+        {"id": "st-linked", "user_id": "9001", "user_login": "eigenerkanal", "started_at": started, "viewer_count": 3},
     ])
     await twitch_service.fetch_live_streams()
     assert await db.live_streams.count_documents({}) == 2, "beide Streams stehen weiter auf der Seite"
@@ -236,6 +236,38 @@ async def test_twitch_sessions_and_minutes_only_count_for_the_linked_channel(flo
     assert {k: v for k, v in (await counters.compute(typed["id"], keys)).items() if k in keys} == {"twitch_live_sessions": 0, "twitch_stream_minutes": 0}
     mine = await counters.compute(linked["id"], keys)
     assert mine["twitch_live_sessions"] == 1 and mine["twitch_stream_minutes"] >= 30
+
+
+@pytest.mark.asyncio
+async def test_a_renamed_twitch_channel_still_counts_by_its_id(flow, monkeypatch):
+    """Twitch erkennt den Kanal an der Kennung, nicht am Login (#2338): nach einer Umbenennung bei Twitch zählt der Stream
+    weiter für das verknüpfte Konto; ein fremder Kanal mit dem alten Namen nicht."""
+    from datetime import timedelta
+
+    from models import now_utc
+    from services import twitch_service
+    from services.secret_store import encrypt_secret
+
+    db = flow.db
+    await db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "twitch_client_id": "cid", "twitch_client_secret": encrypt_secret("geheim")}}, upsert=True)
+    renamed = await flow.add_user(name="umbenannt")
+    await db.users.update_one({"id": renamed["id"]}, {"$set": {"twitch_handle": "neuername", "platform_verified": {"twitch": True}}})
+    await db.platform_links.insert_one({"id": "tw-r", "user_id": renamed["id"], "platform": "twitch", "external_id": "9001", "handle": "altername"})
+    squatter = await flow.add_user(name="altername-fremd")
+    await db.users.update_one({"id": squatter["id"]}, {"$set": {"twitch_handle": "altername"}})
+    await db.platform_links.insert_one({"id": "tw-s", "user_id": squatter["id"], "platform": "twitch", "external_id": "7777", "handle": "irgendwer"})
+    started = (now_utc() - timedelta(minutes=20)).isoformat()
+    fake_twitch(monkeypatch, [
+        {"id": "st-new", "user_id": "9001", "user_login": "neuername", "started_at": started, "viewer_count": 1},
+        {"id": "st-old", "user_id": "6666", "user_login": "altername", "started_at": started, "viewer_count": 1},
+    ])
+    await twitch_service.fetch_live_streams()
+    fake_twitch(monkeypatch, [])
+    await twitch_service.fetch_live_streams()
+    mine = await db.users.find_one({"id": renamed["id"]})
+    assert mine["twitch_live_sessions_count"] == 1 and mine["twitch_stream_minutes"] >= 20, "gleiche Kennung, neuer Name"
+    theirs = await db.users.find_one({"id": squatter["id"]})
+    assert not theirs.get("twitch_live_sessions_count") and not theirs.get("twitch_stream_minutes"), "fremde Kennung"
 
 
 @pytest.mark.asyncio
