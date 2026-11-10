@@ -547,6 +547,60 @@ async def test_only_the_superadmin_may_run_the_recount(flow):
     assert await flow.db.notifications.count_documents({"kind": recount.NOTIFY_KIND}) == 1
 
 
+# ------------------------------------------------------------------ Auslöser aus #2337/#2338
+
+async def queued_announce(flow, user) -> list | None:
+    entry = await flow.db.achievement_eval_queue.find_one({"user_id": user["id"]}, {"_id": 0})
+    return entry.get("announce") if entry else "nicht vorgemerkt"
+
+
+@pytest.mark.asyncio
+async def test_each_real_trigger_names_its_source_and_the_nightly_discord_sync_names_none(flow, monkeypatch):
+    """Was im stillen Modus laut sein darf, nennt der Auslöser: Chat, Konto verknüpfen, Team speichern, Discord-Beitritt,
+    Check-in und Twitch. Der nächtliche Discord-Abgleich ist ein Abgleich, kein Ereignis - er nennt nichts."""
+    from routes import team_routes
+    from services import discord_guilds, discord_runtime, platform_links, twitch_service
+
+    people = {name: await flow.add_user(name=name) for name in ("chat", "konto", "team", "beitritt", "nachts")}
+    await achievement_queue.request_chat_evaluation(people["chat"]["id"])
+    assert await queued_announce(flow, people["chat"]) == ["chat", "community"]
+    await platform_links._request_link_evaluation(people["konto"]["id"], "platform_link")
+    assert await queued_announce(flow, people["konto"]) == ["discord", "profile", "stream"]
+    await team_routes._queue_team_leads({"id": "tm", "leader_id": people["team"]["id"], "co_leader_ids": []}, "team_update")
+    assert await queued_announce(flow, people["team"]) == ["team"]
+
+    main_guild = "700000000000000001"
+    await flow.db.discord_guilds.insert_one({"guild_id": main_guild, "name": "Haupt", "role": "main", "enabled": True})
+    await flow.db.platform_links.insert_many([
+        {"id": "l-b", "user_id": people["beitritt"]["id"], "platform": "discord", "external_id": "301"},
+        {"id": "l-n", "user_id": people["nachts"]["id"], "platform": "discord", "external_id": "302"},
+    ])
+    await discord_guilds.note_membership(flow.db, main_guild, "301", True)
+    assert await queued_announce(flow, people["beitritt"]) == ["discord"], "der Bot sieht den Beitritt im Moment"
+
+    async def member_status(guild_ids, discord_id):
+        return {guild_id: True for guild_id in guild_ids}
+
+    monkeypatch.setattr(discord_runtime.bot, "member_status", member_status)
+    await flow.db.achievement_eval_queue.delete_many({})
+    result = await discord_guilds.sync_all_memberships(flow.db, pause=0)
+    assert result["changed"] >= 1
+    assert await queued_announce(flow, people["nachts"]) is None, "nachts vorgemerkt, aber ohne laute Quelle"
+    assert not recount.in_quiet_scope(), "der stille Rahmen endet mit dem Abgleich"
+
+    calls: list[tuple] = []
+
+    async def evaluate(*args, **kwargs):
+        calls.append((args, kwargs))
+        return 0
+
+    monkeypatch.setattr(badges, "evaluate_user_progress", evaluate)
+    await badges.on_checked_in(people["chat"]["id"], "kein-turnier")
+    assert calls[-1] == ((people["chat"]["id"], {"tournament"}), {}), "Check-in: die Quelle ist zugleich, was laut sein darf"
+    await twitch_service._evaluate_streamer(people["chat"]["id"])
+    assert calls[-1] == ((people["chat"]["id"],), {"announce": {"stream"}})
+
+
 # ------------------------------------------------------------------ Laufband und Wochenrückblick
 
 @pytest.mark.asyncio

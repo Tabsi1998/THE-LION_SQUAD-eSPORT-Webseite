@@ -134,7 +134,8 @@ def _parse_dt(value: str | None) -> datetime | None:
 async def _evaluate_streamer(user_id: str):
     try:
         from services.achievement_core import evaluator
-        await evaluator()(user_id)
+        # Live gegangen oder Stream beendet (#2340): im stillen Modus melden sich die Stream-Stufen laut, Altansprüche still.
+        await evaluator()(user_id, announce={"stream"})
     except Exception as exc:
         logger.debug("[twitch] achievement evaluation failed for %s: %s", user_id, exc)
 
