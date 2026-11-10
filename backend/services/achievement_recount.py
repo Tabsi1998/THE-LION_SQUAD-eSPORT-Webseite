@@ -326,7 +326,7 @@ async def start_finish(db=None, *, actor: dict | None = None) -> str:
     """Für die Verwaltung: Sperre nehmen und den Abschluss im Hintergrund starten. Liefert ``started``, ``running``,
     ``done`` oder ``missing``."""
     db = db if db is not None else get_db()
-    doc = await db.settings.find_one({"id": SETTING_ID}, {"_id": 0, "finish": 1})
+    doc = await db.settings.find_one({"id": SETTING_ID}, {"_id": 0, "id": 1, "finish": 1})
     if not doc:
         return "missing"
     if (doc.get("finish") or {}).get("phase") == "done":
