@@ -26,6 +26,12 @@ function valueText(row) {
   return "";
 }
 
+/** Vorgelesen je Name - im Baum (#2336) mit Weg und gewonnenen Spielen: „LunaByte, im Finale, 1 Spiel gewonnen“. */
+function spokenEntry(row) {
+  const name = row.display_name || "Teilnehmer";
+  return row.place_path ? `${name}, ${row.place_path}, ${gamesWonText(podiumWins(row))}` : row.display_name;
+}
+
 function Avatar({ name, src }) {
   return (
     <span className="tls-podium__avatar" aria-hidden="true">
@@ -80,7 +86,7 @@ export function Podium({ rows, registrations = [], className = "" }) {
             data-metal={place.metal}
             data-testid={`podium-place-${place.rank}`}
             style={{ "--tls-i": RISE_ORDER[place.rank] }}
-            aria-label={`${place.label}: ${place.rows.map((row) => row.display_name).join(", ") || "nicht vergeben"}`}
+            aria-label={`${place.label}: ${place.rows.map(spokenEntry).join(place.rows.some((row) => row.place_path) ? "; " : ", ") || "nicht vergeben"}`}
           >
             <div className="tls-podium__people">
               {place.rank === 1 && (

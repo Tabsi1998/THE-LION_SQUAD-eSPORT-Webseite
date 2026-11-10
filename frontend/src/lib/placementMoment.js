@@ -70,11 +70,6 @@ export function markPlacementShown(placement, storage = defaultStorage()) {
   }
 }
 
-/**
- * Treppchen: Platz 2 links, 1 in der Mitte, 3 rechts; gleiche Plätze stehen nebeneinander auf einer Stufe. Ein Platz,
- * den ein Gleichstand überspringt (zwei Erste - kein Zweiter), bekommt keine Stufe; ein Platz, den es schlicht nicht
- * gibt (nur zwei haben gespielt), bleibt als leere Stufe mit „–“ stehen.
- */
 /** Gewonnene Spiele einer Zeile - `won` aus der Baum-Rangliste, `wins` aus Altbestand und Rückblick. */
 export function podiumWins(row) {
   const wins = Number(row?.won ?? row?.wins);
@@ -97,13 +92,18 @@ export function podiumRoundNote(rows = []) {
   const tree = (rows || []).filter((row) => row && (row.place_path || row.path) && podiumWins(row) != null && Number(row.rank) >= 1);
   const mismatch = tree.some((better) => tree.some((worse) => Number(better.rank) < Number(worse.rank) && podiumWins(better) < podiumWins(worse)));
   if (!mismatch) return "";
-  const double = tree.some((row) => /\b(?:Loser|Grand Final)\b/.test(`${row.reached || ""} ${row.place_path || row.path || ""}`));
+  const double = tree.some((row) => /\b(?:Loser|Winner|Grand Final)\b/.test(`${row.reached || ""} ${row.place_path || row.path || ""}`));
   return [
     "Im K.-o. zählt die erreichte Runde, nicht die Zahl der Siege. Ein Freilos zählt nicht als Sieg.",
     double ? "Im Doppel-K.-o. sammelt man in der Verliererrunde oft mehr Siege." : "",
   ].filter(Boolean).join(" ");
 }
 
+/**
+ * Treppchen: Platz 2 links, 1 in der Mitte, 3 rechts; gleiche Plätze stehen nebeneinander auf einer Stufe. Ein Platz,
+ * den ein Gleichstand überspringt (zwei Erste - kein Zweiter), bekommt keine Stufe; ein Platz, den es schlicht nicht
+ * gibt (nur zwei haben gespielt), bleibt als leere Stufe mit „–“ stehen.
+ */
 export function podiumPlaces(standings) {
   const rows = flatRows(standings).filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3);
   if (!rows.length) return [];

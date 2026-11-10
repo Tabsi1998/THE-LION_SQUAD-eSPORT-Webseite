@@ -85,6 +85,7 @@ test("Baum: der Weg zum Platz, darunter klein die gewonnenen Spiele, und ein Sat
   expect(second).toHaveTextContent("im Grand Final");
   expect(second).toHaveTextContent("1 Spiel gewonnen");
   expect(second).not.toHaveTextContent("Sieg");
+  expect(second).toHaveAttribute("aria-label", "Platz 2: LunaByte, im Grand Final, 1 Spiel gewonnen");
   expect(screen.getByTestId("podium-place-1")).toHaveTextContent("Grand Final gewonnen4 Spiele gewonnen");
   const note = screen.getByTestId("podium-note");
   expect(note).toHaveTextContent("erreichte Runde, nicht die Zahl der Siege");
