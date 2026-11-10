@@ -319,11 +319,14 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
             continue
         allowed[code] = int(tier.get("points") or 0)
     agg: dict[str, dict] = {}
-    async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "earned_at": 1}):
+    async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "earned_at": 1, "recount": 1}):
         points = allowed.get(award["tier_code"])
         if points is None:
             continue
         if since:
+            # Nachgerechnete Stufen (#2340) zählen gesamt, aber in keinem Zeitraum - verdient wurden sie früher.
+            if award.get("recount"):
+                continue
             when = _parse_when(award.get("earned_at"))
             if not when or when < since:
                 continue

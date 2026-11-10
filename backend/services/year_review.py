@@ -215,7 +215,8 @@ async def _season(db, user_id: str, year: int) -> dict | None:
 
 
 async def _achievements(db, user_id: str, year: int) -> dict:
-    awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0, "tier_code": 1, "earned_at": 1}).to_list(5000)
+    # Nachgerechnete Stufen (#2340) stammen nicht aus diesem Jahr - sie stehen nicht im Rückblick.
+    awards = await db.user_achievements.find({"user_id": user_id, "recount": {"$ne": True}}, {"_id": 0, "tier_code": 1, "earned_at": 1}).to_list(5000)
     codes = [a["tier_code"] for a in awards if a.get("tier_code") and year_of(a.get("earned_at")) == year]
     if not codes:
         return {"count": 0, "points": 0, "top": []}

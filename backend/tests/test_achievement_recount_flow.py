@@ -743,3 +743,29 @@ async def test_recounted_tiers_stay_out_of_the_ticker_and_the_weekly_recap(flow)
     await flow.db.user_achievements.delete_one({"id": "a-normal"})
     await flow.db.xp_events.delete_one({"id": "x1"})
     assert await achievement_recap.recap_for(flow.db, user, start, end) is None, "nur Nachgerechnetes: keine Mail"
+
+
+@pytest.mark.asyncio
+async def test_recounted_tiers_count_overall_but_in_no_period_and_not_in_the_year_review(flow):
+    """Review zu #2340: Ranglisten nach Zeitraum und der Jahresrückblick zählen nachgerechnete Stufen nicht - verdient
+    wurden sie früher. Die Gesamt-Rangliste zählt sie."""
+    from datetime import datetime, timezone
+
+    from services import achievement_visibility, year_review
+
+    paula = await flow.add_user(name="paula")
+    await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"privacy_public_profile": True}})
+    at = "2026-11-04T18:00:00+00:00"
+    await flow.db.user_achievements.insert_many([
+        {"id": "a-normal", "user_id": paula["id"], "tier_code": "leser_1", "group_code": "leser", "earned_at": at},
+        {"id": "a-recount", "user_id": paula["id"], "tier_code": "sicher_1", "group_code": "sicher", "earned_at": at, "recount": True, "recount_id": recount.MARKER},
+    ])
+    now = datetime(2026, 11, 11, 12, tzinfo=timezone.utc)
+    overall = await achievement_visibility.leaderboard(flow.db, period="all", now=now)
+    month = await achievement_visibility.leaderboard(flow.db, period="month", now=now)
+    year = await achievement_visibility.leaderboard(flow.db, period="year", now=now)
+    assert (overall[0]["count"], overall[0]["points"]) == (2, 100)
+    assert (month[0]["count"], month[0]["points"]) == (1, 50) and (year[0]["count"], year[0]["points"]) == (1, 50)
+
+    review = await year_review._achievements(flow.db, paula["id"], 2026)
+    assert review["count"] == 1 and [row["name"] for row in review["top"]] == ["Leseratte I"]
