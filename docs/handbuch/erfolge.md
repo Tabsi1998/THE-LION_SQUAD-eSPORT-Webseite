@@ -432,6 +432,10 @@ Bricht der Lauf ab (etwa durch ein Update), steht bei **Abschluss** „Unterbroc
 Abschluss stehen im Protokoll unter **Vergeben**. Am Server geht beides auch per Kommando:
 `python -m scripts.achievements_recount --probelauf` bzw. `--abschliessen` (im Backend-Container, ohne Schalter zeigt es den Stand).
 
+**Nach einer Katalog-Änderung während des stillen Modus aufrufen:** `python -m scripts.achievements_recount --neu-pruefen`. Dann
+gelten alle Konten wieder als nicht nachgerechnet und werden still neu ausgewertet; bis dahin meldet auch ein eigenes Ereignis
+nichts laut – sonst kämen neue Stufen für alte Ansprüche einzeln.
+
 ---
 
 ## 4. Wenn etwas nicht klappt

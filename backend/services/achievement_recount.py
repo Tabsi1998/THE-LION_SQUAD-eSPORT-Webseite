@@ -183,8 +183,9 @@ async def queue_everyone(db, reason: str) -> int:
 
 
 async def recheck(db=None) -> str:
-    """Für ein weiteres Korrektur-Paket während des stillen Modus (etwa den Katalog, #2339): alle Marken verfallen (neue
-    Generation), alle Konten werden still neu ausgewertet. Bis dahin vergibt jedes Ereignis wieder alles still."""
+    """Nach einer Katalog-Änderung während des stillen Modus aufrufen (etwa #2339; Kommando ``--neu-pruefen``): Alle Marken
+    verfallen (neue Generation), alle Konten werden still neu ausgewertet. Bis dahin vergibt jedes Ereignis wieder alles
+    still - sonst meldete es neue Stufen für Altansprüche einzeln."""
     db = db if db is not None else get_db()
     doc = await db.settings.find_one({"id": SETTING_ID, "active": True}, {"_id": 0, "generation": 1})
     if not doc:

@@ -688,6 +688,10 @@ async def test_the_command_line_runs_dry_run_and_finish(flow):
     assert await script.main([], out=out) == 0
     assert "Keine Neuberechnung angelegt" in out.getvalue()
     assert await script.main(["--starten"], out=io.StringIO()) == 0
+    # Nach einer Katalog-Änderung: neue Generation, alle wieder vorgemerkt.
+    out = io.StringIO()
+    assert await script.main(["--neu-pruefen"], out=out) == 0
+    assert "recheck, 1 accounts queued" in out.getvalue() and (await recount.silent_state())["mark"] == f"{recount.MARKER}:2"
 
     out = io.StringIO()
     assert await script.main(["--dry-run"], out=out) == 0

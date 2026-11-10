@@ -10,9 +10,13 @@ Ohne Schalter zeigt das Werkzeug den Stand: ob der stille Modus an ist und wie w
   Lauf geht beim Stand weiter, doppelt geschickt wird nichts.
 - ``--starten`` (auch ``--start``) schaltet den stillen Modus ein, falls Migration 22 ihn nicht gesetzt hat (etwa auf
   einem lokalen Stand, der beim Start noch leer war). Ein abgeschlossener Lauf bleibt abgeschlossen.
+- ``--neu-pruefen`` (auch ``--recheck``): nach einer Katalog-Änderung während des stillen Modus aufrufen. Alle Konten
+  gelten wieder als nicht nachgerechnet und werden still neu ausgewertet - bis dahin meldet auch ein echtes Ereignis
+  nichts laut, damit neue Stufen für Altansprüche nicht einzeln gemeldet werden.
 
 Am Server, im Backend-Container:
     docker compose exec backend python -m scripts.achievements_recount --probelauf
+    docker compose exec backend python -m scripts.achievements_recount --neu-pruefen
     docker compose exec backend python -m scripts.achievements_recount --abschliessen
 
 Umgebung: dieselben MONGO_URL und DB_NAME wie das Backend.
@@ -35,6 +39,8 @@ def parse(argv: list[str]) -> argparse.Namespace:
     action.add_argument("--probelauf", "--dry-run", dest="dry_run", action="store_true", help="nur zählen, nichts vergeben")
     action.add_argument("--abschliessen", "--finish", dest="finish", action="store_true", help="still auswerten, Sammel-Nachricht, stiller Modus aus")
     action.add_argument("--starten", "--start", dest="start", action="store_true", help="stillen Modus einschalten, falls er fehlt")
+    action.add_argument("--neu-pruefen", "--recheck", dest="recheck", action="store_true",
+                        help="nach einer Katalog-Änderung während des stillen Modus: alle Konten still neu auswerten")
     return parser.parse_args(argv)
 
 
@@ -80,6 +86,8 @@ async def main(argv: list[str] | None = None, *, out=None) -> int:
 
     if args.start:
         out.write(await recount.begin() + "\n")
+    elif args.recheck:
+        out.write(await recount.recheck() + "\n")
     elif args.dry_run:
         result = await recount.dry_run(progress=progress)
         if result.get("status") != "done":
