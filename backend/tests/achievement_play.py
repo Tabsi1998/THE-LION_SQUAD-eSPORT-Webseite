@@ -150,10 +150,22 @@ async def team_cup(flow, *, tournament_fields: dict | None = None, **registratio
     return staff, tournament, team, registration, (lead, member, bench), rival_regs
 
 
-async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: list[dict], away: dict) -> tuple[dict, dict, dict, dict]:
+async def record_squad_members(flow, staffel: dict, squad_id: str, people: list[dict], *, via: str = "assign") -> None:
+    """Personen in den Liga-Kader der Season aufnehmen - über ``league_roster.record_members``, den Weg, den Zuteilen,
+    Aufnahme ins Co-Team und Transfer nehmen (schreibt ``league_rosters.squad_ids`` und ``squad_joined_at``)."""
+    from services import league_roster
+
+    ids = [person["id"] for person in people]
+    ctx = await league_roster.context_for_tournament(flow.db, staffel, ids)
+    await league_roster.record_members(flow.db, ctx, ids, via=via, actor_id="liga-leitung", squad_id=squad_id)
+
+
+async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: list[dict], away: dict,
+                      status: str = "live") -> tuple[dict, dict, dict, dict]:
     """Eine Liga-Staffel, in der ein Co-Team spielt - das Spiel (Heim gewinnt) trägt keine Teilnehmerliste, wie nach
-    einer kampflosen Wertung. ``others`` sind im Hauptteam, aber nicht im Kader des Co-Teams.
-    Zurück: Hauptteam, Co-Team, Heim-Anmeldung, Spiel."""
+    einer kampflosen Wertung. ``others`` sind im Hauptteam, aber nicht im Kader des Co-Teams. Die Season kennt „ein Team
+    je Season“ - damit führt sie den Liga-Kader auch ohne Pflicht-ID des Spiels. Zugeteilt wird vor dem Spiel.
+    Zurück: Hauptteam, Co-Team, Heim-Anmeldung, Spiel; die Staffel steht in ``match["tournament_id"]``."""
     from flow_harness import new_id
     from models import now_utc
 
@@ -162,10 +174,14 @@ async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: 
              "created_at": "2026-01-01T00:00:00+00:00", "updated_at": "2026-01-01T00:00:00+00:00"}
     await flow.db.team_squads.insert_one(dict(squad))
     guests = await add_team(flow, "Gast", away, [])
-    staffel = await flow.create_tournament(format="league", status="live", team_mode="team",
-                                           league_context={"league_id": "l1", "season_id": "s1", "staffel": "A"})
+    season_id = new_id()
+    await flow.db.league_seasons.insert_one({"id": season_id, "league_id": "l1", "name": "Season 1", "status": "active",
+                                              "one_team_per_season": True})
+    staffel = await flow.create_tournament(format="league", status=status, team_mode="team",
+                                           league_context={"league_id": "l1", "season_id": season_id, "staffel": "A"})
     home_reg = await register_team(flow, staffel, team, by=None, squad_id=squad["id"])
     away_reg = await register_team(flow, staffel, guests, by=None)
+    await record_squad_members(flow, staffel, squad["id"], squad_members)
     stamp = now_utc().isoformat()
     match = {
         "id": new_id(), "tournament_id": staffel["id"], "stage_number": 1, "round": 1, "order": 1, "status": "completed",

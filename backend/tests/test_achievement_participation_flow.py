@@ -149,13 +149,16 @@ async def test_liga_staffel_zaehlt_fuer_die_teilnehmerliste_des_spiels(flow):
 
 @pytest.mark.asyncio
 async def test_co_team_kaderwechsel_aus_dem_protokoll(flow):
-    """Review M4: Ein Spiel ohne Teilnehmerliste (etwa kampflos gewertet) zählt für den Kader von damals. Danach wechselt
-    „Wechsler“ per Transfer das Co-Team, „Neuzugang“ kommt in den Kader - beides steht im Protokoll, so wie die Routen es
-    schreiben (``league.transfer.approve``, ``league.squad.roster``)."""
+    """Review M4: Ein Spiel ohne Teilnehmerliste (etwa kampflos gewertet) zählt für den Kader von damals - laut Liga-Kader
+    der Season (beim Zuteilen geschrieben). Danach wechselt „Wechsler“ per Transfer das Co-Team, „Neuzugang“ kommt in den
+    Kader: Beides steht im Protokoll, so wie die Routen es schreiben (``league.transfer.approve``,
+    ``league.squad.roster``), der Neuzugang dazu im Liga-Kader."""
     captain, stayer, mover, newcomer, sibling, rival = [
         await flow.add_user(name=name) for name in ("Captain", "Stamm", "Wechsler", "Neuzugang", "Zweites Co-Team", "Gegnerin")]
-    team, squad, _home_reg, _match = await play.squad_match(flow, leader=captain, squad_members=[captain, stayer, mover],
-                                                           others=[newcomer, sibling], away=rival)
+    team, squad, _home_reg, match = await play.squad_match(flow, leader=captain, squad_members=[captain, stayer, mover],
+                                                          others=[newcomer, sibling], away=rival)
+    staffel = await flow.db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0})
+    await play.record_squad_members(flow, staffel, squad["id"], [newcomer], via="member")
     later = (now_utc() + timedelta(minutes=5)).isoformat()
     await flow.db.team_squads.update_one({"id": squad["id"]}, {"$set": {"member_ids": [captain["id"], stayer["id"], newcomer["id"]], "updated_at": later}})
     await flow.db.audit_logs.insert_many([
@@ -171,6 +174,55 @@ async def test_co_team_kaderwechsel_aus_dem_protokoll(flow):
     for person in (newcomer, sibling):
         mine = await values(person)
         assert (mine["matches_played"], mine["matches_won"], mine["team_match_wins"]) == (0, 0, 0), person["username"]
+
+
+async def _delete_squad(flow, squad: dict, _bert: dict) -> None:
+    await flow.db.team_squads.delete_one({"id": squad["id"]})
+
+
+async def _add_after_season(flow, squad: dict, bert: dict) -> None:
+    # Die Staffel ist beendet: Die Aufnahme steht dann weder im Protokoll noch im Liga-Kader der Season.
+    await flow.db.team_squads.update_one({"id": squad["id"]}, {"$addToSet": {"member_ids": bert["id"]}})
+
+
+async def _empty_squad(flow, squad: dict, _bert: dict) -> None:
+    await flow.db.team_squads.update_one({"id": squad["id"]}, {"$set": {"member_ids": []}})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("afterwards", [_delete_squad, _add_after_season, _empty_squad],
+                         ids=["co-team-geloescht", "nach-der-season-aufgenommen", "kader-heute-leer"])
+async def test_wer_nie_im_kader_des_co_teams_stand_bekommt_dessen_spiele_nicht(flow, afterwards):
+    """Nachprüfung zu #2337: Co-Team A gewinnt ein Spiel ohne Teilnehmerliste. Bert ist seit Langem im Hauptteam, spielte
+    die Season aber im Co-Team B - laut Liga-Kader. Was danach mit dem Kader von A geschieht, ändert nichts: Der heutige
+    Kader ist kein Nachweis, das Hauptteam auch nicht. Anna stand im Kader von A und behält ihr Spiel."""
+    captain, anna, bert, rival = [await flow.add_user(name=name) for name in ("Captain", "Anna", "Bert", "Gegnerin")]
+    _team, squad, _home_reg, match = await play.squad_match(flow, leader=captain, squad_members=[captain, anna], others=[bert],
+                                                           away=rival, status="completed")
+    staffel = await flow.db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0})
+    await play.record_squad_members(flow, staffel, "co-team-b", [bert])
+    entry = await flow.db.league_rosters.find_one({"user_id": bert["id"]}, {"_id": 0})
+    assert entry["squad_ids"] == ["co-team-b"] and entry["season_id"] == staffel["league_context"]["season_id"]
+
+    await afterwards(flow, squad, bert)
+
+    mine = await values(bert)
+    assert (mine["matches_played"], mine["matches_won"], mine["team_match_wins"]) == (0, 0, 0), "nie im Kader von A"
+    kept = await values(anna)
+    assert (kept["matches_played"], kept["matches_won"], kept["team_match_wins"]) == (1, 1, 1), "Anna stand im Kader"
+
+
+@pytest.mark.asyncio
+async def test_co_team_ohne_jeden_nachweis_zaehlt_fuer_niemanden(flow):
+    """Kein Liga-Kader, kein Protokoll, keine Teilnehmerliste: Dann weiß niemand, wer gespielt hat. Das Spiel zählt für
+    niemanden - lieber keiner als alle Mitglieder des Hauptteams."""
+    captain, anna, rival = [await flow.add_user(name=name) for name in ("Captain", "Anna", "Gegnerin")]
+    await play.squad_match(flow, leader=captain, squad_members=[captain, anna], others=[], away=rival)
+    await flow.db.league_rosters.delete_many({})
+    for person in (captain, anna):
+        mine = await values(person)
+        assert (mine["matches_played"], mine["team_match_wins"]) == (0, 0), person["username"]
+    assert (await values(rival))["matches_played"] == 1, "die Gegnerin (Team ohne Co-Team) hat ihr Spiel"
 
 
 # ---------------------------------------------------------------- GG-Lob (K4)
