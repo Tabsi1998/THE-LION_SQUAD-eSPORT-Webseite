@@ -113,6 +113,41 @@ async def test_club_events_are_internal_by_visibility_or_type_and_cancelled_even
     assert values["events_attended"] == 4, "abgesagt und nicht erschienen zählen nicht"
 
 
+# ---------------------------------------------------------------- Datenbewusst (H10)
+
+async def privacy(user_id: str) -> int:
+    return (await counters.compute(user_id, {"privacy_reviewed"}, legacy=False))["privacy_reviewed"]
+
+
+@pytest.mark.asyncio
+async def test_data_aware_needs_a_saved_privacy_setting_not_the_registration_default(flow):
+    me = await flow.add_user(name="datenbewusst")
+    db = flow.db
+    # So legt die Registrierung das Konto an (routes/auth_routes.py).
+    await db.users.update_one({"id": me["id"]}, {"$set": {"privacy_public_profile": False, "profile_visibility": {}, "dm_privacy": "everyone"}})
+    assert await privacy(me["id"]) == 0, "die Voreinstellung zählt nicht"
+    flow.act_as(me)
+    response = await flow.patch("/api/users/me", json={"bio": "Hallo"})
+    assert response.status_code == 200, response.text
+    assert await privacy(me["id"]) == 0, "ein anderes Feld ist keine Privatsphäre-Einstellung"
+    response = await flow.patch("/api/users/me", json={"dm_privacy": "friends"})
+    assert response.status_code == 200, response.text
+    assert (await db.users.find_one({"id": me["id"]}))["privacy_reviewed_at"]
+    assert await privacy(me["id"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_data_aware_also_counts_after_a_data_export(flow):
+    me = await flow.add_user(name="auskunft")
+    await flow.db.users.update_one({"id": me["id"]}, {"$set": {"privacy_public_profile": False, "profile_visibility": {}}})
+    flow.act_as(me)
+    response = await flow.get("/api/dsgvo/export-my-data")
+    assert response.status_code == 200
+    assert await privacy(me["id"]) == 1
+    entry = await flow.db.achievement_eval_queue.find_one({"user_id": me["id"]}, {"_id": 0})
+    assert entry and "profile" in entry["sources"]
+
+
 # ---------------------------------------------------------------- Discord (H11, M9)
 
 MAIN, SUB, OFF = "700000000000000001", "700000000000000002", "700000000000000009"

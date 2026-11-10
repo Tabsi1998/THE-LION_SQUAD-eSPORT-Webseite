@@ -168,7 +168,7 @@ async def test_gelesen_und_gesehen_je_einmal(flow):
 async def test_profil_team_saison_und_turnier_zaehler(flow):
     user = await flow.add_user(name="Vielseitig")
     db = flow.db
-    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/a.png", "banner_url": "/b.png", "bio": "Hallo", "website": "https://x.at", "email_verified": True, "notification_preferences": {"push": True}, "privacy_public_profile": True, "newsletter_consent": True, "created_at": (now_utc() - timedelta(days=800)).isoformat()}})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/a.png", "banner_url": "/b.png", "bio": "Hallo", "website": "https://x.at", "email_verified": True, "notification_preferences": {"push": True}, "privacy_public_profile": True, "privacy_reviewed_at": now_utc().isoformat(), "newsletter_consent": True, "created_at": (now_utc() - timedelta(days=800)).isoformat()}})
     await db.platform_links.insert_many([{"id": "l1", "user_id": user["id"], "platform": "discord", "external_id": "1"}, {"id": "l2", "user_id": user["id"], "platform": "youtube", "external_id": "2"}])
     await db.passkeys.insert_one({"user_id": user["id"], "rp_id": "lionsquad.at"})
     await db.mobile_push_tokens.insert_one({"user_id": user["id"], "token": "t"})

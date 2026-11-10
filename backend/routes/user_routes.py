@@ -916,6 +916,14 @@ async def _check_game_id_formats(db, user_id: str, game_ids: dict | None) -> Non
                 raise HTTPException(status_code=422, detail=problem)
 
 
+# Die Felder unter Einstellungen → Privatsphäre (#2338): wer eines davon selbst speichert, hat sich um seine
+# Privatsphäre gekümmert („Datenbewusst“).
+PRIVACY_SETTING_FIELDS = frozenset({
+    "privacy_public_profile", "privacy_achievements_public", "privacy_season_finds_public",
+    "privacy_friends_see_registrations", "profile_visibility", "dm_privacy",
+})
+
+
 @router.put("/me")
 @router.patch("/me")
 async def update_me(
@@ -945,6 +953,10 @@ async def update_me(
         await _attach_membership(me)
         return me
     updates["updated_at"] = now_utc().isoformat()
+    # Datenbewusst (#2338): eine Privatsphäre-Einstellung, die die Person selbst speichert - nicht die Voreinstellung
+    # der Registrierung. Web und App schicken nur geänderte Felder.
+    if PRIVACY_SETTING_FIELDS & set(updates):
+        updates["privacy_reviewed_at"] = updates["updated_at"]
     # Verknüpfte Konten (#260): wer das Feld von Hand ändert, verliert das Häkchen - der Text bleibt.
     # Verglichen wird mit dem gespeicherten Stand, nicht mit dem Sitzungsobjekt.
     from services.platform_links import changed_verified_platforms, unlink

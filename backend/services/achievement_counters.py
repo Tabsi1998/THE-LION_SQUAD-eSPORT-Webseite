@@ -511,8 +511,10 @@ async def _notification_prefs(ctx):
 
 @counter("privacy_reviewed", "profile")
 async def _privacy(ctx):
+    """Datenbewusst (#2338): eine selbst gespeicherte Privatsphäre-Einstellung oder ein geholter Datenexport. Die
+    Registrierung setzt die Felder schon - deren Wert allein zählt nicht mehr."""
     user = await ctx.user()
-    return 1 if isinstance(user.get("privacy_public_profile"), bool) or user.get("profile_visibility") else 0
+    return 1 if user.get("privacy_reviewed_at") or user.get("data_exported_at") else 0
 
 
 @counter("newsletter_subscribed", "profile", "community")

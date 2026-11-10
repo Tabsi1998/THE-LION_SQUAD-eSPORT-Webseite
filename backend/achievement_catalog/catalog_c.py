@@ -111,7 +111,7 @@ PROFILE = [
        "mail-check", "verified", "email_verified", [1], "E-Mail bestätigt.", sort_order=813, materials=["wood"]),
     _c("tutorial", "Rundgang", "profile", "Mach den Rundgang durch die Plattform.", "Beim ersten Besuch den Rundgang zu Ende gehen.",
        "compass", "compass", "onboarding_completed", [1], "Rundgang beendet.", sort_order=814, materials=["wood"]),
-    _c("privacy_aware", "Datenbewusst", "profile", "Kümmere dich um deine Privatsphäre.", "Privatsphäre-Einstellungen speichern oder deinen Datenexport holen.",
+    _c("privacy_aware", "Datenbewusst", "profile", "Kümmere dich um deine Privatsphäre.", "Unter Einstellungen → Privatsphäre selbst etwas einstellen oder deinen Datenexport holen - die Voreinstellung bei der Registrierung zählt nicht.",
        "lock", "privacy", "privacy_reviewed", [1], "Privatsphäre geprüft.", sort_order=815, materials=["iron"]),
     _c("notifications", "Auf dem Laufenden", "profile", "Stell deine Benachrichtigungen ein.", "Konto → Benachrichtigungen speichern.",
        "bell", "bell", "notification_prefs_saved", [1], "Benachrichtigungen eingestellt.", sort_order=816, materials=["iron"]),
