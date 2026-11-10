@@ -8,6 +8,7 @@ später kam, bekommt keine geschenkt, und das Feld ist nie leer. Eine vorhandene
 """
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -141,9 +142,11 @@ async def test_wer_laut_protokoll_erst_nach_dem_spiel_kam_bekommt_es_nicht(flow)
     staff, tournament, team, registration, (lead, _member, _bench), _rival_regs = await play.team_cup(flow)
     opening = next(match for match in await play.open_matches(flow, tournament) if registration["id"] in play.sides(match))
     await play.decide(flow, staff, opening, registration["id"])
+    # Feste Reihenfolge statt zweimal „jetzt“: das Spiel vor zwei Stunden, der Beitritt vor einer.
+    await play.backdate(flow, opening, minutes=120)
     newcomer = await flow.add_user(name="Gerade gekommen")
     await flow.db.teams.update_one({"id": team["id"]}, {"$addToSet": {"member_ids": newcomer["id"]}})
-    joined = now_utc().isoformat()
+    joined = (now_utc() - timedelta(minutes=60)).isoformat()
     await flow.db.audit_logs.insert_one(join(team["id"], newcomer, joined, via="join_code"))
     flow.act_as(lead)
     await set_role(flow, team, newcomer)

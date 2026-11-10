@@ -111,14 +111,20 @@ async def test_nach_dem_teamwechsel_bleibt_was_gespielt_wurde(flow):
     staff, tournament, team, registration, (lead, member, _bench), rival_regs = await play.team_cup(flow)
     opening = next(match for match in await play.open_matches(flow, tournament) if registration["id"] in play.sides(match))
     await play.decide(flow, staff, opening, registration["id"])
+    # Feste Reihenfolge statt dreimal „jetzt“: das erste Spiel vor zwei Stunden, der Wechsel vor einer, das Finale jetzt.
+    await play.backdate(flow, opening, minutes=120)
+    changed = (now_utc() - timedelta(minutes=60)).isoformat()
 
     flow.act_as(member)
     left = await flow.post(f"/api/teams/{team['id']}/leave")
     assert left.status_code == 200, left.text
     assert await flow.db.team_members.count_documents({"team_id": team["id"], "user_id": member["id"]}) == 0
+    stamped = await flow.db.audit_logs.update_one({"action": "team.leave", "target_id": team["id"], "actor_id": member["id"]},
+                                                  {"$set": {"created_at": changed}})
+    assert stamped.modified_count == 1, "der Austritt steht im Protokoll"
     late = await flow.add_user(name="Neuzugang")
     await flow.db.teams.update_one({"id": team["id"]}, {"$addToSet": {"member_ids": late["id"]}})
-    await flow.db.team_members.insert_one({"team_id": team["id"], "user_id": late["id"], "role": "member", "joined_at": now_utc().isoformat()})
+    await flow.db.team_members.insert_one({"team_id": team["id"], "user_id": late["id"], "role": "member", "joined_at": changed})
 
     await play.play_out(flow, staff, tournament, [registration["id"], *[reg["id"] for reg in rival_regs]])
 
@@ -158,8 +164,8 @@ async def test_co_team_kaderwechsel_aus_dem_protokoll(flow):
     team, squad, _home_reg, match = await play.squad_match(flow, leader=captain, squad_members=[captain, stayer, mover],
                                                           others=[newcomer, sibling], away=rival)
     staffel = await flow.db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0})
-    await play.record_squad_members(flow, staffel, squad["id"], [newcomer], via="member")
     later = (now_utc() + timedelta(minutes=5)).isoformat()
+    await play.record_squad_members(flow, staffel, squad["id"], [newcomer], via="member", at=later)
     await flow.db.team_squads.update_one({"id": squad["id"]}, {"$set": {"member_ids": [captain["id"], stayer["id"], newcomer["id"]], "updated_at": later}})
     await flow.db.audit_logs.insert_many([
         {"id": new_id(), "action": "league.transfer.approve", "target_id": "s1", "actor_id": "liga-leitung",

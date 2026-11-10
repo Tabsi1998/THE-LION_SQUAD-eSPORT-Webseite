@@ -71,6 +71,18 @@ async def rank(flow, staff: dict, match: dict, order: list[str]) -> dict:
     return await flow.reload(match)
 
 
+async def backdate(flow, match: dict, *, minutes: int) -> str:
+    """Ein gespieltes Spiel in die Vergangenheit legen. Die Wege schreiben „jetzt“ - soll danach etwas „später“
+    geschehen (Beitritt, Austritt), fallen zwei „jetzt“ sonst gelegentlich auf denselben Augenblick."""
+    from datetime import timedelta
+
+    from models import now_utc
+
+    stamp = (now_utc() - timedelta(minutes=minutes)).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"completed_at": stamp, "updated_at": stamp}})
+    return stamp
+
+
 async def walkover(flow, staff: dict, match: dict, absent: str) -> dict:
     """Kampflos werten: ``absent`` ist nicht erschienen."""
     flow.act_as(staff)
@@ -150,21 +162,28 @@ async def team_cup(flow, *, tournament_fields: dict | None = None, **registratio
     return staff, tournament, team, registration, (lead, member, bench), rival_regs
 
 
-async def record_squad_members(flow, staffel: dict, squad_id: str, people: list[dict], *, via: str = "assign") -> None:
+async def record_squad_members(flow, staffel: dict, squad_id: str, people: list[dict], *, via: str = "assign",
+                               at: str | None = None) -> None:
     """Personen in den Liga-Kader der Season aufnehmen - über ``league_roster.record_members``, den Weg, den Zuteilen,
-    Aufnahme ins Co-Team und Transfer nehmen (schreibt ``league_rosters.squad_ids`` und ``squad_joined_at``)."""
+    Aufnahme ins Co-Team und Transfer nehmen (schreibt ``league_rosters.squad_ids`` und ``squad_joined_at``). ``at``
+    stellt den Zeitpunkt der Aufnahme fest ein: Der Weg schreibt „jetzt“, und zwei „jetzt“ in einem Test können auf
+    denselben Augenblick fallen."""
     from services import league_roster
 
     ids = [person["id"] for person in people]
     ctx = await league_roster.context_for_tournament(flow.db, staffel, ids)
     await league_roster.record_members(flow.db, ctx, ids, via=via, actor_id="liga-leitung", squad_id=squad_id)
+    if at:
+        season_id = staffel["league_context"]["season_id"]
+        await flow.db.league_rosters.update_many({"season_id": season_id, "user_id": {"$in": ids}},
+                                                 {"$set": {f"squad_joined_at.{squad_id}": at}})
 
 
 async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: list[dict], away: dict,
                       status: str = "live") -> tuple[dict, dict, dict, dict]:
     """Eine Liga-Staffel, in der ein Co-Team spielt - das Spiel (Heim gewinnt) trägt keine Teilnehmerliste, wie nach
     einer kampflosen Wertung. ``others`` sind im Hauptteam, aber nicht im Kader des Co-Teams. Die Season kennt „ein Team
-    je Season“ - damit führt sie den Liga-Kader auch ohne Pflicht-ID des Spiels. Zugeteilt wird vor dem Spiel.
+    je Season“ - damit führt sie den Liga-Kader auch ohne Pflicht-ID des Spiels. Zugeteilt wurde zum Jahresbeginn.
     Zurück: Hauptteam, Co-Team, Heim-Anmeldung, Spiel; die Staffel steht in ``match["tournament_id"]``."""
     from flow_harness import new_id
     from models import now_utc
@@ -181,7 +200,7 @@ async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: 
                                            league_context={"league_id": "l1", "season_id": season_id, "staffel": "A"})
     home_reg = await register_team(flow, staffel, team, by=None, squad_id=squad["id"])
     away_reg = await register_team(flow, staffel, guests, by=None)
-    await record_squad_members(flow, staffel, squad["id"], squad_members)
+    await record_squad_members(flow, staffel, squad["id"], squad_members, at="2026-01-01T00:00:00+00:00")
     stamp = now_utc().isoformat()
     match = {
         "id": new_id(), "tournament_id": staffel["id"], "stage_number": 1, "round": 1, "order": 1, "status": "completed",
