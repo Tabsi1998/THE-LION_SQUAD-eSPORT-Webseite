@@ -132,7 +132,7 @@ TOURNAMENT = [
            "clipboard-list", "whistle", "tournaments_staffed_completed", [1, 5, 15, 40, 100], "{n} Turniere geleitet.", sort_order=224, staff_only=True),
     _group("referee", "Schiedsrichter", "tournament", "Entscheide Dispute.", "Als Turnierleitung ein disputiertes Match mit einem Ergebnis abschließen.",
            "gavel", "gavel", "disputes_resolved_as_staff", [1, 10, 30, 75, 200], "{n} Dispute entschieden.", sort_order=225, staff_only=True),
-    _group("tournament_chat", "Turnier-Plauderer", "tournament", "Schreib im Turnier-Chat.", "Nachrichten im Turnier-Chat zählen.",
+    _group("tournament_chat", "Turnier-Plauderer", "tournament", "Schreib im Turnier-Chat.", "Nachrichten im Turnier-Chat zählen - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
            "message-circle", "speech-bubble", "tournament_chat_messages_sent", [10, 50, 150, 500, 1500], "{n} Nachrichten im Turnier-Chat.", sort_order=226),
     _group("prize_winner", "Preisträger", "tournament", "Hol dir Preise.", "Ein vergebener Preis aus einem Turnier zählt.",
            "gift", "gift", "prizes_received", [1, 3, 7, 15, 30], "{n} Preise erhalten.", sort_order=227),

@@ -81,7 +81,7 @@ TEAM = [
        "crown", "captain-band", "captain_days", [30, 180, 365, 730, 1500], "{n} als Kapitän.", sort_order=515, unit=" Tage"),
     _b("team_size", "Vollbesetzung", "team", "Bau ein großes Team auf.", "So viele Mitglieder hat dein größtes Team.",
        "users-round", "roster", "team_size_max", [3, 5, 10], "{n} Mitglieder im Team.", sort_order=516),
-    _b("team_chat", "Teamgeist", "team", "Schreib im Team-Chat.", "Nachrichten im Team-Chat zählen.",
+    _b("team_chat", "Teamgeist", "team", "Schreib im Team-Chat.", "Nachrichten im Team-Chat zählen - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
        "message-circle", "team-chat", "team_chat_messages_sent", [10, 50, 150, 500, 1500], "{n} Nachrichten im Team-Chat.", sort_order=517),
     _b("team_identity", "Teamauftritt", "team", "Gib deinem Team ein Gesicht.", "Logo, Banner und Beschreibung deines Teams sind ausgefüllt.",
        "image", "emblem", "team_profile_complete", [1], "Teamprofil vollständig.", sort_order=518),

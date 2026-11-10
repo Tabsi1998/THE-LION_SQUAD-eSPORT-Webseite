@@ -224,16 +224,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         "status": "accepted",
         "$or": [{"requester_id": user_id}, {"recipient_id": user_id}],
     })
-    p["direct_messages_sent"] = await db.direct_messages.count_documents({"sender_id": user_id})
-    p["team_chat_messages_sent"] = await db.team_chat_messages.count_documents({"user_id": user_id})
-    p["match_chat_messages_sent"] = await db.match_chat_messages.count_documents({"user_id": user_id})
-    p["tournament_chat_messages_sent"] = await db.tournament_chat_messages.count_documents({"user_id": user_id})
-    p["community_messages_sent"] = (
-        p["direct_messages_sent"]
-        + p["team_chat_messages_sent"]
-        + p["match_chat_messages_sent"]
-        + p["tournament_chat_messages_sent"]
-    )
+    # Chat (#2338): die einzige Rechnung der Chat-Zähler - ohne Zurückgehaltenes und Gelöschtes, höchstens 50 am Tag.
+    p.update(await chat_counters(db, user_id))
 
     for k in [
         "checkins_in_a_row", "fast_registrations", "clutch_count",
@@ -252,3 +244,65 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         p.setdefault(k, 0)
 
     return p
+
+
+# ---------------- Chat (#2338) ----------------
+# Gezählt wird nur, was andere zu sehen bekommen: keine zurückgehaltenen oder abgelehnten Nachrichten (Wortfilter) und
+# keine gelöschten. Dazu ein Deckel je Zähler: höchstens CHAT_DAILY_CAP Nachrichten an einem Wiener Tag. Je Zähler, weil
+# sich das aus einer schlanken Abfrage je Chat rechnen lässt (nur created_at, gruppiert nach Tag) und kein Zähler vom
+# anderen abhängt. Schreiben selbst bleibt unbegrenzt.
+CHAT_DAILY_CAP = 50
+HIDDEN_CHAT_STATES = ("held", "rejected")
+# Art -> (Sammlung, Feld mit dem Absender).
+CHAT_COLLECTIONS = {
+    "direct": ("direct_messages", "sender_id"),
+    "team": ("team_chat_messages", "user_id"),
+    "match": ("match_chat_messages", "user_id"),
+    "tournament": ("tournament_chat_messages", "user_id"),
+}
+
+
+def counted_chat_query(field: str, user_id: str, **extra) -> dict:
+    """Die Nachrichten einer Person, die für Erfolge zählen dürfen."""
+    return {field: user_id, "deleted_at": {"$exists": False}, "moderation.state": {"$nin": list(HIDDEN_CHAT_STATES)}, **extra}
+
+
+def vienna_day(value):
+    """Der Wiener Kalendertag eines Zeitstempels - None, wenn er nicht lesbar ist."""
+    from services.achievement_core import VIENNA
+
+    try:
+        moment = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(VIENNA).date()
+
+
+async def chat_days(db, kind: str, user_id: str):
+    """Gezählte Nachrichten je Wiener Tag in einem Chat (ohne lesbares Datum ein eigener Topf, ebenfalls gedeckelt)."""
+    from collections import Counter
+
+    collection, field = CHAT_COLLECTIONS[kind]
+    days = Counter()
+    async for row in db[collection].find(counted_chat_query(field, user_id), {"_id": 0, "created_at": 1}):
+        days[vienna_day(row.get("created_at"))] += 1
+    return days
+
+
+def capped_total(days, cap: int = CHAT_DAILY_CAP) -> int:
+    return sum(min(count, cap) for count in days.values())
+
+
+async def chat_counters(db, user_id: str) -> dict[str, int]:
+    """Alle Chat-Zähler der Erfolge aus einer Rechnung. „Plauderer“ (community_messages_sent) sind laut Katalog die
+    offenen Chats: Turnier-Chat und Match-Chat zusammen, mit einem gemeinsamen Tagesdeckel."""
+    days = {kind: await chat_days(db, kind, user_id) for kind in CHAT_COLLECTIONS}
+    return {
+        "direct_messages_sent": capped_total(days["direct"]),
+        "team_chat_messages_sent": capped_total(days["team"]),
+        "match_chat_messages_sent": capped_total(days["match"]),
+        "tournament_chat_messages_sent": capped_total(days["tournament"]),
+        "community_messages_sent": capped_total(days["tournament"] + days["match"]),
+    }

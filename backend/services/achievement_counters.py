@@ -1347,10 +1347,8 @@ async def _discord_messages(ctx):
     return int((await ctx.user()).get("discord_messages_count") or 0)
 
 
-@counter("community_messages_sent", "community", "tournament", "match")
-async def _community_messages(ctx):
-    """Nachrichten in den offenen Chats: Turnier-Chat und Match-Chat."""
-    return await ctx.db.tournament_chat_messages.count_documents({"user_id": ctx.user_id}) + await ctx.db.match_chat_messages.count_documents({"user_id": ctx.user_id})
+# Die Chat-Zähler („Plauderer“, Team-, Turnier-, Match-Chat, Direktnachrichten) rechnet allein der alte Block
+# (achievement_progress.chat_counters, #2338) - hier stand früher eine zweite, abweichende Rechnung für „Plauderer“.
 
 
 @counter("gallery_uploads_approved", "community")
@@ -1361,10 +1359,12 @@ async def _gallery_uploads(ctx):
 
 @counter("stickers_collected", "community", "chat")
 async def _stickers(ctx):
-    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat."""
+    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat - wie bei den Chat-Zählern nur aus
+    Nachrichten, die nicht zurückgehalten, abgelehnt oder gelöscht sind (#2338)."""
     ids = set()
-    for name, field in (("direct_messages", "sender_id"), ("team_chat_messages", "user_id"), ("tournament_chat_messages", "user_id"), ("match_chat_messages", "user_id")):
-        async for row in ctx.db[name].find({field: ctx.user_id, "sticker.id": {"$exists": True}}, {"_id": 0, "sticker.id": 1}):
+    for name, field in achievement_progress.CHAT_COLLECTIONS.values():
+        query = achievement_progress.counted_chat_query(field, ctx.user_id, **{"sticker.id": {"$exists": True}})
+        async for row in ctx.db[name].find(query, {"_id": 0, "sticker.id": 1}):
             sticker_id = (row.get("sticker") or {}).get("id")
             if sticker_id:
                 ids.add(sticker_id)
