@@ -6,7 +6,9 @@ hat, und in einer Liga-Staffel (Anmeldung ohne Person) für niemanden. Jetzt gil
 - Einzel-Anmeldung: die Person selbst.
 - Team mit Teilnehmerliste am Spiel (Liga: ``lineups`` am Spiel bzw. an seinen Maps): wer darauf steht.
 - Team mit Aufstellung an der Anmeldung (Team am Spieltag, ``lineup``): die Aufgestellten.
-- Co-Team ohne beides: sein Kader.
+- Co-Team ohne beides: wer zum Zeitpunkt des Spiels in seinem Kader stand - aus dem heutigen Kader (``team_squads``) und
+  dem Protokoll der Kaderwechsel (``league.squad.roster``, ``league.transfer.approve``). Ein Transfer nimmt niemandem
+  seine Spiele, und wer neu dazukommt, bekommt keine alten.
 - sonst: alle, die zum Zeitpunkt des Spiels im Team waren - aus dem heutigen Stand (``teams``, ``team_members``) und dem
   Protokoll (``team.join`` / ``team.leave`` / ``team.kick``), für aufgelöste Teams aus ``dissolved_teams``. Wer das Team
   später verlässt, behält so, was er mit ihm gespielt hat.
@@ -156,13 +158,18 @@ class Participation:
     """Anmeldungen, Turniere und Spiele einer Person - auch über ihre Teams."""
 
     def __init__(self, user_id: str, registrations: dict[str, dict], tournaments: dict[str, dict], matches: list[dict],
-                 timeline: TeamTimeline, squads: dict[str, set[str]]):
+                 timeline: TeamTimeline, squads: dict[str, set[str]], squad_timeline: TeamTimeline | None = None):
         self.user_id = user_id
         self.registrations = registrations
         self.tournaments = tournaments
         self.matches = matches
         self.timeline = timeline
         self.squads = squads
+        # Co-Teams: der heutige Kader (``squads``) und die Kaderwechsel der Person aus dem Protokoll (``squad_timeline``).
+        self.squad_timeline = squad_timeline or TeamTimeline()
+        for squad_id, members in squads.items():
+            if user_id in members:
+                self.squad_timeline.joined.setdefault(squad_id, None)
         self.rows: list[Played] = [row for row in (self._row(match) for match in matches) if row]
         self.played: list[Played] = [row for row in self.rows if not row.no_show]
         self._placements: dict[str, Placement] | None = None
@@ -179,14 +186,24 @@ class Participation:
         lineup = [user_id for user_id in registration.get("lineup") or [] if user_id]
         if lineup:
             return self.user_id in lineup
-        squad = self.squads.get(registration.get("squad_id") or "")
-        if squad:
-            return self.user_id in squad
         team_id = registration["team_id"]
+        squad_id = registration.get("squad_id") or ""
+        if self.squads.get(squad_id) or self.squad_timeline.knows(squad_id):
+            return self._in_squad(squad_id, team_id, when)
         if self.timeline.member_at(team_id, when):
             return True
         # Ein Team, von dem es weder Mitglieder noch Protokoll gibt (älterer Bestand): dann zählt, wer es angemeldet hat.
         return registration.get("user_id") == self.user_id and not self.timeline.knows(team_id)
+
+    def _in_squad(self, squad_id: str, team_id: str, when: datetime | None) -> bool:
+        """Stand die Person zum Zeitpunkt des Spiels im Kader des Co-Teams? Wer heute im Kader steht, ohne dass die Aufnahme
+        im Protokoll steht (aufgenommen, bevor das Co-Team in einer Staffel spielte), zählt frühestens seit dem Beitritt
+        zum Hauptteam. Wer nie im Kader stand, hat nicht gespielt - auch als Mitglied des Hauptteams nicht."""
+        if not self.squad_timeline.member_at(squad_id, when):
+            return False
+        if squad_id in self.squad_timeline.joined and self.squad_timeline.joined[squad_id] is None:
+            return self.timeline.member_at(team_id, when) or not self.timeline.knows(team_id)
+        return True
 
     def _row(self, match: dict) -> Played | None:
         if not is_real_match(match):
@@ -397,6 +414,35 @@ async def _timeline(db, user_id: str) -> TeamTimeline:
     return timeline
 
 
+async def _squad_timeline(db, user_id: str, squads: dict[str, set[str]]) -> TeamTimeline:
+    """Wann die Person in welchem Co-Team-Kader stand: die Kaderwechsel aus dem Protokoll (Kader geändert in einer
+    laufenden Staffel, genehmigter Transfer); für den heutigen Kader gilt die letzte protokollierte Aufnahme als Beginn."""
+    timeline = TeamTimeline()
+    events = db.audit_logs.find({"$or": [
+        {"action": "league.squad.roster", "data.added": user_id},
+        {"action": "league.squad.roster", "data.removed": user_id},
+        {"action": "league.transfer.approve", "data.user_id": user_id},
+    ]}, {"_id": 0, "action": 1, "data": 1, "created_at": 1})
+    async for event in events:
+        stamp = parse_time(event.get("created_at"))
+        data = event.get("data") or {}
+        if not stamp:
+            continue
+        if event.get("action") == "league.transfer.approve":
+            changes = [(data.get("from_squad_id"), "leave"), (data.get("to_squad_id"), "join")]
+        else:
+            changes = [(data.get("squad_id"), "join")] if user_id in (data.get("added") or []) else []
+            changes += [(data.get("squad_id"), "leave")] if user_id in (data.get("removed") or []) else []
+        for squad_id, kind in changes:
+            if squad_id:
+                timeline.events.setdefault(squad_id, []).append((stamp, kind))
+    for squad_id, members in squads.items():
+        if user_id in members:
+            joins = [stamp for stamp, kind in timeline.events.get(squad_id) or [] if kind == "join"]
+            timeline.joined[squad_id] = max(joins) if joins else None
+    return timeline
+
+
 async def _load(db, user_id: str) -> Participation:
     timeline = await _timeline(db, user_id)
     registrations = {row["id"]: row async for row in db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}) if row.get("id")}
@@ -432,4 +478,4 @@ async def _load(db, user_id: str) -> Participation:
              "$or": [{"slots.registration_id": {"$in": ids}}, {"results.registration_id": {"$in": ids}}]},
             MATCH_FIELDS,
         ).to_list(10000)
-    return Participation(user_id, registrations, tournaments, matches, timeline, squads)
+    return Participation(user_id, registrations, tournaments, matches, timeline, squads, await _squad_timeline(db, user_id, squads))

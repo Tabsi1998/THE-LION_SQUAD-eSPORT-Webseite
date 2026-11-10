@@ -86,6 +86,45 @@ def test_reihenfolge_teilnehmerliste_vor_aufstellung_vor_kader_vor_mitgliedschaf
     assert participation("me", [squad], [plain], timeline, {"S": {"me"}}).played
 
 
+def squad_participation(squads: dict, squad_timeline: TeamTimeline | None = None, team_since=None) -> Participation:
+    """Ein Co-Team „S“ des Teams „T“ mit zwei Spielen ohne Teilnehmerliste: am 10. und am 20."""
+    timeline = TeamTimeline()
+    timeline.joined["T"] = team_since
+    squad = {"id": "rt", "tournament_id": "t1", "team_id": "T", "squad_id": "S", "user_id": None, "status": "approved"}
+    tournaments = {"t1": {"id": "t1", "status": "live", "format": "league", "league_context": {"league_id": "l"}}}
+    matches = [duel("frueh", "rt", "rx", 10), duel("spaet", "rt", "rx", 20)]
+    return Participation("me", {"rt": squad}, tournaments, matches, timeline, squads, squad_timeline)
+
+
+def played_ids(found: Participation) -> list[str]:
+    return [row.match["id"] for row in found.played]
+
+
+def test_kaderwechsel_im_co_team_wer_gespielt_hat_behaelt_seine_spiele():
+    """Review M4: Nach dem Transfer steht die Person nicht mehr im heutigen Kader - das frühe Spiel bleibt ihr trotzdem."""
+    gone = TeamTimeline()
+    gone.events["S"] = [(at(15), "leave")]
+    assert played_ids(squad_participation({"S": {"other"}}, gone)) == ["frueh"]
+    # Ohne jede Spur im Kader: nicht gespielt - auch als Mitglied des Hauptteams nicht.
+    assert played_ids(squad_participation({"S": {"other"}})) == []
+
+
+def test_kaderwechsel_im_co_team_wer_neu_dazukommt_bekommt_keine_alten_spiele():
+    joined = TeamTimeline()
+    joined.events["S"] = [(at(15), "join")]
+    joined.joined["S"] = at(15)
+    assert played_ids(squad_participation({"S": {"me"}}, joined)) == ["spaet"]
+    # Die Aufnahme steht nicht im Protokoll (das Co-Team spielte da noch in keiner Staffel): frühestens seit dem Beitritt
+    # zum Hauptteam.
+    assert played_ids(squad_participation({"S": {"me"}}, team_since=at(15))) == ["spaet"]
+    assert played_ids(squad_participation({"S": {"me"}})) == ["frueh", "spaet"], "schon immer im Team und im Kader"
+    # Raus und wieder rein: die Lücke dazwischen zählt nicht.
+    back = TeamTimeline()
+    back.events["S"] = [(at(5), "join"), (at(8), "leave"), (at(15), "join")]
+    back.joined["S"] = at(15)
+    assert played_ids(squad_participation({"S": {"me"}}, back)) == ["spaet"]
+
+
 def test_team_ohne_spuren_zaehlt_fuer_die_anmeldende_person():
     team = {"id": "rt", "tournament_id": "t1", "team_id": "weg", "user_id": "me", "status": "approved"}
     assert participation("me", [team], [duel("m1", "rt", "rx", 10)]).played

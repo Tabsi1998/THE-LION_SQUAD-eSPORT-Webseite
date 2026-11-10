@@ -150,6 +150,33 @@ async def team_cup(flow, *, tournament_fields: dict | None = None, **registratio
     return staff, tournament, team, registration, (lead, member, bench), rival_regs
 
 
+async def squad_match(flow, *, leader: dict, squad_members: list[dict], others: list[dict], away: dict) -> tuple[dict, dict, dict, dict]:
+    """Eine Liga-Staffel, in der ein Co-Team spielt - das Spiel (Heim gewinnt) trägt keine Teilnehmerliste, wie nach
+    einer kampflosen Wertung. ``others`` sind im Hauptteam, aber nicht im Kader des Co-Teams.
+    Zurück: Hauptteam, Co-Team, Heim-Anmeldung, Spiel."""
+    from flow_harness import new_id
+    from models import now_utc
+
+    team = await add_team(flow, "Heim", leader, [*squad_members, *others])
+    squad = {"id": new_id(), "team_id": team["id"], "name": "Heim II", "member_ids": [person["id"] for person in squad_members],
+             "created_at": "2026-01-01T00:00:00+00:00", "updated_at": "2026-01-01T00:00:00+00:00"}
+    await flow.db.team_squads.insert_one(dict(squad))
+    guests = await add_team(flow, "Gast", away, [])
+    staffel = await flow.create_tournament(format="league", status="live", team_mode="team",
+                                           league_context={"league_id": "l1", "season_id": "s1", "staffel": "A"})
+    home_reg = await register_team(flow, staffel, team, by=None, squad_id=squad["id"])
+    away_reg = await register_team(flow, staffel, guests, by=None)
+    stamp = now_utc().isoformat()
+    match = {
+        "id": new_id(), "tournament_id": staffel["id"], "stage_number": 1, "round": 1, "order": 1, "status": "completed",
+        "completed_at": stamp, "updated_at": stamp, "match_type": "duel",
+        "slots": [{"slot": 1, "registration_id": home_reg["id"], "status": "filled"}, {"slot": 2, "registration_id": away_reg["id"], "status": "filled"}],
+        "results": [{"registration_id": home_reg["id"], "rank": 1}, {"registration_id": away_reg["id"], "rank": 2}],
+    }
+    await flow.db.matches_v2.insert_one(dict(match))
+    return team, squad, home_reg, match
+
+
 async def league_match(flow, *, home_lineup: list[dict], home_bench: list[dict], away: dict, status: str = "live") -> tuple[dict, dict, dict]:
     """Eine Liga-Staffel mit einem gespielten Spiel (Heim gewinnt 3:1): Teams ohne anmeldende Person, die Teilnehmerliste
     steht am Spiel (``lineups``, ``lineup_user_ids``) - so, wie ``services.league_games`` sie speichert.

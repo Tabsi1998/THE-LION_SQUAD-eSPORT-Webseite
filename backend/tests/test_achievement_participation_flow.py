@@ -5,6 +5,7 @@ riss die Siegesserie, ein kampfloser Sieg zählte nirgends, und im Team zählte 
 """
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -12,7 +13,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import achievement_play as play  # noqa: E402
-from flow_harness import make_flow  # noqa: E402
+from flow_harness import make_flow, new_id  # noqa: E402
 import badges  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import achievement_counters as counters  # noqa: E402
@@ -144,6 +145,32 @@ async def test_liga_staffel_zaehlt_fuer_die_teilnehmerliste_des_spiels(flow):
     assert (loser["matches_played"], loser["matches_won"]) == (1, 0)
     missing = await values(absent)
     assert (missing["matches_played"], missing["matches_won"], missing["team_match_wins"]) == (0, 0, 0), "nicht auf der Liste, nicht gespielt"
+
+
+@pytest.mark.asyncio
+async def test_co_team_kaderwechsel_aus_dem_protokoll(flow):
+    """Review M4: Ein Spiel ohne Teilnehmerliste (etwa kampflos gewertet) zählt für den Kader von damals. Danach wechselt
+    „Wechsler“ per Transfer das Co-Team, „Neuzugang“ kommt in den Kader - beides steht im Protokoll, so wie die Routen es
+    schreiben (``league.transfer.approve``, ``league.squad.roster``)."""
+    captain, stayer, mover, newcomer, sibling, rival = [
+        await flow.add_user(name=name) for name in ("Captain", "Stamm", "Wechsler", "Neuzugang", "Zweites Co-Team", "Gegnerin")]
+    team, squad, _home_reg, _match = await play.squad_match(flow, leader=captain, squad_members=[captain, stayer, mover],
+                                                           others=[newcomer, sibling], away=rival)
+    later = (now_utc() + timedelta(minutes=5)).isoformat()
+    await flow.db.team_squads.update_one({"id": squad["id"]}, {"$set": {"member_ids": [captain["id"], stayer["id"], newcomer["id"]], "updated_at": later}})
+    await flow.db.audit_logs.insert_many([
+        {"id": new_id(), "action": "league.transfer.approve", "target_id": "s1", "actor_id": "liga-leitung",
+         "data": {"transfer_id": new_id(), "user_id": mover["id"], "from_squad_id": squad["id"], "to_squad_id": "anderes-co-team"}, "created_at": later},
+        {"id": new_id(), "action": "league.squad.roster", "target_id": team["id"], "actor_id": captain["id"],
+         "data": {"squad_id": squad["id"], "added": [newcomer["id"]], "removed": []}, "created_at": later},
+    ])
+
+    for person in (captain, stayer, mover):
+        mine = await values(person)
+        assert (mine["matches_played"], mine["matches_won"], mine["team_match_wins"]) == (1, 1, 1), person["username"]
+    for person in (newcomer, sibling):
+        mine = await values(person)
+        assert (mine["matches_played"], mine["matches_won"], mine["team_match_wins"]) == (0, 0, 0), person["username"]
 
 
 # ---------------------------------------------------------------- GG-Lob (K4)
