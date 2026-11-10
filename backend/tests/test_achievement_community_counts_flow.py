@@ -241,6 +241,59 @@ def test_fetched_clips_keep_the_creator_id():
     assert picked[0]["creator_id"] == "123"
 
 
+# ---------------------------------------------------------------- Teamauftritt (M2) und Kapitän (M3)
+
+async def team_values(user_id: str) -> dict:
+    return await counters.compute(user_id, {"team_profile_complete", "captain_days"}, legacy=False)
+
+
+@pytest.mark.asyncio
+async def test_team_identity_counts_for_leader_and_co_leader_and_is_evaluated_on_save(flow):
+    db = flow.db
+    lead = await flow.add_user(name="teamleitung")
+    co = await flow.add_user(name="coleitung")
+    member = await flow.add_user(name="mitspieler")
+    await db.teams.insert_one({"id": "tm-a", "name": "Auftritt", "tag": "AUF", "leader_id": lead["id"], "co_leader_ids": [co["id"]],
+                               "member_ids": [lead["id"], co["id"], member["id"]], "logo_url": "/l.png", "banner_url": "/b.png", "description": "   "})
+    assert (await team_values(lead["id"]))["team_profile_complete"] == 0, "nur Leerzeichen sind keine Beschreibung"
+    flow.act_as(lead)
+    response = await flow.patch("/api/teams/tm-a", json={"description": "Wir spielen Rocket League."})
+    assert response.status_code == 200, response.text
+    queued = {row["user_id"]: row async for row in db.achievement_eval_queue.find({}, {"_id": 0})}
+    assert set(queued) == {lead["id"], co["id"]}, "beim Speichern vorgemerkt: Teamleitung und Co-Leitung"
+    assert all("team" in row["sources"] for row in queued.values())
+    assert (await team_values(lead["id"]))["team_profile_complete"] == 1
+    assert (await team_values(co["id"]))["team_profile_complete"] == 1
+    assert (await team_values(member["id"]))["team_profile_complete"] == 0
+
+
+@pytest.mark.asyncio
+async def test_captain_counts_from_the_takeover_not_from_the_founding(flow):
+    from datetime import timedelta
+
+    from models import now_utc
+
+    db = flow.db
+    old_lead = await flow.add_user(name="gruenderin")
+    new_lead = await flow.add_user(name="nachfolger")
+    founded = (now_utc() - timedelta(days=400)).isoformat()
+    await db.teams.insert_one({"id": "tm-k", "name": "Kapitäne", "tag": "KAP", "leader_id": old_lead["id"], "co_leader_ids": [],
+                               "member_ids": [old_lead["id"], new_lead["id"]], "created_at": founded})
+    assert (await team_values(old_lead["id"]))["captain_days"] == 400, "Altbestand ohne Übernahme: ab der Gründung"
+    flow.act_as(old_lead)
+    response = await flow.post("/api/teams/tm-k/transfer-leader", json={"new_leader_id": new_lead["id"]})
+    assert response.status_code == 200, response.text
+    assert response.json()["leader_since"]
+    assert (await team_values(new_lead["id"]))["captain_days"] == 0, "ab der Übernahme, nicht ab der Gründung"
+    await db.teams.update_one({"id": "tm-k"}, {"$set": {"leader_since": (now_utc() - timedelta(days=12)).isoformat()}})
+    assert (await team_values(new_lead["id"]))["captain_days"] == 12
+
+    flow.act_as(new_lead)
+    response = await flow.post("/api/teams", json={"name": "Neugruendung", "tag": "NEU"})
+    assert response.status_code == 200, response.text
+    assert response.json()["leader_since"] == response.json()["created_at"]
+
+
 # ---------------------------------------------------------------- Verifizierter Streamer
 
 @pytest.mark.asyncio

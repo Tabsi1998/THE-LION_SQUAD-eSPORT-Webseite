@@ -739,20 +739,29 @@ async def _team_size(ctx):
     return max((len(team.get("member_ids") or []) for team in await ctx.teams()), default=0)
 
 
+def team_profile_complete(team: dict) -> bool:
+    """Teamauftritt (#2338): Logo, Banner und Beschreibung - die Beschreibung nicht leer nach dem Trimmen."""
+    return bool(str(team.get("logo_url") or "").strip() and str(team.get("banner_url") or "").strip() and str(team.get("description") or "").strip())
+
+
 @counter("team_profile_complete", "team")
 async def _team_profile(ctx):
-    return 1 if any(team.get("logo_url") and team.get("banner_url") and str(team.get("description") or "").strip() for team in await ctx.teams() if team.get("leader_id") == ctx.user_id) else 0
+    """Für die Teamleitung und die Co-Leitung eines Teams mit vollständigem Auftritt (#2338)."""
+    return 1 if any(team_profile_complete(team) for team in await ctx.teams()
+                    if team.get("leader_id") == ctx.user_id or ctx.user_id in (team.get("co_leader_ids") or [])) else 0
 
 
 @counter("captain_days", "team")
 async def _captain_days(ctx):
+    """Kapitän (#2338): Tage seit der Übernahme der Leitung (``leader_since``) - bei Teams von vor dieser Angabe ab der
+    Gründung."""
     days = 0
     for team in await ctx.teams():
         if team.get("leader_id") != ctx.user_id:
             continue
-        created = _parse(team.get("created_at"))
-        if created:
-            days = max(days, (now_utc() - created).days)
+        since = _parse(team.get("leader_since")) or _parse(team.get("created_at"))
+        if since:
+            days = max(days, (now_utc() - since).days)
     return days
 
 
