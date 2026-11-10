@@ -94,21 +94,20 @@ def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
 
 # ---------------------------------------------------------------- Vergabe
 
-async def record_tournament_awards(db, tournament_id: str) -> int:
-    """Beim Veröffentlichen der Ergebnisse: je Anmeldung ein Eintrag, alte werden überschrieben."""
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
-    if not tournament or is_league_staffel(tournament):
-        # Liga-Staffeln bringen keine Turnier-Pokale - Liga-Titel kommen eigens (docs/LIGA.md, #1638 ff.).
-        return 0
+async def tournament_ranks(db, tournament: dict, *, surface: str = "awards") -> tuple[list[dict], dict, dict[str, int | None]]:
+    """Der Platz je Anmeldung, wie die Auszeichnung ihn festhält: (Anmeldungen, Snapshot, Anmeldung → Platz).
+
+    Die eine Rechnung hinter ``record_tournament_awards`` - die Erfolge (#2337) nutzen sie für abgeschlossene Turniere,
+    deren Auszeichnungen noch nicht geschrieben sind, damit dort derselbe Platz gilt."""
+    tournament_id = tournament["id"]
     regs = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": {"$in": list(REGISTRATION_STATUSES)}}, {"_id": 0},
     ).to_list(1000)
     if not regs:
-        await db.tournament_awards.delete_many({"tournament_id": tournament_id})
-        return 0
+        return [], {}, {}
     read_model = await load_competition_read_model(db, tournament_id)
     snapshot = read_model.structure_snapshot()
-    observe_structure_read(snapshot, surface="awards")
+    observe_structure_read(snapshot, surface=surface)
     matches = snapshot.get("matches") or []
     placements = {}
     # Ein geteilter Platz (#1593) zählt für jeden, der ihn hält.
@@ -126,6 +125,20 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
         for row in rows:
             if row.get("registration_id") and row.get("rank"):
                 placements.setdefault(row["registration_id"], int(row["rank"]))
+    return regs, snapshot, {reg.get("id"): _rank_from_registration(reg) or placements.get(reg.get("id")) for reg in regs}
+
+
+async def record_tournament_awards(db, tournament_id: str) -> int:
+    """Beim Veröffentlichen der Ergebnisse: je Anmeldung ein Eintrag, alte werden überschrieben."""
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament or is_league_staffel(tournament):
+        # Liga-Staffeln bringen keine Turnier-Pokale - Liga-Titel kommen eigens (docs/LIGA.md, #1638 ff.).
+        return 0
+    regs, snapshot, ranks = await tournament_ranks(db, tournament)
+    if not regs:
+        await db.tournament_awards.delete_many({"tournament_id": tournament_id})
+        return 0
+    matches = snapshot.get("matches") or []
 
     game = None
     if tournament.get("game_id"):
@@ -138,7 +151,7 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
     now = now_utc().isoformat()
     kept: list[str] = []
     for reg in regs:
-        rank = _rank_from_registration(reg) or placements.get(reg.get("id"))
+        rank = ranks.get(reg.get("id"))
         summary = registration_match_summary(matches, {reg.get("id")})
         team = teams.get(reg.get("team_id"))
         doc = {

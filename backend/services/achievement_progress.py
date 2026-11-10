@@ -10,8 +10,6 @@ from database import get_db
 from services.private_fields import private_projection
 from services.league_scope import league_tournament_ids
 from services.achievement_participation import load_participation
-from services.competition_read import load_competition_read_model
-from services.competition_standings import registration_tournament_achievement_progress
 
 
 # ---------- Profile-Completeness (Phase C) ----------
@@ -71,43 +69,12 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     participation = await load_participation(db, user_id)
     p.update(participation.match_progress())
 
-    placement_progress = {
-        "tournaments_won": 0,
-        "podium_finishes": 0,
-        "rank_4_count": 0,
-    }
-    registrations_by_tournament: dict[str, list[dict]] = {}
-    if tids:
-        all_registrations = await db.tournament_registrations.find(
-            {"tournament_id": {"$in": tids}},
-            {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1},
-        ).to_list(10000)
-        for registration in all_registrations:
-            tournament_id = registration.get("tournament_id")
-            if tournament_id:
-                registrations_by_tournament.setdefault(tournament_id, []).append(registration)
-    # Das Format entscheidet, aus welcher Tabelle die Plätze kommen (geteilte Plätze in Liga und Swiss, #1593).
-    tournaments_by_id = {
-        row["id"]: row
-        for row in (await db.tournaments.find({"id": {"$in": tids}}, {"_id": 0, "id": 1, "format": 1}).to_list(10000) if tids else [])
-        if row.get("id")
-    }
-    own_registration_ids_by_tournament: dict[str, set[str]] = {}
-    for registration in regs:
-        tournament_id = registration.get("tournament_id")
-        if tournament_id and registration.get("id"):
-            own_registration_ids_by_tournament.setdefault(tournament_id, set()).add(registration["id"])
-    for tournament_id, own_registration_ids in own_registration_ids_by_tournament.items():
-        read_model = await load_competition_read_model(db, tournament_id)
-        summary = registration_tournament_achievement_progress(
-            read_model.structure_snapshot(),
-            registrations_by_tournament.get(tournament_id) or [],
-            own_registration_ids,
-            tournament=tournaments_by_id.get(tournament_id),
-        )
-        for key, value in summary.items():
-            placement_progress[key] += value
-    p.update(placement_progress)
+    # Champion, Podest und Holzmedaille (#2337): der gespeicherte Rang der Auszeichnung, nur aus abgeschlossenen Turnieren
+    # (keine Liga-Staffel) - nicht mehr der Zwischenstand eines laufenden Turniers.
+    placements = (await participation.placements(db)).values()
+    p["tournaments_won"] = sum(1 for placement in placements if 1 in placement.ranks)
+    p["podium_finishes"] = sum(1 for placement in placements if placement.ranks & {1, 2, 3})
+    p["rank_4_count"] = sum(1 for placement in placements if 4 in placement.ranks)
 
     official_lap_query = {
         "user_id": user_id,

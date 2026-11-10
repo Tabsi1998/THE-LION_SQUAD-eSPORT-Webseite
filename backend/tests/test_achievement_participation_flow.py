@@ -12,7 +12,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import achievement_play as play  # noqa: E402
-from flow_harness import make_flow, new_id  # noqa: E402
+from flow_harness import make_flow  # noqa: E402
 import badges  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import achievement_counters as counters  # noqa: E402
@@ -81,23 +81,9 @@ async def test_kampfloser_sieg_zaehlt_als_spiel_und_sieg_nur_fuer_den_sieger(flo
 
 # ---------------------------------------------------------------- Team (K4)
 
-async def team_cup(flow, **registration_fields):
-    """Team „Lions“ (Leitung, Mitglied, Ersatz) gegen drei Einzelspieler - angemeldet hat die Leitung."""
-    staff = await flow.add_staff()
-    lead, member, bench = [await flow.add_user(name=name) for name in ("Leitung", "Mitglied", "Ersatz")]
-    team = await play.add_team(flow, "Lions", lead, [member, bench])
-    tournament = await flow.create_tournament(max_participants=4)
-    registration = await play.register_team(flow, tournament, team, by=lead, seed=1, **registration_fields)
-    rivals = [await flow.add_user(name=f"Rivale {n}") for n in (1, 2, 3)]
-    rival_regs = [await flow.register(tournament, rival, seed=seed) for seed, rival in enumerate(rivals, start=2)]
-    flow.act_as(staff)
-    await play.draw(flow, tournament)
-    return staff, tournament, team, registration, (lead, member, bench), rival_regs
-
-
 @pytest.mark.asyncio
 async def test_im_team_zaehlt_jedes_mitglied_nicht_nur_wer_angemeldet_hat(flow):
-    staff, tournament, _team, registration, (lead, member, bench), rival_regs = await team_cup(flow)
+    staff, tournament, _team, registration, (lead, member, bench), rival_regs = await play.team_cup(flow)
     await play.play_out(flow, staff, tournament, [registration["id"], *[reg["id"] for reg in rival_regs]])
 
     for person in (lead, member, bench):
@@ -108,7 +94,7 @@ async def test_im_team_zaehlt_jedes_mitglied_nicht_nur_wer_angemeldet_hat(flow):
 @pytest.mark.asyncio
 async def test_mit_aufstellung_zaehlen_nur_die_aufgestellten(flow):
     """Team am Spieltag: Die Leitung hat angemeldet, steht aber nicht in der Aufstellung - sie hat nicht gespielt."""
-    staff, tournament, _team, registration, (lead, member, bench), rival_regs = await team_cup(flow)
+    staff, tournament, _team, registration, (lead, member, bench), rival_regs = await play.team_cup(flow)
     await flow.db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"lineup": [member["id"]], "substitutes": [bench["id"]]}})
     await play.play_out(flow, staff, tournament, [registration["id"], *[reg["id"] for reg in rival_regs]])
 
@@ -121,7 +107,7 @@ async def test_mit_aufstellung_zaehlen_nur_die_aufgestellten(flow):
 @pytest.mark.asyncio
 async def test_nach_dem_teamwechsel_bleibt_was_gespielt_wurde(flow):
     """Das Mitglied verlässt das Team nach dem ersten Spiel (echter Weg, steht im Protokoll); eine Neue kommt erst danach."""
-    staff, tournament, team, registration, (lead, member, _bench), rival_regs = await team_cup(flow)
+    staff, tournament, team, registration, (lead, member, _bench), rival_regs = await play.team_cup(flow)
     opening = next(match for match in await play.open_matches(flow, tournament) if registration["id"] in play.sides(match))
     await play.decide(flow, staff, opening, registration["id"])
 
@@ -149,20 +135,7 @@ async def test_liga_staffel_zaehlt_fuer_die_teilnehmerliste_des_spiels(flow):
     """Eine Staffel meldet Teams ohne Person an. Gezählt wird, wer auf der Teilnehmerliste des Spiels steht."""
     captain, player, absent = [await flow.add_user(name=name) for name in ("Captain", "Stamm", "Fehlt")]
     rival = await flow.add_user(name="Gegnerin")
-    home = await play.add_team(flow, "Heim", captain, [player, absent])
-    away = await play.add_team(flow, "Gast", rival, [])
-    staffel = await flow.create_tournament(format="league", status="live", league_context={"league_id": "l1", "season_id": "s1", "staffel": "A"})
-    home_reg = await play.register_team(flow, staffel, home, by=None)
-    away_reg = await play.register_team(flow, staffel, away, by=None)
-    lineups = {home_reg["id"]: [captain["id"], player["id"]], away_reg["id"]: [rival["id"]]}
-    stamp = now_utc().isoformat()
-    await flow.db.matches_v2.insert_one({
-        "id": new_id(), "tournament_id": staffel["id"], "stage_number": 1, "round": 1, "order": 1, "status": "completed",
-        "completed_at": stamp, "updated_at": stamp, "match_type": "duel",
-        "slots": [{"slot": 1, "registration_id": home_reg["id"], "status": "filled"}, {"slot": 2, "registration_id": away_reg["id"], "status": "filled"}],
-        "results": [{"registration_id": home_reg["id"], "rank": 1, "score": 3}, {"registration_id": away_reg["id"], "rank": 2, "score": 1}],
-        "lineups": lineups, "lineup_user_ids": sorted({user for lineup in lineups.values() for user in lineup}),
-    })
+    await play.league_match(flow, home_lineup=[captain, player], home_bench=[absent], away=rival)
 
     for person in (captain, player):
         mine = await values(person)
@@ -177,7 +150,7 @@ async def test_liga_staffel_zaehlt_fuer_die_teilnehmerliste_des_spiels(flow):
 
 @pytest.mark.asyncio
 async def test_gg_lob_fuer_ein_team_bekommen_die_die_gespielt_haben(flow):
-    staff, tournament, _team, registration, (lead, member, bench), _rival_regs = await team_cup(flow)
+    staff, tournament, _team, registration, (lead, member, bench), _rival_regs = await play.team_cup(flow)
     await flow.db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"lineup": [lead["id"], member["id"]]}})
     opening = next(match for match in await play.open_matches(flow, tournament) if registration["id"] in play.sides(match))
     await play.decide(flow, staff, opening, registration["id"])

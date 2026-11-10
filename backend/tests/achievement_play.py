@@ -25,6 +25,25 @@ async def cup(flow, count: int = 4, **fields) -> tuple[dict, dict, list[dict], l
     return staff, tournament, users, registrations
 
 
+async def cup_for(flow, players: list[dict], **fields) -> tuple[dict, dict, list[dict]]:
+    """Ein gestartetes Turnier für genau diese Personen, gesetzt in ihrer Reihenfolge - (Leitung, Turnier, Anmeldungen)."""
+    staff = await flow.add_staff()
+    tournament = await flow.create_tournament(max_participants=len(players), **fields)
+    registrations = [await flow.register(tournament, player, seed=seed) for seed, player in enumerate(players, start=1)]
+    flow.act_as(staff)
+    await draw(flow, tournament)
+    return staff, tournament, registrations
+
+
+async def played_cup(flow, players: list[dict], *, publish: bool = True, **fields) -> tuple[dict, list[dict]]:
+    """Ein ganzes K.-o.-Turnier: Es gewinnt jeweils, wer in ``players`` weiter vorn steht; danach abgeschlossen und
+    (auf Wunsch) veröffentlicht. Zurück kommen Turnier und Anmeldungen."""
+    staff, tournament, registrations = await cup_for(flow, players, **fields)
+    await play_out(flow, staff, tournament, [registration["id"] for registration in registrations])
+    await finish(flow, staff, tournament, publish=publish)
+    return tournament, registrations
+
+
 def sides(match: dict) -> list[str]:
     return [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
 
@@ -114,3 +133,43 @@ async def register_team(flow, tournament: dict, team: dict, *, by: dict | None, 
                     "display_name": team["name"], "team_name": team["name"], "status": "approved", "seed": seed, **fields}
     await flow.db.tournament_registrations.insert_one(dict(registration))
     return registration
+
+
+async def team_cup(flow, *, tournament_fields: dict | None = None, **registration_fields):
+    """Team „Lions“ (Leitung, Mitglied, Ersatz) als Nummer 1 gegen drei Einzelspieler - angemeldet hat die Leitung.
+    Zurück: Leitung des Turniers, Turnier, Team, Team-Anmeldung, (Leitung, Mitglied, Ersatz), Anmeldungen der Rivalen."""
+    staff = await flow.add_staff()
+    lead, member, bench = [await flow.add_user(name=name) for name in ("Leitung", "Mitglied", "Ersatz")]
+    team = await add_team(flow, "Lions", lead, [member, bench])
+    tournament = await flow.create_tournament(max_participants=4, **(tournament_fields or {}))
+    registration = await register_team(flow, tournament, team, by=lead, seed=1, **registration_fields)
+    rivals = [await flow.add_user(name=f"Rivale {n}") for n in (1, 2, 3)]
+    rival_regs = [await flow.register(tournament, rival, seed=seed) for seed, rival in enumerate(rivals, start=2)]
+    flow.act_as(staff)
+    await draw(flow, tournament)
+    return staff, tournament, team, registration, (lead, member, bench), rival_regs
+
+
+async def league_match(flow, *, home_lineup: list[dict], home_bench: list[dict], away: dict, status: str = "live") -> tuple[dict, dict, dict]:
+    """Eine Liga-Staffel mit einem gespielten Spiel (Heim gewinnt 3:1): Teams ohne anmeldende Person, die Teilnehmerliste
+    steht am Spiel (``lineups``, ``lineup_user_ids``) - so, wie ``services.league_games`` sie speichert.
+    Zurück: Staffel, Heim-Anmeldung, Gast-Anmeldung."""
+    from flow_harness import new_id
+    from models import now_utc
+
+    home = await add_team(flow, "Heim", home_lineup[0], [*home_lineup[1:], *home_bench])
+    guests = await add_team(flow, "Gast", away, [])
+    staffel = await flow.create_tournament(format="league", status=status,
+                                           league_context={"league_id": "l1", "season_id": "s1", "staffel": "A"})
+    home_reg = await register_team(flow, staffel, home, by=None)
+    away_reg = await register_team(flow, staffel, guests, by=None)
+    lineups = {home_reg["id"]: [person["id"] for person in home_lineup], away_reg["id"]: [away["id"]]}
+    stamp = now_utc().isoformat()
+    await flow.db.matches_v2.insert_one({
+        "id": new_id(), "tournament_id": staffel["id"], "stage_number": 1, "round": 1, "order": 1, "status": "completed",
+        "completed_at": stamp, "updated_at": stamp, "match_type": "duel",
+        "slots": [{"slot": 1, "registration_id": home_reg["id"], "status": "filled"}, {"slot": 2, "registration_id": away_reg["id"], "status": "filled"}],
+        "results": [{"registration_id": home_reg["id"], "rank": 1, "score": 3}, {"registration_id": away_reg["id"], "rank": 2, "score": 1}],
+        "lineups": lineups, "lineup_user_ids": sorted({user for lineup in lineups.values() for user in lineup}),
+    })
+    return staffel, home_reg, away_reg

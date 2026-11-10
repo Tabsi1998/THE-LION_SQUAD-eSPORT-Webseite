@@ -25,7 +25,7 @@ import contextvars
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from services.competition_standings import STANDING_REGISTRATION_STATUSES, badge_match_progress
+from services.competition_standings import STANDING_REGISTRATION_STATUSES, badge_match_progress, final_match, final_participants
 from services.league_scope import is_league_staffel
 from services.match_winner import is_real_match, lost_by, no_show_ids, participant_ids, won_by
 
@@ -66,6 +66,15 @@ class Played:
     won: bool
     lost: bool
     no_show: bool
+
+
+@dataclass(frozen=True)
+class Placement:
+    """Die Plätze der Person in einem abgeschlossenen Turnier (mehrere nur, wenn sie für mehrere Anmeldungen gespielt hat)
+    und die Größe des Teilnehmerfelds."""
+
+    ranks: frozenset
+    participants: int
 
 
 class TeamTimeline:
@@ -125,6 +134,8 @@ class Participation:
         self.squads = squads
         self.rows: list[Played] = [row for row in (self._row(match) for match in matches) if row]
         self.played: list[Played] = [row for row in self.rows if not row.no_show]
+        self._placements: dict[str, Placement] | None = None
+        self._finals: set[str] | None = None
 
     # ------------------------------------------------ wer zählt für eine Anmeldung in einem Spiel
 
@@ -197,6 +208,71 @@ class Participation:
     def match_progress(self) -> dict:
         """Spielmacher, Sieger und Siegesserie - dieselbe Rechnung wie ``registration_badge_match_progress``."""
         return badge_match_progress((row.match, row.mine) for row in self.rows)
+
+    # ------------------------------------------------ Plätze und Finale: nur abgeschlossene Turniere, nie eine Liga-Staffel
+
+    def finished_entries(self) -> dict[str, list[dict]]:
+        """Die Teilnahmen in abgeschlossenen Turnieren (keine Liga-Staffel), je Turnier."""
+        out: dict[str, list[dict]] = {}
+        for registration in self.entries():
+            tournament_id = registration.get("tournament_id")
+            if self.is_done(tournament_id) and not self.is_league(tournament_id):
+                out.setdefault(tournament_id, []).append(registration)
+        return out
+
+    async def placements(self, db) -> dict[str, Placement]:
+        """Der Platz je abgeschlossenem Turnier - der gespeicherte Rang der Auszeichnung (``tournament_awards.rank``).
+
+        Hat ein abgeschlossenes Turnier noch keine Auszeichnungen (beendet, aber nicht veröffentlicht), gilt der Platz, den
+        die Auszeichnung festhalten würde (``awards.tournament_ranks``). Solange ein Turnier läuft, gibt es keinen Platz."""
+        if self._placements is None:
+            self._placements = await self._load_placements(db)
+        return self._placements
+
+    async def _load_placements(self, db) -> dict[str, Placement]:
+        from services.awards import tournament_ranks
+
+        entries = self.finished_entries()
+        ids = sorted(registration["id"] for registrations in entries.values() for registration in registrations)
+        stored = {}
+        if ids:
+            fields = {"_id": 0, "tournament_id": 1, "registration_id": 1, "rank": 1, "participants": 1}
+            stored = {row["registration_id"]: row async for row in db.tournament_awards.find({"registration_id": {"$in": ids}}, fields)}
+        out: dict[str, Placement] = {}
+        for tournament_id, registrations in entries.items():
+            own = [stored[registration["id"]] for registration in registrations if registration["id"] in stored]
+            if own:
+                ranks = {row.get("rank") for row in own}
+                field = max(int(row.get("participants") or 0) for row in own)
+            elif await db.tournament_awards.count_documents({"tournament_id": tournament_id}, limit=1):
+                continue  # die Auszeichnungen stehen - für diese Anmeldung gibt es keine
+            else:
+                tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+                listed, _snapshot, current = await tournament_ranks(db, tournament, surface="achievements") if tournament else ([], {}, {})
+                ranks = {current.get(registration["id"]) for registration in registrations}
+                field = len(listed)
+            out[tournament_id] = Placement(frozenset(rank for rank in ranks if isinstance(rank, int) and rank > 0), field)
+        return out
+
+    async def finals(self, db) -> set[str]:
+        """Die abgeschlossenen Turniere, in deren Finale die Person stand (``competition_standings.final_participants``):
+        Endspiel, Grand Final oder Finallauf - und sie hat dieses Spiel selbst gespielt."""
+        if self._finals is None:
+            from services.competition_read import load_competition_read_model
+
+            found = set()
+            for tournament_id, registrations in self.finished_entries().items():
+                tournament = self.tournaments[tournament_id]
+                snapshot = (await load_competition_read_model(db, tournament_id)).structure_snapshot()
+                final = final_match(snapshot, tournament=tournament)
+                if not final:
+                    continue
+                on_stage = {reg_id for row in self.played if row.match.get("id") == final.get("id") for reg_id in row.mine}
+                entered = {registration["id"] for registration in registrations}
+                if on_stage & entered & final_participants(snapshot, tournament=tournament):
+                    found.add(tournament_id)
+            self._finals = found
+        return self._finals
 
 
 # ---------------------------------------------------------------- Laden

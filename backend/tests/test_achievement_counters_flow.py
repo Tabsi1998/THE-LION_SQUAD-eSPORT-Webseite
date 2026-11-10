@@ -15,6 +15,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+import achievement_play as play  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 import achievement_catalog as catalog  # noqa: E402
@@ -184,7 +185,12 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
     await db.tournament_staff_assignments.insert_one({"id": "sa1", "tournament_id": "t9", "user_id": user["id"], "role": "referee"})
     await db.tournaments.insert_one({"id": "t9", "title": "Staffed", "status": "completed", "is_public": True, "registration_opens_at": "2026-05-01T18:00:00+00:00"})
     await db.tournament_registrations.insert_one({"id": "rf", "tournament_id": "t9", "user_id": user["id"], "created_at": "2026-05-01T18:04:00+00:00", "status": "checked_in", "updated_at": "2026-05-02T10:00:00+00:00"})
-    await db.tournament_awards.insert_many([{"tournament_id": "t9", "registration_id": "rf", "place": 2}, {"tournament_id": "t8", "registration_id": "rf", "place": 6}])
+    # Platz 2 in einem echten Turnier mit neun Teilnehmern (#2337): gespielt, abgeschlossen, veröffentlicht - die Plätze hält
+    # ``record_tournament_awards`` fest. Das Finale verliert sie gegen die Nummer 1.
+    field = [await flow.add_user(name="Favoritin"), user, *[await flow.add_user(name=f"Feld {n}") for n in range(7)]]
+    cup, cup_regs = await play.played_cup(flow, field)
+    award = await db.tournament_awards.find_one({"tournament_id": cup["id"], "registration_id": cup_regs[1]["id"]}, {"_id": 0})
+    assert (award["rank"], award["participants"]) == (2, 9)
     await db.user_reports.insert_many([{"id": "r1", "reporter_id": user["id"], "status": "removed"}, {"id": "r2", "reporter_id": user["id"], "status": "open"}])
     values = await counters.compute(user["id"])
     expected = {
@@ -193,7 +199,7 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
         "login_streak_max": 12, "level": 10, "prestige_stars": 1, "birthday_logins": 2,
         "team_size_max": 3, "team_profile_complete": 1, "captain_days": 40, "team_tournaments_played": 1,
         "season_top10_finishes": 2, "season_wins": 1, "events_hosted_completed": 1, "club_events_attended": 1,
-        "tournaments_staffed_completed": 1, "fast_registrations": 1, "first_checkins": 1, "top8_finishes": 2, "finals_played": 1, "reports_actioned": 1,
+        "tournaments_staffed_completed": 1, "fast_registrations": 1, "first_checkins": 1, "top8_finishes": 1, "finals_played": 1, "reports_actioned": 1,
     }
     assert {key: values[key] for key in expected} == expected
 

@@ -173,11 +173,13 @@ class Context:
     async def season_standings(self) -> list[dict]:
         return await self._memo("season_standings", lambda: self.db.season_standings.find({"user_id": self.user_id}, {"_id": 0, "rank": 1, "season_id": 1}).to_list(500))
 
-    async def awards_places(self) -> list[dict]:
-        async def load():
-            ids = list(await self.registration_ids())
-            return await self.db.tournament_awards.find({"registration_id": {"$in": ids}}, {"_id": 0, "tournament_id": 1, "place": 1}).to_list(2000) if ids else []
-        return await self._memo("awards_places", load)
+    async def placements(self) -> dict[str, achievement_participation.Placement]:
+        """Der Platz je abgeschlossenem Turnier (#2337) - der gespeicherte Rang der Auszeichnung, nie ein Zwischenstand."""
+        return await (await self.participation()).placements(self.db)
+
+    async def finals(self) -> set[str]:
+        """Die abgeschlossenen Turniere, in deren Finale die Person stand."""
+        return await (await self.participation()).finals(self.db)
 
     async def opponent_registrations(self) -> dict[str, dict]:
         """Die Anmeldungen der Gegner aus allen eigenen Matches (Check-in-Zeiten, Status) - Katalog A."""
@@ -602,14 +604,16 @@ async def _first_checkins(ctx):
     return count
 
 
-@counter("top8_finishes", "tournament")
+@counter("top8_finishes", "tournament", "match")
 async def _top8(ctx):
-    return len({row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) <= 8})
+    """Platz 1 bis 8 in einem abgeschlossenen Turnier - erst ab mehr als acht Teilnehmern, sonst wäre jeder dabei."""
+    return sum(1 for placement in (await ctx.placements()).values() if placement.participants > 8 and any(rank <= 8 for rank in placement.ranks))
 
 
-@counter("finals_played", "tournament")
+@counter("finals_played", "tournament", "match")
 async def _finals(ctx):
-    return len({row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) <= 2})
+    """Im Finale gestanden: Endspiel, Grand Final oder Finallauf - nicht „Platz 1 oder 2“ (Tabellen haben kein Finale)."""
+    return len(await ctx.finals())
 
 
 # ------------------------------------------------------------------ Match (Zeit, Gegner, Lob)
@@ -1087,14 +1091,13 @@ async def _checkin_streak(ctx):
 
 @counter("lower_bracket_top4", "tournament", "match")
 async def _lower_bracket_top4(ctx):
-    places = {row["tournament_id"]: int(row.get("place") or 99) for row in await ctx.awards_places() if row.get("tournament_id")}
-    lower = {match.get("tournament_id") for match in await ctx.matches() if match.get("status") == "completed" and _is_lower_section(match)}
-    return len({tid for tid, place in places.items() if place <= 4 and tid in lower})
+    lower = {row.match.get("tournament_id") for row in await ctx.played() if _is_lower_section(row.match)}
+    return sum(1 for tid, placement in (await ctx.placements()).items() if tid in lower and any(rank <= 4 for rank in placement.ranks))
 
 
 @counter("tournaments_won_undefeated", "tournament", "match")
 async def _undefeated(ctx):
-    won_tournaments = {row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) == 1}
+    won_tournaments = {tid for tid, placement in (await ctx.placements()).items() if 1 in placement.ranks}
     # Verloren hat nur, wer einem anderen Sieger gegenüberstand - auch kampflos; ein Freilos oder Unentschieden nicht.
     lost_in = {row.match.get("tournament_id") for row in (await ctx.participation()).rows if row.lost}
     return len(won_tournaments - lost_in)
@@ -1415,12 +1418,12 @@ async def _pioneer(ctx):
 @counter("distinct_game_wins_one_season", "tournament")
 async def _grand_slam(ctx):
     """Turniersiege in verschiedenen Spielen innerhalb einer Saison - das Maximum über die Saisons."""
-    tournaments = await ctx.tournaments()
+    tournaments = (await ctx.participation()).tournaments
     per_season: dict[str, set[str]] = {}
-    for award in await ctx.awards_places():
-        if award.get("place") != 1:
+    for tournament_id, placement in (await ctx.placements()).items():
+        if 1 not in placement.ranks:
             continue
-        tournament = tournaments.get(award.get("tournament_id")) or {}
+        tournament = tournaments.get(tournament_id) or {}
         if tournament.get("season_id") and tournament.get("game_id"):
             per_season.setdefault(tournament["season_id"], set()).add(tournament["game_id"])
     return max((len(games) for games in per_season.values()), default=0)
