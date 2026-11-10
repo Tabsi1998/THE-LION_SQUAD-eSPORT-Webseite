@@ -70,6 +70,35 @@ export function markPlacementShown(placement, storage = defaultStorage()) {
   }
 }
 
+/** Gewonnene Spiele einer Zeile - `won` aus der Baum-Rangliste, `wins` aus Altbestand und Rückblick. */
+export function podiumWins(row) {
+  const wins = Number(row?.won ?? row?.wins);
+  return Number.isFinite(wins) ? wins : null;
+}
+
+/** „4 Spiele gewonnen“, „1 Spiel gewonnen“, „kein Spiel gewonnen“ - dieselben Worte wie der Server (games_won_text). */
+export function gamesWonText(wins) {
+  const count = Math.max(0, Math.trunc(Number(wins) || 0));
+  if (!count) return "kein Spiel gewonnen";
+  return `${count} ${count === 1 ? "Spiel" : "Spiele"} gewonnen`;
+}
+
+/**
+ * Der Satz unter dem Podest (#2336) - nur im Baum (eine Zeile mit `place_path` bzw. `path`) und nur, wenn die Siege
+ * nicht zur Reihenfolge passen: jemand auf einem besseren Platz hat weniger Spiele gewonnen als jemand dahinter. Liga,
+ * Gruppen, FFA und Fast Lap haben keinen Weg und bekommen nie einen Satz.
+ */
+export function podiumRoundNote(rows = []) {
+  const tree = (rows || []).filter((row) => row && (row.place_path || row.path) && podiumWins(row) != null && Number(row.rank) >= 1);
+  const mismatch = tree.some((better) => tree.some((worse) => Number(better.rank) < Number(worse.rank) && podiumWins(better) < podiumWins(worse)));
+  if (!mismatch) return "";
+  const double = tree.some((row) => /\b(?:Loser|Winner|Grand Final)\b/.test(`${row.reached || ""} ${row.place_path || row.path || ""}`));
+  return [
+    "Im K.-o. zählt die erreichte Runde, nicht die Zahl der Siege. Ein Freilos zählt nicht als Sieg.",
+    double ? "Im Doppel-K.-o. sammelt man in der Verliererrunde oft mehr Siege." : "",
+  ].filter(Boolean).join(" ");
+}
+
 /**
  * Treppchen: Platz 2 links, 1 in der Mitte, 3 rechts; gleiche Plätze stehen nebeneinander auf einer Stufe. Ein Platz,
  * den ein Gleichstand überspringt (zwei Erste - kein Zweiter), bekommt keine Stufe; ein Platz, den es schlicht nicht

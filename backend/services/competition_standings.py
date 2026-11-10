@@ -56,6 +56,16 @@ def _section_kind(match: dict) -> str:
     return section_kind(match.get("section"))
 
 
+def is_bye(match: dict) -> bool:
+    """Ein Freilos: ein Spiel mit höchstens einer Anmeldung auf seinen Plätzen - beim Bau oder nach Ausschluss bzw.
+    Rückzug kampflos entschieden (``resolve_walkovers``). Erkannt wird es nur an den Plätzen: ``result_meta`` kommt im
+    Snapshot nicht an. Ein gewertetes Nichtantreten mit zwei Anmeldungen ist kein Freilos."""
+    slots = match.get("slots") or []
+    filled = {slot.get("registration_id") for slot in slots if slot.get("registration_id")}
+    # Ohne Plätze (Altbestand, nur Ergebnisse) ist es kein Freilos - dann zählen die Ergebnisse wie bisher.
+    return bool(slots) and len(filled) < 2
+
+
 def decided_places(matches: list[dict]) -> dict[str, int]:
     """Welche Plätze der Baum selbst schon vergeben hat (#1549): das entscheidende Spiel schlägt jede Zählung.
 
@@ -130,28 +140,39 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
             "rank_sum": 0,
             "furthest_round": 0,
             "best_rank": None,
+            # Freilos-Spiele (#2336): stehen nicht in ``played``/``won``, zählen aber für die Reihenfolge wie bisher.
+            "byes": 0,
         }
         for registration in registrations
         if registration.get("id")
     }
+    # Siege samt Freilos - nur für die Sortierung, damit sich kein Platz verschiebt (Saisonpunkte, Preise, Pokale).
+    bye_wins: dict[str, int] = {}
     for match in matches:
         if match.get("status") not in TERMINAL_MATCH_STATUSES:
             continue
+        # Ein Freilos ist kein Spiel und kein Sieg (#2336, wie #1796): angezeigt wird es nicht als Spiel.
+        bye = is_bye(match)
         for result in match.get("results") or []:
             registration_id = result.get("registration_id")
             if registration_id not in rank_map:
                 continue
             rank = _safe_int(result.get("rank"), 999)
             row = rank_map[registration_id]
-            row["played"] += 1
             row["rank_sum"] += rank
             row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")))
             row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
-            if rank == 1:
-                row["won"] += 1
+            if bye:
+                row["byes"] += 1
+                if rank == 1:
+                    bye_wins[registration_id] = bye_wins.get(registration_id, 0) + 1
             else:
-                # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
-                row["lost"] += 1
+                row["played"] += 1
+                if rank == 1:
+                    row["won"] += 1
+                else:
+                    # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
+                    row["lost"] += 1
             if rank <= 2:
                 row["top2"] += 1
             score = result.get("points")
@@ -161,13 +182,15 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
                 row["points"] += score
     rows = list(rank_map.values())
     for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
+        # Durchschnitt wie vor #2336 samt Freilos - er ist Teil der Reihenfolge.
+        entries = row["played"] + row["byes"]
+        row["avg_rank"] = round(row["rank_sum"] / entries, 2) if entries else None
     rows.sort(
         key=lambda row: (
-            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung.
+            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung - Siege samt Freilos (#2336).
             -places.get(row["registration_id"], 10_000),
             row["furthest_round"],
-            row["won"],
+            row["won"] + bye_wins.get(row["registration_id"], 0),
             row["top2"],
             row["points"],
             -(row["avg_rank"] or 999),
@@ -868,6 +891,129 @@ def reached_labels(matches: list[dict], stages: list[dict] = (), tournament: dic
     return labels
 
 
+# Wann ein Turnier sein Ergebnis hat - erst dann sagt der Weg „raus“ (vorher könnte noch ein Spiel kommen).
+FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
+
+
+def _round_phrase(label: str) -> str:
+    """„im Halbfinale“, „im Grand Final“ - aber „in Runde 2“, „in Loser Runde 3“."""
+    first = label.split(" ")[0].lower()
+    second = (label.split(" ")[1:2] or [""])[0].lower()
+    if first == "runde" or (first in {"winner", "loser"} and second == "runde"):
+        return f"in {label}"
+    return f"im {label}"
+
+
+def _path_label(match: dict, rounds: dict[tuple, list[int]]) -> str:
+    """Der Rundenname für den Weg: wie im Baum, aber die letzte Runde einer Baumseite heißt immer „Loser Final“ bzw.
+    „Winner Final“ - erkannt an ihrer Stelle in der Seite, nicht an der Zahl im Namen (im Loser Bracket weicht die
+    gespeicherte Runde von der gelesenen Nummer ab, „Loser Runde 6“ ist dort ``round`` 7)."""
+    label = str(match.get("round_label") or "").strip()
+    section = section_kind(match.get("section"))
+    order = rounds.get((match.get("stage_id"), section)) or []
+    last = bool(order) and _safe_int(match.get("round")) == order[-1]
+    if last and section == "loser" and (not label or label.lower().startswith("loser")):
+        return "Loser Final"
+    if last and section == "main" and label.lower().startswith("winner"):
+        # Ohne Loser Bracket (Doppel-K.-o. mit zwei Teilnehmern) ist das letzte Spiel schlicht das Finale.
+        has_loser = bool(rounds.get((match.get("stage_id"), "loser")))
+        return "Winner Final" if has_loser else "Finale"
+    return label
+
+
+def _single_winner(match: dict) -> str | None:
+    """Die eine Anmeldung auf Platz 1 - bei Unentschieden oder ohne Sieger keine."""
+    results = [row for row in match.get("results") or [] if row.get("registration_id")]
+    firsts = [row for row in results if _safe_int(row.get("rank"), 999) == 1 or row.get("outcome") == "winner"]
+    return firsts[0]["registration_id"] if len(firsts) == 1 else None
+
+
+def place_paths(matches: list[dict], stages: list[dict] = (), tournament: dict | None = None,
+                registrations: list[dict] | None = None) -> dict[str, str]:
+    """Wie der Platz im Baum zustande kam (#2336): „Finale gewonnen“, „im Finale“, „Spiel um Platz 3 gewonnen“, „im
+    Halbfinale raus“. Im K.-o. entscheidet die erreichte Runde den Platz, nicht die Zahl der Siege - das Podest sagt
+    deshalb, wo jemand zuletzt spielte und ob er dieses Spiel gewann.
+
+    Nur aus Fakten: das späteste echte Spiel (Phase, dann Runde) mit seinem Ergebnis für die Anmeldung, nur in einer
+    Phase mit Duell-Baum (keine Läufe, keine Tabelle) und nur, wenn das Turnier beendet ist. Liegt danach noch ein
+    gewonnenes Freilos (der Gegner wurde ausgeschlossen oder zog zurück), heißt es „Finale kampflos gewonnen“. Wer
+    selbst ausgeschlossen ist oder zurückzog (Status außerhalb von angenommen/eingecheckt, ``registrations``), bekommt
+    keinen Weg. Fehlt etwas davon, steht für die Anmeldung nichts da - das Podest zeigt dann wie bisher die Siege."""
+    from services.round_labels import attach_round_labels, rounds_by_section, stage_kind
+
+    if (tournament or {}).get("status") not in FINISHED_TOURNAMENT_STATUSES:
+        return {}
+    playable = [dict(match) for match in matches
+                if match.get("status") != "cancelled" and match.get("source", {}).get("engine") == "stage"]
+    if not playable:
+        return {}
+    attach_round_labels(playable, list(stages or []), tournament)
+    rounds = rounds_by_section(playable)
+    stage_types = {stage.get("id"): stage.get("stage_type") for stage in stages or [] if isinstance(stage, dict)}
+    tournament_format = (tournament or {}).get("format")
+    left = {reg.get("id") for reg in registrations or []
+            if (reg.get("status") or "approved") not in STANDING_REGISTRATION_STATUSES}
+    furthest: dict[str, tuple[tuple[int, int], dict]] = {}
+    furthest_bye: dict[str, tuple[tuple[int, int], dict]] = {}
+    for match in playable:
+        target = furthest_bye if is_bye(match) else furthest
+        position = (_safe_int(match.get("stage_number")), _safe_int(match.get("round")))
+        for slot in match.get("slots") or []:
+            registration_id = slot.get("registration_id")
+            if registration_id and (registration_id not in target or position > target[registration_id][0]):
+                target[registration_id] = (position, match)
+
+    def knockout(match: dict) -> bool:
+        kind = stage_kind(stage_types.get(match.get("stage_id")) or match.get("stage_type"), tournament_format,
+                          match.get("match_type"))
+        return kind == "knockout" and match.get("status") in TERMINAL_MATCH_STATUSES
+
+    paths: dict[str, str] = {}
+    for registration_id in set(furthest) | set(furthest_bye):
+        if registration_id in left:
+            continue
+        real = furthest.get(registration_id)
+        walkover = furthest_bye.get(registration_id)
+        if walkover and (not real or walkover[0] > real[0]):
+            # Das letzte „Spiel“ war ein Freilos: nur ein gewonnenes zählt als Weg - kampflos.
+            match = walkover[1]
+            label = _path_label(match, rounds)
+            if knockout(match) and label and _single_winner(match) == registration_id:
+                paths[registration_id] = f"{label} kampflos gewonnen"
+            continue
+        match = real[1]
+        if not knockout(match):
+            continue
+        if not any(row.get("registration_id") == registration_id for row in match.get("results") or []):
+            continue
+        winner = _single_winner(match)
+        if not winner:
+            continue  # Unentschieden oder kein Sieger: kein Weg, der sich sicher sagen lässt.
+        won = winner == registration_id
+        label = _path_label(match, rounds)
+        if not label:
+            continue
+        section = section_kind(match.get("section"))
+        main_rounds = rounds.get((match.get("stage_id"), "main")) or []
+        final_like = section in {"grand_final", "bronze"} or (
+            section == "main" and main_rounds and _safe_int(match.get("round")) == main_rounds[-1])
+        if won:
+            paths[registration_id] = f"{label} gewonnen"
+        elif final_like:
+            paths[registration_id] = _round_phrase(label)
+        else:
+            paths[registration_id] = f"{_round_phrase(label)} raus"
+    return paths
+
+
+def games_won_text(won) -> str:
+    """„4 Spiele gewonnen“, „1 Spiel gewonnen“, „kein Spiel gewonnen“ - die zweite Zeile unter dem Weg (#2336)."""
+    count = _safe_int(won)
+    if count <= 0:
+        return "kein Spiel gewonnen"
+    return f"{count} {'Spiel' if count == 1 else 'Spiele'} gewonnen"
+
+
 def public_standings(
     tournament: dict,
     snapshot: dict,
@@ -890,9 +1036,13 @@ def public_standings(
         return []
     rows = standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
     labels = reached_labels(matches, stages, tournament)
+    paths = place_paths(matches, stages, tournament, registrations)
     for row in rows:
         if row.get("registration_id") in labels:
             row["reached"] = labels[row["registration_id"]]
+        # Wie der Platz zustande kam (#2336) - nur im beendeten Duell-Baum.
+        if row.get("registration_id") in paths:
+            row["place_path"] = paths[row["registration_id"]]
     return rows
 
 
@@ -983,7 +1133,8 @@ def placements_for_structure(
         registration_id = row.get("registration_id")
         rank = _safe_int(row.get("rank"))
         registration = registration_map.get(registration_id)
-        if not registration_id or not rank or not row.get("played") or not registration:
+        # Wer nur Freilose hatte, hat trotzdem einen Platz (#2336) - ``played`` zählt sie nicht mehr.
+        if not registration_id or not rank or not (row.get("played") or row.get("byes")) or not registration:
             continue
         placements.setdefault(rank, []).append({
             "registration_id": registration_id,
