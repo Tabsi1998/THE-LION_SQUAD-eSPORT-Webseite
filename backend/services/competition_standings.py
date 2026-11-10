@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from services.match_winner import is_real_match, no_show_ids, participant_ids, won_by
-from services.round_labels import TABLE_FORMATS, section_kind
+from services.round_labels import TABLE_FORMATS, TABLE_STAGE_TYPES, section_kind
 from services.scoring_rules import maps_mode, rank_with_ties
 
 
@@ -1001,6 +1001,56 @@ def placement_rows_for_structure(snapshot: dict, registrations: list[dict], *, t
         for rank, group in sorted(placements_for_structure(snapshot, registrations, tournament=tournament).items())
         for placement in group
     ]
+
+
+# Formate ohne Endspiel (#2337), falls die Phase ihren Typ nicht nennt: Tabellen kennen kein Finale.
+NO_FINAL_FORMATS = frozenset({"round_robin", "league", "swiss", "time_trial", "grand_prix"})
+
+
+def final_match(snapshot: dict, *, tournament: dict | None = None) -> dict | None:
+    """Das Finale eines Turniers (#2337) - oder ``None``, wenn es keines gibt.
+
+    Nur die letzte Phase zählt. Mit Grand Final ist es das erste Grand-Final-Spiel (nie das Reset-Spiel), sonst das
+    eine Spiel in der höchsten Runde des Hauptbaums - im Doppel-K.-o. ohne Grand Final also das Winner-Finale. Davor muss
+    es etwas gegeben haben: eine frühere Runde oder eine frühere Phase; ein einzelner Lauf ist kein Finale. Das Spiel um
+    Platz 3 und die Verliererrunde sind nie das Finale; Tabellen (Jeder gegen jeden, Liga, Schweizer System, reine
+    Gruppenphase) haben keines."""
+    matches = [match for match in snapshot.get("matches") or [] if match.get("status") != "cancelled" and not match.get("is_preview")]
+    if not matches:
+        return None
+    last_stage = max(_safe_int(match.get("stage_number")) for match in matches)
+    stage_rows = [match for match in matches if _safe_int(match.get("stage_number")) == last_stage]
+    stage_types = {stage.get("id"): stage.get("stage_type") for stage in snapshot.get("stages") or [] if isinstance(stage, dict)}
+    stage_type = next((stage_types[match.get("stage_id")] for match in stage_rows if stage_types.get(match.get("stage_id"))), None)
+    if stage_type in TABLE_STAGE_TYPES or (not stage_type and (tournament or {}).get("format") in NO_FINAL_FORMATS):
+        return None
+
+    def position(match: dict) -> tuple:
+        return _safe_int(match.get("round")), _safe_int(match.get("order")), str(match.get("id") or "")
+
+    grand_finals = [match for match in stage_rows
+                    if _section_kind(match) == "grand_final" and "reset" not in str(match.get("round_name") or "").lower()]
+    if grand_finals:
+        return min(grand_finals, key=position)
+    main = [match for match in stage_rows if _section_kind(match) == "main"]
+    rounds = sorted({_safe_int(match.get("round")) for match in main})
+    if not rounds:
+        return None
+    top_round = [match for match in main if _safe_int(match.get("round")) == rounds[-1]]
+    came_from_somewhere = len(rounds) >= 2 or any(_safe_int(match.get("stage_number")) < last_stage for match in matches)
+    return top_round[0] if len(top_round) == 1 and came_from_somewhere else None
+
+
+def final_participants(snapshot: dict, *, tournament: dict | None = None) -> set[str]:
+    """Wer im Finale stand (#2337): beide im Endspiel bzw. Grand Final, im Mehrspieler-Finale der ganze Finallauf.
+
+    Das Finale muss gespielt sein. Ein kampfloses Finale (Gegner nicht erschienen oder Freilos) zählt für niemanden als
+    „im Finale gestanden“; wer im Finallauf als nicht erschienen steht, war nicht dabei."""
+    match = final_match(snapshot, tournament=tournament)
+    if not match or match.get("status") != "completed" or not is_real_match(match):
+        return set()
+    present = participant_ids(match) - no_show_ids(match)
+    return present if len(present) >= 2 else set()
 
 
 def registration_badge_match_progress(matches: list[dict], registration_ids: set[str]) -> dict:
