@@ -41,7 +41,8 @@ def test_teilnahme_statt_anmeldung_steht_im_text():
     veteran = catalog.GROUP_BY_CODE["tournaments_registered"]
     assert "Anmeldung allein nicht" in veteran["how_to"] and "anmeld" not in veteran["description"].lower()
     steps = [tier["description"] for tier in catalog.ACHIEVEMENT_TIERS if tier["group_code"] == "tournaments_registered"]
-    assert steps and all(step.endswith("Turniere gespielt.") and "anmeldung" not in step.lower() for step in steps)
+    assert steps[0] == "1 Turnier gespielt." and steps[1] == "5 Turniere gespielt.", "Einzahl beim Ziel 1"
+    assert all(step.endswith("Turniere gespielt.") and "anmeldung" not in step.lower() for step in steps[1:])
     assert "Match gespielt" in how_to("distinct_games")
     assert "für dein Team gespielt" in how_to("team_tournaments")
     assert "auch gespielt" in how_to("checkin_first")

@@ -35,11 +35,13 @@ SINGULAR_UNITS = {" Tage": " Tag", " Jahre": " Jahr"}
 
 def _group(code: str, name: str, category: str, description: str, how_to: str, icon: str, art: str, key: str | None, targets: list[int],
            step: str, *, sort_order: int, unit: str = "", staff_only: bool = False, catalog: str = "A",
-           steps: list[str] | None = None, materials: list[str] | None = None, manual: bool = False) -> tuple[dict, list[dict]]:
+           steps: list[str] | None = None, materials: list[str] | None = None, manual: bool = False,
+           singular: str | None = None) -> tuple[dict, list[dict]]:
     """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel **samt** ``unit`` („{n} im Vorstand.“
     wird „90 Tage im Vorstand.“ - die Einheit gehört nicht noch einmal in den Satz, #864); ``steps`` ersetzt ihn durch einen
     eigenen Satz je Stufe, ``materials`` die Leiter (z. B. eine einzelne Silber-Stufe). ``manual`` heißt: nur von Hand
-    vergeben, kein Bedingungsschlüssel. Katalog B–D nutzen denselben Helfer."""
+    vergeben, kein Bedingungsschlüssel. ``singular`` ist der Satz für das Ziel 1, wo die Mehrzahl falsch klänge
+    („1 Turnier gespielt.“ statt „1 Turniere gespielt.“, #2337). Katalog B–D nutzen denselben Helfer."""
     materials = list(materials or LADDERS[len(targets)])
     group = {
         "code": code, "name": name, "category": category, "icon": icon, "art": art,
@@ -50,7 +52,7 @@ def _group(code: str, name: str, category: str, description: str, how_to: str, i
     tiers = []
     for index, (material, target) in enumerate(zip(materials, targets)):
         shown = SINGULAR_UNITS.get(unit, unit) if target == 1 else unit
-        text = steps[index] if steps else step.format(n=f"{target}{shown}")
+        text = steps[index] if steps else (singular if singular and target == 1 else step).format(n=f"{target}{shown}")
         tiers.append(tier(f"{code}_{index + 1}", code, material, f"{name} {ROMAN[index]}", text, condition_key=None if manual else key,
                           progress_target=target, icon=icon, art=art, how_to=how_to, manual_only=manual))
     return group, tiers
@@ -121,7 +123,8 @@ MATCH = [
 
 TOURNAMENT = [
     _group("tournaments_registered", "Turnierveteran", "tournament", "Spiel Turniere mit.", "Jedes Turnier, in dem du angenommen warst und mindestens ein Match gespielt hast, zählt – die Anmeldung allein nicht. Abgesagte Turniere und die Liga zählen nicht.",
-           "ticket", "ticket", "tournaments_registered", [1, 5, 15, 40, 100, 200, 500], "{n} Turniere gespielt.", sort_order=210),
+           "ticket", "ticket", "tournaments_registered", [1, 5, 15, 40, 100, 200, 500], "{n} Turniere gespielt.", sort_order=210,
+           singular="{n} Turnier gespielt."),
     _group("tournaments_completed", "Durchzieher", "tournament", "Spiel Turniere bis zum Ende, ohne aufzugeben.", "Abgeschlossenes Turnier, in dem du gespielt hast, ohne kampflos zu verlieren, auszutreten oder disqualifiziert zu werden.",
            "flag-triangle-right", "finish-flag", "tournaments_completed_no_forfeit", [1, 5, 15, 40, 100, 200, 400], "{n} Turniere durchgezogen.", sort_order=211),
     _group("tournaments_won", "Champion", "tournament", "Gewinne Turniere.", "Platz 1 in einem abgeschlossenen Turnier (keine Liga) – egal in welchem Spiel.",
