@@ -159,8 +159,10 @@ async def test_the_dry_run_counts_per_tier_and_writes_nothing(flow):
     await flow.add_user(name="ohne")
     await claims(flow, paula, news=2, passkey=True)
     await claims(flow, max_, news=1)
+    await published_tournament(flow, paula)
     await recount.begin()
-    watched = ("user_achievements", "xp_events", "user_xp", "user_achievement_stats", "achievement_eval_queue", "achievement_outbox", "notifications")
+    watched = ("user_achievements", "xp_events", "user_xp", "user_achievement_stats", "achievement_eval_queue", "achievement_outbox", "notifications",
+               "tournament_awards")
 
     result = await recount.dry_run()
 
@@ -273,7 +275,8 @@ async def test_an_interrupted_evaluation_keeps_quiet_and_continues(flow, monkeyp
 
     async def failing_once(db, doc_id, field, changes=None):
         calls.append(1)
-        if len(calls) == 1:
+        # Der erste Aufruf folgt auf das Nachtragen der Pokale, der zweite auf den ersten Stapel Konten.
+        if len(calls) == 2:
             raise RuntimeError("Server neu gestartet")
         return await real_extend(db, doc_id, field, changes)
 
@@ -287,6 +290,54 @@ async def test_an_interrupted_evaluation_keeps_quiet_and_continues(flow, monkeyp
         assert all(a.get("recount") for a in (await awards_of(flow, person)).values())
         assert await noisy(flow, person) == 0
         assert await flow.db.notifications.count_documents({"kind": recount.NOTIFY_KIND, "user_id": person["id"]}) == 1
+
+
+async def published_tournament(flow, *people):
+    """Ein Turnier mit veröffentlichten Ergebnissen, dessen Pokale noch fehlen - wie älterer Bestand."""
+    await flow.db.tournaments.insert_one({"id": "t-alt", "slug": "t-alt", "title": "Herbst-Cup", "status": "results_published",
+                                          "start_date": "2025-10-02T17:00:00+02:00", "visibility": "public", "is_public": True, "format": "single_elim"})
+    await flow.db.tournament_registrations.insert_many([
+        {"id": f"r-{n}", "tournament_id": "t-alt", "user_id": person["id"], "status": "approved", "final_position": n + 1}
+        for n, person in enumerate(people)
+    ])
+
+
+@pytest.mark.asyncio
+async def test_finishing_first_rebuilds_the_trophies_quietly(flow, monkeypatch):
+    from services import awards
+
+    paula = await flow.add_user(name="paula")
+    max_ = await flow.add_user(name="max")
+    await claims(flow, paula, news=1)
+    await published_tournament(flow, paula, max_)
+    await recount.begin()
+    real = awards.rebuild_all_awards
+    seen: list[tuple[bool, int]] = []
+
+    async def watched(db):
+        # Vor der Auswertung aller Konten, und als Teil der Neuberechnung.
+        seen.append((recount.in_quiet_scope(), await flow.db.user_achievements.count_documents({})))
+        return await real(db)
+
+    monkeypatch.setattr(awards, "rebuild_all_awards", watched)
+    assert (await recount.finish(batch=1))["status"] == "done"
+
+    assert seen == [(True, 0)]
+    assert await flow.db.tournament_awards.count_documents({"tournament_id": "t-alt"}) == 2
+    assert (await recount.status())["finish"]["awards_rebuilt"] == {"tournaments": 1, "awards": 2}
+    for person in (paula, max_):
+        assert await noisy(flow, person) == 0, "Pokale nachtragen meldet nichts"
+    assert await flow.db.notifications.count_documents({"kind": {"$ne": recount.NOTIFY_KIND}}) == 0
+    # Ein zweiter Lauf trägt nichts mehr nach - fertig ist fertig.
+    await recount.finish()
+    assert len(seen) == 1
+
+
+def test_the_legacy_sources_only_name_keys_of_the_legacy_block():
+    from services import achievement_counters
+
+    assert set(recount.LEGACY_KEY_SOURCES) <= achievement_counters.LEGACY_KEYS
+    assert all(sources <= set(achievement_counters.SOURCES) for sources in recount.LEGACY_KEY_SOURCES.values())
 
 
 @pytest.mark.asyncio

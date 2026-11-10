@@ -11,8 +11,8 @@ Discord je Paket. Solange der stille Modus an ist (``settings`` ``achievements_r
   Zähler zu seiner Quelle gehört (``announce``). Was es nebenbei an Altansprüchen freischaltet, geht still.
 
 Der **Probelauf** rechnet für alle aus, was neu dazukäme, und schreibt nichts außer seinem Ergebnis. Der **Abschluss**
-wertet alle still aus, beendet den stillen Modus und schickt je Person EINE Sammel-Nachricht (Postfach, Push, kein
-Discord). Beide laufen in Stapeln unter einer Sperre; der Abschluss merkt sich seinen Stand, lässt sich nach einem
+trägt zuerst die Pokale nach (wie „Pokale nachtragen“), wertet alle still aus, beendet den stillen Modus und schickt je
+Person EINE Sammel-Nachricht (Postfach, Push, kein Discord). Beide laufen in Stapeln unter einer Sperre; der Abschluss merkt sich seinen Stand, lässt sich nach einem
 Abbruch fortsetzen und schickt beim zweiten Lauf nichts doppelt (``dedupe_key``).
 """
 from __future__ import annotations
@@ -220,7 +220,9 @@ async def start_dry_run(db=None, *, actor: dict | None = None) -> bool:
 
 async def dry_run(db=None, *, actor: dict | None = None, claimed: bool = False, batch: int = DRY_RUN_BATCH, progress=None) -> dict:
     """Für alle Konten ausrechnen, welche Stufen neu dazukämen - ohne Vergabe, ohne XP, ohne gespeicherte Zähler.
-    Folge-Stufen (Sammler, Kategorie-Meister) entstehen erst durch Vergaben: die Zahl ist eine Untergrenze."""
+    Folge-Stufen (Sammler, Kategorie-Meister) entstehen erst durch Vergaben: die Zahl ist eine Untergrenze. Pokale trägt
+    er nicht nach (er schreibt nichts); wo einer Auszeichnung ein Feld wie ``finalist`` fehlt, rechnen die Zähler selbst
+    nach, was sie festhalten würde (``awards.tournament_outcome``, #2337) - also so, als wäre es schon gesetzt."""
     db = db if db is not None else get_db()
     if not claimed:
         await db.settings.update_one({"id": DRY_RUN_ID}, {"$setOnInsert": {"id": DRY_RUN_ID}}, upsert=True)
@@ -344,16 +346,34 @@ def _summary(run: dict) -> dict:
     return {key: run.get(key) for key in ("evaluated", "awarded", "notified", "users_total", "started_at", "finished_at")}
 
 
+async def _rebuild_awards(db, progress) -> dict:
+    """Schritt 0: Pokale und Banner aller Turniere mit veröffentlichten Ergebnissen neu ableiten (wie „Pokale nachtragen“),
+    damit älterer Bestand die Felder trägt, mit denen die Erfolge rechnen (etwa ``finalist`` seit #2337). Das schreibt
+    nur ``tournament_awards`` - keine Meldung, kein Discord; gefahrlos wiederholbar."""
+    from services.awards import rebuild_all_awards
+
+    with quiet_scope():
+        rebuilt = await rebuild_all_awards(db)
+    logger.info("[achievements] Neuberechnung: Pokale von %d Turnieren nachgetragen (%d Einträge)",
+                int(rebuilt.get("tournaments") or 0), int(rebuilt.get("awards") or 0))
+    if progress:
+        progress(f"Pokale nachgetragen: {rebuilt.get('tournaments', 0)} Turniere, {rebuilt.get('awards', 0)} Einträge")
+    return {"tournaments": int(rebuilt.get("tournaments") or 0), "awards": int(rebuilt.get("awards") or 0)}
+
+
 async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
     """Schritt 1: alle Konten still auswerten, samt Folge-Stufen. Danach endet der stille Modus."""
     from services.achievement_core import evaluator
 
     evaluate = evaluator()
     if not run.get("phase"):
-        run = {"phase": "evaluate", "started_at": now_utc().isoformat(), "by": _actor(actor), "cursor": None,
-               "evaluated": 0, "awarded": 0, "notified": 0, "users_total": await db.users.count_documents(ACCOUNTS)}
         # Der stille Modus gilt, bis alle durch sind - auch wenn ihn jemand von Hand abgeschaltet hat.
-        await db.settings.update_one({"id": SETTING_ID}, {"$set": {"active": True, **{f"finish.{k}": v for k, v in run.items()}}})
+        await db.settings.update_one({"id": SETTING_ID}, {"$set": {"active": True}})
+        rebuilt = await _rebuild_awards(db, progress)
+        run = {"phase": "evaluate", "started_at": now_utc().isoformat(), "by": _actor(actor), "cursor": None, "awards_rebuilt": rebuilt,
+               "evaluated": 0, "awarded": 0, "notified": 0, "users_total": await db.users.count_documents(ACCOUNTS)}
+        await db.settings.update_one({"id": SETTING_ID}, {"$set": {f"finish.{k}": v for k, v in run.items()}})
+        await _extend(db, SETTING_ID, "finish.lease_until")
     evaluated, awarded = int(run.get("evaluated") or 0), int(run.get("awarded") or 0)
     total = int(run.get("users_total") or 0)
     async for ids in account_batches(db, run.get("cursor"), batch):

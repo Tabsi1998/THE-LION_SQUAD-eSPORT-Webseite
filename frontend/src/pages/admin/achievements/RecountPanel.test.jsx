@@ -106,5 +106,6 @@ describe("Neuberechnung im Erfolge-Admin (#2340)", () => {
   it("beschreibt einen unterbrochenen Abschluss", () => {
     expect(finishLabel({ interrupted: true, evaluated: 12, users_total: 40 })).toBe("Unterbrochen bei 12 von 40 Konten – „Neuberechnung abschließen“ setzt fort");
     expect(finishLabel({ running: true, phase: "notify", notified: 3 })).toBe("Läuft: Sammel-Nachrichten – 3 verschickt");
+    expect(finishLabel({ running: true })).toBe("Läuft: Pokale werden nachgetragen");
   });
 });
