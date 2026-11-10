@@ -148,8 +148,10 @@ def finalists_of(snapshot: dict, tournament: dict, regs: list[dict]) -> tuple[st
 
 # Was die Erfolge aus einem abgeschlossenen Turnier brauchen (#2337), je Turnier einmal gerechnet statt je Person: Plätze,
 # Teilnehmerfeld, Finalisten. Gebraucht wird das nur, wo die Auszeichnung es nicht (oder noch nicht) trägt: beendet, aber
-# nicht veröffentlicht - und älterer Bestand ohne ``finalist``. Veröffentlicht ändert sich nichts mehr (eine Korrektur
-# veröffentlicht neu und schreibt die Auszeichnungen); „beendet“ gilt nur kurz, dort wird noch korrigiert.
+# nicht veröffentlicht - und älterer Bestand ohne ``finalist``. Gemerktes gilt nur für den Stand, zu dem es gerechnet
+# wurde: Status und ``updated_at`` des Turniers. Wird ein Turnier wieder geöffnet, korrigiert und beendet, ändert sich
+# beides - dann wird neu gerechnet. „Beendet“ gilt außerdem nur kurz: Dort wird noch korrigiert, ohne dass sich am
+# Turnier selbst etwas ändert.
 OUTCOME_TTL_SECONDS = 600
 OUTCOME_CACHE_SIZE = 512
 EMPTY_OUTCOME: dict = {"ranks": {}, "participants": 0, "final_match_id": None, "finalists": frozenset()}
@@ -181,11 +183,12 @@ async def tournament_outcome(db, tournament_id: str) -> dict:
     """``{"ranks": Anmeldung → Platz, "participants": n, "final_match_id": …, "finalists": {…}}`` - derselbe Platz, den die
     Auszeichnung festhält, und wer im Finale stand. Prozessweit gemerkt (siehe oben)."""
     cache = _outcome_cache(db)
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    state = (tournament.get("status"), str(tournament.get("updated_at") or "")) if tournament else None
     hit = cache.get(tournament_id)
     now = time.monotonic()
-    if hit and (hit[0] is None or hit[0] > now):
+    if hit and hit[2] == state and (hit[0] is None or hit[0] > now):
         return hit[1]
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     outcome = EMPTY_OUTCOME
     if tournament:
         regs, snapshot, ranks = await tournament_ranks(db, tournament, surface="achievements")
@@ -194,7 +197,7 @@ async def tournament_outcome(db, tournament_id: str) -> dict:
             outcome = {"ranks": ranks, "participants": len(regs), "final_match_id": final_id, "finalists": frozenset(finalists)}
     if len(cache) >= OUTCOME_CACHE_SIZE:
         cache.clear()
-    cache[tournament_id] = (None if (tournament or {}).get("status") in AWARD_STATUSES else now + OUTCOME_TTL_SECONDS, outcome)
+    cache[tournament_id] = (None if (tournament or {}).get("status") in AWARD_STATUSES else now + OUTCOME_TTL_SECONDS, outcome, state)
     return outcome
 
 

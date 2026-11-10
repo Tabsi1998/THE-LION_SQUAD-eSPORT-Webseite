@@ -132,6 +132,56 @@ async def test_gemerktes_gilt_fuer_beendet_nur_kurz_und_je_datenbank(flow, monke
     assert await awards.tournament_outcome(other, tournament["id"]) == awards.EMPTY_OUTCOME
 
 
+@pytest.mark.asyncio
+async def test_altbestand_wieder_geoeffnet_korrigiert_und_beendet_rechnet_neu(flow, tree_loads):
+    """Nachprüfung zu #2337: Alte Pokale ohne ``finalist`` - das Gemerkte galt für ein veröffentlichtes Turnier dauerhaft.
+    Für eine Korrektur geht das Turnier zurück auf „Beendet“ (so steht es im Handbuch), ein Halbfinale wird korrigiert:
+    Jetzt standen andere im Finale. Status und ``updated_at`` des Turniers haben sich geändert - das Gemerkte gilt nicht
+    mehr, auch wenn die alten Pokale noch nicht neu geschrieben sind."""
+    field = await players(flow, 4)
+    staff, tournament, regs = await play.cup_for(flow, field)
+    await play.play_out(flow, staff, tournament, [reg["id"] for reg in regs])
+    await play.finish(flow, staff, tournament)
+    await flow.db.tournament_awards.update_many({"tournament_id": tournament["id"]}, {"$unset": {"finalist": "", "final_match_id": ""}})
+    awards.forget_outcome(flow.db)
+    tree_loads.clear()
+    user_of = {reg["id"]: user for reg, user in zip(regs, field)}
+    matches = sorted(await flow.matches(tournament), key=lambda match: int(match.get("round") or 0))
+    final = matches[-1]
+    semi = next(match for match in matches if match["id"] != final["id"] and regs[0]["id"] not in play.sides(match))
+    out, into = next(side for side in play.sides(final) if side != regs[0]["id"]), None
+    into = next(side for side in play.sides(semi) if side != out)
+
+    async def finalists() -> set[str]:
+        found = set()
+        for reg_id, person in user_of.items():
+            if (await counters.compute(person["id"], {"finals_played"}))["finals_played"]:
+                found.add(reg_id)
+        return found
+
+    assert await finalists() == {regs[0]["id"], out}
+    assert await finalists() == {regs[0]["id"], out} and tree_loads.count(tournament["id"]) == 1, "gemerkt"
+
+    # Wieder öffnen: zurück auf „Beendet“ (der Status-Weg schreibt ``updated_at``). Zurück auf „Live“ lässt der Weg bei
+    # einem fertig gespielten Baum nicht zu. Dann das Halbfinale korrigieren: Jetzt steht ``into`` im Finale.
+    before = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0, "status": 1, "updated_at": 1})
+    flow.act_as(staff)
+    reopened = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "completed"})
+    assert reopened.status_code == 200, reopened.text
+    after = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0, "status": 1, "updated_at": 1})
+    assert (before["status"], after["status"]) == ("results_published", "completed") and after["updated_at"] != before.get("updated_at")
+
+    def swapped(rows: list[dict]) -> list[dict]:
+        return [{**row, "registration_id": into} if row.get("registration_id") == out else row for row in rows]
+
+    await flow.db.matches_v2.update_one({"id": semi["id"]}, {"$set": {"results": [
+        {"registration_id": into, "rank": 1}, {"registration_id": out, "rank": 2}]}})
+    await flow.db.matches_v2.update_one({"id": final["id"]}, {"$set": {"slots": swapped(final["slots"]), "results": swapped(final["results"])}})
+    assert await flow.db.tournament_awards.count_documents({"tournament_id": tournament["id"], "finalist": {"$exists": True}}) == 0
+    assert await finalists() == {regs[0]["id"], into}, "neu gerechnet - nicht der Stand von vor der Korrektur"
+    assert tree_loads.count(tournament["id"]) == 2, "einmal für den alten Stand, einmal für den neuen"
+
+
 def test_anmeldungen_haben_indizes_fuer_person_und_team():
     import asyncio
 
