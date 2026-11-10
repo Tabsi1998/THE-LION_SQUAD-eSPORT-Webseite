@@ -79,8 +79,11 @@ async def my_achievements(user: dict = Depends(get_current_user)):
     groups = await list_groups_for_user(user["id"], user)
     awards = await list_user_awards(user["id"], user)
     stored = await db.users.find_one({"id": user["id"]}, {"_id": 0, "pinned_achievements": 1, "privacy_achievements_public": 1}) or {}
+    from services import achievement_recount
     return {
         "groups": groups, "awards": awards,
+        # Neuberechnung (#2340): nach dem Abschluss feiert die Seite die nachgerechneten Stufen einmal gesammelt.
+        "recount": await achievement_recount.ceremony_state(db),
         "next_up": visibility.next_up(groups),
         "hidden": await visibility.hidden_summary(db, user["id"]),
         "pinned": visibility.pinned_awards(stored, awards),

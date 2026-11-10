@@ -22,10 +22,11 @@ from flow_harness import make_flow  # noqa: E402
 import badges  # noqa: E402
 from services import achievement_queue, achievement_recount as recount  # noqa: E402
 
+LOOK = {"icon": "trophy", "accent_color": "#29B6E8"}
 GROUPS = [
-    {"code": "leser", "id": "leser", "name": "Leseratte", "category": "community", "public": True, "is_negative": False, "sort_order": 1},
-    {"code": "sicher", "id": "sicher", "name": "Abgesichert", "category": "profile", "public": True, "is_negative": False, "sort_order": 2},
-    {"code": "lob", "id": "lob", "name": "Fairplay", "category": "match", "public": True, "is_negative": False, "sort_order": 3},
+    {"code": "leser", "id": "leser", "name": "Leseratte", "category": "community", "public": True, "is_negative": False, "sort_order": 1, **LOOK},
+    {"code": "sicher", "id": "sicher", "name": "Abgesichert", "category": "profile", "public": True, "is_negative": False, "sort_order": 2, **LOOK},
+    {"code": "lob", "id": "lob", "name": "Fairplay", "category": "match", "public": True, "is_negative": False, "sort_order": 3, **LOOK},
 ]
 # Drei Zähler aus drei Quellen: News gelesen (community), Passkey (profile), Lob verteilt (match).
 TIERS = [
@@ -396,6 +397,26 @@ async def test_after_the_finish_everything_is_loud_again(flow):
     assert got["leser_1"]["recount"] is True and not got["sicher_1"].get("recount")
     note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "achievement"}, {"_id": 0})
     assert note is not None and note["meta"]["tier_codes"] == ["sicher_1"]
+
+
+@pytest.mark.asyncio
+async def test_the_own_achievements_tell_the_page_what_was_recounted_and_when_it_is_done(flow):
+    paula = await flow.add_user(name="paula")
+    await claims(flow, paula, news=1)
+    flow.act_as(paula)
+    res = await flow.get("/api/achievements/me")
+    assert res.status_code == 200 and res.json()["recount"] is None, "ohne Neuberechnung nichts zu feiern"
+
+    await recount.begin()
+    await badges.evaluate_user_progress(paula["id"])
+    mine = (await flow.get("/api/achievements/me")).json()
+    assert mine["recount"] == {"marker": recount.MARKER, "finished": False}, "während des stillen Modus noch keine Sammel-Zeremonie"
+    tiers = {t["code"]: t for g in mine["groups"] for t in g["tiers"]}
+    assert tiers["leser_1"]["earned"] and tiers["leser_1"]["recount"] is True and tiers["sicher_1"]["recount"] is False
+
+    await recount.finish()
+    mine = (await flow.get("/api/achievements/me")).json()
+    assert mine["recount"] == {"marker": recount.MARKER, "finished": True}
 
 
 # ------------------------------------------------------------------ Migration, Kommando, Rechte

@@ -100,4 +100,37 @@ test.describe("Abzeichen-Kunst", () => {
     expect(flagBox.y).toBeLessThan(badgeBox.y);
     await testInfo.attach("ceremony-club.png", { body: await page.screenshot(), contentType: "image/png" });
   });
+
+  test("Neuberechnung (#2340): eine Sammel-Zeremonie mit allen Abzeichen - am PC, auf dem Handy und reduziert", async ({ page }, testInfo) => {
+    await mockAdminSession(page);
+    await page.goto("/admin/achievements/preview");
+    await expect(page.getByTestId("achievement-preview-page")).toBeVisible();
+    await page.getByTestId("ceremony-sequence").selectOption("recount");
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width > 800 ? 900 : 844 });
+      await page.getByTestId("ceremony-play").click();
+      const overlay = page.getByTestId("achievement-unlock-overlay");
+      await expect(overlay).toHaveAttribute("data-sequence", "recount");
+      await expect(page.getByTestId("ceremony-heading")).toHaveText("Du hast 9 Erfolge nachträglich bekommen");
+      await expect(overlay.getByTestId("ceremony-recount-grid").locator("svg.tls-badge")).toHaveCount(9);
+      await expect(page.getByTestId("ceremony-recount-count")).toHaveText("9");
+      await page.waitForTimeout(1800);   // gestaffelt gelandet, Glanz durch, das oberste Abzeichen gehoben
+      // Das Raster bleibt in der Karte - auch auf dem Handy.
+      const card = await overlay.locator(".tls-ceremony__card").boundingBox();
+      const grid = await overlay.getByTestId("ceremony-recount-grid").boundingBox();
+      expect(grid.x).toBeGreaterThanOrEqual(card.x);
+      expect(grid.x + grid.width).toBeLessThanOrEqual(card.x + card.width + 1);
+      const shot = await page.screenshot({ path: testInfo.outputPath(`zeremonie-neuberechnung-${width}.png`) });
+      await testInfo.attach(`zeremonie-neuberechnung-${width}.png`, { body: shot, contentType: "image/png" });
+      await page.keyboard.press("Escape");
+      await expect(overlay).toBeHidden();
+    }
+    await page.getByTestId("ceremony-reduced").click();
+    await page.getByTestId("ceremony-play").click();
+    const calm = page.getByTestId("achievement-unlock-overlay");
+    await expect(calm).toHaveAttribute("data-reduced", "true");
+    await expect(page.getByTestId("ceremony-recount-count")).toHaveText("9");
+    await expect(page.getByTestId("ceremony-recount-sheen")).toHaveCount(0);
+    await expect(page.getByTestId("ceremony-particles")).toHaveCount(0);
+  });
 });

@@ -141,6 +141,16 @@ async def begin(db=None, *, marker: str = MARKER) -> str:
     return "silent mode on"
 
 
+async def ceremony_state(db=None) -> dict | None:
+    """Für die eigene Erfolge-Seite: Kennung der Neuberechnung und ob sie abgeschlossen ist - erst dann zeigt die Seite
+    die Sammel-Zeremonie der nachgerechneten Stufen (einmal je Kennung). None, wenn es keine Neuberechnung gibt."""
+    db = db if db is not None else get_db()
+    doc = await db.settings.find_one({"id": SETTING_ID}, {"_id": 0, "id": 1, "marker": 1, "finish.phase": 1})
+    if not doc:
+        return None
+    return {"marker": str(doc.get("marker") or MARKER), "finished": (doc.get("finish") or {}).get("phase") == "done"}
+
+
 def _held(lease_until, now: str) -> bool:
     return bool(lease_until) and str(lease_until) > now
 

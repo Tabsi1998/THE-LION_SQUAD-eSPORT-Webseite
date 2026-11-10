@@ -296,6 +296,8 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 "earned": bool(earned_doc),
                 "earned_at": earned_doc["earned_at"] if earned_doc else None,
                 "silent": bool(earned_doc.get("silent")) if earned_doc else False,
+                # Nachgerechnet (#2340): die Zeremonie feiert solche Stufen gesammelt, nicht einzeln.
+                "recount": bool(earned_doc.get("recount_id")) if earned_doc else False,
                 "current": min(cur, target) if target else cur,
                 "target": target,
                 "percent": (round(100 * min(cur, target) / target) if target else (100 if earned_doc else 0)),

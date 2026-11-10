@@ -39,6 +39,11 @@ export function sampleCeremony({ material, category, sequence, art, level = 10 }
   if (sequence === "stack") return { tiers: [make(0), make(1, "silver"), make(2, "wood")] };
   if (sequence === "diamond") return { tiers: [make(0, "diamond")] };
   if (sequence === "legendary") return { tiers: [make(0, "legendary")] };
+  // Neuberechnung (#2340): neun nachgerechnete Stufen quer durch die Materialien.
+  if (sequence === "recount") {
+    const ladder = ["gold", "silver", "bronze", "iron", "wood", "platinum", "silver", "bronze", "wood"];
+    return { tiers: ladder.map((m, i) => ({ ...make(0, m), code: `preview_recount_${i}`, name: `Nachgerechnet ${i + 1}` })), context: { recount: true } };
+  }
   const context = { first: { firstEver: true }, group: { groupCompleted: "preview" }, category: { categoryCompleted: category } }[sequence] || {};
   return { tiers: [make(0)], context };
 }

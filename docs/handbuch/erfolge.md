@@ -356,6 +356,11 @@ Zwei-Faktor-Anmeldung):
 4. Die Tafel zeigt den Fortschritt. Am Ende steht „Abgeschlossen am … · N Sammel-Nachrichten“ und „Stiller Modus: Aus“. Ab jetzt
    wird jeder Erfolg wieder einzeln gemeldet.
 
+**Was die Person sieht:** Beim nächsten Besuch der Webseite nach dem Abschluss kommt **eine** Zeremonie „Du hast X Erfolge
+nachträglich bekommen“ mit allen nachgerechneten Abzeichen (bis zu zwölf, der Rest als „+ n“) und dem Knopf **Alle ansehen**.
+Einzeln gefeiert werden nachgerechnete Erfolge nicht, auch nicht während des stillen Modus. Danach gelten sie als gesehen; die
+Zeremonie kommt je Gerät einmal. Ansehen könnt ihr sie vorher unter Reiter **Vorschau** → Sonderablauf **Nachträglich bekommen**.
+
 Der Abschluss ist **gefahrlos wiederholbar**: Ein zweiter Klick nach dem Ende tut nichts, und niemand bekommt die Nachricht zweimal.
 Bricht der Lauf ab (etwa durch ein Update), steht bei **Abschluss** „Unterbrochen“ – ein neuer Klick macht dort weiter. Probelauf und
 Abschluss stehen im Protokoll unter **Vergeben**. Am Server geht beides auch per Kommando:

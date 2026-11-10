@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, animate, motion } from "framer-motion";
 import { Camera, ChevronLeft, ChevronRight, Star, Trophy, User as UserIcon, Volume2, VolumeX, X } from "lucide-react";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
@@ -9,7 +9,7 @@ import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../materials";
 import { Motion, StageBadge } from "./motions";
 import { runParticles } from "./particles";
-import { groupTier, levelTexts, particleKind } from "./select";
+import { RECOUNT_SHOWN, groupTier, levelTexts, particleKind, recountTexts } from "./select";
 import { playCeremonySound, readSoundPrefs, writeSoundPrefs } from "./sounds";
 import "./ceremony.css";
 
@@ -78,6 +78,78 @@ function GroupPedestal({ plan, reduced }) {
             <Badge material={ladder[i]} rank={rank} art={top?.art} icon={top?.icon} size="sm" animate={!reduced && i === 6} />
           </motion.div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Neuberechnung (#2340): alle nachgerechneten Abzeichen auf einer Bühne. Die Zahl zählt hoch, eine Linie zeichnet sich
+// darunter nach, die Abzeichen kommen gestaffelt (55 ms) von unten, dann läuft ein Glanz über das Raster und das
+// wertvollste hebt sich an. Nur transform und opacity; reduziert bleibt ein Einblenden ohne Bewegung.
+const EASE_OUT = [0.23, 1, 0.32, 1];
+const EASE_IN_OUT = [0.77, 0, 0.175, 1];
+const RECOUNT_STAGGER = 0.055;
+const RECOUNT_ENTER = 0.45;
+const RECOUNT_START = 0.45;
+
+function RecountStage({ plan, reduced }) {
+  const total = plan.tiers.length;
+  const shownTiers = plan.tiers.slice(0, RECOUNT_SHOWN);
+  const more = total - shownTiers.length;
+  const [count, setCount] = useState(reduced ? total : 0);
+  useEffect(() => {
+    if (reduced) { setCount(total); return undefined; }
+    const controls = animate(0, total, { duration: Math.min(1.2, 0.4 + total * 0.05), delay: 0.25, ease: EASE_OUT, onUpdate: (value) => setCount(Math.round(value)) });
+    return () => controls.stop();
+  }, [total, reduced]);
+  // Wann das letzte Abzeichen gelandet ist - danach Glanz und Anheben.
+  const settled = RECOUNT_START + (shownTiers.length + (more > 0 ? 1 : 0)) * RECOUNT_STAGGER + RECOUNT_ENTER;
+  const enter = (i) => (reduced
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.2 } }
+    : { initial: { opacity: 0, transform: "translateY(12px) scale(0.9)" }, animate: { opacity: 1, transform: "translateY(0px) scale(1)" }, transition: { duration: RECOUNT_ENTER, delay: RECOUNT_START + i * RECOUNT_STAGGER, ease: EASE_OUT } });
+  return (
+    <div className="tls-ceremony__recount" data-testid="ceremony-recount">
+      <div className="tls-ceremony__recount-count" data-testid="ceremony-recount-count" aria-hidden="true">{count}</div>
+      <motion.span
+        className="tls-ceremony__recount-trace"
+        aria-hidden="true"
+        initial={reduced ? { opacity: 0 } : { opacity: 1, transform: "scaleX(0)" }}
+        animate={reduced ? { opacity: 1 } : { opacity: 1, transform: "scaleX(1)" }}
+        transition={{ duration: reduced ? 0.2 : 0.6, delay: reduced ? 0 : 0.3, ease: EASE_OUT }}
+      />
+      <div className="tls-ceremony__recount-grid" data-testid="ceremony-recount-grid">
+        {shownTiers.map((tier, i) => (
+          <motion.div key={tier.code || i} className="tls-ceremony__recount-item" data-testid={`ceremony-recount-badge-${tier.code}`} {...enter(i)}>
+            {i === 0 && !reduced ? (
+              <motion.div
+                className="relative"
+                data-testid="ceremony-recount-top"
+                initial={{ transform: "translateY(0px) scale(1)" }}
+                animate={{ transform: "translateY(-4px) scale(1.08)" }}
+                transition={{ type: "spring", duration: 0.5, bounce: 0.2, delay: settled }}
+              >
+                <motion.span className="tls-ceremony__recount-glow" aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: settled, ease: EASE_OUT }} />
+                <Badge material={tier.material} level={tier.level} rank={tier.rank} art={tier.art} icon={tier.icon} size={48} />
+              </motion.div>
+            ) : (
+              <Badge material={tier.material} level={tier.level} rank={tier.rank} art={tier.art} icon={tier.icon} size={48} />
+            )}
+          </motion.div>
+        ))}
+        {more > 0 && (
+          <motion.div className="tls-ceremony__recount-more" data-testid="ceremony-recount-more" {...enter(shownTiers.length)}>+{more}</motion.div>
+        )}
+        {!reduced && (
+          <span className="tls-ceremony__recount-shine" aria-hidden="true">
+            <motion.span
+              className="tls-ceremony__recount-sheen"
+              data-testid="ceremony-recount-sheen"
+              initial={{ opacity: 0, transform: "translateX(-120%)" }}
+              animate={{ opacity: [0, 1, 0], transform: "translateX(120%)" }}
+              transition={{ duration: 0.9, delay: settled - 0.15, ease: EASE_IN_OUT }}
+            />
+          </span>
+        )}
       </div>
     </div>
   );
@@ -174,6 +246,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
   const current = tiers[index] || plan.top;
   const look = MATERIAL_LOOKS[plan.material] || MATERIAL_LOOKS.gold;
   const isStack = plan.sequence === "stack";
+  const isRecount = plan.sequence === "recount";
   const isLevelOnly = plan.sequence === "levelup";
   const [phase, setPhase] = useState(isLevelOnly ? "level" : "badge");
   const duration = reduced ? Math.min(plan.duration, 4500) : plan.duration;
@@ -217,6 +290,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
   const heading = useMemo(() => {
     if (plan.heading) return plan.heading;
     if (isLevelOnly) return levelTexts(plan.levelUp).heading;
+    if (plan.sequence === "recount") return recountTexts(tiers.length).heading;
     if (plan.sequence === "first") return "Dein erster Erfolg";
     if (plan.sequence === "group") return `${groupTier(plan)?.group_name || "Gruppe"} vollständig`;
     if (plan.sequence === "category") return "Kategorie abgeschlossen";
@@ -224,7 +298,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
     if (plan.sequence === "diamond") return "Diamant";
     return tiers.length === 1 ? "Neuer Erfolg!" : `${tiers.length} neue Erfolge!`;
   }, [plan, tiers.length, isLevelOnly]);
-  const sub = plan.sub || (isLevelOnly ? rankText || levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
+  const sub = plan.sub || (isRecount ? recountTexts(tiers.length).sub : isLevelOnly ? rankText || levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
   const liveText = `${heading}. ${tiers.map((t) => `${t.name}, ${t.material_name || look.name}, plus ${t.points} Punkte`).join(". ")}${plan.levelUp ? `. Level ${plan.levelUp.level}` : ""}${rankText ? `. ${rankText}` : ""}`;
   const showBadge = phase === "badge" && !isLevelOnly;
   const shareTo = plan.shareId ? `/achievements/a/${encodeURIComponent(plan.shareId)}` : "/u/me?tab=achievements";
@@ -280,7 +354,9 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
 
         <div className={`tls-ceremony__stage ${plan.sequence === "legendary" ? "pt-10" : ""} ${moment && !showBadge ? "tls-ceremony__stage--ascent" : ""}`} data-testid="ceremony-stage" data-phase={phase}>
           {plan.sequence === "category" && <motion.span className="tls-ceremony__vitrine" data-testid="ceremony-vitrine" initial={{ scaleX: 1.15, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} transition={{ duration: reduced ? 0.2 : 1.2, delay: 0.3 }} aria-hidden="true" />}
-          {showBadge ? (
+          {showBadge && isRecount ? (
+            <RecountStage plan={plan} reduced={reduced} />
+          ) : showBadge ? (
             <>
               {isStack && !reduced && tiers.slice(index + 1, index + 4).map((tier, i) => (
                 <motion.div key={tier.code} className="absolute opacity-60" style={{ zIndex: 0 }} initial={{ x: 0, rotate: 0 }} animate={{ x: 70 + i * 34, y: 10 + i * 6, rotate: 8 + i * 6, scale: 0.72 - i * 0.08 }} transition={{ type: "spring", stiffness: 200, damping: 20 }} aria-hidden="true">
@@ -311,7 +387,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
           {plan.sequence === "group" && showBadge && <GroupPedestal plan={plan} reduced={reduced} />}
         </div>
 
-        {showBadge && tiers.length > 0 && (
+        {showBadge && tiers.length > 0 && !isRecount && (
           <div className="relative px-5 pb-4 space-y-2 max-h-[34vh] overflow-y-auto" data-testid="ceremony-list">
             {tiers.map((tier, i) => <TierRow key={tier.code || i} tier={tier} material={tier.material || plan.material} index={i} active={isStack && i === index} onPick={isStack ? setIndex : null} />)}
           </div>
@@ -329,6 +405,9 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
             <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs font-black uppercase tracking-widest" style={{ color: plan.accent, borderColor: `${plan.accent}44`, backgroundColor: `${plan.accent}0d` }} data-testid="ceremony-points">
               <Trophy className="w-3.5 h-3.5" /> +{plan.points} Punkte
             </span>
+          )}
+          {isRecount && showBadge && (
+            <Link to="/u/me?tab=achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] text-xs font-bold uppercase tracking-widest hover:bg-[#29B6E8]/10" data-testid="ceremony-recount-link">Alle ansehen</Link>
           )}
           {plan.sequence === "first" && (
             <Link to="/achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] text-xs font-bold uppercase tracking-widest hover:bg-[#29B6E8]/10" data-testid="ceremony-showcase-link">Zum Schaukasten</Link>
