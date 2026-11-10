@@ -403,6 +403,8 @@ jede Stufe eine eigene Meldung kommt, gibt es den **stillen Modus**. Er schaltet
   immer gemeldet. Schaltet so ein Ereignis nebenbei etwas aus einem anderen Bereich frei, kommt das still dazu.
 - Ist eine Person noch nicht still ausgewertet, bleibt auch ihr eigenes Ereignis still – sonst könnte ein Check-in die alte
   Finalist-Stufe laut melden. Diese Stufe zählt dann in der Sammel-Nachricht am Ende mit.
+- **Kronen** wechseln während des stillen Modus nicht. Der Abschluss rechnet sie einmal neu, und nur wer danach wirklich eine
+  Krone gewonnen, gewechselt oder verloren hat, erfährt es.
 
 **So schließt du die Neuberechnung ab** (Admin → Content → Erfolge → **Übersicht**, Tafel **Neuberechnung**, nur Superadmin mit
 Zwei-Faktor-Anmeldung):

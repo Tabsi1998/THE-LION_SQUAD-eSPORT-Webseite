@@ -483,6 +483,12 @@ async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
         "active": False, "ended_at": now_utc().isoformat(), "finish.phase": "notify", "finish.cursor": None,
     }})
     logger.info("[achievements] Neuberechnung: stiller Modus beendet")
+    # Kronen einmal neu: gespeichert und gemeldet wird nur die Änderung über die ganze Neuberechnung hinweg.
+    try:
+        from services.crown_events import get_crowns
+        await get_crowns(force=True)
+    except Exception:  # noqa: BLE001 - Kronen halten den Abschluss nicht auf; der nächste Abgleich holt sie nach
+        logger.warning("[achievements] Neuberechnung: Kronen nicht neu gerechnet", exc_info=True)
     return {**run, "phase": "notify", "cursor": None, "evaluated": evaluated, "awarded": awarded}
 
 

@@ -177,9 +177,11 @@ async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: b
             await request_evaluation(user_ids, "award", sources={"achievement"}, announce=())
         except Exception as e:  # noqa: BLE001
             logger.debug(f"queue after award failed: {e}")
+    # Kronen: eine stille Vergabe (#2340) stößt keinen Abgleich an - die Kronen rechnet der Abschluss einmal neu.
     try:
         from services.crown_events import schedule_crown_sync
-        schedule_crown_sync()
+        if not quiet:
+            schedule_crown_sync()
     except Exception as e:
         logger.debug(f"crown sync scheduling failed: {e}")
     if not notify:

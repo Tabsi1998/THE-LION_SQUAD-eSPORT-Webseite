@@ -544,6 +544,31 @@ async def test_the_own_achievements_tell_the_page_what_was_recounted_and_when_it
     assert mine["recount"] == {"marker": recount.MARKER, "finished": True}
 
 
+@pytest.mark.asyncio
+async def test_crowns_stand_still_during_the_silent_mode_and_change_once_at_the_end(flow):
+    from services import crown_events
+
+    anna = await flow.add_user(name="anna")
+    ben = await flow.add_user(name="ben")
+    await flow.db.users.update_many({"id": {"$in": [anna["id"], ben["id"]]}}, {"$set": {"privacy_public_profile": True}})
+    await claims(flow, anna, news=1)
+    await badges.evaluate_user_progress(anna["id"])
+    await crown_events.get_crowns(force=True)
+    assert (await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0}))["holders"] == {anna["id"]: "gold"}
+
+    await recount.begin()
+    await claims(flow, ben, news=1, passkey=True, commend=1)   # 150 Punkte - still nachgerechnet
+    await drain()
+    await crown_events.get_crowns(force=True)                   # etwa ein Besuch der Erfolge-Seite
+    assert (await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0}))["holders"] == {anna["id"]: "gold"}, "nicht gespeichert"
+    assert await flow.db.notifications.count_documents({"kind": {"$regex": "^crown_"}}) == 0, "nicht gemeldet"
+
+    await recount.finish()
+    assert (await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0}))["holders"] == {ben["id"]: "gold", anna["id"]: "silver"}
+    kinds = sorted([(n["user_id"] == ben["id"], n["kind"]) async for n in flow.db.notifications.find({"kind": {"$regex": "^crown_"}}, {"_id": 0})])
+    assert kinds == [(False, "crown_changed"), (True, "crown_gained")], "einmal je Person, nur die Änderung über alles"
+
+
 # ------------------------------------------------------------------ Migration, Kommando, Rechte
 
 @pytest.mark.asyncio
