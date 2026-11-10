@@ -233,6 +233,21 @@ async def _team_audit(db, action: str, team_id: str, actor_id: str | None, data:
     })
 
 
+async def _joined_at_for_missing_row(db, team: dict, user_id: str) -> str:
+    """Das Beitrittsdatum für eine Zeile in ``team_members``, die erst jetzt entsteht (#2337): Die Person steht schon im
+    Team (``member_ids``), wann sie kam, ist nicht bekannt. Ohne Datum gälte sie für die Erfolge als „schon immer dabei“,
+    mit „jetzt“ verlöre ein langjähriges Mitglied seine alten Teamspiele. Darum: das Gründungsdatum des Teams, sonst der
+    früheste Beitritt der Person aus dem Protokoll, erst dann jetzt."""
+    created = team.get("created_at")
+    if created:
+        return created.isoformat() if hasattr(created, "isoformat") else str(created)
+    joins = await db.audit_logs.find(
+        {"action": "team.join", "actor_id": user_id, "target_id": team.get("id")}, {"_id": 0, "created_at": 1},
+    ).to_list(200)
+    stamps = sorted(str(row["created_at"]) for row in joins if row.get("created_at"))
+    return stamps[0] if stamps else now_utc().isoformat()
+
+
 async def _tell(user_id: str | None, **note) -> None:
     """Eine Nachricht in die Glocke - was schon gespeichert ist, hält sie nicht mehr auf."""
     try:
@@ -1253,12 +1268,10 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
         await db.teams.update_one(
             {"id": team_id}, {"$pull": {"co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
         )
-    # Fehlt die Zeile (älterer Bestand), bekommt sie beim Anlegen ein Beitrittsdatum (#2337) - ohne gälte die Person für die
-    # Erfolge als „schon immer im Team“.
-    stamp = now_utc().isoformat()
     await db.team_members.update_one(
         {"team_id": team_id, "user_id": user_id},
-        {"$set": {"role": role, "updated_at": stamp}, "$setOnInsert": {"joined_at": stamp}},
+        {"$set": {"role": role, "updated_at": now_utc().isoformat()},
+         "$setOnInsert": {"joined_at": await _joined_at_for_missing_row(db, team, user_id)}},
         upsert=True,
     )
     await create_user_notification(
@@ -1307,13 +1320,14 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
         await db.teams.update_one({"id": team_id}, {"$addToSet": {"co_leader_ids": old_leader}})
         await db.team_members.update_one(
             {"team_id": team_id, "user_id": old_leader},
-            {"$set": {"role": "co_leader", "updated_at": now_utc().isoformat()}, "$setOnInsert": {"joined_at": now_utc().isoformat()}},
+            {"$set": {"role": "co_leader", "updated_at": now_utc().isoformat()},
+             "$setOnInsert": {"joined_at": await _joined_at_for_missing_row(db, team, old_leader)}},
             upsert=True,
         )
-    # Beim Anlegen mit Beitrittsdatum (#2337): eine neue Teamleitung gilt für die Erfolge nicht als „schon immer dabei“.
     await db.team_members.update_one(
         {"team_id": team_id, "user_id": new_leader_id},
-        {"$set": {"role": "leader", "updated_at": now_utc().isoformat()}, "$setOnInsert": {"joined_at": now_utc().isoformat()}},
+        {"$set": {"role": "leader", "updated_at": now_utc().isoformat()},
+         "$setOnInsert": {"joined_at": await _joined_at_for_missing_row(db, team, new_leader_id)}},
         upsert=True,
     )
     await create_user_notification(
