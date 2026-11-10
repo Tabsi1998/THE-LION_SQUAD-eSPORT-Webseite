@@ -45,6 +45,7 @@ DYNAMIC = {
     "services/account_erasure.py:_retention:getattr(db, name)": "account_erasure.RETAINED (Nachweise mit Frist)",
     "services/account_erasure.py:purge_expired_records:getattr(db, name)": "account_erasure.RETAINED_COLLECTIONS",
     "services/achievement_counters.py:_stickers:ctx.db[name]": CHATS,
+    "services/achievement_progress.py:chat_days:db[collection]": CHATS,
     "services/chat_attachments.py:delete_user_attachments:db[collection]": CHATS,
     "services/image_migrate.py:migrate_all:db[coll_name]": MEDIA,
     "services/match_planning.py:ensure_station_slot_available:db[other_collection]": MATCHES,
