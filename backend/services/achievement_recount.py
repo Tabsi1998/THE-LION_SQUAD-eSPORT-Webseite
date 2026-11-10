@@ -431,9 +431,11 @@ def _summary(run: dict) -> dict:
 
 
 FINALIST_MISSING = {"finalist": {"$exists": False}}
+# So viele Turniere rechnet der Finalisten-Nachtrag, bevor er die Sperre des Abschlusses verlängert.
+FINALIST_LEASE_EVERY = 20
 
 
-async def backfill_finalists(db=None, *, progress=None) -> dict:
+async def backfill_finalists(db=None, *, progress=None, keep_alive=None) -> dict:
     """Schritt 0: an vorhandenen Pokalen nur ``finalist`` und ``final_match_id`` ergänzen, wo sie fehlen (seit #2337 stehen
     sie an jeder neuen Auszeichnung) - mit derselben Rechnung wie dort, ``awards.tournament_outcome``. Bewusst nicht
     „Pokale nachtragen“ (``rebuild_all_awards``): das stempelt die heutige Jahreswertung, leitet Ränge neu ab und löscht.
@@ -447,7 +449,10 @@ async def backfill_finalists(db=None, *, progress=None) -> dict:
         return {"tournaments": 0, "awards": 0, "skipped": True}
     tournament_ids = sorted(await db.tournament_awards.distinct("tournament_id", FINALIST_MISSING))
     changed = 0
-    for tournament_id in tournament_ids:
+    for index, tournament_id in enumerate(tournament_ids, start=1):
+        # Viele alte Turniere dauern: die Sperre des Abschlusses (``keep_alive``) läuft sonst ab.
+        if keep_alive and index % FINALIST_LEASE_EVERY == 0:
+            await keep_alive()
         outcome = await tournament_outcome(db, tournament_id)
         finalists = sorted(outcome.get("finalists") or ())
         if finalists:
@@ -473,7 +478,7 @@ async def _evaluate_all(db, run: dict, *, actor, batch: int, progress) -> dict:
         # Der stille Modus gilt, bis alle durch sind - auch wenn ihn jemand von Hand abgeschaltet hat.
         await db.settings.update_one({"id": SETTING_ID}, {"$set": {"active": True}})
         with quiet_scope():
-            backfilled = await backfill_finalists(db, progress=progress)
+            backfilled = await backfill_finalists(db, progress=progress, keep_alive=lambda: _extend(db, SETTING_ID, "finish.lease_until"))
         run = {"phase": "evaluate", "started_at": now_utc().isoformat(), "by": _actor(actor), "cursor": None, "finalists_backfilled": backfilled,
                "evaluated": 0, "awarded": 0, "errors": 0, "notified": 0, "users_total": await db.users.count_documents(ACCOUNTS)}
         await db.settings.update_one({"id": SETTING_ID}, {"$set": {f"finish.{k}": v for k, v in run.items()}})

@@ -464,6 +464,41 @@ async def test_finishing_first_adds_finalists_to_old_trophies_and_touches_nothin
 
 
 @pytest.mark.asyncio
+async def test_the_backfill_keeps_the_finish_lease_alive_on_many_tournaments(flow, monkeypatch):
+    from services import awards
+
+    async def outcome(db, tournament_id):
+        return {"ranks": {}, "participants": 1, "final_match_id": None, "finalists": frozenset()}
+
+    monkeypatch.setattr(awards, "tournament_outcome", outcome, raising=False)
+    monkeypatch.setattr(recount, "FINALIST_LEASE_EVERY", 2)
+    await flow.db.tournament_awards.insert_many([{"id": f"a-{n}", "tournament_id": f"t-{n}", "registration_id": f"r-{n}"} for n in range(5)])
+    beats: list[int] = []
+
+    async def keep_alive():
+        beats.append(1)
+
+    assert await recount.backfill_finalists(keep_alive=keep_alive) == {"tournaments": 5, "awards": 5}
+    assert len(beats) == 2, "nach dem 2. und 4. Turnier"
+
+    # Im Abschluss hängt der Nachtrag an der Sperre des Abschlusses.
+    await flow.db.tournament_awards.update_many({}, {"$unset": {"finalist": "", "final_match_id": ""}})
+    await flow.add_user(name="paula")
+    await recount.begin()
+    extended: list[str] = []
+    real_extend = recount._extend
+
+    async def watched(db, doc_id, field, changes=None):
+        extended.append(field)
+        return await real_extend(db, doc_id, field, changes)
+
+    monkeypatch.setattr(recount, "_extend", watched)
+    assert (await recount.finish(batch=10))["status"] == "done"
+    # Zwei Herzschläge im Nachtrag, einer nach dem Nachtrag, einer nach dem einzigen Stapel Konten, einer beim Versand.
+    assert extended.count("finish.lease_until") == 5
+
+
+@pytest.mark.asyncio
 async def test_without_the_outcome_of_2337_the_backfill_changes_nothing(flow, monkeypatch):
     from services import awards
 
