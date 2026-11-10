@@ -2,11 +2,10 @@ from services.competition_snapshot import adapt_legacy_matches, adapt_stage_matc
 from services.competition_standings import (
     elimination_standings,
     group_standings,
+    badge_match_progress,
     placement_rows_for_structure,
     placements_for_structure,
-    registration_badge_match_progress,
     registration_match_summary,
-    registration_tournament_achievement_progress,
     stage_standings,
     standings_for_structure,
 )
@@ -279,14 +278,21 @@ def test_badge_match_progress_combines_engines_and_keeps_chronological_streak():
         },
     ])
 
-    assert registration_badge_match_progress([*legacy, *stage], {"r1"}) == {
+    assert badge_match_progress((match, {"r1"}) for match in [*legacy, *stage]) == {
         "matches_played": 3,
         "matches_won": 2,
         "match_streak_max": 2,
     }
 
 
-def test_tournament_achievement_progress_keeps_legacy_fourth_place_semantics():
+def _places(snapshot: dict) -> dict[int, list[str]]:
+    """Plätze, wie Auszeichnungen und Erfolge sie lesen (#2337): Champion, Podest und Platz 4 kommen aus
+    ``placements_for_structure`` - über ``awards.tournament_ranks`` in ``tournament_awards.rank``."""
+    return {rank: [placement["registration_id"] for placement in group]
+            for rank, group in placements_for_structure(snapshot, REGISTRATIONS).items()}
+
+
+def test_placements_keep_the_legacy_final_positions():
     snapshot = build_structure_snapshot("t1", legacy_matches=[
         {
             "id": "final",
@@ -310,19 +316,13 @@ def test_tournament_achievement_progress_keeps_legacy_fourth_place_semantics():
         },
     ])
 
-    assert registration_tournament_achievement_progress(snapshot, REGISTRATIONS, {"r1"}) == {
-        "tournaments_won": 1,
-        "podium_finishes": 1,
-        "rank_4_count": 0,
-    }
-    assert registration_tournament_achievement_progress(snapshot, REGISTRATIONS, {"r2"}) == {
-        "tournaments_won": 0,
-        "podium_finishes": 0,
-        "rank_4_count": 1,
-    }
+    # Ein Platz im alten Baum gehört dem Sieger des Spiels mit ``final_position``. Die frühere Sonderregel „Verlierer des
+    # Spiels um Platz 4 zählt als Vierter“ lag nur in ``registration_tournament_achievement_progress`` und ist mit ihr
+    # entfallen (#2337, Review N4): Der alte Speicher ist seit Block 8 leer, die Erfolge lesen den gespeicherten Rang.
+    assert _places(snapshot) == {1: ["r1"], 4: ["r3"]}
 
 
-def test_tournament_achievement_progress_counts_stage_champion():
+def test_placements_name_the_stage_champion_and_the_podium():
     snapshot = build_structure_snapshot("t1", stage_matches=[{
         "id": "stage-final",
         "tournament_id": "t1",
@@ -341,11 +341,7 @@ def test_tournament_achievement_progress_counts_stage_champion():
         "status": "completed",
     }])
 
-    assert registration_tournament_achievement_progress(snapshot, REGISTRATIONS, {"r1"}) == {
-        "tournaments_won": 1,
-        "podium_finishes": 1,
-        "rank_4_count": 0,
-    }
+    assert _places(snapshot) == {1: ["r1"], 2: ["r2"], 3: ["r3"]}
 
 
 def test_decided_places_only_look_at_the_last_stage():
@@ -446,7 +442,7 @@ def test_badge_streak_orders_matches_by_completion_not_by_later_correction():
         duel("d", "r1", "2026-10-04T10:00:00+00:00", "2026-10-04T10:00:00+00:00"),
     ])
     assert all(match.get("completed_at") for match in stage)
-    assert registration_badge_match_progress(stage, {"r1"}) == {
+    assert badge_match_progress((match, {"r1"}) for match in stage) == {
         "matches_played": 4,
         "matches_won": 3,
         "match_streak_max": 2,

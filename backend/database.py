@@ -156,6 +156,9 @@ async def init_indexes():
     # Registrations
     await db.tournament_registrations.create_index("id", unique=True)
     await db.tournament_registrations.create_index([("tournament_id", 1), ("user_id", 1)])
+    # Erfolge (#2337): alle Anmeldungen einer Person und die ihrer Teams - ohne Durchlauf durch die ganze Sammlung.
+    await db.tournament_registrations.create_index("user_id")
+    await db.tournament_registrations.create_index("team_id")
     await db.tournament_registrations.create_index("identity_key", unique=True, sparse=True)
     # Liga Stufe 1 – Co-Teams und Spiele (B), docs/LIGA.md: Anmeldungen je Co-Team, Co-Teams je Captain/Vertreter.
     await db.tournament_registrations.create_index(
@@ -337,6 +340,8 @@ async def init_indexes():
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")
+    # Erfolge (#2337): Team-Beitritte und -Austritte je Person (wer war wann im Team) und die eigenen Ergebnismeldungen.
+    await db.audit_logs.create_index([("action", 1), ("actor_id", 1)])
     # Cross-worker mutation leases.  These protect multi-document tournament
     # operations when multiple API workers receive the same action at once.
     await db.mutation_locks.create_index("resource", unique=True)

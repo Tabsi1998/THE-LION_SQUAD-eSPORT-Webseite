@@ -15,6 +15,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+import achievement_play as play  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 import achievement_catalog as catalog  # noqa: E402
@@ -97,7 +98,8 @@ async def test_signale_mit_deckel_und_saison(flow, monkeypatch):
 
 
 async def seed_match(flow, a: dict, b: dict, *, when: str, winner: str, seed_a: int = 2, seed_b: int = 1, match_id: str = "m1"):
-    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"id": "t1", "title": "Cup", "status": "completed", "is_public": True}}, upsert=True)
+    # Feste Setzliste (#2337): nur dort zählen Topgesetzt und Riesentöter.
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"id": "t1", "title": "Cup", "status": "completed", "is_public": True, "seeding_mode": "manual"}}, upsert=True)
     for user, reg_id, seed in ((a, f"ra-{match_id}", seed_a), (b, f"rb-{match_id}", seed_b)):
         await flow.db.tournament_registrations.insert_one({"id": reg_id, "tournament_id": "t1", "user_id": user["id"], "seed": seed, "status": "checked_in", "created_at": when, "updated_at": when})
     await flow.db.matches_v2.insert_one({
@@ -180,14 +182,31 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
         {"id": "team1", "name": "Löwen", "leader_id": user["id"], "member_ids": [user["id"], "u2", "u3"], "logo_url": "/l.png", "banner_url": "/b.png", "description": "Wir.", "created_at": (now_utc() - timedelta(days=40)).isoformat()},
         {"id": "team2", "name": "Zweit", "leader_id": "u9", "member_ids": [user["id"]], "created_at": now_utc().isoformat()},
     ])
-    await db.tournament_registrations.insert_one({"id": "rt", "tournament_id": "t9", "team_id": "team1", "created_at": now_utc().isoformat()})
+    # Gezählt wird die Teilnahme (#2337): Das Team hat sein Turnier auch gespielt, die Einzel-Anmeldung in t9 ebenso.
+    def played(match_id, tournament_id, first, second):
+        return {"id": match_id, "tournament_id": tournament_id, "stage_number": 1, "round": 1, "order": 1, "status": "completed",
+                "completed_at": "2026-05-03T18:00:00+00:00", "updated_at": "2026-05-03T18:00:00+00:00",
+                "slots": [{"slot": 1, "registration_id": first, "status": "filled"}, {"slot": 2, "registration_id": second, "status": "filled"}],
+                "results": [{"registration_id": first, "rank": 1}, {"registration_id": second, "rank": 2}]}
+    await db.tournaments.insert_one({"id": "t10", "title": "Team-Cup", "status": "completed", "is_public": True})
+    await db.tournament_registrations.insert_many([
+        {"id": "rt", "tournament_id": "t10", "team_id": "team1", "status": "approved", "created_at": now_utc().isoformat()},
+        {"id": "rh", "tournament_id": "t10", "user_id": "u-gegner", "status": "approved", "created_at": now_utc().isoformat()},
+        {"id": "rg", "tournament_id": "t9", "user_id": "u-gegner", "status": "checked_in", "created_at": "2026-05-01T19:00:00+00:00", "updated_at": "2026-05-02T11:00:00+00:00"},
+    ])
+    await db.matches_v2.insert_many([played("m-team", "t10", "rt", "rh"), played("m-solo", "t9", "rf", "rg")])
     await db.season_standings.insert_many([{"season_id": "s1", "user_id": user["id"], "rank": 1}, {"season_id": "s2", "user_id": user["id"], "rank": 7}, {"season_id": "s3", "user_id": user["id"], "rank": 30}])
     await db.events.insert_many([{"id": "e1", "created_by": user["id"], "status": "completed", "visibility": "public"}, {"id": "e2", "created_by": "x", "status": "completed", "visibility": "members"}])
     await db.event_registrations.insert_one({"id": "er1", "event_id": "e2", "user_id": user["id"], "status": "checked_in"})
     await db.tournament_staff_assignments.insert_one({"id": "sa1", "tournament_id": "t9", "user_id": user["id"], "role": "referee"})
     await db.tournaments.insert_one({"id": "t9", "title": "Staffed", "status": "completed", "is_public": True, "registration_opens_at": "2026-05-01T18:00:00+00:00"})
     await db.tournament_registrations.insert_one({"id": "rf", "tournament_id": "t9", "user_id": user["id"], "created_at": "2026-05-01T18:04:00+00:00", "status": "checked_in", "updated_at": "2026-05-02T10:00:00+00:00"})
-    await db.tournament_awards.insert_many([{"tournament_id": "t9", "registration_id": "rf", "place": 2}, {"tournament_id": "t8", "registration_id": "rf", "place": 6}])
+    # Platz 2 in einem echten Turnier mit neun Teilnehmern (#2337): gespielt, abgeschlossen, veröffentlicht - die Plätze hält
+    # ``record_tournament_awards`` fest. Das Finale verliert sie gegen die Nummer 1.
+    field = [await flow.add_user(name="Favoritin"), user, *[await flow.add_user(name=f"Feld {n}") for n in range(7)]]
+    cup, cup_regs = await play.played_cup(flow, field)
+    award = await db.tournament_awards.find_one({"tournament_id": cup["id"], "registration_id": cup_regs[1]["id"]}, {"_id": 0})
+    assert (award["rank"], award["participants"]) == (2, 9)
     await db.user_reports.insert_many([{"id": "r1", "reporter_id": user["id"], "status": "removed"}, {"id": "r2", "reporter_id": user["id"], "status": "open"}])
     values = await counters.compute(user["id"])
     expected = {
@@ -196,7 +215,7 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
         "login_streak_max": 12, "level": 10, "prestige_stars": 1, "birthday_logins": 2,
         "team_size_max": 3, "team_profile_complete": 1, "captain_days": 40, "team_tournaments_played": 1,
         "season_top10_finishes": 2, "season_wins": 1, "events_hosted_completed": 1, "club_events_attended": 1,
-        "tournaments_staffed_completed": 1, "fast_registrations": 1, "first_checkins": 1, "top8_finishes": 2, "finals_played": 1, "reports_actioned": 1,
+        "tournaments_staffed_completed": 1, "fast_registrations": 1, "first_checkins": 1, "top8_finishes": 1, "finals_played": 1, "reports_actioned": 1,
     }
     assert {key: values[key] for key in expected} == expected
 

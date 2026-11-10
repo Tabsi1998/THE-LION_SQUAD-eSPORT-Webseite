@@ -14,6 +14,7 @@ from flow_harness import make_flow  # noqa: E402
 import achievement_catalog as catalog  # noqa: E402
 import badges  # noqa: E402
 from services import achievement_counters as counters  # noqa: E402
+from services import awards  # noqa: E402
 
 KEYS = {"member_since_founding_year", "pioneer_account", "distinct_game_wins_one_season", "all_visible_achievements",
         "witching_hour_matches", "lucky_seven_days", "palindrome_laps", "echo_results", "night_shift_nights", "full_moon_wins",
@@ -30,11 +31,13 @@ async def flow():
         await shutdown()
 
 
-def match(mid, when, won, my_score, their_score):
-    return {"id": mid, "tournament_id": "t1", "status": "completed", "completed_at": when, "updated_at": when,
-            "slots": [{"slot": 1, "registration_id": "r1"}, {"slot": 2, "registration_id": "r-ot"}],
-            "results": [{"registration_id": "r1", "outcome": "winner" if won else "loser", "score": my_score},
-                        {"registration_id": "r-ot", "outcome": "loser" if won else "winner", "score": their_score}]}
+def match(mid, when, won, my_score, their_score, mine="r1", theirs="r-ot", tournament="t1"):
+    # Ergebnisse wie der Ergebnis-Weg sie schreibt: Platz und Stand je Seite.
+    return {"id": mid, "tournament_id": tournament, "status": "completed", "stage_number": 1, "round": 1, "order": 1,
+            "completed_at": when, "updated_at": when,
+            "slots": [{"slot": 1, "registration_id": mine}, {"slot": 2, "registration_id": theirs}],
+            "results": [{"registration_id": mine, "rank": 1 if won else 2, **({} if my_score is None else {"score": my_score})},
+                        {"registration_id": theirs, "rank": 2 if won else 1, **({} if their_score is None else {"score": their_score})}]}
 
 
 def full_moon_near(year_month_start: datetime) -> datetime:
@@ -66,13 +69,14 @@ async def world(db, me: dict, other: dict):
         {"id": "r3", "tournament_id": "t3", "user_id": me["id"], "status": "approved"},
         {"id": "r4", "tournament_id": "t4", "user_id": me["id"], "status": "approved"},
         {"id": "r-ot", "tournament_id": "t1", "user_id": other["id"], "status": "approved"},
+        {"id": "r-ot-2", "tournament_id": "t2", "user_id": other["id"], "status": "approved"},
+        {"id": "r-ot-3", "tournament_id": "t3", "user_id": other["id"], "status": "approved"},
+        {"id": "r-ot-4", "tournament_id": "t4", "user_id": other["id"], "status": "approved"},
     ])
-    await db.tournament_awards.insert_many([
-        {"id": "a1", "tournament_id": "t1", "registration_id": "r1", "place": 1},
-        {"id": "a2", "tournament_id": "t2", "registration_id": "r2", "place": 1},
-        {"id": "a3", "tournament_id": "t3", "registration_id": "r3", "place": 1},
-        {"id": "a4", "tournament_id": "t4", "registration_id": "r4", "place": 1},
-    ])
+    # Die anderen drei Turniere gewinnt sie mit je einem Spiel an einem ruhigen Nachmittag im Mai - ohne Stand, weit weg
+    # von Geisterstunde, Nachtschicht, dem 7. und dem Vollmond.
+    await db.matches_v2.insert_many([
+        match(f"sieg-{n}", f"2026-05-1{n}T12:00:00+00:00", True, None, None, mine=f"r{n}", theirs=f"r-ot-{n}", tournament=f"t{n}") for n in (2, 3, 4)])
     full = full_moon_near(datetime(2026, 10, 1, tzinfo=timezone.utc))
     matches = [
         # Geisterstunde: 23:05 UTC = 00:05 Wien (Winterzeit)
@@ -97,6 +101,11 @@ async def world(db, me: dict, other: dict):
         match("f3", (full + timedelta(days=3)).isoformat(), True, 2, 1),
     ]
     await db.matches_v2.insert_many(matches)
+    # Die Plätze so, wie die Veröffentlichung sie festhält (#2337: ``tournament_awards.rank``) - nicht von Hand erfunden.
+    for tournament_id in ("t1", "t2", "t3", "t4"):
+        await awards.record_tournament_awards(db, tournament_id)
+    winners = [doc["registration_id"] async for doc in db.tournament_awards.find({"rank": 1}, {"_id": 0, "registration_id": 1})]
+    assert sorted(winners) == ["r1", "r2", "r3", "r4"]
     lap = lambda i, ms, **extra: {"id": f"lap-{i}", "challenge_id": "c1", "track_id": "tr1", "user_id": me["id"], "time_ms": ms, "penalty_seconds": 0, "is_invalid": False, "score_scope": "official", "attempt_number": i, "created_at": f"2026-05-0{i}T10:00:00+00:00", **extra}  # noqa: E731
     await db.f1_lap_times.insert_many([lap(1, 83380), lap(2, 83321), lap(3, 59950), lap(4, 61016, is_invalid=True), lap(5, 65056)])
     await db.xp_events.insert_many([
