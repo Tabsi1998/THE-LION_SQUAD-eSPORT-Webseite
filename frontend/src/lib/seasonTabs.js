@@ -60,6 +60,8 @@ const READINESS_ANCHORS = {
   mode_order_missing: "serie", mode_order_length: "serie",
   // Veto (D.3, #1618): die Vorlage steht im Reiter Spielbetrieb, der fehlende Check-in im Reiter Termine.
   veto_invalid: "veto", veto_division_mismatch: "veto", veto_without_checkin: "checkin",
+  // Vorgabe der Woche (#2326): die Wochen ohne Map stehen im selben Kasten.
+  veto_preset_missing: "veto",
   rules_missing: "regelwerk", rules_upcoming: "regelwerk",
   application_none: "selbstanmeldung", application_after_start: "selbstanmeldung", application_closed: "selbstanmeldung",
   divisions_missing: "staffeln", staffel_missing: "staffeln",
