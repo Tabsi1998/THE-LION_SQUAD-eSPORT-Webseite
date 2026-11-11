@@ -38,7 +38,7 @@ RESCAN_AFTER = timedelta(hours=1)
 # Die Staffel mit ihrem Kalender: Die Protestfrist ruht in Sperrzeiten (``response_deadline``).
 STAFFEL_FIELDS = {"_id": 0, "creation_key": 0, "billing": 0}
 MATCH_FIELDS = {"_id": 0, "id": 1, "status": 1, "disputes": 1, "incidents": 1, "completed_at": 1, "result_meta": 1,
-                "admin_decision_at": 1}
+                "admin_decision_at": 1, "updated_at": 1}
 
 
 async def _pages(db, query: dict):
@@ -75,16 +75,19 @@ def season_end(season: dict | None) -> datetime | None:
     return datetime.combine(weeks[-1][1] + timedelta(days=1), time.min, tzinfo=VIENNA).astimezone(timezone.utc)
 
 
-def protest_window(match: dict, tournament: dict | None, season: dict | None) -> tuple[bool, datetime | None]:
+def protest_window(match: dict, tournament: dict | None, season: dict | None,
+                   fallback: datetime | None = None) -> tuple[bool, datetime | None]:
     """Bis wann zu diesem Spiel noch ein Protest kommen kann: ``(wartet, Ende)``. ``wartet``: Das Ergebnis steht noch nicht
     fest, die Frist hat also nicht einmal begonnen. Sonst das Ende - Feststehen des Ergebnisses plus ``protest_hours``, in
-    Sperrzeiten ruhend; ``None``: Es kommt keiner mehr in Frage (Spiel abgesagt) oder der Zeitpunkt ist unbekannt."""
+    Sperrzeiten ruhend. Trägt ein entschiedenes Spiel keinen Zeitpunkt der Entscheidung (Altdaten, Korrektur von Hand),
+    zählt ``fallback``: der letzte bekannte Zeitpunkt. ``None``: Es kommt keiner mehr in Frage (Spiel abgesagt) oder es
+    gibt gar keinen Zeitpunkt."""
     status = str(match.get("status") or "")
     if status in refs.CLOSED_STATUSES:
         return False, None
     if status not in refs.DECIDED_STATUSES:
         return True, None
-    decided = decided_at(match)
+    decided = decided_at(match) or fallback
     if decided is None:
         return False, None
     hours = match_proofs.setting(tournament, season, "protest_hours")
@@ -94,7 +97,8 @@ def protest_window(match: dict, tournament: dict | None, season: dict | None) ->
 def moss_due(row: dict, match: dict, tournament: dict | None, season: dict | None, current: datetime) -> bool:
     """Darf dieser MOSS-Nachweis jetzt gelöscht werden? Erst wenn sein Bezug beendet und die Einspruchsfrist vorbei ist. Hängt
     er an einem Vorfall, kann aus dem noch ein Protest werden - der ist erst nach der Bestätigung des Ergebnisses möglich
-    und läuft dann ``protest_hours``: So lange bleibt der Nachweis mindestens."""
+    und läuft dann ``protest_hours``: So lange bleibt der Nachweis mindestens. Obergrenze, falls das Ergebnis nie feststeht:
+    Season-Ende plus ``evidence_keep_days``."""
     appeal_hours = match_proofs.setting(tournament, season, "appeal_hours")
     ref = refs.resolve(match, "moss", (row.get("context") or {}).get("ref_id") or "", appeal_hours=appeal_hours)
     if ref.found and ref.open:
@@ -103,9 +107,15 @@ def moss_due(row: dict, match: dict, tournament: dict | None, season: dict | Non
     # Ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes zählt die Einspruchsfrist ab dem Hochladen.
     until = ref.hold_until or uploaded + timedelta(hours=appeal_hours)
     if ref.incident:
-        waiting, window = protest_window(match, tournament, season)
+        # Ohne Zeitpunkt der Entscheidung: die letzte Änderung am Spiel, sonst das Ende des Vorfalls, sonst das Hochladen.
+        known = [moment for moment in (refs.parse(match.get("updated_at")), ref.ended_at) if moment]
+        waiting, window = protest_window(match, tournament, season, fallback=max(known) if known else uploaded)
         if waiting:
-            return False
+            # Wird das Spiel nie entschieden, bleibt der Nachweis nicht für immer: spätestens wie jeder andere Nachweis der
+            # Staffel - Season-Ende plus ``evidence_keep_days``. Ohne bestimmbares Season-Ende wartet er weiter.
+            end = season_end(season)
+            cap = end + timedelta(days=match_proofs.setting(tournament, season, "evidence_keep_days")) if end else None
+            return bool(cap) and current >= max(cap, until)
         until = max(until, window) if window else until
     return current >= until
 
