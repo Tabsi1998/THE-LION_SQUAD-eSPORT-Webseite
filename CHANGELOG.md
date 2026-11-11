@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.77.1 (11.11.2026)
+
+### Fehlerbehebungen
+
+* Teamseite zeigt das eigene Banner im vollen 3:1-Format statt abgeschnitten (#2349)
+
 ## 1.77.0 (11.11.2026)
 
 ### Neu
