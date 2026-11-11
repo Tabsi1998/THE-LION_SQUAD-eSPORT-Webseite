@@ -89,8 +89,9 @@ async def _expired_league(db, current: datetime, staffeln: dict[str, dict]) -> l
         if refs.kind_of(row) == "moss":
             ref = refs.resolve(match, "moss", (row.get("context") or {}).get("ref_id") or "", appeal_hours=appeal_hours)
             uploaded = refs.parse(row.get("created_at")) or current
-            until = ref.hold_until if ref.found else uploaded + timedelta(hours=appeal_hours)
-            if not (ref.found and ref.open) and until and current >= until:
+            # Ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes zählt die Einspruchsfrist ab dem Hochladen.
+            until = ref.hold_until or uploaded + timedelta(hours=appeal_hours)
+            if not (ref.found and ref.open) and current >= until:
                 expired.append(row)
         elif not refs.match_hold(match, current, appeal_hours=appeal_hours):
             expired.append(row)

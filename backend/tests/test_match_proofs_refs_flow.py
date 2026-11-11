@@ -160,6 +160,40 @@ async def test_moss_goes_only_to_uploader_captain_and_an_unbiased_lead(flow):
 
 
 @pytest.mark.asyncio
+async def test_moss_may_hang_on_an_incident_with_the_same_visibility(flow):
+    """Der Screenshot vom MOSS-Absturz gehört zum Vorfall (§ 9a.6) - gleiche Sichtregeln wie am Verfahren (Review #2360, M4)."""
+    w = await league_world(flow)
+    match = w["match"]
+    crash = {"id": "vorfall-1", "position": 1, "kind": "moss_crash", "state": "proposed",
+             "reported_by": {"registration_id": w["reg_a"]["id"], "user_id": user(w, "Kapitaen")["id"]}}
+    await set_match(flow, w, incidents=[crash])
+    flow.act_as(user(w, "Mila"))
+    uploaded = await add_image(flow, match, "moss", "vorfall-1")
+    assert uploaded.status_code == 200, uploaded.text
+    moss = uploaded.json()
+    assert (await add_image(flow, match, "moss", "gibt-es-nicht")).status_code == 404
+    for allowed in (user(w, "Mila"), user(w, "Kapitaen"), w["staff"]):
+        flow.act_as(allowed)
+        assert await ids_seen(flow, match, "moss", "vorfall-1") == {moss["id"]}, allowed["display_name"]
+    for hidden in (user(w, "Tom"), user(w, "Falke1")):
+        flow.act_as(hidden)
+        assert await ids_seen(flow, match, "moss", "vorfall-1") == set(), hidden["display_name"]
+        assert (await flow.get(moss["url"])).status_code == 404
+    # Der Nachweis zum Vorfall selbst (kein MOSS) bleibt für beide Seiten sichtbar.
+    flow.act_as(user(w, "Kapitaen"))
+    clip = (await add_link(flow, match, "incident", "vorfall-1")).json()
+    flow.act_as(user(w, "Falke1"))
+    assert await ids_seen(flow, match, "incident", "vorfall-1") == {clip["id"]}
+
+    # Vorfall erledigt: nichts kommt mehr dazu - außer ein Verfahren folgt aus ihm, dann ist MOSS dort wieder offen.
+    await set_match(flow, w, incidents=[{**crash, "state": "decided", "closed_at": now_utc().isoformat()}])
+    flow.act_as(user(w, "Mila"))
+    assert (await add_image(flow, match, "moss", "vorfall-1")).status_code == 409
+    await set_match(flow, w, disputes=[protest(w, incident_id="vorfall-1")])
+    assert (await add_image(flow, match, "moss", "vorfall-1")).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_who_may_add_to_which_reference_and_until_when(flow):
     w = await league_world(flow)
     match = w["match"]

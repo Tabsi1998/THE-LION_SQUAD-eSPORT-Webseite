@@ -2594,7 +2594,7 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
 
 | Feld | Typ | Bedeutung |
 | --- | --- | --- |
-| `id` | str | Kennung, Bezug für Nachweise (`context.kind` `incident`) |
+| `id` | str | Kennung, Bezug für Nachweise (`context.kind` `incident`, bei MOSS auch `moss`) |
 | `position` | int 1…Best of | Map-Position wie in `planned_games[]` und `games[]` |
 | `kind` | `disconnect` \| `rehost` \| `pause` \| `moss_crash` \| `restart_early` \| `replay` \| `other` | Art des Vorfalls |
 | `between_maps` | bool | nur bei `pause`: die Map-Pause nach Anlage C.3. Sie wird **nur dokumentiert** (`minutes`), ohne Vorschlag, Antwort und Kontingent, Stand sofort `agreed` |
@@ -2670,6 +2670,7 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 | `resolved_at`, `resolved_by`, `decision`, `decision_note` | wie bisher | Entscheidung: `keep` \| `change`; `decision_note` ist bei neuen Einträgen Pflicht (mindestens zehn Zeichen) |
 | `appeal_until` | ISO | Ende der Einspruchsfrist, gesetzt mit der Entscheidung (`appeal_hours`) |
 | `against` | `{type, ref_id}` | nur `appeal`: `protest_decision` (Kennung des Verfahrens), `forfeit` oder `correction` (Kennung des Spiels) |
+| `incident_id` | str \| null | das Verfahren folgt aus diesem Vorfall (`incidents[].id`); ein MOSS-Nachweis am Vorfall bleibt dann bis zum Ende dieses Verfahrens |
 
 - **Anzahl** (Nr. 134): je Seite und Spiel ein offenes Verfahren; die Seite ergänzt es bis `evidence_until`. Die Gegenseite kann ein
   eigenes eröffnen.
@@ -2708,7 +2709,7 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | `type` | `"image"` \| `"link"` | fehlt = Bild (Altbestand) |
 | `link` | str | nur bei `link`: die Adresse eines Videos. Nur `https`, höchstens 500 Zeichen, ohne Zugangsdaten in der Adresse, Domain frei. Wird nie eingebettet und nie vom Server abgerufen, nur als Link angezeigt |
 | `context.kind` | `report` \| `incident` \| `protest` \| `statement` \| `moss` | Bezug; Altbestand kennt zusätzlich `dispute` (zählt wie `protest`) |
-| `context.ref_id` | str | Kennung des Vorfalls (`incidents[].id`) bzw. des Verfahrens (`disputes[].id`); bei `report` leer. Fehlt der Schlüssel, ist es Altbestand |
+| `context.ref_id` | str | Kennung des Vorfalls (`incidents[].id`) bzw. des Verfahrens (`disputes[].id`); bei `report` leer; bei `moss` ein Verfahren **oder** ein Vorfall. Fehlt der Schlüssel, ist es Altbestand |
 | `registration_id` | str \| null | die Seite, die hochgeladen hat (null: die Leitung) |
 | `owner_id`, `match_id`, `tournament_id`, `scan_state`, Bildfelder | wie bisher | unverändert |
 | `status` | `pending` \| `attached` \| `removed` | wie bisher; neu `removed` (nur MOSS): von der Seite zurückgezogen, für die Leitung aufbewahrt, dazu `removed_at`, `removed_by` |
@@ -2735,7 +2736,9 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
   `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, bei MOSS `kept: true`, nie die Adresse).
 - **Offen** ist ein Bezug so: `report` bis das Spiel `completed`, `forfeit` oder geschlossen ist; `incident` in `proposed` und
   `in_review`; `protest`, `statement` und `moss` bis das Verfahren `resolved_at` oder `withdrawn_at` trägt.
-- **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Die ZIP-Datei selbst
+- **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Er hängt an einem
+  Verfahren (`disputes[].id`) **oder an einem Vorfall** (`incidents[].id`, etwa `moss_crash`), mit denselben Sichtregeln; offen ist
+  er am Vorfall, solange der Vorfall oder ein daraus folgendes Verfahren (`disputes[].incident_id`) offen ist. Die ZIP-Datei selbst
   (eigener Dateityp, eigene Größen- und Inhaltsprüfung) baut E.2 als `type: "file"` in denselben Regeln.
 
 **Aufbewahrung** (Nr. 31, 136; `services/match_proof_retention.py`, stündlicher Job `proof_photo_retention`):
@@ -2745,7 +2748,7 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Nie verwendetes Foto (`pending`) | 24 Stunden nach dem Hochladen (unverändert) |
 | Turnier ohne Liga | 30 Tage nach dem Hochladen, nicht solange das Spiel `disputed` ist (unverändert) |
 | Liga, alles außer MOSS | ab Season-Ende + `evidence_keep_days`, nicht solange am Spiel ein Vorfall oder Verfahren offen ist oder eine Einspruchsfrist läuft |
-| Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; ohne auffindbares Verfahren `appeal_hours` nach dem Hochladen |
+| Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; am Vorfall: Ende des Vorfalls (`closed_at`) bzw. eines daraus folgenden Verfahrens + Einspruchsfrist; ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes `appeal_hours` nach dem Hochladen |
 | Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
 
 **Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt

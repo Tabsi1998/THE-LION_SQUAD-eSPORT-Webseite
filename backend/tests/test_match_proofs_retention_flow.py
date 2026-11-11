@@ -209,6 +209,48 @@ async def test_a_removed_moss_proof_is_deleted_by_the_retention_like_any_moss(fl
 
 
 @pytest.mark.asyncio
+async def test_moss_on_an_incident_goes_after_the_incident_or_its_procedure(flow):
+    """MOSS am Vorfall: bis zum Ende des Vorfalls bzw. eines daraus folgenden Verfahrens plus Einspruchsfrist (M4)."""
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w)
+    crash = {"id": "vorfall-1", "position": 1, "kind": "moss_crash", "state": "in_review",
+             "reported_by": {"registration_id": w["reg_a"]["id"]}}
+    other = {**crash, "id": "vorfall-2"}
+    await set_match(flow, w, incidents=[crash, other])
+    flow.act_as(user(w, "Mila"))
+    first = (await add_image(flow, match, "moss", "vorfall-1")).json()
+    second = (await add_image(flow, match, "moss", "vorfall-2")).json()
+    assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(days=10)) == 0, "offene Vorfälle"
+
+    closed = now_utc() + timedelta(hours=1)
+    done = {"state": "decided", "closed_at": closed.isoformat()}
+    # Aus dem ersten Vorfall folgt ein Protest - sein MOSS bleibt, der des zweiten geht nach der Einspruchsfrist.
+    await set_match(flow, w, incidents=[{**crash, **done}, {**other, **done}], disputes=[protest(w, incident_id="vorfall-1")])
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=47)) == 0
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=49)) == 1
+    assert await left(flow) == {first["id"]} and first["id"] != second["id"]
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(days=30)) == 0, "das Verfahren läuft noch"
+    decided = closed + timedelta(days=31)
+    await set_match(flow, w, disputes=[protest(w, incident_id="vorfall-1", resolved_at=decided.isoformat())])
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=47)) == 0
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=49)) == 1
+
+
+@pytest.mark.asyncio
+async def test_moss_on_an_incident_without_an_end_time_counts_from_upload(flow):
+    w = await league_world(flow)
+    await season(flow, w)
+    crash = {"id": "vorfall-1", "kind": "moss_crash", "state": "proposed"}
+    await set_match(flow, w, incidents=[crash])
+    flow.act_as(user(w, "Mila"))
+    await add_image(flow, w["match"], "moss", "vorfall-1")
+    await set_match(flow, w, incidents=[{**crash, "state": "withdrawn"}])
+    assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(hours=47)) == 0
+    assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(hours=49)) == 1
+
+
+@pytest.mark.asyncio
 async def test_moss_without_its_procedure_goes_after_the_appeal_hours_from_upload(flow):
     w = await league_world(flow)
     await season(flow, w)

@@ -1,7 +1,8 @@
 """Bezug eines Nachweises (#2360): zu welcher Meldung, welchem Vorfall oder welchem Verfahren er gehört - und ob der noch offen ist.
 
 Blatt-Modul ohne Datenbank: liest nur das Spiel. Die Felder stehen im Vertrag (docs/LIGA.md, „D.5/E.2-Vertrag“):
-``incidents[]`` baut D.5, die Verfahren in ``disputes[]`` (mit ``id`` und ``kind``) baut E.2. Einträge ohne ``id`` sind
+``incidents[]`` baut D.5, die Verfahren in ``disputes[]`` (mit ``id`` und ``kind``) baut E.2. Ein MOSS-Nachweis hängt an
+einem Verfahren oder an einem Vorfall. Einträge ohne ``id`` sind
 Altbestand („Problem melden“) und lassen sich nicht als Bezug ansprechen, zählen aber als offenes Verfahren am Spiel.
 """
 from __future__ import annotations
@@ -79,6 +80,27 @@ def _chain_state(match: dict, entry: dict, appeal_hours: int) -> tuple[bool, dat
     return False, max(_hold_until(row, appeal_hours) for row in chain)
 
 
+def _incident_open(entry: dict) -> bool:
+    return str(entry.get("state") or "proposed") not in CLOSED_INCIDENT_STATES
+
+
+def _incident_ended_at(entry: dict) -> datetime | None:
+    return (parse(entry.get("closed_at")) or parse((entry.get("decision") or {}).get("at"))
+            or parse((entry.get("answer") or {}).get("at")))
+
+
+def _incident_chain_state(match: dict, incident: dict, appeal_hours: int) -> tuple[bool, datetime | None]:
+    """Der Vorfall und die Verfahren, die aus ihm folgen (``disputes[].incident_id``), samt Einsprüchen: offen, solange eines
+    davon offen ist - sonst das späteste Ende plus Einspruchsfrist. ``None`` als Zeit: beendet, aber ohne Zeitpunkt."""
+    states = [_chain_state(match, row, appeal_hours) for row in _rows(match, "disputes")
+              if incident.get("id") and row.get("incident_id") == incident["id"]]
+    if _incident_open(incident) or any(still_open for still_open, _ in states):
+        return True, None
+    ended = _incident_ended_at(incident)
+    holds = [hold for _, hold in states if hold] + ([ended + timedelta(hours=appeal_hours)] if ended else [])
+    return False, max(holds) if holds else None
+
+
 def resolve(match: dict, kind: str, ref_id: str, *, appeal_hours: int) -> Ref:
     """Den Bezug am Spiel finden. ``report`` gibt es immer; alles andere braucht die Kennung eines Vorfalls oder Verfahrens."""
     if kind == "report":
@@ -89,11 +111,17 @@ def resolve(match: dict, kind: str, ref_id: str, *, appeal_hours: int) -> Ref:
         entry = next((row for row in _rows(match, "incidents") if row.get("id") == ref_id), None)
         if entry is None:
             return MISSING
-        return Ref(found=True, open=str(entry.get("state") or "proposed") not in CLOSED_INCIDENT_STATES,
-                   side=(entry.get("reported_by") or {}).get("registration_id"))
+        return Ref(found=True, open=_incident_open(entry), side=(entry.get("reported_by") or {}).get("registration_id"))
     if kind not in PROCEDURE_KINDS:
         return MISSING
     entry = next((row for row in _rows(match, "disputes") if row.get("id") == ref_id), None)
+    if entry is None and kind == "moss":
+        # MOSS darf auch an einem Vorfall hängen - etwa der Screenshot vom Absturz (§ 9a.6) zu ``moss_crash``.
+        incident = next((row for row in _rows(match, "incidents") if row.get("id") == ref_id), None)
+        if incident is None:
+            return MISSING
+        still_open, hold = _incident_chain_state(match, incident, appeal_hours)
+        return Ref(found=True, open=still_open, hold_until=hold)
     if entry is None:
         return MISSING
     still_open, hold = _chain_state(match, entry, appeal_hours)
@@ -106,7 +134,7 @@ def match_hold(match: dict, now: datetime, *, appeal_hours: int) -> bool:
     (auch Altbestand) oder eine Einspruchsfrist?"""
     if str(match.get("status") or "") == "disputed":
         return True
-    if any(str(row.get("state") or "proposed") not in CLOSED_INCIDENT_STATES for row in _rows(match, "incidents")):
+    if any(_incident_open(row) for row in _rows(match, "incidents")):
         return True
     for entry in _rows(match, "disputes"):
         hold = _hold_until(entry, appeal_hours)
