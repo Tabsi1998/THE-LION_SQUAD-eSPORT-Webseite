@@ -60,7 +60,7 @@ def test_normalize_fills_defaults_and_rejects_bad_forms():
     for bad, text in (
         ({"enabled": "ja"}, "ja oder nein"), ({"team_a": "gast"}, "Team A"), ({"step_seconds": 5}, "10 bis 600"),
         ({"step_seconds": True}, "ganze Zahl"), ({"unbekannt": 1}, "unbekanntes Feld"), ({"steps": "x"}, "keine Liste"),
-        ({"steps": [{"kind": "side"}]}, "Sperren, Wählen oder Decider"), ({"steps": [{"kind": "ban", "mode": ""}]}, "Modus"),
+        ({"steps": [{"kind": "side"}]}, "Sperren, Wählen, Decider oder Vorgabe der Woche"), ({"steps": [{"kind": "ban", "mode": ""}]}, "Modus"),
         ({"steps": [{"kind": "ban", "mode": HP, "team": "C"}]}, "Team A oder Team B"),
         ({"steps": [{"kind": "ban", "mode": HP, "team": "A", "position": 1}]}, "keine Position"),
         ({"steps": [{"kind": "pick", "mode": HP, "team": "A"}]}, "Position"),
@@ -219,4 +219,4 @@ def test_step_sentences_are_german():
     assert veto.step_sentence(step("ban", HP, "A"), "Stellung") == "Team A sperrt eine Map (Stellung)"
     assert veto.step_sentence(step("pick", SND, "B", 4), "Suchen") == "Team B wählt Map 4 (Suchen)"
     assert veto.step_sentence(step("decider", CTL, None, 3), "Kontrolle") == "Die übrige Map wird Map 3 (Kontrolle)"
-    assert veto.ROLE_OF == {"ban": "banned", "pick": "picked", "decider": "decider"}
+    assert veto.ROLE_OF == {"ban": "banned", "pick": "picked", "decider": "decider", "preset": "preset"}

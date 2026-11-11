@@ -4,6 +4,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { REPORT_STATE_TEXT } from "@/lib/matchReport";
 import { blockedPlayers } from "@/lib/leagueIds";
+import { plannedRoleLabel } from "@/lib/leagueVeto";
 import {
   changeGame,
   confirmPayload,
@@ -191,7 +192,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           {plan.map_image_url ? <LazyImg src={plan.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
           <span className="min-w-0">
             <span className="block truncate font-bold text-white">{plan.map_name}</span>
-            <span className="block text-xs text-white/60">laut Veto{plan.role === "decider" ? " (Decider)" : ""} · {plan.mode_label || modeLabel(league.pool, game.mode)}</span>
+            <span className="block text-xs text-white/60">laut Veto{plannedRoleLabel(plan.role) ? ` (${plannedRoleLabel(plan.role)})` : ""} · {plan.mode_label || modeLabel(league.pool, game.mode)}</span>
           </span>
         </div>
       ) : null}

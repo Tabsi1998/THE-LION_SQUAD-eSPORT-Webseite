@@ -472,6 +472,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Terminregeln (Kasten „Termine und Verschiebungen“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 | Check-in (Kasten „Check-in vor dem Spiel“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 | Veto (Kasten „Veto“, 2.7d) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen; ein laufendes Veto behält seinen Stand |
+| Vorgabe der Woche (im Kasten „Veto“, 2.7d) | sofort mit **Vorgaben speichern**, für alle Staffeln und ohne Übertragen; gilt für Spiele, deren Veto noch nicht begonnen hat |
 
 ### 2.7a Termine und Verschiebungen (Regelwerk § 7)
 
@@ -523,7 +524,7 @@ Es beginnt, sobald beide Seiten eingecheckt sind, Map 1 folgt direkt danach.
 | **Veto in dieser Season** | an (neue Seasons) | an: nach dem Check-in sperren und wählen die Teams nach der Schrittfolge; aus: Maps beim Ergebnis |
 | **Team A** | Heimteam laut Spielplan | Nr. 22: Team A beginnt laut Vorlage, Team B ist die andere Seite. „Los je Spiel“: der Server lost je Spiel einmal, nie neu beim Neuladen |
 | **Zeit je Schritt (Sekunden)** | 60 | Nr. 23: läuft die Zeit ab, wählt das System zufällig aus den noch zulässigen Maps – das Veto bleibt nie stehen |
-| **Schrittfolge** | leer | je Schritt: **Sperren** oder **Wählen** durch Team A oder B in einem Modus, oder **Decider** (die übrige Map des Modus, setzt das System); Wahl und Decider bekommen ihre **Position** in der Serie (Map 1 bis Best of). Die Reihenfolge der Schritte ist die des Vetos, nicht die Spielreihenfolge |
+| **Schrittfolge** | leer | je Schritt: **Sperren** oder **Wählen** durch Team A oder B in einem Modus, **Decider** (die übrige Map des Modus, setzt das System) oder **Vorgabe** (die Map legt ihr je Spielwoche fest, siehe unten); Wahl, Decider und Vorgabe bekommen ihre **Position** in der Serie (Map 1 bis Best of). Die Reihenfolge der Schritte ist die des Vetos, nicht die Spielreihenfolge |
 
 So geht es am schnellsten: **Vorschlag aus Modusfolge und Pools** baut eine Folge nach Anlage B aus „Modus je Map“, den Poolgrößen und
 dem Best of – je Modus beginnt abwechselnd Team A und B; ein Modus mit einer Position sperrt bis eine Map bleibt und endet mit dem Decider,
@@ -534,6 +535,44 @@ lässt sich nur eine Vorlage speichern, die aufgeht; mit Veto aus bleibt ein Ent
 eine Vorlage, die nach einer Pool-Änderung nicht mehr passt, und eine Season ohne Check-in. Spielt eine Liga N ein anderes Best of als
 die Season, läuft dort kein Veto (Warnung) – die Maps kommen dann beim Ergebnis. Wie es dann läuft, steht in 3.1c. Im Regelwerk nennt
 der Baustein `[[baustein:veto]]` die Vorlage, `{{veto.step_seconds}}` die Zeit je Schritt (2.11).
+
+**Vorgabe der Woche** (Entscheidung Nr. 122): Soll in einem Modus nicht gesperrt und gewählt werden, sondern die Leitung die Map
+festlegen, nehmt in der Schrittfolge die Art **Vorgabe** – mit Modus und Position, ohne Team, höchstens eine je Modus. Die Prüfung
+rechnet sie ein: Die vorgegebene Map braucht einen Platz im Pool des Modus und fehlt den Teams beim Sperren und Wählen. Nach **Veto
+speichern** steht im selben Kasten der Block **Vorgabe der Woche**:
+
+1. Je **Spielwoche** eine Zeile mit den Tagen der Woche. Wählt je Modus die Map aus dem Pool. Oben steht, welche Wochen noch fehlen;
+   diese Zeilen sind markiert.
+2. **Rotiert automatisch durch den Pool** füllt die **leeren** Wochen als Vorschlag: Woche für Woche die nächste Map in der
+   Reihenfolge des Pools, danach wieder die erste. Was ihr schon gewählt habt, bleibt. Jede Woche lässt sich danach einzeln ändern.
+3. **Alle neu verteilen** ersetzt auch gewählte Wochen. Vorher fragt die Seite nach und nennt, wie viele gewählte Wochen das
+   überschreibt.
+4. **Vergangene Wochen und Wochen, in denen schon ein Veto begonnen hat**, fasst keiner der beiden Knöpfe an. An der Zeile steht
+   „vorbei“ bzw. „Veto begonnen“. Von Hand könnt ihr sie weiter ändern.
+5. Was ihr geändert habt, bleibt bis zum Speichern als **geändert** markiert. **Vorgaben speichern**. Lücken dürfen bleiben, ihr
+   könnt also Woche für Woche eintragen. Darunter zeigt **Verlauf**, wer wann welche Woche geändert hat.
+
+<img src="../assets/liga/veto-vorgabe-der-woche-verwaltung.png" alt="Kasten Veto, Block Vorgabe der Woche: oben die Knöpfe Rotiert automatisch durch den Pool und Alle neu verteilen und der Hinweis, welche Spielwochen noch fehlen, darunter je Spielwoche eine Zeile mit den Tagen und der Auswahl der Map; fehlende Wochen sind markiert, die vergangene Woche trägt den Vermerk vorbei" width="640">
+
+Was gilt:
+
+- **Spielwoche heißt Spieltag.** Der Block schreibt „Spielwoche 3“ mit den Tagen dieser Woche. Gemeint ist der dritte Spieltag, also
+  die dritte Woche, in der gespielt wird (Sperrwochen zählen nicht mit). Die Vorgabe gilt für alle Spiele dieses Spieltags.
+- **Ein verschobenes Spiel bleibt in seiner Spielwoche.** Es spielt die Vorgabe seines Spieltags, auch wenn es erst in einer späteren
+  Woche stattfindet – nicht die Vorgabe der Woche, in die der neue Termin fällt.
+- **Ohne Vorgabe beginnt das Veto nicht.** Sind beide Seiten eingecheckt und für die Woche fehlt die Map, sagt die Matchseite das, und
+  ihr bekommt einen Hinweis (einmal je Spielwoche, mit Link zum Kasten). Gewertet wird nichts von selbst.
+- **Nachtragen startet das Veto nicht.** Speichert ihr die fehlende Vorgabe, bekommen die Captains (bzw. Vertreter) beider Seiten die
+  Nachricht „Vorgabe da – Veto kann starten“. Das Veto beginnt erst, wenn **beide Seiten** auf der Matchseite **Bereit zum Veto**
+  getippt haben – so läuft keine Zeit ab, während jemand fehlt. Bis dahin gibt es keine Frist. Die Meldung nach dem Speichern sagt, wie
+  viele Spiele gewartet haben. Das gilt auch, wenn ihr den Schritt **Vorgabe** aus der Schrittfolge nehmt, während ein Spiel wartet.
+- **Ändern wirkt nur nach vorn.** Eine geänderte Vorgabe gilt für Spiele, deren Veto noch nicht begonnen hat. Ein laufendes oder
+  fertiges Veto behält seine Map, auch nach **Neu starten**. Jede Änderung steht im Protokoll und im Verlauf.
+- **Pool geändert?** Steht eine vorgegebene Map nicht mehr im Pool des Modus, beginnt das Veto in dieser Woche nicht. Die Zeile sagt
+  **nicht mehr im Pool**, in der Auswahl steht „Map nicht mehr im Pool – bitte neu wählen“, und oben steht, welche Wochen es betrifft
+  (auch **Was fehlt noch?** im Überblick nennt sie). Die alte Auswahl bleibt gespeichert, bis ihr sie ändert – speichert ihr eine andere
+  Woche, geht dabei nichts verloren. „Rotiert automatisch durch den Pool“ fasst solche Wochen nicht an, „Alle neu verteilen“ schon.
+- Im Regelwerk beschreibt der Baustein `[[baustein:veto]]` die Regel; `{{veto.presets}}` nennt die Maps je Woche (2.11).
 
 ### 2.7c Plattform und Eingabegerät
 
@@ -719,7 +758,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Map-Pool | `[[baustein:map_pool]]` | Tabelle Modus · Maps | Season → Spielbetrieb → Map-Pool |
    | Modusfolge | `[[baustein:mode_order]]` | Modus je Map | Season → Spielbetrieb → Serie |
    | Check-in | `[[baustein:checkin]]` | Fenster (öffnet und schließt, Minuten um den Termin), Mindestens Anwesende je Seite, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen (2.7b); ohne Check-in ein Satz | Season → Termine → Check-in vor dem Spiel |
-   | Veto | `[[baustein:veto]]` | Team A (Heim oder Los), Zeit je Schritt, Start nach dem Check-in und die Schrittfolge nummeriert („1. Team A sperrt eine Map (Stellung)“, 2.7d); ohne Veto ein Satz | Season → Spielbetrieb → Veto |
+   | Veto | `[[baustein:veto]]` | Team A (Heim oder Los), Zeit je Schritt, Start nach dem Check-in und die Schrittfolge nummeriert („1. Team A sperrt eine Map (Stellung)“, 2.7d); mit einer Vorgabe der Woche dazu die Regel (gilt für alle Spiele des Spieltags, nicht sperrbar, nicht wählbar) und der Schritt „Die Liga-Leitung gibt Map 3 je Spielwoche vor“; ohne Veto ein Satz | Season → Spielbetrieb → Veto |
    | Erlaubte Ausrüstung | `[[baustein:loadout_bans]]` | was erlaubt ist: aktive Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild, Hinweise „nicht in …“ bzw. „nur in …“, Waffen als Tabelle je Kategorie mit Bild und den Ausnahmen nach Slot („gesperrt: …“, „nur erlaubt: …“, wenn das kürzer ist), ganz gesperrte Klasse als Zeile „nicht erlaubt“ (im PDF genauso, übrige Ausrüstung als Tabelle; gedacht für Anlage A, 2.1a) | Spiel → Ausrüstung, Season → Regelwerk und Sperrliste |
    | Einstellungen je Modus | `[[baustein:mode_settings]]` | je Modus Zeitlimit, Zeit je Runde, Einstellungen (Tabelle), Regeltext | Spiel → Modi, Season → Ergebnisregeln |
    | Modi der Season | `[[baustein:modes]]` | Tabelle Modus (mit Symbol) · Ergebnisregel in Klartext (Ziel, Runden, Verlängerung, Remis) · Zeit · Spieler je Seite | Season → Spielbetrieb → Modi, Ergebnisregeln |
@@ -743,6 +782,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{best_of}}`, `{{maps_to_win}}`, `{{team_size}}`, `{{min_squad_size}}`, `{{max_squad_size}}`, `{{map_repeat}}` | Serie, Maps zum Sieg, Teamgröße, Kader, Map-Wiederholung in Worten |
    | `{{lineup_mode}}`, `{{lineup_min_players}}`, `{{result_confirm_hours}}`, `{{lineup_amend_hours}}` | Aufstellung, Mindestzahl, Bestätigungs- und Nachtragsfrist |
    | `{{veto.step_seconds}}`, `{{veto.team_a}}` | Veto (2.7d): „60 Sekunden“ je Schritt, „das Heimteam laut Spielplan“ oder „per Los je Spiel“; ohne Veto „(nicht festgelegt)“ |
+   | `{{veto.presets}}` | Vorgabe der Woche (2.7d): „Spielwoche 1: Hafen (Kontrolle); Spielwoche 2: Kai (Kontrolle)“; ohne Einträge „noch keine eingetragen“. Steht die Variable im Regelwerk, schlägt jede neue Vorgabe eine Freigabe vor – wer das nicht will, lässt sie weg (die Matchseite nennt die Map ohnehin) |
    | `{{schedule.matchday_days}}`, `{{schedule.default_weekday}}`, `{{schedule.default_time}}`, `{{schedule.default_slot}}`, `{{schedule.response_hours}}`, `{{schedule.blocked_periods}}` | Spielwoche, Standardtermin („Sonntag, 20:00 Uhr“), Antwortfrist, Sperrzeiten |
    | `{{schedule.home_rule_hours}}`, `{{schedule.reschedule_max}}`, `{{schedule.reschedule_notice_hours}}`, `{{schedule.result_reminder_hours}}`, `{{schedule.result_overdue_hours}}` | Terminregeln (2.7a) |
    | `{{table.points}}` | Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)“ |
@@ -905,6 +945,30 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   Entsperren geht es beim nächsten Aufruf weiter.
 - **Ohne Veto** (Kasten aus, ältere Season, Liga N mit anderem Best of): Die Seite sagt es, nach dem Check-in kommt gleich der Start, die
   Maps werden beim Ergebnis eingetragen.
+- **Vorgabe der Woche** (2.7d): Der Veto-Block nennt sie schon vor dem Check-in („Vorgabe der Woche · Spielwoche 2“). Im Veto steht
+  die Map im Brett als **Vorgabe der Woche** fest, bei der Auswahl ist sie ausgegraut („… ist die Vorgabe der Woche – weder sperrbar
+  noch wählbar“). Ist ihr Schritt an der Reihe, setzt ihn das System sofort; in der Spielreihenfolge steht sie an ihrer Position
+  („Map 3 · Vorgabe der Woche“). **Letzten Schritt zurück** nimmt nur Züge der Seiten zurück, die Vorgabe bleibt.
+- **Vorgabe fehlt:** Statt „Veto läuft“ steht **Veto wartet auf die Vorgabe der Woche** mit der Woche und dem Modus. Niemand kann
+  ziehen oder starten, gewertet wird nichts. Tragt die Map in der Season nach (2.7d).
+- **Vorgabe steht – bereit zum Veto?** Nach dem Nachtragen bekommen beide Seiten die Nachricht „Vorgabe da – Veto kann starten“. Auf
+  der Matchseite tippt je Seite Captain oder Vertreter **Bereit zum Veto**:
+  1. Die Seite zeigt beiden, wer schon bereit ist („Ihr seid bereit – wartet auf die Gegenseite“). Die Gegenseite bekommt einmal eine
+     Nachricht.
+  2. Wer als Erster bereit war, kann mit **Doch nicht bereit** zurücknehmen, solange die Gegenseite noch fehlt.
+  3. Sind beide bereit, beginnt das Veto sofort. Erst ab da läuft die Zeit je Schritt, vorher gibt es keine Frist. Tippen beide
+     gleichzeitig oder doppelt, beginnt trotzdem nur ein Veto.
+  4. Ein neuer Termin setzt „Bereit“ zurück – nach dem neuen Check-in beginnt das Veto wieder von selbst, wenn die Vorgabe steht.
+  5. Nehmt ihr die Vorgabe der Woche wieder heraus, während die Seiten schon „Bereit“ tippen, wartet das Veto wieder auf die Vorgabe.
+     Die Seiten können **Doch nicht bereit** tippen. Sind beide bereit und ihr tragt die Vorgabe wieder ein, beginnt das Veto mit
+     eurem Speichern von selbst.
+- **Notfall: Veto starten (Liga-Leitung).** Kann eine Seite nicht selbst tippen (etwa Captain ohne Netz), startet ihr das wartende
+  Veto im Kasten darunter: **Grund** eintragen (Pflicht), **Veto jetzt starten**. Das braucht „Spiele betreuen“, steht mit Grund im
+  Protokoll, und im eigenen Spiel macht es eine zweite Person (Befangenheit, 2.11).
+
+<img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300"> <img src="../assets/liga/veto-bereit-wartet-390.png" alt="Matchseite am Handy nach dem Nachtragen: Vorgabe steht – bereit zum Veto?, die eigene Seite ist bereit und wartet auf die Gegenseite, darunter der Knopf Doch nicht bereit und der Hinweis, dass erst ab dem Start die Zeit läuft" width="300">
+
+<img src="../assets/liga/veto-bereit-leitung.png" alt="Matchseite der Liga-Leitung am PC: eine Seite ist bereit, die andere noch nicht; darunter der Kasten Notfall: Veto starten mit dem Pflichtfeld Grund und dem Knopf Veto jetzt starten" width="640">
 
 ### 3.1a Turnier nach dem Ende noch „Live“
 

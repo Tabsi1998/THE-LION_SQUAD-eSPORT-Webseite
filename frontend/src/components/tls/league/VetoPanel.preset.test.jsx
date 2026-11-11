@@ -1,0 +1,239 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+// Vorgabe der Woche im Veto-Block der Matchseite (#2326): schon vor dem Veto sichtbar, im Brett als feste Map, in der Spielreihenfolge
+// an ihrer Position - und ein klarer Satz, solange sie fehlt. Erfundene Namen.
+
+const apiMock = { post: vi.fn() };
+vi.mock("@/lib/api", () => ({ api: apiMock }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+const { VetoPanel } = await import("./VetoPanel");
+
+const SIDES = ["Löwen · Rudel A", "Falken · Horst"];
+const PRESETS = [{ mode: "ctl", mode_label: "Kontrolle", position: 3, map_id: "kai", map_name: "Kai", map_image_url: null }];
+const WAITING = {
+  status: "waiting", skipped_reason: null, version: 0, step_seconds: null, team_a: null, team_b: null, current: null, own_turn: false, can_pick: false,
+  pick_hint: "Das Veto beginnt erst, wenn beide Seiten eingecheckt sind.", options: [], remaining: [], history: [], planned_games: [], paused: null, lead: null,
+  week: 1, presets: PRESETS, blocked: null, start: null,
+};
+const BLOCKED_TEXT = "Für Spielwoche 2 steht die Vorgabe der Woche noch nicht – Kontrolle: Die Vorgabe der Woche fehlt. Das Veto beginnt erst, wenn die Liga-Leitung sie eingetragen hat.";
+const RUNNING = {
+  ...WAITING, status: "running", version: 3, step_seconds: 60, team_a: { registration_id: "a", name: SIDES[0], via: "home" }, team_b: { registration_id: "b", name: SIDES[1] },
+  current: { index: 2, number: 3, total: 4, kind: "ban", mode: "ctl", mode_label: "Kontrolle", registration_id: "a", name: SIDES[0], position: null,
+    deadline_at: new Date(Date.now() + 40000).toISOString(), remaining_seconds: 40 },
+  own_turn: true, can_pick: true, pick_hint: null,
+  options: [{ map_id: "hafen", name: "Hafen", image_url: null, allowed: true, hint: null },
+    { map_id: "kai", name: "Kai", image_url: null, allowed: false, hint: "Kai ist die Vorgabe der Woche – weder sperrbar noch wählbar." }],
+  remaining: [{ mode: "ctl", label: "Kontrolle", maps: [
+    { map_id: "hafen", name: "Hafen", image_url: null, status: "open", by_name: null, position: null },
+    { map_id: "kai", name: "Kai", image_url: null, status: "preset", by_name: null, position: 3 }] }],
+};
+
+function panel(block, props = {}) {
+  return <VetoPanel block={block} matchId="m1" busy={false} run={async () => true} onChanged={async () => {}} {...props} />;
+}
+
+test("vor dem Veto: die Vorgabe der Woche steht schon da - ohne Vorgabe in der Vorlage bleibt der Block weg", () => {
+  const { rerender } = render(panel(WAITING));
+  expect(screen.getByTestId("veto-panel")).toHaveAttribute("data-blocked", "false");
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe der Woche");
+  expect(screen.getByTestId("veto-presets")).toHaveTextContent("Vorgabe der Woche · Spielwoche 1");
+  expect(screen.getByTestId("veto-preset-ctl")).toHaveTextContent("Kai");
+  expect(screen.getByTestId("veto-preset-ctl")).toHaveTextContent("Kontrolle · Map 3");
+  expect(screen.getByTestId("veto-presets")).toHaveTextContent("nicht sperrbar und nicht wählbar");
+  expect(screen.queryByTestId("veto-blocked")).toBeNull();
+  // Gegenprobe: eine Vorlage ohne Vorgabe zeigt vor dem Check-in wie bisher nichts.
+  rerender(panel({ ...WAITING, week: null, presets: [] }));
+  expect(screen.queryByTestId("veto-panel")).toBeNull();
+});
+
+test("fehlt die Vorgabe, sagt der Block es klar und fragt weiter nach - gewertet wird nichts", () => {
+  vi.useFakeTimers();
+  const onPoll = vi.fn();
+  const waitingForPreset = { ...WAITING, week: 2, presets: [], blocked: { week: 2, text: BLOCKED_TEXT }, pick_hint: BLOCKED_TEXT };
+  const { rerender } = render(panel(waitingForPreset, { onPoll, bothIn: true }));
+  expect(screen.getByTestId("veto-panel")).toHaveAttribute("data-blocked", "true");
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Veto wartet auf die Vorgabe der Woche");
+  expect(screen.getByTestId("veto-text")).toHaveTextContent(BLOCKED_TEXT);
+  expect(screen.getByTestId("veto-blocked")).toHaveTextContent("Gewertet wird nichts von selbst.");
+  expect(screen.getByTestId("veto-blocked")).toHaveTextContent("wenn beide Seiten hier „Bereit zum Veto“ getippt haben");
+  expect(screen.queryByTestId("veto-ready")).toBeNull();
+  expect(screen.queryByTestId("veto-presets")).toBeNull();
+  vi.advanceTimersByTime(6500);
+  expect(onPoll).toHaveBeenCalledTimes(2);
+  // Gegenprobe: vor dem Check-in beider Seiten gibt es nichts abzuwarten, und mit Vorgabe wartet der Block still - kein Nachfragen.
+  onPoll.mockClear();
+  rerender(panel(waitingForPreset, { onPoll, bothIn: false }));
+  expect(screen.getByTestId("veto-blocked")).toBeInTheDocument();
+  vi.advanceTimersByTime(6500);
+  rerender(panel(WAITING, { onPoll, bothIn: true }));
+  vi.advanceTimersByTime(6500);
+  expect(onPoll).not.toHaveBeenCalled();
+  vi.useRealTimers();
+});
+
+beforeEach(() => {
+  apiMock.post.mockReset();
+});
+
+const SIDE_ROWS = (own, other) => [
+  { registration_id: "a", name: SIDES[0], ready: own, own: true }, { registration_id: "b", name: SIDES[1], ready: other, own: false },
+];
+const START = { sides: SIDE_ROWS(false, false), own_ready: false, other_ready: false, can_ready: true, can_withdraw: false, hint: "Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.", lead: null };
+const READY = { ...WAITING, step_seconds: 60, pick_hint: START.hint, start: START };
+const RUN = async (task) => { await task(); return true; };
+
+test("nachgetragene Vorgabe: beide Seiten tippen „Bereit zum Veto“ - die Seite zeigt, wer bereit ist, ohne Frist davor", async () => {
+  vi.useFakeTimers();
+  const onPoll = vi.fn();
+  const onChanged = vi.fn(async () => {});
+  apiMock.post.mockResolvedValue({ data: { started: false, status: null, version: null, idempotent_replay: false, ready: true } });
+  const { rerender } = render(<VetoPanel block={READY} matchId="m1" busy={false} run={RUN} onChanged={onChanged} onPoll={onPoll} bothIn />);
+  expect(screen.getByTestId("veto-panel")).toHaveAttribute("data-start-ready", "true");
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe steht – bereit zum Veto?");
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Tippt auf „Bereit zum Veto“, sobald ihr so weit seid. Das Veto beginnt, wenn beide Seiten bereit sind.");
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "false");
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveTextContent("noch nicht bereit");
+  expect(screen.getByTestId("veto-ready-note")).toHaveTextContent("Erst dann läuft die Zeit (60 Sekunden je Schritt) – bis dahin gibt es keine Frist.");
+  expect(screen.getByTestId("veto-presets")).toHaveTextContent("Kai");
+  expect(screen.queryByTestId("veto-countdown")).toBeNull();
+  expect(screen.queryByTestId("veto-blocked")).toBeNull();
+  expect(screen.queryByTestId("veto-ready-withdraw")).toBeNull();
+  expect(screen.queryByTestId("veto-lead-start")).toBeNull();
+  // Wird die Gegenseite bereit oder beginnt das Veto, zeigt die Seite es von selbst.
+  vi.advanceTimersByTime(6500);
+  expect(onPoll).toHaveBeenCalledTimes(2);
+  vi.useRealTimers();
+  fireEvent.click(screen.getByTestId("veto-ready-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/ready", { ready: true }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalled());
+
+  // Die eigene Seite ist bereit: „Ihr seid bereit – wartet auf die Gegenseite“, zurücknehmen geht noch.
+  const mine = { ...READY, start: { ...START, sides: SIDE_ROWS(true, false), own_ready: true, can_ready: false, can_withdraw: true } };
+  rerender(<VetoPanel block={mine} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Ihr seid bereit – wartet auf die Gegenseite.");
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "true");
+  expect(screen.getByTestId("veto-ready-side-b")).toHaveAttribute("data-ready", "false");
+  expect(screen.queryByTestId("veto-ready-button")).toBeNull();
+  fireEvent.click(screen.getByTestId("veto-ready-withdraw"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/ready", { ready: false }));
+
+  // Die Gegenseite ist bereit: Der Satz sagt es, der Knopf beginnt das Veto.
+  const theirs = { ...READY, start: { ...START, sides: SIDE_ROWS(false, true), other_ready: true } };
+  rerender(<VetoPanel block={theirs} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Falken · Horst ist bereit – tippt auf „Bereit zum Veto“, dann beginnt es sofort.");
+  expect(screen.getByTestId("veto-ready-side-b")).toHaveTextContent("bereit");
+  expect(screen.getByTestId("veto-ready-button")).toBeInTheDocument();
+  expect(screen.queryByTestId("veto-ready-withdraw")).toBeNull();
+
+  // Gegenprobe: Ohne Merker gibt es den Block gar nicht - das Veto beginnt dann von selbst.
+  rerender(<VetoPanel block={WAITING} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe der Woche");
+  expect(screen.queryByTestId("veto-ready")).toBeNull();
+});
+
+test("Leitung: sieht, wer bereit ist, und startet im Notfall nur mit Grund - befangen nur als Notausnahme", async () => {
+  const onChanged = vi.fn(async () => {});
+  apiMock.post.mockResolvedValue({ data: { started: true, status: "running", version: 1, idempotent_replay: false } });
+  const sides = SIDE_ROWS(true, false).map((row) => ({ ...row, own: false }));
+  const asLead = { ...READY, start: { ...START, sides, can_ready: false, lead: { can_start: true, conflict: null } } };
+  const { rerender } = render(<VetoPanel block={asLead} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Löwen · Rudel A ist bereit. Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.");
+  expect(screen.queryByTestId("veto-ready-button")).toBeNull();
+  expect(screen.getByTestId("veto-lead-start")).toHaveTextContent("Notfall: Veto starten (Liga-Leitung)");
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  expect(screen.getByTestId("veto-lead-start-problem")).toHaveTextContent("Grund");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("veto-lead-start-reason"), { target: { value: "Captain ohne Netz, per Telefon bereit" } });
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/start", { reason: "Captain ohne Netz, per Telefon bereit" }));
+  apiMock.post.mockClear();
+  rerender(<VetoPanel block={{ ...asLead, start: { ...asLead.start, lead: { can_start: true, conflict: { kind: "involved", override: true } } } }} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-lead-start-conflict")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("veto-lead-start-reason"), { target: { value: "Gegenseite nicht erreichbar" } });
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  expect(screen.getByTestId("veto-lead-start-problem")).toHaveTextContent("Notausnahme");
+  fireEvent.change(screen.getByTestId("veto-lead-start-conflict-reason"), { target: { value: "Niemand sonst erreichbar" } });
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/start", { reason: "Gegenseite nicht erreichbar", conflict_reason: "Niemand sonst erreichbar" }));
+  // Gegenprobe: Ohne das Recht „Spiele betreuen“ (oder befangen ohne Notausnahme) gibt es den Notfall-Start nicht.
+  rerender(<VetoPanel block={{ ...asLead, start: { ...asLead.start, lead: { can_start: false, conflict: null } } }} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.queryByTestId("veto-lead-start")).toBeNull();
+});
+
+test("im Veto: die vorgegebene Map steht fest im Brett und lässt sich nicht antippen", () => {
+  render(panel(RUNNING));
+  expect(screen.getByTestId("veto-presets")).toHaveTextContent("Kai");
+  expect(screen.getByTestId("veto-map-ctl-kai")).toHaveAttribute("data-status", "preset");
+  expect(screen.getByTestId("veto-map-ctl-kai")).toHaveTextContent("Map 3 · Vorgabe der Woche");
+  expect(screen.getByTestId("veto-map-ctl-hafen")).toHaveAttribute("data-status", "open");
+  expect(screen.getByTestId("veto-option-kai")).toBeDisabled();
+  expect(screen.getByTestId("veto-option-kai")).toHaveAttribute("title", "Kai ist die Vorgabe der Woche – weder sperrbar noch wählbar.");
+  expect(screen.getByTestId("veto-option-hafen")).not.toBeDisabled();
+});
+
+test("fertig: die Vorgabe steht an ihrer Position in der Spielreihenfolge und im Verlauf", () => {
+  const done = { ...RUNNING, status: "done", current: null, own_turn: false, can_pick: false, options: [],
+    planned_games: [
+      { position: 1, mode: "hp", mode_label: "Stellung", map_id: "nebel", map_name: "Nebel", map_image_url: null, role: "picked", by_registration_id: "a" },
+      { position: 3, mode: "ctl", mode_label: "Kontrolle", map_id: "kai", map_name: "Kai", map_image_url: null, role: "preset", by_registration_id: null },
+    ],
+    history: [{ index: 3, kind: "preset", mode_label: "Kontrolle", name: null, map_name: "Kai", position: 3, via: "auto", at: "x" }] };
+  render(panel(done));
+  expect(screen.getByTestId("veto-planned-3")).toHaveTextContent("Map 3 · Vorgabe der Woche");
+  expect(screen.getByTestId("veto-planned-3")).toHaveTextContent("Kai");
+  expect(screen.getByTestId("veto-planned-1")).not.toHaveTextContent("Vorgabe");
+  expect(screen.getByTestId("veto-history-3")).toHaveTextContent("4. Vorgabe der Woche: Kai → Map 3 (Kontrolle)");
+  expect(screen.queryByTestId("veto-presets")).toBeNull();
+});
+
+test("Detail-Runde: die Vorgabe-Karte hebt sich beim Aufbau gestaffelt an und leuchtet einmal auf - nur transform und opacity", () => {
+  const two = [...PRESETS, { mode: "hp", mode_label: "Stellung", position: 1, map_id: "hafen", map_name: "Hafen", map_image_url: null }];
+  render(panel({ ...WAITING, presets: two }));
+  // Gestaffelt wie die übrigen Map-Karten: je Karte ein Schritt (--tls-i).
+  expect(screen.getByTestId("veto-preset-ctl")).toHaveClass("tls-veto-preset");
+  expect(screen.getByTestId("veto-preset-ctl").style.getPropertyValue("--tls-i")).toBe("0");
+  expect(screen.getByTestId("veto-preset-hp").style.getPropertyValue("--tls-i")).toBe("1");
+  // Die Regeln dazu: Dauern, Kurve und Schalter aus den Bewegungs-Regeln, in den Keyframes nur transform und opacity.
+  const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
+  const rules = css.slice(css.indexOf(".tls-veto-preset {"), css.indexOf("@keyframes tls-veto-preset-glow"));
+  expect(rules).toContain("animation: tls-veto-preset-in var(--tls-motion-mid) var(--tls-ease) backwards;");
+  expect(rules).toContain("animation-delay: calc(var(--tls-i, 0) * 40ms * var(--tls-motion-on));");
+  expect(rules).toContain("animation: tls-veto-preset-glow var(--tls-motion-glow) var(--tls-ease) backwards;");
+  const frames = css.slice(css.indexOf("@keyframes tls-veto-preset-in"), css.indexOf("}\n}", css.indexOf("@keyframes tls-veto-preset-glow")));
+  const animated = [...frames.matchAll(/([a-z-]+):/g)].map((hit) => hit[1]);
+  expect([...new Set(animated)].sort()).toEqual(["opacity", "transform"]);
+  // „Bewegung reduzieren“: Der Weg hängt am Schalter --tls-motion-on, die Dauern stellt die eine Regel in index.css ab.
+  expect(frames).toContain("transform: translateY(calc(6px * var(--tls-motion-on)));");
+  // Gegenprobe: Das Brett des laufenden Vetos bleibt ruhig - nur die Vorgabe-Karte trägt die Klasse.
+  expect(document.querySelectorAll(".tls-veto-preset")).toHaveLength(2);
+});
+
+test("beide bereit, aber die Vorgabe fehlt wieder: niemand steht ohne Knopf da - „Doch nicht bereit“ bleibt", async () => {
+  const onChanged = vi.fn(async () => {});
+  apiMock.post.mockResolvedValue({ data: { started: false, status: null, version: null, idempotent_replay: false, ready: false } });
+  // Die Woche wurde zwischen den beiden Klicks wieder lückenhaft: beide Seiten sind bereit, das Veto konnte nicht beginnen.
+  const stuck = { ...READY, step_seconds: null, presets: [], pick_hint: BLOCKED_TEXT, blocked: { week: 1, text: BLOCKED_TEXT },
+    start: { ...START, sides: SIDE_ROWS(true, true), own_ready: true, other_ready: true, can_ready: false, can_withdraw: true } };
+  const { rerender } = render(<VetoPanel block={stuck} matchId="m1" busy={false} run={RUN} onChanged={onChanged} bothIn />);
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Veto wartet auf die Vorgabe der Woche");
+  expect(screen.getByTestId("veto-text")).toHaveTextContent(BLOCKED_TEXT);
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "true");
+  expect(screen.getByTestId("veto-ready-side-b")).toHaveAttribute("data-ready", "true");
+  expect(screen.queryByTestId("veto-ready-button")).toBeNull();
+  expect(screen.getByTestId("veto-ready-note")).toHaveTextContent("Die Vorgabe der Woche fehlt gerade wieder.");
+  expect(screen.getByTestId("veto-ready-note")).toHaveTextContent("beginnt das Veto von selbst");
+  fireEvent.click(screen.getByTestId("veto-ready-withdraw"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/ready", { ready: false }));
+  // Die Vorgabe steht wieder, das Veto beginnt gleich von selbst: Der Satz sagt es, zurücknehmen geht bis dahin weiter.
+  rerender(<VetoPanel block={{ ...stuck, step_seconds: 60, presets: PRESETS, blocked: null }} matchId="m1" busy={false} run={RUN} onChanged={onChanged} bothIn />);
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe steht – bereit zum Veto?");
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Beide Seiten sind bereit – das Veto beginnt gleich.");
+  expect(screen.getByTestId("veto-ready-withdraw")).toBeInTheDocument();
+  // Gegenprobe: Fehlt die Vorgabe und niemand ist bereit, gibt es den Bereit-Block nicht - nur den Hinweis.
+  rerender(<VetoPanel block={{ ...stuck, start: null }} matchId="m1" busy={false} run={RUN} onChanged={onChanged} bothIn />);
+  expect(screen.getByTestId("veto-blocked")).toBeInTheDocument();
+  expect(screen.queryByTestId("veto-ready")).toBeNull();
+});
