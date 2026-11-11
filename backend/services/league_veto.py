@@ -427,7 +427,9 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
     # Gesperrte Staffel (Codex zu D.3): nur lesen - kein Start aus einem Seitenaufruf, der Scheduler lässt sie ohnehin aus.
     if not rules or tournament.get("locked_at") or veto_of(match) is not None or not _can_run(match):
         return match
-    if not manual and wait_of(match) is not None and rules_mod.preset_steps(rules["steps"]):
+    # Der Merker allein sperrt den Start von selbst - auch wenn die Leitung den Schritt „Vorgabe“ inzwischen aus der Vorlage genommen
+    # hat: Die Teams haben gewartet und sind vielleicht nicht mehr da, eine Frist dürfte jetzt nicht einfach loslaufen.
+    if not manual and wait_of(match) is not None:
         return match
     now = now or now_utc()
     now_iso = now.isoformat()
@@ -504,9 +506,8 @@ async def _not_started_detail(db, match: dict, tournament: dict | None) -> str:
 def start_ready(match: dict, tournament: dict | None) -> bool:
     """Wartet das Veto nur noch auf „Veto starten“? Beide Seiten sind eingecheckt, das Veto hatte auf die Vorgabe der Woche gewartet -
     ob sie inzwischen steht, sagt ``preset_gap``."""
-    rules = rules_mod.rules_of(tournament)
-    return bool(rules and rules_mod.preset_steps(rules["steps"]) and veto_of(match) is None and wait_of(match) is not None
-                and _can_run(match))
+    # Nur der Merker zählt, nicht ob die Vorlage den Schritt „Vorgabe“ noch trägt (Review zu #2326): Wer gewartet hat, startet von Hand.
+    return bool(rules_mod.rules_of(tournament) and veto_of(match) is None and wait_of(match) is not None and _can_run(match))
 
 
 async def manual_start(db, match: dict, tournament: dict | None, *, user: dict, now: datetime | None = None) -> dict:

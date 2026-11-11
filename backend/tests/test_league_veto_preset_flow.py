@@ -21,8 +21,8 @@ from league_start_world import ok  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import league_rule_blocks, league_rules, league_veto, league_veto_sweep  # noqa: E402
 from test_league_veto_flow import (  # noqa: E402
-    ADMIN, ANLAGE_B, CTL, HP, SND, both_in, lead, mid, page, pick, play_anlage_b, season_world, step, stored_veto, veto_block,
-    veto_rules, veto_world,
+    ADMIN, ANLAGE_B, CTL, HP, SND, both_in, lead, mid, page, pick, play_anlage_b, season_world, step, stored_veto, tournament_of,
+    veto_block, veto_rules, veto_world,
 )
 
 # Wie Anlage B, nur Map 3 (Kontrolle) gibt die Leitung je Spielwoche vor; davor sperrt Team A in Kontrolle eine Map.
@@ -179,6 +179,33 @@ async def test_without_the_preset_the_veto_does_not_start_and_the_lead_is_told_o
     assert stored["status"] == "scheduled" and not stored.get("results") and not stored.get("no_show_proposal") and not stored.get("planned_games")
     assert not stored.get("started_at")
 
+
+@pytest.mark.asyncio
+async def test_a_waiting_veto_never_starts_by_itself_when_the_preset_step_is_removed(flow):
+    """Review zu #2326: Der Merker allein sperrt den Start von selbst. Nimmt die Leitung den Schritt „Vorgabe“ aus der Vorlage, während
+    ein Spiel wartet, beginnt dessen Veto nicht beim nächsten Seitenaufruf - und keine Frist läuft los."""
+    world = await preset_world(flow, [preset(2, "map-kai")])
+    await both_in(flow, world)
+    stored = await flow.reload(world["match"])
+    assert "veto" not in stored["flow"] and stored["flow"]["veto_wait"]["week"] == 1
+    # Die Leitung entfernt den Schritt (an der Staffel, wie es das Speichern der Vorlage tut).
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {"veto_rules": veto_rules(ANLAGE_B)}})
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    stored = await flow.reload(world["match"])
+    assert "veto" not in stored["flow"], "kein Start von selbst"
+    assert block["state"] == "veto" and block["veto"]["status"] == "waiting" and block["veto"]["blocked"] is None
+    assert block["veto"]["start"] is not None and block["veto"]["current"] is None, "die Seiten starten von Hand - keine Frist"
+    later = now_utc() + timedelta(minutes=30)
+    await league_veto_sweep.sweep(flow.db, now=later)
+    tournament = await tournament_of(flow, world)
+    untouched = await league_veto.ensure_started(flow.db, await flow.reload(world["match"]), tournament, now=later)
+    assert "veto" not in untouched["flow"] and league_veto.start_ready(untouched, tournament)
+    assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 0
+    # Gegenprobe: Ohne Merker (ein Spiel, das nie gewartet hat) beginnt das Veto mit derselben Vorlage sofort.
+    other = await preset_world(flow, [], rules=veto_rules(ANLAGE_B), letter="B")
+    await both_in(flow, other)
+    running = await stored_veto(flow, other)
+    assert running["status"] == "running" and running["deadline_at"]
 
 
 @pytest.mark.asyncio
