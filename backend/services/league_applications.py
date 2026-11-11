@@ -391,20 +391,28 @@ async def _move(db, application: dict, status: str, actor_id: str | None, *, fie
     return out
 
 
-async def withdraw(db, league: dict, season: dict, application_id: str, user: dict) -> dict:
+async def withdraw(db, league: dict, season: dict, application_id: str, user: dict, *, refresh_previews=None) -> dict:
+    """Zurückziehen. Eine automatische Zuteilung (#2348) nimmt es mit aus der Staffel, solange kein fester Spielplan steht (``_auto_seat`` unter der
+    Staffel-Sperre). Die Warteliste bleibt unberührt: Über den frei gewordenen Platz entscheidet die Leitung."""
     application = await _load(db, season["id"], application_id)
     _team, squad = await _load_side(db, application["squad_id"])
     if not squad or not await may_apply(db, user, squad):
         raise LeagueProblem(NOT_RESPONSIBLE, 403)
-    async with _season_lock(db, season["id"]):
-        application = await _load(db, season["id"], application_id)
-        if application["status"] not in OPEN_STATUSES:
-            raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment") or await _left_over(db, application):
-            raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
-        now = now_utc().isoformat()
-        done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False)
-    await _audit(db, "withdraw", done, user["id"])
+    locked_id = await _auto_seat_to_lock(db, season["id"], application_id)
+    async with _staffel_lock(db, locked_id):
+        async with _season_lock(db, season["id"]):
+            application = await _load(db, season["id"], application_id)
+            if application["status"] not in OPEN_STATUSES:
+                raise LeagueProblem(DECIDED, 409)
+            seat = await _auto_seat(db, season, application, locked_id, fixed_detail=WITHDRAW_ASSIGNED)
+            if not seat and (application.get("assignment") or await _left_over(db, application)):
+                raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
+            now = now_utc().isoformat()
+            done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False,
+                               drop_assignment=bool(seat))
+            await _unseat(db, seat)
+        await _after_unseat(db, seat, user, refresh_previews)
+    await _audit(db, "withdraw", done, user["id"], **_unseat_data(seat))
     await _tell_status(db, league, season, done, WITHDRAWN, squad=squad)
     return done
 
@@ -703,9 +711,10 @@ async def _auto_seat_to_lock(db, season_id: str, application_id: str) -> str | N
     return assignment.get("tournament_id") if assignment.get("auto") else None
 
 
-async def _auto_seat(db, season: dict, application: dict, locked_id: str | None) -> tuple[dict, dict] | None:
-    """Staffel und Anmeldung einer automatischen Zuteilung, die Ablehnen und Warteliste wieder herausnehmen - solange sie einen Platz hält, die Staffel
-    nicht gesperrt ist und sie in keinem festen Spiel steht. ``None``: keine solche Zuteilung, dann gilt wie bisher ``ASSIGNED_ALREADY``."""
+async def _auto_seat(db, season: dict, application: dict, locked_id: str | None, *, fixed_detail: str = AUTO_PLAN_FIXED) -> tuple[dict, dict] | None:
+    """Staffel und Anmeldung einer automatischen Zuteilung, die Ablehnen, Warteliste und Zurückziehen wieder herausnehmen - solange sie einen Platz hält,
+    die Staffel nicht gesperrt ist und sie in keinem festen Spiel steht. ``None``: keine solche Zuteilung, dann gilt wie bisher ``ASSIGNED_ALREADY``.
+    ``fixed_detail``: der Satz bei festem Spielplan - das Team liest einen anderen als die Leitung."""
     assignment = application.get("assignment") or {}
     if not assignment.get("auto"):
         return None
@@ -719,8 +728,22 @@ async def _auto_seat(db, season: dict, application: dict, locked_id: str | None)
     from services.tournament_guard import fixed_match_count
 
     if await fixed_match_count(db, locked_id, registration["id"]):
-        raise LeagueProblem(AUTO_PLAN_FIXED, 409)
+        raise LeagueProblem(fixed_detail, 409)
     return tournament, registration
+
+
+async def _auto_withdrawable(db, application: dict | None) -> bool:
+    """Darf das Team eine automatische Zuteilung noch selbst zurückziehen? Ja, solange sie einen Platz hält und kein fester Spielplan steht - für den Knopf.
+    Geprüft wird beim Zurückziehen unter der Sperre noch einmal."""
+    assignment = (application or {}).get("assignment") or {}
+    if not assignment.get("auto") or application.get("status") != ACCEPTED:
+        return False
+    registration_id = assignment.get("registration_id")
+    if not await db.tournament_registrations.find_one({"id": registration_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 1}):
+        return False
+    from services.tournament_guard import fixed_match_count
+
+    return not await fixed_match_count(db, assignment.get("tournament_id"), registration_id)
 
 
 async def _unseat(db, seat: tuple[dict, dict] | None) -> None:
@@ -876,12 +899,15 @@ async def _left_staffel(db, rows: list[dict]) -> set[str]:
 
 
 def team_answer(application: dict) -> dict:
-    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung."""
-    return {**own_view(application, responsible=True, can_act=True), "rule_consent": application.get("rule_consent")}
+    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung. Eine eben gemachte automatische Zuteilung
+    steht noch in keinem festen Spiel (``_auto_staffel``): Zurückziehen geht."""
+    withdrawable = bool((application.get("assignment") or {}).get("auto"))
+    return {**own_view(application, responsible=True, can_act=True, withdrawable=withdrawable), "rule_consent": application.get("rule_consent")}
 
 
-def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False) -> dict | None:
-    """Ein Antrag für das eigene Team. Der Kader sieht den Stand, ``responsible`` (Captain, Vertreter, Hauptteam-Leitung) auch den Grund, zurückziehen darf nur ``can_act`` (``may_apply``)."""
+def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False, withdrawable: bool = False) -> dict | None:
+    """Ein Antrag für das eigene Team. Der Kader sieht den Stand, ``responsible`` (Captain, Vertreter, Hauptteam-Leitung) auch den Grund, zurückziehen darf nur ``can_act`` (``may_apply``).
+    Zugeteilt nur bei ``withdrawable``: eine automatische Zuteilung ohne festen Spielplan (#2348, ``_auto_withdrawable``)."""
     if not application:
         return None
     out = {"id": application["id"], "status": application["status"], "submitted_at": application.get("submitted_at"),
@@ -889,7 +915,7 @@ def own_view(application: dict | None, *, responsible: bool, can_act: bool = Fal
     if responsible:
         out.update(decided_at=application.get("decided_at"), decision_reason=application.get("decision_reason"),
                    rules_label=f"Version {(application.get('rule_consent') or {}).get('version')}" if application.get("rule_consent") else None,
-                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and not application.get("assignment"))
+                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and (not application.get("assignment") or withdrawable))
     return out
 
 
@@ -943,7 +969,8 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         row = {"squad_id": squad["id"], "squad_name": squad.get("name"), "team_id": team["id"], "team_name": team.get("name"),
                "display_name": squad_registration.display_name(team, squad), "member_count": len([uid for uid in squad.get("member_ids") or [] if uid]),
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
-               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone))}
+               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone),
+                                       withdrawable=can_apply and await _auto_withdrawable(db, application))}
         if can_apply:
             check = {"problems": [], "warnings": [], "shortfall": None}
             if state == OPEN and not active:
@@ -987,7 +1014,9 @@ async def my_applications(db, user: dict) -> list[dict]:
         squad = by_id[squad_id]
         can_act = await may_apply(db, user, squad)
         responsible = can_act or user["id"] in _leads(teams[squad["team_id"]])
-        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone), "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
+        withdrawable = can_act and await _auto_withdrawable(db, application)
+        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone, withdrawable=withdrawable),
+                      "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
                       "url": f"/liga/{league.get('slug')}/{season.get('slug')}"})
     return items
 

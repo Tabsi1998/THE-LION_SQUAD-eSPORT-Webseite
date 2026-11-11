@@ -107,6 +107,18 @@ test("angenommen heißt für das Team Angemeldet, eingereicht nennt die Prüfung
   expect(screen.getByTestId("league-application-row-s1")).not.toHaveTextContent("Die Liga-Leitung prüft");
 });
 
+test("eine automatische Zuteilung zieht das Team selbst zurück, die Rückfrage nennt die Staffel (#2348)", async () => {
+  const assigned = { ...SQUAD, state: "accepted", application: { id: "a1", status: "accepted", staffel: "Liga 1 · Staffel A", can_withdraw: true } };
+  apiMock.get.mockResolvedValue({ data: view([assigned]) });
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderPanel();
+
+  fireEvent.click(await screen.findByTestId("league-application-withdraw-s1"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/leagues/probe-liga/season-1/applications/a1/withdraw", {}));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("spielt nicht mehr in Liga 1 · Staffel A");
+});
+
 test("der Stand einer laufenden Anmeldung nennt die offenen Punkte (#2313)", async () => {
   const submitted = { ...SQUAD, state: "submitted", application: { id: "a1", status: "submitted", can_withdraw: true },
     warnings: ["Mila: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."], shortfall: null };

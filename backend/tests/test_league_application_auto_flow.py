@@ -320,6 +320,49 @@ async def test_an_assignment_by_the_lead_still_goes_through_the_participant_list
     ok(await decide(flow, w, application, "assign", tournament_id=w["tid"]))
 
     assert (await decide(flow, w, application, "reject", reason="Kader passt nicht zur Liga")).status_code == 409
+    side = w["teams"][0]
+    assert (await my_row(flow, w, side))["application"]["can_withdraw"] is False
+    refused = await flow.post(f"{base_url(w)}/applications/{application['id']}/withdraw", json={})
+    assert refused.status_code == 409 and "Austritt" in refused.json()["detail"]
+
+
+# ---------------------------------------------------------------- Zurückziehen nach automatischer Zuteilung
+
+@pytest.mark.asyncio
+async def test_the_team_withdraws_an_auto_assignment_and_the_waitlist_stays(flow):
+    w = await application_world(flow, teams=2, application_slots=1, **AUTO)
+    side = w["teams"][0]
+    first, second = await submitted(flow, w, side), await submitted(flow, w, w["teams"][1])
+    assert (first["status"], second["status"]) == ("accepted", "waitlist")
+    assert first["can_withdraw"] is True, "die Antwort nach dem Einreichen bietet das Zurückziehen"
+    assert (await my_row(flow, w, side))["application"]["can_withdraw"] is True
+
+    done = ok(await flow.post(f"{base_url(w)}/applications/{first['id']}/withdraw", json={}))
+
+    assert done["status"] == "withdrawn"
+    row = await stored(flow, first)
+    assert "assignment" not in row and "active_key" not in row and row["withdrawn_by"] == side["captain"]["id"]
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 0
+    entry = await flow.db.audit_logs.find_one({"action": "league.application.withdraw"}, {"_id": 0})
+    assert entry["data"]["tournament_id"] == w["tid"] and entry["data"]["registration_removed"]
+    assert (await stored(flow, second))["status"] == "waitlist", "die Warteliste bleibt, über den freien Platz entscheidet die Leitung"
+    assert (await inbox(flow, w))["stats"]["free"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_fixed_plan_stops_withdrawing_an_auto_assignment(flow):
+    w = await application_world(flow, teams=1, **AUTO)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    registration = await flow.db.tournament_registrations.find_one({"application_id": application["id"]}, {"_id": 0})
+    await flow.db.matches_v2.insert_one({"id": new_id(), "tournament_id": w["tid"], "slots": [{"registration_id": registration["id"]}], "status": "scheduled"})
+
+    assert (await my_row(flow, w, side))["application"]["can_withdraw"] is False
+    refused = await flow.post(f"{base_url(w)}/applications/{application['id']}/withdraw", json={})
+
+    assert refused.status_code == 409 and "Austritt trägt die Liga-Leitung ein" in refused.json()["detail"]
+    assert (await stored(flow, application))["status"] == "accepted"
+    assert await flow.db.tournament_registrations.count_documents({"id": registration["id"]}) == 1
 
 
 # ---------------------------------------------------------------- Befangenheit (Nr. 73)

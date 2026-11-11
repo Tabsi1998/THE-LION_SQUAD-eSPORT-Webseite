@@ -1142,9 +1142,10 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 | `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, die Prüfung wird wiederholt (`check_squad`), dazu die der Staffel (`build_registration`) |
 | – (beim Einreichen) | `accepted`, mit nur einer Staffel samt `assignment.auto` | Season mit `application_auto_accept`: nach allen offenen Anträgen noch ein Platz frei und niemand auf der Warteliste (#2348) |
 | – (beim Einreichen) | `waitlist` | Season mit `application_auto_accept`: alle Plätze belegt oder von offenen Anträgen gehalten, oder schon jemand auf der Warteliste, und sie hat Platz. Sonst bleibt `submitted` |
+| `accepted` mit `assignment.auto` | `withdrawn` | Captain oder Vertreter, solange kein fester Spielplan steht (sonst 409, Austritt über die Leitung). Die Anmeldung der Staffel fällt weg, die Warteliste bleibt unberührt; `can_withdraw` in den Antworten sagt es vorab (`_auto_withdrawable`) |
 | `accepted` mit `assignment.auto` | `rejected`, `waitlist` | Leitung, Grund Pflicht. Die Anmeldung der Staffel fällt weg wie bei „Zuteilung zurücknehmen“; mit festem Spielplan 409 („Austritt eintragen“), gesperrte Staffel 423 |
 
-Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste.
+Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste - außer einer automatischen Zuteilung ohne festen Spielplan (#2348).
 
 **Automatisch annehmen** (#2348, Entscheidung Nr. 126, `application_auto_accept`): Nach derselben Prüfung wie sonst (Fenster, Regelwerk, `entry_policy`, ein Co-Team je Season, Co-Team-Regeln) entscheidet
 `_auto_decide` unter der Season-Sperre. **Wer zuerst kommt, wird zuerst bedient:** Offene Anträge (`submitted`, `in_review`) halten ihren Platz und zählen hier wie belegte
@@ -1210,7 +1211,7 @@ Hinweis „… ist automatisch angenommen …“ bzw. „… steht automatisch a
 **Löschen:** Eine Season mit Anträgen lässt sich nicht löschen (`delete-plan`, Hinweis auf Archivieren). Ein Co-Team mit offenem Antrag lässt sich erst nach dem Rückzug löschen, ein Hauptteam mit solchem Co-Team nicht auflösen.
 
 **Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist`
-(`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung); `.reject` und `.waitlist` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
+(`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung); `.reject`, `.waitlist` und `.withdraw` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
 
 ### C.1 Spielmodi (#2206)
 

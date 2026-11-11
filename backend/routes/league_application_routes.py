@@ -61,7 +61,8 @@ async def submit_application(league_slug: str, season_slug: str, body: LeagueApp
 @router.post("/{league_slug}/{season_slug}/applications/{application_id}/withdraw")
 async def withdraw_application(league_slug: str, season_slug: str, application_id: str, me: dict = Depends(get_current_user)):
     league, season = await _visible(league_slug, season_slug, me)
-    return applications.team_answer(await _call(applications.withdraw(get_db(), league, season, application_id, me)))
+    return applications.team_answer(await _call(applications.withdraw(get_db(), league, season, application_id, me,
+                                                                      refresh_previews=_refresh_tournament_previews_after_registration)))
 
 
 @me_router.get("/league-applications")

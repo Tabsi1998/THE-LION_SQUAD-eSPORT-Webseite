@@ -57,7 +57,7 @@
           "id": "stand",
           "titel": "Stand und offene Punkte",
           "text": "Den Stand eurer Anmeldung siehst du auf der Ligaseite: Eingereicht heißt, die Liga-Leitung prüft. Angemeldet heißt, ihr habt einen Startplatz, mit Zuteilung folgt fehlt nur noch die Staffel. Dort stehen auch die offenen Punkte, bis alle erledigt sind.",
-          "hinweis": "Zurückziehen geht, bis euer Co-Team einer Staffel zugeteilt ist.",
+          "hinweis": "Zurückziehen geht, bis die Liga-Leitung euch einer Staffel zuteilt. Hat euch die Season automatisch zugeteilt, geht es, bis der Spielplan steht.",
           "bild": true
         }
       ]

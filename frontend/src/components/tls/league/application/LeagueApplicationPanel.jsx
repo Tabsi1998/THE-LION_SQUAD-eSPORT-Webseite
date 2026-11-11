@@ -71,7 +71,9 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   useEffect(() => { load(); }, [load]);
 
   const withdraw = async (row) => {
-    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
+    // Eine automatische Zuteilung zieht das Team selbst zurück, solange der Spielplan nicht steht (#2348) - dann fällt auch der Platz in der Staffel weg.
+    const staffel = row.application?.staffel ? ` und spielt nicht mehr in ${row.application.staffel}` : "";
+    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
     if (!sure) return;
     try {
       await api.post(`${base}/applications/${row.application.id}/withdraw`, {});

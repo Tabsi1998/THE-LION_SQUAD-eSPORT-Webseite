@@ -36,7 +36,7 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 
 <img src="../assets/liga/liga-angemeldet-390.png" alt="Anmeldung auf der Ligaseite am Handy: ein Co-Team Angemeldet mit Staffel, eines Angemeldet – Zuteilung folgt, eines Eingereicht mit dem Satz, dass die Liga-Leitung prüft" width="300">
 
-**Zurückziehen** geht, bis das Co-Team einer Staffel zugeteilt ist. Danach klärt ihr den Austritt mit der Liga-Leitung.
+**Zurückziehen** geht, bis die Liga-Leitung das Co-Team einer Staffel zugeteilt hat. Hat euch die Season automatisch zugeteilt, geht es, bis der Spielplan der Staffel steht. Danach klärt ihr den Austritt mit der Liga-Leitung.
 
 ## Die Woche
 
