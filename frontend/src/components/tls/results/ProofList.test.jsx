@@ -118,6 +118,20 @@ test("abgeschlossen oder ohne Recht: nur lesen - und bei MOSS steht, wer es sieh
   expect(screen.getByTestId("proof-list-audience")).toHaveTextContent("nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite");
 });
 
+test("MOSS: entfernen heißt verbergen - die Rückfrage sagt es, die Leitung sieht den Eintrag als entfernt", async () => {
+  apiMock.get.mockResolvedValue(answer([{ ...IMAGE, kind: "moss", scan_state: "safe" }]));
+  await show({ kind: "moss" });
+  const button = screen.getByTestId("proof-list-remove-b1");
+  fireEvent.click(button);
+  expect(button).toHaveTextContent("Wirklich entfernen? Die Leitung sieht ihn weiter.");
+  expect(screen.getByTestId("proof-list-audience")).toHaveTextContent("bleibt er für die Leitung sichtbar, bis das Verfahren endet");
+  // So sieht ihn danach die Leitung: gekennzeichnet, ohne Knopf zum Entfernen.
+  apiMock.get.mockResolvedValue(answer([{ ...IMAGE, kind: "moss", own: false, own_side: false, can_remove: false, scan_state: "safe", removed: true }], { can_add: true }));
+  await show({ kind: "moss", testId: "leitung" });
+  expect(screen.getByTestId("leitung-item-b1")).toHaveTextContent("von der Seite entfernt, nur noch für die Leitung sichtbar");
+  expect(screen.queryByTestId("leitung-remove-b1")).toBeNull();
+});
+
 test("leer und Ladefehler: ein Satz statt einer leeren Fläche", async () => {
   apiMock.get.mockResolvedValue(answer([]));
   await show();

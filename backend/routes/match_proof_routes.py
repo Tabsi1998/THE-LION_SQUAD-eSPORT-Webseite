@@ -84,7 +84,7 @@ async def add_proof(match_id: str, request: Request, kind: str = Form(...), ref_
 
 @router.delete("/{match_id}/proofs/{proof_id}")
 async def remove_proof(match_id: str, proof_id: str, me: dict = Depends(get_current_user)):
-    """Den eigenen Nachweis entfernen, solange der Bezug offen ist."""
+    """Den eigenen Nachweis entfernen, solange man zu dem Bezug auch hinzufügen dürfte. MOSS bleibt für die Leitung
+    (``kept_for_lead``)."""
     db = get_db()
-    await match_proofs.remove_proof(db, await _match(db, match_id), me, proof_id)
-    return {"ok": True}
+    return await match_proofs.remove_proof(db, await _match(db, match_id), me, proof_id)

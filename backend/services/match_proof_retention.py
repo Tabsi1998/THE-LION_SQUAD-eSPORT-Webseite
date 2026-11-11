@@ -66,7 +66,9 @@ async def _expired_league(db, current: datetime, staffeln: dict[str, dict]) -> l
         elif current >= end + timedelta(days=match_proofs.setting(tournament, season_of(tournament), "evidence_keep_days")):
             due.append(tournament_id)
     base = {"status": "attached"}
-    rows = await db.match_proof_photos.find({**base, "tournament_id": {"$in": sorted(staffeln)}, "context.kind": "moss"}, {"_id": 0}).to_list(1000)
+    # MOSS auch, wenn die Seite ihn zurückgezogen hat (``removed``): Er bleibt für die Leitung bis hierher.
+    rows = await db.match_proof_photos.find({"status": {"$in": list(match_proofs.KEPT_STATUSES)}, "tournament_id": {"$in": sorted(staffeln)},
+                                             "context.kind": "moss"}, {"_id": 0}).to_list(1000)
     if due:
         rows += await db.match_proof_photos.find({**base, "tournament_id": {"$in": sorted(due)}}, {"_id": 0}).to_list(1000)
     if undated:
@@ -104,10 +106,11 @@ async def purge(db, *, now=None) -> int:
     staffeln = {row["id"]: row for row in await db.tournaments.find(
         ONLY_LEAGUE, {"_id": 0, "id": 1, "league_context": 1, "appeal_hours": 1, "evidence_keep_days": 1}).to_list(None)}
     expired = [*await _expired_tournament(db, current, sorted(staffeln)), *await _expired_league(db, current, staffeln)]
-    attached_ids = await db.match_proof_photos.distinct("match_id", {"status": "attached"})
+    kept = {"status": {"$in": list(match_proofs.KEPT_STATUSES)}}
+    attached_ids = await db.match_proof_photos.distinct("match_id", kept)
     known = set(await db.matches_v2.distinct("id", {"id": {"$in": attached_ids}})) if attached_ids else set()
     orphans = await db.match_proof_photos.find(
-        {"status": "attached", "match_id": {"$nin": sorted(known)}}, {"_id": 0}).to_list(500) if attached_ids else []
+        {**kept, "match_id": {"$nin": sorted(known)}}, {"_id": 0}).to_list(500) if attached_ids else []
     seen: set[str] = set()
     rows = []
     for row in [*stale, *expired, *orphans]:

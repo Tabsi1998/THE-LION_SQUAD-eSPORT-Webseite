@@ -44,6 +44,9 @@ logger = logging.getLogger("tls.match_proofs")
 PENDING_TTL = timedelta(hours=24)
 RETENTION_DAYS = 30
 VISIBLE_SCAN_STATES = {"safe", "failed"}
+# Ein MOSS-Nachweis, den seine Seite zurückgezogen hat: bleibt für die Leitung, bis die Aufbewahrung ihn löscht.
+REMOVED = "removed"
+KEPT_STATUSES = ("attached", REMOVED)
 LINK_MAX_LENGTH = 500
 REF_ID_MAX_LENGTH = 120
 # Je Seite und Bezug - genug für „mehrere Screenshots aus verschiedenen Runden“ (Regelwerk § 9.7), zu wenig zum Zumüllen.
@@ -213,10 +216,18 @@ async def viewer_for(db, match: dict, user: dict | None) -> Viewer:
     return Viewer(user_id=user["id"], sides=frozenset(sides), acting=frozenset(acting), lead=lead)
 
 
+def is_removed(doc: dict) -> bool:
+    """Von der Seite zurückgezogen, aber aufbewahrt - das gibt es nur bei MOSS (``remove_proof``)."""
+    return doc.get("status") == REMOVED
+
+
 def can_see_doc(doc: dict, viewer: Viewer) -> bool:
     state = doc.get("scan_state") or "safe"
     if not viewer.user_id or state == "blocked":
         return False
+    if is_removed(doc):
+        # Auch wer ihn hochgeladen hat, sieht ihn nicht mehr - nur die Leitung, bis die Aufbewahrung ihn löscht.
+        return viewer.lead and state in VISIBLE_SCAN_STATES
     if viewer.user_id == doc.get("owner_id"):
         return True
     if state not in VISIBLE_SCAN_STATES or doc.get("status") != "attached":
@@ -232,7 +243,7 @@ async def can_see(db, doc: dict, user: dict | None) -> bool:
     """Nur Spieler dieses Spiels und die Leitung dieses Turniers - bis zur Bildprüfung nur der Absender, MOSS nie die Gegenseite."""
     if not user or (doc.get("scan_state") or "safe") == "blocked":
         return False
-    if user.get("id") == doc.get("owner_id"):
+    if user.get("id") == doc.get("owner_id") and not is_removed(doc):
         return True
     match = await db.matches_v2.find_one({"id": doc.get("match_id")}, {"_id": 0})
     if not match:
@@ -317,7 +328,8 @@ def add_refusal(kind: str, viewer: Viewer, ref: refs.Ref, now: datetime) -> tupl
     return None
 
 
-def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref) -> dict:
+def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref, *, can_change: bool) -> dict:
+    """``can_change``: Darf diese Person zu diesem Bezug gerade hinzufügen? Nur dann darf sie Eigenes auch entfernen."""
     context = doc.get("context") or {}
     own = viewer.user_id == doc.get("owner_id")
     view = {
@@ -330,15 +342,17 @@ def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref) -> dict:
         "own_side": bool(doc.get("registration_id")) and doc["registration_id"] in viewer.sides,
         "created_at": doc.get("created_at"),
         # Altbestand (ohne ``ref_id``) hängt an einer Meldung oder einem Problem und bleibt dort.
-        "can_remove": own and ref.open and "ref_id" in context,
+        "can_remove": own and can_change and "ref_id" in context and not is_removed(doc),
     }
+    if is_removed(doc):
+        view = {**view, "removed": True, "removed_at": doc.get("removed_at")}
     if is_link(doc):
         return {**view, "link": doc.get("link")}
     return {**view, **public_proof(doc)}
 
 
 async def _rows_of(db, match_id: str, kind: str, ref_id: str) -> list[dict]:
-    rows = await db.match_proof_photos.find({"match_id": match_id, "status": "attached"}, {"_id": 0}).to_list(1000)
+    rows = await db.match_proof_photos.find({"match_id": match_id, "status": {"$in": list(KEPT_STATUSES)}}, {"_id": 0}).to_list(1000)
     return sorted((row for row in rows if refs.kind_of(row) == kind and ((row.get("context") or {}).get("ref_id") or "") == ref_id),
                   key=lambda row: str(row.get("created_at") or ""))
 
@@ -351,21 +365,22 @@ async def list_proofs(db, match: dict, user: dict, kind, ref_id) -> dict:
     if not (viewer.sides or viewer.acting or viewer.lead) or not ref.found:
         raise HTTPException(status_code=404, detail="Nachweise nicht gefunden")
     rows = [row for row in await _rows_of(db, match["id"], kind, ref_id) if can_see_doc(row, viewer)]
+    can_add = add_refusal(kind, viewer, ref, now_utc()) is None
     return {
-        "items": [proof_view(row, viewer, ref) for row in rows],
+        "items": [proof_view(row, viewer, ref, can_change=can_add) for row in rows],
         "open": ref.open,
-        "can_add": add_refusal(kind, viewer, ref, now_utc()) is None,
+        "can_add": can_add,
         "limit": MAX_PER_REF,
         "link_max_length": LINK_MAX_LENGTH,
     }
 
 
-async def _audit(db, action: str, match: dict, actor_id: str, doc: dict) -> None:
+async def _audit(db, action: str, match: dict, actor_id: str, doc: dict, **extra) -> None:
     # Nie die Adresse eines Links: das Protokoll bleibt länger als der Nachweis.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "target_id": match.get("tournament_id") or match.get("id"), "actor_id": actor_id,
         "data": {"match_id": match.get("id"), "proof_id": doc["id"], "type": "link" if is_link(doc) else "image",
-                 "kind": refs.kind_of(doc), "ref_id": (doc.get("context") or {}).get("ref_id") or ""},
+                 "kind": refs.kind_of(doc), "ref_id": (doc.get("context") or {}).get("ref_id") or "", **extra},
         "created_at": now_utc().isoformat(),
     })
 
@@ -390,7 +405,7 @@ async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: Upload
     url = clean_link(link) if has_link else None
     side = _own_side(kind, viewer, ref)
     mine = [row for row in await _rows_of(db, match["id"], kind, ref_id)
-            if (row.get("registration_id") == side if side else row.get("owner_id") == user["id"])]
+            if not is_removed(row) and (row.get("registration_id") == side if side else row.get("owner_id") == user["id"])]
     if len(mine) >= MAX_PER_REF:
         raise HTTPException(status_code=409, detail=f"Mehr als {MAX_PER_REF} Nachweise je Seite gehen hier nicht.")
     context = {"kind": kind, "ref_id": ref_id}
@@ -403,20 +418,36 @@ async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: Upload
     else:
         doc = await _store_image(db, match, user, side, file, status="attached", context=context)
     await _audit(db, "match.proof.add", match, user["id"], doc)
-    return proof_view(doc, viewer, ref)
+    return proof_view(doc, viewer, ref, can_change=True)
 
 
-async def remove_proof(db, match: dict, user: dict, proof_id: str) -> None:
-    """Den eigenen Nachweis wieder entfernen - nur über den neuen Weg angehängte und nur, solange der Bezug offen ist."""
+async def remove_proof(db, match: dict, user: dict, proof_id: str) -> dict:
+    """Den eigenen Nachweis wieder entfernen - nur über den neuen Weg angehängte und nur, solange diese Person zu dem Bezug
+    auch hinzufügen dürfte (offen, eigene Seite, Frist nicht vorbei): Sonst ließe sich ein Beleg nach der Frist noch
+    zurückziehen, wenn die Gegenseite schon darauf geantwortet hat. Ein MOSS-Nachweis wird dabei nicht gelöscht, nur als
+    entfernt markiert: Die Seite sieht ihn nicht mehr, die Leitung behält ihn, bis die Aufbewahrung ihn löscht - sonst
+    könnte ein Spieler eine belastende Datei aus dem laufenden Verfahren nehmen."""
     doc = await db.match_proof_photos.find_one({"id": proof_id, "match_id": match["id"], "owner_id": user["id"]}, {"_id": 0})
     context = (doc or {}).get("context") or {}
     if not doc or doc.get("status") != "attached" or "ref_id" not in context:
         raise HTTPException(status_code=404, detail="Nachweis nicht gefunden")
-    ref = await resolve_ref(db, match, refs.kind_of(doc) or "", context.get("ref_id") or "")
+    kind = refs.kind_of(doc) or ""
+    ref = await resolve_ref(db, match, kind, context.get("ref_id") or "")
+    if not ref.found:
+        raise HTTPException(status_code=404, detail="Nachweis nicht gefunden")
     if not ref.open:
         raise HTTPException(status_code=409, detail="Der Nachweis lässt sich nicht mehr entfernen - die Sache ist abgeschlossen.")
-    await delete_rows(db, [doc])
-    await _audit(db, "match.proof.remove", match, user["id"], doc)
+    if add_refusal(kind, await viewer_for(db, match, user), ref, now_utc()) is not None:
+        raise HTTPException(status_code=409, detail="Der Nachweis lässt sich nicht mehr entfernen - die Frist dafür ist vorbei.")
+    kept = kind == "moss"
+    if kept:
+        now = now_utc().isoformat()
+        await db.match_proof_photos.update_one({"id": doc["id"], "status": "attached"}, {"$set": {
+            "status": REMOVED, "removed_at": now, "removed_by": user["id"], "updated_at": now}})
+    else:
+        await delete_rows(db, [doc])
+    await _audit(db, "match.proof.remove", match, user["id"], doc, kept=kept)
+    return {"ok": True, "kept_for_lead": kept}
 
 
 # ---------------------------------------------------------------- Löschen

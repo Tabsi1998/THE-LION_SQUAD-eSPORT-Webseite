@@ -2710,12 +2710,13 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | `context.kind` | `report` \| `incident` \| `protest` \| `statement` \| `moss` | Bezug; Altbestand kennt zusätzlich `dispute` (zählt wie `protest`) |
 | `context.ref_id` | str | Kennung des Vorfalls (`incidents[].id`) bzw. des Verfahrens (`disputes[].id`); bei `report` leer. Fehlt der Schlüssel, ist es Altbestand |
 | `registration_id` | str \| null | die Seite, die hochgeladen hat (null: die Leitung) |
-| `owner_id`, `match_id`, `tournament_id`, `status`, `scan_state`, Bildfelder | wie bisher | unverändert |
+| `owner_id`, `match_id`, `tournament_id`, `scan_state`, Bildfelder | wie bisher | unverändert |
+| `status` | `pending` \| `attached` \| `removed` | wie bisher; neu `removed` (nur MOSS): von der Seite zurückgezogen, für die Leitung aufbewahrt, dazu `removed_at`, `removed_by` |
 
 - **API:** `GET /api/matches/{id}/proofs?kind=&ref_id=` liefert `{items, open, can_add, limit, link_max_length}`, nur was der Aufrufer
   sehen darf. Je Eintrag: `id`, `type`, `kind`, `ref_id`, `side` (Anmeldung), `own`, `own_side`, `can_remove`, `created_at`; ein Bild
   dazu `url`, `width`, `height`, `scan_state`, ein Link `link`. `POST /api/matches/{id}/proofs` (Formular: `kind`, `ref_id` und entweder
-  `file` oder `link`) antwortet mit dem Eintrag, `DELETE /api/matches/{id}/proofs/{proof_id}` mit `{ok}`. Bilder liefert weiter
+  `file` oder `link`) antwortet mit dem Eintrag, `DELETE /api/matches/{id}/proofs/{proof_id}` mit `{ok, kept_for_lead}`. Bilder liefert weiter
   `GET /api/matches/{id}/proof-photos/{id}` aus. Die Logik zum Bezug steht in `services/match_proof_refs.py` (ohne Datenbank).
   Die drei `/proofs`-Endpunkte gibt es **nur für Spiele einer Liga-Staffel**; bei jedem anderen Spiel antworten sie mit 404.
   Turniere bleiben beim einen Foto je Meldung über `/proof-photos`.
@@ -2725,9 +2726,13 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
   mit `results` oder `disputes` darf zu jedem offenen Bezug hinzufügen, wenn sie an dem Spiel nicht beteiligt ist (Befangenheit
   wie B.1, ohne Notausnahme); wer befangen ist, wird wie ein Mitglied seiner Seite geprüft. Höchstens zehn Nachweise je Seite und Bezug, gleiches
   Rate-Limit wie beim Foto vom Ergebnis (gemeinsamer Zähler).
-- **Entfernen** darf nur, wer den Nachweis hinzugefügt hat, und nur solange der Bezug offen ist. Altbestand (über `photo_id` an Meldung
-  oder Problem gehängt) lässt sich so nicht entfernen. Protokoll: `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, nie
-  die Adresse).
+- **Entfernen** darf nur, wer den Nachweis hinzugefügt hat, und nur **solange dieselbe Person zu dem Bezug auch hinzufügen dürfte**
+  (Bezug offen, eigene Seite, `evidence_until` bzw. `statement.due_at` nicht vorbei): Nach der Frist lässt sich ein Beleg nicht mehr
+  zurückziehen. Altbestand (über `photo_id` an Meldung oder Problem gehängt) lässt sich so nicht entfernen.
+  **MOSS wird dabei nicht gelöscht**, sondern als entfernt markiert (`status: "removed"`, `removed_at`, `removed_by`): Danach sieht
+  ihn nur noch die nicht befangene Leitung (in der Liste mit `removed: true`), nicht mehr die Seite und nicht mehr, wer ihn
+  hochgeladen hat. Endgültig löscht ihn erst die Aufbewahrung. Die Antwort nennt das mit `kept_for_lead`. Protokoll:
+  `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, bei MOSS `kept: true`, nie die Adresse).
 - **Offen** ist ein Bezug so: `report` bis das Spiel `completed`, `forfeit` oder geschlossen ist; `incident` in `proposed` und
   `in_review`; `protest`, `statement` und `moss` bis das Verfahren `resolved_at` oder `withdrawn_at` trägt.
 - **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Die ZIP-Datei selbst
@@ -2740,7 +2745,7 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Nie verwendetes Foto (`pending`) | 24 Stunden nach dem Hochladen (unverändert) |
 | Turnier ohne Liga | 30 Tage nach dem Hochladen, nicht solange das Spiel `disputed` ist (unverändert) |
 | Liga, alles außer MOSS | ab Season-Ende + `evidence_keep_days`, nicht solange am Spiel ein Vorfall oder Verfahren offen ist oder eine Einspruchsfrist läuft |
-| Liga, MOSS | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; ohne auffindbares Verfahren `appeal_hours` nach dem Hochladen |
+| Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; ohne auffindbares Verfahren `appeal_hours` nach dem Hochladen |
 | Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
 
 **Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt

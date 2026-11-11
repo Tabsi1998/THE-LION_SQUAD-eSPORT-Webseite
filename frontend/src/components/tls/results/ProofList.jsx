@@ -53,13 +53,13 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
             <span className="sr-only">(öffnet in neuem Tab)</span>
           </a>
         ) : <span className="text-white/70">Bild</span>}
-        <div className="text-white/50">{sideName(item, sideLabels)}{waiting ? " · wird noch geprüft, bis dahin nur für dich sichtbar" : ""}</div>
+        <div className="text-white/50">{sideName(item, sideLabels)}{item.removed ? " · von der Seite entfernt, nur noch für die Leitung sichtbar" : ""}{waiting ? " · wird noch geprüft, bis dahin nur für dich sichtbar" : ""}</div>
       </div>
       {item.can_remove ? (
         <button type="button" disabled={busy} onClick={() => onRemove(item)} aria-label={confirming ? "Wirklich entfernen" : "Nachweis entfernen"}
           className={`shrink-0 min-h-[44px] px-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 ${confirming ? "text-[#FF6B60]" : "text-white/50 hover:text-white"}`}
           data-testid={`${testId}-remove-${item.id}`}>
-          {confirming ? "Wirklich entfernen?" : <Trash2 className="w-4 h-4" />}
+          {confirming ? (item.kind === "moss" ? "Wirklich entfernen? Die Leitung sieht ihn weiter." : "Wirklich entfernen?") : <Trash2 className="w-4 h-4" />}
         </button>
       ) : null}
     </li>
@@ -189,7 +189,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
             </p>
           )}
           <p className="text-xs text-white/50" data-testid={`${testId}-audience`}>
-            {kind === "moss" ? "MOSS-Nachweise sehen nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite." : "Nachweise sehen nur die beiden Seiten dieses Spiels und die Leitung."}
+            {kind === "moss" ? "MOSS-Nachweise sehen nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite. Entfernst du einen, bleibt er für die Leitung sichtbar, bis das Verfahren endet." : "Nachweise sehen nur die beiden Seiten dieses Spiels und die Leitung."}
           </p>
         </>
       ) : null}

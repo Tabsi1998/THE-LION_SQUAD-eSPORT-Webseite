@@ -271,6 +271,73 @@ async def test_remove_only_your_own_and_only_while_the_reference_is_open(flow):
 
 
 @pytest.mark.asyncio
+async def test_removing_follows_the_deadline_for_adding(flow):
+    """Nach der Frist lässt sich ein Beleg nicht mehr zurückziehen - die Gegenseite hat vielleicht schon darauf geantwortet (M2)."""
+    w = await league_world(flow)
+    match = w["match"]
+    soon, past = (now_utc() + timedelta(hours=5)).isoformat(), (now_utc() - timedelta(minutes=1)).isoformat()
+    await set_match(flow, w, disputes=[protest(w, evidence_until=soon, statement={"due_at": soon})])
+    flow.act_as(user(w, "Falke1"))
+    evidence = (await add_link(flow, match, "protest", "verfahren-1")).json()
+    early = (await add_link(flow, match, "protest", "verfahren-1")).json()
+    assert evidence["can_remove"] is True
+    flow.act_as(user(w, "Kapitaen"))
+    answer = (await add_link(flow, match, "statement", "verfahren-1")).json()
+    # Innerhalb der Frist geht es.
+    flow.act_as(user(w, "Falke1"))
+    in_time = await flow.delete(f"/api/matches/{match['id']}/proofs/{early['id']}")
+    assert in_time.status_code == 200 and in_time.json() == {"ok": True, "kept_for_lead": False}
+
+    await set_match(flow, w, disputes=[protest(w, evidence_until=past, statement={"due_at": past})])
+    late_add = await add_link(flow, match, "protest", "verfahren-1")
+    late_remove = await flow.delete(f"/api/matches/{match['id']}/proofs/{evidence['id']}")
+    assert late_add.status_code == 409 and late_remove.status_code == 409 and "Frist" in late_remove.json()["detail"]
+    state = (await listed(flow, match, "protest", "verfahren-1")).json()
+    assert state["open"] is True and [item["can_remove"] for item in state["items"]] == [False]
+    flow.act_as(user(w, "Kapitaen"))
+    late_statement = await flow.delete(f"/api/matches/{match['id']}/proofs/{answer['id']}")
+    assert late_statement.status_code == 409
+    assert await flow.db.match_proof_photos.count_documents({}) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_removed_moss_proof_stays_for_the_lead(flow):
+    """MOSS wird nicht gelöscht, nur als entfernt markiert: Die Seite sieht ihn nicht mehr, die Leitung behält ihn (M2)."""
+    w = await league_world(flow)
+    match = w["match"]
+    await set_match(flow, w, disputes=[protest(w)])
+    flow.act_as(user(w, "Mila"))
+    moss = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    saved = match_proofs.PROOF_DIR / (await flow.db.match_proof_photos.find_one({"id": moss["id"]}, {"_id": 0}))["storage_key"]
+    removed = await flow.delete(f"/api/matches/{match['id']}/proofs/{moss['id']}")
+    assert removed.status_code == 200 and removed.json() == {"ok": True, "kept_for_lead": True}
+    stored = await flow.db.match_proof_photos.find_one({"id": moss["id"]}, {"_id": 0})
+    assert stored["status"] == "removed" and stored["removed_by"] == user(w, "Mila")["id"] and stored["removed_at"]
+    assert saved.is_file(), "die Datei bleibt"
+    audit = await flow.db.audit_logs.find({"action": "match.proof.remove"}, {"_id": 0}).to_list(10)
+    assert [row["data"]["kept"] for row in audit] == [True]
+
+    # Weder wer hochgeladen hat noch Captain oder Gegenseite sehen ihn noch - auch nicht als Bild.
+    for person in (user(w, "Mila"), user(w, "Kapitaen"), user(w, "Falke1")):
+        flow.act_as(person)
+        assert await ids_seen(flow, match, "moss", "verfahren-1") == set(), person["display_name"]
+        assert (await flow.get(moss["url"])).status_code == 404, person["display_name"]
+    flow.act_as(user(w, "Mila"))
+    again = await flow.delete(f"/api/matches/{match['id']}/proofs/{moss['id']}")
+    assert again.status_code == 404
+    # Die Leitung sieht ihn weiter, als entfernt gekennzeichnet.
+    flow.act_as(w["staff"])
+    item = (await listed(flow, match, "moss", "verfahren-1")).json()["items"][0]
+    assert item["id"] == moss["id"] and item["removed"] is True and item["removed_at"] and item["can_remove"] is False
+    assert (await flow.get(moss["url"])).status_code == 200
+    # Ein entfernter Nachweis zählt nicht mehr gegen die Grenze je Seite.
+    flow.act_as(user(w, "Mila"))
+    for _ in range(match_proofs.MAX_PER_REF):
+        added = await add_link(flow, match, "moss", "verfahren-1")
+        assert added.status_code == 200, added.text
+
+
+@pytest.mark.asyncio
 async def test_tournaments_outside_a_league_have_no_proof_list(flow):
     """Turniere bleiben, wie sie sind (Review #2360, M3): ein Foto je Meldung über ``/proof-photos`` - ``/proofs`` gibt es dort nicht."""
     staff = await flow.add_staff()

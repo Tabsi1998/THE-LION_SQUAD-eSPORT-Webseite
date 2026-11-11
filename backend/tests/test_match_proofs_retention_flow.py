@@ -188,6 +188,27 @@ async def test_moss_respects_a_stored_appeal_deadline_and_the_season_setting(flo
 
 
 @pytest.mark.asyncio
+async def test_a_removed_moss_proof_is_deleted_by_the_retention_like_any_moss(flow):
+    """Von der Seite entfernt heißt nur verborgen: Endgültig löscht erst der Job - nach Verfahrensende plus Einspruchsfrist."""
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w)
+    await set_match(flow, w, disputes=[protest(w)])
+    flow.act_as(user(w, "Mila"))
+    moss = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    saved = match_proofs.PROOF_DIR / (await flow.db.match_proof_photos.find_one({"id": moss["id"]}, {"_id": 0}))["storage_key"]
+    removed = await flow.delete(f"/api/matches/{match['id']}/proofs/{moss['id']}")
+    assert removed.status_code == 200, removed.text
+    assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(days=20)) == 0, "offenes Verfahren"
+    decided = now_utc() + timedelta(hours=2)
+    await set_match(flow, w, disputes=[protest(w, resolved_at=decided.isoformat())])
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=47)) == 0
+    assert saved.is_file()
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=49)) == 1
+    assert await left(flow) == set() and not saved.exists()
+
+
+@pytest.mark.asyncio
 async def test_moss_without_its_procedure_goes_after_the_appeal_hours_from_upload(flow):
     w = await league_world(flow)
     await season(flow, w)
