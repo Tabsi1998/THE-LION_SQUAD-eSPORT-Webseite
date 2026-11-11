@@ -4,6 +4,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { AutoBannerStats } from "@/components/tls/AutoBannerStats";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -151,6 +152,8 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
               <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} testId="f1-edit-end" />
               {/* Online-Einreichen gibt es noch nicht: der Schalter kommt mit #1278 zurück (#2130). Gespeichertes bleibt unberührt. */}
               <CheckField label="Automatisches Fast-Lap-Hinweisbanner anzeigen" checked={form.site_banner_enabled} onChange={(v)=>set("site_banner_enabled", v)} accent="#FFD700" />
+              {/* Zahlen der automatischen Banner (#2352), auch nach dem Ende des Banners. */}
+              <AutoBannerStats kind="fastlap" refId={challenge.id} />
             </FormSection>
             <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent="#FFD700" hint="Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.">
               <CheckField
