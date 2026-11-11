@@ -82,6 +82,16 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
    **Planung prüfen** bei widersprüchlichen Zeiten – beim Bearbeiten genauso, direkt unter **Check-in endet** (etwa „Der
    Check-in endet vor seiner Öffnung.“). Gespeichert wird trotzdem.
 
+   Beim Bearbeiten (Reiter **Bearbeiten**, Kasten „Zeitplan und Anmeldung“) steht der Haken **Automatisches
+   Turnier-Hinweisbanner anzeigen**: Solange Anmeldung oder Check-in offen sind bzw. das Turnier innerhalb eines Tages
+   startet, läuft dann oben im Turnierbereich der Website und in der App ein Banner. Ihn sieht, wer das Turnier sehen
+   darf (Sichtbarkeit Community: Angemeldete, Vereinsmitglieder: Mitglieder); bei **Intern** läuft keiner.
+   Darunter stehen seine **Views**, **Klicks** und wann er **zuletzt angezeigt** wurde, bei mehreren Bannern
+   (Anmeldung / Check-in, Startet bald) einzeln aufgeschlüsselt. Die Zahlen bleiben, wenn der Banner nicht mehr läuft.
+   Alle laufenden automatischen Banner zeigt auch Admin → Auftritt → Branding (siehe [Auftritt](auftritt.md)).
+
+   <img src="../assets/turniere/banner-zahlen-handy.png" alt="Turnier bearbeiten am Handy: unter dem Schalter Automatisches Turnier-Hinweisbanner anzeigen stehen Views 168, Klicks 23, zuletzt angezeigt, aufgeschlüsselt nach Anmeldung / Check-in und Startet bald" width="300">
+
    <img src="../assets/turniere/planung-pruefen-bearbeiten-handy.png" alt="Turnier bearbeiten am Handy: Check-in endet liegt vor Check-in öffnet, darunter der gelbe Kasten Planung prüfen" width="300">
 6. Weiter unten, aufklappbar: **Darstellung und Regeln** (**Adresse (URL)** – sie folgt dem Titel, bis du sie selbst
    änderst –, Plattform, Beschreibung, Banner, **Regeln**, Partner), **Spieloptionen** (Best of, **Setzliste**,

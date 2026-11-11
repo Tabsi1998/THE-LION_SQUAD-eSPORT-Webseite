@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, formatApiError, formatRequestError } from "@/lib/api";
 import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
+import { AutoBannerStats } from "@/components/tls/AutoBannerStats";
 import { CheckField, TextField, SelectField as SelectInput } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
@@ -377,6 +378,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet die Teamleitung an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
+            {/* Zahlen der automatischen Banner (#2352): je Vorlage, auch nach dem Ende des Banners. */}
+            <AutoBannerStats kind="tournament" refId={tournament.id} />
             {/* Vor Ort startet die Turnierleitung selbst (#2111, W4): der Schalter steht dort nur noch, solange er an ist. */}
             {(f.event_mode !== "local" || f.auto_start_enabled) && <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" hint={f.event_mode === "local" ? "Vor Ort startet die Turnierleitung selbst – besser ausschalten." : undefined} checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />}
             <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
