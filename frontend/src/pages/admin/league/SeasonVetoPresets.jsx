@@ -9,8 +9,8 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatApiError } from "@/lib/api";
 import {
-  applyRotation, changedWeeks, knownPresets, missingWeeks, overwriteCount, presetChangeLine, presetValue, presetsPayload, presetsToForm, weekDates,
-  weekList, weekLocked, withPreset,
+  applyRotation, changedWeeks, missingWeeks, overwriteCount, presetChangeLine, presetStale, presetValue, presetsPayload, presetsToForm, staleWeeks,
+  weekDates, weekList, weekLocked, withPreset,
 } from "@/lib/leagueVeto";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -24,10 +24,12 @@ function WeekRow({ row, modes, form, problems, changed, onChange }) {
   // Vergangene Wochen und Wochen mit begonnenem Veto fasst der Vorschlag nie an - von Hand bleiben sie änderbar (gilt dann nur für
   // Spiele, deren Veto noch nicht begonnen hat).
   const kept = row.started ? "Veto begonnen" : row.past ? "vorbei" : "";
-  const tone = open ? "border-warn/40 bg-warn/5" : changed ? "border-[#29B6E8]/50 bg-[#29B6E8]/5" : "border-white/10 bg-[#0A0A0A]";
+  // Eine Map, die den Pool verlassen hat, bleibt als solche stehen - nicht still verworfen, bis die Leitung neu wählt (Review).
+  const stale = modes.some((mode) => presetStale(form, row.week, mode));
+  const tone = open || stale ? "border-warn/40 bg-warn/5" : changed ? "border-[#29B6E8]/50 bg-[#29B6E8]/5" : "border-white/10 bg-[#0A0A0A]";
   return (
     <li className={`rounded-sm border px-3 py-2 ${tone}`} data-testid={`veto-preset-week-${row.week}`} data-missing={open ? "true" : "false"}
-      data-changed={changed ? "true" : "false"} data-kept={kept ? "true" : "false"}>
+      data-changed={changed ? "true" : "false"} data-kept={kept ? "true" : "false"} data-stale={stale ? "true" : "false"}>
       {/* Am Handy steht die Woche über der Auswahl (eine Zeile: Woche, Tage, „fehlt“), am PC links daneben - so wird nichts abgeschnitten. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex flex-wrap items-baseline gap-x-2 sm:block sm:w-36 sm:shrink-0">
@@ -35,6 +37,7 @@ function WeekRow({ row, modes, form, problems, changed, onChange }) {
           <div className="text-xs tabular-nums text-white/55">
             {dates || "ohne Kalenderwoche"}
             {open ? <span className="ml-2 font-bold text-warn" data-testid={`veto-preset-week-${row.week}-missing`}>fehlt</span> : null}
+            {stale ? <span className="ml-2 font-bold text-warn" data-testid={`veto-preset-week-${row.week}-stale`}>nicht mehr im Pool</span> : null}
             {changed ? <span className="ml-2 font-bold text-[#29B6E8]" data-testid={`veto-preset-week-${row.week}-changed`}>geändert</span> : null}
           </div>
           {kept ? <div className="text-[11px] text-white/45" data-testid={`veto-preset-week-${row.week}-kept`}>{kept}</div> : null}
@@ -43,9 +46,11 @@ function WeekRow({ row, modes, form, problems, changed, onChange }) {
           {modes.map((mode) => (
             <label key={mode.mode} className="block min-w-0 text-xs text-white/60">
               {mode.label} · Map {mode.position}
-              <select className={`${FIELD} mt-1 ${presetValue(form, row.week, mode.mode) ? "border-white/10" : "border-warn/50"}`} value={presetValue(form, row.week, mode.mode)}
-                onChange={(event) => onChange(row.week, mode.mode, event.target.value)} data-testid={`veto-preset-${row.week}-${mode.mode}`}>
+              <select className={`${FIELD} mt-1 ${presetValue(form, row.week, mode.mode) && !presetStale(form, row.week, mode) ? "border-white/10" : "border-warn/50"}`}
+                value={presetValue(form, row.week, mode.mode)} onChange={(event) => onChange(row.week, mode.mode, event.target.value)}
+                data-testid={`veto-preset-${row.week}-${mode.mode}`}>
                 <option value="">Noch nicht gewählt</option>
+                {presetStale(form, row.week, mode) ? <option value={presetValue(form, row.week, mode.mode)}>Map nicht mehr im Pool – bitte neu wählen</option> : null}
                 {mode.maps.map((item) => <option key={item.map_id} value={item.map_id}>{item.name}</option>)}
               </select>
             </label>
@@ -69,7 +74,7 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
     api.get(`/admin/leagues/seasons/${seasonId}/veto-presets`).then(({ data }) => {
       if (!alive || !Array.isArray(data?.weeks)) return;
       setState(data);
-      setForm(presetsToForm(knownPresets(data.presets, data.modes)));
+      setForm(presetsToForm(data.presets));
     }).catch((failure) => alive && setError(formatApiError(failure.response?.data?.detail) || "Die Vorgaben der Woche konnten nicht geladen werden."));
     return () => { alive = false; };
   }, [seasonId]);
@@ -77,15 +82,18 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
   const weeks = useMemo(() => state?.weeks || [], [state]);
   const modes = useMemo(() => state?.modes || [], [state]);
   const missing = useMemo(() => missingWeeks(form, weeks, modes), [form, weeks, modes]);
-  const saved = useMemo(() => presetsToForm(knownPresets(state?.presets, modes)), [state, modes]);
+  const saved = useMemo(() => presetsToForm(state?.presets), [state]);
   // Geänderte Wochen bleiben bis zum Speichern markiert - nach „Rotiert …“ sieht man so, was der Vorschlag angefasst hat.
   const changed = useMemo(() => changedWeeks(form, saved, weeks, modes), [form, saved, weeks, modes]);
   const dirty = changed.length > 0;
   const keptWeeks = useMemo(() => weeks.filter(weekLocked).map((row) => row.week), [weeks]);
-  // Was der Server an einer gespeicherten Vorgabe bemängelt (etwa eine Map, die nicht mehr im Pool steht) - solange nichts geändert ist.
-  // Wochen ganz ohne Eintrag tragen schon das Wort „fehlt“.
+  // Vorgaben mit einer Map außerhalb des Pools: Sie bleiben stehen und gehen beim Speichern unverändert mit, bis ihr neu wählt.
+  const stale = useMemo(() => staleWeeks(form, weeks, modes), [form, weeks, modes]);
+  // Was der Server an einer gespeicherten Vorgabe bemängelt (etwa „geht mit jede Map nur einmal je Serie nicht auf“) - solange die
+  // Woche unverändert ist. Wochen ganz ohne Eintrag tragen schon das Wort „fehlt“, Maps außerhalb des Pools ihren eigenen Vermerk.
   const stored = useMemo(() => new Set((state?.presets || []).map((row) => row.week)), [state]);
-  const problemsOf = (week) => (dirty || !stored.has(week) ? [] : state?.problems?.find((row) => row.week === week)?.problems || []);
+  const problemsOf = (week) => (changed.includes(week) || stale.includes(week) || !stored.has(week) ? []
+    : state?.problems?.find((row) => row.week === week)?.problems || []);
 
   const frame = "mt-2 space-y-3 rounded-sm border border-[#00D26A]/30 bg-[#00D26A]/[0.03] p-4";
   const title = <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#00D26A]">Vorgabe der Woche</h3>;
@@ -114,7 +122,7 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
     try {
       const { data } = await api.put(`/admin/leagues/seasons/${seasonId}/veto-presets`, { presets: presetsPayload(form, weeks, modes) });
       setState(data);
-      setForm(presetsToForm(knownPresets(data.presets, data.modes)));
+      setForm(presetsToForm(data.presets));
       // Spiele, die auf die Vorgabe gewartet haben: Die Captains sind informiert und starten das Veto selbst - es beginnt nicht von allein.
       const ready = Number(data.matches_ready) || 0;
       toast.success(ready ? `Vorgaben gespeichert – ${ready === 1 ? "ein wartendes Spiel kann sein Veto jetzt starten, die Captains sind" : `${ready} wartende Spiele können ihr Veto jetzt starten, die Captains sind`} informiert.` : "Vorgaben gespeichert.");
@@ -177,7 +185,13 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
         <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="veto-presets-missing" aria-live="polite">
           <strong>Es {missing.length === 1 ? "fehlt" : "fehlen"} noch:</strong> Spielwoche {weekList(missing)}.
         </p>
-      ) : <p className="text-xs text-ok" data-testid="veto-presets-complete">Jede Spielwoche hat ihre Vorgabe.</p>}
+      ) : null}
+      {stale.length ? (
+        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="veto-presets-stale" aria-live="polite">
+          <strong>Map nicht mehr im Pool – bitte neu wählen:</strong> Spielwoche {weekList(stale)}. Bis dahin beginnt das Veto dort nicht. Die alte Auswahl bleibt gespeichert, bis ihr sie ändert.
+        </p>
+      ) : null}
+      {!missing.length && !stale.length ? <p className="text-xs text-ok" data-testid="veto-presets-complete">Jede Spielwoche hat ihre Vorgabe.</p> : null}
       <ol className="space-y-1.5" data-testid="veto-presets-weeks">
         {weeks.map((row) => (
           <WeekRow key={row.week} row={row} modes={modes} form={form} problems={problemsOf(row.week)} changed={changed.includes(row.week)}

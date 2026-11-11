@@ -571,6 +571,26 @@ async def test_the_lead_sets_rotates_and_reads_the_presets_per_week(flow):
     ok(await flow.post(f"{ADMIN}/seasons/{sid}/map-pool/remove-map", json={"map_id": ids["Ruine"], "mode": CTL, "reason": "Ruine ist kaputt"}))
     broken = ok(await flow.get(url))
     assert week_rows(broken) == {week: ["Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus."] for week in (3, 5, 6)}
+    # Review zu #2326: Solche Vorgaben verschwinden nicht still. Ändert die Leitung nur Woche 1, bleiben Woche 3, 5 und 6 gespeichert
+    # (die Verwaltung schickt sie unverändert mit) - geprüft wird nur, was sich ändert.
+    assert [row for row in broken["presets"] if row["map_id"] == ids["Ruine"]] == [preset(3, ids["Ruine"]), preset(5, ids["Ruine"]), preset(6, ids["Ruine"])]
+    other_week = [preset(1, ids["Kai"]), *full["presets"][1:]]
+    kept = ok(await flow.put(url, json={"presets": other_week}))
+    assert kept["changed"] == 1 and kept["presets"] == other_week and sorted(week_rows(kept)) == [3, 5, 6]
+    assert kept["history"][0]["changes"] == [{"week": 1, "mode": CTL, "from": ids["Hafen"], "to": ids["Kai"]}], "nur Woche 1 steht im Verlauf"
+    # Gegenprobe: Neu wählen lässt sich eine Map außerhalb des Pools nicht - auch nicht in einer Woche, die sie schon trug.
+    fresh_bad = await flow.put(url, json={"presets": [preset(1, ids["Ruine"]), *other_week[1:]]})
+    moved_bad = await flow.put(url, json={"presets": [*other_week[:3], preset(4, ids["Ruine"]), *other_week[4:]]})
+    assert fresh_bad.status_code == 422 and fresh_bad.json()["detail"] == "Spielwoche 1: Die Map steht nicht im Pool für Kontrolle."
+    assert moved_bad.status_code == 422 and moved_bad.json()["detail"] == "Spielwoche 4: Die Map steht nicht im Pool für Kontrolle."
+    # Erst wer die Woche ausdrücklich leert oder neu wählt, nimmt die alte Map heraus.
+    fixed = ok(await flow.put(url, json={"presets": [*other_week[:2], preset(3, ids["Kai"]), other_week[3], *other_week[5:]]}))
+    assert preset(3, ids["Kai"]) in fixed["presets"] and not [row for row in fixed["presets"] if row["week"] == 5]
+    assert sorted(week_rows(fixed)) == [5, 6] and week_rows(fixed)[5] == ["Kontrolle: Die Vorgabe der Woche fehlt."]
+    # Nimmt die Leitung den Schritt „Vorgabe“ aus der Vorlage und speichert später wieder Vorgaben, sind die alten Einträge noch da.
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(ANLAGE_B[:8] + [step("ban", CTL, "A"), step("decider", CTL, None, 3)])))
+    empty = ok(await flow.put(url, json={"presets": []}))
+    assert empty["changed"] == 0 and empty["presets"] == fixed["presets"], "was die Verwaltung nicht zeigt, löscht sie auch nicht"
 
 
 @pytest.mark.asyncio

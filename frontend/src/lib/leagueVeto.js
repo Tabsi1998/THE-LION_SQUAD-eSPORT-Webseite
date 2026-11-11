@@ -163,14 +163,22 @@ export function presetsToForm(presets) {
   return Object.fromEntries((presets || []).map((row) => [presetKey(row.week, row.mode), row.map_id]));
 }
 
-/** Nur Vorgaben, deren Map im Pool ihres Modus steht - eine Map, die den Pool verlassen hat, zählt im Formular als „noch nicht gewählt“. */
-export function knownPresets(presets, modes) {
-  const known = Object.fromEntries((modes || []).map((row) => [row.mode, new Set((row.maps || []).map((item) => item.map_id))]));
-  return (presets || []).filter((row) => known[row.mode]?.has(row.map_id));
-}
-
 export function presetValue(form, week, mode) {
   return (form || {})[presetKey(week, mode)] || "";
+}
+
+/**
+ * Steht in dieser Woche eine Map, die den Pool ihres Modus verlassen hat? Sie bleibt im Formular stehen (und geht beim Speichern
+ * unverändert mit), bis die Leitung neu wählt - still verworfen wird sie nicht.
+ */
+export function presetStale(form, week, mode) {
+  const value = presetValue(form, week, mode?.mode);
+  return Boolean(value) && !(mode?.maps || []).some((item) => item.map_id === value);
+}
+
+/** Die Wochen mit einer Vorgabe außerhalb des Pools - dort beginnt das Veto nicht, bis neu gewählt ist. */
+export function staleWeeks(form, weeks, modes) {
+  return (weeks || []).filter(({ week }) => (modes || []).some((mode) => presetStale(form, week, mode))).map(({ week }) => week);
 }
 
 export function withPreset(form, week, mode, mapId) {

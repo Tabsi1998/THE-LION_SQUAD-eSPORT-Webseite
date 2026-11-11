@@ -568,8 +568,10 @@ Was gilt:
   viele Spiele gewartet haben. Das gilt auch, wenn ihr den Schritt **Vorgabe** aus der Schrittfolge nehmt, während ein Spiel wartet.
 - **Ändern wirkt nur nach vorn.** Eine geänderte Vorgabe gilt für Spiele, deren Veto noch nicht begonnen hat. Ein laufendes oder
   fertiges Veto behält seine Map, auch nach **Neu starten**. Jede Änderung steht im Protokoll und im Verlauf.
-- **Pool geändert?** Steht eine vorgegebene Map nicht mehr im Pool des Modus, zählt die Woche wieder als fehlend. Der Block und **Was
-  fehlt noch?** im Überblick nennen die Wochen.
+- **Pool geändert?** Steht eine vorgegebene Map nicht mehr im Pool des Modus, beginnt das Veto in dieser Woche nicht. Die Zeile sagt
+  **nicht mehr im Pool**, in der Auswahl steht „Map nicht mehr im Pool – bitte neu wählen“, und oben steht, welche Wochen es betrifft
+  (auch **Was fehlt noch?** im Überblick nennt sie). Die alte Auswahl bleibt gespeichert, bis ihr sie ändert – speichert ihr eine andere
+  Woche, geht dabei nichts verloren. „Rotiert automatisch durch den Pool“ fasst solche Wochen nicht an, „Alle neu verteilen“ schon.
 - Im Regelwerk beschreibt der Baustein `[[baustein:veto]]` die Regel; `{{veto.presets}}` nennt die Maps je Woche (2.11).
 
 ### 2.7c Plattform und Eingabegerät

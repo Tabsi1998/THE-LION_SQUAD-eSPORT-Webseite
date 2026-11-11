@@ -151,18 +151,50 @@ test("„Rotiert …“ lässt eine leere Woche mit begonnenem Veto aus - und oh
   expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("");
 });
 
-test("ein Fehler des Servers und ein Problem des gespeicherten Stands stehen bei der Woche", async () => {
-  serve(RULES, { ...PRESETS, presets: [{ week: 1, mode: "ctl", map_id: "weg" }, { week: 2, mode: "ctl", map_id: "kai" }, { week: 3, mode: "ctl", map_id: "hafen" }],
-    problems: [{ week: 1, problems: ["Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus."] }] });
+test("eine Map außerhalb des Pools bleibt sichtbar stehen - anderes Speichern nimmt sie mit, erst neu wählen ersetzt sie", async () => {
+  const stored = [{ week: 1, mode: "ctl", map_id: "weg" }, { week: 2, mode: "ctl", map_id: "kai" }, { week: 3, mode: "ctl", map_id: "hafen" }];
+  serve(RULES, { ...PRESETS, presets: stored, problems: [{ week: 1, problems: ["Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus."] }] });
+  apiMock.put.mockImplementation((_url, body) => Promise.resolve({ data: { ...PRESETS, presets: body.presets, problems: [], changed: 1, matches_ready: 0 } }));
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  // Die Map der Woche 1 steht nicht mehr im Pool: Die Zeile sagt es und zeigt die Auswahl als „bitte neu wählen“ - nicht als leer.
+  expect(await screen.findByTestId("veto-preset-week-1")).toHaveAttribute("data-stale", "true");
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-missing", "false");
+  expect(screen.getByTestId("veto-preset-week-1-stale")).toHaveTextContent("nicht mehr im Pool");
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("weg");
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveDisplayValue("Map nicht mehr im Pool – bitte neu wählen");
+  expect(screen.getByTestId("veto-presets-stale")).toHaveTextContent("Map nicht mehr im Pool – bitte neu wählen: Spielwoche 1.");
+  expect(screen.queryByTestId("veto-presets-missing")).toBeNull();
+  expect(screen.queryByTestId("veto-presets-complete")).toBeNull();
+  expect(screen.getByTestId("veto-preset-week-2")).toHaveAttribute("data-stale", "false");
+  expect(screen.getByTestId("veto-presets-save")).toBeDisabled();
+  // „Rotiert …“ füllt nur leere Wochen - die Woche mit der alten Map fasst es nicht an.
+  fireEvent.click(screen.getByTestId("veto-presets-rotate"));
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("weg");
+  // Eine andere Woche ändern und speichern: Die alte Auswahl geht unverändert mit, sie wird nicht still gelöscht.
+  fireEvent.change(screen.getByTestId("veto-preset-2-ctl"), { target: { value: "ruine" } });
+  fireEvent.click(screen.getByTestId("veto-presets-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/veto-presets",
+    { presets: [{ week: 1, mode: "ctl", map_id: "weg" }, { week: 2, mode: "ctl", map_id: "ruine" }, { week: 3, mode: "ctl", map_id: "hafen" }] }));
+  await waitFor(() => expect(screen.queryByTestId("veto-presets-dirty")).toBeNull());
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-stale", "true");
+  // Neu wählen: Der Vermerk verschwindet, die Woche ist geändert.
+  fireEvent.change(screen.getByTestId("veto-preset-1-ctl"), { target: { value: "kai" } });
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-stale", "false");
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-changed", "true");
+  expect(screen.queryByTestId("veto-presets-stale")).toBeNull();
+  expect(screen.getByTestId("veto-presets-complete")).toBeInTheDocument();
+});
+
+test("ein Fehler des Servers steht beim Block, ein Problem des gespeicherten Stands bei seiner Woche", async () => {
+  serve(RULES, { ...PRESETS, presets: [{ week: 1, mode: "ctl", map_id: "kai" }, { week: 2, mode: "ctl", map_id: "kai" }, { week: 3, mode: "ctl", map_id: "hafen" }],
+    problems: [{ week: 1, problems: ["Mit diesen Vorgaben lässt sich die Vorlage nicht zu Ende spielen – bitte eine andere Map vorgeben."] }] });
   apiMock.put.mockRejectedValue({ response: { data: { detail: "Spielwoche 2: Die Map steht nicht im Pool für Kontrolle." } } });
   render(<SeasonVetoRulesPanel seasonId="s1" />);
-  // Die Map der Woche 1 steht nicht mehr im Pool: Die Woche zählt wieder als fehlend, mit dem Satz des Servers.
-  expect(await screen.findByTestId("veto-preset-week-1")).toHaveAttribute("data-missing", "true");
-  expect(screen.getByTestId("veto-preset-week-1-problem")).toHaveTextContent("Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus.");
-  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("");
+  expect(await screen.findByTestId("veto-preset-week-1-problem")).toHaveTextContent("lässt sich die Vorlage nicht zu Ende spielen");
   expect(screen.queryByTestId("veto-preset-week-2-problem")).toBeNull();
-  expect(screen.getByTestId("veto-presets-missing")).toHaveTextContent("Es fehlt noch: Spielwoche 1.");
   fireEvent.change(screen.getByTestId("veto-preset-2-ctl"), { target: { value: "ruine" } });
+  // Der Satz des Servers bleibt bei der unveränderten Woche 1 stehen.
+  expect(screen.getByTestId("veto-preset-week-1-problem")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("veto-presets-save"));
   expect(await screen.findByTestId("veto-presets-error")).toHaveTextContent("Spielwoche 2: Die Map steht nicht im Pool für Kontrolle.");
 });

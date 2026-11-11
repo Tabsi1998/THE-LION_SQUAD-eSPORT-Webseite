@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   KIND_OPTIONS, applyRotation, changedWeeks, historyLine, isSystemKind, mapStatusText, missingWeeks, overwriteCount, plannedRoleLabel,
-  presetChangeLine, presetModes, presetValue, presetsPayload, presetsToForm, readyText, stepLabel, stepSentence, templateProblems, vetoHeadline,
-  vetoRulesPayload, vetoText, weekDates, weekList, weekLocked, withPreset,
+  presetChangeLine, presetModes, presetStale, presetValue, presetsPayload, presetsToForm, readyText, staleWeeks, stepLabel, stepSentence,
+  templateProblems, vetoHeadline, vetoRulesPayload, vetoText, weekDates, weekList, weekLocked, withPreset,
 } from "./leagueVeto";
 
 // Veto-Schrittart „Vorgabe der Woche“ (#2326): Vorlage prüfen wie der Server, die Vorgaben je Spielwoche als Formular und die Sätze der
@@ -80,6 +80,16 @@ describe("Vorgaben je Spielwoche", () => {
     const partly = applyRotation(withPreset(state, 2, "ctl", ""), rotation, kept, { overwrite: true });
     expect([1, 2, 3].map((week) => presetValue(partly, week, "ctl"))).toEqual(["kai", "", "hafen"]);
     expect(presetValue(applyRotation({}, rotation, kept), 2, "ctl")).toBe("");
+    // Eine Map außerhalb des Pools bleibt im Formular stehen und geht unverändert mit - sie gilt weder als leer noch wird sie verworfen.
+    const old = presetsToForm([{ week: 1, mode: "ctl", map_id: "weg" }, { week: 2, mode: "ctl", map_id: "kai" }]);
+    expect(presetStale(old, 1, modes[0])).toBe(true);
+    expect(presetStale(old, 2, modes[0])).toBe(false);
+    expect(presetStale(old, 3, modes[0])).toBe(false);
+    expect(staleWeeks(old, weeks, modes)).toEqual([1]);
+    expect(missingWeeks(old, weeks, modes)).toEqual([3]);
+    expect(presetsPayload(old, weeks, modes)[0]).toEqual({ week: 1, mode: "ctl", map_id: "weg" });
+    expect(presetValue(applyRotation(old, rotation, weeks), 1, "ctl")).toBe("weg");
+    expect(staleWeeks(withPreset(old, 1, "ctl", "hafen"), weeks, modes)).toEqual([]);
     // Wochen oder Modi, die es nicht mehr gibt, gehen nicht an den Server.
     expect(presetsPayload({ ...rotated, "9|ctl": "kai", "1|hp": "kai" }, weeks, modes)).toHaveLength(3);
   });

@@ -2338,7 +2338,10 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
   `PUT …/veto-presets` `{presets: [{week, mode, map_id}]}` (Zuständigkeit `season`) ersetzt die Liste: eine Zeile ohne Map heißt „noch
   nicht gewählt“ und fällt weg (Lücken sind speicherbar und bleiben sichtbar); 422 mit deutschem Satz bei einer Woche, die es nicht gibt,
   einem Modus ohne Schritt `preset`, einer Map außerhalb des Pools des Modus, zwei Maps für dieselbe Woche und denselben Modus oder
-  einer vollständigen Woche, die nicht aufgeht. Antwort wie `GET`, dazu `changed` und `matches_ready` (so viele wartende
+  einer vollständigen Woche, die nicht aufgeht. **Geprüft wird nur, was sich ändert** (Review): Eine gespeicherte Zeile, die
+  unverändert wiederkommt, bleibt – auch wenn ihre Map inzwischen nicht mehr im Pool steht; neu wählen lässt sich eine solche Map
+  nicht. Gespeicherte Einträge, die die Verwaltung gar nicht zeigt (der Modus hat gerade keinen Schritt `preset`, die Woche gibt es
+  nicht mehr), bleiben beim Speichern erhalten, statt zu verschwinden. Antwort wie `GET`, dazu `changed` und `matches_ready` (so viele wartende
   Spiele haben gerade „Vorgabe da – Veto kann starten“ bekommen).
 - **Prüfung vor der Veröffentlichung:** `season_readiness` nennt Wochen ohne (passende) Vorgabe als **Warnung** `veto_preset_missing`
   („Veto: Für Spielwoche 3, 4 und 5 steht die Vorgabe der Woche noch nicht – …“) – kein Hindernis, die Leitung darf Woche für Woche
@@ -2478,7 +2481,9 @@ Pool, oben „Es fehlen noch: Spielwoche 3, 4 und 5.“ (fehlende Wochen sind ma
 ohne Rückfrage). **Vergangene Wochen und Wochen mit begonnenem Veto** (`past`, `started`) fasst keiner der beiden Knöpfe an; die Zeile
 nennt „vorbei“ bzw. „Veto begonnen“, von Hand bleibt sie änderbar. **Geänderte Wochen** bleiben bis zum Speichern als „geändert“
 markiert. Eigener Knopf **„Vorgaben speichern“** und darunter der **Verlauf** aus dem Protokoll. Steht die Art erst im ungespeicherten Formular, sagt der Block „Sobald das Veto damit an und gespeichert
-ist …“; eine Map, die den Pool verlassen hat, zählt wieder als fehlend, mit dem Satz des Servers. `veto_preset_missing` führt hierher.
+ist …“. **Eine Map, die den Pool verlassen hat, wird nicht still verworfen** (Review): Die Zeile zeigt „nicht mehr im Pool“ und in der
+Auswahl „Map nicht mehr im Pool – bitte neu wählen“, oben steht, welche Wochen es betrifft. Das Speichern anderer Wochen schickt sie
+unverändert mit; erst neu wählen oder ausdrücklich leeren nimmt sie heraus. `veto_preset_missing` führt hierher.
 
 **Regelwerk:** Baustein `[[baustein:veto]]` nach dem Muster der Bausteine aus den Einstellungen (#2269: Daten und Darstellung in
 `league_rule_facts.veto_data`/`render_veto`, registriert in `league_rule_blocks.BLOCKS`, eingefroren als `{label, source, data}`):

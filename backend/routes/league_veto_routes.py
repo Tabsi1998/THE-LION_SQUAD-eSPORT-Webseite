@@ -244,7 +244,16 @@ async def put_veto_presets(season_id: str, body: VetoPresetsBody, me: dict = Dep
     ids = league_veto_rules.pool_ids(context["pool"])
     labels = {**context["labels"], **league_veto_rules.pool_labels(context["pool"])}
     wanted = {step["mode"] for step in league_veto_rules.preset_steps(rules.get("steps"))}
+    # Was gespeichert ist und unverändert wiederkommt, bleibt - auch eine Map, die den Pool inzwischen verlassen hat (Review zu #2326):
+    # Die Verwaltung zeigt sie als „nicht mehr im Pool“, und das Speichern einer anderen Woche wirft sie nicht still weg. Geprüft
+    # wird nur, was sich ändert.
+    stored = league_veto_rules.presets_of(season.get("veto_presets"))
+    before = {(row["week"], row["mode"]): row["map_id"] for row in stored}
+    touched = set()
     for row in presets:
+        if before.get((row["week"], row["mode"])) == row["map_id"]:
+            continue
+        touched.add(row["week"])
         label = labels.get(row["mode"]) or "den Modus"
         if row["week"] not in known:
             raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']} gibt es in dieser Season nicht.")
@@ -252,10 +261,16 @@ async def put_veto_presets(season_id: str, body: VetoPresetsBody, me: dict = Dep
             raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: Für {label} sieht die Veto-Vorlage keine Vorgabe der Woche vor.")
         if row["map_id"] not in (ids.get(row["mode"]) or []):
             raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: Die Map steht nicht im Pool für {label}.")
+    # Einträge, die die Verwaltung gar nicht zeigt (der Modus hat gerade keinen Schritt „Vorgabe“, die Woche gibt es nicht mehr),
+    # kann sie auch nicht mitschicken - sie bleiben gespeichert, statt beim nächsten Speichern zu verschwinden.
+    sent = {(row["week"], " ".join(str(row["mode"]).split())) for row in body.model_dump()["presets"]}
+    hidden = [row for row in stored if (row["mode"] not in wanted or row["week"] not in known) and (row["week"], row["mode"]) not in sent]
+    if hidden:
+        presets = league_veto_rules.normalize_presets([*presets, *hidden])
     # Vollständige Wochen müssen aufgehen (etwa „jede Map nur einmal je Serie“) - eine Woche mit Lücke bleibt speicherbar und sichtbar.
     for row in weeks:
         chosen = league_veto_rules.presets_of_week(presets, row["week"])
-        if wanted and wanted <= set(chosen):
+        if row["week"] in touched and wanted and wanted <= set(chosen):
             problems = league_veto_rules.week_problems(rules, chosen, pool=context["pool"], repeat=context["repeat"], labels=context["labels"])
             if problems:
                 raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: {' '.join(problems)}")
