@@ -22,6 +22,25 @@ export const STATE_CLASS = {
 // Solange das Co-Team hier steht, läuft sein Antrag.
 const RUNNING = new Set(["submitted", "in_review", "accepted", "waitlist"]);
 
+/** Was das eigene Team sieht (#2348): angenommen heißt dort „Angemeldet“, ohne Staffel mit „Zuteilung folgt“. Die Leitung liest weiter „Angenommen“. */
+export function teamStateLabel(state, application) {
+  if (state === "accepted" && !application?.staffel_left) return application?.staffel ? "Angemeldet" : "Angemeldet – Zuteilung folgt";
+  return (APPLICATION_STATES[state] || APPLICATION_STATES.none).label;
+}
+
+/** Nach dem Einreichen: was jetzt gilt - mit „automatisch annehmen“ entscheidet die Season gleich (#2348). */
+export function submittedToast(status) {
+  if (status === "accepted") return "Angemeldet. Ihr habt einen Startplatz.";
+  if (status === "waitlist") return "Eingereicht. Ihr steht auf der Warteliste.";
+  return "Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt.";
+}
+
+/** Hinweis in der Verwaltung beim Einschalten von „automatisch annehmen“: Offene Anmeldungen von vorher bleiben bei der Leitung. */
+export function waitingLine(count) {
+  if (!count) return "";
+  return count === 1 ? "1 Anmeldung wartet noch auf Prüfung" : `${count} Anmeldungen warten noch auf Prüfung`;
+}
+
 export const ENTRY_POLICY_OPTIONS = [["all", "Alle Konten, auch externe Teams"], ["members", "Nur Vereinsmitglieder"]];
 
 function when(value) {
@@ -81,6 +100,7 @@ export function applicationToForm(season = {}) {
     application_privacy_text: season.application_privacy_text || "",
     entry_policy: season.entry_policy || "all",
     sibling_squads_in_staffel: Boolean(season.sibling_squads_in_staffel),
+    application_auto_accept: Boolean(season.application_auto_accept),
     // Seasons von vor #2205 tragen die Felder nicht. Niemand hat sie angefasst: Dann geht auch nichts mit.
     had_application: season.entry_policy != null || season.application_opens_at != null,
   };
@@ -100,5 +120,6 @@ export function applicationPayload(form) {
     application_privacy_text: clean(form.application_privacy_text),
     entry_policy: form.entry_policy || "all",
     sibling_squads_in_staffel: Boolean(form.sibling_squads_in_staffel),
+    application_auto_accept: Boolean(form.application_auto_accept),
   };
 }
