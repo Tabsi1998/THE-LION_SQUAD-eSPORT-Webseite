@@ -27,6 +27,7 @@ class Ref:
     evidence_until: datetime | None = None  # bis wann diese Seite nachreichen darf
     statement_until: datetime | None = None  # bis wann die Gegenseite Stellung nimmt
     hold_until: datetime | None = None      # beendet: Ende der Einspruchsfrist
+    incident: bool = False                  # MOSS an einem Vorfall: zusätzlich gilt die Protestfrist des Spiels
 
 
 MISSING = Ref(found=False)
@@ -121,7 +122,7 @@ def resolve(match: dict, kind: str, ref_id: str, *, appeal_hours: int) -> Ref:
         if incident is None:
             return MISSING
         still_open, hold = _incident_chain_state(match, incident, appeal_hours)
-        return Ref(found=True, open=still_open, hold_until=hold)
+        return Ref(found=True, open=still_open, hold_until=hold, incident=True)
     if entry is None:
         return MISSING
     still_open, hold = _chain_state(match, entry, appeal_hours)

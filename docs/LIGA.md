@@ -2756,7 +2756,7 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Nie verwendetes Foto (`pending`) | 24 Stunden nach dem Hochladen (unverändert) |
 | Turnier ohne Liga | 30 Tage nach dem Hochladen, nicht solange das Spiel `disputed` ist (unverändert) |
 | Liga, alles außer MOSS | ab Season-Ende + `evidence_keep_days`, nicht solange am Spiel ein Vorfall oder Verfahren offen ist oder eine Einspruchsfrist läuft |
-| Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; am Vorfall: Ende des Vorfalls (`closed_at`) bzw. eines daraus folgenden Verfahrens + Einspruchsfrist; ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes `appeal_hours` nach dem Hochladen |
+| Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; am Vorfall: Ende des Vorfalls (`closed_at`) bzw. eines daraus folgenden Verfahrens (`disputes[].incident_id`, ganze Kette samt Einspruch) + Einspruchsfrist, **mindestens aber bis das Ergebnis des Spiels feststeht und `protest_hours` abgelaufen sind** (ruhend in Sperrzeiten; so lange kann aus dem Vorfall noch ein Protest werden; bei einem abgesagten Spiel entfällt das); ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes `appeal_hours` nach dem Hochladen |
 | Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
 
 **Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt

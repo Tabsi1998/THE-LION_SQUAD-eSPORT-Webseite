@@ -225,8 +225,10 @@ async def test_moss_on_an_incident_goes_after_the_incident_or_its_procedure(flow
 
     closed = now_utc() + timedelta(hours=1)
     done = {"state": "decided", "closed_at": closed.isoformat()}
-    # Aus dem ersten Vorfall folgt ein Protest - sein MOSS bleibt, der des zweiten geht nach der Einspruchsfrist.
-    await set_match(flow, w, incidents=[{**crash, **done}, {**other, **done}], disputes=[protest(w, incident_id="vorfall-1")])
+    # Aus dem ersten Vorfall folgt ein Protest - sein MOSS bleibt, der des zweiten geht nach der Einspruchsfrist. Das Ergebnis
+    # stand schon vorher fest, die Protestfrist des Spiels (eigener Test) ist also vorbei.
+    await set_match(flow, w, incidents=[{**crash, **done}, {**other, **done}], disputes=[protest(w, incident_id="vorfall-1")],
+                    status="completed", completed_at=(closed - timedelta(days=5)).isoformat())
     assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=47)) == 0
     assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=49)) == 1
     assert await left(flow) == {first["id"]} and first["id"] != second["id"]
@@ -238,6 +240,66 @@ async def test_moss_on_an_incident_goes_after_the_incident_or_its_procedure(flow
 
 
 @pytest.mark.asyncio
+async def test_moss_on_an_incident_stays_until_the_protest_window_of_the_match_is_over(flow):
+    """Ein Protest ist erst nach der Bestätigung möglich und läuft dann ``protest_hours`` - so lange bleibt MOSS am Vorfall
+    mindestens (Review #2360, M5). Vorher endete die Frist 48 Stunden nach dem Vorfall, mitten im laufenden Spiel."""
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w, protest_hours=72)
+    crash = {"id": "vorfall-1", "position": 1, "kind": "moss_crash", "state": "proposed",
+             "reported_by": {"registration_id": w["reg_a"]["id"]}}
+    await set_match(flow, w, incidents=[crash], status="reported")
+    flow.act_as(user(w, "Mila"))
+    assert (await add_image(flow, match, "moss", "vorfall-1")).status_code == 200
+    closed = now_utc()
+    await set_match(flow, w, incidents=[{**crash, "state": "agreed", "closed_at": closed.isoformat()}], status="reported")
+    # Geeinigt, aber das Ergebnis ist nur gemeldet: Die Protestfrist hat nicht einmal begonnen.
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=49)) == 0
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(days=60)) == 0
+    # Bestätigt: ab dann 72 Stunden der Season (nicht die Vorgabe 48).
+    confirmed = closed + timedelta(days=3)
+    await set_match(flow, w, status="completed", completed_at=confirmed.isoformat())
+    assert await match_proof_retention.purge(flow.db, now=confirmed + timedelta(hours=71)) == 0
+    # Kommt in der Frist ein Protest zu dem Vorfall, gilt dessen Kette samt Einspruchsfrist.
+    await set_match(flow, w, disputes=[protest(w, incident_id="vorfall-1")])
+    assert await match_proof_retention.purge(flow.db, now=confirmed + timedelta(days=30)) == 0
+    decided = confirmed + timedelta(days=31)
+    await set_match(flow, w, disputes=[protest(w, incident_id="vorfall-1", resolved_at=decided.isoformat())])
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=47)) == 0
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=49)) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_protest_window_for_moss_on_an_incident_rests_in_blocked_periods(flow):
+    """Ohne Protest: weg nach Bestätigung plus Protestfrist - die in einer Sperrzeit ruht. Ein abgesagtes Spiel wartet nicht."""
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w)
+    crash = {"id": "vorfall-1", "kind": "moss_crash", "state": "proposed"}
+    await set_match(flow, w, incidents=[crash])
+    flow.act_as(user(w, "Mila"))
+    await add_image(flow, match, "moss", "vorfall-1")
+    confirmed = now_utc() + timedelta(hours=3)
+    await set_match(flow, w, incidents=[{**crash, "state": "agreed", "closed_at": now_utc().isoformat()}], status="completed",
+                    completed_at=confirmed.isoformat())
+    assert await match_proof_retention.purge(flow.db, now=confirmed + timedelta(hours=47)) == 0
+    # Sperrzeit ab dem Tag nach der Bestätigung, zehn Tage lang: Die 48 Stunden laufen erst danach zu Ende.
+    first, last = (confirmed + timedelta(days=1)).date(), (confirmed + timedelta(days=10)).date()
+    await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"blocked_periods": [
+        {"start_date": first.isoformat(), "end_date": last.isoformat(), "label": "Pause"}]}})
+    assert await match_proof_retention.purge(flow.db, now=confirmed + timedelta(days=9)) == 0
+    assert await match_proof_retention.purge(flow.db, now=confirmed + timedelta(days=14)) == 1
+
+    # Abgesagtes Spiel: Dort kommt kein Protest mehr - es bleibt bei Vorfallsende plus Einspruchsfrist.
+    await set_match(flow, w, incidents=[crash], status="scheduled")
+    await add_image(flow, match, "moss", "vorfall-1")
+    closed = now_utc()
+    await set_match(flow, w, incidents=[{**crash, "state": "decided", "closed_at": closed.isoformat()}], status="cancelled")
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=47)) == 0
+    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=49)) == 1
+
+
+@pytest.mark.asyncio
 async def test_moss_on_an_incident_without_an_end_time_counts_from_upload(flow):
     w = await league_world(flow)
     await season(flow, w)
@@ -245,7 +307,8 @@ async def test_moss_on_an_incident_without_an_end_time_counts_from_upload(flow):
     await set_match(flow, w, incidents=[crash])
     flow.act_as(user(w, "Mila"))
     await add_image(flow, w["match"], "moss", "vorfall-1")
-    await set_match(flow, w, incidents=[{**crash, "state": "withdrawn"}])
+    await set_match(flow, w, incidents=[{**crash, "state": "withdrawn"}], status="completed",
+                    completed_at=(now_utc() - timedelta(days=5)).isoformat())
     assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(hours=47)) == 0
     assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(hours=49)) == 1
 

@@ -3,7 +3,8 @@
 - Nie verwendete Fotos: 24 Stunden nach dem Hochladen.
 - Turniere ohne Liga: 30 Tage nach dem Hochladen - außer das Spiel ist dann noch in Klärung.
 - Liga-Staffeln: bis Season-Ende plus ``evidence_keep_days``, länger, solange am Spiel ein Vorfall oder Verfahren offen ist
-  oder eine Einspruchsfrist läuft. MOSS (Anti-Cheat) nur, bis das Verfahren beendet und die Einspruchsfrist vorbei ist.
+  oder eine Einspruchsfrist läuft. MOSS (Anti-Cheat) nur, bis das Verfahren beendet und die Einspruchsfrist vorbei ist -
+  an einem Vorfall mindestens, bis das Ergebnis des Spiels feststeht und die Protestfrist abgelaufen ist (``moss_due``).
 - Alles, dessen Spiel es nicht mehr gibt.
 
 Gelesen wird in Seiten nach ``id`` ohne feste Obergrenze: Hinter vielen Nachweisen, die noch gehalten werden (offenes
@@ -21,8 +22,14 @@ from services import match_proof_refs as refs
 from services import match_proofs
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import VIENNA, week_days
+from services.match_disputes import decided_at
+from services.matchday_schedule import response_deadline
 
 PAGE = 500
+# Die Staffel mit ihrem Kalender: Die Protestfrist ruht in Sperrzeiten (``response_deadline``).
+STAFFEL_FIELDS = {"_id": 0, "creation_key": 0, "billing": 0}
+MATCH_FIELDS = {"_id": 0, "id": 1, "status": 1, "disputes": 1, "incidents": 1, "completed_at": 1, "result_meta": 1,
+                "admin_decision_at": 1}
 
 
 async def _pages(db, query: dict):
@@ -57,6 +64,41 @@ def season_end(season: dict | None) -> datetime | None:
     if not weeks:
         return None
     return datetime.combine(weeks[-1][1] + timedelta(days=1), time.min, tzinfo=VIENNA).astimezone(timezone.utc)
+
+
+def protest_window(match: dict, tournament: dict | None, season: dict | None) -> tuple[bool, datetime | None]:
+    """Bis wann zu diesem Spiel noch ein Protest kommen kann: ``(wartet, Ende)``. ``wartet``: Das Ergebnis steht noch nicht
+    fest, die Frist hat also nicht einmal begonnen. Sonst das Ende - Feststehen des Ergebnisses plus ``protest_hours``, in
+    Sperrzeiten ruhend; ``None``: Es kommt keiner mehr in Frage (Spiel abgesagt) oder der Zeitpunkt ist unbekannt."""
+    status = str(match.get("status") or "")
+    if status in refs.CLOSED_STATUSES:
+        return False, None
+    if status not in refs.DECIDED_STATUSES:
+        return True, None
+    decided = decided_at(match)
+    if decided is None:
+        return False, None
+    hours = match_proofs.setting(tournament, season, "protest_hours")
+    return False, response_deadline(tournament, decided, hours) or decided + timedelta(hours=hours)
+
+
+def moss_due(row: dict, match: dict, tournament: dict | None, season: dict | None, current: datetime) -> bool:
+    """Darf dieser MOSS-Nachweis jetzt gelöscht werden? Erst wenn sein Bezug beendet und die Einspruchsfrist vorbei ist. Hängt
+    er an einem Vorfall, kann aus dem noch ein Protest werden - der ist erst nach der Bestätigung des Ergebnisses möglich
+    und läuft dann ``protest_hours``: So lange bleibt der Nachweis mindestens."""
+    appeal_hours = match_proofs.setting(tournament, season, "appeal_hours")
+    ref = refs.resolve(match, "moss", (row.get("context") or {}).get("ref_id") or "", appeal_hours=appeal_hours)
+    if ref.found and ref.open:
+        return False
+    uploaded = refs.parse(row.get("created_at")) or current
+    # Ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes zählt die Einspruchsfrist ab dem Hochladen.
+    until = ref.hold_until or uploaded + timedelta(hours=appeal_hours)
+    if ref.incident:
+        waiting, window = protest_window(match, tournament, season)
+        if waiting:
+            return False
+        until = max(until, window) if window else until
+    return current >= until
 
 
 async def _expired_tournament(db, current: datetime, league_ids: list[str]) -> list[dict]:
@@ -100,21 +142,17 @@ async def _expired_league(db, current: datetime, staffeln: dict[str, dict]) -> l
     expired = []
     for query in queries:
         async for rows in _pages(db, query):
-            matches = await _matches_of(db, rows, {"_id": 0, "id": 1, "status": 1, "disputes": 1, "incidents": 1})
+            matches = await _matches_of(db, rows, MATCH_FIELDS)
             for row in rows:
                 match = matches.get(row.get("match_id"))
                 if match is None:
                     continue  # ohne Spiel: räumt ``purge`` als verwaist ab
                 tournament = staffeln[row["tournament_id"]]
-                appeal_hours = match_proofs.setting(tournament, season_of(tournament), "appeal_hours")
+                season = season_of(tournament)
                 if refs.kind_of(row) == "moss":
-                    ref = refs.resolve(match, "moss", (row.get("context") or {}).get("ref_id") or "", appeal_hours=appeal_hours)
-                    uploaded = refs.parse(row.get("created_at")) or current
-                    # Ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes zählt die Einspruchsfrist ab dem Hochladen.
-                    until = ref.hold_until or uploaded + timedelta(hours=appeal_hours)
-                    if not (ref.found and ref.open) and current >= until:
+                    if moss_due(row, match, tournament, season, current):
                         expired.append(row)
-                elif not refs.match_hold(match, current, appeal_hours=appeal_hours):
+                elif not refs.match_hold(match, current, appeal_hours=match_proofs.setting(tournament, season, "appeal_hours")):
                     expired.append(row)
     return expired
 
@@ -125,8 +163,7 @@ async def purge(db, *, now=None) -> int:
     current = now or now_utc()
     stale = [row async for rows in _pages(db, {"status": "pending", "created_at": {"$lt": (current - match_proofs.PENDING_TTL).isoformat()}})
              for row in rows]
-    staffeln = {row["id"]: row for row in await db.tournaments.find(
-        ONLY_LEAGUE, {"_id": 0, "id": 1, "league_context": 1, "appeal_hours": 1, "evidence_keep_days": 1}).to_list(None)}
+    staffeln = {row["id"]: row for row in await db.tournaments.find(ONLY_LEAGUE, STAFFEL_FIELDS).to_list(None)}
     expired = [*await _expired_tournament(db, current, sorted(staffeln)), *await _expired_league(db, current, staffeln)]
     kept = {"status": {"$in": list(match_proofs.KEPT_STATUSES)}}
     attached_ids = await db.match_proof_photos.distinct("match_id", kept)
