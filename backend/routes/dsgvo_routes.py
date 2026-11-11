@@ -39,8 +39,9 @@ UPLOAD = ("id", "media_scope", "media_type", "kind", "mime", "size", "width", "h
 UPLOAD_EVENT = ("id", "created_at", "endpoint", "media_scope", "kind", "mime", "size", "status", "status_code", "duration_ms",
                 "ip", "user_agent")
 ATTACHMENT = ("id", "kind", "mime", "size", "width", "height", "status", "context", "created_at", "updated_at")
-PROOF_PHOTO = ("id", "match_id", "tournament_id", "registration_id", "mime", "size", "width", "height", "status", "created_at",
-               "updated_at")
+# Nachweise (#2360): ``type`` und ``link`` (Video-Link) und der Bezug (``context``) gehören zur Auskunft.
+PROOF_PHOTO = ("id", "match_id", "tournament_id", "registration_id", "type", "link", "context", "mime", "size", "width", "height",
+               "status", "created_at", "updated_at")
 
 
 def _clean(row: dict, *drop: str) -> dict:

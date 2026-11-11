@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Callable
 
 from services import league_rule_facts as facts, map_pools
+from services.league_presets import PRESETS
 from services.markdown_text import plain as plain_text, text_cell
 from services.matchday_schedule import LOCAL_TZ
 
@@ -108,8 +109,8 @@ def _periods(rows) -> str:
     return ", ".join(facts.period_label(row) for row in rows or []) or "keine"
 
 
-# Vorgaben für Season-Felder, deren Einstellung erst mit einem späteren Paket kommt (E.2 Proteste, E.3 Strafen, D.5 Vorfälle).
-PRESETS = {"protest_hours": 48, "appeal_hours": 48, "evidence_keep_days": 30, "map_break_after": 2, "map_break_minutes": 5}
+# Vorgaben für Season-Felder, deren Einstellung erst mit einem späteren Paket kommt (E.2 Proteste, E.3 Strafen, D.5 Vorfälle):
+# ``PRESETS`` steht seit #2360 im Blatt-Modul ``services/league_presets`` (auch die Aufbewahrung der Nachweise liest sie).
 
 
 def _preset(key: str, default, show: Callable) -> Callable[[Context], str | None]:

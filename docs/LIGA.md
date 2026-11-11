@@ -677,6 +677,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
 | Spiel: `POST /dispute` (ohne eigene Seite) | `disputes` | nein | – |
 | Spiel: `POST /proof-photos` als Leitung, `matches-v2/recalculate-advancement` | `results` | nein | – |
+| Spiel: `GET` und `POST /proofs` als Leitung (#2360) | `results` oder `disputes` | nur beim Bezug `moss`: Befangene sehen ihn nicht | – |
 | `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
 | `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
 | `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
@@ -2557,8 +2558,8 @@ Nur Liga-Staffeln (Turnier mit `league_context`). **Turniere bleiben, wie sie si
 #### Season-Felder
 
 Alle Felder stehen an `league_seasons` und an der Staffel (`tournaments`). Zur Laufzeit zählt der Wert der Staffel, ohne Feld der
-der Season, ohne beides die Vorgabe aus `league_rule_vars.PRESETS` (die **eine** Quelle für Vorgaben; D.5 und E.2 tragen ihre neuen
-Felder dort ein). Liga N weicht nicht ab (kein `overrides`-Eintrag). Übertragen wird in zwei eigenen Gruppen von `SYNC_GROUPS`, die wie
+der Season, ohne beides die Vorgabe aus `services/league_presets.PRESETS` (die **eine** Quelle für Vorgaben, ein Blatt-Modul;
+`league_rule_vars.PRESETS` ist derselbe Wert; D.5 und E.2 tragen ihre neuen Felder dort ein). Liga N weicht nicht ab (kein `overrides`-Eintrag). Übertragen wird in zwei eigenen Gruppen von `SYNC_GROUPS`, die wie
 `checkin` auch in einer laufenden Season gelten, nicht in einer gesperrten Staffel: `incidents` (D.5) und `protests` (E.2). Jeder Vorfall
 und jedes Verfahren **speichert seine berechneten Fristen**; eine geänderte Einstellung wirkt nur auf neue Fälle.
 
@@ -2698,9 +2699,11 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | `registration_id` | str \| null | die Seite, die hochgeladen hat (null: die Leitung) |
 | `owner_id`, `match_id`, `tournament_id`, `status`, `scan_state`, Bildfelder | wie bisher | unverändert |
 
-- **API:** `GET /api/matches/{id}/proofs?kind=&ref_id=` (Liste für diesen Bezug, nur was der Aufrufer sehen darf, je Eintrag `side`,
-  `own`, `can_remove`; dazu `can_add`, `open`, `limit`), `POST /api/matches/{id}/proofs` (Formular: `kind`, `ref_id` und entweder `file`
-  oder `link`), `DELETE /api/matches/{id}/proofs/{proof_id}`. Bilder liefert weiter `GET /api/matches/{id}/proof-photos/{id}` aus.
+- **API:** `GET /api/matches/{id}/proofs?kind=&ref_id=` liefert `{items, open, can_add, limit, link_max_length}`, nur was der Aufrufer
+  sehen darf. Je Eintrag: `id`, `type`, `kind`, `ref_id`, `side` (Anmeldung), `own`, `own_side`, `can_remove`, `created_at`; ein Bild
+  dazu `url`, `width`, `height`, `scan_state`, ein Link `link`. `POST /api/matches/{id}/proofs` (Formular: `kind`, `ref_id` und entweder
+  `file` oder `link`) antwortet mit dem Eintrag, `DELETE /api/matches/{id}/proofs/{proof_id}` mit `{ok}`. Bilder liefert weiter
+  `GET /api/matches/{id}/proof-photos/{id}` aus. Die Logik zum Bezug steht in `services/match_proof_refs.py` (ohne Datenbank).
 - **Hinzufügen** darf, wer für eine Seite des Spiels handelt (Captain, Vertreter, wer angemeldet hat), solange der Bezug offen ist:
   `report` bis das Ergebnis gilt, `incident` solange der Vorfall offen ist, `protest` nur die einreichende Seite bis `evidence_until`,
   `statement` nur die Gegenseite bis `statement.due_at`, `moss` jedes Mitglied einer Seite (der Spieler lädt selbst hoch). Die Leitung
@@ -2714,7 +2717,7 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 - **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Die ZIP-Datei selbst
   (eigener Dateityp, eigene Größen- und Inhaltsprüfung) baut E.2 als `type: "file"` in denselben Regeln.
 
-**Aufbewahrung** (Nr. 31, 136; `match_proofs.purge`, täglicher Job `proof_photo_retention`):
+**Aufbewahrung** (Nr. 31, 136; `services/match_proof_retention.py`, stündlicher Job `proof_photo_retention`):
 
 | Was | Gelöscht |
 | --- | --- |
@@ -2725,7 +2728,9 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
 
 **Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt
-das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, Wiener Zeit). Eine laufende Strafe verlängert die
+das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, Wiener Zeit). Lässt sich das Ende nicht bestimmen
+(Season ohne Kalender), bleibt es bei 30 Tagen ab dem Hochladen, weiter mit der Sperre bei offenem Verfahren. Die Werte liest
+`match_proofs.setting` (Staffel, sonst Season, sonst Vorgabe). Eine laufende Strafe verlängert die
 Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist `match_proof_photos.keep_until` (ISO) und noch nicht gebaut.
 
 #### Altbestand und Übergang
@@ -2759,7 +2764,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   jeder nur seine Schlüssel.
 - Benachrichtigungen: beide nutzen die Art `match_attention` und „Mein Dienst“. D.5: `incident:<id>`, E.2: `procedure:<id>` als
   Schlüssel gegen doppelte Meldungen.
-- `league_rule_vars.PRESETS`, `SYNC_GROUPS`, `seasonTabs.js`: jeder ergänzt nur seine Zeilen bzw. seine Gruppe.
+- `league_presets.PRESETS`, `SYNC_GROUPS`, `seasonTabs.js`: jeder ergänzt nur seine Zeilen bzw. seine Gruppe.
 - Nachweise: beide benutzen `match_proofs` und den Frontend-Baustein `ProofList` unverändert; fehlt etwas, kommt es als eigener Commit
   in den Baustein, nicht als Kopie.
 
