@@ -841,7 +841,7 @@ Darstellung erst beim Lesen, jeder Wert über `markdown_text.text_cell`:
 | `[[baustein:format]]` „Spielformat“ | `best_of`, `team_size`, `min_squad_size`, `max_squad_size`, `map_repeat`, `lineup_mode`, `lineup_min_players` der Season (`effective_settings`), dazu je Liga N die Abweichungen (`overrides`) | `{best_of, maps_to_win, team_size, min_squad_size, max_squad_size, map_repeat, lineup_mode, lineup_min_players, divisions: [{label, best_of, team_size, min_squad_size}]}` | Liste: Serie, Teamgröße, Kader, Map-Wiederholung, Teilnehmerliste; danach „Abweichend in Liga N: …“ |
 | `[[baustein:table]]` „Tabelle und Wertung“ | `scoring_rules` der Season (`normalize_rules`, Altbestand mit seinen Vorgaben), dazu Liga N mit eigenen `scoring_rules` | `{points: {win, draw, loss}, points_mode, allow_draws, tiebreakers, head_to_head, forfeit_score, exit_rule, divisions: [{label, …dieselben Felder}]}` (`points_mode` `result` oder `maps`, #2312; eingefrorene Fassungen ohne das Feld gelten als `result`) | Liste: Punkte (mit `maps`: „je gewonnene Map ein Punkt, 3:2 ergibt 3 und 2“), Remis, Reihenfolge bei Punktgleichheit, Kampflos, Beide nicht erschienen, Ausscheiden (E.1) |
 | `[[baustein:schedule]]` „Termine“ | Kalender der Season (`start_date`, `weeks_total`, `matchday_days`, Standardtermin, `blocked_periods`), `match_schedule_response_hours`, `schedule_rules` (D.1) | `{weeks_total, start_day, end_day, matchday_days, weekday_from, weekday_to, default_weekday, default_time, blocked_periods: [{label, start_date, end_date}], response_hours, rules: {…D.1} \| null}` | Liste: Season und Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig; ohne `schedule_rules` ein Satz, dass Verschiebungen die Leitung entscheidet |
-| `[[baustein:eligibility]]` „Spielberechtigung“ | B.3-Felder der Season (`league_eligibility.rules_view`), `entry_policy`, `unique_game_ids`, die Spiel-ID-Felder des Spiels (`player_id_fields[].label`), die Plattform je Season (#2270, `league_platform.season_block` → `values`) | `{min_age, one_team_per_season, new_player_wait_days, roster_deadline, transfer_windows: [{label, start_date, end_date}], entry_policy, unique_game_ids, id_fields: [label], platform: {field, platforms, crossplay, input_device, divisions: [{label, platforms, crossplay, input_device}]} \| null}` | Liste: Zulassung, Mindestalter, Spiel-IDs, Plattform (Feld, erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster |
+| `[[baustein:eligibility]]` „Spielberechtigung“ | B.3-Felder der Season (`league_eligibility.rules_view`), `entry_policy`, `unique_game_ids`, die Spiel-ID-Felder des Spiels (`player_id_fields[].label`), die Plattform je Season (#2270, `league_platform.season_block` → `values`) | `{min_age, one_team_per_season, new_player_wait_days, roster_deadline, transfer_windows: [{label, start_date, end_date}], entry_policy, auto_accept: bool | null, unique_game_ids, id_fields: [label], platform: {field, platforms, crossplay, input_device, divisions: [{label, platforms, crossplay, input_device}]} \| null}` | Liste: Zulassung, Annahme (#2348: nur mit Anmeldefenster, ältere Fassungen ohne `auto_accept` ohne Zeile), Mindestalter, Spiel-IDs, Plattform (Feld, erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster |
 
 **Variablen** stehen als `{{name}}` im Fließtext (Groß und klein egal, Leerraum in den Klammern erlaubt). Der Wert wird wie ein
 Bausteinwert eingesetzt (`text_cell`: nie Link, nie fett, nie Tabellenspalte) und beim Veröffentlichen je Season in
@@ -874,6 +874,7 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `eligibility.min_age`, `eligibility.wait_days`, `eligibility.roster_deadline`, `eligibility.transfer_windows`, `eligibility.entry_policy`, `eligibility.id_fields` | B.3-Werte in Worten |
 | `eligibility.platform`, `eligibility.crossplay`, `eligibility.input_device` | Plattform je Season (#2270): „PC und PlayStation“ / „alle Plattformen“, „an“ / „aus“, Eingabegerät in Worten; ohne Plattform-Feld „(nicht festgelegt)“ |
 | `application.opens`, `application.closes`, `application.slots` | Anmeldefenster (Wiener Zeit) und Startplätze (B.4) |
+| `application.acceptance` (#2348) | Ganzer Satz ohne Punkt: „Anmeldungen werden automatisch angenommen, die Liga-Leitung kann nachträglich ablehnen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
 | `protest.hours`, `appeal.hours`, `evidence.keep_days` | **Vorab angelegt:** Season-Felder `protest_hours` (Vorgabe 48), `appeal_hours` (48), `evidence_keep_days` (30). Ohne Feld gilt die Vorgabe (`league_rule_vars.PRESETS`). Die Einstellung kommt mit E.2 (Proteste) bzw. E.3 (Strafen) und schreibt **genau diese Felder**, Texte passen sich dann über den Vorschlag an |
 | `match.break_after_map`, `match.break_minutes` | **Vorab angelegt:** Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5); Einstellung mit D.5 (Vorfälle) |
 | `mode:<kennung>.name`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus des Spiels: Name, Ergebnisregel in Klartext, Ziel, Rundenlimit, Zeitlimit („10 Min.“), Zeit je Runde, Spieler je Seite, „ja“/„nein“ |
@@ -1090,6 +1091,7 @@ entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der An
 Captain oder Vertreter melden ein vorhandenes Co-Team auf der Ligaseite für eine Season an. Die Leitung nimmt an, lehnt ab oder setzt auf die Warteliste und
 teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Zeile. Logik in `services/league_applications.py`, Routen in `routes/league_application_routes.py`.
 **Ohne Anmeldefenster an der Season gibt es keine Selbstanmeldung**, und alles bleibt wie vorher. Das Zuteilen in der Turnierverwaltung bleibt als Sonderweg.
+Mit `application_auto_accept` (#2348, Entscheidung Nr. 126) entscheidet die Season beim Einreichen selbst, siehe **Automatisch annehmen** unten.
 
 **Einstellungen an `league_seasons`** (Zuständigkeit `season`, alle optional; wirken sofort, kein Übertragen):
 
@@ -1103,6 +1105,7 @@ teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Z
 | `entry_policy` | `all` \| `members` | `all` | `all` | Zulassung. `members`: Jeder im Kader muss Mitglied sein (dieselbe Regel wie Sichtbarkeit „Nur Mitglieder“) |
 | `sibling_squads_in_staffel` | bool | `false` | `false` | Zwei Co-Teams eines Hauptteams in derselben Staffel. Ein Co-Team bleibt je Season in einer Staffel. Gilt auch fürs Zuteilen. Mit `true` lautet `identity_key` `<tid>:team:<team_id>:squad:<squad_id>` |
 | `application_privacy_text` | str ≤ 2000 | leer | Platzhalter-Satz | Hinweis zum Datenschutz bei der Anmeldung. Den Wortlaut pflegt die Leitung, der Text steht mit im Antrag |
+| `application_auto_accept` (#2348) | bool | `false` | `false` | Anmeldungen automatisch annehmen. `null` lässt den Wert stehen. Kein Staffel-Feld, darum nicht in `SYNC_GROUPS`; Protokoll wie die übrigen Felder über `league.season.update` (`data.fields`) |
 
 **`league_applications`** (eine Zeile je Antrag, ein neuer Antrag nach Ablehnung oder Rückzug ist eine neue Zeile):
 
@@ -1115,10 +1118,11 @@ teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Z
 | `applied_by`, `submitted_at` | str, ISO | Wer wann eingereicht hat |
 | `rule_consent` | `{consent_id, rule_version_id, version, user_id, at}` | Die Fassung, der zugestimmt wurde. Dieselbe Zustimmung steht in `league_rule_consents` |
 | `privacy_consent` | `{text, user_id, at}` | Der Wortlaut, dem zugestimmt wurde |
-| `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht |
+| `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht, beim Zurückstufen einer automatisch angenommenen Anmeldung auch. Entscheidet die Season (#2348), ist `decided_by` `null` |
+| `auto_accepted` (#2348) | `true` | Nur solange die Annahme automatisch war. Jede Entscheidung einer Person (auch Zuteilen) nimmt das Feld weg |
 | `withdrawn_by`, `withdrawn_at` | str, ISO | Rückzug |
-| `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei |
-| `history` | `[{status, by, at, reason?, conflict_reason?}]` | Jeder Schritt. `conflict_reason`: Grund einer Notausnahme des Superadmins (#2245) |
+| `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at, auto?}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei. `auto: true` (#2348): beim Einreichen automatisch zugeteilt, `assigned_by` `null` |
+| `history` | `[{status, by, at, reason?, conflict_reason?, auto?}]` | Jeder Schritt. `conflict_reason`: Grund einer Notausnahme des Superadmins (#2245). `auto: true`: Die Season hat entschieden (#2348), `by` `null`; der Eingang zeigt „automatisch“ |
 | `created_at`, `updated_at` | ISO | |
 
 Indizes: `id` eindeutig, `active_key` eindeutig (sparse), (`season_id`, `status`), `squad_id`, `applied_by`.
@@ -1132,12 +1136,27 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 | `submitted` | `in_review` | Leitung |
 | `submitted`, `in_review`, `waitlist` | `accepted` | Leitung, nur mit freiem Platz. Prüfung wird wiederholt. Mit `tournament_id` gleich zugeteilt |
 | `submitted`, `in_review` | `waitlist` | Leitung, nur wenn die Season eine Warteliste hat und sie nicht voll ist |
-| `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei |
+| `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei. War die Annahme automatisch (`auto_accepted`), nur mit Grund (mindestens fünf Zeichen, sonst 422) |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `rejected` | Leitung, Grund mindestens fünf Zeichen |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `withdrawn` | Captain oder Vertreter |
 | `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, die Prüfung wird wiederholt (`check_squad`), dazu die der Staffel (`build_registration`) |
+| – (beim Einreichen) | `accepted`, mit nur einer Staffel samt `assignment.auto` | Season mit `application_auto_accept`: freier Platz und niemand auf der Warteliste (#2348) |
+| – (beim Einreichen) | `waitlist` | Season mit `application_auto_accept`: alle Plätze belegt oder schon jemand auf der Warteliste, und sie hat Platz. Sonst bleibt `submitted` |
+| `accepted` mit `assignment.auto` | `rejected`, `waitlist` | Leitung, Grund Pflicht. Die Anmeldung der Staffel fällt weg wie bei „Zuteilung zurücknehmen“; mit festem Spielplan 409 („Austritt eintragen“), gesperrte Staffel 423 |
 
 Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste.
+
+**Automatisch annehmen** (#2348, Entscheidung Nr. 126, `application_auto_accept`): Nach derselben Prüfung wie sonst (Fenster, Regelwerk, `entry_policy`, ein Co-Team je Season, Co-Team-Regeln) entscheidet
+`_auto_decide` unter der Season-Sperre. Freier Platz und leere Warteliste: `accepted`, belegt den Platz wie eine Annahme der Leitung. Sonst `waitlist`, wenn die Warteliste Platz hat:
+Ein frei gewordener Platz geht nach den Regeln der Warteliste durch die Leitung, nicht an den nächsten Neuen. Gleichzeitig auf den letzten Platz: Die Season-Sperre lässt
+einen nach dem anderen durch, genau einer wird angenommen. Fehlende Angaben (Nr. 118) halten nichts auf.
+**Zuteilung:** Gibt es genau eine Staffel in den aktiven Liga N, vor ihrem Start (`PRE_START_STATUSES`) und ohne feste Spiele, sperrt das Einreichen sie vorher (Turnier-Sperre vor
+Season-Sperre, Wartezeit wie die Season-Sperre) und teilt zu: `build_registration`, Vorschau, Kader der Season wie beim Zuteilen, `created_by` `null`, `registered_by` wer
+eingereicht hat. Lehnt die Staffel ab (gesperrt, voll, Mindestkader der Staffel), bleibt es bei `accepted` ohne Zuteilung. Mehrere Staffeln: Die Leitung teilt zu, das Team sieht
+„Angemeldet – Zuteilung folgt“. Was gar nicht geht, bleibt `submitted`.
+**Befangenheit:** Keine Entscheidung einer Person, darum auch beim eigenen Team der Leitung. Ablehnen und Zurückstufen danach prüfen Nr. 73 wie immer.
+**Später einschalten:** Offene `submitted`/`in_review`-Anträge bleiben, wie sie sind. `GET /api/admin/leagues/seasons/{id}` liefert `applications_waiting` (nur die Zahl), die
+Verwaltung zeigt beim eingeschalteten Schalter „X Anmeldungen warten noch auf Prüfung“.
 
 **Prüfung** (`league_applications.check_squad`, derselbe Text für Captain und Leitung): Fenster offen, Season weder beendet noch archiviert, gültige Fassung des Regelwerks, Platz oder Warteliste frei,
 kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`. Das sind die `problems`.
@@ -1156,6 +1175,7 @@ Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` un
 Weil das Zuteilen hier über den Antrag entscheidet, gilt die Befangenheit (siehe unten): Die befangene Person bekommt 403, bevor eine Anmeldung entsteht. `POST /api/tournaments/{tid}/squad-registrations` nimmt dafür `conflict_reason` an; der Dialog „Co-Team zuteilen“ fragt nicht danach, die Absage verweist den Superadmin in den Eingang. Ohne offenen Antrag bleibt das Zuteilen ohne Befangenheit.
 
 **Sperren:** Einreichen, Rückzug und Entscheidungen halten `league_season_resource`. Beim Zuteilen zuerst die Turnier-Sperre, dann diese. Besetzt: 409. Der Status wechselt nur mit Bedingung auf den alten Stand.
+Das Einreichen mit automatischer Zuteilung und Ablehnen bzw. Warteliste einer automatischen Zuteilung (#2348) halten ebenso zuerst die Sperre ihrer Staffel.
 
 **Abgebrochenes Zuteilen:** Anmeldung und Antrag sind zwei Schreibvorgänge ohne Transaktion. Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie stehen (Prozess stirbt dazwischen), findet `_left_over` sie über `application_id`: Annehmen und Zuteilen schließen mit ihrer Staffel ab, auch wenn eine andere gewählt ist, und zwar unter deren Sperre und mit derselben Prüfung (`check_squad`). Ist die Staffel gesperrt: 423, bis die Leitung sie entsperrt (`POST /api/tournaments/{id}/unlock`). Fällt die Prüfung durch, bleibt der Antrag stehen, die Leitung nimmt die Anmeldung aus der Teilnehmerliste. Ablehnen, Warteliste und Rückzug antworten 409, bis eines von beiden geschehen ist.
 
@@ -1163,14 +1183,14 @@ Weil das Zuteilen hier über den Antrag entscheidet, gilt die Befangenheit (sieh
 
 | Route | Wer | Zweck |
 | --- | --- | --- |
-| `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy}` oder `null`. Keine Personen |
+| `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy, auto_accept}` oder `null`. Keine Personen |
 | `GET /api/leagues/{liga}/{season}/application` | angemeldet, Season sichtbar | `application`, `rules`, `privacy`, `season_problems`, `squads[]`: die eigenen Co-Teams des Spiels mit `can_apply`, `state`, `application`, nur für Captain und Vertreter dazu `problems`, `warnings`, `shortfall`. `hint`, wenn das Co-Team keinen Captain hat |
-| `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403 |
+| `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403. Antwort mit `status`: `submitted`, mit `application_auto_accept` auch `accepted` (dann `staffel`, wenn zugeteilt) oder `waitlist` |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
-| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `history[].conflict_reason`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
+| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `auto_accepted`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
 | `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
-| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404 |
+| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer automatisch angenommenen Anmeldung verlangt `reason` (422) |
 
 **Befangenheit** (#2245, Entscheidung Nr. 73, Regel in Abschnitt B.1): Über die Anmeldung des eigenen Teams entscheidet eine zweite Person. Befangen sind Kader des Co-Teams,
 Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat, auch mit Zuständigkeit `applications` oder Bereich `leagues`. Prüfen, Annehmen, Ablehnen,
@@ -1181,12 +1201,15 @@ Der Eingang meldet `own_team` nach derselben Regel (`belongs_to_side`) und `supe
 „Grund für die Notausnahme“.
 
 **Benachrichtigungen:** Art `tournament_registration`, `meta.reason` `league_application_submitted`, `_accepted`, `_rejected`, `_waitlist`, `_assigned`, `_withdrawn`, Schlüssel `league-application:<id>:<status>:<schritt>:<user>`. An Captain und Vertreter (ohne beide die Hauptteam-Leitung), bei `submitted` und `withdrawn` auch an die Leitung (`applications`). Mail über `send_league_mail`.
+Automatisch angenommen oder auf die Warteliste (#2348): Das Team bekommt dieselbe Nachricht wie bei einer Entscheidung der Leitung (ohne „eingereicht“), die Leitung den
+Hinweis „… ist automatisch angenommen …“ bzw. „… steht automatisch auf der Warteliste …“. Die Nachricht zur Warteliste nennt einen Grund, wenn es einen gibt.
 
 **Datenschutz:** Gäste sehen Fenster und freie Plätze, keine Anträge. Andere Teams sehen nichts von einem Antrag. Den Grund einer Ablehnung sehen Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und die Liga-Leitung, zurückziehen dürfen nur Captain und Vertreter (`can_withdraw`). Auskunft: `league_applications`, in denen die Person steht, mit den eigenen Zustimmungen und eigenen Schritten (`my_steps`), ohne Kennungen anderer. Wer nur als Liga-Leitung handelte, bekommt wie im Adminprotokoll nur den Vorgang (Kennung des Antrags, Season, Schritt, Zeitpunkt), ohne Team und Grund. Kontolöschung: Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt überall heraus (`applied_by`, Zustimmungen, `withdrawn_by`, `decided_by`, `history[].by`). Den Grund einer Notausnahme (`history[].conflict_reason`) enthält die Auskunft der Liga-Leitung nicht (Vorgang ohne Inhalt wie im Adminprotokoll), bei der Kontolöschung bleibt er im Verlauf, ohne Person. Kein Geburtsdatum in Antworten.
 
 **Löschen:** Eine Season mit Anträgen lässt sich nicht löschen (`delete-plan`, Hinweis auf Archivieren). Ein Co-Team mit offenem Antrag lässt sich erst nach dem Rückzug löschen, ein Hauptteam mit solchem Co-Team nicht auflösen.
 
-**Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`.
+**Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist`
+(`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung); `.reject` und `.waitlist` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
 
 ### C.1 Spielmodi (#2206)
 

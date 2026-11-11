@@ -404,6 +404,7 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 3. **Warteliste** an- oder abschalten, auf Wunsch eine Höchstzahl und eine **Regel zur Warteliste**. Die Regel steht öffentlich auf der Ligaseite.
 4. **Wer darf sich anmelden:** alle Konten (Vorgabe) oder nur Vereinsmitglieder. Bei Mitgliedern gilt das für den ganzen Kader.
 5. **Zwei Co-Teams eines Hauptteams in derselben Staffel:** Vorgabe Nein.
+5a. **Anmeldungen automatisch annehmen:** Vorgabe aus, dann prüfst du jede Anmeldung. Mehr dazu unten unter „Automatisch annehmen“.
 6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei.
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
 
@@ -422,6 +423,12 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 | **Ablehnen** | Nur mit Grund (mindestens fünf Zeichen). Captain und Vertreter lesen ihn. Das Team darf im offenen Fenster neu einreichen |
 
 Hat sich der Kader seit dem Einreichen geändert, sagt das die Anmeldung, und Annehmen oder Zuteilen lehnen mit demselben Satz ab. Sind alle Plätze belegt, geht **Annehmen** nicht mehr. Mit Warteliste nimmt die Season weiter Anmeldungen an, ohne Warteliste endet die Anmeldung.
+
+**Automatisch annehmen** (Schalter unter **Selbstanmeldung**): Ist er an, ist eine gültige Anmeldung beim Einreichen sofort angenommen und belegt einen Startplatz. Es gelten dieselben Regeln wie sonst (Fenster, Regelwerk, wer sich anmelden darf, ein Co-Team je Season); fehlende Angaben halten auch hier nicht auf. Sind alle Plätze vergeben oder wartet schon jemand auf der Warteliste, kommt die Anmeldung auf die Warteliste – einen frei gewordenen Platz vergibst du wie bisher. Gibt es nur eine Staffel, steht das Co-Team gleich darin; bei mehreren teilst du zu, das Team sieht so lange „Angemeldet – Zuteilung folgt“. Du bekommst zu jeder automatischen Annahme eine Nachricht, im Eingang steht „Automatisch angenommen“ und im Verlauf „Angenommen, automatisch“. Das gilt auch für dein eigenes Team, weil niemand entschieden hat.
+
+<img src="../assets/liga/liga-verwaltung-auto-annehmen-1440.png" alt="Selbstanmeldung mit eingeschaltetem Schalter Anmeldungen automatisch annehmen und dem Hinweis auf zwei offene Anmeldungen" width="640">
+
+Passt eine automatisch angenommene Anmeldung nicht, **lehnst du sie ab** oder setzt sie auf die **Warteliste** – beides nur mit Grund, das Team liest ihn. Hat die Season das Co-Team automatisch in die einzige Staffel gesetzt, nimmt Ablehnen oder Warteliste es dort wieder heraus, solange der Spielplan noch nicht steht; danach geht es nur über **Austritt eintragen** in der Teilnehmerliste. Über das eigene Team entscheidet auch hier eine andere Person. Schaltest du die Einstellung später ein, bleiben offene Anmeldungen von vorher bei dir: Unter dem Schalter steht dann „X Anmeldungen warten noch auf Prüfung“.
 
 Teilst du ein Co-Team mit offener Anmeldung über 2.5 direkt zu, gilt die Anmeldung als angenommen. Nimmst du die Zuteilung zurück, bleibt sie angenommen und hält ihren Platz, bis du neu zuteilst oder ablehnst. Zugeteilte zieht niemand per Klick zurück: Den Austritt trägst du in der Teilnehmerliste ein.
 
@@ -726,7 +733,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Spielformat | `[[baustein:format]]` | Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste; Abweichungen je Liga N | Season → Spielbetrieb → Serie, Anmeldung und Kader, Ligen |
    | Tabelle und Wertung | `[[baustein:table]]` | Punkte, Remis, Reihenfolge bei Punktgleichheit, kampflos, beide nicht erschienen, Ausscheiden | Season → Tabelle |
    | Termine | `[[baustein:schedule]]` | Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig | Season → Termine |
-   | Spielberechtigung | `[[baustein:eligibility]]` | Zulassung, Mindestalter, Spiel-IDs, Plattform (erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N, 2.7c), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster | Season → Anmeldung und Kader, Spiel → Spiel-IDs |
+   | Spielberechtigung | `[[baustein:eligibility]]` | Zulassung, Annahme der Anmeldung („automatisch angenommen“ oder „die Liga-Leitung prüft“, nur mit Anmeldefenster, 2.5a), Mindestalter, Spiel-IDs, Plattform (erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N, 2.7c), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster | Season → Anmeldung und Kader, Spiel → Spiel-IDs |
 
 4. **Variablen** stehen mitten im Satz, etwa „Gespielt wird Best of `{{best_of}}`“, und werden beim Lesen durch den Wert der Season
    ersetzt. **Variable einfügen** zeigt die Liste mit dem Wert von heute (mit Suche); die **Hilfe** darunter nennt alle Bausteine und
@@ -750,6 +757,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{eligibility.min_age}}`, `{{eligibility.wait_days}}`, `{{eligibility.roster_deadline}}`, `{{eligibility.transfer_windows}}`, `{{eligibility.entry_policy}}`, `{{eligibility.id_fields}}` | Spielberechtigung (3.9) |
    | `{{eligibility.platform}}`, `{{eligibility.crossplay}}`, `{{eligibility.input_device}}` | Plattform je Season (2.7c): „PC und PlayStation“ oder „alle Plattformen“, Crossplay „an“/„aus“, Eingabegerät; ohne Plattform-Feld „(nicht festgelegt)“ |
    | `{{application.opens}}`, `{{application.closes}}`, `{{application.slots}}` | Anmeldefenster und Startplätze (2.5a) |
+   | `{{application.acceptance}}` | Ein ganzer Satz ohne Punkt (2.5a): „Anmeldungen werden automatisch angenommen, die Liga-Leitung kann nachträglich ablehnen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
    | `{{protest.hours}}`, `{{appeal.hours}}`, `{{evidence.keep_days}}` | Protestfrist, Einspruchsfrist, Aufbewahrung der Beweise. Heute gelten die Vorgaben 48 Stunden, 48 Stunden, 30 Tage; einstellbar werden sie mit den Paketen Proteste und Strafen |
    | `{{match.break_after_map}}`, `{{match.break_minutes}}` | Standardpause zwischen den Maps (Vorgabe nach Map 2, 5 Min.); einstellbar mit dem Paket Vorfälle |
    | `{{mode:<kennung>.name}}`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus: Name, Regel in Klartext, Ziel, Rundenlimit, Zeitlimit, Zeit je Runde, Spieler je Seite, Verlängerung und Remis („ja“/„nein“). Die Kennung steht in der Liste. |

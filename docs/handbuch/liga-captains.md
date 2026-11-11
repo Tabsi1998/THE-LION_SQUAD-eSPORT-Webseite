@@ -18,18 +18,23 @@ Das Co-Team meldet sich auf der **Ligaseite** an, sobald das Anmeldefenster offe
 
    <img src="../assets/liga/liga-anmeldung-hinweise-390.png" alt="Schritt Passt alles? am Handy: Das Co-Team kann angemeldet werden, darunter die offenen Punkte als Hinweis" width="300">
 4. **Regeln lesen und zustimmen**, **Datenschutz-Hinweis lesen und zustimmen**. Beides wird mit Zeitpunkt und deinem Namen gespeichert.
-5. **Anmeldung einreichen.** Das ist noch kein Startplatz: Die Liga-Leitung prüft und entscheidet, du bekommst eine Nachricht.
+5. **Anmeldung einreichen.** Was dann gilt, legt die Liga-Leitung je Season fest, die Zusammenfassung vor dem Einreichen sagt es dir:
+   - **Die Liga-Leitung prüft** (Vorgabe): Das ist noch kein Startplatz. Die Leitung entscheidet, du bekommst eine Nachricht.
+   - **Automatisch angenommen:** Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben, kommt ihr auf die Warteliste. Gibt es nur eine Staffel, steht ihr gleich darin. Die Liga-Leitung kann nachträglich mit Grund ablehnen.
 
 Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 
 | Stand | Heißt |
 | --- | --- |
 | Anmeldung offen | Ihr könnt einreichen |
-| Eingereicht, In Prüfung | Die Liga-Leitung ist dran |
-| Angenommen | Ihr habt einen Startplatz. Liga und Staffel teilt die Liga-Leitung zu, dann stehen sie dabei |
+| Eingereicht, In Prüfung | Die Liga-Leitung prüft die Anmeldung und meldet sich |
+| Angemeldet | Ihr habt einen Startplatz, Liga und Staffel stehen dabei |
+| Angemeldet – Zuteilung folgt | Ihr habt einen Startplatz. Liga und Staffel teilt die Liga-Leitung noch zu |
 | Warteliste | Wird ein Platz frei, entscheidet die Liga-Leitung. Niemand rückt von selbst nach |
 | Abgelehnt | Der Grund steht dabei. Im offenen Fenster dürft ihr neu einreichen |
 | Zurückgezogen | Du oder dein Vertreter habt zurückgezogen. Im offenen Fenster dürft ihr neu einreichen |
+
+<img src="../assets/liga/liga-angemeldet-390.png" alt="Anmeldung auf der Ligaseite am Handy: ein Co-Team Angemeldet mit Staffel, eines Angemeldet – Zuteilung folgt, eines Eingereicht mit dem Satz, dass die Liga-Leitung prüft" width="300">
 
 **Zurückziehen** geht, bis das Co-Team einer Staffel zugeteilt ist. Danach klärt ihr den Austritt mit der Liga-Leitung.
 
