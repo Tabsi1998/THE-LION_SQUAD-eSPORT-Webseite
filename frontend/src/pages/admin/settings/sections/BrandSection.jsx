@@ -72,7 +72,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
             </button>
           </div>
 
-          <div className="grid xl:grid-cols-[minmax(0,1.08fr)_minmax(26rem,0.92fr)] gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.08fr)_minmax(26rem,0.92fr)] gap-4">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="font-bold uppercase tracking-widest text-xs text-white/65">{editingBannerId ? "Banner bearbeiten" : "Neuer Banner"}</div>
