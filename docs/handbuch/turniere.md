@@ -84,7 +84,8 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 
    Beim Bearbeiten (Reiter **Bearbeiten**, Kasten „Zeitplan und Anmeldung“) steht der Haken **Automatisches
    Turnier-Hinweisbanner anzeigen**: Solange Anmeldung oder Check-in offen sind bzw. das Turnier innerhalb eines Tages
-   startet, läuft dann oben im Turnierbereich der Website und in der App ein Banner.
+   startet, läuft dann oben im Turnierbereich der Website und in der App ein Banner. Ihn sieht, wer das Turnier sehen
+   darf (Sichtbarkeit Community: Angemeldete, Vereinsmitglieder: Mitglieder); bei **Intern** läuft keiner.
    Darunter stehen seine **Views**, **Klicks** und wann er **zuletzt angezeigt** wurde, bei mehreren Bannern
    (Anmeldung / Check-in, Startet bald) einzeln aufgeschlüsselt. Die Zahlen bleiben, wenn der Banner nicht mehr läuft.
    Alle laufenden automatischen Banner zeigt auch Admin → Auftritt → Branding (siehe [Auftritt](auftritt.md)).

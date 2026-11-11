@@ -701,6 +701,15 @@ async def _auto_banner_stats_for(db, prefix: str, ref_id: str) -> dict:
     }
 
 
+# Zielgruppe der automatischen Banner (#2352): Sie folgt der Sichtbarkeit von Turnier, Challenge bzw. Server. „Nur
+# intern“ und unbekannte Werte erzeugen keinen Banner.
+AUTO_BANNER_AUDIENCE_BY_VISIBILITY = {"public": "all", "community": "logged_in", "members": "members"}
+
+
+def _auto_banner_audience(visibility: str | None) -> str | None:
+    return AUTO_BANNER_AUDIENCE_BY_VISIBILITY.get(visibility or "public")
+
+
 async def _auto_site_banners(db) -> list[dict]:
     now = now_utc()
     items: list[dict] = []
@@ -709,6 +718,9 @@ async def _auto_site_banners(db) -> list[dict]:
         {"_id": 0, "id": 1, "name": 1, "maintenance_note": 1, "maintenance_until": 1, "visibility": 1},
     ).sort("sort_order", 1).to_list(3)
     for server in servers:
+        audience = _auto_banner_audience(server.get("visibility"))
+        if audience is None:
+            continue
         until = server.get("maintenance_until")
         text = f"{server.get('name') or 'Server'} ist in Wartung"
         if server.get("maintenance_note"):
@@ -728,7 +740,7 @@ async def _auto_site_banners(db) -> list[dict]:
             "style": "minimal",
             "position": "below_nav",
             "scope": "servers",
-            "audience": "members" if server.get("visibility") == "members" else "logged_in" if server.get("visibility") == "community" else "all",
+            "audience": audience,
             "link_url": "/servers",
             "link_label": "Server ansehen",
             **_auto_banner_ref("server", server, None, until),
@@ -736,10 +748,13 @@ async def _auto_site_banners(db) -> list[dict]:
 
     tournaments = await db.tournaments.find(
         {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "is_public": {"$ne": False}},
-        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1,
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1, "visibility": 1,
          "registration_open_from": 1, "registration_open_until": 1, "check_in_from": 1, "check_in_until": 1},
     ).sort("start_date", 1).to_list(10)
     for t in tournaments:
+        audience = _auto_banner_audience(t.get("visibility"))
+        if audience is None:
+            continue
         start_dt = _parse_dt_any(t.get("start_date"))
         if t.get("status") == "check_in":
             text = f"Check-in offen: {t.get('title') or 'Turnier'}"
@@ -768,7 +783,7 @@ async def _auto_site_banners(db) -> list[dict]:
             "style": "neon",
             "position": "below_nav",
             "scope": "tournaments",
-            "audience": "all",
+            "audience": audience,
             "link_url": f"/tournaments/{t.get('slug') or t.get('id')}",
             "link_label": "Zum Turnier",
             **_auto_banner_ref("tournament", t, *period),
@@ -776,10 +791,13 @@ async def _auto_site_banners(db) -> list[dict]:
 
     fastlaps = await db.f1_challenges.find(
         {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "visibility": {"$ne": "internal"}},
-        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1,
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1, "visibility": 1,
          "registration_open_from": 1, "registration_open_until": 1},
     ).sort("start_date", 1).to_list(10)
     for challenge in fastlaps:
+        audience = _auto_banner_audience(challenge.get("visibility"))
+        if audience is None:
+            continue
         start_dt = _parse_dt_any(challenge.get("start_date"))
         if challenge.get("status") == "registration_open":
             text = f"Fast-Lap Einreichung offen: {challenge.get('title') or 'Challenge'}"
@@ -804,7 +822,7 @@ async def _auto_site_banners(db) -> list[dict]:
             "style": "neon",
             "position": "below_nav",
             "scope": "fastlap",
-            "audience": "all",
+            "audience": audience,
             "link_url": f"/fastlap/{challenge.get('slug') or challenge.get('id')}",
             "link_label": "Zur Challenge",
             **_auto_banner_ref("fastlap", challenge, *period),

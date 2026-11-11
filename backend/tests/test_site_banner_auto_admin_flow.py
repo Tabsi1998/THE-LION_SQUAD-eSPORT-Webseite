@@ -151,3 +151,38 @@ async def test_the_public_answer_carries_no_admin_fields(flow):
         auto = next(row for row in rows if row["id"].startswith("auto-tournament-"))
         for field in ("ref_kind", "ref_id", "ref_title", "period_start", "period_end", "manage_url", "stats"):
             assert field not in auto, f"{field} ist intern"
+
+
+async def shown_ids(flow, user, channel=""):
+    flow.act_as(user)
+    res = await flow.get(f"/api/settings/site-banners{channel}")
+    assert res.status_code == 200, res.text
+    return {row["id"] for row in res.json()["items"]}
+
+
+@pytest.mark.asyncio
+async def test_the_audience_follows_the_visibility(flow):
+    """Zielgruppe folgt der Sichtbarkeit (#2352) - auf der Website und in der App."""
+    await open_tournament(flow, tid="t-mitglieder")
+    await open_tournament(flow, tid="t-community")
+    await open_tournament(flow, tid="t-intern")
+    for tid, visibility in (("t-mitglieder", "members"), ("t-community", "community"), ("t-intern", "internal")):
+        await flow.db.tournaments.update_one({"id": tid}, {"$set": {"visibility": visibility}})
+    await flow.db.f1_challenges.insert_one({"id": "c-mitglieder", "slug": "c-mitglieder", "title": "Hotlap", "status": "registration_open",
+                                            "site_banner_enabled": True, "visibility": "members"})
+    await flow.db.game_servers.insert_one({"id": "srv-intern", "name": "Testserver", "status": "maintenance", "site_banner_enabled": True,
+                                           "is_active": True, "visibility": "internal", "sort_order": 1})
+    member_ids = {"auto-tournament-registration-t-mitglieder", "auto-fastlap-registration-c-mitglieder"}
+    community_id = "auto-tournament-registration-t-community"
+    internal_ids = {"auto-tournament-registration-t-intern", "auto-server-maintenance-srv-intern"}
+    player = await flow.add_user(name="spieler")
+    member = {**(await flow.add_user(name="mitglied")), "is_club_member": True}
+    admin = await flow.add_user(role="superadmin", name="leitung")
+    for channel in ("", "?channel=app"):
+        guest = await shown_ids(flow, None, channel)
+        assert not (member_ids | internal_ids | {community_id}) & guest, channel
+        logged_in = await shown_ids(flow, player, channel)
+        assert community_id in logged_in and not (member_ids | internal_ids) & logged_in, channel
+        as_member = await shown_ids(flow, member, channel)
+        assert member_ids | {community_id} <= as_member and not internal_ids & as_member, channel
+        assert not internal_ids & await shown_ids(flow, admin, channel), "„Nur intern“ erzeugt keinen Banner"
