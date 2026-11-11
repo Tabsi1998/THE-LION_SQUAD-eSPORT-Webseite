@@ -2999,6 +2999,36 @@ das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, W
 `match_proofs.setting` (Staffel, sonst Season, sonst Vorgabe). Eine laufende Strafe verlängert die
 Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist `match_proof_photos.keep_until` (ISO) und noch nicht gebaut.
 
+#### E.2 gebaut (#1619, #2297)
+
+`services/league_procedures.py` (Verfahren), `league_procedure_notify.py` (Nachrichten, Schlüssel `procedure:<id>:<anlass>`),
+`league_procedure_sweep.py` (Zeit-Job im Fristen-Job), `league_protest_settings.py` (Season-Felder, Blatt-Modul), Routen in
+`routes/league_protest_routes.py`. Was über die Tabellen oben hinaus festgelegt wurde:
+
+- **Endpunkte:** `GET|PUT /api/admin/leagues/seasons/{id}/protest-settings`, `GET …/procedures` (Eingang, Recht `disputes`);
+  am Spiel `POST /appeals`, `PATCH /procedures/{pid}` (ergänzen bzw. `incident_id`), `POST …/withdraw`, `/statement`,
+  `/statement/extend`, `/assign`, `/decision` (nur `keep`), `/moss-requests`, `/moss-requests/{rid}/excuse` und
+  `GET /proofs/{proof_id}/file` (Download der MOSS-ZIP). `POST /dispute/decision` entscheidet in der Liga dasselbe Verfahren
+  (`procedure_id`, Pflichtbegründung).
+- **„Ergebnis ändern“** läuft über das Ergebnis-Fenster: Eine Korrektur der Leitung entscheidet alle offenen Verfahren des Spiels
+  mit `decision: "change"` (bei gleichem Ergebnis `keep`), ihr Grund wird `decision_note` (mindestens zehn Zeichen, sonst 422).
+  Bei einem offenen Einspruch darf die Person der Ausgangsentscheidung auch nicht korrigieren (403).
+- **Zusätzliche Felder am Eintrag:** `additions[]` (`{text, user_id, at}`, höchstens zehn), `contested_mode` (der Wert von
+  `contested_result_mode` beim Einreichen), `statement.expired_at`, `against.decided_at` und `against.decided_by` (für „einmal je
+  Ausgangsentscheidung“ und „eine andere Person“), an `moss_requests[]` `registration_id`, `uploaded_at`, `missing_at`,
+  `excused_by`, `excused_at`, `excuse_reason`.
+- **Zeit-Job:** Erinnerung an die zuständige Person bei `target_at`; `ESCALATE_AFTER_HOURS` (24, ruhend in Sperrzeiten) später
+  Eskalation an `manage`. Ohne Zuständige eskaliert der Fall `protest_target_hours` nach dem Einreichen.
+- **Matchseite, Block `league`:** `procedures[]` (je Rolle gefiltert), `contested`, `procedure_form` (für handelnde Seiten),
+  `procedure_viewer`, `moss_candidates` (nur Leitung). In `match.disputes[]` stehen Verfahren für alle außer der nicht befangenen
+  Leitung gekürzt (`at`, `id`, `kind`, `state`; die eigene Meldung zusätzlich mit Grund und Entscheidung).
+- **Gegenseite ohne `claimed`:** Sie sieht Grund und Begründung, nicht das abweichende Ergebnis (vorsichtige Auslegung der Tabelle
+  „Sichtbarkeit“).
+- **MOSS-ZIP:** `type: "file"`, nur am Bezug `moss`, Grenze `MAX_DOCUMENT_UPLOAD_MB`. Geprüft wird das Inhaltsverzeichnis, ohne zu
+  entpacken (`match_proofs.check_zip`); gespeichert wird unverändert mit `sha256`.
+- **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App meldet weiter über `/dispute` mit `category`; Art, Pflichtfragen,
+  Ergänzen, Stellungnahme, Einspruch, MOSS und die Markierung „in Klärung“ fehlen dort noch.
+
 #### Altbestand und Übergang
 
 - `disputes[]`-Einträge ohne `kind` und ohne `id` bleiben gültig und lesbar: `match_disputes.open_dispute`, „Braucht Aufmerksamkeit“

@@ -65,7 +65,20 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 | **Bestätigen:** im Web ankreuzen, wer bei euch gespielt hat, und **Stimmt**; in der App nur bestätigen. | Web oder App | sonst gilt die Meldung nach **48 Stunden** |
 | **Teilnehmerliste nachtragen**, wenn „Teilnehmerliste fehlt noch“ dasteht (nach App-Bestätigung oder 48-Stunden-Regel). Das Ergebnis gilt schon. Wer nicht auf der Liste steht, zählt nicht als Einsatz. Niemand spielt am selben Spieltag für zwei Teams. | Matchseite, Web; Startseite → **Offene Aktionen** | bis **48 Stunden ab der Bestätigung**, danach entscheidet die Liga-Leitung: Die Matchseite sagt das und hat den Knopf **@leitung im Matchchat** |
 | **Spielberechtigung im Blick:** Unter eurem Co-Team steht, wer spielen darf und was fehlt (Geburtsdatum, Spiel-ID, Plattform, Wartezeit). Neue Spieler warten nach Spieltag 1 sieben Tage. Wechsel aus einem anderen Co-Team der Season gehen nur per Transfer, den die Teamleitung beantragt; danach wartet die Person immer sieben Tage, auch vor Spieltag 1. | **Teams → Deine Teams** | vor dem Spiel |
-| **Einspruch:** **Stimmt nicht** bzw. **Problem melden** → **Falsches Ergebnis** → kurz schreiben, was nicht stimmt (Foto möglich). Nicht einfach mit anderen Maps bestätigen. | Matchseite | vor dem Ergebnis immer, danach **30 Minuten** (nach der 48-Stunden-Regel bis Ende der Spielwoche); später Matchchat mit **@leitung** |
+| **Beanstandung oder Protest:** **Stimmt nicht** bzw. **Problem melden**. Die Art ergibt sich von selbst: vor der Bestätigung eine **Beanstandung** (das Spiel ruht), danach ein **Protest**. Grund antippen, begründen (mindestens zehn Zeichen), dann Nachweise hinzufügen. Nicht einfach mit anderen Maps bestätigen. Je Seite läuft ein Verfahren; ihr ergänzt es, statt ein zweites zu eröffnen. | Matchseite, Web | Beanstandung bis zur Bestätigung, Protest **48 Stunden ab der Bestätigung** (ruht in Sperrzeiten); später Matchchat mit **@leitung** |
+| **Stellung nehmen**, wenn die Gegenseite ein Verfahren eröffnet hat: Ihr seht Grund und Begründung und schreibt eure Sicht, auf Wunsch mit Nachweisen. | Matchseite, Karte des Verfahrens | **48 Stunden** ab der Benachrichtigung (ruht in Sperrzeiten); die Leitung kann verlängern |
+| **Einspruch** gegen die Entscheidung, eine Wertung kampflos oder eine Korrektur: einmal, mit Begründung. Es entscheidet eine andere Person, endgültig. | Matchseite, Karte des Verfahrens | **48 Stunden** ab der Entscheidung |
+| **MOSS-Datei hochladen**, wenn die Leitung sie anfordert: die ZIP unverändert, so wie MOSS sie geschrieben hat. Sehen können sie nur du, Captain und Vertreter deiner Seite und die Liga-Leitung. | Matchseite, Karte des Verfahrens → **MOSS-Datei (ZIP) hochladen** | **24 Stunden** ab der Anforderung |
+
+**Problem melden, Schritt für Schritt** – links das geführte Formular, rechts die Karte, wie die Gegenseite sie sieht:
+
+<img src="../assets/liga/protest-melden-390.png" alt="Problem melden am Handy: Schritte Art, Grund, Nachweise; die Art Protest steht fest, darunter die Gründe zum Antippen, das abweichende Ergebnis, der Vorfall und die Begründung" width="300"> <img src="../assets/liga/protest-karte-390.png" alt="Karte eines Protests am Handy aus Sicht der Gegenseite: Grund und Begründung, Fristen mit Restzeit, wer übernommen hat, Nachweise und das Feld für die Stellungnahme" width="300">
+
+- **Was die Gegenseite sieht:** Grund, Begründung, Bilder und Links, Stand und Entscheidung. Das abweichende Ergebnis, die Antwort auf „sofort hingewiesen?“ und MOSS-Dateien sieht sie nicht. Alle anderen sehen nur **In Klärung**.
+- **Sofort hingewiesen?** Bei Ausrüstung, Lobby und Spielberechtigung fragt das Formular, ob ihr die Gegenseite sofort angesprochen habt (Regelwerk § 8.8).
+- **Zurückziehen** geht bis zur Entscheidung. Danach ist kein neues Verfahren mit demselben Grund möglich.
+- **In der Tabelle** zählt ein Ergebnis mit laufendem Protest vorläufig weiter; an eurer Zeile steht „1 Spiel in Klärung“. Stellt die Leitung es anders ein, zählt das Spiel bis zur Entscheidung nicht.
+- **In der App** meldet ihr weiter über **Problem melden** mit den vier Grundgründen; Ergänzen, Stellungnahme, Einspruch und MOSS gehen im Web.
 
 **Mehrere Termine auf einmal** – im ersten Bild schlagt ihr drei Termine vor, im zweiten sieht die Gegenseite sie zur Auswahl:
 

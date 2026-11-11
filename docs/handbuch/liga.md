@@ -1108,13 +1108,39 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 
 ### 3.4 Einspruch und Korrektur
 
-- **Einspruch**: Stimmen Maps oder Sieger nicht, tippt die Gegenseite **Stimmt nicht** bzw. **Problem melden** →
-  **Falsches Ergebnis** mit kurzem Text. Möglich vor dem Ergebnis immer, danach 30 Minuten; hat die
-  48-Stunden-Automatik entschieden, bis zum Ende der Spielwoche. Später nur über die Turnierleitung (Matchchat mit
-  **@leitung**).
-- **Entscheiden**: Turnierleitung am Handy → **Braucht Aufmerksamkeit**, oder auf der Matchseite **Streitfall
-  entscheiden**: **Ergebnis bleibt** oder **Ergebnis ändern**. Wer am Spiel selbst beteiligt ist, entscheidet nicht
+- **Beanstandung und Protest** (Regelwerk § 11, § 12): Stimmt etwas nicht, tippt eine Seite **Stimmt nicht** bzw.
+  **Problem melden**. Vor der Bestätigung ist das eine **Beanstandung** – das Spiel ruht („In Klärung“), die
+  48-Stunden-Automatik auch. Nach der Bestätigung ist es ein **Protest**, möglich innerhalb der **Protestfrist** der
+  Season (Vorgabe 48 Stunden ab der Bestätigung, ruht in Sperrzeiten). Das Formular führt: Grund aus eurer Liste,
+  Begründung, bei „Falsches Ergebnis“ das abweichende Ergebnis, bei Ausrüstung, Lobby und Spielberechtigung die
+  Pflichtfrage „sofort hingewiesen?“, dann Nachweise. Je Seite läuft ein Verfahren; ergänzen geht bis zum Ende der Frist,
+  zurückziehen bis zur Entscheidung (danach kein neues mit demselben Grund).
+- **Eingang**: Season → Reiter **Proteste** zeigt alle Verfahren der Season, offene zuerst, mit Zuständiger und
+  Restzeit. **Zum Spiel** öffnet die Matchseite mit der Karte des Verfahrens. Dafür braucht es die Zuständigkeit
+  **Proteste**; wer am Spiel beteiligt ist, sieht im Eingang nur, dass etwas läuft
   ([2.11](#211-bereich-ligen-und-zuständige)).
+
+  <img src="../assets/liga/protest-eingang-1440.png" alt="Reiter Proteste der Season am PC: Eingang der Verfahren mit Protest, Beanstandung und entschiedenem Einspruch, je mit Stand, Zuständiger und dem Link Zum Spiel; darunter die Einstellungen" width="760">
+
+- **Bearbeiten** auf der Karte des Verfahrens: **Übernehmen** (beide Seiten sehen, wer zuständig ist; ab dann läuft die
+  Zielfrist, Vorgabe 72 Stunden), **Stellungnahme +24 Std.**, **MOSS-Datei anfordern** (ein Spieler, Frist 24 Stunden;
+  fehlt die Datei danach, bekommt ihr einen Hinweis – gewertet wird nichts von selbst, **Entschuldigen** geht mit Grund).
+  Läuft die Zielfrist ab, erinnert die Seite die zuständige Person und meldet den Fall einen Tag später an die Leitung mit
+  **Liga verwalten**. Entschieden wird nie automatisch.
+- **Entscheiden**: immer mit **Begründung** (mindestens zehn Zeichen, geht an beide Seiten). **Ergebnis bleibt** schließt
+  das Verfahren; **Ergebnis ändern** öffnet das Ergebnis-Fenster, die Begründung steht dort als Grund der Korrektur.
+  Wer am Spiel selbst beteiligt ist, entscheidet nicht.
+- **Einspruch**: Gegen die Entscheidung, eine Wertung kampflos oder eine Korrektur kann eine Seite innerhalb der
+  Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
+  ersten Entscheidung – auch der Superadmin nicht über die eigene. Bis dahin gilt die erste Entscheidung weiter.
+- **Tabelle und TV**: Mit **Zählt vorläufig** (Vorgabe) bleibt ein Ergebnis mit laufendem Protest in der Tabelle; Spiel
+  und Tabellenzeile tragen „in Klärung“. Mit **Zählt bis zur Entscheidung nicht** fällt das Spiel so lange heraus.
+- **Einstellen**: Season → **Proteste** → **Fristen, Gründe und Tabelle**. Speichern gilt sofort in allen nicht
+  gesperrten Staffeln; laufende Verfahren behalten ihre Fristen. Die vier Grundgründe bleiben in der Liste, damit auch
+  die App melden kann.
+- **Wer sieht was**: die eigene Seite alles; die Gegenseite Grund, Begründung, Bilder, Links, Stand und Entscheidung,
+  aber nicht das abweichende Ergebnis und keine MOSS-Datei; ihr als nicht beteiligte Leitung alles; alle anderen nur
+  „In Klärung“. MOSS-Dateien sehen nur die hochladende Person, Captain und Vertreter ihrer Seite und ihr.
 - **Korrigieren**: am Spiel **Ergebnis korrigieren** – Stand, auf Wunsch Maps und Aufstellungen, Pflicht ist ein
   **Grund** (mindestens fünf Zeichen). Die Korrektur schließt einen offenen Einspruch, die Tabelle rechnet sofort neu.
   Ohne neue Maps bleiben die alten, solange sie zum Stand passen – sonst fallen sie weg. Ablauf wie in
