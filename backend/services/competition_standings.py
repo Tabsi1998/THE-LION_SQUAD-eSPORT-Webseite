@@ -337,7 +337,18 @@ def round_robin_standings(matches: list[dict], registrations: list[dict], rules:
 
     def league_compute(rows_matches, rows_registrations):
         return _league_rows(rows_matches, rows_registrations, rules, context)
-    return _with_form_and_movement(league_compute, effective, registrations)
+    rows = _with_form_and_movement(league_compute, effective, registrations)
+    # Angefochtene Ergebnisse (#1619, E.2, Nr. 30): Sie zählen vorläufig mit (``contested_result_mode: counts``) - die Zeile nennt,
+    # wie viele ihrer Spiele „in Klärung“ sind. Mit ``excluded`` ist das Spiel ``disputed`` und zählt hier gar nicht.
+    contested: dict[str, int] = {}
+    for match in effective:
+        if match.get("contested") and match.get("status") in TERMINAL_MATCH_STATUSES:
+            for slot in match.get("slots") or []:
+                if isinstance(slot, dict) and slot.get("registration_id"):
+                    contested[slot["registration_id"]] = contested.get(slot["registration_id"], 0) + 1
+    for row in rows:
+        row["contested"] = contested.get(row.get("registration_id"), 0)
+    return rows
 
 
 # ---------------------------------------------------------------- Liga-Staffel (E.1, #1625, docs/LIGA.md)

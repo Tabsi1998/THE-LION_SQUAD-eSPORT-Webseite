@@ -60,6 +60,8 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               <td className="tv-standings__name" data-tv-name="1">
                 {row.display_name || "Teilnehmer"}
                 {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
+                {/* Angefochtenes Ergebnis (E.2, #1619): zählt vorläufig - am TV nur der Hinweis, nie Grund oder Seite. */}
+                {Number(row.contested) > 0 ? <span className="tv-standings__exit" data-testid={`tv-contested-${row.registration_id}`}> · in Klärung</span> : null}
               </td>
               {columns.map((column) => (
                 <td key={column.key} className={`tv-standings__num ${column.strong ? "tv-standings__num--strong font-display" : ""}`}>{standingCell(column, row)}</td>
