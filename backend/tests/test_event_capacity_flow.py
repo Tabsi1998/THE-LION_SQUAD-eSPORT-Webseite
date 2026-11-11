@@ -54,44 +54,6 @@ def counting_meets_after_summary(monkeypatch, parties: int = 2, timeout: float =
     monkeypatch.setattr(event_registration, "summary", gated)
 
 
-class MotorPageLength:
-    """Wie Motor: ``find(...).to_list(n)`` liefert höchstens ``n`` Einträge - mongomock_motor übergeht ``n``."""
-
-    def __init__(self, db, collection: str = "event_registrations"):
-        self._db = db
-        self._collection = collection
-
-    def __getattr__(self, name):
-        target = getattr(self._db, name)
-        return _PagedCollection(target) if name == self._collection else target
-
-    def __getitem__(self, name):
-        return self.__getattr__(name)
-
-
-class _PagedCollection:
-    def __init__(self, collection):
-        self._collection = collection
-
-    def __getattr__(self, name):
-        return getattr(self._collection, name)
-
-    def find(self, *args, **kwargs):
-        return _PagedCursor(self._collection.find(*args, **kwargs))
-
-
-class _PagedCursor:
-    def __init__(self, cursor):
-        self._cursor = cursor
-
-    def __getattr__(self, name):
-        return getattr(self._cursor, name)
-
-    async def to_list(self, length=None):
-        rows = await self._cursor.to_list(length)
-        return rows if length is None else rows[:length]
-
-
 async def create_event(flow, **extra) -> dict:
     boss = await flow.add_user(role="superadmin", name="chefin")
     flow.act_as(boss)
@@ -192,12 +154,11 @@ async def test_seats_are_counted_over_all_registrations_also_beyond_two_thousand
         for i in range(many)
     ])
     late = await flow.add_user(role="player", name="spaet")
-    db = MotorPageLength(flow.db)
 
-    doc = await event_registration.register(db, event, late)
+    doc = await event_registration.register(flow.db, event, late)
 
     assert doc["status"] == "waitlist"
-    counts = await event_registration.summary(db, event)
+    counts = await event_registration.summary(flow.db, event)
     assert counts["reserved_seats"] == many and counts["registered_count"] == many and counts["spots_left"] == 0
     assert counts["waitlist_count"] == 1 and counts["waitlist_seats"] == 1
 

@@ -1,6 +1,7 @@
 """Die Minuten-Jobs erreichen jedes laufende Turnier (#1940): Show-Auslosung und Fristen suchen gezielt die Turniere, an
 deren Spielen etwas fällig sein kann - nicht mehr nur die ersten 200 mit Status „live“. Ein Stand mit vielen alten
 „live“-Turnieren (Seeds, Probeläufe) versteckt den Cup des Abends nicht mehr; ungewöhnlich viele melden sich im Log.
+Die alte Grenze von 200 sieht der Test, weil die Test-Mongo bei ``to_list`` wie Motor abschneidet (#2357).
 """
 import logging
 import pathlib
@@ -34,21 +35,6 @@ async def flow():
 @pytest.fixture(autouse=True)
 def fresh_warning_clock(monkeypatch):
     monkeypatch.setattr(live_sweep, "_last_warned", {})
-
-
-@pytest.fixture(autouse=True)
-def motor_like_to_list(monkeypatch):
-    """mongomock_motor gibt bei ``to_list(n)`` alles zurück, Motor höchstens ``n`` - hier wie Motor, sonst bliebe die
-    alte Grenze von 200 im Test unsichtbar."""
-    from mongomock_motor import AsyncCursor
-
-    original = AsyncCursor.to_list
-
-    async def to_list(self, length=None, *args, **kwargs):
-        rows = await original(self, length, *args, **kwargs)
-        return rows[:length] if length else rows
-
-    monkeypatch.setattr(AsyncCursor, "to_list", to_list)
 
 
 async def many_live_tournaments(flow, count: int = FILLERS) -> None:

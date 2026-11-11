@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.78.0 (11.11.2026)
+
+### Neu
+
+* Einstellungen zeigen die laufenden automatischen Banner mit Views, Klicks und Link zur Schaltstelle (#2352)
+* Liga – Anmeldungen je Season automatisch annehmen; wer zuerst kommt, wird zuerst bedient, offene Anmeldungen halten ihren Platz (#2348)
+* Liga – automatisch zuteilen bei genau einer Liga N mit einer Staffel, sonst teilt die Leitung zu (#2348)
+* Liga – Teams ziehen eine automatische Zuteilung bis zum Check-in selbst zurück, solange der Spielplan nicht steht (#2348)
+* Liga-Eingang – angenommene Anmeldungen nur mit Grund auf die Warteliste zurückstufen (#2348)
+* Liga-Eingang – automatisch Angenommene nachträglich mit Grund ablehnen oder zurückstufen, Team der Leitung markiert, Gründe bei nicht möglicher Annahme oder Zuteilung (#2348)
+* Liga-Leitung kann ein wartendes Veto im Notfall mit Grund starten (#2326)
+* Liga-Verwaltung – Schalter „Anmeldungen automatisch annehmen“ mit Hinweis auf offene Anmeldungen und Protokoll beim Umschalten (#2348)
+* Ligaseite – angenommene Anmeldungen zeigen „Angemeldet“ bzw. „Angemeldet – Zuteilung folgt“, freie Startplätze zählen offene Anmeldungen mit (#2348)
+* Matchseite – Veto zeigt die Vorgabe der Woche, weder sperrbar noch wählbar, in der Spielreihenfolge an ihrer Position (#2326)
+* Nach nachgetragener Vorgabe beginnt das Veto erst, wenn beide Seiten „Bereit zum Veto“ getippt haben; vorher läuft keine Zeit (#2326)
+* Regelwerk – Baustein und Variable nennen, wie Anmeldungen angenommen werden (#2348)
+* Regelwerk – Baustein Veto beschreibt die Vorgabe der Woche, neue Variable veto.presets (#2326)
+* Season-Verwaltung – „Rotiert automatisch durch den Pool“ füllt leere Wochen, „Alle neu verteilen“ fragt vor dem Überschreiben nach (#2326)
+* Season-Verwaltung – Map je Spielwoche im Kasten Veto wählen, fehlende Wochen und Verlauf sichtbar (#2326)
+* Turnier- und Fast-Lap-Bearbeitung zeigen Views, Klicks und letzte Anzeige des automatischen Banners (#2352)
+* Veto – neue Schrittart „Vorgabe der Woche“: die Liga-Leitung legt je Spielwoche eine Map fest (#2326)
+* Veto wartet bei fehlender Vorgabe, die Liga-Leitung bekommt einen Hinweis, gewertet wird nichts (#2326)
+
+### Fehlerbehebungen
+
+* Banner-Manager in den Einstellungen passt am Telefon in die Breite (#2352)
+* Check-in – „Beide Seiten eingecheckt“ kündigt kein Veto an, das in diesem Spiel entfällt (#2326)
+* Links der automatischen Banner nennen ihr Ziel für Screenreader (#2352)
+* Matchseite – sind beide Seiten bereit und die Vorgabe der Woche kommt zurück, beginnt das Veto von selbst (#2326)
+* Season-Verwaltung – Vorgabe mit einer Map außerhalb des Pools bleibt sichtbar und geht beim Speichern nicht verloren (#2326)
+* Views und Klicks der Hinweisbanner sind nicht mehr öffentlich abrufbar (#2352)
+* Zielgruppe der automatischen Hinweisbanner folgt der Sichtbarkeit von Turnier, Challenge und Server (#2352)
+
 ## 1.77.1 (11.11.2026)
 
 ### Fehlerbehebungen
