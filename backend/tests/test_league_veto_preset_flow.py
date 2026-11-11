@@ -489,7 +489,8 @@ async def test_the_lead_sets_rotates_and_reads_the_presets_per_week(flow):
     # Staffelgröße 8, eine Runde: sieben Spieltage - Spielwoche 1 beginnt am ersten Tag der Season.
     assert [row["week"] for row in fresh["weeks"]] == [1, 2, 3, 4, 5, 6, 7]
     first_day = datetime.fromisoformat(w["season"]["start_date"]).astimezone(ZoneInfo("Europe/Vienna")).date()
-    assert fresh["weeks"][0] == {"week": 1, "start_day": first_day.isoformat(), "end_day": (first_day + timedelta(days=6)).isoformat()}
+    assert fresh["weeks"][0] == {"week": 1, "start_day": first_day.isoformat(), "end_day": (first_day + timedelta(days=6)).isoformat(),
+                                 "past": False, "started": False}
     assert fresh["weeks"][1]["start_day"] == (first_day + timedelta(days=7)).isoformat()
     ids = {name: row["id"] for name, row in w["maps"].items()}
     assert fresh["modes"] == [{"mode": CTL, "label": "Kontrolle", "position": 3, "maps": [
@@ -540,6 +541,28 @@ async def test_the_lead_sets_rotates_and_reads_the_presets_per_week(flow):
     ok(await flow.post(f"{ADMIN}/seasons/{sid}/map-pool/remove-map", json={"map_id": ids["Ruine"], "mode": CTL, "reason": "Ruine ist kaputt"}))
     broken = ok(await flow.get(url))
     assert week_rows(broken) == {week: ["Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus."] for week in (3, 5, 6)}
+
+
+@pytest.mark.asyncio
+async def test_the_weeks_say_which_are_over_or_have_a_veto_that_began(flow):
+    """Review zu #2326: Der Vorschlag „rotiert durch den Pool“ lässt vergangene Wochen und Wochen mit begonnenem Veto immer aus - dafür
+    nennt die Verwaltung je Woche ``past`` und ``started``."""
+    w = await season_world(flow)
+    sid = w["season"]["id"]
+    url = f"{ADMIN}/seasons/{sid}/veto-presets"
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(WITH_PRESET)))
+    before = ok(await flow.get(url))["weeks"]
+    assert not any(row["past"] or row["started"] for row in before), "die Season beginnt erst in einer Woche"
+    # Die Season läuft seit 16 Tagen: Spielwoche 1 und 2 sind vorbei, Spielwoche 3 läuft. In Spielwoche 4 hat ein Veto begonnen (ein
+    # vorgezogenes Spiel), in Spielwoche 5 wurde eines übersprungen - das zählt nicht.
+    start = (now_utc() - timedelta(days=16)).astimezone(ZoneInfo("Europe/Vienna")).replace(hour=0, minute=0, second=0, microsecond=0)
+    await flow.db.league_seasons.update_one({"id": sid}, {"$set": {"start_date": start.astimezone(ZoneInfo("UTC")).isoformat()}})
+    for week, status in ((4, "running"), (5, "skipped"), (6, "done")):
+        await flow.db.matches_v2.insert_one({"id": new_id(), "tournament_id": w["tid"], "round": week, "matchday_number": week, "status": "scheduled",
+                                             "flow": {"veto": {"status": status}}})
+    weeks = ok(await flow.get(url))["weeks"]
+    assert [(row["week"], row["past"], row["started"]) for row in weeks] == [
+        (1, True, False), (2, True, False), (3, False, False), (4, False, True), (5, False, False), (6, False, True), (7, False, False)]
 
 
 @pytest.mark.asyncio

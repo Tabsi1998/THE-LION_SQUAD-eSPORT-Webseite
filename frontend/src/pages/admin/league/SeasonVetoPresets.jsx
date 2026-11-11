@@ -1,28 +1,43 @@
 // Vorgabe der Woche (#2326, docs/LIGA.md D.3): je Spielwoche und Modus eine Map aus dem Pool - für jeden Schritt „Vorgabe“ der
-// gespeicherten Veto-Vorlage. „Rotiert automatisch durch den Pool“ füllt alle Wochen als Vorschlag, danach ist jede Woche einzeln
-// änderbar; fehlende Wochen stehen oben und sind in der Liste markiert. Eigenes Speichern mit Protokoll; eine Änderung gilt nur für
-// Spiele, deren Veto noch nicht begonnen hat. Steht im Kasten „Veto“ der Season (SeasonVetoRulesPanel).
+// gespeicherten Veto-Vorlage. „Rotiert automatisch durch den Pool“ füllt die leeren Wochen als Vorschlag, „Alle neu verteilen“ ersetzt
+// nach Rückfrage auch gewählte; vergangene Wochen und Wochen mit begonnenem Veto bleiben immer. Jede Woche ist einzeln änderbar,
+// geänderte bleiben bis zum Speichern markiert, fehlende stehen oben und sind in der Liste markiert. Eigenes Speichern mit Protokoll;
+// eine Änderung gilt nur für Spiele, deren Veto noch nicht begonnen hat. Steht im Kasten „Veto“ der Season (SeasonVetoRulesPanel).
 import { useEffect, useMemo, useState } from "react";
-import { History, RefreshCw } from "lucide-react";
+import { History, RefreshCw, Shuffle } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatApiError } from "@/lib/api";
-import { applyRotation, knownPresets, missingWeeks, presetChangeLine, presetValue, presetsPayload, presetsToForm, weekDates, weekList, withPreset } from "@/lib/leagueVeto";
+import {
+  applyRotation, changedWeeks, knownPresets, missingWeeks, overwriteCount, presetChangeLine, presetValue, presetsPayload, presetsToForm, weekDates,
+  weekList, weekLocked, withPreset,
+} from "@/lib/leagueVeto";
 import { viennaDateTime } from "@/lib/vienna";
 
 // „10.11.2026, 19:30“ - ohne Sekunden.
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const FIELD = "min-h-11 w-full rounded-sm border bg-[#121212] px-2 py-1 text-sm text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
 
-function WeekRow({ row, modes, form, problems, onChange }) {
+function WeekRow({ row, modes, form, problems, changed, onChange }) {
   const dates = weekDates(row);
   const open = modes.some(({ mode }) => !presetValue(form, row.week, mode));
+  // Vergangene Wochen und Wochen mit begonnenem Veto fasst der Vorschlag nie an - von Hand bleiben sie änderbar (gilt dann nur für
+  // Spiele, deren Veto noch nicht begonnen hat).
+  const kept = row.started ? "Veto begonnen" : row.past ? "vorbei" : "";
+  const tone = open ? "border-warn/40 bg-warn/5" : changed ? "border-[#29B6E8]/50 bg-[#29B6E8]/5" : "border-white/10 bg-[#0A0A0A]";
   return (
-    <li className={`rounded-sm border px-3 py-2 ${open ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#0A0A0A]"}`} data-testid={`veto-preset-week-${row.week}`} data-missing={open ? "true" : "false"}>
+    <li className={`rounded-sm border px-3 py-2 ${tone}`} data-testid={`veto-preset-week-${row.week}`} data-missing={open ? "true" : "false"}
+      data-changed={changed ? "true" : "false"} data-kept={kept ? "true" : "false"}>
       {/* Am Handy steht die Woche über der Auswahl (eine Zeile: Woche, Tage, „fehlt“), am PC links daneben - so wird nichts abgeschnitten. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex flex-wrap items-baseline gap-x-2 sm:block sm:w-36 sm:shrink-0">
           <div className="text-sm font-bold text-white">Spielwoche {row.week}</div>
-          <div className="text-xs tabular-nums text-white/55">{dates || "ohne Kalenderwoche"}{open ? <span className="ml-2 font-bold text-warn" data-testid={`veto-preset-week-${row.week}-missing`}>fehlt</span> : null}</div>
+          <div className="text-xs tabular-nums text-white/55">
+            {dates || "ohne Kalenderwoche"}
+            {open ? <span className="ml-2 font-bold text-warn" data-testid={`veto-preset-week-${row.week}-missing`}>fehlt</span> : null}
+            {changed ? <span className="ml-2 font-bold text-[#29B6E8]" data-testid={`veto-preset-week-${row.week}-changed`}>geändert</span> : null}
+          </div>
+          {kept ? <div className="text-[11px] text-white/45" data-testid={`veto-preset-week-${row.week}-kept`}>{kept}</div> : null}
         </div>
         <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
           {modes.map((mode) => (
@@ -47,6 +62,7 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
 
   useEffect(() => {
     let alive = true;
@@ -61,7 +77,11 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
   const weeks = useMemo(() => state?.weeks || [], [state]);
   const modes = useMemo(() => state?.modes || [], [state]);
   const missing = useMemo(() => missingWeeks(form, weeks, modes), [form, weeks, modes]);
-  const dirty = useMemo(() => JSON.stringify(presetsPayload(form, weeks, modes)) !== JSON.stringify(presetsPayload(presetsToForm(knownPresets(state?.presets, modes)), weeks, modes)), [form, weeks, modes, state]);
+  const saved = useMemo(() => presetsToForm(knownPresets(state?.presets, modes)), [state, modes]);
+  // Geänderte Wochen bleiben bis zum Speichern markiert - nach „Rotiert …“ sieht man so, was der Vorschlag angefasst hat.
+  const changed = useMemo(() => changedWeeks(form, saved, weeks, modes), [form, saved, weeks, modes]);
+  const dirty = changed.length > 0;
+  const keptWeeks = useMemo(() => weeks.filter(weekLocked).map((row) => row.week), [weeks]);
   // Was der Server an einer gespeicherten Vorgabe bemängelt (etwa eine Map, die nicht mehr im Pool steht) - solange nichts geändert ist.
   // Wochen ganz ohne Eintrag tragen schon das Wort „fehlt“.
   const stored = useMemo(() => new Set((state?.presets || []).map((row) => row.week)), [state]);
@@ -104,24 +124,49 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
       setSaving(false);
     }
   };
+  // „Rotiert automatisch durch den Pool“ füllt nur leere Wochen - was schon gewählt ist, bleibt.
   const rotate = () => {
-    setForm((current) => applyRotation(current, state.rotation));
-    toast.success("Vorschlag eingetragen – jede Woche lässt sich noch ändern, gespeichert ist nichts.");
+    const next = applyRotation(form, state.rotation, weeks);
+    const filled = changedWeeks(next, form, weeks, modes).length;
+    setForm(next);
+    toast.success(filled ? `${filled === 1 ? "Eine leere Woche" : `${filled} leere Wochen`} gefüllt – jede lässt sich noch ändern, gespeichert ist nichts.`
+      : "Keine leere Woche mehr – „Alle neu verteilen“ ersetzt auch die gewählten.");
+  };
+  // „Alle neu verteilen“ ersetzt auch gewählte Wochen - darum mit Rückfrage, wie viele es trifft.
+  const redistribute = async () => {
+    const count = overwriteCount(form, state.rotation, weeks);
+    if (count && !await confirm({
+      title: "Alle Wochen neu verteilen?",
+      description: `Das überschreibt ${count === 1 ? "eine gewählte Woche" : `${count} gewählte Wochen`}. Vergangene Wochen und Wochen mit begonnenem Veto bleiben, wie sie sind. Gespeichert wird erst mit „Vorgaben speichern“.`,
+      confirmLabel: "Neu verteilen",
+    })) return;
+    setForm((current) => applyRotation(current, state.rotation, weeks, { overwrite: true }));
+    toast.success("Neu verteilt – jede Woche lässt sich noch ändern, gespeichert ist nichts.");
   };
 
   return (
     <div className={frame} data-testid="veto-presets-box">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {title}
-        <button type="button" onClick={rotate} disabled={!state.rotation?.length} data-testid="veto-presets-rotate"
-          className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
-          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Rotiert automatisch durch den Pool
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={rotate} disabled={!state.rotation?.length} data-testid="veto-presets-rotate"
+            className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Rotiert automatisch durch den Pool
+          </button>
+          <button type="button" onClick={redistribute} disabled={!state.rotation?.length} data-testid="veto-presets-redistribute"
+            className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+            <Shuffle className="h-3.5 w-3.5" aria-hidden="true" /> Alle neu verteilen
+          </button>
+        </div>
       </div>
       <p className="text-xs text-white/60">
         Je Spielwoche eine Map aus dem Pool des Modus. Sie gilt für alle Spiele dieses Spieltags – auch für ein verschobenes –, und niemand kann sie sperren oder wählen.
-        Ohne Vorgabe beginnt das Veto in der Woche nicht; ihr bekommt dann einen Hinweis. Tragt ihr sie nach, bekommen die wartenden Captains eine Nachricht und starten das Veto selbst.
+        Ohne Vorgabe beginnt das Veto in der Woche nicht; ihr bekommt dann einen Hinweis. Tragt ihr sie nach, bekommen die wartenden Captains eine Nachricht; das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.
         Eine Änderung gilt nur für Spiele, deren Veto noch nicht begonnen hat.
+      </p>
+      <p className="text-xs text-white/50" data-testid="veto-presets-rotation-note">
+        „Rotiert automatisch durch den Pool“ füllt nur leere Wochen, „Alle neu verteilen“ ersetzt auch gewählte.
+        {keptWeeks.length ? ` Spielwoche ${weekList(keptWeeks)} ${keptWeeks.length === 1 ? "bleibt" : "bleiben"} dabei immer, wie sie ${keptWeeks.length === 1 ? "ist" : "sind"} (vorbei oder Veto begonnen).` : ""}
       </p>
       {unsaved ? (
         <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/75" data-testid="veto-presets-template-unsaved">
@@ -135,7 +180,7 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
       ) : <p className="text-xs text-ok" data-testid="veto-presets-complete">Jede Spielwoche hat ihre Vorgabe.</p>}
       <ol className="space-y-1.5" data-testid="veto-presets-weeks">
         {weeks.map((row) => (
-          <WeekRow key={row.week} row={row} modes={modes} form={form} problems={problemsOf(row.week)}
+          <WeekRow key={row.week} row={row} modes={modes} form={form} problems={problemsOf(row.week)} changed={changed.includes(row.week)}
             onChange={(week, mode, mapId) => setForm((current) => withPreset(current, week, mode, mapId))} />
         ))}
       </ol>

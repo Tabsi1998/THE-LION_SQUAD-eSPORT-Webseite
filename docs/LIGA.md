@@ -2326,7 +2326,8 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
   `league.season.veto_presets` mit `from`, `to` und `changes` (`[{week, mode, from, to}]`); daraus liest die Verwaltung die **Historie**
   (die letzten 10 Änderungen: wann, wer, welche Woche von welcher auf welche Map).
 - **Routen:** `GET /api/admin/leagues/seasons/{id}/veto-presets` (jede Zuständigkeit) liefert `active` (Veto an und Schritt `preset`
-  in der gespeicherten Vorlage), `weeks[]` (`{week, start_day, end_day}`), `modes[]` (`{mode, label, position, maps: [{map_id, name}]}`
+  in der gespeicherten Vorlage), `weeks[]` (`{week, start_day, end_day, past, started}` – `past`: der letzte Tag der Woche
+  liegt vor dem heutigen Wiener Kalendertag; `started`: in einem Spiel dieses Spieltags läuft, pausiert oder steht ein Veto), `modes[]` (`{mode, label, position, maps: [{map_id, name}]}`
   je Schritt `preset`), `presets[]`, `problems[]` (`{week, problems}` – nur Wochen, in denen etwas fehlt oder nicht passt), `rotation[]`
   (der Vorschlag „rotiert automatisch durch den Pool“: je Modus Woche für Woche die nächste Map in Pool-Reihenfolge, bei `never` weicht
   ein zweiter Modus derselben Woche aus – `league_veto_rules.rotate`, nichts davon gespeichert) und `history[]`.
@@ -2468,8 +2469,11 @@ Die Art **„Vorgabe“** (`preset`) steht in der Auswahl neben Sperren, Wählen
 Enthält die gespeicherte Vorlage sie, steht **im selben Kasten** der Block **„Vorgabe der Woche“**
 (`pages/admin/league/SeasonVetoPresets.jsx`, #2326): je Spielwoche eine Zeile mit den Tagen der Woche und je Modus einer Auswahl aus dem
 Pool, oben „Es fehlen noch: Spielwoche 3, 4 und 5.“ (fehlende Wochen sind markiert), Knopf **„Rotiert automatisch durch den Pool“**
-(füllt alle Wochen als Vorschlag, danach einzeln änderbar, nichts gespeichert), eigener Knopf **„Vorgaben speichern“** und darunter der
-**Verlauf** aus dem Protokoll. Steht die Art erst im ungespeicherten Formular, sagt der Block „Sobald das Veto damit an und gespeichert
+(füllt **nur leere Wochen** als Vorschlag – was schon gewählt ist, bleibt; danach einzeln änderbar, nichts gespeichert), daneben
+**„Alle neu verteilen“** (ersetzt auch gewählte Wochen, mit Rückfrage „Das überschreibt N gewählte Wochen“ – ohne betroffene Woche
+ohne Rückfrage). **Vergangene Wochen und Wochen mit begonnenem Veto** (`past`, `started`) fasst keiner der beiden Knöpfe an; die Zeile
+nennt „vorbei“ bzw. „Veto begonnen“, von Hand bleibt sie änderbar. **Geänderte Wochen** bleiben bis zum Speichern als „geändert“
+markiert. Eigener Knopf **„Vorgaben speichern“** und darunter der **Verlauf** aus dem Protokoll. Steht die Art erst im ungespeicherten Formular, sagt der Block „Sobald das Veto damit an und gespeichert
 ist …“; eine Map, die den Pool verlassen hat, zählt wieder als fehlend, mit dem Satz des Servers. `veto_preset_missing` führt hierher.
 
 **Regelwerk:** Baustein `[[baustein:veto]]` nach dem Muster der Bausteine aus den Einstellungen (#2269: Daten und Darstellung in

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  KIND_OPTIONS, applyRotation, historyLine, isSystemKind, mapStatusText, missingWeeks, plannedRoleLabel, presetChangeLine, presetModes,
-  presetValue, presetsPayload, presetsToForm, readyText, stepLabel, stepSentence, templateProblems, vetoHeadline, vetoRulesPayload, vetoText, weekDates,
-  weekList, withPreset,
+  KIND_OPTIONS, applyRotation, changedWeeks, historyLine, isSystemKind, mapStatusText, missingWeeks, overwriteCount, plannedRoleLabel,
+  presetChangeLine, presetModes, presetValue, presetsPayload, presetsToForm, readyText, stepLabel, stepSentence, templateProblems, vetoHeadline,
+  vetoRulesPayload, vetoText, weekDates, weekList, weekLocked, withPreset,
 } from "./leagueVeto";
 
 // Veto-Schrittart „Vorgabe der Woche“ (#2326): Vorlage prüfen wie der Server, die Vorgaben je Spielwoche als Formular und die Sätze der
@@ -62,9 +62,24 @@ describe("Vorgaben je Spielwoche", () => {
     expect(missingWeeks(state, weeks, modes)).toEqual([3]);
     // „Noch nicht gewählt“ nimmt die Woche wieder heraus.
     expect(presetsPayload(withPreset(state, 1, "ctl", ""), weeks, modes)).toEqual([{ week: 2, mode: "ctl", map_id: "hafen" }]);
-    const rotated = applyRotation(state, [{ week: 1, mode: "ctl", map_id: "hafen" }, { week: 2, mode: "ctl", map_id: "kai" }, { week: 3, mode: "ctl", map_id: "hafen" }]);
+    const rotation = [{ week: 1, mode: "ctl", map_id: "hafen" }, { week: 2, mode: "ctl", map_id: "kai" }, { week: 3, mode: "ctl", map_id: "hafen" }];
+    // „Rotiert automatisch durch den Pool“ füllt nur leere Wochen: Woche 1 (Kai) und 2 (Hafen) bleiben, Woche 3 kommt dazu.
+    const rotated = applyRotation(state, rotation, weeks);
     expect(missingWeeks(rotated, weeks, modes)).toEqual([]);
-    expect(presetValue(rotated, 1, "ctl")).toBe("hafen");
+    expect([1, 2, 3].map((week) => presetValue(rotated, week, "ctl"))).toEqual(["kai", "hafen", "hafen"]);
+    expect(changedWeeks(rotated, state, weeks, modes)).toEqual([3]);
+    // „Alle neu verteilen“ ersetzt auch gewählte Wochen - die Rückfrage nennt, wie viele: Woche 1 und 2 bekämen eine andere Map.
+    expect(overwriteCount(state, rotation, weeks)).toBe(2);
+    const all = applyRotation(state, rotation, weeks, { overwrite: true });
+    expect([1, 2, 3].map((week) => presetValue(all, week, "ctl"))).toEqual(["hafen", "kai", "hafen"]);
+    expect(changedWeeks(all, state, weeks, modes)).toEqual([1, 2, 3]);
+    // Vergangene Wochen und Wochen mit begonnenem Veto bleiben immer - auch leer und auch bei „Alle neu verteilen“.
+    const kept = [{ ...weeks[0], past: true }, { ...weeks[1], started: true }, weeks[2]];
+    expect(kept.map(weekLocked)).toEqual([true, true, false]);
+    expect(overwriteCount(state, rotation, kept)).toBe(0);
+    const partly = applyRotation(withPreset(state, 2, "ctl", ""), rotation, kept, { overwrite: true });
+    expect([1, 2, 3].map((week) => presetValue(partly, week, "ctl"))).toEqual(["kai", "", "hafen"]);
+    expect(presetValue(applyRotation({}, rotation, kept), 2, "ctl")).toBe("");
     // Wochen oder Modi, die es nicht mehr gibt, gehen nicht an den Server.
     expect(presetsPayload({ ...rotated, "9|ctl": "kai", "1|hp": "kai" }, weeks, modes)).toHaveLength(3);
   });

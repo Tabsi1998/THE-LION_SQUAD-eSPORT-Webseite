@@ -212,9 +212,41 @@ export function weekDates(row) {
   return from && to ? `${from}–${to}` : "";
 }
 
-/** Der Vorschlag „rotiert durch den Pool“ über das Formular gelegt - alle Wochen, danach einzeln änderbar. */
-export function applyRotation(form, rotation) {
-  return { ...(form || {}), ...presetsToForm(rotation) };
+/** Wochen, die der Vorschlag nie anfasst: Die Woche ist vorbei, oder in ihr hat schon ein Veto begonnen. */
+export function weekLocked(row) {
+  return Boolean(row?.past || row?.started);
+}
+
+/**
+ * Der Vorschlag „rotiert durch den Pool“ über das Formular gelegt - danach ist jede Woche einzeln änderbar. Ohne `overwrite` füllt er
+ * nur leere Wochen (was die Leitung schon gewählt hat, bleibt); mit `overwrite` („Alle neu verteilen“) ersetzt er jede Woche. Vergangene
+ * Wochen und Wochen mit begonnenem Veto bleiben in beiden Fällen, wie sie sind.
+ */
+export function applyRotation(form, rotation, weeks = [], { overwrite = false } = {}) {
+  const locked = new Set((weeks || []).filter(weekLocked).map((row) => row.week));
+  const next = { ...(form || {}) };
+  for (const row of rotation || []) {
+    if (locked.has(row.week) || (!overwrite && presetValue(next, row.week, row.mode))) continue;
+    next[presetKey(row.week, row.mode)] = row.map_id;
+  }
+  return next;
+}
+
+/** So viele schon gewählte Wochen bekämen durch „Alle neu verteilen“ eine andere Map - für die Rückfrage. */
+export function overwriteCount(form, rotation, weeks = []) {
+  const next = applyRotation(form, rotation, weeks, { overwrite: true });
+  const changed = new Set();
+  for (const row of rotation || []) {
+    const before = presetValue(form, row.week, row.mode);
+    if (before && before !== presetValue(next, row.week, row.mode)) changed.add(row.week);
+  }
+  return changed.size;
+}
+
+/** Die Wochen, deren Auswahl vom gespeicherten Stand abweicht - sie bleiben bis zum Speichern markiert. */
+export function changedWeeks(form, saved, weeks, modes) {
+  return (weeks || []).filter(({ week }) => (modes || []).some(({ mode }) => presetValue(form, week, mode) !== presetValue(saved, week, mode)))
+    .map(({ week }) => week);
 }
 
 /** Eine Zeile der Historie: „Spielwoche 1 · Kontrolle: Kai → Ruine“ (neu: „– → Kai“, entfernt: „Kai → –“). */

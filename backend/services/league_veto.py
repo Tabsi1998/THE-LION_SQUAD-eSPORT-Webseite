@@ -152,17 +152,25 @@ async def presets_history(db, season_id: str, limit: int = HISTORY_LIMIT) -> lis
              "changes": list((row.get("data") or {}).get("changes") or [])} for row in rows]
 
 
-def season_weeks(season: dict, *, rounds: int = 0) -> list[dict]:
+def season_weeks(season: dict, *, rounds: int = 0, today=None, started=()) -> list[dict]:
     """Die Spielwochen, für die es eine Vorgabe braucht: Spieltag 1 bis ``rounds`` (so viele Spieltage hat die größte Staffel oder
     sind schon angesetzt), ohne Angabe alle aktiven Wochen der Season. Spieltag N liegt in der N-ten aktiven Woche - Sperrwochen zählen
-    nicht mit; ``start_day``/``end_day`` sind deren Wiener Kalendertage (``None``, wenn der Kalender nicht so weit reicht)."""
+    nicht mit; ``start_day``/``end_day`` sind deren Wiener Kalendertage (``None``, wenn der Kalender nicht so weit reicht).
+
+    ``past`` (die Woche ist vorbei - ihr letzter Tag liegt vor ``today``, dem Wiener Kalendertag) und ``started`` (in der Woche hat ein
+    Veto begonnen) sagen der Verwaltung, welche Wochen der Vorschlag „rotiert durch den Pool“ nie anfasst."""
     from services import league_service
 
     blocked = set(league_service.blocked_weeks(season))
     active = [days for number, days in enumerate(league_service.week_days(season), start=1) if number not in blocked]
     count = min(int(rounds or 0) or len(active), rules_mod.WEEKS_MAX)
-    return [{"week": number, "start_day": active[number - 1][0].isoformat() if number <= len(active) else None,
-             "end_day": active[number - 1][1].isoformat() if number <= len(active) else None} for number in range(1, count + 1)]
+    begun = set(started or ())
+    out = []
+    for number in range(1, count + 1):
+        first, last = active[number - 1] if number <= len(active) else (None, None)
+        out.append({"week": number, "start_day": first.isoformat() if first else None, "end_day": last.isoformat() if last else None,
+                    "past": bool(today and last and last < today), "started": number in begun})
+    return out
 
 
 async def preset_weeks(db, season: dict, divisions: list[dict] | None = None) -> list[dict]:
@@ -176,12 +184,16 @@ async def preset_weeks(db, season: dict, divisions: list[dict] | None = None) ->
     settings = [league_service.effective_settings(season, division) for division in divisions] or [league_service.effective_settings(season, None)]
     needed = max(rounds_needed(int(row.get("max_staffel_size") or 0), int(row.get("round_robin_legs") or 1)) for row in settings)
     staffeln = await db.tournaments.find({"league_context.season_id": season["id"]}, {"_id": 0, "id": 1}).to_list(200)
-    played = 0
+    played, started = 0, set()
     if staffeln:
         rows = await db.matches_v2.find({"tournament_id": {"$in": [row["id"] for row in staffeln]}},
-                                        {"_id": 0, "matchday_number": 1, "round": 1, "round_index": 1}).to_list(5000)
+                                        {"_id": 0, "matchday_number": 1, "round": 1, "round_index": 1, "flow.veto.status": 1}).to_list(5000)
         played = max((week_of(row) or 0 for row in rows), default=0)
-    return season_weeks(season, rounds=max(needed, played))
+        # Wochen mit begonnenem Veto (läuft, pausiert, fertig): Die Vorgabe dort steht in einem Veto fest.
+        started = {week_of(row) for row in rows if ((row.get("flow") or {}).get("veto") or {}).get("status") in (RUNNING, PAUSED, DONE)}
+    from services.matchday_schedule import LOCAL_TZ
+
+    return season_weeks(season, rounds=max(needed, played), today=now_utc().astimezone(LOCAL_TZ).date(), started=started - {None})
 
 
 def presets_overview(rules: dict | None, presets: list[dict], weeks: list[dict], *, pool: dict | None, repeat: str,

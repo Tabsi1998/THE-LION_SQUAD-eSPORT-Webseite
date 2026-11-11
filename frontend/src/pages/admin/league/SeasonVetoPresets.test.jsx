@@ -7,6 +7,8 @@ const apiMock = { get: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
+const confirmMock = vi.fn(() => Promise.resolve(true));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 
 const { SeasonVetoRulesPanel } = await import("./SeasonVetoRulesPanel");
 
@@ -32,6 +34,9 @@ function serve(rulesState, presetsState) {
 beforeEach(() => {
   apiMock.get.mockReset();
   apiMock.put.mockReset();
+  toastMock.success.mockClear();
+  confirmMock.mockReset();
+  confirmMock.mockImplementation(() => Promise.resolve(true));
 });
 
 test("ohne Schritt „Vorgabe“ gibt es den Block nicht - mit ihm stehen die Wochen im Kasten Veto, fehlende markiert", async () => {
@@ -60,33 +65,90 @@ test("ohne Schritt „Vorgabe“ gibt es den Block nicht - mit ihm stehen die Wo
   expect(screen.getByTestId("veto-presets-save")).toBeDisabled();
 });
 
-test("Rotation füllt alle Wochen als Vorschlag, danach einzeln änderbar - Speichern schickt die Liste", async () => {
+test("Rotation füllt nur leere Wochen, geänderte bleiben bis zum Speichern markiert - Speichern schickt die Liste", async () => {
   serve(RULES, PRESETS);
-  const saved = [{ week: 1, mode: "ctl", map_id: "hafen" }, { week: 2, mode: "ctl", map_id: "ruine" }, { week: 3, mode: "ctl", map_id: "ruine" }];
-  apiMock.put.mockResolvedValue({ data: { ...PRESETS, presets: saved, problems: [], changed: 3, matches_ready: 1,
-    history: [{ at: "2026-11-11T13:00:00+00:00", by_name: "Ligaleitung", changes: [{ week: 1, mode: "ctl", from: "kai", to: "hafen" }, { week: 2, mode: "ctl", from: null, to: "ruine" }] }] } });
+  const saved = [{ week: 1, mode: "ctl", map_id: "kai" }, { week: 2, mode: "ctl", map_id: "ruine" }, { week: 3, mode: "ctl", map_id: "ruine" }];
+  apiMock.put.mockResolvedValue({ data: { ...PRESETS, presets: saved, problems: [], changed: 2, matches_ready: 1,
+    history: [{ at: "2026-11-11T13:00:00+00:00", by_name: "Ligaleitung", changes: [{ week: 2, mode: "ctl", from: null, to: "ruine" }, { week: 3, mode: "ctl", from: null, to: "ruine" }] }] } });
   render(<SeasonVetoRulesPanel seasonId="s1" />);
   fireEvent.click(await screen.findByTestId("veto-presets-rotate"));
-  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("hafen");
+  // Woche 1 war schon gewählt (Kai) und bleibt - der Vorschlag hätte dort Hafen gesetzt.
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
   expect(screen.getByTestId("veto-preset-2-ctl")).toHaveValue("kai");
   expect(screen.getByTestId("veto-preset-3-ctl")).toHaveValue("ruine");
+  expect(toastMock.success).toHaveBeenLastCalledWith("2 leere Wochen gefüllt – jede lässt sich noch ändern, gespeichert ist nichts.");
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-changed", "false");
+  expect(screen.getByTestId("veto-preset-week-2")).toHaveAttribute("data-changed", "true");
+  expect(screen.getByTestId("veto-preset-week-3-changed")).toHaveTextContent("geändert");
   expect(screen.queryByTestId("veto-presets-missing")).toBeNull();
   expect(screen.getByTestId("veto-presets-complete")).toBeInTheDocument();
   expect(screen.getByTestId("veto-presets-dirty")).toBeInTheDocument();
+  expect(confirmMock).not.toHaveBeenCalled();
   expect(apiMock.put).not.toHaveBeenCalled();
+  // Noch einmal: Es gibt keine leere Woche mehr - nichts ändert sich.
+  fireEvent.click(screen.getByTestId("veto-presets-rotate"));
+  expect(toastMock.success).toHaveBeenLastCalledWith("Keine leere Woche mehr – „Alle neu verteilen“ ersetzt auch die gewählten.");
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
   fireEvent.change(screen.getByTestId("veto-preset-2-ctl"), { target: { value: "ruine" } });
   fireEvent.click(screen.getByTestId("veto-presets-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/veto-presets", { presets: saved }));
   await waitFor(() => expect(screen.queryByTestId("veto-presets-dirty")).toBeNull());
+  // Gespeichert: keine Woche ist mehr als geändert markiert.
+  expect(screen.getByTestId("veto-preset-week-2")).toHaveAttribute("data-changed", "false");
   // Ein Spiel hat auf die Vorgabe gewartet: Die Meldung sagt, dass die Captains das Veto jetzt selbst starten - nicht, dass es läuft.
   expect(toastMock.success).toHaveBeenLastCalledWith("Vorgaben gespeichert – ein wartendes Spiel kann sein Veto jetzt starten, die Captains sind informiert.");
   expect(screen.getByTestId("veto-presets-history")).toHaveTextContent("Verlauf (1 Änderung)");
   expect(screen.getByTestId("veto-presets-history-entry")).toHaveTextContent("Ligaleitung");
-  expect(screen.getByTestId("veto-presets-history-entry")).toHaveTextContent("Spielwoche 1 · Kontrolle: Kai → Hafen");
   expect(screen.getByTestId("veto-presets-history-entry")).toHaveTextContent("Spielwoche 2 · Kontrolle: – → Ruine");
   // Eine Woche wieder leeren: Sie steht sofort als fehlend da.
   fireEvent.change(screen.getByTestId("veto-preset-3-ctl"), { target: { value: "" } });
   expect(screen.getByTestId("veto-presets-missing")).toHaveTextContent("Es fehlt noch: Spielwoche 3.");
+});
+
+test("„Alle neu verteilen“ fragt nach, wie viele gewählte Wochen es überschreibt - vergangene und begonnene bleiben immer", async () => {
+  // Woche 1 ist vorbei (Kai gewählt), in Woche 2 hat ein Veto begonnen (Ruine gewählt), Woche 3 ist gewählt (Hafen), Woche 4 ist leer.
+  const weeks = [{ ...WEEKS[0], past: true, started: false }, { ...WEEKS[1], past: false, started: true }, { ...WEEKS[2], past: false, started: false },
+    { week: 4, start_day: "2026-12-01", end_day: "2026-12-07", past: false, started: false }];
+  const stored = [{ week: 1, mode: "ctl", map_id: "kai" }, { week: 2, mode: "ctl", map_id: "ruine" }, { week: 3, mode: "ctl", map_id: "hafen" }];
+  serve(RULES, { ...PRESETS, weeks, presets: stored, problems: missing([4]), rotation: [...PRESETS.rotation, { week: 4, mode: "ctl", map_id: "hafen" }] });
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  expect(await screen.findByTestId("veto-preset-week-1-kept")).toHaveTextContent("vorbei");
+  expect(screen.getByTestId("veto-preset-week-2-kept")).toHaveTextContent("Veto begonnen");
+  expect(screen.queryByTestId("veto-preset-week-3-kept")).toBeNull();
+  expect(screen.getByTestId("veto-presets-rotation-note")).toHaveTextContent("Spielwoche 1 und 2 bleiben dabei immer, wie sie sind (vorbei oder Veto begonnen).");
+  // Abgelehnt: nichts ändert sich.
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("veto-presets-redistribute"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(confirmMock.mock.calls[0][0].description).toContain("Das überschreibt eine gewählte Woche.");
+  expect(confirmMock.mock.calls[0][0].description).toContain("Vergangene Wochen und Wochen mit begonnenem Veto bleiben");
+  expect(screen.getByTestId("veto-preset-3-ctl")).toHaveValue("hafen");
+  expect(screen.getByTestId("veto-preset-4-ctl")).toHaveValue("");
+  // Bestätigt: Woche 3 und 4 bekommen den Vorschlag, Woche 1 und 2 bleiben.
+  fireEvent.click(screen.getByTestId("veto-presets-redistribute"));
+  await waitFor(() => expect(screen.getByTestId("veto-preset-3-ctl")).toHaveValue("ruine"));
+  expect(screen.getByTestId("veto-preset-4-ctl")).toHaveValue("hafen");
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
+  expect(screen.getByTestId("veto-preset-2-ctl")).toHaveValue("ruine");
+  expect(screen.getByTestId("veto-preset-week-3")).toHaveAttribute("data-changed", "true");
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-changed", "false");
+  // Von Hand bleibt auch eine vergangene Woche änderbar (gilt dann nur für Spiele, deren Veto noch nicht begonnen hat).
+  fireEvent.change(screen.getByTestId("veto-preset-1-ctl"), { target: { value: "hafen" } });
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-changed", "true");
+});
+
+test("„Rotiert …“ lässt eine leere Woche mit begonnenem Veto aus - und ohne Gewähltes fragt „Alle neu verteilen“ nicht nach", async () => {
+  const weeks = [{ ...WEEKS[0], past: false, started: true }, { ...WEEKS[1], past: false, started: false }, { ...WEEKS[2], past: false, started: false }];
+  serve(RULES, { ...PRESETS, weeks, presets: [], problems: missing([1, 2, 3]) });
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("veto-presets-rotate"));
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("");
+  expect(screen.getByTestId("veto-preset-2-ctl")).toHaveValue("kai");
+  expect(screen.getByTestId("veto-presets-missing")).toHaveTextContent("Es fehlt noch: Spielwoche 1.");
+  fireEvent.click(screen.getByTestId("veto-presets-redistribute"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenLastCalledWith("Neu verteilt – jede Woche lässt sich noch ändern, gespeichert ist nichts."));
+  expect(confirmMock).not.toHaveBeenCalled();
+  expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("");
 });
 
 test("ein Fehler des Servers und ein Problem des gespeicherten Stands stehen bei der Woche", async () => {

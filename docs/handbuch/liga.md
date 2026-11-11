@@ -543,12 +543,16 @@ speichern** steht im selben Kasten der Block **Vorgabe der Woche**:
 
 1. Je **Spielwoche** eine Zeile mit den Tagen der Woche. Wählt je Modus die Map aus dem Pool. Oben steht, welche Wochen noch fehlen;
    diese Zeilen sind markiert.
-2. **Rotiert automatisch durch den Pool** füllt alle Wochen als Vorschlag: Woche für Woche die nächste Map in der Reihenfolge des
-   Pools, danach wieder die erste. Jede Woche lässt sich danach einzeln ändern.
-3. **Vorgaben speichern**. Lücken dürfen bleiben, ihr könnt also Woche für Woche eintragen. Darunter zeigt **Verlauf**, wer wann
-   welche Woche geändert hat.
+2. **Rotiert automatisch durch den Pool** füllt die **leeren** Wochen als Vorschlag: Woche für Woche die nächste Map in der
+   Reihenfolge des Pools, danach wieder die erste. Was ihr schon gewählt habt, bleibt. Jede Woche lässt sich danach einzeln ändern.
+3. **Alle neu verteilen** ersetzt auch gewählte Wochen. Vorher fragt die Seite nach und nennt, wie viele gewählte Wochen das
+   überschreibt.
+4. **Vergangene Wochen und Wochen, in denen schon ein Veto begonnen hat**, fasst keiner der beiden Knöpfe an. An der Zeile steht
+   „vorbei“ bzw. „Veto begonnen“. Von Hand könnt ihr sie weiter ändern.
+5. Was ihr geändert habt, bleibt bis zum Speichern als **geändert** markiert. **Vorgaben speichern**. Lücken dürfen bleiben, ihr
+   könnt also Woche für Woche eintragen. Darunter zeigt **Verlauf**, wer wann welche Woche geändert hat.
 
-<img src="../assets/liga/veto-vorgabe-der-woche-verwaltung.png" alt="Kasten Veto, Block Vorgabe der Woche: oben der Knopf Rotiert automatisch durch den Pool und der Hinweis, welche Spielwochen noch fehlen, darunter je Spielwoche eine Zeile mit den Tagen und der Auswahl der Map; fehlende Wochen sind markiert" width="640">
+<img src="../assets/liga/veto-vorgabe-der-woche-verwaltung.png" alt="Kasten Veto, Block Vorgabe der Woche: oben die Knöpfe Rotiert automatisch durch den Pool und Alle neu verteilen und der Hinweis, welche Spielwochen noch fehlen, darunter je Spielwoche eine Zeile mit den Tagen und der Auswahl der Map; fehlende Wochen sind markiert, die vergangene Woche trägt den Vermerk vorbei" width="640">
 
 Was gilt:
 

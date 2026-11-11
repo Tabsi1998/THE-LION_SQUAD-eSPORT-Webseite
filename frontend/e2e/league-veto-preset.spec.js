@@ -88,7 +88,8 @@ const DEFAULTS = { enabled: false, team_a: "home", step_seconds: 60, steps: [] }
 const VETO_RULES = { veto_rules: { enabled: true, team_a: "home", step_seconds: 60, steps: WITH_PRESET }, active: true, defaults: DEFAULTS,
   problems: [], modes: MODES, best_of: 5, game_mode_order: SEASON.game_mode_order, map_repeat: "other_mode", has_checkin: true, staffeln: 1 };
 const day = (offset) => new Date(Date.UTC(2026, 10, 10 + offset)).toISOString().slice(0, 10);
-const WEEKS = Array.from({ length: 7 }, (_, index) => ({ week: index + 1, start_day: day(index * 7), end_day: day(index * 7 + 6) }));
+// Spielwoche 1 ist vorbei: Der Vorschlag fasst sie nie an.
+const WEEKS = Array.from({ length: 7 }, (_, index) => ({ week: index + 1, start_day: day(index * 7), end_day: day(index * 7 + 6), past: index === 0, started: false }));
 const CTL_MAPS = POOL.modes[2].maps.map(({ map_id, name }) => ({ map_id, name }));
 const preset = (week, mapId) => ({ week, mode: "ctl", map_id: mapId });
 const ROTATION = WEEKS.map(({ week }) => preset(week, CTL_MAPS[(week - 1) % CTL_MAPS.length].map_id));
@@ -189,11 +190,17 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       await box.scrollIntoViewIfNeeded();
       await shot(page, testInfo, `vorgaben-verwaltung-fehlend-${width}`, box);
 
+      // „Rotiert automatisch durch den Pool“ füllt nur leere Wochen: Spielwoche 1 (schon gewählt, zudem vorbei) bleibt bei Kaimauer.
+      await expect(page.getByTestId("veto-preset-week-1-kept")).toHaveText("vorbei");
       await page.getByTestId("veto-presets-rotate").click();
       await expect(page.getByTestId("veto-presets-missing")).toHaveCount(0);
       await expect(page.getByTestId("veto-presets-complete")).toBeVisible();
-      await expect(page.getByTestId("veto-preset-1-ctl")).toHaveValue("hafen");
+      await expect(page.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
+      await expect(page.getByTestId("veto-preset-2-ctl")).toHaveValue("kai");
       await expect(page.getByTestId("veto-preset-7-ctl")).toHaveValue("hafen");
+      // Geänderte Wochen bleiben bis zum Speichern markiert.
+      await expect(page.getByTestId("veto-preset-week-1")).toHaveAttribute("data-changed", "false");
+      await expect(page.getByTestId("veto-preset-week-2-changed")).toHaveText("geändert");
       // Danach einzeln änderbar.
       await page.getByTestId("veto-preset-2-ctl").selectOption("ruine");
       await expect(page.getByTestId("veto-presets-dirty")).toBeVisible();
@@ -206,10 +213,20 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       // Die Meldung zum Vorschlag ist weg, bevor das Bild entsteht - sie läge sonst über dem Knopf.
       await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 10_000 });
       await shot(page, testInfo, `vorgaben-verwaltung-${width}`, box);
+      // „Alle neu verteilen“ fragt nach, wie viele gewählte Wochen es überschreibt - Spielwoche 1 (vorbei) bleibt auch dann.
+      await page.getByTestId("veto-presets-redistribute").click();
+      await expect(page.getByRole("dialog")).toContainText("Das überschreibt eine gewählte Woche.");
+      await page.getByTestId("confirm-dialog-cancel").click();
+      await expect(page.getByTestId("veto-preset-2-ctl")).toHaveValue("ruine");
+      await page.getByTestId("veto-presets-redistribute").click();
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect(page.getByTestId("veto-preset-2-ctl")).toHaveValue("kai");
+      await expect(page.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
       await page.getByTestId("veto-presets-save").click();
       await expect.poll(() => puts.length).toBe(1);
-      expect(puts[0]).toEqual(ROTATION.map((row) => (row.week === 2 ? preset(2, "ruine") : row)));
+      expect(puts[0]).toEqual(ROTATION.map((row) => (row.week === 1 ? preset(1, "kai") : row)));
       await expect(page.getByTestId("veto-presets-dirty")).toHaveCount(0);
+      await expect(page.getByTestId("veto-preset-week-2")).toHaveAttribute("data-changed", "false");
     });
 
     test(`Matchseite: Veto mit Vorgabe - fest im Brett, nicht antippbar, in der Spielreihenfolge bei ${width} px`, async ({ page }, testInfo) => {
