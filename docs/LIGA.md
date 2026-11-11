@@ -246,6 +246,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
 | Plattform: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (#2270, B.3) | Season (Feld), Liga N überschreibt den Rest | keines · alle · keine Angabe · keine Angabe |
 | Veto: an/aus, Team A (Heim oder Los), Zeit je Schritt, Schrittfolge (D.3, #1618) | Season (`veto_rules`) | an · Heim · 60 s · Vorschlag aus Modusfolge und Best of, zieht mit dem Pool nach, bis einmal von Hand gespeichert (ältere Seasons ohne Feld: aus) |
+| Veto: Vorgabe der Woche – je Spielwoche und Modus eine Map aus dem Pool (D.3, #2326) | Season (`veto_presets`), gilt ohne Übertragen für alle Staffeln | keine – solange sie für eine Woche fehlt, beginnt das Veto dort nicht |
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
@@ -865,6 +866,7 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `lineup_mode`, `lineup_min_players` | „Teilnehmerliste je Spiel“ / „Aufstellung je Map“, Mindestzahl |
 | `result_confirm_hours`, `lineup_amend_hours` | Bestätigungsfrist, Nachtragsfrist (Stunden) |
 | `veto.step_seconds`, `veto.team_a` | Veto (D.3, #1618): „60 Sekunden“ je Schritt, „das Heimteam laut Spielplan“ / „per Los je Spiel“; ohne Veto in der Season „(nicht festgelegt)“ |
+| `veto.presets` | Vorgabe der Woche (D.3, #2326): „Spielwoche 1: Hafen (Kontrolle); Spielwoche 2: Kai (Kontrolle)“ – nur Wochen mit Eintrag, nur Maps aus dem Pool; „noch keine eingetragen“ ohne Einträge, „(nicht festgelegt)“ ohne Schritt „Vorgabe der Woche“ in der Vorlage |
 | `schedule.matchday_days`, `schedule.default_weekday`, `schedule.default_time`, `schedule.default_slot` | Tage je Spielwoche, Standardtag, Uhrzeit, „Sonntag, 20:00 Uhr“ |
 | `schedule.response_hours`, `schedule.blocked_periods` | Antwortfrist auf Terminvorschläge, Sperrzeiten („Weihnachtspause 21.12.2026–03.01.2027“) |
 | `schedule.home_rule_hours`, `schedule.reschedule_max`, `schedule.reschedule_notice_hours`, `schedule.result_reminder_hours`, `schedule.result_overdue_hours` | D.1-Regeln; ohne `schedule_rules` an der Season „(nicht festgelegt)“ |
@@ -2212,19 +2214,21 @@ neuem Wert.
 | `enabled` | bool | `false` | an/aus; aus = die Maps werden wie bisher beim Ergebnis eingetragen |
 | `team_a` | `"home"` \| `"draw"` | `"home"` | Nr. 22: Team A ist das Heimteam aus dem Spielplan (`slots[0]`) – oder wird je Spiel einmal gelost |
 | `step_seconds` | int 10–600 | 60 | Nr. 23: Zeit je Schritt; nach Ablauf wählt das System |
-| `steps` | `[{kind, mode, team, position}]` | `[]` | die Vorlage, höchstens 60 Schritte: `kind` `ban` \| `pick` \| `decider`; `mode` ein Modus des Spiels; `team` `"A"` \| `"B"` (beim Decider `null` – das System); `position` 1…Best of bei `pick` und `decider`, sonst `null`. Das Modell bleibt offen für weitere Schrittarten; eine Seitenwahl gibt es nicht (Seiten ergeben sich aus Heim/Gast) |
+| `steps` | `[{kind, mode, team, position}]` | `[]` | die Vorlage, höchstens 60 Schritte: `kind` `ban` \| `pick` \| `decider` \| `preset` (Vorgabe der Woche, #2326 – siehe unten); `mode` ein Modus des Spiels; `team` `"A"` \| `"B"` (bei `decider` und `preset` `null` – das System); `position` 1…Best of bei `pick`, `decider` und `preset`, sonst `null`. Das Modell bleibt offen für weitere Schrittarten; eine Seitenwahl gibt es nicht (Seiten ergeben sich aus Heim/Gast) |
 
 **Prüfung der Vorlage** (`league_veto_rules.template_problems(rules, pool, best_of, order, repeat)` – deutsche Sätze, kein JSON). Beim
 `PUT` mit `enabled: true` lehnt der Server Probleme mit 422 ab (mit `enabled: false` wird nur die Form geprüft, so bleibt ein Entwurf
 speicherbar); `season_readiness` prüft die gespeicherte Vorlage gegen den geltenden Pool (Code `veto_invalid`, je Satz ein Problem,
 und `veto_without_checkin`, wenn die Season keinen Check-in trägt; beides nur mit `enabled: true`):
 
-- jede Position 1…Best of genau einmal durch `pick` oder `decider`, keine Position darüber;
+- jede Position 1…Best of genau einmal durch `pick`, `decider` oder `preset`, keine Position darüber;
 - der Modus einer Position passt zu `game_mode_order` (zyklisch wie beim Melden), sofern die Reihenfolge gesetzt ist;
-- jeder Modus der Vorlage hat Maps im Pool; je Modus reicht der Pool: Sperren + Wahlen + Decider ≤ Maps des Modus;
-- `decider` höchstens einmal je Modus und als letzter Schritt seines Modus; bei `map_repeat` `other_mode` oder `always` bleibt nach allen
-  Sperren und Wahlen des Modus **genau eine** Map übrig; bei `never` muss die Simulation mindestens einen vollständigen Durchlauf finden
-  (gewählte Maps fallen aus allen Modi);
+- jeder Modus der Vorlage hat Maps im Pool; je Modus reicht der Pool: Sperren + Wahlen + Decider + Vorgabe ≤ Maps des Modus;
+- `decider` höchstens einmal je Modus und als letzter Schritt seines Modus (ein `preset` desselben Modus darf davor oder danach stehen);
+  bei `map_repeat` `other_mode` oder `always` bleibt nach allen Sperren, Wahlen und der Vorgabe des Modus **genau eine** Map übrig; bei
+  `never` muss die Simulation mindestens einen vollständigen Durchlauf finden (gewählte Maps fallen aus allen Modi; die Vorgabe zählt
+  dabei wie eine freie Wahl vor allen anderen Schritten – es muss also *eine* Vorgabe geben, mit der die Vorlage aufgeht);
+- `preset` höchstens einmal je Modus („höchstens eine Vorgabe der Woche je Modus“);
 - Liga N mit eigenem Best of ≠ dem der Season: Warnung `veto_division_mismatch` („Dort läuft kein Veto – die Maps werden beim Ergebnis
   eingetragen“); in solchen Staffeln bleibt das Veto aus (`skipped`, siehe unten).
 
@@ -2237,7 +2241,63 @@ dem Best of der Season (`league_veto_rules.propose`), generisch ohne Werte eines
 Anlage B: Modi in der Reihenfolge ihres ersten Auftretens; je Modus beginnt abwechselnd Team A, Team B, A …; hat ein Modus eine Position,
 sperren beide abwechselnd bis eine Map bleibt, dann `decider`; hat er mehrere Positionen, sperren beide abwechselnd bis so viele Maps
 bleiben wie Positionen, dann wählen beide abwechselnd, jede Wahl bekommt die nächste Position des Modus. Ohne Reihenfolge nimmt der
-Vorschlag die Modi des Pools zyklisch.
+Vorschlag die Modi des Pools zyklisch. Eine Vorgabe der Woche schlägt er nie vor – die setzt die Leitung bewusst.
+
+**Vorgabe der Woche** (`kind: "preset"`, #2326, Entscheidung Nr. 122 vom 09.11.). Die Liga-Leitung legt für einen Modus je Spielwoche
+eine Map fest; auf diese Map gibt es weder Sperre noch Wahl, sie steht für alle Spiele der Woche fest. Nichts davon ist auf einen Titel
+verdrahtet: Welcher Modus eine Vorgabe bekommt, sagt die Vorlage (ein Schritt `preset` mit Modus und Position, höchstens einer je Modus),
+welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_presets` ist ein neues, freiwilliges Feld.
+
+- **Daten:** `league_seasons.veto_presets` = `[{week, mode, map_id}]`, je Spielwoche und Modus höchstens ein Eintrag, sortiert
+  (`league_veto_rules.normalize_presets`; Woche 1…60). Die Liste steht **nur an der Season**, nicht an den Staffeln: Der Start eines
+  Vetos liest sie über `league_context.season_id` (`league_veto.season_presets`) – eine Quelle, kein Übertragen, keine Gruppe in
+  `SYNC_GROUPS`. Ein von Hand verbogener Wert zählt wie „keine Vorgabe“.
+- **Spielwoche eines Spiels** (`league_veto.week_of` → `matchday_schedule.matchday_number_of`): der **Spieltag** des Spiels
+  (`matchday_number`, sonst `round`). Spieltag N liegt in der N-ten *aktiven* Spielwoche der Season (Sperrwochen zählen nicht mit,
+  `calendar_week_of`); „Spielwoche N“ in Verwaltung, Matchseite und Regelwerk meint darum immer Spieltag N. **Ein verschobenes Spiel
+  behält seinen Spieltag** – es gilt die Vorgabe seines Spieltags, nicht die der Woche, in die der neue Termin fällt (auch wenn es erst
+  Wochen später gespielt wird). Ein Spiel ohne Spieltag hat keine Spielwoche: Dort läuft kein Veto (`skipped`, „Dieses Spiel gehört zu
+  keiner Spielwoche – die Vorgabe der Woche lässt sich nicht bestimmen.“), die Maps werden beim Ergebnis eingetragen.
+- **Welche Wochen** (`league_veto.preset_weeks`): Spieltag 1 bis N, N = die Spieltage der größten Staffel laut Vorgaben
+  (`rounds_needed(max_staffel_size, round_robin_legs)`, über Season und jede aktive Liga N) oder der höchste schon angesetzte Spieltag –
+  was größer ist; ohne beides alle aktiven Wochen. Je Woche `start_day`/`end_day` (Wiener Kalendertage der N-ten aktiven Woche).
+- **Simulation:** Die vorgegebene Map ist **vom ersten Schritt an** aus ihrem Modus genommen (`league_veto_rules.reserve`; bei
+  `map_repeat: never` aus allen Modi) – egal, wo der Schritt in der Vorlage steht. Ist der Schritt an der Reihe, setzt ihn das System
+  sofort wie einen Decider (`via: "auto"`, `role: "preset"`, ohne Frist). `allowed_options` bietet die Map nie an; ein Zug auf sie
+  antwortet 422 „… ist die Vorgabe der Woche – weder sperrbar noch wählbar.“
+- **Prüfung einer Woche** (`league_veto_rules.week_problems(rules, {mode: map_id}, pool, repeat)`): je Schritt `preset` – „Kontrolle:
+  Die Vorgabe der Woche fehlt.“, „Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus.“; bei `never` „Hafen ist für Stellung
+  und Kontrolle vorgegeben – in dieser Season jede Map nur einmal je Serie.“ und, wenn die übrigen Schritte nicht mehr aufgehen, „Mit
+  diesen Vorgaben lässt sich die Vorlage nicht zu Ende spielen – bitte eine andere Map vorgeben.“
+- **Fehlende Vorgabe:** Liefert `week_problems` beim Start einen Satz (fehlt, Map nicht mehr im Pool des Spiels, geht nicht auf),
+  **beginnt das Veto nicht** – kein `flow.veto`, kein `skipped`, nie eine Wertung. Der Stand bleibt `veto`; die Matchseite nennt den
+  Satz (Veto-Block `blocked`, dazu `start_hint`), Start und Zug antworten weiter 409.
+  `ensure_started` vermerkt je Termin einmal `flow.veto_wait = {for_at, rev, week, at}` (Bedingung auf Termin und Revision), schreibt
+  das Protokoll `match.veto.waiting` (`week`, `problems`) und schickt der Liga-Leitung einen Hinweis: an alle mit Zuständigkeit `season`
+  oder `matches` (`league_permissions.staff_user_ids`, wie die übrigen Hinweise an die Leitung), Art `match_attention`, Thema
+  Turnier-Updates, `meta.reason` `veto_preset_missing`, Schlüssel `veto-preset-missing:<season>:<woche>` – **eine** Nachricht je
+  Person, Season und Spielwoche, auch wenn mehrere Spiele warten; Link `/admin/leagues/seasons/<id>#veto`. Vor dem Check-in beider
+  Seiten geht kein Hinweis hinaus (die Matchseite zeigt die Lücke trotzdem schon).
+- **Nachtragen:** Mit dem Speichern der Vorgaben beginnen wartende Vetos sofort (`league_veto_sweep.start_waiting`: Spiele der Season
+  mit `flow.veto_wait`, unter der Turniersperre, ein Spiel hält die anderen nicht auf) – beide Seiten bekommen wie immer „Veto läuft“.
+  Sonst beginnt es beim nächsten Lesen der Matchseite (sie fragt im Wartestand alle 3 Sekunden nach).
+- **Änderung der Vorgabe:** Sie gilt nur für Vetos, die **noch nicht begonnen** haben. Ein begonnenes Veto trägt den Schnappschuss
+  `flow.veto.week` und `flow.veto.presets` (`[{mode, map_id}]`) – auch nach „Neu starten“ der Leitung und im fertigen Veto
+  (`planned_games` bleibt). Erst ein neuer Termin (neue Revision) beginnt ein neues Veto mit der dann geltenden Vorgabe. Protokoll
+  `league.season.veto_presets` mit `from`, `to` und `changes` (`[{week, mode, from, to}]`); daraus liest die Verwaltung die **Historie**
+  (die letzten 10 Änderungen: wann, wer, welche Woche von welcher auf welche Map).
+- **Routen:** `GET /api/admin/leagues/seasons/{id}/veto-presets` (jede Zuständigkeit) liefert `active` (Veto an und Schritt `preset`
+  in der gespeicherten Vorlage), `weeks[]` (`{week, start_day, end_day}`), `modes[]` (`{mode, label, position, maps: [{map_id, name}]}`
+  je Schritt `preset`), `presets[]`, `problems[]` (`{week, problems}` – nur Wochen, in denen etwas fehlt oder nicht passt), `rotation[]`
+  (der Vorschlag „rotiert automatisch durch den Pool“: je Modus Woche für Woche die nächste Map in Pool-Reihenfolge, bei `never` weicht
+  ein zweiter Modus derselben Woche aus – `league_veto_rules.rotate`, nichts davon gespeichert) und `history[]`.
+  `PUT …/veto-presets` `{presets: [{week, mode, map_id}]}` (Zuständigkeit `season`) ersetzt die Liste: eine Zeile ohne Map heißt „noch
+  nicht gewählt“ und fällt weg (Lücken sind speicherbar und bleiben sichtbar); 422 mit deutschem Satz bei einer Woche, die es nicht gibt,
+  einem Modus ohne Schritt `preset`, einer Map außerhalb des Pools des Modus, zwei Maps für dieselbe Woche und denselben Modus oder
+  einer vollständigen Woche, die nicht aufgeht. Antwort wie `GET`, dazu `changed` und `vetoes_started`.
+- **Prüfung vor der Veröffentlichung:** `season_readiness` nennt Wochen ohne (passende) Vorgabe als **Warnung** `veto_preset_missing`
+  („Veto: Für Spielwoche 3, 4 und 5 steht die Vorgabe der Woche noch nicht – …“) – kein Hindernis, die Leitung darf Woche für Woche
+  eintragen. „Was fehlt noch?“ springt an den Kasten Veto.
 
 **`matches_v2.flow.veto`** (intern wie `flow.checkin`, nur Staffeln mit Vorlage schreiben es):
 
@@ -2248,11 +2308,12 @@ Vorschlag die Modi des Pools zyklisch.
 | `for_at`, `rev` | Termin und Termin-Revision (`flow.schedule_rev`, D.2), für die das Veto gilt (wie `flow.ready_for`/`ready_rev`); jeder Terminweg – auch zurück auf denselben Termin oder „Neu ansetzen“ – macht es ungültig, nach erneutem Check-in beider Seiten beginnt es neu |
 | `started_at`, `finished_at` | ISO |
 | `template` | Schnappschuss der Vorlage beim Start (`team_a`, `step_seconds`, `steps`) – eine spätere Änderung der Season ändert ein laufendes Veto nicht |
+| `week`, `presets` | Vorgabe der Woche (#2326): die Spielwoche des Spiels und der Schnappschuss `[{mode, map_id}]` der Vorgaben beim Start – `null` und `[]` ohne Schritt `preset`; eine spätere Änderung der Season ändert sie nicht |
 | `map_pool_id`, `best_of`, `map_repeat` | der Pool (geltende Version, `effective_pool`) und die Werte, mit denen gespielt wird |
 | `team_a`, `team_b` | `registration_id` je Seite; `team_a_via` `home` \| `draw`; bei `draw` dazu `draw: {at}` – serverseitig einmal gelost, nie neu bei einem Reload |
 | `step` | Index des nächsten Schritts (0-basiert); gleich der Zahl der Schritte, wenn fertig |
 | `deadline_at` | Ende des laufenden Schritts (`null` bei Pause oder fertig); nach einem Zug oder einer automatischen Wahl `jetzt + step_seconds` – nie an die alte Frist gekettet, nach einem Ausfall wählt das System also nur einen Schritt, die nächste Seite hat wieder ihre volle Zeit |
-| `steps[]` | erledigte Schritte in Veto-Reihenfolge: `{index, kind, mode, mode_label, team, registration_id, position, map_id, map_name, map_image_url, role, via, by, at}`; `role` wie #1931 (`banned`, `picked`, `decider`), `via` `side` (Captain/Vertreter), `auto` (Zeit abgelaufen oder Decider), `by` die Person (nur bei `side`) |
+| `steps[]` | erledigte Schritte in Veto-Reihenfolge: `{index, kind, mode, mode_label, team, registration_id, position, map_id, map_name, map_image_url, role, via, by, at}`; `role` wie #1931 (`banned`, `picked`, `decider`), dazu `preset` (Vorgabe der Woche), `via` `side` (Captain/Vertreter), `auto` (Zeit abgelaufen, Decider oder Vorgabe der Woche), `by` die Person (nur bei `side`) |
 | `paused` | `{at, by, reason, remaining_seconds}` oder `null` |
 | `lead_log[]` | Eingriffe der Leitung `{action, at, by, reason}` |
 | `skipped_reason` | bei `skipped` der Satz, warum (Vorlage passt nicht zu Best of oder Pool dieses Spiels) |
@@ -2299,8 +2360,8 @@ Lesen der Matchseite und jeder Zug. Idempotent: Ein zweiter Lauf findet nichts m
 
 **Abschluss:** Nach dem letzten Schritt `status: "done"`, `finished_at`, und am Spiel `planned_games[]` (öffentlich, nach `position`
 sortiert) mit denselben Schlüsseln wie `games[]` – `{position, mode, mode_label, mode_icon_url?, map_id, map_name, map_image_url}` als
-Schnappschuss aus dem Pool – dazu `role` (`picked` \| `decider`, Begriffe wie #1931) und `by_registration_id` (die wählende Seite, beim
-Decider `null`). `map_pool_id` wird gesetzt, wenn leer (wie `remember_pool`). Stand `ready`, Protokoll `match.veto.done`, Nachricht an
+Schnappschuss aus dem Pool – dazu `role` (`picked` \| `decider`, Begriffe wie #1931, oder `preset` für die Vorgabe der Woche an ihrer
+Position) und `by_registration_id` (die wählende Seite, bei Decider und Vorgabe `null`). `map_pool_id` wird gesetzt, wenn leer (wie `remember_pool`). Stand `ready`, Protokoll `match.veto.done`, Nachricht an
 beide Seiten „Veto abgeschlossen – die Spielreihenfolge steht, ihr könnt starten“ (`veto_done`, `veto-done:<spiel>:<finished_at>`).
 **Ergebnis:** Das Meldeformular übernimmt Modus und Map je Position aus `planned_games` (fest, nur Sieger, Punkte und Aufstellung
 werden eingetragen); der Server prüft die Meldung der Captains dagegen (`league_games.normalize_games`, 422 „Map 2: laut Veto wird hier …
@@ -2314,7 +2375,7 @@ B.1 (403, Superadmin mit `conflict_reason`), Grund 5–500 Zeichen, `version` wi
 | --- | --- |
 | `pause` | `running` → `paused`, `paused.remaining_seconds` = Rest der Frist |
 | `resume` | `paused` → `running`, Frist = jetzt + Rest |
-| `undo` | nimmt den letzten Schritt zurück (einen automatischen Decider samt dem Zug davor); nur solange nichts begonnen (`started_at`) und nichts gemeldet ist – auch bei `done` (dann wieder `running`, `planned_games` fällt weg) |
+| `undo` | nimmt den letzten Zug einer Seite zurück (automatische Schritte danach – Decider, Vorgabe der Woche – gehen mit; das System setzt sie gleich wieder, wenn sie an der Reihe sind); gibt es noch keinen Zug einer Seite, 409; nur solange nichts begonnen (`started_at`) und nichts gemeldet ist – auch bei `done` (dann wieder `running`, `planned_games` fällt weg) |
 | `restart` | beginnt die Vorlage von vorn, Team A bleibt (ein Los wird nicht neu gezogen) |
 
 Jeder Eingriff steht in `lead_log[]` und im Protokoll `match.veto.lead` (`action`, `reason`); die Matchseite zeigt Pause und Grund beiden
@@ -2324,9 +2385,14 @@ Seiten.
 `version`, `step_seconds`, `team_a {registration_id, name, via}`, `team_b {registration_id, name}`, `current` (`{index, number, total, kind,
 mode, mode_label, mode_icon_url?, registration_id, name, position, deadline_at, remaining_seconds}` oder `null`), `own_turn`, `can_pick`,
 `pick_hint`, `options[]` (alle Maps des Modus des laufenden Schritts `{map_id, name, image_url, allowed, hint}`), `remaining[]` je Modus
-`{mode, label, icon_url?, maps: [{map_id, name, image_url, status: open|banned|picked|decider, by_name, position}]}`, `history[]`
-(`{index, kind, mode_label, name, map_name, position, via, at}`), `planned_games[]`, `paused {at, reason, remaining_seconds}`,
-`lead {can_act, conflict}` (nur Leitung). D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
+`{mode, label, icon_url?, maps: [{map_id, name, image_url, status: open|banned|picked|decider|preset|elsewhere, by_name, position}]}`,
+`history[]` (`{index, kind, mode_label, name, map_name, position, via, at}`), `planned_games[]`, `paused {at, reason, remaining_seconds}`,
+`lead {can_act, conflict}` (nur Leitung). Vorgabe der Woche (#2326): `week` (Spielwoche des Spiels), `presets[]` (`{mode, mode_label,
+mode_icon_url?, position, map_id, map_name, map_image_url}` – vor dem Start die geltenden der Season, danach der Schnappschuss des Vetos)
+und `blocked` (`{week, text}`, nur im Stand `waiting`, wenn die Vorgabe fehlt oder nicht passt; sonst `null`). Im Brett steht die
+vorgegebene Map von Anfang an als `preset`, bei `never` in den anderen Modi als `elsewhere`. Der Veto-Block zeigt die Vorgabe schon vor
+dem Check-in („Vorgabe der Woche · Spielwoche 2“) und sagt im Wartestand „Veto wartet auf die Vorgabe der Woche“ samt dem Satz, dass
+nichts von selbst gewertet wird. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
 Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4.
 
 **Datenschutz:** `flow.veto` ist intern (`flow` in `match_public_view.INTERNAL_KEYS`); `planned_games` ist öffentlich (keine Personen).
@@ -2340,6 +2406,8 @@ Eingriffe als Leitung (`veto_lead`: Vorgang und Zeit). Kontolöschung (`match_fl
 | --- | --- | --- | --- |
 | `GET …/seasons/{id}/veto-rules`, `GET …/veto-rules/proposal` | jede Zuständigkeit der Liga | – | – |
 | `PUT …/seasons/{id}/veto-rules` | `season` | – | – |
+| `GET …/seasons/{id}/veto-presets` (#2326) | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/veto-presets` (#2326) | `season` | – | – |
 | Spiel: `POST /veto/pick` | keins – nur Captain oder Vertreter der Seite am Zug | – | – |
 | Spiel: `POST /veto/lead` | `matches` | ja (Notausnahme `conflict_reason`) | – |
 
@@ -2348,17 +2416,30 @@ Best of und „Modus je Map“ darüber): an/aus, Team A = Heim oder Los, Zeit j
 mit Prüfung live (`frontend/src/lib/leagueVeto.js`, dieselben Sätze wie der Server für Positionen und Poolgrößen; die Suche bei `never`
 und der Abgleich mit dem gespeicherten Pool kommen vom Server), Knopf **„Vorschlag aus Modusfolge und Pools“**, eigener Knopf
 **„Veto speichern“**. „Was fehlt noch?“ springt bei `veto_invalid` an den Kasten, bei `veto_without_checkin` zum Check-in.
+Die Art **„Vorgabe“** (`preset`) steht in der Auswahl neben Sperren, Wählen und Decider – ohne Team („Liga-Leitung“), mit Position.
+Enthält die gespeicherte Vorlage sie, steht **im selben Kasten** der Block **„Vorgabe der Woche“**
+(`pages/admin/league/SeasonVetoPresets.jsx`, #2326): je Spielwoche eine Zeile mit den Tagen der Woche und je Modus einer Auswahl aus dem
+Pool, oben „Es fehlen noch: Spielwoche 3, 4 und 5.“ (fehlende Wochen sind markiert), Knopf **„Rotiert automatisch durch den Pool“**
+(füllt alle Wochen als Vorschlag, danach einzeln änderbar, nichts gespeichert), eigener Knopf **„Vorgaben speichern“** und darunter der
+**Verlauf** aus dem Protokoll. Steht die Art erst im ungespeicherten Formular, sagt der Block „Sobald das Veto damit an und gespeichert
+ist …“; eine Map, die den Pool verlassen hat, zählt wieder als fehlend, mit dem Satz des Servers. `veto_preset_missing` führt hierher.
 
 **Regelwerk:** Baustein `[[baustein:veto]]` nach dem Muster der Bausteine aus den Einstellungen (#2269: Daten und Darstellung in
 `league_rule_facts.veto_data`/`render_veto`, registriert in `league_rule_blocks.BLOCKS`, eingefroren als `{label, source, data}`):
 Team-A-Regel, Zeit je Schritt und die Schritte als Liste („1. Team A sperrt eine Map (Stellung)“, „3. Team A wählt Map 1 (Stellung)“,
 „11. Die übrige Map wird Map 3 (Kontrolle)“); aus heißt „*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*“.
 Dazu die Variablen `{{veto.step_seconds}}` („60 Sekunden“) und `{{veto.team_a}}` („das Heimteam laut Spielplan“ / „per Los je Spiel“).
+Vorgabe der Woche (#2326): Der Baustein nennt den Schritt („9. Die Liga-Leitung gibt Map 3 je Spielwoche vor (Kontrolle)“) und die Regel
+dazu als eigenen Punkt (gilt für alle Spiele des Spieltags, auch ein verschobenes; nicht sperrbar, nicht wählbar; ohne Vorgabe beginnt
+das Veto nicht). **Welche Map es je Woche ist, steht nicht im Baustein**, sondern in der Variable `{{veto.presets}}`
+(`league_rule_facts.veto_presets_text`) – so löst eine neue Vorgabe nur dort „Regelwerk muss freigegeben werden“ aus, wo ein Regelwerk
+die Variable verwendet, und die Regel selbst bleibt freigegeben.
 Beides ist Teil von Fingerabdruck und Vorschlag: Eine geänderte Vorlage löst „Regelwerk muss freigegeben werden“ aus (`data_changes`,
 `pending_release`), die veröffentlichte Fassung zeigt bis zur Freigabe ihren Stand von damals.
 
 **App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. **Audit-Aktionen neu:** `match.veto.start`,
-`match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`.
+`match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`; seit #2326 `match.veto.waiting` und
+`league.season.veto_presets`.
 
 ### Season-Seite der Verwaltung (#2267)
 
