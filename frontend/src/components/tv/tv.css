@@ -1599,3 +1599,85 @@ td.tv-standings__num--strong { color: #ffffff; font-weight: 800; }
   animation: tv-cup-shine calc(var(--tls-motion-slow) * 3) var(--tls-ease) calc(var(--tls-motion-slow) * 2) both;
 }
 @keyframes tv-cup-shine { to { transform: translateX(130%); } }
+
+/* Map-Veto am TV (#1651, pages/display/VetoTVPage.jsx): links wer am Zug ist mit großem Countdown, rechts das Brett (je Modus eine Spalte),
+   darunter der ganze Ablauf in einer Zeile. Countdown, Karten und Zeitleiste sind dieselben Bausteine wie auf der Matchseite
+   (VetoLive.jsx, index.css) - hier nur in TV-Einheiten. „Bewegung aus“ am TV stellt sie still (Regel für .tv-screen oben). */
+.tv-veto__grid {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 0.3fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: calc(var(--tv-u) * 1.6) calc(var(--tv-u) * 2.4);
+}
+.tv-veto__turn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--tv-u) * 1.2);
+  min-height: 0;
+  padding: var(--tv-pad-y) var(--tv-pad-x);
+  text-align: center;
+  border: var(--tv-line-w) solid var(--tv-line);
+  border-radius: 4px;
+  background: var(--tv-panel);
+}
+.tv-veto__turn[data-tone="a"] .tv-veto__who { color: var(--tv-accent); }
+.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-warn-rgb)); }
+.tv-veto__who { overflow-wrap: anywhere; }
+/* Der Countdown: Zahl mitten im Ring. */
+.tv-veto__clock { position: relative; display: grid; place-items: center; }
+.tv-veto__clock > * { grid-area: 1 / 1; }
+.tv-veto__clock .tls-veto-clock__ring { width: calc(var(--tv-u) * 26); height: calc(var(--tv-u) * 26); }
+.tv-veto__clock .tls-veto-clock__text { text-align: center; }
+.tv-veto__clock .tls-veto-clock__caption { font-size: var(--tv-fs-meta); }
+.tv-veto__clock .tls-veto-clock__number { font-size: calc(var(--tv-u) * 7); line-height: 1; }
+.tv-veto__stage { min-height: 0; overflow: hidden; }
+.tv-veto .tls-veto-board {
+  margin-top: 0;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: calc(var(--tv-u) * 1.4);
+}
+.tv-veto .tls-veto-mode { padding: calc(var(--tv-u) * 1.1); background: var(--tv-panel); border-width: var(--tv-line-w); }
+.tv-veto .tls-veto-mode__head { gap: calc(var(--tv-u) * 0.6); font-size: var(--tv-fs-info); }
+.tv-veto .tls-veto-mode__now { font-size: var(--tv-fs-meta); }
+.tv-veto .tls-veto-mode__cards { gap: calc(var(--tv-u) * 0.8); margin-top: calc(var(--tv-u) * 0.8); }
+.tv-veto .tls-veto-card__label { top: 0.4em; left: 0.4em; padding: 0.15em 0.5em; font-size: var(--tv-fs-meta); }
+.tv-veto .tls-veto-card__body { padding: 0.4em 0.6em 0.5em; }
+.tv-veto .tls-veto-card__name { font-size: var(--tv-fs-info); }
+.tv-veto .tls-veto-card__state { font-size: var(--tv-fs-meta); }
+.tv-veto .tls-veto-trace > span:nth-child(odd) { height: 3px; }
+.tv-veto .tls-veto-trace > span:nth-child(even) { width: 3px; }
+.tv-veto__flow { grid-column: 1 / -1; margin-top: 0; }
+.tv-veto .tls-veto-flow__list {
+  overflow: hidden;
+  padding-inline: 0;
+  -webkit-mask-image: none;
+  mask-image: none;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: calc(var(--tv-u) * 0.6);
+}
+.tv-veto .tls-veto-step { padding: 0.5em 0.7em; font-size: var(--tv-fs-meta); }
+.tv-veto .tls-veto-step__head, .tv-veto .tls-veto-step__now { font-size: var(--tv-fs-meta); }
+.tv-veto .tls-veto-step__who { font-size: var(--tv-fs-info); }
+.tv-veto .tls-veto-step__thumb { width: 2.2em; height: 1.25em; }
+/* Fertig: die Spielreihenfolge als große Karten. */
+.tv-veto__planned { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: start; gap: calc(var(--tv-u) * 1.4); }
+.tv-veto__game {
+  display: grid;
+  gap: calc(var(--tv-u) * 0.4);
+  overflow: hidden;
+  padding-bottom: calc(var(--tv-u) * 1);
+  border: var(--tv-line-w) solid var(--tv-green);
+  border-radius: 4px;
+  background: var(--tv-panel);
+  animation: tls-map-in var(--tls-motion-mid) var(--tls-ease) backwards;
+}
+.tv-veto__game > :not(.tv-veto__game-media) { padding-inline: calc(var(--tv-u) * 1); }
+.tv-veto__game-media { position: relative; aspect-ratio: 16 / 9; background: linear-gradient(160deg, #10232b 0%, #0b0b0c 100%); }
+.tv-veto__game-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
