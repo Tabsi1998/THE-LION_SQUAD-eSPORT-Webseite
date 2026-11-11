@@ -3676,7 +3676,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-veto-step__thumb { width: 1.75rem; height: 1rem; flex-shrink: 0; border-radius: 1px; object-fit: cover; }
 .tls-veto-step__now { margin-top: 0.125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; color: rgb(var(--tls-veto-rgb)); }
 @media (min-width: 1024px) {
-  .tls-veto-flow__list { -webkit-mask-image: none; mask-image: none; padding-inline: 0; }
+  .tls-veto-flow__list { grid-auto-columns: minmax(6.5rem, 1fr); }
 }
 
 /* Brett: je Modus ein Kasten, darin die Karten zu zweit; ab 640 px zwei, ab 1024 px drei Modi nebeneinander. */
@@ -3705,6 +3705,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   translate: 0 0; scale: 1;
   transition: translate var(--tls-motion-fast) var(--tls-ease), scale var(--tls-motion-fast) var(--tls-ease);
 }
+.tls-veto-card--live .tls-veto-card__media { display: block; }
 .tls-veto-card--live .tls-veto-card__img { transition: opacity var(--tls-motion-mid) var(--tls-ease); }
 .tls-veto-card--live .tls-veto-card__state { display: block; font-size: 11px; color: rgb(255 255 255 / 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tls-veto-card--live .tls-veto-card__label { display: inline-flex; align-items: center; gap: 0.25rem; }
@@ -3713,7 +3714,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   translate: 0 calc(3px * var(--tls-motion-on)); scale: calc(1 - 0.03 * var(--tls-motion-on));
   transition-duration: var(--tls-motion-mid);
 }
-.tls-veto-card--live[data-status="banned"] .tls-veto-card__img, .tls-veto-card--live[data-status="elsewhere"] .tls-veto-card__img { opacity: 0.45; }
+.tls-veto-card--live[data-status="banned"] .tls-veto-card__img, .tls-veto-card--live[data-status="elsewhere"] .tls-veto-card__img { opacity: 0.7; }
 .tls-veto-card--live[data-status="banned"] .tls-veto-card__label { color: rgb(var(--tls-live-rgb)); }
 .tls-veto-card--live[data-status="banned"] .tls-veto-card__name, .tls-veto-card--live[data-status="elsewhere"] .tls-veto-card__name {
   color: rgb(255 255 255 / 0.55); text-decoration: line-through; text-decoration-color: rgb(255 255 255 / 0.35);
