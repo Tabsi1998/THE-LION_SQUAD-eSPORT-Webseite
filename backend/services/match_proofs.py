@@ -26,6 +26,7 @@ Bezug (docs/LIGA.md, „D.5/E.2-Vertrag“; ``services/match_proof_refs`` sagt, 
 """
 from __future__ import annotations
 
+import ipaddress
 import logging
 import pathlib
 import uuid
@@ -79,8 +80,23 @@ def is_link(doc: dict) -> bool:
     return doc.get("type") == "link"
 
 
+def _is_ip_host(host: str) -> bool:
+    """Steht statt eines Namens eine IP-Adresse da? Auch IPv6 mit eingebetteter IPv4 (``::ffff:10.0.0.1``) und die Formen,
+    die ein Browser als IPv4 liest: Endet der Name auf eine Zahl (``127.1``, ``0x7f.0.0.1``), ist er eine Adresse - eine
+    Domain-Endung ist nie eine Zahl."""
+    bare = host.strip("[]").rstrip(".").split("%", 1)[0]
+    try:
+        ipaddress.ip_address(bare)
+        return True
+    except ValueError:
+        pass
+    last = bare.rsplit(".", 1)[-1].lower()
+    return last.isdigit() or (last.startswith("0x") and all(char in "0123456789abcdef" for char in last[2:]))
+
+
 def clean_link(value) -> str:
-    """Ein Video-Link: nur ``https``, begrenzt lang, ohne Zugangsdaten - die Domain ist frei. Der Server ruft ihn nie ab."""
+    """Ein Video-Link: nur ``https``, begrenzt lang, ohne Zugangsdaten, auf einen Namen statt einer IP-Adresse - die Domain
+    ist frei. Der Server ruft ihn nie ab."""
     text = str(value or "").strip()
     if not text:
         raise HTTPException(status_code=422, detail="Bitte einen Link angeben.")
@@ -100,6 +116,8 @@ def clean_link(value) -> str:
         raise HTTPException(status_code=422, detail="Nur Links mit https:// sind erlaubt.")
     if user or "@" in parts.netloc:
         raise HTTPException(status_code=422, detail="Ein Link mit Zugangsdaten ist nicht erlaubt.")
+    if host and _is_ip_host(host):
+        raise HTTPException(status_code=422, detail="Ein Link auf eine IP-Adresse ist nicht erlaubt - bitte die Adresse der Videoseite angeben.")
     if not host or "." not in host.strip("."):
         raise HTTPException(status_code=422, detail="Das ist kein gültiger Link.")
     return "https://" + text[len("https://"):]

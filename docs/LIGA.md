@@ -2708,7 +2708,7 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Feld | Typ | Bedeutung |
 | --- | --- | --- |
 | `type` | `"image"` \| `"link"` | fehlt = Bild (Altbestand) |
-| `link` | str | nur bei `link`: die Adresse eines Videos. Nur `https`, höchstens 500 Zeichen, ohne Zugangsdaten in der Adresse, Domain frei. Wird nie eingebettet und nie vom Server abgerufen, nur als Link angezeigt |
+| `link` | str | nur bei `link`: die Adresse eines Videos. Nur `https`, höchstens 500 Zeichen, ohne Zugangsdaten in der Adresse, keine IP-Adresse statt eines Namens, Domain frei. Wird nie eingebettet und nie vom Server abgerufen, nur als Link angezeigt |
 | `context.kind` | `report` \| `incident` \| `protest` \| `statement` \| `moss` | Bezug; Altbestand kennt zusätzlich `dispute` (zählt wie `protest`) |
 | `context.ref_id` | str | Kennung des Vorfalls (`incidents[].id`) bzw. des Verfahrens (`disputes[].id`); bei `report` leer; bei `moss` ein Verfahren **oder** ein Vorfall. Fehlt der Schlüssel, ist es Altbestand |
 | `registration_id` | str \| null | die Seite, die hochgeladen hat (null: die Leitung) |

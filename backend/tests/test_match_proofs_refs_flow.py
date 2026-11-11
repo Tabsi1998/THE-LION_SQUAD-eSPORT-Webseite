@@ -84,6 +84,13 @@ async def test_several_images_and_links_per_report_and_who_sees_them(flow):
     "https:///clip",
     "https://video.example/" + "a" * 500,     # Längengrenze
     "   ",
+    "https://192.168.0.1/x",                  # keine IP-Adresse (Review #2360, N4) …
+    "https://[::ffff:10.0.0.1]/x",            # … auch nicht IPv6 mit eingebetteter IPv4
+    "https://[2001:db8::1]/x",
+    "https://127.1/x",                        # … und nicht die Kurzformen, die ein Browser als IPv4 liest
+    "https://0x7f.0.0.1/x",
+    "https://video.example:0/x",              # kein gültiger Port
+    "https://video.example:99999/x",
 ])
 async def test_only_plain_https_links_pass(flow, link):
     w = await league_world(flow)
@@ -91,6 +98,17 @@ async def test_only_plain_https_links_pass(flow, link):
     refused = await add_link(flow, w["match"], link=link)
     assert refused.status_code == 422, refused.text
     assert await flow.db.match_proof_photos.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_any_domain_is_fine_for_a_link(flow):
+    """Gegenprobe zur Ablehnung: Die Domain ist frei - auch Umlaute, Punycode, Port und Parameter gehen durch."""
+    w = await league_world(flow)
+    flow.act_as(user(w, "Kapitaen"))
+    for link in ("https://xn--80ak6aa92e.com/", "https://video.example/?token=abc", "https://ex\u00e4mple.com/x",
+                 "https://video.example:8443/x", "https://1video.example/x", "https://clips.video.example./x"):
+        stored = await add_link(flow, w["match"], link=link)
+        assert stored.status_code == 200 and stored.json()["link"] == link, link
 
 
 @pytest.mark.asyncio
