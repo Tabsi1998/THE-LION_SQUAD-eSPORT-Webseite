@@ -177,14 +177,17 @@ async def test_spielerliste_zaehlt_wie_die_erfolge_seite(flow):
     async def both():
         flow.act_as(anna)
         mine = (await flow.get("/api/achievements/overview")).json()["mine"]["count"]
+        # Review N1: die Dashboard-Kachel und die Rangliste zeigen dieselbe Zahl.
+        tile = (await flow.get("/api/achievements/me/summary")).json()["count"]
         flow.act_as(None)
         listed = next(row for row in (await flow.get("/api/users/public-list")).json() if row["id"] == anna["id"])["achievements_count"]
-        return mine, listed
+        board = next(row for row in (await flow.get("/api/achievements/leaderboard")).json() if row["user_id"] == anna["id"])["count"]
+        return mine, listed, tile, board
 
-    assert await both() == (2, 2), "ohne Negatives und ohne nicht mehr Erreichbares - auf beiden Seiten"
-    # Gegenprobe: ohne Kennzeichen zählt die Stufe auf beiden Seiten mit.
+    assert await both() == (2, 2, 2, 2), "ohne Negatives und ohne nicht mehr Erreichbares - überall"
+    # Gegenprobe: ohne Kennzeichen zählt die Stufe überall mit.
     await flow.db.achievement_groups.update_one({"code": "founding_member"}, {"$set": {"retired": False}})
-    assert await both() == (3, 3)
+    assert await both() == (3, 3, 3, 3)
 
 
 @pytest.mark.asyncio

@@ -329,6 +329,10 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
     groups, tiers = await _catalog(db)
     wanted = category_v2(category) if category else None
     allowed: dict[str, int] = {}
+    # Die Zahl der Erfolge (Review N1) zählt wie „N Erfolge freigeschaltet“ - ohne nicht mehr Erreichbares; die Punkte
+    # bleiben für jede erhaltene Stufe.
+    counted: set[str] = set()
+    now_check = now_utc()
     for code, tier in tiers.items():
         group = groups.get(tier.get("group_code"))
         if not group or group.get("is_negative"):
@@ -336,6 +340,8 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
         if wanted and category_v2(group.get("category")) != wanted:
             continue
         allowed[code] = int(tier.get("points") or 0)
+        if reach.countable(tier, group, now_check):
+            counted.add(code)
     agg: dict[str, dict] = {}
     async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "earned_at": 1, "recount": 1}):
         points = allowed.get(award["tier_code"])
@@ -349,7 +355,7 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
             if not when or when < since:
                 continue
         entry = agg.setdefault(award["user_id"], {"count": 0, "points": 0})
-        entry["count"] += 1
+        entry["count"] += int(award["tier_code"] in counted)
         entry["points"] += points
     if not agg:
         return []
@@ -478,7 +484,8 @@ async def my_summary(db, user_id: str, groups: list[dict], awards: list[dict]) -
         "level": await xp.view(user_id),
         "next_up": nxt[0] if nxt else None,
         "last_award": {k: last.get(k) for k in ("award_id", "code", "name", "group_name", "material", "material_name", "material_color", "icon", "art", "rank", "level", "points", "earned_at")} if last else None,
-        "count": len(earned),
+        # Wie „N Erfolge freigeschaltet“ und Sammler (Review N1): ohne nicht mehr Erreichbares. Punkte bleiben.
+        "count": sum(1 for a in earned if not a.get("retired")),
         "points": sum(int(a.get("points") or 0) for a in earned),
         "hidden": await hidden_summary(db, user_id),
     }
