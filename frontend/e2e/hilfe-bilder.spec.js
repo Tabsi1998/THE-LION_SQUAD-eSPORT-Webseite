@@ -209,6 +209,35 @@ async function liga(page, cam, state) {
   await cam.shot("wer-hat-gespielt", [page.getByTestId("league-participants-count"), page.getByTestId("match-report-submit")],
     { area: [page.getByTestId("league-participants-u1"), page.getByTestId("league-participants-count"), page.getByTestId("match-report-submit")] });
 
+  // Vorfälle im Spiel (D.5, #1619): melden, auf die Meldung der Gegenseite antworten, Map in Klärung.
+  state.routes["/matches/m1/proofs"] = D.PROOFS;
+  match = D.incidentPage();
+  await page.reload();
+  await page.getByTestId("incident-open-form").click();
+  await page.getByTestId("incident-form-position-2").click();
+  await page.getByTestId("incident-form-kind-disconnect").check();
+  await page.getByTestId("incident-form-score-a").fill("3");
+  await page.getByTestId("incident-form-score-b").fill("4");
+  await page.getByTestId("incident-form-proposal-rehost").check();
+  await noSideScroll(page);
+  // Das Formular ist lang - das Bild zeigt die ersten beiden Fragen (welche Map, was ist passiert).
+  await cam.shot("vorfall-melden", [page.getByTestId("incident-form-position-2"), labelOf(page.getByTestId("incident-form-kind-disconnect"))],
+    { area: [page.getByTestId("incident-form-position-1"), labelOf(page.getByTestId("incident-form-kind-pause-between"))] });
+
+  match = D.incidentPage([D.incidentRow()], { hold: { code: "proposed", position: 2, text: "Zu Map 2 ist ein Vorfall gemeldet – die Gegenseite antwortet noch. Bis dahin gilt kein Ergebnis." } });
+  await page.reload();
+  await expect(page.getByTestId("incident-countdown-text-v1")).toContainText(":");
+  await noSideScroll(page);
+  await cam.shot("vorfall-antworten", [page.getByTestId("incident-answer-v1-accept"), page.getByTestId("incident-answer-v1-decline")],
+    { area: [page.getByTestId("incident-state-v1"), page.getByTestId("incident-sentence-v1"), page.getByTestId("incident-answer-v1")] });
+
+  match = D.incidentPage([D.incidentRow({ state: "in_review", review_cause: "rejected", can_answer: false,
+    answer: { registration_id: "a", name: D.SIDES[0].name, at: new Date().toISOString(), note: "Der Stand war 4:4, nicht 3:4." } })], { hold: D.INCIDENT_HOLD });
+  await page.reload();
+  await expect(page.getByTestId("incident-state-v1")).toContainText("In Klärung");
+  await noSideScroll(page);
+  await cam.shot("in-klaerung", page.getByTestId("incident-hold"), { area: [page.getByTestId("incident-hold"), page.getByTestId("incident-sentence-v1")] });
+
   match = D.CONFIRM_PAGE;
   await page.reload();
   for (const id of ["u1", "u2", "u3"]) await page.getByTestId(`league-confirm-participants-${id}`).click();

@@ -32,6 +32,7 @@ import { LeagueRulesNote } from "@/components/tls/league/LeagueRulesNote";
 import { AllowedEquipmentView } from "@/components/tls/league/AllowedEquipmentView";
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
+import { IncidentPanel, MapStateNotes } from "@/components/tls/league/IncidentPanel";
 import { VetoPanel } from "@/components/tls/league/VetoPanel";
 import { keepNewerVeto, mergeLiveVeto } from "@/lib/leagueVeto";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
@@ -564,6 +565,8 @@ function MatchPageView() {
 
           {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
           {data.league ? <LeagueGamesView league={league} /> : null}
+          {/* Vorfälle (D.5, #1619): öffentlich nur „in Klärung“ bzw. „zählt nicht“ je Map - „Map wiederholt“ steht an der Map selbst. */}
+          {data.league ? <MapStateNotes league={league} /> : null}
           {/* Spiel-IDs für die Lobby (#2108) - nur Beteiligte und Turnierleitung bekommen sie vom Server. */}
           {data.league ? <LeagueLobbyIds league={league} /> : null}
           {data.league ? (
@@ -658,6 +661,11 @@ function MatchPageView() {
           )}
           {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}
         </div>
+
+        {/* Vorfälle im Spiel (D.5, #1619): melden, antworten, entscheiden - nur Beteiligte und Leitung bekommen den Block. */}
+        {data.league?.incident_info ? (
+          <IncidentPanel league={league} matchId={id} busy={busy} run={runAction} onChanged={() => load()} />
+        ) : null}
 
         {/* Nach dem Ende (#1221): Ergebnis und Verlauf - keine Terminabstimmung mehr; der Matchchat bleibt für
             Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}

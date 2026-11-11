@@ -175,6 +175,42 @@ const CONFIRM_PAGE = {
   report_state: { status: "confirm", proposal_by: "Falke Eins", proposal_at: "2036-11-14T20:10:00+00:00" }, league: { ...LEAGUE, proposal_games: PLAYED },
 };
 
+// Vorfälle im Spiel (D.5, #1619): Fläche „Vorfälle im Spiel“ auf der Matchseite - melden, antworten, in Klärung.
+const INCIDENT_INFO = {
+  can_report: true, as_lead: false, can_decide: false, conflict: null, answer_minutes: 10, clarification_mode: "continue", break_after: 2, break_minutes: 5,
+  quota: { limit: 1, used: [] }, hold: null,
+  kinds: [{ key: "disconnect", label: "Verbindungsabbruch" }, { key: "rehost", label: "Rehost" }, { key: "pause", label: "Technische Pause" },
+    { key: "moss_crash", label: "MOSS-Absturz" }, { key: "restart_early", label: "Abbruch in der frühen Phase" },
+    { key: "replay", label: "Map soll wiederholt werden" }, { key: "other", label: "Sonstiges" }],
+  proposals: [{ key: "continue_at_score", label: "Beim Stand fortsetzen" }, { key: "rehost", label: "Rehost beim Stand" },
+    { key: "restart", label: "Neustart (frühe Phase)" }, { key: "replay", label: "Map wiederholen" }],
+  outcomes: [{ key: "continue_at_score", label: "Beim Stand fortsetzen" }, { key: "rehost", label: "Rehost beim Stand" }, { key: "restart", label: "Neustart (frühe Phase)" },
+    { key: "replay", label: "Map wiederholen" }, { key: "awarded", label: "Map zugesprochen" }, { key: "no_action", label: "Keine Maßnahme – die Map gilt wie gemeldet" }],
+};
+const PROOFS = { items: [], open: true, can_add: true, limit: 10, link_max_length: 500 };
+function incidentRow(extra = {}) {
+  return {
+    id: "v1", position: 2, kind: "disconnect", kind_label: "Verbindungsabbruch", between_maps: false, minutes: null, at: inMinutes(-2), score: { a: 3, b: 4 }, round: 8,
+    players: [{ id: "f2", name: "Falke Zwei" }], note: "Falke Zwei ist aus der Lobby geflogen.", proposal: "rehost", proposal_label: "Rehost beim Stand",
+    reported_by: { registration_id: "b", name: SIDES[1].name, own: false }, state: "proposed", open: true, expired: false, answer_deadline: inMinutes(8), answer: null,
+    review_cause: null, counts_quota: false, decision: null, voided: null, closed_at: null, procedure: false,
+    can_answer: true, can_withdraw: false, can_decide: false, can_settle: false, ...extra,
+  };
+}
+/** Die Matchseite im laufenden Spiel mit der Fläche „Vorfälle im Spiel“. `info` überschreibt Felder von `incident_info`. */
+function incidentPage(incidents = [], info = {}, league = {}) {
+  const clarifying = incidents.filter((row) => row.state === "in_review").map((row) => row.position);
+  return {
+    ...MATCH_BASE, matchday_label: "Spieltag 1", match: { ...MATCH_BASE.match, status: "in_progress", schedule_status: "accepted" },
+    league: {
+      ...LEAGUE, best_of: 3, needed: 2, incidents,
+      map_state: [1, 2, 3].map((position) => ({ position, state: clarifying.includes(position) ? "in_clarification" : "open" })),
+      incident_info: { ...INCIDENT_INFO, server_time: new Date().toISOString(), ...info }, ...league,
+    },
+  };
+}
+const INCIDENT_HOLD = { code: "in_review", position: 2, text: "Map 2 ist in Klärung – die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis." };
+
 // ---------------------------------------------------------------- Turniere
 
 const SPIELER = { id: "user-1", username: "probe", display_name: "Probe Spieler", role: "player", user_type: "community_user" };
@@ -225,6 +261,7 @@ const BRACKET = {
 const BRACKET_CUP = { id: "t9", slug: "probe-cup", title: "Probe Cup", status: "live", format: "single_elim", my_registration: { id: "r1" } };
 
 module.exports = {
-  BLOCK, BRACKET, BRACKET_CUP, CAPTAIN, CONFIRM_PAGE, CUP, CUP_CHECKIN, DUEL_CONFIRM, DUEL_REPORT, ELIGIBILITY, GAMES, LEAD, MATCH_FIXED, MATCH_PROPOSALS,
+  BLOCK, BRACKET, BRACKET_CUP, CAPTAIN, CONFIRM_PAGE, CUP, CUP_CHECKIN, DUEL_CONFIRM, DUEL_REPORT, ELIGIBILITY, GAMES, INCIDENT_HOLD, INCIDENT_INFO, LEAD, LEAGUE, MATCH_BASE,
+  MATCH_FIXED, MATCH_PROPOSALS, PROOFS, SIDES, incidentPage, incidentRow,
   MATE, MATE2, MEMBERS, MINE, MINE_SUBMITTED, MY_REG, PLAYER, REPORT_PAGE, SEASON_VIEW, SPIELER, SQUAD, TEAM, TEAM_GAMES, checkinPage, readyPage, serve,
 };

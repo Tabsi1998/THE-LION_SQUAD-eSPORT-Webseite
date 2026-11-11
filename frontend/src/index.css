@@ -3592,6 +3592,24 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-checkin-tick { animation: none; }
 }
 
+/* Vorfälle im Spiel (D.5, #1619): Ein Formular oder eine Antwortfläche hebt sich beim Aufklappen 6 px an und blendet ein;
+   „In Klärung“ atmet leise - der Rahmen-Schein steht fest, nur seine Deckkraft läuft; der Balken der Antwortzeit schrumpft
+   von links (nur transform, je Bild in IncidentPanel.jsx gesetzt). Der Haken einer Einigung nutzt .tls-checkin-tick.
+   „Bewegung reduzieren“: nichts hebt sich, nichts atmet, der Balken steht voll - nur die Zahl zählt. */
+@keyframes tls-incident-open { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes tls-incident-pulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+.tls-incident-open { animation: tls-incident-open var(--tls-motion-mid) var(--tls-ease) both; }
+.tls-incident-pulse { position: relative; }
+.tls-incident-pulse::after {
+  content: ""; position: absolute; inset: -3px; border-radius: inherit; pointer-events: none; opacity: 0;
+  box-shadow: 0 0 0 2px rgb(var(--tls-warn-rgb) / 0.5);
+  animation: tls-incident-pulse 2.4s ease-in-out infinite;
+}
+.tls-incident-bar { transform-origin: left; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-incident-open, .tls-incident-pulse::after { animation: none; }
+}
+
 /* Vorgabe der Woche im Veto-Block (#2326): Die Karte kommt beim Aufbau wie die übrigen Map-Karten - 6 px angehoben und
    eingeblendet, gestaffelt um 40 ms je Karte (--tls-i) -, danach leuchtet ihr Rahmen einmal kurz auf. Bewegt werden nur
    transform und opacity; der Schein selbst steht fest, nur seine Deckkraft läuft. Sie erscheint einmal: Das Nachfragen der
