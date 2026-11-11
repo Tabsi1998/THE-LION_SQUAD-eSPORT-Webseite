@@ -153,7 +153,10 @@ def test_the_presets_of_a_season_keep_one_map_per_week_and_mode():
 
 def test_a_week_says_what_is_missing_or_does_not_fit():
     the_pool = pool()
-    check = lambda presets, **extra: veto.week_problems(rules(), presets, pool=the_pool, repeat="other_mode", **extra)  # noqa: E731
+
+    def check(presets, **extra):
+        return veto.week_problems(rules(), presets, pool=the_pool, repeat="other_mode", **extra)
+
     assert check({CTL: "ctl-2"}) == []
     assert check({}) == ["Kontrolle: Die Vorgabe der Woche fehlt."] and check(None) == ["Kontrolle: Die Vorgabe der Woche fehlt."]
     assert check({CTL: "hp-1"}) == ["Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus."]

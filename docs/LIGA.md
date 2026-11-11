@@ -2277,7 +2277,9 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
   oder `matches` (`league_permissions.staff_user_ids`, wie die übrigen Hinweise an die Leitung), Art `match_attention`, Thema
   Turnier-Updates, `meta.reason` `veto_preset_missing`, Schlüssel `veto-preset-missing:<season>:<woche>` – **eine** Nachricht je
   Person, Season und Spielwoche, auch wenn mehrere Spiele warten; Link `/admin/leagues/seasons/<id>#veto`. Vor dem Check-in beider
-  Seiten geht kein Hinweis hinaus (die Matchseite zeigt die Lücke trotzdem schon).
+  Seiten geht kein Hinweis hinaus (die Matchseite zeigt die Lücke trotzdem schon). Die Nachricht „Beide Seiten eingecheckt“ an die
+  Teams sagt dann statt „jetzt läuft das Map-Veto“: „Das Map-Veto wartet noch auf die Vorgabe der Woche – es beginnt, sobald die
+  Liga-Leitung sie eingetragen hat.“ (`league_veto.preset_gap`).
 - **Nachtragen:** Mit dem Speichern der Vorgaben beginnen wartende Vetos sofort (`league_veto_sweep.start_waiting`: Spiele der Season
   mit `flow.veto_wait`, unter der Turniersperre, ein Spiel hält die anderen nicht auf) – beide Seiten bekommen wie immer „Veto läuft“.
   Sonst beginnt es beim nächsten Lesen der Matchseite (sie fragt im Wartestand alle 3 Sekunden nach).

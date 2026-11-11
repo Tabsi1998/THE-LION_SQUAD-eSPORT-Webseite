@@ -49,7 +49,8 @@ test("vor dem Veto: die Vorgabe der Woche steht schon da - ohne Vorgabe in der V
 test("fehlt die Vorgabe, sagt der Block es klar und fragt weiter nach - gewertet wird nichts", () => {
   vi.useFakeTimers();
   const onPoll = vi.fn();
-  const { rerender } = render(panel({ ...WAITING, week: 2, presets: [], blocked: { week: 2, text: BLOCKED_TEXT }, pick_hint: BLOCKED_TEXT }, { onPoll }));
+  const waitingForPreset = { ...WAITING, week: 2, presets: [], blocked: { week: 2, text: BLOCKED_TEXT }, pick_hint: BLOCKED_TEXT };
+  const { rerender } = render(panel(waitingForPreset, { onPoll, bothIn: true }));
   expect(screen.getByTestId("veto-panel")).toHaveAttribute("data-blocked", "true");
   expect(screen.getByTestId("veto-headline")).toHaveTextContent("Veto wartet auf die Vorgabe der Woche");
   expect(screen.getByTestId("veto-text")).toHaveTextContent(BLOCKED_TEXT);
@@ -57,9 +58,12 @@ test("fehlt die Vorgabe, sagt der Block es klar und fragt weiter nach - gewertet
   expect(screen.queryByTestId("veto-presets")).toBeNull();
   vi.advanceTimersByTime(6500);
   expect(onPoll).toHaveBeenCalledTimes(2);
-  // Gegenprobe: mit Vorgabe wartet der Block still auf den Check-in - kein Nachfragen.
+  // Gegenprobe: vor dem Check-in beider Seiten gibt es nichts abzuwarten, und mit Vorgabe wartet der Block still - kein Nachfragen.
   onPoll.mockClear();
-  rerender(panel(WAITING, { onPoll }));
+  rerender(panel(waitingForPreset, { onPoll, bothIn: false }));
+  expect(screen.getByTestId("veto-blocked")).toBeInTheDocument();
+  vi.advanceTimersByTime(6500);
+  rerender(panel(WAITING, { onPoll, bothIn: true }));
   vi.advanceTimersByTime(6500);
   expect(onPoll).not.toHaveBeenCalled();
   vi.useRealTimers();

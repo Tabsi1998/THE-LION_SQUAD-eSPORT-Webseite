@@ -217,11 +217,12 @@ function PlannedGames({ games }) {
   );
 }
 
-export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll }) {
+export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn = false }) {
   const live = block && (block.status === "running" || block.status === "paused");
-  // Vorgabe der Woche fehlt (#2326): Das Veto wartet - die Seite fragt weiter nach, damit es ohne Neuladen beginnt, sobald sie steht.
+  // Vorgabe der Woche fehlt (#2326): Das Veto wartet. Sind beide Seiten eingecheckt (`bothIn`), fragt die Seite weiter nach, damit es
+  // ohne Neuladen beginnt, sobald die Vorgabe steht - vor dem Check-in gibt es noch nichts abzuwarten.
   const blocked = Boolean(block && block.status === "waiting" && block.blocked);
-  const polling = live || blocked;
+  const polling = live || (blocked && bothIn);
   useEffect(() => {
     if (!polling || !onPoll) return undefined;
     const tick = window.setInterval(() => { if (typeof document === "undefined" || !document.hidden) onPoll(); }, POLL_MS);

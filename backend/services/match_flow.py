@@ -267,7 +267,11 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
         from services import league_veto
 
         with_veto = bool(league_veto.rules_mod.rules_of(tournament))
+        # Vorgabe der Woche fehlt (#2326): Dann läuft das Veto noch nicht - die Nachricht sagt, worauf es wartet.
+        waits = bool(with_veto and await league_veto.preset_gap(db, {**match, **fresh}, tournament))
         await _tell(db, match, setup, filled, "Beide Seiten eingecheckt",
+                    "Beide Seiten sind eingecheckt. Das Map-Veto wartet noch auf die Vorgabe der Woche – es beginnt, sobald die Liga-Leitung "
+                    "sie eingetragen hat." if waits else
                     "Beide Seiten sind eingecheckt – jetzt läuft das Map-Veto, danach beginnt Map 1." if with_veto else
                     "Beide Seiten sind eingecheckt – ihr könnt starten. Map 1 beginnt, sobald eine Seite auf „Spiel starten“ tippt.",
                     "checkin_ready", f"checkin-ready:{match['id']}:{now_iso}")

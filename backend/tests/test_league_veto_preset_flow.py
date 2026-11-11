@@ -129,7 +129,8 @@ async def test_with_never_the_preset_is_gone_from_every_mode_and_the_lead_cannot
     # Schritte des Systems lassen sich nicht zurücknehmen - erst der Zug einer Seite; die Vorgabe bleibt dabei stehen.
     nothing = await lead(flow, world, "undo", veto["version"])
     assert nothing.status_code == 409 and "keinen Schritt" in nothing.json()["detail"]
-    assert (await pick(flow, world, "Kapitaen", "map-glut", veto["version"])).status_code == 200
+    banned = await pick(flow, world, "Kapitaen", "map-glut", veto["version"])
+    assert banned.status_code == 200
     undone = await lead(flow, world, "undo", (await stored_veto(flow, world))["version"])
     assert undone.status_code == 200
     after = await stored_veto(flow, world)
@@ -168,6 +169,9 @@ async def test_without_the_preset_the_veto_does_not_start_and_the_lead_is_told_o
     assert world["users"]["Kapitaen"]["id"] not in {row["user_id"] for row in notes}, "nur die Leitung"
     assert await flow.db.audit_logs.count_documents({"action": "match.veto.waiting"}) == 1
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 0
+    # Die Nachricht „Beide Seiten eingecheckt“ verspricht kein laufendes Veto.
+    ready_note = await flow.db.notifications.find_one({"meta.reason": "checkin_ready"}, {"_id": 0})
+    assert ready_note["body"].endswith("Das Map-Veto wartet noch auf die Vorgabe der Woche – es beginnt, sobald die Liga-Leitung sie eingetragen hat.")
     # Nie eine automatische Wertung: kein Ergebnis, kein Vorschlag „nicht erschienen“, das Spiel bleibt angesetzt.
     stored = await flow.reload(world["match"])
     assert stored["status"] == "scheduled" and not stored.get("results") and not stored.get("no_show_proposal") and not stored.get("planned_games")
@@ -175,12 +179,14 @@ async def test_without_the_preset_the_veto_does_not_start_and_the_lead_is_told_o
 
     # Die Leitung trägt die Vorgabe nach: Das wartende Veto beginnt sofort, beide Seiten bekommen „Veto läuft“.
     await set_presets(flow, world, [preset(1, "map-ruine"), preset(2, "map-kai")])
-    assert await league_veto_sweep.start_waiting(flow.db, world["season_id"]) == 1
+    started = await league_veto_sweep.start_waiting(flow.db, world["season_id"])
+    assert started == 1
     veto = await stored_veto(flow, world)
     assert veto["status"] == "running" and veto["presets"] == [{"mode": CTL, "map_id": "map-ruine"}]
     assert "veto_wait" not in (await flow.reload(world["match"]))["flow"]
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 2
-    assert await league_veto_sweep.start_waiting(flow.db, world["season_id"]) == 0, "ein zweiter Lauf findet nichts"
+    again = await league_veto_sweep.start_waiting(flow.db, world["season_id"])
+    assert again == 0, "ein zweiter Lauf findet nichts"
 
 
 @pytest.mark.asyncio
@@ -192,6 +198,7 @@ async def test_with_the_preset_in_place_the_same_match_starts_at_once(flow):
     assert stored["flow"]["veto"]["status"] == "running" and "veto_wait" not in stored["flow"]
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_preset_missing"}) == 0
     assert await flow.db.audit_logs.count_documents({"action": "match.veto.waiting"}) == 0
+    assert (await flow.db.notifications.find_one({"meta.reason": "checkin_ready"}, {"_id": 0}))["body"].endswith("danach beginnt Map 1.")
 
 
 @pytest.mark.asyncio
@@ -207,7 +214,8 @@ async def test_a_preset_that_left_the_pool_waits_and_a_match_without_week_runs_w
     await both_in(flow, other)
     veto = await stored_veto(flow, other)
     assert veto["status"] == "skipped" and veto["skipped_reason"] == league_veto.NO_WEEK_DETAIL
-    assert (await page(flow, other, "Kapitaen"))["checkin"]["state"] == "ready"
+    shown = await page(flow, other, "Kapitaen")
+    assert shown["checkin"]["state"] == "ready" and shown["checkin"]["veto"]["status"] == "skipped"
 
 
 # ---------------------------------------------------------------- Änderung der Vorgabe, Spielwoche des Spieltags
@@ -225,13 +233,16 @@ async def test_a_changed_preset_only_reaches_vetoes_that_have_not_begun(flow):
     log = await flow.db.audit_logs.find_one({"action": "league.season.veto_presets"}, {"_id": 0})
     assert log["target_id"] == world["season_id"] and log["actor_id"] == world["lead"]["id"] and log["data"]["changes"] == changes
     assert log["data"]["from"][0]["map_id"] == "map-kai" and log["data"]["to"][0]["map_id"] == "map-ruine"
-    assert await league_veto_sweep.start_waiting(flow.db, world["season_id"]) == 0
+    started = await league_veto_sweep.start_waiting(flow.db, world["season_id"])
+    assert started == 0, "niemand wartet - das Speichern beginnt kein Veto neu"
 
     # Das begonnene Veto bleibt bei Kai - auch nach einem Neustart durch die Leitung und bis zum Abschluss.
     running = await stored_veto(flow, world)
     assert running["presets"] == [{"mode": CTL, "map_id": "map-kai"}]
-    assert (await veto_block(flow, world, "Kapitaen"))["presets"][0]["map_name"] == "Kai"
-    assert (await pick(flow, world, "Kapitaen", "map-glut", running["version"])).status_code == 200
+    shown = await veto_block(flow, world, "Kapitaen")
+    assert shown["presets"][0]["map_name"] == "Kai"
+    banned = await pick(flow, world, "Kapitaen", "map-glut", running["version"])
+    assert banned.status_code == 200
     restarted = await lead(flow, world, "restart", (await stored_veto(flow, world))["version"])
     assert restarted.status_code == 200 and (await stored_veto(flow, world))["presets"] == [{"mode": CTL, "map_id": "map-kai"}]
     await play_anlage_b(flow, world, SIDE_MOVES)
@@ -243,7 +254,8 @@ async def test_a_changed_preset_only_reaches_vetoes_that_have_not_begun(flow):
     await set_presets(flow, world, [preset(1, "map-hafen"), preset(2, "map-hafen")])
     kept = await flow.reload(world["match"])
     assert kept["planned_games"] == planned and kept["flow"]["veto"]["presets"] == [{"mode": CTL, "map_id": "map-kai"}]
-    assert (await veto_block(flow, world, "Kapitaen"))["presets"][0]["map_name"] == "Kai"
+    shown = await veto_block(flow, world, "Kapitaen")
+    assert shown["presets"][0]["map_name"] == "Kai" and shown["planned_games"] == planned
 
     # Das zweite Spiel derselben Woche hat noch nicht begonnen: Es bekommt die geltende Vorgabe.
     await both_in(flow, later)
@@ -343,7 +355,8 @@ async def test_only_the_season_capability_may_change_the_presets(flow):
     assert denied.status_code == 403
     stranger = await flow.add_user(name="Fremd")
     flow.act_as(stranger)
-    assert (await flow.get(url)).status_code == 403 and (await flow.put(url, json={"presets": [preset(1, kai)]})).status_code == 403
+    read, written = await flow.get(url), await flow.put(url, json={"presets": [preset(1, kai)]})
+    assert read.status_code == 403 and written.status_code == 403
     assert await flow.db.audit_logs.count_documents({"action": "league.season.veto_presets"}) == 0, "nichts gespeichert"
     # Gegenprobe: mit „Season konfigurieren“ geht es.
     manager = await flow.add_user(name="Seasonleitung")

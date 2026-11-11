@@ -229,6 +229,15 @@ async def _waiting_presets(db, match: dict, tournament: dict, rules: dict) -> tu
     return week, _preset_rows(rules["steps"], presets, pool), _preset_text(week, problems) if problems else None
 
 
+async def preset_gap(db, match: dict, tournament: dict | None) -> str | None:
+    """Wartet das Veto dieses Spiels auf die Vorgabe der Woche? Dann der Satz dazu - ``None``, wenn es beginnen kann oder die Staffel
+    keine Vorgabe kennt. Für die Nachricht „Beide Seiten eingecheckt“ (``match_flow.check_in``)."""
+    rules = rules_mod.rules_of(tournament)
+    if not rules or veto_of(match) is not None:
+        return None
+    return (await _waiting_presets(db, match, tournament, rules))[2]
+
+
 async def _wait_for_preset(db, match: dict, tournament: dict, week: int, problems: list[str], now: datetime) -> None:
     """Die Vorgabe der Woche fehlt: Das Veto beginnt nicht. Je Termin einmal vermerkt (``flow.veto_wait``, Bedingung auf Termin und
     Revision), mit Protokoll und Hinweis an die Liga-Leitung - je Season und Spielwoche eine Nachricht, nie eine Wertung."""
@@ -854,5 +863,5 @@ def scrub(veto: dict | None, user_id: str) -> tuple[dict | None, bool]:
 
 __all__ = ["AUTO", "CHANGED_DETAIL", "DONE_DETAIL", "LEAD_ACTIONS", "NO_VETO_DETAIL", "NO_WEEK_DETAIL", "NOT_A_SIDE_DETAIL",
            "NOT_STARTED_DETAIL", "REPORT_VETO_DETAIL", "SIDE", "VetoProblem", "ensure_started", "export_steps", "lead_action", "page_block",
-           "pick", "planned_games_of", "preset_weeks", "presets_history", "presets_overview", "scrub", "season_presets", "season_weeks",
+           "pick", "planned_games_of", "preset_gap", "preset_weeks", "presets_history", "presets_overview", "scrub", "season_presets", "season_weeks",
            "settle_due", "store_presets", "week_of"]
