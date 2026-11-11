@@ -134,6 +134,9 @@ async def _store_image(db, match: dict, owner: dict, registration_id: str | None
         "height": encoded["height"],
         "status": status,
         "context": context,
+        # Von Anfang an „in Prüfung“: Der neue Weg hängt sofort an - ohne den Stand sähe die Gegenseite das Bild, bis die
+        # Bildprüfung ihn setzt, und für immer, falls sie sich gar nicht anstoßen lässt.
+        "scan_state": "pending",
         "created_at": now,
         "updated_at": now,
     }

@@ -372,6 +372,30 @@ async def test_a_removed_moss_proof_stays_for_the_lead(flow):
 
 
 @pytest.mark.asyncio
+async def test_an_image_waits_for_the_image_check_from_the_first_moment(flow, monkeypatch):
+    """Lässt sich die Bildprüfung nicht anstoßen, bleibt das Bild „in Prüfung“ - die Gegenseite sieht es nicht (Review #2360, N1)."""
+    from services import media_scan
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("Prüfdienst nicht erreichbar")
+
+    monkeypatch.setattr(media_scan, "enqueue", broken)
+    w = await league_world(flow)
+    match = w["match"]
+    flow.act_as(user(w, "Kapitaen"))
+    uploaded = await add_image(flow, match)
+    assert uploaded.status_code == 200, uploaded.text
+    image = uploaded.json()
+    stored = await flow.db.match_proof_photos.find_one({"id": image["id"]}, {"_id": 0})
+    assert stored["scan_state"] == "pending" and image["scan_state"] == "pending"
+    assert await ids_seen(flow, match) == {image["id"]}, "wer hochgeladen hat, sieht es"
+    for other in (user(w, "Falke1"), w["staff"]):
+        flow.act_as(other)
+        assert await ids_seen(flow, match) == set(), other["display_name"]
+        assert (await flow.get(image["url"])).status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_tournaments_outside_a_league_have_no_proof_list(flow):
     """Turniere bleiben, wie sie sind (Review #2360, M3): ein Foto je Meldung über ``/proof-photos`` - ``/proofs`` gibt es dort nicht."""
     staff = await flow.add_staff()
