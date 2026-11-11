@@ -144,6 +144,14 @@ test("Kopf mit eigenem Banner (#2328): Bild im Band statt Maskottchen, ohne Bann
   render(<MemoryRouter><TeamHeader team={{ ...HEAD_TEAM, banner_url: "/api/static/uploads/banner.webp" }} header={null} levelInfo={null} userId={null} /></MemoryRouter>);
   expect(screen.getByTestId("team-band-banner")).toHaveAttribute("src", "/api/static/uploads/banner.webp");
   expect(within(screen.getByTestId("team-band")).queryByTestId("team-lion")).toBeNull();
+  // Band im Format des Zuschnitts (3:1), damit nichts abgeschnitten wird.
+  expect(screen.getByTestId("team-band")).toHaveClass("aspect-[3/1]");
+});
+
+test("ohne Banner bleibt der flache Farbstreifen", () => {
+  render(<MemoryRouter><TeamHeader team={{ ...HEAD_TEAM, banner_url: null }} header={null} levelInfo={null} userId={null} /></MemoryRouter>);
+  expect(screen.getByTestId("team-band")).not.toHaveClass("aspect-[3/1]");
+  expect(screen.getByTestId("team-band")).toHaveClass("h-[120px]");
 });
 
 // Persönlich einladen (#985): nur die Antwort auf den aktuellen Begriff zählt; ein Fehler ist kein „Keine passenden“.
