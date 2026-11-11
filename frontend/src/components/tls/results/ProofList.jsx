@@ -174,7 +174,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
               <form onSubmit={addLink} className="flex flex-wrap gap-2" noValidate>
                 <label className="sr-only" htmlFor={`${testId}-link`}>Link zum Video</label>
                 <input id={`${testId}-link`} type="url" inputMode="url" value={link} onChange={(event) => setLink(event.target.value)} maxLength={data.link_max_length || 500}
-                  placeholder="Link zum Video (https://…)" className="input min-h-[44px] min-w-0 flex-1" data-testid={`${testId}-link-input`} />
+                  placeholder="Link zum Video (https://…)" className="input min-h-[44px] min-w-[12rem] flex-1" data-testid={`${testId}-link-input`} />
                 <button disabled={busy} className={BUTTON} data-testid={`${testId}-link-add`}><Link2 className="w-4 h-4" /> Link hinzufügen</button>
               </form>
               <input ref={cameraRef} type="file" accept={ACCEPT} capture="environment" className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-camera-input`} />
