@@ -231,6 +231,28 @@ describe("AchievementsShowcasePage (#619, #1229)", () => {
     expect(screen.queryByTestId("club-showcase-note")).toBeNull();
   });
 
+  it("angemeldet mit Stand je Kategorie (#2339): Haken bei abgeschlossenen, sonst x von y der erreichbaren Stufen", async () => {
+    authState.user = { id: "u1", username: "anna" };
+    const mine = {
+      count: 4, points: 30, categories: { match: 3, fastlap: 0 }, negative: 0, categories_complete: 1,
+      category_progress: { match: { earned: 2, total: 2, complete: true }, fastlap: { earned: 0, total: 4, complete: false }, club: { earned: 0, total: 0, complete: false } },
+    };
+    mockApi({ overview: { ...OVERVIEW, mine } });
+    renderPage();
+    const match = await screen.findByTestId("category-progress-match");
+    expect(match).toHaveTextContent("Abgeschlossen");
+    expect(within(match).getByTestId("category-complete-match")).toBeInTheDocument();
+    expect(screen.getByTestId("category-row-match")).toHaveAttribute("data-complete", "true");
+    expect(screen.getByTestId("category-detail-match")).toHaveTextContent("2 erreichbare Stufen");
+    // Gegenprobe: offen ohne Haken, gezählt werden nur die erreichbaren Stufen (4, nicht die 1 aus dem Katalog).
+    const fastlap = screen.getByTestId("category-progress-fastlap");
+    expect(fastlap).toHaveTextContent("0 von 4 · 0 %");
+    expect(within(fastlap).queryByTestId("category-complete-fastlap")).toBeNull();
+    expect(fastlap).toHaveAttribute("title", expect.stringContaining("selbst erreichen"));
+    // Ohne Erreichbares (Verein für Nicht-Mitglieder im Test: 0) bleibt die alte Zählung.
+    expect(screen.getByTestId("category-progress-club")).toHaveTextContent("0 von 1");
+  });
+
   it("zeigt „Geheim / Fun“ nur, wer selbst etwas davon hat", async () => {
     authState.user = { id: "u1", username: "anna" };
     mockApi({ overview: { ...OVERVIEW, mine: { count: 0, points: 0, categories: {}, negative: 2 } } });
