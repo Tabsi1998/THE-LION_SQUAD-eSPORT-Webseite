@@ -2608,7 +2608,7 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
 | `answer` | `{registration_id, user_id, at, note}` \| null | Antwort der Gegenseite |
 | `review_cause` | `rejected` \| `expired` | warum die Leitung entscheidet |
 | `counts_quota` | bool | zählt gegen das Kontingent: `rehost` und `pause` (ohne `between_maps`) ja, `moss_crash` nie (§ 9a.6), alle anderen nein |
-| `decision` | `{outcome, registration_id, reason, by, at, conflict_reason, missing_positions, surplus_positions}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen); `missing_positions` und `surplus_positions` (`[int]`, optional) siehe „Keine Zusatz-Map auf Vorrat“ |
+| `decision` | `{outcome, registration_id, reason, by, at, conflict_reason, missing_positions, surplus_positions, settled_at, settled_by, settle_reason}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen); `missing_positions` und `surplus_positions` (`[int]`) setzt die Leitung erst im Schritt „Serie feststellen“ (`settled_at`, `settled_by`, `settle_reason`), siehe „Fehlende und überzählige Maps“ |
 | `voided` | `{mode, map_id, score, round, at}` \| null | die für ungültig erklärte Erstaustragung bei `restart` oder `replay` |
 | `closed_at` | ISO \| null | gesetzt mit `agreed`, `decided` oder `withdrawn` |
 
@@ -2631,22 +2631,35 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
   gültig: Melden bleibt möglich, **Bestätigen und die Frist-Automatik (`result_confirm_hours`) ruhen**, das Spiel ist nicht `completed`
   und steht nicht in der Tabelle. `games[]` am Spiel entsteht wie bisher erst mit dem gültigen Ergebnis.
   `clarification_mode` `continue` (Vorgabe): die Serie läuft unter Vorbehalt weiter, die Seiten spielen und melden die übrigen Maps;
-  nach der Entscheidung gilt die Map wie gemeldet (`continue_at_score`, `rehost`, `no_action`), wird wiederholt (`restart`, `replay`)
-  oder zugesprochen (`awarded` → `games[].decision: "awarded"`). `pause_series`: keine weitere Map beginnt, Meldungen mit einer
+  nach der Entscheidung gilt eine zu Ende gespielte Map wie gemeldet (`no_action`), eine abgebrochene wird beim festgehaltenen
+  Stand zu Ende gespielt (`continue_at_score`, `rehost`), die Map wird wiederholt (`restart`, `replay`) oder zugesprochen
+  (`awarded` → `games[].decision: "awarded"`). `pause_series`: keine weitere Map beginnt, Meldungen mit einer
   späteren Position lehnt der Server mit 409 ab, bis entschieden ist. Die Leitung kann die Serie in beiden Fällen jederzeit aussetzen
   oder neu ansetzen (Anlage C.2.6).
-- **Keine Zusatz-Map auf Vorrat** (Entscheidung Fabian 11.11.): Unter Vorbehalt wird die Serie so weitergespielt, als gälte die Map in
-  Klärung wie gemeldet. Niemand spielt vorsorglich eine Map mehr, das System verlangt keine und nimmt keine an (Best of bleibt die
-  Obergrenze der Positionen). Die Entscheidung der Leitung kann die Serie in zwei Richtungen verändern:
-  - **Es fehlt eine Map** (die Map in Klärung dreht oder fällt weg, die Serie ist dadurch nicht entschieden): Die Leitung setzt die
-    fehlende Map an. Sie steht in der Entscheidung (`decision.missing_positions: [int]`), das Spiel bleibt bis zu ihrer Meldung
-    offen (kein gültiges Ergebnis, nicht in der Tabelle); angesetzt und gemeldet wird sie auf dem üblichen Weg (Termin, Melden,
-    Bestätigen).
-  - **Es ist eine Map überzählig** (die Serie war nach der Entscheidung schon vorher entschieden, im Modus `continue` wurde aber
-    weitergespielt): Die überzähligen Maps **zählen nicht**. Die Leitung vermerkt das in der Entscheidung
-    (`decision.surplus_positions: [int]`, im Pflichttext `reason` begründet); diese Positionen kommen nicht in `games[]`, stehen
-    also in keiner Tabelle und keiner Map-Differenz, und die Matchseite zeigt sie wie nicht gespielte Positionen mit dem Hinweis
-    „zählt nicht (Entscheidung der Leitung)“. Es bleibt bei der Regel „keine Map nach der Entscheidung der Serie“ (C.3).
+- **Keine Zusatz-Map auf Vorrat** (Entscheidung Fabian 11.11.): Unter Vorbehalt geht die Serie mit der nächsten Position weiter.
+  Niemand spielt vorsorglich eine Map mehr, das System verlangt keine und nimmt keine an (Best of bleibt die Obergrenze der
+  Positionen). Für den **vorläufigen** Stand der Serie gilt bis zur Entscheidung:
+  - Eine **zu Ende gespielte** Map in Klärung zählt vorläufig wie gemeldet. Strittig ist ihre Wertung, nicht ihr Endstand.
+  - Eine **nicht zu Ende gespielte** Map (Abbruch, offener Neustart, offene Wiederholung) hat keinen Sieger und zählt vorläufig
+    für **keine** Seite. Sie wird nicht „wie gemeldet“ behandelt: Zu melden gibt es nur den Stand beim Abbruch
+    (`incidents[].score`), kein Ergebnis. Die Seiten spielen die übrigen Positionen, solange die Serie ohne diese Map nicht
+    entschieden ist.
+- **Fehlende und überzählige Maps** stehen oft erst fest, wenn die Wiederholung gespielt ist - nicht schon mit der Entscheidung
+  über den Vorfall. Darum zwei Schritte der Leitung (`results` oder `disputes`, nicht befangen):
+  1. **Entscheidung** über den Vorfall (`decision.outcome`, `reason`). Lautet sie `restart` oder `replay`, setzt die Leitung die Map
+     an; gespielt und gemeldet wird sie auf dem üblichen Weg (Termin, Melden, Bestätigen). `missing_positions` und
+     `surplus_positions` bleiben dabei leer. Das Spiel bleibt offen: kein gültiges Ergebnis, nicht in der Tabelle.
+  2. **Serie feststellen**, sobald alle angesetzten Maps gemeldet sind (oder gleich mit der Entscheidung, wenn nichts mehr zu
+     spielen ist, etwa bei `continue_at_score`, `no_action` oder `awarded`): Erst jetzt trägt die Leitung
+     `decision.missing_positions` und `decision.surplus_positions` ein, mit `settled_at`, `settled_by` und dem Pflichttext
+     `settle_reason`.
+     - `missing_positions`: Die Serie ist auch mit dem jetzt geltenden Stand nicht entschieden. Die Leitung setzt die fehlende
+       Position an; nach ihrer Meldung stellt sie die Serie erneut fest.
+     - `surplus_positions`: Mit dem jetzt geltenden Stand war die Serie schon entschieden, bevor eine unter Vorbehalt gespielte
+       Map begann. Diese Maps **zählen nicht**: Sie kommen nicht in `games[]`, stehen in keiner Tabelle und keiner Map-Differenz,
+       und die Matchseite zeigt sie wie nicht gespielte Positionen mit dem Hinweis „zählt nicht (Entscheidung der Leitung)“.
+       Es bleibt bei der Regel „keine Map nach der Entscheidung der Serie“ (C.3).
+  Gültig wird das Ergebnis (Bestätigen, Frist-Automatik, Tabelle) erst, wenn die Serie festgestellt ist und keine Position mehr fehlt.
 
 #### Verfahren: Beanstandung, Protest, Einspruch (E.2)
 
@@ -2797,7 +2810,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
 | Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
 | Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei; `disputes[].incident_id` setzen, wenn ein Verfahren aus einem Vorfall entsteht, samt Prüfung „Vorfall am selben Spiel“ (422) |
 | Zeit-Job | `answer_deadline` → `in_review` | Erinnerung und Eskalation zur Zielfrist, Ablauf der Stellungnahme |
-| Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“, `pause_series` | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |
+| Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“ und bis die Serie festgestellt ist, `pause_series`, Schritt „Serie feststellen“ | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |
 
 **Überschneidungen** (bitte absprechen, wer zuerst mergt, der andere zieht nach):
 
