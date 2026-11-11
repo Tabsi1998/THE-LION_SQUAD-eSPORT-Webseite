@@ -28,7 +28,10 @@ INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_
                            "reschedule_requests", "schedule_history", "result_reminded_at", "result_overdue_at",
                            # Liga-Check-in (#1652, D.2): wer wann für welche Seite eingecheckt hat - mit Namen im Block
                            # ``checkin`` der Matchseite für Beteiligte und Leitung.
-                           "flow"})
+                           "flow",
+                           # Vorfälle (#1619, D.5): Beschreibung, Stand, Entscheidung und Konto-Kennungen - Beteiligte und Leitung
+                           # bekommen sie im Block ``league`` der Matchseite, öffentlich bleibt nur der Stand je Map (``map_state``).
+                           "incidents", "incident_due_at"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 # Liga (#1650): öffentlich je Map nur der Schnappschuss, Sieger und Punkte - Aufstellungen (Konto-Kennungen) bekommen

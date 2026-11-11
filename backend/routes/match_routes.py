@@ -79,6 +79,7 @@ from services.tournament_rules import match_policy, players_can_report, schedule
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services import league_games
+from services import league_incidents
 from services import league_result_rules
 from services import league_schedule
 from services import match_flow
@@ -811,6 +812,12 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         league_block["loadout_bans"] = await loadout_bans.effective(db, tournament, match)
         # Erlaubte Ausrüstung (Nr. 99): dieselbe Sicht wie im Regelwerk - nach dem Ergebnis der Schnappschuss von damals.
         league_block["allowed_equipment"] = await loadout_bans.match_allowed(db, tournament, match)
+        # Vorfälle (D.5, #1619): ``map_state`` für alle, ``incidents`` und ``incident_info`` nur für Beteiligte und die nicht befangene
+        # Leitung - wer befangen ist, sieht wie seine Seite.
+        from services.match_proofs import viewer_for
+        league_block.update(await league_incidents.page_block(
+            db, league, viewer=await viewer_for(db, match, user), conflict=conflict,
+            can_lead=bool(user) and await has_match_result_permission(user, match, capability=("results", "disputes"))))
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
@@ -1501,12 +1508,18 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
+    # Vorfälle (D.5, #1619): Erst entscheiden und die Serie feststellen, dann gilt ein Ergebnis - auch das der Leitung.
+    hold = league_incidents.result_block(match)
+    if hold:
+        raise HTTPException(status_code=409, detail=f"{hold['text']} Bitte zuerst über den Vorfall entscheiden und die Serie feststellen.")
     try:
         # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“ und Grund - nie Best of, Pool oder Aufstellung.
         override = await league_result_rules.override_reason(db, me, match, body.rule_override_reason)
     except league_result_rules.RuleProblem as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
     games, missing, league, lineups = await _staff_games(db, match, body, raw_results, skip_rules=bool(override))
+    # Keine Map zählt doppelt (§ 9.4): Eine neu gestartete oder wiederholte Position trägt „wiederholt“ und ihren Vorfall.
+    games = league_incidents.mark_replays(match, games)
     saved = league_games.with_series(games, lineups)
     if body.hold:
         # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
@@ -1770,6 +1783,12 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
     # Liga (docs/LIGA.md, #1650): Maps, Sieger und die eigene Aufstellung je Map - ohne Maps nur als Bestätigung.
     league = await league_games.setup(db, match, tournament, stage)
     games = lineup = None
+    if league and match.get("incidents"):
+        # Vorfälle (D.5, #1619): Mit „Serie pausiert“ beginnt keine weitere Map, solange eine in Klärung ist.
+        paused = league_incidents.report_refusal(match, (await league_incidents.settings_for(db, tournament))["clarification_mode"],
+                                                 [game.position for game in body.games or []])
+        if paused:
+            raise HTTPException(status_code=409, detail=paused)
     if league:
         try:
             games, lineup = await league_games.prepare_report(
@@ -1811,34 +1830,59 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
 
     stored = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or match
     agreed = report_consensus(stored.get("reports") or [])
-    if not agreed:
+    # Vorfälle (D.5, #1619): Solange einer offen ist oder die Serie noch festgestellt werden muss, ruht das Bestätigen - die
+    # Meldung ist gespeichert, gültig wird nichts.
+    hold = league_incidents.result_block(stored) if league else None
+    if not agreed or hold:
         conflict = reports_conflict(stored.get("reports") or [])
         # Wer gemeldet hat, sieht auf der Seite, wie es weitergeht; die anderen bekommen eine Nachricht (#1132).
         try:
             if conflict:
                 await notify_report_conflict(db, stored, my_registration["id"], me.get("id"))
-            else:
+            elif not agreed:
                 await notify_result_reported(db, stored, entry, me.get("id"))
         except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Meldung auf
             logger.warning("Report notification failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
-        stored["idempotent_replay"] = False
-        stored["awaiting_confirmation"] = True
-        stored["report_status"] = "conflict" if conflict else "waiting"
-        return stored
+        return _awaiting(stored, "conflict" if conflict else "clarification" if hold else "waiting", (hold or {}).get("text"))
+    try:
+        return await _confirm_agreed_result(db, stored, league, agreed, actor_id=me["id"], proof_url=body.screenshot_url, note=body.note)
+    except league_incidents.IncidentProblem as problem:
+        # Die Meldungen passen nicht zur Entscheidung über einen Vorfall: Das Ergebnis trägt die Leitung ein.
+        return _awaiting(stored, "clarification", problem.detail)
 
+
+def _awaiting(stored: dict, status: str, hold: str | None = None) -> dict:
+    """Die Antwort auf eine Meldung, die noch kein Ergebnis ist: ``report_status`` ``waiting`` | ``conflict`` | ``clarification``."""
+    stored["idempotent_replay"] = False
+    stored["awaiting_confirmation"] = True
+    stored["report_status"] = status
+    if hold:
+        stored["result_hold"] = hold
+    return stored
+
+
+async def _confirm_agreed_result(db, stored: dict, league, agreed: list[dict], *, actor_id: str, proof_url: str | None = None,
+                                 note: str | None = None) -> dict:
+    """Zwei übereinstimmende Meldungen werden zum Ergebnis - beim Bestätigen und, wenn das Bestätigen wegen eines Vorfalls geruht
+    hat, sobald nichts mehr dagegen steht (``league_incident_routes``). Der Aufrufer hält Turnier- und Season-Sperre."""
     final_games, missing = (league_games.consensus_games(stored.get("reports"), league.reg_ids) if league
                             else (None, []))
     final_lineups = None
     if league and league.is_series and final_games is not None:
         final_lineups, missing = league_games.consensus_lineups(stored.get("reports"), league.reg_ids)
+    if league and final_games is not None and stored.get("incidents"):
+        # Vorfälle (D.5): je Position genau eine geltende Austragung - wiederholt, zugesprochen oder nicht gezählt.
+        final_games, agreed = await league_incidents.finalize(db, stored, final_games, agreed)
+        if not league.is_series:
+            missing = league_games.missing_lineups(final_games, league.reg_ids)
     try:
         outcome = await submit_v2_result(
             db,
             stored,
             agreed,
-            actor_id=me["id"],
-            proof_url=body.screenshot_url,
-            note=body.note,
+            actor_id=actor_id,
+            proof_url=proof_url,
+            note=note,
             force=False,
             audit_action="match.result.auto_resolution",
             games=final_games,

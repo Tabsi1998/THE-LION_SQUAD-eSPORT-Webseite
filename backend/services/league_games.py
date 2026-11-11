@@ -999,6 +999,8 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
                 # Zusatzfelder (C.3) nur, wenn gesetzt; den Nachweis sehen nur Beteiligte und Leitung - wie Aufstellungen.
                 **{key: game[key] for key in ("mode_icon_url", "status", "replay_reason", "decision", "host_registration_id") if game.get(key)},
                 **({"proof_id": game["proof_id"]} if with_lineups and game.get("proof_id") else {}),
+                # Vorfall zur Map (D.5, #1619): nur Beteiligte und Leitung - öffentlich bleibt „wiederholt“ bzw. „zugesprochen“.
+                **({"incident_id": game["incident_id"]} if with_lineups and game.get("incident_id") else {}),
                 "lineups": (
                     {
                         reg_id: [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in lineup or []]

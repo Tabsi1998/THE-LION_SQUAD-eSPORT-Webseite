@@ -184,9 +184,21 @@ async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None,
                 lineups = {report.get("registration_id"): report["lineup"]} if report.get("lineup") else {}
                 sides = [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
                 missing = missing_participants(lineups, sides)
+            results = report.get("results") or []
+            if games and match.get("incidents"):
+                # Vorfälle (D.5, #1619): je Position genau eine geltende Austragung. Passt die Meldung nicht zur Entscheidung der
+                # Leitung, trägt sie das Ergebnis ein - der Job wartet still.
+                from services import league_incidents
+
+                try:
+                    games, results = await league_incidents.finalize(db, match, games, results)
+                except league_incidents.IncidentProblem:
+                    return 0
+                if lineups is None:
+                    missing = league_missing(match, games)
             try:
                 await submit_v2_result(
-                    db, match, report.get("results") or [], actor_id=report.get("user_id"),
+                    db, match, results, actor_id=report.get("user_id"),
                     proof_url=report.get("proof_url"), note=None, force=False, audit_action="match.result.auto_confirm",
                     games=games, lineups_missing=missing if games else None, match_lineups=lineups,
                 )
@@ -292,6 +304,10 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
     from services import league_veto_sweep
 
     veto = await league_veto_sweep.sweep(db, tournaments, now=now)
+    # Vorfälle (#1619, D.5): abgelaufene Antwortfristen gehen an die Leitung („in Klärung“) - dieselben laufenden Turniere.
+    from services import league_incidents
+
+    incidents = await league_incidents.sweep(db, tournaments, now=now)
     # Turnier nach dem Ende noch „Live“ (#2194): für alle Turniere, eine Abfrage je laufendem Turnier nach dem Ende.
     try:
         overrun = await tournament_overrun.refresh(db, now=now)
@@ -299,4 +315,4 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
         logger.warning("Stand „läuft länger“ nicht aktualisiert", exc_info=True)
         overrun = {}
     return {"proposed": proposed, "confirmed": confirmed, "overdue_lineups": overdue, "schedule": schedule, "checkin": checkin,
-            "veto": veto, "overrun": overrun}
+            "veto": veto, "incidents": incidents, "overrun": overrun}

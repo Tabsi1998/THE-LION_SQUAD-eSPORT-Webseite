@@ -57,6 +57,7 @@ def _side(match: dict, index: int, names: dict, results: dict) -> dict | None:
 def public_match(match: dict, names: dict, scheduled: dict | None = None, best_of: int | None = None) -> dict:
     """Ein Spiel für die Ligaseite: Heim/Auswärts, Termin, Ergebnis, Maps (sobald P4 sie liefert) - ohne Aufstellungen.
     ``best_of``: das der Staffel, wenn das Spiel keines trägt - für die nicht gespielten Maps (C.3)."""
+    from services.league_incident_rules import positions_in_clarification
     from services.league_result_rules import not_played
     results = {row.get("registration_id"): row for row in match.get("results") or [] if row.get("registration_id")}
     # Gemeldete und eingetragene Ergebnisse tragen nur den Platz (``rank``), kein ``outcome`` - dieselbe Regel wie
@@ -77,6 +78,8 @@ def public_match(match: dict, names: dict, scheduled: dict | None = None, best_o
         "forfeit": bool(match.get("forfeit_registration_id")) or match.get("status") == "forfeit",
         # Beide nicht erschienen (E.1, #1625): beide verlieren, kein Sieger.
         "double_forfeit": bool(match.get("double_forfeit")) and match.get("status") == "forfeit",
+        # Vorfälle (D.5, #1619): öffentlich nur, dass eine Map in Klärung ist - nie der Vorfall selbst.
+        "in_clarification": bool(positions_in_clarification(match)) and not done,
         "games": [_public_game(game)
                   for game in sorted(match.get("games") or [], key=lambda game: game.get("position") or 0)
                   if isinstance(game, dict)] if done else [],

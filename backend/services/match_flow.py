@@ -625,7 +625,8 @@ def privacy_query(user_id: str) -> dict:
 async def export_snapshot(db, user_id: str) -> list[dict]:
     """Für die Auskunft (``league_checkin``): je Spiel die eigenen Schritte - als Leitung nur der Vorgang."""
     out = []
-    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "tournament_id": 1, "flow": 1}).to_list(None):
+    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "tournament_id": 1, "flow": 1,
+                                                                   "incidents": 1}).to_list(None):
         steps = []
         # Alle Einträge, auch zu früheren Terminen und ausgeschiedenen Seiten - die Auskunft nennt jeden Schritt der Person.
         raw = ((match.get("flow") or {}).get("checkin") or {}).items()
@@ -644,6 +645,10 @@ async def export_snapshot(db, user_id: str) -> list[dict]:
         from services.league_veto import export_steps
 
         steps.extend(export_steps(match, user_id))
+        # Vorfälle (D.5, #1619): gemeldet, geantwortet, als Leitung entschieden oder als betroffene Person genannt.
+        from services.league_incident_rules import export_steps as incident_steps
+
+        steps.extend(incident_steps(match, user_id))
         if steps:
             out.append({"match_id": match.get("id"), "tournament_id": match.get("tournament_id"), "steps": steps})
     return out
@@ -653,9 +658,16 @@ async def scrub_person(db, user_id: str) -> int:
     """Kontolöschung: Check-ins und Start bleiben (sportlicher Ablauf), die Kennung der Person als Handelnde fällt heraus; die
     Anwesenheitslisten bleiben wie Aufstellungen."""
     done = 0
-    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "flow": 1}).to_list(None):
+    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "flow": 1, "incidents": 1}).to_list(None):
         flow = dict(match.get("flow") or {})
         changed = False
+        # Vorfälle (D.5, #1619): Der Vorfall bleibt, die Kennung der Person fällt heraus - auch aus den Betroffenen.
+        from services.league_incident_rules import scrub as scrub_incidents
+
+        incidents, incidents_changed = scrub_incidents(match.get("incidents"), user_id)
+        if incidents_changed:
+            await db.matches_v2.update_one({"id": match["id"]}, {"$set": {"incidents": incidents}})
+            done += 1
         checkin = {}
         for registration_id, entry in (flow.get("checkin") or {}).items():
             if not isinstance(entry, dict):
