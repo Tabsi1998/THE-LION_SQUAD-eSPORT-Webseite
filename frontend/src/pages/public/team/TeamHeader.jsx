@@ -86,7 +86,9 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
     <section className="border-b border-white/10 pb-6" data-testid="team-header" data-color={header?.color || team.color || "cyan"}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <Link to="/teams" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Teams</Link>
-        <div className="relative mt-3 h-[120px] md:h-[140px] lg:h-[160px] rounded-sm overflow-hidden border border-white/10" style={{ background: bandBackground(hex) }} data-testid="team-band">
+        {/* Mit eigenem Banner hat das Band dasselbe Format wie der Zuschnitt beim Hochladen (3:1), sonst schneidet object-cover
+            oben und unten weg. Ohne Banner bleibt der flache Farbstreifen. */}
+        <div className={`relative mt-3 ${team.banner_url ? "aspect-[3/1] w-full" : "h-[120px] md:h-[140px] lg:h-[160px]"} rounded-sm overflow-hidden border border-white/10`} style={{ background: bandBackground(hex) }} data-testid="team-band" data-banner={team.banner_url ? "true" : undefined}>
           {/* Eigenes Banner (#2328) statt Farbverlauf; unten leicht abgedunkelt, damit Wappen und Name lesbar bleiben. */}
           {team.banner_url ? (
             <>
