@@ -309,13 +309,14 @@ async def test_moss_on_an_incident_of_a_decided_match_without_a_decision_time(fl
     assert await match_proof_retention.purge(flow.db, now=changed + timedelta(hours=95)) == 0
     assert await match_proof_retention.purge(flow.db, now=changed + timedelta(hours=97)) == 1
 
-    # Auch die letzte Änderung fehlt: dann ab dem Ende des Vorfalls.
+    # Auch die letzte Änderung fehlt: dann ab dem Ende des Vorfalls (drei Tage nach dem Hochladen), nicht ab dem Hochladen.
     await set_match(flow, w, incidents=[crash], status="scheduled")
     await add_image(flow, match, "moss", "vorfall-1")
+    ended = now_utc() + timedelta(days=3)
     await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {
-        "status": "completed", "incidents": [{**crash, "state": "agreed", "closed_at": closed.isoformat()}]}, "$unset": {"updated_at": ""}})
-    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=95)) == 0
-    assert await match_proof_retention.purge(flow.db, now=closed + timedelta(hours=97)) == 1
+        "status": "completed", "incidents": [{**crash, "state": "agreed", "closed_at": ended.isoformat()}]}, "$unset": {"updated_at": ""}})
+    assert await match_proof_retention.purge(flow.db, now=ended + timedelta(hours=95)) == 0
+    assert await match_proof_retention.purge(flow.db, now=ended + timedelta(hours=97)) == 1
 
 
 @pytest.mark.asyncio
