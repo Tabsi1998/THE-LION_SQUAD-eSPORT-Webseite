@@ -416,8 +416,9 @@ export function countdownAnnouncement(seconds) {
 }
 
 /**
- * Team A ist blau, Team B violett - Ring, Ablauf und Karten zeigen damit, wer gesperrt oder gewählt hat. Bewusst keine Status-Farbe
- * (Orange, Rot, Gold heißen schon Achtung, läuft, Decider); der Ton steht als --tls-veto-rgb in index.css.
+ * Team A ist blau, Team B orange - Ring, Ablauf und Karten zeigen damit, wer gesperrt oder gewählt hat. Bewusst keine Status-Farbe
+ * (Warn-Orange, Rot, Gold heißen schon Achtung, läuft, Decider; Violett ist die Art „Event“): Team B hat ein eigenes Rot-Orange
+ * (--tls-veto-b-rgb in styles/system.css); der Ton steht als --tls-veto-rgb in index.css.
  */
 export const SIDE_TONE = Object.freeze({ A: "a", B: "b" });
 export const sideTone = (side) => SIDE_TONE[side] || "system";

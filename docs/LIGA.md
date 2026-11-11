@@ -2595,8 +2595,9 @@ die Frist des Servers wird in Geräte-Zeit umgerechnet (`vetoDeadline(block, off
 richtig. Läuft die Zeit ab, steht „Zeit um“; gewählt wird nur auf dem Server (Nr. 23).
 
 **Darstellung** (`components/tls/league/VetoLive.jsx`, Regeln in `index.css` „Map-Veto live“, TV in `tv.css`): Map-Karten mit Bild im Stil
-der Veto-Karten der Team-Liga (`maps.css`, #1616); Team A blau (`--tls-brand`), Team B violett (der Ton von `--tls-event` - bewusst keine
-Status-Farbe: Orange, Rot und Gold heißen schon Achtung, läuft bzw. Decider; Kontrast auf dem Grund 6 : 1), Decider gold, Vorgabe der
+der Veto-Karten der Team-Liga (`maps.css`, #1616); Team A blau (`--tls-brand`), Team B orange (eigenes Rot-Orange `--tls-veto-b`, 255 112 32 in
+`styles/system.css` - bewusst keine Status-Farbe: Warn-Orange, Rot und Gold heißen schon Achtung, läuft bzw. Decider, Violett ist die Art
+„Event“; Kontrast auf dem Grund 7,2 : 1, als Schild mit dunkler Schrift 7,4 : 1), Decider gold, Vorgabe der
 Woche grün. Zustände: offen; gesperrt (gedimmt, leicht abgesenkt, Bann-Symbol, „gesperrt von …“); gewählt (Schild „Map N“ in der Farbe
 der Seite); Decider; Vorgabe der Woche (wie #2326). Ist die eigene Seite am Zug, sind die Karten des laufenden Modus die Auswahl
 (`veto-option-*`), nicht wählbare ausgegraut mit Hinweis. **Detail-Runde:** gestaffelter Aufbau (40 ms je Karte), Anheben eigener

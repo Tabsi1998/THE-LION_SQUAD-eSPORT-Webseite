@@ -1625,7 +1625,7 @@ td.tv-standings__num--strong { color: #ffffff; font-weight: 800; }
   background: var(--tv-panel);
 }
 .tv-veto__turn[data-tone="a"] .tv-veto__who { color: var(--tv-accent); }
-.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-event-rgb)); }
+.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-veto-b-rgb)); }
 .tv-veto__who { overflow-wrap: anywhere; }
 /* Der Countdown: Zahl mitten im Ring. */
 .tv-veto__clock { position: relative; display: grid; place-items: center; }

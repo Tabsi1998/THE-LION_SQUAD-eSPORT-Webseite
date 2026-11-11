@@ -934,7 +934,7 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   Team A (Heimteam, oder gelost) ist zuerst dran. Die Seite zeigt den laufenden Schritt („Schritt 3 von 11 · Stellung · Loewen wählt
   Map 1“), einen Countdown, den **Ablauf** als Leiste (jeder Schritt mit Sperre/Wahl/Decider, Team A oder B und Modus; fertige Schritte
   mit der Map, der laufende markiert) und je Modus alle Maps als **Karten mit Bild** (offen, gesperrt mit Bann-Zeichen und wer, gewählt
-  mit „Map 1“ in der Farbe der Seite, Decider, Vorgabe der Woche). Team A ist blau, Team B violett.
+  mit „Map 1“ in der Farbe der Seite, Decider, Vorgabe der Woche). Team A ist blau, Team B orange.
 - **Ziehen:** Captain oder Vertreter der Seite am Zug tippen im markierten Modus eine Karte an – **Sperren** oder **Wählen**, je nach
   Schritt. Ausgegraute Maps sind gesperrt, schon gewählt oder würden die Serie nicht mehr aufgehen lassen (die Seite sagt es beim
   Antippen). Die übrige Map eines Decider-Schritts setzt das System sofort. Ein Doppelklick oder ein zweites Gerät zählt nicht doppelt;

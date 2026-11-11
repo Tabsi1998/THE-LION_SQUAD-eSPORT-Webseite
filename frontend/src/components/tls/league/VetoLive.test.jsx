@@ -149,7 +149,7 @@ test("die letzten zehn Sekunden: rot und - nur ohne „Bewegung reduzieren“ - 
   expect(reduced.slice(0, reduced.indexOf("}\n}") + 1)).toContain(".tls-veto-clock[data-urgent=\"true\"] .tls-veto-clock__arc { animation: none; }");
 });
 
-test("Teamfarben: A blau, B violett - keine Status-Farbe, lesbar auf dem dunklen Grund und als Schild", () => {
+test("Teamfarben: A blau, B orange - keine Status-Farbe, nicht Event-Violett, lesbar auf dem dunklen Grund und als Schild", () => {
   const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
   const live = css.slice(css.indexOf("/* Map-Veto live (D.4, #1651)"), css.indexOf("/* Bestätigungs-Blatt der Anmeldung"));
   const toneOf = (tone) => {
@@ -158,14 +158,24 @@ test("Teamfarben: A blau, B violett - keine Status-Farbe, lesbar auf dem dunklen
     return at < 0 ? null : live.slice(at + lead.length, live.indexOf("-rgb)", at));
   };
   expect(toneOf("a")).toBe("brand");
-  expect(toneOf("b")).toBe("event");
-  // Team B ist weder Achtung (warn), noch läuft (live), noch Ehre/Decider (honor), noch frei (ok).
-  expect(["warn", "live", "honor", "ok"]).not.toContain(toneOf("b"));
+  expect(toneOf("b")).toBe("veto-b");
+  // Team B ist weder Achtung (warn), noch läuft (live), noch Ehre/Decider (honor), noch frei (ok), noch die Art „Event“ (Violett).
+  expect(["warn", "live", "honor", "ok", "event"]).not.toContain(toneOf("b"));
   const tv = readFileSync(path.join(process.cwd(), "src/components/tv/tv.css"), "utf8");
-  expect(tv).toContain('.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-event-rgb)); }');
+  expect(tv).toContain('.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-veto-b-rgb)); }');
+  // Das Orange steht als eigenes Token in styles/system.css und hebt sich sichtbar von jeder Rolle ab (ein Kanal mind. 40 weg).
+  const system = readFileSync(path.join(process.cwd(), "src/styles/system.css"), "utf8");
+  const match = system.match(/--tls-veto-b-rgb: (\d+) (\d+) (\d+);/);
+  expect(match).not.toBeNull();
+  const channels = match.slice(1).map(Number);
+  const teamB = `#${channels.map((value) => value.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+  for (const role of ["warn", "live", "honor", "ok", "event", "brand"]) {
+    const other = [1, 3, 5].map((index) => parseInt(ROLE_COLORS[role].slice(index, index + 2), 16));
+    expect(Math.max(...channels.map((value, index) => Math.abs(value - other[index]))), `Team B gegen ${role}`).toBeGreaterThanOrEqual(40);
+  }
   // Kontrast: Schrift in der Farbe auf dem Grund und dunkle Schrift auf dem Schild (mind. 4,5 : 1).
-  expect(contrastRatio(ROLE_COLORS.event, SURFACE_COLORS.base)).toBeGreaterThanOrEqual(4.5);
-  expect(contrastRatio("#050505", ROLE_COLORS.event)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(teamB, SURFACE_COLORS.base)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio("#050505", teamB)).toBeGreaterThanOrEqual(4.5);
   expect(contrastRatio(ROLE_COLORS.live, SURFACE_COLORS.base)).toBeGreaterThanOrEqual(4.5);
 });
 
