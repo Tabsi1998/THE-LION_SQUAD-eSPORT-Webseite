@@ -1,18 +1,17 @@
 # Changelog
 
-## [1.79.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.78.0...v1.79.0) (2026-11-11)
-
+## 1.79.0 (11.11.2026)
 
 ### Neu
 
-* Erinnerung „Map-Veto wartet“ an die Seite am Zug ([#1651](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1651)) ([de90f2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/de90f2a996cc97db6f6165ac3562df398b7f192e))
-* Liga – bei Kontolöschung bleibt ein MOSS-Nachweis eines laufenden Verfahrens bis zu dessen Abschluss für die Liga-Leitung ([#2360](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2360)) ([e66a442](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e66a44255a68fada843a7d474bb921c988b6a745))
-* Liga – mehrere Nachweise je Meldung, Vorfall und Protest: Bilder und Video-Links (nur https) ([#2360](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2360)) ([e66a442](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e66a44255a68fada843a7d474bb921c988b6a745))
-* Liga – Nachweise bleiben bis Season-Ende plus Frist, MOSS-Nachweise nur bis zum Ende des Verfahrens ([#2360](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2360)) ([e66a442](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e66a44255a68fada843a7d474bb921c988b6a745))
-* Map-Veto für Zuschauer nur lesend auf der Matchseite ([#1651](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1651)) ([de90f2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/de90f2a996cc97db6f6165ac3562df398b7f192e))
-* Map-Veto live – der Zug der Gegenseite erscheint ohne Neuladen und leuchtet kurz auf ([#1651](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1651)) ([de90f2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/de90f2a996cc97db6f6165ac3562df398b7f192e))
-* Map-Veto live – Map-Karten mit Bild, Countdown nach Serverzeit und Ablauf-Leiste auf der Matchseite ([#1651](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1651)) ([de90f2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/de90f2a996cc97db6f6165ac3562df398b7f192e))
-* TV-Ansicht des Map-Vetos für 1920 px ([#1651](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1651)) ([de90f2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/de90f2a996cc97db6f6165ac3562df398b7f192e))
+* Erinnerung „Map-Veto wartet“ an die Seite am Zug (#1651)
+* Liga – bei Kontolöschung bleibt ein MOSS-Nachweis eines laufenden Verfahrens bis zu dessen Abschluss für die Liga-Leitung (#2360)
+* Liga – mehrere Nachweise je Meldung, Vorfall und Protest: Bilder und Video-Links (nur https) (#2360)
+* Liga – Nachweise bleiben bis Season-Ende plus Frist, MOSS-Nachweise nur bis zum Ende des Verfahrens (#2360)
+* Map-Veto für Zuschauer nur lesend auf der Matchseite (#1651)
+* Map-Veto live – der Zug der Gegenseite erscheint ohne Neuladen und leuchtet kurz auf (#1651)
+* Map-Veto live – Map-Karten mit Bild, Countdown nach Serverzeit und Ablauf-Leiste auf der Matchseite (#1651)
+* TV-Ansicht des Map-Vetos für 1920 px (#1651)
 
 ## 1.78.0 (11.11.2026)
 
