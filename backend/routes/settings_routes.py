@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 import httpx
 
 from database import get_db
-from auth import require_club_admin, require_super, get_current_user, get_optional_user, require_area
+from auth import require_admin, require_club_admin, require_super, get_current_user, get_optional_user, require_area
+from routes.tournament_common import require_lead_of
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS
 from services.auth_settings import (
     is_google_client_id, load_auth_settings, parse_window_time, public_auth_settings, validate_event_window, validate_limit_updates,
@@ -638,6 +639,61 @@ def _parse_dt_any(value):
     return _parse_public_dt(str(value))
 
 
+def _iso_or_empty(value) -> str:
+    if isinstance(value, datetime):
+        return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+    return str(value or "")
+
+
+def _auto_banner_ref(kind: str, source: dict, period_start, period_end) -> dict:
+    """Woher ein automatischer Banner kommt (#2352): nur für die Verwaltung - ``_public_banner_doc`` gibt diese Felder
+    nicht aus. Bewusst nicht ``starts_at``/``ends_at``: die prüft ``_banner_active``, und der Banner läuft am Status."""
+    return {
+        "ref_kind": kind,
+        "ref_id": source.get("id") or "",
+        "ref_title": source.get("title") or source.get("name") or "",
+        "period_start": _iso_or_empty(period_start),
+        "period_end": _iso_or_empty(period_end),
+    }
+
+
+# Vorlagen der automatischen Banner je Quelle (#2352): ``auto-<quelle>-<vorlage>-<id>``. Die Statistik bleibt in
+# ``site_banner_stats``, auch wenn der Banner nicht mehr läuft.
+AUTO_BANNER_TEMPLATES = ("registration", "event")
+AUTO_BANNER_MANAGE_URLS = {
+    "tournament": "/admin/tournaments/{id}?tab=edit",
+    "fastlap": "/admin/f1/{id}",
+    "server": "/admin/game-servers",
+}
+
+
+def _banner_stats_view(row: dict | None) -> dict:
+    row = row or {}
+    return {
+        "impressions": int(row.get("impressions") or 0),
+        "clicks": int(row.get("clicks") or 0),
+        "last_impression_at": row.get("last_impression_at") or "",
+        "last_click_at": row.get("last_click_at") or "",
+    }
+
+
+async def _auto_banner_stats_for(db, prefix: str, ref_id: str) -> dict:
+    ids = {f"{prefix}-{template}-{ref_id}": template for template in AUTO_BANNER_TEMPLATES}
+    rows = await db.site_banner_stats.find({"id": {"$in": list(ids)}}, {"_id": 0}).to_list(len(ids))
+    by_id = {row["id"]: row for row in rows}
+    items = [{"id": banner_id, "template": template, "stats": _banner_stats_view(by_id[banner_id])}
+             for banner_id, template in ids.items() if banner_id in by_id]
+    last_seen = max((item["stats"]["last_impression_at"] for item in items), default="")
+    return {
+        "items": items,
+        "total": {
+            "impressions": sum(item["stats"]["impressions"] for item in items),
+            "clicks": sum(item["stats"]["clicks"] for item in items),
+            "last_impression_at": last_seen,
+        },
+    }
+
+
 async def _auto_site_banners(db) -> list[dict]:
     now = now_utc()
     items: list[dict] = []
@@ -668,23 +724,28 @@ async def _auto_site_banners(db) -> list[dict]:
             "audience": "members" if server.get("visibility") == "members" else "logged_in" if server.get("visibility") == "community" else "all",
             "link_url": "/servers",
             "link_label": "Server ansehen",
+            **_auto_banner_ref("server", server, None, until),
         })
 
     tournaments = await db.tournaments.find(
         {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "is_public": {"$ne": False}},
-        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1,
+         "registration_open_from": 1, "registration_open_until": 1, "check_in_from": 1, "check_in_until": 1},
     ).sort("start_date", 1).to_list(10)
     for t in tournaments:
         start_dt = _parse_dt_any(t.get("start_date"))
         if t.get("status") == "check_in":
             text = f"Check-in offen: {t.get('title') or 'Turnier'}"
             template, tone, priority = "registration", "warning", 85
+            period = (t.get("check_in_from"), t.get("check_in_until"))
         elif t.get("status") == "registration_open":
             text = f"Anmeldung offen: {t.get('title') or 'Turnier'}"
             template, tone, priority = "registration", "success", 75
+            period = (t.get("registration_open_from"), t.get("registration_open_until"))
         elif start_dt and now <= start_dt and (start_dt - now).total_seconds() <= 24 * 3600:
             text = f"Turnier startet bald: {t.get('title') or 'Turnier'}"
             template, tone, priority = "event", "info", 70
+            period = (None, t.get("start_date"))
         else:
             continue
         items.append({
@@ -703,20 +764,24 @@ async def _auto_site_banners(db) -> list[dict]:
             "audience": "all",
             "link_url": f"/tournaments/{t.get('slug') or t.get('id')}",
             "link_label": "Zum Turnier",
+            **_auto_banner_ref("tournament", t, *period),
         })
 
     fastlaps = await db.f1_challenges.find(
         {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "visibility": {"$ne": "internal"}},
-        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1,
+         "registration_open_from": 1, "registration_open_until": 1},
     ).sort("start_date", 1).to_list(10)
     for challenge in fastlaps:
         start_dt = _parse_dt_any(challenge.get("start_date"))
         if challenge.get("status") == "registration_open":
             text = f"Fast-Lap Einreichung offen: {challenge.get('title') or 'Challenge'}"
             template, tone, priority = "registration", "success", 75
+            period = (challenge.get("registration_open_from"), challenge.get("registration_open_until"))
         elif start_dt and now <= start_dt and (start_dt - now).total_seconds() <= 24 * 3600:
             text = f"Fast-Lap startet bald: {challenge.get('title') or 'Challenge'}"
             template, tone, priority = "event", "info", 70
+            period = (None, challenge.get("start_date"))
         else:
             continue
         items.append({
@@ -735,6 +800,7 @@ async def _auto_site_banners(db) -> list[dict]:
             "audience": "all",
             "link_url": f"/fastlap/{challenge.get('slug') or challenge.get('id')}",
             "link_label": "Zur Challenge",
+            **_auto_banner_ref("fastlap", challenge, *period),
         })
     return items
 
@@ -1030,6 +1096,51 @@ async def admin_site_banners(me: dict = Depends(require_area("content"))):
         "starts_at": row.get("starts_at") or "",
         "ends_at": row.get("ends_at") or "",
     } for row in rows]
+
+
+@settings_router.get("/site-banners/admin/auto")
+async def admin_auto_site_banners(me: dict = Depends(require_area("content"))):
+    """Gerade laufende automatische Banner mit Zahlen (#2352) - nur lesbar; geschaltet wird am Turnier, an der
+    Challenge bzw. am Server (``manage_url``)."""
+    db = get_db()
+    rows = await _auto_site_banners(db)
+    stats_rows = await db.site_banner_stats.find({"id": {"$in": [row["id"] for row in rows]}}, {"_id": 0}).to_list(200)
+    stats = {row["id"]: row for row in stats_rows}
+    items = []
+    for row in sorted(rows, key=lambda r: (-int(r.get("priority") or 0), r["id"])):
+        kind = row.get("ref_kind") or ""
+        items.append({
+            "id": row["id"],
+            "kind": kind,
+            "template": row.get("template") or "",
+            "title": row.get("ref_title") or "",
+            "text": row.get("text") or "",
+            "period_start": row.get("period_start") or "",
+            "period_end": row.get("period_end") or "",
+            "manage_url": AUTO_BANNER_MANAGE_URLS.get(kind, "").format(id=row.get("ref_id") or ""),
+            "stats": _banner_stats_view(stats.get(row["id"])),
+        })
+    return {"items": items}
+
+
+@settings_router.get("/site-banners/admin/stats/tournament/{tid}")
+async def admin_tournament_banner_stats(tid: str, me: dict = Depends(require_lead_of("manage"))):
+    """Zahlen der automatischen Banner eines Turniers (#2352), je Vorlage - auch nach dem Ende des Banners."""
+    db = get_db()
+    row = await db.tournaments.find_one({"$or": [{"id": tid}, {"slug": tid}]}, {"_id": 0, "id": 1})
+    if not row:
+        raise HTTPException(404, "Turnier nicht gefunden")
+    return await _auto_banner_stats_for(db, "auto-tournament", row["id"])
+
+
+@settings_router.get("/site-banners/admin/stats/fastlap/{cid}")
+async def admin_fastlap_banner_stats(cid: str, me: dict = Depends(require_admin())):
+    """Zahlen der automatischen Banner einer Fast-Lap-Challenge (#2352) - Rechte wie beim Bearbeiten der Challenge."""
+    db = get_db()
+    row = await db.f1_challenges.find_one({"$or": [{"id": cid}, {"slug": cid}]}, {"_id": 0, "id": 1})
+    if not row:
+        raise HTTPException(404, "Challenge nicht gefunden")
+    return await _auto_banner_stats_for(db, "auto-fastlap", row["id"])
 
 
 @settings_router.post("/site-banners/admin")
