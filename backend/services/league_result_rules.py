@@ -325,8 +325,11 @@ async def attached_proofs(db, match_id: str | None) -> set[str]:
     """Die Fotos, die an diesem Spiel schon hängen (Meldung, Problem) - nur auf sie darf eine Map verweisen."""
     if not match_id:
         return set()
-    rows = await db.match_proof_photos.find({"match_id": match_id, "status": "attached"}, {"_id": 0, "id": 1}).to_list(200)
-    return {row["id"] for row in rows if row.get("id")}
+    rows = await db.match_proof_photos.find(
+        {"match_id": match_id, "status": "attached"}, {"_id": 0, "id": 1, "type": 1, "context": 1}).to_list(200)
+    # Nur Fotos (#2360): Video-Links und MOSS-Nachweise hängen in derselben Sammlung, sind aber kein Foto einer Map.
+    return {row["id"] for row in rows
+            if row.get("id") and row.get("type") != "link" and (row.get("context") or {}).get("kind") != "moss"}
 
 
 def not_played(games: list[dict] | None, best_of: int) -> list[int]:

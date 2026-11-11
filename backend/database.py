@@ -702,6 +702,10 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
      "base_version", {"partialFilterExpression": {"purpose": "base"}}),
     # Testentwürfe an Printful (#2062): je Kennung und je external_id genau ein Protokoll.
     ("shop_test_drafts", "id", "id", {}),
+    # Nachweise zu Spielen (#2360): je Abruf eines Bildes nach ``id``, der Aufräum-Job blättert aufsteigend danach. Die
+    # Kennung kommt an beiden Schreibstellen aus ``models.new_id`` (uuid4) - Dubletten im Altbestand sind nicht zu erwarten;
+    # gäbe es doch eine, bleibt der Start heil und der Index steht unter Betrieb → Checks als fehlend.
+    ("match_proof_photos", "id", "id", {}),
     ("shop_test_drafts", "external_id", "external_id", {}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
@@ -732,6 +736,8 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("team_squads", "team_id"),
     ("chat_attachments", "owner_id"),
     ("chat_attachments", [("status", 1), ("created_at", 1)]),
+    # Nachweise zu Spielen (#2360): je Liste nach ``match_id``. Der eindeutige Index nach ``id`` steht oben.
+    ("match_proof_photos", "match_id"),
     ("stream_watches", [("user_id", 1), ("day", 1), ("key", 1)]),
     ("match_commendations", [("match_id", 1), ("from_registration_id", 1)]),
     ("match_commendations", "to_registration_id"),

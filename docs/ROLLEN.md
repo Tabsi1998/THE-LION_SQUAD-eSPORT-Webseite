@@ -65,7 +65,10 @@ Die Ansicht „Turnierleitung“ (`/tournaments/<slug>/leitung`, in der App „T
 Helfer des Turniers; eintragen, „Rückgängig“ (nur der letzte Eintrag) und Streitfälle entscheiden (#1158) darf je Spiel
 nur, wer dort Ergebnis-Recht hat – die Station-Crew nur an ihrer Station. „Braucht Aufmerksamkeit“ (#1160: Ergebnis
 fehlt, Station defekt) geht an genau diese Leute. Fotos vom Ergebnis (#1157) sehen nur die Spieler des Spiels und die
-Turnierleitung dieses Turniers; Moderatoren nur, wenn die Bildprüfung ein Foto zur Prüfung vorlegt.
+Turnierleitung dieses Turniers; Moderatoren nur, wenn die Bildprüfung ein Foto zur Prüfung vorlegt. Dasselbe gilt für
+weitere Nachweise in der Liga (Bilder und Video-Links zu Vorfall, Protest und Stellungnahme, #2360). Einen MOSS-Nachweis
+sehen nur, wer ihn hochgeladen hat, Captain und Vertreter dieser Seite und die Liga-Leitung mit „Proteste“ oder „Ergebnisse
+korrigieren“, die an dem Spiel nicht beteiligt ist – nicht die übrigen Spieler der eigenen Seite und nie die Gegenseite.
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
 kommen nur aus dem Bereich Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin oder einem solchen
 Einsatz – auch für Moderatoren.
