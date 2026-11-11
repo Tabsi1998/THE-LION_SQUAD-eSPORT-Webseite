@@ -386,11 +386,19 @@ async def test_profil_bekommt_den_stand_je_kategorie_vom_server(flow):
     flow.act_as(guest)
     foreign = (await flow.get(f"/api/achievements/user/{paula['id']}")).json()["progress"]
     assert "club" not in foreign["category_progress"] and foreign["category_progress"]["season"]["complete"] is True
-    # Gegenprobe: ein Mitglied sieht den Verein auch im fremden Profil.
+    # Nachprüfung: keine Summen (Anzahl, Punkte, abgeschlossene Kategorien), aus denen sich der Verein ableiten ließe -
+    # kommt eine Vereins-Stufe dazu, ändert sich für das Nicht-Mitglied an der ganzen Antwort nichts.
+    assert set(foreign) == {"category_progress"}
+    before = (await flow.get(f"/api/achievements/user/{paula['id']}")).json()
+    await _give(flow, paula, "membership_tenure_2", "member_card_1")
+    after = (await flow.get(f"/api/achievements/user/{paula['id']}")).json()
+    assert after == before, "kein Vereins-Erfolg lässt sich ableiten"
+    # Gegenprobe: ein Mitglied sieht den Verein auch im fremden Profil - und die neuen Stufen darin.
     member = await flow.add_user(name="Mitglied")
     await _member(flow, member)
     flow.act_as(member)
-    assert "club" in (await flow.get(f"/api/achievements/user/{paula['id']}")).json()["progress"]["category_progress"]
+    seen = (await flow.get(f"/api/achievements/user/{paula['id']}")).json()
+    assert seen["progress"]["category_progress"]["club"]["earned"] == 3 and seen["progress"]["member"] is True
 
 
 @pytest.mark.asyncio

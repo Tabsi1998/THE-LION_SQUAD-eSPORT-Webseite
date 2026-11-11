@@ -135,11 +135,12 @@ async def user_achievements(user_id: str, viewer: dict | None = Depends(get_opti
         return {"groups": [], "awards": [], "pinned": [], "hidden": {"total": 0, "earned": 0}, "achievements_hidden": True}
     groups = await list_groups_for_user(user_id, viewer)
     awards = await list_user_awards(user_id, viewer)
-    # Review N2: der Stand je Kategorie vom Server - wie auf der Erfolge-Seite; den Verein nur, wer ihn sehen darf.
-    progress = await visibility.my_progress(db, user_id)
-    if not await visibility.viewer_sees_club(db, viewer, user_id):
+    # Review N2: der Stand je Kategorie vom Server - wie auf der Erfolge-Seite; den Verein nur, wer ihn sehen darf, und
+    # nie Summen, aus denen sich Vereins-Erfolge ableiten ließen.
+    sees_club = await visibility.viewer_sees_club(db, viewer, user_id)
+    progress = visibility.foreign_progress(await visibility.my_progress(db, user_id), sees_club=sees_club)
+    if not sees_club:
         groups, awards = visibility.without_club(groups, awards)
-        progress = visibility.progress_without_club(progress)
     return {
         "groups": groups, "awards": awards,
         "pinned": visibility.pinned_awards(user, awards),

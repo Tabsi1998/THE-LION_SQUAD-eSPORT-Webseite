@@ -554,13 +554,14 @@ async def viewer_sees_club(db, viewer: dict | None, target_id: str) -> bool:
     return bool(membership and membership.get("member_status") in ("active", "honorary"))
 
 
-def progress_without_club(progress: dict) -> dict:
-    """Der Stand je Kategorie ohne den Verein - für fremde Profile, die die Verein-Kategorie nicht zeigen (Review N2)."""
-    out = dict(progress or {})
-    out["category_progress"] = {key: row for key, row in (out.get("category_progress") or {}).items() if key != "club"}
-    out["categories"] = {key: value for key, value in (out.get("categories") or {}).items() if key != "club"}
-    out.pop("member", None)
-    return out
+def foreign_progress(progress: dict, *, sees_club: bool) -> dict:
+    """Der Stand je Kategorie für ein fremdes Profil (Review N2): nur ``category_progress`` - mehr braucht das Profil
+    nicht. Ohne Verein-Recht fehlt der Verein ganz, und es gibt keine Summen (Anzahl, Punkte, abgeschlossene Kategorien),
+    aus denen sich Vereins-Erfolge ableiten ließen."""
+    rows = dict((progress or {}).get("category_progress") or {})
+    if sees_club:
+        return {"category_progress": rows, "member": bool((progress or {}).get("member"))}
+    return {"category_progress": {key: row for key, row in rows.items() if key != "club"}}
 
 
 def without_club(groups: list[dict], awards: list[dict]) -> tuple[list[dict], list[dict]]:
