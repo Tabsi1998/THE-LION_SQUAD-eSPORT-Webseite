@@ -15,14 +15,18 @@ Ein Nachweis ist persönlich (Gesichter, Bildschirme, Wohnzimmer). Deshalb:
   EXIF mit GPS-Ort und Kamera fällt dabei weg.
 - Bildprüfung wie im Chat (#415): bis das Ergebnis da ist, sieht das Foto nur, wer es hochgeladen hat.
 - Ein Video ist ein eigener Eintrag mit einem Link (nur ``https``): Er wird nie eingebettet und nie vom Server abgerufen.
-- Aufbewahrung (``services/match_proof_retention.purge``): Turniere 30 Tage nach dem Hochladen - außer das Spiel ist dann noch in Klärung. Liga-Staffeln
-  bis Season-Ende plus ``evidence_keep_days``, länger bei offenem Vorfall oder Verfahren; MOSS nur bis das Verfahren beendet
+- Aufbewahrung (``services/match_proof_retention.purge``): Turniere 30 Tage nach dem Hochladen - außer das Spiel ist dann
+  noch in Klärung. Liga-Staffeln bis Season-Ende plus ``evidence_keep_days``, länger bei offenem Vorfall oder Verfahren;
+  MOSS nur bis der Vorfall bzw. das Verfahren beendet
   und die Einspruchsfrist vorbei ist. Nie verwendete Fotos verschwinden nach 24 Stunden. Alles geht mit dem Turnier und
   mit dem Konto (Kontolöschung).
 
 Zwei Wege: Der alte (ein Foto je Meldung oder Problem) lädt hoch (``pending``, sichtbar nur für den Absender) und hängt das
-Foto beim Abschicken an (``attached``). Der neue (``add_proof``) kennt den Bezug schon und hängt sofort an - beliebig viele je
-Bezug (docs/LIGA.md, „D.5/E.2-Vertrag“; ``services/match_proof_refs`` sagt, ob der Bezug noch offen ist).
+Foto beim Abschicken an (``attached``). Der neue (``add_proof``) kennt den Bezug schon und hängt sofort an - bis zu zehn je
+Seite und Bezug, nur bei Spielen einer Liga-Staffel (docs/LIGA.md, „D.5/E.2-Vertrag“; ``services/match_proof_refs`` sagt, ob
+der Bezug noch offen ist). Wer zu einer Seite gehört, handelt dabei nie als Leitung. Zurückziehen geht nur, solange man auch
+hinzufügen dürfte; ein MOSS-Nachweis wird dabei nur verborgen (``removed``) und bleibt der Leitung, bis die Aufbewahrung
+ihn löscht.
 """
 from __future__ import annotations
 
