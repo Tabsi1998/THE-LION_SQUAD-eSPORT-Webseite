@@ -145,6 +145,12 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
         </p>
       ) : null}
       {row.auto_accepted ? <p className="mt-1 text-xs text-white/60" data-testid={`application-auto-${row.id}`}>Automatisch angenommen{row.decided_at ? ` ${when(row.decided_at)}` : ""}.</p> : null}
+      {/* Befangenheit (#2348, Nr. 73): Beim Team einer Person der Liga-Leitung hat niemand entschieden - die anderen Zuständigen sehen es. */}
+      {row.lead_team_auto ? (
+        <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-warn" data-testid={`application-lead-team-${row.id}`}>
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Team der Leitung – automatisch angenommen
+        </p>
+      ) : null}
       {row.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}
       <Notes row={row} />
       <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} />

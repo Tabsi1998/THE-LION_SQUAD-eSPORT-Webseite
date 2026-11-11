@@ -24,7 +24,7 @@ from models import new_id, now_utc
 from services import checkin_rules, league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
-from services.league_permissions import belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
+from services.league_permissions import CAPABILITIES, belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.log_safe import log_safe
@@ -1053,6 +1053,8 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
     # Befangenheit (#2245): dieselbe Regel wie beim Entscheiden, mit den Teams samt Co-Teams aus ``teams_by_id``.
     sides = {row["id"]: side_of(row) for row in rows}
     side_teams = await teams_by_id(db, sides.values())
+    # Automatisch angenommen beim Team einer Person der Liga-Leitung (#2348): Niemand hat entschieden - die anderen Zuständigen sehen es markiert.
+    leads = [{"id": uid} for uid in sorted(await staff_user_ids(db, league["id"], CAPABILITIES))] if any(row.get("auto_accepted") for row in rows) else []
     open_rows = [(row, squads[row["squad_id"]]) for row in rows if row["status"] in OPEN_STATUSES and row["squad_id"] in squads]
     items = []
     for row in rows:
@@ -1073,6 +1075,7 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "assignment": {**row["assignment"], "left": row["id"] in gone} if row.get("assignment") else None,
             # Automatisch angenommen (#2348): Zurückstufen nur mit Grund; eine automatische Zuteilung (``assignment.auto``) nehmen Ablehnen und Warteliste mit heraus.
             "auto_accepted": bool(row.get("auto_accepted")),
+            "lead_team_auto": bool(row.get("auto_accepted")) and any(belongs_to_side(lead, sides[row["id"]], side_teams.get(row["team_id"])) for lead in leads),
             "member_count": len([uid for uid in (squad or {}).get("member_ids") or [] if uid]),
             "captain_name": names.get((squad or {}).get("captain_id")), "vice_name": names.get((squad or {}).get("vice_captain_id")),
             "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"], "shortfall": check.get("shortfall"),

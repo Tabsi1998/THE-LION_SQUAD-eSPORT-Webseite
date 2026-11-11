@@ -1105,7 +1105,7 @@ Mit `application_auto_accept` (#2348, Entscheidung Nr. 126) entscheidet die Seas
 | `entry_policy` | `all` \| `members` | `all` | `all` | Zulassung. `members`: Jeder im Kader muss Mitglied sein (dieselbe Regel wie Sichtbarkeit „Nur Mitglieder“) |
 | `sibling_squads_in_staffel` | bool | `false` | `false` | Zwei Co-Teams eines Hauptteams in derselben Staffel. Ein Co-Team bleibt je Season in einer Staffel. Gilt auch fürs Zuteilen. Mit `true` lautet `identity_key` `<tid>:team:<team_id>:squad:<squad_id>` |
 | `application_privacy_text` | str ≤ 2000 | leer | Platzhalter-Satz | Hinweis zum Datenschutz bei der Anmeldung. Den Wortlaut pflegt die Leitung, der Text steht mit im Antrag |
-| `application_auto_accept` (#2348) | bool | `false` | `false` | Anmeldungen automatisch annehmen. `null` lässt den Wert stehen. Kein Staffel-Feld, darum nicht in `SYNC_GROUPS`; Protokoll wie die übrigen Felder über `league.season.update` (`data.fields`) |
+| `application_auto_accept` (#2348) | bool | `false` | `false` | Anmeldungen automatisch annehmen. `null` lässt den Wert stehen. Kein Staffel-Feld, darum nicht in `SYNC_GROUPS`; Protokoll wie die übrigen Felder über `league.season.update` (`data.fields`), beim Umschalten dazu `league.season.auto_accept` mit `before` und `after` |
 
 **`league_applications`** (eine Zeile je Antrag, ein neuer Antrag nach Ablehnung oder Rückzug ist eine neue Zeile):
 
@@ -1156,7 +1156,8 @@ einen nach dem anderen durch, genau einer wird angenommen. Fehlende Angaben (Nr.
 Season-Sperre, Wartezeit wie die Season-Sperre) und teilt zu: `build_registration`, Vorschau, Kader der Season wie beim Zuteilen, `created_by` `null`, `registered_by` wer
 eingereicht hat. Lehnt die Staffel ab (gesperrt, voll, Mindestkader der Staffel), bleibt es bei `accepted` ohne Zuteilung. Mehrere Staffeln: Die Leitung teilt zu, das Team sieht
 „Angemeldet – Zuteilung folgt“. Was gar nicht geht, bleibt `submitted`.
-**Befangenheit:** Keine Entscheidung einer Person, darum auch beim eigenen Team der Leitung. Ablehnen und Zurückstufen danach prüfen Nr. 73 wie immer.
+**Befangenheit:** Keine Entscheidung einer Person, darum auch beim eigenen Team der Leitung. Ablehnen und Zurückstufen danach prüfen Nr. 73 wie immer. Gehört eine Person der
+Liga-Leitung (`staff_user_ids` mit allen Zuständigkeiten) nach `belongs_to_side` zum Team, meldet der Eingang `lead_team_auto`, die anderen Zuständigen lesen „Team der Leitung – automatisch angenommen“.
 **Später einschalten:** Offene `submitted`/`in_review`-Anträge bleiben, wie sie sind. `GET /api/admin/leagues/seasons/{id}` liefert `applications_waiting` (nur die Zahl), die
 Verwaltung zeigt beim eingeschalteten Schalter „X Anmeldungen warten auf Prüfung und halten ihren Platz frei. Entscheide sie im Eingang.“
 
@@ -1190,7 +1191,7 @@ Das Einreichen mit automatischer Zuteilung und Ablehnen bzw. Warteliste einer au
 | `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403. Antwort mit `status`: `submitted`, mit `application_auto_accept` auch `accepted` (dann `staffel`, wenn zugeteilt) oder `waitlist` |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
-| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `auto_accepted`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
+| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `auto_accepted`, `lead_team_auto`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
 | `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
 | `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer angenommenen Anmeldung verlangt `reason` (422), auch wenn sie von Hand angenommen war |
 
@@ -1210,7 +1211,7 @@ Hinweis „… ist automatisch angenommen …“ bzw. „… steht automatisch a
 
 **Löschen:** Eine Season mit Anträgen lässt sich nicht löschen (`delete-plan`, Hinweis auf Archivieren). Ein Co-Team mit offenem Antrag lässt sich erst nach dem Rückzug löschen, ein Hauptteam mit solchem Co-Team nicht auflösen.
 
-**Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist`
+**Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist` sowie `league.season.auto_accept` (Umschalten, `before`/`after`)
 (`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung); `.reject`, `.waitlist` und `.withdraw` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
 
 ### C.1 Spielmodi (#2206)

@@ -198,6 +198,17 @@ test("abgelehnt und zurückgezogen stehen eingeklappt, ohne Knöpfe", async () =
   expect(screen.queryByTestId("application-reject-open-a2")).toBeNull();
 });
 
+test("das Team einer Person der Leitung ist nach automatischer Annahme markiert (#2348)", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [
+    { ...ROW, id: "a1", status: "accepted", auto_accepted: true, lead_team_auto: true },
+    { ...ROW, id: "a2", squad_id: "s2", status: "accepted", auto_accepted: true, lead_team_auto: false },
+  ] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-lead-team-a1")).toHaveTextContent("Team der Leitung – automatisch angenommen");
+  expect(screen.queryByTestId("application-lead-team-a2")).toBeNull();
+});
+
 // Automatisch angenommen (#2348): zurückstufen nur mit Grund, eine automatische Zuteilung nehmen Ablehnen und Warteliste wieder heraus.
 test("eine automatisch angenommene Anmeldung geht nur mit Grund auf die Warteliste", async () => {
   apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, status: "accepted", auto_accepted: true, decided_at: "2026-11-02T18:00:00+00:00",

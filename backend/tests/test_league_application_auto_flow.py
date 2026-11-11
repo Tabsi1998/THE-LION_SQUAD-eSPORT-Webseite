@@ -381,6 +381,26 @@ async def test_the_own_team_of_a_lead_is_accepted_but_the_lead_cannot_reject_it(
         refused = await decide(flow, w, application, action, actor=side["captain"], **body)
         assert refused.status_code == 403 and "eigenes Team" in refused.json()["detail"], action
     assert (await stored(flow, application))["status"] == "accepted"
+    # Die anderen Zuständigen sehen es im Eingang markiert: „Team der Leitung – automatisch angenommen“.
+    item = (await inbox(flow, w))["items"][0]
+    assert item["lead_team_auto"] is True and item["own_team"] is False
+
+
+@pytest.mark.asyncio
+async def test_an_auto_accepted_team_without_a_lead_is_not_marked(flow):
+    """Gegenprobe: ohne Person der Liga-Leitung im Team keine Markierung, ebenso bei einer Annahme durch die Leitung."""
+    w = await application_world(flow, teams=2, staffeln=2, **AUTO)
+    auto = await submitted(flow, w, w["teams"][0])
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": w["league"]["id"], "user_id": w["teams"][1]["captain"]["id"],
+                                           "capabilities": ["season"], "created_at": now_utc().isoformat(), "created_by": "test"})
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {"application_auto_accept": False}})
+    by_lead = await submitted(flow, w, w["teams"][1])
+    ok(await decide(flow, w, by_lead, "accept"))
+
+    items = {row["id"]: row for row in (await inbox(flow, w))["items"]}
+
+    assert items[auto["id"]]["auto_accepted"] is True and items[auto["id"]]["lead_team_auto"] is False
+    assert items[by_lead["id"]]["auto_accepted"] is False and items[by_lead["id"]]["lead_team_auto"] is False
 
 
 # ---------------------------------------------------------------- Einstellung: Rechte, Protokoll, später einschalten
@@ -398,8 +418,15 @@ async def test_switching_on_needs_the_season_capability_and_is_logged(flow):
 
     entry = await flow.db.audit_logs.find_one({"action": "league.season.update", "target_id": w["season"]["id"]}, {"_id": 0}, sort=[("created_at", -1)])
     assert "application_auto_accept" in entry["data"]["fields"]
-    # ``null`` lässt den Wert stehen wie bei den übrigen Vorgaben.
+    switched = await flow.db.audit_logs.find_one({"action": "league.season.auto_accept", "target_id": w["season"]["id"]}, {"_id": 0})
+    assert switched["data"]["before"] is False and switched["data"]["after"] is True
+    # ``null`` lässt den Wert stehen wie bei den übrigen Vorgaben - und schreibt kein Umschalten.
     assert ok(await flow.patch(url, json={"application_auto_accept": None}))["application_auto_accept"] is True
+    assert ok(await flow.patch(url, json={"application_slots": 8}))["application_slots"] == 8
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.auto_accept"}) == 1
+    ok(await flow.patch(url, json={"application_auto_accept": False}))
+    back = await flow.db.audit_logs.find_one({"action": "league.season.auto_accept", "data.after": False}, {"_id": 0})
+    assert back["data"]["before"] is True and back["actor_id"]
 
 
 @pytest.mark.asyncio
