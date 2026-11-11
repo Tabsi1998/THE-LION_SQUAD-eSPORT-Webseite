@@ -14,6 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
+from routes import league_veto_routes  # noqa: E402
 from services import league_veto, league_veto_sweep  # noqa: E402
 from test_league_veto_flow import both_in, lead, mid, page, pick, stored_veto, veto_rules, veto_world  # noqa: E402
 
@@ -138,29 +139,136 @@ async def test_spectators_see_the_veto_read_only_without_choice_lead_or_pause_re
     assert tv["paused"]["reason"] is None and tv["own_side"] is None and tv["lead"] is None
 
 
-@pytest.mark.asyncio
-async def test_spectators_only_see_a_visible_staffel_and_the_display_key_opens_it_without_login(flow):
-    world = await started_world(flow)
-    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {"is_public": False, "visibility": "members"}})
-    hidden = await live_status(flow, world, None)
-    assert hidden == 404, "eine nicht öffentliche Staffel bleibt verborgen - wie die Matchseite"
-    outsider = await live_status(flow, world, "Fremd")
-    assert outsider in (403, 404)
-    # Beteiligte sehen ihr Spiel weiter.
-    own = (await live(flow, world, "Kapitaen"))["veto"]
-    assert own["own_turn"] is True
-
+async def tv_key(flow, world) -> str:
     admin = await flow.add_user(role="tournament_admin", name="Hallenleitung")
     admin["areas"] = ["leagues"]
     flow.act_as(admin)
     made = await flow.post("/api/tv/keys", json={"tournament_id": world["tournament"]["id"], "label": "Beamer Halle"})
     assert made.status_code == 200, made.text
-    tv = await live(flow, world, None, key=made.json()["token"])
+    return made.json()["token"]
+
+
+async def answer_of(flow, url: str, **params):
+    flow.act_as(None)
+    answer = await flow.get(url, params=params or None)
+    return answer.status_code, answer.json().get("detail")
+
+
+@pytest.mark.asyncio
+async def test_spectators_only_see_a_visible_staffel_and_the_display_key_opens_it_without_login(flow):
+    world = await started_world(flow)
+    token = await tv_key(flow, world)
+    # Season „Nur Mitglieder“: Die Staffel steht auf „members“ (öffentlich gelistet, Inhalt nur für Mitglieder).
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {"is_public": True, "visibility": "members"}})
+    hidden = await live_status(flow, world, None)
+    assert hidden in (403, 404), "ohne Anmeldung bleibt eine Staffel „Nur Mitglieder“ verborgen - wie die Matchseite"
+    # Beteiligte sehen ihr Spiel weiter.
+    own = (await live(flow, world, "Kapitaen"))["veto"]
+    assert own["own_turn"] is True
+
+    tv = await live(flow, world, None, key=token)
     assert tv["veto"]["status"] == "running" and tv["veto"]["options"] == [] and tv["state"] is None
     assert tv["match"]["sides"] == ["Loewen · Rudel A", "Falken · Horst"]
-    # Gegenprobe: ein falscher Schlüssel öffnet nichts.
-    wrong = await live_status(flow, world, None, key="kein-gueltiger-schluessel")
-    assert wrong == 403
+    # Gegenprobe: ein falscher Schlüssel und ein unbekanntes Spiel sehen gleich aus - kein Hinweis, ob es das Spiel gibt.
+    wrong = await answer_of(flow, f"/api/matches/{mid(world)}/veto", key="kein-gueltiger-schluessel")
+    unknown = await answer_of(flow, "/api/matches/gibt-es-nicht/veto", key=token)
+    unknown_wrong = await answer_of(flow, "/api/matches/gibt-es-nicht/veto", key="kein-gueltiger-schluessel")
+    assert wrong == unknown == unknown_wrong and wrong[0] == 403
+
+    # Auch mit Schlüssel nie: eine interne Staffel (Season aus bzw. nur Verwaltung) und ein Entwurf - wie beim Event-TV.
+    for fields in ({"is_public": False, "visibility": "internal"}, {"is_public": True, "visibility": "public", "status": "draft"}):
+        await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": fields})
+        refused = await answer_of(flow, f"/api/matches/{mid(world)}/veto", key=token)
+        assert refused == wrong, fields
+
+
+@pytest.mark.asyncio
+async def test_spectator_polls_are_limited_per_address_and_per_key(flow, monkeypatch):
+    world = await started_world(flow)
+    token = await tv_key(flow, world)
+    monkeypatch.setattr(league_veto_routes, "SPECTATOR_RATE_LIMIT", 3)
+    address = ["10.0.0.1"]
+    monkeypatch.setattr(league_veto_routes, "get_client_ip", lambda _request: address[0])
+    codes = [await live_status(flow, world, "Fremd") for _ in range(4)]
+    assert codes == [200, 200, 200, 429], "Zuschauer: höchstens so viele Abrufe je Adresse und Minute"
+    # Gegenprobe: Beteiligte fragen unbegrenzt - ihr Abruf ist die Matchseite selbst.
+    own = [await live_status(flow, world, "Kapitaen") for _ in range(5)]
+    assert own == [200] * 5
+    # Je Schlüssel zählt ein eigener Zähler - auch wenn die Bildschirme hinter verschiedenen Adressen stehen.
+    keyed = []
+    for number in range(4):
+        address[0] = f"10.0.1.{number}"
+        keyed.append(await live_status(flow, world, None, key=token))
+    assert keyed == [200, 200, 200, 429]
+    key_rows = await flow.db.rate_limits.count_documents({"_id": {"$regex": "^veto_live_key:"}})
+    named = await flow.db.rate_limits.count_documents({"_id": {"$regex": token}})
+    assert key_rows == 1 and named == 0, "der Zähler nennt den Schlüssel nie"
+
+
+@pytest.mark.asyncio
+async def test_the_spectator_view_is_cached_briefly_but_a_new_move_shows_at_once(flow, monkeypatch):
+    world = await started_world(flow)
+    built = []
+    original = league_veto.live_block
+
+    async def counting(*args, **kwargs):
+        built.append(kwargs.get("spectator"))
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(league_veto, "live_block", counting)
+    clock = [1000.0]
+    monkeypatch.setattr(league_veto_routes, "_clock", lambda: clock[0])
+    first = (await live(flow, world, "Fremd"))["veto"]
+    clock[0] += 1
+    second = (await live(flow, world, None, display="1"))["veto"]
+    assert built == [True], "derselbe Stand: einmal gebaut, für alle Zuschauer"
+    assert second["plan"] == first["plan"] and second["version"] == first["version"]
+    assert second["server_now"] >= first["server_now"], "die Serverzeit ist die dieses Abrufs"
+    # Ein neuer Zug ist sofort da - der Schlüssel des Zwischenspeichers ist der Stand des Spiels.
+    moved = await pick(flow, world, "Kapitaen", "map-glut", first["version"])
+    assert moved.status_code == 200
+    third = (await live(flow, world, "Fremd"))["veto"]
+    assert third["plan"][0]["map_name"] == "Glut" and len(built) == 2
+    # Nach Ablauf baut der nächste Abruf neu, auch ohne Änderung.
+    clock[0] += league_veto_routes.SPECTATOR_CACHE_SECONDS + 0.1
+    await live(flow, world, "Fremd")
+    assert len(built) == 3
+    # Beteiligte gehen nie über den Zwischenspeicher.
+    await live(flow, world, "Kapitaen")
+    assert len(built) == 4 and not built[-1]
+
+
+@pytest.mark.asyncio
+async def test_a_spectator_read_after_the_deadline_triggers_nothing(flow):
+    world = await started_world(flow)
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"flow.veto.deadline_at": (now_utc() - timedelta(seconds=2)).isoformat()}})
+    outside = (await live(flow, world, "Fremd"))["veto"]
+    tv = (await live(flow, world, None, display="1"))["veto"]
+    assert outside["history"] == [] and tv["history"] == [] and outside["current"]["remaining_seconds"] == 0
+    stored = await stored_veto(flow, world)
+    assert stored["steps"] == [] and stored["version"] == 1, "Zuschauer und TV wählen nie - das macht der Job oder die Seite der Beteiligten"
+    # Gegenprobe: Der Abruf eines Captains löst die Frist auf.
+    own = (await live(flow, world, "Falke1"))["veto"]
+    assert len(own["history"]) == 1 and own["history"][0]["via"] == "auto"
+
+
+@pytest.mark.asyncio
+async def test_mark_seen_writes_at_most_every_five_seconds(flow):
+    world = await started_world(flow)
+    match = await flow.reload(world["match"])
+    reg = world["reg_a"]["id"]
+    now = now_utc()
+    first = await league_veto.mark_seen(flow.db, match, reg, now=now)
+    soon = await league_veto.mark_seen(flow.db, match, reg, now=now + timedelta(seconds=4))
+    later = await league_veto.mark_seen(flow.db, match, reg, now=now + timedelta(seconds=6))
+    assert (first, soon, later) == (True, False, True)
+    seen = (await flow.reload(world["match"]))["flow"]["veto_seen"][reg]
+    assert seen == (now + timedelta(seconds=6)).isoformat()
+    # Ohne laufendes Veto und mit einer unbrauchbaren Kennung schreibt es nichts.
+    dotted = await league_veto.mark_seen(flow.db, match, "a.b", now=now + timedelta(seconds=20))
+    paused = {**match, "flow": {**match["flow"], "veto": {**match["flow"]["veto"], "status": "paused"}}}
+    while_paused = await league_veto.mark_seen(flow.db, paused, reg, now=now + timedelta(seconds=20))
+    assert dotted is False and while_paused is False
 
 
 @pytest.mark.asyncio
@@ -225,6 +333,33 @@ async def test_the_side_at_turn_gets_one_reminder_after_twenty_idle_seconds_when
 
 
 @pytest.mark.asyncio
+async def test_after_undo_the_same_step_gets_its_reminder_again_but_not_after_pause_and_resume(flow):
+    world = await started_world(flow)
+    captain = world["users"]["Kapitaen"]["id"]
+    now = await move_deadline(flow, world, 35)
+    first = await league_veto_sweep.nudge(flow.db, now=now)
+    assert first == 1
+    moved = await pick(flow, world, "Kapitaen", "map-glut", 1)
+    undone = await lead(flow, world, "undo", 2, reason="Falsche Map angetippt, beide einig")
+    assert moved.status_code == 200 and undone.status_code == 200
+    stored = await stored_veto(flow, world)
+    assert stored["step"] == 0 and stored["version"] == 3
+    now = await move_deadline(flow, world, 35)
+    again = await league_veto_sweep.nudge(flow.db, now=now)
+    assert again == 1, "derselbe Schritt beginnt nach „Schritt zurück“ neu - die Seite bekommt wieder eine Erinnerung"
+    rows = await nudges(flow)
+    assert [row["user_id"] for row in rows] == [captain, captain]
+    assert rows[0]["meta"]["dedupe_key"] != rows[1]["meta"]["dedupe_key"]
+    # Gegenprobe: Pause und Fortsetzen sind derselbe Schritt - keine dritte.
+    held = await lead(flow, world, "pause", 3)
+    resumed = await lead(flow, world, "resume", 4)
+    assert held.status_code == 200 and resumed.status_code == 200
+    now = await move_deadline(flow, world, 35)
+    after_pause = await league_veto_sweep.nudge(flow.db, now=now)
+    assert after_pause == 0 and len(await nudges(flow)) == 2
+
+
+@pytest.mark.asyncio
 async def test_no_reminder_while_the_side_has_the_veto_open_and_none_for_pause_or_lock(flow):
     world = await started_world(flow)
     now = await move_deadline(flow, world, 35)
@@ -268,14 +403,17 @@ def test_the_reminder_never_fires_for_system_steps_or_in_the_last_seconds():
                                                    {"kind": "decider", "mode": "hp", "team": None, "position": 3}]},
         "deadline_at": (now + timedelta(seconds=30)).isoformat()}}}
     target = league_veto.nudge_target(base, now=now)
-    assert target["registration_id"] == "ra" and target["key"] == "veto-turn:m1:s:0:ra" and target["left"] == 30
+    assert target["registration_id"] == "ra" and target["key"] == "veto-turn:m1:s:0:0:ra" and target["left"] == 30
+    # „Schritt zurück“ oder „Neu starten“ beginnen denselben Schritt neu - eigener Schlüssel; Pause und Fortsetzen nicht.
+    undone = {**base, "flow": {"veto": {**base["flow"]["veto"], "lead_log": [{"action": "pause"}, {"action": "resume"}, {"action": "undo"}]}}}
+    assert league_veto.nudge_target(undone, now=now)["key"] == "veto-turn:m1:s:1:0:ra"
     decider = {**base, "flow": {"veto": {**base["flow"]["veto"], "step": 1}}}
     assert league_veto.nudge_target(decider, now=now) is None, "Decider setzt das System"
     late = {**base, "flow": {"veto": {**base["flow"]["veto"], "deadline_at": (now + timedelta(seconds=3)).isoformat()}}}
     assert league_veto.nudge_target(late, now=now) is None, "kurz vor Ablauf hilft keine Nachricht mehr"
     early = {**base, "flow": {"veto": {**base["flow"]["veto"], "deadline_at": (now + timedelta(seconds=45)).isoformat()}}}
     assert league_veto.nudge_target(early, now=now) is None, "erst nach 20 Sekunden"
-    told = {**base, "flow": {**base["flow"], "veto_nudge": {"key": "veto-turn:m1:s:0:ra"}}}
+    told = {**base, "flow": {**base["flow"], "veto_nudge": {"key": "veto-turn:m1:s:0:0:ra"}}}
     assert league_veto.nudge_target(told, now=now) is None
     open_page = {**base, "flow": {**base["flow"], "veto_seen": {"ra": (now - timedelta(seconds=3)).isoformat()}}}
     assert league_veto.nudge_target(open_page, now=now) is None
