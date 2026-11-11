@@ -2784,6 +2784,13 @@ class LeagueSeasonFields(LeagueLookFields):
     scoring_rules: Optional[dict] = None
     result_confirm_hours: Optional[int] = Field(default=None, ge=1, le=336)
     lineup_amend_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    # Vorfälle im Spiel (D.5, #1619; docs/LIGA.md „D.5/E.2-Vertrag“): Standardpause, Antwortzeit der Gegenseite, Kontingent je Team
+    # und Map, Serie bei einer Map „in Klärung“. Ohne Feld gilt die Vorgabe aus ``league_presets.PRESETS``.
+    map_break_after: Optional[int] = Field(default=None, ge=1, le=7)
+    map_break_minutes: Optional[int] = Field(default=None, ge=0, le=60)
+    incident_answer_minutes: Optional[int] = Field(default=None, ge=1, le=120)
+    incident_quota_per_map: Optional[int] = Field(default=None, ge=0, le=5)
+    clarification_mode: Optional[Literal["continue", "pause_series"]] = None
     # Antwortfrist auf Terminvorschläge (#2106, F3) - wie ``TournamentCreate.match_schedule_response_hours``.
     match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
     rules_text: Optional[str] = Field(default=None, max_length=20000)

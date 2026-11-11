@@ -29,6 +29,7 @@ from services.league_rules_store import delete_drafts, deletion_blockers, staffe
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
+from services.league_presets import INCIDENT_FIELDS
 from services.league_scope import ONLY_LEAGUE
 from services import checkin_rules, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
@@ -98,8 +99,9 @@ SERIES = "series"
 # Mindestgröße je Modus (#2207, C.2): nur an der Season, fehlt = abgeleitet (``league_pool_check``).
 POOL_MIN_MAPS = "pool_min_maps"
 POOL_MIN_MAPS_MAX = 50
+# Vorfälle im Spiel (D.5, #1619): fünf einfache Werte an der Season, ohne Feld gilt die Vorgabe (``league_presets``).
 SEASON_FIELDS = (tuple(SEASON_DEFAULTS) + tuple(SEASON_RULE_DEFAULTS) + APPLICATION_OPTIONAL
-                 + ("name", "slug", "number", "start_date", POOL_MIN_MAPS))
+                 + ("name", "slug", "number", "start_date", POOL_MIN_MAPS) + INCIDENT_FIELDS)
 OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size", "scoring_rules",
                    "match_schedule_response_hours")
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
@@ -487,6 +489,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     # Veto (#1618, D.3): ebenso - ohne Feld (oder aus) gibt es in der Staffel kein Veto.
     if isinstance(season.get("veto_rules"), dict):
         fields["veto_rules"] = copy.deepcopy(season["veto_rules"])
+    # Vorfälle (#1619, D.5): nur, was die Season trägt - ohne Feld gilt in der Staffel die Vorgabe.
+    fields.update({key: season[key] for key in INCIDENT_FIELDS if season.get(key) is not None})
     return fields
 
 
@@ -504,6 +508,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "checkin": ("checkin_rules",),
     # Veto (#1618, D.3): ebenso - ein laufendes Veto behält seinen Schnappschuss der Vorlage.
     "veto": ("veto_rules",),
+    # Vorfälle (#1619, D.5): ebenso - jeder Vorfall hält seine Frist fest, neue Werte gelten nur für neue Fälle.
+    "incidents": INCIDENT_FIELDS,
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -518,6 +524,7 @@ SYNC_GROUP_LABELS = {
     "schedule": "Terminregeln",
     "checkin": "Check-in",
     "veto": "Veto",
+    "incidents": "Vorfälle und Pausen",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
@@ -836,7 +843,7 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     for key in ("name", "slug", "number", "start_date", "weeks_total", "matchday_days", "default_match_weekday",
                 "default_match_time", "round_robin_legs", "max_staffel_size", "best_of", "team_size",
                 "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat",
-                RESPONSE_HOURS, "promote_on_home", *SEASON_RULE_DEFAULTS):
+                RESPONSE_HOURS, "promote_on_home", *SEASON_RULE_DEFAULTS, *INCIDENT_FIELDS):
         if key in fields and fields[key] is None:
             fields.pop(key)  # Pflichtfelder bleiben, wie sie sind
     if "scoring_rules" in fields and fields["scoring_rules"] is None:
@@ -1343,6 +1350,7 @@ STAFFEL_SOURCE_FIELDS = frozenset({
     "start_date", "weeks_total", "blocked_periods", "matchday_days", "default_match_weekday", "default_match_time",
     "round_robin_legs", "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
     "map_repeat", "scoring_rules", "result_confirm_hours", "lineup_amend_hours", "rules_text", RESPONSE_HOURS,
+    *INCIDENT_FIELDS,
 })
 
 
