@@ -1,6 +1,8 @@
 // Veto der Liga (#1618, docs/LIGA.md D.3): die Vorlage je Season live prüfen (dieselben Sätze wie der Server für Positionen, Modusfolge
 // und Poolgrößen - die Suche bei „jede Map nur einmal je Serie“ und der Abgleich mit dem gespeicherten Pool kommen vom Server) und die
 // Sätze des Veto-Blocks auf der Matchseite. Der Server bleibt maßgeblich; hier geht es darum, dass man nichts Falsches eingibt.
+// Live-Oberfläche (D.4, #1651): Takt des Nachfragens, Countdown nach der Serverzeit, Zeitleiste, Karten und was davon aufleuchtet.
+import { serverOffset } from "@/seasons/clock";
 
 // Kurz, damit die Art in der Zeile je Schritt nicht abgeschnitten wird; was Decider und Vorgabe sind, erklärt der Kasten darüber.
 // „Vorgabe“ ist die Vorgabe der Woche (#2326): Die Map legt die Liga-Leitung je Spielwoche fest, das System setzt sie.
@@ -324,16 +326,19 @@ export function actionWord(kind) {
   return kind === "ban" ? "Sperren" : "Wählen";
 }
 
-/** Wohin der Countdown zählt - die Frist des laufenden Schritts, sonst nichts. */
-export function vetoDeadline(block) {
+/**
+ * Wohin der Countdown zählt - die Frist des laufenden Schritts, sonst nichts. `offset` (ms, Serveruhr minus Geräteuhr, #1651) rechnet
+ * die Frist des Servers in die Zeit des Geräts um: Geht das Gerät zwei Minuten nach, zählt der Countdown trotzdem richtig.
+ */
+export function vetoDeadline(block, offset = 0) {
   if (block?.status !== "running" || !block.current?.deadline_at) return null;
   const at = new Date(block.current.deadline_at).getTime();
-  return Number.isFinite(at) ? at : null;
+  return Number.isFinite(at) ? at - (Number(offset) || 0) : null;
 }
 
 /** Wie viel vom Ring noch übrig ist (1 = voll) - über die Zeit je Schritt. */
-export function vetoRingShare(block, now = Date.now()) {
-  const target = vetoDeadline(block);
+export function vetoRingShare(block, now = Date.now(), offset = 0) {
+  const target = vetoDeadline(block, offset);
   const seconds = Number(block?.step_seconds) || 0;
   if (!target || !seconds) return 1;
   return Math.min(1, Math.max(0, (target - now) / (seconds * 1000)));
@@ -359,4 +364,158 @@ export function historyLine(row) {
   if (row.kind === "preset") return `${row.index + 1}. Vorgabe der Woche: ${row.map_name} → Map ${row.position} (${row.mode_label})`;
   if (row.kind === "ban") return `${row.index + 1}. ${row.name || "?"} sperrt ${row.map_name} (${row.mode_label})${auto}`;
   return `${row.index + 1}. ${row.name || "?"} wählt ${row.map_name} → Map ${row.position} (${row.mode_label})${auto}`;
+}
+
+// ---------------------------------------------------------------- Live (D.4, #1651)
+
+/**
+ * Wie oft die Seite nachfragt (ms): schnell, solange das Veto läuft; ruhiger in der Pause (dort ändert nur die Leitung etwas, und das
+ * meldet der Änderungsstrom ohnehin); beim Warten auf „Bereit“ oder die Vorgabe nur, wenn beide Seiten eingecheckt sind. 0: gar nicht.
+ * Im Hintergrund-Tab fragt die Seite nie nach (`useVetoPolling`).
+ */
+export const VETO_POLL_MS = Object.freeze({ running: 2000, paused: 5000, waiting: 3000 });
+
+export function vetoPollMs(block, { bothIn = false } = {}) {
+  if (!block) return 0;
+  if (block.status === "running") return VETO_POLL_MS.running;
+  if (block.status === "paused") return VETO_POLL_MS.paused;
+  if (block.status === "waiting" && (block.blocked || block.start) && bothIn) return VETO_POLL_MS.waiting;
+  return 0;
+}
+
+/**
+ * Abstand der Serveruhr zur Geräteuhr (ms) aus der Serverzeit einer Antwort (`server_now`). Ohne Anfragezeit zählt der Empfang - die
+ * halbe Laufzeit (meist unter 0,1 s) bleibt dann als Fehler, für einen Countdown in Sekunden genug. Ohne gültige Zeit: 0.
+ */
+export function vetoClockOffset(serverNowIso, receivedAt = Date.now(), requestedAt = receivedAt) {
+  return serverOffset(serverNowIso, requestedAt, receivedAt);
+}
+
+/** Die ganzen Sekunden bis zur Frist (aufgerundet, nie unter 0) - `null` ohne Frist. */
+export function secondsLeft(deadline, now = Date.now()) {
+  if (deadline == null || !Number.isFinite(deadline)) return null;
+  return Math.max(0, Math.ceil((deadline - now) / 1000));
+}
+
+/** Ab hier betont der Countdown die letzten Sekunden (Farbe, ohne „Bewegung reduzieren“ ein ruhiger Puls). */
+export const URGENT_SECONDS = 10;
+export const isUrgent = (seconds) => seconds != null && seconds <= URGENT_SECONDS;
+
+/** Wann der Bildschirmleser die Zeit ansagt: bei 30, 10 und 5 Sekunden und beim Ablauf - nicht jede Sekunde. */
+export const ANNOUNCE_AT = Object.freeze([30, 10, 5]);
+
+/**
+ * Der Satz für die höfliche Ansage (`aria-live="polite"`): Er ändert sich nur an den Marken, so sagt der Bildschirmleser nicht jede
+ * Sekunde an. Über 30 Sekunden leer.
+ */
+export function countdownAnnouncement(seconds) {
+  if (seconds == null) return "";
+  if (seconds <= 0) return "Zeit abgelaufen – das System wählt.";
+  const mark = [...ANNOUNCE_AT].reverse().find((value) => seconds <= value);
+  return mark ? `Noch ${mark} Sekunden.` : "";
+}
+
+/** Team A ist blau, Team B gold - Ring, Ablauf und Karten zeigen damit, wer gesperrt oder gewählt hat. */
+export const SIDE_TONE = Object.freeze({ A: "a", B: "b" });
+export const sideTone = (side) => SIDE_TONE[side] || "system";
+
+/** Der Name einer Seite (A oder B) aus dem Block. */
+export function sideName(block, side) {
+  if (side === "A") return block?.team_a?.name || "Team A";
+  if (side === "B") return block?.team_b?.name || "Team B";
+  return "";
+}
+
+export const KIND_SHORT = Object.freeze({ ban: "Sperre", pick: "Wahl", decider: "Decider", preset: "Vorgabe" });
+
+/** Der Ablauf als Zeitleiste: jeder Schritt mit Art, Seite und Modus - fertige mit Map, der laufende als `current`. */
+export function timelineRows(block) {
+  return (block?.plan || []).map((row) => ({
+    ...row,
+    key: `step-${row.index}`,
+    kindLabel: KIND_SHORT[row.kind] || row.kind,
+    who: row.side ? (row.name || `Team ${row.side}`) : row.kind === "preset" ? "Liga-Leitung" : "System",
+    tone: sideTone(row.side),
+    target: row.kind === "ban" ? "" : row.position ? `Map ${row.position}` : "",
+    auto: row.via === "auto" && row.kind !== "decider" && row.kind !== "preset",
+  }));
+}
+
+/** Der Satz zu einem Schritt der Zeitleiste für Bildschirmleser: „Schritt 3 von 11: Loewen wählt Map 1 (Stellung) – Hafen“. */
+export function timelineLabel(row, total) {
+  const what = row.kind === "ban" ? "sperrt eine Map" : row.kind === "pick" ? `wählt Map ${row.position}`
+    : row.kind === "decider" ? `Decider für Map ${row.position}` : `Vorgabe der Woche für Map ${row.position}`;
+  const state = row.state === "done" ? ` – ${row.map_name || "erledigt"}${row.auto ? ", das System hat gewählt" : ""}`
+    : row.state === "current" ? " – läuft" : "";
+  return `Schritt ${row.number} von ${total}: ${row.side ? `${row.who} ` : ""}${what} (${row.mode_label || row.mode})${state}`;
+}
+
+const cardKey = (mode, mapId) => `${mode}:${mapId}`;
+
+/**
+ * Die Karten des Bretts je Modus. `selectable`: die Seite am Zug kann die Karte jetzt antippen; `pickable`: die Karte gehört zur
+ * Auswahl des laufenden Schritts (auch ausgegraut, mit Hinweis). `current`: der Modus des laufenden Schritts.
+ */
+export function boardGroups(block) {
+  const current = block?.status === "running" || block?.status === "paused" ? block.current : null;
+  const options = new Map((block?.options || []).map((option) => [option.map_id, option]));
+  return (block?.remaining || []).map((group) => {
+    const isCurrent = Boolean(current && current.mode === group.mode);
+    return {
+      ...group,
+      current: isCurrent,
+      cards: (group.maps || []).map((row, index) => {
+        const option = isCurrent && block.can_pick ? options.get(row.map_id) || null : null;
+        return {
+          ...row, key: cardKey(group.mode, row.map_id), index, option,
+          pickable: Boolean(option), selectable: Boolean(option?.allowed), tone: sideTone(row.side),
+          statusText: mapStatusText(row),
+        };
+      }),
+    };
+  });
+}
+
+/**
+ * Welche Karten seit dem letzten Stand eine Aktion bekommen haben und kurz aufleuchten: jede Wahl (auch Decider und Vorgabe) und jede
+ * Sperre der Gegenseite - die eigene Sperre dimmt nur. Der erste Stand zählt nicht (beim Laden ist nichts neu), Zuschauer sehen jede
+ * Aktion als neu. Gibt die Schlüssel `Modus:Map` zurück.
+ */
+export function freshCards(before, after, ownSide = null) {
+  const out = new Set();
+  if (!before || !after) return out;
+  const was = new Map();
+  for (const group of before) for (const row of group.maps || []) was.set(cardKey(group.mode, row.map_id), row.status);
+  for (const group of after) {
+    for (const row of group.maps || []) {
+      const key = cardKey(group.mode, row.map_id);
+      if (!was.has(key) || was.get(key) === row.status || row.status === "open" || row.status === "elsewhere") continue;
+      if (row.status !== "banned" || !ownSide || row.side !== ownSide) out.add(key);
+    }
+  }
+  return out;
+}
+
+/**
+ * Den kurzen Abruf (`GET /matches/{id}/veto`) in die geladene Matchseite übernehmen: Bleibt der Stand derselbe (Stand des Check-ins und
+ * Status des Vetos), ersetzt er nur den Veto-Block - beim Captain in `checkin.veto`, beim Zuschauer in `veto_view`. Ändert sich der Stand
+ * (das Veto beginnt, ist fertig, die Leitung pausiert), gibt es `null`: Dann lädt die Seite einmal ganz (Start-Knopf, Meldeformular).
+ */
+export function mergeLiveVeto(page, live) {
+  if (!page || !live?.veto) return null;
+  if (page.checkin) {
+    const before = page.checkin.veto;
+    if (!before || before.status !== live.veto.status || (live.state && live.state !== page.checkin.state)) return null;
+    return { ...page, checkin: { ...page.checkin, veto: live.veto } };
+  }
+  if (page.veto_view && page.veto_view.status === live.veto.status) return { ...page, veto_view: live.veto };
+  return null;
+}
+
+/** Der Name einer Karte für Bildschirmleser: Map, Zustand und - wenn sie antippbar ist - was das Antippen tut. */
+export function cardLabel(card, kind) {
+  const base = `${card.name}: ${card.statusText}`;
+  if (card.selectable) return `${base} – antippen zum ${kind === "ban" ? "Sperren" : "Wählen"}`;
+  if (card.pickable && card.option?.hint) return `${base} – ${card.option.hint}`;
+  return base;
 }
