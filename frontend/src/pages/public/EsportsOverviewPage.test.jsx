@@ -22,11 +22,15 @@ const { default: EsportsOverviewPage, leagueTile } = await import("./EsportsOver
 const SEASON = { id: "s1", slug: "season-1", name: "Season 1", status: "draft", start_date: "2026-11-10" };
 
 test("mit sichtbarer Season: Kachel „Liga“ mit Starttermin und Knopf oben", async () => {
-  state.leagues = [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [SEASON] }];
+  // Starttermin immer in der Zukunft - ein festes Datum läuft ab (rot ab dem 11.11.2026).
+  const start = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+  const iso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+  const shown = `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+  state.leagues = [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [{ ...SEASON, start_date: iso }] }];
   render(<MemoryRouter><EsportsOverviewPage /></MemoryRouter>);
   const tile = await screen.findByTestId("esports-hub-league");
   expect(tile).toHaveAttribute("href", "/liga");
-  expect(screen.getByTestId("esports-hub-league-badge")).toHaveTextContent("Start am 10.11.2026");
+  expect(screen.getByTestId("esports-hub-league-badge")).toHaveTextContent(`Start am ${shown}`);
   expect(screen.getByTestId("esports-hero-league")).toHaveAttribute("href", "/liga");
 });
 
