@@ -2765,7 +2765,8 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Turnier ohne Liga | 30 Tage nach dem Hochladen, nicht solange das Spiel `disputed` ist (unverändert) |
 | Liga, alles außer MOSS | ab Season-Ende + `evidence_keep_days`, nicht solange am Spiel ein Vorfall oder Verfahren offen ist oder eine Einspruchsfrist läuft |
 | Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; am Vorfall: Ende des Vorfalls (`closed_at`) bzw. eines daraus folgenden Verfahrens (`disputes[].incident_id`, ganze Kette samt Einspruch) + Einspruchsfrist, **mindestens aber bis das Ergebnis des Spiels feststeht und `protest_hours` abgelaufen sind** (ruhend in Sperrzeiten; so lange kann aus dem Vorfall noch ein Protest werden; bei einem abgesagten Spiel entfällt das); ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes `appeal_hours` nach dem Hochladen |
-| Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
+| Spiel oder Turnier gelöscht | sofort mit (unverändert) |
+| Konto gelöscht | sofort mit - **außer** ein MOSS-Nachweis der Person wird in einem laufenden Vorfall oder Verfahren noch gebraucht (seine Frist aus der Zeile „Liga, MOSS“ ist nicht um): Der bleibt bis dahin ohne Kennung der Person (`owner_id: null`, `owner_erased: true`, `status: "removed"`) nur für die nicht befangene Leitung, dann löscht ihn der Job (Entscheidung Fabian 11.11., DSGVO Art. 17 Abs. 3 lit. e; `match_proof_retention.delete_for_user`, Protokoll `match.proof.erasure_hold` ohne Person) |
 
 **Bildprüfung:** Ein Bild wird mit `scan_state: "pending"` gespeichert und ist bis zum Ergebnis nur für den Absender sichtbar.
 Lässt sich die Prüfung beim Hochladen nicht anstoßen, reiht derselbe stündliche Job das Bild nach einer Stunde neu ein

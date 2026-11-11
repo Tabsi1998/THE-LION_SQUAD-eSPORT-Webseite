@@ -178,7 +178,10 @@ PERSONAL: dict[str, Entry] = {
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),
     "match_commendations": Entry(KEPT, ("commendations_given",), "das GG gehört zum Match wie das Ergebnis"),
-    "match_proof_photos": Entry(DELETED, ("match_proof_photos",)),
+    "match_proof_photos": Entry(DELETED, ("match_proof_photos",), note=(
+        "Ausnahme (#2360, DSGVO Art. 17 Abs. 3 lit. e): ein MOSS-Nachweis in einem laufenden Vorfall oder Verfahren bleibt ohne "
+        "Kennung der Person nur für die Liga-Leitung, bis das Verfahren samt Einspruchsfrist abgeschlossen ist - dann löscht ihn "
+        "der Job proof_photo_retention")),
     "tournament_staff_assignments": Entry(DELETED, ("tournament_staff",)),
     "league_staff": Entry(DELETED, ("league_staff",)),
     "f1_staff_assignments": Entry(DELETED, ("f1_staff",)),

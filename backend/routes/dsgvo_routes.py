@@ -379,8 +379,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     await db.tournament_chat_messages.update_many({"user_id": user_id}, {"$set": {"message": "[Nachricht gelöscht]", "author_anonymized": True}})
     from services.chat_attachments import delete_user_attachments
     await delete_user_attachments(db, user_id)
-    # Fotos vom Ergebnis (#1157): Dateien und Einträge weg; Meldungen behalten nur die (dann tote) Kennung.
-    from services.match_proofs import delete_for_user as delete_user_proofs
+    # Nachweise zu Spielen (#1157, #2360): Dateien und Einträge weg; Meldungen behalten nur die (dann tote) Kennung. Nur ein
+    # MOSS-Nachweis in einem laufenden Verfahren bleibt ohne Bezug zur Person, bis es abgeschlossen ist (Art. 17 Abs. 3 lit. e).
+    from services.match_proof_retention import delete_for_user as delete_user_proofs
     await delete_user_proofs(db, user_id)
     # Eingesandte Galerie-Fotos (#1186): offene samt Dateien weg, „Foto: Name“ an freigegebenen weg.
     from services.event_photos import delete_for_user as delete_user_photo_submissions

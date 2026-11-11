@@ -6,6 +6,8 @@
   oder eine Einspruchsfrist läuft. MOSS (Anti-Cheat) nur, bis das Verfahren beendet und die Einspruchsfrist vorbei ist -
   an einem Vorfall mindestens, bis das Ergebnis des Spiels feststeht und die Protestfrist abgelaufen ist (``moss_due``).
 - Alles, dessen Spiel es nicht mehr gibt.
+- Kontolöschung (``delete_for_user``): alles sofort - außer MOSS in einem laufenden Vorfall oder Verfahren, der pseudonym
+  für die Leitung bleibt, bis seine Frist um ist.
 
 Gelesen wird in Seiten nach ``id`` ohne feste Obergrenze: Hinter vielen Nachweisen, die noch gehalten werden (offenes
 Verfahren, Spiel in Klärung), bliebe sonst alles Spätere dauerhaft ungeprüft.
@@ -21,7 +23,7 @@ from datetime import datetime, time, timedelta, timezone
 from models import now_utc
 from services import match_proof_refs as refs
 from services import match_proofs, media_scan
-from services.league_scope import ONLY_LEAGUE
+from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.league_service import VIENNA, week_days
 from services.match_disputes import decided_at
 from services.matchday_schedule import response_deadline
@@ -160,6 +162,35 @@ async def _expired_league(db, current: datetime, staffeln: dict[str, dict]) -> l
                 elif not refs.match_hold(match, current, appeal_hours=match_proofs.setting(tournament, season, "appeal_hours")):
                     expired.append(row)
     return expired
+
+
+async def delete_for_user(db, user_id: str, *, now=None) -> int:
+    """Kontolöschung: die eigenen Nachweise und ihre Dateien sofort weg - mit einer Ausnahme (Entscheidung Fabian 11.11.,
+    DSGVO Art. 17 Abs. 3 lit. e): Ein MOSS-Nachweis, der in einem laufenden Vorfall oder Verfahren noch gebraucht wird,
+    bleibt, bis dessen Frist um ist (``moss_due``) - sonst könnte ein Spieler die Prüfung durch Löschen des Kontos beenden.
+    Er wird dabei von der Person gelöst (kein ``owner_id`` mehr) und verborgen (``removed``): Nur die nicht befangene
+    Leitung sieht ihn noch, danach löscht ihn ``purge`` wie jeden MOSS-Nachweis. Ohne laufendes Verfahren: sofort weg."""
+    current = now or now_utc()
+    rows = await db.match_proof_photos.find({"owner_id": user_id}, {"_id": 0}).to_list(None)
+    moss = [row for row in rows if refs.kind_of(row) == "moss" and row.get("status") in match_proofs.KEPT_STATUSES]
+    matches = await _matches_of(db, moss, {**MATCH_FIELDS, "tournament_id": 1})
+    held: list[dict] = []
+    for row in moss:
+        match = matches.get(row.get("match_id"))
+        tournament = await db.tournaments.find_one({"id": (match or {}).get("tournament_id")}, STAFFEL_FIELDS) if match else None
+        if not is_league_staffel(tournament):
+            continue
+        season = await db.league_seasons.find_one({"id": tournament["league_context"].get("season_id")}, {"_id": 0})
+        if not moss_due(row, match, tournament, season, current):
+            held.append(row)
+    stamp = current.isoformat()
+    for row in held:
+        await db.match_proof_photos.update_one({"id": row["id"]}, {"$set": {
+            "owner_id": None, "owner_erased": True, "status": match_proofs.REMOVED, "removed_by": None,
+            "removed_at": row.get("removed_at") or stamp, "updated_at": stamp}})
+        await match_proofs.audit_proof(db, "match.proof.erasure_hold", matches[row["match_id"]], None, row)
+    held_ids = {row["id"] for row in held}
+    return await match_proofs.delete_rows(db, [row for row in rows if row["id"] not in held_ids])
 
 
 async def rescan_stuck(db, *, now=None) -> int:

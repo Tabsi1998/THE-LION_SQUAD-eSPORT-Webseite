@@ -363,6 +363,69 @@ async def test_held_proofs_do_not_hide_later_ones_from_the_job(flow, monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_account_erasure_keeps_moss_of_a_running_procedure_for_the_lead_only(flow):
+    """Kontolöschung bei laufendem Verfahren (Entscheidung Fabian, Art. 17 Abs. 3 lit. e): Der MOSS-Nachweis bleibt ohne
+    Kennung der Person nur für die Leitung, bis das Verfahren samt Einspruchsfrist um ist. Alles andere geht sofort."""
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w)
+    long_ago = (now_utc() - timedelta(days=20)).isoformat()
+    await set_match(flow, w, disputes=[protest(w), protest(w, id="verfahren-alt", resolved_at=long_ago)])
+    captain = user(w, "Kapitaen")
+    flow.act_as(captain)
+    needed = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    report = (await add_link(flow, match)).json()
+    # Ein MOSS-Nachweis zu einem längst erledigten Verfahren (Altfall, den der Job noch nicht geholt hat).
+    await flow.db.match_proof_photos.insert_one({"id": "moss-alt", "match_id": match["id"], "tournament_id": w["tournament"]["id"],
+                                                 "owner_id": captain["id"], "registration_id": w["reg_a"]["id"], "type": "link",
+                                                 "link": "https://video.example/alt", "status": "attached", "created_at": long_ago,
+                                                 "context": {"kind": "moss", "ref_id": "verfahren-alt"}})
+    saved = match_proofs.PROOF_DIR / (await flow.db.match_proof_photos.find_one({"id": needed["id"]}, {"_id": 0}))["storage_key"]
+
+    assert await match_proof_retention.delete_for_user(flow.db, captain["id"]) == 2
+    assert await left(flow) == {needed["id"]} and report["id"] != needed["id"]
+    kept = await flow.db.match_proof_photos.find_one({"id": needed["id"]}, {"_id": 0})
+    assert kept["owner_id"] is None and kept["owner_erased"] is True and kept["status"] == "removed" and kept["removed_by"] is None
+    assert captain["id"] not in str(kept), "keine Kennung der Person mehr am Nachweis"
+    assert saved.is_file()
+    audit = await flow.db.audit_logs.find({"action": "match.proof.erasure_hold"}, {"_id": 0}).to_list(10)
+    assert len(audit) == 1 and audit[0]["actor_id"] is None and captain["id"] not in str(audit[0])
+
+    # Nur die Leitung, die an dem Spiel nicht beteiligt ist, sieht ihn noch.
+    for person in (captain, user(w, "Mila"), user(w, "Falke1")):
+        flow.act_as(person)
+        response = await flow.get(f"/api/matches/{match['id']}/proofs", params={"kind": "moss", "ref_id": "verfahren-1"})
+        assert response.status_code == 200 and response.json()["items"] == [], person["display_name"]
+        assert (await flow.get(needed["url"])).status_code == 404
+    flow.act_as(w["staff"])
+    items = (await flow.get(f"/api/matches/{match['id']}/proofs", params={"kind": "moss", "ref_id": "verfahren-1"})).json()["items"]
+    assert [(item["id"], item["removed"], item["own"]) for item in items] == [(needed["id"], True, False)]
+    assert (await flow.get(needed["url"])).status_code == 200
+
+    # Verfahren entschieden: nach der Einspruchsfrist löscht ihn der Job wie jeden MOSS-Nachweis.
+    decided = now_utc() + timedelta(days=2)
+    await set_match(flow, w, disputes=[protest(w, resolved_at=decided.isoformat())])
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=47)) == 0
+    assert await match_proof_retention.purge(flow.db, now=decided + timedelta(hours=49)) == 1
+    assert await left(flow) == set() and not saved.exists()
+
+
+@pytest.mark.asyncio
+async def test_account_erasure_without_a_running_procedure_deletes_moss_at_once(flow):
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w)
+    await set_match(flow, w, disputes=[protest(w)])
+    flow.act_as(user(w, "Mila"))
+    moss = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    saved = match_proofs.PROOF_DIR / (await flow.db.match_proof_photos.find_one({"id": moss["id"]}, {"_id": 0}))["storage_key"]
+    # Verfahren entschieden, Einspruchsfrist um: Es gibt keinen Grund mehr, die Datei zu halten.
+    await set_match(flow, w, disputes=[protest(w, resolved_at=(now_utc() - timedelta(days=5)).isoformat())])
+    assert await match_proof_retention.delete_for_user(flow.db, user(w, "Mila")["id"]) == 1
+    assert await left(flow) == set() and not saved.exists()
+
+
+@pytest.mark.asyncio
 async def test_the_job_requeues_images_whose_image_check_never_started(flow, monkeypatch):
     """Ließ sich die Bildprüfung beim Hochladen nicht anstoßen, holt der stündliche Job sie nach (Review #2360, N6)."""
     from services import media_scan

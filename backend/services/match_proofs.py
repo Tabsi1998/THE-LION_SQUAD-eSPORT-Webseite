@@ -408,7 +408,7 @@ async def list_proofs(db, match: dict, user: dict, kind, ref_id) -> dict:
     }
 
 
-async def _audit(db, action: str, match: dict, actor_id: str, doc: dict, **extra) -> None:
+async def audit_proof(db, action: str, match: dict, actor_id: str | None, doc: dict, **extra) -> None:
     # Nie die Adresse eines Links: das Protokoll bleibt länger als der Nachweis.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "target_id": match.get("tournament_id") or match.get("id"), "actor_id": actor_id,
@@ -450,7 +450,7 @@ async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: Upload
         await db.match_proof_photos.insert_one(dict(doc))
     else:
         doc = await _store_image(db, match, user, side, file, status="attached", context=context)
-    await _audit(db, "match.proof.add", match, user["id"], doc)
+    await audit_proof(db, "match.proof.add", match, user["id"], doc)
     return proof_view(doc, viewer, ref, can_change=True)
 
 
@@ -479,7 +479,7 @@ async def remove_proof(db, match: dict, user: dict, proof_id: str) -> dict:
             "status": REMOVED, "removed_at": now, "removed_by": user["id"], "updated_at": now}})
     else:
         await delete_rows(db, [doc])
-    await _audit(db, "match.proof.remove", match, user["id"], doc, kept=kept)
+    await audit_proof(db, "match.proof.remove", match, user["id"], doc, kept=kept)
     return {"ok": True, "kept_for_lead": kept}
 
 
@@ -508,7 +508,3 @@ async def delete_for_tournament(db, tournament_id: str) -> int:
     """Turnier gelöscht: seine Nachweise gleich mit."""
     return await delete_rows(db, await db.match_proof_photos.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(None))
 
-
-async def delete_for_user(db, user_id: str) -> int:
-    """Kontolöschung: die eigenen Nachweise und ihre Dateien weg."""
-    return await delete_rows(db, await db.match_proof_photos.find({"owner_id": user_id}, {"_id": 0}).to_list(None))
