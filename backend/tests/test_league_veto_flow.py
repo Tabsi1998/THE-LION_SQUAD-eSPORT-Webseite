@@ -895,7 +895,7 @@ async def test_the_season_template_is_checked_proposed_saved_and_transferred(flo
         assert refused.status_code == 422 and sentence in refused.json()["detail"], (name, refused.text)
         assert refused.json()["detail"].startswith("Die Vorlage passt noch nicht:")
     bad_form = await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules([{"kind": "side", "mode": HP, "team": "A"}]))
-    assert bad_form.status_code == 422 and "Sperren, Wählen oder Decider" in bad_form.json()["detail"]
+    assert bad_form.status_code == 422 and "Sperren, Wählen, Decider oder Vorgabe der Woche" in bad_form.json()["detail"]
     # Aus: ein Entwurf bleibt speicherbar, auch wenn er noch nicht aufgeht.
     draft = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(ANLAGE_B[:3], enabled=False)))
     assert draft["active"] is False and draft["problems"] == []
