@@ -37,10 +37,10 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
         <p className="text-xs text-warn" data-testid="season-form-application-visibility-hint">Die Sichtbarkeit steht auf „Nur Mitglieder“: Externe Konten sehen die Season nicht und können sich nicht anmelden.</p>
       ) : null}
       <Toggle label="Anmeldungen automatisch annehmen"
-        hint="Eine gültige Anmeldung ist sofort angenommen und belegt einen Startplatz. Sind alle vergeben oder wartet schon jemand, kommt sie auf die Warteliste. Gibt es nur eine Staffel, ist das Co-Team gleich zugeteilt. Du kannst nachträglich mit Grund ablehnen. Aus: Du prüfst jede Anmeldung."
+        hint="Eine gültige Anmeldung ist sofort angenommen und belegt einen Startplatz. Wer zuerst kommt, wird zuerst bedient: Anmeldungen, die noch auf deine Prüfung warten, halten ihren Platz. Sind alle vergeben oder wartet schon jemand, kommt sie auf die Warteliste. Gibt es nur eine Staffel, ist das Co-Team gleich zugeteilt. Du kannst nachträglich mit Grund ablehnen. Aus: Du prüfst jede Anmeldung."
         checked={form.application_auto_accept} onChange={(value) => set("application_auto_accept", value)} testId="season-form-application-auto-accept" />
       {waitingText ? (
-        <p className="text-xs text-warn" data-testid="season-form-application-auto-waiting">{waitingText}. Sie werden nicht automatisch angenommen: Entscheide sie im Eingang.</p>
+        <p className="text-xs text-warn" data-testid="season-form-application-auto-waiting">{waitingText}. Entscheide sie im Eingang.</p>
       ) : null}
       <Toggle label="Warteliste" hint="Sind alle Startplätze vergeben, kann die Leitung Anmeldungen auf die Warteliste setzen. Ohne Warteliste endet die Anmeldung, sobald alle Plätze weg sind. Niemand rückt von selbst nach."
         checked={form.application_waitlist} onChange={(value) => set("application_waitlist", value)} testId="season-form-application-waitlist" />

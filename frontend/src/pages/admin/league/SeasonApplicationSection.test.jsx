@@ -25,7 +25,7 @@ test("eingeschaltet nennt sie die offenen Anmeldungen, die bei der Leitung bleib
   renderSection({ application_auto_accept: true }, 2);
 
   expect(screen.getByTestId("season-form-application-auto-accept")).toBeChecked();
-  expect(screen.getByTestId("season-form-application-auto-waiting")).toHaveTextContent("2 Anmeldungen warten noch auf Prüfung. Sie werden nicht automatisch angenommen");
+  expect(screen.getByTestId("season-form-application-auto-waiting")).toHaveTextContent("2 Anmeldungen warten auf Prüfung und halten ihren Platz frei. Entscheide sie im Eingang.");
 });
 
 test("ohne offene Anmeldungen steht kein Hinweis da", () => {

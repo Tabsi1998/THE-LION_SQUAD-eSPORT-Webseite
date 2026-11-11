@@ -1140,14 +1140,15 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `rejected` | Leitung, Grund mindestens fünf Zeichen |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `withdrawn` | Captain oder Vertreter |
 | `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, die Prüfung wird wiederholt (`check_squad`), dazu die der Staffel (`build_registration`) |
-| – (beim Einreichen) | `accepted`, mit nur einer Staffel samt `assignment.auto` | Season mit `application_auto_accept`: freier Platz und niemand auf der Warteliste (#2348) |
-| – (beim Einreichen) | `waitlist` | Season mit `application_auto_accept`: alle Plätze belegt oder schon jemand auf der Warteliste, und sie hat Platz. Sonst bleibt `submitted` |
+| – (beim Einreichen) | `accepted`, mit nur einer Staffel samt `assignment.auto` | Season mit `application_auto_accept`: nach allen offenen Anträgen noch ein Platz frei und niemand auf der Warteliste (#2348) |
+| – (beim Einreichen) | `waitlist` | Season mit `application_auto_accept`: alle Plätze belegt oder von offenen Anträgen gehalten, oder schon jemand auf der Warteliste, und sie hat Platz. Sonst bleibt `submitted` |
 | `accepted` mit `assignment.auto` | `rejected`, `waitlist` | Leitung, Grund Pflicht. Die Anmeldung der Staffel fällt weg wie bei „Zuteilung zurücknehmen“; mit festem Spielplan 409 („Austritt eintragen“), gesperrte Staffel 423 |
 
 Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste.
 
 **Automatisch annehmen** (#2348, Entscheidung Nr. 126, `application_auto_accept`): Nach derselben Prüfung wie sonst (Fenster, Regelwerk, `entry_policy`, ein Co-Team je Season, Co-Team-Regeln) entscheidet
-`_auto_decide` unter der Season-Sperre. Freier Platz und leere Warteliste: `accepted`, belegt den Platz wie eine Annahme der Leitung. Sonst `waitlist`, wenn die Warteliste Platz hat:
+`_auto_decide` unter der Season-Sperre. **Wer zuerst kommt, wird zuerst bedient:** Offene Anträge (`submitted`, `in_review`) halten ihren Platz und zählen hier wie belegte
+(`taken` + offene ohne den eigenen). Ist danach ein Platz frei und die Warteliste leer: `accepted`, belegt den Platz wie eine Annahme der Leitung. Sonst `waitlist`, wenn die Warteliste Platz hat:
 Ein frei gewordener Platz geht nach den Regeln der Warteliste durch die Leitung, nicht an den nächsten Neuen. Gleichzeitig auf den letzten Platz: Die Season-Sperre lässt
 einen nach dem anderen durch, genau einer wird angenommen. Fehlende Angaben (Nr. 118) halten nichts auf.
 **Zuteilung:** Gibt es genau eine Staffel in den aktiven Liga N, vor ihrem Start (`PRE_START_STATUSES`) und ohne feste Spiele, sperrt das Einreichen sie vorher (Turnier-Sperre vor
@@ -1156,7 +1157,7 @@ eingereicht hat. Lehnt die Staffel ab (gesperrt, voll, Mindestkader der Staffel)
 „Angemeldet – Zuteilung folgt“. Was gar nicht geht, bleibt `submitted`.
 **Befangenheit:** Keine Entscheidung einer Person, darum auch beim eigenen Team der Leitung. Ablehnen und Zurückstufen danach prüfen Nr. 73 wie immer.
 **Später einschalten:** Offene `submitted`/`in_review`-Anträge bleiben, wie sie sind. `GET /api/admin/leagues/seasons/{id}` liefert `applications_waiting` (nur die Zahl), die
-Verwaltung zeigt beim eingeschalteten Schalter „X Anmeldungen warten noch auf Prüfung“.
+Verwaltung zeigt beim eingeschalteten Schalter „X Anmeldungen warten auf Prüfung und halten ihren Platz frei. Entscheide sie im Eingang.“
 
 **Prüfung** (`league_applications.check_squad`, derselbe Text für Captain und Leitung): Fenster offen, Season weder beendet noch archiviert, gültige Fassung des Regelwerks, Platz oder Warteliste frei,
 kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`. Das sind die `problems`.

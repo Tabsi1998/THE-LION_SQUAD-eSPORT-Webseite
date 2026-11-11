@@ -361,7 +361,8 @@ async def test_switching_on_needs_the_season_capability_and_is_logged(flow):
 
 @pytest.mark.asyncio
 async def test_switching_on_later_leaves_open_applications_to_the_lead(flow):
-    w = await application_world(flow, teams=3)
+    """Wer zuerst kommt, wird zuerst bedient: Offene Anmeldungen von vorher bleiben bei der Leitung und halten ihren Platz."""
+    w = await application_world(flow, teams=4, application_slots=3)
     early = [await submitted(flow, w, side) for side in w["teams"][:2]]
     flow.act_as(w["lead"])
     url = f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}"
@@ -371,6 +372,13 @@ async def test_switching_on_later_leaves_open_applications_to_the_lead(flow):
 
     assert [(await stored(flow, row))["status"] for row in early] == ["submitted", "submitted"], "nichts wird nachträglich angenommen"
     assert ok(await flow.get(url))["applications_waiting"] == 2
-    assert (await submitted(flow, w, w["teams"][2]))["status"] == "accepted", "neue Anmeldungen schon"
+    third = await submitted(flow, w, w["teams"][2])
+    assert third["status"] == "accepted", "der dritte Platz ist nach den zwei offenen noch frei"
+    fourth = await submitted(flow, w, w["teams"][3])
+    assert fourth["status"] == "waitlist", "die zwei offenen halten ihren Platz, auch wenn erst einer belegt ist"
+    stats = (await inbox(flow, w))["stats"]
+    assert stats["taken"] == 1 and stats["free"] == 2 and stats["open"] == 2 and stats["waiting"] == 1
     flow.act_as(w["lead"])
     assert ok(await flow.get(url))["applications_waiting"] == 2
+    # Die Leitung nimmt die offenen wie bisher an - ihre Plätze waren frei gehalten.
+    assert [ok(await decide(flow, w, row, "accept"))["status"] for row in early] == ["accepted", "accepted"]

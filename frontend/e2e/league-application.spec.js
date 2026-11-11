@@ -176,7 +176,7 @@ for (const [width, height] of WIDTHS) {
       });
       await page.goto("/admin/leagues/seasons/s1#selbstanmeldung");
       await expect(page.getByTestId("season-form-application-auto-accept")).toBeChecked();
-      await expect(page.getByTestId("season-form-application-auto-waiting")).toContainText("2 Anmeldungen warten noch auf Prüfung");
+      await expect(page.getByTestId("season-form-application-auto-waiting")).toContainText("2 Anmeldungen warten auf Prüfung und halten ihren Platz frei");
       await expect(page.getByTestId("application-auto-a6")).toContainText("Automatisch angenommen");
       await expect(page.getByTestId("application-auto-seat-a6")).toBeVisible();
       await expect(page.getByTestId("application-waitlist-open-a6")).toBeVisible();

@@ -661,13 +661,17 @@ async def _auto_staffel(db, season: dict) -> str | None:
 
 async def _auto_decide(db, season: dict, application: dict, locked_id: str | None) -> tuple[dict, dict | None, dict | None] | None:
     """Die Season entscheidet über eine frisch eingereichte Anmeldung: Mit freiem Platz und leerer Warteliste ist sie angenommen, sonst steht sie auf
-    der Warteliste - ein frei gewordener Platz geht nach den Regeln der Warteliste, also durch die Leitung. Keine Entscheidung einer Person, darum ohne
+    der Warteliste - ein frei gewordener Platz geht nach den Regeln der Warteliste, also durch die Leitung. Wer zuerst kommt, wird zuerst bedient:
+    Offene Anmeldungen (eingereicht, in Prüfung) halten ihren Platz und zählen hier wie belegte. Keine Entscheidung einer Person, darum ohne
     Befangenheit (Nr. 73). Was die Staffel nicht zulässt, wird nur angenommen; was gar nicht geht, bleibt eingereicht. Aufrufer halten die Sperren."""
     stats = await seat_stats(db, season)
     now = now_utc().isoformat()
     decided = {"decided_by": None, "decided_at": now, "decision_reason": None}
+    # Die eben geschriebene Anmeldung steht selbst unter ``open``.
+    held = stats["taken"] + max(0, stats["open"] - 1)
+    seat_free = not stats["slots"] or held < stats["slots"]
     try:
-        if not stats["full"] and not stats["waiting"]:
+        if seat_free and not stats["waiting"]:
             fields = {**decided, "auto_accepted": True}
             if locked_id and locked_id == await _auto_staffel(db, season):
                 try:

@@ -35,10 +35,10 @@ export function submittedToast(status) {
   return "Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt.";
 }
 
-/** Hinweis in der Verwaltung beim Einschalten von „automatisch annehmen“: Offene Anmeldungen von vorher bleiben bei der Leitung. */
+/** Hinweis in der Verwaltung bei „automatisch annehmen“: Offene Anmeldungen bleiben bei der Leitung und halten ihren Platz (wer zuerst kommt, wird zuerst bedient). */
 export function waitingLine(count) {
   if (!count) return "";
-  return count === 1 ? "1 Anmeldung wartet noch auf Prüfung" : `${count} Anmeldungen warten noch auf Prüfung`;
+  return count === 1 ? "1 Anmeldung wartet auf Prüfung und hält ihren Platz frei" : `${count} Anmeldungen warten auf Prüfung und halten ihren Platz frei`;
 }
 
 export const ENTRY_POLICY_OPTIONS = [["all", "Alle Konten, auch externe Teams"], ["members", "Nur Vereinsmitglieder"]];

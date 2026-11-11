@@ -60,8 +60,8 @@ describe("Automatisch annehmen (#2348)", () => {
 
   test("der Hinweis auf offene Anmeldungen zählt richtig", () => {
     expect(waitingLine(0)).toBe("");
-    expect(waitingLine(1)).toBe("1 Anmeldung wartet noch auf Prüfung");
-    expect(waitingLine(3)).toBe("3 Anmeldungen warten noch auf Prüfung");
+    expect(waitingLine(1)).toBe("1 Anmeldung wartet auf Prüfung und hält ihren Platz frei");
+    expect(waitingLine(3)).toBe("3 Anmeldungen warten auf Prüfung und halten ihren Platz frei");
   });
 
   test("die Einstellung reist mit dem Formular, Vorgabe aus", () => {
