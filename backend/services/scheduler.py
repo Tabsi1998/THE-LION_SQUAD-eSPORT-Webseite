@@ -777,10 +777,11 @@ async def _safe_draw_show():
 
 
 async def _safe_proof_photo_retention():
-    """Fotos vom Ergebnis (#1157): nie verwendete nach 24 Stunden, sonst 30 Tage nach dem Hochladen weg."""
+    """Nachweise zu Spielen (#1157, #2360): nie verwendete nach 24 Stunden; Turniere 30 Tage nach dem Hochladen, Liga-Staffeln
+    nach Season-Ende plus Frist, MOSS nach Verfahrensende plus Einspruchsfrist (``match_proof_retention.purge``)."""
     try:
         from database import get_db
-        from services.match_proofs import purge
+        from services.match_proof_retention import purge
         removed = await purge(get_db())
         if removed:
             logger.info(f"[scheduler] proof_photo_retention removed={removed}")

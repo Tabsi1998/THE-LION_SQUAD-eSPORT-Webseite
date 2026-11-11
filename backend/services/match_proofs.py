@@ -14,7 +14,7 @@ Ein Nachweis ist persönlich (Gesichter, Bildschirme, Wohnzimmer). Deshalb:
   EXIF mit GPS-Ort und Kamera fällt dabei weg.
 - Bildprüfung wie im Chat (#415): bis das Ergebnis da ist, sieht das Foto nur, wer es hochgeladen hat.
 - Ein Video ist ein eigener Eintrag mit einem Link (nur ``https``): Er wird nie eingebettet und nie vom Server abgerufen.
-- Aufbewahrung (``purge``): Turniere 30 Tage nach dem Hochladen - außer das Spiel ist dann noch in Klärung. Liga-Staffeln
+- Aufbewahrung (``services/match_proof_retention.purge``): Turniere 30 Tage nach dem Hochladen - außer das Spiel ist dann noch in Klärung. Liga-Staffeln
   bis Season-Ende plus ``evidence_keep_days``, länger bei offenem Vorfall oder Verfahren; MOSS nur bis das Verfahren beendet
   und die Einspruchsfrist vorbei ist. Nie verwendete Fotos verschwinden nach 24 Stunden. Alles geht mit dem Turnier und
   mit dem Konto (Kontolöschung).
@@ -440,29 +440,3 @@ async def delete_for_tournament(db, tournament_id: str) -> int:
 async def delete_for_user(db, user_id: str) -> int:
     """Kontolöschung: die eigenen Nachweise und ihre Dateien weg."""
     return await delete_rows(db, await db.match_proof_photos.find({"owner_id": user_id}, {"_id": 0}).to_list(None))
-
-
-async def purge(db, *, now=None) -> int:
-    """Aufräumen: nie verwendete Fotos nach 24 Stunden, alle anderen 30 Tage nach dem Hochladen - außer das Spiel ist
-    noch in Klärung -, und Fotos, deren Spiel es nicht mehr gibt."""
-    current = now or now_utc()
-    stale = await db.match_proof_photos.find(
-        {"status": "pending", "created_at": {"$lt": (current - PENDING_TTL).isoformat()}}, {"_id": 0}).to_list(500)
-    old = await db.match_proof_photos.find(
-        {"status": "attached", "created_at": {"$lt": (current - timedelta(days=RETENTION_DAYS)).isoformat()}}, {"_id": 0}).to_list(500)
-    match_ids = list({row.get("match_id") for row in old if row.get("match_id")})
-    matches = {
-        row["id"]: row for row in await db.matches_v2.find({"id": {"$in": match_ids}}, {"_id": 0, "id": 1, "status": 1}).to_list(len(match_ids) + 1)
-    } if match_ids else {}
-    expired = [row for row in old if (matches.get(row.get("match_id")) or {}).get("status") != "disputed"]
-    attached_ids = await db.match_proof_photos.distinct("match_id", {"status": "attached"})
-    known = set(await db.matches_v2.distinct("id", {"id": {"$in": attached_ids}})) if attached_ids else set()
-    orphans = await db.match_proof_photos.find(
-        {"status": "attached", "match_id": {"$nin": sorted(known)}}, {"_id": 0}).to_list(500) if attached_ids else []
-    seen: set[str] = set()
-    rows = []
-    for row in [*stale, *expired, *orphans]:
-        if row["id"] not in seen:
-            seen.add(row["id"])
-            rows.append(row)
-    return await delete_rows(db, rows)
