@@ -22,7 +22,7 @@ from typing import Awaitable, Callable
 
 from database import get_db
 from models import now_utc
-from services import achievement_participation, achievement_progress
+from services import achievement_participation, achievement_progress, achievement_reach
 from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
 from services.league_scope import NOT_LEAGUE, league_tournament_ids
 from services.match_winner import DECIDED_STATUSES, is_duel, is_real_match, match_winner_id, participant_ids
@@ -129,6 +129,24 @@ class Context:
 
     async def awards(self) -> list[dict]:
         return await self._memo("awards", lambda: self.db.user_achievements.find({"user_id": self.user_id}, {"_id": 0}).to_list(2000))
+
+    async def catalog(self) -> tuple[dict[str, dict], dict[str, dict]]:
+        """Gruppen und Stufen je Code - für die Meta-Erfolge (#2339)."""
+        return await self._memo("catalog", lambda: achievement_reach.load_catalog(self.db))
+
+    async def category_progress(self) -> dict[str, dict]:
+        """Je Kategorie die erreichbaren Stufen und wie viele davon die Person hat (services/achievement_reach.py)."""
+        async def load():
+            groups, tiers = await self.catalog()
+            earned = {award.get("tier_code") for award in await self.awards()}
+            return achievement_reach.category_progress(groups, tiers.values(), earned)
+        return await self._memo("category_progress", load)
+
+    async def is_member(self) -> bool:
+        async def load():
+            from services.membership_service import is_active_member
+            return is_active_member(await self.db.memberships.find_one({"user_id": self.user_id}, {"_id": 0, "member_status": 1}))
+        return await self._memo("is_member", load)
 
     async def teams(self) -> list[dict]:
         return await self._memo("teams", lambda: self.db.teams.find({"member_ids": self.user_id}, {"_id": 0}).to_list(100))
@@ -530,20 +548,25 @@ async def _birthday(ctx):
     return int((await ctx.xp()).get("birthday_logins") or 0)
 
 
+# Geheimnisträger, Kategorie-Meister und Hundert Prozent (#2339) zählen wie die Anzeige - eine Regel für alle in
+# services/achievement_reach.py: nur erreichbare Stufen, Meta-Gruppen nie, nicht mehr Erreichbares nie.
 @counter("hidden_unlocked", "achievement")
 async def _hidden(ctx):
-    hidden = {g["code"] async for g in ctx.db.achievement_groups.find({"hidden": True}, {"_id": 0, "code": 1})}
-    return sum(1 for award in await ctx.awards() if award.get("group_code") in hidden)
+    """Gefundene geheime Gruppen - je Gruppe einmal, nicht mehr erreichbare nicht."""
+    groups, tiers = await ctx.catalog()
+    found = set()
+    for award in await ctx.awards():
+        tier = tiers.get(award.get("tier_code"))
+        group = groups.get((tier or {}).get("group_code"))
+        if group and group.get("hidden") and achievement_reach.countable(tier, group):
+            found.add(group["code"])
+    return len(found)
 
 
 @counter("categories_completed", "achievement")
 async def _categories(ctx):
-    groups = {g["code"]: g async for g in ctx.db.achievement_groups.find({"public": True, "is_negative": {"$ne": True}, "hidden": {"$ne": True}}, {"_id": 0, "code": 1, "category": 1})}
-    tiers_by_category: dict[str, set[str]] = {}
-    async for tier in ctx.db.achievements.find({"group_code": {"$in": list(groups)}}, {"_id": 0, "code": 1, "group_code": 1}):
-        tiers_by_category.setdefault(groups[tier["group_code"]].get("category") or "special", set()).add(tier["code"])
-    earned = {award.get("tier_code") for award in await ctx.awards()}
-    return sum(1 for codes in tiers_by_category.values() if codes and codes <= earned)
+    """Kategorien, in denen die Person jede erreichbare Stufe hat (Kategorie-Meister)."""
+    return len(achievement_reach.completed_categories(await ctx.category_progress()))
 
 
 # ------------------------------------------------------------------ Turnier
@@ -1074,22 +1097,66 @@ async def _deciders_won(ctx):
     return sum(1 for row in await ctx.played() if row.won and _full_distance(row.match, row.mine))
 
 
+def map_sequence(match: dict) -> list[str]:
+    """Die Sieger der Maps in Spielreihenfolge (#2339): aus ``games`` der Vereinsliga (Position, Sieger je Map). Fehlt
+    bei einer Map der Sieger, gibt es keine Reihenfolge - dann eine leere Liste. ``maps`` bleibt als alte Quelle."""
+    rows = [game for game in (match.get("games") or match.get("maps") or []) if isinstance(game, dict)]
+    if not rows or any(not game.get("winner_registration_id") for game in rows):
+        return []
+    rows.sort(key=lambda game: int(game.get("position") or 0))
+    return [str(game["winner_registration_id"]) for game in rows]
+
+
+def was_comeback(match: dict, mine) -> bool:
+    """Comeback (#2339): eine Serie über mindestens drei Maps gewonnen, in der die eigene Seite nach einer Map hinten lag -
+    2:1 nach 0:1 im Bo3, 3:2 nach 0:2 oder 1:2 im Bo5. Nur Duelle mit Sieger je Map."""
+    winners = map_sequence(match)
+    if len(winners) < 3 or not is_duel(match):
+        return False
+    own = their = 0
+    behind = False
+    for winner in winners:
+        if winner in mine:
+            own += 1
+        else:
+            their += 1
+        behind = behind or their > own
+    return behind and own > their
+
+
 @counter("comebacks", "match")
 async def _comebacks(ctx):
-    """Sieg nach 0:1 oder 0:2 - braucht die Kartenreihenfolge (match.maps mit winner_registration_id); ohne sie zählt nichts."""
-    count = 0
-    for row in await ctx.played():
-        match = row.match
-        maps = [m for m in (match.get("maps") or []) if isinstance(m, dict) and m.get("winner_registration_id")]
-        if row.won and is_duel(match) and maps and maps[0]["winner_registration_id"] not in row.mine:
-            count += 1
-    return count
+    """Gewonnene Serien, in denen die Person nach Maps hinten lag - je Match einmal."""
+    return sum(1 for row in await ctx.played() if row.won and was_comeback(row.match, row.mine))
+
+
+def _map_label(value) -> str:
+    return " ".join(str(value or "").split()).lower()
+
+
+def maps_of(match: dict, mine, user_id: str) -> set[str]:
+    """Die Karten eines Spiels für die Person (#2339): die Maps der Vereinsliga (Name, sonst Kennung) - steht an einer Map
+    eine Aufstellung der eigenen Seite, nur dort, wo die Person darin steht - und die Karte, die die Turnierleitung am
+    Match einträgt (``map``)."""
+    names = {_map_label(match.get("map"))}
+    for game in match.get("games") or []:
+        if not isinstance(game, dict):
+            continue
+        lineups = game.get("lineups") or {}
+        own = [user for reg_id in mine for user in (lineups.get(reg_id) or [])]
+        if any(lineups.get(reg_id) for reg_id in mine) and user_id not in own:
+            continue
+        names.add(_map_label(game.get("map_name") or game.get("map_id")))
+    return {name for name in names if name}
 
 
 @counter("distinct_maps", "match")
 async def _distinct_maps(ctx):
-    names = {str(row.match.get("map") or "").strip().lower() for row in await ctx.played()}
-    return len({name for name in names if name})
+    """Kartenkenner: verschiedene Karten über alle gespielten Matches - Liga-Maps und eingetragene Turnierkarten."""
+    names: set[str] = set()
+    for row in await ctx.played():
+        names |= maps_of(row.match, row.mine, ctx.user_id)
+    return len(names)
 
 
 @counter("matches_ready_on_time", "match")
@@ -1285,16 +1352,37 @@ async def _sub_target(ctx):
     return count
 
 
+RECORD_MIN_CHALLENGES = 2
+
+
 @counter("track_records_held", "fastlap")
 async def _track_records(ctx):
-    """Strecken, auf denen die eigene Bestzeit die schnellste gültige Zeit aller ist."""
-    from services.fastlap_standings import effective_ms
-    bests = await ctx.track_bests()
+    """Streckenrekord (#2339): Strecken, auf denen die eigene Bestzeit die schnellste gültige Zeit über alle Challenges
+    desselben Spiels ist - gleiche Strecke heißt gleicher Name. Gezählt erst, wenn die Strecke in mindestens zwei
+    Challenges gefahren wurde; sonst wäre es dasselbe wie Pole Position (je Challenge, ``pole_count``)."""
+    from services.fastlap_standings import official_query, rank_laps
+    own = {row.get("track_id") for row in await ctx.lap_times() if row.get("track_id")}
+    if not own:
+        return 0
+    tracks = await ctx.db.f1_tracks.find({}, {"_id": 0, "id": 1, "name": 1, "challenge_id": 1}).to_list(10000)
+    challenge_ids = sorted({track.get("challenge_id") for track in tracks if track.get("challenge_id")})
+    games = {row["id"]: row.get("game_id") or "" async for row in ctx.db.f1_challenges.find({"id": {"$in": challenge_ids}}, {"_id": 0, "id": 1, "game_id": 1})}
+    by_key: dict[tuple[str, str], list[dict]] = {}
+    for track in tracks:
+        name = _map_label(track.get("name"))
+        if name and track.get("challenge_id"):
+            by_key.setdefault((games.get(track["challenge_id"], ""), name), []).append(track)
     held = 0
-    for track_id, rows in _laps_by_track(await ctx.lap_times()).items():
-        mine = min(effective_ms(row) for row in rows)
-        overall = bests.get(track_id)
-        if overall and mine <= overall[1]:
+    for same in by_key.values():
+        challenge_of = {track["id"]: track["challenge_id"] for track in same}
+        if not own & set(challenge_of):
+            continue
+        rows = await ctx.db.f1_lap_times.find(official_query({"track_id": {"$in": sorted(challenge_of)}}), {"_id": 0, "id": 1, "user_id": 1, "track_id": 1, "time_ms": 1, "penalty_seconds": 1, "created_at": 1}).to_list(100000)
+        driven = {challenge_of.get(row.get("track_id")) for row in rows} - {None}
+        if len(driven) < RECORD_MIN_CHALLENGES:
+            continue
+        ranked = rank_laps(rows)
+        if ranked and ranked[0]["user_id"] == ctx.user_id:
             held += 1
     return held
 
@@ -1578,19 +1666,25 @@ async def _grand_slam(ctx):
     return max((len(games) for games in per_season.values()), default=0)
 
 
-@counter("all_visible_achievements", "achievement")
+@counter("all_visible_achievements", "achievement", "club")
 async def _completionist(ctx):
-    """Jede messbare Stufe, die diese Person sehen kann, ist erreicht (ohne Geheimes, Negatives, Hand-Stufen und sich selbst)."""
-    user = await ctx.user()
-    groups = [g async for g in ctx.db.achievement_groups.find({"public": True, "is_negative": {"$ne": True}, "hidden": {"$ne": True}, "code": {"$ne": "completionist"}}, {"_id": 0, "code": 1, "category": 1})]
-    if not user.get("is_club_member"):
-        groups = [g for g in groups if g.get("category") != "club"]
-    codes = [g["code"] for g in groups]
-    if not codes:
-        return 0
-    tiers = {t["code"] async for t in ctx.db.achievements.find({"group_code": {"$in": codes}, "manual_only": {"$ne": True}}, {"_id": 0, "code": 1})}
-    earned = {award.get("tier_code") for award in await ctx.awards()}
-    return 1 if tiers and tiers <= earned else 0
+    """Hundert Prozent (#2339): jede erreichbare Stufe in allen Kategorien - dieselbe Rechnung wie Kategorie-Meister, den
+    Verein nur für Mitglieder."""
+    return 1 if achievement_reach.all_reachable_done(await ctx.category_progress(), member=await ctx.is_member()) else 0
+
+
+@counter("match_months_streak_max", "match")
+async def _match_months(ctx):
+    """Eiserner Löwe (#2339): die längste Folge von Kalendermonaten (Wien) mit mindestens einem gespielten Match - Freilose
+    und nicht angetretene Spiele zählen nicht, kampflose Siege schon (``played``)."""
+    months = sorted({row.when.astimezone(VIENNA).year * 12 + row.when.astimezone(VIENNA).month - 1 for row in await ctx.played() if row.when})
+    best = run = 0
+    previous = None
+    for month in months:
+        run = run + 1 if previous is not None and month == previous + 1 else 1
+        best = max(best, run)
+        previous = month
+    return best
 
 
 @counter("witching_hour_matches", "match")

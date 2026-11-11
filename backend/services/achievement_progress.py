@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from database import get_db
 from services.private_fields import private_projection
+from services import achievement_reach
 from services.achievement_participation import load_participation
 
 
@@ -134,12 +135,16 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["profile_completeness"] = compute_profile_completeness(user) if user else 0
 
     user_awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
-    p["achievements_unlocked"] = len(user_awards)
     award_codes = list({a.get("tier_code") for a in user_awards if a.get("tier_code")})
+    p["achievements_unlocked"] = 0
     if award_codes:
         award_tiers = await db.achievements.find({"code": {"$in": award_codes}}, {"_id": 0}).to_list(1000)
-        award_groups = await db.achievement_groups.find({}, {"_id": 0, "code": 1, "is_negative": 1}).to_list(500)
+        award_groups = await db.achievement_groups.find({}, {"_id": 0, "code": 1, "is_negative": 1, "public": 1, "hidden": 1, "retired": 1, "available_until": 1}).to_list(500)
         group_is_negative = {g["code"]: bool(g.get("is_negative")) for g in award_groups}
+        # Sammler (#2339): gezählt wie „N Erfolge freigeschaltet“ auf der Erfolge-Seite - jede Stufe außer Negativem und
+        # nicht mehr Erreichbarem (services/achievement_reach.py). Vorher zählte jede Vergabe, auch negative.
+        p["achievements_unlocked"] = len(achievement_reach.countable_earned(
+            {g["code"]: g for g in award_groups}, {t["code"]: t for t in award_tiers}, award_codes))
         p["achievement_points"] = sum(
             int(t.get("points") or 0)
             for t in award_tiers

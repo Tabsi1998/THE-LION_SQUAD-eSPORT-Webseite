@@ -9,6 +9,19 @@ Drei Gruppen werden weiter von Hand vergeben (Helfende Hand, Mentor, Kreativgeis
 from __future__ import annotations
 
 from .catalog_a import _group
+from .materials import CATEGORIES
+
+# Kategorie-Meister (#2339) nennt die Kategorien beim Namen - dieselben wie services/achievement_reach.MASTER_CATEGORIES.
+_MASTER_LABELS = [
+    meta["label"] + (" (nur Mitglieder)" if meta.get("member_only") else "")
+    for _key, meta in sorted(CATEGORIES.items(), key=lambda item: item[1]["order"]) if not meta.get("hidden") and not meta.get("negative")
+]
+CATEGORY_MASTER_HOW_TO = (
+    "Schließ Kategorien ab: " + ", ".join(_MASTER_LABELS) + " – abgeschlossen, wenn du jede erreichbare Stufe darin hast. "
+    "Nicht dazu zählen geheime, negative und von Hand vergebene Stufen, Stufen nur für die Leitung oder eine Aufgabe im Verein, "
+    "nicht mehr erreichbare sowie Kategorie-Meister, Hundert Prozent, Sammler und Geheimnisträger selbst. Kommt später eine "
+    "Stufe dazu, bleibt, was du schon hast."
+)
 
 # Alte Gruppe → neue Gruppe (E1-Migration über die Zähler; Hand-Gruppen nach der alten Höhe).
 REPLACED: dict[str, str] = {
@@ -40,8 +53,9 @@ COMMUNITY = [
        "messages-square", "speech-wave", "discord_messages", [1, 100, 500, 2000, 5000, 10000, 25000], "{n} Nachrichten auf Discord.", sort_order=611),
     _c("events_attended", "Eventgänger", "community", "Sei bei Events dabei.", "Melde dich zu Events an und lass dich vor Ort einchecken - jedes zählt einmal, abgesagte Events zählen nicht.",
        "calendar-check", "ticket-stub", "events_attended", [1, 5, 15, 30, 60, 100, 200], "{n} Events besucht.", sort_order=612),
-    _c("events_hosted", "Gastgeber", "community", "Richte Events aus.", "Lege ein Event an und führ es bis zum Abschluss.",
-       "party-popper", "host", "events_hosted_completed", [1, 5, 15, 40, 100], "{n} Events ausgerichtet.", sort_order=613),
+    # Events legt nur die Turnierleitung an (#2339): Gastgeber sehen nur sie und wer ihn schon hat - wie Turnierleitung.
+    _c("events_hosted", "Gastgeber", "community", "Richte Events aus.", "Als Turnierleitung ein Event anlegen und bis zum Abschluss führen - jedes zählt einmal. Nur für die Turnierleitung sichtbar.",
+       "party-popper", "host", "events_hosted_completed", [1, 5, 15, 40, 100], "{n} Events ausgerichtet.", sort_order=613, staff_only=True),
     _c("friends", "Netzwerker", "community", "Schließ Freundschaften auf der Plattform.", "Freundschaftsanfragen senden oder annehmen - jede bestätigte Freundschaft zählt.",
        "users", "handshake", "friends_count", [1, 5, 15, 30, 60, 100, 200], "{n} Freundschaften.", sort_order=614),
     _c("community_chat", "Plauderer", "community", "Schreib in den offenen Chats.", "Nachrichten im Turnier-Chat und im Match-Chat zählen zusammen - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
@@ -117,16 +131,20 @@ PROFILE = [
        "bell", "bell", "notification_prefs_saved", [1], "Benachrichtigungen eingestellt.", sort_order=816, materials=["iron"]),
     _c("bio_links", "Visitenkarte", "profile", "Erzähl etwas über dich.", "Profiltext und mindestens einen Social-Link eintragen.",
        "id-card", "business-card", "bio_and_socials", [1], "Profiltext und Links gesetzt.", sort_order=817),
-    _c("achievements_unlocked", "Sammler", "profile", "Sammle Erfolge.", "Jede freigeschaltete Stufe zählt.",
-       "trophy", "trophy-case", "achievements_unlocked", [10, 30, 75, 150, 300, 500, 750], "{n} Erfolge freigeschaltet.", sort_order=818),
-    _c("categories_complete", "Kategorie-Meister", "profile", "Schließ ganze Kategorien ab.", "Alle Gruppen einer Kategorie auf die höchste Stufe bringen.",
-       "layout-grid", "category-crown", "categories_completed", [1, 2, 3, 4, 5, 6, 7], "{n} Kategorien vollständig.", sort_order=819),
+    # Sammler, Kategorie-Meister, Geheimnisträger und Hundert Prozent (#2339): gezählt wie die Anzeige „x von y“
+    # (services/achievement_reach.py) - die Ziele liegen unter dem, was es gibt (Prüfung im Katalog-Test).
+    _c("achievements_unlocked", "Sammler", "profile", "Sammle Erfolge.", "Jede freigeschaltete Stufe zählt - auch von Hand vergebene und geheime. Negative und nicht mehr erreichbare zählen nicht.",
+       "trophy", "trophy-case", "achievements_unlocked", [10, 30, 75, 150, 300, 400, 450], "{n} Erfolge freigeschaltet.", sort_order=818),
+    _c("categories_complete", "Kategorie-Meister", "profile", "Schließ ganze Kategorien ab.", CATEGORY_MASTER_HOW_TO,
+       "layout-grid", "category-crown", "categories_completed", [1, 2, 3, 4, 5, 6, 7], "{n} Kategorien abgeschlossen.", sort_order=819,
+       singular="{n} Kategorie abgeschlossen."),
     _c("level_milestones", "Levelaufstieg", "profile", "Steig im Level auf.", "Punkte aus Erfolgen, Matches und Aktivität heben dein Level.",
        "arrow-up-circle", "level-up", "level", [5, 10, 20, 30, 40, 50, 60], "Level {n} erreicht.", sort_order=820),
     _c("prestige", "Prestige", "profile", "Sammle Prestige-Sterne.", "Ab Level 60 kannst du Prestige nehmen - jeder Stern zählt.",
        "star", "prestige-star", "prestige_stars", [1, 2, 3, 4, 5], "{n} Prestige-Sterne.", sort_order=821),
-    _c("hidden_found", "Geheimnisträger", "profile", "Finde die geheimen Erfolge.", "Es gibt Erfolge, die nirgends stehen - wer sie findet, sammelt sie hier.",
-       "eye-off", "secret", "hidden_unlocked", [1, 3, 7, 12, 15], "{n} geheime Erfolge gefunden.", sort_order=822),
+    _c("hidden_found", "Geheimnisträger", "profile", "Finde die geheimen Erfolge.", "Es gibt Erfolge, die nirgends stehen - wer sie findet, sammelt sie hier. Jeder gefundene geheime Erfolg zählt einmal, nicht mehr erreichbare zählen nicht.",
+       "eye-off", "secret", "hidden_unlocked", [1, 3, 7, 10, 13], "{n} geheime Erfolge gefunden.", sort_order=822,
+       singular="{n} geheimen Erfolg gefunden."),
     _c("anniversary", "Jubiläum", "profile", "Bleib uns über Jahre treu.", "Jedes volle Jahr seit deiner Registrierung zählt.",
        "cake", "anniversary", "account_years", [1, 2, 3, 4, 5, 7, 10], "{n} dabei.", sort_order=823, unit=" Jahre"),
     _c("birthday_login", "Geburtstagskind", "profile", "Schau an deinem Geburtstag vorbei.", "Geburtsdatum im Profil eintragen und am Geburtstag anmelden.",
