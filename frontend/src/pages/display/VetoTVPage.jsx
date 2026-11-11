@@ -8,7 +8,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { TvScreen } from "@/components/tv/TvScreen";
 import { TvFooter, TvHeader, TvKeyRefused, TvPill } from "@/components/tv/TvParts";
 import { useFreshCards, useServerOffset, VetoBoard, VetoCountdown, VetoTimeline } from "@/components/tls/league/VetoLive";
-import { plannedRoleLabel, sideName, sideTone, VETO_STATUS_LABELS } from "@/lib/leagueVeto";
+import { isOlderVeto, plannedRoleLabel, sideName, sideTone, VETO_STATUS_LABELS } from "@/lib/leagueVeto";
 
 // Map-Veto am TV (D.4, #1651): ein laufendes Liga-Spiel für 1920 px - großer Countdown, wer am Zug ist, das Brett aus Map-Karten und der
 // Ablauf. Nur lesend und öffentlich wie die übrigen TV-Ansichten: Der Server liefert hier immer die Sicht für Zuschauer (`display=1`),
@@ -73,7 +73,8 @@ function VetoTv() {
   const load = useCallback(async () => {
     try {
       const { data: answer } = await api.get(`/matches/${encodeURIComponent(matchId)}/veto`, { params: { display: 1, ...(displayKey ? { key: displayKey } : {}) } });
-      setData(answer);
+      // Abruf, Änderungsstrom und Frist können sich überholen: Eine ältere Antwort überschreibt nie eine neuere.
+      setData((current) => (isOlderVeto(current?.veto, answer?.veto) ? current : answer));
       setLoadError(null);
       setKeyRefused(false);
       setLastUpdated(Date.now());

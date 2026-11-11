@@ -1,5 +1,5 @@
 import {
-  ANNOUNCE_AT, boardGroups, cardLabel, countdownAnnouncement, freshCards, isUrgent, mergeLiveVeto, secondsLeft, timelineLabel, timelineRows,
+  ANNOUNCE_AT, boardGroups, cardLabel, countdownAnnouncement, freshCards, isOlderVeto, isUrgent, mergeLiveVeto, secondsLeft, timelineLabel, timelineRows,
   VETO_POLL_MS, vetoClockOffset, vetoDeadline, vetoPollMs, vetoRingShare,
 } from "./leagueVeto";
 
@@ -10,13 +10,33 @@ test("kurzer Abruf: gleicher Stand ersetzt nur den Veto-Block, ein neuer Stand l
   expect(merged.checkin.sides).toBe(page.checkin.sides);
   expect(merged.match).toBe(page.match);
   // Veto fertig, Stand „ready“: ganz neu laden (Start-Knopf, Meldeformular).
-  expect(mergeLiveVeto(page, { veto: { status: "done" }, state: "ready" })).toBeNull();
-  expect(mergeLiveVeto(page, { veto: { status: "running" }, state: "ready" })).toBeNull();
+  expect(mergeLiveVeto(page, { veto: { status: "done", version: 12 }, state: "ready" })).toBeNull();
+  expect(mergeLiveVeto(page, { veto: { status: "running", version: 4 }, state: "ready" })).toBeNull();
   expect(mergeLiveVeto(page, { veto: null })).toBeNull();
   // Zuschauer: nur `veto_view`.
   const outside = { match: { id: "m1" }, checkin: null, veto_view: { status: "running", version: 3 } };
   expect(mergeLiveVeto(outside, { veto: { status: "running", version: 5 }, state: null }).veto_view.version).toBe(5);
-  expect(mergeLiveVeto(outside, { veto: { status: "paused" }, state: null })).toBeNull();
+  expect(mergeLiveVeto(outside, { veto: { status: "paused", version: 4 }, state: null })).toBeNull();
+});
+
+test("Reihenfolge: eine ältere Antwort überschreibt nie eine neuere - Serverzeit zuerst, sonst die Version", () => {
+  const shown = { status: "running", version: 5, server_now: "2026-11-15T19:00:10Z" };
+  const page = { checkin: { state: "veto", veto: shown }, veto_view: null };
+  // Älter nach Serverzeit (auch mit anderem Status): nichts ändern, nicht neu laden - die Seite selbst kommt zurück.
+  expect(mergeLiveVeto(page, { veto: { ...shown, version: 4, server_now: "2026-11-15T19:00:08Z" }, state: "veto" })).toBe(page);
+  expect(mergeLiveVeto(page, { veto: { status: "done", version: 9, server_now: "2026-11-15T19:00:09Z" }, state: "ready" })).toBe(page);
+  // Gleiche Serverzeit, kleinere Version: ebenfalls älter.
+  expect(mergeLiveVeto(page, { veto: { ...shown, version: 4 }, state: "veto" })).toBe(page);
+  // Neuer: übernommen.
+  const newer = mergeLiveVeto(page, { veto: { ...shown, version: 6, server_now: "2026-11-15T19:00:12Z" }, state: "veto" });
+  expect(newer).not.toBe(page);
+  expect(newer.checkin.veto.version).toBe(6);
+  // Kleinere Version mit neuerer Serverzeit ist ein neues Veto (neuer Termin) - gilt.
+  expect(isOlderVeto(shown, { version: 1, server_now: "2026-11-15T19:05:00Z" })).toBe(false);
+  expect(isOlderVeto(null, shown)).toBe(false);
+  // Zuschauer genauso.
+  const outside = { checkin: null, veto_view: shown };
+  expect(mergeLiveVeto(outside, { veto: { ...shown, version: 3, server_now: "2026-11-15T19:00:01Z" } })).toBe(outside);
 });
 
 // Map-Veto live (D.4, #1651): Takt des Nachfragens, Countdown nach der Serverzeit, Ansage, Zeitleiste, Karten und was aufleuchtet.

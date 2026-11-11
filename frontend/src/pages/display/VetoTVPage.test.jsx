@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Map-Veto am TV (#1651): ein laufendes Liga-Spiel für 1920 px - großer Countdown, wer am Zug ist, Brett und Ablauf; nur lesend, immer
@@ -104,4 +104,25 @@ test("fertig: die Spielreihenfolge als große Karten; ohne Veto ein klarer Satz;
   renderTv("/display/veto/m1?key=alt");
   expect(await screen.findByTestId("tv-key-refused")).toBeInTheDocument();
   expect(screen.queryByTestId("veto-tv-grid")).toBeNull();
+});
+
+test("Reihenfolge: eine ältere Antwort, die eine neuere überholt, ändert am TV nichts", async () => {
+  const newer = live();
+  const older = live({ version: 2, server_now: new Date(Date.now() - 5000).toISOString(),
+    current: { ...newer.veto.current, index: 0, number: 1, registration_id: "a", name: SIDES[0] },
+    plan: newer.veto.plan.map((row) => ({ ...row, state: row.index === 0 ? "current" : "open", map_name: null })) });
+  const answers = [newer, older];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (url === "/matches/m1/veto") return { data: answers.shift() || newer };
+    return { data: {} };
+  });
+  renderTv("/display/veto/m1");
+  expect(await screen.findByTestId("veto-tv-who")).toHaveTextContent("Falken · Horst");
+  // Der nächste Abruf (hier: Tab wieder sichtbar) bringt die ältere Antwort.
+  act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+  await waitFor(() => expect(answers).toHaveLength(0));
+  expect(screen.getByTestId("veto-tv-who")).toHaveTextContent("Falken · Horst");
+  expect(screen.getByTestId("veto-step-1")).toHaveAttribute("aria-current", "step");
+  expect(screen.getByTestId("veto-step-0")).toHaveTextContent("Glut");
 });

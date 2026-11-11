@@ -497,18 +497,33 @@ export function freshCards(before, after, ownSide = null) {
 }
 
 /**
+ * Ist die Antwort älter als der Stand, der schon da ist (Review zu #1651)? Antworten können sich überholen - eine langsame alte darf eine
+ * schnellere neue nicht überschreiben. Maßgeblich ist die Serverzeit der Antwort (`server_now`); sind beide gleich oder fehlt sie, die
+ * Version des Vetos. Eine kleinere Version mit neuerer Serverzeit ist ein neues Veto (neuer Termin) und gilt.
+ */
+export function isOlderVeto(current, next) {
+  if (!current || !next) return false;
+  const before = Date.parse(current.server_now || "");
+  const after = Date.parse(next.server_now || "");
+  if (Number.isFinite(before) && Number.isFinite(after) && after !== before) return after < before;
+  return Number(next.version || 0) < Number(current.version || 0);
+}
+
+/**
  * Den kurzen Abruf (`GET /matches/{id}/veto`) in die geladene Matchseite übernehmen: Bleibt der Stand derselbe (Stand des Check-ins und
  * Status des Vetos), ersetzt er nur den Veto-Block - beim Captain in `checkin.veto`, beim Zuschauer in `veto_view`. Ändert sich der Stand
- * (das Veto beginnt, ist fertig, die Leitung pausiert), gibt es `null`: Dann lädt die Seite einmal ganz (Start-Knopf, Meldeformular).
+ * (das Veto beginnt, ist fertig, die Leitung pausiert), gibt es `null`: Dann lädt die Seite einmal ganz (Start-Knopf, Meldeformular). Eine
+ * Antwort, die älter ist als der Stand auf der Seite (`isOlderVeto`), ändert nichts: Dann kommt `page` selbst zurück.
  */
 export function mergeLiveVeto(page, live) {
   if (!page || !live?.veto) return null;
+  const shown = page.checkin ? page.checkin.veto : page.veto_view;
+  if (isOlderVeto(shown, live.veto)) return page;
   if (page.checkin) {
-    const before = page.checkin.veto;
-    if (!before || before.status !== live.veto.status || (live.state && live.state !== page.checkin.state)) return null;
+    if (!shown || shown.status !== live.veto.status || (live.state && live.state !== page.checkin.state)) return null;
     return { ...page, checkin: { ...page.checkin, veto: live.veto } };
   }
-  if (page.veto_view && page.veto_view.status === live.veto.status) return { ...page, veto_view: live.veto };
+  if (shown && shown.status === live.veto.status) return { ...page, veto_view: live.veto };
   return null;
 }
 

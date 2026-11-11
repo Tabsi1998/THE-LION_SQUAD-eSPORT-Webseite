@@ -201,6 +201,8 @@ function MatchPageView() {
         await load();
         return;
       }
+      // Eine Antwort, die eine neuere überholt hat, ändert nichts (`mergeLiveVeto` gibt dann den Stand selbst zurück).
+      if (merged === dataRef.current) return;
       dataRef.current = merged;
       setData(merged);
     } catch {
