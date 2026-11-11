@@ -2491,7 +2491,7 @@ sobald beide Seiten eingecheckt sind – so sieht jede Seite ohne Neuladen, dass
 Vorgabe (`.tls-veto-preset` in `index.css`) hebt sich beim Aufbau 6 px an und blendet ein (`--tls-motion-mid`, `--tls-ease`), gestaffelt
 um 40 ms je Karte wie die übrigen Map-Karten (`--tls-i`), danach leuchtet ihr Rahmen einmal auf (`--tls-motion-glow`). Bewegt werden nur
 `transform` und `opacity`; die Karte erscheint einmal, das Nachfragen baut sie nicht neu auf. Mit „Bewegung reduzieren“ ist sie sofort da. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
-Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4.
+Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4 (unten).
 
 **Datenschutz:** `flow.veto` ist intern (`flow` in `match_public_view.INTERNAL_KEYS`); `planned_games` ist öffentlich (keine Personen).
 Auskunft `league_checkin` (`match_flow.export_snapshot`) nennt je Spiel die eigenen Züge (`veto_step`: Schritt, Art, Zeit, Seite) und
@@ -2542,9 +2542,103 @@ die Variable verwendet, und die Regel selbst bleibt freigegeben.
 Beides ist Teil von Fingerabdruck und Vorschlag: Eine geänderte Vorlage löst „Regelwerk muss freigegeben werden“ aus (`data_changes`,
 `pending_release`), die veröffentlichte Fassung zeigt bis zur Freigabe ihren Stand von damals.
 
-**App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. **Audit-Aktionen neu:** `match.veto.start`,
+**App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. Die TV-Ansicht des Vetos kommt mit D.4 (`/display/veto/<Spiel>`). **Audit-Aktionen neu:** `match.veto.start`,
 `match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`; seit #2326 `match.veto.waiting`, `match.veto.ready`, `match.veto.ready_side`
 und `league.season.veto_presets`.
+
+### D.4 Veto live (#1651)
+
+Die Live-Oberfläche des Vetos aus D.3 für beide Captains, Zuschauer und TV. **Der Zustandsautomat bleibt unverändert** (`league_veto`:
+Start, Zug, Zeit, Leitung) - D.4 liest nur, dazu kommt die Erinnerung „Map-Veto wartet“. **Migration: keine.** Kein WebSocket: Live
+heißt kurzer Abruf, dazu der Änderungsstrom (ein Zug ist ein `POST`, der Strom meldet ihn).
+
+**Kurzer Abruf** `GET /api/matches/{id}/veto` (`routes/league_veto_routes.py`, `?display=1`, `?key=`): der Veto-Block ohne die ganze
+Matchseite, dazu `now` (Serverzeit), `state` (Stand des Check-ins, nur Beteiligte) und `match` (`{id, tournament_id, tournament_title,
+matchday_label, scheduled_at, sides[]}` - was die öffentliche Matchseite ohnehin zeigt; `tournament_id` grenzt am TV den Änderungsstrom
+auf die Staffel ein). Ohne Vorlage an der Staffel oder bei klassischen Spielen
+`{veto: null}`.
+
+| Wer | Was | Schreibt |
+| --- | --- | --- |
+| Beteiligte (Captain, Vertreter, Kader - wie `involved` der Matchseite) und Leitung (`matches`) | derselbe Block wie `checkin.veto` der Matchseite (`league_veto.live_block`) | wie die Matchseite: `ensure_started`, `settle_due`; dazu `mark_seen` für die eigene Seite (siehe Erinnerung) |
+| alle anderen, `display=1` (TV) und mit `key` | die Sicht für Zuschauer (`league_veto.spectator_view`) | nichts - Start und Fristen löst der Aufruf der Beteiligten bzw. der Job (`league_veto`, alle 10 Sekunden) |
+
+Sichtbarkeit wie die Matchseite (`_assert_match_visible`: Staffel bzw. Season - die Season reicht ihre Sichtbarkeit an die Staffeln
+weiter, `staffel_visibility`). Mit dem **Anzeige-Schlüssel** des Turniers (`key`, wie Turnierbaum und Stationen, `DISPLAY_GRANT`) auch
+ohne Anmeldung und für Staffeln „Nur Mitglieder“, aber **nie** für eine Staffel im Entwurf oder eine interne (Season „aus“ bzw. „nur
+Verwaltung“: `internal`, nicht öffentlich) - dieselbe Regel wie beim Event-TV (`tv_display.shown_on_event_tv`). Ein unbekanntes Spiel,
+ein falscher, widerrufener oder fremder Schlüssel und eine solche Staffel antworten gleich (403 „Dieser TV-Link gilt nicht mehr …“) - die
+Antwort verrät nicht, welche Spiele es gibt; abgelaufen 403 wie beim Turnierbaum. **Limit und Zwischenspeicher** (Review): Zuschauer, TV
+und Abrufe mit Schlüssel zählen je Adresse und je Schlüssel (nur ein Hash davon) höchstens 600 Abrufe je Minute (`veto_live_address`,
+`veto_live_key`, 429 mit Wartezeit). Die Zuschauer-Sicht gilt 2 Sekunden für alle (`SPECTATOR_CACHE_SECONDS`, je Spiel), solange sich am
+Spiel nichts geändert hat - der Schlüssel ist `updated_at` und der Stand des Vetos aus dem frisch gelesenen Spiel, ein neuer Zug ist also
+sofort sichtbar; `server_now` und `current.remaining_seconds` setzt jeder Abruf neu. Beteiligte und Leitung gehen nie über Limit oder
+Zwischenspeicher. **Zuschauer-Sicht:** `own_turn`/`can_pick` falsch,
+`own_side`, `options`, `lead`, `start`, `blocked` leer, bei einer Pause ohne `paused.reason` (den Grund schreibt die Leitung frei) und mit
+`pick_hint` „Das Veto ist pausiert – die Liga-Leitung setzt es fort.“; vor dem Start nur die Vorgabe der Woche. Personen stehen nie im
+Block, nur die Namen der Seiten. Die Matchseite liefert Zuschauern denselben Block als `veto_view` (nur ohne `checkin`); Beteiligte
+bekommen `veto_view: null`.
+
+**Neue Felder im Veto-Block** (Matchseite und Abruf, nur lesend): `plan[]` - der ganze Ablauf als Zeitleiste, je Schritt der Vorlage
+`{index, number, kind, mode, mode_label, mode_icon_url?, side ("A"|"B"|null), name, position, state ("done"|"current"|"open"), map_id,
+map_name, map_image_url, via}` (`league_veto._plan_rows`, ohne Personen); `remaining[].maps[].side` (welche Seite gesperrt bzw. gewählt
+hat); `own_side` (die eigene Seite, sonst `null`); `server_now` (ISO, Zeitpunkt der Antwort).
+
+**Takt** (`frontend/src/lib/leagueVeto.js`, `vetoPollMs`; `hooks/useVetoPolling.js`): läuft 2 s, Pause 5 s, Warten auf „Bereit“ oder die
+Vorgabe 3 s (nur mit beiden Seiten eingecheckt), sonst nie; im Hintergrund-Tab (`document.hidden`) gar nicht, beim Zurückkommen
+(`visibilitychange`) sofort einmal; kurz nach der Frist (800 ms) einmal extra, dann steht die Zufallswahl. Die Matchseite übernimmt die
+Antwort in den geladenen Stand (`mergeLiveVeto`): Bleiben Stand und Status gleich, ersetzt sie nur den Veto-Block; beginnt oder endet das
+Veto, lädt die Seite einmal ganz (Start-Knopf, Meldeformular). Der TV fragt vor dem Start und nach dem Ende alle 10 Sekunden.
+
+**Countdown nach der Serverzeit:** Abstand Serveruhr - Geräteuhr aus `server_now` (`vetoClockOffset`, wie `seasons/clock.serverOffset`),
+die Frist des Servers wird in Geräte-Zeit umgerechnet (`vetoDeadline(block, offset)`) - ein Gerät, das Minuten nachgeht, zählt trotzdem
+richtig. Läuft die Zeit ab, steht „Zeit um“; gewählt wird nur auf dem Server (Nr. 23).
+
+**Darstellung** (`components/tls/league/VetoLive.jsx`, Regeln in `index.css` „Map-Veto live“, TV in `tv.css`): Map-Karten mit Bild im Stil
+der Veto-Karten der Team-Liga (`maps.css`, #1616); Team A blau (`--tls-brand`), Team B orange (eigenes Rot-Orange `--tls-veto-b`, 255 112 32 in
+`styles/system.css` - bewusst keine Status-Farbe: Warn-Orange, Rot und Gold heißen schon Achtung, läuft bzw. Decider, Violett ist die Art
+„Event“; Kontrast auf dem Grund 7,2 : 1, als Schild mit dunkler Schrift 7,4 : 1), Decider gold, Vorgabe der
+Woche grün. Zustände: offen; gesperrt (gedimmt, leicht abgesenkt, Bann-Symbol, „gesperrt von …“); gewählt (Schild „Map N“ in der Farbe
+der Seite); Decider; Vorgabe der Woche (wie #2326). Ist die eigene Seite am Zug, sind die Karten des laufenden Modus die Auswahl
+(`veto-option-*`), nicht wählbare ausgegraut mit Hinweis. **Detail-Runde:** gestaffelter Aufbau (40 ms je Karte), Anheben eigener
+wählbarer Karten unter dem Zeiger (nur `hover: hover` und `pointer: fine`), Nachgeben beim Antippen, einmaliges Aufleuchten jeder Wahl und
+jeder Aktion der Gegenseite (die eigene Sperre dimmt nur; Zuschauer sehen jede Aktion als neu; `freshCards`), ein nachzeichnender Rahmen
+um den Modus des laufenden Zugs (vier Kanten, `scale`). Bewegt werden nur `transform` (auch `translate`/`scale`) und `opacity`, mit den
+Bewegungs-Variablen; „Bewegung reduzieren“ (bzw. am TV „Bewegung aus“) zeigt alles sofort, der Ring läuft dann ohne Bild-Schleife.
+Countdown: Ring und Restzeit, die letzten 10 Sekunden rot mit Sanduhr und „gleich vorbei“ (auch ohne Farbe und ohne Bewegung lesbar), der
+Ring atmet dazu ruhig (nur ohne „Bewegung reduzieren“). **Ablauf-Leiste:** jeder
+Schritt mit Art, Seite, Modus und Ziel; fertige zeigen die Map (Zufallswahl mit Symbol), der laufende ist markiert und rückt in der Leiste
+in die Mitte (nur die Leiste scrollt). **Stabile Schlüssel:** Karten `Modus:Map`, Schritte nach Index, Rahmen nach Schritt - der Abruf
+baut nichts neu auf, spielt nichts ab, der Fokus bleibt.
+
+**Barrierefreiheit:** Karten sind Knöpfe mit Namen und Zustand („Hafen: offen – antippen zum Sperren“); Schritte der Leiste mit Satz
+(„Schritt 2 von 11: Falken sperrt eine Map (Stellung) – läuft“, `aria-current="step"`); der Countdown sagt höflich nur bei 30, 10 und 5
+Sekunden und beim Ablauf an; der letzte Schritt steht in einer höflichen Ansage.
+
+**Zuschauer und TV:** Die Matchseite zeigt Zuschauern das laufende Veto nur lesend (`readOnly`, ohne Auswahl, Eingriff und Bereit-Block).
+**TV** `/display/veto/<Spiel>` (`pages/display/VetoTVPage.jsx`, fragt immer mit `display=1`): ohne Schlüssel sichtbar wie die
+Matchseite (öffentliche Staffel ohne Anmeldung, „Nur Mitglieder“ nur angemeldet); mit `?key=` (Anzeige-Schlüssel des Turniers aus TV &
+Beamer) auch ohne Anmeldung für Staffeln „Nur Mitglieder“ - nie für Entwurf oder interne Staffel (siehe oben); ein ungültiger Schlüssel
+zeigt „Dieser TV-Link gilt nicht mehr“ und nichts vom Inhalt. Links wer am Zug ist mit großem Countdown, rechts das Brett je Modus,
+darunter der Ablauf; nach dem Ende die Spielreihenfolge als große Karten; QR-Code zur Matchseite (ohne Schlüssel). Eine ältere Antwort
+überschreibt nie eine neuere (`isOlderVeto`: Serverzeit, bei gleicher Zeit die Version - wie `mergeLiveVeto` auf der Matchseite). Link
+„TV-Ansicht“ im Veto-Block der Matchseite.
+
+**Erinnerung „Map-Veto wartet“** (`league_veto.nudge_target`/`nudge_due`, Job `league_veto` nach dem Auflösen der Fristen,
+`league_veto_sweep.nudge`): an Captain und Vertreter der Seite am Zug (`responsible_user_ids`), Art `match_call`, Thema Match-Erinnerungen,
+`meta.reason` `veto_turn`, Schlüssel `veto-turn:<spiel>:<started_at>:<neustarts>:<schritt>:<seite>` - **höchstens eine je Schritt und
+Seite** (Merker `flow.veto_nudge = {key, at}` mit Bedingung auf Version und Schlüssel). `<neustarts>` zählt die Eingriffe „Schritt zurück“
+und „Neu starten“ in `lead_log` (Review): Beginnt derselbe Schritt dadurch neu, gibt es wieder eine Erinnerung; Pause und Fortsetzen
+bleiben derselbe Schritt. Fällig, wenn: das Veto läuft, der Schritt ein Zug einer
+Seite ist (nie Decider oder Vorgabe), seit **20 Sekunden** kein Zug (Zeit je Schritt minus Rest), noch mindestens **5 Sekunden** übrig,
+die Staffel nicht gesperrt und die Seite das Veto **nicht offen** hat. „Offen“ heißt: Captain oder Vertreter der Seite hat in den letzten
+**15 Sekunden** den kurzen Abruf gemacht - der sichtbare Tab fragt alle 2 Sekunden, im Hintergrund nie. Der Abruf vermerkt das als
+`flow.veto_seen.<Anmeldung> = <Zeit>` (höchstens alle 5 Sekunden ein Schreiben, nur solange das Veto läuft, ohne Person und ohne
+`updated_at`). Die Werte stehen als Konstanten in `league_veto.py` (`NUDGE_IDLE_SECONDS` usw.); einstellbar machen kann sie #1647.
+Satz: „Ihr seid im Map-Veto am Zug: sperrt eine Map (Stellung). Noch 35 Sekunden – danach wählt das System.“
+
+**Datenschutz:** `flow.veto_seen` und `flow.veto_nudge` sind intern wie `flow` (keine Personen, nur Anmeldungen und Zeiten); die
+Zuschauer-Sicht nennt keine Personen und keinen Grund einer Pause.
 
 ### Season-Seite der Verwaltung (#2267)
 

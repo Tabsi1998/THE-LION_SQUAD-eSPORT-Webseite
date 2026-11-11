@@ -13,7 +13,8 @@
    text-muted      Nebentext (#1232)
    quiet   Grau    vorbei oder ruhig: beendet, abgesagt, Warteliste
    silver, bronze  nur für Platz 2 und 3
-   pole, fastest   Pink und Violett nur für Pole und schnellste Runde (Rennserien) */
+   pole, fastest   Pink und Violett nur für Pole und schnellste Runde (Rennserien)
+   veto-b  Orange  nur Team B im Map-Veto (Team A ist brand) */
 :root {
   --tls-brand-rgb: 41 182 232;
   --tls-brand: rgb(var(--tls-brand-rgb));
@@ -43,6 +44,12 @@
   --tls-pole: rgb(var(--tls-pole-rgb));
   --tls-fastest-rgb: 192 132 252;
   --tls-fastest: rgb(var(--tls-fastest-rgb));
+
+  /* Map-Veto (#1651): Team B in kräftigem Rot-Orange - nur für die Seite B im Veto (Ring, Ablauf, Karte, TV). Bewusst
+     kein Status: hebt sich von Achtung (warn), läuft (live) und Gold (honor, Decider) ab und ist nicht das Violett der
+     Art „Event“. Lesbar als Schrift auf dem Grund (7,2 : 1) und als Schild mit dunkler Schrift (7,4 : 1). */
+  --tls-veto-b-rgb: 255 112 32;
+  --tls-veto-b: rgb(var(--tls-veto-b-rgb));
 
   /* Flächen: Schwarz als Grund, darauf drei Stufen (Karte, gehobene Karte, Kachel). */
   --tls-surface-0: #0A0A0A;

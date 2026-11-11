@@ -763,6 +763,13 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
         can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None,
         viewer_id=(user or {}).get("id"))
+    # Map-Veto für Zuschauer (D.4, #1651): Wer weder dazugehört noch das Spiel leitet, sieht das Veto nur lesend - ohne Wahl, ohne
+    # Eingriff, ohne Grund einer Pause. Liest nur; Start und Fristen löst der Aufruf der Beteiligten bzw. der Job.
+    veto_view = None
+    if checkin_block is None and collection == "matches_v2":
+        from services import league_veto
+        if league_veto.rules_mod.rules_of(tournament):
+            veto_view = await league_veto.live_block(db, match, tournament, spectator=True)
     # Erst einchecken, dann melden (D.2): der Satz, den auch /report gäbe - die Seite zeigt ihn statt des Meldeformulars.
     report_hint = None
     if can_player_report and checkin_block:
@@ -869,6 +876,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "league": league_block,
         "schedule_block": schedule_block,
         "checkin": checkin_block,
+        "veto_view": veto_view,
     }
 
 

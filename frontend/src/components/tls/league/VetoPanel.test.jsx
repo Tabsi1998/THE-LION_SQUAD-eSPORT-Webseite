@@ -120,11 +120,25 @@ test("fertig: die Spielreihenfolge mit Decider, der Verlauf eingeklappt, kein Po
   vi.useRealTimers();
 });
 
-test("solange das Veto läuft, fragt die Seite alle drei Sekunden nach", () => {
+// Live (#1651): Solange das Veto läuft, fragt die Seite alle zwei Sekunden nach (vorher drei - D.4 macht es schneller), in der Pause
+// alle fünf; im Hintergrund-Tab gar nicht, beim Zurückkommen sofort einmal.
+test("solange das Veto läuft, fragt die Seite alle zwei Sekunden nach - im Hintergrund-Tab nie, zurück sofort", () => {
   vi.useFakeTimers();
   const onPoll = vi.fn();
-  renderPanel(RUNNING, { onPoll });
+  const { rerender } = renderPanel(RUNNING, { onPoll });
   vi.advanceTimersByTime(6500);
+  expect(onPoll).toHaveBeenCalledTimes(3);
+  const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+  onPoll.mockClear();
+  vi.advanceTimersByTime(10000);
+  expect(onPoll).not.toHaveBeenCalled();
+  hidden.mockReturnValue(false);
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(onPoll).toHaveBeenCalledTimes(1);
+  hidden.mockRestore();
+  onPoll.mockClear();
+  rerender(<VetoPanel block={{ ...RUNNING, status: "paused", paused: { at: "x", reason: "Pause", remaining_seconds: 30 } }} matchId="m1" busy={false} run={async () => true} onChanged={async () => {}} onPoll={onPoll} />);
+  vi.advanceTimersByTime(10500);
   expect(onPoll).toHaveBeenCalledTimes(2);
   vi.useRealTimers();
 });
