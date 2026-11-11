@@ -2767,6 +2767,10 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 | Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; am Vorfall: Ende des Vorfalls (`closed_at`) bzw. eines daraus folgenden Verfahrens (`disputes[].incident_id`, ganze Kette samt Einspruch) + Einspruchsfrist, **mindestens aber bis das Ergebnis des Spiels feststeht und `protest_hours` abgelaufen sind** (ruhend in Sperrzeiten; so lange kann aus dem Vorfall noch ein Protest werden; bei einem abgesagten Spiel entfällt das); ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes `appeal_hours` nach dem Hochladen |
 | Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
 
+**Bildprüfung:** Ein Bild wird mit `scan_state: "pending"` gespeichert und ist bis zum Ergebnis nur für den Absender sichtbar.
+Lässt sich die Prüfung beim Hochladen nicht anstoßen, reiht derselbe stündliche Job das Bild nach einer Stunde neu ein
+(`match_proof_retention.rescan_stuck`), solange keine Prüfung für es ansteht.
+
 **Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt
 das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, Wiener Zeit). Lässt sich das Ende nicht bestimmen
 (Season ohne Kalender), bleibt es bei 30 Tagen ab dem Hochladen, weiter mit der Sperre bei offenem Verfahren. Die Werte liest

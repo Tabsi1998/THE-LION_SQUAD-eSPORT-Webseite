@@ -363,6 +363,46 @@ async def test_held_proofs_do_not_hide_later_ones_from_the_job(flow, monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_the_job_requeues_images_whose_image_check_never_started(flow, monkeypatch):
+    """Ließ sich die Bildprüfung beim Hochladen nicht anstoßen, holt der stündliche Job sie nach (Review #2360, N6)."""
+    from services import media_scan
+
+    real, down = media_scan.enqueue, {"now": True}
+
+    async def flaky(*args, **kwargs):
+        if down["now"]:
+            raise RuntimeError("Prüfdienst nicht erreichbar")
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(media_scan, "enqueue", flaky)
+    w = await league_world(flow)
+    match = w["match"]
+    flow.act_as(user(w, "Kapitaen"))
+    stuck = (await add_image(flow, match)).json()
+    assert stuck["scan_state"] == "pending" and await flow.db.media_scans.count_documents({}) == 0
+    down["now"] = False
+    fine = (await add_image(flow, match)).json()
+    link = (await add_link(flow, match)).json()
+
+    # Noch keine Stunde: Der Job wartet. Danach reiht er genau das hängende Bild ein - kein Link, kein geprüftes Bild.
+    assert await match_proof_retention.rescan_stuck(flow.db, now=now_utc() + timedelta(minutes=59)) == 0
+    assert await match_proof_retention.rescan_stuck(flow.db, now=now_utc() + timedelta(minutes=61)) == 1
+    scans = await flow.db.media_scans.find({}, {"_id": 0, "ref_id": 1}).to_list(10)
+    assert sorted(row["ref_id"] for row in scans) == sorted([stuck["id"], fine["id"]])
+    stored = await flow.db.match_proof_photos.find_one({"id": stuck["id"]}, {"_id": 0})
+    assert stored["scan_state"] in match_proofs.VISIBLE_SCAN_STATES, "geprüft"
+    flow.act_as(user(w, "Falke1"))
+    assert (await flow.get(stuck["url"])).status_code == 200, "jetzt sieht es auch die Gegenseite"
+    assert await match_proof_retention.rescan_stuck(flow.db, now=now_utc() + timedelta(hours=5)) == 0
+    assert link["type"] == "link"
+
+    # Steht schon eine Prüfung an, reiht der Job nicht doppelt ein - das ist Sache des Sammlers der Bildprüfung.
+    await flow.db.match_proof_photos.update_one({"id": fine["id"]}, {"$set": {"scan_state": "pending"}})
+    await flow.db.media_scans.update_one({"ref_id": fine["id"]}, {"$set": {"state": "pending"}})
+    assert await match_proof_retention.rescan_stuck(flow.db, now=now_utc() + timedelta(hours=5)) == 0
+
+
+@pytest.mark.asyncio
 async def test_tournaments_keep_their_thirty_days_from_upload(flow):
     """Gegenprobe zur Liga: Ein Turnier ohne Liga löscht weiter 30 Tage nach dem Hochladen - außer das Spiel ist in Klärung."""
     staff = await flow.add_staff()

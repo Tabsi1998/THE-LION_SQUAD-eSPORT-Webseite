@@ -169,7 +169,9 @@ async def _store_image(db, match: dict, owner: dict, registration_id: str | None
         scan = await media_scan.enqueue(db, kind="proof", ref_id=doc["id"], owner_id=owner["id"], path=path,
                                         context={"type": "proof", "match_id": match["id"]})
         doc["scan_state"] = "safe" if scan.get("state") == "failed" else (scan.get("state") or "pending")
-    except Exception as exc:  # noqa: BLE001 - der Upload gilt; der Sammler holt die Prüfung nach
+    # Der Upload gilt. Das Bild bleibt „in Prüfung“ (nur für den Absender sichtbar); der stündliche Job stößt die Prüfung
+    # neu an (``match_proof_retention.rescan_stuck``) - der Sammler der Bildprüfung kennt es ohne Eintrag nicht.
+    except Exception as exc:  # noqa: BLE001 - eine ausgefallene Bildprüfung darf den Upload nicht verhindern
         logger.warning("[proofs] Bildprüfung für %s nicht angestoßen: %s", doc["id"], type(exc).__name__)
         doc["scan_state"] = "pending"
     return doc

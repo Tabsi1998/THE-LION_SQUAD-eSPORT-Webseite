@@ -781,10 +781,14 @@ async def _safe_proof_photo_retention():
     nach Season-Ende plus Frist, MOSS nach Verfahrensende plus Einspruchsfrist (``match_proof_retention.purge``)."""
     try:
         from database import get_db
-        from services.match_proof_retention import purge
+        from services.match_proof_retention import purge, rescan_stuck
         removed = await purge(get_db())
         if removed:
             logger.info(f"[scheduler] proof_photo_retention removed={removed}")
+        # Bilder, deren Bildprüfung sich beim Hochladen nicht anstoßen ließ (#2360): neu einreihen.
+        requeued = await rescan_stuck(get_db())
+        if requeued:
+            logger.info(f"[scheduler] proof_photo_retention rescan={requeued}")
     except Exception as exc:
         _log_task_failure("proof_photo_retention", exc)
 

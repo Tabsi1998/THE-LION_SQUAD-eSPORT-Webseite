@@ -15,17 +15,22 @@ schlösse sich ein Import-Kreis über ``tournament_purge``. Die Regeln stehen in
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, time, timedelta, timezone
 
 from models import now_utc
 from services import match_proof_refs as refs
-from services import match_proofs
+from services import match_proofs, media_scan
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import VIENNA, week_days
 from services.match_disputes import decided_at
 from services.matchday_schedule import response_deadline
 
+logger = logging.getLogger("tls.match_proofs")
+
 PAGE = 500
+# So lange darf ein Bild „in Prüfung“ stehen, bevor der Job nachsieht, ob überhaupt eine Prüfung für es ansteht.
+RESCAN_AFTER = timedelta(hours=1)
 # Die Staffel mit ihrem Kalender: Die Protestfrist ruht in Sperrzeiten (``response_deadline``).
 STAFFEL_FIELDS = {"_id": 0, "creation_key": 0, "billing": 0}
 MATCH_FIELDS = {"_id": 0, "id": 1, "status": 1, "disputes": 1, "incidents": 1, "completed_at": 1, "result_meta": 1,
@@ -155,6 +160,31 @@ async def _expired_league(db, current: datetime, staffeln: dict[str, dict]) -> l
                 elif not refs.match_hold(match, current, appeal_hours=match_proofs.setting(tournament, season, "appeal_hours")):
                     expired.append(row)
     return expired
+
+
+async def rescan_stuck(db, *, now=None) -> int:
+    """Bilder, die länger als eine Stunde „in Prüfung“ stehen, ohne dass eine Prüfung für sie ansteht, neu einreihen.
+
+    Ein Bild wird mit ``scan_state: "pending"`` gespeichert und danach bei der Bildprüfung eingereiht. Scheitert das Einreihen
+    (Datenbank kurz weg, Prüfdienst nicht eingerichtet), gibt es keinen Eintrag in ``media_scans`` - der Sammler der Bildprüfung
+    findet das Bild dann nie, es bliebe für Gegenseite und Leitung dauerhaft unsichtbar. Steht ein Eintrag an, kümmert sich
+    der Sammler; hier wird nichts doppelt eingereiht."""
+    current = now or now_utc()
+    queued = 0
+    async for rows in _pages(db, {"scan_state": "pending", "created_at": {"$lt": (current - RESCAN_AFTER).isoformat()}}):
+        ids = [row["id"] for row in rows]
+        waiting = set(await db.media_scans.distinct("ref_id", {"kind": "proof", "ref_id": {"$in": ids}, "state": "pending"}))
+        for row in rows:
+            path = match_proofs.proof_path(row.get("storage_key"))
+            if row["id"] in waiting or path is None or not path.is_file():
+                continue
+            try:
+                await media_scan.enqueue(db, kind="proof", ref_id=row["id"], owner_id=row.get("owner_id"), path=path,
+                                         context={"type": "proof", "match_id": row.get("match_id")})
+                queued += 1
+            except Exception as exc:  # noqa: BLE001 - beim nächsten Lauf wieder; ein Bild hält die übrigen nicht auf
+                logger.warning("[proofs] Bildprüfung ließ sich nicht neu anstoßen: %s", type(exc).__name__)
+    return queued
 
 
 async def purge(db, *, now=None) -> int:
