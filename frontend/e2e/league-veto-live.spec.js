@@ -163,8 +163,9 @@ async function wire(context, veto, user, own) {
 async function shot(page, testInfo, name) {
   const area = page.getByTestId("checkin-panel").or(page.getByTestId("veto-panel")).first();
   // Kopf, Leiste unten und „Nach oben“ stehen fest über der Seite - im Ausschnitt würden sie über dem Veto liegen.
-  const style = "[data-testid='site-header'], [data-testid='bottom-nav'], [data-testid='scroll-top-btn'], [data-sonner-toaster] { visibility: hidden !important; }";
-  const body = await area.count() ? await area.screenshot({ animations: "allow", style }) : await page.screenshot();
+  // Am TV der Hinweis „Bildschirm wach halten“ - den kennt der Testbrowser nicht, im echten TV steht er nicht da.
+  const style = "[data-testid='site-header'], [data-testid='bottom-nav'], [data-testid='scroll-top-btn'], [data-sonner-toaster], [data-testid='tv-wake-hint'] { visibility: hidden !important; }";
+  const body = await area.count() ? await area.screenshot({ animations: "allow", style }) : await page.screenshot({ style });
   await testInfo.attach(name, { body, contentType: "image/png" });
   if (SHOT_DIR) {
     fs.mkdirSync(SHOT_DIR, { recursive: true });
