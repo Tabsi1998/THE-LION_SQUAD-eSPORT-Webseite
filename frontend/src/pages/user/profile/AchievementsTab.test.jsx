@@ -212,3 +212,23 @@ describe("AchievementsTab – Teilen (#619)", () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 });
+
+describe("AchievementsTab – nicht mehr erreichbar (#2339)", () => {
+  const retiredGroup = {
+    code: "founding_member", name: "Gründungsmitglied", category: "club", icon: "flag", accent_color: "#FFD700", description: "Von Anfang an dabei.", public: true, member_only: true,
+    retired: true, retired_reason: "Nur seit dem Gründungsjahr.", tier_count: 1, earned_count: 1,
+    tiers: [tier("founding_member_1", 1, "Gründungsmitglied I", { earned: true, earned_at: "2026-01-02T10:00:00Z", member_only: true, retired: true, retired_reason: "Nur seit dem Gründungsjahr." })],
+  };
+  const withRetired = { groups: [...GROUPS, retiredGroup], awards: [...AWARDS, { ...AWARDS[0], code: "founding_member_1", award_id: "aw3", name: "Gründungsmitglied I", retired: true }] };
+
+  it("zeigt die erhaltene Stufe mit Hinweis, zählt sie aber in keinem x von y", async () => {
+    renderTab(withRetired);
+    expect(screen.queryByTestId("achievement-showcase-club")).toBeNull();
+    expect(screen.getByTestId("achievement-stats-row")).toHaveTextContent("2/4");
+    const card = screen.getByTestId("achievement-group-founding_member");
+    expect(within(card).getByTestId("achievement-retired-founding_member")).toHaveAttribute("title", expect.stringContaining("Nur seit dem Gründungsjahr."));
+    // Gegenprobe: ohne Kennzeichen zählt sie mit.
+    const plain = achievementInsights({ groups: [...GROUPS, { ...retiredGroup, retired: false, tiers: retiredGroup.tiers.map((t) => ({ ...t, retired: false })) }] });
+    expect(`${plain.earned.length}/${plain.total}`).toBe("3/5");
+  });
+});

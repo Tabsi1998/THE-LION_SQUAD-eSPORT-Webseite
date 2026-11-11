@@ -303,15 +303,17 @@ export function PinnedPanel({ pinned = [], codes = [], onChange }) {
   );
 }
 
-// Kategorien als Vitrinen: „Spielen 41 von 104“ - Klick filtert den Katalog darunter.
+// Kategorien als Vitrinen: „Spielen 41 von 104“ - Klick filtert den Katalog darunter. Nicht mehr Erreichbares (#2339)
+// zählt nicht mit, auch wenn man es hat.
 export function categoryProgress(groups = []) {
   const rows = {};
   for (const group of groups) {
-    if (group.is_negative) continue;
+    if (group.is_negative || group.retired) continue;
     const meta = CATEGORY_META[group.category] || CATEGORY_META.special;
     const row = (rows[group.category] ||= { key: group.category, label: meta.label, icon: meta.icon, accent: meta.accent, order: meta.order, earned: 0, total: 0, groups: 0 });
     row.groups += 1;
     for (const tier of group.tiers || []) {
+      if (tier.retired) continue;
       row.total += 1;
       if (tier.earned) row.earned += 1;
     }

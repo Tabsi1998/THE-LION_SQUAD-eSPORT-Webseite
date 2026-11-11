@@ -15,7 +15,7 @@ const authState = { areas: [] };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "admin" }, can: (...wanted) => wanted.some((area) => authState.areas.includes(area)) }) }));
 
 const { default: AdminAchievementsPage, TABS } = await import("./AdminAchievementsPage");
-const { allowedMaterials, slugFrom } = await import("./achievements/CatalogTab");
+const { allowedMaterials, retiredState, slugFrom } = await import("./achievements/CatalogTab");
 const { parseNames, toIso } = await import("./achievements/AwardTab");
 
 const GROUPS = [
@@ -190,6 +190,32 @@ describe("Katalog", () => {
     fireEvent.change(select, { target: { value: "gold" } });
     fireEvent.submit(screen.getByTestId("tier-sheet"));
     await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/achievements/tiers/matches_played_4", expect.objectContaining({ material: "gold" })));
+  });
+
+  it("setzt eine Gruppe auf „nicht mehr erreichbar“ mit Grund (#2339)", async () => {
+    renderAt("catalog");
+    fireEvent.click(await screen.findByTestId("group-edit-matches_played"));
+    const reason = await screen.findByTestId("group-retired-reason");
+    expect(reason).not.toBeRequired();
+    fireEvent.click(screen.getByTestId("group-retired"));
+    expect(reason).toBeRequired();
+    fireEvent.change(reason, { target: { value: "Das Format gibt es nicht mehr. " } });
+    fireEvent.submit(screen.getByTestId("group-sheet"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/achievements/groups/matches_played",
+      expect.objectContaining({ retired: true, retired_reason: "Das Format gibt es nicht mehr.", available_until: null })));
+  });
+
+  it("zeigt nicht mehr Erreichbares und ein künftiges „erreichbar bis“ in der Liste (#2339)", async () => {
+    const groups = [{ ...GROUPS[0], retired: true, retired_reason: "Vorbei." }, { ...GROUPS[2], available_until: "2999-01-01T00:00:00+00:00", retired_reason: "Bald vorbei." }, GROUPS[1]];
+    apiMock.get.mockImplementation((url) => (url === "/admin/achievements/groups" ? Promise.resolve({ data: groups }) : routeGet(url)));
+    renderAt("catalog");
+    expect(await screen.findByTestId("group-retired-matches_played")).toHaveTextContent("nicht mehr erreichbar");
+    expect(screen.getByTestId("group-retired-season_mvp")).toHaveTextContent("erreichbar bis 01.01.2999");
+    // Gegenprobe: ohne Kennzeichen kein Hinweis.
+    expect(screen.queryByTestId("group-retired-secret_door")).toBeNull();
+    expect(retiredState({ available_until: "2020-01-01T00:00:00Z" }).active).toBe(true);
+    expect(retiredState({ available_until: "2999-01-01T00:00:00Z" })).toMatchObject({ active: false, upcoming: true });
+    expect(retiredState({})).toMatchObject({ active: false, upcoming: false });
   });
 
   it("rechnet die Leiter wie der Server und bildet Kennungen aus Namen", () => {

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, EyeOff, Plus, Search, ShieldCheck, Upload } from "lucide-react";
 import { api } from "@/lib/api";
+import { fromDateTimeLocal, toDateTimeLocalInput } from "@/lib/datetime";
+import { viennaDateTime } from "@/lib/vienna";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
@@ -49,6 +51,69 @@ function conditionText(tier) {
 }
 
 const STATUS = { live: ["live", "#00FF88"], counter: ["Zähler", "#FFD700"], planned: ["geplant", "rgba(255,255,255,0.35)"] };
+
+/**
+ * Nicht mehr erreichbar (#2339): das Kennzeichen oder ein Zeitpunkt, ab dem es gilt. Gilt es heute, ist die Gruppe
+ * bzw. Stufe „retired“ - nur wer sie hat, sieht sie, sie zählt nirgends und wird nicht mehr automatisch vergeben.
+ */
+export function retiredState(doc, now = Date.now()) {
+  const until = doc?.available_until ? new Date(doc.available_until) : null;
+  const dated = Boolean(until && !Number.isNaN(+until));
+  const active = Boolean(doc?.retired) || (dated && +until <= now);
+  return { active, until: dated ? until : null, upcoming: dated && !doc?.retired && +until > now };
+}
+
+function RetiredChip({ doc, testId }) {
+  const state = retiredState(doc);
+  if (!state.active && !state.upcoming) return null;
+  const label = state.active ? "nicht mehr erreichbar" : `erreichbar bis ${viennaDateTime(state.until, { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  return (
+    <span className="text-white/55" title={doc?.retired_reason || undefined} data-testid={testId}>{label}</span>
+  );
+}
+
+// Die Felder für „nicht mehr erreichbar“ - gleich für Gruppe und Stufe; der Grund ist Pflicht, sobald etwas gilt.
+function RetiredFields({ form, set, prefix, what }) {
+  const needsReason = Boolean(form.retired || form.available_until);
+  return (
+    <FormSection
+      title="Nicht mehr erreichbar"
+      hint={`Nur wer ${what} hat, sieht sie noch – sie zählt nirgends mehr mit (x von y, Seltenheit, Kategorie-Meister, Sammler) und wird nicht mehr automatisch vergeben. Von Hand geht weiter.`}
+      accent="#FF8A3D"
+      testId={`${prefix}-retired-section`}
+    >
+      <CheckField label="Nicht mehr erreichbar" checked={form.retired} onChange={(v) => set("retired", v)} testId={`${prefix}-retired`} accent="#FF8A3D" />
+      <FormGrid>
+        <TextField
+          label="Grund"
+          required={needsReason}
+          value={form.retired_reason}
+          onChange={(v) => set("retired_reason", v)}
+          maxLength={300}
+          placeholder="z. B. Das Format gibt es nicht mehr."
+          hint="Sieht die Person, die den Erfolg hat."
+          testId={`${prefix}-retired-reason`}
+        />
+        <TextField
+          label="Erreichbar bis"
+          type="datetime-local"
+          value={form.available_until}
+          onChange={(v) => set("available_until", v)}
+          hint="Optional: ab diesem Zeitpunkt gilt es von selbst."
+          testId={`${prefix}-available-until`}
+        />
+      </FormGrid>
+    </FormSection>
+  );
+}
+
+function retiredForm(doc) {
+  return { retired: Boolean(doc?.retired), retired_reason: doc?.retired_reason || "", available_until: toDateTimeLocalInput(doc?.available_until) };
+}
+
+function retiredPayload(form) {
+  return { retired: Boolean(form.retired), retired_reason: form.retired_reason.trim() || null, available_until: fromDateTimeLocal(form.available_until) };
+}
 
 /** Katalog (E10): Gruppen je Kategorie mit ihren Stufen, Bearbeiten, Prüfung, Export und Import. */
 export function CatalogTab({ board = false }) {
@@ -177,6 +242,8 @@ export function CatalogTab({ board = false }) {
                       {g.is_special && <span className="text-[#FFD700]">Sonder</span>}
                       {g.is_negative && <span className="text-[#FF3B30]">Negativ</span>}
                       {g.is_admin_created && <span className="text-[#29B6E8]">Eigen</span>}
+                      {g.staff_only && <span className="text-white/45" title="Sieht nur die Leitung - und wer sie schon hat">nur Leitung</span>}
+                      <RetiredChip doc={g} testId={`group-retired-${g.code}`} />
                       <button type="button" onClick={() => togglePublic(g)} data-testid={`group-public-${g.code}`} className={`font-bold ${g.public ? "text-[#00FF88]" : "text-white/40"}`}>{g.public ? "Öffentlich" : "Intern"}</button>
                       <button type="button" onClick={() => setEditingGroup(g)} data-testid={`group-edit-${g.code}`} className="text-[#29B6E8] hover:underline normal-case tracking-normal text-xs">Bearbeiten</button>
                       {g.is_admin_created && <button type="button" onClick={() => deleteGroup(g)} className="text-[#FF3B30] hover:underline normal-case tracking-normal text-xs">Löschen</button>}
@@ -208,6 +275,7 @@ export function CatalogTab({ board = false }) {
                                     {condition.text}
                                     {status && !t.manual_only && <span className="ml-2 text-[9px] uppercase tracking-widest" style={{ color: status[1] }}>{status[0]}</span>}
                                     {t.member_only && <div className="mt-0.5 text-[9px] uppercase tracking-widest text-[#FFD700]">nur Mitglieder</div>}
+                                    {(retiredState(t).active || retiredState(t).upcoming) && <div className="mt-0.5 text-[9px] uppercase tracking-widest"><RetiredChip doc={t} testId={`tier-retired-${t.code}`} /></div>}
                                   </td>
                                   <td className="px-3 py-2 text-right tabular-nums">+{t.points}</td>
                                   <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -377,6 +445,7 @@ function GroupForm({ group, onClose, onSaved }) {
     is_negative: group?.is_negative ?? false,
     hidden: group?.hidden ?? false,
     sort_order: group?.sort_order ?? 600,
+    ...retiredForm(group),
   });
   const [codeTouched, setCodeTouched] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -386,7 +455,7 @@ function GroupForm({ group, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, art: form.art || null };
+      const payload = { ...form, art: form.art || null, ...retiredPayload(form) };
       if (isNew) await api.post("/admin/achievements/groups", payload);
       else { delete payload.code; await api.patch(`/admin/achievements/groups/${group.code}`, payload); }
       toast.success("Gespeichert"); onSaved(); onClose();
@@ -410,6 +479,7 @@ function GroupForm({ group, onClose, onSaved }) {
       <CheckField label="Versteckt bis zur Freischaltung" checked={form.hidden} onChange={(v) => set("hidden", v)} testId="group-hidden" accent="#A855F7" />
       <CheckField label="Sonderauszeichnung (von Hand kuratiert)" checked={form.is_special} onChange={(v) => set("is_special", v)} accent="#FFD700" />
       <CheckField label="Negativ/Fun (bis zur Freischaltung geheim)" checked={form.is_negative} onChange={(v) => set("is_negative", v)} testId="group-negative" accent="#FF3B30" />
+      <RetiredFields form={form} set={set} prefix="group" what="die Gruppe" />
       {isNew && (
         <FormSection title="Kennung" hint="Wird aus dem Namen gebildet und lässt sich später nicht mehr ändern." collapsible>
           <TextField label="Kennung" required value={form.code} onChange={(v) => { setCodeTouched(true); set("code", slugFrom(v)); }} testId="group-code" />
@@ -435,6 +505,7 @@ function TierForm({ tier, group, siblings, onClose, onSaved }) {
     art: tier?.art || "",
     manual_only: tier?.manual_only ?? !siblings.some((t) => t.condition_key),
     member_only: tier?.member_only ?? categoryOf(group) === "club",
+    ...retiredForm(tier),
   });
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -443,7 +514,7 @@ function TierForm({ tier, group, siblings, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, art: form.art || null, points: form.points === "" ? null : Number(form.points) };
+      const payload = { ...form, art: form.art || null, points: form.points === "" ? null : Number(form.points), ...retiredPayload(form) };
       if (form.manual_only) { payload.condition_key = null; payload.progress_target = null; }
       if (payload.points === null) delete payload.points;
       if (isNew) await api.post("/admin/achievements/tiers", { ...payload, group_code: group.code });
@@ -479,6 +550,7 @@ function TierForm({ tier, group, siblings, onClose, onSaved }) {
         </FormGrid>
       )}
       <IconField value={form.icon} onChange={(v) => set("icon", v)} />
+      <RetiredFields form={form} set={set} prefix="tier" what="die Stufe" />
       {isNew && (
         <FormSection title="Kennung" hint="Wird vorgeschlagen und lässt sich später nicht mehr ändern." collapsible>
           <TextField label="Kennung" required value={form.code} onChange={(v) => set("code", slugFrom(v))} testId="tier-code" />

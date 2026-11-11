@@ -318,6 +318,19 @@ function HiddenSummaryCard({ hidden }) {
   );
 }
 
+// Nicht mehr erreichbar (#2339): sieht nur, wer den Erfolg hat - der Hinweis sagt, warum er nicht mehr mitzählt.
+function RetiredChip({ reason, testId }) {
+  return (
+    <span
+      className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/15 text-white/45"
+      title={reason ? `Nicht mehr erreichbar: ${reason} Zählt nicht in „x von y“.` : "Nicht mehr erreichbar – zählt nicht in „x von y“."}
+      data-testid={testId}
+    >
+      Nicht mehr erreichbar
+    </span>
+  );
+}
+
 function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, share = null }) {
   const [open, setOpen] = useState(false);
   const earnedTiers = group.tiers.filter(t => t.earned).sort((a, b) => b.level - a.level);
@@ -380,6 +393,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
                 Verein
               </span>
             )}
+            {group.retired && <RetiredChip reason={group.tiers.find((t) => t.retired_reason)?.retired_reason || group.retired_reason} testId={`achievement-retired-${group.code}`} />}
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
           {rare?.top && (
@@ -467,6 +481,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
               geplant
             </span>
           )}
+          {tier.retired && !group?.retired && <RetiredChip reason={tier.retired_reason} testId={`achievement-retired-${tier.code}`} />}
         </div>
         <div className="text-xs text-white/65 mt-0.5">{tier.description}</div>
         {!tier.earned && tier.target > 0 && !tier.manual_only && tier.condition_status !== "planned" && (
