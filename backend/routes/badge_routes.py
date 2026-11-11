@@ -301,6 +301,10 @@ class GroupCreate(BaseModel):
     how_to: str = ""
     art: Optional[str] = None
     sort_order: int = 600
+    # Nicht mehr erreichbar (#2339): nur wer sie hat, sieht sie - mit Grund; wahlweise erst ab einem Zeitpunkt.
+    retired: bool = False
+    retired_reason: Optional[str] = Field(default=None, max_length=300)
+    available_until: Optional[str] = Field(default=None, max_length=40)
 
 
 class GroupPatch(BaseModel):
@@ -316,6 +320,37 @@ class GroupPatch(BaseModel):
     how_to: Optional[str] = None
     art: Optional[str] = None
     sort_order: Optional[int] = None
+    retired: Optional[bool] = None
+    retired_reason: Optional[str] = Field(default=None, max_length=300)
+    available_until: Optional[str] = Field(default=None, max_length=40)
+
+
+RETIRED_REASON_MISSING = "Bitte einen Grund angeben, warum der Erfolg nicht mehr erreichbar ist – die Person, die ihn hat, sieht ihn."
+
+
+def _retired_updates(current: dict, updates: dict) -> dict:
+    """„Nicht mehr erreichbar“ (#2339) prüfen: Datum lesbar (gespeichert als ISO, UTC), Grund Pflicht, sobald das Kennzeichen
+    oder ein Datum gilt. Ohne Kennzeichen und Datum fällt der Grund weg."""
+    from services.achievement_reach import parse_when
+
+    if "available_until" in updates:
+        raw = str(updates.get("available_until") or "").strip()
+        if raw:
+            when = parse_when(raw)
+            if not when:
+                raise HTTPException(400, "Das Datum für „erreichbar bis“ ist nicht lesbar.")
+            updates["available_until"] = when.isoformat()
+        else:
+            updates["available_until"] = None
+    if "retired_reason" in updates:
+        updates["retired_reason"] = " ".join(str(updates.get("retired_reason") or "").split()) or None
+    merged = {**current, **updates}
+    if merged.get("retired") or merged.get("available_until"):
+        if not merged.get("retired_reason"):
+            raise HTTPException(400, RETIRED_REASON_MISSING)
+    elif any(key in updates for key in ("retired", "available_until")):
+        updates["retired_reason"] = None
+    return updates
 
 
 def _check_category(category: str | None) -> None:
@@ -340,7 +375,9 @@ async def admin_create_group(body: GroupCreate, me: dict = Depends(require_area(
     _check_category(body.category)
     if await db.achievement_groups.find_one({"code": body.code}):
         raise HTTPException(409, "Code bereits vergeben.")
-    doc = {**body.model_dump(), "id": body.code, "is_admin_created": True,
+    raw = body.model_dump()
+    raw.update(_retired_updates({}, {key: raw[key] for key in ("retired", "retired_reason", "available_until")}))
+    doc = {**raw, "id": body.code, "is_admin_created": True,
            "created_at": now_utc().isoformat(), "created_by": me["id"]}
     await db.achievement_groups.insert_one(doc)
     doc.pop("_id", None)
@@ -352,12 +389,16 @@ async def admin_create_group(body: GroupCreate, me: dict = Depends(require_area(
 @admin_router.patch("/groups/{code}")
 async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(require_area("content"))):
     db = get_db()
-    nullable_fields = {"description", "accent_color"}
+    nullable_fields = {"description", "accent_color", "retired_reason", "available_until"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_category(updates.get("category"))
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
+    current = await db.achievement_groups.find_one({"code": code}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Group nicht gefunden.")
+    updates = _retired_updates(current, updates)
     res = await db.achievement_groups.update_one({"code": code}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "Group nicht gefunden.")
@@ -398,6 +439,9 @@ class TierCreate(BaseModel):
     icon: Optional[str] = None
     manual_only: bool = False
     member_only: bool = False
+    retired: bool = False
+    retired_reason: Optional[str] = Field(default=None, max_length=300)
+    available_until: Optional[str] = Field(default=None, max_length=40)
 
 
 class TierPatch(BaseModel):
@@ -413,6 +457,9 @@ class TierPatch(BaseModel):
     icon: Optional[str] = None
     manual_only: Optional[bool] = None
     member_only: Optional[bool] = None
+    retired: Optional[bool] = None
+    retired_reason: Optional[str] = Field(default=None, max_length=300)
+    available_until: Optional[str] = Field(default=None, max_length=40)
 
 
 @admin_router.get("/tiers")
@@ -439,6 +486,7 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_area("c
     _check_material(body.material)
     group = await db.achievement_groups.find_one({"code": body.group_code}, {"_id": 0})
     raw = body.model_dump()
+    raw.update(_retired_updates({}, {key: raw[key] for key in ("retired", "retired_reason", "available_until")}))
     if raw.get("points") is None:
         raw.pop("points")
     if raw.get("material") is None:
@@ -459,7 +507,7 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_area("c
 @admin_router.patch("/tiers/{code}")
 async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(require_area("content"))):
     db = get_db()
-    nullable_fields = {"description", "condition_key", "progress_target", "icon"}
+    nullable_fields = {"description", "condition_key", "progress_target", "icon", "retired_reason", "available_until"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_material(updates.get("material"))
@@ -468,6 +516,7 @@ async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(requir
     current = await db.achievements.find_one({"code": code}, {"_id": 0})
     if not current:
         raise HTTPException(404, "Tier nicht gefunden.")
+    updates = _retired_updates(current, updates)
     if updates.get("material") and updates["material"] != current.get("material"):
         await _check_ladder_move(db, current, updates["material"])
     if "material" in updates or "level" in updates:

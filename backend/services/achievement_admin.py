@@ -132,8 +132,11 @@ async def export_catalog(db) -> dict:
     return {"format": "tls-achievements/1", "exported_at": now_utc().isoformat(), "groups": groups, "tiers": tiers}
 
 
-GROUP_FIELDS = ("name", "category", "icon", "art", "accent_color", "description", "how_to", "public", "is_special", "is_negative", "hidden", "sort_order", "member_only", "staff_only")
-TIER_FIELDS = ("group_code", "name", "description", "how_to", "art", "icon", "material", "level", "condition_key", "progress_target", "points", "manual_only", "member_only")
+# „Nicht mehr erreichbar“ (#2339) wandert mit Export und Import - an Gruppe und Stufe, mit Grund und „erreichbar bis“.
+GROUP_FIELDS = ("name", "category", "icon", "art", "accent_color", "description", "how_to", "public", "is_special", "is_negative", "hidden", "sort_order", "member_only", "staff_only",
+                "role_only", "retired", "retired_reason", "available_until")
+TIER_FIELDS = ("group_code", "name", "description", "how_to", "art", "icon", "material", "level", "condition_key", "progress_target", "points", "manual_only", "member_only",
+               "retired", "retired_reason", "available_until")
 
 
 async def import_catalog(db, payload: dict, actor: dict | None, *, dry_run: bool = False) -> dict:
