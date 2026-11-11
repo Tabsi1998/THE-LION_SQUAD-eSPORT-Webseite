@@ -137,7 +137,7 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
 „Gehört zu … – ändern im Event“. Das braucht auch die Hallen-Tafel am TV.
 
 **Automatisches Fast-Lap-Hinweisbanner anzeigen** (im Formular der Challenge): Solange die Einreichung offen ist oder
-die Challenge innerhalb eines Tages startet, läuft oben auf der Website und in der App ein Banner. Unter dem Schalter
+die Challenge innerhalb eines Tages startet, läuft oben im Fast-Lap-Bereich der Website und in der App ein Banner. Unter dem Schalter
 stehen seine **Views**, **Klicks** und wann er **zuletzt angezeigt** wurde – auch, wenn er nicht mehr läuft.
 
 ### 3.2 Wertung: Strecken und Meisterschaft
