@@ -732,6 +732,10 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("team_squads", "team_id"),
     ("chat_attachments", "owner_id"),
     ("chat_attachments", [("status", 1), ("created_at", 1)]),
+    # Nachweise zu Spielen (#2360): je Abruf eines Bildes nach ``id``, je Liste nach ``match_id``; der Aufräum-Job liest in
+    # Seiten aufsteigend nach ``id``.
+    ("match_proof_photos", "id"),
+    ("match_proof_photos", "match_id"),
     ("stream_watches", [("user_id", 1), ("day", 1), ("key", 1)]),
     ("match_commendations", [("match_id", 1), ("from_registration_id", 1)]),
     ("match_commendations", "to_registration_id"),

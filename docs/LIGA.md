@@ -2711,7 +2711,7 @@ interne Vermerke der Leitung stehen nie in öffentlichen Antworten.
 #### Nachweise (gebaut mit #2360)
 
 `services/match_proofs.py`, Routen in `routes/match_proof_routes.py`, Sammlung weiter `match_proof_photos` (kein neuer Name, keine
-Migration). Ein Bezug kann **mehrere** Nachweise tragen.
+Migration; Indizes `id` und `match_id` legt der Start an, `database.AUDIT_INDEXES`). Ein Bezug kann **mehrere** Nachweise tragen.
 
 | Feld | Typ | Bedeutung |
 | --- | --- | --- |
