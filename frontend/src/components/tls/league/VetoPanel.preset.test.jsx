@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 // Vorgabe der Woche im Veto-Block der Matchseite (#2326): schon vor dem Veto sichtbar, im Brett als feste Map, in der Spielreihenfolge
@@ -185,4 +187,26 @@ test("fertig: die Vorgabe steht an ihrer Position in der Spielreihenfolge und im
   expect(screen.getByTestId("veto-planned-1")).not.toHaveTextContent("Vorgabe");
   expect(screen.getByTestId("veto-history-3")).toHaveTextContent("4. Vorgabe der Woche: Kai → Map 3 (Kontrolle)");
   expect(screen.queryByTestId("veto-presets")).toBeNull();
+});
+
+test("Detail-Runde: die Vorgabe-Karte hebt sich beim Aufbau gestaffelt an und leuchtet einmal auf - nur transform und opacity", () => {
+  const two = [...PRESETS, { mode: "hp", mode_label: "Stellung", position: 1, map_id: "hafen", map_name: "Hafen", map_image_url: null }];
+  render(panel({ ...WAITING, presets: two }));
+  // Gestaffelt wie die übrigen Map-Karten: je Karte ein Schritt (--tls-i).
+  expect(screen.getByTestId("veto-preset-ctl")).toHaveClass("tls-veto-preset");
+  expect(screen.getByTestId("veto-preset-ctl").style.getPropertyValue("--tls-i")).toBe("0");
+  expect(screen.getByTestId("veto-preset-hp").style.getPropertyValue("--tls-i")).toBe("1");
+  // Die Regeln dazu: Dauern, Kurve und Schalter aus den Bewegungs-Regeln, in den Keyframes nur transform und opacity.
+  const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
+  const rules = css.slice(css.indexOf(".tls-veto-preset {"), css.indexOf("@keyframes tls-veto-preset-glow"));
+  expect(rules).toContain("animation: tls-veto-preset-in var(--tls-motion-mid) var(--tls-ease) backwards;");
+  expect(rules).toContain("animation-delay: calc(var(--tls-i, 0) * 40ms * var(--tls-motion-on));");
+  expect(rules).toContain("animation: tls-veto-preset-glow var(--tls-motion-glow) var(--tls-ease) backwards;");
+  const frames = css.slice(css.indexOf("@keyframes tls-veto-preset-in"), css.indexOf("}\n}", css.indexOf("@keyframes tls-veto-preset-glow")));
+  const animated = [...frames.matchAll(/([a-z-]+):/g)].map((hit) => hit[1]);
+  expect([...new Set(animated)].sort()).toEqual(["opacity", "transform"]);
+  // „Bewegung reduzieren“: Der Weg hängt am Schalter --tls-motion-on, die Dauern stellt die eine Regel in index.css ab.
+  expect(frames).toContain("transform: translateY(calc(6px * var(--tls-motion-on)));");
+  // Gegenprobe: Das Brett des laufenden Vetos bleibt ruhig - nur die Vorgabe-Karte trägt die Klasse.
+  expect(document.querySelectorAll(".tls-veto-preset")).toHaveLength(2);
 });

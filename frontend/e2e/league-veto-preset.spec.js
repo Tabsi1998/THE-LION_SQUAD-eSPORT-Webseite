@@ -238,6 +238,13 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       await expect(page.getByTestId("veto-presets")).toContainText("Vorgabe der Woche · Spielwoche 2");
       await expect(page.getByTestId("veto-preset-ctl")).toContainText("Kaimauer");
       await expect(page.getByTestId("veto-preset-ctl")).toContainText("Kontrolle · Map 3");
+      // Detail-Runde: Die Karte hebt sich beim Aufbau an und leuchtet einmal auf. Mit „Bewegung reduzieren“ (so läuft diese Spec)
+      // ist sie sofort da - volle Deckkraft, kein Weg, und der Schein steht nicht nach.
+      const card = page.getByTestId("veto-preset-ctl");
+      await expect(card).toHaveCSS("animation-name", "tls-veto-preset-in");
+      await expect(card).toHaveCSS("opacity", "1");
+      await expect(card).toHaveCSS("transform", "none");
+      await expect.poll(() => card.evaluate((node) => window.getComputedStyle(node, "::after").opacity)).toBe("0");
       await expect(page.getByTestId("veto-map-ctl-kai")).toHaveAttribute("data-status", "preset");
       await expect(page.getByTestId("veto-map-ctl-kai")).toContainText("Map 3 · Vorgabe der Woche");
       await expect(page.getByTestId("veto-option-kai")).toBeDisabled();
@@ -260,6 +267,27 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       await expect(page.getByTestId("checkin-start-button")).toBeVisible();
       await expectNoSideScroll(page);
       await shot(page, testInfo, `veto-mit-vorgabe-fertig-${width}`, page.getByTestId("checkin-panel"));
+    });
+
+    test(`Matchseite: mit Bewegung kommt die Vorgabe-Karte gestaffelt und steht danach ruhig bei ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const second = { mode: "hp", mode_label: "Stellung", position: 1, map_id: "nebel", map_name: "Nebelwerk", map_image_url: null };
+      await setup(page, CAPTAIN, { matchPage: { ...PAGE, checkin: { ...CHECKIN, veto: { ...RUNNING, presets: [...PRESETS, second] } } } });
+      // Diese eine Prüfung läuft mit Bewegung: Dauer und Staffelung kommen aus den Bewegungs-Regeln.
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await page.goto("/matches/m1");
+      const first = page.getByTestId("veto-preset-ctl");
+      const next = page.getByTestId("veto-preset-hp");
+      await expect(first).toHaveCSS("animation-duration", "0.24s");
+      await expect(first).toHaveCSS("animation-delay", "0s");
+      await expect(next).toHaveCSS("animation-delay", "0.04s");
+      // Danach steht alles: volle Deckkraft, kein Versatz, der Schein ist wieder weg - und das Nachfragen der Seite baut nichts neu auf.
+      await expect(next).toHaveCSS("opacity", "1");
+      await expect.poll(() => next.evaluate((node) => window.getComputedStyle(node, "::after").opacity), { timeout: 5000 }).toBe("0");
+      await expect.poll(() => first.evaluate((node) => node.getAnimations({ subtree: true }).filter((item) => item.playState === "running").length), { timeout: 5000 }).toBe(0);
+      await page.waitForResponse((response) => response.url().endsWith("/api/matches/m1/page"));
+      expect(await first.evaluate((node) => node.getAnimations({ subtree: true }).filter((item) => item.playState === "running").length)).toBe(0);
+      await expectNoSideScroll(page);
     });
 
     test(`Matchseite: fehlt die Vorgabe, wartet das Veto mit klarem Satz bei ${width} px`, async ({ page }, testInfo) => {

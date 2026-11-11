@@ -2446,7 +2446,10 @@ can_withdraw, hint, lead: {can_start, conflict} | null}`. Überschrift „Vorgab
 nicht bereit“, der Satz darunter je nach Stand („Ihr seid bereit – wartet auf die Gegenseite.“, „… ist bereit – tippt auf ‚Bereit zum
 Veto‘, dann beginnt es sofort.“), Knopf **Bereit zum Veto** bzw. **Doch nicht bereit** nur für die Seiten, für die Leitung der Kasten
 **Notfall: Veto starten** mit Pflichtgrund. Im Wartestand (Vorgabe fehlt oder Start steht aus) fragt die Seite alle 3 Sekunden nach,
-sobald beide Seiten eingecheckt sind – so sieht jede Seite ohne Neuladen, dass die andere bereit ist. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
+sobald beide Seiten eingecheckt sind – so sieht jede Seite ohne Neuladen, dass die andere bereit ist. **Detail-Runde:** Die Karte der
+Vorgabe (`.tls-veto-preset` in `index.css`) hebt sich beim Aufbau 6 px an und blendet ein (`--tls-motion-mid`, `--tls-ease`), gestaffelt
+um 40 ms je Karte wie die übrigen Map-Karten (`--tls-i`), danach leuchtet ihr Rahmen einmal auf (`--tls-motion-glow`). Bewegt werden nur
+`transform` und `opacity`; die Karte erscheint einmal, das Nachfragen baut sie nicht neu auf. Mit „Bewegung reduzieren“ ist sie sofort da. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
 Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4.
 
 **Datenschutz:** `flow.veto` ist intern (`flow` in `match_public_view.INTERNAL_KEYS`); `planned_games` ist öffentlich (keine Personen).

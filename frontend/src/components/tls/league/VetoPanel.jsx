@@ -100,8 +100,10 @@ function WeekPresets({ block }) {
         <Pin className="h-3.5 w-3.5" aria-hidden="true" /> Vorgabe der Woche{block.week ? ` · Spielwoche ${block.week}` : ""}
       </h4>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {block.presets.map((row) => (
-          <li key={row.mode} className="flex min-w-0 items-center gap-3" data-testid={`veto-preset-${row.mode}`}>
+        {/* Beim Aufbau hebt sich jede Karte leicht an und ihr Rahmen leuchtet einmal auf, gestaffelt wie die übrigen Map-Karten
+            (`tls-veto-preset` in index.css: nur transform und opacity, mit „Bewegung reduzieren“ sofort da). */}
+        {block.presets.map((row, index) => (
+          <li key={row.mode} className="tls-veto-preset flex min-w-0 items-center gap-3" style={{ "--tls-i": Math.min(index, 8) }} data-testid={`veto-preset-${row.mode}`}>
             {row.map_image_url ? <LazyImg src={row.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
             <span className="min-w-0">
               <span className="block truncate font-bold text-white">{row.map_name}</span>
