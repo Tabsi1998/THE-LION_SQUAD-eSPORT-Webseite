@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
-import { KIND_OPTIONS, SECONDS, STEPS_MAX, TEAM_A_OPTIONS, TEAM_OPTIONS, emptyStep, moveStep, stepSentence, templateProblems, vetoRulesPayload } from "@/lib/leagueVeto";
+import { KIND_OPTIONS, SECONDS, STEPS_MAX, TEAM_A_OPTIONS, TEAM_OPTIONS, emptyStep, isSystemKind, moveStep, presetModes, stepSentence, templateProblems, vetoRulesPayload } from "@/lib/leagueVeto";
+import { SeasonVetoPresets } from "./SeasonVetoPresets";
 
 const ICON = "inline-flex h-9 w-9 items-center justify-center rounded-sm text-white/55 hover:text-white disabled:opacity-30 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
 
@@ -17,7 +18,7 @@ function toForm(rules, defaults) {
     enabled: Boolean(source.enabled),
     team_a: source.team_a || "home",
     step_seconds: String(source.step_seconds ?? 60),
-    steps: (source.steps || []).map((step) => ({ kind: step.kind, mode: step.mode || "", team: step.team || (step.kind === "decider" ? null : "A"), position: step.position == null ? "" : String(step.position) })),
+    steps: (source.steps || []).map((step) => ({ kind: step.kind, mode: step.mode || "", team: step.team || (isSystemKind(step.kind) ? null : "A"), position: step.position == null ? "" : String(step.position) })),
   };
 }
 
@@ -46,18 +47,18 @@ function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemov
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="w-7 shrink-0 text-xs font-bold tabular-nums text-[#29B6E8]">{number}.</span>
         <select aria-label={`Schritt ${number}: Art`} className={`${FIELD} w-[7.5rem] shrink-0`} value={step.kind} data-testid={`veto-step-${index}-kind`}
-          onChange={(event) => set({ kind: event.target.value, team: event.target.value === "decider" ? null : step.team || "A", position: event.target.value === "ban" ? "" : step.position })}>
+          onChange={(event) => set({ kind: event.target.value, team: isSystemKind(event.target.value) ? null : step.team || "A", position: event.target.value === "ban" ? "" : step.position })}>
           {KIND_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <select aria-label={`Schritt ${number}: Modus`} className={`${FIELD} min-w-[8rem] flex-1`} value={step.mode} onChange={(event) => set({ mode: event.target.value })} data-testid={`veto-step-${index}-mode`}>
           <option value="">Modus wählen</option>
           {modes.map((row) => <option key={row.mode} value={row.mode}>{row.label}</option>)}
         </select>
-        {step.kind !== "decider" ? (
+        {!isSystemKind(step.kind) ? (
           <select aria-label={`Schritt ${number}: Wer`} className={`${FIELD} w-[6.5rem] shrink-0`} value={step.team || ""} onChange={(event) => set({ team: event.target.value })} data-testid={`veto-step-${index}-team`}>
             {TEAM_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-        ) : <span className="inline-flex min-h-9 w-[6.5rem] shrink-0 items-center px-2 text-xs text-white/50">System</span>}
+        ) : <span className="inline-flex min-h-9 w-[6.5rem] shrink-0 items-center px-2 text-xs text-white/50">{step.kind === "preset" ? "Liga-Leitung" : "System"}</span>}
         {step.kind !== "ban" ? (
           <input aria-label={`Schritt ${number}: Position (Map Nr.)`} type="number" min={1} max={9} inputMode="numeric" className={`${FIELD} w-[5rem] shrink-0 tabular-nums`}
             value={step.position} onChange={(event) => set({ position: event.target.value })} placeholder="Map" data-testid={`veto-step-${index}-position`} />
@@ -130,6 +131,8 @@ export function SeasonVetoRulesPanel({ seasonId }) {
   };
   const serverProblems = (state?.problems || []).filter((text) => !problems.includes(text));
   const bestOf = state?.best_of || 1;
+  // Die Modi mit „Vorgabe der Woche“ im gespeicherten Stand - nur für sie lässt sich je Spielwoche eine Map wählen.
+  const savedPresets = presetModes(state?.veto_rules?.steps);
 
   return (
     <FormSection title="Veto" testId="season-veto-rules"
@@ -171,7 +174,7 @@ export function SeasonVetoRulesPanel({ seasonId }) {
             </button>
           </div>
         </div>
-        <p className="text-xs text-white/50">Sperren und Wählen gehören einem Team und einem Modus; eine Wahl und der Decider (die übrige Map, vom System gesetzt) bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
+        <p className="text-xs text-white/50">Sperren und Wählen gehören einem Team und einem Modus; eine Wahl, der Decider (die übrige Map, vom System gesetzt) und die Vorgabe (die Map legt ihr je Spielwoche fest – niemand sperrt oder wählt sie) bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
         {form.steps.length ? (
           <div className="hidden text-[10px] font-bold uppercase tracking-widest text-white/45 sm:flex sm:items-center sm:gap-1.5 sm:px-2" aria-hidden="true">
             <span className="w-7">Nr.</span><span className="w-[7.5rem]">Art</span><span className="min-w-[8rem] flex-1">Modus</span>
@@ -201,6 +204,12 @@ export function SeasonVetoRulesPanel({ seasonId }) {
         className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
         {saving ? "Speichere …" : "Veto speichern"}
       </button>
+      {/* Vorgabe der Woche (#2326): gehört zur Vorlage und steht darum im selben Kasten - mit eigenem Speichern, weil sie sich Woche für
+          Woche ändert, die Vorlage aber nicht. Der Schlüssel lädt den Block neu, sobald „Veto speichern“ die Modi mit Vorgabe ändert. */}
+      {savedPresets.length || presetModes(form.steps).length ? (
+        <SeasonVetoPresets key={`${savedPresets.join("|")}:${state?.veto_rules?.enabled ? "an" : "aus"}`} seasonId={seasonId}
+          unsaved={savedPresets.join("|") !== presetModes(form.steps).join("|") || Boolean(state?.veto_rules?.enabled) !== form.enabled} />
+      ) : null}
     </FormSection>
   );
 }

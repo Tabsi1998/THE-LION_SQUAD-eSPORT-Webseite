@@ -538,6 +538,10 @@ def game_mode_labels(game: dict | None) -> dict[str, str]:
 NO_VETO = "*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*"
 TEAM_A_WORDS = {"home": "Team A ist das Heimteam laut Spielplan, Team B der Gast.", "draw": "Team A wird je Spiel vom System gelost."}
 TEAM_A_SHORT = {"home": "das Heimteam laut Spielplan", "draw": "per Los je Spiel"}
+PRESET_RULE = ("- Vorgabe der Woche: Wo die Schrittfolge es nennt, legt die Liga-Leitung die Map je Spielwoche fest. Sie gilt für alle Spiele "
+               "dieses Spieltags – auch für ein verschobenes –, niemand kann sie sperren oder wählen. Solange sie für eine Woche fehlt, "
+               "beginnt das Veto nicht.")
+NO_PRESETS_YET = "noch keine eingetragen"
 
 
 def veto_rules_of(season: dict) -> dict | None:
@@ -572,11 +576,32 @@ def render_veto(data: dict, variant: str = MARKDOWN) -> str:
         f"- {TEAM_A_WORDS.get(data.get('team_a'), TEAM_A_WORDS['home'])}",
         f"- Je Schritt {int(data.get('step_seconds') or 60)} Sekunden – nach Ablauf wählt das System zufällig aus den noch zulässigen Maps.",
         "- Das Veto beginnt, sobald beide Teams eingecheckt sind; Map 1 folgt direkt danach.",
-        "",
     ]
+    if league_veto_rules.preset_steps(data["steps"]):
+        # Vorgabe der Woche (#2326, Nr. 122): welche Map es je Woche ist, steht nicht hier - die Variable ``veto.presets`` nennt sie.
+        lines.append(PRESET_RULE)
+    lines.append("")
     lines += [f"{index}. {_cell(league_veto_rules.step_sentence(step, step.get('mode_label') or step.get('mode') or ''))}"
               for index, step in enumerate(data["steps"], 1)]
     return "\n".join(lines)
+
+
+def veto_presets_text(season: dict, game: dict | None, pool: dict | None) -> str | None:
+    """Die Vorgaben der Woche in einem Satz für die Variable ``veto.presets`` (#2326): „Spielwoche 1: Hafen (Kontrolle); Spielwoche 2:
+    Kai (Kontrolle)“ - ``None`` ohne Veto oder ohne Schritt „Vorgabe der Woche“, „noch keine eingetragen“ ohne Einträge. Genannt wird nur,
+    was die Vorlage braucht und im Pool steht."""
+    rules = veto_rules_of(season)
+    modes = [step["mode"] for step in league_veto_rules.preset_steps((rules or {}).get("steps"))]
+    if not modes:
+        return None
+    labels = {**league_veto_rules.pool_labels(pool), **game_mode_labels(game)}
+    names = {mode: {item["map_id"]: item.get("name") for item in rows} for mode, rows in league_veto_rules.pool_maps(pool).items()}
+    parts = []
+    for row in league_veto_rules.presets_of(season.get("veto_presets")):
+        name = (names.get(row["mode"]) or {}).get(row["map_id"])
+        if row["mode"] in modes and name:
+            parts.append(f"Spielwoche {row['week']}: {name} ({labels.get(row['mode']) or row['mode']})")
+    return "; ".join(parts) or NO_PRESETS_YET
 
 
 async def build_veto(db, league: dict, season: dict) -> dict:
