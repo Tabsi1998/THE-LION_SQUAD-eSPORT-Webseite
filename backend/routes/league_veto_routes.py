@@ -46,7 +46,7 @@ from services.checkin_rules import FlowProblem, filled, moment
 from services.league_permissions import ANY, require_league, require_no_conflict
 from services.rate_limit import enforce_rate_limit, get_client_ip
 from services.tournament_permissions import has_match_result_permission
-from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired
+from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired, shown_on_event_tv
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 router = APIRouter(prefix="/api/matches", tags=["matches"])
@@ -386,16 +386,23 @@ async def veto_live(match_id: str, request: Request, key: Optional[str] = None, 
     fälliges Veto beim Lesen und abgelaufene Fristen lösen sich auf. Alle anderen sehen das Veto nur lesend (``spectator_view``: keine
     Wahl, kein Eingriff, kein Grund einer Pause) - Sichtbarkeit wie die Matchseite, also nach Staffel bzw. Season. ``display=1`` (TV)
     liefert immer die Zuschauer-Sicht. Mit dem Anzeige-Schlüssel des Turniers (``key``) auch ohne Anmeldung, wie Turnierbaum und
-    Stationen. Zuschauer und TV lösen nichts aus - Start und Fristen übernehmen der Aufruf der Beteiligten und der Job."""
+    Stationen - aber nie für eine Staffel im Entwurf oder eine interne (Season aus bzw. nur Verwaltung), wie beim Event-TV; ein
+    unbekanntes Spiel und ein falscher Schlüssel sehen gleich aus (403). Zuschauer und TV lösen nichts aus - Start und Fristen
+    übernehmen der Aufruf der Beteiligten und der Job."""
     db = get_db()
     now = now_utc()
     if key or display or not user:
         await _limit_spectator(request, key)
-    match, collection = await _find_match_any(match_id)
+    try:
+        match, collection = await _find_match_any(match_id)
+    except HTTPException:
+        if key:
+            raise HTTPException(status_code=403, detail=KEY_INVALID) from None
+        raise
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
     if key:
         link = await validate_access_link(db, key, "tournament", match.get("tournament_id"), None, DISPLAY_GRANT) if tournament else None
-        if not link:
+        if not link or not shown_on_event_tv(tournament):
             raise HTTPException(status_code=403, detail=KEY_INVALID)
         if key_expired(tournament, now):
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
