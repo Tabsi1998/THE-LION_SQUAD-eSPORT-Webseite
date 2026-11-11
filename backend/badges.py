@@ -285,7 +285,8 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
     subject = viewer if viewer and (not user_id or viewer.get("id") == user_id) else None
     if user_id and subject is None:
         subject = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1})
-    sees_staff = await achievement_reach.is_staff_person(db, subject)
+    # Je Gruppe (Review N5): Turnierleitung und Gastgeber die Turnierleitung, Schiedsrichter auch die Liga-Leitung.
+    scopes = await achievement_reach.staff_scopes(db, subject)
     now = now_utc()
 
     out = []
@@ -295,7 +296,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
         is_hidden = bool(g.get("hidden")) and not is_negative
         # Nicht mehr erreichbar (#2339): nur wer etwas davon hat, sieht die Gruppe - und dann nur das Erhaltene.
         group_retired = achievement_reach.is_retired(g, now)
-        only_earned = group_retired or (bool(g.get("staff_only")) and not sees_staff)
+        only_earned = group_retired or not achievement_reach.sees_staff_group(g, scopes)
         if is_negative:
             if not user_id or g["code"] not in earned_group_codes:
                 continue

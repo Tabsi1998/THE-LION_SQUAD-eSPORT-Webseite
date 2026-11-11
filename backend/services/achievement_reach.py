@@ -28,9 +28,6 @@ META_GROUPS = frozenset({"categories_complete", "completionist", "achievements_u
 MASTER_CATEGORIES: tuple[str, ...] = tuple(
     key for key, meta in sorted(CATEGORIES.items(), key=lambda item: item[1]["order"]) if not meta.get("hidden") and not meta.get("negative")
 )
-# Wer die Gruppen der Leitung (Turnierleitung, Schiedsrichter) sieht: Bereich Turnierleitung oder Ligen - oder ein Einsatz
-# als Turnier- bzw. Liga-Leitung.
-STAFF_AREAS = ("tournaments", "leagues")
 RETIRED_FIELDS = ("retired", "retired_reason", "available_until")
 
 
@@ -232,15 +229,29 @@ async def retired_group_codes(db, now: datetime | None = None, *, user_id: str |
     return frozenset(out)
 
 
-async def is_staff_person(db, user: dict | None) -> bool:
-    """Sieht die Gruppen der Leitung: Bereich Turnierleitung oder Ligen (Rolle oder Freigabe), sonst ein Einsatz als
-    Turnier- oder Liga-Leitung. Ohne Zwei-Faktor-Prüfung - es geht nur ums Zeigen, nicht ums Verwalten."""
+# Wer welche Gruppe der Leitung schaffen kann (Review N5): Turnierleitung und Gastgeber nur die Turnierleitung (Bereich oder
+# Einsatz in einem Turnier), den Schiedsrichter auch die Liga-Leitung - sie entscheidet Dispute in ihren Spielen.
+STAFF_GROUP_SCOPES: dict[str, frozenset[str]] = {"referee": frozenset({"tournaments", "leagues"})}
+DEFAULT_STAFF_SCOPES = frozenset({"tournaments"})
+
+
+async def staff_scopes(db, user: dict | None) -> frozenset[str]:
+    """Wofür die Person Leitung ist: ``tournaments`` (Bereich Turnierleitung oder ein Turnier-Einsatz), ``leagues``
+    (Bereich Ligen oder ein Liga-Einsatz). Ohne Zwei-Faktor-Prüfung - es geht nur ums Zeigen, nicht ums Verwalten."""
     from services.permissions import holds_area
 
     if not user or not user.get("id"):
-        return False
-    if holds_area(user, *STAFF_AREAS):
+        return frozenset()
+    scopes = set()
+    if holds_area(user, "tournaments") or await db.tournament_staff_assignments.find_one({"user_id": user["id"]}, {"_id": 1}):
+        scopes.add("tournaments")
+    if holds_area(user, "leagues") or await db.league_staff.find_one({"user_id": user["id"]}, {"_id": 1}):
+        scopes.add("leagues")
+    return frozenset(scopes)
+
+
+def sees_staff_group(group: dict, scopes) -> bool:
+    """Sieht die Person diese Gruppe der Leitung ganz? Ohne ``staff_only`` immer."""
+    if not group.get("staff_only"):
         return True
-    if await db.tournament_staff_assignments.find_one({"user_id": user["id"]}, {"_id": 1}):
-        return True
-    return bool(await db.league_staff.find_one({"user_id": user["id"]}, {"_id": 1}))
+    return bool(STAFF_GROUP_SCOPES.get(group.get("code"), DEFAULT_STAFF_SCOPES) & set(scopes or ()))

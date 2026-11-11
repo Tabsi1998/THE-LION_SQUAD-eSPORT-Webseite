@@ -626,6 +626,27 @@ async def test_turnierleitung_und_schiedsrichter_nur_fuer_die_leitung(flow):
     assert "referee" in _group_codes(profile["groups"])
 
 
+@pytest.mark.asyncio
+async def test_liga_leitung_sieht_nur_den_schiedsrichter(flow):
+    """Review N5: Turnierleitung und Gastgeber gibt es nur für die Turnierleitung - die Liga-Leitung allein sieht nur den
+    Schiedsrichter (sie entscheidet Dispute in ihren Spielen)."""
+    league_lead = await flow.add_user(name="Liga-Leitung")
+    await flow.db.league_staff.insert_one({"league_id": "l1", "user_id": league_lead["id"], "capabilities": ["results"]})
+    granted = await flow.add_user(name="Ligen-Bereich")
+    await flow.db.users.update_one({"id": granted["id"]}, {"$set": {"areas": ["leagues"]}})
+    granted = {**granted, "areas": ["leagues"]}
+    for who in (league_lead, granted):
+        flow.act_as(who)
+        codes = _group_codes((await flow.get("/api/achievements/me")).json()["groups"])
+        assert "referee" in codes, who["display_name"]
+        assert not {"tournament_staff", "events_hosted"} & codes, who["display_name"]
+    assert await reach.staff_scopes(flow.db, league_lead) == frozenset({"leagues"})
+    # Gegenprobe: ein Turnier-Einsatz dazu - dann sieht die Person alle drei.
+    await flow.db.tournament_staff_assignments.insert_one({"id": "a2", "tournament_id": "t1", "user_id": league_lead["id"], "role": "referee"})
+    flow.act_as(league_lead)
+    assert {"tournament_staff", "events_hosted", "referee"} <= _group_codes((await flow.get("/api/achievements/me")).json()["groups"])
+
+
 # ------------------------------------------------------------------ Migration 23
 
 

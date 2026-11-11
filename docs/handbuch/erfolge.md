@@ -175,8 +175,9 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
   gefahren wurde.
 - **Treue** zählt Tage in Folge mit Anmeldung. **Eiserner Löwe** verlangt zwölf Kalendermonate in Folge mit mindestens
   einem gespielten Match (Turnier oder Vereinsliga).
-- **Turnierleitung**, **Schiedsrichter** und **Gastgeber** sieht nur, wer Turniere oder die Liga leitet (Bereich
-  Turnierleitung oder Ligen, oder ein Einsatz als Turnier- bzw. Liga-Leitung) – und wer sie schon hat.
+- **Turnierleitung** und **Gastgeber** sieht nur die Turnierleitung (Bereich Turnierleitung oder ein Einsatz in einem
+  Turnier), **Schiedsrichter** zusätzlich die Liga-Leitung (Bereich Ligen oder ein Liga-Einsatz) – und alle, die sie schon
+  haben.
 
 Wer einen Erfolg nach alten Regeln bekommen hat, behält ihn.
 
