@@ -6,7 +6,7 @@
 // (bzw. am TV „Bewegung aus“) stehen alle Zustände sofort da. Der kurze Abruf baut nichts neu auf: Karten und Schritte tragen feste
 // Schlüssel, aufleuchten lässt nur eine echte Änderung.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Ban, Check, Crown, Pin, Shuffle } from "lucide-react";
+import { Ban, Check, Crown, Hourglass, Pin, Shuffle } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
@@ -50,7 +50,8 @@ export function useFreshCards(block) {
 
 /**
  * Der Countdown je Zug: ein ruhiger Ring und die Restzeit. Er zählt nach der Uhr des Servers (`offset`), nicht nach der des Geräts. Die
- * letzten zehn Sekunden färben sich rot; ohne „Bewegung reduzieren“ atmet der Ring dazu ruhig (nur opacity). Bildschirmleser hören die
+ * letzten zehn Sekunden färben sich rot und tragen Sanduhr und „gleich vorbei“ (auch ohne Farbe und ohne Bewegung lesbar); ohne
+ * „Bewegung reduzieren“ atmet der Ring dazu ruhig (nur opacity). Bildschirmleser hören die
  * Zeit nur bei 30, 10 und 5 Sekunden und beim Ablauf. Läuft die Zeit ab, wählt der Server - hier steht nur „Zeit um“.
  */
 export function VetoCountdown({ block, offset = 0, size = 72, className = "", tv = false }) {
@@ -101,7 +102,10 @@ export function VetoCountdown({ block, offset = 0, size = 72, className = "", tv
           pathLength={RING} strokeDasharray={RING} strokeDashoffset={RING * (1 - share)} />
       </svg>
       <div className="tls-veto-clock__text">
-        <div className="tls-veto-clock__caption">{seconds > 0 ? "noch" : "Zeit um"}</div>
+        {/* Die letzten zehn Sekunden nicht nur rot (Review): Zeichen und Wort sagen es auch ohne Farbe und ohne Bewegung. */}
+        <div className="tls-veto-clock__caption" data-testid="veto-countdown-caption">
+          {seconds > 0 && urgent ? <><Hourglass className="tls-veto-clock__icon" aria-hidden="true" /> gleich vorbei</> : seconds > 0 ? "noch" : "Zeit um"}
+        </div>
         <div className="tls-veto-clock__number font-display text-3xl font-bold tabular-nums" role="timer" aria-live="off" data-testid="veto-countdown-text">{remainingText(target, now) || "0:00"}</div>
         <span className="sr-only" aria-live="polite" data-testid="veto-countdown-announce">{countdownAnnouncement(seconds)}</span>
       </div>

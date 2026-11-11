@@ -3623,14 +3623,15 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   100% { opacity: 0; }
 }
 
-/* Map-Veto live (D.4, #1651): Countdown, Zeitleiste und Brett (components/tls/league/VetoLive.jsx). Team A blau, Team B orange, Decider
-   gold, Vorgabe der Woche grün - als Farbe der Seite (--tls-veto-rgb) an Ring, Schritt und Karte. Bewegt werden nur transform (auch die
+/* Map-Veto live (D.4, #1651): Countdown, Zeitleiste und Brett (components/tls/league/VetoLive.jsx). Team A blau (brand), Team B violett
+   (der Ton der Rolle event - kein Status: Orange, Rot und Gold heißen schon Achtung, läuft bzw. Ehre/Decider; Review), Decider gold,
+   Vorgabe der Woche grün - als Farbe der Seite (--tls-veto-rgb) an Ring, Schritt und Karte. Bewegt werden nur transform (auch die
    Einzel-Eigenschaften translate und scale, damit Aufbau und Zustand sich nicht in die Quere kommen) und opacity, Dauern und Kurve aus den
    Bewegungs-Regeln; der Weg hängt an --tls-motion-on. „Bewegung reduzieren“ stellt Dauern auf fast 0: alles steht sofort da, der Ring
    atmet nicht, der Rahmen zeichnet sich nicht nach. */
 .tls-veto-clock, .tls-veto-step, .tls-veto-card--live, .tls-veto-trace { --tls-veto-rgb: 255 255 255; }
 :is(.tls-veto-clock, .tls-veto-step, .tls-veto-card--live, .tls-veto-trace)[data-tone="a"] { --tls-veto-rgb: var(--tls-brand-rgb); }
-:is(.tls-veto-clock, .tls-veto-step, .tls-veto-card--live, .tls-veto-trace)[data-tone="b"] { --tls-veto-rgb: var(--tls-warn-rgb); }
+:is(.tls-veto-clock, .tls-veto-step, .tls-veto-card--live, .tls-veto-trace)[data-tone="b"] { --tls-veto-rgb: var(--tls-event-rgb); }
 :is(.tls-veto-clock, .tls-veto-trace)[data-tone="system"] { --tls-veto-rgb: var(--tls-honor-rgb); }
 .tls-veto-clock[data-tone="urgent"] { --tls-veto-rgb: var(--tls-live-rgb); }
 
@@ -3638,7 +3639,9 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-veto-clock__track { stroke: rgb(255 255 255 / 0.12); }
 .tls-veto-clock__arc { stroke: rgb(var(--tls-veto-rgb)); }
 .tls-veto-clock__text { text-align: right; }
-.tls-veto-clock__caption { font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: rgb(255 255 255 / 0.55); }
+.tls-veto-clock__caption { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: rgb(255 255 255 / 0.55); }
+.tls-veto-clock__icon { width: 1.3em; height: 1.3em; flex-shrink: 0; }
+.tls-veto-clock[data-urgent="true"] .tls-veto-clock__caption { color: rgb(var(--tls-live-rgb)); font-weight: 700; }
 .tls-veto-clock__number { color: #fff; }
 .tls-veto-clock[data-urgent="true"] .tls-veto-clock__number { color: rgb(var(--tls-live-rgb)); }
 /* Die letzten zehn Sekunden: der Ring atmet ruhig - nur opacity, ohne „Bewegung reduzieren“. */

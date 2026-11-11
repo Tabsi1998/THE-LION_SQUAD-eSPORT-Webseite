@@ -282,6 +282,14 @@ test.describe("Liga: Map-Veto live", () => {
     await expect(page.getByTestId("veto-map-hp-turm")).toHaveAttribute("data-status", "banned", { timeout: 6000 });
     await expectNoSideScroll(page);
     await shot(page, testInfo, "veto-live-1440-zuschauer.png");
+    // Die letzten zehn Sekunden: rot mit Sanduhr und „gleich vorbei“ - auch mit reduzierter Bewegung, ganz ohne Puls.
+    veto.state.deadline = Date.now() + 9000;
+    await expect(page.getByTestId("veto-countdown")).toHaveAttribute("data-urgent", "true", { timeout: 6000 });
+    await expect(page.getByTestId("veto-countdown-caption")).toHaveText(/gleich vorbei/i);
+    await expect(page.getByTestId("veto-countdown-caption").locator("svg")).toBeVisible();
+    const breathing = await page.evaluate(() => getComputedStyle(document.querySelector(".tls-veto-clock__arc")).animationName);
+    expect(breathing).toBe("none");
+    await shot(page, testInfo, "veto-live-1440-zuschauer-gleich-vorbei.png");
     await context.close();
   });
 

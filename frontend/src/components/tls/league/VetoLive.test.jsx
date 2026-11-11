@@ -11,6 +11,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { VetoPanel } = await import("./VetoPanel");
 const { VetoCountdown } = await import("./VetoLive");
+const { ROLE_COLORS, SURFACE_COLORS, contrastRatio } = await import("@/lib/categoryColors");
 
 const SIDES = ["Löwen · Rudel A", "Falken · Horst"];
 const MAP = (map_id, name, extra = {}) => ({ map_id, name, image_url: `/uploads/maps/${map_id}.webp`, status: "open", by_name: null, side: null, position: null, ...extra });
@@ -125,15 +126,20 @@ test("die letzten zehn Sekunden: rot und - nur ohne „Bewegung reduzieren“ - 
   const clock = screen.getByTestId("veto-countdown");
   expect(clock).toHaveAttribute("data-urgent", "false");
   expect(clock).toHaveAttribute("data-tone", "b");
+  expect(screen.getByTestId("veto-countdown-caption")).toHaveTextContent("noch");
   expect(screen.getByTestId("veto-countdown-announce")).toHaveTextContent("");
   act(() => { vi.advanceTimersByTime(6000); });
   expect(screen.getByTestId("veto-countdown-announce")).toHaveTextContent("Noch 30 Sekunden.");
   act(() => { vi.advanceTimersByTime(20000); });
   expect(clock).toHaveAttribute("data-urgent", "true");
   expect(clock).toHaveAttribute("data-tone", "urgent");
+  // Nicht nur Rot (Review): Sanduhr und „gleich vorbei“ stehen da - auch ohne Farbe und ohne Bewegung lesbar.
+  expect(screen.getByTestId("veto-countdown-caption")).toHaveTextContent("gleich vorbei");
+  expect(screen.getByTestId("veto-countdown-caption").querySelector("svg")).not.toBeNull();
   expect(screen.getByTestId("veto-countdown-announce")).toHaveTextContent("Noch 10 Sekunden.");
   act(() => { vi.advanceTimersByTime(10000); });
   expect(screen.getByTestId("veto-countdown-text")).toHaveTextContent("0:00");
+  expect(screen.getByTestId("veto-countdown-caption")).toHaveTextContent("Zeit um");
   expect(screen.getByTestId("veto-countdown-announce")).toHaveTextContent("Zeit abgelaufen – das System wählt.");
   vi.useRealTimers();
   // Die Regeln: Atmen nur über opacity, mit „Bewegung reduzieren“ abgeschaltet.
@@ -141,6 +147,26 @@ test("die letzten zehn Sekunden: rot und - nur ohne „Bewegung reduzieren“ - 
   expect(css).toContain("@keyframes tls-veto-breathe { 50% { opacity: 0.55; } }");
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce) {\n  .tls-veto-clock"));
   expect(reduced.slice(0, reduced.indexOf("}\n}") + 1)).toContain(".tls-veto-clock[data-urgent=\"true\"] .tls-veto-clock__arc { animation: none; }");
+});
+
+test("Teamfarben: A blau, B violett - keine Status-Farbe, lesbar auf dem dunklen Grund und als Schild", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
+  const live = css.slice(css.indexOf("/* Map-Veto live (D.4, #1651)"), css.indexOf("/* Bestätigungs-Blatt der Anmeldung"));
+  const toneOf = (tone) => {
+    const lead = `[data-tone="${tone}"] { --tls-veto-rgb: var(--tls-`;
+    const at = live.indexOf(lead);
+    return at < 0 ? null : live.slice(at + lead.length, live.indexOf("-rgb)", at));
+  };
+  expect(toneOf("a")).toBe("brand");
+  expect(toneOf("b")).toBe("event");
+  // Team B ist weder Achtung (warn), noch läuft (live), noch Ehre/Decider (honor), noch frei (ok).
+  expect(["warn", "live", "honor", "ok"]).not.toContain(toneOf("b"));
+  const tv = readFileSync(path.join(process.cwd(), "src/components/tv/tv.css"), "utf8");
+  expect(tv).toContain('.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-event-rgb)); }');
+  // Kontrast: Schrift in der Farbe auf dem Grund und dunkle Schrift auf dem Schild (mind. 4,5 : 1).
+  expect(contrastRatio(ROLE_COLORS.event, SURFACE_COLORS.base)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio("#050505", ROLE_COLORS.event)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(ROLE_COLORS.live, SURFACE_COLORS.base)).toBeGreaterThanOrEqual(4.5);
 });
 
 test("Ablauf-Leiste: Schritte mit Art, Seite und Modus - fertige zeigen die Map, der laufende ist markiert", () => {

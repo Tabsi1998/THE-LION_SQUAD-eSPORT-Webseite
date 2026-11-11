@@ -2587,7 +2587,8 @@ die Frist des Servers wird in Geräte-Zeit umgerechnet (`vetoDeadline(block, off
 richtig. Läuft die Zeit ab, steht „Zeit um“; gewählt wird nur auf dem Server (Nr. 23).
 
 **Darstellung** (`components/tls/league/VetoLive.jsx`, Regeln in `index.css` „Map-Veto live“, TV in `tv.css`): Map-Karten mit Bild im Stil
-der Veto-Karten der Team-Liga (`maps.css`, #1616); Team A blau (`--tls-brand`), Team B orange (`--tls-warn`), Decider gold, Vorgabe der
+der Veto-Karten der Team-Liga (`maps.css`, #1616); Team A blau (`--tls-brand`), Team B violett (der Ton von `--tls-event` - bewusst keine
+Status-Farbe: Orange, Rot und Gold heißen schon Achtung, läuft bzw. Decider; Kontrast auf dem Grund 6 : 1), Decider gold, Vorgabe der
 Woche grün. Zustände: offen; gesperrt (gedimmt, leicht abgesenkt, Bann-Symbol, „gesperrt von …“); gewählt (Schild „Map N“ in der Farbe
 der Seite); Decider; Vorgabe der Woche (wie #2326). Ist die eigene Seite am Zug, sind die Karten des laufenden Modus die Auswahl
 (`veto-option-*`), nicht wählbare ausgegraut mit Hinweis. **Detail-Runde:** gestaffelter Aufbau (40 ms je Karte), Anheben eigener
@@ -2595,7 +2596,8 @@ wählbarer Karten unter dem Zeiger (nur `hover: hover` und `pointer: fine`), Nac
 jeder Aktion der Gegenseite (die eigene Sperre dimmt nur; Zuschauer sehen jede Aktion als neu; `freshCards`), ein nachzeichnender Rahmen
 um den Modus des laufenden Zugs (vier Kanten, `scale`). Bewegt werden nur `transform` (auch `translate`/`scale`) und `opacity`, mit den
 Bewegungs-Variablen; „Bewegung reduzieren“ (bzw. am TV „Bewegung aus“) zeigt alles sofort, der Ring läuft dann ohne Bild-Schleife.
-Countdown: Ring und Restzeit, die letzten 10 Sekunden rot und ruhig atmend (nur ohne „Bewegung reduzieren“). **Ablauf-Leiste:** jeder
+Countdown: Ring und Restzeit, die letzten 10 Sekunden rot mit Sanduhr und „gleich vorbei“ (auch ohne Farbe und ohne Bewegung lesbar), der
+Ring atmet dazu ruhig (nur ohne „Bewegung reduzieren“). **Ablauf-Leiste:** jeder
 Schritt mit Art, Seite, Modus und Ziel; fertige zeigen die Map (Zufallswahl mit Symbol), der laufende ist markiert und rückt in der Leiste
 in die Mitte (nur die Leiste scrollt). **Stabile Schlüssel:** Karten `Modus:Map`, Schritte nach Index, Rahmen nach Schritt - der Abruf
 baut nichts neu auf, spielt nichts ab, der Fokus bleibt.

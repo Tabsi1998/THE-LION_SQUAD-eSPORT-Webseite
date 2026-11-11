@@ -255,7 +255,7 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
           {block.current ? <p className="mt-1 text-xs text-white/55" data-testid="veto-step">{stepLabel(block.current)}</p> : null}
           {block.team_a ? (
             <p className="mt-1 text-xs text-white/45" data-testid="veto-teams">
-              <span className="text-[#29B6E8]">Team A</span>: {block.team_a.name}{block.team_a.via === "draw" ? " (gelost)" : " (Heim)"} · <span className="text-warn">Team B</span>: {block.team_b?.name}
+              <span className="text-brand">Team A</span>: {block.team_a.name}{block.team_a.via === "draw" ? " (gelost)" : " (Heim)"} · <span className="text-event">Team B</span>: {block.team_b?.name}
             </p>
           ) : null}
         </div>

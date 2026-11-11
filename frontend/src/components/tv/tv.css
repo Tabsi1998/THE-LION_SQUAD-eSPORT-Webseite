@@ -1625,14 +1625,14 @@ td.tv-standings__num--strong { color: #ffffff; font-weight: 800; }
   background: var(--tv-panel);
 }
 .tv-veto__turn[data-tone="a"] .tv-veto__who { color: var(--tv-accent); }
-.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-warn-rgb)); }
+.tv-veto__turn[data-tone="b"] .tv-veto__who { color: rgb(var(--tls-event-rgb)); }
 .tv-veto__who { overflow-wrap: anywhere; }
 /* Der Countdown: Zahl mitten im Ring. */
 .tv-veto__clock { position: relative; display: grid; place-items: center; }
 .tv-veto__clock > * { grid-area: 1 / 1; }
 .tv-veto__clock .tls-veto-clock__ring { width: calc(var(--tv-u) * 26); height: calc(var(--tv-u) * 26); }
 .tv-veto__clock .tls-veto-clock__text { text-align: center; }
-.tv-veto__clock .tls-veto-clock__caption { font-size: var(--tv-fs-meta); }
+.tv-veto__clock .tls-veto-clock__caption { justify-content: center; font-size: var(--tv-fs-meta); }
 .tv-veto__clock .tls-veto-clock__number { font-size: calc(var(--tv-u) * 7); line-height: 1; }
 .tv-veto__stage { min-height: 0; overflow: hidden; }
 .tv-veto .tls-veto-board {

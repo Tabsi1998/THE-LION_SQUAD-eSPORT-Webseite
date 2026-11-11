@@ -934,14 +934,15 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   Team A (Heimteam, oder gelost) ist zuerst dran. Die Seite zeigt den laufenden Schritt („Schritt 3 von 11 · Stellung · Loewen wählt
   Map 1“), einen Countdown, den **Ablauf** als Leiste (jeder Schritt mit Sperre/Wahl/Decider, Team A oder B und Modus; fertige Schritte
   mit der Map, der laufende markiert) und je Modus alle Maps als **Karten mit Bild** (offen, gesperrt mit Bann-Zeichen und wer, gewählt
-  mit „Map 1“ in der Farbe der Seite, Decider, Vorgabe der Woche). Team A ist blau, Team B orange.
+  mit „Map 1“ in der Farbe der Seite, Decider, Vorgabe der Woche). Team A ist blau, Team B violett.
 - **Ziehen:** Captain oder Vertreter der Seite am Zug tippen im markierten Modus eine Karte an – **Sperren** oder **Wählen**, je nach
   Schritt. Ausgegraute Maps sind gesperrt, schon gewählt oder würden die Serie nicht mehr aufgehen lassen (die Seite sagt es beim
   Antippen). Die übrige Map eines Decider-Schritts setzt das System sofort. Ein Doppelklick oder ein zweites Gerät zählt nicht doppelt;
   war die Gegenseite schneller oder die Zeit um, sagt die Seite „bitte neu laden“ und zeigt den neuen Stand.
 - **Live:** Die Seite aktualisiert sich von selbst – alle 2 Sekunden, solange das Veto läuft (im Hintergrund-Tab nicht, beim Zurückkommen
   sofort). Ein Zug der Gegenseite leuchtet auf ihrer Karte kurz auf, der Ablauf rückt weiter. Der Countdown richtet sich nach der Uhr des
-  Servers, nicht nach der des Handys; die letzten 10 Sekunden sind rot. Mit „Bewegung reduzieren“ im Gerät steht alles sofort da.
+  Servers, nicht nach der des Handys; die letzten 10 Sekunden sind rot und mit Sanduhr und „gleich vorbei“ markiert. Mit „Bewegung
+  reduzieren“ im Gerät steht alles sofort da.
 - **Erinnerung:** Ist eine Seite am Zug, hat 20 Sekunden lang nicht gezogen und die Matchseite nicht offen, bekommen Captain und Vertreter
   einmal die Nachricht **„Map-Veto wartet – ihr seid am Zug“** (je Schritt höchstens einmal).
 - **Zuschauer und TV:** Wer nicht beteiligt ist, sieht das laufende Veto auf der Matchseite nur lesend (wenn die Staffel sichtbar ist).
