@@ -304,6 +304,14 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
     from services import league_veto_sweep
 
     veto = await league_veto_sweep.sweep(db, tournaments, now=now)
+    # Verfahren (#1619, E.2): Zielfrist, Stellungnahme, MOSS - erinnert und eskaliert nur, auch nach dem letzten Spiel der Staffel.
+    from services import league_procedure_sweep
+
+    try:
+        procedures = await league_procedure_sweep.sweep(db, now=now)
+    except Exception:  # noqa: BLE001 - die Erinnerung holt der nächste Lauf nach
+        logger.warning("Verfahren der Liga nicht geprüft", exc_info=True)
+        procedures = {}
     # Vorfälle (#1619, D.5): abgelaufene Antwortfristen gehen an die Leitung („in Klärung“) - dieselben laufenden Turniere.
     from services import league_incidents
 
@@ -315,4 +323,4 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
         logger.warning("Stand „läuft länger“ nicht aktualisiert", exc_info=True)
         overrun = {}
     return {"proposed": proposed, "confirmed": confirmed, "overdue_lineups": overdue, "schedule": schedule, "checkin": checkin,
-            "veto": veto, "incidents": incidents, "overrun": overrun}
+            "veto": veto, "procedures": procedures, "incidents": incidents, "overrun": overrun}

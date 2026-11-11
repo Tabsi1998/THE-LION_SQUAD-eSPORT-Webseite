@@ -64,6 +64,7 @@ from match_rules import match_allows_draw
 from services.match_audience import acting_registration, player_ids, player_user_ids, teams_by_id
 # Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
 from services.match_calls import CALL_OPEN_STATUSES, call_view
+from services import league_procedures
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
     proposal_sentence,
@@ -418,8 +419,16 @@ async def _require_result_permission(user: dict, match: dict, *, capability="res
 
 async def _require_undisputed_or_both(user: dict, match: dict) -> None:
     """Staffel (#2203): Bei offenem Streitfall schließt eine Korrektur den Protest - dafür braucht es auch „Proteste“."""
-    if str(match.get("status") or "") == "disputed":
+    if str(match.get("status") or "") == "disputed" or league_procedures.has_open(match):
         await _require_result_permission(user, match, capability="disputes")
+
+
+def _require_procedure_result(user: dict, match: dict, reason: str | None, force: bool) -> None:
+    """Liga (#1619, E.2): Ein Ergebnis zu einem Spiel mit offenem Verfahren entscheidet es mit - nur mit Begründung, und über einen
+    Einspruch nie durch die Person der Ausgangsentscheidung."""
+    refusal = league_procedures.result_refusal(match, user, reason, force=force)
+    if refusal:
+        raise HTTPException(status_code=refusal[0], detail=refusal[1])
 
 
 async def _result_conflict(db, user: dict | None, match: dict) -> dict | None:
@@ -799,6 +808,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
             report_view = await _report_view(db, match, member_reg, can_confirm=False)
     # Liga (#1650): Maps, Sieger und Aufstellungen - zum Melden, Bestätigen, Nachtragen und Anzeigen.
     league_block = None
+    procedure_viewer = None
     league = await league_games.setup(db, match, tournament, stage)
     if league:
         side = acting_reg or (await _member_registration_for_match(db, match, user.get("id")) if user else None)
@@ -813,6 +823,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         league_block["loadout_bans"] = await loadout_bans.effective(db, tournament, match)
         # Erlaubte Ausrüstung (Nr. 99): dieselbe Sicht wie im Regelwerk - nach dem Ergebnis der Schnappschuss von damals.
         league_block["allowed_equipment"] = await loadout_bans.match_allowed(db, tournament, match)
+        # Verfahren (#1619, E.2): Beanstandung, Protest, Einspruch - je nach Rolle; öffentlich nur „in Klärung“ (``contested``).
+        procedure_league = await league_procedures.context(db, match)
+        if procedure_league is not None:
+            procedure_viewer = await league_procedures.viewer_for(db, match, user)
+            league_block.update(await league_procedures.page_block(db, match, procedure_league, user, viewer=procedure_viewer))
         # Vorfälle (D.5, #1619): ``map_state`` für alle, ``incidents`` und ``incident_info`` nur für Beteiligte und die nicht befangene
         # Leitung - wer befangen ist, sieht wie seine Seite.
         from services.match_proofs import viewer_for
@@ -841,6 +856,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
         canonical_match = public_match_view(canonical_match, viewer_id)
+    if procedure_viewer is not None:
+        # Verfahren (#1619, Nr. 133): Einzelheiten stehen je nach Rolle im Block ``league.procedures`` - den Datensatz selbst sieht
+        # nur die nicht befangene Leitung vollständig, auch wer sonst Internes sieht (befangen: wie die eigene Seite).
+        match = league_procedures.strip_rows(match, procedure_viewer)
+        canonical_match = league_procedures.strip_rows(canonical_match, procedure_viewer)
     # Die Dauer, die gilt (#1554) - die App rechnet die Kette nicht selbst.
     duration_game = await load_duration_game(db, tournament)
     with_effective_durations([match, canonical_match], stages=[stage], tournament=tournament, game=duration_game)
@@ -1492,6 +1512,7 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
             await _require_undisputed_or_both(me, match)
+            _require_procedure_result(me, match, body.reason, force)
             await league_permissions.require_no_conflict(db, me, match, action="result", conflict_reason=body.conflict_reason)
             raw_results = [entry.model_dump() for entry in body.results]
             tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "league_context": 1})
@@ -1982,10 +2003,33 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     if not acting_reg and not await leads_tournament(me, m.get("tournament_id"), "disputes"):
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     reason = body.reason.strip()
-    if is_duplicate_dispute(m, me["id"], reason):
+    # Ein beendetes Liga-Verfahren (zurückgezogen, entschieden) ist keine Wiederholung derselben Meldung mehr.
+    pending = [row for row in m.get("disputes") or []
+               if not (league_procedures.is_procedure(row) and league_procedures.state_of(row) != league_procedures.OPEN)]
+    if is_duplicate_dispute({"disputes": pending}, me["id"], reason):
         m.pop("_id", None)
         m["idempotent_replay"] = True
-        return league_incidents.without_incidents(m)
+        return m
+    # Liga-Staffel (#1619, E.2): derselbe Endpunkt schreibt ein Verfahren mit ``id`` und ``kind`` - Beanstandung vor, Protest nach
+    # der Bestätigung. Turniere laufen darunter unverändert weiter.
+    league = await league_procedures.context(db, m) if collection == "matches_v2" else None
+    if league is not None:
+        stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0, "creation_key": 0})
+        try:
+            opened = await league_procedures.submit(
+                db, m, league, user=me, registration_id=(acting_reg or {}).get("id"), reason=reason, reason_key=body.reason_key,
+                category=body.category, claimed=body.claimed, notified_immediately=body.notified_immediately,
+                incident_id=body.incident_id, photo_id=body.photo_id, stage=stage)
+        except league_procedures.ProcedureProblem as problem:
+            raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+        try:
+            from badges import on_dispute_opened
+            await on_dispute_opened(me["id"], match_id=match_id)
+        except Exception:
+            logger.warning("[achievements] Dispute in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
+        viewer = await league_procedures.viewer_for(db, opened["match"], me)
+        return {**league_incidents.without_incidents(league_procedures.strip_rows(opened["match"], viewer)), "idempotent_replay": False,
+                "procedure_id": opened["entry"]["id"]}
     if not reason:
         raise HTTPException(status_code=422, detail="Bitte kurz beschreiben, was nicht stimmt.")
     # „Problem melden“ (#1158): ein Grund zum Antippen - ohne Angabe „Sonstiges“.
@@ -2038,6 +2082,20 @@ async def decide_dispute(match_id: str, body: MatchDisputeDecision, me: dict = D
     await _require_result_permission(me, m, capability="disputes")
     await league_permissions.require_no_conflict(db, me, m, action="dispute_decision", conflict_reason=body.conflict_reason)
     await _ensure_match_tournament_unlocked(db, m)
+    pending = league_procedures.open_rows(m)
+    if pending:
+        # Liga (#1619, E.2): je Verfahren eine Entscheidung mit Pflichtbegründung - derselbe Weg wie ``/procedures/{id}/decision``.
+        target = next((row for row in pending if row["id"] == body.procedure_id), pending[0] if len(pending) == 1 else None)
+        if target is None:
+            raise HTTPException(status_code=409, detail="Zu diesem Spiel laufen mehrere Verfahren. Bitte je Verfahren entscheiden.")
+        if league_procedures.decided_by(target) == me.get("id"):
+            raise HTTPException(status_code=403, detail=league_permissions.OWN_DECISION_DETAIL)
+        league = await league_procedures.context(db, m)
+        try:
+            decided = await league_procedures.decide_keep(db, m, league, target["id"], user=me, note=body.note or "")
+        except league_procedures.ProcedureProblem as problem:
+            raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+        return {"ok": True, "decision": "keep", "status": decided.get("status"), "procedure_id": target["id"]}
     if str(m.get("status") or "") != "disputed":
         raise HTTPException(status_code=409, detail="Zu diesem Spiel ist kein Dispute offen.")
     now_iso = now_utc().isoformat()

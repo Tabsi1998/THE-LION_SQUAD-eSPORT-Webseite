@@ -1446,15 +1446,24 @@ class MatchDispute(BaseModel):
     # „Problem melden“ (#1158): Grund zum Antippen und ein Foto, vorher über /matches/{id}/proof-photos hochgeladen.
     category: Optional[str] = Field(default=None, max_length=40)
     photo_id: Optional[str] = Field(default=None, max_length=120)
+    # Liga-Staffel (#1619, E.2): Grund aus der Liste der Season, das abweichende Ergebnis, die Pflichtfrage „sofort hingewiesen?“
+    # und der Vorfall, aus dem das Verfahren folgt. Ohne diese Felder (App ohne neuen Build) gilt ``category``.
+    reason_key: Optional[str] = Field(default=None, max_length=40)
+    claimed: Optional[dict] = None
+    notified_immediately: Optional[bool] = None
+    incident_id: Optional[str] = Field(default=None, max_length=120)
 
 
 class MatchDisputeDecision(BaseModel):
     # Die Turnierleitung entscheidet (#1158): „keep“ = das Ergebnis bleibt (ohne Ergebnis: weiter wie bisher).
     # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
     decision: Literal["keep"]
+    # Liga-Verfahren (#1619, E.2): dort Pflicht (mindestens zehn Zeichen).
     note: Optional[str] = Field(default=None, max_length=500)
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Liga (#1619): welches Verfahren, wenn an dem Spiel mehrere offen sind.
+    procedure_id: Optional[str] = Field(default=None, max_length=120)
 
 
 # ---------- F1 ----------

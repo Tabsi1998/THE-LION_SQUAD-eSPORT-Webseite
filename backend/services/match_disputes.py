@@ -85,6 +85,12 @@ async def dispute_window(db, match: dict, now: datetime | None = None) -> dict:
     status = str(match.get("status") or "")
     if status in CLOSED_STATUSES:
         return {"open": False, "until": None}
+    # Liga-Staffel (#1619, E.2): Protestfrist der Season ab der Bestätigung, ruhend in Sperrzeiten - Turniere bleiben bei 30 Minuten.
+    from services import league_procedures
+
+    league = await league_procedures.league_window(db, match, now)
+    if league is not None:
+        return league
     if status not in DECIDED_STATUSES:
         return {"open": True, "until": None}
     decided = decided_at(match)

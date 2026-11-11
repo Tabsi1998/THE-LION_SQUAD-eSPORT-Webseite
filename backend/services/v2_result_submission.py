@@ -397,11 +397,20 @@ async def submit_v2_result(
     if application.get("draws"):
         from services.draw_records import record_draws
         await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=match.get("tournament_id"))
-    dispute_resolved = match.get("status") == "disputed"
+    # Liga (#1619, E.2): Ein Protest mit vorläufig zählendem Ergebnis lässt das Spiel „completed“ - die Korrektur entscheidet ihn ebenso.
+    from services import league_procedures
+    open_procedures = league_procedures.has_open(match)
+    dispute_resolved = match.get("status") == "disputed" or open_procedures
     if dispute_resolved:
         unchanged = same_outcome(match.get("results"), application["results"]) and (
             games is None or games == (match.get("games") or []))
-        await _close_disputes(db, match, actor_id, now_iso, decision="keep" if unchanged else "change")
+        decision = "keep" if unchanged else "change"
+        if open_procedures:
+            await league_procedures.close_on_result(db, match, actor_id=actor_id, now_iso=now_iso, decision=decision, note=reason)
+            # Die Entscheidung mit Begründung verschickt das Verfahren selbst - nicht noch einmal als „Dispute entschieden“.
+            dispute_resolved = False
+        else:
+            await _close_disputes(db, match, actor_id, now_iso, decision=decision)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     await _finish_result_side_effects(db, updated, force, dispute_resolved=dispute_resolved)
     if reset_docs:
