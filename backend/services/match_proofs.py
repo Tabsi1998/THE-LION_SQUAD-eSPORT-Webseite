@@ -4,8 +4,9 @@ Ein Nachweis ist persönlich (Gesichter, Bildschirme, Wohnzimmer). Deshalb:
 
 - Sehen dürfen ihn nur die Spieler dieses Spiels (bei Teams jedes Mitglied) und die Leitung dieses Turniers - global oder
   mit Ergebnis- bzw. Protest-Recht für genau dieses Spiel. Nie öffentlich, nicht in Galerie oder Suche. Ein Nachweis mit dem
-  Bezug ``moss`` (Anti-Cheat, Regelwerk § 9a) geht nur an die Seite, die ihn hochgeladen hat, und an die Leitung, die an
-  dem Spiel nicht beteiligt ist - nie an die Gegenseite.
+  Bezug ``moss`` (Anti-Cheat, Regelwerk § 9a) geht nur an die Person, die ihn hochgeladen hat, an Captain und Vertreter
+  ihrer Seite und an die Leitung, die an dem Spiel nicht beteiligt ist - nicht an die übrigen Spieler der eigenen Seite
+  und nie an die Gegenseite.
 - Ein Bild wird nur über ``GET /api/matches/{id}/proof-photos/{foto}`` nach dieser Prüfung ausgeliefert, nie über eine
   öffentliche Upload-Adresse. Wer nicht darf, bekommt 404 (wie bei Chat-Anhängen - sonst ließe sich prüfen, ob es
   ein Foto gibt).
@@ -220,7 +221,9 @@ def can_see_doc(doc: dict, viewer: Viewer) -> bool:
     if state not in VISIBLE_SCAN_STATES or doc.get("status") != "attached":
         return False
     if refs.kind_of(doc) == "moss":
-        return bool(doc.get("registration_id")) and doc["registration_id"] in viewer.sides or viewer.lead_moss
+        # Nur wer hochgeladen hat (oben), wer für diese Seite handeln darf (Captain, Vertreter) und die nicht befangene
+        # Leitung - die übrigen Spieler der eigenen Seite nicht: Die Datei zeigt den PC einer einzelnen Person.
+        return bool(doc.get("registration_id")) and doc["registration_id"] in viewer.acting or viewer.lead_moss
     return bool(viewer.sides) or viewer.lead
 
 

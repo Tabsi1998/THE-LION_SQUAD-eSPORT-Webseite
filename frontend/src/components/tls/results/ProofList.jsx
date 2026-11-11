@@ -189,7 +189,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
             </p>
           )}
           <p className="text-xs text-white/50" data-testid={`${testId}-audience`}>
-            {kind === "moss" ? "MOSS-Nachweise sehen nur deine Seite und die Leitung – nie die Gegenseite." : "Nachweise sehen nur die beiden Seiten dieses Spiels und die Leitung."}
+            {kind === "moss" ? "MOSS-Nachweise sehen nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite." : "Nachweise sehen nur die beiden Seiten dieses Spiels und die Leitung."}
           </p>
         </>
       ) : null}

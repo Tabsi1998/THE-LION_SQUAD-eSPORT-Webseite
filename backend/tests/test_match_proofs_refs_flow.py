@@ -112,7 +112,7 @@ async def test_link_is_stored_as_given_and_needs_exactly_one_of_image_or_link(fl
 
 
 @pytest.mark.asyncio
-async def test_moss_goes_only_to_the_uploading_side_and_an_unbiased_lead(flow):
+async def test_moss_goes_only_to_uploader_captain_and_an_unbiased_lead(flow):
     w = await league_world(flow)
     match = w["match"]
     await set_match(flow, w, disputes=[protest(w)])
@@ -123,10 +123,16 @@ async def test_moss_goes_only_to_the_uploading_side_and_an_unbiased_lead(flow):
     moss = uploaded.json()
     assert (await add_link(flow, match)).status_code == 403, "zur Meldung fügen nur Captain und Vertreter hinzu"
 
-    for teammate in (user(w, "Mila"), user(w, "Kapitaen")):
-        flow.act_as(teammate)
+    # Wer hochgeladen hat und der Captain der eigenen Seite sehen ihn (Entscheidung Fabian 11.11.) …
+    for allowed in (user(w, "Mila"), user(w, "Kapitaen")):
+        flow.act_as(allowed)
         assert await ids_seen(flow, match, "moss", "verfahren-1") == {moss["id"]}
         assert (await flow.get(moss["url"])).status_code == 200
+    # … die übrigen Spieler der eigenen Seite nicht, auch nicht die Leitung des Hauptteams: Die Datei zeigt Milas PC.
+    for teammate in (user(w, "Tom"), user(w, "LoeLeitung")):
+        flow.act_as(teammate)
+        assert await ids_seen(flow, match, "moss", "verfahren-1") == set(), teammate["display_name"]
+        assert (await flow.get(moss["url"])).status_code == 404, teammate["display_name"]
 
     # Die Gegenseite sieht ihn nie - weder in der Liste noch als Bild. Zum Vergleich: einen Nachweis zum Protest sieht sie.
     flow.act_as(user(w, "Falke1"))

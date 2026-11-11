@@ -115,7 +115,7 @@ test("abgeschlossen oder ohne Recht: nur lesen - und bei MOSS steht, wer es sieh
   expect(screen.queryByTestId("proof-list-add")).toBeNull();
   expect(screen.queryByTestId("proof-list-remove-b1")).toBeNull();
   expect(screen.getByTestId("proof-list-closed")).toHaveTextContent("Abgeschlossen");
-  expect(screen.getByTestId("proof-list-audience")).toHaveTextContent("nie die Gegenseite");
+  expect(screen.getByTestId("proof-list-audience")).toHaveTextContent("nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite");
 });
 
 test("leer und Ladefehler: ein Satz statt einer leeren Fläche", async () => {
