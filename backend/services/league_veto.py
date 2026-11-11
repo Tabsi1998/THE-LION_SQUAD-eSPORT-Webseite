@@ -559,8 +559,8 @@ async def _startable(db, match: dict, tournament: dict | None) -> None:
 async def set_ready(db, match: dict, tournament: dict | None, *, registration_id: str, ready: bool, user: dict,
                     now: datetime | None = None) -> dict:
     """„Bereit zum Veto“ (#2326, Nr. 127): Hat das Veto auf die Vorgabe der Woche gewartet, beginnt es erst, wenn **beide** Seiten bereit
-    sind - Captain oder Vertreter je Seite. Die erste Seite kann ihr „Bereit“ zurücknehmen, solange die andere noch nicht bereit ist; die
-    Gegenseite bekommt einmal eine Nachricht. Mit der zweiten Seite beginnt das Veto, und erst dann läuft die Zeit je Schritt.
+    sind - Captain oder Vertreter je Seite. Eine Seite kann ihr „Bereit“ zurücknehmen, solange kein Veto läuft; die Gegenseite
+    bekommt einmal eine Nachricht. Mit der zweiten Seite beginnt das Veto, und erst dann läuft die Zeit je Schritt.
     Doppelklick, zweites Gerät, beide gleichzeitig: jede Markierung und der Start schreiben mit Bedingung - genau ein Veto."""
     now = now or now_utc()
     veto = veto_of(match)
@@ -568,7 +568,12 @@ async def set_ready(db, match: dict, tournament: dict | None, *, registration_id
         if not ready:
             raise FlowProblem("Das Veto läuft schon – „Bereit“ lässt sich nicht mehr zurücknehmen.")
         return _start_answer(veto, replay=True, ready=True)
-    await _startable(db, match, tournament)
+    if ready:
+        await _startable(db, match, tournament)
+    elif not rules_mod.rules_of(tournament):
+        raise FlowProblem(NO_VETO_DETAIL)
+    elif not _can_run(match) or wait_of(match) is None:
+        raise FlowProblem(STARTED_DETAIL if is_running(match) else NOT_STARTED_DETAIL)
     wait = wait_of(match)
     sides = filled(match)[:2]
     other = next((reg_id for reg_id in sides if reg_id != registration_id), None)
@@ -578,10 +583,13 @@ async def set_ready(db, match: dict, tournament: dict | None, *, registration_id
     if not ready:
         if not already:
             return _start_answer(None, replay=True, ready=False)
-        # Zurücknehmen nur, solange die Gegenseite nicht bereit ist - sonst beginnt das Veto gerade.
-        written = await db.matches_v2.update_one({**scope, f"flow.veto_wait.ready.{other}": {"$exists": False}}, {"$unset": {key: ""}})
+        # Zurücknehmen geht, solange kein Veto läuft. Sind beide bereit, beginnt es im selben Aufruf der zweiten Seite - übrig bleibt
+        # „beide bereit, kein Veto“ nur, wenn die Vorgabe der Woche genau dazwischen wieder lückenhaft wurde (Review zu #2326). Dann
+        # soll niemand ohne Knopf dastehen: Zurücknehmen bleibt möglich, auch wenn die Vorgabe gerade fehlt. Der Merker fällt mit dem
+        # Start weg, die Bedingung auf ihn schließt ein inzwischen begonnenes Veto aus.
+        written = await db.matches_v2.update_one({**scope, key: {"$exists": True}}, {"$unset": {key: ""}})
         if not written.matched_count:
-            raise FlowProblem("Die Gegenseite ist schon bereit – das Veto beginnt.")
+            raise FlowProblem(CHANGED_DETAIL)
         await _audit(db, "match.veto.ready_side", match, user.get("id"), {"registration_id": registration_id, "ready": False})
         return _start_answer(None, replay=False, ready=False)
     if not already:
@@ -625,14 +633,45 @@ async def lead_start(db, match: dict, tournament: dict | None, *, reason: str | 
     return _start_answer(veto_of(await _reload(db, match)) or veto, replay=False)
 
 
+async def _start_both_ready(db, match: dict, *, now: datetime | None = None) -> bool:
+    """Beide Seiten sind bereit, die Vorgabe steht (wieder), aber es läuft kein Veto: jetzt beginnen - unter der Sperre des Turniers wie
+    jeder Zug, mit frisch gelesenem Stand. Idempotent: ``ensure_started`` schreibt mit der Bedingung „kein Veto für diesen Termin“; ein
+    zweiter Lauf findet das Veto vor und tut nichts. Ist die Sperre belegt, bleibt es beim Stand - die Seiten können „Bereit“
+    zurücknehmen und neu tippen, das nächste Speichern versucht es wieder."""
+    from services.log_safe import log_safe
+    from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+
+    try:
+        async with mutation_lock(db, tournament_write_resource(match["tournament_id"]), wait_seconds=2.0):
+            tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "creation_key": 0, "billing": 0})
+            fresh = await _reload(db, match)
+            if not tournament or tournament.get("locked_at") or veto_of(fresh) is not None or not start_ready(fresh, tournament):
+                return False
+            if not set(filled(fresh)[:2]) <= ready_sides(fresh) or await preset_gap(db, fresh, tournament):
+                return False
+            started = await ensure_started(db, fresh, tournament, now=now, manual=True, via="ready")
+            return veto_of(started) is not None
+    except MutationLockBusy:
+        logger.info("[league_veto] Veto für match=%s wartet auf die Turniersperre", log_safe(match.get("id")))
+        return False
+
+
 async def announce_ready(db, match: dict, tournament: dict | None, *, now: datetime | None = None) -> bool:
     """Die Leitung hat die fehlende Vorgabe nachgetragen: beiden Seiten sagen, dass das Veto jetzt beginnen kann - einmal je Termin
     (``flow.veto_wait.ready_at`` mit Bedingung, dazu der Schlüssel der Nachricht). Das Veto beginnt dadurch nicht: Dafür tippen beide
-    Seiten „Bereit zum Veto“. ``True``, wenn die Nachricht jetzt hinausging."""
+    Seiten „Bereit zum Veto“. ``True``, wenn die Nachricht jetzt hinausging.
+
+    **Ausnahme** (Review zu #2326): Sind **beide Seiten schon bereit** und es läuft kein Veto - die Vorgabe wurde genau zwischen den
+    beiden Klicks wieder lückenhaft -, gibt es niemanden mehr, der tippen könnte. Dann beginnt das Veto hier selbst (``_start_both_ready``:
+    unter der Sperre des Turniers, ``manual=True``, ``via="ready"``); ``True``, wenn es jetzt begonnen hat."""
     wait = wait_of(match)
-    if not start_ready(match, tournament) or (wait or {}).get("ready_at") or (tournament or {}).get("locked_at"):
+    if not start_ready(match, tournament) or (tournament or {}).get("locked_at"):
         return False
     if await preset_gap(db, match, tournament):
+        return False
+    if set(filled(match)[:2]) <= ready_sides(match):
+        return await _start_both_ready(db, match, now=now)
+    if wait.get("ready_at"):
         return False
     now_iso = (now or now_utc()).isoformat()
     # Der Merker fällt mit dem Start des Vetos weg - die Bedingung auf ihn schließt ein inzwischen begonnenes Veto mit aus.
@@ -944,21 +983,25 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
         # Vorgabe der Woche (#2326): schon vor dem Start sichtbar - und klar gesagt, wenn sie fehlt (dann beginnt das Veto nicht).
         week, presets, blocked = (None, [], None) if is_running(match) or is_finished(match) else await _waiting_presets(db, match, tournament, rules)
         # Die Vorgabe wurde nachgetragen: Das Veto wartet nur noch auf „Bereit zum Veto“ beider Seiten (Nr. 127) - ohne Frist.
-        ready = not blocked and not (tournament or {}).get("locked_at") and start_ready(match, tournament)
+        waiting = not (tournament or {}).get("locked_at") and start_ready(match, tournament)
+        ready = bool(waiting and not blocked)
+        done = ready_sides(match) if waiting else set()
         start = None
-        if ready:
-            done = ready_sides(match)
+        # Der Bereit-Block steht auch da, wenn die Vorgabe wieder fehlt, aber schon jemand bereit ist (Review zu #2326): Wurde die
+        # Woche zwischen den beiden Klicks lückenhaft, soll keine Seite ohne Knopf festsitzen - „Doch nicht bereit“ bleibt möglich.
+        if ready or done:
             own_ready = bool(own_id and own_id in done)
             other_ready = any(reg_id in done for reg_id in filled(match)[:2] if reg_id != own_id) if own_id else False
             start = {
                 "sides": [{"registration_id": reg_id, "name": names.get(reg_id), "ready": reg_id in done, "own": reg_id == own_id}
                           for reg_id in filled(match)[:2]],
                 "own_ready": own_ready, "other_ready": other_ready,
-                # Bereit tippen Captain oder Vertreter der eigenen Seite; zurücknehmen nur, solange die Gegenseite nicht bereit ist.
-                "can_ready": bool(own_id) and not own_ready, "can_withdraw": own_ready and not other_ready,
+                # Bereit tippen Captain oder Vertreter der eigenen Seite - nicht, solange die Vorgabe fehlt. Zurücknehmen geht, solange
+                # kein Veto läuft: Sind beide bereit, beginnt es sofort; bleibt es aus, darf jede Seite wieder zurück.
+                "can_ready": bool(own_id) and not own_ready and ready, "can_withdraw": own_ready,
                 "hint": START_READY_DETAIL,
                 # Notfall: Die Leitung startet mit Pflichtgrund, ohne auf beide zu warten (Befangenheit wie bei jedem Eingriff).
-                "lead": {"can_start": bool(can_lead_act), "conflict": conflict} if lead else None,
+                "lead": {"can_start": bool(can_lead_act) and ready, "conflict": conflict} if lead else None,
             }
         return {"status": "waiting", "skipped_reason": None, "version": 0, "step_seconds": int(rules["step_seconds"]) if ready else None,
                 "team_a": None, "team_b": None, "current": None, "own_turn": False, "can_pick": False,

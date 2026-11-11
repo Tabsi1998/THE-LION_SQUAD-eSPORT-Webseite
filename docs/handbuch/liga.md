@@ -959,6 +959,9 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   3. Sind beide bereit, beginnt das Veto sofort. Erst ab da läuft die Zeit je Schritt, vorher gibt es keine Frist. Tippen beide
      gleichzeitig oder doppelt, beginnt trotzdem nur ein Veto.
   4. Ein neuer Termin setzt „Bereit“ zurück – nach dem neuen Check-in beginnt das Veto wieder von selbst, wenn die Vorgabe steht.
+  5. Nehmt ihr die Vorgabe der Woche wieder heraus, während die Seiten schon „Bereit“ tippen, wartet das Veto wieder auf die Vorgabe.
+     Die Seiten können **Doch nicht bereit** tippen. Sind beide bereit und ihr tragt die Vorgabe wieder ein, beginnt das Veto mit
+     eurem Speichern von selbst.
 - **Notfall: Veto starten (Liga-Leitung).** Kann eine Seite nicht selbst tippen (etwa Captain ohne Netz), startet ihr das wartende
   Veto im Kasten darunter: **Grund** eintragen (Pflicht), **Veto jetzt starten**. Das braucht „Spiele betreuen“, steht mit Grund im
   Protokoll, und im eigenen Spiel macht es eine zweite Person (Befangenheit, 2.11).

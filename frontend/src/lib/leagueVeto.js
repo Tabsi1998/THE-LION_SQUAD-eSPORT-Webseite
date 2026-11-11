@@ -25,8 +25,10 @@ export const VETO_STATUS_LABELS = {
  * nachgetragene Vorgabe, dass jetzt beide Seiten „Bereit zum Veto“ tippen (Nr. 127).
  */
 export function vetoHeadline(block) {
+  // Die fehlende Vorgabe geht vor: Auch wenn schon eine Seite bereit ist, wartet das Veto zuerst auf sie.
+  if (block?.status === "waiting" && block.blocked) return "Veto wartet auf die Vorgabe der Woche";
   if (block?.status === "waiting" && block.start) return block.presets?.length ? "Vorgabe steht – bereit zum Veto?" : "Bereit zum Veto?";
-  if (block?.status === "waiting") return block.blocked ? "Veto wartet auf die Vorgabe der Woche" : "Vorgabe der Woche";
+  if (block?.status === "waiting") return "Vorgabe der Woche";
   return VETO_STATUS_LABELS[block?.status] || "Veto";
 }
 
@@ -269,6 +271,8 @@ export function presetChangeLine(change, modes) {
 /** Der Satz im Stand „bereit zum Veto?“: wer schon bereit ist und was die eigene Seite jetzt tut. */
 export function readyText(start) {
   const other = (start?.sides || []).find((side) => !side.own)?.name || "die Gegenseite";
+  // Beide bereit und trotzdem kein Veto: Das Veto beginnt gleich von selbst - bis dahin kann jede Seite zurücknehmen.
+  if ((start?.sides || []).length > 1 && start.sides.every((side) => side.ready)) return "Beide Seiten sind bereit – das Veto beginnt gleich.";
   if (start?.own_ready) return "Ihr seid bereit – wartet auf die Gegenseite.";
   if (start?.can_ready && start.other_ready) return `${other} ist bereit – tippt auf „Bereit zum Veto“, dann beginnt es sofort.`;
   if (start?.can_ready) return "Tippt auf „Bereit zum Veto“, sobald ihr so weit seid. Das Veto beginnt, wenn beide Seiten bereit sind.";

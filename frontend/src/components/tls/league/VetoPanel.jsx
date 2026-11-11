@@ -154,7 +154,9 @@ function ReadyToStart({ block, matchId, busy, run, onChanged }) {
         </button>
       ) : null}
       <p className="mt-2 text-xs text-white/60" data-testid="veto-ready-note">
-        Das Veto beginnt, sobald beide Seiten bereit sind. Erst dann läuft die Zeit{block.step_seconds ? ` (${block.step_seconds} Sekunden je Schritt)` : ""} – bis dahin gibt es keine Frist.
+        {/* Die Vorgabe fehlt wieder, obwohl schon jemand bereit ist: Das Veto beginnt von selbst, sobald sie steht und beide bereit sind. */}
+        {block.blocked ? "Die Vorgabe der Woche fehlt gerade wieder. Sobald die Liga-Leitung sie eingetragen hat und beide Seiten bereit sind, beginnt das Veto von selbst – bis dahin gibt es keine Frist."
+          : `Das Veto beginnt, sobald beide Seiten bereit sind. Erst dann läuft die Zeit${block.step_seconds ? ` (${block.step_seconds} Sekunden je Schritt)` : ""} – bis dahin gibt es keine Frist.`}
       </p>
     </div>
   );

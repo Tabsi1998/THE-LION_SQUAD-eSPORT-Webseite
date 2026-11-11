@@ -144,4 +144,20 @@ describe("Matchseite", () => {
     expect(readyText({ ...start, sides: watching, can_ready: false })).toBe("Löwen ist bereit. Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.");
     expect(readyText({ ...start, sides: watching.map((row) => ({ ...row, ready: false })), can_ready: false })).toBe("Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.");
   });
+
+  it("beide bereit, aber die Vorgabe fehlt wieder: die fehlende Vorgabe geht vor, danach beginnt das Veto von selbst", () => {
+    const text = "Das Veto beginnt, sobald die Liga-Leitung die Vorgabe für Spielwoche 1 eingetragen hat.";
+    const sides = [{ registration_id: "a", name: "Löwen", ready: true, own: true }, { registration_id: "b", name: "Falken", ready: true, own: false }];
+    const start = { sides, own_ready: true, other_ready: true, can_ready: false, can_withdraw: true };
+    const stuck = { status: "waiting", blocked: { week: 1, text }, presets: [], start };
+    expect(vetoHeadline(stuck)).toBe("Veto wartet auf die Vorgabe der Woche");
+    expect(vetoText(stuck)).toBe(text);
+    // Die Vorgabe steht wieder: Der Satz sagt beiden Seiten und der Leitung, dass es gleich losgeht.
+    const back = { ...stuck, blocked: null, presets: [{ mode: "ctl" }] };
+    expect(vetoHeadline(back)).toBe("Vorgabe steht – bereit zum Veto?");
+    expect(vetoText(back)).toBe("Beide Seiten sind bereit – das Veto beginnt gleich.");
+    expect(readyText({ ...start, sides: sides.map((row) => ({ ...row, own: false })), own_ready: false, can_withdraw: false })).toBe("Beide Seiten sind bereit – das Veto beginnt gleich.");
+    // Gegenprobe: Ist nur die eigene Seite bereit, wartet sie weiter auf die Gegenseite.
+    expect(readyText({ ...start, sides: [sides[0], { ...sides[1], ready: false }], other_ready: false })).toBe("Ihr seid bereit – wartet auf die Gegenseite.");
+  });
 });

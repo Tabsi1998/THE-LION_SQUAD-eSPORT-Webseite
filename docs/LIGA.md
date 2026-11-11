@@ -2307,8 +2307,15 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
      - Ist erst **eine** Seite bereit, beginnt nichts. Die Gegenseite bekommt einmal „Gegenseite bereit zum Veto“ (`match_call`,
        `meta.reason` `veto_side_ready`, Schlüssel `veto-side-ready:<spiel>:<termin>:<rev>:<seite>` – auch nach Zurücknehmen und
        erneutem „Bereit“ nur einmal).
-     - **Zurücknehmen** (`ready: false`) geht, solange die Gegenseite noch nicht bereit ist (Bedingung auf deren Markierung, sonst 409
-       „Die Gegenseite ist schon bereit – das Veto beginnt.“); läuft das Veto, 409.
+     - **Zurücknehmen** (`ready: false`) geht, solange **kein Veto läuft** (Bedingung auf den Merker; läuft das Veto, 409). Im
+       Normalfall heißt das: solange die Gegenseite fehlt – mit der zweiten Seite beginnt das Veto im selben Aufruf.
+     - **Beide bereit, aber kein Veto** (Nachprüfung): Macht die Leitung die Woche genau zwischen den beiden Klicks wieder
+       lückenhaft, steht die zweite Markierung, aber der Start findet keine Vorgabe. Niemand sitzt dann ohne Knopf fest: Die
+       Matchseite zeigt „Veto wartet auf die Vorgabe der Woche“ **und** den Block `start` (beide bereit, `can_ready: false`,
+       `can_withdraw: true`, `lead.can_start: false`) – „Doch nicht bereit“ bleibt, auch ohne Vorgabe. Vervollständigt die Leitung
+       die Vorgaben, beginnt `announce_ready` das Veto **selbst** (`_start_both_ready`: unter der Turniersperre, Stand frisch
+       gelesen, `ensure_started(manual=True, via="ready")`, Protokoll `match.veto.start` ohne Person). Idempotent – zwei Läufe
+       gleichzeitig beginnen ein Veto; das Spiel zählt in `matches_ready` mit. Ist nur eine Seite bereit, bleibt es bei der Meldung.
      - Mit der **zweiten** Seite ruft `set_ready` `ensure_started(manual=True, via="ready")`: Erst jetzt entsteht `flow.veto` mit der
        dann geltenden Vorgabe, die erste Frist läuft ab diesem Moment, beide Seiten bekommen wie immer „Veto läuft“. Protokoll
        `match.veto.start` mit `via: "ready"` und der Person, die zuletzt getippt hat.
@@ -2441,7 +2448,8 @@ und `blocked` (`{week, text}`, nur im Stand `waiting`, wenn die Vorgabe fehlt od
 vorgegebene Map von Anfang an als `preset`, bei `never` in den anderen Modi als `elsewhere`. Der Veto-Block zeigt die Vorgabe schon vor
 dem Check-in („Vorgabe der Woche · Spielwoche 2“) und sagt im Wartestand „Veto wartet auf die Vorgabe der Woche“ samt dem Satz, dass
 nichts von selbst gewertet wird. `start` (nur im Stand `waiting`, sonst `null`): Die nachgetragene Vorgabe steht,
-das Veto wartet auf „Bereit zum Veto“ beider Seiten – `{sides: [{registration_id, name, ready, own}], own_ready, other_ready, can_ready,
+das Veto wartet auf „Bereit zum Veto“ beider Seiten (oder die Vorgabe fehlt wieder und eine Seite ist schon bereit – dann neben
+`blocked`, nur zum Zurücknehmen) – `{sides: [{registration_id, name, ready, own}], own_ready, other_ready, can_ready,
 can_withdraw, hint, lead: {can_start, conflict} | null}`. Überschrift „Vorgabe steht – bereit zum Veto?“, je Seite „bereit“ oder „noch
 nicht bereit“, der Satz darunter je nach Stand („Ihr seid bereit – wartet auf die Gegenseite.“, „… ist bereit – tippt auf ‚Bereit zum
 Veto‘, dann beginnt es sofort.“), Knopf **Bereit zum Veto** bzw. **Doch nicht bereit** nur für die Seiten, für die Leitung der Kasten
