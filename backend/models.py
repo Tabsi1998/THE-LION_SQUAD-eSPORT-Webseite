@@ -2770,6 +2770,8 @@ class LeagueSeasonFields(LeagueLookFields):
     application_privacy_text: Optional[str] = Field(default=None, max_length=2000)
     entry_policy: Optional[Literal["all", "members"]] = None
     sibling_squads_in_staffel: Optional[bool] = None
+    # Anmeldungen automatisch annehmen (#2348): Vorgabe aus, dann prüft die Leitung jede Anmeldung.
+    application_auto_accept: Optional[bool] = None
     # Plattform je Season (#2270, docs/LIGA.md B.3): Feld mit der Plattform, erlaubte Plattformen (leer = alle), Crossplay und
     # Eingabegerät als Angabe. Geprüft wird in ``league_platform.clean_season``; ``null`` heißt: keine Angabe.
     platform_field: Optional[str] = Field(default=None, max_length=80)

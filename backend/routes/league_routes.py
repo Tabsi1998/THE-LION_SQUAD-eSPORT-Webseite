@@ -150,6 +150,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         "default_pool": await map_pools.default_pool(db, game),
         "map_pool": await map_pools.admin_entry(db, pool, league.get("game_id"), "league_season"),
         "divisions": rows,
+        # Hinweis bei „automatisch annehmen“ (#2348): Offene Anmeldungen von vorher nimmt die Season nicht nachträglich an - nur die Zahl, keine Teams.
+        "applications_waiting": await db.league_applications.count_documents({"season_id": season_id, "status": {"$in": ["submitted", "in_review"]}}),
     }
 
 

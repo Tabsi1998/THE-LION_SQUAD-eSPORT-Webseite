@@ -54,7 +54,8 @@ async def my_application_page(league_slug: str, season_slug: str, me: dict = Dep
 @router.post("/{league_slug}/{season_slug}/applications")
 async def submit_application(league_slug: str, season_slug: str, body: LeagueApplicationSubmit, me: dict = Depends(get_current_user)):
     league, season = await _visible(league_slug, season_slug, me)
-    return applications.team_answer(await _call(applications.submit(get_db(), league, season, body.model_dump(), me)))
+    return applications.team_answer(await _call(applications.submit(get_db(), league, season, body.model_dump(), me,
+                                                                    refresh_previews=_refresh_tournament_previews_after_registration)))
 
 
 @router.post("/{league_slug}/{season_slug}/applications/{application_id}/withdraw")
@@ -96,13 +97,15 @@ async def accept_application(season_id: str, application_id: str, body: LeagueAp
 @admin_router.post("/{season_id}/applications/{application_id}/reject")
 async def reject_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.reject(get_db(), league, season, application_id, body.reason, me, conflict_reason=body.conflict_reason)))
+    return _answer(await _call(applications.reject(get_db(), league, season, application_id, body.reason, me, conflict_reason=body.conflict_reason,
+                                                  refresh_previews=_refresh_tournament_previews_after_registration)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/waitlist")
 async def waitlist_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.waitlist(get_db(), league, season, application_id, body.reason, me, conflict_reason=body.conflict_reason)))
+    return _answer(await _call(applications.waitlist(get_db(), league, season, application_id, body.reason, me, conflict_reason=body.conflict_reason,
+                                                    refresh_previews=_refresh_tournament_previews_after_registration)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/assign")

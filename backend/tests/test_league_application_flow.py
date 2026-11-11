@@ -51,6 +51,7 @@ async def test_a_new_season_carries_the_defaults_and_no_window(flow):
     assert stored["entry_policy"] == "all"
     assert stored["sibling_squads_in_staffel"] is False
     assert stored["application_waitlist"] is True
+    assert stored["application_auto_accept"] is False, "Vorgabe aus: Die Leitung prüft jede Anmeldung (#2348)"
     assert "application_opens_at" not in stored and "application_slots" not in stored
 
 
@@ -479,7 +480,8 @@ async def test_guests_see_window_and_seats_but_nobody_else_sees_an_application(f
     assert public["slots"] == 4 and public["slots_free"] == 3
     assert public["waitlist"] is True and public["waitlist_note"] == "Die Leitung entscheidet nach Eingang."
     assert public["opens_at"] and public["closes_at"]
-    assert set(public) == {"state", "opens_at", "closes_at", "slots", "slots_free", "waitlist", "waitlist_full", "waitlist_note", "entry_policy"}
+    assert set(public) == {"state", "opens_at", "closes_at", "slots", "slots_free", "waitlist", "waitlist_full", "waitlist_note", "entry_policy", "auto_accept"}
+    assert public["auto_accept"] is False, "Vorgabe aus: Die Leitung prüft jede Anmeldung (#2348)"
 
     flow.act_as(w["teams"][1]["captain"])
     view = ok(await flow.get(f"{base_url(w)}/application"))
