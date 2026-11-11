@@ -2553,8 +2553,9 @@ Start, Zug, Zeit, Leitung) - D.4 liest nur, dazu kommt die Erinnerung „Map-Vet
 heißt kurzer Abruf, dazu der Änderungsstrom (ein Zug ist ein `POST`, der Strom meldet ihn).
 
 **Kurzer Abruf** `GET /api/matches/{id}/veto` (`routes/league_veto_routes.py`, `?display=1`, `?key=`): der Veto-Block ohne die ganze
-Matchseite, dazu `now` (Serverzeit), `state` (Stand des Check-ins, nur Beteiligte) und `match` (`{id, tournament_title, matchday_label,
-scheduled_at, sides[]}` - was die öffentliche Matchseite ohnehin zeigt). Ohne Vorlage an der Staffel oder bei klassischen Spielen
+Matchseite, dazu `now` (Serverzeit), `state` (Stand des Check-ins, nur Beteiligte) und `match` (`{id, tournament_id, tournament_title,
+matchday_label, scheduled_at, sides[]}` - was die öffentliche Matchseite ohnehin zeigt; `tournament_id` grenzt am TV den Änderungsstrom
+auf die Staffel ein). Ohne Vorlage an der Staffel oder bei klassischen Spielen
 `{veto: null}`.
 
 | Wer | Was | Schreibt |

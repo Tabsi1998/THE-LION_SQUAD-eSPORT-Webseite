@@ -94,7 +94,7 @@ function VetoTv() {
   const offset = useServerOffset(block?.server_now);
   // Kurzer Abruf im Takt des Vetos, vor dem Start und danach ruhig - dazu sofort, wenn der Änderungsstrom einen Zug meldet.
   useVetoPolling(block, load, { offset, idleMs: IDLE_MS });
-  useLiveRefresh(load, ["matches", "matches-v2"], { fallbackMs: 0 });
+  useLiveRefresh(load, ["matches", "matches-v2"], { fallbackMs: 0, tournamentId: data?.match?.tournament_id || null });
   const fresh = useFreshCards(block);
 
   if (keyRefused) return <TvKeyRefused />;

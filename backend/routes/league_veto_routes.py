@@ -306,7 +306,7 @@ def _match_head(match: dict, tournament: dict | None, names: dict[str, str]) -> 
     """Kopf für die TV-Ansicht und Zuschauer: Staffel, Spieltag, die beiden Seiten - was die öffentliche Matchseite ohnehin zeigt."""
     number = match.get("matchday_number") or match.get("round")
     label = match.get("matchday_label") or match.get("round_name") or (f"Spieltag {number}" if number else "Spiel")
-    return {"id": match.get("id"), "tournament_title": (tournament or {}).get("title"), "matchday_label": label,
+    return {"id": match.get("id"), "tournament_id": match.get("tournament_id"), "tournament_title": (tournament or {}).get("title"), "matchday_label": label,
             "scheduled_at": match.get("scheduled_at"), "sides": [names.get(reg_id) or "Team" for reg_id in filled(match)[:2]]}
 
 
