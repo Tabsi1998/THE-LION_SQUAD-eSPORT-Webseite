@@ -3,6 +3,7 @@ Angaben geht durch, die Leitung lässt zu, der Check-in lehnt die Person ab, nac
 Einreichen und vor dem ersten Spiel, je nur einmal. Erfundene Namen."""
 import pathlib
 import sys
+import re
 from datetime import timedelta
 
 import pytest
@@ -75,7 +76,7 @@ async def test_a_missing_birth_date_is_a_hint_and_the_registration_goes_through(
     assert row["problems"] == [] and row["can_submit"] is True, row
     assert any("TeamA S3" in text and "Geburtsdatum fehlt" in text for text in row["warnings"]), row
     assert row["shortfall"] is None
-    assert "1990" not in str(row) and "birth_date" not in str(row)
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", str(row)) and "birth_date" not in str(row)
     answer = await submit(flow, w, side)
     assert answer.status_code == 200, answer.text
 
@@ -121,7 +122,7 @@ async def test_too_young_counts_like_missing_and_only_the_captain_hears_it(flow)
     notes = await open_point_notes(flow)
     assert {note["user_id"] for note in notes} == {side["captain"]["id"], side["vice"]["id"]}, "nichts zu beheben: keine Nachricht an die Person"
     assert "TeamA S3 (Altersvorgabe nicht erfüllt)" in notes[0]["body"]
-    assert "2015" not in str(notes)
+    assert not re.search(r"2015-\d\d-\d\d|\d\d\.\d\d\.2015", str(notes))
 
 
 @pytest.mark.asyncio

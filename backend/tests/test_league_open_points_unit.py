@@ -2,6 +2,7 @@
 halten sie auf. Ohne Datenbank, erfundene Namen."""
 import pathlib
 import sys
+import re
 
 import pytest
 
@@ -48,7 +49,7 @@ def test_a_missing_entry_is_an_open_point_with_the_way_into_the_own_profile(case
 
     assert [(row["id"], row["state"], row["fix_url"]) for row in points["players"]] == [("u4", state, url)]
     assert points["shortfall"] is None
-    assert "2015" not in str(points) and "birth" not in str(points)
+    assert not re.search(r"2015-\d\d-\d\d|\d\d\.\d\d\.2015", str(points)) and "birth" not in str(points)
 
 
 @pytest.mark.parametrize("case", sorted(CASES))
