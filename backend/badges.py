@@ -66,6 +66,10 @@ async def seed_badges():
     for g in ACHIEVEMENT_GROUPS:
         g = apply_category_overrides(g)
         flags = {key: g.pop(key) for key in achievement_reach.RETIRED_FIELDS if key in g}
+        # Ausdrücklich (Review N6): Was der Code nicht als Leitung oder Aufgabe im Verein führt, ist es auch in der
+        # Datenbank nicht - auch wenn ein älterer Stand es dort stehen hat.
+        g.setdefault("staff_only", False)
+        g.setdefault("role_only", False)
         await db.achievement_groups.update_one(
             {"code": g["code"]},
             {"$set": {**g, "id": g["code"]},

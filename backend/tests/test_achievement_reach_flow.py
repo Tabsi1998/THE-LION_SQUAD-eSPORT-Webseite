@@ -627,6 +627,21 @@ async def test_turnierleitung_und_schiedsrichter_nur_fuer_die_leitung(flow):
 
 
 @pytest.mark.asyncio
+async def test_seed_setzt_leitung_und_aufgabe_ausdruecklich(flow):
+    """Review N6: staff_only und role_only stehen an jeder Gruppe - ein alter Stand in der Datenbank wird zurückgesetzt."""
+    negative_code = (await flow.db.achievement_groups.find_one({"is_negative": True}, {"_id": 0, "code": 1}))["code"]
+    for code in ("matches_played", negative_code):
+        await flow.db.achievement_groups.update_one({"code": code}, {"$set": {"role_only": True, "staff_only": True}})
+    await badges.seed_badges()
+    played = await flow.db.achievement_groups.find_one({"code": "matches_played"}, {"_id": 0})
+    assert played["role_only"] is False and played["staff_only"] is False
+    negative = await flow.db.achievement_groups.find_one({"code": negative_code}, {"_id": 0})
+    assert negative["role_only"] is False and negative["staff_only"] is False, "auch die alten Gruppen ohne Helfer"
+    assert (await flow.db.achievement_groups.find_one({"code": "board_service"}, {"_id": 0}))["role_only"] is True
+    assert (await flow.db.achievement_groups.find_one({"code": "events_hosted"}, {"_id": 0}))["staff_only"] is True
+
+
+@pytest.mark.asyncio
 async def test_liga_leitung_sieht_nur_den_schiedsrichter(flow):
     """Review N5: Turnierleitung und Gastgeber gibt es nur für die Turnierleitung - die Liga-Leitung allein sieht nur den
     Schiedsrichter (sie entscheidet Dispute in ihren Spielen)."""

@@ -50,12 +50,10 @@ def _group(code: str, name: str, category: str, description: str, how_to: str, i
         "code": code, "name": name, "category": category, "icon": icon, "art": art,
         "accent_color": CATEGORIES[category]["accent"], "description": description, "how_to": how_to,
         "condition_key": None if manual else key, "public": True, "is_special": False, "is_negative": False, "sort_order": sort_order,
-        "staff_only": staff_only, "catalog": catalog, "manual_only": manual,
+        "staff_only": staff_only, "role_only": role_only, "catalog": catalog, "manual_only": manual,
     }
     if retired:
         group.update({"retired": True, "retired_reason": retired})
-    if role_only:
-        group["role_only"] = True
     tiers = []
     for index, (material, target) in enumerate(zip(materials, targets)):
         shown = SINGULAR_UNITS.get(unit, unit) if target == 1 else unit
