@@ -58,7 +58,7 @@ for (const [label, width, height] of [["Handy", 390, 844], ["PC", 1440, 900]]) {
     const row = page.getByTestId("auto-banner-auto-tournament-registration-t-1");
     await expect(row).toContainText("Turnier · Anmeldung / Check-in");
     await expect(row).toContainText("Views 128 · Klicks 17");
-    await expect(row.getByRole("link", { name: "Zum Turnier" })).toHaveAttribute("href", "/admin/tournaments/t-1?tab=edit");
+    await expect(row.getByRole("link", { name: "Zum Turnier Winter Cup 2026", exact: true })).toHaveAttribute("href", "/admin/tournaments/t-1?tab=edit");
     await expect(page.getByTestId("auto-banner-auto-server-maintenance-srv")).toContainText("bis die Wartung endet");
     await noOverflow(page);
     await list.scrollIntoViewIfNeeded();

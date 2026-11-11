@@ -30,11 +30,15 @@ export function AutoBannerList() {
             {item.title && item.text && <div className="text-[11px] text-white/55 break-words">{item.text}</div>}
             <div className="text-[11px] text-white/45">{autoBannerPeriod(item)}</div>
             <div className="mt-1 text-[11px] text-white/45">{autoBannerNumbers(item.stats)}</div>
-            {item.manage_url && (
-              <Link to={item.manage_url} className="mt-1 inline-block text-[11px] font-bold text-[#29B6E8] hover:underline">
-                {item.kind === "server" ? "Zu den Servern" : item.kind === "fastlap" ? "Zur Challenge" : "Zum Turnier"}
-              </Link>
-            )}
+            {item.manage_url && (() => {
+              const linkText = item.kind === "server" ? "Zu den Servern" : item.kind === "fastlap" ? "Zur Challenge" : "Zum Turnier";
+              // Mehrere gleich lautende Links in der Liste: der Titel sagt dem Screenreader, wohin es geht.
+              return (
+                <Link to={item.manage_url} aria-label={item.title ? `${linkText} ${item.title}` : linkText} className="mt-1 inline-block text-[11px] font-bold text-[#29B6E8] hover:underline">
+                  {linkText}
+                </Link>
+              );
+            })()}
           </div>
         ))}
         {items && items.length === 0 && (

@@ -24,7 +24,7 @@ test("die Liste zeigt jeden laufenden automatischen Banner mit Zahlen und Link z
   expect(row).toHaveTextContent("Turnier · Anmeldung / Check-in");
   expect(row).toHaveTextContent("Herbst-Cup");
   expect(row).toHaveTextContent("Views 12 · Klicks 4");
-  expect(screen.getByRole("link", { name: "Zum Turnier" })).toHaveAttribute("href", "/admin/tournaments/t-1?tab=edit");
+  expect(screen.getByRole("link", { name: "Zum Turnier Herbst-Cup" })).toHaveAttribute("href", "/admin/tournaments/t-1?tab=edit");
 });
 
 test("ohne laufende Banner sagt die Liste das", async () => {
