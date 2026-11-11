@@ -2615,7 +2615,8 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
 - **Ablauf:** `proposed` → `agreed` (Gegenseite stimmt zu) oder `withdrawn` (meldende Seite zieht zurück, nur solange `proposed`).
   Lehnt die Gegenseite ab (`rejected`) oder antwortet sie bis `answer_deadline` nicht (`expired`, Zeit-Job), geht der Vorfall im selben
   Schritt auf `in_review`; `rejected` und `expired` sind keine Ruhezustände, der Grund steht in `review_cause`. `in_review` → `decided`
-  durch die Leitung (`disputes` oder `results`, Befangenheit wie B.1). Offen ist ein Vorfall in `proposed` und `in_review`.
+  durch die Leitung (`disputes` oder `results`, Befangenheit wie B.1). Offen ist ein Vorfall, solange er nicht `agreed`, `decided`
+  oder `withdrawn` ist.
 - **Kontingent** (§ 9.6): je Team und Map zählen die eigenen Vorfälle mit `counts_quota` in `agreed` oder `decided`. Das System zählt und
   zeigt „1 von 1 genutzt“ beiden Seiten und der Leitung; ein weiterer Vorfall bleibt meldbar, braucht aber die Zustimmung der Gegenseite
   und geht sonst an die Leitung. Nichts wird automatisch verweigert oder bestraft (§ 13.1).
@@ -2734,8 +2735,15 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
   ihn nur noch die nicht befangene Leitung (in der Liste mit `removed: true`), nicht mehr die Seite und nicht mehr, wer ihn
   hochgeladen hat. Endgültig löscht ihn erst die Aufbewahrung. Die Antwort nennt das mit `kept_for_lead`. Protokoll:
   `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, bei MOSS `kept: true`, nie die Adresse).
-- **Offen** ist ein Bezug so: `report` bis das Spiel `completed`, `forfeit` oder geschlossen ist; `incident` in `proposed` und
-  `in_review`; `protest`, `statement` und `moss` bis das Verfahren `resolved_at` oder `withdrawn_at` trägt.
+- **Offen** ist ein Bezug so (`match_proof_refs.resolve`, eine Stelle für Hinzufügen, Entfernen und Aufbewahrung):
+  - `report`: bis das Spiel `completed`, `forfeit` oder geschlossen (`cancelled`, `archived`, `bye`) ist.
+  - `incident`: solange der Vorfall nicht `agreed`, `decided` oder `withdrawn` ist.
+  - `protest`, `statement`, `moss` am Verfahren: solange das Verfahren **oder ein Einspruch gegen seine Entscheidung** offen ist
+    (weder `resolved_at` noch `withdrawn_at`). Mit einem Einspruch (`kind: "appeal"`, `against.ref_id` = Kennung des Verfahrens)
+    wird der Bezug also wieder offen, bis der Einspruch entschieden ist: Die Leitung kann nachfordern, ein Spieler MOSS
+    nachreichen. Für die beiden Seiten gelten dabei weiter `evidence_until` und `statement.due_at`; neue Belege zum Einspruch
+    selbst hängen am Einspruch (`protest` mit dessen Kennung).
+  - `moss` am Vorfall: solange der Vorfall oder ein daraus folgendes Verfahren samt Einspruch offen ist.
 - **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Er hängt an einem
   Verfahren (`disputes[].id`) **oder an einem Vorfall** (`incidents[].id`, etwa `moss_crash`), mit denselben Sichtregeln; offen ist
   er am Vorfall, solange der Vorfall oder ein daraus folgendes Verfahren (`disputes[].incident_id`) offen ist. Die ZIP-Datei selbst

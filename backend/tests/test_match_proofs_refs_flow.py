@@ -243,6 +243,39 @@ async def test_who_may_add_to_which_reference_and_until_when(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_reference_is_open_again_while_an_appeal_is_open(flow):
+    """„Bezug offen“ heißt: das Verfahren oder ein Einspruch gegen seine Entscheidung ist offen (Review #2360, N3)."""
+    w = await league_world(flow)
+    match = w["match"]
+    past = (now_utc() - timedelta(hours=1)).isoformat()
+    decided = protest(w, evidence_until=past, resolved_at=past)
+    appeal = {"id": "einspruch-1", "kind": "appeal", "against": {"type": "protest_decision", "ref_id": "verfahren-1"},
+              "registration_id": w["reg_a"]["id"], "at": now_utc().isoformat()}
+    await set_match(flow, w, disputes=[decided])
+    flow.act_as(user(w, "Mila"))
+    assert (await add_image(flow, match, "moss", "verfahren-1")).status_code == 409, "entschieden: abgeschlossen"
+
+    await set_match(flow, w, disputes=[decided, appeal])
+    state = (await listed(flow, match, "moss", "verfahren-1")).json()
+    assert state["open"] is True and state["can_add"] is True
+    moss = await add_image(flow, match, "moss", "verfahren-1")
+    assert moss.status_code == 200, moss.text
+    # Die Fristen der Seiten bleiben: Die Falken reichen zum alten Protest nichts mehr nach - zum Einspruch belegt, wer ihn einlegt.
+    flow.act_as(user(w, "Falke1"))
+    assert (await add_link(flow, match, "protest", "verfahren-1")).status_code == 409
+    flow.act_as(user(w, "Kapitaen"))
+    assert (await add_link(flow, match, "protest", "einspruch-1")).status_code == 200
+    flow.act_as(w["staff"])
+    assert (await add_link(flow, match, "protest", "verfahren-1")).status_code == 200
+
+    await set_match(flow, w, disputes=[decided, {**appeal, "resolved_at": now_utc().isoformat()}])
+    for kind, ref_id in (("moss", "verfahren-1"), ("protest", "verfahren-1"), ("protest", "einspruch-1")):
+        closed = await add_link(flow, match, kind, ref_id)
+        assert closed.status_code == 409, (kind, ref_id)
+    assert (await listed(flow, match, "moss", "verfahren-1")).json()["open"] is False
+
+
+@pytest.mark.asyncio
 async def test_a_biased_lead_acts_like_a_member_of_their_side(flow):
     """Wer zu einer Seite gehört, ist mit Liga-Recht nicht „Leitung“: Seitenregeln und Fristen gelten weiter (Review #2360, M1)."""
     w = await league_world(flow)
