@@ -27,7 +27,7 @@ const OVERVIEW = {
   hidden: { total: 14, earned: 3 },
   week: { week_key: "2026-W45", award: null },
   recent: [],
-  mine: { count: 247, points: 9180, categories: { match: 104, tournament: 40, fastlap: 48 }, negative: 0, category_progress: PROGRESS, categories_complete: 3 },
+  mine: { count: 247, points: 9180, categories: { match: 104, tournament: 40, fastlap: 48 }, negative: 0, member: false, category_progress: PROGRESS, categories_complete: 3 },
 };
 const USER = { id: "u1", username: "pixelpanther", display_name: "PixelPanther", role: "user", is_club_member: false };
 
@@ -70,6 +70,8 @@ test.describe("Erfolge-Seite: Kategorien abschließen (#2339)", () => {
       await expect(page.getByTestId("category-progress-tournament")).toContainText("40 von 92");
       await expect(page.getByTestId("category-complete-tournament")).toHaveCount(0);
       await expect(page.getByTestId("category-progress-special")).toContainText("1 von 7");
+      // Review N3: kein Mitglied - der Verein sagt „Nur für Mitglieder“ statt „0 von 51“.
+      await expect(page.getByTestId("category-progress-club")).toHaveText("Nur für Mitglieder");
       await expect(page.getByTestId("category-progress-hidden")).toContainText("3 von 14 gefunden");
       await expect(page.getByTestId("categories-caption")).toContainText("was du selbst erreichen kannst");
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

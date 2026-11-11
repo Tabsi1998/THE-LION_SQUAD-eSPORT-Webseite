@@ -249,8 +249,28 @@ describe("AchievementsShowcasePage (#619, #1229)", () => {
     expect(fastlap).toHaveTextContent("0 von 4 · 0 %");
     expect(within(fastlap).queryByTestId("category-complete-fastlap")).toBeNull();
     expect(fastlap).toHaveAttribute("title", expect.stringContaining("selbst erreichen"));
-    // Ohne Erreichbares (Verein für Nicht-Mitglieder im Test: 0) bleibt die alte Zählung.
+    // Ohne Erreichbares (Verein im Test: 0) bleibt die alte Zählung.
     expect(screen.getByTestId("category-progress-club")).toHaveTextContent("0 von 1");
+  });
+
+  it("zeigt Nicht-Mitgliedern beim Verein „Nur für Mitglieder“ statt „0 von y“ (Review N3)", async () => {
+    authState.user = { id: "u1", username: "anna" };
+    const progress = { match: { earned: 0, total: 2, complete: false }, club: { earned: 0, total: 51, complete: false } };
+    mockApi({ overview: { ...OVERVIEW, mine: { count: 0, points: 0, categories: {}, negative: 0, member: false, category_progress: progress } } });
+    renderPage();
+    const club = await screen.findByTestId("category-progress-club");
+    expect(club).toHaveTextContent("Nur für Mitglieder");
+    expect(club).not.toHaveTextContent("von");
+    expect(club).toHaveAttribute("title", expect.stringContaining("nur für Vereinsmitglieder"));
+    expect(screen.getByTestId("category-progress-match")).toHaveTextContent("0 von 2");
+  });
+
+  it("zeigt Mitgliedern beim Verein „x von y“ (Gegenprobe zu N3)", async () => {
+    authState.user = { id: "u1", username: "anna" };
+    const progress = { club: { earned: 3, total: 51, complete: false } };
+    mockApi({ overview: { ...OVERVIEW, mine: { count: 3, points: 0, categories: {}, negative: 0, member: true, category_progress: progress } } });
+    renderPage();
+    expect(await screen.findByTestId("category-progress-club")).toHaveTextContent("3 von 51");
   });
 
   it("zeigt „Geheim / Fun“ nur, wer selbst etwas davon hat", async () => {

@@ -253,7 +253,10 @@ async def my_progress(db, user_id: str) -> dict:
         per_cat[cat] = per_cat.get(cat, 0) + 1
         count += 1
     progress = reach.category_progress(groups, tiers.values(), earned, now=now)
-    return {"count": count, "points": points, "categories": per_cat, "negative": negative,
+    # Mitglieds-Stand (Review N3): Nicht-Mitglieder sehen beim Verein „nur für Mitglieder“ statt „0 von 51“.
+    from services.membership_service import is_active_member
+    member = is_active_member(await db.memberships.find_one({"user_id": user_id}, {"_id": 0, "member_status": 1}))
+    return {"count": count, "points": points, "categories": per_cat, "negative": negative, "member": member,
             "category_progress": progress, "categories_complete": len(reach.completed_categories(progress))}
 
 

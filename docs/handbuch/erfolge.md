@@ -157,7 +157,7 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
 - **Eine Kategorie ist abgeschlossen**, wenn jemand jede erreichbare Stufe darin hat. Auf der Erfolge-Seite steht angemeldet
   je Kategorie **„x von y“** der erreichbaren Stufen – oder ein **Haken** und **Abgeschlossen**. Die Kategorien sind Spielen,
   Turnier, Fast Lap, Saison, Team, Community, Streaming & Creator, Profil & Konto, Verein und Besonders; Geheim und Negativ
-  zählen nicht.
+  zählen nicht. Wer kein Mitglied ist, sieht beim Verein **Nur für Mitglieder**.
 - **Kategorie-Meister** zählt die abgeschlossenen Kategorien (Stufe I bis VII). Kategorie-Meister, **Hundert Prozent**,
   **Sammler** und **Geheimnisträger** selbst zählen in keiner Kategorie mit – so hängt keiner an sich selbst. Kommt später
   eine Stufe dazu, bleibt, was jemand schon hat.

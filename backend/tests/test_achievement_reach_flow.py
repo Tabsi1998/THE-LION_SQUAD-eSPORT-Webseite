@@ -340,6 +340,10 @@ async def test_kategorie_ist_abgeschlossen_mit_jeder_erreichbaren_stufe(flow):
     mine = (await flow.get("/api/achievements/overview")).json()["mine"]
     assert mine["category_progress"]["season"] == {"earned": len(season), "total": len(season), "complete": True}
     assert mine["category_progress"]["match"]["complete"] is False and mine["categories_complete"] == 1
+    # Review N3: der Mitglieds-Stand für „nur für Mitglieder“ beim Verein.
+    assert mine["member"] is False
+    await _member(flow, paula)
+    assert (await flow.get("/api/achievements/overview")).json()["mine"]["member"] is True
 
 
 @pytest.mark.asyncio
