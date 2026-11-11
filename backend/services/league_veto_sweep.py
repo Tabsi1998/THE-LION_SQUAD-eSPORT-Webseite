@@ -58,6 +58,35 @@ async def announce_waiting(db, season_id: str, *, now: datetime | None = None) -
     return told
 
 
+async def nudge(db, *, now: datetime | None = None) -> int:
+    """Erinnerung „Map-Veto wartet“ (D.4, #1651) - im Job ``league_veto`` nach dem Auflösen der Fristen: laufende Vetos, deren Frist noch
+    läuft (Teil-Index ``veto_deadline``). Fällig ist sie, wenn die Seite am Zug seit 20 Sekunden nicht gezogen und das Veto nicht offen hat
+    (``league_veto.nudge_target``) - einmal je Schritt und Seite. Gibt die Zahl der Erinnerungen zurück; ein Spiel hält die anderen nicht
+    auf."""
+    now = now or now_utc()
+    rows = await db.matches_v2.find(
+        {"flow.veto.status": RUNNING, "flow.veto.deadline_at": {"$gt": now.isoformat()}, "started_at": None},
+        # ``scheduled_at`` und ``flow.schedule_rev``: das Veto gilt nur zum geltenden Termin (``veto_of``).
+        {"_id": 0, "id": 1, "tournament_id": 1, "started_at": 1, "scheduled_at": 1, "flow.schedule_rev": 1, "flow.veto": 1,
+         "flow.veto_seen": 1, "flow.veto_nudge": 1}).to_list(500)
+    due = [row for row in rows if league_veto.nudge_target(row, now=now)]
+    if not due:
+        return 0
+    locked = {row["id"] for row in await db.tournaments.find(
+        {"id": {"$in": sorted({row.get("tournament_id") for row in due if row.get("tournament_id")})}, "locked_at": {"$ne": None}},
+        {"_id": 0, "id": 1}).to_list(500)}
+    told = 0
+    for row in due:
+        if row.get("tournament_id") in locked:
+            continue
+        try:
+            match = await db.matches_v2.find_one({"id": row["id"]}, {"_id": 0})
+            told += 1 if match and await league_veto.nudge_due(db, match, {"id": row.get("tournament_id")}, now=now) else 0
+        except Exception:  # noqa: BLE001 - ein Spiel hält die anderen nicht auf
+            logger.warning("[league_veto_sweep] Erinnerung „Map-Veto wartet“ zu Spiel %s nicht verschickt", log_safe(row.get("id")), exc_info=True)
+    return told
+
+
 async def sweep(db, tournaments: list[dict] | None = None, *, now: datetime | None = None) -> dict:
     """Ein Lauf: alle laufenden Vetos mit erreichter Frist - mit ``tournaments`` nur die dieser Turniere (Fristen-Job)."""
     now = now or now_utc()
