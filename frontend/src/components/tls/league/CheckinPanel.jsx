@@ -281,7 +281,7 @@ function LeadEntry({ block, matchId, busy, run, onChanged }) {
   );
 }
 
-export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, leadUrl, onPoll }) {
+export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, leadUrl, onPoll, vetoTvHref = null }) {
   if (!block) return null;
   const other = otherSide(block);
   // Veto (#1618, D.3): solange es läuft, trägt der Veto-Block die Überschrift - der Check-in-Kopf wird eine Zeile, die Seiten stehen
@@ -329,7 +329,7 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
       ) : null}
 
       <OwnCheckin key={`${block.state}-${ownSide(block)?.updated_at || ""}`} block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} onAskLead={onAskLead} />
-      <VetoPanel block={block.veto} matchId={matchId} busy={busy} run={run} onChanged={onChanged} onPoll={onPoll} bothIn={vetoRunning} />
+      <VetoPanel block={block.veto} matchId={matchId} busy={busy} run={run} onChanged={onChanged} onPoll={onPoll} bothIn={vetoRunning} tvHref={vetoTvHref} />
       {vetoRunning ? null : <StartBlock block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} />}
       {block.state === "open" && other && !other.checked_in && ownSide(block)?.checked_in ? (
         <p className="mt-3 text-xs text-white/55" data-testid="checkin-waiting">Die Seite aktualisiert sich von selbst, sobald {other.name} eingecheckt hat.</p>

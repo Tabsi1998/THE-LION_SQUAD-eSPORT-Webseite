@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useParams } from "react-router-dom";
 import { CalendarClock, ChevronDown, Flag, MessageSquare, RefreshCw, Send, ShieldCheck, Trophy } from "lucide-react";
@@ -32,6 +32,8 @@ import { LeagueRulesNote } from "@/components/tls/league/LeagueRulesNote";
 import { AllowedEquipmentView } from "@/components/tls/league/AllowedEquipmentView";
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
+import { VetoPanel } from "@/components/tls/league/VetoPanel";
+import { keepNewerVeto, mergeLiveVeto } from "@/lib/leagueVeto";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -169,12 +171,22 @@ function MatchPageView() {
   const [problemCategory, setProblemCategory] = useState("");
   const [actionError, setActionError] = useState("");
 
+  // Map-Veto live (#1651): der zuletzt gezeigte Stand - der kurze Abruf und das volle Laden vergleichen damit, was neuer ist.
+  const dataRef = useRef(null);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   const load = useCallback(async ({ preserveDrafts = true } = {}) => {
     const [{ data: page }, { data: messages }] = await Promise.all([
       api.get(`/matches/${id}/page`),
       api.get(`/matches/${id}/chat`),
     ]);
-    setData(page);
+    // Ist der Veto-Block der vollen Antwort älter als der, den der kurze Abruf inzwischen gebracht hat, bleibt der neuere stehen - der
+    // übrige Seitenstand kommt aus dieser Antwort.
+    const next = keepNewerVeto(dataRef.current, page);
+    dataRef.current = next;
+    setData(next);
     setChat(messages || []);
     const nextMatch = page.match || {};
     if (preserveDrafts) {
@@ -184,6 +196,25 @@ function MatchPageView() {
       setProposalErrors([]);
     }
   }, [id]);
+
+  // Map-Veto live (#1651): Der Veto-Block fragt kurz beim leichten Abruf nach statt die ganze Seite neu zu laden. Bleibt der Stand derselbe,
+  // ersetzt die Antwort nur den Block; beginnt oder endet das Veto, lädt die Seite einmal ganz.
+  const pollVeto = useCallback(async () => {
+    try {
+      const { data: live } = await api.get(`/matches/${id}/veto`);
+      const merged = mergeLiveVeto(dataRef.current, live);
+      if (!merged) {
+        await load();
+        return;
+      }
+      // Eine Antwort, die eine neuere überholt hat, ändert nichts (`mergeLiveVeto` gibt dann den Stand selbst zurück).
+      if (merged === dataRef.current) return;
+      dataRef.current = merged;
+      setData(merged);
+    } catch {
+      // Der nächste Takt fragt wieder.
+    }
+  }, [id, load]);
 
   useEffect(() => {
     const refreshVisible = () => {
@@ -460,8 +491,13 @@ function MatchPageView() {
         {/* Liga-Check-in (#1652): Stand, Countdown, Anwesende und Start - nur Beteiligte und Leitung bekommen den Block. */}
         {data.checkin ? (
           <CheckinPanel block={data.checkin} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })}
-            onPoll={() => load().catch(() => {})} onAskLead={canUseChat ? askStaff : null}
+            onPoll={pollVeto} onAskLead={canUseChat ? askStaff : null} vetoTvHref={`/display/veto/${id}`}
             leadUrl={data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ns-${id}` : null} />
+        ) : null}
+        {/* Map-Veto für Zuschauer (#1651): wer weder dazugehört noch das Spiel leitet, sieht das laufende Veto nur lesend - live. */}
+        {!data.checkin && data.veto_view && (data.veto_view.status === "running" || data.veto_view.status === "paused") ? (
+          <VetoPanel block={data.veto_view} matchId={id} busy={busy} run={runAction} onChanged={() => load()} onPoll={pollVeto} readOnly
+            tvHref={`/display/veto/${id}`} />
         ) : null}
         {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}
         {!finished && isV2 && data.tournament?.id && data.event_mode && data.event_mode !== "online" ? (

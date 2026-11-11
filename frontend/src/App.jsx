@@ -229,6 +229,8 @@ const BracketTVPage = lazyPage(() => import("@/pages/display/BracketTVPage"));
 const StationTVPage = lazyPage(() => import("@/pages/display/StationTVPage"));
 const EventTVPage = lazyPage(() => import("@/pages/display/EventTVPage"));
 const EventCallsTVPage = lazyPage(() => import("@/pages/display/EventCallsTVPage"));
+// Map-Veto am TV (#1651): öffentlich wie Matchseite und Event-TV, mit Anzeige-Schlüssel auch für Staffeln „Nur Mitglieder“.
+const VetoTVPage = lazyPage(() => import("@/pages/display/VetoTVPage"));
 const MyPrizesPage = lazyPage(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazyPage(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazyPage(() => import("@/pages/admin/AdminPrizesPage"));
@@ -496,6 +498,7 @@ function App() {
           <Route path="/display/f1/:id" element={<F1TVPage />} />
           <Route path="/display/event/:id" element={<EventTVPage />} />
           <Route path="/display/event/:id/calls" element={<EventCallsTVPage />} />
+          <Route path="/display/veto/:matchId" element={<VetoTVPage />} />
           <Route path="/display/bracket/:id" element={<BracketTvRoute />} />
           <Route path="/display/bracket/:id/station/:stationId" element={<BracketTvRoute station />} />
 

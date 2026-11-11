@@ -753,13 +753,17 @@ async def _safe_match_deadlines():
 
 
 async def _safe_league_veto():
-    """Veto der Liga (#1618, D.3): abgelaufene Fristen auflösen - alle 10 Sekunden, nur laufende Vetos mit erreichter Frist."""
+    """Veto der Liga (#1618, D.3): abgelaufene Fristen auflösen - alle 10 Sekunden, nur laufende Vetos mit erreichter Frist. Danach
+    die Erinnerung „Map-Veto wartet“ (D.4, #1651) an Seiten, die am Zug sind und das Veto nicht offen haben."""
     try:
         from database import get_db
-        from services.league_veto_sweep import sweep
+        from services.league_veto_sweep import nudge, sweep
         result = await sweep(get_db())
         if result.get("auto"):
             logger.info(f"[scheduler] league_veto auto={result['auto']}")
+        nudged = await nudge(get_db())
+        if nudged:
+            logger.info(f"[scheduler] league_veto nudged={nudged}")
     except Exception as exc:
         _log_task_failure("league_veto", exc)
 
