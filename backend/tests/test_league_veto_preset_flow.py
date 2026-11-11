@@ -31,10 +31,22 @@ WITH_PRESET = [*ANLAGE_B[:8], step("ban", CTL, "A"), step("preset", CTL, None, 3
 SIDE_MOVES = {0: "map-glut", 1: "map-turm", 2: "map-hafen", 3: "map-nebel", 4: "map-werk", 5: "map-kai", 6: "map-turm", 7: "map-nebel"}
 
 
+async def strict_league_indexes(db) -> None:
+    """Die eindeutigen Indizes aus ``database.init_indexes`` für die Sammlungen, die diese Tests direkt beschreiben. Ohne sie legt
+    mongomock eine zweite Season ohne ``number`` in derselben Liga klaglos an - echtes MongoDB (CI) lehnt sie ab. Auf echtem MongoDB
+    stehen die Indizes schon, der Aufruf ändert dort nichts."""
+    from database import unique_index
+
+    await unique_index(db.league_seasons, [("league_id", 1), ("number", 1)], "league_season_number")
+    await unique_index(db.league_seasons, [("league_id", 1), ("slug", 1)], "league_season_slug")
+    await db.league_staff.create_index([("league_id", 1), ("user_id", 1)], unique=True)
+
+
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
     await instance.db.mutation_locks.create_index("resource", unique=True)
+    await strict_league_indexes(instance.db)
     try:
         yield instance
     finally:
@@ -48,7 +60,11 @@ def preset(week: int, map_id: str, mode: str = CTL) -> dict:
 async def preset_world(flow, presets: list[dict] | None, *, rules=None, **fields) -> dict:
     """Die Veto-Welt (zwei Co-Teams, ein Spiel am Spieltag 1) mit einer Season, die die Vorgaben der Woche trägt."""
     world = await veto_world(flow, rules=veto_rules(WITH_PRESET) if rules is None else rules, **fields)
-    season = {"id": world["season_id"], "league_id": "liga", "name": "Season 1", "created_at": now_utc().isoformat()}
+    # Mehrere Welten in einem Test liegen in derselben Liga: Jede Season braucht ihre eigene Nummer und ihren eigenen Kurznamen
+    # (eindeutige Indizes ``league_season_number`` und ``league_season_slug``).
+    number = await flow.db.league_seasons.count_documents({"league_id": "liga"}) + 1
+    season = {"id": world["season_id"], "league_id": "liga", "number": number, "name": "Season 1", "slug": f"season-{number}",
+              "created_at": now_utc().isoformat()}
     if presets is not None:
         season["veto_presets"] = presets
     await flow.db.league_seasons.insert_one(season)
