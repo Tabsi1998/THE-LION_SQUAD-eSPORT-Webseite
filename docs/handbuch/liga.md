@@ -932,11 +932,22 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
 
 - **Start:** Sobald beide Seiten eingecheckt sind, beginnt das Veto von selbst; beide Seiten bekommen eine Nachricht („Veto läuft“),
   Team A (Heimteam, oder gelost) ist zuerst dran. Die Seite zeigt den laufenden Schritt („Schritt 3 von 11 · Stellung · Loewen wählt
-  Map 1“), einen Countdown und je Modus alle Maps mit Stand (offen, gesperrt, gewählt, Decider).
-- **Ziehen:** Captain oder Vertreter der Seite am Zug tippen eine Map an – **Sperren** oder **Wählen**, je nach Schritt. Ausgegraute
-  Maps sind gesperrt, schon gewählt oder würden die Serie nicht mehr aufgehen lassen (die Seite sagt es beim Antippen). Die übrige Map
-  eines Decider-Schritts setzt das System sofort. Ein Doppelklick oder ein zweites Gerät zählt nicht doppelt; war die Gegenseite schneller
-  oder die Zeit um, sagt die Seite „bitte neu laden“ und zeigt den neuen Stand (sie aktualisiert sich alle paar Sekunden von selbst).
+  Map 1“), einen Countdown, den **Ablauf** als Leiste (jeder Schritt mit Sperre/Wahl/Decider, Team A oder B und Modus; fertige Schritte
+  mit der Map, der laufende markiert) und je Modus alle Maps als **Karten mit Bild** (offen, gesperrt mit Bann-Zeichen und wer, gewählt
+  mit „Map 1“ in der Farbe der Seite, Decider, Vorgabe der Woche). Team A ist blau, Team B orange.
+- **Ziehen:** Captain oder Vertreter der Seite am Zug tippen im markierten Modus eine Karte an – **Sperren** oder **Wählen**, je nach
+  Schritt. Ausgegraute Maps sind gesperrt, schon gewählt oder würden die Serie nicht mehr aufgehen lassen (die Seite sagt es beim
+  Antippen). Die übrige Map eines Decider-Schritts setzt das System sofort. Ein Doppelklick oder ein zweites Gerät zählt nicht doppelt;
+  war die Gegenseite schneller oder die Zeit um, sagt die Seite „bitte neu laden“ und zeigt den neuen Stand.
+- **Live:** Die Seite aktualisiert sich von selbst – alle 2 Sekunden, solange das Veto läuft (im Hintergrund-Tab nicht, beim Zurückkommen
+  sofort). Ein Zug der Gegenseite leuchtet auf ihrer Karte kurz auf, der Ablauf rückt weiter. Der Countdown richtet sich nach der Uhr des
+  Servers, nicht nach der des Handys; die letzten 10 Sekunden sind rot. Mit „Bewegung reduzieren“ im Gerät steht alles sofort da.
+- **Erinnerung:** Ist eine Seite am Zug, hat 20 Sekunden lang nicht gezogen und die Matchseite nicht offen, bekommen Captain und Vertreter
+  einmal die Nachricht **„Map-Veto wartet – ihr seid am Zug“** (je Schritt höchstens einmal).
+- **Zuschauer und TV:** Wer nicht beteiligt ist, sieht das laufende Veto auf der Matchseite nur lesend (wenn die Staffel sichtbar ist).
+  Über **TV-Ansicht** im Veto-Block öffnet sich die Ansicht für den Bildschirm (`/display/veto/<Spiel>`): großer Countdown, wer am Zug
+  ist, Karten und Ablauf, danach die Spielreihenfolge. Für Staffeln „Nur Mitglieder“ hängt ihr den Anzeige-Schlüssel des Turniers an
+  (`?key=…`, aus eSports → TV & Beamer).
 - **Zeit:** Läuft die Zeit je Schritt ab, wählt das System zufällig aus den zulässigen Maps und schreibt es in den Verlauf („Zeit
   abgelaufen, das System hat gewählt“). Die nächste Seite hat wieder ihre volle Zeit.
 - **Ende:** Nach dem letzten Schritt steht die **Spielreihenfolge** (Map 1 bis Best of mit Modus und Map) – beide Seiten bekommen eine
@@ -977,6 +988,10 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
 <img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300"> <img src="../assets/liga/veto-bereit-wartet-390.png" alt="Matchseite am Handy nach dem Nachtragen: Vorgabe steht – bereit zum Veto?, die eigene Seite ist bereit und wartet auf die Gegenseite, darunter der Knopf Doch nicht bereit und der Hinweis, dass erst ab dem Start die Zeit läuft" width="300">
 
 <img src="../assets/liga/veto-bereit-leitung.png" alt="Matchseite der Liga-Leitung am PC: eine Seite ist bereit, die andere noch nicht; darunter der Kasten Notfall: Veto starten mit dem Pflichtfeld Grund und dem Knopf Veto jetzt starten" width="640">
+
+<img src="../assets/liga/veto-live-390.png" alt="Matchseite am Handy im laufenden Veto: Countdown in Orange für Team B, darunter die Ablauf-Leiste mit dem laufenden Schritt, die Frage Welche Map sperrt ihr und das Brett mit Map-Karten - die gesperrte Hafenkante gedimmt mit Bann-Zeichen" width="300"> <img src="../assets/liga/veto-live-1440.png" alt="Matchseite am PC im laufenden Veto: Ablauf-Leiste mit elf Schritten, darunter je Modus die Map-Karten mit Bild; gesperrte Karten gedimmt, Nebelwerk als Map 1 von Team A in Blau gewählt, der Modus des laufenden Zugs gerahmt" width="640">
+
+<img src="../assets/liga/veto-live-tv-1920.png" alt="TV-Ansicht des Vetos: links großer Countdown und das Team am Zug, rechts je Modus die Map-Karten, unten der ganze Ablauf mit den fertigen Schritten und ihren Maps" width="640">
 
 ### 3.1a Turnier nach dem Ende noch „Live“
 
