@@ -164,6 +164,7 @@ async def test_without_the_preset_the_veto_does_not_start_and_the_lead_is_told_o
     assert world["lead"]["id"] in {row["user_id"] for row in notes} and len(notes) == len({row["user_id"] for row in notes})
     assert all(row["meta"]["dedupe_key"] == f"veto-preset-missing:{world['season_id']}:1" for row in notes)
     assert "Spielwoche 1" in notes[0]["body"] and "Kontrolle: Die Vorgabe der Woche fehlt." in notes[0]["body"]
+    assert notes[0]["url"] == f"/admin/leagues/seasons/{world['season_id']}#veto" and notes[0]["kind"] == "match_attention"
     assert world["users"]["Kapitaen"]["id"] not in {row["user_id"] for row in notes}, "nur die Leitung"
     assert await flow.db.audit_logs.count_documents({"action": "match.veto.waiting"}) == 1
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 0

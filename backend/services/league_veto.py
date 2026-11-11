@@ -252,7 +252,7 @@ async def _wait_for_preset(db, match: dict, tournament: dict, week: int, problem
                 user_id, "Veto wartet auf die Vorgabe der Woche",
                 f"{tournament.get('title') or 'Liga'} · Spielwoche {week}: {' '.join(problems)} Mindestens ein Spiel ist eingecheckt und "
                 "wartet – das Veto beginnt, sobald die Vorgabe eingetragen ist.",
-                url=f"/admin/leagues/seasons/{season_id}?tab=spielbetrieb#veto", kind="match_attention",
+                url=f"/admin/leagues/seasons/{season_id}#veto", kind="match_attention",
                 meta={"category": "tournament_updates", "tournament_id": tournament.get("id"), "match_id": match.get("id"),
                       "reason": "veto_preset_missing", "dedupe_key": f"veto-preset-missing:{season_id}:{week}"})
     except Exception:  # noqa: BLE001 - der Merker steht, die Matchseite sagt es ohnehin
