@@ -552,9 +552,10 @@ speichern** steht im selben Kasten der Block **Vorgabe der Woche**:
 
 Was gilt:
 
-- **Spielwoche heißt Spieltag.** Spielwoche 3 ist der dritte Spieltag, also die dritte Woche, in der gespielt wird (Sperrwochen zählen
-  nicht mit). Die Vorgabe gilt für alle Spiele dieses Spieltags. Wird ein Spiel verschoben, bleibt es bei der Vorgabe seines
-  Spieltags, auch wenn es erst in einer späteren Woche gespielt wird.
+- **Spielwoche heißt Spieltag.** Der Block schreibt „Spielwoche 3“ mit den Tagen dieser Woche. Gemeint ist der dritte Spieltag, also
+  die dritte Woche, in der gespielt wird (Sperrwochen zählen nicht mit). Die Vorgabe gilt für alle Spiele dieses Spieltags.
+- **Ein verschobenes Spiel bleibt in seiner Spielwoche.** Es spielt die Vorgabe seines Spieltags, auch wenn es erst in einer späteren
+  Woche stattfindet – nicht die Vorgabe der Woche, in die der neue Termin fällt.
 - **Ohne Vorgabe beginnt das Veto nicht.** Sind beide Seiten eingecheckt und für die Woche fehlt die Map, sagt die Matchseite das, und
   ihr bekommt einen Hinweis (einmal je Spielwoche, mit Link zum Kasten). Gewertet wird nichts von selbst.
 - **Nachtragen startet das Veto nicht.** Speichert ihr die fehlende Vorgabe, bekommen die Captains (bzw. Vertreter) beider Seiten die
@@ -949,7 +950,7 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   Erst mit dem Tippen beginnt das Veto und läuft die Zeit je Schritt; vorher gibt es keine Frist. Tippen beide gleichzeitig oder
   doppelt, beginnt trotzdem nur ein Veto.
 
-<img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300">
+<img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300"> <img src="../assets/liga/veto-starten-390.png" alt="Matchseite am Handy nach dem Nachtragen: Vorgabe steht – Veto starten, darunter die Vorgabe der Woche Kaimauer und der Knopf Veto starten mit dem Hinweis, dass erst ab dem Start die Zeit läuft" width="300">
 
 ### 3.1a Turnier nach dem Ende noch „Live“
 
