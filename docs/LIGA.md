@@ -1193,7 +1193,7 @@ Das Einreichen mit automatischer Zuteilung und Ablehnen bzw. Warteliste einer au
 
 | Route | Wer | Zweck |
 | --- | --- | --- |
-| `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy, auto_accept}` oder `null`. Keine Personen |
+| `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy, auto_accept}` oder `null`. Keine Personen. Mit `application_auto_accept` ist `slots_free`, was eine neue Anmeldung wirklich bekommt: Plätze minus belegte minus offene Anträge, `0`, sobald jemand wartet (`_free_for_newcomers`, #2348). Der Eingang (`stats`) zählt weiter nur belegte |
 | `GET /api/leagues/{liga}/{season}/application` | angemeldet, Season sichtbar | `application`, `rules`, `privacy`, `season_problems`, `squads[]`: die eigenen Co-Teams des Spiels mit `can_apply`, `state`, `application`, nur für Captain und Vertreter dazu `problems`, `warnings`, `shortfall`. `hint`, wenn das Co-Team keinen Captain hat |
 | `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403. Antwort mit `status`: `submitted`, mit `application_auto_accept` auch `accepted` (dann `staffel`, wenn zugeteilt) oder `waitlist` |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |

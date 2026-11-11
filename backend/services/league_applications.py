@@ -128,6 +128,16 @@ def _waitlist_has_room(season: dict, stats: dict) -> bool:
     return bool(season.get("application_waitlist")) and (not limit or stats["waiting"] < limit)
 
 
+def _free_for_newcomers(season: dict, stats: dict) -> int | None:
+    """Freie Plätze für die Ligaseite. Mit „automatisch annehmen“ (#2348) das, was eine neue Anmeldung wirklich bekommt: Offene Anträge halten ihren Platz,
+    und wartet schon jemand, geht ein freier Platz durch die Leitung an die Warteliste (wie ``_auto_decide``). Ohne die Einstellung wie bisher."""
+    if not season.get(AUTO_ACCEPT) or not stats["slots"]:
+        return stats["free"]
+    if stats["waiting"]:
+        return 0
+    return max(0, stats["slots"] - stats["taken"] - stats["open"])
+
+
 async def public_block(db, season: dict) -> dict | None:
     """Für alle: Fenster-Stand, freie Plätze, Warteliste. Keine Personen, keine Anträge. ``None``: keine Selbstanmeldung."""
     state = window_state(season)
@@ -135,7 +145,7 @@ async def public_block(db, season: dict) -> dict | None:
         return None
     stats = await seat_stats(db, season)
     return {"state": state, "opens_at": season.get("application_opens_at"), "closes_at": season.get("application_closes_at"),
-            "slots": stats["slots"], "slots_free": stats["free"], "waitlist": bool(season.get("application_waitlist")),
+            "slots": stats["slots"], "slots_free": _free_for_newcomers(season, stats), "waitlist": bool(season.get("application_waitlist")),
             "waitlist_full": bool(season.get("application_waitlist")) and not _waitlist_has_room(season, stats),
             "waitlist_note": season.get("application_waitlist_note"), "entry_policy": season.get("entry_policy") or "all",
             "auto_accept": bool(season.get(AUTO_ACCEPT))}

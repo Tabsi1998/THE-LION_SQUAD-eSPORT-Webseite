@@ -593,6 +593,42 @@ async def test_switching_on_needs_the_season_capability_and_is_logged(flow):
     assert back["data"]["before"] is True and back["actor_id"]
 
 
+async def public_free(flow, w: dict) -> int | None:
+    flow.act_as(None)
+    return ok(await flow.get(base_url(w)))["application"]["slots_free"]
+
+
+@pytest.mark.asyncio
+async def test_the_league_page_shows_the_seats_a_newcomer_can_really_get(flow):
+    """Mit automatischer Annahme zählen offene Anmeldungen auf der Ligaseite wie belegt, und wartet jemand, bekommt ein Neuer keinen Platz."""
+    w = await application_world(flow, teams=4, application_slots=3)
+    early = [await submitted(flow, w, side) for side in w["teams"][:2]]
+    assert await public_free(flow, w) == 3, "Gegenprobe ohne Einstellung: wie bisher nur die belegten Plätze"
+    flow.act_as(w["lead"])
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"application_auto_accept": True}))
+
+    assert await public_free(flow, w) == 1, "die zwei offenen halten ihren Platz"
+    assert (await submitted(flow, w, w["teams"][2]))["status"] == "accepted"
+    assert await public_free(flow, w) == 0
+    ok(await decide(flow, w, early[0], "reject", reason="Kader doppelt gemeldet"))
+    assert await public_free(flow, w) == 1
+    assert (await submitted(flow, w, w["teams"][3]))["status"] == "accepted", "die Seite hat nicht zu viel versprochen"
+    assert await public_free(flow, w) == 0
+    stats = (await inbox(flow, w))["stats"]
+    assert stats["free"] == 1 and stats["open"] == 1, "der Eingang zählt weiter nur belegte Plätze, offene stehen daneben"
+
+
+@pytest.mark.asyncio
+async def test_with_someone_waiting_a_newcomer_gets_no_free_seat(flow):
+    w = await application_world(flow, teams=2, application_slots=2, **AUTO)
+    first = await submitted(flow, w, w["teams"][0])
+    ok(await decide(flow, w, first, "waitlist", reason="Erst die Kader prüfen"))
+
+    assert (await inbox(flow, w))["stats"]["free"] == 2
+    assert await public_free(flow, w) == 0
+    assert (await submitted(flow, w, w["teams"][1]))["status"] == "waitlist"
+
+
 @pytest.mark.asyncio
 async def test_switching_on_later_leaves_open_applications_to_the_lead(flow):
     """Wer zuerst kommt, wird zuerst bedient: Offene Anmeldungen von vorher bleiben bei der Leitung und halten ihren Platz."""
