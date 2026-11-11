@@ -178,6 +178,60 @@ async def test_moss_goes_only_to_uploader_captain_and_an_unbiased_lead(flow):
 
 
 @pytest.mark.asyncio
+async def test_without_captain_the_main_team_lead_sees_moss_of_their_one_side(flow):
+    """Co-Team ohne Captain und Vertreter: Für die Seite handelt die Leitung des Hauptteams - sie sieht MOSS dieser Seite."""
+    w = await league_world(flow)
+    match = w["match"]
+    await set_match(flow, w, disputes=[protest(w)])
+    await flow.db.team_squads.update_one({"id": w["squad_a"]["id"]}, {"$unset": {"captain_id": "", "vice_captain_id": ""}})
+    flow.act_as(user(w, "Mila"))
+    moss = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    seen = {}
+    for name in ("LoeLeitung", "Kapitaen", "Tom", "FalLeitung", "Falke1"):
+        flow.act_as(user(w, name))
+        seen[name] = await ids_seen(flow, match, "moss", "verfahren-1") == {moss["id"]}
+    assert seen == {"LoeLeitung": True, "Kapitaen": False, "Tom": False, "FalLeitung": False, "Falke1": False}
+
+
+@pytest.mark.asyncio
+async def test_who_may_act_for_both_sides_sees_moss_of_neither(flow):
+    """Zwei Co-Teams desselben Hauptteams ohne Captain spielen gegeneinander: Die Leitung des Hauptteams handelt für beide -
+    und ist damit für jede Seite auch Gegenseite. Sie sieht MOSS keiner Seite, nur den selbst hochgeladenen (Review, N7)."""
+    w = await league_world(flow)
+    match, tournament = w["match"], w["tournament"]
+    await flow.db.team_squads.update_one({"id": w["squad_a"]["id"]}, {"$unset": {"captain_id": "", "vice_captain_id": ""}})
+    reg_b = {"id": "reg-rudel-b", "tournament_id": tournament["id"], "team_id": w["lions"]["id"], "squad_id": w["squad_b"]["id"],
+             "squad_name": "Rudel B", "user_id": None, "display_name": "Loewen · Rudel B", "status": "approved",
+             "registration_type": "team", "registered_via": "league_assign", "identity_key": f"{tournament['id']}:squad:rudel-b"}
+    await flow.db.tournament_registrations.insert_one(dict(reg_b))
+    await set_match(flow, w, slots=[{"slot": 1, "status": "filled", "registration_id": w["reg_a"]["id"]},
+                                    {"slot": 2, "status": "filled", "registration_id": reg_b["id"]}],
+                    disputes=[protest(w, registration_id=reg_b["id"], user_id=user(w, "Ida")["id"])])
+    flow.act_as(user(w, "Mila"))  # Rudel A
+    from_a = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    flow.act_as(user(w, "Ida"))   # Rudel B
+    from_b = (await add_image(flow, match, "moss", "verfahren-1")).json()
+
+    lead = user(w, "LoeLeitung")
+    flow.act_as(lead)
+    assert await ids_seen(flow, match, "moss", "verfahren-1") == set()
+    for proof in (from_a, from_b):
+        assert (await flow.get(proof["url"])).status_code == 404
+    # Liga-Recht hilft ihr nicht: Sie ist an dem Spiel beteiligt.
+    lead["areas"] = ["leagues"]
+    await flow.db.users.update_one({"id": lead["id"]}, {"$set": {"areas": ["leagues"]}})
+    assert await ids_seen(flow, match, "moss", "verfahren-1") == set()
+    own = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    assert await ids_seen(flow, match, "moss", "verfahren-1") == {own["id"]}, "den eigenen sieht sie"
+    # Die anderen Nachweise des Verfahrens sieht sie wie jedes Mitglied; die unbeteiligte Leitung sieht alle drei MOSS.
+    flow.act_as(user(w, "Ida"))
+    clip = (await add_link(flow, match, "moss", "verfahren-1")).json()
+    assert await ids_seen(flow, match, "moss", "verfahren-1") == {from_b["id"], clip["id"]}
+    flow.act_as(w["staff"])
+    assert await ids_seen(flow, match, "moss", "verfahren-1") == {from_a["id"], from_b["id"], own["id"], clip["id"]}
+
+
+@pytest.mark.asyncio
 async def test_moss_may_hang_on_an_incident_with_the_same_visibility(flow):
     """Der Screenshot vom MOSS-Absturz gehört zum Vorfall (§ 9a.6) - gleiche Sichtregeln wie am Verfahren (Review #2360, M4)."""
     w = await league_world(flow)

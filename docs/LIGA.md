@@ -2699,7 +2699,7 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 
 | Wer | Vorfall, Verfahren | Nachweise (Bilder, Links) | MOSS |
 | --- | --- | --- | --- |
-| Eigene Seite (Mitglieder des Co-Teams) | alles | ja | nur wer hochgeladen hat sowie Captain und Vertreter dieser Seite (wer für sie handeln darf); die übrigen Spieler nicht (Entscheidung Fabian 11.11.) |
+| Eigene Seite (Mitglieder des Co-Teams) | alles | ja | nur wer hochgeladen hat sowie Captain und Vertreter dieser Seite (wer für sie handeln darf; ohne Captain und Vertreter die Leitung des Hauptteams); die übrigen Spieler nicht (Entscheidung Fabian 11.11.). Wer für **beide** Seiten des Spiels handeln darf, sieht MOSS keiner Seite, nur den selbst hochgeladenen |
 | Gegenseite | Grund, Text, Vorschlag, Stand, Stellungnahme, Entscheidung mit Begründung, wer übernommen hat | ja | nein, nur das Ergebnis der Prüfung in der Begründung (§ 9a.3) |
 | Leitung mit `disputes` oder `results`, nicht befangen | alles | ja | ja |
 | Befangene mit Liga-Recht | wie ihre Seite | wie ihre Seite | wie ihre Seite, nie als Leitung |

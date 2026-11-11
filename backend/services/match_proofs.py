@@ -262,7 +262,10 @@ def can_see_doc(doc: dict, viewer: Viewer) -> bool:
     if refs.kind_of(doc) == "moss":
         # Nur wer hochgeladen hat (oben), wer für diese Seite handeln darf (Captain, Vertreter) und die nicht befangene
         # Leitung - die übrigen Spieler der eigenen Seite nicht: Die Datei zeigt den PC einer einzelnen Person.
-        return bool(doc.get("registration_id")) and doc["registration_id"] in viewer.acting or viewer.lead
+        # Wer für beide Seiten handeln darf (Leitung des Hauptteams, wenn zwei seiner Co-Teams ohne Captain gegeneinander
+        # spielen), ist für jede Seite auch Gegenseite - und sieht darum MOSS keiner von beiden.
+        for_this_side = len(viewer.acting) == 1 and bool(doc.get("registration_id")) and doc["registration_id"] in viewer.acting
+        return for_this_side or viewer.lead
     return bool(viewer.sides) or viewer.lead
 
 
