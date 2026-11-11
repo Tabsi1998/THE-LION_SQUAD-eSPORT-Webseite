@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.76.0 (11.11.2026)
+
+### Neu
+
+* „Verifizierter Streamer“ kommt automatisch mit Twitch-Verknüpfung und Creator-Kennzeichen (#2338)
+* Erfolge – eine Sammel-Zeremonie „Du hast X Erfolge nachträglich bekommen“ statt einzelner Feiern (#2340)
+* Erfolge – Kronen wechseln während der Neuberechnung nicht, gemeldet wird nur die Änderung am Ende (#2340)
+* Erfolge – nachgerechnete Stufen nicht im Laufband, Erfolg der Woche, Wochen- und Jahresrückblick und in keiner Zeitraum-Rangliste (#2340)
+* Erfolge – stiller Modus für die Neuberechnung: nachgerechnete Stufen kommen ohne Meldung, echte Ereignisse melden weiter (#2340)
+* Häkchen „Streamer oder Creator“ im Vereinsprofil der Mitgliederverwaltung (#2338)
+* Verwaltung – Neuberechnung der Erfolge mit Probelauf, Stand „schon still vergeben“, Abschluss und einer Sammel-Nachricht je Person (nur Superadmin) (#2340)
+
+### Fehlerbehebungen
+
+* „Datenbewusst“ zählt erst nach eigener Privatsphäre-Einstellung oder Datenexport (#2338)
+* „Kapitän“ zählt ab der Übernahme der Leitung, im Altbestand ab der protokollierten Übergabe (#2338)
+* „Plauderer“ zählt nur noch Turnier- und Match-Chat, ohne springenden Fortschritt (#2338)
+* „Teamauftritt“ zählt für Teamleitung und Co-Leitung, gleich beim Speichern (#2338)
+* „Überall dabei“ gleicht die Discord-Server beim Verknüpfen und jede Nacht ab (#2338)
+* „Überall dabei“ richtet die Stufen nach der Zahl der eingeschalteten Server (#2338)
+* „Vereinsleben“ erkennt interne Events auch an der Art, abgesagte Events zählen nicht (#2338)
+* Chat-Erfolge zählen keine zurückgehaltenen oder gelöschten Nachrichten und höchstens 50 am Tag (#2338)
+* Discord-Erfolge zählen nur eingeschaltete Server und nach dem Trennen nichts mehr (#2338)
+* Dolibarr-Abgleich löscht ein bekanntes Beitrittsdatum nicht mehr (#2338)
+* Erfolge – „Pünktlich“ zählt jetzt, der Check-in hält seinen Zeitpunkt fest (#2337)
+* Erfolge – „Ungeschlagen“ gilt nur, wenn das Team kein Spiel verloren hat (#2337)
+* Erfolge – Champion, Podest und alle Platz-Erfolge erst nach Abschluss des Turniers (#2337)
+* Erfolge – Durchzieher zählt nur gespielte Turniere ohne kampflose Niederlage, Austritt oder Disqualifikation (#2337)
+* Erfolge – ein Freilos zählt nicht mehr als Spiel und unterbricht keine Serie (#2337)
+* Erfolge – Erklärtexte beschreiben genau, was gezählt wird, und trennen Vereinsliga und Hin- und Rückrunde (#2337)
+* Erfolge – Finalist ist, wer im Finale stand: Endspiel, Grand Final oder der ganze Finallauf (#2337)
+* Erfolge – Finalist, Top 8, Lower-Bracket-Lauf, Ungeschlagen und Grand Slam zählen wieder (#2337)
+* Erfolge – Formatvielfalt zählt die Vereinsliga mit und Mehrspieler frei nur einmal (#2337)
+* Erfolge – im Team und in der Liga zählt, wer gespielt hat, nicht nur wer angemeldet hat (#2337)
+* Erfolge – Kaderwechsel im Co-Team nehmen niemandem seine Spiele und geben keine alten dazu (#2337)
+* Erfolge – kampflose Siege zählen als Spiel und Sieg (#2337)
+* Erfolge – Preisträger zählt nur vergebene Preise aus Turnieren (#2337)
+* Erfolge – Top 8 zählt erst ab mehr als acht Teilnehmern (#2337)
+* Erfolge – Topgesetzt und Riesentöter nur bei fester Setzliste (#2337)
+* Erfolge – Turnierveteran, Multitalent, Formatvielfalt und Teamturniere zählen die Teilnahme statt der Anmeldung, auch nach Austritt oder Disqualifikation (#2337)
+* Gruselnacht zählt am Server nur am 31.10. ab 18 Uhr Wiener Zeit (#2338)
+* Hand-Erfolge nennen Kriterium, wer entscheidet und wer einträgt; „Steckbrief“ nennt alle Felder (#2338)
+* Konto verknüpfen oder trennen wertet die Erfolge gleich aus (#2338)
+* Kontolöschung entfernt auch die Zeitpunkte von Privatsphäre-Einstellung und Datenexport (#2338)
+* Streamer, Sendezeit und Clip-Macher zählen nur mit per Anmeldung verknüpftem Twitch, auch nach einer Umbenennung (#2338)
+* Teams – Rollenwechsel und Leitungsübergabe halten das Beitrittsdatum fest (#2337)
+
+### Schneller
+
+* Chat- und Discord-Nachrichten werten Erfolge leicht über die Warteschlange aus (#2338)
+* Erfolge – Plätze und Finalisten werden je Turnier einmal ermittelt statt je Person (#2337)
+
 ## 1.75.0 (10.11.2026)
 
 ### Neu
