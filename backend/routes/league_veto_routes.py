@@ -21,9 +21,11 @@ Die Logik steht in ``services/league_veto.py`` und ``services/league_veto_rules.
 """
 from __future__ import annotations
 
+import hashlib
+import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from auth import get_current_user, get_optional_user
@@ -40,8 +42,9 @@ from routes.match_routes import (
 )
 from services import game_maps, league_veto, league_veto_rules, league_veto_sweep, map_pools, match_flow
 from services.access_links import touch_access_link, validate_access_link
-from services.checkin_rules import FlowProblem, filled
+from services.checkin_rules import FlowProblem, filled, moment
 from services.league_permissions import ANY, require_league, require_no_conflict
+from services.rate_limit import enforce_rate_limit, get_client_ip
 from services.tournament_permissions import has_match_result_permission
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired
 
@@ -310,29 +313,95 @@ def _match_head(match: dict, tournament: dict | None, names: dict[str, str]) -> 
             "scheduled_at": match.get("scheduled_at"), "sides": [names.get(reg_id) or "Team" for reg_id in filled(match)[:2]]}
 
 
+# Zuschauer und TV (#1651, Review): Viele Bildschirme und Handys fragen dasselbe Spiel alle 2 Sekunden ab. Die Zuschauer-Sicht gilt darum
+# kurz für alle (``SPECTATOR_CACHE_SECONDS``) - solange sich am Spiel nichts geändert hat (Schlüssel: ``updated_at`` und der Stand des
+# Vetos, frisch gelesen). Ein neuer Zug ist damit sofort sichtbar; Serverzeit und Restsekunden werden bei jedem Abruf neu gesetzt.
+# Dazu ein großzügiges Limit je Adresse und je Anzeige-Schlüssel wie beim Event-TV. Beteiligte und Leitung: kein Zwischenspeicher.
+SPECTATOR_CACHE_SECONDS = 2
+SPECTATOR_CACHE_MATCHES = 256
+SPECTATOR_RATE_LIMIT = 600
+SPECTATOR_RATE_WINDOW_SECONDS = 60
+SPECTATOR_RATE_MESSAGE = "Zu viele Abrufe für dieses Veto. Bitte warte noch {wait}."
+
+_spectator_cache: dict[str, tuple[float, tuple, dict, dict]] = {}
+
+
+def _clock() -> float:
+    return time.monotonic()
+
+
+def _key_subject(key: str) -> str:
+    """Der Zähler je Schlüssel nennt den Schlüssel nie - nur einen eigenen Hash davon."""
+    return hashlib.sha256(f"tv-veto-display:{key}".encode("utf-8")).hexdigest()[:32]
+
+
+def _spectator_signature(match: dict) -> tuple:
+    """Was die Zuschauer-Sicht ändern kann, frisch aus dem Spiel: jede Änderung am Spiel (``updated_at``) und der Stand des Vetos."""
+    flow = match.get("flow") or {}
+    veto = flow.get("veto") if isinstance(flow.get("veto"), dict) else {}
+    return (match.get("updated_at"), match.get("scheduled_at"), flow.get("schedule_rev"), veto.get("started_at"), veto.get("version"),
+            veto.get("status"), veto.get("deadline_at"), bool(flow.get("veto_wait")))
+
+
+def _with_server_time(block: dict | None, now) -> dict | None:
+    """Ein zwischengespeicherter Block mit der Serverzeit dieses Abrufs - der Countdown rechnet damit."""
+    if not block:
+        return block
+    out = {**block, "server_now": now.isoformat()}
+    current = block.get("current")
+    deadline = moment((current or {}).get("deadline_at"))
+    if current and deadline:
+        out["current"] = {**current, "remaining_seconds": max(0, int((deadline - now).total_seconds()))}
+    return out
+
+
+async def _spectator_block(db, match: dict, tournament: dict | None, now) -> tuple[dict | None, dict]:
+    signature = _spectator_signature(match)
+    hit = _spectator_cache.get(match["id"])
+    if hit and hit[0] > _clock() and hit[1] == signature:
+        return _with_server_time(hit[2], now), hit[3]
+    names = await league_veto.side_names(db, match)
+    block = await league_veto.live_block(db, match, tournament, names=names, spectator=True, now=now)
+    _spectator_cache.pop(match["id"], None)
+    while len(_spectator_cache) >= SPECTATOR_CACHE_MATCHES:
+        _spectator_cache.pop(next(iter(_spectator_cache)))
+    _spectator_cache[match["id"]] = (_clock() + SPECTATOR_CACHE_SECONDS, signature, block, names)
+    return block, names
+
+
+async def _limit_spectator(request: Request, key: str | None) -> None:
+    await enforce_rate_limit(request, "veto_live_address", SPECTATOR_RATE_LIMIT, SPECTATOR_RATE_WINDOW_SECONDS,
+                             subject=get_client_ip(request), message=SPECTATOR_RATE_MESSAGE)
+    if key:
+        await enforce_rate_limit(request, "veto_live_key", SPECTATOR_RATE_LIMIT, SPECTATOR_RATE_WINDOW_SECONDS, subject=_key_subject(key),
+                                 message=SPECTATOR_RATE_MESSAGE)
+
+
 @router.get("/{match_id}/veto")
-async def veto_live(match_id: str, key: Optional[str] = None, display: bool = False, user: dict | None = Depends(get_optional_user)):
+async def veto_live(match_id: str, request: Request, key: Optional[str] = None, display: bool = False,
+                    user: dict | None = Depends(get_optional_user)):
     """Der kurze Abruf des Vetos (D.4, #1651) - Matchseite, Zuschauer und TV fragen hier statt der ganzen Seite nach.
 
     Beteiligte (Captain, Vertreter, Kader) und die Liga-Leitung bekommen denselben Block wie auf der Matchseite; wie dort beginnt ein
     fälliges Veto beim Lesen und abgelaufene Fristen lösen sich auf. Alle anderen sehen das Veto nur lesend (``spectator_view``: keine
     Wahl, kein Eingriff, kein Grund einer Pause) - Sichtbarkeit wie die Matchseite, also nach Staffel bzw. Season. ``display=1`` (TV)
-    liefert immer die Zuschauer-Sicht; mit dem Anzeige-Schlüssel des Turniers (``key``) auch ohne Anmeldung, wie Turnierbaum und
+    liefert immer die Zuschauer-Sicht. Mit dem Anzeige-Schlüssel des Turniers (``key``) auch ohne Anmeldung, wie Turnierbaum und
     Stationen. Zuschauer und TV lösen nichts aus - Start und Fristen übernehmen der Aufruf der Beteiligten und der Job."""
     db = get_db()
-    match, collection = await _find_match_any(match_id)
     now = now_utc()
-    if key:
-        link = await validate_access_link(db, key, "tournament", match.get("tournament_id"), None, DISPLAY_GRANT)
-        if not link:
-            raise HTTPException(status_code=403, detail=KEY_INVALID)
-    else:
-        await _assert_match_visible(match, user)
+    if key or display or not user:
+        await _limit_spectator(request, key)
+    match, collection = await _find_match_any(match_id)
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
     if key:
-        if not tournament or key_expired(tournament, now):
+        link = await validate_access_link(db, key, "tournament", match.get("tournament_id"), None, DISPLAY_GRANT) if tournament else None
+        if not link:
+            raise HTTPException(status_code=403, detail=KEY_INVALID)
+        if key_expired(tournament, now):
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
+    else:
+        await _assert_match_visible(match, user)
     if collection != "matches_v2" or not league_veto_rules.rules_of(tournament):
         return {"veto": None, "now": now.isoformat(), "state": None, "match": None}
     spectator = bool(key or display or not user)
@@ -341,11 +410,13 @@ async def veto_live(match_id: str, key: Optional[str] = None, display: bool = Fa
         involved = await _can_read_match(match, user) or bool(await _member_registration_for_match(db, match, user.get("id")))
         lead = await has_match_result_permission(user, match, capability="matches")
         spectator = not (involved or lead)
-    names = await league_veto.side_names(db, match)
+        if spectator:
+            await _limit_spectator(request, None)
     state = None
     if spectator:
-        block = await league_veto.live_block(db, match, tournament, names=names, spectator=True, now=now)
+        block, names = await _spectator_block(db, match, tournament, now)
     else:
+        names = await league_veto.side_names(db, match)
         # Wie die Matchseite (``match_flow.page_block``): ein fälliges Veto beginnt, abgelaufene Fristen lösen sich auf.
         match = await league_veto.settle_due(db, await league_veto.ensure_started(db, match, tournament, now=now), tournament, now=now)
         acting = await _acting_registration_for_match(match, user)
