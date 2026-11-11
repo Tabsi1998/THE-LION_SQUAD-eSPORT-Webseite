@@ -45,8 +45,27 @@ test("zeigt alle Arten mit Satz und Weg", () => {
   expect(screen.getByTestId("duty-overdue-open-m1")).toHaveAttribute("href", "/matches/m1");
 });
 
+// Vorfälle (D.5, #1619): Map in Klärung, Serie feststellen, fehlende Map - je mit Satz und Weg zur Matchseite.
+test("Vorfälle: Map in Klärung und Serie feststellen stehen zuerst", () => {
+  const incident_reviews = [
+    { match_id: "m3", title: "Liga · Staffel A", label: "Spieltag 4", code: "in_review", position: 2, url: "/matches/m3#vorfaelle" },
+    { match_id: "m4", title: "Liga · Staffel A", label: "Spieltag 5", code: "unsettled", position: 1, url: "/matches/m4#vorfaelle" },
+    { match_id: "m5", title: "Liga · Staffel B", label: "Spieltag 5", code: "missing", position: 3, url: "/matches/m5#vorfaelle" },
+  ];
+  expect(hasDutyAttention({ incident_reviews })).toBe(true);
+  render(<MemoryRouter><DutyAttention duty={{ ...DUTY, incident_reviews }} /></MemoryRouter>);
+  expect(screen.getByTestId("duty-attention").firstChild).toBe(screen.getByTestId("duty-incident-m3"));
+  expect(screen.getByTestId("duty-incident-m3")).toHaveTextContent("Map in Klärung: Spieltag 4");
+  expect(screen.getByTestId("duty-incident-m3")).toHaveTextContent("Map 2 ist in Klärung");
+  expect(screen.getByTestId("duty-incident-open-m3")).toHaveTextContent("Entscheiden");
+  expect(screen.getByTestId("duty-incident-open-m3")).toHaveAttribute("href", "/matches/m3#vorfaelle");
+  expect(screen.getByTestId("duty-incident-m4")).toHaveTextContent("Serie feststellen: Spieltag 5");
+  expect(screen.getByTestId("duty-incident-m4")).toHaveTextContent("Jetzt die Serie feststellen");
+  expect(screen.getByTestId("duty-incident-m5")).toHaveTextContent("fehlt noch Map 3");
+});
+
 test("ohne Fälle nichts", () => {
-  expect(hasDutyAttention({ ended_live: [], overdue_matches: [], rules_pending: [], checkin_proposals: [] })).toBe(false);
+  expect(hasDutyAttention({ ended_live: [], overdue_matches: [], rules_pending: [], checkin_proposals: [], incident_reviews: [] })).toBe(false);
   expect(hasDutyAttention({ checkin_proposals: [{ match_id: "m2" }] })).toBe(true);
   expect(hasDutyAttention(null)).toBe(false);
   const { container } = render(<MemoryRouter><DutyAttention duty={{}} /></MemoryRouter>);

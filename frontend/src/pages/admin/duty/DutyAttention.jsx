@@ -3,13 +3,20 @@
 // selbst) und überfällige Liga-Spiele (nie gemeldet, Termin lange vorbei). Steht auf „Mein Dienst“ und oben auf der Startseite der
 // Verwaltung, mit direktem Weg.
 import { Link } from "react-router-dom";
-import { AlarmClock, ArrowRight, ClipboardX, Flag, ScrollText } from "lucide-react";
+import { AlarmClock, ArrowRight, ClipboardX, Flag, Scale, ScrollText } from "lucide-react";
 import { endedLiveText } from "@/lib/endedLive";
 import { shortWhen } from "@/lib/leagueSchedule";
 
 export function hasDutyAttention(duty) {
   return Boolean((duty?.ended_live || []).length || (duty?.overdue_matches || []).length || (duty?.rules_pending || []).length
-    || (duty?.checkin_proposals || []).length);
+    || (duty?.checkin_proposals || []).length || (duty?.incident_reviews || []).length);
+}
+
+/** Vorfälle (D.5, #1619): der Satz zu einem Spiel, in dem die Leitung entscheiden oder die Serie feststellen muss. */
+export function incidentReviewText(row) {
+  if (row.code === "in_review") return `Map ${row.position} ist in Klärung: Die Seiten sind sich nicht einig. Nachweise ansehen und entscheiden – bis dahin gilt kein Ergebnis.`;
+  if (row.code === "missing") return `Laut Feststellung fehlt noch Map ${row.position}. Sobald sie gespielt und gemeldet ist, die Serie erneut feststellen.`;
+  return `Über den Vorfall zu Map ${row.position} ist entschieden. Jetzt die Serie feststellen – erst dann gilt ein Ergebnis.`;
 }
 
 /** Der Satz zur Freigabe: was sich geändert hat oder dass ein Entwurf wartet. */
@@ -27,9 +34,23 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
   const overdue = duty?.overdue_matches || [];
   const rules = duty?.rules_pending || [];
   const proposals = duty?.checkin_proposals || [];
-  if (!ended.length && !overdue.length && !rules.length && !proposals.length) return null;
+  const incidents = duty?.incident_reviews || [];
+  if (!ended.length && !overdue.length && !rules.length && !proposals.length && !incidents.length) return null;
   return (
     <ul className="space-y-2" data-testid={testId}>
+      {/* Vorfälle (D.5, #1619) zuerst: Sie halten ein laufendes Spiel auf. */}
+      {incidents.map((row) => (
+        <li key={`incident-${row.match_id}`} className="rounded-sm border border-warn/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-incident-${row.match_id}`} data-code={row.code}>
+          <Scale className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">{row.code === "in_review" ? "Map in Klärung" : "Serie feststellen"}: {row.label}</div>
+            <div className="mt-1 text-sm text-white/70 [overflow-wrap:anywhere]">{row.title} · {incidentReviewText(row)}</div>
+          </div>
+          <Link to={row.url} data-testid={`duty-incident-open-${row.match_id}`} className={BUTTON}>
+            {row.code === "in_review" ? "Entscheiden" : "Spiel öffnen"} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </li>
+      ))}
       {rules.map((row) => (
         <li key={`rules-${row.season_id}`} className="rounded-sm border border-warn/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-rules-${row.season_id}`} data-kind={row.kind}>
           <ScrollText className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
