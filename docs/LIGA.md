@@ -2671,8 +2671,16 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 | `resolved_at`, `resolved_by`, `decision`, `decision_note` | wie bisher | Entscheidung: `keep` \| `change`; `decision_note` ist bei neuen Einträgen Pflicht (mindestens zehn Zeichen) |
 | `appeal_until` | ISO | Ende der Einspruchsfrist, gesetzt mit der Entscheidung (`appeal_hours`) |
 | `against` | `{type, ref_id}` | nur `appeal`: `protest_decision` (Kennung des Verfahrens), `forfeit` oder `correction` (Kennung des Spiels) |
-| `incident_id` | str \| null | das Verfahren folgt aus diesem Vorfall (`incidents[].id`); ein MOSS-Nachweis am Vorfall bleibt dann bis zum Ende dieses Verfahrens |
+| `incident_id` | str \| null | das Verfahren folgt aus diesem Vorfall (`incidents[].id` **desselben Spiels**); ein MOSS-Nachweis am Vorfall bleibt dann bis zum Ende dieses Verfahrens. Wer es setzt, steht unter „Verfahren aus einem Vorfall“ |
 
+- **Verfahren aus einem Vorfall** (`incident_id`): Beim Einreichen wählt die Seite, ob die Beanstandung bzw. der Protest einen
+  Vorfall dieses Spiels betrifft (Auswahl aus `incidents[]`, freiwillig; betrifft der gewählte Grund eine Map mit Vorfall, schlägt
+  das Formular ihn vor). E.2 schreibt die Kennung dann als `incident_id` in den Eintrag. Solange das Verfahren offen ist, darf die
+  Leitung (`disputes`, nicht befangen) die Zuordnung nachtragen oder ändern, mit Protokoll (`match.procedure.amend`, alter und
+  neuer Wert); nach der Entscheidung bleibt sie stehen. **Der Server prüft bei jedem Schreiben, dass es den Vorfall am selben Spiel
+  gibt** - sonst 422 („Diesen Vorfall gibt es an diesem Spiel nicht.“), eine Kennung eines anderen Spiels wird nie gespeichert. Ein
+  Einspruch (`appeal`) trägt kein eigenes `incident_id`, er hängt über `against.ref_id` am Verfahren. Gelesen wird das Feld von
+  der Aufbewahrung (`match_proof_refs`, MOSS am Vorfall) und von der Matchseite (Vorfall und Verfahren zeigen aufeinander).
 - **Anzahl** (Nr. 134): je Seite und Spiel ein offenes Verfahren; die Seite ergänzt es bis `evidence_until`. Die Gegenseite kann ein
   eigenes eröffnen.
 - **Beginn der Protestfrist** (Nr. 63, 129): Bestätigung des Ergebnisses, von Hand oder nach Frist. „Spielwochenende“ und „nächstes Spiel
@@ -2782,7 +2790,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
 | Teil | D.5 | E.2 |
 | --- | --- | --- |
 | Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
-| Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei |
+| Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei; `disputes[].incident_id` setzen, wenn ein Verfahren aus einem Vorfall entsteht, samt Prüfung „Vorfall am selben Spiel“ (422) |
 | Zeit-Job | `answer_deadline` → `in_review` | Erinnerung und Eskalation zur Zielfrist, Ablauf der Stellungnahme |
 | Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“, `pause_series` | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |
 
@@ -2797,6 +2805,8 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
 - Benachrichtigungen: beide nutzen die Art `match_attention` und „Mein Dienst“. D.5: `incident:<id>`, E.2: `procedure:<id>` als
   Schlüssel gegen doppelte Meldungen.
 - `league_presets.PRESETS`, `SYNC_GROUPS`, `seasonTabs.js`: jeder ergänzt nur seine Zeilen bzw. seine Gruppe.
+- `disputes[].incident_id`: E.2 schreibt und prüft es, D.5 liest es nur (Matchseite: „dazu läuft ein Verfahren“). Wird D.5 zuerst
+  gemergt, zeigt es den Hinweis erst, sobald E.2 das Feld füllt; ohne Feld verhält sich alles wie ohne Verfahren.
 - Nachweise: beide benutzen `match_proofs` und den Frontend-Baustein `ProofList` unverändert; fehlt etwas, kommt es als eigener Commit
   in den Baustein, nicht als Kopie.
 
