@@ -65,7 +65,7 @@ export function AutoBannerStats({ kind, refId }) {
     <div className="-mt-1 pl-5 text-xs text-white/50" data-testid={`auto-banner-stats-${kind}`}>
       <div>{autoBannerNumbers(data.total)}</div>
       {items.length > 1 && items.map((item) => (
-        <div key={item.id} className="text-white/40">
+        <div key={item.id} className="text-white/50">
           {autoBannerTemplateLabel(kind, item.template)}: {autoBannerNumbers({ impressions: item.stats?.impressions, clicks: item.stats?.clicks })}
         </div>
       ))}
