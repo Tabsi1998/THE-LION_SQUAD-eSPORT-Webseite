@@ -181,7 +181,7 @@ PERSONAL: dict[str, Entry] = {
     "match_proof_photos": Entry(DELETED, ("match_proof_photos",), note=(
         "Ausnahme (#2360, DSGVO Art. 17 Abs. 3 lit. e): ein MOSS-Nachweis in einem laufenden Vorfall oder Verfahren bleibt ohne "
         "Kennung der Person nur für die Liga-Leitung, bis das Verfahren samt Einspruchsfrist abgeschlossen ist - dann löscht ihn "
-        "der Job proof_photo_retention")),
+        "der Job proof_photo_retention; die Einträge der Bildprüfung (media_scans, kind proof) gehen denselben Weg")),
     "tournament_staff_assignments": Entry(DELETED, ("tournament_staff",)),
     "league_staff": Entry(DELETED, ("league_staff",)),
     "f1_staff_assignments": Entry(DELETED, ("f1_staff",)),
