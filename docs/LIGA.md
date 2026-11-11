@@ -2608,7 +2608,7 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
 | `answer` | `{registration_id, user_id, at, note}` \| null | Antwort der Gegenseite |
 | `review_cause` | `rejected` \| `expired` | warum die Leitung entscheidet |
 | `counts_quota` | bool | zählt gegen das Kontingent: `rehost` und `pause` (ohne `between_maps`) ja, `moss_crash` nie (§ 9a.6), alle anderen nein |
-| `decision` | `{outcome, registration_id, reason, by, at, conflict_reason}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen) |
+| `decision` | `{outcome, registration_id, reason, by, at, conflict_reason, missing_positions, surplus_positions}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen); `missing_positions` und `surplus_positions` (`[int]`, optional) siehe „Keine Zusatz-Map auf Vorrat“ |
 | `voided` | `{mode, map_id, score, round, at}` \| null | die für ungültig erklärte Erstaustragung bei `restart` oder `replay` |
 | `closed_at` | ISO \| null | gesetzt mit `agreed`, `decided` oder `withdrawn` |
 
@@ -2634,6 +2634,18 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
   oder zugesprochen (`awarded` → `games[].decision: "awarded"`). `pause_series`: keine weitere Map beginnt, Meldungen mit einer
   späteren Position lehnt der Server mit 409 ab, bis entschieden ist. Die Leitung kann die Serie in beiden Fällen jederzeit aussetzen
   oder neu ansetzen (Anlage C.2.6).
+- **Keine Zusatz-Map auf Vorrat** (Entscheidung Fabian 11.11.): Unter Vorbehalt wird die Serie so weitergespielt, als gälte die Map in
+  Klärung wie gemeldet. Niemand spielt vorsorglich eine Map mehr, das System verlangt keine und nimmt keine an (Best of bleibt die
+  Obergrenze der Positionen). Die Entscheidung der Leitung kann die Serie in zwei Richtungen verändern:
+  - **Es fehlt eine Map** (die Map in Klärung dreht oder fällt weg, die Serie ist dadurch nicht entschieden): Die Leitung setzt die
+    fehlende Map an. Sie steht in der Entscheidung (`decision.missing_positions: [int]`), das Spiel bleibt bis zu ihrer Meldung
+    offen (kein gültiges Ergebnis, nicht in der Tabelle); angesetzt und gemeldet wird sie auf dem üblichen Weg (Termin, Melden,
+    Bestätigen).
+  - **Es ist eine Map überzählig** (die Serie war nach der Entscheidung schon vorher entschieden, im Modus `continue` wurde aber
+    weitergespielt): Die überzähligen Maps **zählen nicht**. Die Leitung vermerkt das in der Entscheidung
+    (`decision.surplus_positions: [int]`, im Pflichttext `reason` begründet); diese Positionen kommen nicht in `games[]`, stehen
+    also in keiner Tabelle und keiner Map-Differenz, und die Matchseite zeigt sie wie nicht gespielte Positionen mit dem Hinweis
+    „zählt nicht (Entscheidung der Leitung)“. Es bleibt bei der Regel „keine Map nach der Entscheidung der Serie“ (C.3).
 
 #### Verfahren: Beanstandung, Protest, Einspruch (E.2)
 
