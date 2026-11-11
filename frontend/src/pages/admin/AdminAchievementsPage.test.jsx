@@ -15,7 +15,7 @@ const authState = { areas: [] };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "admin" }, can: (...wanted) => wanted.some((area) => authState.areas.includes(area)) }) }));
 
 const { default: AdminAchievementsPage, TABS } = await import("./AdminAchievementsPage");
-const { allowedMaterials, retiredState, slugFrom } = await import("./achievements/CatalogTab");
+const { allowedMaterials, retiredPayload, retiredState, slugFrom } = await import("./achievements/CatalogTab");
 const { parseNames, toIso } = await import("./achievements/AwardTab");
 
 const GROUPS = [
@@ -202,7 +202,25 @@ describe("Katalog", () => {
     fireEvent.change(reason, { target: { value: "Das Format gibt es nicht mehr. " } });
     fireEvent.submit(screen.getByTestId("group-sheet"));
     await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/achievements/groups/matches_played",
-      expect.objectContaining({ retired: true, retired_reason: "Das Format gibt es nicht mehr.", available_until: null })));
+      expect.objectContaining({ retired: true, retired_reason: "Das Format gibt es nicht mehr." })));
+    // Review M2: ein unverändertes leeres „erreichbar bis“ geht nicht mit.
+    expect(apiMock.patch.mock.calls.at(-1)[1]).not.toHaveProperty("available_until");
+  });
+
+  it("schickt beim Speichern der Beschreibung nichts zu „nicht mehr erreichbar“ mit (Review M2)", async () => {
+    const groups = [{ ...GROUPS[2], code: "pioneer", available_until: null, retired_reason: null }, ...GROUPS.slice(0, 2)];
+    apiMock.get.mockImplementation((url) => (url === "/admin/achievements/groups" ? Promise.resolve({ data: groups }) : routeGet(url)));
+    renderAt("catalog");
+    fireEvent.click(await screen.findByTestId("group-edit-pioneer"));
+    fireEvent.change(await screen.findByTestId("group-description"), { target: { value: "Neu beschrieben." } });
+    fireEvent.submit(screen.getByTestId("group-sheet"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+    const sent = apiMock.patch.mock.calls.at(-1)[1];
+    expect(sent.description).toBe("Neu beschrieben.");
+    for (const key of ["retired", "retired_reason", "available_until"]) expect(sent).not.toHaveProperty(key);
+    // Gegenprobe: wer das Datum wirklich leert, schickt es mit.
+    expect(retiredPayload({ retired: false, retired_reason: "Vorbei.", available_until: "" }, { available_until: "2026-03-01T10:00:00+00:00", retired_reason: "Vorbei." }))
+      .toEqual({ available_until: null });
   });
 
   it("zeigt nicht mehr Erreichbares und ein künftiges „erreichbar bis“ in der Liste (#2339)", async () => {

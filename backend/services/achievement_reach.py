@@ -161,22 +161,46 @@ PIONEER_REASON = "Nur die ersten hundert Konten der Plattform – die Plätze si
 # dem Datum entstanden sind - Altansprüche (das 40. Konto, das nie ausgewertet wurde) bekommen den Erfolg weiter.
 # Gruppe → Feld am Konto. Für alle anderen Gruppen sperrt das Datum jede automatische Vergabe ab dann.
 CLAIM_DATE_FIELDS: dict[str, str] = {PIONEER_GROUP: "created_at"}
+# Hat die Verwaltung „nicht mehr erreichbar“ selbst gesetzt oder geleert (Admin oder Import), merkt sich die Gruppe bzw.
+# Stufe das - keine Regel überschreibt es dann (Review M2).
+MANUAL_FLAG = "retired_manual"
+PIONEER_RULE_FLAG = "pioneer_rule_applied"
 
 
 async def apply_rules(db) -> None:
     """Regeln, die sich aus den Daten ergeben (Seed): Pionier bekommt ``available_until``, sobald es das hundertste Konto
-    gibt. Einmal gesetzt, bleibt der Wert - auch wenn die Verwaltung ihn später leert."""
-    group = await db.achievement_groups.find_one({"code": PIONEER_GROUP}, {"_id": 0, "code": 1, "available_until": 1})
-    if not group or "available_until" in group:
+    gibt - einmal (Merker ``pioneer_rule_applied``) und nie gegen eine Entscheidung der Verwaltung (``retired_manual``)."""
+    group = await db.achievement_groups.find_one({"code": PIONEER_GROUP}, {"_id": 0, "code": 1, PIONEER_RULE_FLAG: 1, MANUAL_FLAG: 1})
+    if not group or group.get(PIONEER_RULE_FLAG) or group.get(MANUAL_FLAG):
         return
     rows = await db.users.find({"created_at": {"$nin": [None, ""]}}, {"_id": 0, "created_at": 1}).sort("created_at", 1).skip(PIONEER_ACCOUNTS - 1).limit(1).to_list(1)
     if not rows:
         return
     stamp = rows[0]["created_at"]
     await db.achievement_groups.update_one(
-        {"code": PIONEER_GROUP, "available_until": {"$exists": False}},
-        {"$set": {"available_until": stamp.isoformat() if isinstance(stamp, datetime) else str(stamp), "retired_reason": PIONEER_REASON}},
+        {"code": PIONEER_GROUP, PIONEER_RULE_FLAG: {"$ne": True}, MANUAL_FLAG: {"$ne": True}},
+        {"$set": {"available_until": stamp.isoformat() if isinstance(stamp, datetime) else str(stamp), "retired_reason": PIONEER_REASON,
+                  PIONEER_RULE_FLAG: True}},
     )
+
+
+def retired_changes(current: dict | None, updates: dict) -> bool:
+    """Ändert ``updates`` etwas an „nicht mehr erreichbar“? (Verwaltung und Import - dann gilt ``retired_manual``.) Ein
+    mitgeschicktes ``available_until: null`` bei leerem Feld ist keine Änderung."""
+    current = current or {}
+    for key in RETIRED_FIELDS:
+        if key not in updates:
+            continue
+        old, new = current.get(key), updates.get(key)
+        if key == "retired":
+            old, new = bool(old), bool(new)
+        elif key == "available_until":
+            old, new = parse_when(old), parse_when(new)
+        else:
+            old, new = (str(old or "").strip() or None), (str(new or "").strip() or None)
+        if old != new:
+            return True
+    return False
 
 
 async def load_catalog(db) -> tuple[dict[str, dict], dict[str, dict]]:

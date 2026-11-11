@@ -147,7 +147,8 @@ test.describe("Admin-Katalog: nicht mehr erreichbar (#2339)", () => {
       await testInfo.attach(`admin-katalog-retired-${width}.png`, { body: shot, contentType: "image/png" });
       await page.getByTestId("group-save").click();
       await expect.poll(() => calls.length).toBe(WIDTHS.indexOf(width) + 1);
-      expect(calls[calls.length - 1]).toEqual({ path: "/admin/achievements/groups/pole", body: expect.objectContaining({ retired: true, retired_reason: "Wird nicht mehr gefahren.", available_until: null }) });
+      expect(calls[calls.length - 1]).toEqual({ path: "/admin/achievements/groups/pole", body: expect.objectContaining({ retired: true, retired_reason: "Wird nicht mehr gefahren." }) });
+      expect(calls[calls.length - 1].body).not.toHaveProperty("available_until");
     }
   });
 });

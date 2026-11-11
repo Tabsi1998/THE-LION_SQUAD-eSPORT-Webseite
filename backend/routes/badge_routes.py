@@ -330,8 +330,9 @@ RETIRED_REASON_MISSING = "Bitte einen Grund angeben, warum der Erfolg nicht mehr
 
 def _retired_updates(current: dict, updates: dict) -> dict:
     """„Nicht mehr erreichbar“ (#2339) prüfen: Datum lesbar (gespeichert als ISO, UTC), Grund Pflicht, sobald das Kennzeichen
-    oder ein Datum gilt. Ohne Kennzeichen und Datum fällt der Grund weg."""
-    from services.achievement_reach import parse_when
+    oder ein Datum gilt. Ohne Kennzeichen und Datum fällt der Grund weg. Ändert sich wirklich etwas, merkt sich die Gruppe
+    bzw. Stufe die Entscheidung der Verwaltung (``retired_manual``) - die Pionier-Regel überschreibt sie dann nicht."""
+    from services.achievement_reach import MANUAL_FLAG, parse_when, retired_changes
 
     if "available_until" in updates:
         raw = str(updates.get("available_until") or "").strip()
@@ -350,6 +351,8 @@ def _retired_updates(current: dict, updates: dict) -> dict:
             raise HTTPException(400, RETIRED_REASON_MISSING)
     elif any(key in updates for key in ("retired", "available_until")):
         updates["retired_reason"] = None
+    if retired_changes(current, updates):
+        updates[MANUAL_FLAG] = True
     return updates
 
 

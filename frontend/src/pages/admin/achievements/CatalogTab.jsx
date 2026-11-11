@@ -111,8 +111,24 @@ function retiredForm(doc) {
   return { retired: Boolean(doc?.retired), retired_reason: doc?.retired_reason || "", available_until: toDateTimeLocalInput(doc?.available_until) };
 }
 
-function retiredPayload(form) {
-  return { retired: Boolean(form.retired), retired_reason: form.retired_reason.trim() || null, available_until: fromDateTimeLocal(form.available_until) };
+const RETIRED_KEYS = ["retired", "retired_reason", "available_until"];
+
+/**
+ * Was am Formular für „nicht mehr erreichbar“ wirklich geändert wurde (Review M2) - nur das geht an den Server. Ein
+ * unverändertes leeres „erreichbar bis“ schickt kein ``null``: Sonst gälte schon das Speichern einer Beschreibung als
+ * Entscheidung der Verwaltung.
+ */
+export function retiredPayload(form, original) {
+  const before = retiredForm(original);
+  const out = {};
+  if (Boolean(form.retired) !== before.retired) out.retired = Boolean(form.retired);
+  if (form.retired_reason.trim() !== before.retired_reason.trim()) out.retired_reason = form.retired_reason.trim() || null;
+  if (form.available_until !== before.available_until) out.available_until = fromDateTimeLocal(form.available_until);
+  return out;
+}
+
+function withoutRetired(form) {
+  return Object.fromEntries(Object.entries(form).filter(([key]) => !RETIRED_KEYS.includes(key)));
 }
 
 /** Katalog (E10): Gruppen je Kategorie mit ihren Stufen, Bearbeiten, Prüfung, Export und Import. */
@@ -455,7 +471,7 @@ function GroupForm({ group, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, art: form.art || null, ...retiredPayload(form) };
+      const payload = { ...withoutRetired(form), art: form.art || null, ...retiredPayload(form, group) };
       if (isNew) await api.post("/admin/achievements/groups", payload);
       else { delete payload.code; await api.patch(`/admin/achievements/groups/${group.code}`, payload); }
       toast.success("Gespeichert"); onSaved(); onClose();
@@ -514,7 +530,7 @@ function TierForm({ tier, group, siblings, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, art: form.art || null, points: form.points === "" ? null : Number(form.points), ...retiredPayload(form) };
+      const payload = { ...withoutRetired(form), art: form.art || null, points: form.points === "" ? null : Number(form.points), ...retiredPayload(form, tier) };
       if (form.manual_only) { payload.condition_key = null; payload.progress_target = null; }
       if (payload.points === null) delete payload.points;
       if (isNew) await api.post("/admin/achievements/tiers", { ...payload, group_code: group.code });

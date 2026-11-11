@@ -264,6 +264,63 @@ async def test_pionier_altanspruch_bleibt_nach_dem_hundertsten_konto(flow):
     assert not await flow.db.user_achievements.find_one({"user_id": "u38", "tier_code": "pioneer_1"})
 
 
+async def _accounts(flow, count: int, *, offset: int = 0):
+    start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    await flow.db.users.insert_many([{"id": f"a{i}", "username": f"a{i}", "created_at": (start + timedelta(hours=i)).isoformat()}
+                                     for i in range(offset, offset + count)])
+
+
+@pytest.mark.asyncio
+async def test_pionier_regel_bleibt_aktiv_wenn_die_verwaltung_nur_die_beschreibung_speichert(flow):
+    """Review M2: eigener Merker statt „das Feld steht da“; nur eine echte Änderung ist eine Entscheidung der Verwaltung."""
+    admin = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(admin)
+    await _accounts(flow, 50)
+    res = await flow.patch("/api/admin/achievements/groups/pioneer", json={"description": "Eines der ersten hundert Konten - neu."})
+    assert res.status_code == 200, res.text
+    # Auch ein alter Client, der ein leeres Datum mitschickt, ändert nichts.
+    res = await flow.patch("/api/admin/achievements/groups/pioneer", json={"available_until": None})
+    assert res.status_code == 200 and not res.json().get("retired_manual")
+    await _accounts(flow, 50, offset=50)
+    await badges.seed_badges()
+    group = await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0})
+    assert group["available_until"] and group["pioneer_rule_applied"] is True and not group.get("retired_manual")
+
+    # Bewusst geleert: gemerkt, und ein Neustart setzt das Datum nicht wieder.
+    res = await flow.patch("/api/admin/achievements/groups/pioneer", json={"available_until": None})
+    assert res.status_code == 200 and res.json()["retired_manual"] is True and res.json()["available_until"] is None
+    await badges.seed_badges()
+    assert (await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0}))["available_until"] is None
+
+
+@pytest.mark.asyncio
+async def test_pionier_regel_weicht_einer_entscheidung_der_verwaltung(flow):
+    admin = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(admin)
+    await _accounts(flow, 10)
+    res = await flow.patch("/api/admin/achievements/groups/pioneer", json={"available_until": "2030-01-01T00:00:00Z", "retired_reason": "Bis 2030."})
+    assert res.status_code == 200 and res.json()["retired_manual"] is True
+    await _accounts(flow, 95, offset=10)
+    await badges.seed_badges()
+    assert (await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0}))["available_until"] == "2030-01-01T00:00:00+00:00"
+    # Gegenprobe: ohne Entscheidung der Verwaltung greift die Regel.
+    await flow.db.achievement_groups.update_one({"code": "pioneer"}, {"$unset": {"retired_manual": "", "available_until": ""}})
+    await badges.seed_badges()
+    assert (await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0}))["available_until"] == "2025-01-05T03:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_import_merkt_eine_geaenderte_entscheidung(flow):
+    admin = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(admin)
+    payload = {"groups": [{"code": "pioneer", "available_until": None, "name": "Pionier"},
+                          {"code": "pole", "retired": True, "retired_reason": "Test."}], "tiers": []}
+    res = await flow.post("/api/admin/achievements/catalog/import", json=payload)
+    assert res.status_code == 200 and res.json()["applied"] is True, res.text
+    assert not (await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0})).get("retired_manual"), "leer bleibt leer"
+    assert (await flow.db.achievement_groups.find_one({"code": "pole"}, {"_id": 0}))["retired_manual"] is True
+
+
 # ------------------------------------------------------------------ 2. und 4. Kategorie-Meister und Meta-Erfolge
 
 

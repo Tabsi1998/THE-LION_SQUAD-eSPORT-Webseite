@@ -16,6 +16,7 @@ from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, ann
 from achievement_catalog.validate import validate_catalog
 from models import new_id, now_utc
 from services import achievement_visibility as visibility
+from services.achievement_reach import MANUAL_FLAG, retired_changes
 
 logger = logging.getLogger("tls.achievements.admin")
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -151,16 +152,23 @@ async def import_catalog(db, payload: dict, actor: dict | None, *, dry_run: bool
     merged_groups = dict(existing_groups)
     for g in incoming_groups:
         base = dict(existing_groups.get(g["code"]) or {"code": g["code"], "id": g["code"], "is_admin_created": True, "public": True, "is_special": False, "is_negative": False})
+        # Ändert der Import „nicht mehr erreichbar“, ist das eine Entscheidung der Verwaltung (Review M2) - wie im Admin.
+        manual = retired_changes(base, g)
         for key in GROUP_FIELDS:
             if key in g:
                 base[key] = g[key]
+        if manual:
+            base[MANUAL_FLAG] = True
         merged_groups[g["code"]] = base
     merged_tiers = dict(existing_tiers)
     for t in incoming_tiers:
         base = dict(existing_tiers.get(t["code"]) or {"code": t["code"], "id": t["code"]})
+        manual = retired_changes(base, t)
         for key in TIER_FIELDS:
             if key in t:
                 base[key] = t[key]
+        if manual:
+            base[MANUAL_FLAG] = True
         group = merged_groups.get(base.get("group_code"))
         merged_tiers[t["code"]] = annotate_tier(base, group) if group else base
     report = validate_catalog(list(merged_groups.values()), list(merged_tiers.values()), CONDITION_KEY_STATUS)
