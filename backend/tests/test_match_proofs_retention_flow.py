@@ -209,9 +209,10 @@ async def test_tournaments_keep_their_thirty_days_from_upload(flow):
              "slots": [{"slot": 1, "registration_id": registrations[0]["id"]}, {"slot": 2, "registration_id": registrations[1]["id"]}]}
     await flow.db.matches_v2.insert_one(dict(match))
     flow.act_as(users[0])
-    added = await add_link(flow, match)
-    assert added.status_code == 200, added.text
-    assert (await add_link(flow, match, "moss", "verfahren-1")).status_code == 404, "ohne Verfahren kein MOSS"
+    # Der alte Weg: ein Foto, das mit der Meldung abgeschickt wurde.
+    await flow.db.match_proof_photos.insert_one({"id": "foto-1", "match_id": match["id"], "tournament_id": tournament["id"],
+                                                 "owner_id": users[0]["id"], "status": "attached", "context": {"kind": "report"},
+                                                 "created_at": now_utc().isoformat()})
     assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(days=29)) == 0
     await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"status": "disputed"}})
     assert await match_proof_retention.purge(flow.db, now=now_utc() + timedelta(days=31)) == 0

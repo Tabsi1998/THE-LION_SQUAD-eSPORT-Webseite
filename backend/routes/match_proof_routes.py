@@ -6,7 +6,7 @@ dieses Turniers (services/match_proofs.can_see) - alle anderen bekommen 404.
 
 ``/proof-photos`` ist der alte Weg (ein Foto, das mit der Meldung oder dem Problem abgeschickt wird). ``/proofs`` hängt
 mehrere Bilder und Video-Links an einen Bezug (Meldung, Vorfall, Protest, Stellungnahme, MOSS - docs/LIGA.md,
-„D.5/E.2-Vertrag“).
+„D.5/E.2-Vertrag“) - nur bei Spielen einer Liga-Staffel, sonst 404.
 """
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse

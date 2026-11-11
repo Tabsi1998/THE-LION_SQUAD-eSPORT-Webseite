@@ -2717,6 +2717,8 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
   dazu `url`, `width`, `height`, `scan_state`, ein Link `link`. `POST /api/matches/{id}/proofs` (Formular: `kind`, `ref_id` und entweder
   `file` oder `link`) antwortet mit dem Eintrag, `DELETE /api/matches/{id}/proofs/{proof_id}` mit `{ok}`. Bilder liefert weiter
   `GET /api/matches/{id}/proof-photos/{id}` aus. Die Logik zum Bezug steht in `services/match_proof_refs.py` (ohne Datenbank).
+  Die drei `/proofs`-Endpunkte gibt es **nur für Spiele einer Liga-Staffel**; bei jedem anderen Spiel antworten sie mit 404.
+  Turniere bleiben beim einen Foto je Meldung über `/proof-photos`.
 - **Hinzufügen** darf, wer für eine Seite des Spiels handelt (Captain, Vertreter, wer angemeldet hat), solange der Bezug offen ist:
   `report` bis das Ergebnis gilt, `incident` solange der Vorfall offen ist, `protest` nur die einreichende Seite bis `evidence_until`,
   `statement` nur die Gegenseite bis `statement.due_at`, `moss` jedes Mitglied einer Seite (der Spieler lädt selbst hoch). Die Leitung

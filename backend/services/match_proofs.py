@@ -276,7 +276,11 @@ def setting(tournament: dict | None, season: dict | None, key: str) -> int:
 
 
 async def resolve_ref(db, match: dict, kind: str, ref_id: str) -> refs.Ref:
+    """Der Bezug am Spiel. Mehrere Nachweise je Bezug gibt es nur in einer Liga-Staffel - Turniere bleiben beim einen Foto je
+    Meldung (``/proof-photos``), dort antworten Auflisten, Hinzufügen und Entfernen mit 404."""
     tournament, season = await _settings(db, match)
+    if tournament is None:
+        raise HTTPException(status_code=404, detail="Nachweise nicht gefunden")
     return refs.resolve(match, kind, ref_id, appeal_hours=setting(tournament, season, "appeal_hours"))
 
 

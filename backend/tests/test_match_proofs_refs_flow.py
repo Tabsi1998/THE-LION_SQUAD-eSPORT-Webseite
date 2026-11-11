@@ -271,6 +271,29 @@ async def test_remove_only_your_own_and_only_while_the_reference_is_open(flow):
 
 
 @pytest.mark.asyncio
+async def test_tournaments_outside_a_league_have_no_proof_list(flow):
+    """Turniere bleiben, wie sie sind (Review #2360, M3): ein Foto je Meldung über ``/proof-photos`` - ``/proofs`` gibt es dort nicht."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, users, registrations = await flow.with_participants(2)
+    match = {"id": "pokal-1", "tournament_id": tournament["id"], "match_type": "duel", "status": "scheduled",
+             "slots": [{"slot": 1, "registration_id": registrations[0]["id"]}, {"slot": 2, "registration_id": registrations[1]["id"]}]}
+    await flow.db.matches_v2.insert_one(dict(match))
+    for person in (users[0], staff):
+        flow.act_as(person)
+        codes = [(await add_link(flow, match)).status_code, (await add_image(flow, match)).status_code,
+                 (await add_link(flow, match, "moss", "verfahren-1")).status_code, (await listed(flow, match)).status_code]
+        assert codes == [404, 404, 404, 404], person["display_name"]
+    assert await flow.db.match_proof_photos.count_documents({}) == 0
+    # Der alte Weg bleibt: ein Foto hochladen, das mit der Meldung mitgeht.
+    flow.act_as(users[0])
+    photo = await flow.post(f"/api/matches/{match['id']}/proof-photos", files={"file": ("ergebnis.jpg", picture(), "image/jpeg")})
+    assert photo.status_code == 200, photo.text
+    gone = await flow.delete(f"/api/matches/{match['id']}/proofs/{photo.json()['id']}")
+    assert gone.status_code == 404 and await flow.db.match_proof_photos.count_documents({}) == 1
+
+
+@pytest.mark.asyncio
 async def test_old_photos_keep_working_and_show_up_in_the_list(flow):
     """Altbestand: das eine Foto zur Meldung (``photo_id``) läuft unverändert weiter und steht in der Liste - ohne Entfernen."""
     w = await league_world(flow)
