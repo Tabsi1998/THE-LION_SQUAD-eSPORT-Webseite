@@ -15,14 +15,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
-from league_match_world import duel  # noqa: E402
+from league_match_world import checked_in, duel  # noqa: E402
 from league_rules_world import publish  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import league_rule_blocks, league_rules, league_veto, league_veto_sweep  # noqa: E402
 from test_league_veto_flow import (  # noqa: E402
-    ADMIN, ANLAGE_B, CTL, HP, SND, both_in, lead, mid, page, pick, play_anlage_b, season_world, step, stored_veto, tournament_of,
-    veto_block, veto_rules, veto_world,
+    ADMIN, ANLAGE_B, CTL, HP, SND, both_in, lead, mid, page, pick, play_anlage_b, pool_body, season_world, step, stored_veto,
+    tournament_of, veto_block, veto_rules, veto_world,
 )
 
 # Wie Anlage B, nur Map 3 (Kontrolle) gibt die Leitung je Spielwoche vor; davor sperrt Team A in Kontrolle eine Map.
@@ -563,6 +563,62 @@ async def test_the_weeks_say_which_are_over_or_have_a_veto_that_began(flow):
     weeks = ok(await flow.get(url))["weeks"]
     assert [(row["week"], row["past"], row["started"]) for row in weeks] == [
         (1, True, False), (2, True, False), (3, False, False), (4, False, True), (5, False, False), (6, False, True), (7, False, False)]
+
+
+async def waiting_match(flow, w: dict) -> dict:
+    """Ein Spiel am Spieltag 1 in der Staffel der Season, beide Seiten eingecheckt - der nächste Aufruf will das Veto beginnen."""
+    match = {"id": new_id(), "tournament_id": w["tid"], "match_type": "duel", "status": "scheduled", "round": 1, "matchday_number": 1,
+             "scheduled_at": now_utc().replace(microsecond=0).isoformat(),
+             "slots": [{"slot": 1, "status": "filled", "registration_id": new_id()}, {"slot": 2, "status": "filled", "registration_id": new_id()}]}
+    await flow.db.matches_v2.insert_one(dict(match))
+    await checked_in(flow, match["id"])
+    return match
+
+
+async def try_start(flow, w: dict, match: dict) -> dict:
+    tournament = await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0})
+    await league_veto.ensure_started(flow.db, await flow.reload(match), tournament)
+    return await flow.reload(match)
+
+
+@pytest.mark.asyncio
+async def test_a_changed_template_or_pool_also_tells_the_waiting_sides(flow):
+    """Review zu #2326: Nicht nur das Speichern der Vorgaben, auch eine geänderte Vorlage oder ein geänderter Pool kann ein wartendes Veto
+    startbar machen - dann erfahren es die Seiten genauso. Das Veto beginnt dadurch nie."""
+    w = await season_world(flow)
+    sid = w["season"]["id"]
+    ids = {name: row["id"] for name, row in w["maps"].items()}
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(WITH_PRESET)))
+    match = await waiting_match(flow, w)
+    stored = await try_start(flow, w, match)
+    assert "veto" not in stored["flow"] and stored["flow"]["veto_wait"]["week"] == 1 and not stored["flow"]["veto_wait"].get("ready_at")
+    # Die Leitung nimmt den Schritt „Vorgabe“ aus der Vorlage: Das wartende Spiel kann jetzt starten - die Antwort sagt, wie viele.
+    saved = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(ANLAGE_B)))
+    stored = await flow.reload(match)
+    assert saved["matches_ready"] == 1 and stored["flow"]["veto_wait"]["ready_at"] and "veto" not in stored["flow"]
+    assert await flow.db.audit_logs.count_documents({"action": "match.veto.ready"}) == 1
+    again = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(ANLAGE_B, step_seconds=90)))
+    assert again["matches_ready"] == 0, "je Spiel und Termin nur einmal"
+
+    # Pool: Die vorgegebene Map (Kai) fehlt im Pool der Staffel - das Spiel wartet. Kommt sie zurück, erfahren es die Seiten.
+    other = await season_world(flow)
+    oid = other["season"]["id"]
+    ids = {name: row["id"] for name, row in other["maps"].items()}
+    ok(await flow.put(f"{ADMIN}/seasons/{oid}/veto-rules", json=veto_rules(WITH_PRESET)))
+    ok(await flow.put(f"{ADMIN}/seasons/{oid}/veto-presets", json={"presets": [preset(1, ids["Kai"])]}))
+    small = {HP: ["Hafen", "Nebel", "Turm", "Glut"], SND: ["Nebel", "Turm", "Kai", "Werk"], CTL: ["Hafen", "Ruine"]}
+    ok(await flow.put(f"{ADMIN}/seasons/{oid}/map-pool", json=pool_body(other, small)))
+    ok(await flow.post(f"{ADMIN}/seasons/{oid}/sync", json={}))
+    game = await waiting_match(flow, other)
+    stored = await try_start(flow, other, game)
+    assert "veto" not in stored["flow"] and stored["flow"]["veto_wait"]["week"] == 1 and not stored["flow"]["veto_wait"].get("ready_at")
+    before = await flow.db.audit_logs.count_documents({"action": "match.veto.ready"})
+    full = {**small, CTL: ["Hafen", "Kai", "Ruine"]}
+    ok(await flow.put(f"{ADMIN}/seasons/{oid}/map-pool", json=pool_body(other, full)))
+    ok(await flow.post(f"{ADMIN}/seasons/{oid}/sync", json={}))
+    stored = await flow.reload(game)
+    assert stored["flow"]["veto_wait"]["ready_at"] and "veto" not in stored["flow"]
+    assert await flow.db.audit_logs.count_documents({"action": "match.veto.ready"}) == before + 1
 
 
 @pytest.mark.asyncio

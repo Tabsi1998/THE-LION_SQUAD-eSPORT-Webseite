@@ -40,6 +40,7 @@ from services import league_pool_check
 from services import league_readiness
 from services import league_service as leagues
 from services import league_veto
+from services import league_veto_sweep
 from services.league_permissions import (
     ANY,
     CAPABILITIES,
@@ -438,6 +439,8 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
     await _audit(db, "league.season.map_pool.save", me, season_id, {"version": doc["version"], "pool_id": doc["id"]})
     # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem neuen Pool nach.
     await league_veto.follow_pool(db, season, actor_id=me.get("id"))
+    # Vorgabe der Woche (#2326): Geht mit dem neuen Pool (oder der nachgezogenen Vorlage) ein wartendes Veto auf, erfahren es die Seiten.
+    await league_veto_sweep.announce_waiting(db, season_id)
     # Mindestgröße je Modus (#2207): nur Warnung - die Prüfung vor der Veröffentlichung nennt es als Problem.
     warnings = league_pool_check.pool_problems(season, await league_pool_check.divisions_of(db, season_id), doc, game)
     return {**map_pools.saved_view(doc, "league_season", admin=True), "warnings": warnings}
@@ -503,6 +506,8 @@ async def admin_season_pool_remove_map(season_id: str, body: LeagueMapRemove,
     if created:
         # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem kleineren Pool nach.
         await league_veto.follow_pool(db, fresh, actor_id=me.get("id"))
+    # Vorgabe der Woche (#2326): Der neue Pool steht schon an den Staffeln - passt ein wartendes Veto jetzt, erfahren es die Seiten.
+    await league_veto_sweep.announce_waiting(db, season_id)
     divisions = await league_pool_check.divisions_of(db, season_id)
     warnings = league_pool_check.pool_problems(fresh, divisions, doc, game)
     return {"pool": map_pools.saved_view(doc, "league_season", admin=True), "staffeln": results, "warnings": warnings,
@@ -634,6 +639,8 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league("s
     finally:
         # Auch nach einem Abbruch: was schon geschrieben ist, soll die Live-Meldung neu nachschlagen.
         reset_scope_cache()
+    # Vorgabe der Woche (#2326): Mit dem übertragenen Pool oder der Vorlage kann ein wartendes Veto jetzt starten - die Seiten erfahren es.
+    await league_veto_sweep.announce_waiting(db, season_id)
     return {"staffeln": results}
 
 

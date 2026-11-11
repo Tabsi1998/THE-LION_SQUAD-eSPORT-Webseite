@@ -2292,7 +2292,9 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
      Vorgabe jetzt passt, bekommen die Verantwortlichen **beider Seiten** (Captain, Vertreter – `responsible_user_ids`) „Vorgabe da –
      Veto kann starten“ (Art `match_call`, `meta.reason` `veto_preset_ready`, Schlüssel `veto-preset-ready:<spiel>:<termin>:<rev>`).
      Einmal je Spiel und Termin: `flow.veto_wait.ready_at` wird mit Bedingung gesetzt, Protokoll `match.veto.ready`. Ein zweites
-     Speichern meldet nicht noch einmal. Ein Spiel hält die anderen nicht auf.
+     Speichern meldet nicht noch einmal. Ein Spiel hält die anderen nicht auf. Dieselbe Meldung geht hinaus, wenn ein wartendes Veto
+     auf anderem Weg startbar wird (Review): nach `PUT …/veto-rules` (etwa ohne den Schritt `preset`; Antwort mit `matches_ready`),
+     nach dem Speichern des Season-Pools, nach „Map aus dem Pool nehmen“ und nach „Vorgaben auf Staffeln übertragen“.
   2. Die Matchseite zeigt **„Vorgabe steht – bereit zum Veto?“** und wer schon bereit ist (Veto-Block `start`, Stand weiter `veto`,
      `start_hint` = „Das Veto beginnt, sobald beide Seiten ‚Bereit zum Veto‘ getippt haben. Vorher läuft keine Zeit.“). Bis zum Start
      gibt es **keine Frist**.

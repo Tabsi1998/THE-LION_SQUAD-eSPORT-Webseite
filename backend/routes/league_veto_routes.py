@@ -191,7 +191,10 @@ async def put_veto_rules(season_id: str, body: VetoRulesBody, me: dict = Depends
     # Von Hand gespeichert: ohne den Merker „unberührt“ (Nr. 108) - ab jetzt bleibt die Vorlage, auch wenn der Pool sich ändert.
     # Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen nach dem Entsperren mit).
     staffeln = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
-    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln)
+    # Vorgabe der Woche (#2326): Mit der neuen Vorlage (etwa ohne den Schritt „Vorgabe“) kann ein wartendes Veto jetzt starten - beide
+    # Seiten erfahren es. Es beginnt dadurch nicht.
+    ready = await league_veto_sweep.announce_waiting(db, season_id)
+    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln, matches_ready=ready)
 
 
 # ---------------------------------------------------------------- Vorgabe der Woche (#2326)
