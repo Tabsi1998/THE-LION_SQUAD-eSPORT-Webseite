@@ -110,7 +110,8 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     # Ein bestätigtes Ergebnis kann für alle Beteiligten Erfolge auslösen (#301).
     try:
         from services.achievement_queue import request_evaluation
-        await request_evaluation(user_ids, "match_result")
+        # Im stillen Modus der Neuberechnung (#2340) melden sich Spiel- und Turnier-Stufen laut, Altansprüche still.
+        await request_evaluation(user_ids, "match_result", announce={"match", "tournament"})
     except Exception as exc:  # noqa: BLE001 - Erfolge halten kein Ergebnis auf
         logger.warning("[achievements] Ergebnis nicht zur Auswertung vorgemerkt type=%s", type(exc).__name__)
 

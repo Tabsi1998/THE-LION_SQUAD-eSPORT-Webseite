@@ -363,7 +363,7 @@ async def test_queue_holds_each_person_once_and_a_result_queues_everyone(flow, m
 
     evaluated = []
 
-    async def fake_eval(user_id, sources=None):
+    async def fake_eval(user_id, sources=None, **_kwargs):
         evaluated.append(user_id)
         return 1
 

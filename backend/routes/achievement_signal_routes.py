@@ -62,7 +62,12 @@ async def post_signals(body: SignalBatch, request: Request, me: dict = Depends(g
     if accepted:
         try:
             from badges import evaluate_user_progress
-            newly = int(await evaluate_user_progress(me["id"], {"signal"}, legacy=False) or 0)
+            from services.achievement_core import loud_awards
+            # Nur laut Vergebenes zählt (#2340): Die Seite feiert die neuesten ``newly_awarded`` Stufen - still
+            # nachgerechnete (Neuberechnung) kämen sonst als längst gesehene noch einmal.
+            with loud_awards() as loud:
+                await evaluate_user_progress(me["id"], {"signal"}, legacy=False)
+            newly = len(loud)
         except Exception:  # noqa: BLE001 - die Zählung steht; ausgewertet wird dann über die Warteschlange
             logger.warning("[achievements] signal evaluation failed for %s", log_safe(me["id"]), exc_info=True)
             from services.achievement_queue import request_evaluation

@@ -17,7 +17,11 @@ const NAV = { items: [
     { key: "fastlap", to: "/fastlap", label: "Fast Lap", visible: true, order: 3 },
   ] },
 ] };
-const LEAGUES = { leagues: [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [{ id: "s1", slug: "season-1", name: "Season 1", status: "draft", start_date: "2026-11-10" }] }] };
+// Starttermin immer in der Zukunft - ein festes Datum laeuft ab.
+const START = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+const START_ISO = `${START.getFullYear()}-${String(START.getMonth() + 1).padStart(2, "0")}-${String(START.getDate()).padStart(2, "0")}`;
+const START_SHOWN = `${START_ISO.slice(8, 10)}.${START_ISO.slice(5, 7)}.${START_ISO.slice(0, 4)}`;
+const LEAGUES = { leagues: [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [{ id: "s1", slug: "season-1", name: "Season 1", status: "draft", start_date: START_ISO }] }] };
 
 async function mockApi(page, state, { user = EDITOR } = {}) {
   await page.addInitScript(() => {
@@ -105,7 +109,7 @@ for (const [label, width, height] of WIDTHS) {
       await page.goto("/esports");
       const tile = page.getByTestId("esports-hub-league");
       await expect(tile).toHaveAttribute("href", "/liga");
-      await expect(page.getByTestId("esports-hub-league-badge")).toHaveText(/Start am 10\.11\.2026/i);
+      await expect(page.getByTestId("esports-hub-league-badge")).toHaveText(`Start am ${START_SHOWN}`);
       await noSideScroll(page);
     });
   });

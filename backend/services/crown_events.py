@@ -143,7 +143,11 @@ async def get_crowns(force: bool = False) -> dict[str, str]:
     rows = await _points_rows()
     merged, rank_only = _split_crowns(rows)
     try:
-        await _persist_and_notify(rank_only)
+        # Stiller Modus der Neuberechnung (#2340): Kronenwechsel weder speichern noch melden - der Abschluss rechnet sie
+        # einmal neu, dann erfährt nur, wer netto eine Krone gewonnen, gewechselt oder verloren hat.
+        from services.achievement_core import recount_silent
+        if not await recount_silent(get_db()):
+            await _persist_and_notify(rank_only)
     except Exception as e:
         logger.warning(f"crown transition notify failed: {e}")
     _cache["at"] = now

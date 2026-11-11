@@ -478,6 +478,14 @@ async def migrate_one_hide_field(db) -> str:
     return f"{len(hidden)} sponsors hidden, {len(rows)} contract statuses cleared, {len(archived)} references renamed"
 
 
+async def migrate_achievements_recount(db) -> str:
+    """Stiller Modus für die Neuberechnung der Erfolge (#2340): an, bevor die korrigierten Zähler (#2337, #2338, #2339)
+    kommen. Steht der Eintrag schon, bleibt er; ohne Konten gibt es nichts nachzurechnen. Abgeschlossen wird von Hand
+    (Admin → Erfolge → Übersicht oder backend/scripts/achievements_recount.py)."""
+    from services.achievement_recount import begin
+    return await begin(db)
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -512,6 +520,8 @@ MIGRATIONS = (
     (20, "squad_game_names", migrate_squad_game_names),
     # #2130: Sponsor und Referenz blenden nur noch über ``is_active`` aus; die Sichtbarkeit bleibt, wie sie war.
     (21, "one_hide_field", migrate_one_hide_field),
+    # #2340: Erfolge still nachrechnen, bis die Neuberechnung abgeschlossen ist (services/achievement_recount.py).
+    (22, "achievements_recount_silent", migrate_achievements_recount),
 )
 
 

@@ -442,7 +442,8 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
             await db.membership_applications.update_one({"id": app_id, "status": new_status}, {"$set": {"status": "pending", "decided_at": None, "decided_by": None, "decision_note": None}})
             raise HTTPException(409, str(exc))
         await db.memberships.update_one({"user_id": app["user_id"]}, {"$set": {"contribution_pref": app.get("contribution_pref")}})
-        await evaluate_user_progress(app["user_id"])
+        # Im stillen Modus (#2340) melden sich die Vereins-Stufen laut, Altansprüche still.
+        await evaluate_user_progress(app["user_id"], announce={"club"})
         try:
             await evaluate_membership_badges(app["user_id"])
         except Exception:

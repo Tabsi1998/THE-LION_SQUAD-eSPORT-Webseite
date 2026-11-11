@@ -319,11 +319,14 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
             continue
         allowed[code] = int(tier.get("points") or 0)
     agg: dict[str, dict] = {}
-    async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "earned_at": 1}):
+    async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "earned_at": 1, "recount": 1}):
         points = allowed.get(award["tier_code"])
         if points is None:
             continue
         if since:
+            # Nachgerechnete Stufen (#2340) zählen gesamt, aber in keinem Zeitraum - verdient wurden sie früher.
+            if award.get("recount"):
+                continue
             when = _parse_when(award.get("earned_at"))
             if not when or when < since:
                 continue
@@ -369,7 +372,8 @@ async def _pick_week_award(db, start: datetime, end: datetime) -> dict | None:
     groups, tiers = await _catalog(db)
     rarity_data = await rarity(db)
     candidates = []
-    async for award in db.user_achievements.find({}, {"_id": 0}):
+    # Nachgerechnete Stufen (#2340) sind kein Erfolg dieser Woche - sie kommen nur mit der Sammel-Nachricht.
+    async for award in db.user_achievements.find({"recount": {"$ne": True}}, {"_id": 0}):
         when = _parse_when(award.get("earned_at"))
         if not when or when < start or when >= end:
             continue
@@ -418,7 +422,8 @@ async def recent_unlocks(db, limit: int = 20) -> list[dict]:
     capped = max(1, min(int(limit or 20), 60))
     out: list[dict] = []
     users: dict[str, dict | None] = {}
-    async for award in db.user_achievements.find({}, {"_id": 0}).sort("earned_at", -1).limit(capped * 6):
+    # Nachgerechnete Stufen (#2340) laufen nicht durchs Laufband - sonst stünde es nach der Neuberechnung voll davon.
+    async for award in db.user_achievements.find({"recount": {"$ne": True}}, {"_id": 0}).sort("earned_at", -1).limit(capped * 6):
         tier = tiers.get(award["tier_code"])
         group = groups.get(tier.get("group_code")) if tier else None
         if not tier or not group or group.get("is_negative"):

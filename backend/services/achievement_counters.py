@@ -14,6 +14,8 @@ Deckel und nur für Tage, an denen die Saison lief. Gespeichert wird nur Person,
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Awaitable, Callable
@@ -833,9 +835,26 @@ async def _reports(ctx):
 
 # ------------------------------------------------------------------ Rechnen, Cache, Abgleich
 
+# Welche Zähler in einer ``counting``-Klammer ausfielen (#2340): Die Neuberechnung setzt ihre Marke nur nach einer
+# vollständigen Auswertung - ein ausgefallener Zähler zählt sonst als 0.
+_failed_keys: ContextVar[set[str] | None] = ContextVar("achievement_counters_failed", default=None)
+
+
+@contextmanager
+def counting():
+    """Liefert die Menge der Zähler, die in dieser Klammer ausfielen - leer heißt: vollständig gerechnet."""
+    failed: set[str] = set()
+    token = _failed_keys.set(failed)
+    try:
+        yield failed
+    finally:
+        _failed_keys.reset(token)
+
+
 async def compute(user_id: str, keys: set[str] | None = None, legacy: bool = True) -> dict[str, int]:
     """Zähler rechnen - alle, oder nur ``keys``. Der alte Block läuft mit, außer ``legacy`` ist aus (nur mit ``keys``):
-    dann werden wirklich nur diese Zähler gerechnet - für Signale, die nichts am alten Block ändern."""
+    dann werden wirklich nur diese Zähler gerechnet - für Signale, die nichts am alten Block ändern. Fällt ein Zähler
+    aus, rechnet der Rest weiter; eine ``counting``-Klammer erfährt davon."""
     db = get_db()
     values: dict[str, int] = {}
     # Alter Block und Registry rechnen aus denselben Anmeldungen und Spielen (#2337) - je Lauf einmal geladen.
@@ -850,6 +869,9 @@ async def compute(user_id: str, keys: set[str] | None = None, legacy: bool = Tru
                 values[key] = int(await item.compute(ctx) or 0)
             except Exception:  # noqa: BLE001 - ein kaputter Zähler hält die anderen nicht auf
                 logger.warning("[achievements] counter %s failed for %s", key, _log_safe(user_id), exc_info=True)
+                failed = _failed_keys.get()
+                if failed is not None:
+                    failed.add(key)
     return values
 
 

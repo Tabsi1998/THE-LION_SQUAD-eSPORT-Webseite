@@ -460,12 +460,16 @@ async def sync_all_memberships(db, *, batch: int = SYNC_BATCH, pause: float = SY
     wer währenddessen verknüpft, behält, was der Abgleich beim Verknüpfen gerade geschrieben hat."""
     import asyncio
 
+    from services.achievement_core import quiet_scope
+
     started = now_utc().isoformat()
     guild_ids = await usable_guild_ids(db)
     linked = sorted({row["user_id"] async for row in db.platform_links.find({"platform": "discord"}, {"_id": 0, "user_id": 1}) if row.get("user_id")})
     checked = changed = 0
     for index, user_id in enumerate(linked, start=1):
-        result = await sync_memberships(db, user_id, guild_ids=guild_ids)
+        # Nachts ein Abgleich, kein Ereignis (#2340): im stillen Modus der Neuberechnung meldet er nichts laut.
+        with quiet_scope():
+            result = await sync_memberships(db, user_id, guild_ids=guild_ids)
         checked += result["checked"]
         changed += result["changed"]
         if batch and index % batch == 0 and index < len(linked):

@@ -17,6 +17,19 @@ const PEOPLE = [
   { id: "u2", username: "max", display_name: "Max", state: "already" },
 ];
 
+// Neuberechnung (#2340): stiller Modus an, Probelauf fertig mit zwei Stufen, Abschluss läuft nach dem Klick.
+const RECOUNT = {
+  exists: true, active: true, marker: "2340", started_at: "2026-11-10T08:00:00+00:00", ended_at: null, dry_run: { running: false }, finish: { running: false, done: false, interrupted: false },
+  recounted: { awards: 31, users: 14, tiers: [{ tier_code: "finalist_1", name: "Finalist I", group_name: "Finalist", material: "wood", count: 9 }] },
+};
+const RECOUNT_DRY = {
+  status: "done", running: false, checked: 40, total: 40, affected_users: 12, awards: 19, errors: 0, finished_at: "2026-11-10T09:00:00+00:00",
+  tiers: [
+    { tier_code: "finalist_1", name: "Finalist I", group_name: "Finalist", material: "wood", count: 11, negative: false },
+    { tier_code: "matches_played_2", name: "Spielmacher II", group_name: "Spielmacher", material: "iron", count: 8, negative: false },
+  ],
+};
+
 async function mockAdmin(page, calls) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
@@ -40,6 +53,10 @@ async function mockAdmin(page, calls) {
           ? { recipients: 2, would_award: 1, already: 1, skipped: 0, awarded: 0, unknown: ["niemand"], dry_run: true, people: PEOPLE }
           : { recipients: 2, would_award: 1, already: 1, skipped: 0, awarded: 1, unknown: ["niemand"], dry_run: false });
       }
+      if (path === "/admin/achievements/recount/dry-run") return json({ ...RECOUNT, dry_run: RECOUNT_DRY });
+      if (path === "/admin/achievements/recount/finish") {
+        return json({ ...RECOUNT, dry_run: RECOUNT_DRY, finish: { running: true, phase: "evaluate", evaluated: 0, users_total: 40 } });
+      }
       return json({}, 405);
     }
     if (request.method() !== "GET") return json({}, 405);
@@ -50,6 +67,7 @@ async function mockAdmin(page, calls) {
       "/admin/achievements/users/search": [PAULA],
       "/admin/achievements/users/u1/awards": [],
       "/admin/achievements/events": [],
+      "/admin/achievements/recount": calls.some((c) => c.path === "/admin/achievements/recount/dry-run") ? { ...RECOUNT, dry_run: RECOUNT_DRY } : RECOUNT,
       "/tournaments": [{ id: "t1", name: "Herbst-Cup" }],
       "/events": [],
       "/teams": [],
@@ -105,5 +123,31 @@ test.describe("Erfolge im Admin", () => {
     await expect.poll(() => calls.filter((c) => c.path === "/admin/achievements/award/bulk").length).toBe(2);
     expect(calls[calls.length - 1].body).toEqual(expect.objectContaining({ dry_run: false, names: ["paula", "max", "niemand"], tournament_id: "t1" }));
     await expect(page.getByTestId("bulk-result")).toHaveCount(0);
+  });
+
+  test("Neuberechnung: Probelauf mit Tabelle, Abschluss erst nach der Rückfrage (#2340)", async ({ page }, testInfo) => {
+    const calls = [];
+    await mockAdmin(page, calls);
+    await page.goto("/admin/achievements");
+    await expect(page.getByTestId("ach-recount-mode")).toContainText("An seit");
+    await expect(page.getByTestId("ach-recount-recounted")).toHaveText("31 Stufen an 14 Personen");
+    await page.getByTestId("ach-recount-dry-run").click();
+    await expect(page.getByTestId("ach-recount-summary")).toHaveText("12 Personen bekämen 19 Stufen neu dazu.");
+    await expect(page.getByTestId("ach-recount-row-finalist_1")).toContainText("Finalist I");
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width > 800 ? 900 : 844 });
+      await page.getByTestId("ach-recount").scrollIntoViewIfNeeded();
+      // Auf dem Handy wischt die Tabelle, die Seite selbst bleibt in der Breite.
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+      const shot = await page.getByTestId("ach-recount").screenshot({ path: testInfo.outputPath(`neuberechnung-${width}.png`) });
+      await testInfo.attach(`neuberechnung-${width}.png`, { body: shot, contentType: "image/png" });
+    }
+    await page.getByTestId("ach-recount-finish").click();
+    await expect(page.getByTestId("confirm-dialog-confirm")).toBeVisible();
+    expect(calls.some((c) => c.path === "/admin/achievements/recount/finish")).toBe(false);
+    await page.getByTestId("confirm-dialog-confirm").click();
+    await expect.poll(() => calls.filter((c) => c.path === "/admin/achievements/recount/finish").length).toBe(1);
+    await expect(page.getByTestId("ach-recount-finish-state")).toContainText("Läuft: 0 von 40 Konten ausgewertet");
+    await expect(page.getByTestId("ach-recount-finish")).toBeDisabled();
   });
 });
