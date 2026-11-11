@@ -1097,25 +1097,36 @@ async def _deciders_won(ctx):
     return sum(1 for row in await ctx.played() if row.won and _full_distance(row.match, row.mine))
 
 
-def map_sequence(match: dict) -> list[str]:
-    """Die Sieger der Maps in Spielreihenfolge (#2339): aus ``games`` der Vereinsliga (Position, Sieger je Map). Fehlt
-    bei einer Map der Sieger, gibt es keine Reihenfolge - dann eine leere Liste. ``maps`` bleibt als alte Quelle."""
+# Eine Map, die die Leitung zugesprochen hat (league_result_rules.AWARDED), wurde nicht gespielt (Review M3).
+AWARDED_MAP = "awarded"
+
+
+def is_awarded_map(game: dict) -> bool:
+    return str(game.get("decision") or "") == AWARDED_MAP
+
+
+def map_sequence(match: dict) -> list[tuple[str, bool]]:
+    """Die Maps in Spielreihenfolge (#2339): (Sieger, zugesprochen) aus ``games`` der Vereinsliga. Fehlt bei einer Map der
+    Sieger, gibt es keine Reihenfolge - dann eine leere Liste. ``maps`` bleibt als alte Quelle."""
     rows = [game for game in (match.get("games") or match.get("maps") or []) if isinstance(game, dict)]
     if not rows or any(not game.get("winner_registration_id") for game in rows):
         return []
     rows.sort(key=lambda game: int(game.get("position") or 0))
-    return [str(game["winner_registration_id"]) for game in rows]
+    return [(str(game["winner_registration_id"]), is_awarded_map(game)) for game in rows]
 
 
 def was_comeback(match: dict, mine) -> bool:
     """Comeback (#2339): eine Serie über mindestens drei Maps gewonnen, in der die eigene Seite nach einer Map hinten lag -
-    2:1 nach 0:1 im Bo3, 3:2 nach 0:2 oder 1:2 im Bo5. Nur Duelle mit Sieger je Map."""
-    winners = map_sequence(match)
-    if len(winners) < 3 or not is_duel(match):
+    2:1 nach 0:1 im Bo3, 3:2 nach 0:2 oder 1:2 im Bo5. Nur Duelle mit Sieger je Map. Eine zugesprochene Map dreht keinen
+    Rückstand (Review M3): Kommt nach dem ersten Rückstand eine zugesprochene Map, ist es kein Comeback."""
+    maps = map_sequence(match)
+    if len(maps) < 3 or not is_duel(match):
         return False
     own = their = 0
     behind = False
-    for winner in winners:
+    for winner, awarded in maps:
+        if behind and awarded:
+            return False
         if winner in mine:
             own += 1
         else:
@@ -1140,7 +1151,8 @@ def maps_of(match: dict, mine, user_id: str) -> set[str]:
     Match einträgt (``map``)."""
     names = {_map_label(match.get("map"))}
     for game in match.get("games") or []:
-        if not isinstance(game, dict):
+        # Zugesprochene Maps (Review M3) wurden nicht gespielt.
+        if not isinstance(game, dict) or is_awarded_map(game):
             continue
         lineups = game.get("lineups") or {}
         own = [user for reg_id in mine for user in (lineups.get(reg_id) or [])]

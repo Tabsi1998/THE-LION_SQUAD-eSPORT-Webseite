@@ -44,7 +44,9 @@ MATCH_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, 
                 "section": 1, "bracket": 1, "round_name": 1, "group_id": 1, "stage_number": 1, "round": 1, "order": 1,
                 "match_type": 1, "is_preview": 1, "lineups": 1, "games.lineups": 1,
                 # Maps der Vereinsliga (#2339): Reihenfolge, Sieger und Name je Map für Comeback und Kartenkenner.
-                "games.position": 1, "games.winner_registration_id": 1, "games.map_id": 1, "games.map_name": 1}
+                "games.position": 1, "games.winner_registration_id": 1, "games.map_id": 1, "games.map_name": 1,
+                # Zugesprochene Maps (Review M3) zählen weder als gespielte Karte noch für ein Comeback.
+                "games.decision": 1}
 
 # Wer gespielt hat und danach ausgetreten ist oder disqualifiziert wurde, hat trotzdem teilgenommen (Review zu #2337).
 LEFT_REGISTRATION_STATUSES = frozenset({"withdrawn", "disqualified"})

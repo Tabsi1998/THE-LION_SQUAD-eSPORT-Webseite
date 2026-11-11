@@ -168,6 +168,8 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
 - **Comeback** und **Kartenkenner** zählen die **Maps der Vereinsliga** (Sieger je Map): Comeback ist eine gewonnene Serie,
   in der man nach Maps hinten lag (2:1 nach 0:1, 3:2 nach 0:2). Kartenkenner zählt jede Map einmal – mit Aufstellung je Map
   nur die, auf denen man aufgestellt war – und dazu die Karte, die die Turnierleitung an einem Turniermatch einträgt.
+  **Zugesprochene Maps** zählen bei beiden nicht: Sie sind keine gespielte Karte, und wird nach einem Rückstand eine Map
+  zugesprochen, ist die Serie kein Comeback.
 - **Pole Position** ist die Bestzeit einer Strecke in **einer** Fast-Lap-Challenge. **Streckenrekord** ist die Bestzeit über
   **alle** Challenges desselben Spiels (gleicher Streckenname) und zählt erst, wenn die Strecke in mindestens zwei Challenges
   gefahren wurde.

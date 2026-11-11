@@ -96,11 +96,11 @@ MATCH = [
     _group("win_rate", "Effizienz", "match", "Halte eine hohe Siegquote - ab 30 Matches.", "Ab 30 gespielten Matches zählt deine Siegquote in Prozent.",
            "percent", "gauge", "win_rate_qualified", [55, 60, 65, 70, 75], "{n} Siegquote bei mindestens 30 Matches.", sort_order=113, unit=" %"),
     # Comeback (#2339): aus den Maps der Vereinsliga (``matches_v2.games`` mit Sieger je Map) - ``match.maps`` schreibt niemand.
-    _group("comeback", "Comeback", "match", "Dreh Serien, in denen du schon zurücklagst.", "Gewinn eine Serie über mehrere Maps, in der du nach Maps schon hinten lagst - etwa 2:1 nach 0:1 im Best of 3 oder 3:2 nach 0:2 im Best of 5. Zählt, wo jede Map mit Sieger eingetragen ist, wie in der Vereinsliga.",
+    _group("comeback", "Comeback", "match", "Dreh Serien, in denen du schon zurücklagst.", "Gewinn eine Serie über mehrere Maps, in der du nach Maps schon hinten lagst - etwa 2:1 nach 0:1 im Best of 3 oder 3:2 nach 0:2 im Best of 5. Zählt, wo jede Map mit Sieger eingetragen ist, wie in der Vereinsliga. Wird nach dem Rückstand eine Map zugesprochen, zählt es nicht.",
            "undo-2", "phoenix", "comebacks", [1, 5, 15, 40, 100], "{n} Comebacks.", sort_order=114, singular="{n} Comeback."),
     _group("clean_sheet", "Zu Null", "match", "Gewinne Serien, ohne eine Karte abzugeben.", "Gewinn ein Match, bei dem der Gegner keine Karte holt.",
            "shield-check", "shield", "clean_sheets", [1, 10, 30, 75, 150], "{n} Siege zu Null.", sort_order=115),
-    _group("maps_played", "Kartenkenner", "match", "Spiel auf vielen verschiedenen Karten.", "Jede Karte zählt einmal: die Maps der Vereinsliga, auf denen du gespielt hast (mit Aufstellung je Map nur die, auf denen du aufgestellt warst), und die Karte, die die Turnierleitung an einem Turniermatch einträgt.",
+    _group("maps_played", "Kartenkenner", "match", "Spiel auf vielen verschiedenen Karten.", "Jede Karte zählt einmal: die Maps der Vereinsliga, auf denen du gespielt hast (mit Aufstellung je Map nur die, auf denen du aufgestellt warst), und die Karte, die die Turnierleitung an einem Turniermatch einträgt. Zugesprochene Maps zählen nicht.",
            "map", "map", "distinct_maps", [5, 15, 30, 60, 100], "{n} verschiedene Karten gespielt.", sort_order=116),
     _group("formats_played", "Formatvielfalt", "match", "Spiel in vielen Turnierformaten.", FORMATS_HOW_TO,
            "layout-grid", "grid", "distinct_formats", [2, 3, 4, 6, 8], "{n} verschiedene Formate gespielt.", sort_order=117),

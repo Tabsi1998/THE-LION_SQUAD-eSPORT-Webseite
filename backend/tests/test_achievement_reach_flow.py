@@ -452,6 +452,27 @@ def test_kartenkenner_nur_maps_mit_eigener_aufstellung():
     ]}
     assert counters.maps_of(match, {"me"}, "u1") == {"rust", "nuketown", "hacienda"}
     assert counters.maps_of(match, {"me"}, "u3") == {"rust", "hacienda"}
+    # Review M3: eine zugesprochene Map ist keine gespielte Karte.
+    match["games"][2]["decision"] = "awarded"
+    assert counters.maps_of(match, {"me"}, "u1") == {"rust", "nuketown"}
+
+
+def test_zugesprochene_map_dreht_keinen_rueckstand():
+    from services.league_result_rules import AWARDED
+
+    assert counters.AWARDED_MAP == AWARDED
+
+    def match(*maps):
+        return {"slots": [{"registration_id": "me"}, {"registration_id": "you"}],
+                "games": [{"position": index + 1, "winner_registration_id": winner, **({"decision": "awarded"} if awarded else {})}
+                          for index, (winner, awarded) in enumerate(maps)]}
+    mine = {"me"}
+    assert counters.was_comeback(match(("you", False), ("me", False), ("me", False)), mine), "Gegenprobe: gespielt"
+    assert not counters.was_comeback(match(("you", False), ("me", True), ("me", False)), mine), "zugesprochen nach dem Rückstand"
+    assert not counters.was_comeback(match(("you", False), ("me", False), ("me", True)), mine), "Entscheidung zugesprochen"
+    assert not counters.was_comeback(match(("you", False), ("you", False), ("me", False), ("you", True), ("me", False)), mine)
+    # Vor dem Rückstand zählt eine zugesprochene Map nicht dagegen: 1:0 zugesprochen, 1:2, dann 3:2 gespielt.
+    assert counters.was_comeback(match(("me", True), ("you", False), ("you", False), ("me", False), ("me", False)), mine)
 
 
 async def _league_match(flow, a, b, *, match_id, winners, when="2026-08-01T18:00:00+00:00"):
@@ -481,6 +502,11 @@ async def test_comeback_und_kartenkenner_aus_den_liga_maps(flow):
     assert values == {"comebacks": 1, "distinct_maps": 3}
     theirs = await counters.compute(bernd["id"], {"comebacks"}, legacy=False)
     assert theirs["comebacks"] == 0
+    # Review M3: die dritte Map wurde zugesprochen - kein Comeback, und „Map 3“ ist keine gespielte Karte.
+    await flow.db.matches_v2.update_one({"id": "cb1"}, {"$set": {"games.2.decision": "awarded"}})
+    values = await counters.compute(anna["id"], {"comebacks", "distinct_maps"}, legacy=False)
+    assert values == {"comebacks": 0, "distinct_maps": 2}
+    await flow.db.matches_v2.update_one({"id": "cb1"}, {"$set": {"games.2.decision": "played"}})
     # Gegenprobe: ohne Maps (nur das Ergebnis) zählt nichts.
     await flow.db.matches_v2.update_many({}, {"$unset": {"games": ""}})
     values = await counters.compute(anna["id"], {"comebacks", "distinct_maps"}, legacy=False)
