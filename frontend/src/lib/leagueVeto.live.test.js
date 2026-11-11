@@ -1,5 +1,6 @@
 import {
-  ANNOUNCE_AT, boardGroups, cardLabel, countdownAnnouncement, freshCards, isOlderVeto, isUrgent, mergeLiveVeto, secondsLeft, timelineLabel, timelineRows,
+  ANNOUNCE_AT, boardGroups, cardLabel, countdownAnnouncement, freshCards, isOlderVeto, isUrgent, keepNewerVeto, mergeLiveVeto, secondsLeft, timelineLabel,
+  timelineRows,
   VETO_POLL_MS, vetoClockOffset, vetoDeadline, vetoPollMs, vetoRingShare,
 } from "./leagueVeto";
 
@@ -17,6 +18,25 @@ test("kurzer Abruf: gleicher Stand ersetzt nur den Veto-Block, ein neuer Stand l
   const outside = { match: { id: "m1" }, checkin: null, veto_view: { status: "running", version: 3 } };
   expect(mergeLiveVeto(outside, { veto: { status: "running", version: 5 }, state: null }).veto_view.version).toBe(5);
   expect(mergeLiveVeto(outside, { veto: { status: "paused", version: 4 }, state: null })).toBeNull();
+});
+
+test("volles Neuladen: ein älterer Veto-Block bleibt draußen, der übrige Seitenstand kommt aus der neuen Antwort", () => {
+  const newer = { status: "running", version: 6, server_now: "2026-11-15T19:00:12Z" };
+  const older = { status: "running", version: 5, server_now: "2026-11-15T19:00:10Z" };
+  const shown = { match: { id: "m1" }, checkin: { state: "veto", sides: ["alt"], veto: newer }, veto_view: null };
+  const page = { match: { id: "m1", note: "neu" }, checkin: { state: "veto", sides: ["neu"], veto: older }, veto_view: null };
+  const next = keepNewerVeto(shown, page);
+  expect(next.checkin.veto).toBe(newer);
+  expect(next.checkin.sides).toEqual(["neu"]);
+  expect(next.match.note).toBe("neu");
+  // Gegenprobe: Ist der Block der vollen Antwort neuer (oder gleich alt), gilt er.
+  const fresh = { ...page, checkin: { ...page.checkin, veto: { ...newer, version: 7, server_now: "2026-11-15T19:00:13Z" } } };
+  expect(keepNewerVeto(shown, fresh)).toBe(fresh);
+  expect(keepNewerVeto(null, page)).toBe(page);
+  // Zuschauer: `veto_view` genauso.
+  const outside = keepNewerVeto({ checkin: null, veto_view: newer }, { checkin: null, veto_view: older, match: { note: "neu" } });
+  expect(outside.veto_view).toBe(newer);
+  expect(outside.match.note).toBe("neu");
 });
 
 test("Reihenfolge: eine ältere Antwort überschreibt nie eine neuere - Serverzeit zuerst, sonst die Version", () => {

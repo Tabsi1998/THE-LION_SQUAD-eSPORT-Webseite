@@ -33,7 +33,7 @@ import { AllowedEquipmentView } from "@/components/tls/league/AllowedEquipmentVi
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
 import { VetoPanel } from "@/components/tls/league/VetoPanel";
-import { mergeLiveVeto } from "@/lib/leagueVeto";
+import { keepNewerVeto, mergeLiveVeto } from "@/lib/leagueVeto";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -171,12 +171,22 @@ function MatchPageView() {
   const [problemCategory, setProblemCategory] = useState("");
   const [actionError, setActionError] = useState("");
 
+  // Map-Veto live (#1651): der zuletzt gezeigte Stand - der kurze Abruf und das volle Laden vergleichen damit, was neuer ist.
+  const dataRef = useRef(null);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   const load = useCallback(async ({ preserveDrafts = true } = {}) => {
     const [{ data: page }, { data: messages }] = await Promise.all([
       api.get(`/matches/${id}/page`),
       api.get(`/matches/${id}/chat`),
     ]);
-    setData(page);
+    // Ist der Veto-Block der vollen Antwort älter als der, den der kurze Abruf inzwischen gebracht hat, bleibt der neuere stehen - der
+    // übrige Seitenstand kommt aus dieser Antwort.
+    const next = keepNewerVeto(dataRef.current, page);
+    dataRef.current = next;
+    setData(next);
     setChat(messages || []);
     const nextMatch = page.match || {};
     if (preserveDrafts) {
@@ -189,10 +199,6 @@ function MatchPageView() {
 
   // Map-Veto live (#1651): Der Veto-Block fragt kurz beim leichten Abruf nach statt die ganze Seite neu zu laden. Bleibt der Stand derselbe,
   // ersetzt die Antwort nur den Block; beginnt oder endet das Veto, lädt die Seite einmal ganz.
-  const dataRef = useRef(null);
-  useEffect(() => {
-    dataRef.current = data;
-  }, [data]);
   const pollVeto = useCallback(async () => {
     try {
       const { data: live } = await api.get(`/matches/${id}/veto`);

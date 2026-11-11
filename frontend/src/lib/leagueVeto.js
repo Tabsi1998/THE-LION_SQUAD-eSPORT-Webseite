@@ -530,6 +530,24 @@ export function mergeLiveVeto(page, live) {
   return null;
 }
 
+/**
+ * Die ganze Matchseite neu geladen, aber ihr Veto-Block ist älter als der, den der kurze Abruf schon gebracht hat (Nachprüfung zu #1651):
+ * Dann gilt der übrige Seitenstand der neuen Antwort, der Veto-Block bleibt der neuere - beim Captain `checkin.veto`, beim Zuschauer
+ * `veto_view`. Sonst kommt `page` unverändert zurück.
+ */
+export function keepNewerVeto(current, page) {
+  if (!current || !page) return page;
+  let out = page;
+  const shown = current.checkin?.veto;
+  if (page.checkin && shown && page.checkin.veto && isOlderVeto(shown, page.checkin.veto)) {
+    out = { ...out, checkin: { ...page.checkin, veto: shown } };
+  }
+  if (current.veto_view && page.veto_view && isOlderVeto(current.veto_view, page.veto_view)) {
+    out = { ...out, veto_view: current.veto_view };
+  }
+  return out;
+}
+
 /** Der Name einer Karte für Bildschirmleser: Map, Zustand und - wenn sie antippbar ist - was das Antippen tut. */
 export function cardLabel(card, kind) {
   const base = `${card.name}: ${card.statusText}`;
