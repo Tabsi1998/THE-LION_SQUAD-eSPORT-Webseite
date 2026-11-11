@@ -194,15 +194,21 @@ async def test_spectator_polls_are_limited_per_address_and_per_key(flow, monkeyp
     # Gegenprobe: Beteiligte fragen unbegrenzt - ihr Abruf ist die Matchseite selbst.
     own = [await live_status(flow, world, "Kapitaen") for _ in range(5)]
     assert own == [200] * 5
-    # Je Schlüssel zählt ein eigener Zähler - auch wenn die Bildschirme hinter verschiedenen Adressen stehen.
-    keyed = []
-    for number in range(4):
-        address[0] = f"10.0.1.{number}"
-        keyed.append(await live_status(flow, world, None, key=token))
+    # Ein gültiger Schlüssel zählt nur in seinem eigenen Topf: Hallen-TVs hinter derselben (schon vollen) Adresse laufen weiter, bis
+    # der Schlüssel selbst sein Limit erreicht - auch über verschiedene Adressen.
+    keyed = [await live_status(flow, world, None, key=token) for _ in range(2)]
+    address[0] = "10.0.1.9"
+    keyed += [await live_status(flow, world, None, key=token) for _ in range(2)]
     assert keyed == [200, 200, 200, 429]
     key_rows = await flow.db.rate_limits.count_documents({"_id": {"$regex": "^veto_live_key:"}})
     named = await flow.db.rate_limits.count_documents({"_id": {"$regex": token}})
+    on_address = await flow.db.rate_limits.count_documents({"_id": {"$regex": r"^veto_live_address:10\.0\.1\.9:"}})
     assert key_rows == 1 and named == 0, "der Zähler nennt den Schlüssel nie"
+    assert on_address == 0, "gültige Schlüssel zählen nicht auf die Adresse"
+    # Gegenprobe: Ein falscher Schlüssel zählt auf die Adresse - Raten bleibt gebremst.
+    address[0] = "10.0.2.1"
+    guessed = [await live_status(flow, world, None, key=f"geraten-{number}") for number in range(4)]
+    assert guessed == [403, 403, 403, 429]
 
 
 @pytest.mark.asyncio

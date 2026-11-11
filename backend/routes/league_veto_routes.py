@@ -369,12 +369,22 @@ async def _spectator_block(db, match: dict, tournament: dict | None, now) -> tup
     return block, names
 
 
-async def _limit_spectator(request: Request, key: str | None) -> None:
+async def _limit_address(request: Request) -> None:
+    """Zuschauer ohne Schlüssel und jeder abgelehnte Schlüssel zählen je Adresse - so bleibt auch das Raten von Schlüsseln gebremst."""
     await enforce_rate_limit(request, "veto_live_address", SPECTATOR_RATE_LIMIT, SPECTATOR_RATE_WINDOW_SECONDS,
                              subject=get_client_ip(request), message=SPECTATOR_RATE_MESSAGE)
-    if key:
-        await enforce_rate_limit(request, "veto_live_key", SPECTATOR_RATE_LIMIT, SPECTATOR_RATE_WINDOW_SECONDS, subject=_key_subject(key),
-                                 message=SPECTATOR_RATE_MESSAGE)
+
+
+async def _limit_key(request: Request, key: str) -> None:
+    """Ein gültiger Schlüssel zählt nur in seinem eigenen Topf (Review): Hallen-TVs hinter einer gemeinsamen Adresse laufen nicht ins
+    Limit der Zuschauer im selben Netz."""
+    await enforce_rate_limit(request, "veto_live_key", SPECTATOR_RATE_LIMIT, SPECTATOR_RATE_WINDOW_SECONDS, subject=_key_subject(key),
+                             message=SPECTATOR_RATE_MESSAGE)
+
+
+async def _refuse_key(request: Request, detail: str = KEY_INVALID):
+    await _limit_address(request)
+    raise HTTPException(status_code=403, detail=detail)
 
 
 @router.get("/{match_id}/veto")
@@ -391,21 +401,23 @@ async def veto_live(match_id: str, request: Request, key: Optional[str] = None, 
     übernehmen der Aufruf der Beteiligten und der Job."""
     db = get_db()
     now = now_utc()
-    if key or display or not user:
-        await _limit_spectator(request, key)
+    if not key and (display or not user):
+        await _limit_address(request)
     try:
         match, collection = await _find_match_any(match_id)
     except HTTPException:
         if key:
-            raise HTTPException(status_code=403, detail=KEY_INVALID) from None
+            await _refuse_key(request)
         raise
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
     if key:
         link = await validate_access_link(db, key, "tournament", match.get("tournament_id"), None, DISPLAY_GRANT) if tournament else None
         if not link or not shown_on_event_tv(tournament):
-            raise HTTPException(status_code=403, detail=KEY_INVALID)
+            await _refuse_key(request)
         if key_expired(tournament, now):
-            raise HTTPException(status_code=403, detail=KEY_EXPIRED)
+            await _refuse_key(request, KEY_EXPIRED)
+        # Gültiger Schlüssel: nur sein eigener Topf, nicht zusätzlich der der Adresse.
+        await _limit_key(request, key)
         await touch_access_link(db, link)
     else:
         await _assert_match_visible(match, user)
@@ -418,7 +430,7 @@ async def veto_live(match_id: str, request: Request, key: Optional[str] = None, 
         lead = await has_match_result_permission(user, match, capability="matches")
         spectator = not (involved or lead)
         if spectator:
-            await _limit_spectator(request, None)
+            await _limit_address(request)
     state = None
     if spectator:
         block, names = await _spectator_block(db, match, tournament, now)
