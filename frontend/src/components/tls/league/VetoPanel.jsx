@@ -115,23 +115,89 @@ function WeekPresets({ block }) {
   );
 }
 
-// „Veto starten“ (#2326): Die Liga-Leitung hat die fehlende Vorgabe nachgetragen. Das Veto beginnt nicht von selbst - sonst liefe die
-// Zeit, während niemand mehr da ist. Captain oder Vertreter einer Seite tippt den Knopf; bis dahin läuft keine Frist.
-function StartVeto({ block, matchId, busy, run, onChanged }) {
-  const start = () => run(async () => {
-    const { data } = await api.post(`/matches/${matchId}/veto/start`, {});
-    toast.success(data?.idempotent_replay ? "Das Veto läuft schon." : "Veto gestartet – ab jetzt läuft die Zeit je Schritt.");
+// „Bereit zum Veto“ (#2326, Nr. 124 und 127): Die Liga-Leitung hat die fehlende Vorgabe nachgetragen. Das Veto beginnt nicht von
+// selbst - sonst liefe die Zeit, während niemand mehr da ist -, sondern erst, wenn Captain oder Vertreter **beider** Seiten „Bereit zum
+// Veto“ getippt haben. Die Seite zeigt, wer schon bereit ist; die erste Seite kann zurücknehmen, solange die andere fehlt. Bis zum
+// Start läuft keine Frist.
+function ReadyToStart({ block, matchId, busy, run, onChanged }) {
+  const start = block.start;
+  const send = (ready) => run(async () => {
+    const { data } = await api.post(`/matches/${matchId}/veto/ready`, { ready });
+    toast.success(data?.started ? "Beide Seiten sind bereit – das Veto läuft." : ready ? "Ihr seid bereit – jetzt fehlt die Gegenseite." : "„Bereit“ zurückgenommen.");
     await onChanged();
-  }, "Veto starten hat nicht geklappt.");
+  }, ready ? "„Bereit zum Veto“ hat nicht geklappt." : "Zurücknehmen hat nicht geklappt.");
   return (
-    <div className="mt-4 rounded-sm border border-[#29B6E8]/40 bg-[#29B6E8]/5 p-4" data-testid="veto-start">
-      <button type="button" disabled={busy} onClick={start} data-testid="veto-start-button"
-        className="tls-btn tls-btn--primary inline-flex min-h-12 items-center gap-2 rounded-sm px-5 py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50">
-        <Play className="h-4 w-4" aria-hidden="true" /> Veto starten
-      </button>
-      <p className="mt-2 text-xs text-white/60">
-        Erst ab dem Start läuft die Zeit{block.step_seconds ? ` (${block.step_seconds} Sekunden je Schritt)` : ""}. Bis dahin läuft keine Frist – die Gegenseite kann ebenso starten.
+    <div className="mt-4 rounded-sm border border-[#29B6E8]/40 bg-[#29B6E8]/5 p-4" data-testid="veto-ready">
+      <ul className="grid gap-2 sm:grid-cols-2" aria-label="Bereit zum Veto">
+        {(start.sides || []).map((side) => (
+          <li key={side.registration_id} data-testid={`veto-ready-side-${side.registration_id}`} data-ready={side.ready ? "true" : "false"}
+            className={`flex min-w-0 items-center justify-between gap-3 rounded-sm border px-3 py-2 text-sm ${side.ready ? "border-[#00D26A]/50 bg-[#00D26A]/10 text-white" : "border-white/10 bg-white/[0.03] text-white/75"}`}>
+            <span className="min-w-0 font-bold [overflow-wrap:anywhere]">{side.name}{side.own ? <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Ihr</span> : null}</span>
+            <span className={`inline-flex shrink-0 items-center gap-1 text-xs font-bold ${side.ready ? "text-[#00D26A]" : "text-white/50"}`}>
+              {side.ready ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}{side.ready ? "bereit" : "noch nicht bereit"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {start.can_ready ? (
+        <button type="button" disabled={busy} onClick={() => send(true)} data-testid="veto-ready-button"
+          className="tls-btn tls-btn--primary mt-3 inline-flex min-h-12 items-center gap-2 rounded-sm px-5 py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50">
+          <Play className="h-4 w-4" aria-hidden="true" /> Bereit zum Veto
+        </button>
+      ) : null}
+      {start.can_withdraw ? (
+        <button type="button" disabled={busy} onClick={() => send(false)} data-testid="veto-ready-withdraw"
+          className="tls-btn tls-btn--quiet mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+          <Undo2 className="h-3.5 w-3.5" aria-hidden="true" /> Doch nicht bereit
+        </button>
+      ) : null}
+      <p className="mt-2 text-xs text-white/60" data-testid="veto-ready-note">
+        Das Veto beginnt, sobald beide Seiten bereit sind. Erst dann läuft die Zeit{block.step_seconds ? ` (${block.step_seconds} Sekunden je Schritt)` : ""} – bis dahin gibt es keine Frist.
       </p>
+    </div>
+  );
+}
+
+// Notfall (Nr. 127): Die Liga-Leitung startet das wartende Veto, ohne dass beide Seiten „Bereit“ getippt haben - nur mit Grund, im
+// Protokoll; im eigenen Spiel als Superadmin nur mit zweitem Grund (Befangenheit).
+function LeadStart({ block, matchId, busy, run, onChanged }) {
+  const [reason, setReason] = useState("");
+  const [conflictReason, setConflictReason] = useState("");
+  const [problem, setProblem] = useState("");
+  const lead = block.start?.lead;
+  if (!lead?.can_start) return null;
+  const needsConflictReason = Boolean(lead.conflict?.override);
+  const start = () => {
+    if (reason.trim().length < REASON_MIN) return setProblem("Bitte einen Grund angeben (mindestens fünf Zeichen).");
+    if (needsConflictReason && conflictReason.trim().length < REASON_MIN) return setProblem("Als Notausnahme braucht es einen Grund (mindestens fünf Zeichen).");
+    setProblem("");
+    return run(async () => {
+      await api.post(`/matches/${matchId}/veto/start`, { reason: reason.trim(), ...(needsConflictReason ? { conflict_reason: conflictReason.trim() } : {}) });
+      toast.success("Veto gestartet – steht im Protokoll.");
+      setReason("");
+      await onChanged();
+    }, "Starten hat nicht geklappt.");
+  };
+  return (
+    <div className="mt-4 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid="veto-lead-start">
+      <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-honor"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Notfall: Veto starten (Liga-Leitung)</h3>
+      <p className="mt-1 text-xs text-white/60">Nur, wenn eine Seite nicht selbst „Bereit“ tippen kann. Ab dem Start läuft die Zeit je Schritt; der Grund steht im Protokoll.</p>
+      {needsConflictReason ? <p className="mt-2 text-xs text-warn" data-testid="veto-lead-start-conflict">Du bist an diesem Spiel selbst beteiligt – als Superadmin nur als Notausnahme mit Grund.</p> : null}
+      <label className="mt-3 block text-xs text-white/60">
+        Grund (Pflicht)
+        <input value={reason} maxLength={500} onChange={(event) => { setReason(event.target.value); setProblem(""); }} className="input mt-1 w-full" placeholder="z. B. Captain ohne Netz, per Telefon bereit" data-testid="veto-lead-start-reason" />
+      </label>
+      {needsConflictReason ? (
+        <label className="mt-3 block text-xs text-white/60">
+          Grund für die Notausnahme
+          <input value={conflictReason} maxLength={500} onChange={(event) => setConflictReason(event.target.value)} className="input mt-1 w-full" data-testid="veto-lead-start-conflict-reason" />
+        </label>
+      ) : null}
+      <button type="button" disabled={busy} onClick={start} data-testid="veto-lead-start-button"
+        className="tls-btn tls-btn--quiet mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+        <Play className="h-3.5 w-3.5" aria-hidden="true" /> Veto jetzt starten
+      </button>
+      {problem ? <p className="mt-2 text-xs text-warn" role="alert" data-testid="veto-lead-start-problem">{problem}</p> : null}
     </div>
   );
 }
@@ -243,7 +309,8 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
   // Vorgabe der Woche fehlt (#2326): Das Veto wartet. Sind beide Seiten eingecheckt (`bothIn`), fragt die Seite weiter nach, damit es
   // ohne Neuladen beginnt, sobald die Vorgabe steht - vor dem Check-in gibt es noch nichts abzuwarten.
   const blocked = Boolean(block && block.status === "waiting" && block.blocked);
-  // Die Vorgabe wurde nachgetragen: Das Veto wartet auf „Veto starten“ - auch dann fragt die Seite nach, falls die Gegenseite startet.
+  // Die Vorgabe wurde nachgetragen: Das Veto wartet auf „Bereit zum Veto“ beider Seiten - auch dann fragt die Seite nach, damit jede
+  // sieht, wenn die andere bereit ist oder das Veto beginnt.
   const startReady = Boolean(block && block.status === "waiting" && block.start);
   const polling = live || ((blocked || startReady) && bothIn);
   useEffect(() => {
@@ -277,11 +344,12 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
       ) : null}
       {blocked ? (
         <p className="mt-3 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" role="status" data-testid="veto-blocked">
-          Gewertet wird nichts von selbst. Sind beide Seiten eingecheckt, bekommt die Liga-Leitung einen Hinweis. Sobald die Vorgabe steht, bekommt ihr eine Nachricht und startet das Veto hier selbst.
+          Gewertet wird nichts von selbst. Sind beide Seiten eingecheckt, bekommt die Liga-Leitung einen Hinweis. Sobald die Vorgabe steht, bekommt ihr eine Nachricht – das Veto beginnt, wenn beide Seiten hier „Bereit zum Veto“ getippt haben.
         </p>
       ) : null}
       {block.status === "done" ? null : <WeekPresets block={block} />}
-      {startReady && block.start.can_start ? <StartVeto block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
+      {startReady ? <ReadyToStart block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
+      {startReady ? <LeadStart block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
       {block.status === "skipped" ? <p className="mt-3 text-xs text-white/55" data-testid="veto-skipped">Die Maps werden beim Ergebnis eingetragen.</p> : null}
       {block.status === "done" && block.planned_games?.length ? <PlannedGames games={block.planned_games} /> : null}
       {block.status === "running" || block.status === "paused" ? <ModeBoard remaining={block.remaining || []} /> : null}

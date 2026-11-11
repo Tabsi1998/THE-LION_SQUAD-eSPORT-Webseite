@@ -154,6 +154,8 @@ ROUTES = [
     route("POST", "/api/matches/{match}/checkin/start", "matches", {}),
     # Veto (D.3, #1618): Eingriff der Leitung - der Zug selbst gehört den Captains (kein Liga-Recht).
     route("POST", "/api/matches/{match}/veto/lead", "matches", {"action": "pause", "reason": "Grund genug", "version": 0}),
+    # Notfall-Start eines wartenden Vetos (#2326, Nr. 127) - „Bereit zum Veto“ gehört den Captains (kein Liga-Recht).
+    route("POST", "/api/matches/{match}/veto/start", "matches", {"reason": "Grund genug"}),
     # Staffel: lesen
     route("GET", "/api/tournaments/{tid}/staff", READ),
     route("GET", "/api/tournaments/{tid}/lead", READ),

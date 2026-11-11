@@ -39,7 +39,8 @@ const BLOCKED = {
   status: "waiting", skipped_reason: null, version: 0, step_seconds: null, team_a: null, team_b: null, current: null, own_turn: false, can_pick: false,
   pick_hint: BLOCKED_TEXT, options: [], remaining: [], history: [], planned_games: [], paused: null, lead: null, week: 2, presets: [], blocked: { week: 2, text: BLOCKED_TEXT },
 };
-const START_READY = "Die Vorgabe der Woche steht – Captain oder Vertreter einer Seite tippt auf „Veto starten“. Vorher läuft keine Zeit.";
+const START_READY = "Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben. Vorher läuft keine Zeit.";
+const OTHER_CAPTAIN = { id: "f1", username: "falke", display_name: "Falke Eins", role: "player" };
 const PLANNED = [
   { position: 1, mode: "hp", mode_label: "Stellung", map_id: "nebel", map_name: "Nebelwerk", map_image_url: null, role: "picked", by_registration_id: "a" },
   { position: 2, mode: "snd", mode_label: "Suchen & Zerstören", map_id: "turm", map_name: "Funkturm", map_image_url: null, role: "picked", by_registration_id: "b" },
@@ -98,7 +99,8 @@ const VETO_PRESETS = {
   history: [{ at: "2026-11-10T18:30:00+00:00", by_name: "Liga Leitung", changes: [{ week: 1, mode: "ctl", from: null, to: "kai" }] }],
 };
 
-async function setup(page, user, { matchPage = PAGE, posts = [], puts = [] } = {}) {
+// `matchPage` darf eine Funktion sein (der Stand ändert sich im Test), `handle(url, method, body)` beantwortet eigene Aufrufe vorab.
+async function setup(page, user, { matchPage = PAGE, posts = [], puts = [], handle = null } = {}) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
@@ -110,7 +112,9 @@ async function setup(page, user, { matchPage = PAGE, posts = [], puts = [] } = {
     if (url === "/api/auth/me") return route.fulfill(json(user));
     if (url === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
     if (url === "/api/leagues") return route.fulfill(json({ leagues: [] }));
-    if (url === "/api/matches/m1/page") return route.fulfill(json(matchPage));
+    const own = handle ? handle(url, request.method(), request.method() === "GET" ? null : request.postDataJSON()) : undefined;
+    if (own !== undefined) return route.fulfill(json(own));
+    if (url === "/api/matches/m1/page") return route.fulfill(json(typeof matchPage === "function" ? matchPage() : matchPage));
     if (url === "/api/matches/m1/chat") return route.fulfill(json([]));
     if (url === "/api/admin/leagues/seasons/s1") return route.fulfill(json(SEASON_PAGE));
     if (url === "/api/admin/leagues/seasons/s1/readiness") return route.fulfill(json({ ok: true, problems: [], warnings: [], requirements: [], max_maps: 5, superadmin: true }));
@@ -256,37 +260,103 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       await shot(page, testInfo, `veto-vorgabe-fehlt-${width}`, page.getByTestId("checkin-panel"));
     });
 
-    test(`Matchseite: nachgetragene Vorgabe - „Veto starten“ ohne Frist, der Klick geht an den Server bei ${width} px`, async ({ page }, testInfo) => {
+    test(`Matchseite: nachgetragene Vorgabe - zwei Seiten tippen „Bereit zum Veto“, erst dann beginnt es bei ${width} px`, async ({ page, browser }, testInfo) => {
+      // Ein Spiel, zwei Konten: der Captain der Heimseite und der Captain der Gegenseite, je in einem eigenen Fenster. Beide lesen
+      // denselben nachgestellten Stand - wer „Bereit“ tippt, ändert ihn für beide.
+      const state = { ready: { a: false, b: false }, posts: [] };
+      const sideView = (own) => {
+        const other = own === "a" ? "b" : "a";
+        const started = state.ready.a && state.ready.b;
+        const sides = [{ ...OWN, own: own === "a" }, { ...OTHER, own: own === "b" }];
+        if (started) {
+          const running = { ...RUNNING, own_turn: own === "a", can_pick: own === "a", pick_hint: own === "a" ? null : `Jetzt ist ${SIDES[0]} am Zug.`, start: null };
+          return { ...PAGE, acting_registration_id: own, checkin: { ...CHECKIN, sides, own_registration_id: own, veto: running } };
+        }
+        const start = {
+          sides: [{ registration_id: "a", name: SIDES[0], ready: state.ready.a, own: own === "a" }, { registration_id: "b", name: SIDES[1], ready: state.ready.b, own: own === "b" }],
+          own_ready: state.ready[own], other_ready: state.ready[other], can_ready: !state.ready[own], can_withdraw: state.ready[own] && !state.ready[other],
+          hint: START_READY, lead: null,
+        };
+        const waiting = { ...BLOCKED, step_seconds: 60, presets: PRESETS, blocked: null, pick_hint: START_READY, start };
+        return { ...PAGE, acting_registration_id: own, checkin: { ...CHECKIN, sides, own_registration_id: own, start_hint: START_READY, veto: waiting } };
+      };
+      const serve = (own) => ({
+        matchPage: () => sideView(own),
+        handle: (url, method, body) => {
+          if (url !== "/api/matches/m1/veto/ready" || method !== "POST") return undefined;
+          state.posts.push({ side: own, body });
+          state.ready[own] = Boolean(body.ready);
+          const started = state.ready.a && state.ready.b;
+          return { started, status: started ? "running" : null, version: started ? 1 : null, idempotent_replay: false, ready: state.ready[own] };
+        },
+      });
       await page.setViewportSize({ width, height: 1000 });
-      const posts = [];
-      const ready = { ...BLOCKED, step_seconds: 60, presets: PRESETS, blocked: null, pick_hint: START_READY, start: { can_start: true, hint: null } };
-      await setup(page, CAPTAIN, { posts, matchPage: { ...PAGE, checkin: { ...CHECKIN, start_hint: START_READY, veto: ready } } });
+      await setup(page, CAPTAIN, serve("a"));
+      const context = await browser.newContext({ viewport: { width, height: 1000 }, baseURL: testInfo.project.use.baseURL });
+      const guest = await context.newPage();
+      await setup(guest, OTHER_CAPTAIN, serve("b"));
+
       await page.goto("/matches/m1");
       await expect(page.getByTestId("checkin-slim")).toContainText("Beide Seiten eingecheckt");
       await expect(page.getByTestId("veto-panel")).toHaveAttribute("data-start-ready", "true");
-      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – Veto starten");
-      await expect(page.getByTestId("veto-text")).toContainText("Tippt auf „Veto starten“, sobald beide Teams bereit sind.");
+      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – bereit zum Veto?");
+      await expect(page.getByTestId("veto-text")).toContainText("Das Veto beginnt, wenn beide Seiten bereit sind.");
       await expect(page.getByTestId("veto-preset-ctl")).toContainText("Kaimauer");
-      await expect(page.getByTestId("veto-start")).toContainText("Bis dahin läuft keine Frist");
+      await expect(page.getByTestId("veto-ready-note")).toContainText("bis dahin gibt es keine Frist");
       // Kein Countdown, kein Brett, kein „Spiel starten“ - erst das Veto.
       await expect(page.getByTestId("veto-countdown")).toHaveCount(0);
       await expect(page.getByTestId("veto-board")).toHaveCount(0);
       await expect(page.getByTestId("checkin-start-button")).toHaveCount(0);
       await expectNoSideScroll(page);
-      await shot(page, testInfo, `veto-starten-${width}`, page.getByTestId("checkin-panel"));
-      await page.getByTestId("veto-start-button").click();
-      await expect.poll(() => posts.find((row) => row.path === "/api/matches/m1/veto/start")?.body).toEqual({});
 
-      // Die Leitung (keine Seite) sieht den Stand, aber keinen Knopf.
-      await page.unrouteAll({ behavior: "ignoreErrors" });
-      const asLead = { ...ready, start: { can_start: false, hint: START_READY } };
-      await setup(page, LEAD, { matchPage: { ...PAGE, acting_registration_id: null, checkin: { ...CHECKIN, own_registration_id: null, start_hint: START_READY,
-        sides: [{ ...OWN, own: false }, OTHER], veto: asLead, lead: { can_enter: false, conflict: null, rosters: {} } } } });
-      await page.goto("/matches/m1");
-      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – Veto starten");
-      await expect(page.getByTestId("veto-text")).toContainText("Captain oder Vertreter einer Seite startet das Veto.");
-      await expect(page.getByTestId("veto-start-button")).toHaveCount(0);
+      // Die Heimseite ist bereit: Sie wartet, kann zurücknehmen - nichts beginnt.
+      await page.getByTestId("veto-ready-button").click();
+      await expect(page.getByTestId("veto-text")).toHaveText("Ihr seid bereit – wartet auf die Gegenseite.");
+      await expect(page.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "true");
+      await expect(page.getByTestId("veto-ready-side-b")).toHaveAttribute("data-ready", "false");
+      await expect(page.getByTestId("veto-ready-withdraw")).toBeVisible();
+      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – bereit zum Veto?");
       await expectNoSideScroll(page);
+      await shot(page, testInfo, `veto-bereit-wartet-${width}`, page.getByTestId("checkin-panel"));
+
+      // Die Gegenseite sieht es in ihrem Fenster und tippt selbst - jetzt beginnt das Veto, für beide.
+      await guest.goto("/matches/m1");
+      await expect(guest.getByTestId("veto-text")).toContainText(`${SIDES[0]} ist bereit – tippt auf „Bereit zum Veto“, dann beginnt es sofort.`);
+      await expect(guest.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "true");
+      await expect(guest.getByTestId("veto-ready-withdraw")).toHaveCount(0);
+      await expectNoSideScroll(guest);
+      await shot(guest, testInfo, `veto-bereit-gegenseite-${width}`, guest.getByTestId("checkin-panel"));
+      await guest.getByTestId("veto-ready-button").click();
+      await expect(guest.getByTestId("veto-headline")).toHaveText("Veto läuft");
+      // Die Heimseite hat nichts getippt: Ihr Fenster fragt nach und zeigt das laufende Veto von selbst.
+      await expect(page.getByTestId("veto-headline")).toHaveText("Veto läuft", { timeout: 10_000 });
+      await expect(page.getByTestId("veto-ready")).toHaveCount(0);
+      expect(state.posts).toEqual([{ side: "a", body: { ready: true } }, { side: "b", body: { ready: true } }]);
+      await context.close();
+    });
+
+    test(`Matchseite: Leitung startet ein wartendes Veto im Notfall nur mit Grund bei ${width} px`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const posts = [];
+      const start = {
+        sides: [{ registration_id: "a", name: SIDES[0], ready: true, own: false }, { registration_id: "b", name: SIDES[1], ready: false, own: false }],
+        own_ready: false, other_ready: false, can_ready: false, can_withdraw: false, hint: START_READY, lead: { can_start: true, conflict: null },
+      };
+      const waiting = { ...BLOCKED, step_seconds: 60, presets: PRESETS, blocked: null, pick_hint: START_READY, start };
+      await setup(page, LEAD, { posts, matchPage: { ...PAGE, acting_registration_id: null, checkin: { ...CHECKIN, own_registration_id: null, start_hint: START_READY,
+        sides: [{ ...OWN, own: false }, OTHER], veto: waiting, lead: { can_enter: false, conflict: null, rosters: {} } } } });
+      await page.goto("/matches/m1");
+      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – bereit zum Veto?");
+      await expect(page.getByTestId("veto-text")).toContainText(`${SIDES[0]} ist bereit.`);
+      await expect(page.getByTestId("veto-ready-button")).toHaveCount(0);
+      await page.getByTestId("veto-lead-start-button").click();
+      await expect(page.getByTestId("veto-lead-start-problem")).toContainText("Grund");
+      expect(posts.filter((row) => row.path.includes("/veto/"))).toEqual([]);
+      await page.getByTestId("veto-lead-start-reason").fill("Captain der Falken ohne Netz, per Telefon bereit");
+      await expectNoSideScroll(page);
+      await shot(page, testInfo, `veto-bereit-leitung-${width}`, page.getByTestId("checkin-panel"));
+      await page.getByTestId("veto-lead-start-button").click();
+      await expect.poll(() => posts.find((row) => row.path === "/api/matches/m1/veto/start")?.body).toEqual({ reason: "Captain der Falken ohne Netz, per Telefon bereit" });
     });
   }
 });

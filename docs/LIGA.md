@@ -2283,27 +2283,43 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
   `league_veto.outlook` (`running`, `waiting`, `skipped`): Entfällt das Veto in diesem Spiel, weil die Vorlage nicht passt (`skipped`),
   heißt es „… ihr könnt starten. In diesem Spiel läuft kein Veto, die Maps tragt ihr beim Ergebnis ein. …“ – nicht mehr „jetzt läuft das
   Map-Veto“.
-- **Nachtragen startet nicht von selbst** (Fabian 11.11.): Hat ein Veto auf die Vorgabe gewartet (`league_veto.wait_of`: der Merker
-  `flow.veto_wait` zum geltenden Termin und seiner Revision), beginnt es **nie mehr automatisch** – weder beim Speichern der Vorgabe
-  noch beim Lesen der Matchseite noch im Job. Sonst liefe die Zeit je Schritt, während die Teams vielleicht nicht mehr da sind, und das
-  System wählte für sie. Stattdessen:
+- **Nachtragen startet nicht von selbst** (Fabian 11.11., Nr. 124 und 127): Hat ein Veto auf die Vorgabe gewartet
+  (`league_veto.wait_of`: der Merker `flow.veto_wait` zum geltenden Termin und seiner Revision), beginnt es **nie mehr automatisch** –
+  weder beim Speichern der Vorgabe noch beim Lesen der Matchseite noch im Job. Sonst liefe die Zeit je Schritt, während die Teams
+  vielleicht nicht mehr da sind, und das System wählte für sie. **Der Merker allein entscheidet** (Review): Nimmt die Leitung den
+  Schritt `preset` aus der Vorlage, während ein Spiel wartet, bleibt es beim Start von Hand – keine Frist läuft los. Stattdessen:
   1. Das Speichern der Vorgaben ruft `league_veto_sweep.announce_waiting`: Für jedes Spiel der Season mit gültigem Merker, dessen
      Vorgabe jetzt passt, bekommen die Verantwortlichen **beider Seiten** (Captain, Vertreter – `responsible_user_ids`) „Vorgabe da –
      Veto kann starten“ (Art `match_call`, `meta.reason` `veto_preset_ready`, Schlüssel `veto-preset-ready:<spiel>:<termin>:<rev>`).
      Einmal je Spiel und Termin: `flow.veto_wait.ready_at` wird mit Bedingung gesetzt, Protokoll `match.veto.ready`. Ein zweites
      Speichern meldet nicht noch einmal. Ein Spiel hält die anderen nicht auf.
-  2. Die Matchseite zeigt **„Vorgabe steht – Veto starten“** (Veto-Block `start: {can_start, hint}`, Stand weiter `veto`,
-     `start_hint` = „Die Vorgabe der Woche steht – Captain oder Vertreter einer Seite tippt auf ‚Veto starten‘. Vorher läuft keine
-     Zeit.“). Bis zum Start gibt es **keine Frist**.
-  3. `POST /api/matches/{id}/veto/start` (ohne Inhalt) – Captain oder Vertreter **einer** der beiden Seiten, Rechte wie bei einem Zug
-     (`acting_registration`; Leitung und Unbeteiligte 403), unter der Turniersperre. `league_veto.manual_start` ruft
-     `ensure_started(manual=True)`: Erst jetzt entsteht `flow.veto` mit der dann geltenden Vorgabe, die erste Frist läuft ab diesem
-     Moment, beide Seiten bekommen wie immer „Veto läuft“. Protokoll `match.veto.start` mit `via: "manual"` und der Person.
-     **Idempotent:** Geschrieben wird mit der Bedingung „kein Veto für diesen Termin“ – Doppelklick, zweites Gerät oder beide Seiten
-     gleichzeitig beginnen genau ein Veto, alle weiteren Aufrufe antworten 200 mit `idempotent_replay: true`. Fehlt die Vorgabe (noch
-     oder wieder), 409 mit dem Satz der Woche.
-  Ohne Merker bleibt alles wie in D.3: Steht die Vorgabe schon vor dem Check-in beider Seiten, beginnt das Veto von selbst. Ein neuer
-  Termin macht den Merker ungültig – nach erneutem Check-in gilt wieder der automatische Start (oder ein neues Warten).
+  2. Die Matchseite zeigt **„Vorgabe steht – bereit zum Veto?“** und wer schon bereit ist (Veto-Block `start`, Stand weiter `veto`,
+     `start_hint` = „Das Veto beginnt, sobald beide Seiten ‚Bereit zum Veto‘ getippt haben. Vorher läuft keine Zeit.“). Bis zum Start
+     gibt es **keine Frist**.
+  3. **Beide Seiten tippen „Bereit zum Veto“** (Nr. 127): `POST /api/matches/{id}/veto/ready` `{ready: true|false}` – Captain oder
+     Vertreter der **eigenen** Seite, Rechte wie bei einem Zug (`acting_registration`; Leitung und Unbeteiligte 403), unter der
+     Turniersperre (`league_veto.set_ready`). Die Markierung steht am Merker: `flow.veto_wait.ready.<registration_id> = {at}` (ohne
+     Person – die steht im Protokoll `match.veto.ready_side` mit `registration_id` und `ready`).
+     - Ist erst **eine** Seite bereit, beginnt nichts. Die Gegenseite bekommt einmal „Gegenseite bereit zum Veto“ (`match_call`,
+       `meta.reason` `veto_side_ready`, Schlüssel `veto-side-ready:<spiel>:<termin>:<rev>:<seite>` – auch nach Zurücknehmen und
+       erneutem „Bereit“ nur einmal).
+     - **Zurücknehmen** (`ready: false`) geht, solange die Gegenseite noch nicht bereit ist (Bedingung auf deren Markierung, sonst 409
+       „Die Gegenseite ist schon bereit – das Veto beginnt.“); läuft das Veto, 409.
+     - Mit der **zweiten** Seite ruft `set_ready` `ensure_started(manual=True, via="ready")`: Erst jetzt entsteht `flow.veto` mit der
+       dann geltenden Vorgabe, die erste Frist läuft ab diesem Moment, beide Seiten bekommen wie immer „Veto läuft“. Protokoll
+       `match.veto.start` mit `via: "ready"` und der Person, die zuletzt getippt hat.
+     - **Idempotent:** Jede Markierung und der Start schreiben mit Bedingung („noch nicht markiert“, „kein Veto für diesen Termin“) –
+       Doppelklick, zweites Gerät oder beide Seiten gleichzeitig beginnen genau ein Veto; Wiederholungen antworten 200 mit
+       `idempotent_replay: true`. Antwort `{started, status, version, ready, idempotent_replay}`. Fehlt die Vorgabe (noch oder
+       wieder), 409 mit dem Satz der Woche.
+  4. **Notfall-Start der Leitung:** `POST /api/matches/{id}/veto/start` `{reason, conflict_reason?}` – Liga-Recht `matches`,
+     Befangenheit wie B.1 (403, Superadmin mit `conflict_reason`), Grund 5–500 Zeichen (`league_veto.lead_start`). Beginnt das wartende
+     Veto, ohne dass beide Seiten bereit sind; Protokoll `match.veto.lead` mit `action: "start"` und Grund, dazu `match.veto.start` mit
+     `via: "lead"`, Eintrag in `lead_log[]` des Vetos (Datenschutz wie jeder Eingriff). Ohne wartendes Veto 409.
+  Ohne Merker bleibt alles wie in D.3: Steht die Vorgabe schon vor dem Check-in beider Seiten, beginnt das Veto von selbst. **Ein neuer
+  Termin oder eine neue Revision** macht den Merker ungültig und setzt damit die Bereit-Markierungen zurück
+  (`league_veto.ready_sides` liest sie nur zum geltenden Termin) – nach erneutem Check-in gilt wieder der automatische Start (oder ein
+  neues Warten).
 - **Änderung der Vorgabe:** Sie gilt nur für Vetos, die **noch nicht begonnen** haben. Ein begonnenes Veto trägt den Schnappschuss
   `flow.veto.week` und `flow.veto.presets` (`[{mode, map_id}]`) – auch nach „Neu starten“ der Leitung und im fertigen Veto
   (`planned_games` bleibt). Erst ein neuer Termin (neue Revision) beginnt ein neues Veto mit der dann geltenden Vorgabe. Protokoll
@@ -2416,10 +2432,13 @@ mode_icon_url?, position, map_id, map_name, map_image_url}` – vor dem Start di
 und `blocked` (`{week, text}`, nur im Stand `waiting`, wenn die Vorgabe fehlt oder nicht passt; sonst `null`). Im Brett steht die
 vorgegebene Map von Anfang an als `preset`, bei `never` in den anderen Modi als `elsewhere`. Der Veto-Block zeigt die Vorgabe schon vor
 dem Check-in („Vorgabe der Woche · Spielwoche 2“) und sagt im Wartestand „Veto wartet auf die Vorgabe der Woche“ samt dem Satz, dass
-nichts von selbst gewertet wird. `start` (`{can_start, hint}`, nur im Stand `waiting`, sonst `null`): Die nachgetragene Vorgabe steht,
-das Veto wartet auf „Veto starten“ – Überschrift „Vorgabe steht – Veto starten“, der Knopf nur für die Seiten (`can_start`), darunter
-„Erst ab dem Start läuft die Zeit … Bis dahin läuft keine Frist“. Im Wartestand (Vorgabe fehlt oder Start steht aus) fragt die Seite
-alle 3 Sekunden nach, sobald beide Seiten eingecheckt sind. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
+nichts von selbst gewertet wird. `start` (nur im Stand `waiting`, sonst `null`): Die nachgetragene Vorgabe steht,
+das Veto wartet auf „Bereit zum Veto“ beider Seiten – `{sides: [{registration_id, name, ready, own}], own_ready, other_ready, can_ready,
+can_withdraw, hint, lead: {can_start, conflict} | null}`. Überschrift „Vorgabe steht – bereit zum Veto?“, je Seite „bereit“ oder „noch
+nicht bereit“, der Satz darunter je nach Stand („Ihr seid bereit – wartet auf die Gegenseite.“, „… ist bereit – tippt auf ‚Bereit zum
+Veto‘, dann beginnt es sofort.“), Knopf **Bereit zum Veto** bzw. **Doch nicht bereit** nur für die Seiten, für die Leitung der Kasten
+**Notfall: Veto starten** mit Pflichtgrund. Im Wartestand (Vorgabe fehlt oder Start steht aus) fragt die Seite alle 3 Sekunden nach,
+sobald beide Seiten eingecheckt sind – so sieht jede Seite ohne Neuladen, dass die andere bereit ist. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
 Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4.
 
 **Datenschutz:** `flow.veto` ist intern (`flow` in `match_public_view.INTERNAL_KEYS`); `planned_games` ist öffentlich (keine Personen).
@@ -2436,7 +2455,8 @@ Eingriffe als Leitung (`veto_lead`: Vorgang und Zeit). Kontolöschung (`match_fl
 | `GET …/seasons/{id}/veto-presets` (#2326) | jede Zuständigkeit der Liga | – | – |
 | `PUT …/seasons/{id}/veto-presets` (#2326) | `season` | – | – |
 | Spiel: `POST /veto/pick` | keins – nur Captain oder Vertreter der Seite am Zug | – | – |
-| Spiel: `POST /veto/start` (#2326) | keins – nur Captain oder Vertreter einer der beiden Seiten | – | – |
+| Spiel: `POST /veto/ready` (#2326, Nr. 127) | keins – nur Captain oder Vertreter der eigenen Seite | – | – |
+| Spiel: `POST /veto/start` (#2326, Nr. 127: Notfall-Start) | `matches` | ja (Notausnahme `conflict_reason`) | – |
 | Spiel: `POST /veto/lead` | `matches` | ja (Notausnahme `conflict_reason`) | – |
 
 **Verwaltung:** Season-Seite, Reiter Spielbetrieb, Kasten **Veto** (Sprungmarke `#veto`, nach „Serie“ – die Vorlage bezieht sich auf
@@ -2466,7 +2486,7 @@ Beides ist Teil von Fingerabdruck und Vorschlag: Eine geänderte Vorlage löst �
 `pending_release`), die veröffentlichte Fassung zeigt bis zur Freigabe ihren Stand von damals.
 
 **App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. **Audit-Aktionen neu:** `match.veto.start`,
-`match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`; seit #2326 `match.veto.waiting`, `match.veto.ready`
+`match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`; seit #2326 `match.veto.waiting`, `match.veto.ready`, `match.veto.ready_side`
 und `league.season.veto_presets`.
 
 ### Season-Seite der Verwaltung (#2267)

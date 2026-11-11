@@ -559,9 +559,9 @@ Was gilt:
 - **Ohne Vorgabe beginnt das Veto nicht.** Sind beide Seiten eingecheckt und für die Woche fehlt die Map, sagt die Matchseite das, und
   ihr bekommt einen Hinweis (einmal je Spielwoche, mit Link zum Kasten). Gewertet wird nichts von selbst.
 - **Nachtragen startet das Veto nicht.** Speichert ihr die fehlende Vorgabe, bekommen die Captains (bzw. Vertreter) beider Seiten die
-  Nachricht „Vorgabe da – Veto kann starten“. Das Veto beginnt erst, wenn einer von ihnen auf der Matchseite **Veto starten** tippt –
-  so läuft keine Zeit ab, während niemand da ist. Bis dahin gibt es keine Frist. Die Meldung nach dem Speichern sagt, wie viele Spiele
-  gewartet haben.
+  Nachricht „Vorgabe da – Veto kann starten“. Das Veto beginnt erst, wenn **beide Seiten** auf der Matchseite **Bereit zum Veto**
+  getippt haben – so läuft keine Zeit ab, während jemand fehlt. Bis dahin gibt es keine Frist. Die Meldung nach dem Speichern sagt, wie
+  viele Spiele gewartet haben. Das gilt auch, wenn ihr den Schritt **Vorgabe** aus der Schrittfolge nehmt, während ein Spiel wartet.
 - **Ändern wirkt nur nach vorn.** Eine geänderte Vorgabe gilt für Spiele, deren Veto noch nicht begonnen hat. Ein laufendes oder
   fertiges Veto behält seine Map, auch nach **Neu starten**. Jede Änderung steht im Protokoll und im Verlauf.
 - **Pool geändert?** Steht eine vorgegebene Map nicht mehr im Pool des Modus, zählt die Woche wieder als fehlend. Der Block und **Was
@@ -945,12 +945,21 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   („Map 3 · Vorgabe der Woche“). **Letzten Schritt zurück** nimmt nur Züge der Seiten zurück, die Vorgabe bleibt.
 - **Vorgabe fehlt:** Statt „Veto läuft“ steht **Veto wartet auf die Vorgabe der Woche** mit der Woche und dem Modus. Niemand kann
   ziehen oder starten, gewertet wird nichts. Tragt die Map in der Season nach (2.7d).
-- **Vorgabe steht – Veto starten:** Nach dem Nachtragen bekommen beide Seiten die Nachricht „Vorgabe da – Veto kann starten“, und auf
-  der Matchseite steht der Knopf **Veto starten** (für Captain und Vertreter beider Seiten; ihr als Leitung seht den Stand ohne Knopf).
-  Erst mit dem Tippen beginnt das Veto und läuft die Zeit je Schritt; vorher gibt es keine Frist. Tippen beide gleichzeitig oder
-  doppelt, beginnt trotzdem nur ein Veto.
+- **Vorgabe steht – bereit zum Veto?** Nach dem Nachtragen bekommen beide Seiten die Nachricht „Vorgabe da – Veto kann starten“. Auf
+  der Matchseite tippt je Seite Captain oder Vertreter **Bereit zum Veto**:
+  1. Die Seite zeigt beiden, wer schon bereit ist („Ihr seid bereit – wartet auf die Gegenseite“). Die Gegenseite bekommt einmal eine
+     Nachricht.
+  2. Wer als Erster bereit war, kann mit **Doch nicht bereit** zurücknehmen, solange die Gegenseite noch fehlt.
+  3. Sind beide bereit, beginnt das Veto sofort. Erst ab da läuft die Zeit je Schritt, vorher gibt es keine Frist. Tippen beide
+     gleichzeitig oder doppelt, beginnt trotzdem nur ein Veto.
+  4. Ein neuer Termin setzt „Bereit“ zurück – nach dem neuen Check-in beginnt das Veto wieder von selbst, wenn die Vorgabe steht.
+- **Notfall: Veto starten (Liga-Leitung).** Kann eine Seite nicht selbst tippen (etwa Captain ohne Netz), startet ihr das wartende
+  Veto im Kasten darunter: **Grund** eintragen (Pflicht), **Veto jetzt starten**. Das braucht „Spiele betreuen“, steht mit Grund im
+  Protokoll, und im eigenen Spiel macht es eine zweite Person (Befangenheit, 2.11).
 
-<img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300"> <img src="../assets/liga/veto-starten-390.png" alt="Matchseite am Handy nach dem Nachtragen: Vorgabe steht – Veto starten, darunter die Vorgabe der Woche Kaimauer und der Knopf Veto starten mit dem Hinweis, dass erst ab dem Start die Zeit läuft" width="300">
+<img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300"> <img src="../assets/liga/veto-bereit-wartet-390.png" alt="Matchseite am Handy nach dem Nachtragen: Vorgabe steht – bereit zum Veto?, die eigene Seite ist bereit und wartet auf die Gegenseite, darunter der Knopf Doch nicht bereit und der Hinweis, dass erst ab dem Start die Zeit läuft" width="300">
+
+<img src="../assets/liga/veto-bereit-leitung.png" alt="Matchseite der Liga-Leitung am PC: eine Seite ist bereit, die andere noch nicht; darunter der Kasten Notfall: Veto starten mit dem Pflichtfeld Grund und dem Knopf Veto jetzt starten" width="640">
 
 ### 3.1a Turnier nach dem Ende noch „Live“
 

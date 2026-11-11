@@ -208,13 +208,24 @@ async def test_a_waiting_veto_never_starts_by_itself_when_the_preset_step_is_rem
     assert running["status"] == "running" and running["deadline_at"]
 
 
-@pytest.mark.asyncio
-async def test_after_the_lead_adds_the_preset_a_captain_starts_the_veto_by_hand(flow):
-    """Fabian 11.11.: Nachtragen startet nicht sofort. Beide Seiten bekommen „Vorgabe da – Veto kann starten“; das Veto beginnt erst,
-    wenn Captain oder Vertreter einer Seite „Veto starten“ tippt - ohne Zeitlimit davor, idempotent bei Doppelklick."""
-    world = await preset_world(flow, [preset(2, "map-kai")])
+async def ready(flow, world, user, value: bool = True):
+    flow.act_as(user if isinstance(user, dict) else world["users"][user])
+    return await flow.post(f"/api/matches/{mid(world)}/veto/ready", json={"ready": value})
+
+
+async def waiting_world(flow, letter: str = "A") -> dict:
+    """Beide Seiten eingecheckt, die Vorgabe fehlte - dann trägt die Leitung sie nach (Kai für Spielwoche 1)."""
+    world = await preset_world(flow, [preset(2, "map-kai")], letter=letter)
     await both_in(flow, world)
-    await set_presets(flow, world, [preset(1, "map-ruine"), preset(2, "map-kai")])
+    await set_presets(flow, world, [preset(1, "map-kai"), preset(2, "map-kai")])
+    return world
+
+
+@pytest.mark.asyncio
+async def test_after_the_lead_adds_the_preset_both_sides_say_ready_before_the_veto_starts(flow):
+    """Fabian 11.11. (Nr. 124, 127): Nachtragen startet nicht sofort. Beide Seiten bekommen „Vorgabe da – Veto kann starten“; das Veto
+    beginnt erst, wenn Captain oder Vertreter **beider** Seiten „Bereit zum Veto“ getippt haben - ohne Zeitlimit davor."""
+    world = await waiting_world(flow)
     told = await league_veto_sweep.announce_waiting(flow.db, world["season_id"])
     assert told == 1
     stored = await flow.reload(world["match"])
@@ -223,89 +234,162 @@ async def test_after_the_lead_adds_the_preset_a_captain_starts_the_veto_by_hand(
     recipients = {row["user_id"] for row in notes}
     assert {world["users"]["Kapitaen"]["id"], world["users"]["Falke1"]["id"]} <= recipients and world["lead"]["id"] not in recipients
     assert len(notes) == len(recipients) and all(row["title"] == "Vorgabe da – Veto kann starten" for row in notes)
-    assert notes[0]["url"] == f"/matches/{mid(world)}" and "Veto starten" in notes[0]["body"]
+    assert notes[0]["url"] == f"/matches/{mid(world)}" and "„Bereit zum Veto“" in notes[0]["body"] and "beide Seiten" in notes[0]["body"]
     assert all(row["meta"]["dedupe_key"] == f"veto-preset-ready:{mid(world)}:{stored['flow']['veto_wait']['for_at']}:0" for row in notes)
     assert await flow.db.audit_logs.count_documents({"action": "match.veto.ready"}) == 1
     # Ein zweites Speichern (andere Map) meldet nicht noch einmal.
-    await set_presets(flow, world, [preset(1, "map-kai"), preset(2, "map-kai")])
+    await set_presets(flow, world, [preset(1, "map-ruine"), preset(2, "map-kai")])
     again = await league_veto_sweep.announce_waiting(flow.db, world["season_id"])
     assert again == 0 and await flow.db.notifications.count_documents({"meta.reason": "veto_preset_ready"}) == len(notes)
 
-    # Die Matchseite sagt „Vorgabe steht – Veto starten“: den Seiten mit Knopf, der Leitung ohne.
+    # Die Matchseite zeigt, wer bereit ist - den Seiten mit Knopf, der Leitung mit dem Notfall-Start.
+    reg_a, reg_h = world["reg_a"]["id"], world["reg_h"]["id"]
     own = (await page(flow, world, "Kapitaen"))["checkin"]
     assert own["state"] == "veto" and own["can_start"] is False and own["start_hint"] == league_veto.START_READY_DETAIL
-    assert own["veto"]["status"] == "waiting" and own["veto"]["blocked"] is None and own["veto"]["start"] == {"can_start": True, "hint": None}
-    assert own["veto"]["presets"][0]["map_name"] == "Kai" and own["veto"]["step_seconds"] == 60
+    start = own["veto"]["start"]
+    assert own["veto"]["status"] == "waiting" and own["veto"]["blocked"] is None and own["veto"]["step_seconds"] == 60
+    assert [(row["registration_id"], row["ready"], row["own"]) for row in start["sides"]] == [(reg_a, False, True), (reg_h, False, False)]
+    assert (start["own_ready"], start["other_ready"], start["can_ready"], start["can_withdraw"], start["lead"]) == (False, False, True, False, None)
+    assert own["veto"]["presets"][0]["map_name"] == "Ruine"
     as_lead = await veto_block(flow, world, world["lead"])
-    assert as_lead["start"] == {"can_start": False, "hint": league_veto.START_READY_DETAIL}
+    assert as_lead["start"]["can_ready"] is False and as_lead["start"]["lead"] == {"can_start": True, "conflict": None}
     # Kein Zeitlimit vor dem Start: Weder das Lesen der Seite noch die Jobs beginnen das Veto - auch eine Stunde später nicht.
     later = now_utc() + timedelta(hours=1)
     await league_veto_sweep.sweep(flow.db, now=later)
-    tournament = await flow.db.tournaments.find_one({"id": world["tournament"]["id"]}, {"_id": 0})
+    tournament = await tournament_of(flow, world)
     untouched = await league_veto.ensure_started(flow.db, await flow.reload(world["match"]), tournament, now=later)
     assert "veto" not in untouched["flow"]
     move = await pick(flow, world, "Kapitaen", "map-glut", 0)
     assert move.status_code == 409 and move.json()["detail"] == league_veto.START_READY_DETAIL
+
+    # Rechte wie bei einem Zug: Fremde und die Leitung tippen nicht „Bereit“.
+    foreign = await ready(flow, world, "Fremd")
+    by_lead = await ready(flow, world, world["lead"])
+    assert foreign.status_code in (403, 404) and by_lead.status_code == 403
+    # Die erste Seite ist bereit: Nichts beginnt, die Gegenseite bekommt einmal eine Nachricht, die Seite zeigt es beiden.
+    first = await ready(flow, world, "Kapitaen")
+    assert first.status_code == 200 and first.json() == {"started": False, "status": None, "version": None, "idempotent_replay": False, "ready": True}
+    double = await ready(flow, world, "Kapitaen")
+    assert double.status_code == 200 and double.json()["idempotent_replay"] is True and double.json()["started"] is False
+    stored = await flow.reload(world["match"])
+    assert "veto" not in stored["flow"] and league_veto.ready_sides(stored) == {reg_a}
+    told_other = await flow.db.notifications.find({"meta.reason": "veto_side_ready"}, {"_id": 0}).to_list(20)
+    assert world["users"]["Falke1"]["id"] in {row["user_id"] for row in told_other}
+    assert world["users"]["Kapitaen"]["id"] not in {row["user_id"] for row in told_other}, "nur die Gegenseite"
+    assert told_other[0]["title"] == "Gegenseite bereit zum Veto" and "Loewen · Rudel A ist bereit zum Veto" in told_other[0]["body"]
+    mine = (await veto_block(flow, world, "Kapitaen"))["start"]
+    assert (mine["own_ready"], mine["other_ready"], mine["can_ready"], mine["can_withdraw"]) == (True, False, False, True)
+    theirs = (await veto_block(flow, world, "Falke1"))["start"]
+    assert (theirs["own_ready"], theirs["other_ready"], theirs["can_ready"], theirs["can_withdraw"]) == (False, True, True, False)
+    # Zurücknehmen geht, solange die Gegenseite nicht bereit ist - und ein erneutes „Bereit“ meldet nicht noch einmal.
+    back = await ready(flow, world, "Kapitaen", False)
+    assert back.status_code == 200 and back.json()["ready"] is False and league_veto.ready_sides(await flow.reload(world["match"])) == set()
+    back_again = await ready(flow, world, "Kapitaen", False)
+    assert back_again.status_code == 200 and back_again.json()["idempotent_replay"] is True
+    once_more = await ready(flow, world, "Kapitaen")
+    assert once_more.status_code == 200 and await flow.db.notifications.count_documents({"meta.reason": "veto_side_ready"}) == len(told_other)
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 0
 
-    # Rechte wie bei einem Zug: Fremde und die Leitung starten nicht.
-    url = f"/api/matches/{mid(world)}/veto/start"
-    flow.act_as(world["users"]["Fremd"])
-    foreign = await flow.post(url, json={})
-    flow.act_as(world["lead"])
-    by_lead = await flow.post(url, json={})
-    assert foreign.status_code in (403, 404) and by_lead.status_code == 403 and "veto" not in (await flow.reload(world["match"]))["flow"]
-    # „Veto starten“: Der erste Klick beginnt es, der zweite (auch von der anderen Seite) ist folgenlos.
-    flow.act_as(world["users"]["Falke1"])
-    first = await flow.post(url, json={})
-    assert first.status_code == 200 and first.json() == {"version": 1, "status": "running", "idempotent_replay": False}
-    second = await flow.post(url, json={})
-    flow.act_as(world["users"]["Kapitaen"])
-    third = await flow.post(url, json={})
-    assert second.status_code == 200 and second.json()["idempotent_replay"] is True
-    assert third.status_code == 200 and third.json() == {"version": 1, "status": "running", "idempotent_replay": True}
+    # Die zweite Seite ist bereit: Jetzt beginnt das Veto - mit der Vorgabe, die beim Start gilt, und der Frist ab jetzt.
+    second = await ready(flow, world, "Falke1")
+    assert second.status_code == 200 and second.json() == {"started": True, "status": "running", "version": 1, "idempotent_replay": False, "ready": True}
     veto = await stored_veto(flow, world)
-    assert veto["status"] == "running" and veto["presets"] == [{"mode": CTL, "map_id": "map-kai"}], "die Vorgabe beim Start gilt"
+    assert veto["status"] == "running" and veto["presets"] == [{"mode": CTL, "map_id": "map-ruine"}]
     assert veto["deadline_at"] > now_utc().isoformat(), "die Zeit je Schritt läuft erst ab dem Start"
     assert "veto_wait" not in (await flow.reload(world["match"]))["flow"]
     starts = await flow.db.audit_logs.find({"action": "match.veto.start"}, {"_id": 0}).to_list(5)
-    assert len(starts) == 1 and starts[0]["actor_id"] == world["users"]["Falke1"]["id"] and starts[0]["data"]["via"] == "manual"
+    assert len(starts) == 1 and starts[0]["actor_id"] == world["users"]["Falke1"]["id"] and starts[0]["data"]["via"] == "ready"
+    assert await flow.db.audit_logs.count_documents({"action": "match.veto.ready_side"}) == 4, "bereit, zurück, bereit, bereit"
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 2
+    # Danach: Wiederholung ist folgenlos, zurücknehmen geht nicht mehr.
+    replay = await ready(flow, world, "Kapitaen")
+    too_late = await ready(flow, world, "Kapitaen", False)
+    assert replay.status_code == 200 and replay.json()["idempotent_replay"] is True and replay.json()["started"] is True
+    assert too_late.status_code == 409 and "läuft schon" in too_late.json()["detail"]
     block = await veto_block(flow, world, "Kapitaen")
     assert block["status"] == "running" and block["start"] is None and block["own_turn"] is True
 
 
 @pytest.mark.asyncio
-async def test_two_clicks_at_once_start_one_veto_and_a_missing_preset_still_refuses(flow):
+async def test_ready_at_once_starts_one_veto_and_a_new_time_resets_the_marks(flow):
+    # Die Vorgabe fehlt noch: „Bereit“ sagt, worauf das Veto wartet - nichts wird vermerkt.
     world = await preset_world(flow, [])
     await both_in(flow, world)
-    url = f"/api/matches/{mid(world)}/veto/start"
-    flow.act_as(world["users"]["Kapitaen"])
-    # Die Vorgabe fehlt noch: „Veto starten“ sagt, worauf es wartet - nichts beginnt.
-    early = await flow.post(url, json={})
+    early = await ready(flow, world, "Kapitaen")
     assert early.status_code == 409 and "Kontrolle: Die Vorgabe der Woche fehlt." in early.json()["detail"]
+    assert league_veto.ready_sides(await flow.reload(world["match"])) == set()
     await set_presets(flow, world, [preset(1, "map-kai")])
-    both = await asyncio.gather(flow.post(url, json={}), flow.post(url, json={}))
-    assert [answer.status_code for answer in both] == [200, 200]
-    assert sorted(answer.json()["idempotent_replay"] for answer in both) == [False, True]
+    # Beide Seiten gleichzeitig und doppelt: genau ein Start.
+    flow.act_as(world["users"]["Kapitaen"])
+    url = f"/api/matches/{mid(world)}/veto/ready"
+    mine = await asyncio.gather(flow.post(url, json={"ready": True}), flow.post(url, json={"ready": True}))
+    flow.act_as(world["users"]["Falke1"])
+    theirs = await asyncio.gather(flow.post(url, json={"ready": True}), flow.post(url, json={"ready": True}))
+    assert [answer.status_code for answer in (*mine, *theirs)] == [200] * 4
+    assert [answer.json()["started"] for answer in mine] == [False, False]
+    assert sorted(answer.json()["idempotent_replay"] for answer in theirs) == [False, True] and all(answer.json()["started"] for answer in theirs)
     assert await flow.db.audit_logs.count_documents({"action": "match.veto.start"}) == 1
     assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 2
-    # Gegenprobe: Ohne vorheriges Warten (Vorgabe von Anfang an da) beginnt das Veto von selbst - „Veto starten“ ist nur die Wiederholung.
+    # Gegenprobe: Ohne vorheriges Warten (Vorgabe von Anfang an da) beginnt das Veto von selbst - „Bereit“ ist nur die Wiederholung.
     other = await preset_world(flow, [preset(1, "map-kai")], letter="B")
     await both_in(flow, other)
     running = await stored_veto(flow, other)
-    flow.act_as(other["users"]["Kapitaen"])
-    replay = await flow.post(f"/api/matches/{mid(other)}/veto/start", json={})
+    replay = await ready(flow, other, "Kapitaen")
     assert running["status"] == "running" and replay.status_code == 200 and replay.json()["idempotent_replay"] is True
-    # Ein neuer Termin macht den Merker ungültig: Nach erneutem Check-in beginnt das Veto wieder von selbst.
-    third = await preset_world(flow, [], letter="C")
-    await both_in(flow, third)
-    await set_presets(flow, third, [preset(1, "map-kai")])
-    assert league_veto.start_ready(await flow.reload(third["match"]), await flow.db.tournaments.find_one({"id": third["tournament"]["id"]}, {"_id": 0}))
+
+    # Ein neuer Termin (neue Revision) setzt die Bereit-Markierungen zurück: Nach erneutem Check-in beginnt das Veto wieder von selbst.
+    third = await waiting_world(flow, letter="C")
+    said = await ready(flow, third, "Kapitaen")
+    assert said.status_code == 200 and league_veto.ready_sides(await flow.reload(third["match"])) == {third["reg_a"]["id"]}
     await flow.db.matches_v2.update_one({"id": mid(third)}, {"$set": {"scheduled_at": (now_utc() + timedelta(minutes=5)).replace(microsecond=0).isoformat()},
                                                           "$inc": {"flow.schedule_rev": 1}, "$unset": {"flow.ready_at": "", "flow.checkin": ""}})
+    moved = await flow.reload(third["match"])
+    tournament = await tournament_of(flow, third)
+    assert league_veto.ready_sides(moved) == set() and league_veto.wait_of(moved) is None and not league_veto.start_ready(moved, tournament)
+    refused = await ready(flow, third, "Falke1")
+    assert refused.status_code == 409, "ohne Check-in zum neuen Termin gibt es nichts zu starten"
     await both_in(flow, third)
     assert (await stored_veto(flow, third))["status"] == "running"
+
+
+@pytest.mark.asyncio
+async def test_the_lead_starts_a_waiting_veto_in_an_emergency_with_a_reason(flow):
+    world = await waiting_world(flow)
+    url = f"/api/matches/{mid(world)}/veto/start"
+    # Captains und Fremde starten nicht allein - dafür gibt es „Bereit zum Veto“.
+    flow.act_as(world["users"]["Kapitaen"])
+    by_side = await flow.post(url, json={"reason": "Wir wollen los"})
+    assert by_side.status_code == 403 and "veto" not in (await flow.reload(world["match"]))["flow"]
+    flow.act_as(world["lead"])
+    without = await flow.post(url, json={})
+    short = await flow.post(url, json={"reason": "eil"})
+    assert without.status_code == 422 and short.status_code == 422 and "Grund" in short.json()["detail"]
+    assert "veto" not in (await flow.reload(world["match"]))["flow"], "ohne Grund kein Start"
+    started = await flow.post(url, json={"reason": "Falken-Captain ohne Netz, per Telefon bereit"})
+    assert started.status_code == 200 and started.json()["started"] is True and started.json()["status"] == "running"
+    assert started.json()["idempotent_replay"] is False
+    veto = await stored_veto(flow, world)
+    assert veto["lead_log"] == [{"action": "start", "at": veto["started_at"], "by": world["lead"]["id"], "reason": "Falken-Captain ohne Netz, per Telefon bereit"}]
+    log = await flow.db.audit_logs.find_one({"action": "match.veto.lead"}, {"_id": 0})
+    assert log["actor_id"] == world["lead"]["id"] and log["data"]["action"] == "start" and log["data"]["reason"].startswith("Falken-Captain")
+    start_log = await flow.db.audit_logs.find_one({"action": "match.veto.start"}, {"_id": 0})
+    assert start_log["data"]["via"] == "lead" and start_log["actor_id"] == world["lead"]["id"]
+    assert world["lead"]["id"] in (await flow.reload(world["match"]))["flow"]["user_ids"]
+    again = await flow.post(url, json={"reason": "Noch einmal getippt"})
+    assert again.status_code == 200 and again.json()["idempotent_replay"] is True
+    assert await flow.db.audit_logs.count_documents({"action": "match.veto.lead"}) == 1
+    # Befangenheit: Wer selbst im Spiel steht, startet nicht - auch nicht mit dem Liga-Recht.
+    other = await waiting_world(flow, letter="B")
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "liga", "user_id": other["users"]["LoeLeitung"]["id"],
+                                           "capabilities": ["matches"], "created_at": now_utc().isoformat()})
+    flow.act_as(other["users"]["LoeLeitung"])
+    biased = await flow.post(f"/api/matches/{mid(other)}/veto/start", json={"reason": "Eigenes Team wartet schon lange"})
+    assert biased.status_code == 403 and "veto" not in (await flow.reload(other["match"]))["flow"]
+    # Gegenprobe: Ohne Warten gibt es nichts zu starten - das Veto beginnt von selbst, die Leitung bekommt den Stand.
+    third = await preset_world(flow, [preset(1, "map-kai")], letter="C")
+    flow.act_as(third["lead"])
+    nothing = await flow.post(f"/api/matches/{mid(third)}/veto/start", json={"reason": "Ohne Check-in geht nichts"})
+    assert nothing.status_code == 409
 
 
 @pytest.mark.asyncio

@@ -6,8 +6,10 @@
 - ``GET|PUT /api/admin/leagues/seasons/{season_id}/veto-presets`` (#2326): die Vorgabe der Woche - je Spielwoche und Modus eine Map aus
   dem Pool, mit Vorschlag „rotiert durch den Pool“, fehlenden Wochen und Historie. Rechte wie die Vorlage. Eine Änderung gilt nur für
   Vetos, die noch nicht begonnen haben; Spiele, die auf die Vorgabe gewartet haben, bekommen „Vorgabe da – Veto kann starten“.
-- ``POST /api/matches/{match_id}/veto/start`` (#2326): „Veto starten“ nach einer nachgetragenen Vorgabe - Captain oder Vertreter einer
-  Seite, idempotent.
+- ``POST /api/matches/{match_id}/veto/ready`` (#2326, Nr. 127): „Bereit zum Veto“ nach einer nachgetragenen Vorgabe - Captain oder
+  Vertreter je Seite; sind beide bereit, beginnt das Veto. Zurücknehmen, solange die Gegenseite nicht bereit ist. Idempotent.
+- ``POST /api/matches/{match_id}/veto/start`` (#2326, Nr. 127): Notfall-Start durch die Liga-Leitung („Spiele betreuen“) mit Pflichtgrund,
+  Befangenheit wie B.1.
 - ``POST /api/matches/{match_id}/veto/pick``: die Seite am Zug sperrt oder wählt eine Map (Captain, Vertreter).
 - ``POST /api/matches/{match_id}/veto/lead``: Pause, Fortsetzen, Schritt zurück, Neustart - Liga-Leitung mit „Spiele betreuen“, mit Grund,
   Befangenheit wie B.1.
@@ -79,6 +81,20 @@ class PickBody(BaseModel):
 
     map_id: str = Field(min_length=1, max_length=120)
     version: int = Field(ge=0)
+
+
+class ReadyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # False nimmt „Bereit“ zurück - nur solange die Gegenseite noch nicht bereit ist.
+    ready: bool = True
+
+
+class LeadStartBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class LeadBody(BaseModel):
@@ -274,17 +290,36 @@ async def veto_pick(match_id: str, body: PickBody, me: dict = Depends(get_curren
         _raise(problem)
 
 
-@router.post("/{match_id}/veto/start")
-async def veto_start(match_id: str, me: dict = Depends(get_current_user), _mutation: None = Depends(_serialized_match_write)):
-    """„Veto starten“ (#2326): nur nötig, wenn das Veto auf die Vorgabe der Woche gewartet hat - Captain oder Vertreter einer Seite, wie
-    bei einem Zug. Sonst beginnt das Veto wie immer von selbst."""
+@router.post("/{match_id}/veto/ready")
+async def veto_ready(match_id: str, body: ReadyBody, me: dict = Depends(get_current_user),
+                     _mutation: None = Depends(_serialized_match_write)):
+    """„Bereit zum Veto“ (#2326, Nr. 127): nur, wenn das Veto auf die Vorgabe der Woche gewartet hat - Captain oder Vertreter der
+    eigenen Seite, wie bei einem Zug. Sind beide Seiten bereit, beginnt das Veto; sonst beginnt es wie immer von selbst."""
     db, match, tournament, acting_reg = await _context(match_id, me)
     if not acting_reg:
         raise HTTPException(status_code=403, detail=league_veto.NOT_A_SIDE_DETAIL)
     if not league_veto_rules.rules_of(tournament):
         raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
     try:
-        return await league_veto.manual_start(db, match, tournament, user=me)
+        return await league_veto.set_ready(db, match, tournament, registration_id=acting_reg["id"], ready=body.ready, user=me)
+    except (FlowProblem, league_veto_rules.VetoProblem) as problem:
+        _raise(problem)
+
+
+@router.post("/{match_id}/veto/start")
+async def veto_start(match_id: str, body: LeadStartBody, me: dict = Depends(get_current_user),
+                     _mutation: None = Depends(_serialized_match_write)):
+    """Notfall (#2326, Nr. 127): Die Liga-Leitung („Spiele betreuen“) beginnt ein wartendes Veto, ohne dass beide Seiten „Bereit“ getippt
+    haben - mit Pflichtgrund und Protokoll, Befangenheit wie bei jedem Eingriff."""
+    db, match, tournament, _acting_reg = await _context(match_id, me)
+    # Erst, wer handeln darf (403), dann, ob es hier ein Veto gibt (409) - wie beim Eingriff ins laufende Veto.
+    if not await has_match_result_permission(me, match, capability="matches"):
+        raise HTTPException(status_code=403, detail="Im Notfall starten kann die Liga-Leitung mit „Spiele betreuen“.")
+    await require_no_conflict(db, me, match, action="veto_start", conflict_reason=body.conflict_reason)
+    if not league_veto_rules.rules_of(tournament):
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    try:
+        return await league_veto.lead_start(db, match, tournament, reason=body.reason, user=me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)
 

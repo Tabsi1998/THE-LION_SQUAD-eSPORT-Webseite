@@ -131,7 +131,7 @@
           "id": "map-veto",
           "titel": "Map-Veto",
           "text": "Hat eure Season ein Map-Veto, kommt es nach dem Check-in beider Seiten. Ihr sperrt oder wählt abwechselnd Maps. Seid ihr dran, tippst du eine Map an. Die Uhr zeigt, wie viel Zeit bleibt. Steht eine Map als Vorgabe der Woche da, hat die Liga-Leitung sie festgelegt. Die könnt ihr weder sperren noch wählen.",
-          "hinweis": "Nicht jede Season hat ein Veto. Ohne Veto fällt dieser Schritt weg. Fehlt die Vorgabe der Woche noch, wartet das Veto, bis die Liga-Leitung sie eingetragen hat. Gewertet wird dabei nichts. Danach tippt eine Seite auf Veto starten. Erst dann läuft die Uhr.",
+          "hinweis": "Nicht jede Season hat ein Veto. Ohne Veto fällt dieser Schritt weg. Fehlt die Vorgabe der Woche noch, wartet das Veto, bis die Liga-Leitung sie eingetragen hat. Gewertet wird dabei nichts. Danach tippen beide Seiten auf Bereit zum Veto. Die Seite zeigt, wer schon bereit ist. Erst wenn beide bereit sind, beginnt das Veto und läuft die Uhr.",
           "bild": false
         },
         {

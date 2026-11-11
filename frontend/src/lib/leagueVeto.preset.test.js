@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   KIND_OPTIONS, applyRotation, historyLine, isSystemKind, mapStatusText, missingWeeks, plannedRoleLabel, presetChangeLine, presetModes,
-  presetValue, presetsPayload, presetsToForm, stepLabel, stepSentence, templateProblems, vetoHeadline, vetoRulesPayload, vetoText, weekDates,
+  presetValue, presetsPayload, presetsToForm, readyText, stepLabel, stepSentence, templateProblems, vetoHeadline, vetoRulesPayload, vetoText, weekDates,
   weekList, withPreset,
 } from "./leagueVeto";
 
@@ -102,10 +102,21 @@ describe("Matchseite", () => {
     expect(vetoHeadline(waiting)).toBe("Vorgabe der Woche");
     expect(vetoText(waiting)).toBe("Sobald beide Seiten eingecheckt sind, beginnt das Map-Veto – danach startet Map 1.");
     expect(vetoHeadline({ status: "running" })).toBe("Veto läuft");
-    // Nachgetragen: Eine Seite startet das Veto - der Satz sagt, wer.
-    const ready = { status: "waiting", blocked: null, start: { can_start: true, hint: null } };
-    expect(vetoHeadline(ready)).toBe("Vorgabe steht – Veto starten");
-    expect(vetoText(ready)).toBe("Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Tippt auf „Veto starten“, sobald beide Teams bereit sind.");
-    expect(vetoText({ ...ready, start: { can_start: false } })).toBe("Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Captain oder Vertreter einer Seite startet das Veto.");
+  });
+
+  it("nachgetragen: beide Seiten tippen „Bereit zum Veto“ - der Satz sagt jeder Seite, wer schon bereit ist", () => {
+    const sides = (own, other) => [{ registration_id: "a", name: "Löwen", ready: own, own: true }, { registration_id: "b", name: "Falken", ready: other, own: false }];
+    const start = { sides: sides(false, false), own_ready: false, other_ready: false, can_ready: true, can_withdraw: false };
+    const ready = { status: "waiting", blocked: null, presets: [{ mode: "ctl" }], start };
+    expect(vetoHeadline(ready)).toBe("Vorgabe steht – bereit zum Veto?");
+    // Steht der Schritt „Vorgabe“ nicht mehr in der Vorlage, bleibt nur die Frage.
+    expect(vetoHeadline({ ...ready, presets: [] })).toBe("Bereit zum Veto?");
+    expect(vetoText(ready)).toBe("Tippt auf „Bereit zum Veto“, sobald ihr so weit seid. Das Veto beginnt, wenn beide Seiten bereit sind.");
+    expect(readyText({ ...start, sides: sides(true, false), own_ready: true, can_ready: false, can_withdraw: true })).toBe("Ihr seid bereit – wartet auf die Gegenseite.");
+    expect(readyText({ ...start, sides: sides(false, true), other_ready: true })).toBe("Falken ist bereit – tippt auf „Bereit zum Veto“, dann beginnt es sofort.");
+    // Wer keine Seite vertritt (Leitung, Mitspieler ohne Amt), liest den Stand.
+    const watching = sides(true, false).map((row) => ({ ...row, own: false }));
+    expect(readyText({ ...start, sides: watching, can_ready: false })).toBe("Löwen ist bereit. Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.");
+    expect(readyText({ ...start, sides: watching.map((row) => ({ ...row, ready: false })), can_ready: false })).toBe("Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.");
   });
 });

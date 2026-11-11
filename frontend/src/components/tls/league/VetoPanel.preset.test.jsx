@@ -56,8 +56,8 @@ test("fehlt die Vorgabe, sagt der Block es klar und fragt weiter nach - gewertet
   expect(screen.getByTestId("veto-headline")).toHaveTextContent("Veto wartet auf die Vorgabe der Woche");
   expect(screen.getByTestId("veto-text")).toHaveTextContent(BLOCKED_TEXT);
   expect(screen.getByTestId("veto-blocked")).toHaveTextContent("Gewertet wird nichts von selbst.");
-  expect(screen.getByTestId("veto-blocked")).toHaveTextContent("startet das Veto hier selbst");
-  expect(screen.queryByTestId("veto-start")).toBeNull();
+  expect(screen.getByTestId("veto-blocked")).toHaveTextContent("wenn beide Seiten hier „Bereit zum Veto“ getippt haben");
+  expect(screen.queryByTestId("veto-ready")).toBeNull();
   expect(screen.queryByTestId("veto-presets")).toBeNull();
   vi.advanceTimersByTime(6500);
   expect(onPoll).toHaveBeenCalledTimes(2);
@@ -72,36 +72,93 @@ test("fehlt die Vorgabe, sagt der Block es klar und fragt weiter nach - gewertet
   vi.useRealTimers();
 });
 
-test("nachgetragene Vorgabe: „Veto starten“ beginnt das Veto erst auf Knopfdruck - nur für die Seiten, ohne Frist davor", async () => {
+beforeEach(() => {
+  apiMock.post.mockReset();
+});
+
+const SIDE_ROWS = (own, other) => [
+  { registration_id: "a", name: SIDES[0], ready: own, own: true }, { registration_id: "b", name: SIDES[1], ready: other, own: false },
+];
+const START = { sides: SIDE_ROWS(false, false), own_ready: false, other_ready: false, can_ready: true, can_withdraw: false, hint: "Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.", lead: null };
+const READY = { ...WAITING, step_seconds: 60, pick_hint: START.hint, start: START };
+const RUN = async (task) => { await task(); return true; };
+
+test("nachgetragene Vorgabe: beide Seiten tippen „Bereit zum Veto“ - die Seite zeigt, wer bereit ist, ohne Frist davor", async () => {
   vi.useFakeTimers();
   const onPoll = vi.fn();
   const onChanged = vi.fn(async () => {});
-  apiMock.post.mockResolvedValue({ data: { version: 1, status: "running", idempotent_replay: false } });
-  const ready = { ...WAITING, step_seconds: 60, pick_hint: "Die Vorgabe der Woche steht.", start: { can_start: true, hint: null } };
-  const run = async (task) => { await task(); return true; };
-  const { rerender } = render(<VetoPanel block={ready} matchId="m1" busy={false} run={run} onChanged={onChanged} onPoll={onPoll} bothIn />);
+  apiMock.post.mockResolvedValue({ data: { started: false, status: null, version: null, idempotent_replay: false, ready: true } });
+  const { rerender } = render(<VetoPanel block={READY} matchId="m1" busy={false} run={RUN} onChanged={onChanged} onPoll={onPoll} bothIn />);
   expect(screen.getByTestId("veto-panel")).toHaveAttribute("data-start-ready", "true");
-  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe steht – Veto starten");
-  expect(screen.getByTestId("veto-text")).toHaveTextContent("Tippt auf „Veto starten“, sobald beide Teams bereit sind.");
-  expect(screen.getByTestId("veto-start")).toHaveTextContent("Erst ab dem Start läuft die Zeit (60 Sekunden je Schritt). Bis dahin läuft keine Frist");
+  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe steht – bereit zum Veto?");
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Tippt auf „Bereit zum Veto“, sobald ihr so weit seid. Das Veto beginnt, wenn beide Seiten bereit sind.");
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "false");
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveTextContent("noch nicht bereit");
+  expect(screen.getByTestId("veto-ready-note")).toHaveTextContent("Erst dann läuft die Zeit (60 Sekunden je Schritt) – bis dahin gibt es keine Frist.");
   expect(screen.getByTestId("veto-presets")).toHaveTextContent("Kai");
   expect(screen.queryByTestId("veto-countdown")).toBeNull();
   expect(screen.queryByTestId("veto-blocked")).toBeNull();
-  // Startet die Gegenseite, zeigt die Seite es von selbst.
+  expect(screen.queryByTestId("veto-ready-withdraw")).toBeNull();
+  expect(screen.queryByTestId("veto-lead-start")).toBeNull();
+  // Wird die Gegenseite bereit oder beginnt das Veto, zeigt die Seite es von selbst.
   vi.advanceTimersByTime(6500);
   expect(onPoll).toHaveBeenCalledTimes(2);
   vi.useRealTimers();
-  fireEvent.click(screen.getByTestId("veto-start-button"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/start", {}));
+  fireEvent.click(screen.getByTestId("veto-ready-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/ready", { ready: true }));
   await waitFor(() => expect(onChanged).toHaveBeenCalled());
-  // Gegenprobe: Wer keine Seite vertritt (Leitung), sieht den Stand, aber keinen Knopf - und ohne Merker gibt es ihn gar nicht.
-  rerender(<VetoPanel block={{ ...ready, start: { can_start: false, hint: "Captain oder Vertreter einer Seite tippt auf „Veto starten“." } }} matchId="m1" busy={false} run={run} onChanged={onChanged} />);
-  expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe steht – Veto starten");
-  expect(screen.getByTestId("veto-text")).toHaveTextContent("Captain oder Vertreter einer Seite startet das Veto.");
-  expect(screen.queryByTestId("veto-start-button")).toBeNull();
-  rerender(<VetoPanel block={WAITING} matchId="m1" busy={false} run={run} onChanged={onChanged} />);
+
+  // Die eigene Seite ist bereit: „Ihr seid bereit – wartet auf die Gegenseite“, zurücknehmen geht noch.
+  const mine = { ...READY, start: { ...START, sides: SIDE_ROWS(true, false), own_ready: true, can_ready: false, can_withdraw: true } };
+  rerender(<VetoPanel block={mine} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Ihr seid bereit – wartet auf die Gegenseite.");
+  expect(screen.getByTestId("veto-ready-side-a")).toHaveAttribute("data-ready", "true");
+  expect(screen.getByTestId("veto-ready-side-b")).toHaveAttribute("data-ready", "false");
+  expect(screen.queryByTestId("veto-ready-button")).toBeNull();
+  fireEvent.click(screen.getByTestId("veto-ready-withdraw"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/ready", { ready: false }));
+
+  // Die Gegenseite ist bereit: Der Satz sagt es, der Knopf beginnt das Veto.
+  const theirs = { ...READY, start: { ...START, sides: SIDE_ROWS(false, true), other_ready: true } };
+  rerender(<VetoPanel block={theirs} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Falken · Horst ist bereit – tippt auf „Bereit zum Veto“, dann beginnt es sofort.");
+  expect(screen.getByTestId("veto-ready-side-b")).toHaveTextContent("bereit");
+  expect(screen.getByTestId("veto-ready-button")).toBeInTheDocument();
+  expect(screen.queryByTestId("veto-ready-withdraw")).toBeNull();
+
+  // Gegenprobe: Ohne Merker gibt es den Block gar nicht - das Veto beginnt dann von selbst.
+  rerender(<VetoPanel block={WAITING} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
   expect(screen.getByTestId("veto-headline")).toHaveTextContent("Vorgabe der Woche");
-  expect(screen.queryByTestId("veto-start")).toBeNull();
+  expect(screen.queryByTestId("veto-ready")).toBeNull();
+});
+
+test("Leitung: sieht, wer bereit ist, und startet im Notfall nur mit Grund - befangen nur als Notausnahme", async () => {
+  const onChanged = vi.fn(async () => {});
+  apiMock.post.mockResolvedValue({ data: { started: true, status: "running", version: 1, idempotent_replay: false } });
+  const sides = SIDE_ROWS(true, false).map((row) => ({ ...row, own: false }));
+  const asLead = { ...READY, start: { ...START, sides, can_ready: false, lead: { can_start: true, conflict: null } } };
+  const { rerender } = render(<VetoPanel block={asLead} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-text")).toHaveTextContent("Löwen · Rudel A ist bereit. Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.");
+  expect(screen.queryByTestId("veto-ready-button")).toBeNull();
+  expect(screen.getByTestId("veto-lead-start")).toHaveTextContent("Notfall: Veto starten (Liga-Leitung)");
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  expect(screen.getByTestId("veto-lead-start-problem")).toHaveTextContent("Grund");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("veto-lead-start-reason"), { target: { value: "Captain ohne Netz, per Telefon bereit" } });
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/start", { reason: "Captain ohne Netz, per Telefon bereit" }));
+  apiMock.post.mockClear();
+  rerender(<VetoPanel block={{ ...asLead, start: { ...asLead.start, lead: { can_start: true, conflict: { kind: "involved", override: true } } } }} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.getByTestId("veto-lead-start-conflict")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("veto-lead-start-reason"), { target: { value: "Gegenseite nicht erreichbar" } });
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  expect(screen.getByTestId("veto-lead-start-problem")).toHaveTextContent("Notausnahme");
+  fireEvent.change(screen.getByTestId("veto-lead-start-conflict-reason"), { target: { value: "Niemand sonst erreichbar" } });
+  fireEvent.click(screen.getByTestId("veto-lead-start-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/veto/start", { reason: "Gegenseite nicht erreichbar", conflict_reason: "Niemand sonst erreichbar" }));
+  // Gegenprobe: Ohne das Recht „Spiele betreuen“ (oder befangen ohne Notausnahme) gibt es den Notfall-Start nicht.
+  rerender(<VetoPanel block={{ ...asLead, start: { ...asLead.start, lead: { can_start: false, conflict: null } } }} matchId="m1" busy={false} run={RUN} onChanged={onChanged} />);
+  expect(screen.queryByTestId("veto-lead-start")).toBeNull();
 });
 
 test("im Veto: die vorgegebene Map steht fest im Brett und lässt sich nicht antippen", () => {

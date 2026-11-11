@@ -485,7 +485,7 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
         # Vorgabe der Woche fehlt (#2326): Das Veto hat nicht begonnen - der Satz sagt, worauf es wartet.
         start_hint = veto_block["blocked"]["text"]
     elif current == VETO and veto_block and veto_block.get("start"):
-        # Die Vorgabe wurde nachgetragen: erst „Veto starten“, dann das Veto, dann Map 1.
+        # Die Vorgabe wurde nachgetragen: erst tippen beide Seiten „Bereit zum Veto“, dann das Veto, dann Map 1.
         start_hint = league_veto.START_READY_DETAIL
     proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else None
     if proposal and (proposal.get("decision") or proposal.get("rule") != "check_in"):
