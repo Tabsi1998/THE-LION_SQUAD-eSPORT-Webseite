@@ -300,6 +300,41 @@ async def test_hard_rules_still_refuse_with_auto_accept(flow):
 # ---------------------------------------------------------------- Plätze und Warteliste
 
 @pytest.mark.asyncio
+async def test_free_seats_but_a_full_waitlist_with_someone_waiting_stays_submitted(flow):
+    """Jemand wartet, also nicht vorbei an der Warteliste - die ist aber voll: Der Antrag bleibt eingereicht, die Leitung entscheidet."""
+    w = await application_world(flow, teams=2, application_slots=2, application_waitlist_limit=1, **AUTO)
+    first = await submitted(flow, w, w["teams"][0])
+    ok(await decide(flow, w, first, "waitlist", reason="Erst die Kader prüfen"))
+    stats = (await inbox(flow, w))["stats"]
+    assert stats["free"] == 2 and stats["waiting"] == 1
+
+    second = await submitted(flow, w, w["teams"][1])
+
+    assert second["status"] == "submitted"
+    row = await stored(flow, second)
+    assert [step["status"] for step in row["history"]] == ["submitted"] and "auto_accepted" not in row
+    assert await flow.db.audit_logs.count_documents({"action": {"$in": ["league.application.auto_accept", "league.application.auto_waitlist"]},
+                                                     "data.application_id": second["id"]}) == 0
+    assert await reasons(flow, w["teams"][1]["captain"]) == ["league_application_submitted"]
+
+
+@pytest.mark.asyncio
+async def test_a_locked_staffel_leaves_the_squad_accepted_without_staffel(flow):
+    from routes.tournament_common import TOURNAMENT_MUTATION_LOCKED_DETAIL
+
+    w = await application_world(flow, teams=1, **AUTO)
+    await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"locked_at": "2026-01-01T00:00:00+00:00"}})
+
+    answer = await submitted(flow, w, w["teams"][0])
+
+    assert answer["status"] == "accepted" and answer["staffel"] is None
+    row = await stored(flow, answer)
+    assert "assignment" not in row and row["auto_problem"] == TOURNAMENT_MUTATION_LOCKED_DETAIL
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": w["tid"]}) == 0
+    assert (await inbox(flow, w))["stats"]["unassigned"] == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("auto,second_status", [(True, "waitlist"), (False, "submitted")])
 async def test_full_seats_put_the_next_on_the_waitlist(flow, auto, second_status):
     w = await application_world(flow, teams=2, application_slots=1, application_auto_accept=auto)
@@ -506,6 +541,30 @@ async def test_an_auto_accepted_team_without_a_lead_is_not_marked(flow):
 
     assert items[auto["id"]]["auto_accepted"] is True and items[auto["id"]]["lead_team_auto"] is False
     assert items[by_lead["id"]]["auto_accepted"] is False and items[by_lead["id"]]["lead_team_auto"] is False
+
+
+@pytest.mark.asyncio
+async def test_the_superadmin_rejects_the_auto_assigned_own_team_only_as_an_emergency(flow):
+    """Notausnahme (#2245) auch beim Ablehnen einer automatischen Zuteilung: ohne Grund 403, mit Grund raus aus der Staffel und im Protokoll."""
+    w = await application_world(flow, teams=1, **AUTO)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    boss = {**side["lead"], "role": "superadmin"}
+    reason = "Niemand sonst erreichbar, Saisonstart morgen"
+
+    refused = await decide(flow, w, application, "reject", actor=boss, reason="Kader passt nicht zur Liga")
+    assert refused.status_code == 403
+    assert (await stored(flow, application))["status"] == "accepted"
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 1
+
+    done = ok(await decide(flow, w, application, "reject", actor=boss, reason="Kader passt nicht zur Liga", conflict_reason=reason))
+
+    assert done["status"] == "rejected" and "assignment" not in await stored(flow, application)
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 0
+    entry = await flow.db.audit_logs.find_one({"action": "league.application.reject"}, {"_id": 0})
+    assert entry["actor_id"] == boss["id"] and entry["data"]["conflict_override"] == reason and entry["data"]["registration_removed"]
+    override = await flow.db.audit_logs.find_one({"action": "league.conflict.override"}, {"_id": 0})
+    assert override["data"]["action"] == "application_reject" and override["data"]["reason"] == reason
 
 
 # ---------------------------------------------------------------- Einstellung: Rechte, Protokoll, später einschalten
