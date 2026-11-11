@@ -126,18 +126,21 @@ async def test_switched_on_with_one_staffel_the_squad_is_accepted_and_assigned(f
     assert items[0]["auto_accepted"] is True and items[0]["history"][1]["by_name"] == "automatisch" and items[0]["history"][1]["auto"] is True
 
 
-async def second_division(flow, w: dict) -> str:
+async def second_division(flow, w: dict, *, with_staffel: bool = True) -> str | None:
     flow.act_as(w["lead"])
     division = ok(await flow.post(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}/divisions", json={}))
+    if not with_staffel:
+        return None
     return ok(await flow.post(f"{ADMIN_LEAGUES}/divisions/{division['id']}/staffeln", json={}))["tournament_id"]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("shape", ["two_staffeln", "two_divisions"])
+@pytest.mark.parametrize("shape", ["two_staffeln", "two_divisions", "second_division_without_staffel"])
 async def test_with_several_staffeln_the_lead_assigns(flow, shape):
+    """Automatisch zugeteilt wird nur bei genau einer aktiven Liga N mit genau einer Staffel - auch eine zweite Liga N ohne Staffel lässt die Wahl der Leitung."""
     w = await application_world(flow, teams=1, staffeln=2 if shape == "two_staffeln" else 1, **AUTO)
-    if shape == "two_divisions":
-        await second_division(flow, w)
+    if shape != "two_staffeln":
+        await second_division(flow, w, with_staffel=shape == "two_divisions")
     side = w["teams"][0]
 
     answer = await submitted(flow, w, side)

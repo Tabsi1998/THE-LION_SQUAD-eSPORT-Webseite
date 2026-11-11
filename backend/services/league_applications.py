@@ -645,9 +645,11 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
 
 async def _auto_staffel(db, season: dict) -> str | None:
     """Die einzige Staffel der Season - nur dorthin teilt „automatisch annehmen“ gleich zu, und nur vor ihrem Start ohne feste Spiele.
-    Gibt es mehrere (Liga N oder Staffeln) oder keine, teilt die Leitung zu."""
+    Nur bei genau einer aktiven Liga N mit genau einer Staffel: Hat eine zweite Liga N (noch) keine Staffel, wählt die Leitung trotzdem die Liga N."""
     divisions = [row["id"] for row in await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0, "id": 1}).to_list(50)]
-    rows = [row for row in await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": {"$in": divisions}, **ONLY_LEAGUE},
+    if len(divisions) != 1:
+        return None
+    rows = [row for row in await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": divisions[0], **ONLY_LEAGUE},
                                                      {"_id": 0, "id": 1, "status": 1}).to_list(200)
             if row.get("status") not in squad_registration.FINISHED_TOURNAMENT_STATUSES]
     if len(rows) != 1 or rows[0].get("status") not in league_service.PRE_START_STATUSES:
