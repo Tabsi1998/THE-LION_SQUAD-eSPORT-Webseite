@@ -10,6 +10,9 @@
   Vertreter je Seite; sind beide bereit, beginnt das Veto. Zurücknehmen, solange die Gegenseite nicht bereit ist. Idempotent.
 - ``POST /api/matches/{match_id}/veto/start`` (#2326, Nr. 127): Notfall-Start durch die Liga-Leitung („Spiele betreuen“) mit Pflichtgrund,
   Befangenheit wie B.1.
+- ``GET /api/matches/{match_id}/veto`` (D.4, #1651): der Veto-Block für den kurzen Abruf - Beteiligte und Leitung wie auf der Matchseite,
+  alle anderen (und ``display=1``, der TV) nur lesend ohne Internes; mit Anzeige-Schlüssel des Turniers (``key``) ohne Anmeldung. Dazu
+  die Serverzeit der Antwort für den Countdown.
 - ``POST /api/matches/{match_id}/veto/pick``: die Seite am Zug sperrt oder wählt eine Map (Captain, Vertreter).
 - ``POST /api/matches/{match_id}/veto/lead``: Pause, Fortsetzen, Schritt zurück, Neustart - Liga-Leitung mit „Spiele betreuen“, mit Grund,
   Befangenheit wie B.1.
@@ -23,18 +26,24 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from auth import get_current_user
+from auth import get_current_user, get_optional_user
 from database import get_db
+from models import now_utc
 from routes.match_routes import (
     _acting_registration_for_match,
     _assert_match_visible,
+    _can_read_match,
     _find_match_any,
+    _member_registration_for_match,
+    _result_conflict,
     _serialized_match_write,
 )
-from services import game_maps, league_veto, league_veto_rules, league_veto_sweep, map_pools
-from services.checkin_rules import FlowProblem
+from services import game_maps, league_veto, league_veto_rules, league_veto_sweep, map_pools, match_flow
+from services.access_links import touch_access_link, validate_access_link
+from services.checkin_rules import FlowProblem, filled
 from services.league_permissions import ANY, require_league, require_no_conflict
 from services.tournament_permissions import has_match_result_permission
+from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 router = APIRouter(prefix="/api/matches", tags=["matches"])
@@ -291,6 +300,62 @@ async def _context(match_id: str, user: dict):
     if tournament and tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail="Turnier ist gesperrt und kann nur noch angesehen werden.")
     return db, match, tournament, await _acting_registration_for_match(match, user)
+
+
+def _match_head(match: dict, tournament: dict | None, names: dict[str, str]) -> dict:
+    """Kopf für die TV-Ansicht und Zuschauer: Staffel, Spieltag, die beiden Seiten - was die öffentliche Matchseite ohnehin zeigt."""
+    number = match.get("matchday_number") or match.get("round")
+    label = match.get("matchday_label") or match.get("round_name") or (f"Spieltag {number}" if number else "Spiel")
+    return {"id": match.get("id"), "tournament_title": (tournament or {}).get("title"), "matchday_label": label,
+            "scheduled_at": match.get("scheduled_at"), "sides": [names.get(reg_id) or "Team" for reg_id in filled(match)[:2]]}
+
+
+@router.get("/{match_id}/veto")
+async def veto_live(match_id: str, key: Optional[str] = None, display: bool = False, user: dict | None = Depends(get_optional_user)):
+    """Der kurze Abruf des Vetos (D.4, #1651) - Matchseite, Zuschauer und TV fragen hier statt der ganzen Seite nach.
+
+    Beteiligte (Captain, Vertreter, Kader) und die Liga-Leitung bekommen denselben Block wie auf der Matchseite; wie dort beginnt ein
+    fälliges Veto beim Lesen und abgelaufene Fristen lösen sich auf. Alle anderen sehen das Veto nur lesend (``spectator_view``: keine
+    Wahl, kein Eingriff, kein Grund einer Pause) - Sichtbarkeit wie die Matchseite, also nach Staffel bzw. Season. ``display=1`` (TV)
+    liefert immer die Zuschauer-Sicht; mit dem Anzeige-Schlüssel des Turniers (``key``) auch ohne Anmeldung, wie Turnierbaum und
+    Stationen. Zuschauer und TV lösen nichts aus - Start und Fristen übernehmen der Aufruf der Beteiligten und der Job."""
+    db = get_db()
+    match, collection = await _find_match_any(match_id)
+    now = now_utc()
+    if key:
+        link = await validate_access_link(db, key, "tournament", match.get("tournament_id"), None, DISPLAY_GRANT)
+        if not link:
+            raise HTTPException(status_code=403, detail=KEY_INVALID)
+    else:
+        await _assert_match_visible(match, user)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
+    if key:
+        if not tournament or key_expired(tournament, now):
+            raise HTTPException(status_code=403, detail=KEY_EXPIRED)
+        await touch_access_link(db, link)
+    if collection != "matches_v2" or not league_veto_rules.rules_of(tournament):
+        return {"veto": None, "now": now.isoformat(), "state": None, "match": None}
+    spectator = bool(key or display or not user)
+    lead = False
+    if not spectator:
+        involved = await _can_read_match(match, user) or bool(await _member_registration_for_match(db, match, user.get("id")))
+        lead = await has_match_result_permission(user, match, capability="matches")
+        spectator = not (involved or lead)
+    names = await league_veto.side_names(db, match)
+    state = None
+    if spectator:
+        block = await league_veto.live_block(db, match, tournament, names=names, spectator=True, now=now)
+    else:
+        # Wie die Matchseite (``match_flow.page_block``): ein fälliges Veto beginnt, abgelaufene Fristen lösen sich auf.
+        match = await league_veto.settle_due(db, await league_veto.ensure_started(db, match, tournament, now=now), tournament, now=now)
+        acting = await _acting_registration_for_match(match, user)
+        conflict = await _result_conflict(db, user, match) if lead else None
+        block = await league_veto.live_block(db, match, tournament, names=names, own_id=(acting or {}).get("id"), lead=lead,
+                                             can_lead_act=bool(lead and (not conflict or conflict["override"])), conflict=conflict, now=now)
+        # Die Seite hat das Veto offen - dann braucht sie keine Erinnerung „Map-Veto wartet“.
+        await league_veto.mark_seen(db, match, (acting or {}).get("id"), now=now)
+        state = match_flow.state(match, tournament, now)
+    return {"veto": block, "now": now.isoformat(), "state": state, "match": _match_head(match, tournament, names)}
 
 
 @router.post("/{match_id}/veto/pick")

@@ -1007,7 +1007,9 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
                 "team_a": None, "team_b": None, "current": None, "own_turn": False, "can_pick": False,
                 "pick_hint": blocked or (START_READY_DETAIL if ready else NOT_STARTED_DETAIL), "options": [],
                 "remaining": [], "history": [], "planned_games": [], "paused": None, "lead": None,
-                "week": week, "presets": presets, "blocked": {"week": week, "text": blocked} if blocked else None, "start": start}
+                "week": week, "presets": presets, "blocked": {"week": week, "text": blocked} if blocked else None, "start": start,
+                # Live-Oberfläche (D.4, #1651): Ablauf, eigene Seite und die Serverzeit der Antwort für den Countdown.
+                "plan": [], "own_side": None, "server_now": now.isoformat()}
     run = await _run_of(db, match, veto)
     step = run.current if veto.get("status") in (RUNNING, PAUSED) else None
     deadline = moment(veto.get("deadline_at"))
@@ -1034,6 +1036,8 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
             options.append({"map_id": item["map_id"], "name": item.get("name"), "image_url": item.get("image_url"), "allowed": ok,
                             "hint": None if ok else _option_hint(run, item["map_id"])})
     taken = {(row.get("mode"), row.get("map_id")): row for row in veto.get("steps") or []}
+    # Live-Oberfläche (D.4, #1651): Team A oder B statt der Anmeldung - so erkennt die Seite die Züge der Gegenseite, ohne Kennungen.
+    side_of = {reg_id: side for side, reg_id in (("A", veto.get("team_a")), ("B", veto.get("team_b"))) if reg_id}
     # Jede Map nur einmal je Serie (``never``): eine in einem anderen Modus gewählte Map ist hier nicht mehr „offen“.
     played = {row.get("map_id"): row for row in veto.get("steps") or [] if row.get("kind") != rules_mod.BAN}
     remaining = []
@@ -1056,6 +1060,7 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
                 status = (row or {}).get("role") or "open"
             maps.append({"map_id": item.get("map_id"), "name": item.get("name"), "image_url": item.get("image_url"),
                          "status": status, "by_name": names.get((row or {}).get("registration_id")) if row else None,
+                         "side": side_of.get((row or {}).get("registration_id")) if row else None,
                          "position": (row or {}).get("position")})
         remaining.append({"mode": group["mode"], "label": group.get("label") or group["mode"],
                           **({"icon_url": group["icon_url"]} if group.get("icon_url") else {}), "maps": maps})
@@ -1082,7 +1087,154 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
                  "conflict": conflict} if lead else None,
         # Vorgabe der Woche (#2326): die Spielwoche und die festgehaltenen Maps dieses Vetos - nicht die heutigen der Season.
         "week": veto.get("week"), "presets": _preset_rows(run.steps, run.presets, run.pool), "blocked": None, "start": None,
+        # Live-Oberfläche (D.4, #1651): der ganze Ablauf als Zeitleiste, die eigene Seite (A/B) und die Serverzeit der Antwort - der
+        # Countdown rechnet damit, nicht mit der Uhr des Geräts.
+        "plan": _plan_rows(run, veto, step, names), "own_side": side_of.get(own_id) if own_id else None, "server_now": now.isoformat(),
     }
+
+
+def _plan_rows(run: _Run, veto: dict, step: dict | None, names: dict[str, str]) -> list[dict]:
+    """Der Ablauf des Vetos als Zeitleiste (D.4, #1651): jeder Schritt der Vorlage mit Art, Modus, Seite und Position - erledigte mit der
+    Map (und ob das System gewählt hat), der laufende als ``current``, die übrigen ``open``. Ohne Personen."""
+    done = {row.get("index"): row for row in veto.get("steps") or [] if isinstance(row.get("index"), int)}
+    rows = []
+    for index, item in enumerate(run.steps):
+        entry = done.get(index) or {}
+        side = None if item.get("kind") in SYSTEM_KINDS else item.get("team")
+        reg_id = _registration_for(veto, item)
+        rows.append({
+            "index": index, "number": index + 1, "kind": item.get("kind"), "mode": item.get("mode"), **_mode_head(run.pool, item.get("mode")),
+            "side": side, "name": names.get(reg_id) if reg_id else None, "position": item.get("position"),
+            "state": "done" if entry else ("current" if step is not None and index == run.index else "open"),
+            "map_id": entry.get("map_id"), "map_name": entry.get("map_name"), "map_image_url": entry.get("map_image_url"),
+            "via": entry.get("via"),
+        })
+    return rows
+
+
+# ---------------------------------------------------------------- Live: Zuschauer, TV, Erinnerung (D.4, #1651)
+
+SPECTATOR_PAUSE_HINT = "Das Veto ist pausiert – die Liga-Leitung setzt es fort."
+# Die Seite hat das Veto offen, solange ihr kurzer Abruf läuft (sichtbarer Tab, alle 2 Sekunden): geschrieben wird höchstens alle
+# SEEN_THROTTLE_SECONDS, als „offen“ gilt ein Abruf der letzten NUDGE_SEEN_SECONDS.
+SEEN_THROTTLE_SECONDS = 5
+NUDGE_SEEN_SECONDS = 15
+# „Map-Veto wartet“: frühestens nach NUDGE_IDLE_SECONDS ohne Zug im laufenden Schritt, nicht mehr in den letzten Sekunden.
+NUDGE_IDLE_SECONDS = 20
+NUDGE_MIN_LEFT_SECONDS = 5
+
+
+def spectator_view(block: dict | None) -> dict | None:
+    """Was Zuschauer und TV vom Veto sehen (#1651): nur lesend und ohne Internes - keine Wahl, kein Eingriff, kein Bereit-Stand, keine
+    Lücke der Vorgabe und kein Grund einer Pause (den schreibt die Leitung frei hinein). Personen stehen ohnehin nicht im Block, nur die
+    Namen der beiden Seiten. Vor dem Start bleibt nur die Vorgabe der Woche."""
+    if not block:
+        return None
+    out = {**block, "own_turn": False, "can_pick": False, "own_side": None, "options": [], "lead": None, "start": None, "blocked": None}
+    if block.get("status") == "waiting":
+        return {**out, "pick_hint": None, "step_seconds": None}
+    if isinstance(block.get("paused"), dict):
+        out["paused"] = {"at": block["paused"].get("at"), "reason": None, "remaining_seconds": block["paused"].get("remaining_seconds")}
+    if block.get("status") == PAUSED:
+        out["pick_hint"] = SPECTATOR_PAUSE_HINT
+    return out
+
+
+async def side_names(db, match: dict) -> dict[str, str]:
+    """Die Namen der Seiten (Anmeldung → Name), wie Matchseite und Nachrichten sie nennen."""
+    return await _side_names(db, match)
+
+
+async def live_block(db, match: dict, tournament: dict | None, *, names: dict[str, str] | None = None, own_id: str | None = None,
+                     lead: bool = False, can_lead_act: bool = False, conflict: dict | None = None, spectator: bool = False,
+                     now: datetime | None = None) -> dict | None:
+    """Der Veto-Block für den kurzen Abruf (``GET /api/matches/{id}/veto``) - derselbe wie auf der Matchseite, nur ohne den übrigen
+    Check-in. ``spectator``: die Sicht für Zuschauer und TV (``spectator_view``). Schreibt nichts; Start und Fristen löst vorher der
+    Aufruf der Beteiligten bzw. der Job."""
+    names = names if names is not None else await _side_names(db, match)
+    if spectator:
+        return spectator_view(await page_block(db, match, tournament, names=names, own_id=None, lead=False, can_lead_act=False,
+                                               conflict=None, now=now))
+    return await page_block(db, match, tournament, names=names, own_id=own_id, lead=lead, can_lead_act=can_lead_act,
+                            conflict=conflict, now=now)
+
+
+def _plain_key(value: str | None) -> bool:
+    text = str(value or "")
+    return bool(text) and "." not in text and not text.startswith("$")
+
+
+async def mark_seen(db, match: dict, registration_id: str | None, *, now: datetime | None = None) -> bool:
+    """Die Seite hat das laufende Veto offen (#1651) - für die Erinnerung „Map-Veto wartet“. Steht als ``flow.veto_seen.<Anmeldung>``
+    (Zeitpunkt, keine Person), geschrieben höchstens alle SEEN_THROTTLE_SECONDS und nur, solange das Veto läuft. Am Veto selbst ändert
+    sich nichts (keine Version, kein ``updated_at``)."""
+    veto = veto_of(match)
+    if not _plain_key(registration_id) or not veto or veto.get("status") != RUNNING:
+        return False
+    now = now or now_utc()
+    path = f"flow.veto_seen.{registration_id}"
+    cutoff = (now - timedelta(seconds=SEEN_THROTTLE_SECONDS)).isoformat()
+    written = await db.matches_v2.update_one(
+        {"id": match["id"], "flow.veto.status": RUNNING, "$or": [{path: {"$exists": False}}, {path: {"$lt": cutoff}}]},
+        {"$set": {path: now.isoformat()}})
+    return bool(written.modified_count)
+
+
+def nudge_target(match: dict, *, now: datetime) -> dict | None:
+    """Ist jetzt eine Erinnerung „Map-Veto wartet“ fällig (#1651)? Nur im laufenden Veto, nur für den Zug einer Seite (nie Decider oder
+    Vorgabe), frühestens NUDGE_IDLE_SECONDS nach Beginn des Schritts, nicht in den letzten NUDGE_MIN_LEFT_SECONDS, nur wenn die Seite das
+    Veto gerade nicht offen hat - und je Schritt und Seite einmal (``flow.veto_nudge.key``). Gibt Schritt, Seite und Schlüssel zurück."""
+    veto = veto_of(match)
+    if not veto or veto.get("status") != RUNNING or match.get("started_at"):
+        return None
+    template = veto.get("template") or {}
+    steps = template.get("steps") or []
+    index = int(veto.get("step") or 0)
+    if index >= len(steps) or steps[index].get("kind") in SYSTEM_KINDS:
+        return None
+    step = steps[index]
+    turn_id = _registration_for(veto, step)
+    deadline = moment(veto.get("deadline_at"))
+    if not turn_id or not deadline:
+        return None
+    left = (deadline - now).total_seconds()
+    if int(template.get("step_seconds") or 60) - left < NUDGE_IDLE_SECONDS or left < NUDGE_MIN_LEFT_SECONDS:
+        return None
+    flow = match.get("flow") or {}
+    seen = moment((flow.get("veto_seen") or {}).get(turn_id)) if isinstance(flow.get("veto_seen"), dict) else None
+    if seen and (now - seen).total_seconds() < NUDGE_SEEN_SECONDS:
+        return None
+    key = f"veto-turn:{match.get('id')}:{veto.get('started_at')}:{index}:{turn_id}"
+    if (flow.get("veto_nudge") or {}).get("key") == key:
+        return None
+    return {"index": index, "step": step, "registration_id": turn_id, "key": key, "left": max(0, int(left))}
+
+
+async def nudge_due(db, match: dict, tournament: dict | None, *, now: datetime | None = None) -> bool:
+    """Erinnerung „Map-Veto wartet“ (#1651) an die Verantwortlichen der Seite am Zug, wenn ``nudge_target`` sie fällig nennt. Der Merker
+    ``flow.veto_nudge`` wird mit Bedingung auf Version und Schlüssel gesetzt - zwei Läufe gleichzeitig schicken eine Nachricht. Am Veto
+    ändert sich nichts. Gesperrte Staffel: nichts."""
+    now = now or now_utc()
+    if (tournament or {}).get("locked_at"):
+        return False
+    target = nudge_target(match, now=now)
+    if not target:
+        return False
+    veto = veto_of(match) or {}
+    written = await db.matches_v2.update_one(
+        {"id": match["id"], "flow.veto.version": veto.get("version"), "flow.veto.status": RUNNING, "started_at": None,
+         "flow.veto_nudge.key": {"$ne": target["key"]}},
+        {"$set": {"flow.veto_nudge": {"key": target["key"], "at": now.isoformat()}}})
+    if not written.matched_count:
+        return False
+    pool = await map_pools.version_by_id(db, veto.get("map_pool_id"))
+    step = target["step"]
+    what = "sperrt eine Map" if step.get("kind") == rules_mod.BAN else f"wählt Map {step.get('position')}"
+    label = _mode_head(pool, step.get("mode"))["mode_label"]
+    sent = await _tell(db, match, [target["registration_id"]], "Map-Veto wartet – ihr seid am Zug",
+                       f"Ihr seid im Map-Veto am Zug: {what} ({label}). Noch {target['left']} Sekunden – danach wählt das System.",
+                       "veto_turn", target["key"])
+    return sent > 0
 
 
 # ---------------------------------------------------------------- Datenschutz
