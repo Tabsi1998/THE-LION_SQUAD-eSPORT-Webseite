@@ -2294,7 +2294,9 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
      Einmal je Spiel und Termin: `flow.veto_wait.ready_at` wird mit Bedingung gesetzt, Protokoll `match.veto.ready`. Ein zweites
      Speichern meldet nicht noch einmal. Ein Spiel hält die anderen nicht auf. Dieselbe Meldung geht hinaus, wenn ein wartendes Veto
      auf anderem Weg startbar wird (Review): nach `PUT …/veto-rules` (etwa ohne den Schritt `preset`; Antwort mit `matches_ready`),
-     nach dem Speichern des Season-Pools, nach „Map aus dem Pool nehmen“ und nach „Vorgaben auf Staffeln übertragen“.
+     nach dem Speichern des Season-Pools, nach „Map aus dem Pool nehmen“ und nach „Vorgaben auf Staffeln übertragen“. Und damit kein
+     Spiel durchrutscht, liest `_wait_for_preset` die Vorgaben nach dem Schreiben des Merkers noch einmal: Hat die Leitung sie genau
+     dazwischen gespeichert (ihr Lauf fand noch keinen Merker), geht die Meldung von dort hinaus – statt des Hinweises an die Leitung.
   2. Die Matchseite zeigt **„Vorgabe steht – bereit zum Veto?“** und wer schon bereit ist (Veto-Block `start`, Stand weiter `veto`,
      `start_hint` = „Das Veto beginnt, sobald beide Seiten ‚Bereit zum Veto‘ getippt haben. Vorher läuft keine Zeit.“). Bis zum Start
      gibt es **keine Frist**.

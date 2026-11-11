@@ -288,6 +288,13 @@ async def _wait_for_preset(db, match: dict, tournament: dict, week: int, problem
         {"$set": {"flow.veto_wait": marker}})
     if not written.matched_count:
         return
+    # Zwischen dem Lesen der Vorgaben und dem Merker kann die Leitung sie gespeichert haben (Review zu #2326): Ihr Speichern fand dann
+    # noch kein wartendes Spiel, und niemand erführe, dass es losgehen kann. Darum nach dem Merker noch einmal lesen - stehen die
+    # Vorgaben jetzt, bekommen die Seiten „Vorgabe da – Veto kann starten“ statt die Leitung einen überholten Hinweis.
+    fresh = await _reload(db, match)
+    if not await preset_gap(db, fresh, tournament):
+        await announce_ready(db, fresh, tournament, now=now)
+        return
     await _audit(db, "match.veto.waiting", match, None, {"week": week, "problems": problems})
     try:
         from services.league_permissions import staff_user_ids
@@ -299,7 +306,8 @@ async def _wait_for_preset(db, match: dict, tournament: dict, week: int, problem
             await create_user_notification(
                 user_id, "Veto wartet auf die Vorgabe der Woche",
                 f"{tournament.get('title') or 'Liga'} · Spielwoche {week}: {' '.join(problems)} Mindestens ein Spiel ist eingecheckt und "
-                "wartet. Sobald die Vorgabe eingetragen ist, bekommen beide Seiten eine Nachricht und starten das Veto selbst.",
+                "wartet. Sobald die Vorgabe eingetragen ist, bekommen beide Seiten eine Nachricht – das Veto beginnt, wenn beide "
+                "„Bereit zum Veto“ getippt haben.",
                 url=f"/admin/leagues/seasons/{season_id}#veto", kind="match_attention",
                 meta={"category": "tournament_updates", "tournament_id": tournament.get("id"), "match_id": match.get("id"),
                       "reason": "veto_preset_missing", "dedupe_key": f"veto-preset-missing:{season_id}:{week}"})

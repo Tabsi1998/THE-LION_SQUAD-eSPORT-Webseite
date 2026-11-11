@@ -393,6 +393,36 @@ async def test_the_lead_starts_a_waiting_veto_in_an_emergency_with_a_reason(flow
 
 
 @pytest.mark.asyncio
+async def test_a_preset_saved_while_the_wait_is_being_noted_still_reaches_the_sides(flow):
+    """Review zu #2326: Speichert die Leitung die Vorgabe genau zwischen dem Lesen und dem Merker, fand ihr Speichern noch kein
+    wartendes Spiel. Der Merker liest darum danach noch einmal - die Seiten bekommen „Vorgabe da“, die Leitung keinen überholten Hinweis."""
+    world = await preset_world(flow, [])
+    await checked_in(flow, mid(world))
+    match = await flow.reload(world["match"])
+    tournament = await tournament_of(flow, world)
+    # Der Start hat „Vorgabe fehlt“ gelesen - bevor er den Merker schreibt, speichert die Leitung die Vorgabe (ihr Lauf findet nichts).
+    await set_presets(flow, world, [preset(1, "map-kai")])
+    told = await league_veto_sweep.announce_waiting(flow.db, world["season_id"])
+    assert told == 0, "noch kein Merker - das Speichern findet kein wartendes Spiel"
+    await league_veto._wait_for_preset(flow.db, match, tournament, 1, ["Kontrolle: Die Vorgabe der Woche fehlt."], now_utc())
+    stored = await flow.reload(world["match"])
+    assert stored["flow"]["veto_wait"]["ready_at"] and "veto" not in stored["flow"]
+    notes = await flow.db.notifications.find({"meta.reason": "veto_preset_ready"}, {"_id": 0}).to_list(20)
+    assert {world["users"]["Kapitaen"]["id"], world["users"]["Falke1"]["id"]} <= {row["user_id"] for row in notes}
+    assert await flow.db.notifications.count_documents({"meta.reason": "veto_preset_missing"}) == 0
+    assert await flow.db.audit_logs.count_documents({"action": "match.veto.waiting"}) == 0
+    assert await flow.db.audit_logs.count_documents({"action": "match.veto.ready"}) == 1
+    # Gegenprobe: Fehlt die Vorgabe nach dem Merker weiter, bekommt die Leitung ihren Hinweis und die Seiten nichts.
+    other = await preset_world(flow, [], letter="B")
+    await checked_in(flow, mid(other))
+    await league_veto._wait_for_preset(flow.db, await flow.reload(other["match"]), await tournament_of(flow, other), 1,
+                                       ["Kontrolle: Die Vorgabe der Woche fehlt."], now_utc())
+    assert not (await flow.reload(other["match"]))["flow"]["veto_wait"].get("ready_at")
+    assert await flow.db.notifications.count_documents({"meta.reason": "veto_preset_missing", "meta.match_id": mid(other)}) >= 1
+    assert await flow.db.notifications.count_documents({"meta.reason": "veto_preset_ready", "meta.match_id": mid(other)}) == 0
+
+
+@pytest.mark.asyncio
 async def test_with_the_preset_in_place_the_same_match_starts_at_once(flow):
     """Gegenprobe zur fehlenden Vorgabe: dieselbe Welt, nur mit Vorgabe für Spielwoche 1 - das Veto beginnt beim Check-in."""
     world = await preset_world(flow, [preset(1, "map-kai")])
