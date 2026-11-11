@@ -1,7 +1,12 @@
+const nodePath = require("path");
 const { test, expect } = require("@playwright/test");
 
 // Selbstanmeldung mit Co-Team (docs/LIGA.md, B.4, #2205) bei 390 und 1440 px, Server nachgestellt, nur erfundene Namen: Ligaseite für Gäste und Captains, die vier Schritte,
-// die Team-Seite und der Eingang der Leitung. Kein seitliches Scrollen.
+// die Team-Seite und der Eingang der Leitung. Kein seitliches Scrollen. Bilder (#2348): E2E_SHOTS_DIR, sonst die Testausgabe.
+
+function shotPath(testInfo, name) {
+  return process.env.E2E_SHOTS_DIR ? nodePath.join(process.env.E2E_SHOTS_DIR, name) : testInfo.outputPath(name);
+}
 
 const CONSENT = () => window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
   essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
@@ -139,6 +144,45 @@ for (const [width, height] of WIDTHS) {
       await expect(page.getByTestId("league-application-withdraw-sq1")).toBeVisible();
       await expect(page.getByTestId("league-application-row-sq2")).toContainText("nächsten Season");
       await noSideScroll(page);
+    });
+
+    // Automatisch annehmen (#2348): Das Team liest „Angemeldet“, ohne Staffel „Angemeldet – Zuteilung folgt“; eingereicht nennt die Prüfung durch die Leitung.
+    test("Status auf der Ligaseite: Angemeldet, Zuteilung folgt, eingereicht", async ({ page }, testInfo) => {
+      await mock(page, CAPTAIN, seasonRoutes({ ...MINE, application: { ...BLOCK, slots_free: 1, auto_accept: true }, squads: [
+        { ...SQUAD, state: "accepted", warnings: [], application: { id: "a1", status: "accepted", staffel: "Liga 1 · Staffel A", can_withdraw: false }, can_submit: false },
+        { ...BLOCKED, state: "accepted", problems: [], application: { id: "a2", status: "accepted", staffel: null, can_withdraw: true }, can_submit: false },
+        { ...SQUAD, squad_id: "sq3", squad_name: "Meute", display_name: "Loewen Langername · Meute", state: "submitted", warnings: [], application: { id: "a3", status: "submitted", can_withdraw: true }, can_submit: false },
+      ] }));
+      await page.goto("/liga/probe-liga/season-1");
+      await expect(page.getByTestId("league-application-state-sq1")).toHaveText("Angemeldet");
+      await expect(page.getByTestId("league-application-row-sq1")).toContainText("Spielt in Liga 1 · Staffel A.");
+      await expect(page.getByTestId("league-application-state-sq2")).toHaveText("Angemeldet – Zuteilung folgt");
+      await expect(page.getByTestId("league-application-row-sq3")).toContainText("Die Liga-Leitung prüft die Anmeldung und meldet sich.");
+      await expect(page.getByTestId("league-application-seats")).toHaveText("1 von 8 Startplätzen frei");
+      await noSideScroll(page);
+      await page.getByTestId("league-application").screenshot({ path: shotPath(testInfo, `liga-angemeldet-${width}.png`) });
+    });
+
+    test("Leitung: automatisch annehmen mit offenen Anmeldungen von vorher", async ({ page }, testInfo) => {
+      await mock(page, ADMIN, (path) => {
+        if (path === "/admin/leagues/seasons/s1") return { ...ADMIN_SEASON, applications_waiting: 2, season: { ...ADMIN_SEASON.season, application_auto_accept: true } };
+        if (path === "/admin/leagues/seasons/s1/applications") return { ...INBOX, items: [
+          { ...ROW, id: "a6", status: "accepted", problems: [], warnings: [], shortfall: null, auto_accepted: true, decided_at: "2026-11-02T18:00:00+00:00",
+            assignment: { tournament_id: "t1", label: "Liga 1 · Staffel A", auto: true },
+            history: [ROW.history[0], { status: "accepted", at: "2026-11-02T18:00:00+00:00", by_name: "automatisch", auto: true }] },
+          ROW,
+        ] };
+        return undefined;
+      });
+      await page.goto("/admin/leagues/seasons/s1#selbstanmeldung");
+      await expect(page.getByTestId("season-form-application-auto-accept")).toBeChecked();
+      await expect(page.getByTestId("season-form-application-auto-waiting")).toContainText("2 Anmeldungen warten noch auf Prüfung");
+      await expect(page.getByTestId("application-auto-a6")).toContainText("Automatisch angenommen");
+      await expect(page.getByTestId("application-auto-seat-a6")).toBeVisible();
+      await expect(page.getByTestId("application-waitlist-open-a6")).toBeVisible();
+      await expect(page.getByTestId("application-assign-a6")).toHaveCount(0);
+      await noSideScroll(page);
+      await page.getByTestId("season-application-settings").screenshot({ path: shotPath(testInfo, `liga-verwaltung-auto-annehmen-${width}.png`) });
     });
 
     test("Leitung: Einstellungen und Eingang", async ({ page }) => {
