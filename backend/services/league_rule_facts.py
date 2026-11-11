@@ -34,6 +34,9 @@ TIEBREAKER_WORDS = {"head_to_head": "direkter Vergleich", "score_diff": "Map-Dif
                     "wins": "mehr Siege", "lead_decision": "Entscheid der Liga-Leitung"}
 CRITERION_WORDS = {"points": "Punkte", "score_diff": "Map-Differenz", "score_for": "gewonnene Maps"}
 ENTRY_POLICY_WORDS = {"all": "alle Konten", "members": "nur Vereinsmitglieder"}
+# Anmeldungen automatisch annehmen (#2348): ganze Sätze ohne Punkt, für den Baustein und ``{{application.acceptance}}``.
+AUTO_ACCEPT_WORDS = {True: "Anmeldungen werden automatisch angenommen, die Liga-Leitung kann nachträglich ablehnen",
+                     False: "Die Liga-Leitung prüft jede Anmeldung"}
 LINEUP_WORDS = {"series": "Teilnehmerliste je Spiel", "per_map": "Aufstellung je Map"}
 
 _cell = text_cell
@@ -477,6 +480,8 @@ def eligibility_data(season: dict, id_fields: list[str], platform: dict | None =
         "transfer_windows": [{"label": " ".join(str(row.get("label") or "").split()), "start_date": row.get("start_date"), "end_date": row.get("end_date")}
                              for row in rules.get("transfer_windows") or [] if isinstance(row, dict)],
         "entry_policy": season.get("entry_policy") or "all",
+        # Nur mit Selbstanmeldung (Anmeldefenster): ``None`` sonst, dann keine Zeile. Ältere eingefrorene Fassungen tragen den Schlüssel nicht.
+        "auto_accept": bool(season.get("application_auto_accept")) if season.get("application_opens_at") and season.get("application_closes_at") else None,
         "unique_game_ids": bool(rules.get("unique_game_ids")),
         "id_fields": list(id_fields),
         # Plattform je Season (#2270, ``platform_data``): ``None`` ohne jede Angabe, dann keine Zeile.
@@ -486,6 +491,8 @@ def eligibility_data(season: dict, id_fields: list[str], platform: dict | None =
 
 def render_eligibility(data: dict, variant: str = MARKDOWN) -> str:
     lines = [f"- Zulassung: {ENTRY_POLICY_WORDS.get(data.get('entry_policy'), ENTRY_POLICY_WORDS['all'])}."]
+    if data.get("auto_accept") is not None:
+        lines.append(f"- Annahme: {AUTO_ACCEPT_WORDS[bool(data['auto_accept'])]}.")
     if data.get("min_age"):
         lines.append(f"- Mindestalter: {data['min_age']} Jahre am Prüftag, laut Geburtsdatum im Profil.")
     else:
@@ -523,7 +530,7 @@ def render_eligibility(data: dict, variant: str = MARKDOWN) -> str:
 
 async def build_eligibility(db, league: dict, season: dict) -> dict:
     data = eligibility_data(season, await id_field_labels(db, league), platform=await platform_data(db, season))
-    return {"source": {key: data.get(key) for key in ("min_age", "new_player_wait_days", "roster_deadline", "entry_policy", "id_fields", "platform")},
+    return {"source": {key: data.get(key) for key in ("min_age", "new_player_wait_days", "roster_deadline", "entry_policy", "auto_accept", "id_fields", "platform")},
             "data": data}
 
 

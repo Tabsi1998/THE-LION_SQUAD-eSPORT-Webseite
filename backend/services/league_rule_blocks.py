@@ -288,7 +288,8 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
           facts.build_table, facts.render_table),
     Block("schedule", "Termine", "Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen und Fristen (D.1).",
           facts.build_schedule, facts.render_schedule),
-    Block("eligibility", "Spielberechtigung", "Zulassung, Mindestalter, Spiel-IDs, Plattform, ein Co-Team je Season, Wartezeit, Stichtag und Transferfenster (B.3, #2270).",
+    Block("eligibility", "Spielberechtigung", "Zulassung, Annahme der Anmeldung (automatisch oder durch die Leitung, #2348), Mindestalter, Spiel-IDs, Plattform, "
+          "ein Co-Team je Season, Wartezeit, Stichtag und Transferfenster (B.3, #2270).",
           facts.build_eligibility, facts.render_eligibility),
 )}
 _IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
