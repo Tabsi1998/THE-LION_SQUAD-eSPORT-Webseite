@@ -18,6 +18,7 @@ schlösse sich ein Import-Kreis über ``tournament_purge``. Die Regeln stehen in
 from __future__ import annotations
 
 import logging
+import pathlib
 from datetime import datetime, time, timedelta, timezone
 
 from models import now_utc
@@ -27,6 +28,7 @@ from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.league_service import VIENNA, week_days
 from services.match_disputes import decided_at
 from services.matchday_schedule import response_deadline
+from storage import QUARANTINE_DIR
 
 logger = logging.getLogger("tls.match_proofs")
 
@@ -169,7 +171,8 @@ async def delete_for_user(db, user_id: str, *, now=None) -> int:
     DSGVO Art. 17 Abs. 3 lit. e): Ein MOSS-Nachweis, der in einem laufenden Vorfall oder Verfahren noch gebraucht wird,
     bleibt, bis dessen Frist um ist (``moss_due``) - sonst könnte ein Spieler die Prüfung durch Löschen des Kontos beenden.
     Er wird dabei von der Person gelöst (kein ``owner_id`` mehr) und verborgen (``removed``): Nur die nicht befangene
-    Leitung sieht ihn noch, danach löscht ihn ``purge`` wie jeden MOSS-Nachweis. Ohne laufendes Verfahren: sofort weg."""
+    Leitung sieht ihn noch, danach löscht ihn ``purge`` wie jeden MOSS-Nachweis. Ohne laufendes Verfahren: sofort weg.
+    Die Einträge der Bildprüfung (``media_scans``) gehen denselben Weg: gelöscht mit dem Nachweis, sonst ohne Person."""
     current = now or now_utc()
     rows = await db.match_proof_photos.find({"owner_id": user_id}, {"_id": 0}).to_list(None)
     moss = [row for row in rows if refs.kind_of(row) == "moss" and row.get("status") in match_proofs.KEPT_STATUSES]
@@ -190,7 +193,25 @@ async def delete_for_user(db, user_id: str, *, now=None) -> int:
             "removed_at": row.get("removed_at") or stamp, "updated_at": stamp}})
         await match_proofs.audit_proof(db, "match.proof.erasure_hold", matches[row["match_id"]], None, row)
     held_ids = {row["id"] for row in held}
-    return await match_proofs.delete_rows(db, [row for row in rows if row["id"] not in held_ids])
+    gone = [row for row in rows if row["id"] not in held_ids]
+    # Die Bildprüfung führt je Bild einen Eintrag mit der Kennung des Kontos: Er geht mit dem Nachweis - bleibt der Nachweis,
+    # verliert auch der Eintrag den Bezug zur Person.
+    if held_ids:
+        await db.media_scans.update_many({"kind": "proof", "ref_id": {"$in": sorted(held_ids)}}, {"$set": {"owner_id": None}})
+    await _delete_scans(db, [row["id"] for row in gone])
+    return await match_proofs.delete_rows(db, gone)
+
+
+async def _delete_scans(db, proof_ids: list[str]) -> None:
+    """Die Einträge der Bildprüfung zu diesen Nachweisen löschen - samt einem Original, das in der Quarantäne liegt."""
+    if not proof_ids:
+        return
+    query = {"kind": "proof", "ref_id": {"$in": proof_ids}}
+    async for scan in db.media_scans.find(query, {"_id": 0, "quarantine_key": 1}):
+        key = pathlib.PurePosixPath(str(scan.get("quarantine_key") or "").replace("\\", "/")).name
+        if key:
+            (QUARANTINE_DIR / key).unlink(missing_ok=True)
+    await db.media_scans.delete_many(query)
 
 
 async def rescan_stuck(db, *, now=None) -> int:

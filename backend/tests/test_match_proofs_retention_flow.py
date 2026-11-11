@@ -411,6 +411,40 @@ async def test_account_erasure_keeps_moss_of_a_running_procedure_for_the_lead_on
 
 
 @pytest.mark.asyncio
+async def test_account_erasure_leaves_no_trace_of_the_person_at_proof_or_image_check(flow):
+    """Die ganze Kontolöschung (wie die Route sie ausführt): Am gehaltenen MOSS-Nachweis und an seinem Eintrag der Bildprüfung
+    steht keine Kennung der Person mehr; zu gelöschten Nachweisen bleibt kein Prüfeintrag zurück (Review #2360, Runde 3)."""
+    from routes.dsgvo_routes import _anonymize_user_data
+
+    w = await league_world(flow)
+    match = w["match"]
+    await season(flow, w)
+    await set_match(flow, w, disputes=[protest(w), protest(w, id="verfahren-alt")])
+    mila = user(w, "Mila")
+    flow.act_as(mila)
+    needed = (await add_image(flow, match, "moss", "verfahren-1")).json()
+    stale = (await add_image(flow, match, "moss", "verfahren-alt")).json()
+    await set_match(flow, w, disputes=[protest(w), protest(w, id="verfahren-alt", resolved_at=(now_utc() - timedelta(days=20)).isoformat())])
+    scans = await flow.db.media_scans.find({"kind": "proof"}, {"_id": 0, "ref_id": 1, "owner_id": 1}).to_list(10)
+    assert sorted(row["ref_id"] for row in scans) == sorted([needed["id"], stale["id"]]) and all(row["owner_id"] == mila["id"] for row in scans)
+
+    await _anonymize_user_data(flow.db, mila["id"], mila["id"], "self")
+
+    assert await left(flow) == {needed["id"]}
+    kept = await flow.db.match_proof_photos.find_one({"id": needed["id"]}, {"_id": 0})
+    assert kept["owner_id"] is None and kept["status"] == "removed" and mila["id"] not in str(kept)
+    scans = await flow.db.media_scans.find({"kind": "proof"}, {"_id": 0}).to_list(10)
+    assert [row["ref_id"] for row in scans] == [needed["id"]], "der Prüfeintrag des gelöschten Nachweises ist weg"
+    assert scans[0]["owner_id"] is None and mila["id"] not in str(scans[0])
+    # Das Protokoll behält wie überall die Kennung des Kontos - und die zeigt nur noch auf die pseudonymisierte Kontozeile.
+    audits = await flow.db.audit_logs.find({"data.proof_id": needed["id"]}, {"_id": 0, "action": 1, "actor_id": 1}).to_list(10)
+    assert sorted((row["action"], row["actor_id"] == mila["id"]) for row in audits) == [
+        ("match.proof.add", True), ("match.proof.erasure_hold", False)]
+    account = await flow.db.users.find_one({"id": mila["id"]}, {"_id": 0, "username": 1, "display_name": 1, "email": 1})
+    assert account["username"].startswith("deleted_") and "Mila" not in str(account)
+
+
+@pytest.mark.asyncio
 async def test_account_erasure_without_a_running_procedure_deletes_moss_at_once(flow):
     w = await league_world(flow)
     match = w["match"]
