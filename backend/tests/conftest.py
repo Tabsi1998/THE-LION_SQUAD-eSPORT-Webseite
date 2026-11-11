@@ -4,6 +4,7 @@ import sys
 from datetime import datetime
 
 import flow_mongo
+import mongomock_to_list
 import pytest
 import requests
 import shard_plan
@@ -48,6 +49,8 @@ DEMO_PASSWORD = os.environ.get("TEST_DEMO_PASSWORD", "")
 def pytest_configure(config):
     # CI in Teilen (TEST_SHARD=n/gesamt, #2054); ohne die Variable läuft die ganze Suite.
     shard_plan.configure(config)
+    # Test-Mongo: ``to_list(n)`` liefert wie Motor höchstens n Einträge (#2357), in jedem Prozess.
+    mongomock_to_list.install()
     # Ablauf-Tests gegen echtes MongoDB (#2200): eine Adresse, die nicht erlaubt ist, beendet den Lauf vor dem ersten Test.
     try:
         flow_mongo.configured_url()
