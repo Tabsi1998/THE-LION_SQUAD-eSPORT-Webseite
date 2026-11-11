@@ -48,6 +48,8 @@ CATEGORY_LINKS: dict[str, str] = {
 }
 
 _rarity_cache: dict = {"at": None, "data": None}
+# Für die Verwaltung (Review N7): dieselbe Rechnung samt nicht mehr Erreichbarem.
+_rarity_cache_admin: dict = {"at": None, "data": None}
 
 
 # ------------------------------------------------------------------ Grundlagen
@@ -122,12 +124,14 @@ def _group_is_member_only(group: dict | None) -> bool:
 
 # ------------------------------------------------------------------ Seltenheit
 
-async def rarity(db, *, force: bool = False, now: datetime | None = None) -> dict:
+async def rarity(db, *, force: bool = False, now: datetime | None = None, include_retired: bool = False) -> dict:
     """Je Stufe: wie viele Konten sie haben und wie viel Prozent das sind. Je Gruppe dazu die höchste
-    Stufe („top“) mit ihrer Seltenheit - das ist die Zahl auf der Karte. Eine Minute zwischengespeichert."""
+    Stufe („top“) mit ihrer Seltenheit - das ist die Zahl auf der Karte. Eine Minute zwischengespeichert.
+    ``include_retired`` (nur die Verwaltung, Review N7): auch nicht mehr Erreichbares, mit ``retired`` an der Zeile."""
     now = now or now_utc()
-    cached = _rarity_cache.get("data")
-    if cached and not force and _rarity_cache.get("at") and (now - _rarity_cache["at"]).total_seconds() < RARITY_TTL_SECONDS:
+    cache = _rarity_cache if not include_retired else _rarity_cache_admin
+    cached = cache.get("data")
+    if cached and not force and cache.get("at") and (now - cache["at"]).total_seconds() < RARITY_TTL_SECONDS:
         return cached
     bases = await _bases(db)
     groups, tiers = await _catalog(db)
@@ -137,12 +141,16 @@ async def rarity(db, *, force: bool = False, now: datetime | None = None) -> dic
     tier_rows: dict[str, dict] = {}
     for code, tier in tiers.items():
         group = groups.get(tier.get("group_code"))
-        # Nicht mehr erreichbar (#2339) hat keine Seltenheit - es lässt sich nicht mehr bekommen.
-        if not group or group.get("is_negative") or reach.tier_retired(tier, group, now):
+        # Nicht mehr erreichbar (#2339) hat keine Seltenheit - es lässt sich nicht mehr bekommen. Die Verwaltung sieht es
+        # trotzdem, mit Vermerk.
+        if not group or group.get("is_negative"):
+            continue
+        retired = reach.tier_retired(tier, group, now)
+        if retired and not include_retired:
             continue
         base = bases["members"] if _group_is_member_only(group) else bases["all"]
         count = len(holders.get(code, ()))
-        tier_rows[code] = {"holders": count, "percent": _percent(count, base), "base": base}
+        tier_rows[code] = {"holders": count, "percent": _percent(count, base), "base": base, **({"retired": True} if retired else {})}
     group_rows: dict[str, dict] = {}
     for code, group in groups.items():
         if group.get("is_negative"):
@@ -167,12 +175,13 @@ async def rarity(db, *, force: bool = False, now: datetime | None = None) -> dic
         }
     data = {"base": bases["all"], "members_base": bases["members"], "tiers": tier_rows, "groups": group_rows,
             "computed_at": now.isoformat()}
-    _rarity_cache.update({"at": now, "data": data})
+    cache.update({"at": now, "data": data})
     return data
 
 
 def reset_rarity_cache() -> None:
     _rarity_cache.update({"at": None, "data": None})
+    _rarity_cache_admin.update({"at": None, "data": None})
 
 
 # ------------------------------------------------------------------ Kategorien

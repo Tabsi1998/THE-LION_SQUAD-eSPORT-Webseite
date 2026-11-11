@@ -389,6 +389,14 @@ describe("Statistik", () => {
     expect(screen.queryByTestId("stats-row-matches_played_4")).toBeNull();
     expect(screen.getByTestId("stats-row-season_top10_1")).toHaveTextContent("Saisonspitze");
   });
+
+  it("vermerkt nicht mehr Erreichbares in der Seltenheit (Review N7)", async () => {
+    const stats = { ...STATS, rarity: [...STATS.rarity, { code: "founding_member_1", name: "Gründungsmitglied I", group_name: "Gründungsmitglied", category: "club", material: "gold", holders: 3, percent: 10, retired: true }] };
+    apiMock.get.mockImplementation((url) => (url === "/admin/achievements/stats" ? Promise.resolve({ data: stats }) : routeGet(url)));
+    renderAt("stats");
+    expect(await screen.findByTestId("stats-retired-founding_member_1")).toHaveTextContent("nicht mehr erreichbar");
+    expect(screen.queryByTestId("stats-retired-matches_played_4")).toBeNull();
+  });
 });
 
 describe("Jahresrückblick", () => {

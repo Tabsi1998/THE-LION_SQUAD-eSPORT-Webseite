@@ -191,6 +191,28 @@ async def test_spielerliste_zaehlt_wie_die_erfolge_seite(flow):
 
 
 @pytest.mark.asyncio
+async def test_admin_statistik_zeigt_nicht_mehr_erreichbares_mit_vermerk(flow):
+    """Review N7: Seite ohne, Verwaltung mit - Übersicht, Statistik und CSV vermerken es."""
+    admin = await flow.add_user(role="superadmin", name="chef")
+    anna = await flow.add_user(name="Anna")
+    await _member(flow, anna)
+    await _give(flow, anna, "founding_member_1", "matches_played_1", "matches_played_2")
+    visibility.reset_rarity_cache()
+    flow.act_as(admin)
+    stats = (await flow.get("/api/admin/achievements/stats")).json()
+    founding = next(r for r in stats["rarity"] if r["code"] == "founding_member_1")
+    assert founding["retired"] is True and founding["holders"] == 1
+    assert next(r for r in stats["rarity"] if r["code"] == "matches_played_1")["retired"] is False
+    overview = (await flow.get("/api/admin/achievements/overview")).json()
+    assert "retired" in overview["rarest"]
+    csv_text = (await flow.get("/api/admin/achievements/stats.csv")).text
+    assert "Nicht mehr erreichbar" in csv_text.splitlines()[0] and any(line.startswith("founding_member_1;") and line.endswith(";ja") for line in csv_text.splitlines())
+    # Gegenprobe: die Seite selbst zeigt keine Seltenheit dafür.
+    flow.act_as(None)
+    assert "founding_member_1" not in (await flow.get("/api/achievements/overview")).json()["rarity"]["tiers"]
+
+
+@pytest.mark.asyncio
 async def test_nicht_mehr_erreichbares_wird_nicht_automatisch_vergeben(flow):
     racer = await flow.add_user(name="Fahrer")
     await flow.db.tournaments.insert_one({"id": "gp", "title": "GP", "format": "grand_prix", "status": "completed"})

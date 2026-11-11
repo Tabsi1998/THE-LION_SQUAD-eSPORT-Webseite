@@ -85,13 +85,14 @@ async def overview(db) -> dict:
         per_category[cat] = per_category.get(cat, 0) + 1
         if str(award.get("earned_at") or "") >= since7:
             unlocks7 += 1
-    rarity = await visibility.rarity(db)
+    # Die Verwaltung sieht auch nicht mehr Erreichbares - mit Vermerk (Review N7).
+    rarity = await visibility.rarity(db, include_retired=True)
     rarest = None
     for code, row in rarity["tiers"].items():
         if row["holders"] <= 0:
             continue
         if rarest is None or (row["holders"], -int(tiers[code].get("rank") or 0)) < (rarest["holders"], -int(tiers[rarest["code"]].get("rank") or 0)):
-            rarest = {"code": code, "holders": row["holders"], "percent": row["percent"]}
+            rarest = {"code": code, "holders": row["holders"], "percent": row["percent"], "retired": bool(row.get("retired"))}
     if rarest:
         t = tiers[rarest["code"]]
         rarest.update({"name": t.get("name"), "material": t.get("material"), "material_name": t.get("material_name"), "group_name": groups.get(t.get("group_code"), {}).get("name")})
@@ -484,14 +485,15 @@ async def prestige_reset(db, actor: dict, user_id: str, reason: str) -> dict:
 
 async def stats(db, *, weeks: int = 12) -> dict:
     groups, tiers = await visibility._catalog(db)
-    rarity = await visibility.rarity(db)
+    # Auch nicht mehr Erreichbares - die Zeile trägt den Vermerk ``retired`` (Review N7).
+    rarity = await visibility.rarity(db, include_retired=True)
     rows = []
     for code, row in rarity["tiers"].items():
         t = tiers.get(code) or {}
         g = groups.get(t.get("group_code")) or {}
         rows.append({"code": code, "name": t.get("name"), "group_code": t.get("group_code"), "group_name": g.get("name"), "category": category_v2(g.get("category")),
                      "material": t.get("material"), "material_name": t.get("material_name") or MATERIALS.get(t.get("material") or "", {}).get("name"), "rank": int(t.get("rank") or 0),
-                     "holders": row["holders"], "percent": row["percent"], "points": int(t.get("points") or 0)})
+                     "holders": row["holders"], "percent": row["percent"], "points": int(t.get("points") or 0), "retired": bool(row.get("retired"))})
     rows.sort(key=lambda r: (r["percent"], r["holders"], r["name"] or ""))
     negative = {code for code, g in groups.items() if g.get("is_negative")}
     now = now_utc().astimezone(VIENNA)
@@ -522,9 +524,10 @@ async def stats(db, *, weeks: int = 12) -> dict:
 def stats_csv(data: dict) -> str:
     out = io.StringIO()
     writer = csv.writer(out, delimiter=";")
-    writer.writerow(["Stufe", "Name", "Gruppe", "Kategorie", "Material", "Rang", "Punkte", "Personen", "Prozent"])
+    writer.writerow(["Stufe", "Name", "Gruppe", "Kategorie", "Material", "Rang", "Punkte", "Personen", "Prozent", "Nicht mehr erreichbar"])
     for r in data.get("rarity", []):
-        writer.writerow([r["code"], r["name"], r["group_name"], r["category"], r["material_name"], r["rank"], r["points"], r["holders"], str(r["percent"]).replace(".", ",")])
+        writer.writerow([r["code"], r["name"], r["group_name"], r["category"], r["material_name"], r["rank"], r["points"], r["holders"], str(r["percent"]).replace(".", ","),
+                         "ja" if r.get("retired") else ""])
     writer.writerow([])
     writer.writerow(["Woche", "Freischaltungen"])
     for w in data.get("weekly", []):
