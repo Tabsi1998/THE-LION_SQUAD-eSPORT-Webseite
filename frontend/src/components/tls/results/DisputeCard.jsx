@@ -90,7 +90,7 @@ export function DisputeCard({ item, busy = false, highlighted = false, onKeep, o
 // Ergebnis-Fenster - die Korrektur mit Grund entscheidet das Verfahren mit.
 
 const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-[#FF6B60]" };
-const STATE_STYLE = { open: "border-[#FFD700]/50 text-[#FFD700]", decided: "border-white/20 text-white/70", withdrawn: "border-white/15 text-white/50" };
+const STATE_STYLE = { open: "border-honor/50 text-honor", decided: "border-white/20 text-white/70", withdrawn: "border-white/15 text-white/50" };
 const SMALL_BUTTON = "tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50";
 
 function when(value) {
@@ -162,13 +162,13 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
   const mossPending = (p.moss_requests || []).some((row) => row.own && ["requested", "missing"].includes(row.state));
 
   return (
-    <article className={`rounded-sm border bg-[#121212] p-4 ${open ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid={`procedure-${p.id}`} data-state={p.state} id={`verfahren-${p.id}`}>
+    <article className={`rounded-sm border bg-[#121212] p-4 ${open ? "border-honor/40" : "border-white/10"}`} data-testid={`procedure-${p.id}`} data-state={p.state} id={`verfahren-${p.id}`}>
       <div className="tls-stagger space-y-3">
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">{sideName}{p.at ? ` · ${when(p.at)}` : ""}</div>
             <h3 className="mt-1 flex items-center gap-2 font-heading text-lg font-black uppercase">
-              <Scale className="h-4 w-4 shrink-0 text-[#FFD700]" aria-hidden="true" /> {p.kind_label}
+              <Scale className="h-4 w-4 shrink-0 text-honor" aria-hidden="true" /> {p.kind_label}
             </h3>
             <div className="text-sm font-bold text-white/70" data-testid={`procedure-reason-label-${p.id}`}>{p.kind === "appeal" && p.against ? AGAINST_LABELS[p.against.type] : p.reason_label}</div>
           </div>
@@ -255,7 +255,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
 
         {outcome ? (
           <section className="space-y-1 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5" data-testid={`procedure-decision-${p.id}`}>
-            <div className="flex items-center gap-1.5 text-sm font-bold text-white"><Gavel className="h-4 w-4 text-[#FFD700]" aria-hidden="true" /> {outcome}</div>
+            <div className="flex items-center gap-1.5 text-sm font-bold text-white"><Gavel className="h-4 w-4 text-honor" aria-hidden="true" /> {outcome}</div>
             {p.decision_note ? <p className="whitespace-pre-line text-sm text-white/75">Begründung: {p.decision_note}</p> : null}
             {p.resolved_at ? <p className="text-xs text-white/45">Entschieden am {when(p.resolved_at)}{p.resolved_by ? ` von ${p.resolved_by}` : ""}</p> : null}
             {p.appeal_until && p.can_appeal ? <Deadline label="Einspruch möglich bis" until={p.appeal_until} now={now} testId={`procedure-appeal-until-${p.id}`} /> : null}

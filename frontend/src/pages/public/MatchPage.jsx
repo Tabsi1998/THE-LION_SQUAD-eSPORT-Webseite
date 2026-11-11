@@ -615,7 +615,7 @@ function MatchPageView() {
           <OwnDisputes match={match} userId={user?.id} />
           {/* Liga-Verfahren (#1619, E.2): öffentlich nur „in Klärung“ - Beteiligte und Leitung sehen Stand, Fristen und Entscheidung. */}
           {data.league?.contested && !data.in_dispute ? (
-            <p className="mt-5 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-3 text-sm text-white/85" data-testid="match-contested">
+            <p className="mt-5 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 text-sm text-white/85" data-testid="match-contested">
               <strong>In Klärung</strong> – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.
             </p>
           ) : null}

@@ -74,7 +74,7 @@ function ProceduresInbox({ seasonId }) {
             {state.items.map((item) => {
               const deadline = item.target_at || item.statement?.due_at || null;
               return (
-                <li key={item.id} className={`rounded-sm border bg-[#0A0A0A] p-3 ${item.state === "open" ? "border-[#FFD700]/30" : "border-white/10"}`} data-testid={`season-procedure-${item.id}`}>
+                <li key={item.id} className={`rounded-sm border bg-[#0A0A0A] p-3 ${item.state === "open" ? "border-honor/30" : "border-white/10"}`} data-testid={`season-procedure-${item.id}`}>
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <div className="min-w-0">
                       <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">{item.staffel}</div>
