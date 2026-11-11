@@ -346,6 +346,33 @@ async def test_import_merkt_eine_geaenderte_entscheidung(flow):
     assert (await flow.db.achievement_groups.find_one({"code": "pole"}, {"_id": 0}))["retired_manual"] is True
 
 
+def test_nur_kennzeichen_oder_datum_sind_eine_entscheidung():
+    """Nachprüfung: ein neuer Grund allein setzt ``retired_manual`` nicht."""
+    current = {"retired": False, "retired_reason": "Alt.", "available_until": "2026-03-01T10:00:00+00:00"}
+    assert not reach.retired_changes(current, {"retired_reason": "Neu formuliert."})
+    assert not reach.retired_changes(current, {"retired": False, "available_until": "2026-03-01T10:00:00Z", "retired_reason": "Neu."})
+    assert reach.retired_changes(current, {"retired": True})
+    assert reach.retired_changes(current, {"available_until": None})
+    assert reach.retired_changes({}, {"available_until": "2030-01-01T00:00:00Z"})
+
+
+@pytest.mark.asyncio
+async def test_neuer_grund_laesst_die_pionier_regel_aktiv(flow):
+    admin = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(admin)
+    await _accounts(flow, 50)
+    res = await flow.patch("/api/admin/achievements/groups/pioneer", json={"retired_reason": "Die ersten hundert Konten."})
+    assert res.status_code == 200 and not res.json().get("retired_manual"), res.text
+    payload = {"groups": [{"code": "pioneer", "retired_reason": "Aus dem Import."}], "tiers": []}
+    res = await flow.post("/api/admin/achievements/catalog/import", json=payload)
+    assert res.status_code == 200 and res.json()["applied"] is True, res.text
+    assert not (await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0})).get("retired_manual")
+    await _accounts(flow, 50, offset=50)
+    await badges.seed_badges()
+    group = await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0})
+    assert group["pioneer_rule_applied"] is True and group["available_until"], "die Regel greift trotz neuem Grund"
+
+
 # ------------------------------------------------------------------ 2. und 4. Kategorie-Meister und Meta-Erfolge
 
 

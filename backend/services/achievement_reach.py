@@ -182,22 +182,13 @@ async def apply_rules(db) -> None:
 
 
 def retired_changes(current: dict | None, updates: dict) -> bool:
-    """Ändert ``updates`` etwas an „nicht mehr erreichbar“? (Verwaltung und Import - dann gilt ``retired_manual``.) Ein
-    mitgeschicktes ``available_until: null`` bei leerem Feld ist keine Änderung."""
+    """Ändert ``updates`` die Entscheidung „nicht mehr erreichbar“ - das Kennzeichen oder „erreichbar bis“? (Verwaltung und
+    Import - dann gilt ``retired_manual``.) Ein neuer Grund allein ist keine Entscheidung, ein mitgeschicktes
+    ``available_until: null`` bei leerem Feld auch nicht."""
     current = current or {}
-    for key in RETIRED_FIELDS:
-        if key not in updates:
-            continue
-        old, new = current.get(key), updates.get(key)
-        if key == "retired":
-            old, new = bool(old), bool(new)
-        elif key == "available_until":
-            old, new = parse_when(old), parse_when(new)
-        else:
-            old, new = (str(old or "").strip() or None), (str(new or "").strip() or None)
-        if old != new:
-            return True
-    return False
+    if "retired" in updates and bool(current.get("retired")) != bool(updates.get("retired")):
+        return True
+    return "available_until" in updates and parse_when(current.get("available_until")) != parse_when(updates.get("available_until"))
 
 
 async def load_catalog(db) -> tuple[dict[str, dict], dict[str, dict]]:
