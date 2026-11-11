@@ -20,7 +20,7 @@ from models import new_id, now_utc
 from services import league_protest_settings as protest_settings
 from services import match_proof_refs as refs
 from services.league_scope import is_league_staffel
-from services.match_disputes import CATEGORIES, CLOSED_STATUSES, DECIDED_STATUSES, decided_at
+from services.match_disputes import CATEGORIES, DECIDED_STATUSES, decided_at, league_window_of
 from services.matchday_schedule import response_deadline
 
 OBJECTION, PROTEST, APPEAL = "objection", "protest", "appeal"
@@ -149,25 +149,8 @@ def _halts(row: dict) -> bool:
 async def window(db, match: dict, league: League, now: datetime | None = None) -> dict:
     """Darf eine Seite jetzt ein Verfahren eröffnen - und bis wann? Vor der Bestätigung immer (Beanstandung), danach
     ``protest_hours`` ab der Bestätigung (ruhend in Sperrzeiten). „Nächstes Spiel des Siegers“ gilt in der Liga nicht (Nr. 129)."""
-    now = now or now_utc()
-    if str(match.get("status") or "") in CLOSED_STATUSES:
-        return {"open": False, "until": None, "kind": None}
-    if kind_now(match) == OBJECTION:
-        return {"open": True, "until": None, "kind": OBJECTION}
-    decided = decided_at(match)
-    until = _hours(league, decided, league.settings["protest_hours"]) if decided else None
-    if until is None or now >= until:
-        return {"open": False, "until": None, "kind": PROTEST}
-    return {"open": True, "until": until.isoformat(), "kind": PROTEST}
-
-
-async def league_window(db, match: dict, now: datetime | None = None) -> dict | None:
-    """Für ``match_disputes.dispute_window``: das Fenster einer Liga-Staffel - ``None`` bei jedem anderen Turnier."""
-    league = await context(db, match)
-    if league is None:
-        return None
-    found = await window(db, match, league, now)
-    return {"open": found["open"], "until": found["until"]}
+    # Eine Stelle für Server, Website und App: dieselbe Rechnung wie ``match_disputes.dispute_window`` (``can_dispute``).
+    return league_window_of(match, league.tournament, league.settings["protest_hours"], now or now_utc())
 
 
 # ---------------------------------------------------------------- Schreiben: gemeinsame Bausteine

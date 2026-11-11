@@ -79,7 +79,13 @@ async def add_proof(match_id: str, request: Request, kind: str = Form(...), ref_
     checked = await match_proofs.check_add(db, match, me, kind, ref_id)
     # Derselbe Zähler wie beim Foto vom Ergebnis: Wer beide Wege nutzt, bekommt nicht doppelt so viele Uploads.
     await enforce_rate_limit(request, "matches:proof-photo", subject=me["id"], **UPLOAD_LIMIT)
-    return await match_proofs.add_proof(db, match, me, checked, file=file, link=link)
+    added = await match_proofs.add_proof(db, match, me, checked, file=file, link=link)
+    if added.get("type") == "file":
+        # Die MOSS-Datei ist da (#2297): Hat die Leitung sie von dieser Person angefordert, ist die Anforderung damit erfüllt.
+        from services import league_procedures
+
+        await league_procedures.note_moss_upload(db, match, added.get("ref_id") or "", me["id"])
+    return added
 
 
 @router.delete("/{match_id}/proofs/{proof_id}")

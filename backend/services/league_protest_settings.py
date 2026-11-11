@@ -10,7 +10,10 @@ from __future__ import annotations
 import copy
 
 from services.league_presets import PRESETS
-from services.match_disputes import CATEGORIES
+
+# Die vier Gründe von „Problem melden“ (``match_disputes.CATEGORIES``, auch in der App): Sie bleiben in jeder Liste - hier als eigene
+# Konstante, damit dieses Modul ein Blatt bleibt (``match_disputes`` liest die Einstellungen für das Fenster der Liga).
+CATEGORIES = {"wrong_result": "Falsches Ergebnis", "rule_violation": "Regelverstoß", "technical": "Technik", "other": "Sonstiges"}
 
 # Feld → (kleinster, größter Wert, Bezeichnung für die Meldung)
 NUMBERS: dict[str, tuple[int, int, str]] = {

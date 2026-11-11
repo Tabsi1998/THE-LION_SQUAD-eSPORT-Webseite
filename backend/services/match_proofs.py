@@ -542,10 +542,6 @@ async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: Upload
     elif kind == "moss" and looks_like_zip(file):
         # Die MOSS-Datei selbst (#2297): eigener Dateityp mit eigener Prüfung - nur am Bezug ``moss``.
         doc = await _store_zip(db, match, user, side, file, context=context)
-        from services import league_procedures
-
-        # Hat die Leitung die Datei dieser Person angefordert, ist die Anforderung damit erfüllt.
-        await league_procedures.note_moss_upload(db, match, ref_id, user["id"])
     else:
         doc = await _store_image(db, match, user, side, file, status="attached", context=context)
     await audit_proof(db, "match.proof.add", match, user["id"], doc)

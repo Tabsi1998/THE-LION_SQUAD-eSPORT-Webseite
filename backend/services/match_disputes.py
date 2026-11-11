@@ -79,6 +79,41 @@ async def winner_next_matches(db, match: dict) -> list[dict]:
     ]
 
 
+def league_window_of(match: dict, tournament: dict, protest_hours: int, now: datetime) -> dict:
+    """Das Fenster in einer Liga-Staffel (#1619, E.2, Nr. 129): vor der Bestätigung immer (Beanstandung, ``objection``), danach
+    ``protest_hours`` ab der Bestätigung (Protest) - Zeit in Sperrzeiten zählt nicht mit. „Nächstes Spiel des Siegers“ und „Ende der
+    Spielwoche“ gelten hier nicht. Ein Spiel, das wegen eines Verfahrens ruht (``disputed``), zählt mit dem Stand von vorher."""
+    from services.matchday_schedule import response_deadline
+
+    status = str(match.get("status") or "")
+    if status in CLOSED_STATUSES:
+        return {"open": False, "until": None, "kind": None}
+    if status == "disputed":
+        status = str(match.get("status_before_dispute") or "")
+    if status not in DECIDED_STATUSES:
+        return {"open": True, "until": None, "kind": "objection"}
+    decided = decided_at(match)
+    until = response_deadline(tournament, decided, protest_hours) if decided else None
+    if until is None or now >= until:
+        return {"open": False, "until": None, "kind": "protest"}
+    return {"open": True, "until": until.isoformat(), "kind": "protest"}
+
+
+async def league_window(db, match: dict, now: datetime | None = None) -> dict | None:
+    """``league_window_of`` für das Spiel - ``None`` bei jedem Turnier ohne Liga."""
+    from services import league_protest_settings
+    from services.league_scope import is_league_staffel
+
+    if not match.get("tournament_id"):
+        return None
+    tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "creation_key": 0, "billing": 0})
+    if not is_league_staffel(tournament):
+        return None
+    season = await db.league_seasons.find_one({"id": tournament["league_context"].get("season_id")}, {"_id": 0})
+    hours = league_protest_settings.effective(tournament, season)["protest_hours"]
+    return league_window_of(match, tournament, hours, now or now_utc())
+
+
 async def dispute_window(db, match: dict, now: datetime | None = None) -> dict:
     """Ist ein Dispute möglich - und bis wann? ``until`` ist leer, solange es kein Ergebnis gibt."""
     now = now or now_utc()
@@ -86,11 +121,9 @@ async def dispute_window(db, match: dict, now: datetime | None = None) -> dict:
     if status in CLOSED_STATUSES:
         return {"open": False, "until": None}
     # Liga-Staffel (#1619, E.2): Protestfrist der Season ab der Bestätigung, ruhend in Sperrzeiten - Turniere bleiben bei 30 Minuten.
-    from services import league_procedures
-
-    league = await league_procedures.league_window(db, match, now)
+    league = await league_window(db, match, now)
     if league is not None:
-        return league
+        return {"open": league["open"], "until": league["until"]}
     if status not in DECIDED_STATUSES:
         return {"open": True, "until": None}
     decided = decided_at(match)
