@@ -95,8 +95,9 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
       const { data } = await api.put(`/admin/leagues/seasons/${seasonId}/veto-presets`, { presets: presetsPayload(form, weeks, modes) });
       setState(data);
       setForm(presetsToForm(knownPresets(data.presets, data.modes)));
-      const started = Number(data.vetoes_started) || 0;
-      toast.success(started ? `Vorgaben gespeichert – ${started === 1 ? "ein wartendes Veto hat" : `${started} wartende Vetos haben`} begonnen.` : "Vorgaben gespeichert.");
+      // Spiele, die auf die Vorgabe gewartet haben: Die Captains sind informiert und starten das Veto selbst - es beginnt nicht von allein.
+      const ready = Number(data.matches_ready) || 0;
+      toast.success(ready ? `Vorgaben gespeichert – ${ready === 1 ? "ein wartendes Spiel kann sein Veto jetzt starten, die Captains sind" : `${ready} wartende Spiele können ihr Veto jetzt starten, die Captains sind`} informiert.` : "Vorgaben gespeichert.");
     } catch (failure) {
       setError(formatApiError(failure.response?.data?.detail) || "Die Vorgaben konnten nicht gespeichert werden.");
     } finally {
@@ -119,7 +120,8 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
       </div>
       <p className="text-xs text-white/60">
         Je Spielwoche eine Map aus dem Pool des Modus. Sie gilt für alle Spiele dieses Spieltags – auch für ein verschobenes –, und niemand kann sie sperren oder wählen.
-        Ohne Vorgabe beginnt das Veto in der Woche nicht; ihr bekommt dann einen Hinweis. Eine Änderung gilt nur für Spiele, deren Veto noch nicht begonnen hat.
+        Ohne Vorgabe beginnt das Veto in der Woche nicht; ihr bekommt dann einen Hinweis. Tragt ihr sie nach, bekommen die wartenden Captains eine Nachricht und starten das Veto selbst.
+        Eine Änderung gilt nur für Spiele, deren Veto noch nicht begonnen hat.
       </p>
       {unsaved ? (
         <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/75" data-testid="veto-presets-template-unsaved">

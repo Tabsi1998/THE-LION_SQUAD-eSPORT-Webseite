@@ -5,7 +5,9 @@
 - ``GET …/veto-rules/proposal``: ein Vorschlag aus Modusfolge, Poolgrößen und Best of - nichts wird gespeichert.
 - ``GET|PUT /api/admin/leagues/seasons/{season_id}/veto-presets`` (#2326): die Vorgabe der Woche - je Spielwoche und Modus eine Map aus
   dem Pool, mit Vorschlag „rotiert durch den Pool“, fehlenden Wochen und Historie. Rechte wie die Vorlage. Eine Änderung gilt nur für
-  Vetos, die noch nicht begonnen haben; wartende Vetos beginnen mit dem Speichern.
+  Vetos, die noch nicht begonnen haben; Spiele, die auf die Vorgabe gewartet haben, bekommen „Vorgabe da – Veto kann starten“.
+- ``POST /api/matches/{match_id}/veto/start`` (#2326): „Veto starten“ nach einer nachgetragenen Vorgabe - Captain oder Vertreter einer
+  Seite, idempotent.
 - ``POST /api/matches/{match_id}/veto/pick``: die Seite am Zug sperrt oder wählt eine Map (Captain, Vertreter).
 - ``POST /api/matches/{match_id}/veto/lead``: Pause, Fortsetzen, Schritt zurück, Neustart - Liga-Leitung mit „Spiele betreuen“, mit Grund,
   Befangenheit wie B.1.
@@ -239,9 +241,10 @@ async def put_veto_presets(season_id: str, body: VetoPresetsBody, me: dict = Dep
             if problems:
                 raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: {' '.join(problems)}")
     changes = await league_veto.store_presets(db, season, presets, actor_id=me.get("id"))
-    # Wartende Vetos (beide Seiten eingecheckt, die Vorgabe fehlte) beginnen jetzt - begonnene und fertige bleiben, wie sie sind.
-    started = await league_veto_sweep.start_waiting(db, season_id) if changes else 0
-    return await _presets_answer(db, {**season, "veto_presets": presets}, context, changed=len(changes), vetoes_started=started)
+    # Wartende Spiele (beide Seiten eingecheckt, die Vorgabe fehlte): Beide Seiten erfahren, dass sie das Veto jetzt starten können.
+    # Es beginnt nicht von selbst - sonst liefe die Zeit, während niemand mehr da ist. Begonnene und fertige Vetos bleiben, wie sie sind.
+    told = await league_veto_sweep.announce_waiting(db, season_id) if changes else 0
+    return await _presets_answer(db, {**season, "veto_presets": presets}, context, changed=len(changes), matches_ready=told)
 
 
 async def _context(match_id: str, user: dict):
@@ -267,6 +270,21 @@ async def veto_pick(match_id: str, body: PickBody, me: dict = Depends(get_curren
     try:
         return await league_veto.pick(db, match, tournament, registration_id=acting_reg["id"], map_id=body.map_id, version=body.version,
                                       user=me)
+    except (FlowProblem, league_veto_rules.VetoProblem) as problem:
+        _raise(problem)
+
+
+@router.post("/{match_id}/veto/start")
+async def veto_start(match_id: str, me: dict = Depends(get_current_user), _mutation: None = Depends(_serialized_match_write)):
+    """„Veto starten“ (#2326): nur nötig, wenn das Veto auf die Vorgabe der Woche gewartet hat - Captain oder Vertreter einer Seite, wie
+    bei einem Zug. Sonst beginnt das Veto wie immer von selbst."""
+    db, match, tournament, acting_reg = await _context(match_id, me)
+    if not acting_reg:
+        raise HTTPException(status_code=403, detail=league_veto.NOT_A_SIDE_DETAIL)
+    if not league_veto_rules.rules_of(tournament):
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    try:
+        return await league_veto.manual_start(db, match, tournament, user=me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)
 

@@ -270,8 +270,8 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
         # Vorgabe der Woche fehlt (#2326): Dann läuft das Veto noch nicht - die Nachricht sagt, worauf es wartet.
         waits = bool(with_veto and await league_veto.preset_gap(db, {**match, **fresh}, tournament))
         await _tell(db, match, setup, filled, "Beide Seiten eingecheckt",
-                    "Beide Seiten sind eingecheckt. Das Map-Veto wartet noch auf die Vorgabe der Woche – es beginnt, sobald die Liga-Leitung "
-                    "sie eingetragen hat." if waits else
+                    "Beide Seiten sind eingecheckt. Das Map-Veto wartet noch auf die Vorgabe der Woche – sobald die Liga-Leitung sie "
+                    "eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite." if waits else
                     "Beide Seiten sind eingecheckt – jetzt läuft das Map-Veto, danach beginnt Map 1." if with_veto else
                     "Beide Seiten sind eingecheckt – ihr könnt starten. Map 1 beginnt, sobald eine Seite auf „Spiel starten“ tippt.",
                     "checkin_ready", f"checkin-ready:{match['id']}:{now_iso}")
@@ -478,6 +478,9 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
     if current == VETO and veto_block and veto_block.get("blocked"):
         # Vorgabe der Woche fehlt (#2326): Das Veto hat nicht begonnen - der Satz sagt, worauf es wartet.
         start_hint = veto_block["blocked"]["text"]
+    elif current == VETO and veto_block and veto_block.get("start"):
+        # Die Vorgabe wurde nachgetragen: erst „Veto starten“, dann das Veto, dann Map 1.
+        start_hint = league_veto.START_READY_DETAIL
     proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else None
     if proposal and (proposal.get("decision") or proposal.get("rule") != "check_in"):
         proposal = None

@@ -20,8 +20,12 @@ export const VETO_STATUS_LABELS = {
   done: "Spielreihenfolge steht",
   skipped: "Kein Veto in diesem Spiel",
 };
-/** Die Überschrift des Veto-Blocks: wartet das Veto auf die Vorgabe der Woche (#2326), sagt sie genau das. */
+/**
+ * Die Überschrift des Veto-Blocks: wartet das Veto auf die Vorgabe der Woche (#2326), sagt sie genau das - und steht die
+ * nachgetragene Vorgabe, dass jetzt eine Seite das Veto startet.
+ */
 export function vetoHeadline(block) {
+  if (block?.status === "waiting" && block.start) return "Vorgabe steht – Veto starten";
   if (block?.status === "waiting") return block.blocked ? "Veto wartet auf die Vorgabe der Woche" : "Vorgabe der Woche";
   return VETO_STATUS_LABELS[block?.status] || "Veto";
 }
@@ -231,6 +235,12 @@ export function vetoText(block) {
     case "waiting":
       // Vorgabe der Woche fehlt (#2326): Das Veto beginnt nicht - der Server sagt, für welche Woche und welchen Modus.
       if (block.blocked?.text) return block.blocked.text;
+      // Nachgetragen: Das Veto beginnt nicht von selbst - eine Seite startet es, vorher läuft keine Zeit.
+      if (block.start) {
+        return block.start.can_start
+          ? "Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Tippt auf „Veto starten“, sobald beide Teams bereit sind."
+          : "Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Captain oder Vertreter einer Seite startet das Veto.";
+      }
       return "Sobald beide Seiten eingecheckt sind, beginnt das Map-Veto – danach startet Map 1.";
     case "running":
       if (!current) return "Das Veto läuft.";

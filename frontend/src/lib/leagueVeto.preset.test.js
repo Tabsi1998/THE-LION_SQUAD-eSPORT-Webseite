@@ -102,5 +102,10 @@ describe("Matchseite", () => {
     expect(vetoHeadline(waiting)).toBe("Vorgabe der Woche");
     expect(vetoText(waiting)).toBe("Sobald beide Seiten eingecheckt sind, beginnt das Map-Veto – danach startet Map 1.");
     expect(vetoHeadline({ status: "running" })).toBe("Veto läuft");
+    // Nachgetragen: Eine Seite startet das Veto - der Satz sagt, wer.
+    const ready = { status: "waiting", blocked: null, start: { can_start: true, hint: null } };
+    expect(vetoHeadline(ready)).toBe("Vorgabe steht – Veto starten");
+    expect(vetoText(ready)).toBe("Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Tippt auf „Veto starten“, sobald beide Teams bereit sind.");
+    expect(vetoText({ ...ready, start: { can_start: false } })).toBe("Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Captain oder Vertreter einer Seite startet das Veto.");
   });
 });

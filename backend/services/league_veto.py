@@ -55,6 +55,7 @@ STARTED_DETAIL = "Das Spiel läuft schon – am Veto ändert sich nichts mehr."
 REPORT_VETO_DETAIL = "Erst das Veto abschließen – dann melden."
 SYSTEM_STEP_DETAIL = "Diesen Schritt setzt das System."
 NO_WEEK_DETAIL = "Dieses Spiel gehört zu keiner Spielwoche – die Vorgabe der Woche lässt sich nicht bestimmen."
+START_READY_DETAIL = "Die Vorgabe der Woche steht – Captain oder Vertreter einer Seite tippt auf „Veto starten“. Vorher läuft keine Zeit."
 PRESET_LIMIT = 500
 HISTORY_LIMIT = 10
 
@@ -260,7 +261,7 @@ async def _wait_for_preset(db, match: dict, tournament: dict, week: int, problem
             await create_user_notification(
                 user_id, "Veto wartet auf die Vorgabe der Woche",
                 f"{tournament.get('title') or 'Liga'} · Spielwoche {week}: {' '.join(problems)} Mindestens ein Spiel ist eingecheckt und "
-                "wartet – das Veto beginnt, sobald die Vorgabe eingetragen ist.",
+                "wartet. Sobald die Vorgabe eingetragen ist, bekommen beide Seiten eine Nachricht und starten das Veto selbst.",
                 url=f"/admin/leagues/seasons/{season_id}#veto", kind="match_attention",
                 meta={"category": "tournament_updates", "tournament_id": tournament.get("id"), "match_id": match.get("id"),
                       "reason": "veto_preset_missing", "dedupe_key": f"veto-preset-missing:{season_id}:{week}"})
@@ -378,12 +379,29 @@ def _can_run(match: dict) -> bool:
             and not has_report(match) and str(match.get("status") or "") in OPEN_MATCH_STATUSES and not match.get("is_preview"))
 
 
-async def ensure_started(db, match: dict, tournament: dict | None, *, now: datetime | None = None) -> dict:
+def wait_of(match: dict | None) -> dict | None:
+    """Der Merker „das Veto hat auf die Vorgabe der Woche gewartet“ zum geltenden Termin und seiner Revision (``flow.veto_wait``) - ein
+    neuer Termin macht ihn ungültig, wie das Veto selbst."""
+    wait = ((match or {}).get("flow") or {}).get("veto_wait")
+    if not isinstance(wait, dict):
+        return None
+    same = wait.get("for_at") == iso((match or {}).get("scheduled_at")) and int(wait.get("rev") or 0) == schedule_rev(match)
+    return wait if same else None
+
+
+async def ensure_started(db, match: dict, tournament: dict | None, *, now: datetime | None = None, manual: bool = False,
+                         actor_id: str | None = None) -> dict:
     """Das Veto beginnen, sobald beide Seiten eingecheckt sind - genau einmal je Termin (Bedingung: kein Veto für diesen Termin).
-    Gibt das Spiel zurück, bei einem Start den frischen Stand. Ohne Vorlage, mit Veto oder ohne „beide da“ passiert nichts."""
+    Gibt das Spiel zurück, bei einem Start den frischen Stand. Ohne Vorlage, mit Veto oder ohne „beide da“ passiert nichts.
+
+    Hat das Veto auf die Vorgabe der Woche gewartet (``wait_of``), beginnt es **nicht mehr von selbst**: Die Teams sind vielleicht nicht
+    mehr da, und nach 60 Sekunden würde das System für sie wählen. Dann startet es erst ``manual`` - ein Captain oder Vertreter tippt
+    „Veto starten“ (``manual_start``)."""
     rules = rules_mod.rules_of(tournament)
     # Gesperrte Staffel (Codex zu D.3): nur lesen - kein Start aus einem Seitenaufruf, der Scheduler lässt sie ohnehin aus.
     if not rules or tournament.get("locked_at") or veto_of(match) is not None or not _can_run(match):
+        return match
+    if not manual and wait_of(match) is not None and rules_mod.preset_steps(rules["steps"]):
         return match
     now = now or now_utc()
     now_iso = now.isoformat()
@@ -394,7 +412,7 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
     pool, best_of, order, repeat = await _match_setup(db, match, tournament)
     problem = rules_mod.fits_problem(rules, pool=pool, best_of=best_of, order=order, repeat=repeat)
     # Vorgabe der Woche (#2326): die Map der Spielwoche dieses Spiels - fehlt sie, beginnt das Veto nicht (kein ``skipped``, keine
-    # Wertung): Die Leitung trägt sie nach, dann beginnt es beim nächsten Lesen oder sofort beim Speichern der Vorgaben.
+    # Wertung): Die Leitung trägt sie nach, danach startet eine Seite das Veto von Hand.
     week, presets = None, {}
     if not problem and rules_mod.preset_steps(rules["steps"]):
         week = week_of(match)
@@ -431,8 +449,9 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
     fresh = await _reload(db, match)
     if not written.matched_count:
         return fresh
-    await _audit(db, "match.veto.start", match, None, {
+    await _audit(db, "match.veto.start", match, actor_id if manual else None, {
         "status": doc["status"], "team_a": doc["team_a"], "team_a_via": doc["team_a_via"], "map_pool_id": doc["map_pool_id"],
+        **({"via": "manual"} if manual else {}),
         **({"week": week, "presets": doc["presets"]} if doc["presets"] else {}),
         **({"skipped_reason": problem} if problem else {})})
     if problem:
@@ -445,6 +464,69 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
                 f"Das Map-Veto hat begonnen – {names.get(doc['team_a'], 'die Gegenseite')} beginnt. Je Schritt "
                 f"{doc['template']['step_seconds']} Sekunden.", "veto_start", f"veto-start:{match['id']}:{now_iso}")
     return await settle_due(db, fresh, tournament, now=now)
+
+
+async def _not_started_detail(db, match: dict, tournament: dict | None) -> str:
+    """Warum es noch kein Veto gibt: die Vorgabe der Woche fehlt, sie steht und jemand muss „Veto starten“ tippen - oder es fehlt
+    schlicht der Check-in."""
+    gap = await preset_gap(db, match, tournament)
+    if gap:
+        return gap
+    return START_READY_DETAIL if start_ready(match, tournament) else NOT_STARTED_DETAIL
+
+
+def start_ready(match: dict, tournament: dict | None) -> bool:
+    """Wartet das Veto nur noch auf „Veto starten“? Beide Seiten sind eingecheckt, das Veto hatte auf die Vorgabe der Woche gewartet -
+    ob sie inzwischen steht, sagt ``preset_gap``."""
+    rules = rules_mod.rules_of(tournament)
+    return bool(rules and rules_mod.preset_steps(rules["steps"]) and veto_of(match) is None and wait_of(match) is not None
+                and _can_run(match))
+
+
+async def manual_start(db, match: dict, tournament: dict | None, *, user: dict, now: datetime | None = None) -> dict:
+    """„Veto starten“ (#2326): Captain oder Vertreter einer Seite beginnt das Veto, das auf die Vorgabe der Woche gewartet hat - erst
+    ab hier läuft die Zeit je Schritt. Doppelklick, zweites Gerät, beide Seiten gleichzeitig: einer schreibt (Bedingung „kein Veto für
+    diesen Termin“), die anderen bekommen den Stand als Wiederholung."""
+    if not rules_mod.rules_of(tournament):
+        raise FlowProblem(NO_VETO_DETAIL)
+    now = now or now_utc()
+    if veto_of(match) is not None:
+        veto = veto_of(match)
+        return {"version": veto.get("version"), "status": veto.get("status"), "idempotent_replay": True}
+    if not _can_run(match):
+        raise FlowProblem(STARTED_DETAIL if is_running(match) else NOT_STARTED_DETAIL)
+    fresh = await ensure_started(db, match, tournament, now=now, manual=True, actor_id=user.get("id"))
+    veto = veto_of(fresh)
+    if veto is None:
+        # Nichts geschrieben: Die Vorgabe fehlt noch (oder wieder) - der Satz sagt, für welche Woche und welchen Modus.
+        raise FlowProblem(await preset_gap(db, fresh, tournament) or CHANGED_DETAIL)
+    started_here = veto.get("started_at") == now.isoformat()
+    return {"version": veto.get("version"), "status": veto.get("status"), "idempotent_replay": not started_here}
+
+
+async def announce_ready(db, match: dict, tournament: dict | None, *, now: datetime | None = None) -> bool:
+    """Die Leitung hat die fehlende Vorgabe nachgetragen: beiden Seiten sagen, dass sie das Veto jetzt starten können - einmal je Termin
+    (``flow.veto_wait.ready_at`` mit Bedingung, dazu der Schlüssel der Nachricht). Das Veto beginnt dadurch nicht. ``True``, wenn die
+    Nachricht jetzt hinausging."""
+    wait = wait_of(match)
+    if not start_ready(match, tournament) or (wait or {}).get("ready_at") or (tournament or {}).get("locked_at"):
+        return False
+    if await preset_gap(db, match, tournament):
+        return False
+    now_iso = (now or now_utc()).isoformat()
+    # Der Merker fällt mit dem Start des Vetos weg - die Bedingung auf ihn schließt ein inzwischen begonnenes Veto mit aus.
+    written = await db.matches_v2.update_one(
+        {"id": match["id"], "started_at": None, "flow.veto_wait.for_at": wait.get("for_at"), "flow.veto_wait.rev": wait.get("rev"),
+         "flow.veto_wait.ready_at": None},
+        {"$set": {"flow.veto_wait.ready_at": now_iso}})
+    if not written.matched_count:
+        return False
+    await _audit(db, "match.veto.ready", match, None, {"week": wait.get("week")})
+    await _tell(db, match, filled(match)[:2], "Vorgabe da – Veto kann starten",
+                "Die Liga-Leitung hat die Vorgabe der Woche eingetragen. Tippt auf der Matchseite auf „Veto starten“, sobald ihr bereit seid "
+                "– erst ab dann läuft die Zeit je Schritt.",
+                "veto_preset_ready", f"veto-preset-ready:{match['id']}:{wait.get('for_at')}:{wait.get('rev')}")
+    return True
 
 
 # ---------------------------------------------------------------- Schritte schreiben
@@ -621,7 +703,7 @@ async def pick(db, match: dict, tournament: dict | None, *, registration_id: str
     match = await settle_due(db, match, tournament, now=now)
     veto = veto_of(match)
     if veto is None:
-        raise FlowProblem(STARTED_DETAIL if is_running(match) else NOT_STARTED_DETAIL)
+        raise FlowProblem(STARTED_DETAIL if is_running(match) else await _not_started_detail(db, match, tournament))
     refusal = _refusal(veto)
     if refusal:
         raise FlowProblem(refusal)
@@ -670,7 +752,7 @@ async def lead_action(db, match: dict, tournament: dict | None, *, action: str, 
         raise FlowProblem(STARTED_DETAIL)
     veto = veto_of(match)
     if veto is None:
-        raise FlowProblem(NOT_STARTED_DETAIL)
+        raise FlowProblem(await _not_started_detail(db, match, tournament))
     if veto.get("status") == SKIPPED:
         raise FlowProblem(_refusal(veto))
     text = _clean_reason(reason)
@@ -739,10 +821,14 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
     if veto is None:
         # Vorgabe der Woche (#2326): schon vor dem Start sichtbar - und klar gesagt, wenn sie fehlt (dann beginnt das Veto nicht).
         week, presets, blocked = (None, [], None) if is_running(match) or is_finished(match) else await _waiting_presets(db, match, tournament, rules)
-        return {"status": "waiting", "skipped_reason": None, "version": 0, "step_seconds": None, "team_a": None, "team_b": None,
-                "current": None, "own_turn": False, "can_pick": False, "pick_hint": blocked or NOT_STARTED_DETAIL, "options": [],
+        # Die Vorgabe wurde nachgetragen: Das Veto wartet nur noch auf „Veto starten“ - ohne Frist, bis eine Seite tippt.
+        ready = not blocked and not (tournament or {}).get("locked_at") and start_ready(match, tournament)
+        return {"status": "waiting", "skipped_reason": None, "version": 0, "step_seconds": int(rules["step_seconds"]) if ready else None,
+                "team_a": None, "team_b": None, "current": None, "own_turn": False, "can_pick": False,
+                "pick_hint": blocked or (START_READY_DETAIL if ready else NOT_STARTED_DETAIL), "options": [],
                 "remaining": [], "history": [], "planned_games": [], "paused": None, "lead": None,
-                "week": week, "presets": presets, "blocked": {"week": week, "text": blocked} if blocked else None}
+                "week": week, "presets": presets, "blocked": {"week": week, "text": blocked} if blocked else None,
+                "start": {"can_start": bool(own_id), "hint": None if own_id else START_READY_DETAIL} if ready else None}
     run = await _run_of(db, match, veto)
     step = run.current if veto.get("status") in (RUNNING, PAUSED) else None
     deadline = moment(veto.get("deadline_at"))
@@ -816,7 +902,7 @@ async def page_block(db, match: dict, tournament: dict | None, *, names: dict[st
         "lead": {"can_act": bool(can_lead_act and veto.get("status") in (RUNNING, PAUSED, DONE) and not match.get("started_at")),
                  "conflict": conflict} if lead else None,
         # Vorgabe der Woche (#2326): die Spielwoche und die festgehaltenen Maps dieses Vetos - nicht die heutigen der Season.
-        "week": veto.get("week"), "presets": _preset_rows(run.steps, run.presets, run.pool), "blocked": None,
+        "week": veto.get("week"), "presets": _preset_rows(run.steps, run.presets, run.pool), "blocked": None, "start": None,
     }
 
 
@@ -863,5 +949,5 @@ def scrub(veto: dict | None, user_id: str) -> tuple[dict | None, bool]:
 
 __all__ = ["AUTO", "CHANGED_DETAIL", "DONE_DETAIL", "LEAD_ACTIONS", "NO_VETO_DETAIL", "NO_WEEK_DETAIL", "NOT_A_SIDE_DETAIL",
            "NOT_STARTED_DETAIL", "REPORT_VETO_DETAIL", "SIDE", "VetoProblem", "ensure_started", "export_steps", "lead_action", "page_block",
-           "pick", "planned_games_of", "preset_gap", "preset_weeks", "presets_history", "presets_overview", "scrub", "season_presets", "season_weeks",
-           "settle_due", "store_presets", "week_of"]
+           "START_READY_DETAIL", "announce_ready", "manual_start", "pick", "planned_games_of", "preset_gap", "preset_weeks", "presets_history",
+           "presets_overview", "scrub", "season_presets", "season_weeks", "settle_due", "start_ready", "store_presets", "wait_of", "week_of"]

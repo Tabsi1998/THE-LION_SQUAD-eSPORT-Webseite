@@ -556,8 +556,11 @@ Was gilt:
   nicht mit). Die Vorgabe gilt für alle Spiele dieses Spieltags. Wird ein Spiel verschoben, bleibt es bei der Vorgabe seines
   Spieltags, auch wenn es erst in einer späteren Woche gespielt wird.
 - **Ohne Vorgabe beginnt das Veto nicht.** Sind beide Seiten eingecheckt und für die Woche fehlt die Map, sagt die Matchseite das, und
-  ihr bekommt einen Hinweis (einmal je Spielwoche, mit Link zum Kasten). Gewertet wird nichts von selbst. Sobald ihr die Vorgabe
-  speichert, beginnen die wartenden Vetos.
+  ihr bekommt einen Hinweis (einmal je Spielwoche, mit Link zum Kasten). Gewertet wird nichts von selbst.
+- **Nachtragen startet das Veto nicht.** Speichert ihr die fehlende Vorgabe, bekommen die Captains (bzw. Vertreter) beider Seiten die
+  Nachricht „Vorgabe da – Veto kann starten“. Das Veto beginnt erst, wenn einer von ihnen auf der Matchseite **Veto starten** tippt –
+  so läuft keine Zeit ab, während niemand da ist. Bis dahin gibt es keine Frist. Die Meldung nach dem Speichern sagt, wie viele Spiele
+  gewartet haben.
 - **Ändern wirkt nur nach vorn.** Eine geänderte Vorgabe gilt für Spiele, deren Veto noch nicht begonnen hat. Ein laufendes oder
   fertiges Veto behält seine Map, auch nach **Neu starten**. Jede Änderung steht im Protokoll und im Verlauf.
 - **Pool geändert?** Steht eine vorgegebene Map nicht mehr im Pool des Modus, zählt die Woche wieder als fehlend. Der Block und **Was
@@ -940,8 +943,11 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   noch wählbar“). Ist ihr Schritt an der Reihe, setzt ihn das System sofort; in der Spielreihenfolge steht sie an ihrer Position
   („Map 3 · Vorgabe der Woche“). **Letzten Schritt zurück** nimmt nur Züge der Seiten zurück, die Vorgabe bleibt.
 - **Vorgabe fehlt:** Statt „Veto läuft“ steht **Veto wartet auf die Vorgabe der Woche** mit der Woche und dem Modus. Niemand kann
-  ziehen oder starten, gewertet wird nichts. Tragt die Map in der Season nach (2.7d) – das Veto beginnt dann von selbst, beide Seiten
-  bekommen die Nachricht „Veto läuft“.
+  ziehen oder starten, gewertet wird nichts. Tragt die Map in der Season nach (2.7d).
+- **Vorgabe steht – Veto starten:** Nach dem Nachtragen bekommen beide Seiten die Nachricht „Vorgabe da – Veto kann starten“, und auf
+  der Matchseite steht der Knopf **Veto starten** (für Captain und Vertreter beider Seiten; ihr als Leitung seht den Stand ohne Knopf).
+  Erst mit dem Tippen beginnt das Veto und läuft die Zeit je Schritt; vorher gibt es keine Frist. Tippen beide gleichzeitig oder
+  doppelt, beginnt trotzdem nur ein Veto.
 
 <img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300">
 

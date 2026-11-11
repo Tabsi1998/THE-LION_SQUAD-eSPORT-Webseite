@@ -39,6 +39,7 @@ const BLOCKED = {
   status: "waiting", skipped_reason: null, version: 0, step_seconds: null, team_a: null, team_b: null, current: null, own_turn: false, can_pick: false,
   pick_hint: BLOCKED_TEXT, options: [], remaining: [], history: [], planned_games: [], paused: null, lead: null, week: 2, presets: [], blocked: { week: 2, text: BLOCKED_TEXT },
 };
+const START_READY = "Die Vorgabe der Woche steht – Captain oder Vertreter einer Seite tippt auf „Veto starten“. Vorher läuft keine Zeit.";
 const PLANNED = [
   { position: 1, mode: "hp", mode_label: "Stellung", map_id: "nebel", map_name: "Nebelwerk", map_image_url: null, role: "picked", by_registration_id: "a" },
   { position: 2, mode: "snd", mode_label: "Suchen & Zerstören", map_id: "turm", map_name: "Funkturm", map_image_url: null, role: "picked", by_registration_id: "b" },
@@ -118,7 +119,7 @@ async function setup(page, user, { matchPage = PAGE, posts = [], puts = [] } = {
     if (url === "/api/admin/leagues/seasons/s1/veto-presets" && request.method() === "PUT") {
       const saved = request.postDataJSON().presets;
       puts.push(saved);
-      return route.fulfill(json({ ...VETO_PRESETS, presets: saved, problems: [], changed: saved.length, vetoes_started: 1 }));
+      return route.fulfill(json({ ...VETO_PRESETS, presets: saved, problems: [], changed: saved.length, matches_ready: 1 }));
     }
     if (url === "/api/admin/leagues/seasons/s1/veto-presets") return route.fulfill(json(VETO_PRESETS));
     if (url === "/api/admin/league-rules/league_season/s1") return route.fulfill(json({ current: null, inherited: null, versions: [], draft: null, data_changes: null }));
@@ -253,6 +254,39 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       await expect(page.getByTestId("checkin-start-button")).toHaveCount(0);
       await expectNoSideScroll(page);
       await shot(page, testInfo, `veto-vorgabe-fehlt-${width}`, page.getByTestId("checkin-panel"));
+    });
+
+    test(`Matchseite: nachgetragene Vorgabe - „Veto starten“ ohne Frist, der Klick geht an den Server bei ${width} px`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const posts = [];
+      const ready = { ...BLOCKED, step_seconds: 60, presets: PRESETS, blocked: null, pick_hint: START_READY, start: { can_start: true, hint: null } };
+      await setup(page, CAPTAIN, { posts, matchPage: { ...PAGE, checkin: { ...CHECKIN, start_hint: START_READY, veto: ready } } });
+      await page.goto("/matches/m1");
+      await expect(page.getByTestId("checkin-slim")).toContainText("Beide Seiten eingecheckt");
+      await expect(page.getByTestId("veto-panel")).toHaveAttribute("data-start-ready", "true");
+      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – Veto starten");
+      await expect(page.getByTestId("veto-text")).toContainText("Tippt auf „Veto starten“, sobald beide Teams bereit sind.");
+      await expect(page.getByTestId("veto-preset-ctl")).toContainText("Kaimauer");
+      await expect(page.getByTestId("veto-start")).toContainText("Bis dahin läuft keine Frist");
+      // Kein Countdown, kein Brett, kein „Spiel starten“ - erst das Veto.
+      await expect(page.getByTestId("veto-countdown")).toHaveCount(0);
+      await expect(page.getByTestId("veto-board")).toHaveCount(0);
+      await expect(page.getByTestId("checkin-start-button")).toHaveCount(0);
+      await expectNoSideScroll(page);
+      await shot(page, testInfo, `veto-starten-${width}`, page.getByTestId("checkin-panel"));
+      await page.getByTestId("veto-start-button").click();
+      await expect.poll(() => posts.find((row) => row.path === "/api/matches/m1/veto/start")?.body).toEqual({});
+
+      // Die Leitung (keine Seite) sieht den Stand, aber keinen Knopf.
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+      const asLead = { ...ready, start: { can_start: false, hint: START_READY } };
+      await setup(page, LEAD, { matchPage: { ...PAGE, acting_registration_id: null, checkin: { ...CHECKIN, own_registration_id: null, start_hint: START_READY,
+        sides: [{ ...OWN, own: false }, OTHER], veto: asLead, lead: { can_enter: false, conflict: null, rosters: {} } } } });
+      await page.goto("/matches/m1");
+      await expect(page.getByTestId("veto-headline")).toHaveText("Vorgabe steht – Veto starten");
+      await expect(page.getByTestId("veto-text")).toContainText("Captain oder Vertreter einer Seite startet das Veto.");
+      await expect(page.getByTestId("veto-start-button")).toHaveCount(0);
+      await expectNoSideScroll(page);
     });
   }
 });

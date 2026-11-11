@@ -5,7 +5,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const apiMock = { get: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toastMock = { success: vi.fn(), error: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { SeasonVetoRulesPanel } = await import("./SeasonVetoRulesPanel");
 
@@ -62,7 +63,7 @@ test("ohne Schritt „Vorgabe“ gibt es den Block nicht - mit ihm stehen die Wo
 test("Rotation füllt alle Wochen als Vorschlag, danach einzeln änderbar - Speichern schickt die Liste", async () => {
   serve(RULES, PRESETS);
   const saved = [{ week: 1, mode: "ctl", map_id: "hafen" }, { week: 2, mode: "ctl", map_id: "ruine" }, { week: 3, mode: "ctl", map_id: "ruine" }];
-  apiMock.put.mockResolvedValue({ data: { ...PRESETS, presets: saved, problems: [], changed: 3, vetoes_started: 1,
+  apiMock.put.mockResolvedValue({ data: { ...PRESETS, presets: saved, problems: [], changed: 3, matches_ready: 1,
     history: [{ at: "2026-11-11T13:00:00+00:00", by_name: "Ligaleitung", changes: [{ week: 1, mode: "ctl", from: "kai", to: "hafen" }, { week: 2, mode: "ctl", from: null, to: "ruine" }] }] } });
   render(<SeasonVetoRulesPanel seasonId="s1" />);
   fireEvent.click(await screen.findByTestId("veto-presets-rotate"));
@@ -77,6 +78,8 @@ test("Rotation füllt alle Wochen als Vorschlag, danach einzeln änderbar - Spei
   fireEvent.click(screen.getByTestId("veto-presets-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s1/veto-presets", { presets: saved }));
   await waitFor(() => expect(screen.queryByTestId("veto-presets-dirty")).toBeNull());
+  // Ein Spiel hat auf die Vorgabe gewartet: Die Meldung sagt, dass die Captains das Veto jetzt selbst starten - nicht, dass es läuft.
+  expect(toastMock.success).toHaveBeenLastCalledWith("Vorgaben gespeichert – ein wartendes Spiel kann sein Veto jetzt starten, die Captains sind informiert.");
   expect(screen.getByTestId("veto-presets-history")).toHaveTextContent("Verlauf (1 Änderung)");
   expect(screen.getByTestId("veto-presets-history-entry")).toHaveTextContent("Ligaleitung");
   expect(screen.getByTestId("veto-presets-history-entry")).toHaveTextContent("Spielwoche 1 · Kontrolle: Kai → Hafen");

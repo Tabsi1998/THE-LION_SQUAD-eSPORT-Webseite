@@ -115,6 +115,27 @@ function WeekPresets({ block }) {
   );
 }
 
+// „Veto starten“ (#2326): Die Liga-Leitung hat die fehlende Vorgabe nachgetragen. Das Veto beginnt nicht von selbst - sonst liefe die
+// Zeit, während niemand mehr da ist. Captain oder Vertreter einer Seite tippt den Knopf; bis dahin läuft keine Frist.
+function StartVeto({ block, matchId, busy, run, onChanged }) {
+  const start = () => run(async () => {
+    const { data } = await api.post(`/matches/${matchId}/veto/start`, {});
+    toast.success(data?.idempotent_replay ? "Das Veto läuft schon." : "Veto gestartet – ab jetzt läuft die Zeit je Schritt.");
+    await onChanged();
+  }, "Veto starten hat nicht geklappt.");
+  return (
+    <div className="mt-4 rounded-sm border border-[#29B6E8]/40 bg-[#29B6E8]/5 p-4" data-testid="veto-start">
+      <button type="button" disabled={busy} onClick={start} data-testid="veto-start-button"
+        className="tls-btn tls-btn--primary inline-flex min-h-12 items-center gap-2 rounded-sm px-5 py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50">
+        <Play className="h-4 w-4" aria-hidden="true" /> Veto starten
+      </button>
+      <p className="mt-2 text-xs text-white/60">
+        Erst ab dem Start läuft die Zeit{block.step_seconds ? ` (${block.step_seconds} Sekunden je Schritt)` : ""}. Bis dahin läuft keine Frist – die Gegenseite kann ebenso starten.
+      </p>
+    </div>
+  );
+}
+
 function OwnTurn({ block, matchId, busy, run, onChanged }) {
   if (!block.can_pick || !block.current) return null;
   const word = actionWord(block.current.kind);
@@ -222,19 +243,21 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
   // Vorgabe der Woche fehlt (#2326): Das Veto wartet. Sind beide Seiten eingecheckt (`bothIn`), fragt die Seite weiter nach, damit es
   // ohne Neuladen beginnt, sobald die Vorgabe steht - vor dem Check-in gibt es noch nichts abzuwarten.
   const blocked = Boolean(block && block.status === "waiting" && block.blocked);
-  const polling = live || (blocked && bothIn);
+  // Die Vorgabe wurde nachgetragen: Das Veto wartet auf „Veto starten“ - auch dann fragt die Seite nach, falls die Gegenseite startet.
+  const startReady = Boolean(block && block.status === "waiting" && block.start);
+  const polling = live || ((blocked || startReady) && bothIn);
   useEffect(() => {
     if (!polling || !onPoll) return undefined;
     const tick = window.setInterval(() => { if (typeof document === "undefined" || !document.hidden) onPoll(); }, POLL_MS);
     return () => window.clearInterval(tick);
   }, [polling, onPoll]);
   // Vor dem Start zeigt der Block nur etwas, wenn es eine Vorgabe der Woche gibt - oder wenn sie fehlt.
-  if (!block || (block.status === "waiting" && !blocked && !block.presets?.length)) return null;
-  const tone = blocked ? "border-warn/50"
+  if (!block || (block.status === "waiting" && !blocked && !startReady && !block.presets?.length)) return null;
+  const tone = blocked ? "border-warn/50" : startReady ? "border-[#29B6E8]/60"
     : { running: block.own_turn ? "border-[#29B6E8]/60" : "border-honor/40", paused: "border-warn/50", done: "border-[#00D26A]/50", skipped: "border-white/15" }[block.status] || "border-white/15";
   return (
     <section className={`mt-5 rounded-sm border bg-[#0A0A0A] p-4 ${tone}`} data-testid="veto-panel" data-status={block.status} data-own-turn={block.own_turn ? "true" : "false"}
-      data-blocked={blocked ? "true" : "false"}>
+      data-blocked={blocked ? "true" : "false"} data-start-ready={startReady ? "true" : "false"}>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Map-Veto · Regelwerk § 6</div>
@@ -254,10 +277,11 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
       ) : null}
       {blocked ? (
         <p className="mt-3 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" role="status" data-testid="veto-blocked">
-          Gewertet wird nichts von selbst. Sind beide Seiten eingecheckt, bekommt die Liga-Leitung einen Hinweis – die Seite aktualisiert sich, sobald das Veto beginnt.
+          Gewertet wird nichts von selbst. Sind beide Seiten eingecheckt, bekommt die Liga-Leitung einen Hinweis. Sobald die Vorgabe steht, bekommt ihr eine Nachricht und startet das Veto hier selbst.
         </p>
       ) : null}
       {block.status === "done" ? null : <WeekPresets block={block} />}
+      {startReady && block.start.can_start ? <StartVeto block={block} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
       {block.status === "skipped" ? <p className="mt-3 text-xs text-white/55" data-testid="veto-skipped">Die Maps werden beim Ergebnis eingetragen.</p> : null}
       {block.status === "done" && block.planned_games?.length ? <PlannedGames games={block.planned_games} /> : null}
       {block.status === "running" || block.status === "paused" ? <ModeBoard remaining={block.remaining || []} /> : null}

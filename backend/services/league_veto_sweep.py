@@ -35,39 +35,27 @@ async def _settle(db, row: dict, now: datetime) -> int:
         return 0
 
 
-async def _start(db, row: dict, now: datetime) -> int:
-    """Ein wartendes Veto unter der Turniersperre beginnen - 1, wenn es jetzt begonnen hat."""
-    try:
-        async with mutation_lock(db, tournament_write_resource(row["tournament_id"]), wait_seconds=2.0):
-            tournament = await db.tournaments.find_one({"id": row["tournament_id"]}, {"_id": 0, "creation_key": 0, "billing": 0})
-            match = await db.matches_v2.find_one({"id": row["id"]}, {"_id": 0})
-            if not tournament or not match or tournament.get("locked_at") or veto_of(match) is not None:
-                return 0
-            after = await league_veto.ensure_started(db, match, tournament, now=now)
-            return 1 if veto_of(after) is not None else 0
-    except MutationLockBusy:
-        logger.info("Veto für match=%s wartet auf die Turniersperre", log_safe(row.get("id")))
-        return 0
-
-
-async def start_waiting(db, season_id: str, *, now: datetime | None = None) -> int:
-    """Nach dem Speichern der Vorgaben der Woche (#2326): Spiele dieser Season, deren Veto nur auf die Vorgabe gewartet hat
-    (``flow.veto_wait``), beginnen sofort - beide Seiten bekommen wie immer „Veto läuft“. Fehlt weiter etwas, bleibt es beim Warten.
-    Gibt die Zahl der begonnenen Vetos zurück; ein Spiel hält die anderen nicht auf."""
+async def announce_waiting(db, season_id: str, *, now: datetime | None = None) -> int:
+    """Nach dem Speichern der Vorgaben der Woche (#2326): Spiele dieser Season, deren Veto auf die Vorgabe gewartet hat
+    (``flow.veto_wait``) und jetzt beginnen könnte, bekommen an beide Seiten „Vorgabe da – Veto kann starten“. **Das Veto beginnt
+    dadurch nicht** - ein Captain oder Vertreter startet es auf der Matchseite, vorher läuft keine Zeit. Je Spiel und Termin einmal
+    (``league_veto.announce_ready`` schreibt mit Bedingung, ohne Sperre sicher). Gibt die Zahl der benachrichtigten Spiele zurück; ein
+    Spiel hält die anderen nicht auf."""
     now = now or now_utc()
-    staffeln = await db.tournaments.find({"league_context.season_id": season_id, "locked_at": None}, {"_id": 0, "id": 1}).to_list(200)
-    ids = [row["id"] for row in staffeln if row.get("id")]
-    if not ids:
+    staffeln = await db.tournaments.find({"league_context.season_id": season_id, "locked_at": None},
+                                         {"_id": 0, "creation_key": 0, "billing": 0}).to_list(200)
+    by_id = {row["id"]: row for row in staffeln if row.get("id")}
+    if not by_id:
         return 0
-    rows = await db.matches_v2.find({"tournament_id": {"$in": ids}, "flow.veto_wait": {"$exists": True}, "started_at": None},
-                                    {"_id": 0, "id": 1, "tournament_id": 1}).to_list(500)
-    started = 0
-    for row in rows:
+    rows = await db.matches_v2.find({"tournament_id": {"$in": sorted(by_id)}, "flow.veto_wait": {"$exists": True}, "started_at": None},
+                                    {"_id": 0}).to_list(500)
+    told = 0
+    for match in rows:
         try:
-            started += await _start(db, row, now)
+            told += 1 if await league_veto.announce_ready(db, match, by_id[match["tournament_id"]], now=now) else 0
         except Exception:  # noqa: BLE001 - ein Spiel hält die anderen nicht auf
-            logger.warning("[league_veto_sweep] Veto von Spiel %s nicht begonnen", log_safe(row.get("id")), exc_info=True)
-    return started
+            logger.warning("[league_veto_sweep] Nachricht „Veto kann starten“ zu Spiel %s nicht verschickt", log_safe(match.get("id")), exc_info=True)
+    return told
 
 
 async def sweep(db, tournaments: list[dict] | None = None, *, now: datetime | None = None) -> dict:
