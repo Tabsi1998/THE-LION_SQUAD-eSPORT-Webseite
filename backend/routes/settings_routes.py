@@ -604,7 +604,8 @@ def banner_channels(doc: dict) -> list[str]:
     return ["web", "app"] if doc.get("source") == "auto" else ["web"]
 
 
-def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
+def _public_banner_doc(doc: dict) -> dict:
+    """Was Website und App von einem Banner bekommen - ohne Views und Klicks: die sieht nur die Verwaltung (#2352)."""
     return {
         "id": doc.get("id"),
         "enabled": bool(doc.get("enabled", True)),
@@ -624,6 +625,12 @@ def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
         "template": doc.get("template") or "custom",
         "source": doc.get("source") or "manual",
         "channels": banner_channels(doc),
+    }
+
+
+def _admin_banner_doc(doc: dict, stats: dict | None = None) -> dict:
+    """Der öffentliche Baustein plus Views und Klicks - nur für die Banner-Verwaltung (#931, #2352)."""
+    return _public_banner_doc(doc) | {
         "stats": {
             "impressions": int((stats or {}).get("impressions") or doc.get("impressions") or 0),
             "clicks": int((stats or {}).get("clicks") or doc.get("clicks") or 0),
@@ -1079,9 +1086,8 @@ async def list_site_banners(response: Response, me: dict | None = Depends(get_op
     from services.visibility import sees_member_content
     member_view = await sees_member_content(me, look_up_membership=False)
     active = [doc for doc in all_docs if _banner_active(doc, me, member_view) and wanted in banner_channels(doc)]
-    stats_rows = await db.site_banner_stats.find({"id": {"$in": [doc["id"] for doc in active if doc.get("id")]}}, {"_id": 0}).to_list(200)
-    stats = {row["id"]: row for row in stats_rows}
-    items = [_public_banner_doc(doc, stats.get(doc.get("id"))) for doc in active]
+    # Views und Klicks bleiben intern (#2352) - die öffentliche Antwort trägt sie nicht.
+    items = [_public_banner_doc(doc) for doc in active]
     items.sort(key=lambda row: (int(row.get("priority") or 0), row.get("id") or ""), reverse=True)
     return {"items": items[:8]}
 
@@ -1092,7 +1098,7 @@ async def admin_site_banners(me: dict = Depends(require_area("content"))):
     rows = await db.site_banners.find({}, {"_id": 0}).sort([("priority", -1), ("updated_at", -1)]).to_list(200)
     stats_rows = await db.site_banner_stats.find({"id": {"$in": [row["id"] for row in rows if row.get("id")]}}, {"_id": 0}).to_list(200)
     stats = {row["id"]: row for row in stats_rows}
-    return [_public_banner_doc(row, stats.get(row.get("id"))) | {
+    return [_admin_banner_doc(row, stats.get(row.get("id"))) | {
         "starts_at": row.get("starts_at") or "",
         "ends_at": row.get("ends_at") or "",
     } for row in rows]

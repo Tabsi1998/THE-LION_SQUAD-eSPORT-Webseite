@@ -132,6 +132,9 @@ async def test_the_public_answer_carries_no_admin_fields(flow):
     await open_tournament(flow)
     rows = (await flow.get("/api/settings/site-banners")).json()["items"]
     auto = next(row for row in rows if row["id"].startswith("auto-tournament-"))
-    for field in ("ref_kind", "ref_id", "ref_title", "period_start", "period_end", "manage_url"):
-        assert field not in auto
-    assert set(auto["stats"]) == {"impressions", "clicks"}, "die öffentliche Antwort bekommt keine neuen Zahlen"
+    await flow.db.site_banner_stats.insert_one({"id": auto["id"], "impressions": 5, "clicks": 2})
+    for channel in ("", "?channel=app"):
+        rows = (await flow.get(f"/api/settings/site-banners{channel}")).json()["items"]
+        auto = next(row for row in rows if row["id"].startswith("auto-tournament-"))
+        for field in ("ref_kind", "ref_id", "ref_title", "period_start", "period_end", "manage_url", "stats"):
+            assert field not in auto, f"{field} ist intern"
