@@ -1204,7 +1204,11 @@ def nudge_target(match: dict, *, now: datetime) -> dict | None:
     seen = moment((flow.get("veto_seen") or {}).get(turn_id)) if isinstance(flow.get("veto_seen"), dict) else None
     if seen and (now - seen).total_seconds() < NUDGE_SEEN_SECONDS:
         return None
-    key = f"veto-turn:{match.get('id')}:{veto.get('started_at')}:{index}:{turn_id}"
+    # „Schritt zurück“ und „Neu starten“ der Leitung (Review zu #1651): Derselbe Schritt beginnt dann noch einmal - der Zähler dieser
+    # Eingriffe gehört in den Schlüssel, sonst bliebe die Seite beim zweiten Mal ohne Erinnerung. Pause und Fortsetzen zählen nicht:
+    # Es bleibt derselbe Schritt.
+    resets = sum(1 for row in veto.get("lead_log") or [] if isinstance(row, dict) and row.get("action") in ("undo", "restart"))
+    key = f"veto-turn:{match.get('id')}:{veto.get('started_at')}:{resets}:{index}:{turn_id}"
     if (flow.get("veto_nudge") or {}).get("key") == key:
         return None
     return {"index": index, "step": step, "registration_id": turn_id, "key": key, "left": max(0, int(left))}
