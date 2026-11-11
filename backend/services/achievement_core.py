@@ -107,12 +107,18 @@ def evaluator() -> Evaluator:
     return _evaluator
 
 
-def due_tiers(tiers: list[dict], counters: dict, earned_codes: set, *, active_member: bool, only_keys=None) -> list[dict]:
+def due_tiers(tiers: list[dict], counters: dict, earned_codes: set, *, active_member: bool, only_keys=None,
+              retired_groups=frozenset()) -> list[dict]:
     """Die Stufen, die jetzt fällig sind: noch nicht vergeben, Zähler am Ziel, Mitglieder-Stufen nur für Mitglieder.
-    Dieselbe Prüfung für die Auswertung (badges) und den Probelauf der Neuberechnung (#2340)."""
+    Dieselbe Prüfung für die Auswertung (badges) und den Probelauf der Neuberechnung (#2340). Nicht mehr Erreichbares
+    (#2339: die Stufe retired oder ihre Gruppe in ``retired_groups``) vergibt keine Automatik mehr."""
+    from services.achievement_reach import is_retired
+
     due = []
     for t in tiers:
         if t["code"] in earned_codes:
+            continue
+        if t.get("group_code") in retired_groups or is_retired(t):
             continue
         if t.get("member_only") and not active_member:
             continue

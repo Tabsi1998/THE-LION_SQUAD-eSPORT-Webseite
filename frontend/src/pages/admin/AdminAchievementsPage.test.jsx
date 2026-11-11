@@ -15,7 +15,7 @@ const authState = { areas: [] };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "admin" }, can: (...wanted) => wanted.some((area) => authState.areas.includes(area)) }) }));
 
 const { default: AdminAchievementsPage, TABS } = await import("./AdminAchievementsPage");
-const { allowedMaterials, slugFrom } = await import("./achievements/CatalogTab");
+const { allowedMaterials, retiredPayload, retiredState, slugFrom } = await import("./achievements/CatalogTab");
 const { parseNames, toIso } = await import("./achievements/AwardTab");
 
 const GROUPS = [
@@ -192,6 +192,55 @@ describe("Katalog", () => {
     await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/achievements/tiers/matches_played_4", expect.objectContaining({ material: "gold" })));
   });
 
+  it("setzt eine Gruppe auf „nicht mehr erreichbar“ mit Grund (#2339)", async () => {
+    renderAt("catalog");
+    fireEvent.click(await screen.findByTestId("group-edit-matches_played"));
+    const reason = await screen.findByTestId("group-retired-reason");
+    expect(reason).not.toBeRequired();
+    fireEvent.click(screen.getByTestId("group-retired"));
+    expect(reason).toBeRequired();
+    fireEvent.change(reason, { target: { value: "Das Format gibt es nicht mehr. " } });
+    fireEvent.submit(screen.getByTestId("group-sheet"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/achievements/groups/matches_played",
+      expect.objectContaining({ retired: true, retired_reason: "Das Format gibt es nicht mehr." })));
+    // Review M2: ein unverändertes leeres „erreichbar bis“ geht nicht mit.
+    expect(apiMock.patch.mock.calls.at(-1)[1]).not.toHaveProperty("available_until");
+  });
+
+  it("schickt beim Speichern der Beschreibung nichts zu „nicht mehr erreichbar“ mit (Review M2)", async () => {
+    const groups = [{ ...GROUPS[2], code: "pioneer", available_until: null, retired_reason: null }, ...GROUPS.slice(0, 2)];
+    apiMock.get.mockImplementation((url) => (url === "/admin/achievements/groups" ? Promise.resolve({ data: groups }) : routeGet(url)));
+    renderAt("catalog");
+    fireEvent.click(await screen.findByTestId("group-edit-pioneer"));
+    fireEvent.change(await screen.findByTestId("group-description"), { target: { value: "Neu beschrieben." } });
+    fireEvent.submit(screen.getByTestId("group-sheet"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+    const sent = apiMock.patch.mock.calls.at(-1)[1];
+    expect(sent.description).toBe("Neu beschrieben.");
+    for (const key of ["retired", "retired_reason", "available_until"]) expect(sent).not.toHaveProperty(key);
+    // Gegenprobe: wer das Datum wirklich leert, schickt es mit.
+    expect(retiredPayload({ retired: false, retired_reason: "Vorbei.", available_until: "" }, { available_until: "2026-03-01T10:00:00+00:00", retired_reason: "Vorbei." }))
+      .toEqual({ available_until: null });
+  });
+
+  it("zeigt nicht mehr Erreichbares und ein künftiges „erreichbar bis“ in der Liste (#2339)", async () => {
+    const groups = [{ ...GROUPS[0], retired: true, retired_reason: "Vorbei." }, { ...GROUPS[2], available_until: "2999-01-01T00:00:00+00:00", retired_reason: "Bald vorbei." }, GROUPS[1]];
+    apiMock.get.mockImplementation((url) => (url === "/admin/achievements/groups" ? Promise.resolve({ data: groups }) : routeGet(url)));
+    renderAt("catalog");
+    expect(await screen.findByTestId("group-retired-matches_played")).toHaveTextContent("nicht mehr erreichbar");
+    expect(screen.getByTestId("group-retired-season_mvp")).toHaveTextContent("erreichbar bis 01.01.2999");
+    // Review N4: der Grund hängt am Hinweis und steht in der aufgeklappten Gruppe.
+    const chip = screen.getByTestId("group-retired-matches_played");
+    expect(document.getElementById(chip.getAttribute("aria-describedby"))).toHaveTextContent("Grund: Vorbei.");
+    fireEvent.click(screen.getByTestId("group-toggle-matches_played"));
+    expect(screen.getByTestId("group-retired-reason-text-matches_played")).toHaveTextContent("Nicht mehr erreichbar – Grund: Vorbei.");
+    // Gegenprobe: ohne Kennzeichen kein Hinweis.
+    expect(screen.queryByTestId("group-retired-secret_door")).toBeNull();
+    expect(retiredState({ available_until: "2020-01-01T00:00:00Z" }).active).toBe(true);
+    expect(retiredState({ available_until: "2999-01-01T00:00:00Z" })).toMatchObject({ active: false, upcoming: true });
+    expect(retiredState({})).toMatchObject({ active: false, upcoming: false });
+  });
+
   it("rechnet die Leiter wie der Server und bildet Kennungen aus Namen", () => {
     const ladder = TIERS.filter((t) => t.group_code === "matches_played");
     expect(allowedMaterials(ladder[2], ladder)).toEqual(["bronze"]);
@@ -339,6 +388,14 @@ describe("Statistik", () => {
     fireEvent.change(screen.getByTestId("stats-category"), { target: { value: "season" } });
     expect(screen.queryByTestId("stats-row-matches_played_4")).toBeNull();
     expect(screen.getByTestId("stats-row-season_top10_1")).toHaveTextContent("Saisonspitze");
+  });
+
+  it("vermerkt nicht mehr Erreichbares in der Seltenheit (Review N7)", async () => {
+    const stats = { ...STATS, rarity: [...STATS.rarity, { code: "founding_member_1", name: "Gründungsmitglied I", group_name: "Gründungsmitglied", category: "club", material: "gold", holders: 3, percent: 10, retired: true }] };
+    apiMock.get.mockImplementation((url) => (url === "/admin/achievements/stats" ? Promise.resolve({ data: stats }) : routeGet(url)));
+    renderAt("stats");
+    expect(await screen.findByTestId("stats-retired-founding_member_1")).toHaveTextContent("nicht mehr erreichbar");
+    expect(screen.queryByTestId("stats-retired-matches_played_4")).toBeNull();
   });
 });
 

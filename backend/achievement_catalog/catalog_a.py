@@ -36,19 +36,24 @@ SINGULAR_UNITS = {" Tage": " Tag", " Jahre": " Jahr"}
 def _group(code: str, name: str, category: str, description: str, how_to: str, icon: str, art: str, key: str | None, targets: list[int],
            step: str, *, sort_order: int, unit: str = "", staff_only: bool = False, catalog: str = "A",
            steps: list[str] | None = None, materials: list[str] | None = None, manual: bool = False,
-           singular: str | None = None) -> tuple[dict, list[dict]]:
+           singular: str | None = None, retired: str | None = None, role_only: bool = False) -> tuple[dict, list[dict]]:
     """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel **samt** ``unit`` („{n} im Vorstand.“
     wird „90 Tage im Vorstand.“ - die Einheit gehört nicht noch einmal in den Satz, #864); ``steps`` ersetzt ihn durch einen
     eigenen Satz je Stufe, ``materials`` die Leiter (z. B. eine einzelne Silber-Stufe). ``manual`` heißt: nur von Hand
     vergeben, kein Bedingungsschlüssel. ``singular`` ist der Satz für das Ziel 1, wo die Mehrzahl falsch klänge
-    („1 Turnier gespielt.“ statt „1 Turniere gespielt.“, #2337). Katalog B–D nutzen denselben Helfer."""
+    („1 Turnier gespielt.“ statt „1 Turniere gespielt.“, #2337). ``retired`` (#2339) ist der Grund, warum die Gruppe nicht
+    mehr erreichbar ist - dann sieht sie nur, wer sie hat (services/achievement_reach.py). ``staff_only``: nur die Leitung
+    kann sie schaffen und sieht sie; ``role_only``: nur mit einer Aufgabe im Verein (Vorstand, Creator) - für alle sichtbar,
+    aber nicht für Kategorie-Meister und Hundert Prozent. Katalog B–D nutzen denselben Helfer."""
     materials = list(materials or LADDERS[len(targets)])
     group = {
         "code": code, "name": name, "category": category, "icon": icon, "art": art,
         "accent_color": CATEGORIES[category]["accent"], "description": description, "how_to": how_to,
         "condition_key": None if manual else key, "public": True, "is_special": False, "is_negative": False, "sort_order": sort_order,
-        "staff_only": staff_only, "catalog": catalog, "manual_only": manual,
+        "staff_only": staff_only, "role_only": role_only, "catalog": catalog, "manual_only": manual,
     }
+    if retired:
+        group.update({"retired": True, "retired_reason": retired})
     tiers = []
     for index, (material, target) in enumerate(zip(materials, targets)):
         shown = SINGULAR_UNITS.get(unit, unit) if target == 1 else unit
@@ -88,11 +93,12 @@ MATCH = [
            "flame", "flame", "match_streak_max", [3, 5, 8, 12, 16, 20, 30], "{n} Siege in Folge.", sort_order=112),
     _group("win_rate", "Effizienz", "match", "Halte eine hohe Siegquote - ab 30 Matches.", "Ab 30 gespielten Matches zählt deine Siegquote in Prozent.",
            "percent", "gauge", "win_rate_qualified", [55, 60, 65, 70, 75], "{n} Siegquote bei mindestens 30 Matches.", sort_order=113, unit=" %"),
-    _group("comeback", "Comeback", "match", "Dreh Serien, in denen du schon zurücklagst.", "Gewinn ein Bo3 oder Bo5 nach 0:1 oder 0:2 - die Karten müssen dafür eingetragen sein.",
-           "undo-2", "phoenix", "comebacks", [1, 5, 15, 40, 100], "{n} Comebacks.", sort_order=114),
+    # Comeback (#2339): aus den Maps der Vereinsliga (``matches_v2.games`` mit Sieger je Map) - ``match.maps`` schreibt niemand.
+    _group("comeback", "Comeback", "match", "Dreh Serien, in denen du schon zurücklagst.", "Gewinn eine Serie über mehrere Maps, in der du nach Maps schon hinten lagst - etwa 2:1 nach 0:1 im Best of 3 oder 3:2 nach 0:2 im Best of 5. Zählt, wo jede Map mit Sieger eingetragen ist, wie in der Vereinsliga. Wird nach dem Rückstand eine Map zugesprochen, zählt es nicht.",
+           "undo-2", "phoenix", "comebacks", [1, 5, 15, 40, 100], "{n} Comebacks.", sort_order=114, singular="{n} Comeback."),
     _group("clean_sheet", "Zu Null", "match", "Gewinne Serien, ohne eine Karte abzugeben.", "Gewinn ein Match, bei dem der Gegner keine Karte holt.",
            "shield-check", "shield", "clean_sheets", [1, 10, 30, 75, 150], "{n} Siege zu Null.", sort_order=115),
-    _group("maps_played", "Kartenkenner", "match", "Spiel auf vielen verschiedenen Karten.", "Zählt jede Karte einmal - nur bei Spielen mit Kartenliste.",
+    _group("maps_played", "Kartenkenner", "match", "Spiel auf vielen verschiedenen Karten.", "Jede Karte zählt einmal: die Maps der Vereinsliga, auf denen du gespielt hast (mit Aufstellung je Map nur die, auf denen du aufgestellt warst), und die Karte, die die Turnierleitung an einem Turniermatch einträgt. Zugesprochene Maps zählen nicht.",
            "map", "map", "distinct_maps", [5, 15, 30, 60, 100], "{n} verschiedene Karten gespielt.", sort_order=116),
     _group("formats_played", "Formatvielfalt", "match", "Spiel in vielen Turnierformaten.", FORMATS_HOW_TO,
            "layout-grid", "grid", "distinct_formats", [2, 3, 4, 6, 8], "{n} verschiedene Formate gespielt.", sort_order=117),
@@ -152,9 +158,10 @@ TOURNAMENT = [
            "layout-list", "group", "group_stage_firsts", [1, 5, 15, 40, 100], "{n} Gruppen gewonnen.", sort_order=222),
     _group("featured_match", "Im Rampenlicht", "tournament", "Spiel in Turnieren, die gestreamt werden.", "Jedes Match, das du in einem Turnier mit hinterlegtem Stream spielst, zählt – auch wenn gerade ein anderes Match gezeigt wird. Freilose und die Vereinsliga zählen nicht.",
            "radio", "spotlight", "streamed_matches", [1, 5, 20], "{n} Matches im Rampenlicht.", sort_order=223),
-    _group("tournament_staff", "Turnierleitung", "tournament", "Leite Turniere bis zum Ende.", "Als Turnierleitung ein Turnier abschließen.",
+    # Turnierleitung und Schiedsrichter (#2339): sichtbar nur für die Leitung - und für alle, die sie schon haben.
+    _group("tournament_staff", "Turnierleitung", "tournament", "Leite Turniere bis zum Ende.", "Als Turnierleitung ein Turnier abschließen - jedes zählt einmal. Nur für die Turnierleitung sichtbar.",
            "clipboard-list", "whistle", "tournaments_staffed_completed", [1, 5, 15, 40, 100], "{n} Turniere geleitet.", sort_order=224, staff_only=True),
-    _group("referee", "Schiedsrichter", "tournament", "Entscheide Dispute.", "Als Turnierleitung ein disputiertes Match mit einem Ergebnis abschließen.",
+    _group("referee", "Schiedsrichter", "tournament", "Entscheide Dispute.", "Als Turnier- oder Liga-Leitung ein disputiertes Match mit einem Ergebnis abschließen. Nur für die Leitung sichtbar.",
            "gavel", "gavel", "disputes_resolved_as_staff", [1, 10, 30, 75, 200], "{n} Dispute entschieden.", sort_order=225, staff_only=True),
     _group("tournament_chat", "Turnier-Plauderer", "tournament", "Schreib im Turnier-Chat.", "Nachrichten im Turnier-Chat zählen - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
            "message-circle", "speech-bubble", "tournament_chat_messages_sent", [10, 50, 150, 500, 1500], "{n} Nachrichten im Turnier-Chat.", sort_order=226),

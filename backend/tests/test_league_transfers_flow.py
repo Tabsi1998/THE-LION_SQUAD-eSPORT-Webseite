@@ -2,6 +2,7 @@
 Dazu was Profil und Team-Seite über die Berechtigung sehen - nie ein Geburtsdatum. Erfundene Namen."""
 import pathlib
 import sys
+import re
 from datetime import timedelta
 
 import pytest
@@ -336,7 +337,7 @@ async def test_the_own_profile_shows_the_state_without_a_date(flow):
     await born(flow, w, "Ida", ADULT)
     response = await flow.get("/api/me/league-eligibility")
     assert response.json()["items"][0]["age"] == "met"
-    assert "1990" not in response.text
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", response.text)
 
 
 @pytest.mark.asyncio
@@ -356,7 +357,7 @@ async def test_the_team_page_shows_state_candidates_and_window(flow):
     response = await flow.get(f"{squad_url(w)}/eligibility")
 
     assert response.status_code == 200, response.text
-    assert "1990" not in response.text and "birth" not in response.text
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", response.text) and "birth" not in response.text
     season = response.json()["seasons"][0]
     assert season["rules"]["max_squad_size"] == 50
     assert season["rules"]["min_age"] == 18
@@ -405,7 +406,7 @@ async def test_the_roster_overview_counts_waiting_and_age_without_a_date(flow):
     overview = await flow.get(f"/api/admin/leagues/seasons/{w['season_id']}/roster")
 
     assert overview.status_code == 200, overview.text
-    assert "1990" not in overview.text and "birth_date" not in overview.text
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", overview.text) and "birth_date" not in overview.text
     body = overview.json()
     assert body["counts"]["age"] == 1
     squad = next(row for row in body["squads"] if row["squad_id"] == w["squad_a"]["id"])

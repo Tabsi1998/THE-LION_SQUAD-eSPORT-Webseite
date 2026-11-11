@@ -578,6 +578,7 @@ async def list_public_users(
     xp_docs = {row["user_id"]: row async for row in db.user_xp.find({"user_id": {"$in": user_ids}}, {"_id": 0, "user_id": 1, "total": 1, "prestige": 1})}
 
     from services.achievement_visibility import achievements_public
+    from services.achievement_reach import countable
     out = []
     for u in users:
         score = compute_profile_completeness(u)
@@ -608,7 +609,9 @@ async def list_public_users(
             "user_type": derived_user_type(u, memberships.get(u["id"])),
             "created_at": u.get("created_at"),
             "profile_completeness": score,
-            "achievements_count": len(ua),
+            # Gezählt wie „N Erfolge freigeschaltet“ auf der Erfolge-Seite und wie Sammler (#2339): ohne Negatives und
+            # ohne nicht mehr Erreichbares (services/achievement_reach.countable).
+            "achievements_count": sum(1 for a in ua if countable(tiers.get(a["tier_code"]), group_map.get((tiers.get(a["tier_code"]) or {}).get("group_code")))),
             "top_achievement": top,
             "achievement_level": level_view((xp_docs.get(u["id"]) or {}).get("total", 0), (xp_docs.get(u["id"]) or {}).get("prestige", 0)),
         })

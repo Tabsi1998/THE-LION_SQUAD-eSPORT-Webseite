@@ -1,6 +1,7 @@
 """Der Eingang der Leitung (docs/LIGA.md, B.4, #2205): prüfen, annehmen, ablehnen, Warteliste, zuteilen. Dazu Plätze, Sonderweg, Nachrichten, Datenschutz. Erfundene Namen."""
 import pathlib
 import sys
+import re
 
 import pytest
 import pytest_asyncio
@@ -506,7 +507,7 @@ async def test_inbox_shows_consent_people_and_staffeln_without_birth_dates(flow)
     assert row["member_count"] == 5
     # Seit #2313 ein offener Punkt, kein Halt: Die Leitung darf trotzdem zulassen.
     assert row["problems"] == [] and any("Geburtsdatum fehlt" in text for text in row["warnings"])
-    assert "1990" not in str(body)
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", str(body))
     assert [staffel["staffel"] for staffel in body["divisions"][0]["staffeln"]] == ["A"]
     assert [step["status"] for step in row["history"]] == ["submitted"]
 

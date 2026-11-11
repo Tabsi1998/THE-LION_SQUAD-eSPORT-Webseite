@@ -7,7 +7,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
-import { CATEGORY_META, STATUS_FILTERS, formatPercent } from "@/components/tls/AchievementGroups";
+import { CATEGORY_META, STATUS_FILTERS, categoryProgressSummary, formatPercent } from "@/components/tls/AchievementGroups";
 import { AccountLevelProgress } from "@/components/tls/AccountLevel";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -303,24 +303,27 @@ export function PinnedPanel({ pinned = [], codes = [], onChange }) {
   );
 }
 
-// Kategorien als Vitrinen: „Spielen 41 von 104“ - Klick filtert den Katalog darunter.
-export function categoryProgress(groups = []) {
-  const rows = {};
-  for (const group of groups) {
-    if (group.is_negative) continue;
-    const meta = CATEGORY_META[group.category] || CATEGORY_META.special;
-    const row = (rows[group.category] ||= { key: group.category, label: meta.label, icon: meta.icon, accent: meta.accent, order: meta.order, earned: 0, total: 0, groups: 0 });
-    row.groups += 1;
-    for (const tier of group.tiers || []) {
-      row.total += 1;
-      if (tier.earned) row.earned += 1;
-    }
+// Kategorien als Vitrinen: „Spielen 41 von 104“ - Klick filtert den Katalog darunter. Gezählt wird nicht hier, sondern
+// auf dem Server (Review N2, ``progress.category_progress`` aus GET /achievements/me bzw. /user/{id}): dieselbe Regel wie
+// auf der Erfolge-Seite - nur erreichbare Stufen, Verein für Nicht-Mitglieder „Nur für Mitglieder“.
+export function categoryProgress(progress) {
+  const rows = [];
+  for (const [key, row] of Object.entries(progress?.category_progress || {})) {
+    const summary = categoryProgressSummary(row, { key, member: progress.member });
+    if (!summary) continue;
+    const meta = CATEGORY_META[key] || CATEGORY_META.special;
+    rows.push({ key, label: meta.label, icon: meta.icon, accent: meta.accent, order: meta.order, ...summary });
   }
-  return Object.values(rows).sort((a, b) => a.order - b.order);
+  return rows.sort((a, b) => a.order - b.order);
 }
 
-export function CategoryShowcase({ groups = [], active = null, onPick }) {
-  const rows = categoryProgress(groups);
+function showcaseText(row) {
+  if (row.membersOnly) return "Nur für Mitglieder";
+  return row.complete ? "Abgeschlossen" : `${row.earned} von ${row.total}`;
+}
+
+export function CategoryShowcase({ progress = null, active = null, onPick }) {
+  const rows = categoryProgress(progress);
   if (!rows.length) return null;
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-showcase">
@@ -337,7 +340,7 @@ export function CategoryShowcase({ groups = [], active = null, onPick }) {
       </div>
       <div className="grid sm:grid-cols-2 gap-2">
         {rows.map((row) => {
-          const percent = row.total ? Math.round((row.earned / row.total) * 100) : 0;
+          const percent = Math.round(row.percent);
           const selected = active === row.key;
           return (
             <button
@@ -351,7 +354,7 @@ export function CategoryShowcase({ groups = [], active = null, onPick }) {
               <div className="flex items-center gap-2">
                 <AchievementIcon name={row.icon} fallback="trophy" className="w-3.5 h-3.5 shrink-0" style={{ color: row.accent }} />
                 <span className="font-heading font-bold uppercase text-sm truncate">{row.label}</span>
-                <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50 tabular-nums shrink-0">{row.earned} von {row.total}</span>
+                <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50 tabular-nums shrink-0" data-complete={row.complete ? "true" : undefined}>{showcaseText(row)}</span>
               </div>
               <div className="mt-2 h-1 bg-white/5 rounded-sm overflow-hidden">
                 <div className="h-full" style={{ width: `${percent}%`, backgroundColor: row.accent }} />

@@ -146,7 +146,9 @@ async def test_fastlap_zaehler_aus_rundenzeiten(flow):
     values = await counters.compute(me["id"], KEYS)
     assert values["pb_improvements"] == 3, "61,0 / 59,5 / 59,4 unterbieten die bisherige Bestzeit; ungültig und Referenz zählen nicht"
     assert values["sub_target_laps"] == 2, "59,5 und 59,4 (mit Strafe) unter 60,0 - nur tr1 hat eine Zielzeit"
-    assert values["track_records_held"] == 2, "tr2 und tr3 halte ich, tr1 hält der Gegner mit 59,0"
+    # Seit #2339 ist der Streckenrekord der Allzeit-Rekord über mehrere Challenges - jede Strecke hier steht nur in einer
+    # Challenge, das ist Pole Position (tr2 und tr3 meine, tr1 die des Gegners), kein Rekord. Mehr in test_achievement_reach_flow.
+    assert values["track_records_held"] == 0, "jede Strecke nur in einer Challenge - Pole, kein Streckenrekord"
     assert values["consistent_sessions"] == 1, "zehn Runden auf tr2 binnen einem Prozent"
     assert values["championship_top3"] == 1, "Cup abgeschlossen: 18 + 25 Punkte gegen 25 - die laufende Challenge zählt nicht"
     assert values["grand_prix_entries"] == 1, "eine Anmeldung zählt, die zurückgezogene nicht"

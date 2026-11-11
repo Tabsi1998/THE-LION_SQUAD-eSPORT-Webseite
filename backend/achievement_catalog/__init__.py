@@ -61,6 +61,8 @@ COUNTER_KEYS_V2 = (
     "tournaments_registered", "distinct_games_registered", "distinct_formats",
     # Katalog F (#1750): Abzeichen aus externen Wettbewerben
     "external_podiums", "external_seasons",
+    # Eiserner Löwe (#2339): Monate in Folge mit einem gespielten Match
+    "match_months_streak_max",
 )
 CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
 

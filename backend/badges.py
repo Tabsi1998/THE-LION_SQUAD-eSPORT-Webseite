@@ -26,7 +26,7 @@ from achievement_catalog import (
     CONDITION_KEY_STATUS, apply_category_overrides, annotate_tier, material_color, material_name,
 )
 from services.membership_service import get_membership, is_active_member
-from services import achievement_core
+from services import achievement_core, achievement_reach
 from services import achievement_recount as recount
 from services.achievement_core import NEGATIVE_INCIDENTS  # umgezogen (#1420), hier weiter erreichbar
 from services.achievement_core import due_tiers, note_loud_award, quiet_scope
@@ -60,21 +60,37 @@ async def seed_badges():
         )
         logger.info("[achievements] v4 migration complete — legacy collections dropped.")
 
+    # „Nicht mehr erreichbar“ (#2339) schreibt der Seed nicht jedes Mal über, sondern nur, wenn sich die Entscheidung im
+    # Code ändert - was die Verwaltung setzt, bleibt (services/achievement_reach.apply_catalog_retirement).
+    seeded_groups: list[dict] = []
     for g in ACHIEVEMENT_GROUPS:
         g = apply_category_overrides(g)
+        flags = {key: g.pop(key) for key in achievement_reach.RETIRED_FIELDS if key in g}
+        # Ausdrücklich (Review N6): Was der Code nicht als Leitung oder Aufgabe im Verein führt, ist es auch in der
+        # Datenbank nicht - auch wenn ein älterer Stand es dort stehen hat.
+        g.setdefault("staff_only", False)
+        g.setdefault("role_only", False)
         await db.achievement_groups.update_one(
             {"code": g["code"]},
             {"$set": {**g, "id": g["code"]},
              "$setOnInsert": {"created_at": now_utc().isoformat(), "is_admin_created": False}},
             upsert=True,
         )
-    for t in ACHIEVEMENT_TIERS:
+        seeded_groups.append({"code": g["code"], **flags})
+    seeded_tiers: list[dict] = []
+    for tier_doc in ACHIEVEMENT_TIERS:
+        t = {key: value for key, value in tier_doc.items() if key not in achievement_reach.RETIRED_FIELDS}
+        flags = {key: tier_doc[key] for key in achievement_reach.RETIRED_FIELDS if key in tier_doc}
         await db.achievements.update_one(
             {"code": t["code"]},
             {"$set": {**t, "id": t["code"]},
              "$setOnInsert": {"created_at": now_utc().isoformat()}},
             upsert=True,
         )
+        seeded_tiers.append({"code": t["code"], **flags})
+    await achievement_reach.apply_catalog_retirement(db.achievement_groups, seeded_groups)
+    await achievement_reach.apply_catalog_retirement(db.achievements, seeded_tiers)
+    await achievement_reach.apply_rules(db)
     # Von Hand angelegte Stufen (Admin) bekommen Material und Rang nachgetragen (#611).
     async for t in db.achievements.find({"material": {"$exists": False}}, {"_id": 0}):
         group = await db.achievement_groups.find_one({"code": t.get("group_code")}, {"_id": 0})
@@ -268,12 +284,23 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
         progress = await achievement_counters.stats(user_id)
     awarded_codes = {a["tier_code"]: a for a in awards}
     earned_group_codes = {a.get("group_code") for a in awards if a.get("group_code")}
+    # Gruppen der Leitung (#2339, Turnierleitung, Schiedsrichter, Gastgeber): ganz sieht sie nur, wer sie schaffen kann -
+    # gemeint ist die Person, um deren Erfolge es geht (ohne Person: wer schaut). Alle anderen nur, was sie schon haben.
+    subject = viewer if viewer and (not user_id or viewer.get("id") == user_id) else None
+    if user_id and subject is None:
+        subject = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1})
+    # Je Gruppe (Review N5): Turnierleitung und Gastgeber die Turnierleitung, Schiedsrichter auch die Liga-Leitung.
+    scopes = await achievement_reach.staff_scopes(db, subject)
+    now = now_utc()
 
     out = []
     for g in groups:
         is_negative = bool(g.get("is_negative"))
         # Geheime Gruppen (#611) tauchen wie negative erst nach der ersten Freischaltung auf - Admins sehen alles.
         is_hidden = bool(g.get("hidden")) and not is_negative
+        # Nicht mehr erreichbar (#2339): nur wer etwas davon hat, sieht die Gruppe - und dann nur das Erhaltene.
+        group_retired = achievement_reach.is_retired(g, now)
+        only_earned = group_retired or not achievement_reach.sees_staff_group(g, scopes)
         if is_negative:
             if not user_id or g["code"] not in earned_group_codes:
                 continue
@@ -282,9 +309,16 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 continue
         elif not g.get("public") and not is_admin:
             continue
+        if only_earned and (not user_id or g["code"] not in earned_group_codes):
+            continue
         gtiers = [t for t in tiers if t.get("group_code") == g["code"]]
-        if is_negative or (is_hidden and not is_admin):
+        if is_negative or (is_hidden and not is_admin) or only_earned:
             gtiers = [t for t in gtiers if t["code"] in awarded_codes]
+        elif gtiers:
+            # Eine einzelne Stufe kann nicht mehr erreichbar sein - auch sie sieht nur, wer sie hat.
+            gtiers = [t for t in gtiers if t["code"] in awarded_codes or not achievement_reach.is_retired(t, now)]
+            if not gtiers:
+                continue
         gtiers.sort(key=lambda x: (x.get("rank") or 0, x.get("level", 0)))
         out_tiers = []
         for t in gtiers:
@@ -308,6 +342,9 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 "condition_status": CONDITION_KEY_STATUS.get(ck) if ck else None,
                 "is_negative": is_negative,
                 "secret": is_negative,
+                # Nicht mehr erreichbar (#2339): zählt nirgends mit - die Seite zeigt es an der erhaltenen Stufe.
+                "retired": achievement_reach.tier_retired(t, g, now),
+                "retired_reason": achievement_reach.retired_reason(t, g) if achievement_reach.tier_retired(t, g, now) else None,
             }
             if is_negative:
                 tier_payload.update({
@@ -325,6 +362,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
         out.append({
             **g,
             "hidden": is_hidden,
+            "retired": group_retired,
             "description": _safe_negative_group_description() if is_negative else g.get("description"),
             "tiers": out_tiers,
             "highest_earned_level": max(earned_levels) if earned_levels else 0,
@@ -365,6 +403,8 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
             **material_fields(t, g),
             "earned_at": a["earned_at"],
             "silent": bool(a.get("silent")),
+            # Nicht mehr erreichbar (#2339): bleibt bei der Person, zählt aber in keinem „x von y“.
+            "retired": achievement_reach.tier_retired(t, g),
         })
     return out
 
@@ -391,10 +431,12 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     if light:
         query["condition_key"] = {"$in": sorted(only_keys)}
     tiers = await db.achievements.find(query, {"_id": 0}).to_list(2000)
+    # Altansprüche vor „erreichbar bis“ (Pionier: das Konto ist älter) bleiben offen - Review M1.
+    retired_groups = await achievement_reach.retired_group_codes(db, user_id=user_id)
     decide = recount.Decider(user_id, sources if announce is None else announce)
     # Mehrere Stufen auf einmal (#1296): eine Meldung „Level X erreicht“ mit dem erreichten Level, nicht eine je Aufstieg.
     async with xp.collected_level_ups():
-        for t in due_tiers(tiers, counters, earned_codes, active_member=active_member, only_keys=only_keys):
+        for t in due_tiers(tiers, counters, earned_codes, active_member=active_member, only_keys=only_keys, retired_groups=retired_groups):
             ck = t["condition_key"]
             context = {"auto_progress": True, "current": counters.get(ck), "target": t["progress_target"]}
             marker = await decide.marker_for(ck)

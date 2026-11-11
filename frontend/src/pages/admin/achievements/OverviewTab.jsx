@@ -61,7 +61,7 @@ export function OverviewTab() {
         <Stat label="Freischaltungen 7 Tage" value={data.unlocks_7d} testId="ov-unlocks-7d" />
         <Stat label="Freischaltungen 30 Tage" value={data.unlocks_30d} accent="#29B6E8" testId="ov-unlocks-30d" />
         <Stat label="Ohne Erfolg" value={data.users_without_award} hint={`von ${data.users_total} Personen`} accent="#FF3B30" testId="ov-without" />
-        <Stat label="Seltenste Stufe" value={rarest ? rarest.name : "–"} hint={rarest ? `${rarest.group_name} · ${rarest.holders} Person${rarest.holders === 1 ? "" : "en"} (${rarest.percent} %)` : "noch keine Vergabe"} accent={rarest ? materialColor(rarest) : "#FFD700"} testId="ov-rarest" />
+        <Stat label="Seltenste Stufe" value={rarest ? rarest.name : "–"} hint={rarest ? `${rarest.group_name} · ${rarest.holders} Person${rarest.holders === 1 ? "" : "en"} (${rarest.percent} %)${rarest.retired ? " · nicht mehr erreichbar" : ""}` : "noch keine Vergabe"} accent={rarest ? materialColor(rarest) : "#FFD700"} testId="ov-rarest" />
         <Stat label="Aktivste Kategorie" value={active ? active.label : "–"} hint={active ? `${active.count} Freischaltungen in 30 Tagen` : "noch keine"} accent="#00FF88" testId="ov-active" />
       </div>
 

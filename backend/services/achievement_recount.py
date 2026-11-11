@@ -314,6 +314,8 @@ async def _count_due(db, *, batch: int, total: int, progress=None) -> dict:
     from services import achievement_counters
     from services.membership_service import get_membership, is_active_member
 
+    from services.achievement_reach import retired_group_codes
+
     tiers = await db.achievements.find({"manual_only": {"$ne": True}}, {"_id": 0}).to_list(5000)
     groups = {g["code"]: g async for g in db.achievement_groups.find({}, {"_id": 0, "code": 1, "name": 1, "is_negative": 1})}
     counts: dict[str, int] = {}
@@ -323,7 +325,9 @@ async def _count_due(db, *, batch: int, total: int, progress=None) -> dict:
             try:
                 counters = await achievement_counters.compute(user_id)
                 earned = {row["tier_code"] async for row in db.user_achievements.find({"user_id": user_id}, {"_id": 0, "tier_code": 1})}
-                due = due_tiers(tiers, counters, earned, active_member=is_active_member(await get_membership(user_id)))
+                # Je Person (Review M1): Altansprüche vor „erreichbar bis“ bleiben offen.
+                retired_groups = await retired_group_codes(db, user_id=user_id)
+                due = due_tiers(tiers, counters, earned, active_member=is_active_member(await get_membership(user_id)), retired_groups=retired_groups)
             except Exception:  # noqa: BLE001 - ein Konto hält den Probelauf nicht auf
                 errors += 1
                 logger.warning("[achievements] Probelauf: ein Konto ließ sich nicht rechnen", exc_info=True)
