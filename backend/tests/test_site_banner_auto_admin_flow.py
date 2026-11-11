@@ -115,6 +115,19 @@ async def test_a_tournament_without_numbers_and_the_rights(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_content_area_alone_does_not_open_tournament_numbers(flow):
+    """Die Redaktion sieht die Liste unter Einstellungen, die Zahlen am Turnier aber nur mit dem Turnierbereich."""
+    await open_tournament(flow, tid="t-voll")
+    await flow.db.site_banner_stats.insert_one({"id": "auto-tournament-registration-t-voll", "impressions": 7, "clicks": 0})
+    redaktion = {**(await flow.add_user(role="player", name="redaktion")), "areas": ["content"]}
+    flow.act_as(redaktion)
+    listed = await flow.get("/api/settings/site-banners/admin/auto")
+    assert listed.status_code == 200
+    denied = await flow.get("/api/settings/site-banners/admin/stats/tournament/t-voll")
+    assert denied.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_fastlap_numbers_and_rights(flow):
     await flow.db.f1_challenges.insert_one({"id": "c-1", "slug": "monza", "title": "Monza", "status": "completed"})
     await flow.db.site_banner_stats.insert_one({"id": "auto-fastlap-registration-c-1", "impressions": 2, "clicks": 1})
