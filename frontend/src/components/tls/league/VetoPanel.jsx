@@ -2,13 +2,13 @@
 // Stand, die Wahl der eigenen Seite, der Verlauf und am Ende die Spielreihenfolge. Die Liga-Leitung pausiert, setzt fort, nimmt einen
 // Schritt zurück oder startet neu - mit Grund. Kurzes Polling, solange das Veto läuft; die Live-Oberfläche mit Animationen ist D.4.
 import { useEffect, useRef, useState } from "react";
-import { Ban, Check, ListOrdered, Pause, Play, RotateCcw, ShieldAlert, Undo2 } from "lucide-react";
+import { Ban, Check, ListOrdered, Pause, Pin, Play, RotateCcw, ShieldAlert, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { api } from "@/lib/api";
 import { remainingText } from "@/lib/leagueCheckin";
-import { VETO_STATUS_LABELS, actionWord, historyLine, mapStatusText, stepLabel, vetoDeadline, vetoRingShare, vetoText } from "@/lib/leagueVeto";
+import { actionWord, historyLine, mapStatusText, plannedRoleLabel, stepLabel, vetoDeadline, vetoHeadline, vetoRingShare, vetoText } from "@/lib/leagueVeto";
 import { motionAllowed } from "@/lib/motion";
 
 const POLL_MS = 3000;
@@ -17,6 +17,8 @@ const REASON_MIN = 5;
 const STATUS_TONE = {
   open: "border-white/10 bg-white/[0.03] text-white/85", banned: "border-live/40 bg-live/10 text-white/50 line-through",
   picked: "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white", decider: "border-honor/60 bg-honor/10 text-white",
+  // Vorgabe der Woche (#2326): steht fest, bevor jemand zieht - weder sperrbar noch wählbar.
+  preset: "border-[#00D26A]/60 bg-[#00D26A]/10 text-white",
   // Jede Map nur einmal je Serie: anderswo schon gewählt - gedimmt, nicht „offen“.
   elsewhere: "border-white/5 bg-white/[0.02] text-white/40 line-through",
 };
@@ -88,6 +90,31 @@ function ModeBoard({ remaining }) {
   );
 }
 
+// Vorgabe der Woche (#2326): die Map, die die Liga-Leitung für diese Spielwoche festgelegt hat - schon vor dem Veto sichtbar,
+// während des Vetos über dem Brett. Sie steht fest: niemand sperrt oder wählt sie.
+function WeekPresets({ block }) {
+  if (!block.presets?.length) return null;
+  return (
+    <div className="mt-4 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-3" data-testid="veto-presets">
+      <h4 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-[#00D26A]">
+        <Pin className="h-3.5 w-3.5" aria-hidden="true" /> Vorgabe der Woche{block.week ? ` · Spielwoche ${block.week}` : ""}
+      </h4>
+      <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {block.presets.map((row) => (
+          <li key={row.mode} className="flex min-w-0 items-center gap-3" data-testid={`veto-preset-${row.mode}`}>
+            {row.map_image_url ? <LazyImg src={row.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
+            <span className="min-w-0">
+              <span className="block truncate font-bold text-white">{row.map_name}</span>
+              <span className="flex items-center gap-1 text-xs text-white/60"><ModeIcon src={row.mode_icon_url} size="xs" /> {row.mode_label} · Map {row.position}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-white/55">Von der Liga-Leitung festgelegt – nicht sperrbar und nicht wählbar.</p>
+    </div>
+  );
+}
+
 function OwnTurn({ block, matchId, busy, run, onChanged }) {
   if (!block.can_pick || !block.current) return null;
   const word = actionWord(block.current.kind);
@@ -115,7 +142,10 @@ function OwnTurn({ block, matchId, busy, run, onChanged }) {
         ))}
       </div>
       {block.options.some((option) => !option.allowed) ? (
-        <p className="mt-2 text-xs text-white/55" data-testid="veto-options-hint">Ausgegraute Maps sind gesperrt, schon gewählt oder ließen die Serie nicht mehr aufgehen.</p>
+        <p className="mt-2 text-xs text-white/55" data-testid="veto-options-hint">
+          {block.presets?.length ? "Ausgegraute Maps sind gesperrt, schon gewählt, als Vorgabe der Woche fest oder ließen die Serie nicht mehr aufgehen."
+            : "Ausgegraute Maps sind gesperrt, schon gewählt oder ließen die Serie nicht mehr aufgehen."}
+        </p>
       ) : null}
     </div>
   );
@@ -177,7 +207,7 @@ function PlannedGames({ games }) {
         <li key={game.position} className="flex min-w-0 items-center gap-3 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-2" data-testid={`veto-planned-${game.position}`}>
           {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
           <span className="min-w-0">
-            <span className="block text-[10px] font-bold uppercase tracking-widest text-[#00D26A]">Map {game.position}{game.role === "decider" ? " · Decider" : ""}</span>
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-[#00D26A]">Map {game.position}{plannedRoleLabel(game.role) ? ` · ${plannedRoleLabel(game.role)}` : ""}</span>
             <span className="block truncate font-bold text-white">{game.map_name}</span>
             <span className="flex items-center gap-1 text-xs text-white/60"><ModeIcon src={game.mode_icon_url} size="xs" /> {game.mode_label}</span>
           </span>
@@ -189,19 +219,25 @@ function PlannedGames({ games }) {
 
 export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll }) {
   const live = block && (block.status === "running" || block.status === "paused");
+  // Vorgabe der Woche fehlt (#2326): Das Veto wartet - die Seite fragt weiter nach, damit es ohne Neuladen beginnt, sobald sie steht.
+  const blocked = Boolean(block && block.status === "waiting" && block.blocked);
+  const polling = live || blocked;
   useEffect(() => {
-    if (!live || !onPoll) return undefined;
+    if (!polling || !onPoll) return undefined;
     const tick = window.setInterval(() => { if (typeof document === "undefined" || !document.hidden) onPoll(); }, POLL_MS);
     return () => window.clearInterval(tick);
-  }, [live, onPoll]);
-  if (!block || block.status === "waiting") return null;
-  const tone = { running: block.own_turn ? "border-[#29B6E8]/60" : "border-honor/40", paused: "border-warn/50", done: "border-[#00D26A]/50", skipped: "border-white/15" }[block.status] || "border-white/15";
+  }, [polling, onPoll]);
+  // Vor dem Start zeigt der Block nur etwas, wenn es eine Vorgabe der Woche gibt - oder wenn sie fehlt.
+  if (!block || (block.status === "waiting" && !blocked && !block.presets?.length)) return null;
+  const tone = blocked ? "border-warn/50"
+    : { running: block.own_turn ? "border-[#29B6E8]/60" : "border-honor/40", paused: "border-warn/50", done: "border-[#00D26A]/50", skipped: "border-white/15" }[block.status] || "border-white/15";
   return (
-    <section className={`mt-5 rounded-sm border bg-[#0A0A0A] p-4 ${tone}`} data-testid="veto-panel" data-status={block.status} data-own-turn={block.own_turn ? "true" : "false"}>
+    <section className={`mt-5 rounded-sm border bg-[#0A0A0A] p-4 ${tone}`} data-testid="veto-panel" data-status={block.status} data-own-turn={block.own_turn ? "true" : "false"}
+      data-blocked={blocked ? "true" : "false"}>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Map-Veto · Regelwerk § 6</div>
-          <h3 className="mt-1 font-heading text-xl font-black uppercase" data-testid="veto-headline">{VETO_STATUS_LABELS[block.status] || "Veto"}</h3>
+          <h3 className="mt-1 font-heading text-xl font-black uppercase" data-testid="veto-headline">{vetoHeadline(block)}</h3>
           <p className="mt-1 text-sm text-white/75" data-testid="veto-text">{vetoText(block)}</p>
           {block.current ? <p className="mt-1 text-xs text-white/55" data-testid="veto-step">{stepLabel(block.current)}</p> : null}
           {block.team_a ? (
@@ -215,6 +251,12 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll }) {
           <strong>Pausiert</strong> – {block.paused.reason}
         </p>
       ) : null}
+      {blocked ? (
+        <p className="mt-3 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" role="status" data-testid="veto-blocked">
+          Gewertet wird nichts von selbst. Sind beide Seiten eingecheckt, bekommt die Liga-Leitung einen Hinweis – die Seite aktualisiert sich, sobald das Veto beginnt.
+        </p>
+      ) : null}
+      {block.status === "done" ? null : <WeekPresets block={block} />}
       {block.status === "skipped" ? <p className="mt-3 text-xs text-white/55" data-testid="veto-skipped">Die Maps werden beim Ergebnis eingetragen.</p> : null}
       {block.status === "done" && block.planned_games?.length ? <PlannedGames games={block.planned_games} /> : null}
       {block.status === "running" || block.status === "paused" ? <ModeBoard remaining={block.remaining || []} /> : null}
