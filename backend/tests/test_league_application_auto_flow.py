@@ -20,6 +20,7 @@ from league_start_world import ok  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import league_applications as applications  # noqa: E402
 from services.league_service import LeagueProblem  # noqa: E402
+from squad_world import make_squad  # noqa: E402
 
 AUTO = {"application_auto_accept": True}
 
@@ -165,6 +166,110 @@ async def test_a_staffel_that_already_started_is_not_assigned_automatically(flow
     answer = await submitted(flow, w, w["teams"][0])
 
     assert answer["status"] == "accepted" and "assignment" not in await stored(flow, answer)
+    # Der Grund steht am Antrag, im Eingang und im Hinweis an die Leitung (Review #2348).
+    assert (await stored(flow, answer))["auto_problem"] == applications.AUTO_STAFFEL_STARTED
+    assert (await inbox(flow, w))["items"][0]["auto_problem"] == applications.AUTO_STAFFEL_STARTED
+    lead_note = await flow.db.notifications.find_one({"user_id": w["lead"]["id"], "meta.reason": "league_application_accepted"}, {"_id": 0})
+    assert f"Automatisch zuteilen ging nicht: {applications.AUTO_STAFFEL_STARTED}" in lead_note["body"]
+
+
+@pytest.mark.asyncio
+async def test_a_full_staffel_leaves_the_squad_accepted_without_staffel_and_names_the_reason(flow):
+    w = await application_world(flow, teams=2, **AUTO)
+    await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"max_participants": 1}})
+    direct = w["teams"][1]
+    flow.act_as(w["lead"])
+    ok(await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": direct["team"]["id"], "squad_id": direct["squad"]["id"]}))
+
+    answer = await submitted(flow, w, w["teams"][0])
+
+    row = await stored(flow, answer)
+    assert answer["status"] == "accepted" and "assignment" not in row and row["auto_problem"]
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": w["teams"][0]["squad"]["id"]}) == 0
+    entry = await flow.db.audit_logs.find_one({"action": "league.application.auto_accept"}, {"_id": 0})
+    assert entry["data"]["problem"] == row["auto_problem"]
+    lead_note = await flow.db.notifications.find_one({"user_id": w["lead"]["id"], "meta.reason": "league_application_accepted"}, {"_id": 0})
+    assert f"Automatisch zuteilen ging nicht: {row['auto_problem']}" in lead_note["body"]
+    # Teilt die Leitung später zu, ist der Grund erledigt.
+    await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"max_participants": 8}})
+    ok(await decide(flow, w, answer, "assign", tournament_id=w["tid"]))
+    assert "auto_problem" not in await stored(flow, answer)
+
+
+async def second_squad(flow, w: dict, side: dict) -> dict:
+    extra = [await flow.add_user(name=f"Zweit {index}") for index in range(4)]
+    await flow.db.teams.update_one({"id": side["team"]["id"]}, {"$addToSet": {"member_ids": {"$each": [user["id"] for user in extra]}}})
+    squad = await make_squad(flow, side["team"], "Zweite Reihe", extra, captain=extra[0], vice=extra[1], game_id=w["game"]["id"])
+    return {**side, "squad": squad, "captain": extra[0], "vice": extra[1], "member": extra[3], "people": extra}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("siblings_allowed", [False, True])
+async def test_a_sibling_squad_in_the_only_staffel_is_not_accepted_automatically(flow, siblings_allowed):
+    w = await application_world(flow, teams=1, sibling_squads_in_staffel=siblings_allowed, **AUTO)
+    side = w["teams"][0]
+    twin = await second_squad(flow, w, side)
+    assert (await submitted(flow, w, side))["status"] == "accepted"
+
+    answer = await submitted(flow, w, twin)
+
+    if siblings_allowed:
+        assert answer["status"] == "accepted" and answer["staffel"] == "Liga 1 · Staffel A", "Gegenprobe: erlaubt die Season zwei Co-Teams, geht es"
+        return
+    assert answer["status"] == "submitted"
+    row = await stored(flow, answer)
+    assert "hat schon ein Co-Team in der einzigen Staffel" in row["auto_problem"] and "auto_accepted" not in row
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": twin["squad"]["id"]}) == 0
+    assert await flow.db.audit_logs.count_documents({"action": "league.application.auto_accept"}) == 1
+    lead_note = await flow.db.notifications.find_one({"user_id": w["lead"]["id"], "meta.reason": "league_application_submitted"}, {"_id": 0})
+    assert "Automatisch annehmen ging nicht" in lead_note["body"] and "einzigen Staffel" in lead_note["body"]
+    assert await reasons(flow, twin["captain"]) == ["league_application_submitted"]
+    item = next(item for item in (await inbox(flow, w))["items"] if item["id"] == answer["id"])
+    assert "einzigen Staffel" in item["auto_problem"]
+    # Entscheidet die Leitung, ist der Grund erledigt.
+    ok(await decide(flow, w, answer, "review"))
+    assert "auto_problem" not in await stored(flow, answer)
+
+
+# ---------------------------------------------------------------- Unerwartete Fehler kippen das Einreichen nicht
+
+@pytest.mark.asyncio
+async def test_an_unexpected_error_leaves_the_application_submitted(flow, monkeypatch):
+    w = await application_world(flow, teams=1, **AUTO)
+    side = w["teams"][0]
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(applications, "_place", broken)
+    answer = await submit(flow, w, side)
+
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["status"] == "submitted"
+    row = await flow.db.league_applications.find_one({"squad_id": side["squad"]["id"]}, {"_id": 0})
+    assert row["status"] == "submitted" and "auto_accepted" not in row and [step["status"] for step in row["history"]] == ["submitted"]
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 0
+    assert await flow.db.audit_logs.find_one({"action": "league.application.submit"}, {"_id": 1})
+    assert await reasons(flow, side["captain"]) == ["league_application_submitted"]
+    lead_note = await flow.db.notifications.find_one({"user_id": w["lead"]["id"], "meta.reason": "league_application_submitted"}, {"_id": 0})
+    assert applications.AUTO_FAILED in lead_note["body"]
+
+
+@pytest.mark.asyncio
+async def test_an_error_after_the_assignment_keeps_it(flow, monkeypatch):
+    w = await application_world(flow, teams=1, **AUTO)
+    side = w["teams"][0]
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Vorschau weg")
+
+    monkeypatch.setattr(applications, "_after_assign", broken)
+    answer = await submit(flow, w, side)
+
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["status"] == "accepted" and answer.json()["staffel"] == "Liga 1 · Staffel A"
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 1
+    assert await reasons(flow, side["captain"]) == ["league_application_accepted"]
 
 
 @pytest.mark.asyncio

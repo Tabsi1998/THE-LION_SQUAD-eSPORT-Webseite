@@ -198,6 +198,19 @@ test("abgelehnt und zurückgezogen stehen eingeklappt, ohne Knöpfe", async () =
   expect(screen.queryByTestId("application-reject-open-a2")).toBeNull();
 });
 
+test("der Eingang nennt, warum die Season nicht annehmen oder zuteilen konnte (#2348)", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [
+    { ...ROW, id: "a1", status: "accepted", auto_accepted: true, auto_problem: "Die Staffel ist gesperrt." },
+    { ...ROW, id: "a2", squad_id: "s2", auto_problem: "Loewen hat schon ein Co-Team in der einzigen Staffel." },
+    { ...ROW, id: "a3", squad_id: "s3" },
+  ] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-auto-problem-a1")).toHaveTextContent("Nicht automatisch zugeteilt: Die Staffel ist gesperrt.");
+  expect(screen.getByTestId("application-auto-problem-a2")).toHaveTextContent("Nicht automatisch angenommen: Loewen hat schon ein Co-Team");
+  expect(screen.queryByTestId("application-auto-problem-a3")).toBeNull();
+});
+
 test("das Team einer Person der Leitung ist nach automatischer Annahme markiert (#2348)", async () => {
   apiMock.get.mockResolvedValue({ data: { ...BODY, items: [
     { ...ROW, id: "a1", status: "accepted", auto_accepted: true, lead_team_auto: true },

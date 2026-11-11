@@ -145,6 +145,12 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
         </p>
       ) : null}
       {row.auto_accepted ? <p className="mt-1 text-xs text-white/60" data-testid={`application-auto-${row.id}`}>Automatisch angenommen{row.decided_at ? ` ${when(row.decided_at)}` : ""}.</p> : null}
+      {/* Warum die Season nicht annehmen bzw. zuteilen konnte (#2348): Staffel voll oder gesperrt, Geschwister-Co-Team, Fehler. */}
+      {row.auto_problem ? (
+        <p className="mt-1 text-xs text-warn [overflow-wrap:anywhere]" data-testid={`application-auto-problem-${row.id}`}>
+          {row.status === "accepted" ? "Nicht automatisch zugeteilt" : "Nicht automatisch angenommen"}: {row.auto_problem}
+        </p>
+      ) : null}
       {/* Befangenheit (#2348, Nr. 73): Beim Team einer Person der Liga-Leitung hat niemand entschieden - die anderen Zuständigen sehen es. */}
       {row.lead_team_auto ? (
         <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-warn" data-testid={`application-lead-team-${row.id}`}>
