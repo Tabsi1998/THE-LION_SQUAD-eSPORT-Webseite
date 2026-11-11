@@ -115,6 +115,8 @@ ROUTES = [
     route("PUT", "/api/tournaments/{tid}/onsite-access", "manage", {"enabled": False}),
     route("POST", "/api/tournaments/{tid}/onsite-access/renew", "manage"),
     route("POST", "/api/tournaments/{tid}/staff", "manage", {"user_id": "{user}", "role": "referee"}),
+    # Zahlen der automatischen Banner (#2352): wie das Bearbeiten der Staffel
+    route("GET", "/api/settings/site-banners/admin/stats/tournament/{tid}", "manage"),
     # Staffel: Aufbau
     route("DELETE", "/api/tournaments/{tid}", "season"),
     route("POST", "/api/tournaments/{tid}/bracket/plan", "season", {}),
