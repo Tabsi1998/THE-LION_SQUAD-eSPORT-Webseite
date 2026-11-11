@@ -426,7 +426,8 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     if light:
         query["condition_key"] = {"$in": sorted(only_keys)}
     tiers = await db.achievements.find(query, {"_id": 0}).to_list(2000)
-    retired_groups = await achievement_reach.retired_group_codes(db)
+    # Altansprüche vor „erreichbar bis“ (Pionier: das Konto ist älter) bleiben offen - Review M1.
+    retired_groups = await achievement_reach.retired_group_codes(db, user_id=user_id)
     decide = recount.Decider(user_id, sources if announce is None else announce)
     # Mehrere Stufen auf einmal (#1296): eine Meldung „Level X erreicht“ mit dem erreichten Level, nicht eine je Aufstieg.
     async with xp.collected_level_ups():

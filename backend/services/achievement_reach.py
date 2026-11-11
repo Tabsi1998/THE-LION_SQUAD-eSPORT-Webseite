@@ -157,6 +157,12 @@ PIONEER_ACCOUNTS = 100
 PIONEER_REASON = "Nur die ersten hundert Konten der Plattform – die Plätze sind vergeben."
 
 
+# Wann ein Anspruch entstanden ist, wo der Zähler es weiß (Review M1): „erreichbar bis“ sperrt dann nur Ansprüche, die nach
+# dem Datum entstanden sind - Altansprüche (das 40. Konto, das nie ausgewertet wurde) bekommen den Erfolg weiter.
+# Gruppe → Feld am Konto. Für alle anderen Gruppen sperrt das Datum jede automatische Vergabe ab dann.
+CLAIM_DATE_FIELDS: dict[str, str] = {PIONEER_GROUP: "created_at"}
+
+
 async def apply_rules(db) -> None:
     """Regeln, die sich aus den Daten ergeben (Seed): Pionier bekommt ``available_until``, sobald es das hundertste Konto
     gibt. Einmal gesetzt, bleibt der Wert - auch wenn die Verwaltung ihn später leert."""
@@ -179,12 +185,27 @@ async def load_catalog(db) -> tuple[dict[str, dict], dict[str, dict]]:
     return groups, tiers
 
 
-async def retired_group_codes(db, now: datetime | None = None) -> frozenset[str]:
-    """Die Gruppen, die nicht mehr erreichbar sind - für die Vergabe (``achievement_core.due_tiers``)."""
+async def retired_group_codes(db, now: datetime | None = None, *, user_id: str | None = None) -> frozenset[str]:
+    """Die Gruppen, die nicht mehr erreichbar sind - für die Vergabe (``achievement_core.due_tiers``). Mit ``user_id``
+    bleibt eine Gruppe mit Anspruchsdatum (``CLAIM_DATE_FIELDS``, Pionier) offen, wenn der Anspruch vor ``available_until``
+    entstand; das Kennzeichen ``retired`` selbst sperrt immer."""
     now = now or now_utc()
     query = {"$or": [{"retired": True}, {"available_until": {"$nin": [None, ""]}}]}
     rows = await db.achievement_groups.find(query, {"_id": 0, "code": 1, "retired": 1, "available_until": 1}).to_list(1000)
-    return frozenset(g["code"] for g in rows if is_retired(g, now))
+    out: set[str] = set()
+    user: dict | None = None
+    for group in rows:
+        if not is_retired(group, now):
+            continue
+        field = CLAIM_DATE_FIELDS.get(group["code"])
+        if field and user_id and not group.get("retired"):
+            if user is None:
+                user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, **{key: 1 for key in CLAIM_DATE_FIELDS.values()}}) or {}
+            claimed, until = parse_when(user.get(field)), parse_when(group.get("available_until"))
+            if claimed and until and claimed <= until:
+                continue
+        out.add(group["code"])
+    return frozenset(out)
 
 
 async def is_staff_person(db, user: dict | None) -> bool:

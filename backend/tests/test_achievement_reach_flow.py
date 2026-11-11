@@ -244,6 +244,26 @@ async def test_pionier_ist_erreichbar_bis_zum_hundertsten_konto(flow):
     assert "pioneer" not in _group_codes((await flow.get("/api/achievements/me")).json()["groups"])
 
 
+@pytest.mark.asyncio
+async def test_pionier_altanspruch_bleibt_nach_dem_hundertsten_konto(flow):
+    """Review M1: „erreichbar bis“ sperrt nur Ansprüche danach - das 40. Konto, nie ausgewertet, bekommt Pionier noch."""
+    start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    await flow.db.users.insert_many([{"id": f"u{i}", "username": f"u{i}", "is_active": True, "created_at": (start + timedelta(hours=i)).isoformat()}
+                                     for i in range(101)])
+    await badges.seed_badges()
+    assert reach.is_retired(await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0}))
+    assert "pioneer" not in await reach.retired_group_codes(flow.db, user_id="u39")
+    assert "pioneer" in await reach.retired_group_codes(flow.db, user_id="u100") and "pioneer" in await reach.retired_group_codes(flow.db)
+    await badges.evaluate_user_progress("u39")
+    assert await flow.db.user_achievements.find_one({"user_id": "u39", "tier_code": "pioneer_1"}), "Konto Nr. 40 hat den Anspruch"
+    # Gegenprobe: das 101. Konto hat keinen (Zähler 0), und mit dem Kennzeichen retired sperrt es für alle.
+    await badges.evaluate_user_progress("u100")
+    assert not await flow.db.user_achievements.find_one({"user_id": "u100", "tier_code": "pioneer_1"})
+    await flow.db.achievement_groups.update_one({"code": "pioneer"}, {"$set": {"retired": True}})
+    await badges.evaluate_user_progress("u38")
+    assert not await flow.db.user_achievements.find_one({"user_id": "u38", "tier_code": "pioneer_1"})
+
+
 # ------------------------------------------------------------------ 2. und 4. Kategorie-Meister und Meta-Erfolge
 
 
