@@ -2565,7 +2565,15 @@ auf die Staffel ein). Ohne Vorlage an der Staffel oder bei klassischen Spielen
 
 Sichtbarkeit wie die Matchseite (`_assert_match_visible`: Staffel bzw. Season - die Season reicht ihre Sichtbarkeit an die Staffeln
 weiter, `staffel_visibility`). Mit dem **Anzeige-Schlüssel** des Turniers (`key`, wie Turnierbaum und Stationen, `DISPLAY_GRANT`) auch
-ohne Anmeldung und für Staffeln „Nur Mitglieder“; abgelaufen 403 wie dort. **Zuschauer-Sicht:** `own_turn`/`can_pick` falsch,
+ohne Anmeldung und für Staffeln „Nur Mitglieder“, aber **nie** für eine Staffel im Entwurf oder eine interne (Season „aus“ bzw. „nur
+Verwaltung“: `internal`, nicht öffentlich) - dieselbe Regel wie beim Event-TV (`tv_display.shown_on_event_tv`). Ein unbekanntes Spiel,
+ein falscher, widerrufener oder fremder Schlüssel und eine solche Staffel antworten gleich (403 „Dieser TV-Link gilt nicht mehr …“) - die
+Antwort verrät nicht, welche Spiele es gibt; abgelaufen 403 wie beim Turnierbaum. **Limit und Zwischenspeicher** (Review): Zuschauer, TV
+und Abrufe mit Schlüssel zählen je Adresse und je Schlüssel (nur ein Hash davon) höchstens 600 Abrufe je Minute (`veto_live_address`,
+`veto_live_key`, 429 mit Wartezeit). Die Zuschauer-Sicht gilt 2 Sekunden für alle (`SPECTATOR_CACHE_SECONDS`, je Spiel), solange sich am
+Spiel nichts geändert hat - der Schlüssel ist `updated_at` und der Stand des Vetos aus dem frisch gelesenen Spiel, ein neuer Zug ist also
+sofort sichtbar; `server_now` und `current.remaining_seconds` setzt jeder Abruf neu. Beteiligte und Leitung gehen nie über Limit oder
+Zwischenspeicher. **Zuschauer-Sicht:** `own_turn`/`can_pick` falsch,
 `own_side`, `options`, `lead`, `start`, `blocked` leer, bei einer Pause ohne `paused.reason` (den Grund schreibt die Leitung frei) und mit
 `pick_hint` „Das Veto ist pausiert – die Liga-Leitung setzt es fort.“; vor dem Start nur die Vorgabe der Woche. Personen stehen nie im
 Block, nur die Namen der Seiten. Die Matchseite liefert Zuschauern denselben Block als `veto_view` (nur ohne `checkin`); Beteiligte
@@ -2607,14 +2615,20 @@ baut nichts neu auf, spielt nichts ab, der Fokus bleibt.
 Sekunden und beim Ablauf an; der letzte Schritt steht in einer höflichen Ansage.
 
 **Zuschauer und TV:** Die Matchseite zeigt Zuschauern das laufende Veto nur lesend (`readOnly`, ohne Auswahl, Eingriff und Bereit-Block).
-**TV** `/display/veto/<Spiel>` (`pages/display/VetoTVPage.jsx`, ohne Anmeldung wie der Event-TV, `?key=` für Staffeln „Nur
-Mitglieder“): links wer am Zug ist mit großem Countdown, rechts das Brett je Modus, darunter der Ablauf; nach dem Ende die Spielreihenfolge
-als große Karten; QR-Code zur Matchseite. Link „TV-Ansicht“ im Veto-Block der Matchseite.
+**TV** `/display/veto/<Spiel>` (`pages/display/VetoTVPage.jsx`, fragt immer mit `display=1`): ohne Schlüssel sichtbar wie die
+Matchseite (öffentliche Staffel ohne Anmeldung, „Nur Mitglieder“ nur angemeldet); mit `?key=` (Anzeige-Schlüssel des Turniers aus TV &
+Beamer) auch ohne Anmeldung für Staffeln „Nur Mitglieder“ - nie für Entwurf oder interne Staffel (siehe oben); ein ungültiger Schlüssel
+zeigt „Dieser TV-Link gilt nicht mehr“ und nichts vom Inhalt. Links wer am Zug ist mit großem Countdown, rechts das Brett je Modus,
+darunter der Ablauf; nach dem Ende die Spielreihenfolge als große Karten; QR-Code zur Matchseite (ohne Schlüssel). Eine ältere Antwort
+überschreibt nie eine neuere (`isOlderVeto`: Serverzeit, bei gleicher Zeit die Version - wie `mergeLiveVeto` auf der Matchseite). Link
+„TV-Ansicht“ im Veto-Block der Matchseite.
 
 **Erinnerung „Map-Veto wartet“** (`league_veto.nudge_target`/`nudge_due`, Job `league_veto` nach dem Auflösen der Fristen,
 `league_veto_sweep.nudge`): an Captain und Vertreter der Seite am Zug (`responsible_user_ids`), Art `match_call`, Thema Match-Erinnerungen,
-`meta.reason` `veto_turn`, Schlüssel `veto-turn:<spiel>:<started_at>:<schritt>:<seite>` - **höchstens eine je Schritt und Seite**
-(Merker `flow.veto_nudge = {key, at}` mit Bedingung auf Version und Schlüssel). Fällig, wenn: das Veto läuft, der Schritt ein Zug einer
+`meta.reason` `veto_turn`, Schlüssel `veto-turn:<spiel>:<started_at>:<neustarts>:<schritt>:<seite>` - **höchstens eine je Schritt und
+Seite** (Merker `flow.veto_nudge = {key, at}` mit Bedingung auf Version und Schlüssel). `<neustarts>` zählt die Eingriffe „Schritt zurück“
+und „Neu starten“ in `lead_log` (Review): Beginnt derselbe Schritt dadurch neu, gibt es wieder eine Erinnerung; Pause und Fortsetzen
+bleiben derselbe Schritt. Fällig, wenn: das Veto läuft, der Schritt ein Zug einer
 Seite ist (nie Decider oder Vorgabe), seit **20 Sekunden** kein Zug (Zeit je Schritt minus Rest), noch mindestens **5 Sekunden** übrig,
 die Staffel nicht gesperrt und die Seite das Veto **nicht offen** hat. „Offen“ heißt: Captain oder Vertreter der Seite hat in den letzten
 **15 Sekunden** den kurzen Abruf gemacht - der sichtbare Tab fragt alle 2 Sekunden, im Hintergrund nie. Der Abruf vermerkt das als

@@ -948,7 +948,8 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
 - **Zuschauer und TV:** Wer nicht beteiligt ist, sieht das laufende Veto auf der Matchseite nur lesend (wenn die Staffel sichtbar ist).
   Über **TV-Ansicht** im Veto-Block öffnet sich die Ansicht für den Bildschirm (`/display/veto/<Spiel>`): großer Countdown, wer am Zug
   ist, Karten und Ablauf, danach die Spielreihenfolge. Für Staffeln „Nur Mitglieder“ hängt ihr den Anzeige-Schlüssel des Turniers an
-  (`?key=…`, aus eSports → TV & Beamer).
+  (`?key=…`, aus eSports → TV & Beamer). Für eine Season „aus“ oder „nur Verwaltung“ und im Entwurf zeigt der TV auch mit Schlüssel
+  nichts.
 - **Zeit:** Läuft die Zeit je Schritt ab, wählt das System zufällig aus den zulässigen Maps und schreibt es in den Verlauf („Zeit
   abgelaufen, das System hat gewählt“). Die nächste Seite hat wieder ihre volle Zeit.
 - **Ende:** Nach dem letzten Schritt steht die **Spielreihenfolge** (Map 1 bis Best of mit Modus und Map) – beide Seiten bekommen eine
