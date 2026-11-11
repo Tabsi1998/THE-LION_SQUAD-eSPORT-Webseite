@@ -198,6 +198,42 @@ test("abgelehnt und zurückgezogen stehen eingeklappt, ohne Knöpfe", async () =
   expect(screen.queryByTestId("application-reject-open-a2")).toBeNull();
 });
 
+// Automatisch angenommen (#2348): zurückstufen nur mit Grund, eine automatische Zuteilung nehmen Ablehnen und Warteliste wieder heraus.
+test("eine automatisch angenommene Anmeldung geht nur mit Grund auf die Warteliste", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, status: "accepted", auto_accepted: true, decided_at: "2026-11-02T18:00:00+00:00",
+    history: [...ROW.history, { status: "accepted", at: "2026-11-02T18:00:00+00:00", by_name: "automatisch", auto: true }] }] } });
+  renderPanel();
+
+  const row = await screen.findByTestId("application-a1");
+  expect(screen.getByTestId("application-auto-a1")).toHaveTextContent("Automatisch angenommen 02.11.2026");
+  expect(row).toHaveTextContent("Angenommen, automatisch");
+  expect(screen.queryByTestId("application-waitlist-a1")).toBeNull();
+  fireEvent.click(screen.getByTestId("application-waitlist-open-a1"));
+  const send = screen.getByTestId("application-waitlist-send-a1");
+  expect(send).toBeDisabled();
+  fireEvent.change(screen.getByTestId("application-reason-a1"), { target: { value: "Erst die Kader prüfen" } });
+  fireEvent.click(send);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/waitlist", { reason: "Erst die Kader prüfen" }));
+});
+
+test("eine automatische Zuteilung lässt sich ablehnen, eine der Leitung nicht", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [
+    { ...ROW, id: "a1", status: "accepted", auto_accepted: true, assignment: { tournament_id: "t1", label: "Liga 1 · Staffel A", auto: true } },
+    { ...ROW, id: "a2", squad_id: "s2", status: "accepted", assignment: { tournament_id: "t1", label: "Liga 1 · Staffel A" } },
+  ] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-auto-seat-a1")).toHaveTextContent("wieder aus der Staffel");
+  expect(screen.queryByTestId("application-assign-a1")).toBeNull();
+  expect(screen.queryByTestId("application-staffel-a1")).toBeNull();
+  expect(screen.getByTestId("application-waitlist-open-a1")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("application-reject-open-a1"));
+  fireEvent.change(screen.getByTestId("application-reason-a1"), { target: { value: "Kader passt nicht" } });
+  fireEvent.click(screen.getByTestId("application-reject-send-a1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/reject", { reason: "Kader passt nicht" }));
+  expect(screen.queryByTestId("application-reject-open-a2")).toBeNull();
+});
+
 test("eine Absage des Servers steht als Meldung da, und die Liste lädt neu", async () => {
   apiMock.post.mockRejectedValue({ response: { data: { detail: "Alle Startplätze sind vergeben." } } });
   renderPanel();
