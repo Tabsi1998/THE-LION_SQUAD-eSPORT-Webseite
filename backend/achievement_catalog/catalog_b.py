@@ -31,7 +31,7 @@ def _b(*args, **kwargs):
 FASTLAP = [
     _b("laps_valid", "Rundenzähler", "fastlap", "Sammle gültige Fast-Lap-Runden.", "Reich Rundenzeiten bei Fast-Lap-Challenges ein; jede gültige Runde zählt.",
        "flag", "checkered-flag", "fastlap_valid_count", [10, 50, 150, 500, 1000, 2500, 5000], "{n} gültige Runden.", sort_order=310),
-    _b("pole", "Pole Position", "fastlap", "Halte die Bestzeit auf einer Strecke.", "Fahr auf einer Strecke die schnellste gültige Zeit aller - jede Strecke zählt einmal.",
+    _b("pole", "Pole Position", "fastlap", "Halte die Bestzeit auf einer Strecke.", "Fahr in einer Fast-Lap-Challenge auf einer Strecke die schnellste gültige Zeit aller - jede Strecke jeder Challenge zählt einmal, solange du vorn bist.",
        "trophy", "pole", "pole_count", [1, 3, 7, 15, 30, 60, 100], "{n} Pole Positions.", sort_order=311),
     _b("tracks", "Streckenkenner", "fastlap", "Fahr auf vielen verschiedenen Strecken.", "Jede Strecke mit einer gültigen Runde zählt einmal.",
        "map", "track", "distinct_tracks", [3, 7, 15, 25, 40, 60, 100], "{n} verschiedene Strecken.", sort_order=312),
@@ -42,9 +42,12 @@ FASTLAP = [
     _b("championship_top", "Meisterschafts-Top", "fastlap", "Lande in der Championship einer Challenge unter den ersten Drei.", "Platz 1 bis 3 in der Gesamtwertung einer abgeschlossenen Fast-Lap-Challenge.",
        "crown", "podium-flag", "championship_top3", [1, 3, 7, 15, 30], "{n}-mal in den Top 3 einer Championship.", sort_order=315),
     _b("grand_prix", "Grand-Prix-Fahrer", "fastlap", "Fahr Grand-Prix-Turniere.", "Melde dich zu Turnieren im Format Grand Prix an; jede Anmeldung zählt.",
-       "car", "helmet", "grand_prix_entries", [1, 5, 15, 40, 100], "{n} Grand-Prix-Anmeldungen.", sort_order=316),
-    _b("lap_record", "Streckenrekord", "fastlap", "Halte Streckenrekorde.", "Deine Bestzeit ist die schnellste gültige Zeit auf der Strecke - so viele Strecken hältst du gerade.",
-       "medal", "record", "track_records_held", [1, 3, 7, 15, 30], "{n} Streckenrekorde gehalten.", sort_order=317),
+       "car", "helmet", "grand_prix_entries", [1, 5, 15, 40, 100], "{n} Grand-Prix-Anmeldungen.", sort_order=316,
+       retired="Das Turnierformat Grand Prix gibt es nicht mehr."),
+    # Streckenrekord (#2339): nicht mehr dasselbe wie Pole Position - der Allzeit-Rekord über alle Challenges desselben
+    # Spiels, gezählt erst, wenn die Strecke in mindestens zwei Challenges gefahren wurde. Bisherige Vergaben bleiben.
+    _b("lap_record", "Streckenrekord", "fastlap", "Halte Allzeit-Rekorde auf Strecken.", "Deine Bestzeit ist die schnellste gültige Zeit auf einer Strecke über alle Fast-Lap-Challenges desselben Spiels - gleiche Strecke heißt gleicher Name. Zählt, sobald die Strecke in mindestens zwei Challenges gefahren wurde; so viele Rekorde hältst du gerade.",
+       "medal", "record", "track_records_held", [1, 3, 7, 15, 30], "{n} Streckenrekorde gehalten.", sort_order=317, singular="{n} Streckenrekord gehalten."),
     _b("consistency", "Konstanz", "fastlap", "Fahr gleichmäßig schnell.", "Auf einer Strecke zehn gültige Runden binnen einem Prozent deiner Bestzeit - jede Strecke zählt einmal.",
        "activity", "metronome", "consistent_sessions", [1, 5, 15, 40, 100], "{n}-mal konstant gefahren.", sort_order=318),
 ]

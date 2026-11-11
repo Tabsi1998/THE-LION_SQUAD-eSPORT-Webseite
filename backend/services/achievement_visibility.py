@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 from achievement_catalog import CATEGORIES, MATERIALS, category_v2
 from models import now_utc
+from services import achievement_reach as reach
 
 logger = logging.getLogger("tls.achievements.visibility")
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -47,6 +48,8 @@ CATEGORY_LINKS: dict[str, str] = {
 }
 
 _rarity_cache: dict = {"at": None, "data": None}
+# Für die Verwaltung (Review N7): dieselbe Rechnung samt nicht mehr Erreichbarem.
+_rarity_cache_admin: dict = {"at": None, "data": None}
 
 
 # ------------------------------------------------------------------ Grundlagen
@@ -121,12 +124,14 @@ def _group_is_member_only(group: dict | None) -> bool:
 
 # ------------------------------------------------------------------ Seltenheit
 
-async def rarity(db, *, force: bool = False, now: datetime | None = None) -> dict:
+async def rarity(db, *, force: bool = False, now: datetime | None = None, include_retired: bool = False) -> dict:
     """Je Stufe: wie viele Konten sie haben und wie viel Prozent das sind. Je Gruppe dazu die höchste
-    Stufe („top“) mit ihrer Seltenheit - das ist die Zahl auf der Karte. Eine Minute zwischengespeichert."""
+    Stufe („top“) mit ihrer Seltenheit - das ist die Zahl auf der Karte. Eine Minute zwischengespeichert.
+    ``include_retired`` (nur die Verwaltung, Review N7): auch nicht mehr Erreichbares, mit ``retired`` an der Zeile."""
     now = now or now_utc()
-    cached = _rarity_cache.get("data")
-    if cached and not force and _rarity_cache.get("at") and (now - _rarity_cache["at"]).total_seconds() < RARITY_TTL_SECONDS:
+    cache = _rarity_cache if not include_retired else _rarity_cache_admin
+    cached = cache.get("data")
+    if cached and not force and cache.get("at") and (now - cache["at"]).total_seconds() < RARITY_TTL_SECONDS:
         return cached
     bases = await _bases(db)
     groups, tiers = await _catalog(db)
@@ -136,11 +141,16 @@ async def rarity(db, *, force: bool = False, now: datetime | None = None) -> dic
     tier_rows: dict[str, dict] = {}
     for code, tier in tiers.items():
         group = groups.get(tier.get("group_code"))
+        # Nicht mehr erreichbar (#2339) hat keine Seltenheit - es lässt sich nicht mehr bekommen. Die Verwaltung sieht es
+        # trotzdem, mit Vermerk.
         if not group or group.get("is_negative"):
+            continue
+        retired = reach.tier_retired(tier, group, now)
+        if retired and not include_retired:
             continue
         base = bases["members"] if _group_is_member_only(group) else bases["all"]
         count = len(holders.get(code, ()))
-        tier_rows[code] = {"holders": count, "percent": _percent(count, base), "base": base}
+        tier_rows[code] = {"holders": count, "percent": _percent(count, base), "base": base, **({"retired": True} if retired else {})}
     group_rows: dict[str, dict] = {}
     for code, group in groups.items():
         if group.get("is_negative"):
@@ -165,21 +175,24 @@ async def rarity(db, *, force: bool = False, now: datetime | None = None) -> dic
         }
     data = {"base": bases["all"], "members_base": bases["members"], "tiers": tier_rows, "groups": group_rows,
             "computed_at": now.isoformat()}
-    _rarity_cache.update({"at": now, "data": data})
+    cache.update({"at": now, "data": data})
     return data
 
 
 def reset_rarity_cache() -> None:
     _rarity_cache.update({"at": None, "data": None})
+    _rarity_cache_admin.update({"at": None, "data": None})
 
 
 # ------------------------------------------------------------------ Kategorien
 
 async def category_overview(db, *, rarity_data: dict | None = None) -> list[dict]:
     """Je Kategorie: Gruppen, Stufen, wie viele Leute etwas davon haben und der Fortschritt der
-    Community (Vergaben geteilt durch Konten × Stufen). Negativ bleibt draußen, Geheim zählt nur."""
+    Community (Vergaben geteilt durch Konten × Stufen). Negativ bleibt draußen, Geheim zählt nur. Nicht mehr Erreichbares
+    und die Gruppen der Leitung (#2339) zählen nicht - sie sieht nicht jede und jeder."""
     rarity_data = rarity_data or await rarity(db)
     groups, tiers = await _catalog(db)
+    now = now_utc()
     per_cat: dict[str, dict] = {}
     for key, meta in CATEGORIES.items():
         if meta.get("negative"):
@@ -198,9 +211,11 @@ async def category_overview(db, *, rarity_data: dict | None = None) -> list[dict
             continue
         if not group.get("public") and not group.get("hidden"):
             continue
+        if reach.is_retired(group, now) or group.get("staff_only"):
+            continue
         row["groups"] += 1
         for tier in tiers.values():
-            if tier.get("group_code") == group["code"]:
+            if tier.get("group_code") == group["code"] and not reach.is_retired(tier, now):
                 row["tiers"] += 1
                 row["points"] += int(tier.get("points") or 0)
                 tier_cat[tier["code"]] = cat
@@ -219,12 +234,16 @@ async def category_overview(db, *, rarity_data: dict | None = None) -> list[dict
 
 
 async def my_progress(db, user_id: str) -> dict:
-    """Der eigene Stand für die Erfolge-Seite (#1229): Stufen und Punkte insgesamt und je Kategorie - gezählt wie in
-    category_overview (öffentliche und geheime Gruppen), damit „12 von 40“ zusammenpasst. Negatives zählt nicht mit;
-    wie viele davon da sind, steht extra - dafür zeigt die Seite die eigene Zeile „Geheim / Fun“."""
+    """Der eigene Stand für die Erfolge-Seite (#1229): Stufen und Punkte insgesamt und je Kategorie. ``count`` zählt wie
+    Sammler (#2339, services/achievement_reach.py): jede erhaltene Stufe außer Negativem und nicht mehr Erreichbarem.
+    ``category_progress`` je Kategorie ``{earned, total, complete}`` zählt wie Kategorie-Meister - nur erreichbare Stufen;
+    daraus zeigt die Seite den Haken bzw. „x von y“. Die Punkte bleiben für jede erhaltene Stufe (wie in der Rangliste).
+    Negatives zählt nicht mit; wie viele davon da sind, steht extra - dafür zeigt die Seite die eigene Zeile „Geheim / Fun“."""
     groups, tiers = await _catalog(db)
+    now = now_utc()
     per_cat: dict[str, int] = {}
     count = points = negative = 0
+    earned: set[str] = set()
     async for award in db.user_achievements.find({"user_id": user_id}, {"_id": 0, "tier_code": 1}):
         tier = tiers.get(award.get("tier_code"))
         group = groups.get(tier.get("group_code")) if tier else None
@@ -235,22 +254,32 @@ async def my_progress(db, user_id: str) -> dict:
             continue
         if not group.get("public") and not group.get("hidden"):
             continue
+        earned.add(tier["code"])
+        points += int(tier.get("points") or 0)
+        if not reach.countable(tier, group, now):
+            continue
         cat = category_v2(group.get("category"))
         per_cat[cat] = per_cat.get(cat, 0) + 1
         count += 1
-        points += int(tier.get("points") or 0)
-    return {"count": count, "points": points, "categories": per_cat, "negative": negative}
+    progress = reach.category_progress(groups, tiers.values(), earned, now=now)
+    # Mitglieds-Stand (Review N3): Nicht-Mitglieder sehen beim Verein „nur für Mitglieder“ statt „0 von 51“.
+    from services.membership_service import is_active_member
+    member = is_active_member(await db.memberships.find_one({"user_id": user_id}, {"_id": 0, "member_status": 1}))
+    return {"count": count, "points": points, "categories": per_cat, "negative": negative, "member": member,
+            "category_progress": progress, "categories_complete": len(reach.completed_categories(progress))}
 
 
 async def hidden_summary(db, user_id: str | None) -> dict:
-    """„0 von 13 gefunden“ - die Zahl der geheimen Gruppen und wie viele davon die Person schon hat."""
-    total = await db.achievement_groups.count_documents({"hidden": True, "is_negative": {"$ne": True}})
+    """„0 von 13 gefunden“ - die Zahl der geheimen Gruppen und wie viele davon die Person schon hat. Nicht mehr
+    erreichbare (#2339) zählen auf keiner Seite."""
+    now = now_utc()
+    codes = [g["code"] async for g in db.achievement_groups.find({"hidden": True, "is_negative": {"$ne": True}}, {"_id": 0, "code": 1, "retired": 1, "available_until": 1})
+             if not reach.is_retired(g, now)]
     earned = 0
-    if user_id and total:
-        codes = [g["code"] async for g in db.achievement_groups.find({"hidden": True, "is_negative": {"$ne": True}}, {"_id": 0, "code": 1})]
+    if user_id and codes:
         found = await db.user_achievements.distinct("group_code", {"user_id": user_id, "group_code": {"$in": codes}})
         earned = len(found)
-    return {"total": total, "earned": earned}
+    return {"total": len(codes), "earned": earned}
 
 
 # ------------------------------------------------------------------ Als Nächstes
@@ -260,11 +289,12 @@ def next_up(groups: list[dict], limit: int = 3) -> list[dict]:
     Hand, nicht geplant, nicht geheim. Sortiert nach Prozent, dann nach dem, was noch fehlt."""
     candidates = []
     for group in groups:
-        if group.get("is_negative") or group.get("hidden"):
+        # Nicht mehr Erreichbares (#2339) ist nie „als Nächstes“ dran.
+        if group.get("is_negative") or group.get("hidden") or group.get("retired"):
             continue
         tiers = sorted(group.get("tiers") or [], key=lambda t: (int(t.get("rank") or 0), int(t.get("level") or 0)))
         for tier in tiers:
-            if tier.get("earned"):
+            if tier.get("earned") or tier.get("retired"):
                 continue
             if tier.get("manual_only") or tier.get("condition_status") == "planned" or not tier.get("target"):
                 break
@@ -311,6 +341,10 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
     groups, tiers = await _catalog(db)
     wanted = category_v2(category) if category else None
     allowed: dict[str, int] = {}
+    # Die Zahl der Erfolge (Review N1) zählt wie „N Erfolge freigeschaltet“ - ohne nicht mehr Erreichbares; die Punkte
+    # bleiben für jede erhaltene Stufe.
+    counted: set[str] = set()
+    now_check = now_utc()
     for code, tier in tiers.items():
         group = groups.get(tier.get("group_code"))
         if not group or group.get("is_negative"):
@@ -318,6 +352,8 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
         if wanted and category_v2(group.get("category")) != wanted:
             continue
         allowed[code] = int(tier.get("points") or 0)
+        if reach.countable(tier, group, now_check):
+            counted.add(code)
     agg: dict[str, dict] = {}
     async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "earned_at": 1, "recount": 1}):
         points = allowed.get(award["tier_code"])
@@ -331,7 +367,7 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
             if not when or when < since:
                 continue
         entry = agg.setdefault(award["user_id"], {"count": 0, "points": 0})
-        entry["count"] += 1
+        entry["count"] += int(award["tier_code"] in counted)
         entry["points"] += points
     if not agg:
         return []
@@ -379,7 +415,8 @@ async def _pick_week_award(db, start: datetime, end: datetime) -> dict | None:
             continue
         tier = tiers.get(award["tier_code"])
         group = groups.get(tier.get("group_code")) if tier else None
-        if not tier or not group or group.get("is_negative"):
+        # Nicht mehr Erreichbares (#2339) hat keine Seltenheit und wäre sonst immer der seltenste Erfolg der Woche.
+        if not tier or not group or group.get("is_negative") or reach.tier_retired(tier, group):
             continue
         rare = rarity_data["tiers"].get(tier["code"], {"holders": 0, "percent": 0.0})
         candidates.append((rare["holders"], -int(tier.get("rank") or 0), -when.timestamp(), award, tier, group, rare))
@@ -459,7 +496,8 @@ async def my_summary(db, user_id: str, groups: list[dict], awards: list[dict]) -
         "level": await xp.view(user_id),
         "next_up": nxt[0] if nxt else None,
         "last_award": {k: last.get(k) for k in ("award_id", "code", "name", "group_name", "material", "material_name", "material_color", "icon", "art", "rank", "level", "points", "earned_at")} if last else None,
-        "count": len(earned),
+        # Wie „N Erfolge freigeschaltet“ und Sammler (Review N1): ohne nicht mehr Erreichbares. Punkte bleiben.
+        "count": sum(1 for a in earned if not a.get("retired")),
         "points": sum(int(a.get("points") or 0) for a in earned),
         "hidden": await hidden_summary(db, user_id),
     }
@@ -514,6 +552,16 @@ async def viewer_sees_club(db, viewer: dict | None, target_id: str) -> bool:
         return True
     membership = await db.memberships.find_one({"user_id": viewer["id"]}, {"_id": 0, "member_status": 1})
     return bool(membership and membership.get("member_status") in ("active", "honorary"))
+
+
+def foreign_progress(progress: dict, *, sees_club: bool) -> dict:
+    """Der Stand je Kategorie für ein fremdes Profil (Review N2): nur ``category_progress`` - mehr braucht das Profil
+    nicht. Ohne Verein-Recht fehlt der Verein ganz, und es gibt keine Summen (Anzahl, Punkte, abgeschlossene Kategorien),
+    aus denen sich Vereins-Erfolge ableiten ließen."""
+    rows = dict((progress or {}).get("category_progress") or {})
+    if sees_club:
+        return {"category_progress": rows, "member": bool((progress or {}).get("member"))}
+    return {"category_progress": {key: row for key, row in rows.items() if key != "club"}}
 
 
 def without_club(groups: list[dict], awards: list[dict]) -> tuple[list[dict], list[dict]]:

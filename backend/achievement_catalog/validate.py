@@ -24,6 +24,20 @@ def _finding(code: str, message: str, *, group: str | None = None, tier: str | N
     return out
 
 
+def _check_retired(doc: dict, label: str, errors: list, warnings: list, **where) -> None:
+    """„Nicht mehr erreichbar“ (#2339): ein lesbares „erreichbar bis“ und ein Grund, den die Person mit dem Erfolg sieht."""
+    from datetime import datetime
+
+    until = doc.get("available_until")
+    if until:
+        try:
+            datetime.fromisoformat(str(until).replace("Z", "+00:00"))
+        except ValueError:
+            errors.append(_finding("retired_date_unreadable", f"{label}: das Datum für „erreichbar bis“ ist nicht lesbar.", **where))
+    if (doc.get("retired") or until) and not str(doc.get("retired_reason") or "").strip():
+        warnings.append(_finding("retired_reason_missing", f"{label} ist nicht mehr erreichbar, nennt aber keinen Grund.", **where))
+
+
 def validate_catalog(groups: list[dict], tiers: list[dict], condition_status: dict | None = None) -> dict:
     """Prüft Gruppen und Stufen. ``condition_status`` ist die Karte Schlüssel → live/counter/planned."""
     errors: list[dict] = []
@@ -68,6 +82,7 @@ def validate_catalog(groups: list[dict], tiers: list[dict], condition_status: di
             warnings.append(_finding("group_art_missing", f"Gruppe „{gname(g)}“ hat kein Motiv.", group=code))
         if cat == "hidden" and not g.get("hidden"):
             warnings.append(_finding("group_hidden_flag", f"Gruppe „{gname(g)}“ steht in „Geheim“, ist aber nicht als versteckt markiert.", group=code))
+        _check_retired(g, f"Gruppe „{gname(g)}“", errors, warnings, group=code)
 
     per_group: dict[str, list[dict]] = defaultdict(list)
     for t in tiers:
@@ -100,6 +115,7 @@ def validate_catalog(groups: list[dict], tiers: list[dict], condition_status: di
             errors.append(_finding("tier_club_member_only", f"Stufe „{tname(t)}“ liegt im Verein, ist aber nicht nur für Mitglieder.", tier=code, group=group.get("code")))
         if not negative and not str(t.get("how_to") or "").strip():
             warnings.append(_finding("tier_how_to_missing", f"Stufe „{tname(t)}“ sagt nicht, wie man sie schafft.", tier=code, group=group.get("code")))
+        _check_retired(t, f"Stufe „{tname(t)}“", errors, warnings, tier=code, group=group.get("code"))
 
     for gcode, rows in per_group.items():
         group = by_code.get(gcode)

@@ -475,7 +475,9 @@ def test_explanations_name_the_rules():
         assert label in steckbrief, label
     assert len(achievement_progress.PROFILE_FIELDS) == 12, "kommt ein Feld dazu, gehört es in den Text"
     assert groups["team_identity"]["how_to"] == "Logo, Banner und Teambeschreibung deines Teams sind ausgefüllt - zählt für die Teamleitung und die Co-Leitung."
-    assert groups["streamer_verified"]["how_to"] == "Dein Twitch-Konto ist per Anmeldung verknüpft und der Verein führt dich als Streamer oder Creator."
+    # Seit #2339 sagt der Text dazu, warum er nicht für Kategorie-Meister zählt.
+    assert groups["streamer_verified"]["how_to"] == ("Dein Twitch-Konto ist per Anmeldung verknüpft und der Verein führt dich als Streamer oder Creator. "
+                                                     "Zählt nicht für Kategorie-Meister und Hundert Prozent, weil der Verein entscheidet.")
 
 
 # ---------------------------------------------------------------- Dolibarr: Beitrittsdatum (M10)

@@ -196,7 +196,9 @@ test("Angeheftete stehen zuerst in der Uebersicht, der Reiter zeigt Kategorie-Ba
       ] },
   ];
   const award = { code: "matches_played_1", award_id: "aw1", name: "Spielmacher I", group_name: "Spielmacher", group_category: "match", material_name: "Holz", material_color: "#A0703C", level_name: "Holz", level_color: "#A0703C", points: 5, icon: "swords" };
-  mockApiWithAchievements({ groups, awards: [award], pinned: [award], hidden: { total: 13, earned: 2 }, achievements_hidden: false });
+  // Der Stand je Kategorie kommt vom Server (#2339, Review N2).
+  const progress = { category_progress: { match: { earned: 1, total: 2, complete: false }, fastlap: { earned: 0, total: 4, complete: false } } };
+  mockApiWithAchievements({ groups, awards: [award], pinned: [award], hidden: { total: 13, earned: 2 }, achievements_hidden: false, progress });
   renderPage();
   const pinned = await screen.findByTestId("profile-pinned-awards");
   expect(within(pinned).getByTestId("profile-pinned-matches_played_1")).toHaveTextContent("Spielmacher I");
