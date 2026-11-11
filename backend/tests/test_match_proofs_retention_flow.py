@@ -263,6 +263,43 @@ async def test_moss_without_its_procedure_goes_after_the_appeal_hours_from_uploa
 
 
 @pytest.mark.asyncio
+async def test_held_proofs_do_not_hide_later_ones_from_the_job(flow, monkeypatch):
+    """Der Job liest in Seiten ohne feste Obergrenze: Hinter vielen gehaltenen Nachweisen bleibt nichts ungeprüft (Review, N2)."""
+    monkeypatch.setattr(match_proof_retention, "PAGE", 2)
+    w = await league_world(flow)
+    doc = await season(flow, w)
+    late = match_proof_retention.season_end(doc) + timedelta(days=400)
+    done = {"id": "spiel-fertig", "tournament_id": w["tournament"]["id"], "status": "completed", "slots": []}
+    await flow.db.matches_v2.insert_one(dict(done))
+    await set_match(flow, w, disputes=[protest(w)])
+
+    def proof(proof_id: str, match_id: str, tournament_id: str, **extra) -> dict:
+        return {"id": proof_id, "match_id": match_id, "tournament_id": tournament_id, "owner_id": "jemand", "type": "link",
+                "link": "https://video.example/x", "status": "attached", "context": {"kind": "report", "ref_id": ""},
+                "created_at": now_utc().isoformat(), **extra}
+
+    # Liga: fünf gehaltene Nachweise (offenes Verfahren) stehen in der Reihenfolge vor den dreien eines erledigten Spiels.
+    held = [proof(f"a-{n}", w["match"]["id"], w["tournament"]["id"]) for n in range(5)]
+    free = [proof(f"z-{n}", done["id"], w["tournament"]["id"]) for n in range(3)]
+    # MOSS mitten in der Season: vier zu einem offenen Verfahren, einer ohne auffindbares Verfahren.
+    moss = [proof(f"m-{n}", w["match"]["id"], w["tournament"]["id"], context={"kind": "moss", "ref_id": "verfahren-1"}) for n in range(4)]
+    lost = proof("n-0", done["id"], w["tournament"]["id"], context={"kind": "moss", "ref_id": "weg"})
+    # Turnier: drei alte Nachweise eines Spiels in Klärung vor einem alten eines erledigten Spiels.
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    cup, _users, _registrations = await flow.with_participants(2)
+    await flow.db.matches_v2.insert_one({"id": "pokal-streit", "tournament_id": cup["id"], "status": "disputed", "slots": []})
+    await flow.db.matches_v2.insert_one({"id": "pokal-fertig", "tournament_id": cup["id"], "status": "completed", "slots": []})
+    cup_held = [proof(f"b-{n}", "pokal-streit", cup["id"]) for n in range(3)]
+    cup_free = proof("y-0", "pokal-fertig", cup["id"])
+    await flow.db.match_proof_photos.insert_many([dict(row) for row in (*held, *free, *moss, lost, *cup_held, cup_free)])
+
+    assert await match_proof_retention.purge(flow.db, now=late) == 5
+    assert await left(flow) == {row["id"] for row in (*held, *moss, *cup_held)}
+    assert await match_proof_retention.purge(flow.db, now=late) == 0
+
+
+@pytest.mark.asyncio
 async def test_tournaments_keep_their_thirty_days_from_upload(flow):
     """Gegenprobe zur Liga: Ein Turnier ohne Liga löscht weiter 30 Tage nach dem Hochladen - außer das Spiel ist in Klärung."""
     staff = await flow.add_staff()

@@ -355,7 +355,10 @@ def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref, *, can_change: bool) ->
 
 
 async def _rows_of(db, match_id: str, kind: str, ref_id: str) -> list[dict]:
-    rows = await db.match_proof_photos.find({"match_id": match_id, "status": {"$in": list(KEPT_STATUSES)}}, {"_id": 0}).to_list(1000)
+    # Nach Spiel und Bezug gefiltert statt nach einer festen Zahl gekappt - sonst fiele bei vielen Nachweisen etwas heraus.
+    kinds = [kind, *(old for old, new in refs.LEGACY_KINDS.items() if new == kind)]
+    rows = await db.match_proof_photos.find(
+        {"match_id": match_id, "status": {"$in": list(KEPT_STATUSES)}, "context.kind": {"$in": kinds}}, {"_id": 0}).to_list(None)
     return sorted((row for row in rows if refs.kind_of(row) == kind and ((row.get("context") or {}).get("ref_id") or "") == ref_id),
                   key=lambda row: str(row.get("created_at") or ""))
 
