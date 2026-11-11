@@ -148,6 +148,36 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
   nach dem Speichern. „Kapitän“ zählt die Tage seit der Übernahme der Leitung (bei älteren Teams ohne diese Angabe ab der Gründung).
 - **Gruselnacht:** Der Kürbis zählt nur am **31.10. ab 18 Uhr** (Wiener Zeit) – das prüft der Server.
 
+**Kategorien abschließen und die Meta-Erfolge.** Eine Regel für alles, was andere Erfolge zählt:
+
+- **Erreichbar** ist eine Stufe, die man selbst schaffen kann: öffentlich, nicht geheim, nicht negativ, nicht von Hand
+  vergeben, nicht nur für die Leitung und nicht **nicht mehr erreichbar** (siehe 3.2). Stufen, für die man gewählt oder vom
+  Verein bestimmt werden muss (**Vorstandsarbeit**, **Verifizierter Streamer**), sind sichtbar, zählen hier aber nicht. Den
+  **Verein** gibt es nur für Mitglieder.
+- **Eine Kategorie ist abgeschlossen**, wenn jemand jede erreichbare Stufe darin hat. Auf der Erfolge-Seite steht angemeldet
+  je Kategorie **„x von y“** der erreichbaren Stufen – oder ein **Haken** und **Abgeschlossen**. Die Kategorien sind Spielen,
+  Turnier, Fast Lap, Saison, Team, Community, Streaming & Creator, Profil & Konto, Verein und Besonders; Geheim und Negativ
+  zählen nicht.
+- **Kategorie-Meister** zählt die abgeschlossenen Kategorien (Stufe I bis VII). Kategorie-Meister, **Hundert Prozent**,
+  **Sammler** und **Geheimnisträger** selbst zählen in keiner Kategorie mit – so hängt keiner an sich selbst. Kommt später
+  eine Stufe dazu, bleibt, was jemand schon hat.
+- **Hundert Prozent:** jede erreichbare Stufe in allen Kategorien; den Verein brauchen nur Mitglieder.
+- **Sammler** zählt jede erhaltene Stufe – auch von Hand vergebene und geheime –, aber keine negativen und keine nicht mehr
+  erreichbaren (Ziele 10 bis 450). Dieselbe Zahl steht auf der Erfolge-Seite unter „Du hast bereits … Erfolge“.
+- **Geheimnisträger** zählt gefundene geheime Erfolge, je Gruppe einmal (Ziele 1 bis 13).
+- **Comeback** und **Kartenkenner** zählen die **Maps der Vereinsliga** (Sieger je Map): Comeback ist eine gewonnene Serie,
+  in der man nach Maps hinten lag (2:1 nach 0:1, 3:2 nach 0:2). Kartenkenner zählt jede Map einmal – mit Aufstellung je Map
+  nur die, auf denen man aufgestellt war – und dazu die Karte, die die Turnierleitung an einem Turniermatch einträgt.
+- **Pole Position** ist die Bestzeit einer Strecke in **einer** Fast-Lap-Challenge. **Streckenrekord** ist die Bestzeit über
+  **alle** Challenges desselben Spiels (gleicher Streckenname) und zählt erst, wenn die Strecke in mindestens zwei Challenges
+  gefahren wurde.
+- **Treue** zählt Tage in Folge mit Anmeldung. **Eiserner Löwe** verlangt zwölf Kalendermonate in Folge mit mindestens
+  einem gespielten Match (Turnier oder Vereinsliga).
+- **Turnierleitung**, **Schiedsrichter** und **Gastgeber** sieht nur, wer Turniere oder die Liga leitet (Bereich
+  Turnierleitung oder Ligen, oder ein Einsatz als Turnier- bzw. Liga-Leitung) – und wer sie schon hat.
+
+Wer einen Erfolg nach alten Regeln bekommen hat, behält ihn.
+
 ### 3.2 Der Katalog: Gruppen, Stufen, Materialien
 
 Reiter **Katalog**. Eine **Gruppe** ist ein Erfolg („Turniersieger“), eine **Stufe** ist seine Ausbaustufe. Gruppen stehen nach
@@ -158,7 +188,8 @@ Das **Material** der Stufe steht für die Wertigkeit: **Holz, Eisen, Bronze, Sil
 **Legendär** und **Geheim**. Jede Stufe bringt **Punkte** (nach Material voreingestellt, änderbar).
 
 Je Gruppe sind sichtbar: Zahl der Stufen, **versteckt** (Name und Stufen erscheinen erst nach der Freischaltung; vorher steht nur ein
-Fragezeichen), **Sonder**, **Negativ**, **Eigen** (von euch angelegt), und der Schalter **Öffentlich** / **Intern**. In der Tabelle der Stufen
+Fragezeichen), **Sonder**, **Negativ**, **Eigen** (von euch angelegt), **nur Leitung**, **nicht mehr erreichbar** bzw.
+**erreichbar bis …** und der Schalter **Öffentlich** / **Intern**. In der Tabelle der Stufen
 steht die **Bedingung**: **Automatik · Ziel n** (ein Zähler prüft das Ziel) oder **von Hand**; dazu ein Status: **live**, **Zähler**, **geplant**
 (die Automatik ist noch nicht angeschlossen) und **nur Mitglieder**.
 
@@ -172,6 +203,21 @@ Stufen dürfen nur Materialien bekommen, die zwischen ihren Nachbarstufen Platz 
 2. In der Gruppe **Neue Stufe** – Name, Material, Punkte. **Von Hand vergeben (keine Automatik)** ist die übliche Wahl für eigene
    Erfolge. Für Vereins-Abzeichen gibt es **Nur für Vereinsmitglieder**.
 3. Löschen geht nur bei Gruppen, die ihr selbst angelegt habt, und löscht **alle Vergaben** mit (Rückfrage).
+
+**Nicht mehr erreichbar.** Lässt sich ein Erfolg nicht mehr schaffen (das Format gibt es nicht mehr, die Zeit ist vorbei),
+löscht ihn nicht, sondern setzt ihn beim Bearbeiten der Gruppe oder Stufe im Kasten **Nicht mehr erreichbar**:
+
+1. Häkchen **Nicht mehr erreichbar** setzen.
+2. **Grund** eintragen – Pflicht; die Person, die den Erfolg hat, sieht ihn am Abzeichen.
+3. Wahlweise **Erreichbar bis**: Ab diesem Zeitpunkt gilt es von selbst (vorher steht in der Liste „erreichbar bis …“).
+
+Dann sieht ihn nur noch, wer ihn hat (Erfolge-Seite, Profil, öffentliches Profil – dort mit dem Hinweis **Nicht mehr
+erreichbar**). Er zählt nirgends mehr mit – nicht in „x von y“, Seltenheit, Kategorien, Kategorie-Meister, Sammler oder
+Hundert Prozent – und wird nicht mehr automatisch vergeben. **Von Hand vergeben geht weiter.** In der Liste steht an der
+Gruppe bzw. Stufe **nicht mehr erreichbar**. Ein Neustart überschreibt eure Einstellung nicht.
+
+Ab Werk nicht mehr erreichbar: **Gründungsmitglied**, **LAN-Gründer**, **Beta-Tester** und **Grand-Prix-Fahrer** (das
+Format gibt es nicht mehr). **Pionier** ist erreichbar bis zur Registrierung des hundertsten Kontos.
 
 **Katalog prüfen** läuft dieselben Regeln wie der automatische Test und listet **Fehler** und **Hinweise** mit Sprung zur Gruppe.
 **Export** speichert den Katalog als Datei; **Katalog einspielen** (nur Vorstand und Systemverwaltung) prüft eine solche Datei erst, schreibt
@@ -434,7 +480,8 @@ Abschluss stehen im Protokoll unter **Vergeben**. Am Server geht beides auch per
 
 **Nach einer Katalog-Änderung während des stillen Modus aufrufen:** `python -m scripts.achievements_recount --neu-pruefen`. Dann
 gelten alle Konten wieder als nicht nachgerechnet und werden still neu ausgewertet; bis dahin meldet auch ein eigenes Ereignis
-nichts laut – sonst kämen neue Stufen für alte Ansprüche einzeln.
+nichts laut – sonst kämen neue Stufen für alte Ansprüche einzeln. Das Update mit den reparierten Meta-Erfolgen (Kategorie-Meister,
+Sammler, Hundert Prozent, nicht mehr Erreichbares) macht das von selbst, solange der stille Modus noch an ist; danach nicht mehr.
 
 ---
 
@@ -445,6 +492,8 @@ nichts laut – sonst kämen neue Stufen für alte Ansprüche einzeln.
 | Ein Erfolg kommt nicht | Die Warteschlange läuft alle 30 Sekunden; die Stufe ist **von Hand** oder **nur Mitglieder**; die Person ist kein aktives Mitglied | Übersicht → **Alle jetzt auswerten**; Bedingung im Katalog prüfen |
 | „Champion“ oder „Podest“ kommt nicht, obwohl das Finale gespielt ist | Plätze zählen erst, wenn das Turnier beendet ist | Turnier auf **Beendet** setzen bzw. Ergebnisse veröffentlichen ([Turniere](turniere.md)) |
 | Ein Teammitglied bekommt einen Team-Erfolg nicht | Es steht nicht in der Aufstellung bzw. Teilnehmerliste des Spiels | Aufstellung prüfen; ohne Aufstellung zählen alle, die damals im Team waren (3.1) |
+| Ein Erfolg fehlt im Katalog der Erfolge-Seite | Er ist **nicht mehr erreichbar** oder gehört der Leitung (Turnierleitung, Schiedsrichter, Gastgeber) – das sieht nur, wer ihn hat bzw. die Leitung | Im Admin-Katalog steht **nicht mehr erreichbar** bzw. **nur Leitung** (3.2) |
+| Eine Kategorie ist nicht abgeschlossen, obwohl alles erreicht scheint | Es fehlt eine erreichbare Stufe; von Hand vergebene, geheime und nicht mehr erreichbare zählen nicht | Auf der Erfolge-Seite „x von y“ der Kategorie ansehen und die Kategorie aufklappen (3.1) |
 | Katalog zeigt „geplant“ bei einer Stufe | Die Automatik für diesen Zähler ist noch nicht angeschlossen | Stufe von Hand vergeben |
 | „… dürfen nur der Vorstand oder die Systemverwaltung“ | Massenvergabe, Import, XP-Korrektur und Prestige-Reset sind dafür vorbehalten | Vorstand oder System fragen |
 | Vergabe: „Diese Stufe ist nur für aktive Vereinsmitglieder“ | Die Person ist kein aktives Mitglied oder Ehrenmitglied | Mitgliedschaft klären ([Verein](verein.md)) |
