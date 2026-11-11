@@ -186,3 +186,30 @@ async def test_the_audience_follows_the_visibility(flow):
         as_member = await shown_ids(flow, member, channel)
         assert member_ids | {community_id} <= as_member and not internal_ids & as_member, channel
         assert not internal_ids & await shown_ids(flow, admin, channel), "„Nur intern“ erzeugt keinen Banner"
+
+
+@pytest.mark.asyncio
+async def test_internal_entries_do_not_crowd_out_public_ones(flow, monkeypatch):
+    """Nur drei Server kommen in Frage: interne in Wartung belegen keinen Platz (#2352). Fehlende Sichtbarkeit gilt als
+    öffentlich."""
+    import mongomock_motor
+
+    # mongomock_motor übergeht die Länge bei ``to_list`` - Motor und MongoDB schneiden ab. Hier wie dort.
+    original = mongomock_motor.AsyncCursor.to_list
+
+    async def to_list_with_length(self, length=None, *args, **kwargs):
+        rows = await original(self, length, *args, **kwargs)
+        return rows[:length] if length else rows
+
+    monkeypatch.setattr(mongomock_motor.AsyncCursor, "to_list", to_list_with_length)
+    for number in range(3):
+        await flow.db.game_servers.insert_one({"id": f"srv-intern-{number}", "name": f"Intern {number}", "status": "maintenance",
+                                               "site_banner_enabled": True, "is_active": True, "visibility": "internal",
+                                               "sort_order": number})
+    await flow.db.game_servers.insert_one({"id": "srv-offen", "name": "Offen", "status": "maintenance", "site_banner_enabled": True,
+                                           "is_active": True, "visibility": "public", "sort_order": 10})
+    await flow.db.game_servers.insert_one({"id": "srv-alt", "name": "Alt", "status": "maintenance", "site_banner_enabled": True,
+                                           "is_active": True, "sort_order": 11})
+    shown = await shown_ids(flow, None)
+    assert {"auto-server-maintenance-srv-offen", "auto-server-maintenance-srv-alt"} <= shown
+    assert not {f"auto-server-maintenance-srv-intern-{number}" for number in range(3)} & shown

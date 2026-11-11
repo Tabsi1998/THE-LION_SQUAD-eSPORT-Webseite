@@ -710,11 +710,16 @@ def _auto_banner_audience(visibility: str | None) -> str | None:
     return AUTO_BANNER_AUDIENCE_BY_VISIBILITY.get(visibility or "public")
 
 
+# Schon in der Abfrage (#2352): Was keinen Banner bekommt, belegt keinen der wenigen Plätze (``to_list``). ``None``
+# erfasst auch fehlende Felder - sie gelten als öffentlich.
+AUTO_BANNER_VISIBILITY_QUERY = {"$in": [None, "", *AUTO_BANNER_AUDIENCE_BY_VISIBILITY]}
+
+
 async def _auto_site_banners(db) -> list[dict]:
     now = now_utc()
     items: list[dict] = []
     servers = await db.game_servers.find(
-        {"status": "maintenance", "site_banner_enabled": True, "is_active": {"$ne": False}},
+        {"status": "maintenance", "site_banner_enabled": True, "is_active": {"$ne": False}, "visibility": AUTO_BANNER_VISIBILITY_QUERY},
         {"_id": 0, "id": 1, "name": 1, "maintenance_note": 1, "maintenance_until": 1, "visibility": 1},
     ).sort("sort_order", 1).to_list(3)
     for server in servers:
@@ -747,7 +752,8 @@ async def _auto_site_banners(db) -> list[dict]:
         })
 
     tournaments = await db.tournaments.find(
-        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "is_public": {"$ne": False}},
+        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "is_public": {"$ne": False},
+         "visibility": AUTO_BANNER_VISIBILITY_QUERY},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1, "visibility": 1,
          "registration_open_from": 1, "registration_open_until": 1, "check_in_from": 1, "check_in_until": 1},
     ).sort("start_date", 1).to_list(10)
@@ -790,7 +796,8 @@ async def _auto_site_banners(db) -> list[dict]:
         })
 
     fastlaps = await db.f1_challenges.find(
-        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "visibility": {"$ne": "internal"}},
+        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True,
+         "visibility": AUTO_BANNER_VISIBILITY_QUERY},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1, "visibility": 1,
          "registration_open_from": 1, "registration_open_until": 1},
     ).sort("start_date", 1).to_list(10)
