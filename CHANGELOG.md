@@ -1,11 +1,10 @@
 # Changelog
 
-## [1.77.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.77.0...v1.77.1) (2026-11-11)
-
+## 1.77.1 (11.11.2026)
 
 ### Fehlerbehebungen
 
-* Teamseite zeigt das eigene Banner im vollen 3:1-Format statt abgeschnitten ([#2349](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2349)) ([3ceda7c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3ceda7c402ad249a59a4c8a5ef19b369dd572def))
+* Teamseite zeigt das eigene Banner im vollen 3:1-Format statt abgeschnitten (#2349)
 
 ## 1.77.0 (11.11.2026)
 
