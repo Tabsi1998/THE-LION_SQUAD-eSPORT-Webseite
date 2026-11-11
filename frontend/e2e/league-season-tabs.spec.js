@@ -58,6 +58,22 @@ const SCHEDULE = { active: true, defaults: { home_rule: true, home_rule_hours: 7
 SCHEDULE.schedule_rules = SCHEDULE.defaults;
 const RULES_VIEW = { current: null, inherited: null, versions: [], draft: { revision: 1, title: "Regelwerk Season 1" }, data_changes: null };
 
+const PROTEST_VALUES = {
+  protest_hours: 48, statement_hours: 48, protest_target_hours: 72, appeal_hours: 48, moss_upload_hours: 24, evidence_keep_days: 30, contested_result_mode: "counts",
+  protest_reasons: [["wrong_result", "Falsches Ergebnis"], ["rule_violation", "Regelverstoß"], ["equipment", "Ausrüstung", true], ["lobby", "Lobby und Einstellungen", true],
+    ["player", "Spielberechtigung eines Spielers", true], ["cheating", "Cheat-Verdacht"], ["technical", "Technik"], ["other", "Sonstiges"]]
+    .map(([key, label, ask]) => ({ key, label, ask_notified: Boolean(ask) })),
+};
+const PROTESTS = { settings: PROTEST_VALUES, active: true, defaults: PROTEST_VALUES, limits: {}, reasons_max: 20,
+  fixed_reasons: ["wrong_result", "rule_violation", "technical", "other"], staffeln: 2 };
+const PROCEDURES = { open: 2, items: [
+  { id: "p1", match_id: "m1", staffel: "Probe-Liga Season 1 · Liga 1 · Staffel A", sides: ["Rudel Alpha mit langem Namen", "Horst der Falken"], side_name: "Horst der Falken",
+    kind_label: "Protest", reason_label: "Falsches Ergebnis", state: "open", conflict: false, assignee: { name: "Leitung" }, target_at: new Date(Date.now() + 30 * 3600 * 1000).toISOString() },
+  { id: "p2", match_id: "m2", staffel: "Probe-Liga Season 1 · Liga 1 · Staffel A", sides: ["Rudel Beta", "Horst der Falken"], kind_label: "Beanstandung", state: "open", conflict: true },
+  { id: "p3", match_id: "m3", staffel: "Probe-Liga Season 1 · Liga 1 · Staffel A", sides: ["Rudel Alpha mit langem Namen", "Nordlichter"], side_name: "Nordlichter",
+    kind_label: "Einspruch", state: "decided", conflict: false, resolved_at: "2026-11-09T18:30:00Z" },
+] };
+
 async function mockServer(page) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
@@ -84,6 +100,9 @@ async function mockServer(page) {
       "/admin/leagues/seasons/s1/loadout-bans": { game: { id: "g1", name: "Probe Shooter", modes: GAME.modes }, categories: [], library: [], list: null, versions: [] },
       "/admin/leagues/seasons/s1/map-pool/versions": { versions: [] },
       "/admin/league-rules/league_season/s1": RULES_VIEW,
+      // Reiter „Proteste“ (E.2, #1619): Einstellungen und Eingang der Verfahren.
+      "/admin/leagues/seasons/s1/protest-settings": PROTESTS,
+      "/admin/leagues/seasons/s1/procedures": PROCEDURES,
     };
     if (where in bodies) return json(bodies[where])(route);
     if (["/sponsors", "/notifications/me", "/games"].some((prefix) => where.startsWith(prefix))) return json([])(route);
@@ -108,7 +127,7 @@ async function shot(page, name, width) {
 
 const TABS = [
   ["ueberblick", "season-phases"], ["spielbetrieb", "season-pool-modes"], ["termine", "season-calendar"], ["anmeldung", "season-application-settings"],
-  ["tabelle", "season-table-rules"], ["regelwerk", "season-rules"], ["ligen", "season-divisions"],
+  ["tabelle", "season-table-rules"], ["proteste", "season-protest-settings"], ["regelwerk", "season-rules"], ["ligen", "season-divisions"],
 ];
 
 test.describe("Liga: Season-Seite mit Reitern", () => {
