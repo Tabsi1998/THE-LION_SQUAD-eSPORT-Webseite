@@ -63,6 +63,9 @@ WAITLIST_FULL = "Die Warteliste ist voll."
 DECIDED = "Dieser Antrag hat sich schon geändert. Bitte neu laden."
 ASSIGNED_ALREADY = "Dieses Co-Team ist schon zugeteilt. Das Herausnehmen geht über die Teilnehmerliste der Staffel."
 WITHDRAW_ASSIGNED = "Das Co-Team ist schon einer Staffel zugeteilt. Den Austritt trägt die Liga-Leitung ein."
+# Zurückziehen einer automatischen Zuteilung (#2348) wie die Turnier-Abmeldung: nach Check-in oder sobald Check-in bzw. Staffel laufen nur über die Leitung.
+WITHDRAW_STARTED = "Nach dem Check-in oder sobald Check-in oder Staffel laufen, geht der Austritt nur über die Liga-Leitung."
+TEAM_LEAVE_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed"})
 GONE = "Diesen Antrag gibt es nicht."
 BUSY = "An dieser Season wird gerade etwas geändert. Bitte gleich noch einmal versuchen."
 STAFFEL_GONE = "Diese Staffel gehört nicht zu dieser Season."
@@ -424,6 +427,8 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
             seat = await _auto_seat(db, season, application, locked_id, fixed_detail=WITHDRAW_ASSIGNED)
             if not seat and (application.get("assignment") or await _left_over(db, application)):
                 raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
+            if seat and not _team_may_leave(*seat):
+                raise LeagueProblem(WITHDRAW_STARTED, 409)
             now = now_utc().isoformat()
             done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False,
                                drop_assignment=bool(seat))
@@ -799,14 +804,22 @@ async def _auto_seat(db, season: dict, application: dict, locked_id: str | None,
     return tournament, registration
 
 
+def _team_may_leave(tournament: dict, registration: dict) -> bool:
+    """Dieselbe Regel wie bei der Turnier-Abmeldung durch das Team (``tournament_registration_routes.unregister``): nicht eingecheckt, und die Staffel steht
+    noch vor Check-in und Start. Danach trägt die Liga-Leitung den Austritt ein."""
+    return registration.get("status") != "checked_in" and (tournament.get("status") or "draft") in TEAM_LEAVE_STATUSES
+
+
 async def _auto_withdrawable(db, application: dict | None) -> bool:
-    """Darf das Team eine automatische Zuteilung noch selbst zurückziehen? Ja, solange sie einen Platz hält und kein fester Spielplan steht - für den Knopf.
-    Geprüft wird beim Zurückziehen unter der Sperre noch einmal."""
+    """Darf das Team eine automatische Zuteilung noch selbst zurückziehen? Ja, solange sie einen Platz hält, nicht eingecheckt ist, die Staffel vor Check-in
+    und Start steht und kein fester Spielplan steht - für den Knopf. Geprüft wird beim Zurückziehen unter der Sperre noch einmal."""
     assignment = (application or {}).get("assignment") or {}
     if not assignment.get("auto") or application.get("status") != ACCEPTED:
         return False
     registration_id = assignment.get("registration_id")
-    if not await db.tournament_registrations.find_one({"id": registration_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 1}):
+    registration = await db.tournament_registrations.find_one({"id": registration_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0, "status": 1})
+    tournament = await db.tournaments.find_one({"id": assignment.get("tournament_id")}, {"_id": 0, "status": 1})
+    if not registration or not tournament or not _team_may_leave(tournament, registration):
         return False
     from services.tournament_guard import fixed_match_count
 
@@ -969,10 +982,10 @@ async def _left_staffel(db, rows: list[dict]) -> set[str]:
     return {row["id"] for row in rows if (row.get("assignment") or {}).get("registration_id") and row["assignment"]["registration_id"] not in active}
 
 
-def team_answer(application: dict) -> dict:
-    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung. Eine eben gemachte automatische Zuteilung
-    steht noch in keinem festen Spiel (``_auto_staffel``): Zurückziehen geht."""
-    withdrawable = bool((application.get("assignment") or {}).get("auto"))
+async def team_answer(db, application: dict) -> dict:
+    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung. Ob eine eben gemachte automatische
+    Zuteilung noch zurückgeht, sagt dieselbe Regel wie auf der Ligaseite (``_auto_withdrawable``) - etwa nicht, wenn der Check-in der Staffel läuft."""
+    withdrawable = await _auto_withdrawable(db, application)
     return {**own_view(application, responsible=True, can_act=True, withdrawable=withdrawable), "rule_consent": application.get("rule_consent")}
 
 

@@ -505,6 +505,39 @@ async def test_a_fixed_plan_stops_withdrawing_an_auto_assignment(flow):
     assert await flow.db.tournament_registrations.count_documents({"id": registration["id"]}) == 1
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("when", ["checked_in", "check_in_open", "live"])
+async def test_after_check_in_or_start_the_team_cannot_withdraw_an_auto_assignment(flow, when):
+    """Dieselbe Regel wie bei der Turnier-Abmeldung: eingecheckt, Check-in offen oder Staffel läuft - dann nur über die Liga-Leitung."""
+    w = await application_world(flow, teams=1, **AUTO)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    registration = await flow.db.tournament_registrations.find_one({"application_id": application["id"]}, {"_id": 0})
+    if when == "checked_in":
+        await flow.db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"status": "checked_in"}})
+    else:
+        await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"status": "check_in" if when == "check_in_open" else "live"}})
+
+    assert (await my_row(flow, w, side))["application"]["can_withdraw"] is False
+    refused = await flow.post(f"{base_url(w)}/applications/{application['id']}/withdraw", json={})
+
+    assert refused.status_code == 409 and "nur über die Liga-Leitung" in refused.json()["detail"], refused.text
+    assert (await stored(flow, application))["status"] == "accepted"
+    assert await flow.db.tournament_registrations.count_documents({"id": registration["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_auto_assignment_during_check_in_is_not_offered_for_withdrawal(flow):
+    """Teilt die Season während des Check-ins zu, bietet schon die Antwort nach dem Einreichen kein Zurückziehen an."""
+    w = await application_world(flow, teams=1, **AUTO)
+    await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"status": "check_in"}})
+
+    answer = await submitted(flow, w, w["teams"][0])
+
+    assert answer["status"] == "accepted" and answer["staffel"] == "Liga 1 · Staffel A"
+    assert answer["can_withdraw"] is False
+
+
 # ---------------------------------------------------------------- Befangenheit (Nr. 73)
 
 @pytest.mark.asyncio
