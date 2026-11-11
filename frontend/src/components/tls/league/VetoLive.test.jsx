@@ -89,6 +89,22 @@ test("gewählt, Decider und Vorgabe tragen Position und Seite; Zuschauer sehen a
   expect([...document.querySelectorAll(".tls-veto-card--live")].every((card) => card.disabled)).toBe(true);
 });
 
+test("Pause bei Zuschauern: ohne Grund kein leeres „Pausiert – “, sondern ihr Hinweis; die Seiten sehen den Grund", () => {
+  const hint = "Das Veto ist pausiert – die Liga-Leitung setzt es fort.";
+  const paused = block({ status: "paused", own_turn: false, can_pick: false, own_side: null, options: [], pick_hint: hint,
+    current: { ...block().current, deadline_at: null, remaining_seconds: 21 }, paused: { at: "x", reason: null, remaining_seconds: 21 } });
+  const { rerender } = render(panel(paused, { readOnly: true }));
+  expect(screen.getByTestId("veto-paused")).toHaveTextContent(hint);
+  expect(screen.getByTestId("veto-paused").textContent).not.toMatch(/Pausiert –\s*$/);
+  expect(screen.getByTestId("veto-countdown-text")).toHaveTextContent("0:21");
+  // Ohne Satz vom Server: derselbe Hinweis aus der Seite.
+  rerender(panel({ ...paused, pick_hint: null }, { readOnly: true }));
+  expect(screen.getByTestId("veto-paused")).toHaveTextContent(hint);
+  // Die Seiten: Grund wie bisher.
+  rerender(panel({ ...paused, paused: { ...paused.paused, reason: "Störung bei einem Team" } }));
+  expect(screen.getByTestId("veto-paused")).toHaveTextContent("Pausiert – Störung bei einem Team");
+});
+
 test("Countdown nach der Serverzeit: das Gerät geht 10 Minuten nach - es zählt trotzdem 40 Sekunden", () => {
   const device = Date.now();
   const server = device + 10 * 60 * 1000;

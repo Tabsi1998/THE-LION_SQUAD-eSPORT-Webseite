@@ -265,7 +265,8 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
       <p className="sr-only" aria-live="polite" data-testid="veto-announce">{live && block.history?.length ? historyLine(block.history[block.history.length - 1]) : ""}</p>
       {block.status === "paused" && block.paused ? (
         <p className="mt-3 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="veto-paused">
-          <strong>Pausiert</strong> – {block.paused.reason}
+          {/* Zuschauer bekommen den frei geschriebenen Grund nicht (#1651) - dann steht ihr Hinweis da, kein leeres „Pausiert – “. */}
+          {block.paused.reason ? <><strong>Pausiert</strong> – {block.paused.reason}</> : (block.pick_hint || "Das Veto ist pausiert – die Liga-Leitung setzt es fort.")}
         </p>
       ) : null}
       {blocked ? (
