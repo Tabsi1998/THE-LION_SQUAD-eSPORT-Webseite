@@ -232,11 +232,37 @@ async def _waiting_presets(db, match: dict, tournament: dict, rules: dict) -> tu
 
 async def preset_gap(db, match: dict, tournament: dict | None) -> str | None:
     """Wartet das Veto dieses Spiels auf die Vorgabe der Woche? Dann der Satz dazu - ``None``, wenn es beginnen kann oder die Staffel
-    keine Vorgabe kennt. Für die Nachricht „Beide Seiten eingecheckt“ (``match_flow.check_in``)."""
+    keine Vorgabe kennt."""
     rules = rules_mod.rules_of(tournament)
     if not rules or veto_of(match) is not None:
         return None
     return (await _waiting_presets(db, match, tournament, rules))[2]
+
+
+WILL_RUN, WILL_WAIT, WILL_SKIP = "running", "waiting", "skipped"
+
+
+async def outlook(db, match: dict, tournament: dict | None) -> str | None:
+    """Was mit dem Veto geschieht, sobald beide Seiten eingecheckt sind - für die Nachricht „Beide Seiten eingecheckt“
+    (``match_flow.check_in``), damit sie nichts verspricht, was nicht kommt: ``running`` (es beginnt), ``waiting`` (die Vorgabe der Woche
+    fehlt), ``skipped`` (die Vorlage passt nicht zu diesem Spiel - die Maps kommen beim Ergebnis); ``None`` ohne Veto in der Staffel."""
+    rules = rules_mod.rules_of(tournament)
+    if not rules:
+        return None
+    veto = veto_of(match)
+    if veto is not None:
+        return WILL_SKIP if veto.get("status") == SKIPPED else WILL_RUN
+    pool, best_of, order, repeat = await _match_setup(db, match, tournament)
+    if rules_mod.fits_problem(rules, pool=pool, best_of=best_of, order=order, repeat=repeat):
+        return WILL_SKIP
+    if rules_mod.preset_steps(rules["steps"]):
+        week = week_of(match)
+        if week is None:
+            return WILL_SKIP
+        presets = rules_mod.presets_of_week(await season_presets(db, tournament), week)
+        if rules_mod.week_problems(rules, presets, pool=pool, repeat=repeat):
+            return WILL_WAIT
+    return WILL_RUN
 
 
 async def _wait_for_preset(db, match: dict, tournament: dict, week: int, problems: list[str], now: datetime) -> None:
@@ -949,5 +975,5 @@ def scrub(veto: dict | None, user_id: str) -> tuple[dict | None, bool]:
 
 __all__ = ["AUTO", "CHANGED_DETAIL", "DONE_DETAIL", "LEAD_ACTIONS", "NO_VETO_DETAIL", "NO_WEEK_DETAIL", "NOT_A_SIDE_DETAIL",
            "NOT_STARTED_DETAIL", "REPORT_VETO_DETAIL", "SIDE", "VetoProblem", "ensure_started", "export_steps", "lead_action", "page_block",
-           "START_READY_DETAIL", "announce_ready", "manual_start", "pick", "planned_games_of", "preset_gap", "preset_weeks", "presets_history",
+           "START_READY_DETAIL", "WILL_RUN", "WILL_SKIP", "WILL_WAIT", "announce_ready", "manual_start", "outlook", "pick", "planned_games_of", "preset_gap", "preset_weeks", "presets_history",
            "presets_overview", "scrub", "season_presets", "season_weeks", "settle_due", "start_ready", "store_presets", "wait_of", "week_of"]

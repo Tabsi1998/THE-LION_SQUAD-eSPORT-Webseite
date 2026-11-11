@@ -2279,7 +2279,10 @@ welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_p
   Person, Season und Spielwoche, auch wenn mehrere Spiele warten; Link `/admin/leagues/seasons/<id>#veto`. Vor dem Check-in beider
   Seiten geht kein Hinweis hinaus (die Matchseite zeigt die Lücke trotzdem schon). Die Nachricht „Beide Seiten eingecheckt“ an die
   Teams sagt dann statt „jetzt läuft das Map-Veto“: „Das Map-Veto wartet noch auf die Vorgabe der Woche – sobald die Liga-Leitung sie
-  eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite.“ (`league_veto.preset_gap`).
+  eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite.“ Welche Fassung gilt, sagt
+  `league_veto.outlook` (`running`, `waiting`, `skipped`): Entfällt das Veto in diesem Spiel, weil die Vorlage nicht passt (`skipped`),
+  heißt es „… ihr könnt starten. In diesem Spiel läuft kein Veto, die Maps tragt ihr beim Ergebnis ein. …“ – nicht mehr „jetzt läuft das
+  Map-Veto“.
 - **Nachtragen startet nicht von selbst** (Fabian 11.11.): Hat ein Veto auf die Vorgabe gewartet (`league_veto.wait_of`: der Merker
   `flow.veto_wait` zum geltenden Termin und seiner Revision), beginnt es **nie mehr automatisch** – weder beim Speichern der Vorgabe
   noch beim Lesen der Matchseite noch im Job. Sonst liefe die Zeit je Schritt, während die Teams vielleicht nicht mehr da sind, und das

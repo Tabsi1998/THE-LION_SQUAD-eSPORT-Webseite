@@ -267,13 +267,19 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
         from services import league_veto
 
         with_veto = bool(league_veto.rules_mod.rules_of(tournament))
-        # Vorgabe der Woche fehlt (#2326): Dann läuft das Veto noch nicht - die Nachricht sagt, worauf es wartet.
-        waits = bool(with_veto and await league_veto.preset_gap(db, {**match, **fresh}, tournament))
+        # Die Nachricht verspricht nur, was kommt (#2326): Das Veto läuft, wartet auf die Vorgabe der Woche - oder es entfällt in
+        # diesem Spiel, weil die Vorlage nicht passt (dann geht es gleich mit „Spiel starten“ weiter).
+        coming = await league_veto.outlook(db, {**match, **fresh}, tournament) if with_veto else None
+        texts = {
+            league_veto.WILL_RUN: "Beide Seiten sind eingecheckt – jetzt läuft das Map-Veto, danach beginnt Map 1.",
+            league_veto.WILL_WAIT: "Beide Seiten sind eingecheckt. Das Map-Veto wartet noch auf die Vorgabe der Woche – sobald die Liga-Leitung "
+                                   "sie eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite.",
+            league_veto.WILL_SKIP: "Beide Seiten sind eingecheckt – ihr könnt starten. In diesem Spiel läuft kein Veto, die Maps tragt ihr beim "
+                                   "Ergebnis ein. Map 1 beginnt, sobald eine Seite auf „Spiel starten“ tippt.",
+        }
         await _tell(db, match, setup, filled, "Beide Seiten eingecheckt",
-                    "Beide Seiten sind eingecheckt. Das Map-Veto wartet noch auf die Vorgabe der Woche – sobald die Liga-Leitung sie "
-                    "eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite." if waits else
-                    "Beide Seiten sind eingecheckt – jetzt läuft das Map-Veto, danach beginnt Map 1." if with_veto else
-                    "Beide Seiten sind eingecheckt – ihr könnt starten. Map 1 beginnt, sobald eine Seite auf „Spiel starten“ tippt.",
+                    texts.get(coming) or "Beide Seiten sind eingecheckt – ihr könnt starten. Map 1 beginnt, sobald eine Seite auf „Spiel "
+                                         "starten“ tippt.",
                     "checkin_ready", f"checkin-ready:{match['id']}:{now_iso}")
         # Veto (D.3, #1618): beginnt sofort, wenn beide da sind - einmal je Termin.
         if with_veto:
