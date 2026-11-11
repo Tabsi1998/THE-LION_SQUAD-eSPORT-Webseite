@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { BrandField, BrandSelect, LegalTextArea } from "../fields";
 import { SetupGuide } from "@/components/tls/SetupGuide";
+import { AutoBannerList } from "@/components/tls/AutoBannerStats";
 import { Trash2, Plus } from "lucide-react";
 import { BannerPreview, BannerScopePicker, BrandNumberField, BrandDateTimeField } from "./parts";
 import { COUNTDOWN_DAYS_DEFAULT, DATE_DAYS as COUNTDOWN_DAYS_MAX } from "@/lib/countdownRule";
@@ -165,6 +166,8 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                   {siteBanners.length === 0 && <div className="text-sm text-white/35 py-6 text-center">Noch keine separaten Banner angelegt.</div>}
                 </div>
               </div>
+              {/* Automatische Banner (#2352): nur lesbar, mit Zahlen und dem Weg zur Stelle, wo man sie schaltet. */}
+              <AutoBannerList />
             </div>
           </div>
         </div>
