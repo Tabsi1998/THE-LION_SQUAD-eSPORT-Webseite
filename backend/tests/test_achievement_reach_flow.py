@@ -594,6 +594,27 @@ async def test_streckenrekord_ueber_alle_challenges_nicht_wie_pole(flow):
     assert (await counters.compute(anna["id"], {"track_records_held"}, legacy=False))["track_records_held"] == 1
 
 
+@pytest.mark.asyncio
+async def test_streckenrekord_legt_challenges_ohne_spiel_nicht_zusammen(flow):
+    """Review N8: Ohne ``game_id`` steht jede Challenge für sich; Namen zählen ohne Groß-/Kleinschreibung und Leerraum,
+    echte Varianten („Monza (Italien)“) bleiben getrennt."""
+    anna = await flow.add_user(name="Anna")
+    await flow.db.f1_challenges.insert_many([{"id": "n1", "title": "Ohne Spiel 1"}, {"id": "n2", "title": "Ohne Spiel 2", "game_id": ""},
+                                             {"id": "g1", "title": "Mit Spiel 1", "game_id": "f1"}, {"id": "g2", "title": "Mit Spiel 2", "game_id": "f1"}])
+    await flow.db.f1_tracks.insert_many([
+        {"id": "x1", "challenge_id": "n1", "name": "Imola"}, {"id": "x2", "challenge_id": "n2", "name": "Imola"},
+        {"id": "y1", "challenge_id": "g1", "name": "  SPA  "}, {"id": "y2", "challenge_id": "g2", "name": "spa"},
+        {"id": "z1", "challenge_id": "g1", "name": "Monza"}, {"id": "z2", "challenge_id": "g2", "name": "Monza (Italien)"},
+    ])
+    await flow.db.f1_lap_times.insert_many([{"id": new_id(), "user_id": anna["id"], "challenge_id": cid, "track_id": tid, "time_ms": 80000, "is_invalid": False,
+                                             "created_at": "2026-08-01T12:00:00+00:00"} for cid, tid in (("n1", "x1"), ("n2", "x2"), ("g1", "y1"), ("g2", "y2"), ("g1", "z1"), ("g2", "z2"))])
+    # Nur Spa zählt: gleiches Spiel, Name gleich bis auf Schreibweise. Imola (ohne Spiel) und Monza/Monza (Italien) nicht.
+    assert (await counters.compute(anna["id"], {"track_records_held"}, legacy=False))["track_records_held"] == 1
+    # Gegenprobe: bekommen die Challenges ohne Spiel eines, zählt auch Imola.
+    await flow.db.f1_challenges.update_many({"id": {"$in": ["n1", "n2"]}}, {"$set": {"game_id": "f1"}})
+    assert (await counters.compute(anna["id"], {"track_records_held"}, legacy=False))["track_records_held"] == 2
+
+
 async def _played_in(flow, user, other, month: str, match_id: str):
     when = f"{month}-15T18:00:00+00:00"
     await _league_match(flow, user, other, match_id=match_id, winners=["a", "a"], when=when)

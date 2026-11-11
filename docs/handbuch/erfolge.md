@@ -172,7 +172,9 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
   zugesprochen, ist die Serie kein Comeback.
 - **Pole Position** ist die Bestzeit einer Strecke in **einer** Fast-Lap-Challenge. **Streckenrekord** ist die Bestzeit über
   **alle** Challenges desselben Spiels (gleicher Streckenname) und zählt erst, wenn die Strecke in mindestens zwei Challenges
-  gefahren wurde.
+  gefahren wurde. Beim Namen zählen Groß- und Kleinschreibung und Leerzeichen nicht, sonst muss er gleich sein: „Monza“ und
+  „Monza (Italien)“ sind zwei Strecken – den Namen also bei jeder Challenge gleich schreiben. Challenges ohne eingetragenes
+  Spiel werden nie zusammengelegt.
 - **Treue** zählt Tage in Folge mit Anmeldung. **Eiserner Löwe** verlangt zwölf Kalendermonate in Folge mit mindestens
   einem gespielten Match (Turnier oder Vereinsliga).
 - **Turnierleitung** und **Gastgeber** sieht nur die Turnierleitung (Bereich Turnierleitung oder ein Einsatz in einem

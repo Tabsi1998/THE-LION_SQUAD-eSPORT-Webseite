@@ -1367,6 +1367,12 @@ async def _sub_target(ctx):
 RECORD_MIN_CHALLENGES = 2
 
 
+def _track_name(value) -> str:
+    """Streckenname zum Vergleich (Review N8): Leerraum zusammengefasst, Groß- und Kleinschreibung egal. Echte Varianten
+    („Monza“ und „Monza (Italien)“) bleiben verschiedene Strecken."""
+    return " ".join(str(value or "").split()).casefold()
+
+
 @counter("track_records_held", "fastlap")
 async def _track_records(ctx):
     """Streckenrekord (#2339): Strecken, auf denen die eigene Bestzeit die schnellste gültige Zeit über alle Challenges
@@ -1376,14 +1382,26 @@ async def _track_records(ctx):
     own = {row.get("track_id") for row in await ctx.lap_times() if row.get("track_id")}
     if not own:
         return 0
-    tracks = await ctx.db.f1_tracks.find({}, {"_id": 0, "id": 1, "name": 1, "challenge_id": 1}).to_list(10000)
-    challenge_ids = sorted({track.get("challenge_id") for track in tracks if track.get("challenge_id")})
-    games = {row["id"]: row.get("game_id") or "" async for row in ctx.db.f1_challenges.find({"id": {"$in": challenge_ids}}, {"_id": 0, "id": 1, "game_id": 1})}
+    projection = {"_id": 0, "id": 1, "name": 1, "challenge_id": 1}
+    # Nur die Spiele, in denen die Person Runden hat (Review N8) - nicht alle Strecken aller Challenges.
+    own_tracks = await ctx.db.f1_tracks.find({"id": {"$in": sorted(own)}}, projection).to_list(10000)
+    own_challenges = sorted({track["challenge_id"] for track in own_tracks if track.get("challenge_id")})
+    games = {row["id"]: row.get("game_id") or "" async for row in ctx.db.f1_challenges.find({"id": {"$in": own_challenges}}, {"_id": 0, "id": 1, "game_id": 1})}
+    game_ids = sorted({game for game in games.values() if game})
+    if game_ids:
+        games.update({row["id"]: row["game_id"] async for row in ctx.db.f1_challenges.find({"game_id": {"$in": game_ids}}, {"_id": 0, "id": 1, "game_id": 1})})
+    same_game = sorted(cid for cid, game in games.items() if game)
+    tracks = {track["id"]: track for track in own_tracks}
+    if same_game:
+        tracks.update({track["id"]: track async for track in ctx.db.f1_tracks.find({"challenge_id": {"$in": same_game}}, projection)})
     by_key: dict[tuple[str, str], list[dict]] = {}
-    for track in tracks:
-        name = _map_label(track.get("name"))
-        if name and track.get("challenge_id"):
-            by_key.setdefault((games.get(track["challenge_id"], ""), name), []).append(track)
+    for track in tracks.values():
+        name = _track_name(track.get("name"))
+        challenge_id = track.get("challenge_id")
+        if name and challenge_id:
+            # Ohne Spiel an der Challenge wird nichts zusammengelegt (Review N8): die Strecke steht für sich.
+            scope = games.get(challenge_id) or f"challenge:{challenge_id}"
+            by_key.setdefault((scope, name), []).append(track)
     held = 0
     for same in by_key.values():
         challenge_of = {track["id"]: track["challenge_id"] for track in same}
