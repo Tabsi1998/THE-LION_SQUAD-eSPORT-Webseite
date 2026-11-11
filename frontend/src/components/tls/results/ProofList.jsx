@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, ExternalLink, ImagePlus, Link2, Loader2, Trash2 } from "lucide-react";
+import { Camera, Download, ExternalLink, FileArchive, ImagePlus, Link2, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { chatAttachmentSrc } from "@/lib/chatAttachments";
 
@@ -15,8 +15,17 @@ const BUTTON = "tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center
 function errorText(error, fallback) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string" && detail) return detail;
-  if (error?.response?.status === 413) return "Das Bild ist zu groß.";
+  if (error?.response?.status === 413) return "Die Datei ist zu groß.";
   return fallback;
+}
+
+// MOSS-Datei (#2297): die ZIP, wie MOSS sie schreibt - nur am Bezug „moss“, nur zum Herunterladen.
+const ZIP_ACCEPT = ".zip,application/zip,application/x-zip-compressed";
+
+function sizeText(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toLocaleString("de-AT", { maximumFractionDigits: 1 })} MB`;
+  return `${Math.max(1, Math.round(value / 1024)).toLocaleString("de-AT")} KB`;
 }
 
 function linkLabel(link) {
@@ -38,8 +47,10 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
   const waiting = item.type === "image" && item.own && ["pending", "review"].includes(item.scan_state);
   return (
     <li className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-2" data-testid={`${testId}-item-${item.id}`}>
-      {item.type === "link" ? (
-        <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-sm bg-white/5 text-white/50"><Link2 className="w-5 h-5" /></span>
+      {item.type === "link" || item.type === "file" ? (
+        <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-sm bg-white/5 text-white/50">
+          {item.type === "file" ? <FileArchive className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
+        </span>
       ) : (
         <a href={chatAttachmentSrc(item.url)} target="_blank" rel="noreferrer" className="block h-14 w-20 shrink-0 overflow-hidden rounded-sm bg-white/5">
           <img src={chatAttachmentSrc(item.url, 400)} alt="Nachweis als Bild" className="h-full w-full object-cover" loading="lazy" />
@@ -52,7 +63,13 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
             <ExternalLink className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             <span className="sr-only">(öffnet in neuem Tab)</span>
           </a>
+        ) : item.type === "file" ? (
+          <a href={chatAttachmentSrc(item.url)} download className="inline-flex max-w-full items-center gap-1 text-[#29B6E8] hover:underline" data-testid={`${testId}-file-${item.id}`}>
+            <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">MOSS-Datei (ZIP, {sizeText(item.size)}) herunterladen</span>
+          </a>
         ) : <span className="text-white/70">Bild</span>}
+        {item.type === "file" && item.sha256 ? <div className="truncate font-mono text-[10px] text-white/40" title={item.sha256}>SHA-256 {item.sha256}</div> : null}
         <div className="text-white/50">{sideName(item, sideLabels)}{item.removed ? " · von der Seite entfernt, nur noch für die Leitung sichtbar" : ""}{waiting ? " · wird noch geprüft, bis dahin nur für dich sichtbar" : ""}</div>
       </div>
       {item.can_remove ? (
@@ -74,6 +91,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
   const [confirmId, setConfirmId] = useState(null);
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
+  const zipRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -170,7 +188,15 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
                 <button type="button" disabled={busy} onClick={() => galleryRef.current?.click()} className={BUTTON} data-testid={`${testId}-gallery`}>
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />} Bild hinzufügen
                 </button>
+                {kind === "moss" ? (
+                  <button type="button" disabled={busy} onClick={() => zipRef.current?.click()} className={BUTTON} data-testid={`${testId}-zip`}>
+                    <FileArchive className="w-4 h-4" /> MOSS-Datei (ZIP) hochladen
+                  </button>
+                ) : null}
               </div>
+              {kind === "moss" ? (
+                <input ref={zipRef} type="file" accept={ZIP_ACCEPT} className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-zip-input`} />
+              ) : null}
               <form onSubmit={addLink} className="flex flex-wrap gap-2" noValidate>
                 <label className="sr-only" htmlFor={`${testId}-link`}>Link zum Video</label>
                 <input id={`${testId}-link`} type="url" inputMode="url" value={link} onChange={(event) => setLink(event.target.value)} maxLength={data.link_max_length || 500}
