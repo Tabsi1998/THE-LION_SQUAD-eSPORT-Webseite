@@ -879,7 +879,7 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `application.opens`, `application.closes`, `application.slots` | Anmeldefenster (Wiener Zeit) und Startplätze (B.4) |
 | `application.acceptance` (#2348) | Ganzer Satz ohne Punkt: „Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
 | `protest.hours`, `appeal.hours`, `evidence.keep_days` | **Vorab angelegt:** Season-Felder `protest_hours` (Vorgabe 48), `appeal_hours` (48), `evidence_keep_days` (30). Ohne Feld gilt die Vorgabe (`league_rule_vars.PRESETS`). Die Einstellung kommt mit E.2 (Proteste) bzw. E.3 (Strafen) und schreibt **genau diese Felder**, Texte passen sich dann über den Vorschlag an |
-| `match.break_after_map`, `match.break_minutes` | **Vorab angelegt:** Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5); Einstellung mit D.5 (Vorfälle). Alle Felder für Vorfälle und Proteste stehen im Abschnitt „D.5/E.2-Vertrag“ (#2360) |
+| `match.break_after_map`, `match.break_minutes`, `incident.answer_minutes` | Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5), `incident_answer_minutes` (10); ohne Feld gilt die Vorgabe. Einstellbar seit D.5 (#1619) im Reiter Spielbetrieb, Abschnitt „Vorfälle und Pausen“. Alle Felder für Vorfälle und Proteste stehen im Abschnitt „D.5/E.2-Vertrag“ (#2360) |
 | `mode:<kennung>.name`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus des Spiels: Name, Ergebnisregel in Klartext, Ziel, Rundenlimit, Zeitlimit („10 Min.“), Zeit je Runde, Spieler je Seite, „ja“/„nein“ |
 
 **Ablauf bei Änderungen** (Obmann 03.11.): Ändert sich eine Einstellung, vergleicht die Verwaltung wie bisher die letzte Fassung mit
@@ -2755,6 +2755,59 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
        Es bleibt bei der Regel „keine Map nach der Entscheidung der Serie“ (C.3).
   Gültig wird das Ergebnis (Bestätigen, Frist-Automatik, Tabelle) erst, wenn die Serie festgestellt ist und keine Position mehr fehlt.
 
+**Gebaut mit D.5 (#1619):** `services/league_incidents.py` (Abläufe) und `services/league_incident_rules.py` (Regeln ohne
+Datenbank, Blatt-Modul), Routen in `routes/league_incident_routes.py`, Oberfläche `components/tls/league/IncidentPanel.jsx` (Sätze
+und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gilt:
+
+- **API** (nur Spiele einer Liga-Staffel, sonst 404; gesperrte Staffel 423; alle unter der Schreibsperre des Turniers):
+
+  | Aufruf | Wer | Wirkung |
+  | --- | --- | --- |
+  | `POST /api/matches/{id}/incidents` | Captain, Vertreter, wer angemeldet hat; sonst die Leitung mit `results` oder `disputes` (nicht befangen) | meldet: `position`, `kind`, `proposal`, freiwillig `score`, `round`, `players`, `note`; die Map-Pause mit `between_maps: true` und `minutes` |
+  | `POST …/incidents/{incident_id}/answer` | die Gegenseite | `{accept, note}`: `agreed` oder im selben Schritt `in_review` |
+  | `POST …/incidents/{incident_id}/withdraw` | die meldende Seite | nur solange `proposed` |
+  | `POST …/incidents/{incident_id}/decision` | Leitung, nicht befangen (Superadmin mit `conflict_reason`) | `{outcome, registration_id, reason, settle?}`; `settle` stellt die Serie gleich fest (nie bei `restart`, `replay`) |
+  | `POST …/incidents/{incident_id}/settle` | Leitung, nicht befangen | `{missing_positions, surplus_positions, reason}`, wiederholbar, bis das Ergebnis gilt |
+
+  Antwort jeweils `{incident_id, state, result_confirmed, hold}`. Gelesen wird über den Block `league` der Matchseite:
+  `map_state` (`[{position, state, surplus?}]`, für alle), `incidents` und `incident_info` (Rechte, Auswahl, Kontingent, `hold`,
+  `server_time`; nur Beteiligte und Leitung). Eine befangene Leitung sieht wie ihre Seite und bekommt `incident_info.conflict`.
+- **Was ein Ergebnis aufhält** (`league_incidents.result_block`, eine Stelle für Bestätigen, Frist-Automatik und `/result`): ein
+  **offener** Vorfall - also auch `proposed`, nicht erst `in_review` -, eine Entscheidung ohne Feststellung und eine Feststellung mit
+  `missing_positions`. So ist ein Spiel mit einer Map in Klärung nie `completed`. Auch die Leitung trägt über `/result` erst ein,
+  wenn nichts mehr aufhält (409 mit dem Satz, was fehlt). „Nicht erschienen“ und „Kampflos“ bleiben frei (Entscheidung der Leitung).
+- **Nach jedem Schritt** (Zustimmen, Zurückziehen, Entscheiden, Feststellen): Hält nichts mehr auf und stimmen die Meldungen beider
+  Seiten überein, gilt das Ergebnis sofort - das Bestätigen hat nur geruht. Die Frist-Automatik (eine einzelne Meldung) rechnet
+  frühestens ab dem Ende des letzten Vorfalls bzw. der Feststellung (`confirm_clock`), nicht ab der Meldung.
+- **Das gültige Ergebnis** (`league_incidents.finalize`, beim Bestätigen, in der Frist-Automatik und nach der Feststellung): Eine
+  Position mit Neustart oder Wiederholung bekommt `status: "replayed"`, `replay_reason` und `incident_id`; eine zugesprochene
+  Position Sieger, `decision: "awarded"`, keine Punkte und `incident_id`; Positionen in `surplus_positions` und jede Position nach
+  der Entscheidung der Serie fallen weg, das Ergebnis folgt dann den Maps. Passt die Meldung danach nicht (Lücke, kein Sieger der
+  Serie), wird nichts geschrieben: „… das Ergebnis trägt die Liga-Leitung ein“. Maps der Leitung (`/result`) bekommen nur die
+  Markierung, Sieger und Zahl der Maps bleiben, wie sie eingibt.
+- **Meldungen bleiben vollständig:** Eine Meldung nennt wie bisher die Positionen 1, 2, 3 … ohne Lücke bis zum Sieger der Serie.
+  Eine abgebrochene Map ohne Sieger wird daher erst mit der ganzen Serie gemeldet - nach der Entscheidung, wenn sie zu Ende
+  gespielt, wiederholt oder zugesprochen ist. Eine Meldung „mit Lücke“ gibt es nicht (offener Punkt, siehe #1619).
+- **Die Leitung meldet selbst** (`reported_by.registration_id: null`): Es gibt keine Gegenseite, die antworten müsste - der Vorfall
+  ist sofort `in_review` (`review_cause: null`). So setzt die Leitung eine Serie aus (Anlage C.2.6).
+- **Je Position ein offener Vorfall:** Ein zweiter zur selben Map wird mit 409 abgelehnt, bis der erste abgeschlossen ist (die
+  Map-Pause ausgenommen). Höchstens 30 Vorfälle je Spiel.
+- **Zeit-Job:** im Fristen-Job `match_deadlines` (jede Minute), `league_incidents.sweep`. `incident_due_at` am Spiel ist die
+  früheste offene `answer_deadline` - nur der Zeiger für den Job, kein Stand. Antwortet die Gegenseite nach der Frist, läuft der
+  Vorfall im selben Aufruf ab (409).
+- **Nachrichten:** Art `match_attention`, Schlüssel `incident:<id>:<ereignis>` (`reported`, `answered`, `review`, `decided`,
+  `withdrawn`, `settled:<zeit>`) - je Vorfall und Ereignis einmal, sonst verschluckte der Schlüssel `incident:<id>` die zweite
+  Nachricht an dieselbe Person. „Mein Dienst“: `incident_reviews` (Map in Klärung, Serie feststellen), ohne eigene Spiele.
+- **Öffentlich:** `map_state` an der Matchseite und `in_clarification` am Spiel der Staffel-Seite (`league_page.public_match`).
+  `incidents` und `incident_due_at` stehen nie in der öffentlichen Sicht eines Spiels (`match_public_view`), `games[].incident_id`
+  nur bei Beteiligten und Leitung.
+- **Protokoll** ohne freien Text: `match.incident.report`, `.answer`, `.withdraw`, `.expire`, `.decide`, `.settle` mit Kennung, Map,
+  Art und Stand - nie Beschreibung, Begründung oder Namen. **Datenschutz:** Auskunft und Kontolöschung über `flow.user_ids`
+  (`match_flow.export_snapshot`, `scrub_person`): der Vorfall bleibt, die Kennung der Person fällt heraus, auch aus `players`.
+- **App:** `mobile/` zeigt Vorfälle noch nicht (Folgepunkt in #2173). Eine Bestätigung aus der App wird bei offenem Vorfall
+  gespeichert, aber nicht gültig (`awaiting_confirmation: true`, `report_status: "clarification"`, `result_hold` mit dem Satz).
+- **TV und Druck** zeigen keinen Stand je Map - dort ändert sich nichts.
+
 #### Verfahren: Beanstandung, Protest, Einspruch (E.2)
 
 Ein Verfahren ist ein Eintrag in `matches_v2.disputes[]` (kein zweites System, Nr. 130). Neue Einträge tragen `id` und `kind`;
@@ -2933,7 +2986,7 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 | Reiter | Sprungmarke | Inhalt | Speichern |
 | --- | --- | --- | --- |
 | Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
-| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie`, `#veto` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Veto (D.3, #1618); Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`; Pool, Mindestgröße, Ergebnisregeln und Veto eigene Knöpfe |
+| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie`, `#veto`, `#vorfaelle` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Veto (D.3, #1618); Vorfälle und Pausen (D.5, #1619); Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`, `map_break_after`, `map_break_minutes`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Pool, Mindestgröße, Ergebnisregeln und Veto eigene Knöpfe |
 | Termine | `#termine`, `#kalender`, `#terminregeln`, `#checkin` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1), Check-in-Regeln (D.2, #1652) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln und Check-in eigene Knöpfe |
 | Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#plattform`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Plattform und Eingabegerät (#2270), Eingang, Kaderübersicht | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar), `platform_field`, `allowed_platforms`, `crossplay`, `input_device` |
 | Tabelle | `#tabelle`, `#punkte`, `#gleichstand` | Punkte, Gleichstand, Ausscheiden (E.1), Gleichstände der Staffeln | `scoring_rules` |
