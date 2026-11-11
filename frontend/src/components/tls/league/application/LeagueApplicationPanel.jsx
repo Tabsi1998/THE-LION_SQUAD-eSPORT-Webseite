@@ -8,12 +8,13 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
-import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, windowLine } from "@/lib/leagueApplications";
+import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
 
-export function ApplicationStateBadge({ state, testId }) {
+// ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
+export function ApplicationStateBadge({ state, testId, label }) {
   const info = APPLICATION_STATES[state] || APPLICATION_STATES.none;
   return (
-    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[info.tone]}`}>{info.label}</span>
+    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[info.tone]}`}>{label || info.label}</span>
   );
 }
 
@@ -24,8 +25,9 @@ function OwnSquadRow({ row, onWithdraw }) {
       <div className="min-w-0 flex-1 basis-64">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
-          <ApplicationStateBadge state={row.state} />
+          <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, application)} testId={`league-application-state-${row.squad_id}`} />
         </div>
+        {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 text-sm text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
         {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
         {row.state === "accepted" && !application?.staffel ? <p className="mt-1 text-sm text-white/75">Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
@@ -69,7 +71,9 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   useEffect(() => { load(); }, [load]);
 
   const withdraw = async (row) => {
-    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
+    // Eine automatische Zuteilung zieht das Team selbst zurück, solange der Spielplan nicht steht (#2348) - dann fällt auch der Platz in der Staffel weg.
+    const staffel = row.application?.staffel ? ` und spielt nicht mehr in ${row.application.staffel}` : "";
+    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
     if (!sure) return;
     try {
       await api.post(`${base}/applications/${row.application.id}/withdraw`, {});

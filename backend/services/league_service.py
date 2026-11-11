@@ -86,6 +86,8 @@ SEASON_RULE_DEFAULTS: dict = {
     "entry_policy": "all",
     "sibling_squads_in_staffel": False,
     "application_waitlist": True,
+    # Anmeldungen automatisch annehmen (#2348): aus = die Leitung prüft jede Anmeldung. Fehlt das Feld (ältere Seasons), gilt dasselbe.
+    "application_auto_accept": False,
 }
 # Selbstanmeldung (#2205): Leer heißt: gibt es nicht - darum dürfen die Felder auch wieder leer werden.
 APPLICATION_TIMES = ("application_opens_at", "application_closes_at")

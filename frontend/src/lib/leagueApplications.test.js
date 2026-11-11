@@ -6,6 +6,9 @@ import {
   canStartApplication,
   seatsLine,
   statsLine,
+  submittedToast,
+  teamStateLabel,
+  waitingLine,
   windowLine,
 } from "./leagueApplications";
 
@@ -37,6 +40,35 @@ describe("Fenster und Plätze", () => {
   test("alle Zustände aus dem Auftrag haben einen Namen", () => {
     expect(Object.keys(APPLICATION_STATES).sort()).toEqual(["accepted", "in_review", "none", "open", "rejected", "submitted", "waitlist", "withdrawn"]);
     expect(APPLICATION_STATES.in_review.label).toBe("In Prüfung");
+  });
+});
+
+describe("Automatisch annehmen (#2348)", () => {
+  test("das eigene Team liest Angemeldet, die übrigen Stände wie gehabt", () => {
+    expect(teamStateLabel("accepted", { staffel: "Liga 1 · Staffel A" })).toBe("Angemeldet");
+    expect(teamStateLabel("accepted", { staffel: null })).toBe("Angemeldet – Zuteilung folgt");
+    expect(teamStateLabel("accepted", { staffel: "Liga 1 · Staffel A", staffel_left: true })).toBe("Angenommen");
+    expect(teamStateLabel("submitted", null)).toBe("Eingereicht");
+    expect(teamStateLabel("unbekannt", null)).toBe("Nicht angemeldet");
+  });
+
+  test("die Meldung nach dem Einreichen folgt dem Stand", () => {
+    expect(submittedToast("accepted")).toBe("Angemeldet. Ihr habt einen Startplatz.");
+    expect(submittedToast("waitlist")).toBe("Eingereicht. Ihr steht auf der Warteliste.");
+    expect(submittedToast("submitted")).toBe("Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt.");
+  });
+
+  test("der Hinweis auf offene Anmeldungen zählt richtig", () => {
+    expect(waitingLine(0)).toBe("");
+    expect(waitingLine(1)).toBe("1 Anmeldung wartet auf Prüfung und hält ihren Platz frei");
+    expect(waitingLine(3)).toBe("3 Anmeldungen warten auf Prüfung und halten ihren Platz frei");
+  });
+
+  test("die Einstellung reist mit dem Formular, Vorgabe aus", () => {
+    const opened = { application_opens_at: "2026-07-01T16:00:00+00:00", application_closes_at: "2026-07-02T16:00:00+00:00" };
+    expect(applicationToForm(opened).application_auto_accept).toBe(false);
+    expect(applicationPayload(applicationToForm({ ...opened, application_auto_accept: true })).application_auto_accept).toBe(true);
+    expect(applicationPayload(applicationToForm(opened)).application_auto_accept).toBe(false);
   });
 });
 

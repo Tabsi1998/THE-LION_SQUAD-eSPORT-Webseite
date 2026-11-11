@@ -465,12 +465,18 @@ async def test_a_second_accept_after_the_waitlist_tells_the_team_again(flow):
     side = w["teams"][0]
     application = await submitted(flow, w, side)
     ok(await decide(flow, w, application, "accept"))
-    ok(await decide(flow, w, application, "waitlist"))
+    # Zurückstufen einer angenommenen Anmeldung nur mit Grund (#2348), auch von Hand angenommen - das Team liest ihn.
+    without = await decide(flow, w, application, "waitlist")
+    assert without.status_code == 422 and "Grund" in without.json()["detail"]
+    assert (await flow.db.league_applications.find_one({"id": application["id"]}))["status"] == "accepted"
+    ok(await decide(flow, w, application, "waitlist", reason="Platz wird anders gebraucht"))
     ok(await decide(flow, w, application, "accept"))
 
     notes = await flow.db.notifications.find({"user_id": side["captain"]["id"], "meta.reason": "league_application_accepted"}, {"_id": 0}).to_list(5)
 
     assert len(notes) == 2
+    waiting = await flow.db.notifications.find_one({"user_id": side["captain"]["id"], "meta.reason": "league_application_waitlist"}, {"_id": 0})
+    assert "Grund: Platz wird anders gebraucht" in waiting["body"]
 
 
 @pytest.mark.asyncio

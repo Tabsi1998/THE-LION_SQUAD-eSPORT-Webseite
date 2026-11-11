@@ -70,6 +70,40 @@ test("der ganze Weg: wählen, prüfen, zustimmen, einreichen, zurück zur Ligase
   expect(toastMock.success).toHaveBeenCalled();
 });
 
+// #2348: Mit „automatisch annehmen“ zählt das Einreichen gleich - Zusammenfassung und Meldung sagen das, ohne die Prüfung durch die Leitung.
+test("mit automatischer Annahme sagt die Zusammenfassung, dass ihr gleich angemeldet seid", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, application: { ...VIEW.application, auto_accept: true } } });
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "accepted" } });
+  renderPage();
+  await toConsent();
+  fireEvent.click(screen.getByTestId("apply-accept-rules"));
+  fireEvent.click(screen.getByTestId("apply-accept-privacy"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-summary-auto")).toHaveTextContent("seid ihr mit dem Einreichen angemeldet");
+  expect(screen.getByTestId("apply-summary-auto")).toHaveTextContent("Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste.");
+  expect(screen.getByTestId("apply-summary-auto")).toHaveTextContent("Zurückziehen geht dann bis zum Check-in, solange noch kein Spielplan steht.");
+  expect(screen.getByTestId("apply-summary")).not.toHaveTextContent("Die Liga-Leitung prüft die Anmeldung");
+  fireEvent.click(screen.getByTestId("apply-submit"));
+
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Angemeldet. Ihr habt einen Startplatz."));
+});
+
+test("ohne automatische Annahme prüft die Leitung", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "submitted" } });
+  renderPage();
+  await toConsent();
+  fireEvent.click(screen.getByTestId("apply-accept-rules"));
+  fireEvent.click(screen.getByTestId("apply-accept-privacy"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-summary")).toHaveTextContent("Die Liga-Leitung prüft die Anmeldung");
+  expect(screen.queryByTestId("apply-summary-auto")).toBeNull();
+  fireEvent.click(screen.getByTestId("apply-submit"));
+
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt."));
+});
+
 test("die Prüfung sagt im Klartext, was fehlt, und hält den Weg an", async () => {
   renderPage();
 

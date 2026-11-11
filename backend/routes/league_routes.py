@@ -151,6 +151,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         "default_pool": await map_pools.default_pool(db, game),
         "map_pool": await map_pools.admin_entry(db, pool, league.get("game_id"), "league_season"),
         "divisions": rows,
+        # Hinweis bei „automatisch annehmen“ (#2348): Offene Anmeldungen von vorher nimmt die Season nicht nachträglich an - nur die Zahl, keine Teams.
+        "applications_waiting": await db.league_applications.count_documents({"season_id": season_id, "status": {"$in": ["submitted", "in_review"]}}),
     }
 
 
@@ -386,6 +388,10 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
         # Plattform je Season (#2270): vorher und nachher - nur Auswahlwerte des Spiels, keine Personen.
         await _audit(db, "league.season.platform", me, season_id, {"season_id": season_id, "before": league_platform.settings_of(season),
                                                                   "after": league_platform.settings_of(doc)})
+    if bool(season.get("application_auto_accept")) != bool(doc.get("application_auto_accept")):
+        # Anmeldungen automatisch annehmen (#2348): Umschalten mit Wert vorher und nachher - ein Fehlen zählt als aus.
+        await _audit(db, "league.season.auto_accept", me, season_id, {"season_id": season_id, "before": bool(season.get("application_auto_accept")),
+                                                                     "after": bool(doc.get("application_auto_accept"))})
     visibility_applied = 0
     if "visibility" in changed:
         # „Aus“ heißt sofort aus: die Sichtbarkeit geht ohne „Übertragen“ auf alle Staffeln, auch gesperrte.

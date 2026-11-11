@@ -11,7 +11,7 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { HelpLink } from "@/components/tls/HelpLink";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { isSelectable } from "@/lib/leagueApplications";
+import { isSelectable, submittedToast, teamStateLabel } from "@/lib/leagueApplications";
 import { platformLines, platformShort } from "@/lib/leaguePlatform";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
@@ -51,7 +51,7 @@ function SquadChoice({ rows, chosen, onChoose }) {
                   <span className="block font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
                   <span className="block text-xs text-white/55">{row.member_count} Spieler im Kader</span>
                 </span>
-                {free ? null : <ApplicationStateBadge state={row.state} />}
+                {free ? null : <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, row.application)} />}
               </label>
             </li>
           );
@@ -152,7 +152,8 @@ function ConsentStep({ rules, privacy, acceptRules, acceptPrivacy, onRules, onPr
   );
 }
 
-function Summary({ row, rules }) {
+// ``auto``: Die Season nimmt Anmeldungen automatisch an (#2348) - dann zählt das Einreichen gleich, sonst entscheidet die Leitung.
+function Summary({ row, rules, auto }) {
   return (
     <div className="space-y-3" data-testid="apply-summary">
       <dl className="space-y-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 text-sm">
@@ -160,7 +161,11 @@ function Summary({ row, rules }) {
         <div><dt className="text-xs uppercase tracking-wider text-white/50">Regeln</dt><dd className="text-white/85">{rules.label}, zugestimmt</dd></div>
         <div><dt className="text-xs uppercase tracking-wider text-white/50">Datenschutz</dt><dd className="text-white/85">zugestimmt</dd></div>
       </dl>
-      <p className="text-sm text-white/70">Einreichen heißt noch nicht, dass ihr dabei seid: Die Liga-Leitung prüft die Anmeldung, nimmt sie an oder lehnt sie ab und teilt Liga und Staffel zu. Du bekommst eine Nachricht.</p>
+      {auto ? (
+        <p className="text-sm text-white/70" data-testid="apply-summary-auto">Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, gibt es nur eine Staffel, steht ihr gleich darin. Zurückziehen geht dann bis zum Check-in, solange noch kein Spielplan steht. Du bekommst eine Nachricht.</p>
+      ) : (
+        <p className="text-sm text-white/70">Einreichen heißt noch nicht, dass ihr dabei seid: Die Liga-Leitung prüft die Anmeldung, nimmt sie an oder lehnt sie ab und teilt Liga und Staffel zu. Du bekommst eine Nachricht.</p>
+      )}
     </div>
   );
 }
@@ -200,8 +205,8 @@ export default function LeagueApplyPage() {
   const submit = async () => {
     setBusy(true);
     try {
-      await api.post(`/leagues/${league}/${season}/applications`, { squad_id: chosen, rule_version_id: view.rules?.version_id, accept_rules: acceptRules, accept_privacy: acceptPrivacy });
-      toast.success("Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt.");
+      const { data } = await api.post(`/leagues/${league}/${season}/applications`, { squad_id: chosen, rule_version_id: view.rules?.version_id, accept_rules: acceptRules, accept_privacy: acceptPrivacy });
+      toast.success(submittedToast(data?.status));
       navigate(backPath);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -252,7 +257,7 @@ export default function LeagueApplyPage() {
         {step === 0 ? <SquadChoice rows={rows} chosen={chosen} onChoose={setChosen} /> : null}
         {step === 1 && row ? <CheckStep row={row} seasonProblems={view.season_problems || []} platform={view.platform} /> : null}
         {step === 2 && view.rules ? <ConsentStep rules={view.rules} privacy={view.privacy} acceptRules={acceptRules} acceptPrivacy={acceptPrivacy} onRules={setAcceptRules} onPrivacy={setAcceptPrivacy} /> : null}
-        {step === 3 && row ? <Summary row={row} rules={view.rules} /> : null}
+        {step === 3 && row ? <Summary row={row} rules={view.rules} auto={Boolean(view.application?.auto_accept)} /> : null}
       </section>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         {step === 0

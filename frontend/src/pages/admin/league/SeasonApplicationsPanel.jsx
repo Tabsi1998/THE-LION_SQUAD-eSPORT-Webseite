@@ -62,17 +62,23 @@ function OwnTeamNote({ row }) {
 
 function RowActions({ row, options, busy, act, superadmin }) {
   const [staffel, setStaffel] = useState("");
-  const [rejecting, setRejecting] = useState(false);
+  // Welcher Grund gerade offen ist: Ablehnen, oder Warteliste bei einer automatisch angenommenen Anmeldung (#2348).
+  const [mode, setMode] = useState(null);
   const [reason, setReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
   const unassigned = row.status === "accepted" && !row.assignment;
+  // Eine automatische Zuteilung (#2348) nehmen Ablehnen und Warteliste wieder aus der Staffel; jede andere bleibt der Teilnehmerliste.
+  const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
   const deciding = ["submitted", "in_review", "waitlist"].includes(row.status);
-  if (!deciding && !unassigned) return null;
+  if (!deciding && !unassigned && !autoSeated) return null;
   if (row.own_team && !superadmin) return <div className="mt-3"><OwnTeamNote row={row} /></div>;
   // Nur der Superadmin darf beim eigenen Team, als Notausnahme: Jeder Knopf schickt den Grund mit und geht erst mit fünf Zeichen.
   const override = row.own_team ? conflictReason.trim() : "";
   const blocked = busy || (row.own_team && override.length < REASON_MIN);
   const send = (action, body) => act(row, action, override ? { ...body, conflict_reason: override } : body);
+  // Angenommen (automatisch oder von Hand): Zurückstufen nur mit Grund, das Team liest ihn wie beim Ablehnen (#2348).
+  const waitlistWithReason = row.status === "accepted";
+  const toggle = (next) => setMode((current) => (current === next ? null : next));
   return (
     <div className="mt-3 space-y-3">
       {row.own_team ? (
@@ -82,24 +88,33 @@ function RowActions({ row, options, busy, act, superadmin }) {
             hint="Als Superadmin geht es trotzdem, mit mindestens fünf Zeichen. Der Grund steht im Verlauf und im Protokoll." />
         </div>
       ) : null}
-      {options.length ? (
+      {autoSeated ? (
+        <p className="text-xs text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen das Co-Team wieder aus der Staffel, solange der Spielplan nicht steht.</p>
+      ) : options.length ? (
         <SelectField label={unassigned ? "Staffel" : "Staffel (geht auch später)"} value={staffel} onChange={setStaffel} testId={`application-staffel-${row.id}`} className="max-w-md"
           options={[["", "Staffel wählen …"], ...options]} />
       ) : <p className="text-xs text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
       <div className="flex flex-wrap gap-2">
         {deciding ? (
           <button type="button" disabled={blocked} onClick={() => send("accept", staffel ? { tournament_id: staffel } : {})} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
-        ) : (
+        ) : unassigned ? (
           <button type="button" disabled={blocked || !staffel} onClick={() => send("assign", { tournament_id: staffel })} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
-        )}
+        ) : null}
         {row.status === "submitted" ? <button type="button" disabled={blocked} onClick={() => send("review", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-review-${row.id}`}>In Prüfung nehmen</button> : null}
-        {row.status !== "waitlist" ? <button type="button" disabled={blocked} onClick={() => send("waitlist", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-waitlist-${row.id}`}>Warteliste</button> : null}
-        <button type="button" disabled={busy} onClick={() => setRejecting((value) => !value)} aria-expanded={rejecting} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-open-${row.id}`}>Ablehnen</button>
+        {row.status !== "waitlist" && waitlistWithReason ? (
+          <button type="button" disabled={busy} onClick={() => toggle("waitlist")} aria-expanded={mode === "waitlist"} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-waitlist-open-${row.id}`}>Warteliste</button>
+        ) : null}
+        {row.status !== "waitlist" && !waitlistWithReason ? <button type="button" disabled={blocked} onClick={() => send("waitlist", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-waitlist-${row.id}`}>Warteliste</button> : null}
+        <button type="button" disabled={busy} onClick={() => toggle("reject")} aria-expanded={mode === "reject"} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-open-${row.id}`}>Ablehnen</button>
       </div>
-      {rejecting ? (
+      {mode ? (
         <div className="max-w-xl space-y-2">
           <TextAreaField label="Grund (Pflicht, das Team liest ihn)" rows={2} value={reason} onChange={setReason} testId={`application-reason-${row.id}`} />
-          <button type="button" disabled={blocked || reason.trim().length < REASON_MIN} onClick={() => send("reject", { reason: reason.trim() })} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-send-${row.id}`}>Ablehnung senden</button>
+          {mode === "reject" ? (
+            <button type="button" disabled={blocked || reason.trim().length < REASON_MIN} onClick={() => send("reject", { reason: reason.trim() })} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-send-${row.id}`}>Ablehnung senden</button>
+          ) : (
+            <button type="button" disabled={blocked || reason.trim().length < REASON_MIN} onClick={() => send("waitlist", { reason: reason.trim() })} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-waitlist-send-${row.id}`}>Auf die Warteliste</button>
+          )}
         </div>
       ) : null}
     </div>
@@ -127,6 +142,19 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/85">
           {row.assignment.label}{row.assignment.left ? " (nicht mehr dabei, der Platz ist frei)" : ""}
           <Link to={`/admin/tournaments/${row.assignment.tournament_id}`} data-testid={`application-open-staffel-${row.id}`} className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">Turnierverwaltung <ExternalLink className="h-3 w-3" aria-hidden="true" /></Link>
+        </p>
+      ) : null}
+      {row.auto_accepted ? <p className="mt-1 text-xs text-white/60" data-testid={`application-auto-${row.id}`}>Automatisch angenommen{row.decided_at ? ` ${when(row.decided_at)}` : ""}.</p> : null}
+      {/* Warum die Season nicht annehmen bzw. zuteilen konnte (#2348): Staffel voll oder gesperrt, Geschwister-Co-Team, Fehler. */}
+      {row.auto_problem ? (
+        <p className="mt-1 text-xs text-warn [overflow-wrap:anywhere]" data-testid={`application-auto-problem-${row.id}`}>
+          {row.status === "accepted" ? "Nicht automatisch zugeteilt" : "Nicht automatisch angenommen"}: {row.auto_problem}
+        </p>
+      ) : null}
+      {/* Befangenheit (#2348, Nr. 73): Beim Team einer Person der Liga-Leitung hat niemand entschieden - die anderen Zuständigen sehen es. */}
+      {row.lead_team_auto ? (
+        <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-warn" data-testid={`application-lead-team-${row.id}`}>
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Team der Leitung – automatisch angenommen
         </p>
       ) : null}
       {row.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}

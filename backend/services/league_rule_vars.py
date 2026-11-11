@@ -227,6 +227,10 @@ def _static() -> list[Variable]:
         Variable("application.opens", "Anmeldung ab", "Beginn des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_opens_at"))),
         Variable("application.closes", "Anmeldung bis", "Ende des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_closes_at"))),
         Variable("application.slots", "Startplätze", "Zahl der Startplätze der Season.", "Anmeldung", lambda ctx: _count(_season(ctx, "application_slots"))),
+        # Anmeldungen automatisch annehmen (#2348): ein ganzer Satz ohne Punkt, ohne Anmeldefenster „(nicht festgelegt)“.
+        Variable("application.acceptance", "Annahme der Anmeldung", "„Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; … zurückstufen“ "
+                 "oder „Die Liga-Leitung prüft jede Anmeldung“ - ein ganzer Satz ohne Punkt.", "Anmeldung",
+                 lambda ctx: facts.AUTO_ACCEPT_WORDS[bool(ctx.eligibility["auto_accept"])] if ctx.eligibility.get("auto_accept") is not None else None),
         # Vorab angelegt: Die Season trägt diese Felder noch nicht, es gilt die Vorgabe. Die Einstellung kommt mit dem genannten Paket
         # und schreibt dasselbe Feld - Texte mit diesen Variablen passen sich dann von selbst an (docs/LIGA.md, B.2).
         Variable("protest.hours", "Protestfrist", "Frist für einen Protest ab der Ergebnisbestätigung (Vorgabe 48 Stunden, einstellbar mit E.2).",

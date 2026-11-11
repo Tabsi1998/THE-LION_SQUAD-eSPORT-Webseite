@@ -12,7 +12,7 @@ import { SeasonTabForm } from "./SeasonTabForm";
 
 const JUMPS = [["selbstanmeldung", "Selbstanmeldung"], ["spielberechtigung", "Kader und Spielberechtigung"], ["plattform", "Plattform"], ["anmeldungen", "Eingang"], ["kader", "Kaderübersicht"]];
 
-export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canApplications, canRoster, formProps, onJump }) {
+export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canApplications, canRoster, formProps, onJump, applicationsWaiting = 0 }) {
   const hasWindow = Boolean(form.application_opens || form.application_closes);
   // Meldeschluss (nur Anzeige) und Anmeldefenster sagten dasselbe zweimal: Mit Fenster gilt „Anmeldung bis“; ein schon gesetzter
   // Meldeschluss bleibt sichtbar, damit er sich leeren lässt.
@@ -33,7 +33,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
       ) : null}
       {canSeason ? (
         <SeasonTabForm {...formProps}>
-          <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} />
+          <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} waiting={applicationsWaiting} />
           <SeasonEligibilitySection form={form} set={set} id="spielberechtigung" />
           <SeasonPlatformSection seasonId={seasonId} form={form} set={set} id="plattform" version={season.updated_at} />
         </SeasonTabForm>

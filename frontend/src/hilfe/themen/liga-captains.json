@@ -49,15 +49,15 @@
         {
           "id": "einreichen",
           "titel": "Anmeldung einreichen",
-          "text": "Prüf die Zusammenfassung und tippe auf Anmeldung einreichen. Die Liga-Leitung entscheidet und du bekommst eine Nachricht.",
-          "hinweis": "Einreichen heißt noch nicht, dass ihr dabei seid. Liga und Staffel teilt die Liga-Leitung zu.",
+          "text": "Prüf die Zusammenfassung und tippe auf Anmeldung einreichen. Je nach Season prüft die Liga-Leitung die Anmeldung, oder ihr seid gleich angemeldet. Die Zusammenfassung sagt dir, was gilt. Du bekommst eine Nachricht.",
+          "hinweis": "Werden Anmeldungen automatisch angenommen und ist ein Startplatz frei, steht danach Angemeldet da. Sind alle Plätze vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, außer es gibt nur eine Staffel.",
           "bild": true
         },
         {
           "id": "stand",
           "titel": "Stand und offene Punkte",
-          "text": "Den Stand eurer Anmeldung siehst du auf der Ligaseite. Dort stehen auch die offenen Punkte, bis alle erledigt sind.",
-          "hinweis": "Zurückziehen geht, bis euer Co-Team einer Staffel zugeteilt ist.",
+          "text": "Den Stand eurer Anmeldung siehst du auf der Ligaseite. „Eingereicht“: Die Liga-Leitung prüft noch. „Angemeldet“: Ihr habt einen Startplatz. Steht „Zuteilung folgt“ dabei, fehlt nur noch die Staffel. Darunter stehen die offenen Punkte, bis alle erledigt sind.",
+          "hinweis": "Zurückziehen geht, bis die Liga-Leitung euch einer Staffel zuteilt. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange noch kein Spielplan steht.",
           "bild": true
         }
       ]

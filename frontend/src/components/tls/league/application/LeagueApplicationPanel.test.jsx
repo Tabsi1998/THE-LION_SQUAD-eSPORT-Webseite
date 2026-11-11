@@ -91,6 +91,34 @@ test("der Status zeigt Grund und Staffel und bietet das Zurückziehen", async ()
   expect(apiMock.get).toHaveBeenCalledTimes(2);
 });
 
+// #2348: Das eigene Team liest „Angemeldet“, ohne Staffel mit „Zuteilung folgt“; eingereicht steht mit einem Satz, dass die Leitung prüft.
+test("angenommen heißt für das Team Angemeldet, eingereicht nennt die Prüfung", async () => {
+  const assigned = { ...SQUAD, state: "accepted", application: { id: "a1", status: "accepted", staffel: "Liga 1 · Staffel A", can_withdraw: false } };
+  const unassigned = { ...SQUAD, squad_id: "s2", state: "accepted", application: { id: "a2", status: "accepted", staffel: null, can_withdraw: true } };
+  const submitted = { ...SQUAD, squad_id: "s3", state: "submitted", application: { id: "a3", status: "submitted", can_withdraw: true } };
+  apiMock.get.mockResolvedValue({ data: view([assigned, unassigned, submitted]) });
+  renderPanel();
+
+  expect(await screen.findByTestId("league-application-state-s1")).toHaveTextContent(/^Angemeldet$/);
+  expect(screen.getByTestId("league-application-state-s2")).toHaveTextContent("Angemeldet – Zuteilung folgt");
+  expect(screen.getByTestId("league-application-row-s2")).toHaveTextContent("Liga und Staffel teilt die Liga-Leitung noch zu.");
+  expect(screen.getByTestId("league-application-state-s3")).toHaveTextContent("Eingereicht");
+  expect(screen.getByTestId("league-application-row-s3")).toHaveTextContent("Die Liga-Leitung prüft die Anmeldung und meldet sich.");
+  expect(screen.getByTestId("league-application-row-s1")).not.toHaveTextContent("Die Liga-Leitung prüft");
+});
+
+test("eine automatische Zuteilung zieht das Team selbst zurück, die Rückfrage nennt die Staffel (#2348)", async () => {
+  const assigned = { ...SQUAD, state: "accepted", application: { id: "a1", status: "accepted", staffel: "Liga 1 · Staffel A", can_withdraw: true } };
+  apiMock.get.mockResolvedValue({ data: view([assigned]) });
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderPanel();
+
+  fireEvent.click(await screen.findByTestId("league-application-withdraw-s1"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/leagues/probe-liga/season-1/applications/a1/withdraw", {}));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("spielt nicht mehr in Liga 1 · Staffel A");
+});
+
 test("der Stand einer laufenden Anmeldung nennt die offenen Punkte (#2313)", async () => {
   const submitted = { ...SQUAD, state: "submitted", application: { id: "a1", status: "submitted", can_withdraw: true },
     warnings: ["Mila: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."], shortfall: null };
