@@ -267,9 +267,19 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
         from services import league_veto
 
         with_veto = bool(league_veto.rules_mod.rules_of(tournament))
+        # Die Nachricht verspricht nur, was kommt (#2326): Das Veto läuft, wartet auf die Vorgabe der Woche - oder es entfällt in
+        # diesem Spiel, weil die Vorlage nicht passt (dann geht es gleich mit „Spiel starten“ weiter).
+        coming = await league_veto.outlook(db, {**match, **fresh}, tournament) if with_veto else None
+        texts = {
+            league_veto.WILL_RUN: "Beide Seiten sind eingecheckt – jetzt läuft das Map-Veto, danach beginnt Map 1.",
+            league_veto.WILL_WAIT: "Beide Seiten sind eingecheckt. Das Map-Veto wartet noch auf die Vorgabe der Woche – sobald die Liga-Leitung "
+                                   "sie eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite.",
+            league_veto.WILL_SKIP: "Beide Seiten sind eingecheckt – ihr könnt starten. In diesem Spiel läuft kein Veto, die Maps tragt ihr beim "
+                                   "Ergebnis ein. Map 1 beginnt, sobald eine Seite auf „Spiel starten“ tippt.",
+        }
         await _tell(db, match, setup, filled, "Beide Seiten eingecheckt",
-                    "Beide Seiten sind eingecheckt – jetzt läuft das Map-Veto, danach beginnt Map 1." if with_veto else
-                    "Beide Seiten sind eingecheckt – ihr könnt starten. Map 1 beginnt, sobald eine Seite auf „Spiel starten“ tippt.",
+                    texts.get(coming) or "Beide Seiten sind eingecheckt – ihr könnt starten. Map 1 beginnt, sobald eine Seite auf „Spiel "
+                                         "starten“ tippt.",
                     "checkin_ready", f"checkin-ready:{match['id']}:{now_iso}")
         # Veto (D.3, #1618): beginnt sofort, wenn beide da sind - einmal je Termin.
         if with_veto:
@@ -468,6 +478,15 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
                 start_hint = rules_changed_detail(consent, setup.names.get(reg["id"]))
                 break
     can_start = bool(own_id or (lead and can_lead_enter)) and current == READY and start_hint is None
+    # Veto (D.3, #1618): wer am Zug ist, Maps je Modus, Verlauf und am Ende die Spielreihenfolge - nur Staffeln mit Vorlage.
+    veto_block = await league_veto.page_block(db, match, tournament, names=setup.names, own_id=own_id, lead=lead,
+                                              can_lead_act=bool(lead and can_lead_enter), conflict=conflict if lead else None, now=now)
+    if current == VETO and veto_block and veto_block.get("blocked"):
+        # Vorgabe der Woche fehlt (#2326): Das Veto hat nicht begonnen - der Satz sagt, worauf es wartet.
+        start_hint = veto_block["blocked"]["text"]
+    elif current == VETO and veto_block and veto_block.get("start"):
+        # Die Vorgabe wurde nachgetragen: erst tippen beide Seiten „Bereit zum Veto“, dann das Veto, dann Map 1.
+        start_hint = league_veto.START_READY_DETAIL
     proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else None
     if proposal and (proposal.get("decision") or proposal.get("rule") != "check_in"):
         proposal = None
@@ -519,9 +538,7 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
                                            for user_id in setup.rosters.get(reg["id"]) or set()), key=lambda row: row["name"].casefold())
                         for reg in setup.registrations},
         } if lead else None,
-        # Veto (D.3, #1618): wer am Zug ist, Maps je Modus, Verlauf und am Ende die Spielreihenfolge - nur Staffeln mit Vorlage.
-        "veto": await league_veto.page_block(db, match, tournament, names=setup.names, own_id=own_id, lead=lead,
-                                             can_lead_act=bool(lead and can_lead_enter), conflict=conflict if lead else None, now=now),
+        "veto": veto_block,
     }
 
 

@@ -3,6 +3,13 @@
 - ``GET|PUT /api/admin/leagues/seasons/{season_id}/veto-rules``: die Vorlage je Season (an/aus, Team A, Zeit je Schritt, Schritte) -
   Zuständigkeit „Season konfigurieren“, lesen jede Zuständigkeit. Das Speichern gilt sofort für alle nicht gesperrten Staffeln.
 - ``GET …/veto-rules/proposal``: ein Vorschlag aus Modusfolge, Poolgrößen und Best of - nichts wird gespeichert.
+- ``GET|PUT /api/admin/leagues/seasons/{season_id}/veto-presets`` (#2326): die Vorgabe der Woche - je Spielwoche und Modus eine Map aus
+  dem Pool, mit Vorschlag „rotiert durch den Pool“, fehlenden Wochen und Historie. Rechte wie die Vorlage. Eine Änderung gilt nur für
+  Vetos, die noch nicht begonnen haben; Spiele, die auf die Vorgabe gewartet haben, bekommen „Vorgabe da – Veto kann starten“.
+- ``POST /api/matches/{match_id}/veto/ready`` (#2326, Nr. 127): „Bereit zum Veto“ nach einer nachgetragenen Vorgabe - Captain oder
+  Vertreter je Seite; sind beide bereit, beginnt das Veto. Zurücknehmen, solange die Gegenseite nicht bereit ist. Idempotent.
+- ``POST /api/matches/{match_id}/veto/start`` (#2326, Nr. 127): Notfall-Start durch die Liga-Leitung („Spiele betreuen“) mit Pflichtgrund,
+  Befangenheit wie B.1.
 - ``POST /api/matches/{match_id}/veto/pick``: die Seite am Zug sperrt oder wählt eine Map (Captain, Vertreter).
 - ``POST /api/matches/{match_id}/veto/lead``: Pause, Fortsetzen, Schritt zurück, Neustart - Liga-Leitung mit „Spiele betreuen“, mit Grund,
   Befangenheit wie B.1.
@@ -24,7 +31,7 @@ from routes.match_routes import (
     _find_match_any,
     _serialized_match_write,
 )
-from services import game_maps, league_veto, league_veto_rules, map_pools
+from services import game_maps, league_veto, league_veto_rules, league_veto_sweep, map_pools
 from services.checkin_rules import FlowProblem
 from services.league_permissions import ANY, require_league, require_no_conflict
 from services.tournament_permissions import has_match_result_permission
@@ -54,11 +61,40 @@ class VetoRulesBody(BaseModel):
     steps: list[VetoStepBody] = Field(default_factory=list, max_length=league_veto_rules.STEPS_MAX)
 
 
+class VetoPresetBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    week: int
+    mode: str = Field(max_length=40)
+    # Leer heißt „noch nicht gewählt“ - die Woche bleibt als fehlend sichtbar.
+    map_id: str = Field(default="", max_length=120)
+
+
+class VetoPresetsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    presets: list[VetoPresetBody] = Field(default_factory=list, max_length=league_veto_rules.WEEKS_MAX * league_veto_rules.POSITION_MAX)
+
+
 class PickBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     map_id: str = Field(min_length=1, max_length=120)
     version: int = Field(ge=0)
+
+
+class ReadyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # False nimmt „Bereit“ zurück - nur solange die Gegenseite noch nicht bereit ist.
+    ready: bool = True
+
+
+class LeadStartBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class LeadBody(BaseModel):
@@ -155,7 +191,94 @@ async def put_veto_rules(season_id: str, body: VetoRulesBody, me: dict = Depends
     # Von Hand gespeichert: ohne den Merker „unberührt“ (Nr. 108) - ab jetzt bleibt die Vorlage, auch wenn der Pool sich ändert.
     # Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen nach dem Entsperren mit).
     staffeln = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
-    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln)
+    # Vorgabe der Woche (#2326): Mit der neuen Vorlage (etwa ohne den Schritt „Vorgabe“) kann ein wartendes Veto jetzt starten - beide
+    # Seiten erfahren es. Es beginnt dadurch nicht.
+    ready = await league_veto_sweep.announce_waiting(db, season_id)
+    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln, matches_ready=ready)
+
+
+# ---------------------------------------------------------------- Vorgabe der Woche (#2326)
+
+def _preset_modes(rules: dict | None, context: dict) -> list[dict]:
+    """Die Modi mit einem Schritt „Vorgabe der Woche“ in der gespeicherten Vorlage - mit Position und den Maps des Pools zur Auswahl."""
+    maps = league_veto_rules.pool_maps(context["pool"])
+    labels = {**context["labels"], **league_veto_rules.pool_labels(context["pool"])}
+    return [{"mode": step["mode"], "label": labels.get(step["mode"]) or step["mode"], "position": step["position"],
+             "maps": [{"map_id": item["map_id"], "name": item.get("name")} for item in maps.get(step["mode"]) or []]}
+            for step in league_veto_rules.preset_steps((rules or {}).get("steps"))]
+
+
+async def _presets_answer(db, season: dict, context: dict, **extra) -> dict:
+    rules = _stored(season)
+    presets = league_veto_rules.presets_of(season.get("veto_presets"))
+    weeks = await league_veto.preset_weeks(db, season)
+    return {
+        "active": bool(rules and rules.get("enabled") and league_veto_rules.preset_steps(rules.get("steps"))),
+        "weeks": weeks, "modes": _preset_modes(rules, context), "presets": presets,
+        # Sichtbar, welche Wochen fehlen oder nicht mehr passen - je Woche die Sätze.
+        "problems": league_veto.presets_overview(rules, presets, weeks, pool=context["pool"], repeat=context["repeat"], labels=context["labels"]),
+        # Der Vorschlag „rotiert automatisch durch den Pool“ für alle Wochen - nichts davon ist gespeichert.
+        "rotation": league_veto_rules.rotate(rules or {}, pool=context["pool"], weeks=len(weeks), repeat=context["repeat"]),
+        "history": await league_veto.presets_history(db, season["id"]), **extra}
+
+
+@admin_router.get("/seasons/{season_id}/veto-presets")
+async def get_veto_presets(season_id: str, _me: dict = Depends(require_any_capability)):
+    db = get_db()
+    season = await _season(db, season_id)
+    return await _presets_answer(db, season, await _season_context(db, season))
+
+
+@admin_router.put("/seasons/{season_id}/veto-presets")
+async def put_veto_presets(season_id: str, body: VetoPresetsBody, me: dict = Depends(require_season)):
+    db = get_db()
+    season = await _season(db, season_id)
+    context = await _season_context(db, season)
+    try:
+        presets = league_veto_rules.normalize_presets(body.model_dump()["presets"])
+    except league_veto_rules.VetoProblem as problem:
+        _raise(problem)
+    rules = _stored(season) or league_veto_rules.defaults()
+    weeks = await league_veto.preset_weeks(db, season)
+    known = {row["week"] for row in weeks}
+    ids = league_veto_rules.pool_ids(context["pool"])
+    labels = {**context["labels"], **league_veto_rules.pool_labels(context["pool"])}
+    wanted = {step["mode"] for step in league_veto_rules.preset_steps(rules.get("steps"))}
+    # Was gespeichert ist und unverändert wiederkommt, bleibt - auch eine Map, die den Pool inzwischen verlassen hat (Review zu #2326):
+    # Die Verwaltung zeigt sie als „nicht mehr im Pool“, und das Speichern einer anderen Woche wirft sie nicht still weg. Geprüft
+    # wird nur, was sich ändert.
+    stored = league_veto_rules.presets_of(season.get("veto_presets"))
+    before = {(row["week"], row["mode"]): row["map_id"] for row in stored}
+    touched = set()
+    for row in presets:
+        if before.get((row["week"], row["mode"])) == row["map_id"]:
+            continue
+        touched.add(row["week"])
+        label = labels.get(row["mode"]) or "den Modus"
+        if row["week"] not in known:
+            raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']} gibt es in dieser Season nicht.")
+        if row["mode"] not in wanted:
+            raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: Für {label} sieht die Veto-Vorlage keine Vorgabe der Woche vor.")
+        if row["map_id"] not in (ids.get(row["mode"]) or []):
+            raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: Die Map steht nicht im Pool für {label}.")
+    # Einträge, die die Verwaltung gar nicht zeigt (der Modus hat gerade keinen Schritt „Vorgabe“, die Woche gibt es nicht mehr),
+    # kann sie auch nicht mitschicken - sie bleiben gespeichert, statt beim nächsten Speichern zu verschwinden.
+    sent = {(row["week"], " ".join(str(row["mode"]).split())) for row in body.model_dump()["presets"]}
+    hidden = [row for row in stored if (row["mode"] not in wanted or row["week"] not in known) and (row["week"], row["mode"]) not in sent]
+    if hidden:
+        presets = league_veto_rules.normalize_presets([*presets, *hidden])
+    # Vollständige Wochen müssen aufgehen (etwa „jede Map nur einmal je Serie“) - eine Woche mit Lücke bleibt speicherbar und sichtbar.
+    for row in weeks:
+        chosen = league_veto_rules.presets_of_week(presets, row["week"])
+        if row["week"] in touched and wanted and wanted <= set(chosen):
+            problems = league_veto_rules.week_problems(rules, chosen, pool=context["pool"], repeat=context["repeat"], labels=context["labels"])
+            if problems:
+                raise HTTPException(status_code=422, detail=f"Spielwoche {row['week']}: {' '.join(problems)}")
+    changes = await league_veto.store_presets(db, season, presets, actor_id=me.get("id"))
+    # Wartende Spiele (beide Seiten eingecheckt, die Vorgabe fehlte): Beide Seiten erfahren, dass sie das Veto jetzt starten können.
+    # Es beginnt nicht von selbst - sonst liefe die Zeit, während niemand mehr da ist. Begonnene und fertige Vetos bleiben, wie sie sind.
+    told = await league_veto_sweep.announce_waiting(db, season_id) if changes else 0
+    return await _presets_answer(db, {**season, "veto_presets": presets}, context, changed=len(changes), matches_ready=told)
 
 
 async def _context(match_id: str, user: dict):
@@ -181,6 +304,40 @@ async def veto_pick(match_id: str, body: PickBody, me: dict = Depends(get_curren
     try:
         return await league_veto.pick(db, match, tournament, registration_id=acting_reg["id"], map_id=body.map_id, version=body.version,
                                       user=me)
+    except (FlowProblem, league_veto_rules.VetoProblem) as problem:
+        _raise(problem)
+
+
+@router.post("/{match_id}/veto/ready")
+async def veto_ready(match_id: str, body: ReadyBody, me: dict = Depends(get_current_user),
+                     _mutation: None = Depends(_serialized_match_write)):
+    """„Bereit zum Veto“ (#2326, Nr. 127): nur, wenn das Veto auf die Vorgabe der Woche gewartet hat - Captain oder Vertreter der
+    eigenen Seite, wie bei einem Zug. Sind beide Seiten bereit, beginnt das Veto; sonst beginnt es wie immer von selbst."""
+    db, match, tournament, acting_reg = await _context(match_id, me)
+    if not acting_reg:
+        raise HTTPException(status_code=403, detail=league_veto.NOT_A_SIDE_DETAIL)
+    if not league_veto_rules.rules_of(tournament):
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    try:
+        return await league_veto.set_ready(db, match, tournament, registration_id=acting_reg["id"], ready=body.ready, user=me)
+    except (FlowProblem, league_veto_rules.VetoProblem) as problem:
+        _raise(problem)
+
+
+@router.post("/{match_id}/veto/start")
+async def veto_start(match_id: str, body: LeadStartBody, me: dict = Depends(get_current_user),
+                     _mutation: None = Depends(_serialized_match_write)):
+    """Notfall (#2326, Nr. 127): Die Liga-Leitung („Spiele betreuen“) beginnt ein wartendes Veto, ohne dass beide Seiten „Bereit“ getippt
+    haben - mit Pflichtgrund und Protokoll, Befangenheit wie bei jedem Eingriff."""
+    db, match, tournament, _acting_reg = await _context(match_id, me)
+    # Erst, wer handeln darf (403), dann, ob es hier ein Veto gibt (409) - wie beim Eingriff ins laufende Veto.
+    if not await has_match_result_permission(me, match, capability="matches"):
+        raise HTTPException(status_code=403, detail="Im Notfall starten kann die Liga-Leitung mit „Spiele betreuen“.")
+    await require_no_conflict(db, me, match, action="veto_start", conflict_reason=body.conflict_reason)
+    if not league_veto_rules.rules_of(tournament):
+        raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
+    try:
+        return await league_veto.lead_start(db, match, tournament, reason=body.reason, user=me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)
 

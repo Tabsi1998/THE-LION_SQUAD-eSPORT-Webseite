@@ -124,6 +124,37 @@ def _veto_items(season: dict, divisions: list[dict], pool: dict | None, game: di
     return out
 
 
+def _weeks_text(weeks: list[int]) -> str:
+    names = [str(week) for week in weeks]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} und {names[-1]}"
+
+
+async def _veto_preset_items(db, season: dict, divisions: list[dict], pool: dict | None, game: dict | None) -> list[tuple[str, dict]]:
+    """Vorgabe der Woche (#2326): Wochen, in denen sie fehlt oder nicht mehr zum Pool passt - eine Warnung, kein Hindernis: Die Leitung
+    darf sie Woche für Woche eintragen, nur beginnt das Veto in einer Woche ohne Vorgabe nicht."""
+    from services import league_veto
+
+    raw = season.get("veto_rules")
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return []
+    try:
+        rules = league_veto_rules.normalize(raw)
+    except league_veto_rules.VetoProblem:
+        return []
+    if not league_veto_rules.preset_steps(rules["steps"]):
+        return []
+    active = [row for row in divisions if (row.get("status") or "active") == "active"]
+    labels = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
+    rows = league_veto.presets_overview(rules, league_veto_rules.presets_of(season.get("veto_presets")),
+                                        await league_veto.preset_weeks(db, season, active), pool=pool,
+                                        repeat=season.get("map_repeat") or "other_mode", labels=labels)
+    if not rows:
+        return []
+    weeks = [row["week"] for row in rows]
+    return [("warning", _item("veto_preset_missing", f"Veto: Für Spielwoche {_weeks_text(weeks)} steht die Vorgabe der Woche noch nicht – "
+                                                     "dort beginnt das Veto erst, wenn sie eingetragen ist."))]
+
+
 async def season_readiness(db, league: dict, season: dict, user: dict | None = None) -> dict:
     """Die Prüfung für ``season`` (auch mit ungespeicherten Änderungen). Siehe Modulkopf und docs/LIGA.md."""
     items: list[tuple[str, dict]] = []
@@ -162,6 +193,7 @@ async def season_readiness(db, league: dict, season: dict, user: dict | None = N
     maps = {row["id"]: row for row in await db.game_maps.find({"id": {"$in": map_ids}}, {"_id": 0, "id": 1, "status": 1}).to_list(None)}
     items += _pool_state_items(pool, game, order, maps)
     items += _veto_items(season, divisions, pool, game)
+    items += await _veto_preset_items(db, season, divisions, pool, game)
     problems = [item for kind, item in items if kind == "problem"]
     return {"ok": not problems, "problems": problems, "warnings": [item for kind, item in items if kind == "warning"],
             "requirements": need["rows"], "total": need["total"], "max_maps": need["max_maps"],

@@ -428,6 +428,13 @@ async def test_a_template_that_does_not_fit_this_match_skips_the_veto_and_says_w
     await both_in(flow, world)
     veto = await stored_veto(flow, world)
     assert veto["status"] == "skipped" and veto["skipped_reason"].startswith("Schritt 4: Position 4 gibt es bei Best of 3 nicht.")
+    # Die Nachricht „Beide Seiten eingecheckt“ verspricht kein Veto, das in diesem Spiel entfällt (#2326) - im Lauf nach Anlage B
+    # (erster Test) heißt sie weiter „jetzt läuft das Map-Veto“.
+    ready_note = await flow.db.notifications.find_one({"meta.reason": "checkin_ready"}, {"_id": 0})
+    assert "Map-Veto" not in ready_note["body"] and ready_note["body"].endswith(
+        "ihr könnt starten. In diesem Spiel läuft kein Veto, die Maps tragt ihr beim Ergebnis ein. Map 1 beginnt, sobald eine Seite auf "
+        "„Spiel starten“ tippt.")
+    assert await flow.db.notifications.count_documents({"meta.reason": "veto_start"}) == 0
     block = (await page(flow, world, "Kapitaen"))["checkin"]
     assert block["state"] == "ready" and block["can_start"] is True and block["veto"]["status"] == "skipped"
     assert block["veto"]["pick_hint"].startswith("In diesem Spiel läuft kein Veto:")
@@ -895,7 +902,7 @@ async def test_the_season_template_is_checked_proposed_saved_and_transferred(flo
         assert refused.status_code == 422 and sentence in refused.json()["detail"], (name, refused.text)
         assert refused.json()["detail"].startswith("Die Vorlage passt noch nicht:")
     bad_form = await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules([{"kind": "side", "mode": HP, "team": "A"}]))
-    assert bad_form.status_code == 422 and "Sperren, Wählen oder Decider" in bad_form.json()["detail"]
+    assert bad_form.status_code == 422 and "Sperren, Wählen, Decider oder Vorgabe der Woche" in bad_form.json()["detail"]
     # Aus: ein Entwurf bleibt speicherbar, auch wenn er noch nicht aufgeht.
     draft = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(ANLAGE_B[:3], enabled=False)))
     assert draft["active"] is False and draft["problems"] == []

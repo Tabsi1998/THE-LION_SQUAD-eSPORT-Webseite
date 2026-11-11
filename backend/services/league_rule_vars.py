@@ -170,6 +170,9 @@ def _static() -> list[Variable]:
                  lambda ctx: f"{ctx.veto['step_seconds']} Sekunden" if ctx.veto.get("enabled") else None),
         Variable("veto.team_a", "Team A im Veto", "„das Heimteam laut Spielplan“ oder „per Los je Spiel“.", "Serie und Kader",
                  lambda ctx: facts.TEAM_A_SHORT.get(ctx.veto.get("team_a")) if ctx.veto.get("enabled") else None),
+        # Vorgabe der Woche (#2326): nur mit einem solchen Schritt in der Vorlage - sonst „(nicht festgelegt)“.
+        Variable("veto.presets", "Vorgaben der Woche im Veto", "Je Spielwoche die Map, die die Liga-Leitung vorgibt, etwa „Spielwoche 1: Hafen (Kontrolle)“.",
+                 "Serie und Kader", lambda ctx: facts.veto_presets_text(ctx.season, ctx.game, ctx.pool) if ctx.season else None),
         Variable("schedule.matchday_days", "Tage je Spielwoche", "Länge der Spielwoche in Tagen.", "Termine", lambda ctx: _count(ctx.schedule.get("matchday_days"))),
         Variable("schedule.default_weekday", "Standardtag", "Wochentag des Standardtermins.", "Termine",
                  lambda ctx: facts.WEEKDAYS[int(ctx.schedule.get("default_weekday") or 0) % 7] if ctx.schedule else None),

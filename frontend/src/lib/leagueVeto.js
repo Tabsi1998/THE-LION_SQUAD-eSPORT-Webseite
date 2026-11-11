@@ -2,8 +2,12 @@
 // und Poolgrößen - die Suche bei „jede Map nur einmal je Serie“ und der Abgleich mit dem gespeicherten Pool kommen vom Server) und die
 // Sätze des Veto-Blocks auf der Matchseite. Der Server bleibt maßgeblich; hier geht es darum, dass man nichts Falsches eingibt.
 
-// Kurz, damit die Art in der Zeile je Schritt nicht abgeschnitten wird; was der Decider ist, erklärt der Kasten darüber.
-export const KIND_OPTIONS = [["ban", "Sperren"], ["pick", "Wählen"], ["decider", "Decider"]];
+// Kurz, damit die Art in der Zeile je Schritt nicht abgeschnitten wird; was Decider und Vorgabe sind, erklärt der Kasten darüber.
+// „Vorgabe“ ist die Vorgabe der Woche (#2326): Die Map legt die Liga-Leitung je Spielwoche fest, das System setzt sie.
+export const KIND_OPTIONS = [["ban", "Sperren"], ["pick", "Wählen"], ["decider", "Decider"], ["preset", "Vorgabe"]];
+/** Schritte, die das System setzt - ohne Team. */
+export const SYSTEM_KINDS = ["decider", "preset"];
+export const isSystemKind = (kind) => SYSTEM_KINDS.includes(kind);
 export const TEAM_OPTIONS = [["A", "Team A"], ["B", "Team B"]];
 export const TEAM_A_OPTIONS = [["home", "Heimteam laut Spielplan"], ["draw", "Los je Spiel"]];
 export const SECONDS = [10, 600];
@@ -16,6 +20,24 @@ export const VETO_STATUS_LABELS = {
   done: "Spielreihenfolge steht",
   skipped: "Kein Veto in diesem Spiel",
 };
+/**
+ * Die Überschrift des Veto-Blocks: wartet das Veto auf die Vorgabe der Woche (#2326), sagt sie genau das - und steht die
+ * nachgetragene Vorgabe, dass jetzt beide Seiten „Bereit zum Veto“ tippen (Nr. 127).
+ */
+export function vetoHeadline(block) {
+  // Die fehlende Vorgabe geht vor: Auch wenn schon eine Seite bereit ist, wartet das Veto zuerst auf sie.
+  if (block?.status === "waiting" && block.blocked) return "Veto wartet auf die Vorgabe der Woche";
+  if (block?.status === "waiting" && block.start) return block.presets?.length ? "Vorgabe steht – bereit zum Veto?" : "Bereit zum Veto?";
+  if (block?.status === "waiting") return "Vorgabe der Woche";
+  return VETO_STATUS_LABELS[block?.status] || "Veto";
+}
+
+/** Die Rolle einer Map in der Spielreihenfolge als Zusatz hinter „Map 3“: Decider, Vorgabe der Woche - sonst nichts. */
+export function plannedRoleLabel(role) {
+  if (role === "decider") return "Decider";
+  if (role === "preset") return "Vorgabe der Woche";
+  return "";
+}
 
 export function emptyStep(mode = "") {
   return { kind: "ban", mode, team: "A", position: "" };
@@ -34,6 +56,7 @@ export function moveStep(steps, index, delta) {
 export function stepSentence(step, labelOf = (mode) => mode) {
   const label = labelOf(step.mode) || step.mode || "?";
   if (step.kind === "decider") return `Die übrige Map wird Map ${step.position || "?"} (${label})`;
+  if (step.kind === "preset") return `Die Liga-Leitung gibt Map ${step.position || "?"} je Spielwoche vor (${label})`;
   const who = `Team ${step.team || "?"}`;
   if (step.kind === "ban") return `${who} sperrt eine Map (${label})`;
   return `${who} wählt Map ${step.position || "?"} (${label})`;
@@ -53,7 +76,7 @@ export function vetoRulesPayload(form) {
     steps: (form.steps || []).map((step) => ({
       kind: step.kind,
       mode: step.mode,
-      team: step.kind === "decider" ? null : step.team || null,
+      team: isSystemKind(step.kind) ? null : step.team || null,
       position: step.kind === "ban" ? null : int(step.position),
     })),
   };
@@ -77,7 +100,7 @@ export function templateProblems(form, { modes = [], bestOf = 1, order = [], rep
     const number = at + 1;
     if (!step.mode) out.push(`Schritt ${number}: bitte den Modus wählen.`);
     else if (modes.length && !(step.mode in haveOf)) out.push(`Schritt ${number}: Der Modus „${labelOf(step.mode)}“ hat keine Maps im Pool.`);
-    if (step.kind !== "decider" && !step.team) out.push(`Schritt ${number}: bitte Team A oder Team B wählen.`);
+    if (!isSystemKind(step.kind) && !step.team) out.push(`Schritt ${number}: bitte Team A oder Team B wählen.`);
     if (step.kind !== "ban" && (step.position == null || step.position < 1)) out.push(`Schritt ${number}: Position - bitte eine ganze Zahl ab 1.`);
   });
   if (out.length) return out;
@@ -103,29 +126,160 @@ export function templateProblems(form, { modes = [], bestOf = 1, order = [], rep
   }
   const counts = {};
   for (const step of steps) {
-    const row = (counts[step.mode] ||= { bans: 0, picks: 0, deciders: 0 });
+    const row = (counts[step.mode] ||= { bans: 0, picks: 0, deciders: 0, presets: 0 });
     if (step.kind === "ban") row.bans += 1;
     else if (step.kind === "pick") row.picks += 1;
+    else if (step.kind === "preset") row.presets += 1;
     else row.deciders += 1;
   }
-  for (const [mode, { bans, picks, deciders }] of Object.entries(counts)) {
+  for (const [mode, { bans, picks, deciders, presets }] of Object.entries(counts)) {
     const label = labelOf(mode);
     if (deciders > 1) out.push(`${label}: höchstens ein Decider je Modus.`);
-    const own = steps.filter((step) => step.mode === mode);
+    if (presets > 1) out.push(`${label}: höchstens eine Vorgabe der Woche je Modus.`);
+    // Die Vorgabe der Woche ist von Anfang an aus dem Modus genommen - wo ihr Schritt steht, ändert am Decider nichts.
+    const own = steps.filter((step) => step.mode === mode && step.kind !== "preset");
     if (deciders === 1 && own[own.length - 1].kind !== "decider") out.push(`${label}: Der Decider muss der letzte Schritt seines Modus sein.`);
     const have = haveOf[mode] || 0;
     if (!have) continue;
-    const needed = bans + picks + deciders;
+    const needed = bans + picks + deciders + presets;
     if (have < needed) {
-      out.push(`${label}: ${plural(bans, "Sperre", "Sperren")} und ${plural(picks, "Wahl", "Wahlen")}${deciders ? " und ein Decider" : ""} brauchen ${needed} Maps – der Pool hat ${have}.`);
-    } else if (deciders === 1 && repeat !== "never" && have !== bans + picks + 1) {
-      out.push(`${label}: Der Decider braucht genau eine übrige Map – nach ${plural(bans, "Sperre", "Sperren")} und ${plural(picks, "Wahl", "Wahlen")} bleiben ${have - bans - picks}.`);
+      out.push(`${label}: ${plural(bans, "Sperre", "Sperren")} und ${plural(picks, "Wahl", "Wahlen")}${deciders ? " und ein Decider" : ""}${presets ? " und die Vorgabe der Woche" : ""} brauchen ${needed} Maps – der Pool hat ${have}.`);
+    } else if (deciders === 1 && repeat !== "never" && have !== bans + picks + presets + 1) {
+      out.push(`${label}: Der Decider braucht genau eine übrige Map – nach ${plural(bans, "Sperre", "Sperren")} und ${plural(picks, "Wahl", "Wahlen")}${presets ? " und der Vorgabe der Woche" : ""} bleiben ${have - bans - picks - presets}.`);
     }
   }
   return out;
 }
 
+// ---------------------------------------------------------------- Vorgabe der Woche (#2326)
+
+/** Die Modi mit einem Schritt „Vorgabe der Woche“ in einer Vorlage (Formular oder gespeichert). */
+export function presetModes(steps) {
+  return (steps || []).filter((step) => step.kind === "preset" && step.mode).map((step) => step.mode);
+}
+
+const presetKey = (week, mode) => `${week}|${mode}`;
+
+/** Die gespeicherten Vorgaben als Formular: `{"<Woche>|<Modus>": map_id}`. */
+export function presetsToForm(presets) {
+  return Object.fromEntries((presets || []).map((row) => [presetKey(row.week, row.mode), row.map_id]));
+}
+
+export function presetValue(form, week, mode) {
+  return (form || {})[presetKey(week, mode)] || "";
+}
+
+/**
+ * Steht in dieser Woche eine Map, die den Pool ihres Modus verlassen hat? Sie bleibt im Formular stehen (und geht beim Speichern
+ * unverändert mit), bis die Leitung neu wählt - still verworfen wird sie nicht.
+ */
+export function presetStale(form, week, mode) {
+  const value = presetValue(form, week, mode?.mode);
+  return Boolean(value) && !(mode?.maps || []).some((item) => item.map_id === value);
+}
+
+/** Die Wochen mit einer Vorgabe außerhalb des Pools - dort beginnt das Veto nicht, bis neu gewählt ist. */
+export function staleWeeks(form, weeks, modes) {
+  return (weeks || []).filter(({ week }) => (modes || []).some((mode) => presetStale(form, week, mode))).map(({ week }) => week);
+}
+
+export function withPreset(form, week, mode, mapId) {
+  return { ...(form || {}), [presetKey(week, mode)]: mapId || "" };
+}
+
+/** Das Formular als Liste für den Server - nur gewählte Maps, nur Wochen und Modi, die es gibt. */
+export function presetsPayload(form, weeks, modes) {
+  const out = [];
+  for (const { week } of weeks || []) {
+    for (const { mode } of modes || []) {
+      const mapId = presetValue(form, week, mode);
+      if (mapId) out.push({ week, mode, map_id: mapId });
+    }
+  }
+  return out;
+}
+
+/** Die Wochen, in denen für mindestens einen Modus noch keine Map gewählt ist. */
+export function missingWeeks(form, weeks, modes) {
+  return (weeks || []).filter(({ week }) => (modes || []).some(({ mode }) => !presetValue(form, week, mode))).map(({ week }) => week);
+}
+
+/** „3, 4 und 5“ */
+export function weekList(weeks) {
+  const names = (weeks || []).map(String);
+  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}`;
+}
+
+const dayMonth = (day) => {
+  const [, month, date] = String(day || "").split("-");
+  return month && date ? `${date}.${month}.` : "";
+};
+
+/** „10.11.–16.11.“ aus den Wiener Kalendertagen einer Spielwoche - leer, wenn der Kalender der Season nicht so weit reicht. */
+export function weekDates(row) {
+  const from = dayMonth(row?.start_day);
+  const to = dayMonth(row?.end_day);
+  return from && to ? `${from}–${to}` : "";
+}
+
+/** Wochen, die der Vorschlag nie anfasst: Die Woche ist vorbei, oder in ihr hat schon ein Veto begonnen. */
+export function weekLocked(row) {
+  return Boolean(row?.past || row?.started);
+}
+
+/**
+ * Der Vorschlag „rotiert durch den Pool“ über das Formular gelegt - danach ist jede Woche einzeln änderbar. Ohne `overwrite` füllt er
+ * nur leere Wochen (was die Leitung schon gewählt hat, bleibt); mit `overwrite` („Alle neu verteilen“) ersetzt er jede Woche. Vergangene
+ * Wochen und Wochen mit begonnenem Veto bleiben in beiden Fällen, wie sie sind.
+ */
+export function applyRotation(form, rotation, weeks = [], { overwrite = false } = {}) {
+  const locked = new Set((weeks || []).filter(weekLocked).map((row) => row.week));
+  const next = { ...(form || {}) };
+  for (const row of rotation || []) {
+    if (locked.has(row.week) || (!overwrite && presetValue(next, row.week, row.mode))) continue;
+    next[presetKey(row.week, row.mode)] = row.map_id;
+  }
+  return next;
+}
+
+/** So viele schon gewählte Wochen bekämen durch „Alle neu verteilen“ eine andere Map - für die Rückfrage. */
+export function overwriteCount(form, rotation, weeks = []) {
+  const next = applyRotation(form, rotation, weeks, { overwrite: true });
+  const changed = new Set();
+  for (const row of rotation || []) {
+    const before = presetValue(form, row.week, row.mode);
+    if (before && before !== presetValue(next, row.week, row.mode)) changed.add(row.week);
+  }
+  return changed.size;
+}
+
+/** Die Wochen, deren Auswahl vom gespeicherten Stand abweicht - sie bleiben bis zum Speichern markiert. */
+export function changedWeeks(form, saved, weeks, modes) {
+  return (weeks || []).filter(({ week }) => (modes || []).some(({ mode }) => presetValue(form, week, mode) !== presetValue(saved, week, mode)))
+    .map(({ week }) => week);
+}
+
+/** Eine Zeile der Historie: „Spielwoche 1 · Kontrolle: Kai → Ruine“ (neu: „– → Kai“, entfernt: „Kai → –“). */
+export function presetChangeLine(change, modes) {
+  const mode = (modes || []).find((row) => row.mode === change.mode);
+  const name = (mapId) => (mapId ? mode?.maps?.find((item) => item.map_id === mapId)?.name || "eine Map außerhalb des Pools" : "–");
+  return `Spielwoche ${change.week} · ${mode?.label || change.mode}: ${name(change.from)} → ${name(change.to)}`;
+}
+
 // ---------------------------------------------------------------- Matchseite
+
+/** Der Satz im Stand „bereit zum Veto?“: wer schon bereit ist und was die eigene Seite jetzt tut. */
+export function readyText(start) {
+  const other = (start?.sides || []).find((side) => !side.own)?.name || "die Gegenseite";
+  // Beide bereit und trotzdem kein Veto: Das Veto beginnt gleich von selbst - bis dahin kann jede Seite zurücknehmen.
+  if ((start?.sides || []).length > 1 && start.sides.every((side) => side.ready)) return "Beide Seiten sind bereit – das Veto beginnt gleich.";
+  if (start?.own_ready) return "Ihr seid bereit – wartet auf die Gegenseite.";
+  if (start?.can_ready && start.other_ready) return `${other} ist bereit – tippt auf „Bereit zum Veto“, dann beginnt es sofort.`;
+  if (start?.can_ready) return "Tippt auf „Bereit zum Veto“, sobald ihr so weit seid. Das Veto beginnt, wenn beide Seiten bereit sind.";
+  const ready = (start?.sides || []).filter((side) => side.ready).map((side) => side.name);
+  return ready.length ? `${ready.join(" und ")} ist bereit. Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.`
+    : "Das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.";
+}
 
 /** Der eine Satz unter der Überschrift des Veto-Blocks. */
 export function vetoText(block) {
@@ -134,10 +288,16 @@ export function vetoText(block) {
   const name = current?.name || "die Gegenseite";
   switch (block.status) {
     case "waiting":
+      // Vorgabe der Woche fehlt (#2326): Das Veto beginnt nicht - der Server sagt, für welche Woche und welchen Modus.
+      if (block.blocked?.text) return block.blocked.text;
+      // Nachgetragen: Das Veto beginnt nicht von selbst, sondern wenn beide Seiten „Bereit zum Veto“ getippt haben - vorher läuft
+      // keine Zeit. Der Satz sagt jeder Seite, wer schon bereit ist und was sie jetzt tut.
+      if (block.start) return readyText(block.start);
       return "Sobald beide Seiten eingecheckt sind, beginnt das Map-Veto – danach startet Map 1.";
     case "running":
       if (!current) return "Das Veto läuft.";
       if (current.kind === "decider") return `Die übrige Map wird Map ${current.position} – das setzt das System.`;
+      if (current.kind === "preset") return `Die Vorgabe der Woche wird Map ${current.position} – das setzt das System.`;
       if (block.own_turn) return `Ihr seid am Zug: ${current.kind === "ban" ? "sperrt eine Map" : `wählt Map ${current.position}`} (${current.mode_label}). Nach ${block.step_seconds} Sekunden wählt das System.`;
       return `${name} ist am Zug: ${current.kind === "ban" ? "sperrt eine Map" : `wählt Map ${current.position}`} (${current.mode_label}).`;
     case "paused":
@@ -154,7 +314,8 @@ export function vetoText(block) {
 /** „Schritt 3 von 11 · Stellung · Team A wählt Map 1“ */
 export function stepLabel(current) {
   if (!current) return "";
-  const what = current.kind === "ban" ? "sperrt eine Map" : current.kind === "pick" ? `wählt Map ${current.position}` : `Decider für Map ${current.position}`;
+  const what = current.kind === "ban" ? "sperrt eine Map" : current.kind === "pick" ? `wählt Map ${current.position}`
+    : current.kind === "preset" ? `Vorgabe der Woche für Map ${current.position}` : `Decider für Map ${current.position}`;
   return `Schritt ${current.number} von ${current.total} · ${current.mode_label} · ${current.name ? `${current.name} ${what}` : what}`;
 }
 
@@ -184,6 +345,7 @@ export function mapStatusText(row) {
   if (row.status === "banned") return row.by_name ? `gesperrt von ${row.by_name}` : "gesperrt";
   if (row.status === "picked") return `Map ${row.position}${row.by_name ? ` · ${row.by_name}` : ""}`;
   if (row.status === "decider") return `Map ${row.position} · Decider`;
+  if (row.status === "preset") return `Map ${row.position} · Vorgabe der Woche`;
   // Jede Map nur einmal je Serie (`never`): in einem anderen Modus schon gewählt - nicht „offen“.
   if (row.status === "elsewhere") return `in anderem Modus gespielt${row.position ? ` (Map ${row.position})` : ""}`;
   return "offen";
@@ -194,6 +356,7 @@ export function historyLine(row) {
   if (!row) return "";
   const auto = row.via === "auto" && row.kind !== "decider" ? " · Zeit abgelaufen, das System hat gewählt" : "";
   if (row.kind === "decider") return `${row.index + 1}. Decider: ${row.map_name} → Map ${row.position} (${row.mode_label})`;
+  if (row.kind === "preset") return `${row.index + 1}. Vorgabe der Woche: ${row.map_name} → Map ${row.position} (${row.mode_label})`;
   if (row.kind === "ban") return `${row.index + 1}. ${row.name || "?"} sperrt ${row.map_name} (${row.mode_label})${auto}`;
   return `${row.index + 1}. ${row.name || "?"} wählt ${row.map_name} → Map ${row.position} (${row.mode_label})${auto}`;
 }

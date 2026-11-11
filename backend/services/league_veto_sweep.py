@@ -13,6 +13,7 @@ from datetime import datetime
 from models import now_utc
 from services import league_veto
 from services.league_veto_rules import RUNNING, veto_of
+from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 logger = logging.getLogger("tls.league_veto_sweep")
@@ -32,6 +33,29 @@ async def _settle(db, row: dict, now: datetime) -> int:
     except MutationLockBusy:
         logger.info("Veto für match=%s wartet auf die Turniersperre", row.get("id"))
         return 0
+
+
+async def announce_waiting(db, season_id: str, *, now: datetime | None = None) -> int:
+    """Nach dem Speichern der Vorgaben der Woche (#2326): Spiele dieser Season, deren Veto auf die Vorgabe gewartet hat
+    (``flow.veto_wait``) und jetzt beginnen könnte, bekommen an beide Seiten „Vorgabe da – Veto kann starten“. **Das Veto beginnt
+    dadurch nicht** - ein Captain oder Vertreter startet es auf der Matchseite, vorher läuft keine Zeit. Je Spiel und Termin einmal
+    (``league_veto.announce_ready`` schreibt mit Bedingung, ohne Sperre sicher). Gibt die Zahl der benachrichtigten Spiele zurück; ein
+    Spiel hält die anderen nicht auf."""
+    now = now or now_utc()
+    staffeln = await db.tournaments.find({"league_context.season_id": season_id, "locked_at": None},
+                                         {"_id": 0, "creation_key": 0, "billing": 0}).to_list(200)
+    by_id = {row["id"]: row for row in staffeln if row.get("id")}
+    if not by_id:
+        return 0
+    rows = await db.matches_v2.find({"tournament_id": {"$in": sorted(by_id)}, "flow.veto_wait": {"$exists": True}, "started_at": None},
+                                    {"_id": 0}).to_list(500)
+    told = 0
+    for match in rows:
+        try:
+            told += 1 if await league_veto.announce_ready(db, match, by_id[match["tournament_id"]], now=now) else 0
+        except Exception:  # noqa: BLE001 - ein Spiel hält die anderen nicht auf
+            logger.warning("[league_veto_sweep] Nachricht „Veto kann starten“ zu Spiel %s nicht verschickt", log_safe(match.get("id")), exc_info=True)
+    return told
 
 
 async def sweep(db, tournaments: list[dict] | None = None, *, now: datetime | None = None) -> dict:
