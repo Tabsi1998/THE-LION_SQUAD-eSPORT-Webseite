@@ -40,8 +40,10 @@ async def member(flow, name, **fields):
 
 
 async def with_badge(flow, user):
-    await flow.db.achievements.insert_one({"code": "test-tier", "name": "Test-Erfolg", "level": 1, "points": 10})
-    await flow.db.user_achievements.insert_one({"user_id": user["id"], "tier_code": "test-tier", "level": 1,
+    # Mit Gruppe (#2339): Die Spielerliste zählt wie die Erfolge-Seite - eine Stufe ohne Gruppe zählt dort nicht.
+    await flow.db.achievement_groups.insert_one({"code": "test-group", "name": "Test-Gruppe", "category": "match", "public": True})
+    await flow.db.achievements.insert_one({"code": "test-tier", "group_code": "test-group", "name": "Test-Erfolg", "level": 1, "points": 10})
+    await flow.db.user_achievements.insert_one({"user_id": user["id"], "tier_code": "test-tier", "group_code": "test-group", "level": 1,
                                                 "earned_at": "2026-10-01T10:00:00+00:00"})
 
 

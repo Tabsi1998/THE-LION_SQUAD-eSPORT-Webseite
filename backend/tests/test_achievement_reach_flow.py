@@ -168,6 +168,26 @@ async def test_nicht_mehr_erreichbares_zaehlt_nirgends_mit(flow):
 
 
 @pytest.mark.asyncio
+async def test_spielerliste_zaehlt_wie_die_erfolge_seite(flow):
+    anna = await flow.add_user(name="Anna")
+    await _member(flow, anna)
+    await flow.db.users.update_one({"id": anna["id"]}, {"$set": {"privacy_public_profile": True}})
+    await _give(flow, anna, "matches_played_1", "founding_member_1", "community_helper_1", "neg_afk")
+
+    async def both():
+        flow.act_as(anna)
+        mine = (await flow.get("/api/achievements/overview")).json()["mine"]["count"]
+        flow.act_as(None)
+        listed = next(row for row in (await flow.get("/api/users/public-list")).json() if row["id"] == anna["id"])["achievements_count"]
+        return mine, listed
+
+    assert await both() == (2, 2), "ohne Negatives und ohne nicht mehr Erreichbares - auf beiden Seiten"
+    # Gegenprobe: ohne Kennzeichen zählt die Stufe auf beiden Seiten mit.
+    await flow.db.achievement_groups.update_one({"code": "founding_member"}, {"$set": {"retired": False}})
+    assert await both() == (3, 3)
+
+
+@pytest.mark.asyncio
 async def test_nicht_mehr_erreichbares_wird_nicht_automatisch_vergeben(flow):
     racer = await flow.add_user(name="Fahrer")
     await flow.db.tournaments.insert_one({"id": "gp", "title": "GP", "format": "grand_prix", "status": "completed"})
