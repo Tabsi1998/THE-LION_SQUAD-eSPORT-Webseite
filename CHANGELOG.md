@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.77.1 (11.11.2026)
+
+### Fehlerbehebungen
+
+* Teamseite zeigt das eigene Banner im vollen 3:1-Format statt abgeschnitten (#2349)
+
+## 1.77.0 (11.11.2026)
+
+### Neu
+
+* Admin-Katalog – Erfolge mit Grund auf „nicht mehr erreichbar“ setzen (#2339)
+* Erfolge – nicht mehr Erreichbares sieht nur, wer es hat; es zählt nirgends mit (#2339)
+* Erfolge-Seite zeigt je Kategorie einen Haken oder „x von y“ der erreichbaren Stufen (#2339)
+
+### Fehlerbehebungen
+
+* Comeback und Kartenkenner zählen die Maps der Vereinsliga, zugesprochene nicht (#2339)
+* Kategorie-Meister zählt nur erreichbare Stufen, ohne Zirkel (#2339)
+* Nicht-Mitglieder sehen beim Verein „Nur für Mitglieder“ (#2339)
+* Pionier bleibt für frühe Konten erreichbar, die Verwaltung behält ihre Einstellung (#2339)
+* Profil, Spielerliste, Rangliste und Kachel zählen Erfolge wie die Erfolge-Seite (#2339)
+* Saison und Profil & Konto zeigen auf der Erfolge-Seite ihr eigenes Symbol (#2339)
+* Sammler, Geheimnisträger und Hundert Prozent sind erreichbar und zählen wie die Anzeige (#2339)
+* Streckenrekord und Eiserner Löwe mit eigenem Kriterium (#2339)
+* Turnierleitung, Schiedsrichter und Gastgeber sieht nur die Leitung (#2339)
+
 ## 1.76.0 (11.11.2026)
 
 ### Neu

@@ -161,6 +161,23 @@ for (const [label, width, height] of WIDTHS) {
       await expect.poll(() => calls.find((call) => call.method === "DELETE")?.path).toBe("/api/teams/t-1/members/u-2");
     });
 
+    test("Teamseite: eigenes Banner steht ganz im Band (3:1 wie beim Zuschnitt)", async ({ page }, testInfo) => {
+      const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='1500' height='500'><rect width='1500' height='500' fill='#1b1035'/><text x='750' y='90' font-size='80' fill='white' text-anchor='middle' font-family='sans-serif'>OBEN</text><text x='750' y='470' font-size='80' fill='white' text-anchor='middle' font-family='sans-serif'>UNTEN</text></svg>";
+      await mockApi(page, LEAD, {
+        "/api/teams/t-1": { ...TEAM, banner_url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}` },
+        "/api/teams/t-1/overview": { upcoming: [], recent: [] },
+        "/api/teams/t-1/level": {},
+      }, []);
+      await page.goto("/teams/t-1");
+      const band = page.getByTestId("team-band");
+      await expect(page.getByTestId("team-band-banner")).toBeVisible();
+      const box = await band.boundingBox();
+      expect(Math.abs(box.width / box.height - 3)).toBeLessThan(0.05);
+      expect(await overflow(page)).toBeLessThanOrEqual(0);
+      const shot = await page.getByTestId("team-header").screenshot(process.env.SHOT_DIR ? { path: `${process.env.SHOT_DIR}/banner-${width}.png` } : {});
+      await testInfo.attach(`banner-${width}.png`, { body: shot, contentType: "image/png" });
+    });
+
     test("Teamseite: privat schalten mit Hinweis, Beitrittscode erneuern, aufgelöst statt nicht gefunden", async ({ page }) => {
       const calls = [];
       await mockApi(page, LEAD, {
