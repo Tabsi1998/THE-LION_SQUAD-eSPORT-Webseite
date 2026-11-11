@@ -878,7 +878,7 @@ Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variab
 | `application.opens`, `application.closes`, `application.slots` | Anmeldefenster (Wiener Zeit) und Startplätze (B.4) |
 | `application.acceptance` (#2348) | Ganzer Satz ohne Punkt: „Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
 | `protest.hours`, `appeal.hours`, `evidence.keep_days` | **Vorab angelegt:** Season-Felder `protest_hours` (Vorgabe 48), `appeal_hours` (48), `evidence_keep_days` (30). Ohne Feld gilt die Vorgabe (`league_rule_vars.PRESETS`). Die Einstellung kommt mit E.2 (Proteste) bzw. E.3 (Strafen) und schreibt **genau diese Felder**, Texte passen sich dann über den Vorschlag an |
-| `match.break_after_map`, `match.break_minutes` | **Vorab angelegt:** Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5); Einstellung mit D.5 (Vorfälle) |
+| `match.break_after_map`, `match.break_minutes` | **Vorab angelegt:** Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5); Einstellung mit D.5 (Vorfälle). Alle Felder für Vorfälle und Proteste stehen im Abschnitt „D.5/E.2-Vertrag“ (#2360) |
 | `mode:<kennung>.name`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus des Spiels: Name, Ergebnisregel in Klartext, Ziel, Rundenlimit, Zeitlimit („10 Min.“), Zeit je Runde, Spieler je Seite, „ja“/„nein“ |
 
 **Ablauf bei Änderungen** (Obmann 03.11.): Ändert sich eine Einstellung, vergleicht die Verwaltung wie bisher die letzte Fassung mit
@@ -2545,6 +2545,223 @@ Beides ist Teil von Fingerabdruck und Vorschlag: Eine geänderte Vorlage löst �
 **App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. **Audit-Aktionen neu:** `match.veto.start`,
 `match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`; seit #2326 `match.veto.waiting`, `match.veto.ready`, `match.veto.ready_side`
 und `league.season.veto_presets`.
+
+### D.5/E.2-Vertrag: Vorfälle, Verfahren und Nachweise (#2360)
+
+Regelwerk v2 § 9, § 9a, § 10, § 12, § 13 und Anlage C; Entscheidungen Nr. 24, 29, 30, 31, 41, 45, 63, 103, 109, 121 und 129–136.
+Dieser Abschnitt ist der gemeinsame Vertrag für **D.5 Vorfälle** und **E.2 Proteste** (#1619). Gebaut ist davon mit #2360 nur der
+**Nachweis-Baustein** (Unterabschnitt „Nachweise“); alles andere legt Namen, Felder und Regeln fest, an die sich beide Pakete halten.
+Nur Liga-Staffeln (Turnier mit `league_context`). **Turniere bleiben, wie sie sind:** „Problem melden“ mit 30 Minuten
+(`match_disputes.DISPUTE_WINDOW_MINUTES`), ein Foto je Meldung, 30 Tage Aufbewahrung. **Migration: keine**, jedes Feld ist optional.
+
+#### Season-Felder
+
+Alle Felder stehen an `league_seasons` und an der Staffel (`tournaments`). Zur Laufzeit zählt der Wert der Staffel, ohne Feld der
+der Season, ohne beides die Vorgabe aus `league_rule_vars.PRESETS` (die **eine** Quelle für Vorgaben; D.5 und E.2 tragen ihre neuen
+Felder dort ein). Liga N weicht nicht ab (kein `overrides`-Eintrag). Übertragen wird in zwei eigenen Gruppen von `SYNC_GROUPS`, die wie
+`checkin` auch in einer laufenden Season gelten, nicht in einer gesperrten Staffel: `incidents` (D.5) und `protests` (E.2). Jeder Vorfall
+und jedes Verfahren **speichert seine berechneten Fristen**; eine geänderte Einstellung wirkt nur auf neue Fälle.
+
+| Feld | Typ | Vorgabe | Paket | Bedeutung |
+| --- | --- | --- | --- | --- |
+| `map_break_after` | int 1–7 | 2 | D.5 | reserviert (#2269): Standardpause nach dieser Map (Anlage C.3) |
+| `map_break_minutes` | int 0–60 | 5 | D.5 | reserviert: Dauer der Standardpause |
+| `incident_answer_minutes` | int 1–120 | 10 | D.5 | neu: Antwortzeit der Gegenseite auf einen Vorfall (Nr. 131); läuft ohne Ruhen, sie liegt mitten im Spiel |
+| `incident_quota_per_map` | int 0–5 | 1 | D.5 | neu: Rehosts und technische Pausen je Team und Map (§ 9.6) |
+| `clarification_mode` | `"continue"` \| `"pause_series"` | `"continue"` | D.5 | neu: Serie bei Map „in Klärung“ (Nr. 132) |
+| `protest_hours` | int 1–336 | 48 | E.2 | reserviert: Protestfrist ab Bestätigung des Ergebnisses (Nr. 129, 63) |
+| `statement_hours` | int 1–336 | 48 | E.2 | neu: Frist der Gegenseite für die Stellungnahme, ab Benachrichtigung (Nr. 133) |
+| `protest_target_hours` | int 1–720 | 72 | E.2 | neu: Zielfrist der Leitung ab „übernommen“ (Nr. 135); danach Erinnerung und Eskalation, nie eine automatische Entscheidung |
+| `appeal_hours` | int 1–336 | 48 | E.2 | reserviert: Einspruchsfrist ab Bekanntgabe der Entscheidung (Nr. 41, 45); E.3 nutzt dasselbe Feld für Strafen |
+| `moss_upload_hours` | int 1–168 | 24 | E.2 | neu: Frist für eine angeforderte MOSS-Datei (§ 9a.3) |
+| `protest_reasons` | `[{key, label, ask_notified}]`, 1–20 | siehe unten | E.2 | neu: Gründe zum Antippen (Nr. 134); `ask_notified` stellt die Pflichtfrage „sofort hingewiesen?“ |
+| `contested_result_mode` | `"counts"` \| `"excluded"` | `"counts"` | E.2 | neu: angefochtenes Ergebnis in der Tabelle (Nr. 30) |
+| `evidence_keep_days` | int 0–365 | 30 | E.2 | reserviert: Aufbewahrung der Nachweise nach Season-Ende (Nr. 31, 136); gelesen seit #2360 |
+
+Vorgabe für `protest_reasons`: `wrong_result` „Falsches Ergebnis“, `rule_violation` „Regelverstoß“, `equipment` „Ausrüstung“
+(`ask_notified`), `lobby` „Lobby und Einstellungen“ (`ask_notified`), `player` „Spielberechtigung eines Spielers“ (`ask_notified`),
+`cheating` „Cheat-Verdacht“, `technical` „Technik“, `other` „Sonstiges“. Die vier Schlüssel von „Problem melden“
+(`match_disputes.CATEGORIES`) bleiben darin erhalten, das Alt-Feld `category` wird weiter mitgeschrieben.
+
+**Fristen in Stunden ruhen in Sperrzeiten** (Nr. 29, 133): gerechnet wird mit `matchday_schedule.response_deadline(tournament, start, hours)`
+(Sperrzeiten und Sperrwochen zählen nicht mit), gespeichert als ISO-Zeit am Fall. Neue Variablen für den Regeltext kommen mit dem
+jeweiligen Paket nach dem Muster der reservierten (`incident.answer_minutes`, `statement.hours`, `protest.target_hours`, `moss.upload_hours`).
+
+#### Vorfälle: `matches_v2.incidents[]` (D.5)
+
+Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder lehnt ab; ohne Einigung entscheidet die Leitung (Nr. 24, 131).
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `id` | str | Kennung, Bezug für Nachweise (`context.kind` `incident`) |
+| `position` | int 1…Best of | Map-Position wie in `planned_games[]` und `games[]` |
+| `kind` | `disconnect` \| `rehost` \| `pause` \| `moss_crash` \| `restart_early` \| `replay` \| `other` | Art des Vorfalls |
+| `between_maps` | bool | nur bei `pause`: die Map-Pause nach Anlage C.3. Sie wird **nur dokumentiert** (`minutes`), ohne Vorschlag, Antwort und Kontingent, Stand sofort `agreed` |
+| `reported_by` | `{registration_id, user_id}` | meldende Seite und Person; die Leitung meldet mit `registration_id: null` |
+| `at` | ISO | Zeitpunkt der Meldung |
+| `score` | `{<registration_id>: int}` \| null | Stand beim Vorfall (Runden bzw. Punkte), `round` (int) und `players` (`[user_id]`, betroffene Personen) dazu optional |
+| `note` | str ≤ 500 | Beschreibung, Ursache soweit bekannt |
+| `proposal` | `continue_at_score` \| `rehost` \| `restart` \| `replay` | Vorschlag: beim Stand fortsetzen, Rehost beim Stand, Neustart in der frühen Phase (Anlage C.1, Nr. 103), Wiederholung der Map |
+| `state` | `proposed` \| `agreed` \| `rejected` \| `expired` \| `in_review` \| `decided` \| `withdrawn` | siehe Ablauf |
+| `answer_deadline` | ISO | `at` + `incident_answer_minutes` |
+| `answer` | `{registration_id, user_id, at, note}` \| null | Antwort der Gegenseite |
+| `review_cause` | `rejected` \| `expired` | warum die Leitung entscheidet |
+| `counts_quota` | bool | zählt gegen das Kontingent: `rehost` und `pause` (ohne `between_maps`) ja, `moss_crash` nie (§ 9a.6), alle anderen nein |
+| `decision` | `{outcome, registration_id, reason, by, at, conflict_reason}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen) |
+| `voided` | `{mode, map_id, score, round, at}` \| null | die für ungültig erklärte Erstaustragung bei `restart` oder `replay` |
+| `closed_at` | ISO \| null | gesetzt mit `agreed`, `decided` oder `withdrawn` |
+
+- **Ablauf:** `proposed` → `agreed` (Gegenseite stimmt zu) oder `withdrawn` (meldende Seite zieht zurück, nur solange `proposed`).
+  Lehnt die Gegenseite ab (`rejected`) oder antwortet sie bis `answer_deadline` nicht (`expired`, Zeit-Job), geht der Vorfall im selben
+  Schritt auf `in_review`; `rejected` und `expired` sind keine Ruhezustände, der Grund steht in `review_cause`. `in_review` → `decided`
+  durch die Leitung (`disputes` oder `results`, Befangenheit wie B.1). Offen ist ein Vorfall in `proposed` und `in_review`.
+- **Kontingent** (§ 9.6): je Team und Map zählen die eigenen Vorfälle mit `counts_quota` in `agreed` oder `decided`. Das System zählt und
+  zeigt „1 von 1 genutzt“ beiden Seiten und der Leitung; ein weiterer Vorfall bleibt meldbar, braucht aber die Zustimmung der Gegenseite
+  und geht sonst an die Leitung. Nichts wird automatisch verweigert oder bestraft (§ 13.1).
+- **Eine Map zählt nie doppelt** (§ 9.4, Anlage C.2.7): `games[]` trägt je Position genau **eine** geltende Austragung. Wird eine Map neu
+  gestartet oder wiederholt, steht die ungültige Erstaustragung nur in `incidents[].voided`; der geltende Eintrag in `games[]` bekommt
+  `status: "replayed"`, `replay_reason` (C.3) und neu `incident_id`. Kein Leser von `games[]` (Tabelle, Konsens, App) sieht die
+  Erstaustragung.
+- **Map-Stand „in Klärung“:** Quelle ist der Vorfall, kein zweites Feld. Eine Position ist in Klärung, solange ein Vorfall dieser
+  Position `in_review` ist. Die Matchseite liefert im Block `league` je Position `map_state`: `open` \| `in_clarification` \| `replayed` \|
+  `awarded` \| `played`, dazu `incidents[]` für Beteiligte und Leitung.
+- **Wie zählt die Map vor der Entscheidung?** Gar nicht (Nr. 132). Solange eine Position in Klärung ist, wird kein Ergebnis des Spiels
+  gültig: Melden bleibt möglich, **Bestätigen und die Frist-Automatik (`result_confirm_hours`) ruhen**, das Spiel ist nicht `completed`
+  und steht nicht in der Tabelle. `games[]` am Spiel entsteht wie bisher erst mit dem gültigen Ergebnis.
+  `clarification_mode` `continue` (Vorgabe): die Serie läuft unter Vorbehalt weiter, die Seiten spielen und melden die übrigen Maps;
+  nach der Entscheidung gilt die Map wie gemeldet (`continue_at_score`, `rehost`, `no_action`), wird wiederholt (`restart`, `replay`)
+  oder zugesprochen (`awarded` → `games[].decision: "awarded"`). `pause_series`: keine weitere Map beginnt, Meldungen mit einer
+  späteren Position lehnt der Server mit 409 ab, bis entschieden ist. Die Leitung kann die Serie in beiden Fällen jederzeit aussetzen
+  oder neu ansetzen (Anlage C.2.6).
+
+#### Verfahren: Beanstandung, Protest, Einspruch (E.2)
+
+Ein Verfahren ist ein Eintrag in `matches_v2.disputes[]` (kein zweites System, Nr. 130). Neue Einträge tragen `id` und `kind`;
+Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `id` | str | Kennung, Bezug für Nachweise (`protest`, `statement`, `moss`) |
+| `kind` | `objection` \| `protest` \| `appeal` | Beanstandung (vor der Bestätigung, innerhalb `result_confirm_hours`), Protest (danach, innerhalb `protest_hours`), Einspruch |
+| `registration_id`, `user_id`, `at` | wie bisher | Seite, Person, Zeitpunkt |
+| `reason_key` | Schlüssel aus `protest_reasons` | Grund; `category` wird für alte Leser mitgeschrieben |
+| `reason` | str 10–1000 | Begründung, Pflicht |
+| `claimed` | `{results, games}` \| null | das abweichende Ergebnis. Pflicht ist die Begründung plus `claimed` **oder** ein Grund, der kein Ergebnis betrifft (Nr. 130) |
+| `notified_immediately` | bool \| null | Pflichtantwort bei Gründen mit `ask_notified` (§ 8.8) |
+| `evidence_until` | ISO | bis wann die einreichende Seite ergänzen und Nachweise nachreichen darf (Ende der Protest- bzw. Bestätigungsfrist) |
+| `statement` | `{registration_id, due_at, extended_by, text, user_id, at}` \| null | Stellungnahme der Gegenseite: `due_at` = Benachrichtigung + `statement_hours`; die Leitung kann verlängern (`extended_by`) |
+| `moss_requests` | `[{id, user_id, requested_by, at, due_at, state}]` | angeforderte MOSS-Dateien (§ 9a.3): `state` `requested` \| `uploaded` \| `missing` \| `excused` |
+| `assignee` | `{user_id, at}` \| null | wer „übernommen“ hat (Nr. 135), sichtbar für beide Seiten; Befangene können nicht übernehmen |
+| `target_at`, `reminded_at`, `escalated_at` | ISO | Zielfrist (`assignee.at` + `protest_target_hours`), Erinnerung an die Person, Eskalation an `manage` |
+| `state` | `open` \| `withdrawn` \| `decided` | Zurückziehen bis zur Entscheidung (`withdrawn_at`, `withdrawn_by`), protokolliert; danach kein neues Verfahren derselben Seite mit demselben `reason_key` |
+| `resolved_at`, `resolved_by`, `decision`, `decision_note` | wie bisher | Entscheidung: `keep` \| `change`; `decision_note` ist bei neuen Einträgen Pflicht (mindestens zehn Zeichen) |
+| `appeal_until` | ISO | Ende der Einspruchsfrist, gesetzt mit der Entscheidung (`appeal_hours`) |
+| `against` | `{type, ref_id}` | nur `appeal`: `protest_decision` (Kennung des Verfahrens), `forfeit` oder `correction` (Kennung des Spiels) |
+
+- **Anzahl** (Nr. 134): je Seite und Spiel ein offenes Verfahren; die Seite ergänzt es bis `evidence_until`. Die Gegenseite kann ein
+  eigenes eröffnen.
+- **Beginn der Protestfrist** (Nr. 63, 129): Bestätigung des Ergebnisses, von Hand oder nach Frist. „Spielwochenende“ und „nächstes Spiel
+  des Siegers“ gelten in der Liga nicht mehr.
+- **Einspruch** (Nr. 41, 45, § 13.7, Anlage C.5): einmal je Ausgangsentscheidung, nur gegen Protestentscheid, Kampflos-Wertung und
+  Ergebniskorrektur (Strafen: E.3 am selben Feld `appeal_hours`). Es entscheidet eine andere Person als `resolved_by` der
+  Ausgangsentscheidung, auch nicht der Superadmin (`conflict_of_interest(…, decided_by=…)`), begründet und endgültig. Die
+  Ausgangsentscheidung gilt bis dahin weiter.
+- **Wirkung auf die Tabelle** (Nr. 30, § 11.8): Eine **Beanstandung** hält das Spiel wie heute an (`status: "disputed"`, die Automatik
+  ruht), es zählt noch nicht. Ein **Protest** lässt mit `contested_result_mode` `counts` den Stand `completed` bzw. `forfeit` stehen:
+  Das Ergebnis zählt vorläufig, Spiel und Tabellenzeile tragen die Markierung „in Klärung“ (Spiel: `contested: true`, Zeile:
+  `contested` = Zahl der betroffenen Spiele). Mit `excluded` wird das Spiel wie heute `disputed` und zählt bis zur Entscheidung nicht.
+  Eine Korrektur rechnet die Tabelle neu.
+
+#### Sichtbarkeit (Nr. 133)
+
+| Wer | Vorfall, Verfahren | Nachweise (Bilder, Links) | MOSS |
+| --- | --- | --- | --- |
+| Eigene Seite (Mitglieder des Co-Teams) | alles | ja | nur die hochladende Seite |
+| Gegenseite | Grund, Text, Vorschlag, Stand, Stellungnahme, Entscheidung mit Begründung, wer übernommen hat | ja | nein, nur das Ergebnis der Prüfung in der Begründung (§ 9a.3) |
+| Leitung mit `disputes` oder `results` | alles | ja | ja, Befangene nicht |
+| Alle anderen, öffentlich | nur „in Klärung“ bzw. „Map wiederholt“ am Spiel und an der Tabellenzeile | nein | nein |
+
+Wer nichts sehen darf, bekommt 404, nicht 403 (wie bei Fotos vom Ergebnis). `claimed`, `notified_immediately`, `moss_requests` und
+interne Vermerke der Leitung stehen nie in öffentlichen Antworten.
+
+#### Nachweise (gebaut mit #2360)
+
+`services/match_proofs.py`, Routen in `routes/match_proof_routes.py`, Sammlung weiter `match_proof_photos` (kein neuer Name, keine
+Migration). Ein Bezug kann **mehrere** Nachweise tragen.
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `type` | `"image"` \| `"link"` | fehlt = Bild (Altbestand) |
+| `link` | str | nur bei `link`: die Adresse eines Videos. Nur `https`, höchstens 500 Zeichen, ohne Zugangsdaten in der Adresse, Domain frei. Wird nie eingebettet und nie vom Server abgerufen, nur als Link angezeigt |
+| `context.kind` | `report` \| `incident` \| `protest` \| `statement` \| `moss` | Bezug; Altbestand kennt zusätzlich `dispute` (zählt wie `protest`) |
+| `context.ref_id` | str | Kennung des Vorfalls (`incidents[].id`) bzw. des Verfahrens (`disputes[].id`); bei `report` leer. Fehlt der Schlüssel, ist es Altbestand |
+| `registration_id` | str \| null | die Seite, die hochgeladen hat (null: die Leitung) |
+| `owner_id`, `match_id`, `tournament_id`, `status`, `scan_state`, Bildfelder | wie bisher | unverändert |
+
+- **API:** `GET /api/matches/{id}/proofs?kind=&ref_id=` (Liste für diesen Bezug, nur was der Aufrufer sehen darf, je Eintrag `side`,
+  `own`, `can_remove`; dazu `can_add`, `open`, `limit`), `POST /api/matches/{id}/proofs` (Formular: `kind`, `ref_id` und entweder `file`
+  oder `link`), `DELETE /api/matches/{id}/proofs/{proof_id}`. Bilder liefert weiter `GET /api/matches/{id}/proof-photos/{id}` aus.
+- **Hinzufügen** darf, wer für eine Seite des Spiels handelt (Captain, Vertreter, wer angemeldet hat), solange der Bezug offen ist:
+  `report` bis das Ergebnis gilt, `incident` solange der Vorfall offen ist, `protest` nur die einreichende Seite bis `evidence_until`,
+  `statement` nur die Gegenseite bis `statement.due_at`, `moss` jedes Mitglied einer Seite (der Spieler lädt selbst hoch). Die Leitung
+  mit `results` oder `disputes` darf zu jedem offenen Bezug hinzufügen. Höchstens zehn Nachweise je Seite und Bezug, gleiches
+  Rate-Limit wie beim Foto vom Ergebnis (gemeinsamer Zähler).
+- **Entfernen** darf nur, wer den Nachweis hinzugefügt hat, und nur solange der Bezug offen ist. Altbestand (über `photo_id` an Meldung
+  oder Problem gehängt) lässt sich so nicht entfernen. Protokoll: `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, nie
+  die Adresse).
+- **Offen** ist ein Bezug so: `report` bis das Spiel `completed`, `forfeit` oder geschlossen ist; `incident` in `proposed` und
+  `in_review`; `protest`, `statement` und `moss` bis das Verfahren `resolved_at` oder `withdrawn_at` trägt.
+- **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Die ZIP-Datei selbst
+  (eigener Dateityp, eigene Größen- und Inhaltsprüfung) baut E.2 als `type: "file"` in denselben Regeln.
+
+**Aufbewahrung** (Nr. 31, 136; `match_proofs.purge`, täglicher Job `proof_photo_retention`):
+
+| Was | Gelöscht |
+| --- | --- |
+| Nie verwendetes Foto (`pending`) | 24 Stunden nach dem Hochladen (unverändert) |
+| Turnier ohne Liga | 30 Tage nach dem Hochladen, nicht solange das Spiel `disputed` ist (unverändert) |
+| Liga, alles außer MOSS | ab Season-Ende + `evidence_keep_days`, nicht solange am Spiel ein Vorfall oder Verfahren offen ist oder eine Einspruchsfrist läuft |
+| Liga, MOSS | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; ohne auffindbares Verfahren `appeal_hours` nach dem Hochladen |
+| Spiel, Turnier oder Konto gelöscht | sofort mit (unverändert) |
+
+**Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt
+das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, Wiener Zeit). Eine laufende Strafe verlängert die
+Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist `match_proof_photos.keep_until` (ISO) und noch nicht gebaut.
+
+#### Altbestand und Übergang
+
+- `disputes[]`-Einträge ohne `kind` und ohne `id` bleiben gültig und lesbar: `match_disputes.open_dispute`, „Braucht Aufmerksamkeit“
+  und `POST /dispute/decision` behandeln alte und neue Einträge gleich (offen = ohne `resolved_at`).
+- `POST /api/matches/{id}/dispute` bleibt für Turniere unverändert und schreibt dort weiter Einträge ohne `kind`. In einer Liga-Staffel
+  schreibt derselbe Endpunkt ab E.2 Einträge mit `id` und `kind` (`objection` vor, `protest` nach der Bestätigung); ein Aufruf ohne die
+  neuen Felder (App ohne neuen Build) bleibt erlaubt und wird mit `reason_key` aus `category` gespeichert.
+- Fotos über `photo_id` (Meldung, Problem) laufen unverändert weiter: `context` ohne `ref_id`, sichtbar wie bisher, eines je Meldung.
+  In der Liste eines Bezugs erscheinen sie mit `can_remove: false`.
+- Aufbewahrung: Für alte Nachweise einer Liga-Staffel gilt ab jetzt die Liga-Regel (sie bleiben also länger als bisher, nie kürzer);
+  Turniere bleiben bei 30 Tagen.
+
+#### Wer baut was
+
+| Teil | D.5 | E.2 |
+| --- | --- | --- |
+| Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
+| Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei |
+| Zeit-Job | `answer_deadline` → `in_review` | Erinnerung und Eskalation zur Zielfrist, Ablauf der Stellungnahme |
+| Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“, `pause_series` | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |
+
+**Überschneidungen** (bitte absprechen, wer zuerst mergt, der andere zieht nach):
+
+- `routes/match_routes.py`: D.5 fasst Melden und Bestätigen an (Ruhen bei „in Klärung“), E.2 `POST /dispute`, `/dispute/decision` und
+  das Fenster. Neue Endpunkte gehören in eigene Dateien (`routes/league_incident_routes.py`, `routes/league_protest_routes.py`).
+- `ProblemReportForm.jsx` und `DisputeCard.jsx`: gehören E.2 (Art, Gründe, Pflichtfrage, Nachweis-Liste). D.5 baut ein eigenes Formular
+  „Vorfall melden“ und fasst beide Dateien nicht an.
+- Matchseite, Block `league` (`league_games.page_block`): D.5 ergänzt `incidents` und `map_state`, E.2 `procedures` und `contested`;
+  jeder nur seine Schlüssel.
+- Benachrichtigungen: beide nutzen die Art `match_attention` und „Mein Dienst“. D.5: `incident:<id>`, E.2: `procedure:<id>` als
+  Schlüssel gegen doppelte Meldungen.
+- `league_rule_vars.PRESETS`, `SYNC_GROUPS`, `seasonTabs.js`: jeder ergänzt nur seine Zeilen bzw. seine Gruppe.
+- Nachweise: beide benutzen `match_proofs` und den Frontend-Baustein `ProofList` unverändert; fehlt etwas, kommt es als eigener Commit
+  in den Baustein, nicht als Kopie.
 
 ### Season-Seite der Verwaltung (#2267)
 
