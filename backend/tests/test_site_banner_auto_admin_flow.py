@@ -189,19 +189,9 @@ async def test_the_audience_follows_the_visibility(flow):
 
 
 @pytest.mark.asyncio
-async def test_internal_entries_do_not_crowd_out_public_ones(flow, monkeypatch):
+async def test_internal_entries_do_not_crowd_out_public_ones(flow):
     """Nur drei Server kommen in Frage: interne in Wartung belegen keinen Platz (#2352). Fehlende Sichtbarkeit gilt als
-    öffentlich."""
-    import mongomock_motor
-
-    # mongomock_motor übergeht die Länge bei ``to_list`` - Motor und MongoDB schneiden ab. Hier wie dort.
-    original = mongomock_motor.AsyncCursor.to_list
-
-    async def to_list_with_length(self, length=None, *args, **kwargs):
-        rows = await original(self, length, *args, **kwargs)
-        return rows[:length] if length else rows
-
-    monkeypatch.setattr(mongomock_motor.AsyncCursor, "to_list", to_list_with_length)
+    öffentlich. Die Test-Mongo schneidet bei ``to_list`` wie Motor ab (#2357, ``mongomock_to_list``)."""
     for number in range(3):
         await flow.db.game_servers.insert_one({"id": f"srv-intern-{number}", "name": f"Intern {number}", "status": "maintenance",
                                                "site_banner_enabled": True, "is_active": True, "visibility": "internal",
