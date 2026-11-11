@@ -75,7 +75,8 @@ AUTO_ACCEPT = "application_auto_accept"
 AUTO_ACTOR: dict = {"id": None}
 AUTO_NAME = "automatisch"
 AUTO_PLAN_FIXED = "Der Spielplan der Staffel steht schon. Das Co-Team bitte über „Austritt eintragen“ in der Teilnehmerliste herausnehmen."
-AUTO_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Das Team war automatisch angenommen und liest ihn."
+# Zurückstufen einer angenommenen Anmeldung (#2348): wie beim Ablehnen nur mit Grund, egal ob automatisch oder von Hand angenommen.
+DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, das Team liest ihn."
 
 
 # ---------------------------------------------------------------- Fenster und Plätze
@@ -449,7 +450,8 @@ async def reject(db, league: dict, season: dict, application_id: str, reason: st
 
 async def waitlist(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict, *, conflict_reason: str | None = None,
                    refresh_previews=None) -> dict:
-    """Auf die Warteliste. Eine automatisch angenommene Anmeldung (#2348) zurückstufen geht nur mit Grund, eine automatische Zuteilung fällt dabei weg."""
+    """Auf die Warteliste. Eine angenommene Anmeldung zurückstufen geht nur mit Grund (#2348), automatisch oder von Hand angenommen - das Team liest ihn.
+    Eine automatische Zuteilung fällt dabei weg."""
     override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     text = (reason or "").strip() or None
     locked_id = await _auto_seat_to_lock(db, season["id"], application_id)
@@ -460,8 +462,6 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
             override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] not in (SUBMITTED, IN_REVIEW, ACCEPTED):
                 raise LeagueProblem(DECIDED, 409)
-            if application["status"] == ACCEPTED and application.get("auto_accepted") and len(text or "") < REASON_MIN:
-                raise LeagueProblem(AUTO_REASON)
             seat = await _auto_seat(db, fresh, application, locked_id)
             if not seat and (application.get("assignment") or await _left_over(db, application)):
                 raise LeagueProblem(ASSIGNED_ALREADY, 409)
@@ -469,6 +469,8 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
                 raise LeagueProblem(NO_WAITLIST, 409)
             if not _waitlist_has_room(fresh, await seat_stats(db, fresh)):
                 raise LeagueProblem(WAITLIST_FULL, 409)
+            if application["status"] == ACCEPTED and len(text or "") < REASON_MIN:
+                raise LeagueProblem(DEMOTE_REASON)
             now = now_utc().isoformat()
             done = await _move(db, application, WAITLIST, actor["id"], reason=text, override=override, drop_assignment=bool(seat),
                                fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})

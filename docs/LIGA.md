@@ -1118,7 +1118,7 @@ Mit `application_auto_accept` (#2348, Entscheidung Nr. 126) entscheidet die Seas
 | `applied_by`, `submitted_at` | str, ISO | Wer wann eingereicht hat |
 | `rule_consent` | `{consent_id, rule_version_id, version, user_id, at}` | Die Fassung, der zugestimmt wurde. Dieselbe Zustimmung steht in `league_rule_consents` |
 | `privacy_consent` | `{text, user_id, at}` | Der Wortlaut, dem zugestimmt wurde |
-| `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht, beim Zurückstufen einer automatisch angenommenen Anmeldung auch. Entscheidet die Season (#2348), ist `decided_by` `null` |
+| `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht, beim Zurückstufen einer angenommenen Anmeldung auch (#2348, automatisch oder von Hand angenommen). Entscheidet die Season (#2348), ist `decided_by` `null` |
 | `auto_accepted` (#2348) | `true` | Nur solange die Annahme automatisch war. Jede Entscheidung einer Person (auch Zuteilen) nimmt das Feld weg |
 | `withdrawn_by`, `withdrawn_at` | str, ISO | Rückzug |
 | `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at, auto?}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei. `auto: true` (#2348): beim Einreichen automatisch zugeteilt, `assigned_by` `null` |
@@ -1136,7 +1136,7 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 | `submitted` | `in_review` | Leitung |
 | `submitted`, `in_review`, `waitlist` | `accepted` | Leitung, nur mit freiem Platz. Prüfung wird wiederholt. Mit `tournament_id` gleich zugeteilt |
 | `submitted`, `in_review` | `waitlist` | Leitung, nur wenn die Season eine Warteliste hat und sie nicht voll ist |
-| `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei. War die Annahme automatisch (`auto_accepted`), nur mit Grund (mindestens fünf Zeichen, sonst 422) |
+| `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei. Nur mit Grund (mindestens fünf Zeichen, sonst 422; #2348), das Team liest ihn in der Nachricht |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `rejected` | Leitung, Grund mindestens fünf Zeichen |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `withdrawn` | Captain oder Vertreter |
 | `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, die Prüfung wird wiederholt (`check_squad`), dazu die der Staffel (`build_registration`) |
@@ -1190,7 +1190,7 @@ Das Einreichen mit automatischer Zuteilung und Ablehnen bzw. Warteliste einer au
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
 | `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `auto_accepted`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
 | `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
-| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer automatisch angenommenen Anmeldung verlangt `reason` (422) |
+| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer angenommenen Anmeldung verlangt `reason` (422), auch wenn sie von Hand angenommen war |
 
 **Befangenheit** (#2245, Entscheidung Nr. 73, Regel in Abschnitt B.1): Über die Anmeldung des eigenen Teams entscheidet eine zweite Person. Befangen sind Kader des Co-Teams,
 Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat, auch mit Zuständigkeit `applications` oder Bereich `leagues`. Prüfen, Annehmen, Ablehnen,

@@ -216,6 +216,20 @@ test("eine automatisch angenommene Anmeldung geht nur mit Grund auf die Wartelis
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/waitlist", { reason: "Erst die Kader prüfen" }));
 });
 
+test("auch eine von Hand angenommene Anmeldung geht nur mit Grund auf die Warteliste, eingereichte mit einem Klick", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, id: "a1", status: "accepted" }, { ...ROW, id: "a2", squad_id: "s2" }] } });
+  renderPanel();
+
+  await screen.findByTestId("application-a1");
+  expect(screen.queryByTestId("application-waitlist-a1")).toBeNull();
+  fireEvent.click(screen.getByTestId("application-waitlist-open-a1"));
+  expect(screen.getByTestId("application-waitlist-send-a1")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("application-reason-a1"), { target: { value: "Platz wird anders gebraucht" } });
+  fireEvent.click(screen.getByTestId("application-waitlist-send-a1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/waitlist", { reason: "Platz wird anders gebraucht" }));
+  expect(screen.getByTestId("application-waitlist-a2")).toBeInTheDocument();
+});
+
 test("eine automatische Zuteilung lässt sich ablehnen, eine der Leitung nicht", async () => {
   apiMock.get.mockResolvedValue({ data: { ...BODY, items: [
     { ...ROW, id: "a1", status: "accepted", auto_accepted: true, assignment: { tournament_id: "t1", label: "Liga 1 · Staffel A", auto: true } },

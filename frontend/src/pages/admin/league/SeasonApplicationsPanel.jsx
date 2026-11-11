@@ -76,8 +76,8 @@ function RowActions({ row, options, busy, act, superadmin }) {
   const override = row.own_team ? conflictReason.trim() : "";
   const blocked = busy || (row.own_team && override.length < REASON_MIN);
   const send = (action, body) => act(row, action, override ? { ...body, conflict_reason: override } : body);
-  // Automatisch angenommen: Zurückstufen nur mit Grund, das Team liest ihn wie beim Ablehnen.
-  const waitlistWithReason = row.status === "accepted" && Boolean(row.auto_accepted);
+  // Angenommen (automatisch oder von Hand): Zurückstufen nur mit Grund, das Team liest ihn wie beim Ablehnen (#2348).
+  const waitlistWithReason = row.status === "accepted";
   const toggle = (next) => setMode((current) => (current === next ? null : next));
   return (
     <div className="mt-3 space-y-3">
