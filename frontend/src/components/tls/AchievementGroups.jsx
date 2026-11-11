@@ -335,16 +335,30 @@ function HiddenSummaryCard({ hidden }) {
   );
 }
 
-// Nicht mehr erreichbar (#2339): sieht nur, wer den Erfolg hat - der Hinweis sagt, warum er nicht mehr mitzählt.
-function RetiredChip({ reason, testId }) {
+// Nicht mehr erreichbar (#2339): sieht nur, wer den Erfolg hat - der Hinweis sagt, warum er nicht mehr mitzählt. Der
+// Grund steht sichtbar in der aufgeklappten Karte und hängt per aria-describedby am Hinweis (Review N4).
+function retiredText(reason) {
+  return reason ? `Nicht mehr erreichbar: ${reason} Zählt nicht in „x von y“.` : "Nicht mehr erreichbar – zählt nicht in „x von y“.";
+}
+
+function RetiredChip({ reason, testId, describedBy }) {
   return (
     <span
       className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/15 text-white/45"
-      title={reason ? `Nicht mehr erreichbar: ${reason} Zählt nicht in „x von y“.` : "Nicht mehr erreichbar – zählt nicht in „x von y“."}
+      title={retiredText(reason)}
+      aria-describedby={describedBy}
       data-testid={testId}
     >
       Nicht mehr erreichbar
     </span>
+  );
+}
+
+function RetiredReason({ reason, id, testId }) {
+  return (
+    <div id={id} className="mt-1 text-[11px] text-white/45" data-testid={testId}>
+      {retiredText(reason)}
+    </div>
   );
 }
 
@@ -361,6 +375,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
   const lockedPulse = !earnedOnly && !hasAny && !isNegative && Number(nextLocked?.percent || 0) >= 80;
   const highestLabel = highest ? levelLabel(highest.level, group, highest) : "";
   const rare = !isNegative ? groupRarity(rarity, group) : null;
+  const groupRetiredReason = group.retired ? (group.tiers.find((t) => t.retired_reason)?.retired_reason || group.retired_reason) : null;
 
   return (
     <motion.div
@@ -410,7 +425,12 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
                 Verein
               </span>
             )}
-            {group.retired && <RetiredChip reason={group.tiers.find((t) => t.retired_reason)?.retired_reason || group.retired_reason} testId={`achievement-retired-${group.code}`} />}
+            {group.retired && (
+              <>
+                <RetiredChip reason={groupRetiredReason} testId={`achievement-retired-${group.code}`} describedBy={`achievement-retired-reason-${group.code}`} />
+                <span id={`achievement-retired-reason-${group.code}`} className="sr-only">{retiredText(groupRetiredReason)}</span>
+              </>
+            )}
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
           {rare?.top && (
@@ -498,9 +518,12 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
               geplant
             </span>
           )}
-          {tier.retired && !group?.retired && <RetiredChip reason={tier.retired_reason} testId={`achievement-retired-${tier.code}`} />}
+          {tier.retired && !group?.retired && <RetiredChip reason={tier.retired_reason} testId={`achievement-retired-${tier.code}`} describedBy={`achievement-tier-retired-reason-${tier.code}`} />}
         </div>
         <div className="text-xs text-white/65 mt-0.5">{tier.description}</div>
+        {tier.retired && (
+          <RetiredReason reason={tier.retired_reason} id={`achievement-tier-retired-reason-${tier.code}`} testId={`achievement-tier-retired-reason-${tier.code}`} />
+        )}
         {!tier.earned && tier.target > 0 && !tier.manual_only && tier.condition_status !== "planned" && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">

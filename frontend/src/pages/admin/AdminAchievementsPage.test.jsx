@@ -229,6 +229,11 @@ describe("Katalog", () => {
     renderAt("catalog");
     expect(await screen.findByTestId("group-retired-matches_played")).toHaveTextContent("nicht mehr erreichbar");
     expect(screen.getByTestId("group-retired-season_mvp")).toHaveTextContent("erreichbar bis 01.01.2999");
+    // Review N4: der Grund hängt am Hinweis und steht in der aufgeklappten Gruppe.
+    const chip = screen.getByTestId("group-retired-matches_played");
+    expect(document.getElementById(chip.getAttribute("aria-describedby"))).toHaveTextContent("Grund: Vorbei.");
+    fireEvent.click(screen.getByTestId("group-toggle-matches_played"));
+    expect(screen.getByTestId("group-retired-reason-text-matches_played")).toHaveTextContent("Nicht mehr erreichbar – Grund: Vorbei.");
     // Gegenprobe: ohne Kennzeichen kein Hinweis.
     expect(screen.queryByTestId("group-retired-secret_door")).toBeNull();
     expect(retiredState({ available_until: "2020-01-01T00:00:00Z" }).active).toBe(true);

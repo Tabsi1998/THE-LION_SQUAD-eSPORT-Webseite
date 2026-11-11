@@ -63,12 +63,28 @@ export function retiredState(doc, now = Date.now()) {
   return { active, until: dated ? until : null, upcoming: dated && !doc?.retired && +until > now };
 }
 
+// Der Hinweis in der Liste; der Grund hängt per aria-describedby daran und steht sichtbar in der aufgeklappten Gruppe
+// bzw. unter der Stufe (Review N4).
 function RetiredChip({ doc, testId }) {
   const state = retiredState(doc);
   if (!state.active && !state.upcoming) return null;
   const label = state.active ? "nicht mehr erreichbar" : `erreichbar bis ${viennaDateTime(state.until, { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  const reasonId = doc?.retired_reason && testId ? `${testId}-reason` : undefined;
   return (
-    <span className="text-white/55" title={doc?.retired_reason || undefined} data-testid={testId}>{label}</span>
+    <>
+      <span className="text-white/55" title={doc?.retired_reason || undefined} aria-describedby={reasonId} data-testid={testId}>{label}</span>
+      {reasonId && <span id={reasonId} className="sr-only">Grund: {doc.retired_reason}</span>}
+    </>
+  );
+}
+
+function RetiredReason({ doc, testId }) {
+  const state = retiredState(doc);
+  if ((!state.active && !state.upcoming) || !doc?.retired_reason) return null;
+  return (
+    <p className="mb-2 text-[11px] text-[#FF8A3D]/85 normal-case tracking-normal" data-testid={testId}>
+      {state.active ? "Nicht mehr erreichbar" : "Erreichbar bis zum Datum"} – Grund: {doc.retired_reason}
+    </p>
   );
 }
 
@@ -268,6 +284,7 @@ export function CatalogTab({ board = false }) {
                   {isOpen && (
                     <div className="px-4 pb-4" data-testid={`group-tiers-${g.code}`}>
                       {hidden && <p className="mb-2 text-[11px] text-[#A855F7]/80">Versteckt: Wer die Gruppe noch nicht hat, sieht nur ein Fragezeichen – Name und Stufen erscheinen erst nach der Freischaltung.</p>}
+                      <RetiredReason doc={g} testId={`group-retired-reason-text-${g.code}`} />
                       <div className="tls-swipe pb-0 border border-white/5 rounded-sm">
                         <table className="w-full text-sm min-w-[640px]">
                           <thead className="bg-[#0A0A0A] text-[10px] uppercase tracking-widest text-white/45">
@@ -291,7 +308,12 @@ export function CatalogTab({ board = false }) {
                                     {condition.text}
                                     {status && !t.manual_only && <span className="ml-2 text-[9px] uppercase tracking-widest" style={{ color: status[1] }}>{status[0]}</span>}
                                     {t.member_only && <div className="mt-0.5 text-[9px] uppercase tracking-widest text-[#FFD700]">nur Mitglieder</div>}
-                                    {(retiredState(t).active || retiredState(t).upcoming) && <div className="mt-0.5 text-[9px] uppercase tracking-widest"><RetiredChip doc={t} testId={`tier-retired-${t.code}`} /></div>}
+                                    {(retiredState(t).active || retiredState(t).upcoming) && (
+                                      <div className="mt-0.5 text-[9px] uppercase tracking-widest">
+                                        <RetiredChip doc={t} testId={`tier-retired-${t.code}`} />
+                                        {t.retired_reason && <div className="normal-case tracking-normal text-[11px] text-white/45" data-testid={`tier-retired-reason-text-${t.code}`}>Grund: {t.retired_reason}</div>}
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="px-3 py-2 text-right tabular-nums">+{t.points}</td>
                                   <td className="px-3 py-2 text-right whitespace-nowrap">

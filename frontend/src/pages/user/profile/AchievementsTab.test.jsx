@@ -231,6 +231,11 @@ describe("AchievementsTab – nicht mehr erreichbar (#2339)", () => {
     expect(screen.getByTestId("achievement-stats-row")).toHaveTextContent("2/4");
     const card = screen.getByTestId("achievement-group-founding_member");
     expect(within(card).getByTestId("achievement-retired-founding_member")).toHaveAttribute("title", expect.stringContaining("Nur seit dem Gründungsjahr."));
+    // Review N4: der Grund steht sichtbar in der aufgeklappten Karte und hängt am Hinweis.
+    const chip = within(card).getByTestId("achievement-retired-founding_member");
+    expect(document.getElementById(chip.getAttribute("aria-describedby"))).toHaveTextContent("Nur seit dem Gründungsjahr.");
+    fireEvent.click(within(card).getAllByRole("button")[0]);
+    expect(await screen.findByTestId("achievement-tier-retired-reason-founding_member_1")).toHaveTextContent("Nicht mehr erreichbar: Nur seit dem Gründungsjahr.");
     // Gegenprobe: ohne Kennzeichen zählt sie mit.
     const plain = achievementInsights({ groups: [...GROUPS, { ...retiredGroup, retired: false, tiers: retiredGroup.tiers.map((t) => ({ ...t, retired: false })) }] });
     expect(`${plain.earned.length}/${plain.total}`).toBe("3/5");
