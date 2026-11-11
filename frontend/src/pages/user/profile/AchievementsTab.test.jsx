@@ -20,6 +20,7 @@ globalThis.IntersectionObserver = FakeIntersectionObserver;
 const { AchievementsTab } = await import("./AchievementsTab");
 const { ConfirmDialogProvider } = await import("@/components/tls/ConfirmDialog");
 const { achievementInsights } = await import("./form");
+const { categoryProgress } = await import("./AchievementPanels");
 
 function tier(code, rank, name, extra = {}) {
   return { code, rank, level: Math.min(4, Math.ceil(rank / 2)), name, description: `${name}.`, points: 5 * rank, material: "wood", material_name: "Holz", material_color: "#A0703C",
@@ -47,6 +48,8 @@ const DATA = {
   pinned: [AWARDS[1]], pinned_codes: ["matches_played_2"],
   privacy_achievements_public: true,
   level: { level: 7, xp: 1234, next_level_xp: 1500, progress: 40, title: "Fährte", next_title_at: 10, prestige: 1, points: 1234, next_level_points: 1500 },
+  // Stand je Kategorie vom Server (#2339, Review N2).
+  progress: { member: true, category_progress: { match: { earned: 2, total: 3, complete: false }, fastlap: { earned: 0, total: 1, complete: false } } },
 };
 
 function renderTab(overrides = {}, props = {}) {
@@ -223,6 +226,7 @@ describe("AchievementsTab – nicht mehr erreichbar (#2339)", () => {
 
   it("zeigt die erhaltene Stufe mit Hinweis, zählt sie aber in keinem x von y", async () => {
     renderTab(withRetired);
+    // Die Vitrinen zählen nicht selbst (Review N2) - der Server lässt Nicht-mehr-Erreichbares weg.
     expect(screen.queryByTestId("achievement-showcase-club")).toBeNull();
     expect(screen.getByTestId("achievement-stats-row")).toHaveTextContent("2/4");
     const card = screen.getByTestId("achievement-group-founding_member");
@@ -230,5 +234,21 @@ describe("AchievementsTab – nicht mehr erreichbar (#2339)", () => {
     // Gegenprobe: ohne Kennzeichen zählt sie mit.
     const plain = achievementInsights({ groups: [...GROUPS, { ...retiredGroup, retired: false, tiers: retiredGroup.tiers.map((t) => ({ ...t, retired: false })) }] });
     expect(`${plain.earned.length}/${plain.total}`).toBe("3/5");
+  });
+});
+
+describe("AchievementsTab – Vitrinen vom Server (#2339, Review N2/N3)", () => {
+  it("zeigt den Stand je Kategorie wie die Erfolge-Seite: abgeschlossen, x von y, Verein nur für Mitglieder", () => {
+    const progress = { member: false, category_progress: {
+      match: { earned: 104, total: 104, complete: true }, fastlap: { earned: 3, total: 48, complete: false }, club: { earned: 0, total: 51, complete: false }, special: { earned: 0, total: 0, complete: false },
+    } };
+    renderTab({ progress });
+    expect(screen.getByTestId("achievement-showcase-match")).toHaveTextContent("Abgeschlossen");
+    // Die Gruppen der Liste (3 Stufen in Spielen) zählen nicht - die Zahl kommt vom Server.
+    expect(screen.getByTestId("achievement-showcase-fastlap")).toHaveTextContent("3 von 48");
+    expect(screen.getByTestId("achievement-showcase-club")).toHaveTextContent("Nur für Mitglieder");
+    expect(screen.queryByTestId("achievement-showcase-special")).toBeNull();
+    // Gegenprobe: Mitglieder sehen beim Verein „x von y“.
+    expect(categoryProgress({ ...progress, member: true }).find((row) => row.key === "club").membersOnly).toBe(false);
   });
 });

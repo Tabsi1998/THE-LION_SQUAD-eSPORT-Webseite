@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Trophy, Crown, Medal, Sparkles, Target, Flame, CircleHelp, Gem, ArrowDownWideNarrow, Layers, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { AchievementCategoryGroups, CATEGORY_META, formatPercent } from "@/components/tls/AchievementGroups";
+import { AchievementCategoryGroups, CATEGORY_META, categoryProgressSummary, formatPercent } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
@@ -54,23 +54,6 @@ export const PERIODS = [
 // Kategorie-Meister (#2339): „x von y“ zählt nur, was man selbst erreichen kann - wie der Erfolg selbst.
 export const CATEGORY_PROGRESS_HINT = "Gezählt werden die Stufen, die du selbst erreichen kannst – ohne geheime, von Hand vergebene, nicht mehr erreichbare und die der Leitung. Hast du alle, ist die Kategorie abgeschlossen und zählt für Kategorie-Meister.";
 export const CLUB_MEMBERS_ONLY_HINT = "Die Stufen im Verein gibt es nur für Vereinsmitglieder – für Kategorie-Meister zählt der Verein nur bei Mitgliedern.";
-
-/**
- * Der eigene Stand einer Kategorie (#2339) aus ``mine.category_progress``: abgeschlossen, „x von y“ mit Prozent - oder
- * null, wenn es dort nichts Erreichbares gibt (Geheim, Negativ) oder keinen eigenen Stand. Nicht-Mitglieder (``member``
- * false, Review N3) sehen beim Verein „Nur für Mitglieder“ statt „0 von 51“ - außer sie haben ihn schon abgeschlossen.
- */
-export function ownCategoryProgress(progress, { key = null, member = true } = {}) {
-  const total = Number(progress?.total || 0);
-  if (!progress || total <= 0) return null;
-  const earned = Math.min(Number(progress.earned || 0), total);
-  const percent = (100 * earned) / total;
-  const complete = Boolean(progress.complete) || earned >= total;
-  if (key === "club" && member === false && !complete) {
-    return { earned, total, percent: 0, complete: false, membersOnly: true, summary: "Nur für Mitglieder" };
-  }
-  return { earned, total, percent, complete, membersOnly: false, summary: complete ? "Abgeschlossen" : `${earned} von ${total} · ${formatPercent(Math.round(percent))}` };
-}
 
 /** Die Zeilen der Kategorien: alles aus der Übersicht außer Negativ - das bekommt nur, wer selbst etwas davon hat. */
 export function categoryRows(overview, mine) {
@@ -260,7 +243,7 @@ export default function AchievementsShowcasePage() {
                     index={index}
                     category={category}
                     own={mine ? Number(mine.categories?.[category.key] || 0) : null}
-                    progress={mine ? ownCategoryProgress(mine.category_progress?.[category.key], { key: category.key, member: mine.member }) : null}
+                    progress={mine ? categoryProgressSummary(mine.category_progress?.[category.key], { key: category.key, member: mine.member }) : null}
                     negativeCount={Number(mine?.negative || 0)}
                     hidden={hidden}
                     open={open.has(category.key)}

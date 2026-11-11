@@ -90,6 +90,8 @@ async def my_achievements(user: dict = Depends(get_current_user)):
         "pinned_codes": list(stored.get("pinned_achievements") or []),
         "privacy_achievements_public": visibility.achievements_public(stored),
         "level": await xp.own_view(user["id"]),
+        # Review N2: der Stand je Kategorie kommt vom Server - dieselbe Rechnung wie auf der Erfolge-Seite.
+        "progress": await visibility.my_progress(db, user["id"]),
     }
 
 
@@ -133,13 +135,17 @@ async def user_achievements(user_id: str, viewer: dict | None = Depends(get_opti
         return {"groups": [], "awards": [], "pinned": [], "hidden": {"total": 0, "earned": 0}, "achievements_hidden": True}
     groups = await list_groups_for_user(user_id, viewer)
     awards = await list_user_awards(user_id, viewer)
+    # Review N2: der Stand je Kategorie vom Server - wie auf der Erfolge-Seite; den Verein nur, wer ihn sehen darf.
+    progress = await visibility.my_progress(db, user_id)
     if not await visibility.viewer_sees_club(db, viewer, user_id):
         groups, awards = visibility.without_club(groups, awards)
+        progress = visibility.progress_without_club(progress)
     return {
         "groups": groups, "awards": awards,
         "pinned": visibility.pinned_awards(user, awards),
         "hidden": await visibility.hidden_summary(db, user_id),
         "achievements_hidden": False,
+        "progress": progress,
     }
 
 

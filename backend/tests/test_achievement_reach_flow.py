@@ -347,6 +347,31 @@ async def test_kategorie_ist_abgeschlossen_mit_jeder_erreichbaren_stufe(flow):
 
 
 @pytest.mark.asyncio
+async def test_profil_bekommt_den_stand_je_kategorie_vom_server(flow):
+    """Review N2: /me und /user/{id} liefern ``progress`` wie die Erfolge-Seite - fremde Profile ohne Verein, wenn der
+    Betrachter ihn nicht sieht."""
+    paula = await flow.add_user(name="Paula")
+    await _member(flow, paula)
+    await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"privacy_public_profile": True}})
+    season = await _reachable_codes(flow, category="season")
+    await _give(flow, paula, *season, "membership_tenure_1")
+    flow.act_as(paula)
+    own = (await flow.get("/api/achievements/me")).json()["progress"]
+    overview = (await flow.get("/api/achievements/overview")).json()["mine"]
+    assert own["category_progress"] == overview["category_progress"] and own["member"] is True
+    assert own["category_progress"]["season"]["complete"] is True and own["category_progress"]["club"]["earned"] == 1
+    guest = await flow.add_user(name="Gast")
+    flow.act_as(guest)
+    foreign = (await flow.get(f"/api/achievements/user/{paula['id']}")).json()["progress"]
+    assert "club" not in foreign["category_progress"] and foreign["category_progress"]["season"]["complete"] is True
+    # Gegenprobe: ein Mitglied sieht den Verein auch im fremden Profil.
+    member = await flow.add_user(name="Mitglied")
+    await _member(flow, member)
+    flow.act_as(member)
+    assert "club" in (await flow.get(f"/api/achievements/user/{paula['id']}")).json()["progress"]["category_progress"]
+
+
+@pytest.mark.asyncio
 async def test_kategorie_meister_ohne_zirkel_hand_geheim_und_leitung(flow):
     paula = await flow.add_user(name="Paula")
     profile = await _reachable_codes(flow, category="profile")

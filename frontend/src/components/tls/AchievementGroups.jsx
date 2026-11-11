@@ -54,6 +54,23 @@ export function formatPercent(value) {
   return `${n.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`;
 }
 
+/**
+ * Der Stand einer Kategorie (#2339) aus ``category_progress`` vom Server - eine Rechnung für Erfolge-Seite und Profil
+ * (Review N2): abgeschlossen, „x von y“ mit Prozent - oder null, wenn es dort nichts Erreichbares gibt. Nicht-Mitglieder
+ * (``member`` false, Review N3) sehen beim Verein „Nur für Mitglieder“ - außer sie haben ihn schon abgeschlossen.
+ */
+export function categoryProgressSummary(progress, { key = null, member = true } = {}) {
+  const total = Number(progress?.total || 0);
+  if (!progress || total <= 0) return null;
+  const earned = Math.min(Number(progress.earned || 0), total);
+  const percent = (100 * earned) / total;
+  const complete = Boolean(progress.complete) || earned >= total;
+  if (key === "club" && member === false && !complete) {
+    return { earned, total, percent: 0, complete: false, membersOnly: true, summary: "Nur für Mitglieder" };
+  }
+  return { earned, total, percent, complete, membersOnly: false, summary: complete ? "Abgeschlossen" : `${earned} von ${total} · ${formatPercent(Math.round(percent))}` };
+}
+
 // Das Abzeichen (E8, #618) in Listen: Material und Motiv aus dem Katalog, nicht erreichte Stufen als
 // Silhouette mit Fortschrittsring; der Hover sagt, wie man es schafft.
 function ListBadge({ tier, group, earned = true, size = "md", animate = false, percent = 0 }) {

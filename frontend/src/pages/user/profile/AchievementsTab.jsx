@@ -87,7 +87,8 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
           <NextUpPanel items={achData.next_up || []} />
           <PinnedPanel pinned={achData.pinned || []} codes={pinnedCodes} onChange={savePins} />
           <SeasonFindsPanel />
-          <CategoryShowcase groups={groups} active={category} onPick={setCategory} />
+          {/* Stand je Kategorie vom Server (Review N2) - dieselbe Zahl wie auf der Erfolge-Seite. */}
+          <CategoryShowcase progress={achData.progress} active={category} onPick={setCategory} />
           <AchievementFilters filters={filters} onChange={setFilters} resultCount={visibleCount} />
           <AchievementGroupsView
             groups={groups}
