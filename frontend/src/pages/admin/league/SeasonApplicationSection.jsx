@@ -42,7 +42,7 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
       {waitingText ? (
         <p className="text-xs text-warn" data-testid="season-form-application-auto-waiting">{waitingText}. Entscheide sie im Eingang.</p>
       ) : null}
-      <Toggle label="Warteliste" hint="Sind alle Startplätze vergeben, kann die Leitung Anmeldungen auf die Warteliste setzen. Ohne Warteliste endet die Anmeldung, sobald alle Plätze weg sind. Niemand rückt von selbst nach."
+      <Toggle label="Warteliste" hint="Sind alle Startplätze vergeben, kommen Anmeldungen auf die Warteliste: Du setzt sie dorthin, mit „automatisch annehmen“ die Season. Ohne Warteliste endet die Anmeldung, sobald alle Plätze weg sind. Niemand rückt von selbst nach, über einen freien Platz entscheidest du."
         checked={form.application_waitlist} onChange={(value) => set("application_waitlist", value)} testId="season-form-application-waitlist" />
       <TextAreaField label="Regel zur Warteliste" rows={2} value={form.application_waitlist_note} onChange={(value) => set("application_waitlist_note", value)} hint="Steht öffentlich auf der Ligaseite, z. B. nach welcher Reihenfolge die Leitung entscheidet." testId="season-form-application-waitlist-note" />
       <Toggle label="Zwei Co-Teams eines Hauptteams in derselben Staffel" hint="Vorgabe: Nein. Gilt auch fürs Zuteilen in der Turnierverwaltung. Ein Co-Team bleibt je Season in einer Staffel."

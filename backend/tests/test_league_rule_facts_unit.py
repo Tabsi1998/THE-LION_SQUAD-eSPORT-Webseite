@@ -196,7 +196,8 @@ def test_eligibility_block_lists_b3_with_id_fields_and_the_platform():
 def test_eligibility_block_names_how_applications_are_accepted():
     """#2348: je nach Einstellung „automatisch angenommen“ oder „die Liga-Leitung prüft“ - ohne Anmeldefenster und in älteren Fassungen keine Zeile."""
     auto = facts.render_eligibility(facts.eligibility_data({**SEASON, "application_auto_accept": True}, []))
-    assert "- Annahme: Anmeldungen werden automatisch angenommen, die Liga-Leitung kann nachträglich ablehnen." in auto
+    assert "- Annahme: Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, " \
+           "kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen." in auto
     by_lead = facts.render_eligibility(facts.eligibility_data(SEASON, []))
     assert "- Annahme: Die Liga-Leitung prüft jede Anmeldung." in by_lead
     no_window = facts.eligibility_data({**SEASON, "application_opens_at": None, "application_closes_at": None, "application_auto_accept": True}, [])
@@ -206,7 +207,8 @@ def test_eligibility_block_names_how_applications_are_accepted():
     ctx = context()
     assert variables.value_of("application.acceptance", ctx) == "Die Liga-Leitung prüft jede Anmeldung"
     ctx.eligibility = facts.eligibility_data({**SEASON, "application_auto_accept": True}, [])
-    assert variables.value_of("application.acceptance", ctx) == "Anmeldungen werden automatisch angenommen, die Liga-Leitung kann nachträglich ablehnen"
+    assert variables.value_of("application.acceptance", ctx) == facts.AUTO_ACCEPT_WORDS[True]
+    assert "wartet schon jemand" in facts.AUTO_ACCEPT_WORDS[True] and "mit Grund" in facts.AUTO_ACCEPT_WORDS[True]
     ctx.eligibility = no_window
     assert variables.value_of("application.acceptance", ctx) is None
 

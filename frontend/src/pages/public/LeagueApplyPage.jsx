@@ -162,7 +162,7 @@ function Summary({ row, rules, auto }) {
         <div><dt className="text-xs uppercase tracking-wider text-white/50">Datenschutz</dt><dd className="text-white/85">zugestimmt</dd></div>
       </dl>
       {auto ? (
-        <p className="text-sm text-white/70" data-testid="apply-summary-auto">Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, gibt es nur eine Staffel, steht ihr gleich darin. Zurückziehen geht dann, bis der Spielplan steht. Du bekommst eine Nachricht.</p>
+        <p className="text-sm text-white/70" data-testid="apply-summary-auto">Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, gibt es nur eine Staffel, steht ihr gleich darin. Zurückziehen geht dann, bis der Spielplan steht. Du bekommst eine Nachricht.</p>
       ) : (
         <p className="text-sm text-white/70">Einreichen heißt noch nicht, dass ihr dabei seid: Die Liga-Leitung prüft die Anmeldung, nimmt sie an oder lehnt sie ab und teilt Liga und Staffel zu. Du bekommst eine Nachricht.</p>
       )}

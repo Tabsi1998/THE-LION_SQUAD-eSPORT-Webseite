@@ -20,7 +20,7 @@ Das Co-Team meldet sich auf der **Ligaseite** an, sobald das Anmeldefenster offe
 4. **Regeln lesen und zustimmen**, **Datenschutz-Hinweis lesen und zustimmen**. Beides wird mit Zeitpunkt und deinem Namen gespeichert.
 5. **Anmeldung einreichen.** Was dann gilt, legt die Liga-Leitung je Season fest, die Zusammenfassung vor dem Einreichen sagt es dir:
    - **Die Liga-Leitung prüft** (Vorgabe): Das ist noch kein Startplatz. Die Leitung entscheidet, du bekommst eine Nachricht.
-   - **Automatisch angenommen:** Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben, kommt ihr auf die Warteliste. Gibt es nur eine Staffel, steht ihr gleich darin. Die Liga-Leitung kann nachträglich mit Grund ablehnen.
+   - **Automatisch angenommen:** Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Gibt es nur eine Staffel, steht ihr gleich darin. Die Liga-Leitung kann nachträglich mit Grund ablehnen.
 
 Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 

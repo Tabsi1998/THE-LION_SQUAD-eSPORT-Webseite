@@ -35,7 +35,8 @@ TIEBREAKER_WORDS = {"head_to_head": "direkter Vergleich", "score_diff": "Map-Dif
 CRITERION_WORDS = {"points": "Punkte", "score_diff": "Map-Differenz", "score_for": "gewonnene Maps"}
 ENTRY_POLICY_WORDS = {"all": "alle Konten", "members": "nur Vereinsmitglieder"}
 # Anmeldungen automatisch annehmen (#2348): ganze Sätze ohne Punkt, für den Baustein und ``{{application.acceptance}}``.
-AUTO_ACCEPT_WORDS = {True: "Anmeldungen werden automatisch angenommen, die Liga-Leitung kann nachträglich ablehnen",
+AUTO_ACCEPT_WORDS = {True: "Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, "
+                           "kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen",
                      False: "Die Liga-Leitung prüft jede Anmeldung"}
 LINEUP_WORDS = {"series": "Teilnehmerliste je Spiel", "per_map": "Aufstellung je Map"}
 

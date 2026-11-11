@@ -81,6 +81,8 @@ test("mit automatischer Annahme sagt die Zusammenfassung, dass ihr gleich angeme
   fireEvent.click(screen.getByTestId("apply-next"));
 
   expect(await screen.findByTestId("apply-summary-auto")).toHaveTextContent("seid ihr mit dem Einreichen angemeldet");
+  expect(screen.getByTestId("apply-summary-auto")).toHaveTextContent("Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste.");
+  expect(screen.getByTestId("apply-summary-auto")).toHaveTextContent("Zurückziehen geht dann, bis der Spielplan steht.");
   expect(screen.getByTestId("apply-summary")).not.toHaveTextContent("Die Liga-Leitung prüft die Anmeldung");
   fireEvent.click(screen.getByTestId("apply-submit"));
 
