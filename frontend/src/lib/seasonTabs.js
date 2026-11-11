@@ -11,6 +11,8 @@ export const SEASON_TABS = [
   { key: "termine", label: "Termine" },
   { key: "anmeldung", label: "Anmeldung und Kader" },
   { key: "tabelle", label: "Tabelle" },
+  // Proteste (E.2, #1619): Eingang der Verfahren und die Einstellungen dazu, eigenes Speichern.
+  { key: "proteste", label: "Proteste" },
   { key: "regelwerk", label: "Regelwerk und Sperrliste" },
   { key: "ligen", label: "Ligen und Staffeln" },
 ];
@@ -37,6 +39,8 @@ export const SEASON_SECTIONS = {
   kader: "anmeldung",
   punkte: "tabelle",
   gleichstand: "tabelle",
+  verfahren: "proteste",
+  protestregeln: "proteste",
   sperrliste: "regelwerk",
   staffeln: "ligen",
   uebertragen: "ligen",

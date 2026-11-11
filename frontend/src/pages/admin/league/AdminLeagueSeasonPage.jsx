@@ -35,6 +35,7 @@ import { SeasonEntryTab } from "./SeasonEntryTab";
 import { SeasonOverviewTab } from "./SeasonOverviewTab";
 import { SeasonPlayTab } from "./SeasonPlayTab";
 import { useSeasonReadiness } from "./SeasonReadinessPanel";
+import { SeasonProtestsTab } from "./SeasonProtestsTab";
 import { SeasonRulesTab } from "./SeasonRulesTab";
 import { SeasonTablePanel } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
@@ -346,6 +347,8 @@ export default function AdminLeagueSeasonPage() {
         <div id="gleichstand" className="scroll-mt-24"><SeasonTablePanel divisions={data.divisions} canDecide={can("results")} /></div>
       </div>
     ),
+    // Proteste (E.2, #1619): Eingang für „Proteste“, Einstellungen für „Season konfigurieren“ (lesen darf jede Zuständigkeit).
+    proteste: () => <SeasonProtestsTab seasonId={seasonId} canSeason={canSeason} canDisputes={can("disputes")} />,
     regelwerk: () => (
       <SeasonRulesTab seasonId={seasonId} season={season} canSeason={canSeason} canRules={canRules} rulesView={rulesView} rulesNotice={notice}
         rulesLink={rulesLink} onPendingSync={setPendingSync} />
