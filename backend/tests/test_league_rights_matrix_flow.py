@@ -73,6 +73,9 @@ ROUTES = [
     route("GET", "/api/admin/leagues/seasons/{season}/veto-rules", ANY),
     route("GET", "/api/admin/leagues/seasons/{season}/veto-rules/proposal", ANY),
     route("PUT", "/api/admin/leagues/seasons/{season}/veto-rules", "season", {"enabled": False, "steps": []}),
+    # Vorgabe der Woche (#2326): Map je Spielwoche
+    route("GET", "/api/admin/leagues/seasons/{season}/veto-presets", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/veto-presets", "season", {"presets": []}),
     # Plattform je Season (#2270)
     route("GET", "/api/admin/leagues/seasons/{season}/platform", ANY),
     route("PATCH", "/api/admin/leagues/seasons/{season}", "season", {"crossplay": True}),

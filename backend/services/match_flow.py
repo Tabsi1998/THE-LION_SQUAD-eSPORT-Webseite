@@ -468,6 +468,12 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
                 start_hint = rules_changed_detail(consent, setup.names.get(reg["id"]))
                 break
     can_start = bool(own_id or (lead and can_lead_enter)) and current == READY and start_hint is None
+    # Veto (D.3, #1618): wer am Zug ist, Maps je Modus, Verlauf und am Ende die Spielreihenfolge - nur Staffeln mit Vorlage.
+    veto_block = await league_veto.page_block(db, match, tournament, names=setup.names, own_id=own_id, lead=lead,
+                                              can_lead_act=bool(lead and can_lead_enter), conflict=conflict if lead else None, now=now)
+    if current == VETO and veto_block and veto_block.get("blocked"):
+        # Vorgabe der Woche fehlt (#2326): Das Veto hat nicht begonnen - der Satz sagt, worauf es wartet.
+        start_hint = veto_block["blocked"]["text"]
     proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else None
     if proposal and (proposal.get("decision") or proposal.get("rule") != "check_in"):
         proposal = None
@@ -519,9 +525,7 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
                                            for user_id in setup.rosters.get(reg["id"]) or set()), key=lambda row: row["name"].casefold())
                         for reg in setup.registrations},
         } if lead else None,
-        # Veto (D.3, #1618): wer am Zug ist, Maps je Modus, Verlauf und am Ende die Spielreihenfolge - nur Staffeln mit Vorlage.
-        "veto": await league_veto.page_block(db, match, tournament, names=setup.names, own_id=own_id, lead=lead,
-                                             can_lead_act=bool(lead and can_lead_enter), conflict=conflict if lead else None, now=now),
+        "veto": veto_block,
     }
 
 
