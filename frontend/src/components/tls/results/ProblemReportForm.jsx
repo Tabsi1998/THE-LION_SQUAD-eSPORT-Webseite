@@ -41,7 +41,8 @@ function Steps({ current }) {
 function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, separated, help, initialCategory }) {
   const [form, setForm] = useState({ reasonKey: initialCategory || "", text: "", notified: null, scores: {}, incidentId: "" });
   const [error, setError] = useState("");
-  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  // Jede Eingabe nimmt die letzte Fehlermeldung weg - sie gilt für den Stand beim Absenden, nicht für den korrigierten.
+  const set = (key, value) => { setError(""); setForm((current) => ({ ...current, [key]: value })); };
   const reason = (guide.reasons || []).find((row) => row.key === form.reasonKey);
   const isResult = form.reasonKey === (guide.result_reason || "wrong_result");
   const wrapper = `space-y-4 ${separated ? "border-t border-white/10 pt-5" : ""}`;

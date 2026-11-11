@@ -169,8 +169,8 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">{sideName}{p.at ? ` · ${when(p.at)}` : ""}</div>
             <h3 className="mt-1 flex items-center gap-2 font-heading text-lg font-black uppercase">
               <Scale className="h-4 w-4 shrink-0 text-[#FFD700]" aria-hidden="true" /> {p.kind_label}
-              <span className="font-sans text-sm font-bold normal-case text-white/70">· {p.kind === "appeal" && p.against ? AGAINST_LABELS[p.against.type] : p.reason_label}</span>
             </h3>
+            <div className="text-sm font-bold text-white/70" data-testid={`procedure-reason-label-${p.id}`}>{p.kind === "appeal" && p.against ? AGAINST_LABELS[p.against.type] : p.reason_label}</div>
           </div>
           <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${STATE_STYLE[p.state]}`} data-testid={`procedure-state-${p.id}`}>{PROCEDURE_STATE_LABELS[p.state]}</span>
         </header>
@@ -235,8 +235,8 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
             {mossPending || p.can_lead || (p.moss_requests || []).length ? <ProofList matchId={matchId} kind="moss" refId={p.id} title="MOSS-Nachweise" sideLabels={sideNames} testId={`procedure-moss-proofs-${p.id}`} onChanged={onChanged} /> : null}
             {p.can_lead ? (
               <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  <label className="min-w-0 flex-1">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                  <label className="min-w-0">
                     <span className="sr-only">Spieler</span>
                     <select value={player} onChange={(event) => setPlayer(event.target.value)} className="input min-h-[44px] w-full" data-testid={`procedure-moss-player-${p.id}`}>
                       <option value="">Spieler wählen …</option>
