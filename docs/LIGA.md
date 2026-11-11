@@ -677,7 +677,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
 | Spiel: `POST /dispute` (ohne eigene Seite) | `disputes` | nein | – |
 | Spiel: `POST /proof-photos` als Leitung, `matches-v2/recalculate-advancement` | `results` | nein | – |
-| Spiel: `GET` und `POST /proofs` als Leitung (#2360) | `results` oder `disputes` | nur beim Bezug `moss`: Befangene sehen ihn nicht | – |
+| Spiel: `GET` und `POST /proofs` als Leitung (#2360) | `results` oder `disputes` | ja, ohne Notausnahme: Befangene sind hier nie Leitung, sie sehen und handeln wie ein Mitglied ihrer Seite (Seitenregeln und Fristen gelten, MOSS der Gegenseite bleibt verborgen) | – |
 | `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
 | `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
 | `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
@@ -2691,7 +2691,8 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 | --- | --- | --- | --- |
 | Eigene Seite (Mitglieder des Co-Teams) | alles | ja | nur wer hochgeladen hat sowie Captain und Vertreter dieser Seite (wer für sie handeln darf); die übrigen Spieler nicht (Entscheidung Fabian 11.11.) |
 | Gegenseite | Grund, Text, Vorschlag, Stand, Stellungnahme, Entscheidung mit Begründung, wer übernommen hat | ja | nein, nur das Ergebnis der Prüfung in der Begründung (§ 9a.3) |
-| Leitung mit `disputes` oder `results` | alles | ja | ja, Befangene nicht |
+| Leitung mit `disputes` oder `results`, nicht befangen | alles | ja | ja |
+| Befangene mit Liga-Recht | wie ihre Seite | wie ihre Seite | wie ihre Seite, nie als Leitung |
 | Alle anderen, öffentlich | nur „in Klärung“ bzw. „Map wiederholt“ am Spiel und an der Tabellenzeile | nein | nein |
 
 Wer nichts sehen darf, bekommt 404, nicht 403 (wie bei Fotos vom Ergebnis). `claimed`, `notified_immediately`, `moss_requests` und
@@ -2719,7 +2720,8 @@ Migration). Ein Bezug kann **mehrere** Nachweise tragen.
 - **Hinzufügen** darf, wer für eine Seite des Spiels handelt (Captain, Vertreter, wer angemeldet hat), solange der Bezug offen ist:
   `report` bis das Ergebnis gilt, `incident` solange der Vorfall offen ist, `protest` nur die einreichende Seite bis `evidence_until`,
   `statement` nur die Gegenseite bis `statement.due_at`, `moss` jedes Mitglied einer Seite (der Spieler lädt selbst hoch). Die Leitung
-  mit `results` oder `disputes` darf zu jedem offenen Bezug hinzufügen. Höchstens zehn Nachweise je Seite und Bezug, gleiches
+  mit `results` oder `disputes` darf zu jedem offenen Bezug hinzufügen, wenn sie an dem Spiel nicht beteiligt ist (Befangenheit
+  wie B.1, ohne Notausnahme); wer befangen ist, wird wie ein Mitglied seiner Seite geprüft. Höchstens zehn Nachweise je Seite und Bezug, gleiches
   Rate-Limit wie beim Foto vom Ergebnis (gemeinsamer Zähler).
 - **Entfernen** darf nur, wer den Nachweis hinzugefügt hat, und nur solange der Bezug offen ist. Altbestand (über `photo_id` an Meldung
   oder Problem gehängt) lässt sich so nicht entfernen. Protokoll: `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, nie

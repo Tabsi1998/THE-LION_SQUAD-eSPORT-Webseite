@@ -209,6 +209,37 @@ async def test_who_may_add_to_which_reference_and_until_when(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_biased_lead_acts_like_a_member_of_their_side(flow):
+    """Wer zu einer Seite gehört, ist mit Liga-Recht nicht „Leitung“: Seitenregeln und Fristen gelten weiter (Review #2360, M1)."""
+    w = await league_world(flow)
+    match = w["match"]
+    past = (now_utc() - timedelta(minutes=1)).isoformat()
+    # Verfahren der Falken; Nachreichfrist und Frist der Stellungnahme sind vorbei.
+    await set_match(flow, w, disputes=[protest(w, evidence_until=past, statement={"due_at": past})])
+    for name in ("Mila", "Kapitaen"):
+        user(w, name)["areas"] = ["leagues"]
+        await flow.db.users.update_one({"id": user(w, name)["id"]}, {"$set": {"areas": ["leagues"]}})
+
+    # Mila ist Löwin ohne Amt: weder zum Protest der Falken noch zur Stellungnahme - auch nicht als „Leitung“.
+    flow.act_as(user(w, "Mila"))
+    as_protest = await add_link(flow, match, "protest", "verfahren-1")
+    as_statement = await add_link(flow, match, "statement", "verfahren-1")
+    assert [as_protest.status_code, as_statement.status_code] == [403, 403]
+    state = (await listed(flow, match, "protest", "verfahren-1")).json()
+    assert state["can_add"] is False and state["items"] == [], "lesen darf sie als Mitglied ihrer Seite"
+    # Der Captain der Löwen: die Seitenregel (kein Nachweis zum fremden Protest) und die abgelaufene Frist gelten für ihn.
+    flow.act_as(user(w, "Kapitaen"))
+    foreign = await add_link(flow, match, "protest", "verfahren-1")
+    late = await add_link(flow, match, "statement", "verfahren-1")
+    assert foreign.status_code == 403 and late.status_code == 409 and "Frist" in late.json()["detail"]
+    assert await flow.db.match_proof_photos.count_documents({}) == 0
+    # Gegenprobe: Die Leitung, die an dem Spiel nicht beteiligt ist, darf beides.
+    flow.act_as(w["staff"])
+    neutral = await add_link(flow, match, "protest", "verfahren-1")
+    assert neutral.status_code == 200 and neutral.json()["side"] is None
+
+
+@pytest.mark.asyncio
 async def test_remove_only_your_own_and_only_while_the_reference_is_open(flow):
     w = await league_world(flow)
     match = w["match"]

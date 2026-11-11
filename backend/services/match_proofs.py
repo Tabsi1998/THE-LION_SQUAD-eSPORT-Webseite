@@ -184,11 +184,13 @@ class Viewer:
     user_id: str | None = None
     sides: frozenset = frozenset()    # Anmeldungen dieses Spiels, zu deren Spielern die Person gehört
     acting: frozenset = frozenset()   # … für die sie handeln darf (Captain, Vertreter, wer angemeldet hat)
-    lead: bool = False                # Leitung mit Ergebnis- oder Protest-Recht für dieses Spiel
-    lead_moss: bool = False           # … und an dem Spiel nicht beteiligt (nur gefüllt, wenn danach gefragt wird)
+    lead: bool = False                # Leitung mit Ergebnis- oder Protest-Recht für dieses Spiel - und nicht befangen
 
 
-async def viewer_for(db, match: dict, user: dict | None, *, moss: bool = False) -> Viewer:
+async def viewer_for(db, match: dict, user: dict | None) -> Viewer:
+    """Als wer diese Person auf die Nachweise des Spiels schaut. Wer zu einer Seite gehört (befangen, #2203), ist hier nie
+    „Leitung“, auch mit Liga-Recht: Sie sieht und handelt wie ein Mitglied ihrer Seite - sonst könnte sie Fristen und
+    Seitenregeln umgehen und sähe MOSS der Gegenseite. Turniere ohne Liga kennen keine Befangenheit."""
     if not user or not user.get("id"):
         return Viewer()
     from services.match_audience import may_act, player_ids, registrations_for_match, teams_by_id
@@ -204,12 +206,11 @@ async def viewer_for(db, match: dict, user: dict | None, *, moss: bool = False) 
         if registration.get("user_id") == user["id"] or may_act(registration, team, user["id"]):
             acting.add(registration["id"])
     lead = await has_match_result_permission(user, match, capability=("results", "disputes"))
-    lead_moss = False
-    if lead and moss:
+    if lead:
         from services.league_permissions import conflict_of_interest
 
-        lead_moss = await conflict_of_interest(db, user, match) is None
-    return Viewer(user_id=user["id"], sides=frozenset(sides), acting=frozenset(acting), lead=lead, lead_moss=lead_moss)
+        lead = await conflict_of_interest(db, user, match) is None
+    return Viewer(user_id=user["id"], sides=frozenset(sides), acting=frozenset(acting), lead=lead)
 
 
 def can_see_doc(doc: dict, viewer: Viewer) -> bool:
@@ -223,7 +224,7 @@ def can_see_doc(doc: dict, viewer: Viewer) -> bool:
     if refs.kind_of(doc) == "moss":
         # Nur wer hochgeladen hat (oben), wer für diese Seite handeln darf (Captain, Vertreter) und die nicht befangene
         # Leitung - die übrigen Spieler der eigenen Seite nicht: Die Datei zeigt den PC einer einzelnen Person.
-        return bool(doc.get("registration_id")) and doc["registration_id"] in viewer.acting or viewer.lead_moss
+        return bool(doc.get("registration_id")) and doc["registration_id"] in viewer.acting or viewer.lead
     return bool(viewer.sides) or viewer.lead
 
 
@@ -236,7 +237,7 @@ async def can_see(db, doc: dict, user: dict | None) -> bool:
     match = await db.matches_v2.find_one({"id": doc.get("match_id")}, {"_id": 0})
     if not match:
         return False
-    return can_see_doc(doc, await viewer_for(db, match, user, moss=refs.kind_of(doc) == "moss"))
+    return can_see_doc(doc, await viewer_for(db, match, user))
 
 
 # ---------------------------------------------------------------- Mehrere Nachweise je Bezug (#2360)
@@ -341,7 +342,7 @@ async def _rows_of(db, match_id: str, kind: str, ref_id: str) -> list[dict]:
 async def list_proofs(db, match: dict, user: dict, kind, ref_id) -> dict:
     """Die Nachweise eines Bezugs, soweit diese Person sie sehen darf. Wer zu keiner Seite gehört und nicht leitet: 404."""
     kind, ref_id = clean_ref(kind, ref_id)
-    viewer = await viewer_for(db, match, user, moss=kind == "moss")
+    viewer = await viewer_for(db, match, user)
     ref = await resolve_ref(db, match, kind, ref_id)
     if not (viewer.sides or viewer.acting or viewer.lead) or not ref.found:
         raise HTTPException(status_code=404, detail="Nachweise nicht gefunden")
@@ -368,7 +369,7 @@ async def _audit(db, action: str, match: dict, actor_id: str, doc: dict) -> None
 async def check_add(db, match: dict, user: dict, kind, ref_id) -> tuple[str, str, Viewer, refs.Ref]:
     """Darf diese Person zu diesem Bezug hinzufügen? Sonst die passende Absage (vor Rate-Limit und Upload)."""
     kind, ref_id = clean_ref(kind, ref_id)
-    viewer = await viewer_for(db, match, user, moss=kind == "moss")
+    viewer = await viewer_for(db, match, user)
     ref = await resolve_ref(db, match, kind, ref_id)
     refusal = add_refusal(kind, viewer, ref, now_utc())
     if refusal:
