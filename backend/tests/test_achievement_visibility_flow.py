@@ -158,7 +158,8 @@ async def test_rangliste_je_kategorie_und_zeitraum(flow):
     assert await badges.award_achievement(cara["id"], "matches_played_1")
     long_ago = (datetime.now(timezone.utc) - timedelta(days=400)).isoformat()
     await flow.db.user_achievements.update_one({"user_id": ben["id"], "tier_code": "matches_played_1"}, {"$set": {"earned_at": long_ago}})
-    await flow.db.user_xp.insert_one({"user_id": anna["id"], "total": 900, "prestige": 1, "level": 4})
+    # Die Vergaben haben Anna schon XP gutgeschrieben - je Person gibt es eine Zeile (eindeutiger Index, #2216).
+    await flow.db.user_xp.update_one({"user_id": anna["id"]}, {"$set": {"total": 900, "prestige": 1, "level": 4}}, upsert=True)
     wood = catalog.MATERIALS["wood"]["points"]
 
     flow.act_as(None)

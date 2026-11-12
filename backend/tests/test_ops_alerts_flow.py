@@ -166,9 +166,9 @@ async def test_retention_purges_old_mail_and_audit_rows(flow):
     await flow.db.event_messages.insert_many([{"id": "m-old", "created_at": (now_utc() - timedelta(days=800)).isoformat()}, {"id": "m-new", "created_at": old}])
     # An der Tür Eingetragene (#2127, EV17): nach derselben Frist bleibt nur die Zählung; Anmeldungen mit Konto bleiben.
     await flow.db.event_registrations.insert_many([
-        {"id": "w-old", "walk_in": True, "display_name": "Gast Alt", "internal_note": "Tel 0664", "note": "kommt später", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
-        {"id": "w-new", "walk_in": True, "display_name": "Gast Neu", "internal_note": "bleibt noch", "created_at": old},
-        {"id": "r-old", "user_id": "u1", "display_name": "Konto Alt", "internal_note": "bleibt", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
+        {"id": "w-old", "event_id": "e-tuer", "user_id": "walkin:w-old", "walk_in": True, "display_name": "Gast Alt", "internal_note": "Tel 0664", "note": "kommt später", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
+        {"id": "w-new", "event_id": "e-tuer", "user_id": "walkin:w-new", "walk_in": True, "display_name": "Gast Neu", "internal_note": "bleibt noch", "created_at": old},
+        {"id": "r-old", "event_id": "e-tuer", "user_id": "u1", "display_name": "Konto Alt", "internal_note": "bleibt", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
     ])
     removed = await ops_alerts.purge_old_logs(flow.db)
     assert removed == {"email_logs": 1, "audit_logs": 1, "event_messages": 1, "walk_in_names": 1, "contact_messages": 0}

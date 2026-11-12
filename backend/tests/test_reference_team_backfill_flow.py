@@ -32,7 +32,7 @@ async def flow():
 
 
 async def _season(db, sid: str, team_scoring: bool = True) -> dict:
-    series = {"id": sid, "lineage_id": "spur-1", "season": "2026", "status": "active",
+    series = {"id": sid, "lineage_id": "spur-1", "season": "2026", "season_slug": sid, "status": "active",
               "rules": {"points_by_place": SCHEME, "team_scoring": {"enabled": team_scoring}}}
     await db.reference_series.insert_one(dict(series))
     await db.reference_rounds.insert_one({"id": f"{sid}-r1", "series_id": sid, "order": 1, "status": "scored",
@@ -79,7 +79,7 @@ async def test_old_rows_without_a_team_get_the_default_team_exactly_once(flow):
     db = flow.db
     await _season(db, "mit", team_scoring=True)
     await _season(db, "ohne", team_scoring=False)
-    await db.reference_series.insert_one({"id": "leer", "lineage_id": "spur-1", "season": "2025", "rules": {}})
+    await db.reference_series.insert_one({"id": "leer", "season_slug": "leer", "lineage_id": "spur-1", "season": "2025", "rules": {}})
     # Vor der Migration: leer heißt kein Team - die Löwen und Rot hätten still ihre Punkte verloren.
     assert await _teams(db, "mit") == {}
 

@@ -215,7 +215,7 @@ async def test_admin_statistik_zeigt_nicht_mehr_erreichbares_mit_vermerk(flow):
 @pytest.mark.asyncio
 async def test_nicht_mehr_erreichbares_wird_nicht_automatisch_vergeben(flow):
     racer = await flow.add_user(name="Fahrer")
-    await flow.db.tournaments.insert_one({"id": "gp", "title": "GP", "format": "grand_prix", "status": "completed"})
+    await flow.db.tournaments.insert_one({"id": "gp", "slug": "gp", "title": "GP", "format": "grand_prix", "status": "completed"})
     await flow.db.tournament_registrations.insert_one({"id": "r-gp", "tournament_id": "gp", "user_id": racer["id"], "status": "approved"})
     assert (await counters.compute(racer["id"], {"grand_prix_entries"}, legacy=False))["grand_prix_entries"] == 1
     await badges.evaluate_user_progress(racer["id"])
@@ -257,10 +257,10 @@ async def test_verwaltung_setzt_retired_mit_grund_und_der_seed_laesst_es_stehen(
 @pytest.mark.asyncio
 async def test_pionier_ist_erreichbar_bis_zum_hundertsten_konto(flow):
     start = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    await flow.db.users.insert_many([{"id": f"u{i}", "username": f"u{i}", "created_at": (start + timedelta(hours=i)).isoformat()} for i in range(99)])
+    await flow.db.users.insert_many([{"id": f"u{i}", "email": f"u{i}" + "@example.test", "username": f"u{i}", "created_at": (start + timedelta(hours=i)).isoformat()} for i in range(99)])
     await badges.seed_badges()
     assert "available_until" not in await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0}), "erst ab hundert Konten"
-    await flow.db.users.insert_one({"id": "u99", "username": "u99", "created_at": (start + timedelta(hours=99)).isoformat()})
+    await flow.db.users.insert_one({"id": "u99", "email": "u99" + "@example.test", "username": "u99", "created_at": (start + timedelta(hours=99)).isoformat()})
     await badges.seed_badges()
     group = await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0})
     assert group["available_until"] == (start + timedelta(hours=99)).isoformat() and reach.is_retired(group)
@@ -273,7 +273,7 @@ async def test_pionier_ist_erreichbar_bis_zum_hundertsten_konto(flow):
 async def test_pionier_altanspruch_bleibt_nach_dem_hundertsten_konto(flow):
     """Review M1: „erreichbar bis“ sperrt nur Ansprüche danach - das 40. Konto, nie ausgewertet, bekommt Pionier noch."""
     start = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    await flow.db.users.insert_many([{"id": f"u{i}", "username": f"u{i}", "is_active": True, "created_at": (start + timedelta(hours=i)).isoformat()}
+    await flow.db.users.insert_many([{"id": f"u{i}", "email": f"u{i}" + "@example.test", "username": f"u{i}", "is_active": True, "created_at": (start + timedelta(hours=i)).isoformat()}
                                      for i in range(101)])
     await badges.seed_badges()
     assert reach.is_retired(await flow.db.achievement_groups.find_one({"code": "pioneer"}, {"_id": 0}))
@@ -291,7 +291,7 @@ async def test_pionier_altanspruch_bleibt_nach_dem_hundertsten_konto(flow):
 
 async def _accounts(flow, count: int, *, offset: int = 0):
     start = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    await flow.db.users.insert_many([{"id": f"a{i}", "username": f"a{i}", "created_at": (start + timedelta(hours=i)).isoformat()}
+    await flow.db.users.insert_many([{"id": f"a{i}", "email": f"a{i}" + "@example.test", "username": f"a{i}", "created_at": (start + timedelta(hours=i)).isoformat()}
                                      for i in range(offset, offset + count)])
 
 
@@ -609,7 +609,7 @@ async def test_comeback_und_kartenkenner_aus_den_liga_maps(flow):
 async def test_streckenrekord_ueber_alle_challenges_nicht_wie_pole(flow):
     anna = await flow.add_user(name="Anna")
     bernd = await flow.add_user(name="Bernd")
-    await flow.db.f1_challenges.insert_many([{"id": "c1", "title": "LAN 1", "game_id": "f1"}, {"id": "c2", "title": "LAN 2", "game_id": "f1"}, {"id": "c3", "title": "Andere", "game_id": "gt"}])
+    await flow.db.f1_challenges.insert_many([{"id": "c1", "slug": "c1", "title": "LAN 1", "game_id": "f1"}, {"id": "c2", "slug": "c2", "title": "LAN 2", "game_id": "f1"}, {"id": "c3", "slug": "c3", "title": "Andere", "game_id": "gt"}])
     await flow.db.f1_tracks.insert_many([
         {"id": "t1", "challenge_id": "c1", "name": "Monza"}, {"id": "t2", "challenge_id": "c2", "name": " monza "},
         {"id": "t3", "challenge_id": "c1", "name": "Spa"}, {"id": "t4", "challenge_id": "c3", "name": "Monza"},
@@ -634,8 +634,8 @@ async def test_streckenrekord_legt_challenges_ohne_spiel_nicht_zusammen(flow):
     """Review N8: Ohne ``game_id`` steht jede Challenge für sich; Namen zählen ohne Groß-/Kleinschreibung und Leerraum,
     echte Varianten („Monza (Italien)“) bleiben getrennt."""
     anna = await flow.add_user(name="Anna")
-    await flow.db.f1_challenges.insert_many([{"id": "n1", "title": "Ohne Spiel 1"}, {"id": "n2", "title": "Ohne Spiel 2", "game_id": ""},
-                                             {"id": "g1", "title": "Mit Spiel 1", "game_id": "f1"}, {"id": "g2", "title": "Mit Spiel 2", "game_id": "f1"}])
+    await flow.db.f1_challenges.insert_many([{"id": "n1", "slug": "n1", "title": "Ohne Spiel 1"}, {"id": "n2", "slug": "n2", "title": "Ohne Spiel 2", "game_id": ""},
+                                             {"id": "g1", "slug": "g1", "title": "Mit Spiel 1", "game_id": "f1"}, {"id": "g2", "slug": "g2", "title": "Mit Spiel 2", "game_id": "f1"}])
     await flow.db.f1_tracks.insert_many([
         {"id": "x1", "challenge_id": "n1", "name": "Imola"}, {"id": "x2", "challenge_id": "n2", "name": "Imola"},
         {"id": "y1", "challenge_id": "g1", "name": "  SPA  "}, {"id": "y2", "challenge_id": "g2", "name": "spa"},
