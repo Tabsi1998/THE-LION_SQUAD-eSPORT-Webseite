@@ -250,6 +250,9 @@ der Abgleich den Fall von selbst. Die Website gibt **nie** eine Gutschrift frei.
   Entwurf in Dolibarr.
 - Weil der Auftrag diesen Entwurf weiter vermerkt, merkt die Website bei einem **erneuten Storno** keine neue Gutschrift vor. Habt
   ihr den Entwurf gelöscht, legt bei einem erneuten Storno die Gutschrift von Hand an (der Fall „Storniert, Beleg existiert“ sagt es).
+- Ein Auftrag schreibt seinen Beleg nur an die Anmeldung, solange sie seinen eingefrorenen Preis trägt; nach einer Rückkehr mit neuem
+  Auftrag bleibt ein alter, gutgeschriebener Beleg so beim alten Auftrag. Altaufträge ohne Preis-Kennung (von vor #1184) gleicht der
+  Abgleich weiter nur über die Anmeldung ab.
 
 **Gutschrift ≠ Erstattung.** Die Gutschrift gleicht den Beleg in Dolibarr aus. Erstattet ist erst,
 was tatsächlich zurücküberwiesen (oder bar zurückgegeben) wurde – das haltet ihr im Detail des
