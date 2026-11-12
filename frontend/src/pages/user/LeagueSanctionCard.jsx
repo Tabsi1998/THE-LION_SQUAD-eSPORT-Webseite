@@ -39,9 +39,9 @@ export function LeagueSanctionCard({ p, onChanged }) {
     }
   };
   return (
-    <div data-testid={`penalty-card-${p.ref_id}`} className="rounded-sm border border-white/10 bg-[#121212] p-5">
+    <div data-testid={`penalty-card-${p.ref_id}`} className="rounded-sm border border-white/10 bg-[#121212] p-4 sm:p-5">
       <div className="flex items-start gap-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-[#FF6B60]/10 text-[#FF6B60]"><Gavel className="h-5 w-5" aria-hidden="true" /></div>
+        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-[#FF6B60]/10 text-[#FF6B60] sm:flex"><Gavel className="h-5 w-5" aria-hidden="true" /></div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
@@ -60,7 +60,7 @@ export function LeagueSanctionCard({ p, onChanged }) {
           <dl className="mt-1 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
             <dt className="text-white/50">Regelverstoß</dt><dd className="min-w-0 break-words text-white/90">{sanction.rule_ref}</dd>
             <dt className="text-white/50">Begründung</dt><dd className="min-w-0 whitespace-pre-line break-words text-white/90">{sanction.reason}</dd>
-            {sanction.period ? <><dt className="text-white/50">Zeitraum</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${sanction.id}`}>{sanction.period}</dd></> : null}
+            {sanction.period ? <><dt className="text-white/50">{sanction.points ? "Höhe" : "Zeitraum"}</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${sanction.id}`}>{sanction.period}</dd></> : null}
             <dt className="text-white/50">Verhängt</dt><dd className="text-white/70">{viennaDateTime(p.issued_at, WHEN)}{p.issued_by_name ? ` von ${p.issued_by_name}` : ""}</dd>
             {sanction.status === "revoked" ? (
               <><dt className="text-white/50">Aufgehoben</dt><dd className="min-w-0 break-words text-white/80" data-testid={`sanction-revoked-${sanction.id}`}>{viennaDateTime(sanction.revoked_at, WHEN)}: {sanction.revoke_reason}</dd></>

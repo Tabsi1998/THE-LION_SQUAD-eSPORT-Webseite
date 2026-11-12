@@ -266,7 +266,7 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
       <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
         <dt className="text-white/50">Regelverstoß</dt><dd className="min-w-0 break-words text-white/90">{item.rule_ref}</dd>
         <dt className="text-white/50">Begründung</dt><dd className="min-w-0 whitespace-pre-line break-words text-white/90">{item.reason}</dd>
-        {item.period ? <><dt className="text-white/50">Zeitraum</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${item.id}`}>{item.period}</dd></> : null}
+        {item.period ? <><dt className="text-white/50">{item.points ? "Höhe" : "Zeitraum"}</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${item.id}`}>{item.period}</dd></> : null}
         <dt className="text-white/50">Verhängt</dt><dd className="text-white/70">{viennaDateTime(item.created_at, WHEN)}{item.created_by_name ? ` von ${item.created_by_name}` : ""}</dd>
         {item.status === "revoked" ? (
           <><dt className="text-white/50">Widerrufen</dt><dd className="min-w-0 break-words text-white/70">{viennaDateTime(item.revoked_at, WHEN)}{item.revoked_by_name ? ` von ${item.revoked_by_name}` : ""}: {item.revoke_reason}</dd></>
