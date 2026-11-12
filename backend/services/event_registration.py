@@ -459,7 +459,16 @@ async def _update_own(db, event: dict, me: dict, changes: dict, *, via: str) -> 
 
 async def cancel(db, event: dict, me: dict, *, via: str = "web") -> dict:
     """Die eigene Anmeldung zurückziehen - nur bis zum Beginn und nicht nach dem Check-in; Aufträge dazu werden
-    storniert, Audit mit dem Weg."""
+    storniert, Audit mit dem Weg. Unter derselben Platzsperre wie An- und Ummeldung (#2184): Zwischen dem Storno der
+    Anmeldung und dem ihres Auftrags darf keine gleichzeitige Neuanmeldung zurückbuchen."""
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            return await _cancel(db, event, me, via=via)
+    except MutationLockBusy:
+        raise SeatsBusy()
+
+
+async def _cancel(db, event: dict, me: dict, *, via: str) -> dict:
     reg = await existing_registration(db, event, me)
     if not reg or reg.get("status") in {"cancelled", "no_show"}:
         raise RegistrationError(404, "Anmeldung nicht gefunden")

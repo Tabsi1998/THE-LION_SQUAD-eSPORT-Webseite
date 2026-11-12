@@ -5,6 +5,7 @@ Der Beleg in Dolibarr wird nie still ersetzt, die Finanzverwaltung bekommt einen
 Reaktivieren durch die Leitung (#2127). Die Anmeldung zeigt wieder den Stand dieses Belegs, die Nachricht nennt keinen
 Betrag, der so nicht abgerechnet wird. Gibt es noch keinen Beleg (oder ist der Entwurf in Dolibarr gelöscht, #2226), gilt
 der neue Preis mit eigenem Auftrag. Dolibarr ist nur der Fake, Namen sind erfunden."""
+import asyncio
 import pathlib
 import sys
 
@@ -15,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from services import billing_cases, billing_orders, dolibarr_billing, dolibarr_client  # noqa: E402
+from services import billing_cases, billing_orders, dolibarr_billing, dolibarr_client, event_registration  # noqa: E402
 from services.event_notifications import KEPT_INVOICE, KIND, kept_invoice_line, price_to_bill  # noqa: E402
 from test_billing_dolibarr_flow import TERMS, book, connect, order_of, paid_event, person  # noqa: E402
 
@@ -494,6 +495,40 @@ async def test_abgleich_zwischen_auswahl_und_rueckbuchung_ergibt_neuen_auftrag(f
     assert not reg.get("invoice_ref") and not reg.get("invoice_id")
     body = (await last_note(flow, paula))["body"]
     assert KEPT_INVOICE not in body and ("40,00" if by_lead else "20,00") in body
+
+
+@pytest.mark.asyncio
+async def test_storno_und_gleichzeitige_neuanmeldung_laufen_nacheinander(flow, fake, monkeypatch):
+    """Die Person storniert und meldet sich im selben Moment wieder an (zwei Geräte, Website und Discord). Das Storno storniert
+    erst die Anmeldung, dann den Auftrag - dazwischen darf keine Neuanmeldung zurückbuchen, sonst stünde der Auftrag danach
+    wieder auf „storniert“, obwohl die Person dabei ist. Beide gehen unter derselben Platzsperre."""
+    await flow.db.mutation_locks.create_index("resource", unique=True)   # wie in der echten Datenbank: eine Sperre je Event
+    kassier, event, paula, booked, order = await drafted(flow)
+    await settle(flow, fake, order, "validated")
+    stored_event = await flow.db.events.find_one({"id": event["id"]}, {"_id": 0})
+    started, go = asyncio.Event(), asyncio.Event()
+    original = billing_orders.cancel_orders_for
+
+    async def paused(db, **kwargs):
+        started.set()
+        await asyncio.wait_for(go.wait(), 5)
+        return await original(db, **kwargs)
+
+    monkeypatch.setattr(billing_orders, "cancel_orders_for", paused)
+    cancelling = asyncio.create_task(event_registration.cancel(flow.db, stored_event, paula))
+    await asyncio.wait_for(started.wait(), 5)
+    registering = asyncio.create_task(event_registration.register(flow.db, stored_event, paula))
+    await asyncio.sleep(0.3)
+    go.set()
+    await cancelling
+    back = await registering
+    monkeypatch.setattr(billing_orders, "cancel_orders_for", original)
+
+    assert back["status"] == "registered"
+    stored = await order_of(flow, booked)
+    assert "booking_state" not in stored, "die Person ist dabei - der Auftrag gilt als gebucht"
+    assert [entry["state"] for entry in stored["booking_events"]] == ["cancelled", "restored"]
+    assert "changed_after_invoice" in await open_cases(flow, order)
 
 
 @pytest.mark.asyncio
