@@ -9,7 +9,7 @@ Ein Verfahren ist ein Eintrag in ``matches_v2.disputes[]`` mit ``id`` und ``kind
 - **Einspruch** (``appeal``): gegen Protestentscheid, Kampflos-Wertung oder Korrektur. Es entscheidet eine andere Person.
 
 Nie automatisch gewertet: Fristen erinnern und eskalieren nur (``league_procedure_sweep``). Alle Fristen stehen als ISO-Zeit am Eintrag.
-Wer was sieht, steht in ``view`` (Nr. 133): die Gegenseite ohne ``claimed``, „sofort hingewiesen?“ und MOSS, alle anderen nichts.
+Wer was sieht, steht in ``view`` (Nr. 133): die Gegenseite ohne „sofort hingewiesen?“ und MOSS, alle anderen nichts.
 """
 from __future__ import annotations
 
@@ -717,9 +717,11 @@ def view(row: dict, match: dict, viewer: Viewer, league: League, names: dict, no
                        and bool(refs.parse(row.get("appeal_until")) and now < refs.parse(row["appeal_until"]))
                        and not any(other["kind"] == APPEAL and (other.get("against") or {}).get("ref_id") == row["id"] for other in rows(match))),
     }
+    # Das abweichende Ergebnis sehen beide Seiten und die Leitung (Entscheidung Fabian 12.11.): Die Stellungnahme braucht den Bezug.
+    out["claimed"] = row.get("claimed")
     if full:
-        # Nur die eigene Seite und die Leitung: das abweichende Ergebnis und die Antwort auf „sofort hingewiesen?“.
-        out.update({"claimed": row.get("claimed"), "notified_immediately": row.get("notified_immediately")})
+        # Nur die eigene Seite und die Leitung: die Antwort auf „sofort hingewiesen?“.
+        out["notified_immediately"] = row.get("notified_immediately")
     if viewer.lead:
         out.update({"submitted_by": names.get(row.get("user_id")), "resolved_by": names.get(row.get("resolved_by")),
                     "escalated_at": row.get("escalated_at"), "reminded_at": row.get("reminded_at")})

@@ -141,7 +141,7 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
         ) : <p className="text-xs text-white/50">Tippe an, worum es geht – dann fragen wir nur, was dazu nötig ist.</p>}
       </section>
       <p className="text-xs text-white/50" data-testid="match-dispute-hint">
-        3 · Nachweise fügst du im nächsten Schritt hinzu. Die Gegenseite sieht Grund und Begründung und kann Stellung nehmen; das abweichende Ergebnis sieht nur die Liga-Leitung.
+        3 · Nachweise fügst du im nächsten Schritt hinzu. Die Gegenseite sieht Grund, Begründung und das abweichende Ergebnis und kann Stellung nehmen.
       </p>
       {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid="match-dispute-error">{error}</p> : null}
       <button disabled={busy} className="tls-btn tls-btn--danger min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">

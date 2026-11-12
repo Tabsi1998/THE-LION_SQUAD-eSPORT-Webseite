@@ -477,12 +477,13 @@ async def test_who_sees_what_of_a_procedure(flow):
     flow.act_as(user(w, "Falke3"))
     assert (await procedure_seen(flow, w, pid))["moss_requests"] == [], "die übrigen Spieler sehen die Anforderung nicht"
 
-    # Die Gegenseite: Grund, Text, Stand - ohne das abweichende Ergebnis, „sofort hingewiesen?“ und MOSS.
+    # Die Gegenseite: Grund, Text, Stand und das abweichende Ergebnis - ohne „sofort hingewiesen?“ und MOSS.
     flow.act_as(user(w, "Mila"))
     info = await page(flow, w)
     other = info["league"]["procedures"][0]
     assert other["reason"] == REASON and other["reason_label"] == "Ausrüstung" and other["opponent"] is True
-    assert "claimed" not in other and "notified_immediately" not in other and other["moss_requests"] == []
+    assert other["claimed"] == {**claim(w), "games": []}, "die Stellungnahme braucht den Bezug"
+    assert "notified_immediately" not in other and other["moss_requests"] == []
     raw = info["match"]["disputes"][0]
     assert "reason" not in raw and "claimed" not in raw and "moss_requests" not in raw
 
@@ -512,7 +513,7 @@ async def test_a_biased_lead_is_treated_like_their_side(flow):
     user(w, "Mila")["areas"] = ["leagues"]
     flow.act_as(user(w, "Mila"))
     seen = await procedure_seen(flow, w, pid)
-    assert "claimed" not in seen and seen["can_lead"] is False, "wie ihre Seite, nie als Leitung"
+    assert "notified_immediately" not in seen and "submitted_by" not in seen and seen["can_lead"] is False, "wie ihre Seite, nie als Leitung"
     for action, payload in (("assign", {}), ("decision", {"decision": "keep", "decision_note": NOTE}),
                             ("moss-requests", {"user_id": user(w, "Falke2")["id"]})):
         assert (await act(flow, w, pid, action, **payload)).status_code == 403, action

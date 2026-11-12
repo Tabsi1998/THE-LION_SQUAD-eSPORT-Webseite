@@ -43,7 +43,7 @@ const CAPTAIN = page_of({ procedure_form: FORM }, { can_dispute: true });
 const SUBMITTED = page_of({ procedures: [PROCEDURE], contested: true, procedure_form: { ...FORM, open: false } }, { can_dispute: true });
 const OPPONENT = page_of({
   own_registration_id: "a", contested: true,
-  procedures: [{ ...PROCEDURE, own: false, opponent: true, claimed: undefined, can_amend: false, can_withdraw: false, can_state: true,
+  procedures: [{ ...PROCEDURE, own: false, opponent: true, can_amend: false, can_withdraw: false, can_state: true,
     assignee: { name: "Liga-Leitung Nord", at: inHours(-3), own: false }, target_at: inHours(60) }],
 }, { acting_registration_id: "a" });
 const LEAD = page_of({
@@ -151,7 +151,7 @@ test.describe("Liga: Beanstandung, Protest und Einspruch", () => {
       await page.goto("/matches/m1");
       const card = page.getByTestId("procedure-p1");
       await expect(card.getByTestId("procedure-reason-p1")).toContainText("falsch gemeldet");
-      await expect(card.getByTestId("procedure-claimed-p1")).toHaveCount(0);
+      await expect(card.getByTestId("procedure-claimed-p1")).toContainText("1 : 2");
       await expect(card.getByTestId("procedure-statement-until-p1")).toContainText("noch");
       await expect(card.getByTestId("procedure-assignee-p1")).toContainText("Übernommen von Liga-Leitung Nord");
       await expect(card.getByTestId("procedure-lead-p1")).toHaveCount(0);

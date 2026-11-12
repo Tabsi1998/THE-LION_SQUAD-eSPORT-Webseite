@@ -1138,8 +1138,8 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 - **Einstellen**: Season → **Proteste** → **Fristen, Gründe und Tabelle**. Speichern gilt sofort in allen nicht
   gesperrten Staffeln; laufende Verfahren behalten ihre Fristen. Die vier Grundgründe bleiben in der Liste, damit auch
   die App melden kann.
-- **Wer sieht was**: die eigene Seite alles; die Gegenseite Grund, Begründung, Bilder, Links, Stand und Entscheidung,
-  aber nicht das abweichende Ergebnis und keine MOSS-Datei; ihr als nicht beteiligte Leitung alles; alle anderen nur
+- **Wer sieht was**: die eigene Seite alles; die Gegenseite Grund, Begründung, das abweichende Ergebnis, Bilder,
+  Links, Stand und Entscheidung, aber keine MOSS-Datei; ihr als nicht beteiligte Leitung alles; alle anderen nur
   „In Klärung“. MOSS-Dateien sehen nur die hochladende Person, Captain und Vertreter ihrer Seite und ihr.
 - **Korrigieren**: am Spiel **Ergebnis korrigieren** – Stand, auf Wunsch Maps und Aufstellungen, Pflicht ist ein
   **Grund** (mindestens fünf Zeichen). Die Korrektur schließt einen offenen Einspruch, die Tabelle rechnet sofort neu.

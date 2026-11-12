@@ -88,12 +88,13 @@ describe("Problem melden, geführt", () => {
 });
 
 describe("Karte des Verfahrens", () => {
-  it("zeigt der Gegenseite Grund, Frist und das Feld für die Stellungnahme - ohne das abweichende Ergebnis", async () => {
+  it("zeigt der Gegenseite Grund, abweichendes Ergebnis, Frist und das Feld für die Stellungnahme", async () => {
     const onChanged = vi.fn();
-    render(<ProcedureCard matchId="m1" procedure={procedure({ opponent: true, can_state: true })} sideNames={NAMES} onChanged={onChanged} />);
+    const claimed = { results: [{ registration_id: "reg-a", score: 1 }, { registration_id: "reg-b", score: 2 }] };
+    render(<ProcedureCard matchId="m1" procedure={procedure({ opponent: true, can_state: true, claimed })} sideNames={NAMES} onChanged={onChanged} />);
     expect(screen.getByTestId("procedure-reason-p1")).toHaveTextContent(TEXT);
     expect(screen.getByTestId("procedure-statement-until-p1")).toHaveTextContent("noch");
-    expect(screen.queryByTestId("procedure-claimed-p1")).toBeNull();
+    expect(screen.getByTestId("procedure-claimed-p1")).toHaveTextContent("Rudel A 1 : 2 Horst");
     expect(screen.queryByTestId("procedure-lead-p1")).toBeNull();
     expect(screen.getByTestId("procedure-assignee-p1")).toHaveTextContent("Noch von niemandem übernommen");
 

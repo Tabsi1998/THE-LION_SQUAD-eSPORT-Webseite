@@ -74,7 +74,7 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 
 <img src="../assets/liga/protest-melden-390.png" alt="Problem melden am Handy: Schritte Art, Grund, Nachweise; die Art Protest steht fest, darunter die Gründe zum Antippen, das abweichende Ergebnis, der Vorfall und die Begründung" width="300"> <img src="../assets/liga/protest-karte-390.png" alt="Karte eines Protests am Handy aus Sicht der Gegenseite: Grund und Begründung, Fristen mit Restzeit, wer übernommen hat, Nachweise und das Feld für die Stellungnahme" width="300">
 
-- **Was die Gegenseite sieht:** Grund, Begründung, Bilder und Links, Stand und Entscheidung. Das abweichende Ergebnis, die Antwort auf „sofort hingewiesen?“ und MOSS-Dateien sieht sie nicht. Alle anderen sehen nur **In Klärung**.
+- **Was die Gegenseite sieht:** Grund, Begründung, das abweichende Ergebnis, Bilder und Links, Stand und Entscheidung. Die Antwort auf „sofort hingewiesen?“ und MOSS-Dateien sieht sie nicht. Alle anderen sehen nur **In Klärung**.
 - **Sofort hingewiesen?** Bei Ausrüstung, Lobby und Spielberechtigung fragt das Formular, ob ihr die Gegenseite sofort angesprochen habt (Regelwerk § 8.8).
 - **Zurückziehen** geht bis zur Entscheidung. Danach ist kein neues Verfahren mit demselben Grund möglich.
 - **In der Tabelle** zählt ein Ergebnis mit laufendem Protest vorläufig weiter; an eurer Zeile steht „1 Spiel in Klärung“. Stellt die Leitung es anders ein, zählt das Spiel bis zur Entscheidung nicht.
