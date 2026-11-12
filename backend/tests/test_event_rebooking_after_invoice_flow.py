@@ -197,6 +197,51 @@ async def test_entwurf_nach_der_neuanmeldung_geloescht_der_prueffall_bleibt(flow
     await billing_orders.sync_due()
     cases = await open_cases(flow, order)
     assert "changed_after_invoice" in cases and "cancelled_after_invoice" not in cases
+    # Die Buchung ist wieder da: Der Auftrag wartet auf die Entscheidung der Finanzverwaltung, statt mit dem Storno zu enden.
+    stored = await order_of(flow, booked)
+    assert stored["status"] == "held" and stored["removed_invoices"]
+    assert (await registration(flow, booked))["billing_status"] == "pending"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("by_lead", [False, True])
+async def test_zurueck_nach_storno_gilt_am_auftrag_wieder_als_gebucht(flow, fake, by_lead):
+    """Der Auftrag vergisst den Storno, sobald die Person zurück ist (#2184): kein vorgemerkter Gutschrift-Entwurf mehr, eine
+    Zahlung ist keine „Zahlung auf stornierte Buchung“, und die Summe der Veranstaltung zählt die Buchung wieder."""
+    await connect(flow, **TERMS, credit_note_draft_on_cancel=True)
+    kassier = await person(flow, "kassier", role="club_admin")
+    event = await paid_event(flow, kassier)
+    paula = await person(flow, "paula")
+    booked = await book(flow, paula, event, companions=1)
+    await billing_orders.classify_due()
+    order = await settle(flow, fake, await order_of(flow, booked), "validated")
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    if by_lead:
+        flow.act_as(kassier)
+        gone = await flow.patch(url, json={"status": "cancelled"})
+        assert gone.status_code == 200, gone.text
+    else:
+        await cancel_self(flow, event, paula)
+    cancelled = await order_of(flow, booked)
+    assert cancelled["booking_state"] == "cancelled" and cancelled.get("credit_note_due_at"), "Gutschrift-Entwurf ist vorgemerkt"
+
+    if by_lead:
+        flow.act_as(kassier)
+        response = await flow.patch(url, json={"status": "registered"})
+        assert response.status_code == 200, response.text
+    else:
+        await book(flow, paula, event, companions=0)
+    stored = await order_of(flow, booked)
+    assert "booking_state" not in stored and "credit_note_due_at" not in stored and stored.get("booking_restored_at")
+
+    fake.pay(order["invoice_id"])
+    counts = await billing_orders.sync_due()
+    assert counts["credit_drafts"] == 0, "keine Gutschrift für eine Buchung, die wieder gilt"
+    cases = await open_cases(flow, order)
+    assert "paid_after_cancel" not in cases and "changed_after_invoice" in cases
+    assert "cancelled_after_invoice" in cases, "den Storno-Fall erledigt die Finanzverwaltung mit Grund"
+    summary = await billing_orders.source_summary(flow.db, "event", event["id"])
+    assert summary["booked_cents"] == 4000 and summary["paid_cents"] == 4000
 
 
 @pytest.mark.asyncio
@@ -207,7 +252,8 @@ async def test_leitung_aktiviert_nach_dem_abgleich_wieder_auch_dann_ein_prueffal
     order = await settle(flow, fake, order, "validated")
     flow.act_as(kassier)
     url = f"/api/events/{event['id']}/registrations/{booked['id']}"
-    assert (await flow.patch(url, json={"status": "cancelled"})).status_code == 200
+    gone = await flow.patch(url, json={"status": "cancelled"})
+    assert gone.status_code == 200, gone.text
     await billing_orders.sync_due()
     assert (await registration(flow, booked))["billing_status"] == "invoiced"
 
@@ -226,3 +272,4 @@ def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
     for status in ("invoiced", "paid", "cancelled"):
         assert price_to_bill({"price_snapshot": snapshot, "billing_status": status}) is None
     assert price_to_bill({"price_snapshot": {"total_cents": 0}}) is None and price_to_bill({}) is None
+

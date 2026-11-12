@@ -921,8 +921,8 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
         except pricing.PricingError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=registration_id, reason=event_registration.REBOOKED_BY_LEAD,
-                                                       new_total_cents=int(price.get("total_cents") or 0))
+        await billing_orders.rebook_after_invoice(db, invoiced_before, reason=event_registration.REBOOKED_BY_LEAD,
+                                                  new_total_cents=int(price.get("total_cents") or 0))
         updates.update(billing_orders.rebooked_fields(invoiced_before))
     elif pricing.is_paid(offer) and becomes_active and (reactivated or not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):
         try:

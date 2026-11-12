@@ -193,6 +193,21 @@ def rebooked_fields(order: dict) -> dict:
     return {**({"price_snapshot": order["snapshot"]} if order.get("snapshot") else {}), **invoice_fields(order)}
 
 
+async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents: int) -> dict | None:
+    """Die stornierte Buchung ist zurück (#2184): Am Auftrag gilt sie wieder als gebucht - ohne das bliebe der Auftrag
+    „storniert“, ein vorgemerkter Gutschrift-Entwurf entstünde trotzdem, eine Zahlung würde zur „Zahlung auf stornierte
+    Buchung“, und ein gelöschter Entwurf beendete den Auftrag. Ein schon angelegter Gutschrift-Entwurf bleibt (die
+    Finanzverwaltung entscheidet), der Fall „Storniert, Beleg existiert“ ebenso. Dazu der Prüffall mit alt und neu."""
+    now = now_utc().isoformat()
+    await db.billing_orders.update_one({"id": order["id"], "booking_state": "cancelled"}, {
+        "$set": {"booking_restored_at": now, "updated_at": now},
+        "$unset": {"booking_state": "", "booking_cancelled_at": "", "paid_cents_at_cancel": ""}})
+    await db.billing_orders.update_one(
+        {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
+        {"$unset": {"credit_note_due_at": ""}})
+    return await note_change_after_invoice(db, kind=order["kind"], registration_id=order["registration_id"], reason=reason, new_total_cents=new_total_cents)
+
+
 async def release_order(db, order_id: str, actor_id: str) -> dict | None:
     """Rechnungszeitpunkt „bewusst später“: die Freigabe durch die Finanzverwaltung."""
     await db.billing_orders.update_one({"id": order_id, "status": "held"}, {"$set": {"status": "pending", "released_by": actor_id, "released_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}})

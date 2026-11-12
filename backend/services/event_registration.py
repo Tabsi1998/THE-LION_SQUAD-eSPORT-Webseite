@@ -266,8 +266,7 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         "created_at": now,
     })
     if invoiced:
-        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=doc["id"], reason=REBOOKED_SELF,
-                                                       new_total_cents=int(price.get("total_cents") or 0))
+        await billing_orders.rebook_after_invoice(db, invoiced, reason=REBOOKED_SELF, new_total_cents=int(price.get("total_cents") or 0))
     elif doc.get("price_snapshot"):
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
                                           snapshot=doc["price_snapshot"], timing=pricing.order_timing(doc["price_snapshot"], offer))
