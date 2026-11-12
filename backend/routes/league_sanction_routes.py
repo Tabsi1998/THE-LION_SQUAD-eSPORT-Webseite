@@ -1,6 +1,8 @@
 """Strafen im Wettbewerb in der Verwaltung (E.3, docs/LIGA.md „E.3 Strafen“).
 
 - ``GET  /api/admin/leagues/seasons/{season_id}/sanctions``: Strafen der Season, Arten, Katalog und die Auswahl der Co-Teams.
+- ``GET  /api/admin/leagues/seasons/{season_id}/sanctions/proofs?match_id=``: die Nachweise eines Spiels zur Auswahl - nur, was
+  die Person am Spiel sehen darf.
 - ``POST /api/admin/leagues/seasons/{season_id}/sanctions``: verhängen.
 - ``POST …/sanctions/{sanction_id}/confirm``: vorläufige Sperre bestätigen (mit Zeitraum).
 - ``POST …/sanctions/{sanction_id}/revoke``: widerrufen, mit Grund - nimmt jede Wirkung zurück.
@@ -15,7 +17,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from database import get_db
@@ -128,7 +130,7 @@ async def _staffel_write(db, doc: dict):
 
 
 async def _one(db, doc: dict, me: dict) -> dict:
-    row = await sanctions.view(db, doc, await sanctions.names_for(db, [doc]), admin=True)
+    row = await sanctions.attach_proofs(db, await sanctions.view(db, doc, await sanctions.names_for(db, [doc]), admin=True), doc, me)
     row["own_side"] = bool(await league_permissions.side_conflict(db, me, sanctions.side_of(doc)))
     row["own_decision"] = sanctions.own_decision(doc, me)
     return row
@@ -140,6 +142,17 @@ async def list_sanctions(season_id: str, me: dict = Depends(require_sanctions)):
     return await sanctions.overview(db, await _season(db, season_id), me)
 
 
+@admin_router.get("/seasons/{season_id}/sanctions/proofs")
+async def list_match_proofs(season_id: str, match_id: str = Query(max_length=80), me: dict = Depends(require_sanctions)):
+    db = get_db()
+    season = await _season(db, season_id)
+    try:
+        match = await sanctions.check_match(db, season, match_id, None, required=True)
+    except sanctions.SanctionProblem as problem:
+        raise _refuse(problem) from None
+    return {"items": await sanctions.visible_proofs(db, match, me)}
+
+
 @admin_router.post("/seasons/{season_id}/sanctions")
 async def create_sanction(season_id: str, body: SanctionBody, me: dict = Depends(require_sanctions)):
     db = get_db()
@@ -148,6 +161,7 @@ async def create_sanction(season_id: str, body: SanctionBody, me: dict = Depends
         doc, registration, _tournament, match = await sanctions.build(db, season, body.model_dump(), me)
         override = await _no_conflict(db, me, doc, match, body.conflict_reason)
         doc["conflict_reason"] = override
+        await sanctions.require_visible_proofs(db, doc, match, me)
         async with _staffel_write(db, doc) as locked:
             if locked is not None:
                 # Unter der Sperre neu lesen: Anmeldung und Staffel können sich seit der Prüfung geändert haben.

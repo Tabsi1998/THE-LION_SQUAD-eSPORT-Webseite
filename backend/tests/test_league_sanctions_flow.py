@@ -429,9 +429,19 @@ async def test_proofs_of_a_running_sanction_are_kept_and_released_afterwards(flo
     await flow.db.league_seasons.update_one({"id": world["season_id"]}, {"$set": {"start_date": "2025-01-06T00:00:00", "weeks_total": 2}})
     foreign = await issue(flow, world, kind="warning", target_type="squad", registration_id=world["reg_a"]["id"], proof_ids=["beweis-1"])
     assert foreign.status_code == 422, "Nachweise gehören zu einem Spiel"
+    # Zur Auswahl steht, was die Person am Spiel sehen darf: die Leitung mit Ergebnis-Recht alles, „Strafen“ allein nichts.
+    flow.act_as(world["lead"])
+    offered = (await flow.get(f"{world['url']}/proofs", params={"match_id": match_id})).json()["items"]
+    assert [row["id"] for row in offered] == ["beweis-1", "beweis-2"]
+    flow.act_as(world["second"])
+    assert (await flow.get(f"{world['url']}/proofs", params={"match_id": match_id})).json()["items"] == []
+    blind = await issue(flow, world, "second", kind="team_ban", target_type="squad", registration_id=world["reg_a"]["id"],
+                        match_id=match_id, proof_ids=["beweis-1"], ends_at=at(days=30))
+    assert blind.status_code == 403
     issued = await issue(flow, world, kind="team_ban", target_type="squad", registration_id=world["reg_a"]["id"],
                          match_id=match_id, proof_ids=["beweis-1"], ends_at=at(days=30))
     assert issued.status_code == 200, issued.text
+    assert [row["id"] for row in issued.json()["proofs"]] == ["beweis-1"] and issued.json()["proof_count"] == 1
     held = await flow.db.match_proof_photos.find_one({"id": "beweis-1"}, {"_id": 0})
     assert held["keep_until"] >= at(days=29)
 

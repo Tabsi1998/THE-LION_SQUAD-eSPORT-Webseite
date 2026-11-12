@@ -268,7 +268,7 @@ async def _player_registration(db, season: dict, user_id: str) -> tuple[dict, di
     return found[0], tournaments[found[0]["tournament_id"]]
 
 
-async def _check_match(db, season: dict, match_id: str | None, registration: dict | None, *, required: bool) -> dict | None:
+async def check_match(db, season: dict, match_id: str | None, registration: dict | None, *, required: bool) -> dict | None:
     if not match_id:
         if required:
             raise SanctionProblem("Bitte das Spiel wählen, auf das sich die Strafe bezieht.")
@@ -295,6 +295,35 @@ async def _check_proofs(db, match: dict | None, proof_ids) -> list[str]:
     if count != len(ids):
         raise SanctionProblem("Ein Nachweis gehört nicht zu diesem Spiel oder wurde entfernt.")
     return ids
+
+
+async def visible_proofs(db, match: dict | None, user: dict) -> list[dict]:
+    """Die Nachweise eines Spiels, die diese Person dort sehen darf (``match_proofs.can_see_doc``: die nicht befangene Leitung mit
+    Ergebnis- oder Protest-Recht) - die Auswahl beim Verhängen und die Anzeige an der Strafe."""
+    from services import match_proof_refs, match_proofs
+
+    if not match:
+        return []
+    viewer = await match_proofs.viewer_for(db, match, user)
+    rows = await db.match_proof_photos.find({"match_id": match["id"], "status": "attached"}, {"_id": 0}).to_list(500)
+    return [match_proofs.proof_view(row, viewer, match_proof_refs.MISSING, can_change=False)
+            for row in sorted(rows, key=lambda row: str(row.get("created_at") or "")) if match_proofs.can_see_doc(row, viewer)]
+
+
+async def require_visible_proofs(db, doc: dict, match: dict | None, user: dict) -> None:
+    """Angehängt wird nur, was die Person am Spiel selbst sehen darf."""
+    if doc.get("proof_ids") and not set(doc["proof_ids"]) <= {row["id"] for row in await visible_proofs(db, match, user)}:
+        raise SanctionProblem("Einen dieser Nachweise darfst du an diesem Spiel nicht sehen. Nachweise sieht die Leitung mit "
+                              "„Ergebnisse korrigieren“ oder „Proteste“.", 403)
+
+
+async def attach_proofs(db, row: dict, doc: dict, user: dict) -> dict:
+    """Die Nachweise einer Strafe für die Verwaltung: was diese Person sehen darf, dazu wie viele es insgesamt sind."""
+    ids = set(doc.get("proof_ids") or [])
+    match = await db.matches_v2.find_one({"id": doc["match_id"]}, {"_id": 0}) if ids and doc.get("match_id") else None
+    row["proofs"] = [proof for proof in await visible_proofs(db, match, user) if proof["id"] in ids]
+    row["proof_count"] = len(ids)
+    return row
 
 
 def _period(kind: str, state: str, season: dict, registration: dict | None, body: dict, now: datetime) -> dict:
@@ -366,7 +395,7 @@ async def build(db, season: dict, body: dict, actor: dict, *, now: datetime | No
             registration, tournament = await _player_registration(db, season, user_id)
     if kind == "disqualification" and registration.get("status") not in ACTIVE_REGISTRATION:
         raise SanctionProblem("Dieses Co-Team ist nicht mehr im Wettbewerb.", 409)
-    match = await _check_match(db, season, body.get("match_id"), registration, required=bool(KINDS[kind].get("match")))
+    match = await check_match(db, season, body.get("match_id"), registration, required=bool(KINDS[kind].get("match")))
     points = _int(body.get("points"), 1, POINTS_MAX, f"Der Punktabzug liegt zwischen 1 und {POINTS_MAX}.") if kind == "point_deduction" else None
     doc = {
         "id": new_id(), "league_id": season.get("league_id"), "season_id": season["id"], "kind": kind, "target_type": target_type,
@@ -792,7 +821,7 @@ async def overview(db, season: dict, me: dict) -> dict:
     now = now_utc()
     items = []
     for doc in docs:
-        row = await view(db, doc, names, now=now, admin=True)
+        row = await attach_proofs(db, await view(db, doc, names, now=now, admin=True), doc, me)
         conflict = await league_permissions.side_conflict(db, me, side_of(doc))
         row["own_side"] = bool(conflict)
         row["own_decision"] = own_decision(doc, me)
