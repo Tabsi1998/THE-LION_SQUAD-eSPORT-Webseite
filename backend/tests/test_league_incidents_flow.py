@@ -530,6 +530,35 @@ async def test_answers_to_reports_and_problems_never_carry_raw_incidents(flow):
 
 
 @pytest.mark.asyncio
+async def test_amending_the_lineup_does_not_carry_raw_incidents(flow):
+    """Auch die Antwort auf „Aufstellung nachtragen“ liefert das Spiel ohne Vorfälle - kein Grund der Notausnahme, keine Kennung
+    der Leitung."""
+    w = await world(flow)
+    incident_id = await reported(flow, w, proposal="continue_at_score")
+    assert (await answered(flow, w, incident_id, False)).status_code == 200
+    boss = w["users"]["LoeLeitung"]
+    boss["role"] = "superadmin"
+    await flow.db.users.update_one({"id": boss["id"]}, {"$set": {"role": "superadmin"}})
+    flow.act_as(boss)
+    forced = await flow.post(url(w, f"/{incident_id}/decision"), json={
+        "outcome": "no_action", "reason": "Beide Seiten gehört", "conflict_reason": "Niemand sonst erreichbar XYZ", "settle": SETTLE})
+    assert forced.status_code == 200, forced.text
+    assert (await both_report(flow, w))["awaiting_confirmation"] is False
+
+    flow.act_as(w["users"]["Kapitaen"])
+    amended = await flow.put(f"/api/matches/{w['match']['id']}/lineups", json={
+        "games": [{"position": 1, "lineup": ids(w, "Kapitaen", "Tom")}, {"position": 2, "lineup": ids(w, "Kapitaen", "Tom")}]})
+    assert amended.status_code == 200, amended.text
+    assert amended.json()["id"] == w["match"]["id"] and amended.json()["idempotent_replay"] is False
+    assert "incidents" not in amended.json() and "incident_due_at" not in amended.json()
+    assert "Niemand sonst erreichbar XYZ" not in amended.text and boss["id"] not in amended.text
+    assert "Verbindung der Löwen weg" not in amended.text
+    raw = await stored(flow, w)
+    assert raw["incidents"][0]["decision"]["conflict_reason"] == "Niemand sonst erreichbar XYZ", "Gegenprobe: gespeichert bleibt es"
+    assert [game["lineups"][w["reg_a"]["id"]] for game in raw["games"]] == [ids(w, "Kapitaen", "Tom")] * 2, "nachgetragen ist"
+
+
+@pytest.mark.asyncio
 async def test_a_confirming_report_does_not_carry_raw_incidents_either(flow):
     w = await world(flow)
     incident_id = await reported(flow, w, proposal="continue_at_score")

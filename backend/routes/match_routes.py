@@ -1963,7 +1963,8 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
-    return {**updated, "idempotent_replay": False}
+    # Vorfälle (D.5, #1619): wie bei Meldung und „Problem melden“ nie roh in der Antwort.
+    return {**league_incidents.without_incidents(updated), "idempotent_replay": False}
 
 
 @router.post("/{match_id}/dispute")

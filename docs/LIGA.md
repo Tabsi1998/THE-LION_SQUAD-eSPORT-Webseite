@@ -2846,7 +2846,7 @@ und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gil
   `replay` erst, wenn neu gemeldet ist.
 - **Öffentlich:** `map_state` an der Matchseite und `in_clarification` am Spiel der Staffel-Seite (`league_page.public_match`).
   `incidents` und `incident_due_at` stehen nie in der öffentlichen Sicht eines Spiels (`match_public_view`), `games[].incident_id`
-  nur bei Beteiligten und Leitung. Auch die Antworten auf `POST /report` und `POST /dispute` tragen das Spiel **ohne** `incidents`,
+  nur bei Beteiligten und Leitung. Auch die Antworten auf `POST /report`, `POST /dispute` und `PUT /lineups` tragen das Spiel **ohne** `incidents`,
   `incident_due_at` und `flow.user_ids` (`league_incidents.without_incidents`). Vorfälle liest nur der Block `league` der
   Matchseite, zugeschnitten auf die Person.
 - **Oberfläche: jede Angabe an einer Stelle.** „In Klärung“ steht am Chip der Map und als Abzeichen der Vorfall-Karte, sonst
