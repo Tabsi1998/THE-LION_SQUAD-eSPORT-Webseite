@@ -80,8 +80,8 @@ async def active_year(flow):
     old = await finished(flow, "FC 25 Winter-Cup", "2025-12-30T18:00:00+00:00")
     await flow.register(old, me)
 
-    lan = {"id": new_id(), "name": "LAN-Wochenende Herbst", "start_date": "2026-10-03T08:00:00+00:00"}
-    skipped = {"id": new_id(), "name": "Vereinsabend", "start_date": "2026-11-12T17:00:00+00:00"}
+    lan = {"id": new_id(), "slug": "lan-herbst", "name": "LAN-Wochenende Herbst", "start_date": "2026-10-03T08:00:00+00:00"}
+    skipped = {"id": new_id(), "slug": "vereinsabend", "name": "Vereinsabend", "start_date": "2026-11-12T17:00:00+00:00"}
     await flow.db.events.insert_many([dict(lan), dict(skipped)])
     await flow.db.event_registrations.insert_many([
         {"id": new_id(), "event_id": lan["id"], "user_id": me["id"], "status": "checked_in"},

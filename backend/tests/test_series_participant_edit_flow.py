@@ -333,9 +333,9 @@ async def test_participants_list_brings_profiles_to_choose_from_and_who_is_in_a_
     ctx = await _setup(flow)
     own = ctx["own"]["id"]
     await flow.db.club_member_profiles.insert_many([
-        {"id": "p-bert", "display_name": "Bert Probe", "is_active": True},
-        {"id": "p-anna", "display_name": "Anna Probe", "is_active": True},
-        {"id": "p-alt", "display_name": "Alt Probe", "is_active": False}])
+        {"id": "p-bert", "slug": "p-bert", "display_name": "Bert Probe", "is_active": True},
+        {"id": "p-anna", "slug": "p-anna", "display_name": "Anna Probe", "is_active": True},
+        {"id": "p-alt", "slug": "p-alt", "display_name": "Alt Probe", "is_active": False}])
     drafted = await _add(flow, own, "Probe Entwurf")
     unused = await _add(flow, own, "Probe Nie")
     await _publish(flow, own, ctx["rounds"][0], _places([drafted["id"]]), status="draft")
@@ -461,7 +461,7 @@ async def test_after_merging_extern_takes_back_the_aliases_of_both_names_in_ever
 @pytest.mark.asyncio
 async def test_merging_points_the_alias_of_the_other_spelling_to_the_kept_assignment(flow):
     ctx = await _setup(flow)
-    await flow.db.club_member_profiles.insert_one({"id": "p-bert", "display_name": "Bert Probe", "is_active": True})
+    await flow.db.club_member_profiles.insert_one({"id": "p-bert", "slug": "p-bert", "display_name": "Bert Probe", "is_active": True})
     own, earlier = ctx["own"]["id"], ctx["earlier"]["id"]
     there = await _add(flow, earlier, "Probe Zweitname")
     kept = await _add(flow, own, "Probe Erstname")

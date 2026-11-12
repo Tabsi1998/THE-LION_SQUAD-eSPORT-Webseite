@@ -34,8 +34,8 @@ async def test_home_state_carries_live_counts_per_card(flow):
     await flow.db.matches_v2.insert_one({"id": "m2", "tournament_id": "t1", "status": "completed"})
     await flow.db.events.insert_one({"id": "e1", "slug": "lan", "name": "LAN", "status": "registration_open", "visibility": "public", "start_date": soon,
                                      "has_registration": True, "max_participants": 20, "created_at": now_utc().isoformat()})
-    await flow.db.event_registrations.insert_one({"id": "er1", "event_id": "e1", "status": "registered"})
-    await flow.db.event_registrations.insert_one({"id": "er2", "event_id": "e1", "status": "cancelled"})
+    await flow.db.event_registrations.insert_one({"id": "er1", "event_id": "e1", "user_id": "u-er1", "status": "registered"})
+    await flow.db.event_registrations.insert_one({"id": "er2", "event_id": "e1", "user_id": "u-er2", "status": "cancelled"})
     await flow.db.events.insert_one({"id": "e2", "slug": "treffen", "name": "Treffen ohne Anmeldung", "status": "scheduled", "visibility": "public", "start_date": soon,
                                      "created_at": now_utc().isoformat()})
     await flow.db.f1_challenges.insert_one({"id": "c1", "slug": "fastlap", "title": "Fast Lap", "status": "live", "visibility": "public", "start_date": now_utc().isoformat(),

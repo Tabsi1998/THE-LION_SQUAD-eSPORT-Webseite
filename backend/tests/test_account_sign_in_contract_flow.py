@@ -168,12 +168,16 @@ async def test_sign_in_is_limited_per_address_before_any_password_check(flow, ha
 
     from services import rate_limit
 
+    # Heute, nicht an einem festen Tag: Echtes MongoDB räumt die Zähler über ihren TTL-Index ab, ein Zähler aus der
+    # Vergangenheit verschwindet mitten im Test (#2216).
+    frozen = datetime.now(timezone.utc).replace(second=30, microsecond=0)
+
     class Frozen(datetime):
         """Die Uhr steht mitten in einem Fenster - sonst kippt der Test, wenn er über eine Minutengrenze läuft."""
 
         @classmethod
         def now(cls, tz=None):
-            return datetime(2026, 10, 14, 12, 0, 30, tzinfo=timezone.utc)
+            return frozen
 
     monkeypatch.setattr(rate_limit, "datetime", Frozen)
     known = await account(flow)
