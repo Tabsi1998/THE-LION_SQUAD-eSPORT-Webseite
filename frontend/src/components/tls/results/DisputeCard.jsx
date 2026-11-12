@@ -126,6 +126,55 @@ function Deadline({ label, until, now, testId }) {
   );
 }
 
+/**
+ * Einspruch einlegen (Nr. 41, 45): gegen die Entscheidung über ein Verfahren, eine Wertung kampflos oder eine Korrektur - einmal,
+ * mit Begründung, innerhalb der Einspruchsfrist. Erst ein Knopf, dann das Feld: Niemand legt aus Versehen Einspruch ein.
+ */
+export function AppealForm({ matchId, against, until = null, onChanged, testId = "appeal" }) {
+  const [openForm, setOpenForm] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const now = useNow(Boolean(until));
+  const submit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(`/matches/${matchId}/appeals`, { against_type: against.type, ref_id: against.ref_id, reason: text.trim() });
+      setText("");
+      setOpenForm(false);
+      await onChanged?.();
+    } catch (failure) {
+      setError(formatApiError(failure.response?.data?.detail) || "Der Einspruch ließ sich nicht einlegen.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-2" data-testid={testId}>
+      {until ? <Deadline label="Einspruch möglich bis" until={until} now={now} testId={`${testId}-until`} /> : null}
+      {openForm ? (
+        <form onSubmit={submit} className="tls-stagger space-y-2" noValidate>
+          <label className="block">
+            <span className="mb-1 block text-sm text-white/75">Einspruch {AGAINST_LABELS[against.type]} – Begründung</span>
+            <textarea value={text} onChange={(event) => setText(event.target.value)} rows={3} maxLength={1000} className="input w-full min-h-[5rem] resize-y"
+              placeholder="Warum ist die Entscheidung aus eurer Sicht falsch? Mindestens zehn Zeichen." data-testid={`${testId}-input`} />
+          </label>
+          <p className="text-xs text-white/50">Einspruch geht nur einmal. Es entscheidet eine andere Person als bei der ersten Entscheidung, ihre Entscheidung ist endgültig. Bis dahin gilt die erste Entscheidung weiter.</p>
+          <div className="flex flex-wrap gap-2">
+            <button disabled={busy || text.trim().length < 10} className={SMALL_BUTTON} data-testid={`${testId}-send`}>Einspruch einlegen</button>
+            <button type="button" disabled={busy} onClick={() => setOpenForm(false)} className="min-h-[44px] px-2 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white">Abbrechen</button>
+          </div>
+        </form>
+      ) : (
+        <button type="button" onClick={() => setOpenForm(true)} className={SMALL_BUTTON} data-testid={`${testId}-open`}>Einspruch einlegen</button>
+      )}
+      {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
+    </div>
+  );
+}
+
 export function ProcedureCard({ matchId, procedure, sideNames = {}, players = [], conflictOverride = false, onChanged, onChangeResult = null }) {
   const p = procedure;
   const open = p.state === "open";
@@ -258,7 +307,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
             <div className="flex items-center gap-1.5 text-sm font-bold text-white"><Gavel className="h-4 w-4 text-honor" aria-hidden="true" /> {outcome}</div>
             {p.decision_note ? <p className="whitespace-pre-line text-sm text-white/75">Begründung: {p.decision_note}</p> : null}
             {p.resolved_at ? <p className="text-xs text-white/45">Entschieden am {when(p.resolved_at)}{p.resolved_by ? ` von ${p.resolved_by}` : ""}</p> : null}
-            {p.appeal_until && p.can_appeal ? <Deadline label="Einspruch möglich bis" until={p.appeal_until} now={now} testId={`procedure-appeal-until-${p.id}`} /> : null}
+            {p.can_appeal ? <AppealForm matchId={matchId} against={{ type: "protest_decision", ref_id: p.id }} until={p.appeal_until} onChanged={onChanged} testId={`procedure-appeal-${p.id}`} /> : null}
           </section>
         ) : null}
 

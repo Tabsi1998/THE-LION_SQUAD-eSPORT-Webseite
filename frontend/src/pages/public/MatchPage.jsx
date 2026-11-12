@@ -38,7 +38,7 @@ import { keepNewerVeto, mergeLiveVeto } from "@/lib/leagueVeto";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
-import { ProcedureCard } from "@/components/tls/results/DisputeCard";
+import { AppealForm, ProcedureCard } from "@/components/tls/results/DisputeCard";
 import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { DoubleNoShowAction } from "@/components/tls/league/DoubleNoShowAction";
@@ -618,6 +618,15 @@ function MatchPageView() {
             <p className="mt-5 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 text-sm text-white/85" data-testid="match-contested">
               <strong>In Klärung</strong> – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.
             </p>
+          ) : null}
+          {/* Einspruch gegen eine Wertung kampflos oder eine Korrektur (Nr. 41, 45) - gegen einen Protestentscheid steht er an dessen Karte. */}
+          {procedureForm?.appealable ? (
+            <section className="mt-5 space-y-2 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="match-appealable">
+              <p className="text-sm text-white/80">
+                {procedureForm.appealable.type === "forfeit" ? "Dieses Spiel wurde kampflos gewertet." : "Das Ergebnis dieses Spiels wurde von der Liga-Leitung korrigiert."} Seid ihr nicht einverstanden, könnt ihr einmal Einspruch einlegen.
+              </p>
+              <AppealForm matchId={id} against={procedureForm.appealable} until={procedureForm.appealable.until} onChanged={() => load({ preserveDrafts: false })} testId="match-appeal" />
+            </section>
           ) : null}
           {procedures.length ? (
             <section className="mt-5 space-y-3" aria-label="Verfahren zu diesem Spiel" data-testid="match-procedures">

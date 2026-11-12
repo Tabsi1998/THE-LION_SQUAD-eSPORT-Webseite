@@ -761,7 +761,11 @@ async def page_block(db, match: dict, league: League, user: dict | None, *, now:
         until = _hours(league, decided, league.settings["appeal_hours"]) if kind and decided else None
         taken = any(row["kind"] == APPEAL and (row.get("against") or {}).get("type") == kind
                     and (row.get("against") or {}).get("decided_at") == _iso(decided) for row in rows(match))
-        if until and now < until and not taken:
+        # Kam die Korrektur als Entscheidung eines Verfahrens, richtet sich der Einspruch gegen diese Entscheidung (Karte des Verfahrens).
+        by_procedure = kind == "correction" and any(
+            row["kind"] != APPEAL and state_of(row) == DECIDED and row.get("decision") == "change"
+            and (refs.parse(row.get("resolved_at")) or now) >= decided for row in rows(match))
+        if until and now < until and not taken and not by_procedure:
             appealable = {"type": kind, "ref_id": match["id"], "until": until.isoformat()}
     players: list[dict] = []
     if viewer.can_decide and open_rows(match):
