@@ -159,7 +159,8 @@ export function stateSentence(incident, { otherName = "die Gegenseite", ownSide 
       // Mitglied der Seite, die antworten muss, ohne selbst handeln zu dürfen - oder die Liga-Leitung.
       return ownSide ? "Euer Captain oder Vertreter ist dran: zustimmen oder ablehnen." : `${otherName} antwortet noch.`;
     case "agreed":
-      return `Beide Seiten sind sich einig: ${incident.proposal_label || "wie vorgeschlagen"}.`;
+      // Worauf, steht in der Zeile „Vorschlag“ darunter - nicht zweimal.
+      return "Beide Seiten sind sich einig – es geht weiter wie vorgeschlagen.";
     case "in_review":
       return [REVIEW_CAUSE[incident.review_cause], SERIES_MEANWHILE[mode]].filter(Boolean).join(" ");
     case "decided":
@@ -172,6 +173,12 @@ export function stateSentence(incident, { otherName = "die Gegenseite", ownSide 
     default:
       return "";
   }
+}
+
+/** Die Zeile „Vorschlag“ entfällt, wenn die Leitung genau so entschieden hat - dann nennt es schon der Satz der Entscheidung. */
+export function showsProposal(incident) {
+  if (!incident?.proposal_label) return false;
+  return !(incident.state === "decided" && incident.decision?.outcome === incident.proposal);
 }
 
 /** Was nach der Entscheidung noch zur Serie gilt - leer, solange es keine Entscheidung gibt. */

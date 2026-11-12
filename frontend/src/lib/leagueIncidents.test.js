@@ -1,7 +1,7 @@
 import {
   PAUSE_BETWEEN, canSettleAtOnce, clockOffset, closeProblem, countsQuota, decisionProblem, emptyIncidentForm, holdNotice, incidentPayload,
   incidentProblem, mapStateNotes, positionLabel, pulsingIncidentId, quotaHint, quotaText, remainingMs, remainingShare, remainingText, scoreText,
-  settleProblem, settleSentence, sortedIncidents, stateSentence,
+  settleProblem, settleSentence, showsProposal, sortedIncidents, stateSentence,
 } from "./leagueIncidents";
 
 // Vorfälle im Spiel (D.5, #1619): Sätze, Prüfung und Anfrage des Formulars. Erfundene Namen.
@@ -65,12 +65,23 @@ test("je Stand ein Satz, der sagt, wer dran ist - ohne Uhrzeit, die steht nur am
   for (const row of [{ can_answer: true }, { reported_by: { own: true } }, {}]) {
     expect(stateSentence({ ...base, state: "proposed", ...row })).not.toMatch(/\d\d:\d\d/);
   }
-  expect(stateSentence({ ...base, state: "agreed" })).toBe("Beide Seiten sind sich einig: Map wiederholen.");
+  // Worauf sich die Seiten einigen, steht nur in der Zeile „Vorschlag“ - nicht noch einmal im Satz.
+  expect(stateSentence({ ...base, state: "agreed" })).toBe("Beide Seiten sind sich einig – es geht weiter wie vorgeschlagen.");
   expect(stateSentence({ state: "decided", decision: { outcome_label: "Map zugesprochen", awarded_to: "Rudel A" } })).toBe("Entscheidung der Liga-Leitung: Map zugesprochen (Rudel A).");
   expect(stateSentence({ state: "withdrawn" })).toContain("Zurückgezogen");
   expect(stateSentence({ state: "closed", close_reason: "lead" })).toBe("Die Liga-Leitung hat den Vorfall ohne Entscheidung geschlossen.");
   expect(stateSentence({ state: "closed", close_reason: "match_ended" })).toContain("Das Spiel ist zu Ende");
   expect(stateSentence({ between_maps: true, minutes: 7, position: 2, state: "agreed" })).toBe("Pause von 7 Minuten nach Map 2 – nur festgehalten.");
+});
+
+test("die Zeile „Vorschlag“ entfällt, wenn die Entscheidung dasselbe sagt", () => {
+  const row = { proposal: "replay", proposal_label: "Map wiederholen" };
+  expect(showsProposal({ ...row, state: "proposed" })).toBe(true);
+  expect(showsProposal({ ...row, state: "agreed" })).toBe(true);
+  expect(showsProposal({ ...row, state: "decided", decision: { outcome: "rehost" } })).toBe(true);
+  expect(showsProposal({ ...row, state: "decided", decision: { outcome: "replay" } })).toBe(false);
+  expect(showsProposal({ state: "agreed", proposal_label: null })).toBe(false);
+  expect(showsProposal(null)).toBe(false);
 });
 
 test("„In Klärung“ steht nicht im Satz der Karte - nur der Grund und was die Serie solange tut", () => {

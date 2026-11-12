@@ -197,6 +197,12 @@ test("nach der Entscheidung stehen Begründung und Feststellung da - die Leitung
   expect(screen.getByTestId("incident-settled-v1")).toHaveTextContent("noch nicht festgestellt");
   expect(screen.getByTestId("incident-voided-v1")).toHaveTextContent("Die erste Austragung (Stand 3:4) zählt nicht");
   expect(screen.getByTestId("incident-procedure-v1")).toHaveTextContent("Dazu läuft ein Verfahren.");
+  // Jede Angabe einmal - auch mit offenem Formular: „Map wiederholen“ nennt der Satz der Entscheidung (die Zeile „Vorschlag“ sagte
+  // dasselbe und entfällt), „gilt kein Ergebnis“ nur die Zeile der Feststellung.
+  const card = screen.getByTestId("incident-v1").textContent;
+  expect(card.match(/Map wiederholen/g)).toHaveLength(1);
+  expect(card.match(/gilt kein Ergebnis/gi)).toHaveLength(1);
+  expect(screen.queryByTestId("incident-proposal-v1")).toBeNull();
   // Abgeschlossene Vorfälle laden ihre Nachweise erst beim Aufklappen.
   expect(apiMock.get).not.toHaveBeenCalled();
   fireEvent.click(screen.getByTestId("incident-settle-v1-missing-3"));
@@ -206,6 +212,13 @@ test("nach der Entscheidung stehen Begründung und Feststellung da - die Leitung
   fireEvent.click(screen.getByTestId("incident-settle-v1-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/incidents/v1/settle", {
     missing_positions: [3], surplus_positions: [], reason: "Map 3 fehlt noch" }));
+});
+
+test("nach der Einigung steht der Vorschlag nur in seiner Zeile, nicht noch einmal im Satz", async () => {
+  await show({ ...LEAGUE, incidents: [incident({ state: "agreed", open: false })] });
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Beide Seiten sind sich einig – es geht weiter wie vorgeschlagen.");
+  expect(screen.getByTestId("incident-proposal-v1")).toHaveTextContent("Vorschlag: Map wiederholen");
+  expect(screen.getByTestId("incident-v1").textContent.match(/Map wiederholen/g)).toHaveLength(1);
 });
 
 test("„In Klärung“ steht in der Fläche nur am Abzeichen der Karte - und höchstens eines atmet", async () => {

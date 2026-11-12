@@ -2856,7 +2856,10 @@ und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gil
 - **Oberfläche: jede Angabe an einer Stelle.** „In Klärung“ steht am Chip der Map und als Abzeichen der Vorfall-Karte, sonst
   nirgends; höchstens ein Element atmet. Restzeit und Uhrzeit der Frist stehen nur am Countdown. Wer antworten muss, liest „Ihr
   seid dran: stimmt zu oder lehnt ab.“, die meldende Seite „Die Gegenseite antwortet noch.“ Über den Karten steht nur, was an
-  keiner Karte steht (`hold.code: "rereport"`). Mit „Bewegung reduzieren“ zeigt der Balken die echte Restzeit, ohne Übergang.
+  keiner Karte steht (`hold.code: "rereport"`). Der Vorschlag steht in der Zeile „Vorschlag“, nicht noch einmal im Satz der
+  Einigung; hat die Leitung genau so entschieden, nennt ihn nur der Satz der Entscheidung. „Bis dahin gilt kein Ergebnis“ steht
+  je Karte einmal - an der Feststellung, nicht in den Formularen. Mit „Bewegung reduzieren“ zeigt der Balken die echte
+  Restzeit, ohne Übergang.
 - **Protokoll** ohne freien Text: `match.incident.report`, `.answer`, `.withdraw`, `.expire`, `.decide`, `.settle`, `.close` mit
   Kennung, Map, Art und Stand - nie Beschreibung, Begründung oder Namen. **Datenschutz:** Auskunft und Kontolöschung über `flow.user_ids`
   (`match_flow.export_snapshot`, `scrub_person`): der Vorfall bleibt, die Kennung der Person fällt heraus, auch aus `players`

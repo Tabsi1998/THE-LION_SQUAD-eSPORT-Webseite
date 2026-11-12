@@ -18,8 +18,8 @@ import { motionAllowed } from "@/lib/motion";
 import {
   KIND_HELP, OUTCOME_HELP, PAUSE_BETWEEN, PAUSE_BETWEEN_HELP, PAUSE_BETWEEN_LABEL, PROPOSAL_HELP, STATE_LABELS, canSettleAtOnce, clock,
   clockOffset, closeProblem, decisionProblem, emptyIncidentForm, holdNotice, incidentPayload, incidentProblem, mapStateNotes, positionLabel,
-  pulsingIncidentId, quotaHint, quotaText, remainingMs, remainingShare, remainingText, scoreText, settleProblem, settleSentence, sortedIncidents,
-  stateSentence,
+  pulsingIncidentId, quotaHint, quotaText, remainingMs, remainingShare, remainingText, scoreText, settleProblem, settleSentence, showsProposal,
+  sortedIncidents, stateSentence,
 } from "@/lib/leagueIncidents";
 import { ConflictReasonField, overrideMissing, overridePayload } from "./ConflictOverride";
 
@@ -131,7 +131,7 @@ function SettleFields({ league, form, set, testId, withMissing = true }) {
     <div className="space-y-3">
       {withMissing ? (
         <PositionToggles legend="Fehlt noch eine Map?" bestOf={league.best_of} value={form.missing_positions} onChange={(value) => set("missing_positions", value)}
-          testId={`${testId}-missing`} hint="Nur antippen, wenn die Serie mit dem jetzt geltenden Stand nicht entschieden ist. Solange eine Map fehlt, gilt kein Ergebnis." />
+          testId={`${testId}-missing`} hint="Nur antippen, wenn die Serie mit dem jetzt geltenden Stand nicht entschieden ist." />
       ) : null}
       <PositionToggles legend="Welche Maps zählen nicht?" bestOf={league.best_of} value={form.surplus_positions} onChange={(value) => set("surplus_positions", value)}
         testId={`${testId}-surplus`} hint="Maps, die unter Vorbehalt gespielt wurden, obwohl die Serie schon entschieden war. Meist keine." />
@@ -203,7 +203,7 @@ function DecisionForm({ league, info, incident, matchId, busy, run, onChanged })
           {form.settle ? <SettleFields league={league} form={form} set={set} testId={`incident-decision-${incident.id}`} withMissing={false} /> : null}
         </div>
       ) : form.outcome ? (
-        <p className="rounded-sm border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/65">Die Map wird neu gespielt und wie üblich gemeldet. Danach stellst du hier die Serie fest – erst dann gilt ein Ergebnis.</p>
+        <p className="rounded-sm border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/65">Die Map wird neu gespielt, danach melden die Seiten die Serie neu. Dann stellst du hier die Serie fest – erst damit gilt ein Ergebnis.</p>
       ) : null}
       {needsOverride ? <ConflictReasonField value={form.conflict} onChange={(value) => set("conflict", value)} testId={`incident-decision-${incident.id}-conflict`} /> : null}
       {problem ? <p className="text-sm text-warn" role="alert" data-testid={`incident-decision-${incident.id}-problem`}>{problem}</p> : null}
@@ -236,7 +236,7 @@ function SettleForm({ league, info, incident, matchId, busy, run, onChanged }) {
   return (
     <form onSubmit={submit} className="tls-incident-open mt-4 space-y-4 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid={`incident-settle-${incident.id}`} noValidate>
       <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-honor"><Scale className="h-4 w-4" aria-hidden="true" /> Serie feststellen</h4>
-      <p className="text-xs text-white/65">{decision.settled_at ? "Schon festgestellt – du kannst es ändern, solange das Ergebnis nicht gilt, etwa nachdem die fehlende Map gespielt ist." : "Sobald alle angesetzten Maps gespielt und gemeldet sind: festhalten, ob noch eine Map fehlt und ob Maps nicht zählen. Erst danach gilt ein Ergebnis."}</p>
+      <p className="text-xs text-white/65">{decision.settled_at ? "Schon festgestellt – du kannst es ändern, solange das Ergebnis nicht gilt, etwa nachdem die fehlende Map gespielt ist." : "Sobald alle angesetzten Maps gespielt und gemeldet sind: festhalten, ob noch eine Map fehlt und ob Maps nicht zählen."}</p>
       <SettleFields league={league} form={form} set={set} testId={`incident-settle-${incident.id}`} />
       <label className="block">
         <span className={LEGEND}>Begründung (Pflicht)</span>
@@ -370,7 +370,7 @@ function IncidentCard({ league, info, incident, matchId, busy, run, onChanged, o
       {sentence ? <p className="mt-3 text-sm text-white/85" data-testid={`incident-sentence-${incident.id}`}>{sentence}</p> : null}
       {incident.between_maps ? null : (
         <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs text-white/65 sm:grid-cols-2">
-          {incident.proposal_label ? <div><dt className="inline text-white/45">Vorschlag: </dt><dd className="inline font-bold text-white/85">{incident.proposal_label}</dd></div> : null}
+          {showsProposal(incident) ? <div data-testid={`incident-proposal-${incident.id}`}><dt className="inline text-white/45">Vorschlag: </dt><dd className="inline font-bold text-white/85">{incident.proposal_label}</dd></div> : null}
           {stand ? <div><dt className="inline text-white/45">Stand beim Vorfall: </dt><dd className="inline font-bold tabular-nums text-white/85">{stand}{incident.round != null ? ` · Runde ${incident.round}` : ""}</dd></div> : null}
           {incident.players?.length ? <div className="sm:col-span-2"><dt className="inline text-white/45">Betroffen: </dt><dd className="inline [overflow-wrap:anywhere]">{incident.players.map((person) => person.name).join(", ")}</dd></div> : null}
           {incident.counts_quota && reporter.registration_id ? (

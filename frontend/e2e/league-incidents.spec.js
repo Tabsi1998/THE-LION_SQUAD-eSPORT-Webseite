@@ -251,6 +251,8 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       await page.reload();
       await expect(page.getByTestId("incident-settled-v1")).toContainText("noch nicht festgestellt");
       await expect(page.getByTestId("incident-voided-v1")).toContainText("Die erste Austragung (Stand 3:4) zählt nicht");
+      // „Bis dahin gilt kein Ergebnis“ steht einmal - an der Feststellung, nicht noch im Formular darunter.
+      expect((await page.getByTestId("incident-v1").textContent()).match(/gilt kein Ergebnis/gi)).toHaveLength(1);
       await page.getByTestId("incident-settle-v1-missing-3").click();
       await page.getByTestId("incident-settle-v1-reason").fill("Map 3 fehlt noch, es steht 1:1.");
       await expectNoSideScroll(page);
@@ -269,6 +271,10 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       await page.goto("/matches/m1");
       await expect(page.getByTestId("incident-hold")).toHaveText("Map 2 wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr.");
       await expect(page.getByTestId("incident-state-v1")).toHaveText("Einig");
+      // Worauf sich die Seiten geeinigt haben, steht in der Zeile „Vorschlag“ - nicht noch einmal im Satz.
+      await expect(page.getByTestId("incident-sentence-v1")).toHaveText("Beide Seiten sind sich einig – es geht weiter wie vorgeschlagen.");
+      await expect(page.getByTestId("incident-proposal-v1")).toHaveText("Vorschlag: Map wiederholen");
+      expect((await page.getByTestId("incident-v1").textContent()).match(/Map wiederholen/g)).toHaveLength(1);
       await expect(page.getByTestId("incident-voided-v1")).toContainText("Die erste Austragung (Stand 3:4) zählt nicht");
       await expect(page.locator(".tls-incident-pulse")).toHaveCount(0);
       await expectNoSideScroll(page);
