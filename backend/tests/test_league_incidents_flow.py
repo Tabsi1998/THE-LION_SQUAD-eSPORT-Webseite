@@ -457,6 +457,23 @@ async def test_a_confirming_report_does_not_carry_raw_incidents_either(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_answer_to_a_new_incident_names_what_holds_the_result_across_all_incidents(flow):
+    w = await world(flow)
+    flow.act_as(w["users"]["Kapitaen"])
+    first = await flow.post(url(w), json=incident(w, position=1))
+    assert first.status_code == 200 and first.json()["hold"]["code"] == "proposed" and first.json()["hold"]["position"] == 1
+    assert (await answered(flow, w, first.json()["incident_id"], False)).status_code == 200
+    # Map 1 ist in Klärung: Ein neuer Vorfall zu Map 2 ändert nicht, was das Ergebnis als Erstes aufhält.
+    flow.act_as(w["users"]["Kapitaen"])
+    second = await flow.post(url(w), json=incident(w, position=2))
+    assert second.status_code == 200 and second.json()["state"] == "proposed"
+    assert second.json()["hold"]["code"] == "in_review" and second.json()["hold"]["position"] == 1
+    # Die Map-Pause wird nur dokumentiert - sie hält selbst nichts auf, die Antwort nennt trotzdem den Stand des Spiels.
+    pause = await flow.post(url(w), json={"position": 2, "kind": "pause", "between_maps": True, "minutes": 5})
+    assert pause.status_code == 200 and pause.json()["hold"]["code"] == "in_review"
+
+
+@pytest.mark.asyncio
 async def test_inputs_answer_with_a_german_sentence(flow):
     w = await world(flow)
     flow.act_as(w["users"]["Kapitaen"])

@@ -174,7 +174,9 @@ async def report_incident(match_id: str, body: IncidentBody, request: Request, m
                                               registration_id=registration_id, body=body.model_dump(exclude={"conflict_reason"}))
     except league_incidents.IncidentProblem as problem:
         _raise(problem)
-    return _answer(entry, {"result_confirmed": False, "hold": league_incidents.result_block({"incidents": [entry]})})
+    # Was das Ergebnis jetzt aufhält - aus allen Vorfällen des Spiels, nicht nur aus dem eben gemeldeten.
+    stored = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    return _answer(entry, {"result_confirmed": False, "hold": league_incidents.result_block(stored)})
 
 
 @router.post("/{match_id}/incidents/{incident_id}/answer")
