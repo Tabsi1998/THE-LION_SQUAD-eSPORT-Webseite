@@ -230,6 +230,10 @@ async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents:
     await db.billing_orders.update_one(
         {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
         {"$unset": {"credit_note_due_at": ""}})
+    # Läuft gerade ein Gutschrift-Lauf (Merker gesetzt), geht die Rückkehr nicht still durch: Der Lauf liest diesen Merker nach dem
+    # Anlegen und meldet einen Entwurf, der trotz Rückkehr entstand, als Prüffall (``dolibarr_billing.draft_credit_note``).
+    await db.billing_orders.update_one({"id": order["id"], "credit_note_claim_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
+                                       {"$set": {"credit_note_returned_at": now}})
     await note_change_after_invoice(db, kind=order["kind"], registration_id=order["registration_id"], reason=reason, new_total_cents=new_total_cents)
     return True
 

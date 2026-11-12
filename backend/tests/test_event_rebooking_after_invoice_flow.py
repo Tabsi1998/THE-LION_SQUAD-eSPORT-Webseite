@@ -333,6 +333,32 @@ async def test_protokoll_der_leitung_ohne_preis_und_belegfelder(flow, fake):
     assert [row["data"]["updates"] for row in rows] == [{"status": "cancelled"}, {"status": "registered"}]
 
 
+@pytest.mark.asyncio
+async def test_rueckkehr_kurz_vor_dem_anlegen_der_gutschrift_wird_ein_prueffall(flow, fake, monkeypatch):
+    """Das letzte Fenster lässt sich nicht schließen: Die Person kommt zurück, unmittelbar bevor Dolibarr den Gutschrift-Entwurf
+    anlegt. Dann bleibt der Entwurf am Auftrag vermerkt, und die Finanzverwaltung bekommt einen eigenen Prüffall: löschen."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    original = dolibarr_client.DolibarrClient.create_invoice
+
+    async def back_right_before(self, payload):
+        await book(flow, paula, event, companions=0)
+        return await original(self, payload)
+
+    monkeypatch.setattr(dolibarr_client.DolibarrClient, "create_invoice", back_right_before)
+    counts = await billing_orders.sync_due()
+    monkeypatch.setattr(dolibarr_client.DolibarrClient, "create_invoice", original)
+
+    assert counts["credit_drafts"] == 1
+    stored = await order_of(flow, booked)
+    assert stored.get("credit_note_id") and "booking_state" not in stored, "der Entwurf ist vermerkt, die Buchung gilt"
+    assert "credit_note_due_at" not in stored and "credit_note_claim_at" not in stored and "credit_note_returned_at" not in stored
+    case = (await open_cases(flow, order)).get("credit_after_return")
+    assert case and case["detail"]["credit_note_ref"] == stored["credit_note_ref"], "Finanzen löscht den Entwurf in Dolibarr"
+    assert billing_cases.case_view(case)["label"] == "Gutschrift-Entwurf trotz Rückkehr"
+    assert case["detail"]["returned_at"], "die Rückkehr hat den laufenden Gutschrift-Lauf vermerkt"
+    assert (await registration(flow, booked))["status"] == "registered"
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)

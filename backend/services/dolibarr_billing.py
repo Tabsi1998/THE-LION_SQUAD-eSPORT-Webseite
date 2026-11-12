@@ -850,7 +850,20 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
         except DolibarrError:
             ref = ""
         ref = ref or f"(PROV{credit_id})"
-        await finish({"credit_note_id": credit_id, "credit_note_ref": ref, "credit_note_source": "website", "credit_note_created_at": now})
+        # Das letzte Fenster (#2184): Kam die Person zurück, während Dolibarr den Entwurf anlegte, bleibt er vermerkt - die
+        # Finanzverwaltung löscht ihn. Frisch gelesen; den Merker ``credit_note_returned_at`` setzt die Rückbuchung.
+        after = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "credit_note_returned_at": 1}) or {}
+        await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"credit_note_id": credit_id, "credit_note_ref": ref, "credit_note_source": "website",
+                                                                          "credit_note_created_at": now, "updated_at": now_utc().isoformat()},
+                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": "",
+                                                                            "credit_note_returned_at": ""}})
+        if after.get("booking_state") != "cancelled":
+            from services import billing_cases
+
+            await billing_cases.open_case(db, order, "credit_after_return", {
+                "credit_note_ref": ref, "returned_at": after.get("credit_note_returned_at") or "",
+                "credit_note": f"Gutschrift-Entwurf {ref} entstand, während die Person zurückkam – in Dolibarr löschen."})
+            return "created"
         await _credit_case(db, order, f"Gutschrift-Entwurf {ref} über den ganzen Betrag liegt in Dolibarr bereit – prüfen (Teilbetrag?) und freigeben.", ref)
         logger.info("[billing] Gutschrift-Entwurf %s zu Beleg %s", ref, state["invoice_ref"])
         return "created"
