@@ -350,13 +350,19 @@ async def _tell_review(db, match: dict, entry: dict, lead_in: str, *, skip: str 
 
 
 async def withdraw(db, match: dict, setup, incident_id: str, *, user: dict, registration_id: str) -> dict:
-    """Die meldende Seite zieht zurück - nur solange niemand geantwortet hat."""
+    """Die meldende Seite zieht zurück - nur solange niemand geantwortet hat und die Antwortzeit läuft. Danach liegt der Vorfall bei
+    der Leitung, auch wenn der Job ihn noch nicht weitergereicht hat: Er läuft dann im selben Schritt ab (409)."""
     entry = find(match, incident_id)
     if state_of(entry) != PROPOSED:
         raise IncidentProblem("Zurückziehen geht nur, solange die Gegenseite noch nicht geantwortet hat.", 409)
     if registration_id != (entry.get("reported_by") or {}).get("registration_id"):
         raise IncidentProblem("Zurückziehen kann nur die Seite, die den Vorfall gemeldet hat.", 403)
-    changed = {**entry, "state": WITHDRAWN, "closed_at": now_utc().isoformat()}
+    now = now_utc()
+    deadline = moment(entry.get("answer_deadline"))
+    if deadline and now > deadline:
+        await expire_due(db, match, now=now)
+        raise IncidentProblem(f"{LATE_DETAIL} Zurückziehen geht nicht mehr.", 409)
+    changed = {**entry, "state": WITHDRAWN, "closed_at": now.isoformat()}
     stored = await _store(db, match, _replace(incidents_of(match), changed), user_ids=[user.get("id")])
     await _audit(db, "match.incident.withdraw", match, user.get("id"), changed)
     others = [side for side in setup.reg_ids if side != registration_id]
@@ -586,7 +592,8 @@ def incident_view(match: dict, entry: dict, *, names: dict[str, str], people: di
         "can_close": bool(lead and is_open(entry)),
         "procedure": _has_open_procedure(match, str(entry.get("id") or "")),
         "can_answer": bool(can_act and own_id and reporter and own_id != reporter and waiting),
-        "can_withdraw": bool(can_act and own_id and own_id == reporter and state == PROPOSED),
+        # Nur solange die Antwortzeit läuft - danach liegt der Vorfall bei der Leitung.
+        "can_withdraw": bool(can_act and own_id and own_id == reporter and waiting),
         "can_decide": bool(lead and state == IN_REVIEW),
         # Nach Neustart oder Wiederholung erst, wenn danach neu gemeldet ist - vorher gibt es nichts festzustellen.
         "can_settle": bool(lead and state == DECIDED and not final and not awaits_replay(match, entry)),

@@ -242,6 +242,30 @@ async def test_a_late_answer_expires_the_incident_in_the_same_step(flow):
 
 
 @pytest.mark.asyncio
+async def test_withdrawing_after_the_answer_time_is_refused(flow):
+    """Zurückziehen prüft die Zeit, nicht nur den Stand: Nach der Antwortzeit liegt der Vorfall bei der Leitung."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    past = (now_utc() - timedelta(minutes=1)).isoformat()
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {"incidents.0.answer_deadline": past, "incident_due_at": past}})
+    flow.act_as(w["users"]["Kapitaen"])
+    assert (await page(flow, w))["league"]["incidents"][0]["can_withdraw"] is False, "die Seite bietet es nicht mehr an"
+    late = await flow.post(url(w, f"/{incident_id}/withdraw"))
+    assert late.status_code == 409 and "Zurückziehen geht nicht mehr" in late.json()["detail"]
+    entry = (await stored(flow, w))["incidents"][0]
+    assert entry["state"] == "in_review" and entry["review_cause"] == "expired" and entry["closed_at"] is None
+    assert await flow.db.notifications.count_documents({"meta.dedupe_key": f"incident:{incident_id}:review"}) > 0
+
+    # Gegenprobe: In der Antwortzeit geht es.
+    other = await world(flow, letter="B")
+    second = await reported(flow, other)
+    flow.act_as(other["users"]["Kapitaen"])
+    assert (await page(flow, other))["league"]["incidents"][0]["can_withdraw"] is True
+    in_time = await flow.post(url(other, f"/{second}/withdraw"))
+    assert in_time.status_code == 200 and in_time.json()["state"] == "withdrawn"
+
+
+@pytest.mark.asyncio
 async def test_the_deadline_automatic_rests_during_clarification(flow):
     w = await world(flow)
     tournament = await flow.db.tournaments.find_one({"id": w["tournament"]["id"]}, {"_id": 0})
