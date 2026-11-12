@@ -3014,7 +3014,15 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
 - **„Ergebnis ändern“** läuft über das Ergebnis-Fenster: Eine Korrektur der Leitung entscheidet alle offenen Verfahren des Spiels
   mit `decision: "change"` (bei gleichem Ergebnis `keep`), ihr Grund wird `decision_note` (mindestens zehn Zeichen, sonst 422).
   Bei einem offenen Einspruch darf die Person der Ausgangsentscheidung auch nicht korrigieren (403).
-- **Zusätzliche Felder am Eintrag:** `additions[]` (`{text, user_id, at}`, höchstens zehn), `contested_mode` (der Wert von
+- **Jedes Ergebnis prüft zentral** (`league_procedures.result_decision_refusal`, aufgerufen in `submit_v2_result`): Zu einem Spiel
+  mit offenem Verfahren schreibt kein Weg ein Ergebnis - auch nicht `POST /forfeit`, „nicht erschienen“ bestätigen oder ein
+  gehaltenes Ergebnis - ohne das Recht `disputes`, als Befangene (Superadmin nur als Notausnahme mit Grund), beim Einspruch durch
+  die Person der Ausgangsentscheidung (409) oder ohne Begründung von mindestens zehn Zeichen (422; bei der Wertung kampflos ist
+  ihre Pflicht-Begründung die `decision_note`). Meldungen der Spieler und die Frist-Automatik entscheiden nie ein Verfahren (409).
+- **Zurückgezogen heißt nicht mehr offen:** `match_deadlines.auto_confirm_due`, `match_disputes.open_dispute` und die Karte der
+  Leitungsansicht überspringen Einträge mit `withdrawn_at` bzw. `state` `withdrawn`/`decided`; die Frist-Automatik läuft danach weiter.
+  Bei geänderter Paarung bekommt ein Verfahren `decision: "void"` und `state: "decided"`.
+- **Zusätzliche Felder am Eintrag:** `escalate_at`, `additions[]` (`{text, user_id, at}`, höchstens zehn), `contested_mode` (der Wert von
   `contested_result_mode` beim Einreichen), `statement.expired_at`, `against.decided_at` und `against.decided_by` (für „einmal je
   Ausgangsentscheidung“ und „eine andere Person“), an `moss_requests[]` `registration_id`, `uploaded_at`, `missing_at`,
   `excused_by`, `excused_at`, `excuse_reason`.
@@ -3031,8 +3039,11 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   Stelle wie D.5 die Map in Klärung (`in_clarification`); der TV-Baum schreibt es statt des Stands, die PDF-Tabelle hängt es an den Namen.
 - **„Braucht Aufmerksamkeit“:** Ein offenes Verfahren an einem Spiel mit festem Ergebnis (`counts`, Einspruch) ist ein Fall der Art
   `procedure` mit `action: "open"` („Zum Spiel“); `match_disputes.open_procedure_rows` liest dafür ohne `league_procedures`.
-- **Listen der Leitung:** `GET /matches/{id}`, `GET /tournaments/{id}/matches-v2` und der Baum kürzen Verfahren für Beteiligte mit
-  Liga-Recht auf `at`, `id`, `kind`, `state` (`league_procedures.strip_for_involved`).
+- **Verfahren im Spiel-Datensatz** (Nr. 133/137): ungekürzt nur für die nicht befangene Leitung mit `disputes` oder `results`. Alle
+  anderen - Seiten, Fremde, Liga-Personal ohne diese Rechte, Beteiligte mit Liga-Recht - bekommen `at`, `id`, `kind`, `state`; wer
+  eingereicht hat, dazu Grund, Text und Entscheidung der eigenen Meldung, nie `moss_requests`, `assignee`, `statement` oder
+  `notified_immediately`. Eine Stelle (`match_public_view.public_dispute_row`) für `public_match_view`, `GET /matches/{id}`,
+  `GET /tournaments/{id}/matches-v2`, den Baum und die Antworten von `/dispute`, `PUT /lineups` und dem Matchplan.
 - **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
   Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
 - **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.

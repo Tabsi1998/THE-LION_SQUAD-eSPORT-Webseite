@@ -1129,6 +1129,8 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   an die Leitung mit **Liga verwalten**. Entschieden wird nie automatisch.
 - **Entscheiden**: immer mit **Begründung** (mindestens zehn Zeichen, geht an beide Seiten). **Ergebnis bleibt** schließt
   das Verfahren; **Ergebnis ändern** öffnet das Ergebnis-Fenster, die Begründung steht dort als Grund der Korrektur.
+  Auch eine Wertung **kampflos** oder **nicht erschienen** entscheidet ein offenes Verfahren mit: Sie geht dann nur mit dem
+  Recht **Proteste** und einer Begründung von mindestens zehn Zeichen.
   Wer am Spiel selbst beteiligt ist, entscheidet nicht.
 - **Einspruch**: Gegen die Entscheidung, eine Wertung kampflos oder eine Korrektur kann eine Seite innerhalb der
   Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
