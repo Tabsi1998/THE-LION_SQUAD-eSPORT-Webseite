@@ -52,6 +52,7 @@ from routes.league_result_rule_routes import admin_router as league_result_rule_
 from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
 from routes.league_checkin_routes import admin_router as league_checkin_admin_router, router as league_checkin_router
 from routes.league_protest_routes import admin_router as league_protest_admin_router, router as league_protest_router
+from routes.league_reminder_routes import admin_router as league_reminder_admin_router
 from routes.league_veto_routes import admin_router as league_veto_admin_router, router as league_veto_router
 from routes.league_incident_routes import router as league_incident_router
 from routes.league_platform_routes import admin_router as league_platform_admin_router
@@ -418,6 +419,7 @@ app.include_router(league_loadout_router)  # Sperrliste je Season (#2218)
 app.include_router(league_schedule_router)  # Verschiebung am Spiel (#2194)
 app.include_router(league_checkin_admin_router)  # Check-in-Regeln je Season (docs/LIGA.md, D.2, #1652)
 app.include_router(league_checkin_router)  # Check-in und Start am Spiel (#1652)
+app.include_router(league_reminder_admin_router)  # Erinnerungen je Season (docs/LIGA.md, E.5, #1647)
 app.include_router(league_protest_admin_router)  # Proteste je Season: Einstellungen und Eingang (docs/LIGA.md, E.2, #1619)
 app.include_router(league_protest_router)  # Beanstandung, Protest, Einspruch und MOSS-Datei am Spiel (#1619, #2297)
 app.include_router(league_veto_admin_router)  # Veto-Vorlage je Season (docs/LIGA.md, D.3, #1618)

@@ -33,3 +33,15 @@ PRESETS.update({
         {"key": "other", "label": "Sonstiges", "ask_notified": False},
     ],
 })
+
+# E.5 Erinnerungen (#1647): ein Schalter je Art, Zeiten mit Vorgabe, Discord nur ergänzend (Nr. 34, Vorgabe aus). Season-Feld
+# ``reminder_rules`` (Gruppe ``reminders`` in ``league_service.SYNC_GROUPS``), geprüft in ``services/league_reminder_rules``. Die
+# Zeiten der Erinnerung „Ergebnis fehlt“ stehen weiter in den Terminregeln (``schedule_rules.result_reminder_hours``).
+PRESETS["reminder_rules"] = {
+    "upcoming": True, "upcoming_early_hours": 24, "upcoming_late_minutes": 60,
+    "unscheduled": True, "unscheduled_week_percent": 50,
+    "result_missing": True,
+    # Nr. 140: bisher fest 20 s ohne Zug und nie in den letzten 5 s - das bleibt die Vorgabe.
+    "veto_turn": True, "veto_idle_seconds": 20, "veto_min_left_seconds": 5,
+    "discord": False,
+}
