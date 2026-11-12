@@ -1351,7 +1351,8 @@ class MatchV2ResultSubmit(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
     # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
     hold: bool = False
-    reason: Optional[str] = Field(default=None, max_length=500)
+    # Bis 2000 Zeichen: Die Korrektur zu einem Liga-Verfahren trägt die Begründung der Entscheidung (#1619, E.2).
+    reason: Optional[str] = Field(default=None, max_length=2000)
     # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
     games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
     # Teilnehmerlisten beider Seiten (#2204), je Seite freiwillig - nur in Staffeln mit ``lineup_mode: series``.
@@ -1458,8 +1459,8 @@ class MatchDisputeDecision(BaseModel):
     # Die Turnierleitung entscheidet (#1158): „keep“ = das Ergebnis bleibt (ohne Ergebnis: weiter wie bisher).
     # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
     decision: Literal["keep"]
-    # Liga-Verfahren (#1619, E.2): dort Pflicht (mindestens zehn Zeichen).
-    note: Optional[str] = Field(default=None, max_length=500)
+    # Liga-Verfahren (#1619, E.2): dort Pflicht (mindestens zehn Zeichen). Überall dieselbe Länge wie an der Karte des Verfahrens.
+    note: Optional[str] = Field(default=None, max_length=2000)
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
     # Liga (#1619): welches Verfahren, wenn an dem Spiel mehrere offen sind.

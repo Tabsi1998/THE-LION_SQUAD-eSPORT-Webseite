@@ -233,7 +233,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           {correcting || deciding ? (
             <label className="block">
               <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{deciding ? "Begründung der Entscheidung (geht an beide Seiten)" : "Grund der Korrektur (steht im Protokoll)"}</span>
-              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={deciding ? 2000 : 500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
             </label>
           ) : null}
 
