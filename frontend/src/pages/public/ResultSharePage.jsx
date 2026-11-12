@@ -33,9 +33,9 @@ export function PathList({ steps = [], title = "Weg", testId = "result-path" }) 
           return (
             <li key={`${step.label}-${index}`} className="flex items-center gap-3 border border-white/10 bg-white/[0.03] rounded-sm pl-2 pr-3 py-2" data-testid={`${testId}-step`}>
               <span className={`w-1 self-stretch rounded-full ${style.mark}`} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate font-semibold text-sm">
-                {step.label}
-                {note ? <span className="ml-2 text-xs font-semibold text-warn" data-testid={`${testId}-clarification`}>{note}</span> : null}
+              <span className="min-w-0 flex-1 flex items-baseline gap-2">
+                <span className="min-w-0 truncate font-semibold text-sm">{step.label}</span>
+                {note ? <span className="shrink-0 text-xs font-semibold text-warn" data-testid={`${testId}-clarification`}>{note}</span> : null}
               </span>
               {style.word ? <span className="sr-only">{style.word}</span> : null}
               <span className={`shrink-0 font-heading font-bold tabular-nums text-sm ${style.value}`}>{step.result}</span>
