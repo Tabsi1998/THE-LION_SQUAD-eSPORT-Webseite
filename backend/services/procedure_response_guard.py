@@ -57,6 +57,10 @@ async def guard_response(request, call_next):
     from database import get_db
     from services import league_procedures
 
+    # Erst prüfen, ob überhaupt ein Verfahren mit Inhalt in der Antwort steckt - ein Zähler (``"disputes": 3``) oder schon gekürzte
+    # Zeilen brauchen weder die Person der Anfrage (eine Datenbankabfrage) noch eine Kürzung.
+    if not league_procedures.carries_details(payload):
+        return _rebuilt(response, body)
     guarded = await league_procedures.guard(get_db(), payload, await _user_of(request))
     if guarded is payload or guarded == payload:
         return _rebuilt(response, body)

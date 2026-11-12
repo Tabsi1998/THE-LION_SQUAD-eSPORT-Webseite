@@ -712,60 +712,114 @@ async def for_viewer(db, match: dict, user: dict | None) -> dict:
     return strip_rows(match, await viewer_for(db, match, user))
 
 
-def _carries_procedures(node) -> bool:
-    """Steckt irgendwo in der Antwort ein Spiel mit Verfahren? In jeder Tiefe - ohne Rekursion, damit auch tief verschachtelte
-    Antworten sicher durchsucht werden."""
-    todo = [node]
+def _row_needs_cut(row, viewer_id: str | None) -> bool:
+    """Trägt diese Zeile mehr, als jede Person bzw. die einreichende Person selbst sehen darf? Schon gekürzte Zeilen (nur die
+    öffentlichen Schlüssel, oder die eigene Meldung ohne Internes) brauchen keine weitere Prüfung."""
+    from services.match_public_view import PROCEDURE_OWN_HIDDEN, PROCEDURE_PUBLIC_KEYS
+
+    if not is_procedure(row):
+        return False
+    keys = set(row)
+    if keys & PROCEDURE_OWN_HIDDEN:
+        return True
+    return bool(keys - set(PROCEDURE_PUBLIC_KEYS)) and not (viewer_id and row.get("user_id") == viewer_id)
+
+
+def _nodes_to_cut(payload, viewer_id: str | None) -> list[dict]:
+    """Alle Knoten der Antwort (in jeder Tiefe, ohne Rekursion), deren ``disputes`` noch etwas tragen, das zu prüfen ist."""
+    found: list[dict] = []
+    todo = [payload]
     while todo:
         current = todo.pop()
         if isinstance(current, dict):
             entries = current.get("disputes")
-            if isinstance(entries, list) and any(is_procedure(row) for row in entries):
-                return True
+            if isinstance(entries, list) and any(_row_needs_cut(row, viewer_id) for row in entries):
+                found.append(current)
             todo.extend(value for value in current.values() if isinstance(value, (dict, list)))
         elif isinstance(current, list):
             todo.extend(value for value in current if isinstance(value, (dict, list)))
-    return False
+    return found
+
+
+def carries_details(payload) -> bool:
+    """Steckt in der Antwort ein Verfahren mit mehr als den öffentlichen Schlüsseln? Für den Wächter der Antworten: Ein Zähler
+    (``"disputes": 3``) oder schon gekürzte Zeilen brauchen weder die Person der Anfrage noch eine Kürzung."""
+    return bool(_nodes_to_cut(payload, None))
+
+
+async def _lead_verdicts(db, nodes: list[dict], user: dict | None) -> dict[int, bool]:
+    """Für welche dieser Knoten ist die Person die nicht befangene Leitung? Je Anfrage einmal je Staffel entschieden (ein
+    Recht, eine Abfrage der Beteiligung) statt je Spiel - wie ``for_viewer_list``. Lässt sich ein Knoten keinem Spiel zuordnen,
+    gilt: nein."""
+    verdicts = {id(node): False for node in nodes}
+    if not user or not user.get("id"):
+        return verdicts
+    from services.league_permissions import involved_match_ids
+    from services.tournament_permissions import has_match_result_permission
+
+    full: dict[int, dict] = {}
+    lookups: dict[str, list[dict]] = {}
+    for node in nodes:
+        if node.get("tournament_id") and node.get("slots"):
+            full[id(node)] = node
+        else:
+            key = str(node.get("id") or node.get("match_id") or "")
+            if key:
+                lookups.setdefault(key, []).append(node)
+    if lookups:
+        stored = await db.matches_v2.find({"id": {"$in": sorted(lookups)}}, {"_id": 0}).to_list(len(lookups) + 1)
+        for match in stored:
+            for node in lookups.get(match.get("id") or "", []):
+                full[id(node)] = match
+    by_tournament: dict[str, list[tuple[int, dict]]] = {}
+    for key, match in full.items():
+        by_tournament.setdefault(str(match.get("tournament_id") or ""), []).append((key, match))
+    tournament_ids = sorted(key for key in by_tournament if key)
+    tournaments = {row["id"]: row for row in await db.tournaments.find(
+        {"id": {"$in": tournament_ids}}, {"_id": 0, "id": 1, "league_context": 1}).to_list(len(tournament_ids) + 1)} if tournament_ids else {}
+    for tournament_id, rows_ in by_tournament.items():
+        tournament = tournaments.get(tournament_id)
+        if not is_league_staffel(tournament):
+            # Verfahren gibt es nur in Liga-Staffeln; alles andere wird einzeln geprüft (Helfer mit Einsatz je Spiel).
+            for key, match in rows_:
+                verdicts[key] = (await viewer_for(db, match, user)).lead
+            continue
+        if not await has_match_result_permission(user, rows_[0][1], capability=("results", "disputes")):
+            continue
+        involved = await involved_match_ids(db, user, tournament, [match for _key, match in rows_])
+        for key, match in rows_:
+            verdicts[key] = match.get("id") not in involved
+    return verdicts
 
 
 async def guard(db, payload, user: dict | None):
     """Für jede Antwort, die ein ganzes Spiel enthalten kann (Melden, Bestätigen, Check-in, Veto, Termin, Ergebnis, Wertung,
-    Listen): Verfahren darin bleiben nur für die nicht befangene Leitung mit „Proteste“ oder „Ergebnisse“ ungekürzt. Sucht in der
-    Antwort nach Spielen mit Verfahren - ohne solche kostet der Aufruf nichts und ändert nichts."""
-    if not _carries_procedures(payload):
+    Listen): Verfahren darin bleiben nur für die nicht befangene Leitung mit „Proteste“ oder „Ergebnisse“ ungekürzt. Sucht in jeder
+    Tiefe nach Spielen mit Verfahren, die noch nicht gekürzt sind - ohne solche kostet der Aufruf keine Abfrage und ändert nichts.
+    Im Zweifel (Knoten ohne erkennbares Spiel) wird gekürzt."""
+    viewer_id = (user or {}).get("id")
+    nodes = _nodes_to_cut(payload, viewer_id)
+    if not nodes:
         return payload
     from services.match_public_view import without_procedure_details
 
-    leads: dict[str, bool] = {}
+    verdicts = await _lead_verdicts(db, nodes, user)
+    cut = {key for key, lead in verdicts.items() if not lead}
+    if not cut:
+        return payload
 
-    async def lead_of(match: dict) -> bool:
-        # Welches Spiel ist das? Die eigene Kennung, sonst ``match_id``. Lässt es sich nicht bestimmen (Knoten ohne Kennung und
-        # ohne Turnier und Seiten), gilt: im Zweifel kürzen.
-        key = str(match.get("id") or match.get("match_id") or "")
-        if key not in leads:
-            full = match if match.get("tournament_id") and match.get("slots") else (
-                await db.matches_v2.find_one({"id": key}, {"_id": 0}) if key else None)
-            verdict = bool(full) and (await viewer_for(db, full, user)).lead
-            if not key:
-                return verdict
-            leads[key] = verdict
-        return leads[key]
-
-    async def walk(node, depth: int = 0):
+    def rebuild(node, depth: int = 0):
         if not isinstance(node, (dict, list)):
             return node
-        if depth > 200:
-            # So tief verschachtelt ist keine Antwort der API - sicherheitshalber ohne Verfahren statt ungeprüft.
-            return None if _carries_procedures(node) else node
+        if depth > 400:
+            # So tief verschachtelt ist keine Antwort der API - sicherheitshalber ohne den Teil statt ungeprüft.
+            return None if _nodes_to_cut(node, viewer_id) else node
         if isinstance(node, list):
-            return [await walk(value, depth + 1) for value in node]
-        out = {key: (value if key == "disputes" else await walk(value, depth + 1)) for key, value in node.items()}
-        entries = node.get("disputes")
-        if isinstance(entries, list) and any(is_procedure(row) for row in entries) and not await lead_of(node):
-            out = without_procedure_details(out, (user or {}).get("id"))
-        return out
+            return [rebuild(value, depth + 1) for value in node]
+        out = {key: (value if key == "disputes" else rebuild(value, depth + 1)) for key, value in node.items()}
+        return without_procedure_details(out, viewer_id) if id(node) in cut else out
 
-    return await walk(payload)
+    return rebuild(payload)
 
 
 async def for_viewer_list(db, user: dict | None, matches: list[dict], involved: set[str]) -> list[dict]:

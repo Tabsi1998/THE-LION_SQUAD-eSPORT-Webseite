@@ -343,3 +343,77 @@ async def test_every_json_answer_of_the_api_passes_the_guard(flow, monkeypatch):
         assert set(FORBIDDEN) <= set(leaks(await flow.get("/api/probe-neue-route/spiel")))
     finally:
         server.app.router.routes[:] = [route for route in server.app.router.routes if getattr(route, "path", "") != "/api/probe-neue-route/spiel"]
+
+
+# ---------------------------------------------------------------- Leistung, Inhaltstyp, Reihenfolge, Auskunft nach DSGVO
+
+@pytest.mark.asyncio
+async def test_answers_without_procedure_details_cost_no_user_lookup(flow, monkeypatch):
+    """Ein Zähler (``"disputes": 3``, Leitungsseite) oder schon gekürzte Zeilen: weder die Person der Anfrage noch eine Kürzung."""
+    from fastapi import APIRouter
+
+    import server
+    from services import procedure_response_guard
+
+    w = await scene(flow)
+    raw = await stored(flow, w)
+    cut = {"at": raw["disputes"][0]["at"], "id": raw["disputes"][0]["id"], "kind": "objection", "state": "withdrawn"}
+    router = APIRouter(prefix="/api/probe-zaehler")
+
+    @router.get("/zahl")
+    async def only_a_counter():
+        return {"matches": [{"id": raw["id"], "disputes": 3}], "rows": [{"id": raw["id"], "disputes": [cut, {"at": "2026-11-01T10:00:00+00:00"}]}]}
+
+    @router.get("/roh")
+    async def raw_match():
+        return {"match": raw}
+
+    calls = []
+    real = procedure_response_guard._user_of
+
+    async def counted(request):
+        calls.append(request.url.path)
+        return await real(request)
+
+    monkeypatch.setattr(procedure_response_guard, "_user_of", counted)
+    server.app.include_router(router)
+    try:
+        flow.act_as(user(w, "Kapitaen"))
+        plain = await flow.get("/api/probe-zaehler/zahl")
+        assert plain.status_code == 200 and plain.json()["matches"][0]["disputes"] == 3 and plain.json()["rows"][0]["disputes"][0] == cut
+        assert calls == [], "keine Benutzerabfrage ohne Verfahren mit Inhalt"
+        assert leaks(await flow.get("/api/probe-zaehler/roh")) == [] and calls == ["/api/probe-zaehler/roh"], "Gegenprobe: mit Inhalt wird geprüft"
+    finally:
+        server.app.router.routes[:] = [route for route in server.app.router.routes if not getattr(route, "path", "").startswith("/api/probe-zaehler")]
+
+
+@pytest.mark.asyncio
+async def test_many_matches_with_procedures_cost_one_decision_per_staffel(flow, monkeypatch):
+    from services import league_permissions
+
+    w = await scene(flow)
+    raw = await stored(flow, w)
+    payload = {"matches": [{**raw, "id": f"spiel-{index}"} for index in range(40)] + [raw]}
+    seen = {"viewer_for": 0, "involved": 0}
+    real_viewer, real_involved = league_procedures.viewer_for, league_permissions.involved_match_ids
+
+    async def viewer(*args, **kwargs):
+        seen["viewer_for"] += 1
+        return await real_viewer(*args, **kwargs)
+
+    async def involved(*args, **kwargs):
+        seen["involved"] += 1
+        return await real_involved(*args, **kwargs)
+
+    monkeypatch.setattr(league_procedures, "viewer_for", viewer)
+    monkeypatch.setattr(league_permissions, "involved_match_ids", involved)
+    for viewer_user, full in ((w["staff"], True), (user(w, "Kapitaen"), False), (w["helper"], False)):
+        seen.update(viewer_for=0, involved=0)
+        out = await league_procedures.guard(flow.db, payload, viewer_user)
+        assert (out == payload) is full, viewer_user["display_name"]
+        assert all(set(match["disputes"][0]) == {"at", "id", "kind", "state"} for match in out["matches"]) is (not full)
+        assert seen["viewer_for"] == 0 and seen["involved"] <= 1, f"je Staffel eine Entscheidung, nicht je Spiel: {seen}"
+        # Schon gekürzt: ein zweiter Durchgang (Route und Middleware hintereinander) kostet nichts mehr.
+        seen.update(viewer_for=0, involved=0)
+        again = await league_procedures.guard(flow.db, out, viewer_user)
+        assert again == out and (full or seen == {"viewer_for": 0, "involved": 0})
