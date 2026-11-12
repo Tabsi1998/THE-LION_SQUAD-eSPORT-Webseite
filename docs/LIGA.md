@@ -2814,8 +2814,8 @@ und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gil
   - *Das Spiel ist zu Ende, ohne dass der Vorfall abgeschlossen wurde* (`forfeit`, `cancelled`, `archived`, `bye`, `completed`): Offene Vorfälle
     gelten sofort in jeder Sicht als geschlossen (`close_reason: "match_ended"`), **ohne Nachricht** - es gibt nichts mehr zu
     beantworten oder zu entscheiden. Der Zeit-Job lässt sie nicht mehr ablaufen und schreibt den Stand fest, ebenso der nächste
-    Schritt an einem Vorfall dieses Spiels (er antwortet mit 409). „In Klärung“ verschwindet öffentlich, „Mein Dienst“ nennt das
-    Spiel nicht mehr.
+    Schritt an einem Vorfall dieses Spiels (er antwortet mit 409) - aber erst nach der Rechteprüfung des Aufrufs: Wer den Schritt
+    nicht tun darf, schreibt auch so nichts. „In Klärung“ verschwindet öffentlich, „Mein Dienst“ nennt das Spiel nicht mehr.
   - *Die Leitung schließt* (`…/close`, `close_reason: "lead"`, Begründung Pflicht): beide Seiten bekommen „Vorfall geschlossen“,
     die Begründung steht auf der Matchseite. Gedacht für den Fall, dass über die Map nichts mehr zu entscheiden ist - etwa bevor
     das Spiel kampflos gewertet wird.

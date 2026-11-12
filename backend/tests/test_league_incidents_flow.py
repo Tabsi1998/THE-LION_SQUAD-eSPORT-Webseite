@@ -891,6 +891,99 @@ async def test_no_forfeit_while_an_incident_is_open_until_the_lead_closes_it(flo
 
 
 @pytest.mark.asyncio
+async def test_closing_respects_bias_makes_agreed_reports_valid_and_logs_without_free_text(flow):
+    """Schließen ohne Entscheidung: nicht für Mitglieder, nicht für die befangene Leitung - der Superadmin nur als Notausnahme mit
+    Grund. Haben beide Seiten dasselbe gemeldet, gilt das Ergebnis mit dem Schließen. Im Protokoll steht kein freier Text."""
+    w = await world(flow)
+    incident_id = await reported(flow, w, proposal="continue_at_score")
+    assert (await answered(flow, w, incident_id, False)).status_code == 200
+    held = await both_report(flow, w)
+    assert held["awaiting_confirmation"] is True and held["report_status"] == "clarification", "die Map ist in Klärung"
+    body = {"reason": "Spiel wird anders gewertet XYZ"}
+
+    flow.act_as(w["users"]["Mila"])
+    assert (await flow.post(url(w, f"/{incident_id}/close"), json=body)).status_code == 403
+    biased = w["users"]["FalLeitung"]
+    biased["areas"] = ["leagues"]
+    await flow.db.users.update_one({"id": biased["id"]}, {"$set": {"areas": ["leagues"]}})
+    flow.act_as(biased)
+    refused = await flow.post(url(w, f"/{incident_id}/close"), json=body)
+    assert refused.status_code == 403 and "selbst beteiligt" in refused.json()["detail"]
+    assert (await page(flow, w))["league"]["incidents"][0]["can_close"] is False, "die Seite bietet es der befangenen Leitung nicht an"
+    boss = w["users"]["LoeLeitung"]
+    boss["role"] = "superadmin"
+    await flow.db.users.update_one({"id": boss["id"]}, {"$set": {"role": "superadmin"}})
+    flow.act_as(boss)
+    plain = await flow.post(url(w, f"/{incident_id}/close"), json=body)
+    assert plain.status_code == 403 and "Notausnahme" in plain.json()["detail"]
+    match = await stored(flow, w)
+    assert match["incidents"][0]["state"] == "in_review" and match["status"] != "completed"
+    assert await flow.db.audit_logs.count_documents({"action": "match.incident.close"}) == 0
+
+    forced = await flow.post(url(w, f"/{incident_id}/close"), json={**body, "conflict_reason": "Niemand sonst erreichbar ABC"})
+    assert forced.status_code == 200, forced.text
+    assert forced.json() == {"incident_id": incident_id, "state": "closed", "result_confirmed": True, "hold": None}
+    match = await stored(flow, w)
+    entry = match["incidents"][0]
+    assert match["status"] == "completed", "beide Seiten hatten dasselbe gemeldet"
+    assert (entry["state"], entry["close_reason"], entry["closed_by"]) == ("closed", "lead", boss["id"])
+    assert entry["close_note"] == "Spiel wird anders gewertet XYZ"
+
+    # Protokoll: Kennung, Map, Art, Stand und der feste Grund - nie die Begründung oder der Grund der Notausnahme.
+    logged = await flow.db.audit_logs.find({"action": "match.incident.close"}, {"_id": 0}).to_list(5)
+    assert len(logged) == 1 and logged[0]["actor_id"] == boss["id"]
+    assert logged[0]["data"] == {"match_id": w["match"]["id"], "stage_id": match["stage_id"], "match_key": match.get("match_key"),
+                                 "incident_id": incident_id, "position": 2, "kind": "disconnect", "state": "closed", "reason": "lead"}
+    assert "XYZ" not in str(logged) and "ABC" not in str(logged)
+    override = await flow.db.audit_logs.find({"action": "league.conflict.override"}, {"_id": 0}).to_list(5)
+    assert [row["data"]["action"] for row in override] == ["incident_close"], "die Notausnahme steht in ihrem eigenen Eintrag"
+    # Keine Seite liest den Grund der Notausnahme oder wer geschlossen hat.
+    flow.act_as(w["users"]["Falke1"])
+    seen = str((await page(flow, w))["league"])
+    assert "Spiel wird anders gewertet XYZ" in seen and "ABC" not in seen and boss["id"] not in seen
+
+
+@pytest.mark.asyncio
+async def test_someone_without_a_right_changes_nothing_at_an_ended_match(flow):
+    """Ein beendetes Spiel schließt seine Vorfälle beim nächsten Schritt - aber erst nach der Rechteprüfung: Wer nichts darf,
+    schreibt auch auf diesem Weg nichts."""
+    w = await world(flow)
+    waiting = await reported(flow, w)
+    review = await reported(flow, w, position=1)
+    assert (await answered(flow, w, review, False)).status_code == 200
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {"status": "cancelled"}})
+    before = await stored(flow, w)
+
+    async def untouched() -> None:
+        now = await stored(flow, w)
+        assert now["incidents"] == before["incidents"] and now.get("updated_at") == before.get("updated_at")
+        assert await flow.db.audit_logs.count_documents({"action": "match.incident.close"}) == 0
+
+    reason = {"reason": "Bitte schließen, danke"}
+    for name in ("Fremd", "Mila"):
+        flow.act_as(w["users"][name])
+        attempts = [
+            await flow.post(url(w), json=incident(w, position=3)),
+            await flow.post(url(w, f"/{waiting}/answer"), json={"accept": True}),
+            await flow.post(url(w, f"/{waiting}/withdraw")),
+            await flow.post(url(w, f"/{review}/decision"), json={"outcome": "no_action", "reason": "Passt schon so"}),
+            await flow.post(url(w, f"/{review}/settle"), json={**SETTLE, "reason": "Nichts mehr zu spielen"}),
+            await flow.post(url(w, f"/{review}/close"), json=reason),
+        ]
+        assert [response.status_code for response in attempts] == [403] * 6, name
+        await untouched()
+    # Die Seiten dürfen antworten, aber nicht entscheiden: Auch ihr abgelehnter Aufruf schreibt nichts.
+    flow.act_as(w["users"]["Falke1"])
+    assert (await flow.post(url(w, f"/{review}/close"), json=reason)).status_code == 403
+    await untouched()
+
+    # Gegenprobe: Wer handeln darf, stößt das Schließen an und hört 409.
+    assert (await flow.post(url(w, f"/{waiting}/answer"), json={"accept": True})).status_code == 409
+    after = await stored(flow, w)
+    assert [(row["state"], row["close_reason"]) for row in after["incidents"]] == [("closed", "match_ended")] * 2
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("ended_status", ["forfeit", "cancelled"])
 async def test_a_match_that_ends_without_being_played_closes_its_open_incidents_silently(flow, ended_status):
     """Das Spiel endet von selbst (Rückzug, Absage): Offene Vorfälle werden ohne Nachricht geschlossen und laufen nicht mehr ab."""

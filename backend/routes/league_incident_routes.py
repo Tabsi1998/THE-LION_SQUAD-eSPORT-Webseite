@@ -110,10 +110,15 @@ async def _context(match_id: str, user: dict):
         raise HTTPException(status_code=404, detail=NOT_LEAGUE_DETAIL)
     if tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail="Turnier ist gesperrt und kann nur noch angesehen werden.")
-    # Ist das Spiel inzwischen zu Ende (kampflos, abgesagt), sind offene Vorfälle geschlossen - der Schritt danach antwortet mit 409.
+    return db, match, tournament, setup
+
+
+async def _closed_if_ended(db, match: dict, setup) -> dict:
+    """Ist das Spiel inzwischen zu Ende (kampflos, abgesagt), sind offene Vorfälle geschlossen - der Schritt danach antwortet mit
+    409. Geschrieben wird erst **nach** der Rechteprüfung der Route: Wer nichts darf, ändert auch so nichts."""
     match = await league_incidents.close_ended(db, match)
     setup.match = match
-    return db, match, tournament, setup
+    return match
 
 
 async def _as_lead(db, user: dict, match: dict, *, action: str, conflict_reason: str | None) -> None:
@@ -169,6 +174,7 @@ async def report_incident(match_id: str, body: IncidentBody, request: Request, m
         await require_no_conflict(db, me, match, action="incident_report", conflict_reason=body.conflict_reason)
         registration_id = None
     await enforce_rate_limit(request, "matches:incident", subject=me["id"], **REPORT_LIMIT)
+    match = await _closed_if_ended(db, match, setup)
     try:
         entry = await league_incidents.report(db, match, setup, await league_incidents.settings_for(db, tournament), user=me,
                                               registration_id=registration_id, body=body.model_dump(exclude={"conflict_reason"}))
@@ -184,6 +190,7 @@ async def answer_incident(match_id: str, incident_id: str, body: AnswerBody, me:
                           _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, setup = await _context(match_id, me)
     registration_id = await _side(match, me)
+    match = await _closed_if_ended(db, match, setup)
     try:
         entry = await league_incidents.answer(db, match, setup, incident_id, user=me, registration_id=registration_id,
                                               accept=body.accept, note=body.note)
@@ -197,6 +204,7 @@ async def withdraw_incident(match_id: str, incident_id: str, me: dict = Depends(
                             _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, setup = await _context(match_id, me)
     registration_id = await _side(match, me)
+    match = await _closed_if_ended(db, match, setup)
     try:
         entry = await league_incidents.withdraw(db, match, setup, incident_id, user=me, registration_id=registration_id)
     except league_incidents.IncidentProblem as problem:
@@ -209,6 +217,7 @@ async def decide_incident(match_id: str, incident_id: str, body: DecisionBody, m
                           _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, setup = await _context(match_id, me)
     await _as_lead(db, me, match, action="incident_decide", conflict_reason=body.conflict_reason)
+    match = await _closed_if_ended(db, match, setup)
     try:
         entry = await league_incidents.decide(
             db, match, setup, incident_id, user=me, outcome=body.outcome, registration_id=body.registration_id, reason=body.reason,
@@ -224,6 +233,7 @@ async def settle_incident(match_id: str, incident_id: str, body: SettleBody, me:
                           _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, setup = await _context(match_id, me)
     await _as_lead(db, me, match, action="incident_settle", conflict_reason=body.conflict_reason)
+    match = await _closed_if_ended(db, match, setup)
     try:
         entry = await league_incidents.settle(db, match, setup, incident_id, user=me, body=body.model_dump(exclude={"conflict_reason"}))
     except league_incidents.IncidentProblem as problem:
@@ -236,6 +246,7 @@ async def close_incident(match_id: str, incident_id: str, body: CloseBody, me: d
                          _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, setup = await _context(match_id, me)
     await _as_lead(db, me, match, action="incident_close", conflict_reason=body.conflict_reason)
+    match = await _closed_if_ended(db, match, setup)
     try:
         entry = await league_incidents.close(db, match, setup, incident_id, user=me, reason=body.reason)
     except league_incidents.IncidentProblem as problem:
