@@ -4,7 +4,7 @@ import { chatAttachmentSrc } from "@/lib/chatAttachments";
 import { viennaDateTime } from "@/lib/vienna";
 import { api, formatApiError } from "@/lib/api";
 import { AGAINST_LABELS, MOSS_STATE_LABELS, PROCEDURE_STATE_LABELS, claimedText, deadlineTone, decisionText, remainingText } from "@/lib/leagueProcedures";
-import { ProofList } from "@/components/tls/results/ProofList";
+import { ProofList, proofHintText } from "@/components/tls/results/ProofList";
 
 // Streitfall für die Turnierleitung (#1158): Meldung mit Grund, Foto und das eingetragene Ergebnis - entschieden wird
 // mit einem Tipp. „Ergebnis bleibt“ (ohne Ergebnis: „Weiter wie bisher“) schließt den Dispute; „Ergebnis ändern“
@@ -246,7 +246,9 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
           </div>
         ) : null}
 
-        <ProofList matchId={matchId} kind="protest" refId={p.id} title="Nachweise" sideLabels={sideNames} testId={`procedure-proofs-${p.id}`} />
+        <ProofList matchId={matchId} kind="protest" refId={p.id} title="Nachweise" sideLabels={sideNames} testId={`procedure-proofs-${p.id}`} hint={false} />
+        {/* Was als Nachweis zählt: einmal für die ganze Karte, nicht unter jeder der drei Listen. */}
+        {open ? <p className="text-xs text-white/50" data-testid={`procedure-proof-hint-${p.id}`}>{proofHintText()}</p> : null}
 
         {p.statement ? (
           <section className="space-y-2 border-t border-white/10 pt-3" data-testid={`procedure-statement-${p.id}`}>
@@ -263,7 +265,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
                 <button disabled={busy || text.trim().length < 10} className={SMALL_BUTTON} data-testid={`procedure-statement-send-${p.id}`}>{p.statement.text ? "Stellungnahme ersetzen" : "Stellung nehmen"}</button>
               </form>
             ) : null}
-            {p.statement.text || p.can_state ? <ProofList matchId={matchId} kind="statement" refId={p.id} title="Nachweise zur Stellungnahme" sideLabels={sideNames} testId={`procedure-statement-proofs-${p.id}`} /> : null}
+            {p.statement.text || p.can_state ? <ProofList matchId={matchId} kind="statement" refId={p.id} title="Nachweise zur Stellungnahme" sideLabels={sideNames} testId={`procedure-statement-proofs-${p.id}`} hint={false} /> : null}
           </section>
         ) : null}
 
@@ -281,7 +283,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
               </div>
             ))}
             {mossPending ? <p className="text-xs text-warn">Bitte lade die ZIP-Datei unverändert hoch, so wie MOSS sie geschrieben hat (Regelwerk § 9a).</p> : null}
-            {mossPending || p.can_lead || (p.moss_requests || []).length ? <ProofList matchId={matchId} kind="moss" refId={p.id} title="MOSS-Nachweise" sideLabels={sideNames} testId={`procedure-moss-proofs-${p.id}`} onChanged={onChanged} /> : null}
+            {mossPending || p.can_lead || (p.moss_requests || []).length ? <ProofList matchId={matchId} kind="moss" refId={p.id} title="MOSS-Nachweise" sideLabels={sideNames} testId={`procedure-moss-proofs-${p.id}`} onChanged={onChanged} hint={false} /> : null}
             {p.can_lead ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">

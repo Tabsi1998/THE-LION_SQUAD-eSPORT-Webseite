@@ -83,7 +83,12 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
   );
 }
 
-export function ProofList({ matchId, kind, refId = "", title = "Nachweise", sideLabels = null, testId = "proof-list", onChanged = null }) {
+/** Was als Nachweis zählt (Regelwerk § 10.6) - ein Bereich mit mehreren Listen zeigt den Satz einmal selbst (`hint={false}`). */
+export function proofHintText(limit = 10) {
+  return `Auf Bildern und Videos muss die Ingame-Uhr oder ein anderer Zeitstempel zu sehen sein. Videos gibst du als Link an (nur https, etwa ungelistet hochgeladen), mindestens 720p und 15 Sekunden; bei mehr als zwei Minuten schreib die Zeitstellen dazu (Regelwerk § 10.6). Höchstens ${limit} Nachweise je Seite.`;
+}
+
+export function ProofList({ matchId, kind, refId = "", title = "Nachweise", sideLabels = null, testId = "proof-list", onChanged = null, hint = true }) {
   const [state, setState] = useState({ status: "loading", data: null });
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
@@ -211,9 +216,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
               </form>
               <input ref={cameraRef} type="file" accept={ACCEPT} capture="environment" className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-camera-input`} />
               <input ref={galleryRef} type="file" accept={ACCEPT} className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-input`} />
-              <p className="text-xs text-white/50" data-testid={`${testId}-hint`}>
-                Auf Bildern und Videos muss die Ingame-Uhr oder ein anderer Zeitstempel zu sehen sein. Videos gibst du als Link an (nur https, etwa ungelistet hochgeladen), mindestens 720p und 15 Sekunden; bei mehr als zwei Minuten schreib die Zeitstellen dazu (Regelwerk § 10.6). Höchstens {data.limit} Nachweise je Seite.
-              </p>
+              {hint ? <p className="text-xs text-white/50" data-testid={`${testId}-hint`}>{proofHintText(data.limit)}</p> : null}
             </div>
           ) : (
             <p className="text-xs text-white/50" data-testid={`${testId}-closed`}>
