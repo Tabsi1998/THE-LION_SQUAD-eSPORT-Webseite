@@ -661,6 +661,13 @@ def strip_rows(match: dict | None, viewer: Viewer) -> dict | None:
     return {**match, "disputes": out}
 
 
+def strip_for_involved(match: dict, user_id: str | None, involved: bool) -> dict:
+    """Für Listen und Einzelabrufe der Leitung (Spielplan, Baum, ``GET /matches/{id}``): Wer an dem Spiel beteiligt ist, bekommt
+    die Verfahren auch mit Liga-Recht nur gekürzt - keine MOSS-Anforderungen, keine Antwort auf „sofort hingewiesen?“, keine
+    Konten. Was die eigene Seite sehen darf, steht auf der Matchseite im Block ``league.procedures``."""
+    return strip_rows(match, Viewer(user_id=user_id)) if involved and rows(match) else match
+
+
 def _moss_view(row: dict, viewer: Viewer, names: dict) -> list[dict]:
     out = []
     for item in row.get("moss_requests") or []:

@@ -146,6 +146,13 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
         viewer_id = (user or {}).get("id")
         matches_v2 = [public_match_view(match, viewer_id) for match in matches_v2]
         stages = [public_stage_view(stage) for stage in stages]
+    elif isinstance(t.get("league_context"), dict) and any(match.get("disputes") for match in matches_v2):
+        # Verfahren (E.2, #1619): im eigenen Spiel sieht auch die Leitung nur, was ihre Seite sehen darf.
+        from services.league_permissions import involved_match_ids
+        from services.league_procedures import strip_for_involved
+
+        own = await involved_match_ids(db, user, t, matches_v2)
+        matches_v2 = [strip_for_involved(match, (user or {}).get("id"), match.get("id") in own) for match in matches_v2]
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     raw_regs = regs
     own_ids = await _own_registration_ids(db, regs, user)

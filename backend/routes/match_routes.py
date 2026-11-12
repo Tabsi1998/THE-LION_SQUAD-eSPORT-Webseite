@@ -1643,6 +1643,9 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
     m, _collection = await _find_match_any(match_id)
     await _assert_match_visible(m, user)
     if await _sees_internal(m, user):
+        # Verfahren (E.2, #1619): im eigenen Spiel sieht auch die Leitung nur, was ihre Seite sehen darf.
+        if league_procedures.rows(m) and await league_permissions.conflict_of_interest(get_db(), user, m):
+            return league_procedures.strip_for_involved(m, (user or {}).get("id"), True)
         return m
     return public_match_view(m, (user or {}).get("id"))
 
