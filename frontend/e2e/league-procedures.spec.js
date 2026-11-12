@@ -54,6 +54,8 @@ const LEAD = page_of({
     assignee: { name: "Liga-Leitung Nord", at: inHours(-3), own: true }, target_at: inHours(60),
     moss_requests: [{ id: "r1", user_id: "u1", name: "Mila Mustermann", side: "a", at: inHours(-1), due_at: inHours(20), state: "requested", own: false }] }],
 }, { acting_registration_id: null, can_act: false, can_submit_result: true, can_staff_submit_result: true });
+const FORFEIT = page_of({ procedure_form: { ...FORM, open: false, kind: "protest", appealable: { type: "forfeit", ref_id: "m1", until: inHours(30) } } },
+  { match: { ...BASE.match, status: "forfeit" } });
 const PROOFS = { items: [{ id: "n1", type: "link", kind: "protest", ref_id: "p1", side: "b", own: false, own_side: false, can_remove: false, link: "https://video.example/clip?v=abc" }],
   open: true, can_add: true, limit: 10, link_max_length: 500 };
 const MOSS = { items: [{ id: "z1", type: "file", kind: "moss", ref_id: "p1", side: "a", own: false, own_side: false, can_remove: false,
@@ -79,6 +81,10 @@ async function setup(page, first, { role = "player", next = null } = {}) {
       return route.fulfill(json({ id: "m1", procedure_id: "p1", idempotent_replay: false }));
     }
     if (where.pathname === "/api/matches/m1/proofs") return route.fulfill(json(where.searchParams.get("kind") === "moss" ? MOSS : PROOFS));
+    if (where.pathname === "/api/matches/m1/appeals" && request.method() === "POST") {
+      calls.posts.push(["appeals", request.postDataJSON()]);
+      return route.fulfill(json({ procedures: [], contested: true, procedure_id: "e1" }));
+    }
     if (where.pathname.startsWith("/api/matches/m1/procedures/") && request.method() === "POST") {
       calls.posts.push([where.pathname.split("/procedures/p1/")[1], request.postDataJSON()]);
       return route.fulfill(json({ procedures: payload.league.procedures, contested: true }));
@@ -182,6 +188,25 @@ test.describe("Liga: Beanstandung, Protest und Einspruch", () => {
       await card.getByTestId("procedure-keep-p1").click();
       await expect.poll(() => calls.posts.map(([action]) => action)).toEqual(["moss-requests", "decision"]);
       expect(calls.posts[1][1]).toEqual({ decision: "keep", decision_note: "Die Aufzeichnung bestätigt das gemeldete Ergebnis." });
+      // Der lange Hinweis zu Nachweisen steht je Karte einmal, nicht unter jeder der drei Listen.
+      await expect(card.getByText(/Ingame-Uhr/)).toHaveCount(1);
+    });
+
+    test(`Einspruch gegen eine Wertung kampflos geht bei ${width} px per Knopf, mit Begründung`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const calls = await setup(page, FORFEIT);
+      await page.goto("/matches/m1");
+      const box = page.getByTestId("match-appealable");
+      await expect(box).toContainText("kampflos gewertet");
+      await expect(box.getByTestId("match-appeal-until")).toContainText("noch");
+      await expect(box.getByTestId("match-appeal-input")).toHaveCount(0);
+      await box.getByTestId("match-appeal-open").click();
+      await expect(box.getByTestId("match-appeal-send")).toBeDisabled();
+      await box.getByTestId("match-appeal-input").fill("Wir waren pünktlich da, der Check-in hat nicht gespeichert.");
+      await noSideScroll(page);
+      await shot(page, box, "einspruch-kampflos", width);
+      await box.getByTestId("match-appeal-send").click();
+      await expect.poll(() => calls.posts).toEqual([["appeals", { against_type: "forfeit", ref_id: "m1", reason: "Wir waren pünktlich da, der Check-in hat nicht gespeichert." }]]);
     });
   }
 });
