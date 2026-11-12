@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from models import now_utc
+from services.league_calendar import season_end_at
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_sanctions")
@@ -68,18 +69,53 @@ class Bans:
     squads: dict[str, dict] = field(default_factory=dict)
 
 
-async def covered_matches(db, row: dict) -> list[str]:
+@dataclass
+class Frame:
+    """Was die Auswertung von Sperren nach Spielen braucht, für viele Strafen einmal geladen: das Ende ihrer Season und die
+    entschiedenen Liga-Spiele ihrer Anmeldung, nach Zeitpunkt sortiert."""
+
+    season_ends: dict[str, datetime | None] = field(default_factory=dict)
+    decided: dict[str, list[tuple[datetime, str]]] = field(default_factory=dict)
+
+
+async def frame_for(db, rows: list[dict]) -> Frame:
+    """Zwei Abfragen für alle Sperren nach Spielen unter ``rows`` - statt einer je Sperre."""
+    counted = [row for row in rows if row.get("matches") and row.get("kind") in BAN_KINDS]
+    frame = Frame()
+    if not counted:
+        return frame
+    season_ids = sorted({row["season_id"] for row in counted if row.get("season_id")})
+    async for season in db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}):
+        frame.season_ends[season["id"]] = season_end_at(season)
+    registration_ids = sorted({row["registration_id"] for row in counted if row.get("registration_id")})
+    if registration_ids:
+        async for match in db.matches_v2.find(
+                {"slots.registration_id": {"$in": registration_ids}, "status": {"$in": sorted(DECIDED_MATCH)}},
+                {"_id": 0, "id": 1, "completed_at": 1, "is_preview": 1, "slots.registration_id": 1}):
+            moment = parse(match.get("completed_at"))
+            if match.get("is_preview") or not moment:
+                continue
+            for slot in match.get("slots") or []:
+                if slot.get("registration_id") in registration_ids:
+                    frame.decided.setdefault(slot["registration_id"], []).append((moment, match["id"]))
+        for played in frame.decided.values():
+            played.sort()
+    return frame
+
+
+def covered_matches(row: dict, frame: Frame) -> list[str]:
     """Die gesperrten Spiele einer Sperre nach Spielen: die ersten ``matches`` entschiedenen Liga-Spiele der Anmeldung ab ``starts_at``."""
-    registration_id, count = row.get("registration_id"), int(row.get("matches") or 0)
-    start = parse(row.get("starts_at"))
-    if not registration_id or not count or not start:
+    count, start = int(row.get("matches") or 0), parse(row.get("starts_at"))
+    if not row.get("registration_id") or not count or not start:
         return []
-    found = await db.matches_v2.find(
-        {"slots.registration_id": registration_id, "status": {"$in": sorted(DECIDED_MATCH)}},
-        {"_id": 0, "id": 1, "completed_at": 1, "is_preview": 1}).to_list(500)
-    dated = sorted((moment, match["id"]) for match in found
-                   if not match.get("is_preview") and (moment := parse(match.get("completed_at"))) and moment >= start)
-    return [match_id for _moment, match_id in dated[:count]]
+    return [match_id for moment, match_id in frame.decided.get(row["registration_id"], []) if moment >= start][:count]
+
+
+def season_over(row: dict, frame: Frame, at: datetime) -> bool:
+    """Nr. 101: Eine Spielsperre endet spätestens mit ihrer Season - auch wenn nicht alle Spiele abgesessen sind (Team ausgeschieden,
+    Person gewechselt, kein Spiel mehr angesetzt). Ohne bestimmbares Season-Ende gilt nur die Zählung."""
+    end = frame.season_ends.get(row.get("season_id") or "")
+    return bool(end and at >= end)
 
 
 def _until_text(row: dict, remaining: int | None) -> str:
@@ -99,7 +135,7 @@ def _until_text(row: dict, remaining: int | None) -> str:
     return f"{lead} bis {_local(end)}." if end else f"{lead}."
 
 
-async def ban_state(db, row: dict, *, season_id: str | None, match: dict | None = None, now: datetime | None = None) -> dict | None:
+def ban_state(row: dict, frame: Frame, *, season_id: str | None, match: dict | None = None, now: datetime | None = None) -> dict | None:
     """Wirkt diese Sperre gerade? ``None``: nein. Sonst ``{reason, until, sanction_id, kind}``. Mit ``match`` für genau dieses Spiel:
     ein entschiedenes zählt zu seinem ``completed_at`` (Nachtrag der Teilnehmerliste), ein offenes jetzt."""
     if row.get("revoked_at") or row.get("kind") not in BAN_KINDS:
@@ -114,12 +150,12 @@ async def ban_state(db, row: dict, *, season_id: str | None, match: dict | None 
     remaining = None
     if row.get("state") != PROVISIONAL:
         if row.get("matches"):
-            covered = await covered_matches(db, row)
+            covered = covered_matches(row, frame)
             if decided:
                 if match.get("id") not in covered:
                     return None
                 remaining = 0
-            elif len(covered) >= int(row["matches"]):
+            elif len(covered) >= int(row["matches"]) or season_over(row, frame, at):
                 return None
             else:
                 remaining = int(row["matches"]) - len(covered)
@@ -133,19 +169,19 @@ async def ban_state(db, row: dict, *, season_id: str | None, match: dict | None 
 
 async def bans(db, league_id: str | None, season_id: str | None, user_ids, *, match: dict | None = None,
                now: datetime | None = None) -> Bans:
-    """Die laufenden Sperren für diese Personen und für alle Co-Teams der Liga - eine Abfrage, ausgewertet im Speicher."""
+    """Die laufenden Sperren für diese Personen und für alle Co-Teams der Liga - ausgewertet im Speicher."""
     out = Bans()
     if not league_id:
         return out
     wanted = {user_id for user_id in user_ids or [] if user_id}
     rows = await db.competition_sanctions.find(
         {"league_id": league_id, "kind": {"$in": list(BAN_KINDS)}, "revoked_at": None}, {"_id": 0}).to_list(2000)
+    rows = [row for row in rows if row.get("target_type") == SQUAD or row.get("user_id") in wanted]
+    frame = await frame_for(db, rows)
     for row in rows:
         is_squad = row.get("target_type") == SQUAD
         key = row.get("squad_id") if is_squad else row.get("user_id")
-        if not key or (not is_squad and key not in wanted):
-            continue
-        state = await ban_state(db, row, season_id=season_id, match=match, now=now)
+        state = ban_state(row, frame, season_id=season_id, match=match, now=now) if key else None
         if state:
             (out.squads if is_squad else out.users).setdefault(key, state)
     return out
@@ -168,8 +204,9 @@ def squad_ban(found: Bans | None, squad_id: str | None) -> dict | None:
 # ---------------------------------------------------------------- Aufbewahrung der Nachweise (Nr. 31, 136)
 
 
-async def hold_until(db, doc: dict, now: datetime | None = None) -> str | None:
-    """Bis wann die Nachweise dieser Strafe mindestens bleiben: solange sie läuft, ein Einspruch offen ist oder die Frist läuft."""
+async def hold_until(db, doc: dict, now: datetime | None = None, frame: Frame | None = None) -> str | None:
+    """Bis wann die Nachweise dieser Strafe mindestens bleiben: solange sie läuft, ein Einspruch offen ist oder die Frist läuft.
+    Eine Sperre nach Spielen hält höchstens bis zum Ende ihrer Season (Nr. 101, 136) - danach gilt die normale Frist."""
     now = now or now_utc()
     if doc.get("revoked_at") and (doc.get("appeal") or {}).get("state") != OPEN:
         return None
@@ -178,8 +215,12 @@ async def hold_until(db, doc: dict, now: datetime | None = None) -> str | None:
     moments = [moment for moment in (parse(doc.get("appeal_until")),) if moment]
     if doc.get("kind") in BAN_KINDS:
         if doc.get("matches"):
-            if len(await covered_matches(db, doc)) < int(doc["matches"]):
-                return OPEN_END
+            frame = frame or await frame_for(db, [doc])
+            if len(covered_matches(doc, frame)) < int(doc["matches"]):
+                end = frame.season_ends.get(doc.get("season_id") or "")
+                if not end:
+                    return OPEN_END
+                moments.append(end)
         elif doc.get("ends_at"):
             moments.append(parse(doc["ends_at"]))
         else:

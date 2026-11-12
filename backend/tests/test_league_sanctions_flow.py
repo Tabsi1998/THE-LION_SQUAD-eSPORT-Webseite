@@ -575,3 +575,61 @@ async def test_the_affected_do_not_learn_who_issued_the_sanction(flow):
     flow.act_as(await flow.add_staff())
     inbox = [row for row in (await flow.get("/api/admin/penalties")).json()["items"] if row["kind"] == "league_sanction"]
     assert {row["issued_by_name"] for row in inbox} == {"Strafleitung"}
+
+
+# ---------------------------------------------------------------- Sperre nach Spielen endet mit der Season (Review R1, M3)
+
+
+async def end_season(flow, world) -> None:
+    """Die Season ist vorbei: zwei Spielwochen ab einem Montag vor langer Zeit."""
+    await flow.db.league_seasons.update_one({"id": world["season_id"]}, {"$set": {"start_date": "2025-01-06T00:00:00", "weeks_total": 2}})
+
+
+async def listed(flow, world, sanction_id: str) -> dict:
+    flow.act_as(world["lead"])
+    return next(row for row in (await flow.get(world["url"])).json()["items"] if row["id"] == sanction_id)
+
+
+@pytest.mark.asyncio
+async def test_a_ban_by_matches_ends_with_the_season_even_if_no_match_is_left(flow):
+    """Nr. 101: höchstens bis zum Ende der laufenden Season - sonst liefe die Sperre ewig und hielte die Nachweise für immer."""
+    world = await sanction_world(flow)
+    match_id = world["match"]["id"]
+    await flow.db.match_proof_photos.insert_one({"id": "beweis-1", "match_id": match_id, "tournament_id": world["tournament"]["id"],
+                                                 "status": "attached", "created_at": at(-5), "context": {"kind": "report"}})
+    issued = await ban(flow, world, matches=3, match_id=match_id, proof_ids=["beweis-1"])
+    assert issued.status_code == 200, issued.text
+    sanction = issued.json()
+    # Während der Season: gesperrt, die Nachweise bleiben mindestens bis zum Season-Ende (nicht für immer).
+    assert (await eligibility(flow, world, "Mila"))["ok"] is False
+    hold = (await flow.db.match_proof_photos.find_one({"id": "beweis-1"}, {"_id": 0}))["keep_until"]
+    assert at(days=30) < hold < at(days=90), hold
+    await end_season(flow, world)
+    assert (await eligibility(flow, world, "Mila"))["ok"] is True
+    row = await listed(flow, world, sanction["id"])
+    assert row["status"] == "served" and row["period"] == "3 Liga-Spiele, mit dem Ende der Season beendet"
+    # Die Einspruchsfrist läuft noch - danach hält nichts mehr.
+    doc = await flow.db.competition_sanctions.find_one({"id": sanction["id"]}, {"_id": 0})
+    assert await league_sanction_bans.hold_until(flow.db, doc) == doc["appeal_until"]
+    assert await league_sanction_bans.hold_until(flow.db, doc, now_utc() + timedelta(days=5)) is None
+
+
+@pytest.mark.asyncio
+async def test_a_ban_by_matches_survives_a_withdrawn_team_and_a_transfer_only_until_the_season_ends(flow):
+    world = await sanction_world(flow)
+    left = (await ban(flow, world, "Mila", matches=2)).json()
+    # Das Co-Team scheidet aus: Es kommt kein Spiel mehr, die Sperre bleibt bis zum Season-Ende.
+    await flow.db.tournament_registrations.update_one({"id": world["reg_a"]["id"]}, {"$set": {"status": "withdrawn"}})
+    assert (await eligibility(flow, world, "Mila"))["ok"] is False
+    assert (await listed(flow, world, left["id"]))["period"] == "2 Liga-Spiele, noch 2"
+    # Die Person wechselt das Co-Team: gesperrt bleibt sie auch dort, gezählt wird weiter die Anmeldung der Strafe.
+    await flow.db.team_squads.update_one({"id": world["squad_a"]["id"]}, {"$pull": {"member_ids": uid(world, "Mila")}})
+    await flow.db.team_squads.update_one({"id": world["squad_b"]["id"]}, {"$push": {"member_ids": uid(world, "Mila")}})
+    moved = await eligibility(flow, world, "Mila", "squad_b")
+    assert moved["state"] == "sanctioned" and "für noch 2 Liga-Spiele" in moved["reason"]
+    await end_season(flow, world)
+    assert (await eligibility(flow, world, "Mila", "squad_b"))["ok"] is True
+    assert (await listed(flow, world, left["id"]))["status"] == "served"
+    # Gegenprobe: Eine Sperre bis zu einem Zeitpunkt und ein Ligaausschluss enden nicht mit der Season.
+    assert (await issue(flow, world, kind="league_exclusion", target_type="player", user_id=uid(world, "Tom"))).status_code == 200
+    assert (await eligibility(flow, world, "Tom"))["ok"] is False

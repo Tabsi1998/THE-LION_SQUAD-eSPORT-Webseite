@@ -21,13 +21,13 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timedelta
 
 from models import now_utc
 from services import match_proof_refs as refs
 from services import match_proofs, media_scan
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
-from services.league_service import VIENNA, week_days
+from services.league_calendar import season_end_at
 from services.match_disputes import decided_at
 from services.matchday_schedule import response_deadline
 from storage import QUARANTINE_DIR
@@ -64,17 +64,9 @@ async def _matches_of(db, rows: list[dict], fields: dict) -> dict[str, dict]:
 
 
 def season_end(season: dict | None) -> datetime | None:
-    """Wann die Season zu Ende ist: der Abschluss durch die Leitung (``closed_at``, kommt mit F.1) - bis dahin das Ende des
+    """Wann die Season zu Ende ist (``league_calendar.season_end_at``): der Abschluss durch die Leitung, bis dahin das Ende des
     letzten Tages der letzten Spielwoche. ``None``: nicht bestimmbar."""
-    if not season:
-        return None
-    closed = refs.parse(season.get("closed_at"))
-    if closed:
-        return closed
-    weeks = week_days(season)
-    if not weeks:
-        return None
-    return datetime.combine(weeks[-1][1] + timedelta(days=1), time.min, tzinfo=VIENNA).astimezone(timezone.utc)
+    return season_end_at(season)
 
 
 def protest_window(match: dict, tournament: dict | None, season: dict | None,

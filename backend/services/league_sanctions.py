@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 from models import new_id, now_utc
 from services.league_sanction_bans import (BAN_KINDS, FINAL, GRANTED, KINDS, OPEN, PLAYER, PROVISIONAL, SQUAD, UPHELD, _local,
-                                          covered_matches, parse, sync_proof_hold)
+                                          covered_matches, frame_for, parse, season_over, sync_proof_hold)
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_sanctions")
@@ -563,8 +563,9 @@ async def for_user(db, user_id: str) -> list[dict]:
 # ---------------------------------------------------------------- Ansichten
 
 
-async def progress(db, doc: dict, now: datetime | None = None) -> dict:
-    """``status``: ``revoked``, ``provisional``, ``active`` oder ``served`` (Sperre vorbei), dazu der Satz zum Zeitraum."""
+async def progress(db, doc: dict, now: datetime | None = None, frame=None) -> dict:
+    """``status``: ``revoked``, ``provisional``, ``active`` oder ``served`` (Sperre vorbei), dazu der Satz zum Zeitraum. ``frame``: für
+    Listen einmal geladen (``frame_for``), sonst je Strafe."""
     now = now or now_utc()
     if doc.get("revoked_at"):
         return {"status": "revoked", "period": None}
@@ -573,8 +574,12 @@ async def progress(db, doc: dict, now: datetime | None = None) -> dict:
     if doc.get("state") == PROVISIONAL:
         return {"status": PROVISIONAL, "period": "vorläufig, bis die Liga-Leitung entschieden hat"}
     if doc.get("matches"):
-        left = int(doc["matches"]) - len(await covered_matches(db, doc))
+        frame = frame or await frame_for(db, [doc])
+        left = int(doc["matches"]) - len(covered_matches(doc, frame))
         total = f"{doc['matches']} Liga-{'Spiel' if doc['matches'] == 1 else 'Spiele'}"
+        if left > 0 and season_over(doc, frame, now):
+            # Nr. 101: spätestens mit der Season ist die Sperre vorbei, auch wenn nicht alle Spiele abgesessen sind.
+            return {"status": "served", "period": f"{total}, mit dem Ende der Season beendet"}
         return {"status": "active" if left > 0 else "served", "period": f"{total}, noch {left}" if left > 0 else f"{total}, abgesessen"}
     end = parse(doc.get("ends_at"))
     start = parse(doc.get("starts_at"))

@@ -3163,7 +3163,10 @@ Index: `id` eindeutig; `(league_id, season_id)`; `user_id`; `squad_id`; `registr
 - **Sperre nach Spielen:** Es zählen die Liga-Spiele der Anmeldung (`registration_id`) mit Stand `completed` oder `forfeit` und
   `completed_at` ab `starts_at`, in dieser Reihenfolge. Die ersten `matches` davon sind die gesperrten Spiele. Solange weniger gezählt
   sind, ist die Person in jedem offenen Spiel gesperrt; danach bleibt sie es für die gesperrten Spiele (Nachtrag der
-  Teilnehmerliste). Abgesagte Spiele zählen nicht.
+  Teilnehmerliste). Abgesagte Spiele zählen nicht. **Spätestens mit dem Ende der Season ist die Sperre vorbei** (Nr. 101), auch
+  wenn nicht alle Spiele abgesessen sind - etwa weil das Co-Team ausgeschieden ist, die Person gewechselt hat oder kein Spiel mehr
+  angesetzt wird: Stand „abgelaufen“, Zeitraum „… mit dem Ende der Season beendet“. Wechselt die Person das Co-Team, zählen weiter
+  die Spiele der Anmeldung, für die die Sperre verhängt wurde; gesperrt ist die Person in der ganzen Season.
 - **Sperre nach Zeit:** gilt von `starts_at` bis `ends_at`. Für ein bereits entschiedenes Spiel zählt dessen `completed_at`
   (Nachtrag), sonst jetzt.
 - **Spielsperre über das Season-Ende hinaus** lehnt der Server ab (422): Was darüber hinausgeht, ist Teamsperre oder Ligaausschluss.
@@ -3228,7 +3231,7 @@ Begründung: „… ist gesperrt“), damit sie aufstellen können. Link `/my/pe
 
 **Aufbewahrung (Nr. 31, 136):** Nachweise in `proof_ids` tragen `match_proof_photos.keep_until` (ISO), solange die Strafe läuft,
 ein Einspruch offen ist oder die Einspruchsfrist läuft: Ende der Sperre bzw. `appeal_until`, das spätere von beiden; ohne
-bestimmbares Ende `9999-12-31`. Jede Änderung an der Strafe und der stündliche Job (`league_sanction_bans.refresh_proof_holds`)
+bestimmbares Ende `9999-12-31`. Eine Sperre nach Spielen hält höchstens bis zum Ende ihrer Season; danach gilt die normale Frist. Jede Änderung an der Strafe und der stündliche Job (`league_sanction_bans.refresh_proof_holds`)
 setzen den Wert neu; der Job löscht nichts, dessen `keep_until` in der Zukunft liegt.
 
 **Kontolöschung und Auskunft:** `competition_sanctions` steht in `personal_data.py` (bleibt als Nachweis der Liga-Leitung, drei
