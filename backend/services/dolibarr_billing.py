@@ -628,9 +628,11 @@ async def _review_cases(db, order: dict, state: dict, payments: list[dict] | Non
         await billing_cases.open_case(db, order, "overpaid", {"over_cents": -int(state.get("remaining_cents") or 0), "invoice_ref": state["invoice_ref"]})
     else:
         await billing_cases.auto_resolve(db, order["id"], "overpaid", "Die Überzahlung ist in Dolibarr ausgeglichen.")
-    if order.get("booking_state") == "cancelled":
+    # Der Stand der Buchung frisch gelesen: Kommt die Person während des Abgleichs zurück (#2184), ist eine Zahlung keine auf eine stornierte Buchung.
+    booking = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "paid_cents_at_cancel": 1}) or {}
+    if booking.get("booking_state") == "cancelled":
         paid_now = paid_cents({**order, **{k: v for k, v in state.items() if k != "remote_socid"}}, payments)
-        if paid_now > int(order.get("paid_cents_at_cancel") or 0):
+        if paid_now > int(booking.get("paid_cents_at_cancel") or 0):
             opened += 1
             await billing_cases.open_case(db, order, "paid_after_cancel", {"paid_cents": paid_now, "invoice_ref": state["invoice_ref"]})
         # Dolibarr hat den Storno aufgelöst: Gutschrift über den ganzen Betrag oder Beleg aufgegeben.
@@ -669,13 +671,15 @@ async def _remove_draft(db, order: dict) -> bool:
     from services import billing_cases
 
     now = now_utc().isoformat()
-    cancelled = order.get("booking_state") == "cancelled"
+    # Frisch gelesen und im Filter festgehalten: Kommt die Person gerade zurück (#2184), endet der Auftrag nicht mit dem Storno.
+    fresh = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "booking_changed_at": 1}) or {}
+    cancelled = fresh.get("booking_state") == "cancelled"
     ref = str(order.get("invoice_ref") or order.get("invoice_id"))
     note = "" if cancelled else f"Entwurf {ref} wurde in Dolibarr gelöscht. Soll neu abgerechnet werden: „Freigeben“. Sonst: „Keine neue Rechnung“."
-    if order.get("booking_changed_at") and not cancelled:
+    if fresh.get("booking_changed_at") and not cancelled:
         note += " Die Buchung wurde nach dem Beleg geändert – Preis prüfen."
     done = await db.billing_orders.update_one(
-        {"id": order["id"], "status": "invoiced", "invoice_id": order["invoice_id"]},
+        {"id": order["id"], "status": "invoiced", "invoice_id": order["invoice_id"], "booking_state": "cancelled" if cancelled else {"$ne": "cancelled"}},
         {"$set": {"status": "cancelled" if cancelled else "held", "note": note, "attempts": 0, "updated_at": now},
          "$unset": {field: "" for field in INVOICE_FIELDS},
          "$push": {"removed_invoices": {"invoice_id": order["invoice_id"], "invoice_ref": ref, "at": now}}})

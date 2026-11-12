@@ -296,6 +296,38 @@ async def test_rueckkehr_mitten_im_gutschrift_lauf_legt_keinen_entwurf_an(flow, 
     assert "credit_note_id" not in stored and "credit_note_due_at" not in stored and "credit_note_claim_at" not in stored
 
 
+async def sync_with(flow, order):
+    """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
+    settings = await dolibarr_client.load_settings(flow.db)
+    return await dolibarr_billing.sync_one(flow.db, settings, dolibarr_client.DolibarrClient(settings), order)
+
+
+@pytest.mark.asyncio
+async def test_abgleich_mit_altem_stand_meldet_keine_zahlung_auf_stornierte_buchung(flow, fake):
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    await cancel_self(flow, event, paula)
+    stale = await order_of(flow, booked)
+    await book(flow, paula, event, companions=0)
+    fake.pay(order["invoice_id"])
+    await sync_with(flow, stale)
+    cases = await open_cases(flow, order)
+    assert "paid_after_cancel" not in cases and "changed_after_invoice" in cases
+
+
+@pytest.mark.asyncio
+async def test_abgleich_mit_altem_stand_beendet_den_auftrag_nach_geloeschtem_entwurf_nicht(flow, fake):
+    kassier, event, paula, booked, order = await drafted(flow)
+    await cancel_self(flow, event, paula)
+    stale = await order_of(flow, booked)
+    await book(flow, paula, event, companions=0)
+    fake.remove(order["invoice_id"])
+    await sync_with(flow, stale)
+    stored = await order_of(flow, booked)
+    assert stored["status"] == "held" and stored["removed_invoices"]
+    assert (await registration(flow, booked))["billing_status"] == "pending"
+
+
 @pytest.mark.asyncio
 async def test_leitung_aktiviert_nach_dem_abgleich_wieder_auch_dann_ein_prueffall(flow, fake):
     """Dieselbe Regel für die Leitung (#2127): Auch wenn der Abgleich die stornierte Anmeldung schon wieder auf den Stand des
