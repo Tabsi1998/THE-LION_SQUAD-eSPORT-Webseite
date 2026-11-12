@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.80.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.79.0...v1.80.0) (2026-11-12)
+
+
+### Neu
+
+* Hilfe – „Wenn im Spiel etwas passiert“ für Captains ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – eingetragenes Ergebnis der Leitung stellt die Serie nach einem Vorfall fest ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – Gegenseite stimmt einem Vorfall zu oder lehnt ab, mit laufender Antwortzeit ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – kampflos und „nicht erschienen“ erst, wenn kein Vorfall mehr offen ist; ein beendetes Spiel schließt offene Vorfälle ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – Kontingent für Rehosts und Pausen je Team und Map wird gezählt und angezeigt ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – Map „in Klärung“: Liga-Leitung entscheidet und stellt die Serie fest, bis dahin gilt kein Ergebnis ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – Vorfälle im Spiel melden: Verbindungsabbruch, Rehost, Pause und MOSS-Absturz mit Vorschlag an die Gegenseite ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – Vorfälle und Pausen je Season einstellbar (Antwortzeit, Kontingent, Serie bei Klärung, Standardpause) ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga – wiederholte Map zählt nur einmal, nach Neustart oder Wiederholung zählen nur Meldungen von danach ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Liga-Leitung – offenen Vorfall ohne Entscheidung schließen ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Ligaseite – Spiele mit einer Map in Klärung sind gekennzeichnet ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+* Mein Dienst – „Map in Klärung“ und „Serie feststellen“ für die Liga-Leitung ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+
+
+### Fehlerbehebungen
+
+* Nachweise – Link-Feld bricht am Handy um statt zu schrumpfen ([#1619](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1619)) ([31c70ab](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/31c70ab7977ce9dd165d649444f9cd58db939dbf))
+
 ## 1.79.0 (11.11.2026)
 
 ### Neu
