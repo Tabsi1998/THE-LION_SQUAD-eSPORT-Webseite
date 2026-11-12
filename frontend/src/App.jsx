@@ -90,6 +90,7 @@ const LeagueIndexPage = lazyPage(() => import("@/pages/public/LeagueIndexPage"))
 const LeagueSeasonPage = lazyPage(() => import("@/pages/public/LeagueSeasonPage"));
 // Unterseiten der Season (#2268): Spieltage Woche für Woche, Teams der Season.
 const LeagueSeasonMatchdaysPage = lazyPage(() => import("@/pages/public/LeagueSeasonMatchdaysPage"));
+const LeagueSeasonTeamsPage = lazyPage(() => import("@/pages/public/LeagueSeasonTeamsPage"));
 const LeagueRulesPage = lazyPage(() => import("@/pages/public/LeagueRulesPage"));
 const LeagueApplyPage = lazyPage(() => import("@/pages/public/LeagueApplyPage"));
 const MatchPage = lazyPage(() => import("@/pages/public/MatchPage"));
@@ -329,6 +330,7 @@ function App() {
           <Route path="/liga/:league/:season" element={<LeagueSeasonPage />} />
           <Route path="/liga/:league/:season/regeln" element={<LeagueRulesPage />} />
           <Route path="/liga/:league/:season/spieltage" element={<LeagueSeasonMatchdaysPage />} />
+          <Route path="/liga/:league/:season/teams" element={<LeagueSeasonTeamsPage />} />
           <Route path="/liga/:league/:season/anmelden" element={<ProtectedRoute><LeagueApplyPage /></ProtectedRoute>} />
           <Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} />
           <Route path="/tournaments/:slug/ergebnis/:username" element={<ResultSharePage />} />
