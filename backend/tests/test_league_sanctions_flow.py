@@ -536,3 +536,25 @@ async def test_confirming_next_to_a_revoke_does_not_revive_the_ban(flow):
     assert await refused(league_sanctions.confirm(flow.db, second, {"matches": 3}, world["second"])) == 409
     assert (await stored(flow, again["id"]))["matches"] == 1
     assert await flow.db.audit_logs.count_documents({"action": "league.sanction.confirm"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_revoke_closes_an_open_appeal_and_releases_the_proofs(flow):
+    """Review R1, N1: Nach dem Widerruf gibt es nichts mehr zu entscheiden - der Einspruch ist erledigt."""
+    world = await sanction_world(flow)
+    sanction = (await ban(flow, world, matches=2)).json()
+    assert (await appeal(flow, world, sanction["id"], "Mila")).status_code == 200
+    assert await league_sanction_bans.hold_until(flow.db, await stored(flow, sanction["id"])) == league_sanction_bans.OPEN_END
+    revoked = await revoke(flow, world, sanction["id"])
+    assert revoked.status_code == 200, revoked.text
+    assert revoked.json()["appeal"]["state"] == "moot" and revoked.json()["appeal"]["note"] == "Strafe widerrufen"
+    assert (await decide(flow, world, sanction["id"], "second", "upheld")).status_code == 409
+    assert (await decide(flow, world, sanction["id"], "second", "granted")).status_code == 409
+    final = await stored(flow, sanction["id"])
+    assert final["appeal"]["state"] == "moot" and final["appeal"]["text"], "der Text des Einspruchs bleibt stehen"
+    assert await league_sanction_bans.hold_until(flow.db, final) is None
+    # Gegenprobe: Ein entschiedener Einspruch bleibt beim späteren Widerruf, wie er entschieden wurde.
+    kept = (await ban(flow, world, "Tom", matches=1)).json()
+    assert (await appeal(flow, world, kept["id"], "Tom")).status_code == 200
+    assert (await decide(flow, world, kept["id"], "second", "upheld")).status_code == 200
+    assert (await revoke(flow, world, kept["id"])).json()["appeal"]["state"] == "upheld"

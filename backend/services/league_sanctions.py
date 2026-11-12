@@ -420,6 +420,8 @@ async def _claim(db, doc: dict, condition: dict, fields: dict, detail: str) -> d
 
 
 ALREADY_REVOKED = "Diese Strafe ist schon widerrufen."
+# Einspruch erledigt: Die Strafe wurde widerrufen, bevor jemand über ihn entschieden hat.
+MOOT, MOOT_NOTE = "moot", "Strafe widerrufen"
 NOT_PROVISIONAL = "Diese Strafe ist nicht mehr vorläufig."
 NO_OPEN_APPEAL = "Zu dieser Strafe ist kein Einspruch offen."
 
@@ -453,8 +455,14 @@ async def revoke(db, doc: dict, reason, actor_id: str | None, *, via: str = "rev
     except SanctionProblem:
         await _save(db, doc, {"revoked_at": None, "revoked_by": None, "revoke_reason": None, "revoked_via": None})
         raise
+    # Ein offener Einspruch ist damit erledigt (auch einer, der gerade erst eingegangen ist): Es gibt nichts mehr zu entscheiden.
+    closed = await db.competition_sanctions.update_one(
+        {"id": doc["id"], "appeal.state": OPEN},
+        {"$set": {"appeal.state": MOOT, "appeal.decided_at": doc["revoked_at"], "appeal.note": MOOT_NOTE}})
+    if closed.modified_count:
+        doc["appeal"] = {**(doc.get("appeal") or {}), "state": MOOT, "decided_at": doc["revoked_at"], "note": MOOT_NOTE}
     await sync_proof_hold(db, doc)
-    await audit(db, "revoke", doc, actor_id, via=via, reason_length=len(reason))
+    await audit(db, "revoke", doc, actor_id, via=via, reason_length=len(reason), appeal_closed=bool(closed.modified_count))
     return doc
 
 

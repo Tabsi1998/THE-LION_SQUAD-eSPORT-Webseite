@@ -9,7 +9,9 @@ export const SANCTION_STATUS = {
   revoked: { label: "Widerrufen", tone: "calm" },
 };
 
-export const APPEAL_STATE_LABELS = { open: "Einspruch offen", upheld: "Einspruch abgelehnt, Strafe bleibt", granted: "Einspruch stattgegeben, Strafe aufgehoben" };
+export const APPEAL_STATE_LABELS = { open: "Einspruch offen", upheld: "Einspruch abgelehnt, Strafe bleibt", granted: "Einspruch stattgegeben, Strafe aufgehoben",
+  // Erledigt: Die Leitung hat die Strafe widerrufen, bevor über den Einspruch entschieden wurde.
+  moot: "Einspruch erledigt, Strafe widerrufen" };
 
 export const EMPTY_SANCTION_FORM = {
   catalog_key: "", kind: "warning", target_type: "squad", tournament_id: "", registration_id: "", user_id: "", match_id: "",

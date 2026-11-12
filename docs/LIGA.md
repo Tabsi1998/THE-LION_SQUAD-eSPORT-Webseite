@@ -3134,7 +3134,7 @@ Regelwerk § 13, Anlage C.4 bis C.6; Entscheidungen Nr. 11c, 31, 32, 34b, 41, 43
 | `state` | `provisional` (vorläufig, Nr. 44) oder `final` (endgültig) |
 | `final_at`, `final_by` | wann und durch wen endgültig |
 | `appeal_until` | Ende der Einspruchsfrist: `final_at` + `appeal_hours` der Season (Vorgabe 48 h) |
-| `appeal` | `null` oder `{id, by, at, text, state: open/upheld/granted, decided_by, decided_at, note}` |
+| `appeal` | `null` oder `{id, by, at, text, state: open/upheld/granted/moot, decided_by, decided_at, note}`; `moot`: Die Strafe wurde widerrufen, bevor über den Einspruch entschieden war |
 | `revoked_at`, `revoked_by`, `revoke_reason`, `revoked_via` | Widerruf mit Pflichtgrund; `revoked_via`: `revoke` (Leitung) oder `appeal` (Einspruch stattgegeben) |
 | `effect` | was die Strafe geschrieben hat: `{deduction_id}` bzw. `{removal: {plan_id, previous_status, match_ids}}` |
 | `conflict_reason` | Grund der Notausnahme, wenn der Superadmin über die eigene Seite entschied |
@@ -3181,7 +3181,8 @@ Punktabzug: Eintrag aus `point_deductions` entfernt, die Tabelle rechnet neu. Di
 davor (`removal.previous_status`), Platz in der Season (`league_squad_key`) wieder belegt, Spiele, die das Ausscheiden kampflos
 gewertet oder abgesagt hat, wieder offen (Termin bleibt, Check-in und Veto beginnen neu); gespielte Ergebnisse standen nie anders
 am Spiel. Ist der Platz in der Season inzwischen anders vergeben, lehnt der Widerruf mit 409 ab. Eine widerrufene Strafe bleibt
-als Zeile mit Grund stehen.
+als Zeile mit Grund stehen. Ein noch offener Einspruch ist mit dem Widerruf erledigt (`moot`, Vermerk „Strafe widerrufen“); danach
+lehnt die Entscheidung über ihn mit 409 ab, und die Nachweise sind nicht länger gehalten.
 
 **Einspruch (Nr. 41, 45):** einmal je Strafe, nur gegen endgültige, nicht widerrufene Strafen, bis `appeal_until`. Einlegen
 dürfen: die betroffene Person; beim Co-Team Captain, Vertreter, Leitung und Co-Leitung des Hauptteams. Text 10 bis 2000 Zeichen.
