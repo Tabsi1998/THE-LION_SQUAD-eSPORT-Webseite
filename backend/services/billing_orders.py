@@ -198,20 +198,28 @@ async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
                                             sort=[("created_at", -1)])
 
 
-async def current_invoiced_order(db, *, kind: str, registration: dict) -> dict | None:
-    """Der Auftrag mit gültigem Beleg, zu dem die Anmeldung gerade gehört (derselbe eingefrorene Preis, #2184) - nicht ein alter,
-    gutgeschriebener derselben Anmeldung. Ohne Preis-Kennung (Altdaten) der jüngste gültige."""
+def _own_order_filter(kind: str, registration: dict) -> dict:
+    """Der Auftrag, zu dem die Anmeldung gerade gehört: derselbe eingefrorene Preis (#2184). Die Kennung bestimmt ihn eindeutig -
+    auch wenn sein Beleg inzwischen gutgeschrieben ist. Ohne Kennung (Altdaten) alle Aufträge der Anmeldung."""
     digest = (registration.get("price_snapshot") or {}).get("hash")
-    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration["id"], "status": "invoiced", **INVOICE_STILL_VALID,
-                                             **({"snapshot.hash": digest} if digest else {})}, {"_id": 0}, sort=[("created_at", -1)])
+    return {"kind": kind, "registration_id": registration["id"], "status": "invoiced", **({"snapshot.hash": digest} if digest else {})}
 
 
-async def booking_cancelled_with_invoice(db, *, kind: str, registration_id: str) -> bool:
-    """Ist die Buchung am Auftrag storniert, obwohl der Beleg existiert und noch gilt? Das entscheidet über die Rückkehr (#2184) -
-    nicht der Stand der Anmeldung, den der Abgleich zwischendurch wieder auf den des Belegs setzt. Ein alter, voll gutgeschriebener
-    oder aufgegebener Auftrag bleibt für immer „storniert“ und zählt hier nicht."""
-    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", "booking_state": "cancelled",
-                                             **INVOICE_STILL_VALID}, {"_id": 0, "id": 1}) is not None
+async def current_invoiced_order(db, *, kind: str, registration: dict) -> dict | None:
+    """Der Auftrag mit Beleg, zu dem die Anmeldung gerade gehört - nicht ein alter derselben Anmeldung (#2184). Mit Preis-Kennung
+    genau dieser, auch voll gutgeschrieben (die Finanzverwaltung soll die Änderung sehen); ohne Kennung (Altdaten) der jüngste gültige."""
+    query = _own_order_filter(kind, registration)
+    if "snapshot.hash" not in query:
+        query.update(INVOICE_STILL_VALID)
+    return await db.billing_orders.find_one(query, {"_id": 0}, sort=[("created_at", -1)])
+
+
+async def booking_cancelled_with_invoice(db, *, kind: str, registration: dict) -> bool:
+    """Ist die Buchung am Auftrag der Anmeldung storniert, obwohl der Beleg existiert? Das entscheidet über die Rückkehr (#2184) -
+    nicht der Stand der Anmeldung, den der Abgleich zwischendurch wieder auf den des Belegs setzt. Gefragt wird nur der Auftrag,
+    zu dem die Anmeldung gehört: Ein alter, gutgeschriebener bleibt für immer „storniert“, nachdem es einen neuen gibt. Ist der
+    eigene Beleg inzwischen gutgeschrieben, zählt die Rückkehr trotzdem - dann mit neuem Preis (``invoiced_order`` findet ihn nicht)."""
+    return await db.billing_orders.find_one({**_own_order_filter(kind, registration), "booking_state": "cancelled"}, {"_id": 0, "id": 1}) is not None
 
 
 def rebooked_fields(order: dict) -> dict:

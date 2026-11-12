@@ -919,7 +919,7 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
     moving_in = becomes_active and current.get("status") not in ACTIVE_EVENT_REGISTRATION_STATUSES
     reactivated = pricing.is_paid(offer) and moving_in and (
         current.get("billing_status") == "cancelled" or current.get("status") in event_registration.ENDED_STATUSES
-        or await billing_orders.booking_cancelled_with_invoice(db, kind="event", registration_id=registration_id))
+        or await billing_orders.booking_cancelled_with_invoice(db, kind="event", registration=current))
     new_price_due = reactivated or (pricing.is_paid(offer) and moving_in and not current.get("price_snapshot"))
     # Dieselbe Regel wie bei der Neuanmeldung durch die Person selbst (``event_registration._register``).
     invoiced_before = await billing_orders.invoiced_order(db, kind="event", registration_id=registration_id) if new_price_due else None

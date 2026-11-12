@@ -904,3 +904,52 @@ async def test_warteliste_und_zurueck_ohne_storno_kein_hinweis_auf_eine_pruefung
     note = await last_note(flow, paula)
     assert note["title"].startswith("Nachgerückt") and KEPT_INVOICE not in note["body"]
     assert "40,00" in note["body"], "wie bisher: der Kostenbeitrag der bestehenden Rechnung"
+
+
+async def cases_of_all_orders(flow, booked) -> list[tuple[str, str]]:
+    found = []
+    for order in await flow.db.billing_orders.find({"registration_id": booked["id"]}, {"_id": 0, "id": 1}).to_list(20):
+        found += [(case["kind"], case["status"]) for case in await billing_cases.cases_for_order(flow.db, order["id"])]
+    return found
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("how", ["credited", "abandoned"])
+async def test_aktive_anmeldung_beleg_voll_gutgeschrieben_dann_begleitung_geaendert(flow, fake, how):
+    """Review R4: Ohne Storno, Beleg voll gutgeschrieben (z. B. Fehlbeleg), dann ändert die Leitung die Begleitpersonen.
+    Die Kennung bestimmt den Auftrag eindeutig - der Prüffall entsteht wie vorher an ihm, nicht still gar keiner."""
+    kassier, event, _paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    if how == "credited":
+        fake.credit(order["invoice_id"], 40)
+    else:
+        fake.abandon(order["invoice_id"])
+    await billing_orders.sync_due()
+    flow.act_as(kassier)
+    changed = await flow.patch(f"/api/events/{event['id']}/registrations/{booked['id']}", json={"companion_count": 2})
+    assert changed.status_code == 200, changed.text
+    assert ("changed_after_invoice", "open") in await cases_of_all_orders(flow, booked)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("how", ["credited", "abandoned"])
+async def test_storno_gutgeschrieben_dann_ueber_warteliste_zurueck_neuer_auftrag(flow, fake, how):
+    """Review R4: Storno, der eigene Beleg wird voll gutgeschrieben, dann holt die Leitung die Person über die Warteliste zurück.
+    Das ist eine Rückkehr: neuer Auftrag zum aktuellen Preis - nicht still ohne Abrechnung dabei."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    await cancel_self(flow, event, paula)
+    if how == "credited":
+        fake.credit(order["invoice_id"], 40)
+    else:
+        fake.abandon(order["invoice_id"])
+    await billing_orders.sync_due()
+    flow.act_as(kassier)
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    for status in ("waitlist", "registered"):
+        response = await flow.patch(url, json={"status": status})
+        assert response.status_code == 200, response.text
+    orders = await flow.db.billing_orders.find({"registration_id": booked["id"]}, {"_id": 0}).to_list(20)
+    assert len(orders) == 2, [(row["status"], row.get("payment_state")) for row in orders]
+    reg = await registration(flow, booked)
+    assert reg["price_snapshot"]["hash"] != order["snapshot"]["hash"] and reg["billing_status"] == "pending"
