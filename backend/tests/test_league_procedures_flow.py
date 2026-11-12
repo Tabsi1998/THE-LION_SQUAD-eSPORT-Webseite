@@ -543,9 +543,9 @@ async def test_the_inbox_lists_procedures_for_the_lead(flow):
 
 # ---------------------------------------------------------------- MOSS
 
-def moss_zip(names=("screenshot_001.jpg", "moss.log"), *, payload: bytes = b"x" * 64) -> bytes:
+def moss_zip(names=("screenshot_001.jpg", "moss.log"), *, payload: bytes = b"x" * 64, method=zipfile.ZIP_DEFLATED) -> bytes:
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(buffer, "w", method) as archive:
         for name in names:
             archive.writestr(name, payload)
     return buffer.getvalue()
@@ -556,7 +556,7 @@ async def upload(flow, w, pid: str, data: bytes, name: str = "moss.zip", mime: s
 
 
 @pytest.mark.asyncio
-async def test_moss_zip_is_checked_without_unpacking(flow):
+async def test_moss_zip_is_checked_without_unpacking(flow, monkeypatch):
     w = await league_world(flow)
     await completed(flow, w)
     pid = await opened(flow, w, reason_key="cheating", claimed=None)
@@ -580,6 +580,15 @@ async def test_moss_zip_is_checked_without_unpacking(flow):
         response = await upload(flow, w, pid, data)
         assert response.status_code == 422, label
     assert await flow.db.match_proof_photos.count_documents({}) == 0, "nichts davon liegt auf dem Server"
+    assert not list(match_proofs.PROOF_DIR.glob("*.zip")), "auch keine abgelehnte Datei auf der Platte"
+
+    # Eigene Grenze nur für MOSS (MAX_MOSS_UPLOAD_MB, Vorgabe 200): darüber 413, die Datei wird nicht behalten.
+    assert match_proofs.moss_max_mb() == 200
+    monkeypatch.setenv("MAX_MOSS_UPLOAD_MB", "1")
+    too_big = await upload(flow, w, pid, moss_zip(payload=bytes(range(256)) * 8192, method=zipfile.ZIP_STORED))
+    assert too_big.status_code == 413 and "1 MB" in too_big.json()["detail"]
+    assert not list(match_proofs.PROOF_DIR.glob("*.zip"))
+    monkeypatch.delenv("MAX_MOSS_UPLOAD_MB")
 
     good = moss_zip()
     done = await upload(flow, w, pid, good)

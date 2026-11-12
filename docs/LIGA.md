@@ -3025,7 +3025,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   Leitung gekürzt (`at`, `id`, `kind`, `state`; die eigene Meldung zusätzlich mit Grund und Entscheidung).
 - **Gegenseite mit `claimed`** (Entscheidung Fabian 12.11.): Sie sieht Grund, Begründung und das abweichende Ergebnis - die
   Stellungnahme braucht den Bezug. `notified_immediately` und `moss_requests` bleiben der eigenen Seite und der Leitung.
-- **MOSS-ZIP:** `type: "file"`, nur am Bezug `moss`, Grenze `MAX_DOCUMENT_UPLOAD_MB`. Geprüft wird das Inhaltsverzeichnis, ohne zu
+- **MOSS-ZIP:** `type: "file"`, nur am Bezug `moss`, eigene Grenze `MAX_MOSS_UPLOAD_MB` (Vorgabe 200, andere Dokumente bleiben bei 50 MB), gestreamt auf die Platte. Geprüft wird das Inhaltsverzeichnis, ohne zu
   entpacken (`match_proofs.check_zip`); gespeichert wird unverändert mit `sha256`.
 - **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App meldet weiter über `/dispute` mit `category`; Art, Pflichtfragen,
   Ergänzen, Stellungnahme, Einspruch, MOSS und die Markierung „in Klärung“ fehlen dort noch.

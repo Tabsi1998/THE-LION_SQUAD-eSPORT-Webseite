@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Download, ExternalLink, FileArchive, ImagePlus, Link2, Loader2, Trash2 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, uploadApi } from "@/lib/api";
 import { chatAttachmentSrc } from "@/lib/chatAttachments";
 
 // Nachweise zu einem Bezug (#2360): mehrere Bilder und Video-Links zu einer Meldung, einem Vorfall, einem Protest, einer
@@ -107,7 +107,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
     load();
   }, [load]);
 
-  const send = async (fill, fallback) => {
+  const send = async (fill, fallback, client = api) => {
     setBusy(true);
     setError("");
     try {
@@ -115,7 +115,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
       form.append("kind", kind);
       form.append("ref_id", refId);
       fill(form);
-      await api.post(`/matches/${matchId}/proofs`, form);
+      await client.post(`/matches/${matchId}/proofs`, form);
       await load();
       onChanged?.();
       return true;
@@ -130,6 +130,12 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
   const addFile = (fileList) => {
     const file = fileList?.[0];
     if (file) send((form) => form.append("file", file), "Hochladen hat nicht geklappt.");
+  };
+
+  // Die MOSS-ZIP (#2297) kann bis 200 MB groß sein: über den Upload-Host, an der 100-MB-Grenze von Cloudflare vorbei.
+  const addZip = (fileList) => {
+    const file = fileList?.[0];
+    if (file) send((form) => form.append("file", file), "Die MOSS-Datei ließ sich nicht hochladen.", uploadApi);
   };
 
   const addLink = async (event) => {
@@ -195,7 +201,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
                 ) : null}
               </div>
               {kind === "moss" ? (
-                <input ref={zipRef} type="file" accept={ZIP_ACCEPT} className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-zip-input`} />
+                <input ref={zipRef} type="file" accept={ZIP_ACCEPT} className="hidden" onChange={(event) => { addZip(event.target.files); event.target.value = ""; }} data-testid={`${testId}-zip-input`} />
               ) : null}
               <form onSubmit={addLink} className="flex flex-wrap gap-2" noValidate>
                 <label className="sr-only" htmlFor={`${testId}-link`}>Link zum Video</label>

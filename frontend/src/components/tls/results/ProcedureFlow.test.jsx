@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProblemReportForm } from "./ProblemReportForm";
 import { ProcedureCard } from "./DisputeCard";
+import { ProofList } from "./ProofList";
 
-const { api } = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
-vi.mock("@/lib/api", () => ({ api, formatApiError: (detail) => (typeof detail === "string" ? detail : "") }));
+const { api, uploadApi } = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() }, uploadApi: { post: vi.fn() } }));
+vi.mock("@/lib/api", () => ({ api, uploadApi, formatApiError: (detail) => (typeof detail === "string" ? detail : "") }));
 
 const GUIDE = {
   kind: "protest", kind_label: "Protest", until: "2099-01-01T12:00:00Z", open: true, result_reason: "wrong_result", reason_min: 10, reason_max: 1000,
@@ -84,6 +85,30 @@ describe("Problem melden, geführt", () => {
     render(<ProblemReportForm matchId="m1" onSubmit={vi.fn()} />);
     expect(screen.getByTestId("match-dispute-btn")).toHaveTextContent("An die Turnierleitung schicken");
     expect(screen.queryByTestId("procedure-steps")).toBeNull();
+  });
+});
+
+describe("MOSS-Datei", () => {
+  it("schickt die ZIP über den Upload-Host und Bilder wie bisher", async () => {
+    api.get.mockResolvedValue({ data: { items: [], open: true, can_add: true, limit: 10 } });
+    uploadApi.post.mockResolvedValue({ data: {} });
+    render(<ProofList matchId="m1" kind="moss" refId="p1" />);
+    const zip = new File(["PK"], "moss.zip", { type: "application/zip" });
+    fireEvent.change(await screen.findByTestId("proof-list-zip-input"), { target: { files: [zip] } });
+    await waitFor(() => expect(uploadApi.post).toHaveBeenCalledTimes(1));
+    expect(uploadApi.post.mock.calls[0][0]).toBe("/matches/m1/proofs");
+    expect(uploadApi.post.mock.calls[0][1].get("file")).toBe(zip);
+    expect(api.post).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("proof-list-input"), { target: { files: [new File(["x"], "bild.png", { type: "image/png" })] } });
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    expect(uploadApi.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("bietet die ZIP nur am Bezug MOSS an", async () => {
+    api.get.mockResolvedValue({ data: { items: [], open: true, can_add: true, limit: 10 } });
+    render(<ProofList matchId="m1" kind="protest" refId="p1" />);
+    expect(await screen.findByTestId("proof-list-gallery")).toBeInTheDocument();
+    expect(screen.queryByTestId("proof-list-zip")).toBeNull();
   });
 });
 

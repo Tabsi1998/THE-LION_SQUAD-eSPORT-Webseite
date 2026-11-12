@@ -115,16 +115,25 @@ def looks_like_zip(file: UploadFile) -> bool:
     return name.endswith(".zip") or (file.content_type or "").lower() in {"application/zip", "application/x-zip-compressed"}
 
 
-def check_zip(data: bytes) -> dict:
-    """Die ZIP-Datei prüfen, ohne sie zu entpacken: Kennung am Anfang, lesbares Inhaltsverzeichnis, keine Pfade nach außen, keine
-    Programme, keine Archive im Archiv, kein Kennwort und keine Zip-Bombe (Zahl und entpackte Größe der Einträge)."""
-    import io
+def moss_max_mb() -> int:
+    """Die Grenze nur für die MOSS-ZIP (``MAX_MOSS_UPLOAD_MB``, Vorgabe 200) - andere Dokumente bleiben bei ihrer eigenen."""
+    from services.image_upload import _upload_mb_from_env
+
+    return _upload_mb_from_env("MAX_MOSS_UPLOAD_MB", 200)
+
+
+def check_zip(path: pathlib.Path) -> dict:
+    """Die abgelegte ZIP-Datei prüfen, ohne sie zu entpacken und ohne sie ganz in den Speicher zu laden: Kennung am Anfang,
+    lesbares Inhaltsverzeichnis, keine Pfade nach außen, keine Programme, keine Archive im Archiv, kein Kennwort und keine
+    Zip-Bombe (Zahl und entpackte Größe der Einträge)."""
     import zipfile
 
-    if not data.startswith(ZIP_MAGIC):
-        raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        if handle.read(len(ZIP_MAGIC)) != ZIP_MAGIC:
+            raise HTTPException(status_code=422, detail=ZIP_REFUSED)
     try:
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        with zipfile.ZipFile(path) as archive:
             entries = archive.infolist()
     except (zipfile.BadZipFile, ValueError, NotImplementedError, OSError):
         raise HTTPException(status_code=422, detail=ZIP_REFUSED) from None
@@ -140,7 +149,7 @@ def check_zip(data: bytes) -> dict:
         if pathlib.PurePosixPath(name).suffix.lower() in ZIP_FORBIDDEN_SUFFIXES:
             raise HTTPException(status_code=422, detail="Die ZIP-Datei enthält Programme oder weitere Archive. Bitte die MOSS-Datei unverändert hochladen.")
         unpacked += entry.file_size
-    if unpacked > ZIP_MAX_UNPACKED_BYTES or unpacked > max(len(data), 1) * ZIP_MAX_RATIO:
+    if unpacked > ZIP_MAX_UNPACKED_BYTES or unpacked > max(size, 1) * ZIP_MAX_RATIO:
         raise HTTPException(status_code=422, detail=ZIP_REFUSED)
     return {"entries": len(entries), "unpacked": unpacked}
 
@@ -150,22 +159,28 @@ async def _store_zip(db, match: dict, owner: dict, registration_id: str | None, 
     Angabe des Spielers vergleichen kann. Ausgeliefert wird sie nur als Download über ``/proofs/{id}/file``."""
     import hashlib
 
-    from services.image_upload import MAX_DOCUMENT_UPLOAD_MB, _read_upload_limited
+    from services.image_upload import _write_upload_stream_limited
 
-    data = await _read_upload_limited(file, MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024, MAX_DOCUMENT_UPLOAD_MB)
-    checked = check_zip(data)
+    limit = moss_max_mb()
     key = f"{uuid.uuid4().hex}.zip"
+    path = PROOF_DIR / key
+    # Gestreamt auf die Platte (bis 200 MB): nie die ganze Datei im Speicher. Zu groß oder nicht beschreibbar räumt der Schreiber auf.
+    size = await _write_upload_stream_limited(file, path, b"", limit * 1024 * 1024, limit)
     try:
-        ensure_directory(PROOF_DIR)
-        (PROOF_DIR / key).write_bytes(data)
-    except OSError as exc:
-        logger.error("[proofs] could not write %s: %s", key, type(exc).__name__)
-        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar.")
+        checked = check_zip(path)
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except HTTPException:
+        # Abgelehnt: nichts davon bleibt auf dem Server liegen.
+        path.unlink(missing_ok=True)
+        raise
     now = now_utc().isoformat()
     doc = {
         "id": new_id(), "type": "file", "match_id": match["id"], "tournament_id": match.get("tournament_id"), "owner_id": owner["id"],
-        "registration_id": registration_id, "storage_key": key, "mime": "application/zip", "size": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(), "entries": checked["entries"], "status": "attached", "context": context,
+        "registration_id": registration_id, "storage_key": key, "mime": "application/zip", "size": size,
+        "sha256": digest.hexdigest(), "entries": checked["entries"], "status": "attached", "context": context,
         "scan_state": "safe", "created_at": now, "updated_at": now,
     }
     await db.match_proof_photos.insert_one(dict(doc))
