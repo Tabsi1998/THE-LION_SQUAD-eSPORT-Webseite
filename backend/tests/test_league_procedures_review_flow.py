@@ -158,11 +158,11 @@ async def test_the_raw_match_never_shows_foreign_procedure_details(flow):
     # Liga-Personal ohne „Proteste“ und „Ergebnisse“ sieht das Spiel, aber keine Inhalte des Verfahrens.
     helper = await flow.add_user(name="Helferin")
     await flow.db.league_staff.insert_one({"id": "ls-1", "league_id": "liga", "user_id": helper["id"], "capabilities": ["matches"]})
-    flow.act_as(helper)
+    flow.act_as({**helper, "mfa_enabled": True, "auth_mfa_verified": True})
     for url in urls:
         seen = await flow.get(url)
-        if seen.status_code == 200:
-            assert set(row_in(seen.json(), w)) == PROCEDURE_ONLY, url
+        assert seen.status_code == 200, url
+        assert set(row_in(seen.json(), w)) == PROCEDURE_ONLY, url
 
     # Gegenprobe: Die nicht befangene Leitung mit „Proteste“ sieht alles.
     flow.act_as(w["staff"])
