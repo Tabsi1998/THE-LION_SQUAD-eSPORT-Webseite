@@ -119,8 +119,13 @@ def public_stage_view(stage: dict | None) -> dict | None:
 
 def public_tournament_view(tournament: dict | None) -> dict | None:
     """Das Turnier auf der Spielseite: ohne die interne Abrechnung (`billing`) und ohne den Umbau-Vorschlag der
-    Turnierleitung (`heat_rebuild_plan`, #1550) - wie die öffentliche Turnierseite."""
+    Turnierleitung (`heat_rebuild_plan`, #1550) - wie die öffentliche Turnierseite. Ebenso ohne die Felder der Liga-Leitung
+    (`point_deductions`, `table_decisions`, siehe ``league_table.LEAD_ONLY_FIELDS``): Die Tabelle rechnet der Server."""
     if not isinstance(tournament, dict):
         return tournament
-    return {key: value for key, value in tournament.items()
-            if key not in {"billing", "heat_rebuild_plan", "heat_rebuild_dismissed", "participant_removal_plan"}}
+    return {key: value for key, value in tournament.items() if key not in PUBLIC_HIDDEN_TOURNAMENT_FIELDS}
+
+
+# Muss ``league_table.LEAD_ONLY_FIELDS`` enthalten (Test); hier als Wert, damit dieses Modul ohne Import-Kreis bleibt.
+PUBLIC_HIDDEN_TOURNAMENT_FIELDS = frozenset({"billing", "heat_rebuild_plan", "heat_rebuild_dismissed", "participant_removal_plan",
+                                             "point_deductions", "table_decisions"})

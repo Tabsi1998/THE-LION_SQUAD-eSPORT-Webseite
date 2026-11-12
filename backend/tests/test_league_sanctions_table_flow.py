@@ -194,6 +194,11 @@ async def test_reason_and_issuer_of_a_sanction_never_reach_public_tournament_vie
     banned = await issue(flow, world, kind="disqualification", target_type="squad", registration_id="reg-2",
                          rule_ref="Matchabsprache Spieltag 1")
     assert banned.status_code == 200, banned.text
+    # Ein Entscheid der Leitung über einen Gleichstand trägt die Person der Leitung (`decided_by`).
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"table_decisions": [
+        {"id": "entscheid-1", "registration_ids": ["reg-1", "reg-3"], "reason": "Los", "decided_by": world["admin"]["id"],
+         "decided_at": now_utc().isoformat()}]}})
+    match = (await matches_of(flow, staffel))[0]
     captain = await flow.db.users.find_one({"display_name": "Captain 1"}, {"_id": 0})
     secrets = ("Beleidigung", "Matchabsprache", "geprüft", deduction.json()["id"])
     for viewer in (None, captain):
@@ -206,6 +211,13 @@ async def test_reason_and_issuer_of_a_sanction_never_reach_public_tournament_vie
                 assert secret not in answer.text, (url, secret)
         single = (await flow.get(f"/api/tournaments/{staffel['id']}")).json()
         assert "point_deductions" not in single and "table_decisions" not in single
+        # Review R2: Spielbaum und Spielseite tragen das Turnier mit - ohne die Felder der Leitung.
+        for url in (f"/api/tournaments/{staffel['id']}/bracket", f"/api/matches/{match['id']}/page"):
+            answer = await flow.get(url)
+            assert answer.status_code == 200, (url, answer.text)
+            carried = answer.json().get("tournament") or {}
+            assert "point_deductions" not in carried and "table_decisions" not in carried, url
+            assert deduction.json()["id"] not in answer.text and "entscheid-1" not in answer.text, url
     # Die Tabelle zeigt den Abzug weiter, und das Ausscheiden nennt öffentlich nur, dass es eine Strafe ist.
     assert (await rows(flow, staffel))["reg-1"]["deducted_points"] == 2
     removal = (await flow.db.tournament_registrations.find_one({"id": "reg-2"}, {"_id": 0}))["removal"]
@@ -214,6 +226,12 @@ async def test_reason_and_issuer_of_a_sanction_never_reach_public_tournament_vie
     flow.act_as(world["admin"])
     lead = (await flow.get(f"/api/tournaments/{staffel['id']}")).json()
     assert [sorted(row) for row in lead["point_deductions"]] == [["created_at", "id", "points", "registration_id", "sanction_id", "source"]]
+
+
+def test_public_tournament_view_hides_every_lead_only_field():
+    """Die Spielseite kürzt ohne Import von ``league_table`` - diese Liste muss mitwachsen."""
+    from services import league_table, match_public_view
+    assert set(league_table.LEAD_ONLY_FIELDS) <= match_public_view.PUBLIC_HIDDEN_TOURNAMENT_FIELDS
 
 
 @pytest.mark.asyncio
