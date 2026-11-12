@@ -455,7 +455,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 
 | Thema | Issue / Folgepaket |
 | --- | --- |
-| Erinnerungen 24 h/1 h, Termin offen, Ergebnis fehlt | #1647 – erstes Folgepaket |
+| Erinnerungen 24 h/1 h, Termin offen, Ergebnis fehlt | #1647 – umgesetzt, siehe 12 „E.5 Benachrichtigungen und Erinnerungen“ |
 | Auf-/Abstieg, Saisonabschluss, Meister, Zonen, Final-Snapshots | #1627, #1645, Rest von #1625 – bis ca. Woche 8 |
 | Map-Veto live, Ready-Check | #1618, #1651, #1652 |
 | Los mit Vorschau, Planhash/Preview-Apply | #1623 (voll), #1622 |
@@ -2635,11 +2635,45 @@ Seite ist (nie Decider oder Vorgabe), seit **20 Sekunden** kein Zug (Zeit je Sch
 die Staffel nicht gesperrt und die Seite das Veto **nicht offen** hat. „Offen“ heißt: Captain oder Vertreter der Seite hat in den letzten
 **15 Sekunden** den kurzen Abruf gemacht - der sichtbare Tab fragt alle 2 Sekunden, im Hintergrund nie. Der Abruf vermerkt das als
 `flow.veto_seen.<Anmeldung> = <Zeit>` (höchstens alle 5 Sekunden ein Schreiben, nur solange das Veto läuft, ohne Person und ohne
-`updated_at`). Die Werte stehen als Konstanten in `league_veto.py` (`NUDGE_IDLE_SECONDS` usw.); einstellbar machen kann sie #1647.
+`updated_at`). Die Werte 20 und 5 sind die Vorgaben (`NUDGE_IDLE_SECONDS` usw. in `league_veto.py`); je Season einstellbar seit E.5 (#1647).
 Satz: „Ihr seid im Map-Veto am Zug: sperrt eine Map (Stellung). Noch 35 Sekunden – danach wählt das System.“
 
 **Datenschutz:** `flow.veto_seen` und `flow.veto_nudge` sind intern wie `flow` (keine Personen, nur Anmeldungen und Zeiten); die
 Zuschauer-Sicht nennt keine Personen und keinen Grund einer Pause.
+
+### E.5 Benachrichtigungen und Erinnerungen (#1647)
+
+Alle Liga-Erinnerungen laufen über `create_user_notification` (Postfach, Push, auf Wunsch Discord) mit Thema `match_reminders` - jede Person
+schaltet sie unter „Match-Erinnerungen“ in den Benachrichtigungs-Einstellungen ab (Web und App lesen dieselben Kategorien, keine neue).
+Die Erinnerung 10 Minuten vorher (`match_reminder.py`, alle Turniere) bleibt unverändert.
+
+**Einstellung je Season** (`reminder_rules` an `league_seasons` und Staffel, Vorgabe in `league_presets.PRESETS`, geprüft in
+`services/league_reminder_rules.py`): `GET|PUT /api/admin/leagues/seasons/{id}/reminder-rules` (lesen jede Zuständigkeit, speichern
+„Season konfigurieren“), gilt sofort für alle nicht gesperrten Staffeln; Gruppe `reminders` beim Übertragen. Ohne Feld gelten die Vorgaben -
+ältere Staffeln erinnern also wie bisher. Verwaltung: Reiter **Termine**, Kasten **Erinnerungen** (`#erinnerungen`).
+
+| Art | Feld (Vorgabe) | An wen | Wann, wann nicht |
+| --- | --- | --- | --- |
+| Spiel steht an | `upcoming` (an), `upcoming_early_hours` (24), `upcoming_late_minutes` (60) | Aufgestellte (ohne Aufstellung der Kader) und Captains beider Seiten, je Seite mit dem Namen der anderen | ab dem Zeitpunkt bis 30 Minuten danach (Nachholfenster); nicht bei abgesagt, gestartet, laufend, nicht zum alten Termin eines verschobenen Spiels, nicht in einer Sperrzeit (jetzt oder am Termin) |
+| Termin noch offen | `unscheduled` (an), `unscheduled_week_percent` (50 = Wochenmitte) | Captains beider Seiten | solange kein fester Termin (`schedule_source` nicht `accepted`/`manual`), einmal je Spielwoche; nicht, wenn der Standardtermin schon vorbei ist (dann „Ergebnis fehlt“ und „überfällig“, Nr. 28), nicht in einer Sperrzeit |
+| Ergebnis fehlt | `result_missing` (an); Zeit weiter `schedule_rules.result_reminder_hours` | Captains beider Seiten | wie D.1; wartet, solange ein Vorfall (D.5) oder ein Verfahren (E.2) offen ist |
+| Map-Veto wartet | `veto_turn` (an), `veto_idle_seconds` (20), `veto_min_left_seconds` (5) | Seite am Zug | wie D.4, nur mit den Werten der Season (Nr. 140) |
+| Discord | `discord` (aus, Nr. 34) | - | aus: `meta.no_discord`, nur Postfach und Push; an: Direktnachricht vom Bot an alle mit Discord-Opt-in |
+
+Texte: „Liga-Spiel in 24 Stunden“ - „<Staffel>: gegen <Gegner> am Sa 14.11. 20:00 Uhr.“ (Wiener Zeit); „Termin noch offen“ - „Noch kein
+Termin vereinbart. Bitte auf der Matchseite einen Termin vorschlagen oder annehmen – ohne Einigung gilt der Standardtermin …“.
+
+**Kein Doppelversand:** Jede Liga-Erinnerung trägt `meta.dedupe_key` (`league-upcoming:<spiel>:<termin>:<art>`,
+`league-unscheduled:<spiel>:<wochenbeginn>`, `result-reminder:…`, `veto-turn:…`) und `meta.unique_dedupe`; `create_user_notification`
+schreibt den Schlüssel dann auch als `unique_dedupe_key`. Der eindeutige Teilindex `notifications.user_unique_dedupe` (`user_id` +
+`unique_dedupe_key`, nur Zeilen mit Schlüssel, `AUDIT_UNIQUE_INDEXES`) lässt je Person nur eine Zeile zu: Laufen zwei Jobs gleichzeitig,
+verliert der zweite beim Schreiben (`DuplicateKeyError`) und schickt weder Push noch Discord. Für diese Zeilen gilt keine Abkühlzeit - der
+Schlüssel ersetzt sie. Kein Merker am Spiel: ein neuer Termin ergibt einen neuen Schlüssel.
+
+**Job:** „Spiel steht an“ und „Termin offen“ laufen im Fristen-Job (`match_deadline_sweep` → `league_reminders.sweep`, jede Minute, dieselben
+laufenden Turniere), „Ergebnis fehlt“ in `league_schedule_sweep.overdue`, „Map-Veto wartet“ in `league_veto_sweep.nudge`.
+
+**App:** keine Änderung - Push und Glocke kommen über den bestehenden Weg (`kind` `match_reminder`, `match_schedule`, `match_call`).
 
 ### D.5/E.2-Vertrag: Vorfälle, Verfahren und Nachweise (#2360)
 
