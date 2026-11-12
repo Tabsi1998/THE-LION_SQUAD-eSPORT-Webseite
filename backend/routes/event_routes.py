@@ -911,8 +911,12 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
     # schon einen Beleg, wird er nicht still ersetzt - Finanzen bekommt einen Prüffall.
     # Es zählt der Stand der Abrechnung, nicht der alte Status: auch wer nach einem Storno über die Warteliste zurückkommt.
     # Und der beendete Status selbst (#2184): Der Abgleich setzt eine stornierte Anmeldung wieder auf den Stand ihres Belegs.
+    # Entscheidend ist der Auftrag (#2184): Über die Warteliste zurück, nachdem der Abgleich den Stand des Belegs gesetzt hat, sieht die
+    # Anmeldung nicht mehr storniert aus - die Buchung am Auftrag schon.
     moving_in = becomes_active and current.get("status") not in ACTIVE_EVENT_REGISTRATION_STATUSES
-    reactivated = pricing.is_paid(offer) and moving_in and (current.get("billing_status") == "cancelled" or current.get("status") in event_registration.ENDED_STATUSES)
+    reactivated = pricing.is_paid(offer) and moving_in and (
+        current.get("billing_status") == "cancelled" or current.get("status") in event_registration.ENDED_STATUSES
+        or await billing_orders.booking_cancelled_with_invoice(db, kind="event", registration_id=registration_id))
     new_price_due = reactivated or (pricing.is_paid(offer) and moving_in and not current.get("price_snapshot"))
     # Dieselbe Regel wie bei der Neuanmeldung durch die Person selbst (``event_registration._register``).
     invoiced_before = await billing_orders.invoiced_order(db, kind="event", registration_id=registration_id) if new_price_due else None

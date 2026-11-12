@@ -266,6 +266,28 @@ async def test_leitung_aktiviert_nach_dem_abgleich_wieder_auch_dann_ein_prueffal
     assert note["title"].startswith("Du bist wieder dabei") and "Kostenbeitrag" not in note["body"] and KEPT_INVOICE in note["body"]
 
 
+@pytest.mark.asyncio
+async def test_leitung_storno_warteliste_abgleich_dann_dabei_ein_prueffall(flow, fake):
+    """Storniert, von der Leitung auf die Warteliste gesetzt, der Abgleich setzt den Stand des Belegs, dann nachgerückt: Es
+    entscheidet der Auftrag (Buchung storniert), nicht der Stand der Anmeldung - auch hier ein Prüffall, die Buchung gilt wieder."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    flow.act_as(kassier)
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    for status in ("cancelled", "waitlist"):
+        response = await flow.patch(url, json={"status": status})
+        assert response.status_code == 200, response.text
+    await billing_orders.sync_due()
+    waiting = await registration(flow, booked)
+    assert waiting["status"] == "waitlist" and waiting["billing_status"] == "invoiced"
+
+    response = await flow.patch(url, json={"status": "registered"})
+    assert response.status_code == 200, response.text
+    stored = await assert_review(flow, booked, order, reason=LEAD_REASON, new_cents=4000, billing_status="invoiced")
+    assert "booking_state" not in stored
+    assert KEPT_INVOICE in (await last_note(flow, paula))["body"]
+
+
 def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
     """Dieselbe Regel für Glocke, Mail und die Discord-Antwort: kein Betrag, wenn schon ein Beleg da ist oder storniert wurde."""
     snapshot = {"total_cents": 2000, "currency": "EUR"}

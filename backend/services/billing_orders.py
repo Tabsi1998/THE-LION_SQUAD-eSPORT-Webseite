@@ -186,6 +186,13 @@ async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
     return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced"}, {"_id": 0})
 
 
+async def booking_cancelled_with_invoice(db, *, kind: str, registration_id: str) -> bool:
+    """Ist die Buchung am Auftrag storniert, obwohl der Beleg existiert? Das entscheidet über die Rückkehr (#2184) - nicht der
+    Stand der Anmeldung, den der Abgleich zwischendurch wieder auf den des Belegs setzt."""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", "booking_state": "cancelled"},
+                                            {"_id": 0, "id": 1}) is not None
+
+
 def rebooked_fields(order: dict) -> dict:
     """Nach einem Storno wieder dabei, obwohl der Beleg schon existiert (#2127 Leitung, #2184 selbst neu angemeldet): Die
     Anmeldung bekommt keinen neuen Preis, sondern wieder den des Belegs und seinen Stand - wie nach dem nächsten Abgleich.
