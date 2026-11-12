@@ -701,6 +701,51 @@ async def for_viewer(db, match: dict, user: dict | None) -> dict:
     return strip_rows(match, await viewer_for(db, match, user))
 
 
+def _carries_procedures(node, depth: int = 0) -> bool:
+    if depth > 6:
+        return False
+    if isinstance(node, dict):
+        entries = node.get("disputes")
+        if isinstance(entries, list) and any(is_procedure(row) for row in entries):
+            return True
+        return any(_carries_procedures(value, depth + 1) for value in node.values() if isinstance(value, (dict, list)))
+    if isinstance(node, list):
+        return any(_carries_procedures(value, depth + 1) for value in node)
+    return False
+
+
+async def guard(db, payload, user: dict | None):
+    """Für jede Antwort, die ein ganzes Spiel enthalten kann (Melden, Bestätigen, Check-in, Veto, Termin, Ergebnis, Wertung,
+    Listen): Verfahren darin bleiben nur für die nicht befangene Leitung mit „Proteste“ oder „Ergebnisse“ ungekürzt. Sucht in der
+    Antwort nach Spielen mit Verfahren - ohne solche kostet der Aufruf nichts und ändert nichts."""
+    if not _carries_procedures(payload):
+        return payload
+    from services.match_public_view import without_procedure_details
+
+    leads: dict[str, bool] = {}
+
+    async def lead_of(match: dict) -> bool:
+        key = str(match.get("id") or "")
+        if key not in leads:
+            full = match if match.get("tournament_id") and match.get("slots") else (
+                await db.matches_v2.find_one({"id": key}, {"_id": 0}) if key else None)
+            leads[key] = bool(full) and (await viewer_for(db, full, user)).lead
+        return leads[key]
+
+    async def walk(node, depth: int = 0):
+        if depth > 6 or not isinstance(node, (dict, list)):
+            return node
+        if isinstance(node, list):
+            return [await walk(value, depth + 1) for value in node]
+        out = {key: (value if key == "disputes" else await walk(value, depth + 1)) for key, value in node.items()}
+        entries = node.get("disputes")
+        if isinstance(entries, list) and any(is_procedure(row) for row in entries) and not await lead_of(node):
+            out = without_procedure_details(out, (user or {}).get("id"))
+        return out
+
+    return await walk(payload)
+
+
 async def for_viewer_list(db, user: dict | None, matches: list[dict], involved: set[str]) -> list[dict]:
     """Die Spiele einer Staffel für eine Person mit Liga-Recht (Spielplan, Baum): Verfahren ungekürzt nur mit „Proteste“ oder
     „Ergebnisse“ und nur in Spielen, an denen sie nicht beteiligt ist. Das Recht gilt für die ganze Staffel - eine Prüfung reicht."""

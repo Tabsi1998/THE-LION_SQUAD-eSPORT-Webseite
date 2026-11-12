@@ -40,7 +40,7 @@ from routes.match_routes import (
     _result_conflict,
     _serialized_match_write,
 )
-from services import game_maps, league_veto, league_veto_rules, league_veto_sweep, map_pools, match_flow
+from services import game_maps, league_procedures, league_veto, league_veto_rules, league_veto_sweep, map_pools, match_flow
 from services.access_links import touch_access_link, validate_access_link
 from services.checkin_rules import FlowProblem, filled, moment
 from services.league_permissions import ANY, require_league, require_no_conflict
@@ -457,8 +457,10 @@ async def veto_pick(match_id: str, body: PickBody, me: dict = Depends(get_curren
     if not league_veto_rules.rules_of(tournament):
         raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
     try:
-        return await league_veto.pick(db, match, tournament, registration_id=acting_reg["id"], map_id=body.map_id, version=body.version,
+        done = await league_veto.pick(db, match, tournament, registration_id=acting_reg["id"], map_id=body.map_id, version=body.version,
                                       user=me)
+        # Verfahren in der Antwort nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+        return await league_procedures.guard(db, done, me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)
 
@@ -474,7 +476,8 @@ async def veto_ready(match_id: str, body: ReadyBody, me: dict = Depends(get_curr
     if not league_veto_rules.rules_of(tournament):
         raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
     try:
-        return await league_veto.set_ready(db, match, tournament, registration_id=acting_reg["id"], ready=body.ready, user=me)
+        return await league_procedures.guard(
+            db, await league_veto.set_ready(db, match, tournament, registration_id=acting_reg["id"], ready=body.ready, user=me), me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)
 
@@ -492,7 +495,7 @@ async def veto_start(match_id: str, body: LeadStartBody, me: dict = Depends(get_
     if not league_veto_rules.rules_of(tournament):
         raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
     try:
-        return await league_veto.lead_start(db, match, tournament, reason=body.reason, user=me)
+        return await league_procedures.guard(db, await league_veto.lead_start(db, match, tournament, reason=body.reason, user=me), me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)
 
@@ -508,6 +511,7 @@ async def veto_lead(match_id: str, body: LeadBody, me: dict = Depends(get_curren
     if not league_veto_rules.rules_of(tournament):
         raise HTTPException(status_code=409, detail=league_veto.NO_VETO_DETAIL)
     try:
-        return await league_veto.lead_action(db, match, tournament, action=body.action, reason=body.reason, version=body.version, user=me)
+        return await league_procedures.guard(
+            db, await league_veto.lead_action(db, match, tournament, action=body.action, reason=body.reason, version=body.version, user=me), me)
     except (FlowProblem, league_veto_rules.VetoProblem) as problem:
         _raise(problem)

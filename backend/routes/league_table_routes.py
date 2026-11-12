@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from database import get_db
 from models import new_id, now_utc
-from services import checkin_rules, league_permissions
+from services import checkin_rules, league_permissions, league_procedures
 from services import league_table
 from services.change_events import publish_api_change
 from services.league_scope import ONLY_LEAGUE
@@ -179,7 +179,8 @@ async def admin_double_no_show(tournament_id: str, match_id: str, body: DoubleNo
     await _audit(db, "match.forfeit.double", me, tournament_id, {"match_id": match_id, "registration_ids": sides,
                                                                  "note_length": len(note)})
     await publish_api_change("POST", f"/api/matches/{match_id}/result", 200)
-    return await _match(db, tournament_id, match_id)
+    # Verfahren in der Antwort nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+    return await league_procedures.guard(db, await _match(db, tournament_id, match_id), me)
 
 
 @admin_router.delete("/{tournament_id}/matches/{match_id}/double-no-show")
@@ -218,4 +219,5 @@ async def admin_undo_double_no_show(tournament_id: str, match_id: str, body: Tab
     await league_table.after_change(db, tournament, match, scored=False)
     await _audit(db, "match.forfeit.double.undo", me, tournament_id, {"match_id": match_id, "reason": reason})
     await publish_api_change("DELETE", f"/api/matches/{match_id}/result", 200)
-    return await _match(db, tournament_id, match_id)
+    # Verfahren in der Antwort nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+    return await league_procedures.guard(db, await _match(db, tournament_id, match_id), me)

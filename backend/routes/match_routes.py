@@ -1518,7 +1518,7 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
             tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "league_context": 1})
             # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - Prüfen und Schreiben unter der Season-Sperre.
             async with league_games.season_lock(db, tournament):
-                return await _submit_staff_result(db, match, body, raw_results, me, force)
+                return await league_procedures.guard(db, await _submit_staff_result(db, match, body, raw_results, me, force), me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
@@ -1631,7 +1631,7 @@ async def undo_match_result(match_id: str, body: MatchResultUndo | None = None, 
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
             match, _collection = await _find_match_any(match_id)
             await league_permissions.require_no_conflict(db, me, match, action="result_undo", conflict_reason=conflict_reason)
-            return await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None))
+            return await league_procedures.guard(db, await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None)), me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
@@ -1948,9 +1948,10 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     try:
         # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - nach der Turnier-Sperre die Season-Sperre.
         async with league_games.season_lock(db, tournament):
-            # Vorfälle (D.5, #1619): nie roh in der Antwort auf eine Meldung - sie tragen Begründungen, den Grund einer
-            # Notausnahme und Konto-Kennungen. Die Seite liest ihre gefilterte Sicht im Block ``league`` der Matchseite.
-            return league_incidents.without_incidents(await _report_v2(db, m, body, me, tournament, stage))
+            # Die Antwort trägt das ganze Spiel: Verfahren darin nur, soweit diese Person sie sehen darf (E.2, #1619, Nr. 133/137),
+            # Vorfälle nie roh (D.5) - die Seite liest ihre gefilterte Sicht im Block ``league`` der Matchseite.
+            return league_incidents.without_incidents(
+                await league_procedures.guard(db, await _report_v2(db, m, body, me, tournament, stage), me))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
@@ -2177,4 +2178,4 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
         raise HTTPException(status_code=409, detail=blocked)
     await _ensure_match_tournament_unlocked(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
-    return await _forfeit_v2(db, m, body, me, force)
+    return await league_procedures.guard(db, await _forfeit_v2(db, m, body, me, force), me)

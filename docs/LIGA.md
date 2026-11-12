@@ -3043,7 +3043,10 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   anderen - Seiten, Fremde, Liga-Personal ohne diese Rechte, Beteiligte mit Liga-Recht - bekommen `at`, `id`, `kind`, `state`; wer
   eingereicht hat, dazu Grund, Text und Entscheidung der eigenen Meldung, nie `moss_requests`, `assignee`, `statement` oder
   `notified_immediately`. Eine Stelle (`match_public_view.public_dispute_row`) für `public_match_view`, `GET /matches/{id}`,
-  `GET /tournaments/{id}/matches-v2`, den Baum und die Antworten von `/dispute`, `PUT /lineups` und dem Matchplan.
+  `GET /tournaments/{id}/matches-v2`, den Baum und die Antworten von `/dispute`, `PUT /lineups` und dem Matchplan. Antworten auf
+  Aktionen, die das ganze Spiel zurückgeben (Melden und Bestätigen, Ergebnis, „Rückgängig“, Wertung kampflos, Check-in, Start,
+  Veto, Verschiebung, „beide nicht erschienen“), laufen durch `league_procedures.guard` - er sucht in der Antwort nach Spielen mit
+  Verfahren und kürzt sie für alle außer der nicht befangenen Leitung (`tests/test_league_procedures_leak_flow.py`).
 - **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
   Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
 - **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
