@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from services import billing_cases, billing_orders, dolibarr_client  # noqa: E402
+from services import billing_cases, billing_orders, dolibarr_billing, dolibarr_client  # noqa: E402
 from services.event_notifications import KEPT_INVOICE, KIND, kept_invoice_line, price_to_bill  # noqa: E402
 from test_billing_dolibarr_flow import TERMS, book, connect, order_of, paid_event, person  # noqa: E402
 
@@ -244,6 +244,56 @@ async def test_zurueck_nach_storno_gilt_am_auftrag_wieder_als_gebucht(flow, fake
     assert "cancelled_after_invoice" in cases, "den Storno-Fall erledigt die Finanzverwaltung mit Grund"
     summary = await billing_orders.source_summary(flow.db, "event", event["id"])
     assert summary["booked_cents"] == 4000 and summary["paid_cents"] == 4000
+
+
+async def cancelled_with_credit_draft_due(flow, fake):
+    """Freigegebener Beleg, Schalter „Gutschrift-Entwurf bei Abmeldung“ an, selbst storniert: Der Entwurf ist vorgemerkt."""
+    await connect(flow, **TERMS, credit_note_draft_on_cancel=True)
+    kassier = await person(flow, "kassier", role="club_admin")
+    event = await paid_event(flow, kassier)
+    paula = await person(flow, "paula")
+    booked = await book(flow, paula, event, companions=1)
+    await billing_orders.classify_due()
+    await settle(flow, fake, await order_of(flow, booked), "validated")
+    await cancel_self(flow, event, paula)
+    order = await order_of(flow, booked)
+    assert order["booking_state"] == "cancelled" and order.get("credit_note_due_at")
+    return event, paula, booked, order
+
+
+@pytest.mark.asyncio
+async def test_rueckkehr_waehrend_haengendem_gutschrift_merker_legt_keinen_entwurf_an(flow, fake):
+    """Der Gutschrift-Lauf hat den Auftrag schon beansprucht (Merker), da kommt die Person zurück. Gibt der Lauf den Merker nach
+    einem Fehler wieder frei, legt der nächste trotzdem keinen Entwurf an: Die Buchung gilt wieder."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    await flow.db.billing_orders.update_one({"id": order["id"]}, {"$set": {"credit_note_claim_at": "2026-01-01T00:00:00+00:00"}})
+    await book(flow, paula, event, companions=0)
+    await flow.db.billing_orders.update_one({"id": order["id"]}, {"$unset": {"credit_note_claim_at": ""}})
+
+    counts = await billing_orders.sync_due()
+    assert counts["credit_drafts"] == 0
+    assert "credit_note_id" not in await order_of(flow, booked)
+    settings = await dolibarr_client.load_settings(flow.db)
+    result = await dolibarr_billing.draft_credit_note(flow.db, settings, dolibarr_client.DolibarrClient(settings), order)
+    assert result == "skipped", "auch mit dem alten Stand des Auftrags in der Hand"
+
+
+@pytest.mark.asyncio
+async def test_rueckkehr_mitten_im_gutschrift_lauf_legt_keinen_entwurf_an(flow, fake, monkeypatch):
+    """Der Lauf hat den Auftrag beansprucht und fragt Dolibarr, da kommt die Person zurück: Vor dem Anlegen sieht er nach."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    original = dolibarr_client.DolibarrClient.credit_notes_of
+
+    async def meanwhile_back(self, invoice_id):
+        await flow.db.billing_orders.update_one({"id": order["id"]}, {"$unset": {"booking_state": ""}})
+        return await original(self, invoice_id)
+
+    monkeypatch.setattr(dolibarr_client.DolibarrClient, "credit_notes_of", meanwhile_back)
+    settings = await dolibarr_client.load_settings(flow.db)
+    result = await dolibarr_billing.draft_credit_note(flow.db, settings, dolibarr_client.DolibarrClient(settings), order)
+    assert result == "skipped"
+    stored = await order_of(flow, booked)
+    assert "credit_note_id" not in stored and "credit_note_due_at" not in stored and "credit_note_claim_at" not in stored
 
 
 @pytest.mark.asyncio

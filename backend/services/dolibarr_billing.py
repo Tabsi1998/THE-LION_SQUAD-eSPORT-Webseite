@@ -804,9 +804,11 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
     """Den vorgemerkten Gutschrift-Entwurf anlegen: „created“, „linked“ (in Dolibarr gibt es schon eine Gutschrift),
     „draft_invoice“ (der Beleg ist noch Entwurf - löschen statt gutschreiben), „skipped“ oder „failed“."""
     now = now_utc().isoformat()
-    # Der Merker vor allem anderen: ein zweiter Lauf zur selben Zeit legt nichts doppelt an.
+    # Der Merker vor allem anderen: ein zweiter Lauf zur selben Zeit legt nichts doppelt an. Nur solange die Buchung storniert ist -
+    # ist die Person zurück (#2184), gibt es nichts gutzuschreiben, auch wenn die Vormerkung noch steht.
     claimed = await db.billing_orders.update_one(
-        {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
+        {"id": order["id"], "booking_state": "cancelled", "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False},
+         "credit_note_claim_at": {"$exists": False}},
         {"$set": {"credit_note_claim_at": now}},
     )
     if claimed.modified_count != 1:
@@ -833,6 +835,10 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
             await finish({"credit_note_id": int(found["id"]), "credit_note_ref": ref, "credit_note_source": "dolibarr"})
             await _credit_case(db, order, f"In Dolibarr gibt es schon eine Gutschrift ({ref}) – keine zweite angelegt.", ref)
             return "linked"
+        # Während Dolibarr gefragt wurde, kann die Person zurückgekommen sein (#2184): dann keine Gutschrift.
+        if not await db.billing_orders.find_one({"id": order["id"], "booking_state": "cancelled"}, {"_id": 0, "id": 1}):
+            await finish({"credit_note_note": "booking_restored"})
+            return "skipped"
         note = f"Gutschrift zu {state['invoice_ref']} – Abmeldung" + (f": {order['cancel_reason']}" if order.get("cancel_reason") else "")
         credit_id = await client.create_invoice(credit_note_payload(invoice, ref_ext=credit_ref_ext(order), note=note))
         try:
@@ -860,8 +866,8 @@ async def draft_credit_notes_due(db, settings: dict, client: DolibarrClient, lim
     """Vorgemerkte Gutschrift-Entwürfe anlegen - nur mit Schalter und Schreibzugriff. Gibt die Zahl der neuen zurück."""
     if not settings.get(CREDIT_SETTING) or not write_capable(settings):
         return 0
-    rows = await db.billing_orders.find({"status": "invoiced", "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
-                                        {"_id": 0}).sort("credit_note_due_at", 1).to_list(limit)
+    rows = await db.billing_orders.find({"status": "invoiced", "booking_state": "cancelled", "credit_note_due_at": {"$exists": True},
+                                         "credit_note_id": {"$exists": False}}, {"_id": 0}).sort("credit_note_due_at", 1).to_list(limit)
     created = 0
     for order in rows:
         if await draft_credit_note(db, settings, client, order) == "created":
