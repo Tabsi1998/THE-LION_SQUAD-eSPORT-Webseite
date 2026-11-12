@@ -16,7 +16,9 @@ LEGACY_KINDS = {"dispute": "protest"}
 PROCEDURE_KINDS = frozenset({"protest", "statement", "moss"})
 DECIDED_STATUSES = frozenset({"completed", "forfeit"})
 CLOSED_STATUSES = frozenset({"cancelled", "archived", "bye"})
-CLOSED_INCIDENT_STATES = frozenset({"agreed", "decided", "withdrawn"})
+# ``closed`` (D.5, #1619): ohne Einigung und ohne Entscheidung geschlossen - das Spiel endete ohne diesen Vorfall, oder die
+# Leitung hat ihn geschlossen.
+CLOSED_INCIDENT_STATES = frozenset({"agreed", "decided", "withdrawn", "closed"})
 
 
 @dataclass(frozen=True)

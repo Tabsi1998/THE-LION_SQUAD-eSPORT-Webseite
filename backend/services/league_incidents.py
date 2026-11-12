@@ -31,7 +31,8 @@ from services.league_incident_rules import (  # noqa: F401 - weiterhin über lea
     MAX_PLAYERS, MAX_ROUND, MAX_SCORE, NOTE_MAX, NOT_A_SIDE_DETAIL, NOT_FINALIZABLE_DETAIL, NOT_FOUND_DETAIL,
     NO_ACTION, OUTCOMES, OUTCOME_LABELS, PROPOSALS, PROPOSAL_LABELS, PROPOSED, QUOTA_KINDS, REASON_MAX, REASON_MIN,
     REHOST, REJECTED, REPLAY, REPLAY_REASON_MAX, RESTART, VOIDING, WITHDRAWN, _effects, _replay_reason,
-    OPEN_HOLD_CODES, REPLAY_FIRST_DETAIL, awaits_replay, confirm_clock, counts_quota, current_reports, due_at, export_steps, final_games, find, incidents_of,
+    BY_LEAD, CLOSED, ENDED_STATUSES, MATCH_ENDED, OPEN_HOLD_CODES, REPLAY_FIRST_DETAIL, as_shown, awaits_replay, confirm_clock,
+    counts_quota, current_reports, due_at, forfeit_refusal, match_ended, open_incidents, export_steps, final_games, find, incidents_of,
     is_open, map_states, mark_replays, missing_positions, outcome_of, position_of, positions_in_clarification, quota_used,
     replay_cutoff, replay_pending, replay_text, report_refusal, result_block, scrub, setting_of, state_of, surplus_positions,
 )
@@ -446,7 +447,8 @@ async def expire_due(db, match: dict, *, now: datetime | None = None) -> int:
     now = now or now_utc()
     incidents = incidents_of(match)
     due = [row for row in incidents if state_of(row) == PROPOSED and (moment(row.get("answer_deadline")) or now) <= now]
-    if not due:
+    if not due or match_ended(match):
+        # In einem beendeten Spiel läuft kein Vorfall mehr ab - er wird geschlossen (``close_ended``), niemand bekommt „in Klärung“.
         return 0
     changed = [{**row, "state": IN_REVIEW, "review_cause": EXPIRED} for row in due]
     by_id = {row["id"]: row for row in changed}
@@ -457,26 +459,66 @@ async def expire_due(db, match: dict, *, now: datetime | None = None) -> int:
     return len(changed)
 
 
+async def close_ended(db, match: dict, *, now: datetime | None = None) -> dict:
+    """Das Spiel ist zu Ende (kampflos, nicht erschienen, abgesagt, auch von selbst): Offene Vorfälle werden **ohne Nachricht**
+    geschlossen (``state: closed``, ``close_reason: match_ended``) - es gibt nichts mehr zu beantworten oder zu entscheiden. Gibt das
+    Spiel mit dem neuen Stand zurück; ohne offenen Vorfall unverändert."""
+    incidents = incidents_of(match)
+    if not match_ended(match) or not any(is_open(row) for row in incidents):
+        return match
+    now_iso = (now or now_utc()).isoformat()
+    closing = {row.get("id") for row in incidents if is_open(row)}
+    changed = [{**row, "state": CLOSED, "close_reason": MATCH_ENDED, "closed_at": now_iso} if row.get("id") in closing else row
+               for row in incidents]
+    stored = await _store(db, match, changed)
+    for entry in changed:
+        if entry.get("id") in closing:
+            await _audit(db, "match.incident.close", match, None, entry, reason=MATCH_ENDED)
+    return stored
+
+
+async def close(db, match: dict, setup, incident_id: str, *, user: dict, reason) -> dict:
+    """Die Leitung schließt einen offenen Vorfall ohne Entscheidung über die Map - etwa bevor sie das Spiel kampflos wertet. Mit
+    Begründung; beide Seiten erfahren es. Recht und Befangenheit prüft die Route."""
+    entry = find(match, incident_id)
+    if not is_open(entry):
+        raise IncidentProblem(ANSWERED_DETAIL, 409)
+    text = _reason(reason)
+    changed = {**entry, "state": CLOSED, "close_reason": BY_LEAD, "close_note": text, "closed_by": user.get("id"),
+               "closed_at": now_utc().isoformat()}
+    stored = await _store(db, match, _replace(incidents_of(match), changed), user_ids=[user.get("id")])
+    await _audit(db, "match.incident.close", match, user.get("id"), changed, reason=BY_LEAD)
+    await _tell(db, stored, setup.reg_ids, "Vorfall geschlossen",
+                f"Die Liga-Leitung hat den Vorfall zu Map {position_of(entry)} ohne Entscheidung geschlossen. Die Begründung steht auf "
+                "der Matchseite.", "closed", changed, skip=user.get("id"))
+    return changed
+
+
 async def sweep(db, tournaments: list[dict] | None = None, *, now: datetime | None = None) -> dict:
-    """Ein Lauf des Zeit-Jobs (im Fristen-Job ``match_deadlines``): alle Spiele mit erreichter Antwortfrist - mit ``tournaments`` nur
-    die dieser Turniere. Geschrieben wird unter der Turniersperre."""
+    """Ein Lauf des Zeit-Jobs (im Fristen-Job ``match_deadlines``): Spiele mit erreichter Antwortfrist und beendete Spiele, an denen
+    noch ein Vorfall offen ist - mit ``tournaments`` nur die dieser Turniere. Geschrieben wird unter der Turniersperre."""
     from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
     now = now or now_utc()
-    query: dict = {"incident_due_at": {"$lte": now.isoformat()}}
+    query: dict = {"$or": [{"incident_due_at": {"$lte": now.isoformat()}},
+                           {"status": {"$in": sorted(ENDED_STATUSES)}, "incidents.state": {"$in": [PROPOSED, IN_REVIEW]}}]}
     if tournaments is not None:
         ids = [row.get("id") for row in tournaments if row.get("id")]
         if not ids:
-            return {"expired": 0}
+            return {"expired": 0, "closed": 0}
         query["tournament_id"] = {"$in": ids}
     rows = await db.matches_v2.find(query, {"_id": 0, "id": 1, "tournament_id": 1}).to_list(500)
-    expired = 0
+    expired = closed = 0
     for row in rows:
         count = 0
         try:
             async with mutation_lock(db, tournament_write_resource(row["tournament_id"]), wait_seconds=2.0):
                 match = await db.matches_v2.find_one({"id": row["id"]}, {"_id": 0})
-                if match:
+                if match and match_ended(match):
+                    count = sum(1 for item in incidents_of(match) if is_open(item))
+                    await close_ended(db, match, now=now)
+                    closed += count
+                elif match:
                     count = await expire_due(db, match, now=now)
                     expired += count
         except MutationLockBusy:
@@ -492,7 +534,7 @@ async def sweep(db, tournaments: list[dict] | None = None, *, now: datetime | No
                 await publish_api_change("POST", f"/api/matches/{row['id']}/incidents", 200)
             except Exception:  # noqa: BLE001 - die Matchseite holt es beim nächsten Abruf
                 logger.debug("Live-Meldung für Match %s nicht verschickt", log_safe(row.get("id")), exc_info=True)
-    return {"expired": expired}
+    return {"expired": expired, "closed": closed}
 
 
 # ---------------------------------------------------------------- Matchseite
@@ -537,6 +579,9 @@ def incident_view(match: dict, entry: dict, *, names: dict[str, str], people: di
                       "settled_at": decision.get("settled_at"), "settle_reason": decision.get("settle_reason") or ""}
                      if decision else None),
         "voided": entry.get("voided"), "closed_at": entry.get("closed_at"),
+        # Geschlossen ohne Entscheidung: weil das Spiel zu Ende ist oder durch die Leitung (mit ihrer Begründung).
+        "close_reason": entry.get("close_reason"), "close_note": entry.get("close_note") or "",
+        "can_close": bool(lead and is_open(entry)),
         "procedure": _has_open_procedure(match, str(entry.get("id") or "")),
         "can_answer": bool(can_act and own_id and reporter and own_id != reporter and waiting),
         "can_withdraw": bool(can_act and own_id and own_id == reporter and state == PROPOSED),
@@ -566,7 +611,8 @@ async def page_block(db, setup, *, viewer, can_lead: bool, conflict: dict | None
         return block
     own_id = next(iter(sorted(viewer.acting or viewer.sides)), None)
     can_act = bool(viewer.acting)
-    rows = incidents_of(match)
+    # In einem beendeten Spiel gilt ein noch offener Vorfall als geschlossen - auch bevor der Job es geschrieben hat.
+    rows = as_shown(match)
     wanted = sorted({user_id for row in rows for user_id in row.get("players") or []})
     people: dict[str, dict] = {}
     if wanted:

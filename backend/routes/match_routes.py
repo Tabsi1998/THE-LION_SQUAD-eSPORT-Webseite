@@ -2105,6 +2105,10 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     m, collection = await _find_match_any(match_id)
     await _require_result_permission(me, m)
     await league_permissions.require_no_conflict(db, me, m, action="forfeit", conflict_reason=body.get("conflict_reason"))
+    # Vorfälle (D.5, #1619, Nr. 146): Solange ein Vorfall offen ist, wird nicht kampflos gewertet - erst entscheiden oder schließen.
+    blocked = league_incidents.forfeit_refusal(m)
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
     await _ensure_match_tournament_unlocked(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
     return await _forfeit_v2(db, m, body, me, force)

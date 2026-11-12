@@ -15,7 +15,7 @@ import { ProofList } from "@/components/tls/results/ProofList";
 import { motionAllowed } from "@/lib/motion";
 import {
   KIND_HELP, OUTCOME_HELP, PAUSE_BETWEEN, PAUSE_BETWEEN_HELP, PAUSE_BETWEEN_LABEL, PROPOSAL_HELP, STATE_LABELS, canSettleAtOnce, clock,
-  clockOffset, decisionProblem, emptyIncidentForm, incidentPayload, incidentProblem, mapStateNotes, positionLabel, quotaHint, quotaText,
+  clockOffset, closeProblem, decisionProblem, emptyIncidentForm, incidentPayload, incidentProblem, mapStateNotes, positionLabel, quotaHint, quotaText,
   remainingMs, remainingShare, remainingText, scoreText, settleProblem, settleSentence, sortedIncidents, stateSentence,
 } from "@/lib/leagueIncidents";
 import { ConflictReasonField, overrideMissing, overridePayload } from "./ConflictOverride";
@@ -24,7 +24,7 @@ const PRIMARY = "tls-btn tls-btn--primary inline-flex min-h-11 items-center just
 const SECONDARY = "tls-btn tls-btn--secondary inline-flex min-h-11 items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
 const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-11 items-center justify-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
 const LEGEND = "text-[11px] font-bold uppercase tracking-widest text-white/60";
-const TONES = { proposed: "border-honor/45", in_review: "border-warn/55", agreed: "border-[#00D26A]/40", decided: "border-[#29B6E8]/40", withdrawn: "border-white/10" };
+const TONES = { proposed: "border-honor/45", in_review: "border-warn/55", agreed: "border-[#00D26A]/40", decided: "border-[#29B6E8]/40", withdrawn: "border-white/10", closed: "border-white/10" };
 
 /** Öffentlich (auch für Gäste): nur, dass eine Map in Klärung ist oder nicht zählt - nie der Vorfall selbst. */
 export function MapStateNotes({ league }) {
@@ -85,7 +85,7 @@ function AnswerCountdown({ incident, offset, onDone }) {
 
 function StateBadge({ incident }) {
   const state = incident.state;
-  const Icon = { proposed: Hourglass, in_review: Scale, agreed: Check, decided: Gavel, withdrawn: Undo2 }[state] || Hourglass;
+  const Icon = { proposed: Hourglass, in_review: Scale, agreed: Check, decided: Gavel, withdrawn: Undo2, closed: X }[state] || Hourglass;
   return (
     <span data-testid={`incident-state-${incident.id}`} data-state={state}
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${state === "in_review" ? "tls-incident-pulse border-warn/55 bg-warn/10 text-white" : state === "agreed" ? "border-[#00D26A]/50 bg-[#00D26A]/10 text-[#7CF0B4]" : "border-white/15 bg-white/[0.04] text-white/75"}`}>
@@ -270,6 +270,48 @@ function AnswerActions({ incident, matchId, busy, run, onChanged }) {
   );
 }
 
+/** Die Liga-Leitung schließt einen offenen Vorfall ohne Entscheidung - etwa bevor sie das Spiel kampflos wertet. */
+function CloseForm({ info, incident, matchId, busy, run, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ reason: "", conflict: "" });
+  const [problem, setProblem] = useState("");
+  const set = (key, value) => { setProblem(""); setForm((current) => ({ ...current, [key]: value })); };
+  const needsOverride = Boolean(info.conflict?.override);
+  const submit = (event) => {
+    event.preventDefault();
+    const missing = closeProblem(form) || (overrideMissing(needsOverride, form.conflict) ? "Als Notausnahme braucht es einen Grund (mindestens fünf Zeichen)." : "");
+    setProblem(missing);
+    if (missing) return undefined;
+    return run(async () => {
+      await api.post(`/matches/${matchId}/incidents/${incident.id}/close`, { reason: form.reason.trim(), ...overridePayload(needsOverride, form.conflict) });
+      toast.success("Vorfall geschlossen.");
+      await onChanged();
+    }, "Der Vorfall ließ sich nicht schließen.");
+  };
+  if (!open) {
+    return (
+      <button type="button" disabled={busy} onClick={() => setOpen(true)} className={`${QUIET} mt-3`} data-testid={`incident-close-${incident.id}-open`}>
+        <X className="h-4 w-4" aria-hidden="true" /> Ohne Entscheidung schließen
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="tls-incident-open mt-3 space-y-3 rounded-sm border border-white/15 bg-black/20 p-3" data-testid={`incident-close-${incident.id}`} noValidate>
+      <p className="text-xs text-white/65">Schließt den Vorfall, ohne über die Map zu entscheiden – etwa wenn das Spiel kampflos gewertet wird. Solange ein Vorfall offen ist, geht „kampflos“ und „nicht erschienen“ nicht.</p>
+      <label className="block">
+        <span className={LEGEND}>Begründung (Pflicht, beide Seiten lesen sie)</span>
+        <textarea value={form.reason} maxLength={500} rows={2} onChange={(event) => set("reason", event.target.value)} className="input mt-1 w-full resize-y" data-testid={`incident-close-${incident.id}-reason`} />
+      </label>
+      {needsOverride ? <ConflictReasonField value={form.conflict} onChange={(value) => set("conflict", value)} testId={`incident-close-${incident.id}-conflict`} /> : null}
+      {problem ? <p className="text-sm text-warn" role="alert" data-testid={`incident-close-${incident.id}-problem`}>{problem}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={busy} className={SECONDARY} data-testid={`incident-close-${incident.id}-submit`}><X className="h-4 w-4" aria-hidden="true" /> Vorfall schließen</button>
+        <button type="button" disabled={busy} onClick={() => setOpen(false)} className={QUIET}>Zurück</button>
+      </div>
+    </form>
+  );
+}
+
 /** Nachweise erst laden, wenn jemand sie aufklappt - ein offener Vorfall zeigt sie gleich. */
 function IncidentProofs({ incident, league, matchId }) {
   const [open, setOpen] = useState(Boolean(incident.open));
@@ -337,6 +379,11 @@ function IncidentCard({ league, info, incident, matchId, busy, run, onChanged, o
           <p className="mt-1 text-xs text-white/65" data-testid={`incident-settled-${incident.id}`}>{settleSentence(incident.decision)}{incident.decision.settle_reason ? ` ${incident.decision.settle_reason}` : ""}</p>
         </div>
       ) : null}
+      {incident.close_note ? (
+        <p className="mt-3 rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`incident-close-note-${incident.id}`}>
+          <span className="text-white/55">Begründung der Liga-Leitung: </span>{incident.close_note}
+        </p>
+      ) : null}
       {incident.voided ? (
         <p className="mt-2 text-xs text-white/60" data-testid={`incident-voided-${incident.id}`}>Die erste Austragung{scoreText(incident.voided.score, league.sides) ? ` (Stand ${scoreText(incident.voided.score, league.sides)})` : ""} zählt nicht – die Map wird nur einmal gewertet.</p>
       ) : null}
@@ -344,6 +391,7 @@ function IncidentCard({ league, info, incident, matchId, busy, run, onChanged, o
       {incident.between_maps ? null : <IncidentProofs incident={incident} league={league} matchId={matchId} />}
       {incident.can_decide ? <DecisionForm league={league} info={info} incident={incident} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
       {incident.can_settle ? <SettleForm key={incident.decision?.settled_at || "offen"} league={league} info={info} incident={incident} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
+      {incident.can_close ? <CloseForm info={info} incident={incident} matchId={matchId} busy={busy} run={run} onChanged={onChanged} /> : null}
     </li>
   );
 }

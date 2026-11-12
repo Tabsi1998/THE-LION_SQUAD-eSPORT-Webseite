@@ -217,7 +217,7 @@ async def test_an_unanswered_incident_goes_to_review_once_and_tells_everyone_onc
 
     # Zweiter Lauf: findet nichts mehr. Ein Lauf mit altem Stand schreibt nicht und schickt nichts.
     assert (await league_incidents.sweep(flow.db, now=now + timedelta(minutes=12)))["expired"] == 0
-    assert (await deadline_sweep(flow.db, now=now + timedelta(minutes=13)))["incidents"] == {"expired": 0}
+    assert (await deadline_sweep(flow.db, now=now + timedelta(minutes=13)))["incidents"] == {"expired": 0, "closed": 0}
     with pytest.raises(league_incidents.IncidentProblem):
         await league_incidents.expire_due(flow.db, stale, now=now + timedelta(minutes=11))
     assert len(await told()) == len(first), "keine zweite Nachricht"
@@ -635,6 +635,118 @@ async def test_a_decided_replay_is_only_settled_after_it_was_reported_again(flow
     assert confirmed.status_code == 200 and confirmed.json()["awaiting_confirmation"] is False
     match = await stored(flow, w)
     assert match["status"] == "completed" and match["games"][1]["status"] == "replayed"
+
+
+@pytest.mark.asyncio
+async def test_no_forfeit_while_an_incident_is_open_until_the_lead_closes_it(flow):
+    """Nr. 146: „kampflos“ und „nicht erschienen“ sind bei offenem Vorfall gesperrt - die Leitung entscheidet oder schließt ihn zuerst."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    match_id, tid = w["match"]["id"], w["tournament"]["id"]
+    flow.act_as(w["staff"])
+    forfeit_body = {"forfeit_registration_id": w["reg_h"]["id"], "note": "Nicht erschienen laut Leitung"}
+    refused = [
+        await flow.post(f"/api/matches/{match_id}/forfeit", json=forfeit_body),
+        await flow.post(f"/api/tournaments/{tid}/lead/no-show/{match_id}", json={"action": "confirm", "registration_id": w["reg_h"]["id"]}),
+        await flow.post(f"/api/admin/leagues/staffeln/{tid}/matches/{match_id}/double-no-show", json={"note": "Beide nicht erschienen"}),
+    ]
+    for response in refused:
+        assert response.status_code == 409, response.text
+        assert "Zu Map 2 ist ein Vorfall offen" in response.json()["detail"] and "entscheiden oder ihn schließen" in response.json()["detail"]
+    match = await stored(flow, w)
+    assert match["status"] not in ("forfeit", "completed") and match["incidents"][0]["state"] == "proposed"
+
+    # Schließen: nur die Leitung, mit Begründung, beide Seiten erfahren es einmal.
+    for name in ("Kapitaen", "Falke1", "Fremd"):
+        flow.act_as(w["users"][name])
+        denied = await flow.post(url(w, f"/{incident_id}/close"), json={"reason": "Wir wollen das nicht mehr"})
+        assert denied.status_code == 403, name
+    flow.act_as(w["staff"])
+    short = await flow.post(url(w, f"/{incident_id}/close"), json={"reason": "ok"})
+    assert short.status_code == 422
+    closed = await flow.post(url(w, f"/{incident_id}/close"), json={"reason": "Gegner ist nach dem Abbruch nicht mehr erschienen"})
+    assert closed.status_code == 200 and closed.json()["state"] == "closed", closed.text
+    entry = (await stored(flow, w))["incidents"][0]
+    assert entry["close_reason"] == "lead" and entry["closed_by"] == w["staff"]["id"] and entry["closed_at"]
+    assert (await stored(flow, w))["incident_due_at"] is None
+    told = await flow.db.notifications.find({"meta.dedupe_key": f"incident:{incident_id}:closed"}, {"_id": 0, "user_id": 1}).to_list(20)
+    assert {row["user_id"] for row in told} >= {w["users"]["Kapitaen"]["id"], w["users"]["Falke1"]["id"]}
+    assert (await flow.post(url(w, f"/{incident_id}/close"), json={"reason": "Noch einmal schließen"})).status_code == 409
+    flow.act_as(w["users"]["Falke1"])
+    shown = (await page(flow, w))["league"]["incidents"][0]
+    assert shown["state"] == "closed" and shown["close_reason"] == "lead" and "nicht mehr erschienen" in shown["close_note"]
+    assert w["staff"]["id"] not in str(shown), "wer geschlossen hat, steht nicht in der Sicht der Seiten"
+
+    # Jetzt lässt sich kampflos werten.
+    flow.act_as(w["staff"])
+    done = await flow.post(f"/api/matches/{match_id}/forfeit", json=forfeit_body)
+    assert done.status_code == 200, done.text
+    assert (await stored(flow, w))["status"] == "forfeit"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ended_status", ["forfeit", "cancelled"])
+async def test_a_match_that_ends_without_being_played_closes_its_open_incidents_silently(flow, ended_status):
+    """Das Spiel endet von selbst (Rückzug, Absage): Offene Vorfälle werden ohne Nachricht geschlossen und laufen nicht mehr ab."""
+    w = await world(flow)
+    waiting = await reported(flow, w)                       # wartet auf Antwort
+    review = await reported(flow, w, position=1)
+    assert (await answered(flow, w, review, False)).status_code == 200   # in Klärung
+    flow.act_as(None)
+    assert (await page(flow, w))["league"]["map_state"][0]["state"] == "in_clarification", "Gegenprobe: vorher steht „in Klärung“ da"
+    told_before = await flow.db.notifications.count_documents({})
+    results = [{"registration_id": w["reg_a"]["id"], "rank": 1, "score": 1, "forfeit": False},
+               {"registration_id": w["reg_h"]["id"], "rank": 2, "score": 0, "forfeit": True}]
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {
+        "status": ended_status, **({"results": results, "forfeit_registration_id": w["reg_h"]["id"]} if ended_status == "forfeit" else {})}})
+
+    # Sofort, noch bevor der Job läuft: öffentlich kein „in Klärung“, nichts hält mehr auf, die Seiten sehen „geschlossen“.
+    match = await stored(flow, w)
+    assert league_incidents.result_block(match) is None and league_incidents.positions_in_clarification(match) == []
+    flow.act_as(None)
+    assert all(row["state"] != "in_clarification" for row in (await page(flow, w))["league"]["map_state"])
+    flow.act_as(w["users"]["Falke1"])
+    seen = (await page(flow, w))["league"]
+    assert {row["state"] for row in seen["incidents"]} == {"closed"} and seen["incident_info"]["hold"] is None
+    assert not any(row["can_answer"] or row["can_withdraw"] or row["can_decide"] for row in seen["incidents"])
+
+    # Der Job lässt nichts mehr ablaufen: geschlossen statt „in Klärung“, keine Nachricht, einmal.
+    swept = await league_incidents.sweep(flow.db, now=now_utc() + timedelta(minutes=11))
+    assert swept == {"expired": 0, "closed": 2}
+    match = await stored(flow, w)
+    assert [(row["state"], row["close_reason"]) for row in match["incidents"]] == [("closed", "match_ended")] * 2
+    assert all(row["closed_at"] for row in match["incidents"]) and match["incident_due_at"] is None
+    assert await flow.db.notifications.count_documents({}) == told_before, "niemand bekommt eine Nachricht"
+    assert not await flow.db.notifications.count_documents({"meta.dedupe_key": f"incident:{waiting}:review"})
+    assert await league_incidents.sweep(flow.db, now=now_utc() + timedelta(minutes=12)) == {"expired": 0, "closed": 0}
+    assert await flow.db.audit_logs.count_documents({"action": "match.incident.close", "data.reason": "match_ended"}) == 2
+    assert await flow.db.audit_logs.count_documents({"action": "match.incident.expire"}) == 0
+
+    # Antworten und Entscheiden gehen nicht mehr; Nachweise zum Vorfall sind geschlossen.
+    assert (await answered(flow, w, waiting, True)).status_code == 409
+    assert (await decide(flow, w, review, "no_action")).status_code == 409
+    from services import match_proof_refs
+    assert match_proof_refs.resolve(match, "incident", waiting, appeal_hours=48).open is False
+
+    if ended_status == "forfeit":
+        # Eine spätere Korrektur der Leitung hält kein Vorfall auf.
+        flow.act_as(w["staff"])
+        lineups = {w["reg_a"]["id"]: lions(w), w["reg_h"]["id"]: falcons(w)}
+        corrected = await flow.post(f"/api/matches/{w['match']['id']}/result?force=true", json={
+            "results": two_nil(w)["results"], "games": [{**game, "lineups": lineups} for game in two_nil(w)["games"]],
+            "reason": "Korrektur der Wertung: Das Spiel wurde doch gespielt"})
+        assert corrected.status_code == 200, corrected.text
+
+
+@pytest.mark.asyncio
+async def test_an_ended_match_closes_an_incident_on_the_next_step_too(flow):
+    """Ohne Job: Der nächste Schritt an einem beendeten Spiel schließt den Vorfall und antwortet mit 409."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {"status": "cancelled"}})
+    assert (await answered(flow, w, incident_id, True)).status_code == 409
+    entry = (await stored(flow, w))["incidents"][0]
+    assert entry["state"] == "closed" and entry["close_reason"] == "match_ended" and entry["answer"] is None
 
 
 @pytest.mark.asyncio

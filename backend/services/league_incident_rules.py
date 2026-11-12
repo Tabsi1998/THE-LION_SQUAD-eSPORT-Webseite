@@ -10,10 +10,14 @@ from datetime import datetime
 
 from services.checkin_rules import moment
 from services.league_presets import CLARIFICATION_MODES, PRESETS
-from services.match_proof_refs import CLOSED_INCIDENT_STATES
+from services.match_proof_refs import CLOSED_INCIDENT_STATES, CLOSED_STATUSES
 
 PROPOSED, AGREED, REJECTED, EXPIRED, IN_REVIEW, DECIDED, WITHDRAWN = (
     "proposed", "agreed", "rejected", "expired", "in_review", "decided", "withdrawn")
+# Geschlossen ohne Einigung und ohne Entscheidung: das Spiel endete ohne diesen Vorfall (``match_ended``) oder die Leitung hat ihn
+# geschlossen (``lead``). Der Grund steht in ``close_reason``.
+CLOSED = "closed"
+MATCH_ENDED, BY_LEAD = "match_ended", "lead"
 KIND_LABELS = {
     "disconnect": "Verbindungsabbruch",
     "rehost": "Rehost",
@@ -39,6 +43,8 @@ VOIDING = frozenset({RESTART, REPLAY})
 # Zählt gegen das Kontingent je Team und Map (§ 9.6) - der MOSS-Absturz nie (§ 9a.6), die Map-Pause auch nicht.
 QUOTA_KINDS = frozenset({"rehost", "pause"})
 FINAL_STATUSES = frozenset({"completed", "forfeit"})
+# Das Spiel ist zu Ende - gespielt, kampflos gewertet, abgesagt oder archiviert. Ein Vorfall hält dann nichts mehr auf.
+ENDED_STATUSES = FINAL_STATUSES | CLOSED_STATUSES
 NOTE_MAX = 500
 REASON_MIN, REASON_MAX = 5, 500
 REPLAY_REASON_MAX = 200
@@ -125,9 +131,41 @@ def find(match: dict, incident_id: str) -> dict:
     return entry
 
 
+def match_ended(match: dict | None) -> bool:
+    """Ist das Spiel zu Ende (gespielt, kampflos, abgesagt, archiviert)? Dann ist ein noch offener Vorfall gegenstandslos: Er hält
+    nichts auf, steht öffentlich nicht mehr als „in Klärung“ und wird ohne Nachricht geschlossen (``league_incidents.close_ended``)."""
+    return str((match or {}).get("status") or "") in ENDED_STATUSES
+
+
+def open_incidents(match: dict | None) -> list[dict]:
+    """Die Vorfälle, über die noch jemand antworten oder entscheiden muss - keine, sobald das Spiel zu Ende ist."""
+    return [] if match_ended(match) else [row for row in incidents_of(match) if is_open(row)]
+
+
+def as_shown(match: dict | None) -> list[dict]:
+    """Die Vorfälle, wie sie gelten: In einem beendeten Spiel ist ein noch offener Vorfall geschlossen, auch wenn der Job ihn
+    noch nicht geschrieben hat."""
+    rows = incidents_of(match)
+    if not match_ended(match):
+        return rows
+    return [{**row, "state": CLOSED, "close_reason": MATCH_ENDED} if is_open(row) else row for row in rows]
+
+
+def forfeit_refusal(match: dict | None) -> str | None:
+    """Warum die Leitung das Spiel gerade nicht kampflos bzw. als „nicht erschienen“ werten kann - ``None``: es geht. Bei einem
+    offenen Vorfall entscheidet oder schließt sie ihn zuerst (Entscheidung Nr. 146)."""
+    rows = open_incidents(match)
+    if not rows:
+        return None
+    position = min(position_of(row) for row in rows)
+    return (f"Zu Map {position} ist ein Vorfall offen. Bitte zuerst über den Vorfall entscheiden oder ihn schließen – erst dann lässt "
+            "sich das Spiel kampflos werten.")
+
+
 def positions_in_clarification(match: dict | None) -> list[int]:
-    """Quelle ist der Vorfall: Eine Position ist in Klärung, solange ein Vorfall dieser Position ``in_review`` ist."""
-    return sorted({position_of(row) for row in incidents_of(match) if state_of(row) == IN_REVIEW})
+    """Quelle ist der Vorfall: Eine Position ist in Klärung, solange ein Vorfall dieser Position ``in_review`` ist - und das Spiel
+    nicht schon zu Ende ist."""
+    return sorted({position_of(row) for row in open_incidents(match) if state_of(row) == IN_REVIEW})
 
 
 def surplus_positions(match: dict | None) -> list[int]:
@@ -194,7 +232,10 @@ def result_block(match: dict | None) -> dict | None:
 
     Offen ist ein Vorfall, solange er nicht ``agreed``, ``decided`` oder ``withdrawn`` ist. Wird eine Map neu gestartet oder
     wiederholt, gilt nichts, bis danach neu gemeldet ist (``rereport``). Nach einer Entscheidung der Leitung gilt das Ergebnis erst,
-    wenn sie die Serie festgestellt hat und keine Position mehr fehlt."""
+    wenn sie die Serie festgestellt hat und keine Position mehr fehlt. Ist das Spiel zu Ende, hält kein Vorfall mehr etwas auf -
+    auch keine spätere Korrektur der Leitung."""
+    if match_ended(match):
+        return None
     rows = incidents_of(match)
     review = [row for row in rows if state_of(row) == IN_REVIEW]
     if review:
@@ -389,6 +430,8 @@ def export_steps(match: dict, user_id: str) -> list[dict]:
             steps.append({**base, "role": "incident_decided", "at": decision.get("at")})
         if decision.get("settled_by") == user_id:
             steps.append({**base, "role": "incident_settled", "at": decision.get("settled_at")})
+        if row.get("closed_by") == user_id:
+            steps.append({**base, "role": "incident_closed", "at": row.get("closed_at")})
         if user_id in (row.get("players") or []):
             steps.append({**base, "role": "incident_affected", "at": row.get("at")})
     return steps
@@ -417,6 +460,9 @@ def scrub(incidents, user_id: str) -> tuple[list | None, bool]:
                     decision[key] = None
                     changed = True
             row["decision"] = decision
+        if row.get("closed_by") == user_id:
+            row["closed_by"] = None
+            changed = True
         if user_id in (row.get("players") or []):
             row["players"] = [item for item in row["players"] if item != user_id]
             changed = True

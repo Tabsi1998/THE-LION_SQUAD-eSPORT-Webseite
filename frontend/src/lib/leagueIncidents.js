@@ -9,6 +9,8 @@ export const STATE_LABELS = {
   in_review: "In Klärung",
   decided: "Entschieden",
   withdrawn: "Zurückgezogen",
+  // Ohne Einigung und ohne Entscheidung: das Spiel ist zu Ende, oder die Liga-Leitung hat den Vorfall geschlossen.
+  closed: "Geschlossen",
 };
 
 // Was passiert ist - je Art ein Satz, wann sie passt. `pause_between` ist die Map-Pause (nur dokumentiert).
@@ -135,6 +137,9 @@ export function stateSentence(incident, { remaining = "", otherName = "die Gegen
       return `Entscheidung der Liga-Leitung: ${incident.decision?.outcome_label || "entschieden"}${incident.decision?.awarded_to ? ` (${incident.decision.awarded_to})` : ""}.`;
     case "withdrawn":
       return "Zurückgezogen – es ist nichts weiter zu tun.";
+    case "closed":
+      return incident.close_reason === "lead" ? "Die Liga-Leitung hat den Vorfall ohne Entscheidung geschlossen."
+        : "Das Spiel ist zu Ende – der Vorfall wurde ohne Entscheidung geschlossen.";
     default:
       return "";
   }
@@ -210,6 +215,11 @@ export function settleProblem(form) {
   if (missing.some((position) => surplus.includes(position))) return "Eine Map kann nicht zugleich fehlen und überzählig sein.";
   if (String(form.reason || "").trim().length < 5) return "Bitte die Feststellung begründen (mindestens fünf Zeichen).";
   return "";
+}
+
+/** Der erste Satz, der am Schließen fehlt. */
+export function closeProblem(form) {
+  return String(form.reason || "").trim().length < 5 ? "Bitte begründen, warum du den Vorfall schließt (mindestens fünf Zeichen)." : "";
 }
 
 /** Offene Vorfälle zuerst, darin die neuesten oben - Abgeschlossenes danach. */

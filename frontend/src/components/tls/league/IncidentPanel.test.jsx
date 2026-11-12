@@ -182,6 +182,32 @@ test("nach der Entscheidung stehen Begründung und Feststellung da - die Leitung
     missing_positions: [3], surplus_positions: [], reason: "Map 3 fehlt noch" }));
 });
 
+test("die Liga-Leitung schließt einen offenen Vorfall ohne Entscheidung - mit Begründung", async () => {
+  const row = incident({ state: "proposed", can_close: true });
+  await show({ ...LEAGUE, own_registration_id: null, incidents: [row], incident_info: { ...INFO, as_lead: true, can_decide: true } });
+  expect(screen.queryByTestId("incident-close-v1")).toBeNull();
+  fireEvent.click(screen.getByTestId("incident-close-v1-open"));
+  fireEvent.click(screen.getByTestId("incident-close-v1-submit"));
+  expect(screen.getByTestId("incident-close-v1-problem")).toHaveTextContent("begründen");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("incident-close-v1-reason"), { target: { value: "Gegner nicht mehr erschienen" } });
+  fireEvent.click(screen.getByTestId("incident-close-v1-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/incidents/v1/close", { reason: "Gegner nicht mehr erschienen" }));
+});
+
+test("ein geschlossener Vorfall sagt, warum - ohne Knöpfe", async () => {
+  const ended = incident({ state: "closed", open: false, close_reason: "match_ended" });
+  const byLead = incident({ id: "v2", state: "closed", open: false, close_reason: "lead", close_note: "Gegner nicht mehr erschienen" });
+  await show({ ...LEAGUE, incidents: [ended, byLead], incident_info: { ...INFO, can_report: false } });
+  expect(screen.getByTestId("incident-state-v1")).toHaveTextContent("Geschlossen");
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Das Spiel ist zu Ende – der Vorfall wurde ohne Entscheidung geschlossen.");
+  expect(screen.getByTestId("incident-sentence-v2")).toHaveTextContent("Die Liga-Leitung hat den Vorfall ohne Entscheidung geschlossen.");
+  expect(screen.getByTestId("incident-close-note-v2")).toHaveTextContent("Gegner nicht mehr erschienen");
+  expect(screen.queryByTestId("incident-countdown-v1")).toBeNull();
+  expect(screen.queryByTestId("incident-close-v1-open")).toBeNull();
+  expect(screen.queryByTestId("incident-answer-v1")).toBeNull();
+});
+
 test("wer befangen ist, liest warum - und entscheidet nichts", async () => {
   const row = incident({ state: "in_review", open: true });
   await show({ ...LEAGUE, incidents: [row], incident_info: { ...INFO, can_report: false, conflict: { kind: "involved", override: false } } });

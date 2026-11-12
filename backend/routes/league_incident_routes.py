@@ -6,6 +6,8 @@
 - ``POST …/incidents/{incident_id}/withdraw``: die meldende Seite zieht zurück, solange niemand geantwortet hat.
 - ``POST …/incidents/{incident_id}/decision``: die Entscheidung der Leitung, auf Wunsch gleich mit „Serie feststellen“.
 - ``POST …/incidents/{incident_id}/settle``: „Serie feststellen“ - fehlende und überzählige Maps mit Begründung.
+- ``POST …/incidents/{incident_id}/close``: die Leitung schließt einen offenen Vorfall ohne Entscheidung, mit Begründung - etwa bevor
+  sie das Spiel kampflos wertet (solange ein Vorfall offen ist, sind „kampflos“ und „nicht erschienen“ gesperrt).
 
 Nur Spiele einer Liga-Staffel, sonst 404. Entscheiden darf, wer in der Liga „Ergebnisse“ oder „Proteste“ hat und an dem Spiel nicht
 beteiligt ist (Befangenheit wie B.1; der Superadmin nur als Notausnahme mit Grund). Hält nach einem Schritt nichts mehr das Ergebnis
@@ -75,6 +77,13 @@ class SettleBody(BaseModel):
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
+class CloseBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Optional[str] = Field(default=None, max_length=league_incidents.REASON_MAX)
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class DecisionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -101,6 +110,9 @@ async def _context(match_id: str, user: dict):
         raise HTTPException(status_code=404, detail=NOT_LEAGUE_DETAIL)
     if tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail="Turnier ist gesperrt und kann nur noch angesehen werden.")
+    # Ist das Spiel inzwischen zu Ende (kampflos, abgesagt), sind offene Vorfälle geschlossen - der Schritt danach antwortet mit 409.
+    match = await league_incidents.close_ended(db, match)
+    setup.match = match
     return db, match, tournament, setup
 
 
@@ -212,6 +224,18 @@ async def settle_incident(match_id: str, incident_id: str, body: SettleBody, me:
     await _as_lead(db, me, match, action="incident_settle", conflict_reason=body.conflict_reason)
     try:
         entry = await league_incidents.settle(db, match, setup, incident_id, user=me, body=body.model_dump(exclude={"conflict_reason"}))
+    except league_incidents.IncidentProblem as problem:
+        _raise(problem)
+    return _answer(entry, await _after_change(db, match_id, tournament, setup, me))
+
+
+@router.post("/{match_id}/incidents/{incident_id}/close")
+async def close_incident(match_id: str, incident_id: str, body: CloseBody, me: dict = Depends(get_current_user),
+                         _mutation: None = Depends(_serialized_match_write)):
+    db, match, tournament, setup = await _context(match_id, me)
+    await _as_lead(db, me, match, action="incident_close", conflict_reason=body.conflict_reason)
+    try:
+        entry = await league_incidents.close(db, match, setup, incident_id, user=me, reason=body.reason)
     except league_incidents.IncidentProblem as problem:
         _raise(problem)
     return _answer(entry, await _after_change(db, match_id, tournament, setup, me))

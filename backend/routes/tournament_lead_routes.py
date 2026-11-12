@@ -138,6 +138,12 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
         await _audit(db, "match.no_show.extended", match, me["id"], {"proposal_id": proposal.get("id"), "until": until})
         return {"ok": True, "extended_until": until, "idempotent_replay": False}
 
+    # Vorfälle (D.5, #1619, Nr. 146): Solange ein Vorfall offen ist, wird nicht „nicht erschienen“ gewertet - erst entscheiden.
+    from services.league_incident_rules import forfeit_refusal
+
+    blocked = forfeit_refusal(match)
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
     filled = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
     if body.registration_id not in filled:
         raise HTTPException(status_code=422, detail="Bitte die Seite wählen, die nicht erschienen ist.")
