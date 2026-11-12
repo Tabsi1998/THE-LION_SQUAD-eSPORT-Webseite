@@ -262,12 +262,20 @@ async def test_a_contested_result_reads_in_clarification_and_the_decision_redraw
     assert png_size(story) == (1080, 1920) and png_size(wide) == (1200, 630)
     meta = (await flow.get(f"/api/seo/meta?path={data['path']}")).json()
     assert "Finale 1:2 · in Klärung" in meta["description"]
+    # Review: Der Turnierweg im Profil liest denselben Stand (öffentlich und eigen).
+    profile_path = f"/api/profile/neonfalke/tournaments/{cup['slug']}/path"
+    for viewer in (None, me):
+        flow.act_as(viewer)
+        seen = (await flow.get(profile_path)).json()
+        assert [step.get("contested") for step in seen["steps"]] == [None, True], viewer
+    flow.act_as(None)
 
     # Entscheid: Das Ergebnis bleibt und gilt - die Karte ist sofort wieder die ohne Hinweis.
     await flow.db.matches_v2.update_one({"id": final["id"]}, {"$set": {"contested": False}})
     decided = (await flow.get(url)).json()
     assert decided["chips"] == plain["chips"] and decided["steps"] == plain["steps"]
     assert (await flow.get(decided["image_paths"]["story"])).content == plain_story
+    assert all("contested" not in step for step in (await flow.get(profile_path)).json()["steps"])
 
 
 @pytest.mark.asyncio
