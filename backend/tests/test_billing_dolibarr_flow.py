@@ -162,14 +162,17 @@ async def test_same_email_in_dolibarr_waits_for_finance_instead_of_guessing(flow
     assert (await billing_orders.classify_due())["invoiced"] == 1
     assert (await order_of(flow, booked))["thirdparty_id"] == existing["id"]
 
-    # Andere Antwort: bewusst neu anlegen.
-    other = await person(flow, "zweiter", email=gast["email"])
+    # Andere Antwort: bewusst neu anlegen. Eine E-Mail gehört nur zu einem Konto (eindeutiger Index, #2216) - der zweite
+    # Gast hat seine eigene, und auch dazu kennt Dolibarr schon einen Geschäftspartner.
+    other = await person(flow, "zweiter")
+    existing_other = fake.add_thirdparty("Familie Zweiter", other["email"])
     booked2 = await book(flow, other, event)
     assert (await billing_orders.classify_due())["waiting_review"] == 1
     order2 = await order_of(flow, booked2)
     flow.act_as(kassier)
     created = await flow.post(f"/api/admin/finance/orders/{order2['id']}/new-thirdparty")
-    assert created.status_code == 200 and created.json()["thirdparty_id"] != existing["id"]
+    assert created.status_code == 200
+    assert created.json()["thirdparty_id"] not in {existing["id"], existing_other["id"]}
     assert (await billing_orders.classify_due())["invoiced"] == 1
 
 

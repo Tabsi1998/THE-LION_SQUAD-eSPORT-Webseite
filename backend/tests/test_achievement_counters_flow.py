@@ -188,7 +188,7 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
                 "completed_at": "2026-05-03T18:00:00+00:00", "updated_at": "2026-05-03T18:00:00+00:00",
                 "slots": [{"slot": 1, "registration_id": first, "status": "filled"}, {"slot": 2, "registration_id": second, "status": "filled"}],
                 "results": [{"registration_id": first, "rank": 1}, {"registration_id": second, "rank": 2}]}
-    await db.tournaments.insert_one({"id": "t10", "title": "Team-Cup", "status": "completed", "is_public": True})
+    await db.tournaments.insert_one({"id": "t10", "slug": "t10", "title": "Team-Cup", "status": "completed", "is_public": True})
     await db.tournament_registrations.insert_many([
         {"id": "rt", "tournament_id": "t10", "team_id": "team1", "status": "approved", "created_at": now_utc().isoformat()},
         {"id": "rh", "tournament_id": "t10", "user_id": "u-gegner", "status": "approved", "created_at": now_utc().isoformat()},
@@ -196,10 +196,10 @@ async def test_profil_team_saison_und_turnier_zaehler(flow):
     ])
     await db.matches_v2.insert_many([played("m-team", "t10", "rt", "rh"), played("m-solo", "t9", "rf", "rg")])
     await db.season_standings.insert_many([{"season_id": "s1", "user_id": user["id"], "rank": 1}, {"season_id": "s2", "user_id": user["id"], "rank": 7}, {"season_id": "s3", "user_id": user["id"], "rank": 30}])
-    await db.events.insert_many([{"id": "e1", "created_by": user["id"], "status": "completed", "visibility": "public"}, {"id": "e2", "created_by": "x", "status": "completed", "visibility": "members"}])
+    await db.events.insert_many([{"id": "e1", "slug": "e1", "created_by": user["id"], "status": "completed", "visibility": "public"}, {"id": "e2", "slug": "e2", "created_by": "x", "status": "completed", "visibility": "members"}])
     await db.event_registrations.insert_one({"id": "er1", "event_id": "e2", "user_id": user["id"], "status": "checked_in"})
     await db.tournament_staff_assignments.insert_one({"id": "sa1", "tournament_id": "t9", "user_id": user["id"], "role": "referee"})
-    await db.tournaments.insert_one({"id": "t9", "title": "Staffed", "status": "completed", "is_public": True, "registration_opens_at": "2026-05-01T18:00:00+00:00"})
+    await db.tournaments.insert_one({"id": "t9", "slug": "t9", "title": "Staffed", "status": "completed", "is_public": True, "registration_opens_at": "2026-05-01T18:00:00+00:00"})
     await db.tournament_registrations.insert_one({"id": "rf", "tournament_id": "t9", "user_id": user["id"], "created_at": "2026-05-01T18:04:00+00:00", "status": "checked_in", "updated_at": "2026-05-02T10:00:00+00:00"})
     # Platz 2 in einem echten Turnier mit neun Teilnehmern (#2337): gespielt, abgeschlossen, veröffentlicht - die Plätze hält
     # ``record_tournament_awards`` fest. Das Finale verliert sie gegen die Nummer 1.

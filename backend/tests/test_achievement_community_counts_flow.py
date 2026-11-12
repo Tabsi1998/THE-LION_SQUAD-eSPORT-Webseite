@@ -134,12 +134,12 @@ async def test_club_events_are_internal_by_visibility_or_type_and_cancelled_even
     me = await flow.add_user(name="vereinsmensch")
     db = flow.db
     await db.events.insert_many([
-        {"id": "e-members", "name": "Mitgliederabend", "visibility": "members", "event_type": "general", "status": "completed"},
-        {"id": "e-evening", "name": "Vereinsabend", "visibility": "public", "event_type": "club_evening", "status": "completed"},
-        {"id": "e-internal", "name": "Klausur", "visibility": "community", "event_type": "internal", "status": "completed"},
-        {"id": "e-public", "name": "LAN", "visibility": "public", "event_type": "lan_party", "status": "completed"},
-        {"id": "e-cancelled", "name": "Abgesagt", "visibility": "internal", "event_type": "club_evening", "status": "cancelled"},
-        {"id": "e-noshow", "name": "Nicht da", "visibility": "public", "event_type": "club_evening", "status": "completed"},
+        {"id": "e-members", "slug": "e-members", "name": "Mitgliederabend", "visibility": "members", "event_type": "general", "status": "completed"},
+        {"id": "e-evening", "slug": "e-evening", "name": "Vereinsabend", "visibility": "public", "event_type": "club_evening", "status": "completed"},
+        {"id": "e-internal", "slug": "e-internal", "name": "Klausur", "visibility": "community", "event_type": "internal", "status": "completed"},
+        {"id": "e-public", "slug": "e-public", "name": "LAN", "visibility": "public", "event_type": "lan_party", "status": "completed"},
+        {"id": "e-cancelled", "slug": "e-cancelled", "name": "Abgesagt", "visibility": "internal", "event_type": "club_evening", "status": "cancelled"},
+        {"id": "e-noshow", "slug": "e-noshow", "name": "Nicht da", "visibility": "public", "event_type": "club_evening", "status": "completed"},
     ])
     await db.event_registrations.insert_many([
         {"id": "r1", "event_id": "e-members", "user_id": me["id"], "status": "checked_in"},

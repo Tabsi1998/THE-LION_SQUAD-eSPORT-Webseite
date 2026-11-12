@@ -58,10 +58,10 @@ async def world(db, me: dict, other: dict):
     ])
     await db.users.update_one({"id": me["id"]}, {"$set": {"is_club_member": True, "created_at": datetime(2026, 1, 5, tzinfo=timezone.utc)}})
     await db.tournaments.insert_many([
-        {"id": "t1", "title": "Eins", "status": "completed", "game_id": "g1", "season_id": "s1"},
-        {"id": "t2", "title": "Zwei", "status": "completed", "game_id": "g2", "season_id": "s1"},
-        {"id": "t3", "title": "Drei", "status": "completed", "game_id": "g3", "season_id": "s1"},
-        {"id": "t4", "title": "Vier", "status": "completed", "game_id": "g1", "season_id": "s2"},
+        {"id": "t1", "slug": "t1", "title": "Eins", "status": "completed", "game_id": "g1", "season_id": "s1"},
+        {"id": "t2", "slug": "t2", "title": "Zwei", "status": "completed", "game_id": "g2", "season_id": "s1"},
+        {"id": "t3", "slug": "t3", "title": "Drei", "status": "completed", "game_id": "g3", "season_id": "s1"},
+        {"id": "t4", "slug": "t4", "title": "Vier", "status": "completed", "game_id": "g1", "season_id": "s2"},
     ])
     await db.tournament_registrations.insert_many([
         {"id": "r1", "tournament_id": "t1", "user_id": me["id"], "status": "approved"},
