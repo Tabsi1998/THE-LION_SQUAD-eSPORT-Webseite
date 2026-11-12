@@ -756,7 +756,8 @@ async def test_the_lead_records_an_incident_and_marks_a_replay_in_an_entered_res
     taken = await flow.post(url(w), json=incident(w, proposal="replay"))
     assert taken.status_code == 200 and taken.json()["state"] == "in_review", taken.text
     entry = (await stored(flow, w))["incidents"][0]
-    assert entry["reported_by"]["registration_id"] is None and entry["review_cause"] is None
+    assert entry["reported_by"]["registration_id"] is None and entry["review_cause"] == "lead"
+    assert entry["answer"] is None and entry["closed_at"] is None, "ohne Antwort einer Seite sofort in Klärung"
     assert (await decide(flow, w, entry["id"], "replay")).status_code == 200
     # Niemand hat nach der Wiederholung gemeldet: Festzustellen gibt es noch nichts - die Leitung trägt das Ergebnis selbst ein,
     # damit steht die Serie fest.

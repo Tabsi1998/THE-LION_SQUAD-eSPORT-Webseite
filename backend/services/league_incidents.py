@@ -273,8 +273,9 @@ async def report(db, match: dict, setup, settings: dict, *, user: dict, registra
             entry["players"] = players
             people.extend(players)
         if registration_id is None:
-            # Die Leitung meldet selbst: Es gibt keine Gegenseite, die antworten müsste - die Map ist sofort in Klärung.
-            entry.update(state=IN_REVIEW)
+            # Die Leitung meldet selbst: Es gibt keine Gegenseite, die antworten müsste - die Map ist sofort in Klärung
+            # (``review_cause: "lead"``, Entscheidung Nr. 146).
+            entry.update(state=IN_REVIEW, review_cause=BY_LEAD)
         else:
             entry["answer_deadline"] = (now + timedelta(minutes=int(settings["incident_answer_minutes"]))).isoformat()
     stored = await _store(db, match, [*before, entry], user_ids=people)
