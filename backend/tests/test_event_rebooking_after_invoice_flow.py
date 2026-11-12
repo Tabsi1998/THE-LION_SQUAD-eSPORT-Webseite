@@ -357,6 +357,7 @@ async def test_rueckkehr_kurz_vor_dem_anlegen_der_gutschrift_wird_ein_prueffall(
     assert billing_cases.case_view(case)["label"] == "Gutschrift-Entwurf trotz Rückkehr"
     assert case["detail"]["returned_at"], "die Rückkehr hat den laufenden Gutschrift-Lauf vermerkt"
     assert (await registration(flow, booked))["status"] == "registered"
+    await assert_no_contradicting_credit_case(flow, order)
 
 
 @pytest.mark.asyncio
@@ -393,6 +394,15 @@ async def test_rueckkehr_nach_dem_anlegen_der_gutschrift_wird_ein_prueffall(flow
     assert "booking_state" not in stored and stored.get("credit_note_id")
     case = (await open_cases(flow, order)).get("credit_after_return")
     assert case and case["detail"]["credit_note_ref"] == stored["credit_note_ref"]
+    await assert_no_contradicting_credit_case(flow, order)
+
+
+async def assert_no_contradicting_credit_case(flow, order):
+    """„Gutschrift-Entwurf trotz Rückkehr“ (löschen) und „Storniert, Beleg existiert“ (Entwurf freigeben) widersprechen sich: Der
+    Storno-Fall ist mit dem Hinweis erledigt, dass die Person zurück ist."""
+    rows = await billing_cases.cases_for_order(flow.db, order["id"])
+    assert [row["status"] for row in rows if row["kind"] == "cancelled_after_invoice"] and all(
+        row["status"] == "resolved" and "wieder angemeldet" in row["resolution"] for row in rows if row["kind"] == "cancelled_after_invoice")
 
 
 class _ReturnAfterRead:
@@ -434,6 +444,7 @@ async def test_rueckkehr_gleich_nach_dem_lesen_im_gutschrift_lauf_wird_ein_pruef
     stored = await order_of(flow, booked)
     assert "booking_state" not in stored and stored.get("credit_note_id") and "credit_note_returned_at" not in stored
     assert "credit_after_return" in await open_cases(flow, order)
+    await assert_no_contradicting_credit_case(flow, order)
 
 
 class _ReturnAfterDraftRemoved(_ReturnAfterRead):

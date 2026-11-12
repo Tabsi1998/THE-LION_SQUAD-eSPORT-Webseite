@@ -812,6 +812,17 @@ async def credit_after_return_case(db, order: dict, ref: str, returned_at: str) 
     await billing_cases.open_case(db, order, "credit_after_return", {
         "credit_note_ref": ref, "returned_at": returned_at,
         "credit_note": f"Gutschrift-Entwurf {ref} liegt in Dolibarr, die Person ist aber wieder angemeldet – in Dolibarr löschen."})
+    await _settle_contradicting_cancel_case(db, order["id"])
+
+
+async def _settle_contradicting_cancel_case(db, order_id: str) -> None:
+    """„Storniert, Beleg existiert“ sagt „Entwurf freigeben“, „Gutschrift-Entwurf trotz Rückkehr“ sagt „löschen“ (#2184): Ist der
+    zweite offen, ist der erste erledigt - die Person ist zurück."""
+    from services import billing_cases
+
+    if await db.billing_cases.find_one({"order_id": order_id, "kind": "credit_after_return", "status": "open"}, {"_id": 0, "id": 1}):
+        await billing_cases.auto_resolve(db, order_id, "cancelled_after_invoice",
+                                         "Die Person ist wieder angemeldet – den Gutschrift-Entwurf nicht freigeben, sondern löschen (Fall „Gutschrift-Entwurf trotz Rückkehr“).")
 
 
 async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: dict) -> str:
@@ -874,6 +885,8 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
             await credit_after_return_case(db, order, ref, after.get("credit_note_returned_at") or now)
             return "created"
         await _credit_case(db, order, f"Gutschrift-Entwurf {ref} über den ganzen Betrag liegt in Dolibarr bereit – prüfen (Teilbetrag?) und freigeben.", ref)
+        # Kam die Rückkehr gerade zwischen Lesen und hier, ist „Gutschrift-Entwurf trotz Rückkehr“ schon offen - dann gilt der Storno-Fall nicht.
+        await _settle_contradicting_cancel_case(db, order["id"])
         logger.info("[billing] Gutschrift-Entwurf %s zu Beleg %s", ref, state["invoice_ref"])
         return "created"
     except DolibarrError as exc:
