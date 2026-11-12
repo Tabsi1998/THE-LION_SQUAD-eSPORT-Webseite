@@ -4,7 +4,7 @@ import { chatAttachmentSrc } from "@/lib/chatAttachments";
 import { viennaDateTime } from "@/lib/vienna";
 import { api, formatApiError } from "@/lib/api";
 import { AGAINST_LABELS, MOSS_STATE_LABELS, PROCEDURE_STATE_LABELS, claimedText, deadlineTone, decisionText, remainingText } from "@/lib/leagueProcedures";
-import { ProofList, proofHintText } from "@/components/tls/results/ProofList";
+import { ProofList, proofAudienceText, proofHintText } from "@/components/tls/results/ProofList";
 
 // Streitfall für die Turnierleitung (#1158): Meldung mit Grund, Foto und das eingetragene Ergebnis - entschieden wird
 // mit einem Tipp. „Ergebnis bleibt“ (ohne Ergebnis: „Weiter wie bisher“) schließt den Dispute; „Ergebnis ändern“
@@ -175,7 +175,18 @@ export function AppealForm({ matchId, against, until = null, onChanged, testId =
   );
 }
 
-export function ProcedureCard({ matchId, procedure, sideNames = {}, players = [], conflictOverride = false, onChanged, onChangeResult = null }) {
+/** Für die Leitung eingeklappt, damit die Karte kurz bleibt - alle anderen sehen den Inhalt direkt. */
+function Fold({ when, summary, testId, children }) {
+  if (!when) return children;
+  return (
+    <details className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3" data-testid={testId}>
+      <summary className="flex min-h-[44px] cursor-pointer items-center text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white">{summary}</summary>
+      <div className="space-y-2 pb-3">{children}</div>
+    </details>
+  );
+}
+
+export function ProcedureCard({ matchId, procedure, sideNames = {}, players = [], conflictOverride = false, onChanged, onChangeResult = null, proofsElsewhere = false }) {
   const p = procedure;
   const open = p.state === "open";
   const now = useNow(open);
@@ -189,6 +200,8 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const base = `/matches/${matchId}/procedures/${p.id}`;
   const lead = conflictOverride ? { conflict_reason: conflictReason.trim() } : {};
+  // Notausnahme des Superadmins (B.1): ohne Grund geht kein Schritt der Leitung.
+  const blocked = conflictOverride && conflictReason.trim().length < 5;
 
   const run = async (call, after) => {
     setBusy(true);
@@ -246,9 +259,12 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
           </div>
         ) : null}
 
-        <ProofList matchId={matchId} kind="protest" refId={p.id} title="Nachweise" sideLabels={sideNames} testId={`procedure-proofs-${p.id}`} hint={false} />
-        {/* Was als Nachweis zählt: einmal für die ganze Karte, nicht unter jeder der drei Listen. */}
-        {open ? <p className="text-xs text-white/50" data-testid={`procedure-proof-hint-${p.id}`}>{proofHintText()}</p> : null}
+        {/* Direkt nach dem Einreichen stehen die Nachweise oben im Formular (Schritt 3) - jede Info nur an einer Stelle. */}
+        {proofsElsewhere ? <p className="text-xs text-white/55" data-testid={`procedure-proofs-elsewhere-${p.id}`}>Deine Nachweise fügst du gerade oben im Formular hinzu.</p>
+          : <ProofList matchId={matchId} kind="protest" refId={p.id} title="Nachweise" sideLabels={sideNames} testId={`procedure-proofs-${p.id}`} hint={false} />}
+        {/* Was als Nachweis zählt und wer ihn sieht: einmal für die ganze Karte, nicht unter jeder der drei Listen. */}
+        {open && !proofsElsewhere ? <p className="text-xs text-white/50" data-testid={`procedure-proof-hint-${p.id}`}>{proofHintText()}</p> : null}
+        {!proofsElsewhere ? <p className="text-xs text-white/50" data-testid={`procedure-proof-audience-${p.id}`}>{proofAudienceText("protest")}</p> : null}
 
         {p.statement ? (
           <section className="space-y-2 border-t border-white/10 pt-3" data-testid={`procedure-statement-${p.id}`}>
@@ -265,7 +281,11 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
                 <button disabled={busy || text.trim().length < 10} className={SMALL_BUTTON} data-testid={`procedure-statement-send-${p.id}`}>{p.statement.text ? "Stellungnahme ersetzen" : "Stellung nehmen"}</button>
               </form>
             ) : null}
-            {p.statement.text || p.can_state ? <ProofList matchId={matchId} kind="statement" refId={p.id} title="Nachweise zur Stellungnahme" sideLabels={sideNames} testId={`procedure-statement-proofs-${p.id}`} hint={false} /> : null}
+            {p.statement.text || p.can_state ? (
+              <Fold when={p.can_lead} summary="Nachweise zur Stellungnahme" testId={`procedure-statement-fold-${p.id}`}>
+                <ProofList matchId={matchId} kind="statement" refId={p.id} title="Nachweise zur Stellungnahme" sideLabels={sideNames} testId={`procedure-statement-proofs-${p.id}`} hint={false} />
+              </Fold>
+            ) : null}
           </section>
         ) : null}
 
@@ -283,7 +303,12 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
               </div>
             ))}
             {mossPending ? <p className="text-xs text-warn">Bitte lade die ZIP-Datei unverändert hoch, so wie MOSS sie geschrieben hat (Regelwerk § 9a).</p> : null}
-            {mossPending || p.can_lead || (p.moss_requests || []).length ? <ProofList matchId={matchId} kind="moss" refId={p.id} title="MOSS-Nachweise" sideLabels={sideNames} testId={`procedure-moss-proofs-${p.id}`} onChanged={onChanged} hint={false} /> : null}
+            {mossPending || p.can_lead || (p.moss_requests || []).length ? (
+              <Fold when={p.can_lead} summary="MOSS-Nachweise" testId={`procedure-moss-fold-${p.id}`}>
+                <ProofList matchId={matchId} kind="moss" refId={p.id} title="MOSS-Nachweise" sideLabels={sideNames} testId={`procedure-moss-proofs-${p.id}`} onChanged={onChanged} hint={false} />
+                <p className="text-xs text-white/50" data-testid={`procedure-moss-audience-${p.id}`}>{proofAudienceText("moss")}</p>
+              </Fold>
+            ) : null}
             {p.can_lead ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
@@ -324,7 +349,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
               </label>
             ) : null}
             <div className="flex flex-wrap gap-2">
-              {!p.assignee?.own ? <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/assign`, lead))} className={SMALL_BUTTON} data-testid={`procedure-assign-${p.id}`}>{p.assignee ? "Von mir übernehmen" : "Übernehmen"}</button> : null}
+              {!p.assignee?.own ? <button type="button" disabled={busy || blocked} onClick={() => run(() => api.post(`${base}/assign`, lead))} className={SMALL_BUTTON} data-testid={`procedure-assign-${p.id}`}>{p.assignee ? "Von mir übernehmen" : "Übernehmen"}</button> : null}
               {p.statement && !p.statement.text ? <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/statement/extend`, { hours: 24, ...lead }))} className={SMALL_BUTTON} data-testid={`procedure-extend-${p.id}`}>Stellungnahme +24 Std.</button> : null}
             </div>
             <label className="block">
@@ -332,7 +357,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
               <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={2000} className="input w-full min-h-[5rem] resize-y" placeholder="Mindestens zehn Zeichen" data-testid={`procedure-note-${p.id}`} />
             </label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <button type="button" disabled={busy || note.trim().length < 10} onClick={() => run(() => api.post(`${base}/decision`, { decision: "keep", decision_note: note.trim(), ...lead }), () => setNote(""))}
+              <button type="button" disabled={busy || blocked || note.trim().length < 10} onClick={() => run(() => api.post(`${base}/decision`, { decision: "keep", decision_note: note.trim(), ...lead }), () => setNote(""))}
                 className={SMALL_BUTTON} data-testid={`procedure-keep-${p.id}`}>{p.kind === "appeal" ? "Einspruch abweisen" : "Ergebnis bleibt"}</button>
               {onChangeResult ? <button type="button" disabled={busy || note.trim().length < 10} onClick={() => onChangeResult(note.trim())}
                 className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`procedure-change-${p.id}`}>Ergebnis ändern</button> : null}

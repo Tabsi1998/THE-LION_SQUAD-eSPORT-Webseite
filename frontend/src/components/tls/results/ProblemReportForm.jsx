@@ -100,7 +100,7 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
                 <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
                   {sides.map((side, index) => (
                     <label key={side.id} className={`block min-w-0 ${index === 1 ? "order-3" : ""}`}>
-                      <span className="mb-1 block truncate text-xs text-white/55">{side.name}</span>
+                      <span className="mb-1 block text-xs text-white/55 [overflow-wrap:anywhere]">{side.name}</span>
                       <input type="number" inputMode="numeric" min={0} max={999} value={form.scores[side.id] ?? ""}
                         onChange={(event) => set("scores", { ...form.scores, [side.id]: event.target.value })}
                         className="input min-h-[44px] w-full text-center tabular-nums" aria-label={`Maps für ${side.name}`} data-testid={`procedure-claimed-${index}`} />

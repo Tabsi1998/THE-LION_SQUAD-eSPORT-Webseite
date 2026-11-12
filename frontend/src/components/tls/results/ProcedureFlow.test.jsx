@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProblemReportForm } from "./ProblemReportForm";
 import { AppealForm, ProcedureCard } from "./DisputeCard";
 import { ProofList } from "./ProofList";
+import { OwnDisputes } from "./OwnDisputes";
 
 const { api, uploadApi } = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() }, uploadApi: { post: vi.fn() } }));
 vi.mock("@/lib/api", () => ({ api, uploadApi, formatApiError: (detail) => (typeof detail === "string" ? detail : "") }));
@@ -125,6 +126,48 @@ describe("Hinweis zu Nachweisen", () => {
     api.get.mockResolvedValue({ data: { items: [], open: true, can_add: true, limit: 10 } });
     render(<ProofList matchId="m1" kind="report" />);
     expect(await screen.findByTestId("proof-list-hint")).toHaveTextContent("Ingame-Uhr");
+  });
+});
+
+describe("Jede Info an einer Stelle", () => {
+  it("zeigt ein Liga-Verfahren nicht noch einmal als „Deine Meldung“ - Meldungen der Turniere bleiben", () => {
+    const at = "2026-11-10T19:30:00Z";
+    const procedureRow = { user_id: "u1", id: "p1", kind: "protest", state: "withdrawn", category: "other", reason: TEXT, at };
+    const { container, rerender } = render(<OwnDisputes match={{ disputes: [procedureRow] }} userId="u1" />);
+    expect(container).toBeEmptyDOMElement();
+    rerender(<OwnDisputes match={{ disputes: [procedureRow, { user_id: "u1", category: "technical", reason: "Lobby abgestürzt", at }] }} userId="u1" />);
+    expect(screen.getAllByTestId("match-own-dispute")).toHaveLength(1);
+    expect(screen.getByTestId("match-own-dispute")).toHaveTextContent("Lobby abgestürzt");
+  });
+
+  it("lässt die Nachweise der Karte weg, solange Schritt 3 des Formulars sie zeigt", async () => {
+    const { rerender } = render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ own: true })} proofsElsewhere />);
+    expect(screen.getByTestId("procedure-proofs-elsewhere-p1")).toBeInTheDocument();
+    expect(api.get).not.toHaveBeenCalledWith("/matches/m1/proofs", { params: { kind: "protest", ref_id: "p1" } });
+    rerender(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ own: true })} />);
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith("/matches/m1/proofs", { params: { kind: "protest", ref_id: "p1" } }));
+    expect(screen.queryByTestId("procedure-proofs-elsewhere-p1")).toBeNull();
+  });
+
+  it("sagt je Karte einmal, wer Nachweise sieht, und klappt für die Leitung die Nebenlisten ein", async () => {
+    api.get.mockResolvedValue({ data: { items: [], open: true, can_add: true, limit: 10 } });
+    const said = { ...procedure().statement, text: "Die Map wurde korrekt gemeldet.", at: "2026-11-11T09:00:00Z" };
+    const { rerender } = render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ can_lead: true, statement: said })} />);
+    expect(await screen.findByTestId("procedure-moss-proofs-p1-add")).toBeInTheDocument();
+    expect(screen.getAllByText(/Nachweise sehen nur die beiden Seiten/)).toHaveLength(1);
+    expect(screen.getAllByText(/MOSS-Nachweise sehen nur du/)).toHaveLength(1);
+    expect(screen.getByTestId("procedure-statement-fold-p1")).not.toHaveAttribute("open");
+    expect(screen.getByTestId("procedure-moss-fold-p1")).not.toHaveAttribute("open");
+    rerender(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ opponent: true, statement: said })} />);
+    expect(screen.queryByTestId("procedure-statement-fold-p1")).toBeNull();
+  });
+
+  it("verlangt vom befangenen Superadmin erst den Grund der Notausnahme", async () => {
+    render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ can_lead: true })} conflictOverride />);
+    expect(screen.getByTestId("procedure-assign-p1")).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Grund der Notausnahme"), { target: { value: "Niemand sonst ist erreichbar." } });
+    fireEvent.click(screen.getByTestId("procedure-assign-p1"));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/matches/m1/procedures/p1/assign", { conflict_reason: "Niemand sonst ist erreichbar." }));
   });
 });
 

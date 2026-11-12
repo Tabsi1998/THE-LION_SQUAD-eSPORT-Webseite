@@ -88,6 +88,13 @@ export function proofHintText(limit = 10) {
   return `Auf Bildern und Videos muss die Ingame-Uhr oder ein anderer Zeitstempel zu sehen sein. Videos gibst du als Link an (nur https, etwa ungelistet hochgeladen), mindestens 720p und 15 Sekunden; bei mehr als zwei Minuten schreib die Zeitstellen dazu (Regelwerk § 10.6). Höchstens ${limit} Nachweise je Seite.`;
 }
 
+/** Wer die Nachweise eines Bezugs sieht - ein Bereich mit mehreren Listen sagt es einmal selbst (`hint={false}`). */
+export function proofAudienceText(kind) {
+  return kind === "moss"
+    ? "MOSS-Nachweise sehen nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite. Entfernst du einen, bleibt er für die Leitung sichtbar, bis das Verfahren endet."
+    : "Nachweise sehen nur die beiden Seiten dieses Spiels und die Leitung.";
+}
+
 export function ProofList({ matchId, kind, refId = "", title = "Nachweise", sideLabels = null, testId = "proof-list", onChanged = null, hint = true }) {
   const [state, setState] = useState({ status: "loading", data: null });
   const [link, setLink] = useState("");
@@ -223,9 +230,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
               {data.open ? "Hier kannst du keine Nachweise hinzufügen." : "Abgeschlossen – die Nachweise lassen sich nicht mehr ändern."}
             </p>
           )}
-          <p className="text-xs text-white/50" data-testid={`${testId}-audience`}>
-            {kind === "moss" ? "MOSS-Nachweise sehen nur du, Captain und Vertreter deiner Seite und die Leitung – nie die Gegenseite. Entfernst du einen, bleibt er für die Leitung sichtbar, bis das Verfahren endet." : "Nachweise sehen nur die beiden Seiten dieses Spiels und die Leitung."}
-          </p>
+          {hint ? <p className="text-xs text-white/50" data-testid={`${testId}-audience`}>{proofAudienceText(kind)}</p> : null}
         </>
       ) : null}
       {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}

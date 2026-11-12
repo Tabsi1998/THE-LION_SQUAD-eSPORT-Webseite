@@ -604,7 +604,7 @@ function MatchPageView() {
 
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
-              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die Turnierleitung prüft und entscheidet.
+              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die {data.league ? "Liga-Leitung" : "Turnierleitung"} prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
               {(canStaffSubmit || data.can_decide_dispute) && data.tournament && !procedures.length ? (
                 <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
@@ -631,7 +631,7 @@ function MatchPageView() {
           {procedures.length ? (
             <section className="mt-5 space-y-3" aria-label="Verfahren zu diesem Spiel" data-testid="match-procedures">
               {procedures.map((procedure) => (
-                <ProcedureCard key={procedure.id} matchId={id} procedure={procedure} sideNames={sideNames} players={data.league?.moss_candidates || []}
+                <ProcedureCard key={procedure.id} matchId={id} procedure={procedure} sideNames={sideNames} proofsElsewhere={procedureStep === procedure.id} players={data.league?.moss_candidates || []}
                   conflictOverride={Boolean(data.conflict?.override)} onChanged={() => load({ preserveDrafts: false })}
                   onChangeResult={data.result_entry ? (reason) => { setDecisionReason(reason); setResultOpen(true); } : null} />
               ))}
