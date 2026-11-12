@@ -9,6 +9,8 @@ import "./maps.css";
 const STAGGER_STEPS = 8;
 // Karten im Raster: zwei Spalten am Handy, drei ab sm, vier ab lg (max. ~240 px in der schmalen Spalte).
 const CARD_SIZES = "(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw";
+// Wischbar (#2268, Ligaseite): am Handy eine Reihe großer Karten (78 % breit), ab sm das Raster mit drei Spalten.
+const SWIPE_SIZES = "(min-width: 1024px) 360px, (min-width: 640px) 33vw, 78vw";
 
 export function MapCard({ item, index = 0, position = null, sizes = CARD_SIZES, testId = "map-card" }) {
   return (
@@ -36,8 +38,9 @@ function countText(count) {
 const HEADING = "font-heading text-2xl font-black uppercase";
 
 // `headingClass` und `icon`: die Überschrift im Stil der Seite (Turnierseite: fett mit Symbol wie „Regeln“, „Preise“).
+// `swipe`: am Handy je Modus eine wischbare Reihe statt des Rasters (Ligaseite, #2268).
 export function MapPoolView({ pool, title = "Map-Pool", hint = "", headingId = "map-pool-title", headingClass = HEADING, icon: Icon = null,
-  className = "mt-12", testId = "map-pool" }) {
+  className = "mt-12", testId = "map-pool", swipe = false }) {
   const groups = (pool?.modes || []).filter((group) => group.maps?.length);
   if (!groups.length) return null;
   const showModes = groups.length > 1 || groups[0].mode;
@@ -56,9 +59,10 @@ export function MapPoolView({ pool, title = "Map-Pool", hint = "", headingId = "
                 <span className="text-white/45 tracking-normal normal-case font-semibold tabular-nums">{countText(group.maps.length)}</span>
               </h3>
             ) : null}
-            <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <ul className={swipe ? "tls-map-pool-swipe tls-swipe" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"}
+              aria-label={swipe ? `Maps ${group.label || group.mode || ""}`.trim() : undefined}>
               {group.maps.map((item, index) => (
-                <li key={item.map_id || item.name}><MapCard item={item} index={index} /></li>
+                <li key={item.map_id || item.name}><MapCard item={item} index={index} sizes={swipe ? SWIPE_SIZES : CARD_SIZES} /></li>
               ))}
             </ul>
           </div>

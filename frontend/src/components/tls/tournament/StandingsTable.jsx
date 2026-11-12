@@ -62,9 +62,10 @@ function Notes({ row }) {
  * frisch geänderter Zeilen; `registerRow`: useFlipRows - Zeilen gleiten an ihren neuen Platz; `certificateHref`: Link
  * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile; `nameLabel`: Kopf der Namensspalte („Team“
  * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable);
- * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit).
+ * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit);
+ * `championKey`: Schlüssel der Meister-Zeile (Liga, #2268) - nur sie trägt Gold.
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false }) {
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null }) {
   const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league)
     .filter((column) => !(hideDraws && column.key === "drawn"))
     .map((column) => {
@@ -102,6 +103,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 data-testid={`standing-row-${row.registration_id}`}
                 data-changed={isChanged ? "true" : undefined}
                 data-mine={row.is_mine ? "true" : undefined}
+                data-champion={championKey && key === championKey ? "true" : undefined}
                 className={`tls-standing-row ${isChanged ? "tls-changed-row" : ""}`}
               >
                 <td className="pl-3 sm:pl-4 pr-1 py-2.5 align-middle">

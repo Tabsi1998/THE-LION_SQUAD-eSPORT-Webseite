@@ -325,7 +325,7 @@ test("Ligaseite verlinkt das Regelwerk statt des Aufklappblocks", async ({ page 
   await page.goto("/liga/probe/s1");
   await expect(page.getByTestId("league-rules-version")).toContainText("Version 2");
   await expect(page.getByTestId("league-rules")).toHaveCount(0);
-  await page.getByTestId("league-rules-link").getByRole("link", { name: /Regeln/ }).click();
+  await page.getByTestId("league-rules-link").getByRole("link", { name: "Regelwerk", exact: true }).click();
   await expect(page).toHaveURL(/\/liga\/probe\/s1\/regeln$/);
   await expect(page.getByTestId("rules-document")).toBeVisible();
 });
