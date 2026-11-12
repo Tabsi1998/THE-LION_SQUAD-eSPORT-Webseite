@@ -122,6 +122,21 @@ async def test_a_test_that_changes_indexes_gets_a_rebuilt_database():
         await shutdown_second()
 
 
+@pytest.mark.asyncio
+async def test_an_index_a_test_adds_is_dropped_without_a_new_database():
+    """Der Katalog der Erfolge legt beim Einspielen eigene Indizes an (#2216) - das kostet keine neue Datenbank."""
+    first, shutdown_first = make_flow()
+    await first.db.user_xp.create_index([("total", -1)])
+    await shutdown_first()
+
+    second, shutdown_second = make_flow()
+    try:
+        assert second.db.name == first.db.name, "dieselbe Datenbank, nur ohne den neuen Index"
+        assert "total_-1" not in await second.db.user_xp.index_information()
+    finally:
+        await shutdown_second()
+
+
 def test_the_process_database_is_gone_at_the_end():
     from flow_harness import load_application
     from pymongo import MongoClient
