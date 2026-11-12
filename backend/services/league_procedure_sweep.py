@@ -63,7 +63,9 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
     now = now or now_utc()
     counts = {"reminded": 0, "escalated": 0, "statement_expired": 0, "moss_missing": 0}
     matches = await db.matches_v2.find(
-        {"disputes": {"$elemMatch": {"kind": {"$in": list(procedures.KINDS)}, "state": procedures.OPEN}}}, {"_id": 0}).to_list(500)
+        # ``disputes.state`` zuerst: darauf liegt der Index ``procedure_state`` (database.py) - ``$elemMatch`` grenzt danach ein.
+        {"disputes.state": procedures.OPEN,
+         "disputes": {"$elemMatch": {"kind": {"$in": list(procedures.KINDS)}, "state": procedures.OPEN}}}, {"_id": 0}).to_list(500)
     for match in matches:
         try:
             league = await procedures.context(db, match)
