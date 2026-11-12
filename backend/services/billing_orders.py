@@ -50,6 +50,10 @@ INVOICE_LINK_CLEARED = {"invoice_id": None, "invoice_ref": None, "invoice_status
 INVOICE_STILL_VALID = {"payment_state": {"$nin": ["credited", "abandoned"]}, "invoice_status": {"$ne": "abandoned"}}
 # Ein Auftrag, der nichts mehr trägt: Buchung storniert und der Beleg gutgeschrieben oder aufgegeben - er hält keine neue Buchung auf.
 SETTLED_AFTER_CANCEL = {"booking_state": "cancelled", "$or": [{"payment_state": {"$in": ["credited", "abandoned"]}}, {"invoice_status": "abandoned"}]}
+# Der Grund im Prüffall der Finanzverwaltung, wenn eine beendete Anmeldung trotz Beleg zurückkommt (#2127, #2184) - für Events
+# und Turniere (#2368) derselbe.
+REBOOKED_SELF = "Nach Storno selbst neu angemeldet"
+REBOOKED_BY_LEAD = "Anmeldung wieder aktiviert"
 STATUS_LABELS = {
     "pending": "neu",
     "waiting_write_access": "wartet auf Schreibzugriff",

@@ -72,12 +72,24 @@ def quote_for(registration: dict, tournament: dict, offer: dict, selected: list[
     return pricing.quote(offer, seats=seats, teams=1, selected=selected)
 
 
-async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict, selected: list[str] | None = None) -> dict | None:
-    """Preis einfrieren und Auftrag anlegen - nur bei verbindlicher Teilnahme und nur einmal."""
+async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict, selected: list[str] | None = None,
+                       rebook_reason: str = billing_orders.REBOOKED_BY_LEAD) -> dict | None:
+    """Preis einfrieren und Auftrag anlegen - nur bei verbindlicher Teilnahme und nur einmal.
+
+    Zurück nach einem Storno, obwohl es zur Anmeldung schon einen Beleg gibt (#2368, wie bei Events #2184): kein neuer Preis
+    und kein zweiter Auftrag. Die Buchung gilt am Auftrag wieder (``billing_orders.rebook_after_invoice``), die Anmeldung trägt
+    wieder Preis und Stand des Belegs, die Finanzverwaltung bekommt den Prüffall mit alt und neu (Grund ``rebook_reason``). Gilt
+    der Beleg nicht mehr (voll gutgeschrieben, aufgegeben, Entwurf gelöscht), gilt der aktuelle Preis mit eigenem Auftrag.
+
+    Was hier an die Anmeldung geht, steht danach auch in ``registration`` - nach einer Rückbuchung dazu ``invoice_kept`` (nur
+    für Nachricht und Antwort, nie gespeichert, ``event_notifications.kept_invoice_line``)."""
     offer = tournament.get("billing") or {}
     if not charges(tournament, offer) or registration.get("status") not in BILLABLE_STATUSES:
         return None
-    if registration.get("price_snapshot") and registration.get("billing_status") not in (None, "cancelled"):
+    # Entscheidend ist der Auftrag, nicht der Stand der Anmeldung: Der Abgleich setzt eine beendete Anmeldung wieder auf den
+    # Stand ihres Belegs (``billing_status`` „invoiced“), die Buchung am Auftrag bleibt storniert.
+    returning = await billing_orders.booking_cancelled_with_invoice(db, kind="tournament", registration=registration)
+    if registration.get("price_snapshot") and registration.get("billing_status") not in (None, "cancelled") and not returning:
         return registration["price_snapshot"]
     try:
         price = quote_for(registration, tournament, offer, selected or registration.get("selected_positions") or [])
@@ -85,14 +97,42 @@ async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict,
         raise HTTPException(status_code=400, detail=str(exc))
     if price.get("free"):
         return None
+    now = now_utc().isoformat()
+    invoiced = await billing_orders.invoiced_order(db, kind="tournament", registration_id=registration["id"]) if returning else None
+    if invoiced and await billing_orders.rebook_after_invoice(db, invoiced, reason=rebook_reason, new_total_cents=int(price.get("total_cents") or 0)):
+        fields = billing_orders.rebooked_fields(invoiced)
+        await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {**fields, "updated_at": now}})
+        registration.update(fields, invoice_kept=True)
+        return registration.get("price_snapshot")
     snapshot = pricing.snapshot(price, recipient=payer, source={
         "kind": "tournament", "id": tournament["id"], "slug": tournament.get("slug"), "registration_id": registration["id"],
         "team_id": registration.get("team_id"), "display_name": registration.get("display_name"),
     }, invoice_timing=offer.get("invoice_timing") or "on_confirm")
-    await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"price_snapshot": snapshot, "billing_status": "pending", "updated_at": now_utc().isoformat()}})
+    fields = {"price_snapshot": snapshot, "billing_status": "pending"}
+    if registration.get("invoice_id") or registration.get("invoice_ref"):
+        fields.update(billing_orders.INVOICE_LINK_CLEARED)   # der alte Beleg gilt nicht mehr - die Anmeldung zeigt ihn nicht weiter
+    await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {**fields, "updated_at": now}})
+    registration.update(fields)
     await billing_orders.create_order(db, kind="tournament", source_id=tournament["id"], registration_id=registration["id"], user_id=payer["id"],
                                       snapshot=snapshot, timing=pricing.order_timing(snapshot, offer))
     return snapshot
+
+
+async def returning_registration_id(db, tournament: dict, *, payer_id: str, team_id: str | None) -> str | None:
+    """Abgemeldet und neu angemeldet (#2368): Die Abmeldung löscht die Turnier-Anmeldung, ihr Auftrag mit Beleg bleibt
+    „storniert“. Gilt der Beleg noch, kommt dieselbe Anmeldung zurück - mit ihrer Kennung, damit ``freeze_price`` den Auftrag
+    findet, statt einen zweiten anzulegen (auch erst beim Nachrücken von der Warteliste oder bei der Freigabe).
+
+    Dieselbe Anmeldung heißt: dasselbe Turnier, dieselbe zahlende Person und dasselbe Team (Solo: keins). Meldet ein anderes
+    Mitglied das Team neu an, übernimmt es die Kosten selbst: eigener Auftrag, die alte Rechnung bleibt beim alten Auftrag
+    (Gutschrift über den Storno). Lebt die Anmeldung zum Auftrag noch, ist es keine Rückkehr über diesen Weg."""
+    order = await db.billing_orders.find_one(
+        {"kind": "tournament", "source_id": tournament["id"], "user_id": payer_id, "snapshot.source.team_id": team_id,
+         "status": "invoiced", "booking_state": "cancelled", **billing_orders.INVOICE_STILL_VALID},
+        {"_id": 0, "registration_id": 1}, sort=[("created_at", -1)])
+    if not order or await db.tournament_registrations.find_one({"id": order["registration_id"]}, {"_id": 0, "id": 1}):
+        return None
+    return order["registration_id"]
 
 
 async def repair_order(db, registration: dict, tournament: dict, *, actor: dict | None) -> dict | None:

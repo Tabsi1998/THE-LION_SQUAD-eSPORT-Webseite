@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from database import get_db
-from services import league_applications, squad_registration
+from services import billing_orders, league_applications, squad_registration
 from services.league_scope import is_league_staffel
 from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
 from services.permissions import is_confirmed_tournament_lead
@@ -122,11 +122,14 @@ BRACKET_REFRESH_LOCKED_STATUSES = {"live", "paused", "completed", "results_publi
 # Solange der Baum nicht steht, rücken Wartende von selbst nach (#1551).
 WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_closed", "check_in"}
 ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
+# Der Grund im Prüffall, wenn eine Anmeldung nach Storno mit Beleg von selbst von der Warteliste nachrückt (#2368).
+MOVED_UP_AFTER_CANCEL = "Nach Storno von der Warteliste nachgerückt"
 # Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
 LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
 # Was eine neue Anmeldung nach einer weggenommenen Ablehnung nicht mitnimmt (#2113): die Marke, die alte Bestätigung, den
-# alten Preis samt Beleg (den Preis friert erst die Freigabe neu ein) und die Aufstellung samt „Wer ist da“ von damals.
-REOPEN_CLEARS = ("rejection_dismissed_at", "notified_status", "price_snapshot", "billing_status", "invoice_ref", "invoice_status",
+# alten Preis samt Beleg (den Preis friert erst die Freigabe neu ein - gilt der Beleg noch, bucht sie ihn zurück, #2368) und die
+# Aufstellung samt „Wer ist da“ von damals.
+REOPEN_CLEARS = ("rejection_dismissed_at", "notified_status", "price_snapshot", "billing_status", "invoice_id", "invoice_ref", "invoice_status",
                  "payment_state", "lineup", "substitutes", "lineup_updated_at", "lineup_updated_by", "presence", "presence_nudged_at",
                  "checked_in_at")
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
@@ -190,7 +193,8 @@ async def _move_up_from_waitlist(db, tid: str, actor_id: str | None, *, exclude_
         payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1}) \
             if reg.get("user_id") else None
         if payer:
-            await tournament_fees.freeze_price(db, reg, tournament, payer=payer)
+            # Nach Storno mit Beleg neu angemeldet und jetzt nachgerückt (#2368): der Beleg gilt weiter, die Nachricht sagt es.
+            await tournament_fees.freeze_price(db, reg, tournament, payer=payer, rebook_reason=MOVED_UP_AFTER_CANCEL)
         await _notify_registration(db, tid, reg, "approved", previous="waitlist", actor_id=actor_id)
         await _audit_tournament_action(db, "tournament.registration.waitlist_moved_up", actor_id, tid, {"registration_id": reg["id"]})
         moved.append(reg["id"])
@@ -636,8 +640,13 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     # Count approved
     count = await db.tournament_registrations.count_documents(
         {"tournament_id": tid, "status": {"$in": ["pending", "approved", "checked_in"]}})
+    # Abgemeldet, obwohl der Beleg schon existiert, und neu angemeldet (#2368): dieselbe Anmeldung kommt zurück - ihr Auftrag
+    # wird zurückgebucht statt ein zweiter angelegt (``tournament_fees.freeze_price``), jetzt oder beim Nachrücken.
+    returning_id = None
+    if not reopen and tournament_fees.charges(tournament, fee_offer):
+        returning_id = await tournament_fees.returning_registration_id(db, tournament, payer_id=me["id"], team_id=team.get("id") if team else None)
     reg = {
-        "id": new_id(),
+        "id": returning_id or new_id(),
         "identity_key": f"{tid}:team:{team['id']}" if team else f"{tid}:user:{me['id']}",
         "tournament_id": tid,
         "user_id": me["id"],
@@ -690,10 +699,9 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
             return {**existing, "auto_bracket_update": None, "idempotent_replay": True}
         raise
     if reg["status"] in {"approved", "checked_in"}:
-        # Verbindlich dabei: Preis einfrieren, Auftrag anlegen (#319). Warteliste zahlt beim Nachrücken.
-        snapshot = await tournament_fees.freeze_price(db, reg, tournament, payer=me)
-        if snapshot:
-            reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
+        # Verbindlich dabei: Preis einfrieren, Auftrag anlegen (#319) - oder nach Storno mit Beleg zurückbuchen (#2368); die
+        # Felder stehen danach in ``reg``. Warteliste zahlt beim Nachrücken.
+        await tournament_fees.freeze_price(db, reg, tournament, payer=me, rebook_reason=billing_orders.REBOOKED_SELF)
     reg.pop("_id", None)
     reg.pop("identity_key", None)
     # Vorschau-Baum, Bestätigung und Erfolge folgen nach der Sperre (#1859, ``self_register``).
@@ -1144,6 +1152,12 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         {"$set": updates, "$unset": clears} if clears else {"$set": updates},
     )
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
+    if updates.get("status") in tournament_fees.BILLABLE_STATUSES:
+        # Startgeld (#319): Freigabe friert den Preis ein (Zahlungspflichtig ist, wer angemeldet hat) - oder bucht nach einem
+        # Storno mit Beleg zurück (#2368). Vor der Nachricht: Sie sagt dann, dass es schon eine Rechnung gibt.
+        payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
+        if payer:
+            await tournament_fees.freeze_price(db, reg, tournament_doc, payer=payer)
     if updates.get("status") and updates["status"] != previous_status:
         await _notify_registration(db, tid, reg, updates["status"], previous=previous_status, reason=status_reason, actor_id=me.get("id"))
         # Protokoll (#2111, TA19): wer welchen Anmeldestatus gesetzt hat - der Grund steht nur in der Nachricht.
@@ -1160,15 +1174,8 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if tournament:
             reg["auto_bracket_update"] = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
-            # Startgeld (#319): Freigabe friert den Preis ein (Zahlungspflichtig ist, wer angemeldet hat);
-            # Ablehnung oder Nichterscheinen vor dem Beleg schließt den Auftrag.
-            if updates.get("status") in tournament_fees.BILLABLE_STATUSES:
-                payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
-                if payer:
-                    snapshot = await tournament_fees.freeze_price(db, reg, tournament, payer=payer)
-                    if snapshot:
-                        reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
-            elif updates.get("status") in tournament_fees.CLOSED_STATUSES:
+            # Startgeld (#319): Ablehnung oder Nichterscheinen vor dem Beleg schließt den Auftrag (die Freigabe steht oben).
+            if updates.get("status") in tournament_fees.CLOSED_STATUSES:
                 await tournament_fees.close_price(db, reg, f"Anmeldung: {updates['status']}")
     return {**reg, "idempotent_replay": False}
 
