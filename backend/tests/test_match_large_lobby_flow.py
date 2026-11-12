@@ -1,9 +1,9 @@
 """Große Lobbys (#2216): Free for All und Battle Royale legen alle Anmeldungen in ein einziges Spiel.
 
 Ein Turnier darf bis zu 4096 Teilnehmer haben (``models.PARTICIPANT_LIMIT``). Die Stellen, die die Anmeldungen eines Spiels
-lesen, kappten bei 50, 64 oder 100 - auf echtem MongoDB fehlten danach alle weiteren: kein Platz auf der Matchseite, kein
-Ergebnis melden, kein Matchchat, keine Benachrichtigung. Mongomock ignoriert die Länge bei ``to_list``, deshalb ist der Fehler
-nur mit ``FLOW_MONGO_URL`` zu sehen.
+lesen, kappten bei 50, 64 oder 100 - danach fehlten alle weiteren: kein Platz auf der Matchseite, kein Ergebnis melden, kein
+Matchchat, keine Benachrichtigung, und der Vorschlag „nicht erschienen“ zählte höchstens 64 Teilnehmer. ``to_list(n)`` liefert
+auf mongomock wie bei Motor höchstens n Einträge (#2357), der Fehler ist also auf beiden Datenbanken zu sehen.
 """
 import pathlib
 import sys
@@ -65,3 +65,20 @@ async def test_every_player_of_a_big_lobby_hears_about_the_result(flow):
     assert entered.status_code == 200, entered.text
     told = await flow.db.notifications.distinct("user_id", {"kind": "match_result"})
     assert set(told) == {user["id"] for user in users}, "jeder Platz erfährt das Ergebnis"
+
+
+@pytest.mark.asyncio
+async def test_the_no_show_notice_of_a_big_lobby_counts_every_player(flow):
+    from datetime import timedelta
+
+    from models import now_utc
+    from services.match_deadline_sweep import sweep
+
+    _tournament, match, _users, _registrations = await big_lobby(flow)
+    called = (now_utc() - timedelta(hours=2)).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"station_id": "station-1", "called_at": called}})
+    swept = await sweep(flow.db)
+    assert swept["proposed"] == 1, swept
+    notices = await flow.db.notifications.find({"meta.reason": "no_show"}, {"_id": 0, "body": 1}).to_list(None)
+    assert notices, "die Leitung erfährt vom Vorschlag"
+    assert all(f"{LOBBY} Teilnehmer" in notice["body"] for notice in notices), notices[:1]
