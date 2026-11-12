@@ -639,7 +639,10 @@ async def close_on_result(db, match: dict, *, actor_id: str, now_iso: str, decis
             row = {**row, "resolved_at": now_iso, "resolved_by": actor_id, "decision": decision}
         disputes.append(row)
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
-        "disputes": disputes, "dispute_resolved_at": now_iso, "dispute_resolved_by": actor_id, "contested": False}})
+        "disputes": disputes, "dispute_resolved_at": now_iso, "dispute_resolved_by": actor_id, "contested": False,
+        # Der Zeit-Job und der MOSS-Upload schreiben nur auf dem Stand, den sie gelesen haben (``_save_row``): Mit dem neuen
+        # ``updated_at`` überschreibt ein älterer Schnappschuss diese Entscheidung nicht.
+        "updated_at": now_utc().isoformat()}})
     for row in closed:
         await audit(db, "match.procedure.decide", match, actor_id, row, decision=decision, via="result")
     if closed and league is not None:
