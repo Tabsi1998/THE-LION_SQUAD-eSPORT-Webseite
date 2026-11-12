@@ -180,9 +180,11 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       await expect(card).toContainText("Map 2 · Funkturm bei Nacht · Verbindungsabbruch");
       await expect(card).toContainText("Vorschlag: Rehost beim Stand");
       await expect(card).toContainText("Stand beim Vorfall: 3:4 · Runde 8");
-      await expect(page.getByTestId("incident-sentence-v1")).toContainText("Bitte antwortet.");
+      // Wer antworten muss, liest genau das; die Uhrzeit der Frist steht nur am Countdown, kein zweiter Hinweis über der Karte.
+      await expect(page.getByTestId("incident-sentence-v1")).toHaveText("Ihr seid dran: stimmt zu oder lehnt ab.");
+      await expect(page.getByTestId("incident-countdown-v1")).toContainText(/Antwortzeit bis \d\d:\d\d/);
       await expect(page.getByTestId("incident-countdown-text-v1")).toHaveText(/^[78]:\d\d$/);
-      await expect(page.getByTestId("incident-hold")).toContainText("die Gegenseite antwortet noch");
+      await expect(page.getByTestId("incident-hold")).toHaveCount(0);
       await expect(page.getByTestId("incident-proof-v1")).toBeVisible();
       await expectNoSideScroll(page);
       await shot(page, testInfo, "vorfall-antworten", width);
@@ -193,15 +195,20 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       await expect.poll(() => posts.find((row) => row.path === "/api/matches/m1/incidents/v1/answer")?.body).toEqual({ accept: false, note: "Der Stand war 4:4." });
     });
 
-    test(`in Klärung: Satz zum Ergebnis, Serie pausiert, Nachweise bleiben offen bei ${width} px`, async ({ page }, testInfo) => {
+    test(`in Klärung: steht am Chip der Map und am Abzeichen, sonst nirgends; Serie pausiert bei ${width} px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
       const row = incident({ state: "in_review", review_cause: "rejected", answer: { registration_id: "a", name: NAMES[0], at: inMinutes(-1), note: "Der Stand war 4:4." } });
       await setup(page, CAPTAIN, matchPage({ incidents: [row], info: { hold: HOLD, clarification_mode: "pause_series", can_report: true } }));
       await page.goto("/matches/m1");
       await expect(page.getByTestId("incident-state-v1")).toHaveText("In Klärung");
-      await expect(page.getByTestId("incident-hold")).toContainText("Die Serie pausiert: Spätere Maps lassen sich erst danach melden.");
-      await expect(page.getByTestId("incident-sentence-v1")).toContainText("Abgelehnt");
-      await expect(page.getByTestId("map-state-2")).toContainText("Map 2 ist in Klärung");
+      await expect(page.getByTestId("map-state-2")).toHaveText("Map 2 ist in Klärung");
+      // Jede Angabe an einer Stelle: kein Hinweis über den Karten, kein Satz „in Klärung“ in der Karte.
+      await expect(page.getByTestId("incident-hold")).toHaveCount(0);
+      await expect(page.getByTestId("incident-sentence-v1")).toHaveText("Die Gegenseite hat abgelehnt. Die Serie pausiert: Spätere Maps meldet ihr erst nach der Entscheidung.");
+      expect((await page.locator("main, body").first().innerText()).match(/in klärung/gi)).toHaveLength(2);
+      // Höchstens ein Element atmet: das Abzeichen der Karte, nicht auch noch der Chip der Map.
+      await expect(page.locator(".tls-incident-pulse")).toHaveCount(1);
+      await expect(page.getByTestId("incident-state-v1")).toHaveClass(/tls-incident-pulse/);
       await expect(page.getByTestId("incident-decision-v1")).toHaveCount(0);
       await expectNoSideScroll(page);
       await shot(page, testInfo, "vorfall-in-klaerung", width);
@@ -214,7 +221,7 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       const info = { as_lead: true, can_decide: true, hold: HOLD };
       await setup(page, LEAD, () => matchPage({ incidents: rows, info, league: { own_registration_id: null, roster: [] }, page: { can_act: false, acting_registration_id: null } }), posts);
       await page.goto("/matches/m1");
-      await expect(page.getByTestId("incident-sentence-v1")).toContainText("Keine Antwort in der Zeit");
+      await expect(page.getByTestId("incident-sentence-v1")).toContainText("Keine Antwort in der Antwortzeit.");
       await page.getByTestId("incident-decision-v1-submit").click();
       await expect(page.getByTestId("incident-decision-v1-problem")).toContainText("wie entschieden wird");
       await page.getByTestId("incident-decision-v1-replay").check();
@@ -243,6 +250,21 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       await page.getByTestId("incident-settle-v1-submit").click();
       await expect.poll(() => posts.find((row) => row.path === "/api/matches/m1/incidents/v1/settle")?.body).toEqual({
         missing_positions: [3], surplus_positions: [], reason: "Map 3 fehlt noch, es steht 1:1." });
+    });
+
+    test(`Einigung auf Wiederholung: die Seite sagt „danach meldet ihr die Serie neu“ bei ${width} px`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const row = incident({ state: "agreed", open: false, proposal: "replay", proposal_label: "Map wiederholen", voided: { score: { a: 3, b: 4 } },
+        answer: { registration_id: "a", name: NAMES[0], at: inMinutes(-1), note: "" } });
+      const hold = { code: "rereport", position: 2, text: "Map 2 wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr." };
+      await setup(page, CAPTAIN, matchPage({ incidents: [row], info: { hold } }));
+      await page.goto("/matches/m1");
+      await expect(page.getByTestId("incident-hold")).toHaveText("Map 2 wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr.");
+      await expect(page.getByTestId("incident-state-v1")).toHaveText("Einig");
+      await expect(page.getByTestId("incident-voided-v1")).toContainText("Die erste Austragung (Stand 3:4) zählt nicht");
+      await expect(page.locator(".tls-incident-pulse")).toHaveCount(0);
+      await expectNoSideScroll(page);
+      await shot(page, testInfo, "vorfall-neu-melden", width);
     });
 
     test(`Gäste lesen nur „in Klärung“ an der Map bei ${width} px`, async ({ page }, testInfo) => {

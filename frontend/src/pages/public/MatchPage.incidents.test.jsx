@@ -54,7 +54,7 @@ test("wer nicht dazugehört, liest nur „in Klärung“ an der Map - keine Flä
   expect(screen.queryByTestId("map-state-1")).toBeNull();
 });
 
-test("Beteiligte sehen die Fläche mit dem Vorfall und dem Satz, was das Ergebnis aufhält", async () => {
+test("Beteiligte sehen die Fläche mit dem Vorfall - „in Klärung“ steht einmal am Chip der Map und einmal am Abzeichen", async () => {
   const incident = {
     id: "v1", position: 2, kind: "disconnect", kind_label: "Verbindungsabbruch", between_maps: false, at: "2026-11-11T19:00:00Z", score: null,
     players: [], note: "", proposal: "replay", proposal_label: "Map wiederholen", reported_by: { registration_id: "a", name: "Loewen · Rudel A", own: false },
@@ -66,7 +66,12 @@ test("Beteiligte sehen die Fläche mit dem Vorfall und dem Satz, was das Ergebni
     hold: { code: "in_review", position: 2, text: "Map 2 ist in Klärung – die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis." }, server_time: "2026-11-11T19:20:00Z" };
   renderMatch({ ...BASE, league: { ...LEAGUE, own_registration_id: "b", incidents: [incident], incident_info: info } });
   expect(await screen.findByTestId("incident-panel")).toHaveTextContent("Vorfälle im Spiel");
-  expect(screen.getByTestId("incident-hold")).toHaveTextContent("Die Serie pausiert: Spätere Maps lassen sich erst danach melden.");
-  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Keine Antwort in der Zeit");
-  expect(screen.getByTestId("map-state-2")).toBeInTheDocument();
+  expect(screen.queryByTestId("incident-hold")).toBeNull();
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Keine Antwort in der Antwortzeit. Die Serie pausiert: Spätere Maps meldet ihr erst nach der Entscheidung.");
+  expect(screen.getByTestId("map-state-2")).toHaveTextContent("Map 2 ist in Klärung");
+  expect(screen.getByTestId("incident-state-v1")).toHaveTextContent("In Klärung");
+  // Auf der ganzen Seite: der Chip der Map und das Abzeichen der Karte - sonst nirgends. Und nur eines davon atmet.
+  expect(document.body.textContent.match(/in Klärung/gi)).toHaveLength(2);
+  expect(document.querySelectorAll(".tls-incident-pulse")).toHaveLength(1);
+  expect(screen.getByTestId("incident-state-v1")).toHaveClass("tls-incident-pulse");
 });

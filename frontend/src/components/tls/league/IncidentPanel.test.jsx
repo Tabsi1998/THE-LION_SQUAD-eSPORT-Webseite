@@ -100,9 +100,12 @@ test("die Gegenseite sieht Vorschlag, Stand und Countdown und stimmt zu oder leh
   expect(card).toHaveTextContent("Vorschlag: Map wiederholen");
   expect(card).toHaveTextContent("Stand beim Vorfall: 3:4 · Runde 8");
   expect(card).toHaveTextContent("Betroffen: Mila");
-  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Bitte antwortet.");
+  // Wer antworten muss, liest genau das - die Uhrzeit der Frist steht nur am Countdown, kein zweiter Hinweis über der Karte.
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Ihr seid dran: stimmt zu oder lehnt ab.");
+  expect(screen.getByTestId("incident-sentence-v1").textContent).not.toMatch(/\d\d:\d\d/);
+  expect(screen.getByTestId("incident-countdown-v1").textContent).toMatch(/Antwortzeit bis \d\d:\d\d/);
   expect(screen.getByTestId("incident-countdown-text-v1").textContent).toMatch(/^4:0\d$/);
-  expect(screen.getByTestId("incident-hold")).toHaveTextContent("Zu Map 2 ist ein Vorfall gemeldet.");
+  expect(screen.queryByTestId("incident-hold")).toBeNull();
   // Offene Vorfälle zeigen ihre Nachweise gleich.
   expect(apiMock.get).toHaveBeenCalledWith("/matches/m1/proofs", { params: { kind: "incident", ref_id: "v1" } });
 
@@ -121,7 +124,8 @@ test("zustimmen ist ein Tipp", async () => {
 
 test("die meldende Seite wartet auf die Gegenseite und kann zurückziehen", async () => {
   await show({ ...LEAGUE, incidents: [incident({ can_withdraw: true })] });
-  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Wartet auf Horst.");
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Die Gegenseite antwortet noch.");
+  expect(screen.getByTestId("incident-sentence-v1").textContent).not.toMatch(/\d\d:\d\d/);
   expect(screen.queryByTestId("incident-answer-v1")).toBeNull();
   fireEvent.click(screen.getByTestId("incident-withdraw-v1"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/incidents/v1/withdraw"));
@@ -145,7 +149,7 @@ test("die Liga-Leitung entscheidet mit Begründung und stellt die Serie fest", a
   const row = incident({ state: "in_review", review_cause: "rejected", can_decide: true });
   await show({ ...LEAGUE, own_registration_id: null, incidents: [row], incident_info: { ...INFO, as_lead: true, can_decide: true, can_report: true } });
   expect(screen.getByTestId("incident-state-v1")).toHaveTextContent("In Klärung");
-  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Abgelehnt");
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Die Gegenseite hat abgelehnt. Die Serie läuft unter Vorbehalt weiter");
   fireEvent.click(screen.getByTestId("incident-decision-v1-submit"));
   expect(screen.getByTestId("incident-decision-v1-problem")).toHaveTextContent("wie entschieden wird");
   // Nach „Map wiederholen“ gibt es kein „gleich feststellen“ - die Map wird erst gespielt.
@@ -180,6 +184,45 @@ test("nach der Entscheidung stehen Begründung und Feststellung da - die Leitung
   fireEvent.click(screen.getByTestId("incident-settle-v1-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/incidents/v1/settle", {
     missing_positions: [3], surplus_positions: [], reason: "Map 3 fehlt noch" }));
+});
+
+test("„In Klärung“ steht in der Fläche nur am Abzeichen der Karte - und höchstens eines atmet", async () => {
+  const rows = [incident({ state: "in_review", review_cause: "rejected", at: "2026-11-11T19:30:00Z" }),
+    incident({ id: "v2", position: 1, state: "in_review", review_cause: "expired", at: "2026-11-11T19:10:00Z" }),
+    incident({ id: "v3", position: 3, state: "proposed", can_withdraw: true })];
+  const hold = { code: "in_review", position: 1, text: "Map 1 ist in Klärung – die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis." };
+  await show({ ...LEAGUE, incidents: rows, incident_info: { ...INFO, hold, clarification_mode: "pause_series" } });
+  // Kein Hinweis über den Karten, kein Satz „in Klärung“ in den Karten.
+  expect(screen.queryByTestId("incident-hold")).toBeNull();
+  const panel = screen.getByTestId("incident-panel");
+  expect(panel.textContent.match(/In Klärung/gi)).toHaveLength(2);
+  expect(screen.getByTestId("incident-sentence-v1")).toHaveTextContent("Die Gegenseite hat abgelehnt. Die Serie pausiert: Spätere Maps meldet ihr erst nach der Entscheidung.");
+  expect(screen.getByTestId("incident-sentence-v2")).toHaveTextContent("Keine Antwort in der Antwortzeit.");
+  // Zwei Vorfälle in Klärung: Nur das erste Abzeichen atmet.
+  expect(panel.querySelectorAll(".tls-incident-pulse")).toHaveLength(1);
+  expect(screen.getByTestId("incident-state-v1")).toHaveClass("tls-incident-pulse");
+  expect(screen.getByTestId("incident-state-v2")).not.toHaveClass("tls-incident-pulse");
+});
+
+test("nach Neustart oder Wiederholung sagt ein Hinweis, dass neu gemeldet wird - die Leitung stellt erst danach fest", async () => {
+  const decision = { outcome: "replay", outcome_label: "Map wiederholen", reason: "Serverausfall belegt", missing_positions: [], surplus_positions: [], settled_at: null };
+  const row = incident({ state: "decided", open: false, decision, voided: { score: { a: 3, b: 4 } }, can_settle: false, awaits_replay: true });
+  const hold = { code: "rereport", position: 2, text: "Map 2 wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr." };
+  await show({ ...LEAGUE, own_registration_id: null, incidents: [row], incident_info: { ...INFO, as_lead: true, can_decide: true, hold } });
+  expect(screen.getByTestId("incident-hold")).toHaveTextContent("Map 2 wird wiederholt – danach meldet ihr die Serie neu.");
+  expect(screen.getByTestId("incident-hold")).toHaveAttribute("data-code", "rereport");
+  expect(screen.queryByTestId("incident-settle-v1")).toBeNull();
+});
+
+test("am Chip der Map atmet „in Klärung“ nur, wenn die Seite keine Vorfall-Karten zeigt", () => {
+  const map_state = [{ position: 1, state: "in_clarification" }, { position: 2, state: "in_clarification" }];
+  const { unmount } = render(<MapStateNotes league={{ map_state }} />);
+  expect(screen.getByTestId("map-state-1")).toHaveClass("tls-incident-pulse");
+  expect(screen.getByTestId("map-state-2")).not.toHaveClass("tls-incident-pulse");
+  unmount();
+  render(<MapStateNotes league={{ map_state, incident_info: INFO }} />);
+  expect(screen.getByTestId("map-state-1")).toHaveTextContent("Map 1 ist in Klärung");
+  expect(screen.getByTestId("map-state-1")).not.toHaveClass("tls-incident-pulse");
 });
 
 test("die Liga-Leitung schließt einen offenen Vorfall ohne Entscheidung - mit Begründung", async () => {

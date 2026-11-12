@@ -1,12 +1,14 @@
 // Vorfälle im Spiel auf der Matchseite (D.5, #1619; docs/LIGA.md „D.5/E.2-Vertrag“ → „Vorfälle“): geführt und ohne Vorwissen
-// bedienbar (#2023). Oben steht, ob gerade etwas das Ergebnis aufhält; darunter jeder Vorfall als Karte mit dem einen Satz, was
-// gilt, dem Countdown für die Antwort der Gegenseite, den Nachweisen (ProofList) und - für die Liga-Leitung - Entscheidung und
-// „Serie feststellen“. „Vorfall melden“ fragt Schritt für Schritt: welche Map, was ist passiert, wie stand es, was schlagt ihr vor.
-// Jede Angabe steht an einer Stelle: Den Stand je Map zeigt die Map-Liste, den Vorfall nur diese Fläche.
-// Bewegung: Karten erscheinen gestaffelt, der Balken der Antwortzeit läuft ohne Sprünge, „In Klärung“ atmet leise, eine Einigung
-// setzt ihren Haken. Mit „Bewegung reduzieren“ steht alles still, nur die Zahl zählt.
+// bedienbar (#2023). Jeder Vorfall ist eine Karte mit dem einen Satz, wer jetzt dran ist, dem Countdown für die Antwort der
+// Gegenseite, den Nachweisen (ProofList) und - für die Liga-Leitung - Entscheidung und „Serie feststellen“. „Vorfall melden“ fragt
+// Schritt für Schritt: welche Map, was ist passiert, wie stand es, was schlagt ihr vor.
+// Jede Angabe steht an einer Stelle: „In Klärung“ am Chip der Map und am Abzeichen der Karte, die Uhrzeit der Frist am Countdown,
+// die Feststellung an der Entscheidung. Über den Karten steht nur, was an keiner Karte steht: nach Neustart oder Wiederholung
+// „Map N wird wiederholt – danach meldet ihr die Serie neu“.
+// Bewegung: Karten erscheinen gestaffelt, der Balken der Antwortzeit läuft ohne Sprünge, höchstens ein Abzeichen „In Klärung“ atmet
+// leise, eine Einigung setzt ihren Haken. Mit „Bewegung reduzieren“ atmet und gleitet nichts.
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, Gavel, Hourglass, Scale, ShieldAlert, Undo2, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Gavel, Hourglass, RotateCcw, Scale, ShieldAlert, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { HelpLink } from "@/components/tls/HelpLink";
@@ -15,8 +17,9 @@ import { ProofList } from "@/components/tls/results/ProofList";
 import { motionAllowed } from "@/lib/motion";
 import {
   KIND_HELP, OUTCOME_HELP, PAUSE_BETWEEN, PAUSE_BETWEEN_HELP, PAUSE_BETWEEN_LABEL, PROPOSAL_HELP, STATE_LABELS, canSettleAtOnce, clock,
-  clockOffset, closeProblem, decisionProblem, emptyIncidentForm, incidentPayload, incidentProblem, mapStateNotes, positionLabel, quotaHint, quotaText,
-  remainingMs, remainingShare, remainingText, scoreText, settleProblem, settleSentence, sortedIncidents, stateSentence,
+  clockOffset, closeProblem, decisionProblem, emptyIncidentForm, holdNotice, incidentPayload, incidentProblem, mapStateNotes, positionLabel,
+  pulsingIncidentId, quotaHint, quotaText, remainingMs, remainingShare, remainingText, scoreText, settleProblem, settleSentence, sortedIncidents,
+  stateSentence,
 } from "@/lib/leagueIncidents";
 import { ConflictReasonField, overrideMissing, overridePayload } from "./ConflictOverride";
 
@@ -26,15 +29,19 @@ const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-11 items-center justify-
 const LEGEND = "text-[11px] font-bold uppercase tracking-widest text-white/60";
 const TONES = { proposed: "border-honor/45", in_review: "border-warn/55", agreed: "border-[#00D26A]/40", decided: "border-[#29B6E8]/40", withdrawn: "border-white/10", closed: "border-white/10" };
 
-/** Öffentlich (auch für Gäste): nur, dass eine Map in Klärung ist oder nicht zählt - nie der Vorfall selbst. */
+/**
+ * Öffentlich (auch für Gäste): nur, dass eine Map in Klärung ist oder nicht zählt - nie der Vorfall selbst. Höchstens ein Element
+ * atmet: hier der erste Chip - und nur, wenn die Seite keine Vorfall-Karten zeigt (dort atmet das Abzeichen der Karte).
+ */
 export function MapStateNotes({ league }) {
   const notes = mapStateNotes(league);
   if (!notes.length) return null;
+  const pulsing = league?.incident_info ? null : notes.find((note) => note.kind === "clarification")?.position;
   return (
     <ul className="mt-4 flex flex-wrap gap-2" data-testid="map-state-notes" aria-label="Stand der Maps">
       {notes.map((note) => (
         <li key={`${note.kind}-${note.position}`} data-testid={`map-state-${note.position}`} data-kind={note.kind}
-          className={`inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 text-xs font-bold ${note.kind === "clarification" ? "tls-incident-pulse border-warn/55 bg-warn/10 text-white" : "border-white/15 bg-white/[0.04] text-white/75"}`}>
+          className={`inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 text-xs font-bold ${note.kind === "clarification" ? `${note.position === pulsing ? "tls-incident-pulse " : ""}border-warn/55 bg-warn/10 text-white` : "border-white/15 bg-white/[0.04] text-white/75"}`}>
           {note.kind === "clarification" ? <Scale className="h-3.5 w-3.5 text-warn" aria-hidden="true" /> : null}
           {note.text}
         </li>
@@ -83,12 +90,13 @@ function AnswerCountdown({ incident, offset, onDone }) {
   );
 }
 
-function StateBadge({ incident }) {
+/** Der Stand der Karte. `pulse`: Dieses eine Abzeichen „In Klärung“ atmet - bei mehreren Vorfällen in Klärung nur das erste. */
+function StateBadge({ incident, pulse = false }) {
   const state = incident.state;
   const Icon = { proposed: Hourglass, in_review: Scale, agreed: Check, decided: Gavel, withdrawn: Undo2, closed: X }[state] || Hourglass;
   return (
-    <span data-testid={`incident-state-${incident.id}`} data-state={state}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${state === "in_review" ? "tls-incident-pulse border-warn/55 bg-warn/10 text-white" : state === "agreed" ? "border-[#00D26A]/50 bg-[#00D26A]/10 text-[#7CF0B4]" : "border-white/15 bg-white/[0.04] text-white/75"}`}>
+    <span data-testid={`incident-state-${incident.id}`} data-state={state} data-pulse={pulse ? "true" : undefined}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${state === "in_review" ? `${pulse ? "tls-incident-pulse " : ""}border-warn/55 bg-warn/10 text-white` : state === "agreed" ? "border-[#00D26A]/50 bg-[#00D26A]/10 text-[#7CF0B4]" : "border-white/15 bg-white/[0.04] text-white/75"}`}>
       <Icon className={`h-3.5 w-3.5 ${state === "agreed" ? "tls-checkin-tick" : ""}`} aria-hidden="true" />
       {STATE_LABELS[state] || state}
     </span>
@@ -334,12 +342,12 @@ function IncidentProofs({ incident, league, matchId }) {
   );
 }
 
-function IncidentCard({ league, info, incident, matchId, busy, run, onChanged, offset }) {
+function IncidentCard({ league, info, incident, matchId, busy, run, onChanged, offset, pulse }) {
   const waiting = incident.state === "proposed" && !incident.expired;
   const reporter = incident.reported_by || {};
   const other = league.sides.find((side) => side.registration_id !== reporter.registration_id);
-  // Die Restzeit steht nur im Countdown darunter - der Satz nennt die Uhrzeit der Frist.
-  const sentence = stateSentence(incident, { otherName: other?.name });
+  // Jede Angabe an einer Stelle: Restzeit und Uhrzeit der Frist stehen nur im Countdown darunter, „In Klärung“ nur am Abzeichen.
+  const sentence = stateSentence(incident, { otherName: other?.name, ownSide: Boolean(league.own_registration_id), mode: info.clarification_mode });
   const stand = scoreText(incident.score, league.sides);
   const withdraw = () => run(async () => {
     await api.post(`/matches/${matchId}/incidents/${incident.id}/withdraw`);
@@ -353,9 +361,9 @@ function IncidentCard({ league, info, incident, matchId, busy, run, onChanged, o
           <h4 className="font-heading text-base font-black uppercase [overflow-wrap:anywhere]">{positionLabel(league, incident.position)} · {incident.between_maps ? PAUSE_BETWEEN_LABEL : incident.kind_label}</h4>
           <p className="mt-0.5 text-xs text-white/55">Gemeldet von {reporter.name || "einer Seite"}{reporter.own ? " (ihr)" : ""} um {clock(incident.at)}</p>
         </div>
-        <StateBadge incident={incident} />
+        <StateBadge incident={incident} pulse={pulse} />
       </div>
-      <p className="mt-3 text-sm text-white/85" data-testid={`incident-sentence-${incident.id}`}>{sentence}</p>
+      {sentence ? <p className="mt-3 text-sm text-white/85" data-testid={`incident-sentence-${incident.id}`}>{sentence}</p> : null}
       {incident.between_maps ? null : (
         <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs text-white/65 sm:grid-cols-2">
           {incident.proposal_label ? <div><dt className="inline text-white/45">Vorschlag: </dt><dd className="inline font-bold text-white/85">{incident.proposal_label}</dd></div> : null}
@@ -534,6 +542,9 @@ export function IncidentPanel({ league, matchId, busy, run, onChanged }) {
   if (!info) return null;
   const incidents = sortedIncidents(league.incidents);
   if (!incidents.length && !info.can_report) return null;
+  const notice = holdNotice(info);
+  // Höchstens ein Element bewegt sich: bei mehreren Vorfällen in Klärung atmet nur das erste Abzeichen.
+  const pulseId = pulsingIncidentId(incidents);
   return (
     <section id="vorfaelle" className="mt-6 scroll-mt-24 rounded-sm border border-white/10 bg-[#121212] p-5" data-testid="incident-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -551,10 +562,12 @@ export function IncidentPanel({ league, matchId, busy, run, onChanged }) {
           </button>
         ) : null}
       </div>
-      {info.hold ? (
-        <p className="mt-4 flex items-start gap-2 rounded-sm border border-warn/45 bg-warn/10 px-3 py-2.5 text-sm text-white/90" data-testid="incident-hold" data-code={info.hold.code}>
-          <Scale className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
-          <span>{info.hold.text}{info.clarification_mode === "pause_series" && info.hold.code === "in_review" ? " Die Serie pausiert: Spätere Maps lassen sich erst danach melden." : info.hold.code === "in_review" ? " Die Serie läuft unter Vorbehalt weiter." : ""}</span>
+      {/* Nur, was an keiner Karte steht: Nach Neustart oder Wiederholung zählen frühere Meldungen nicht - die Serie wird neu gemeldet.
+          „In Klärung“, Antwortzeit und Feststellung sagt die Karte selbst (Abzeichen, Countdown, Entscheidung). */}
+      {notice ? (
+        <p className="mt-4 flex items-start gap-2 rounded-sm border border-honor/40 bg-honor/5 px-3 py-2.5 text-sm text-white/90" data-testid="incident-hold" data-code={info.hold.code}>
+          <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-honor" aria-hidden="true" />
+          <span>{notice}</span>
         </p>
       ) : null}
       {info.conflict && !info.conflict.override && info.can_decide === false ? (
@@ -567,7 +580,8 @@ export function IncidentPanel({ league, matchId, busy, run, onChanged }) {
       {incidents.length ? (
         <StaggerIn as="ul" className="mt-4 space-y-3" data-testid="incident-list">
           {incidents.map((incident) => (
-            <IncidentCard key={incident.id} league={league} info={info} incident={incident} matchId={matchId} busy={busy} run={run} onChanged={onChanged} offset={offset} />
+            <IncidentCard key={incident.id} league={league} info={info} incident={incident} matchId={matchId} busy={busy} run={run} onChanged={onChanged} offset={offset}
+              pulse={incident.id === pulseId} />
           ))}
         </StaggerIn>
       ) : (

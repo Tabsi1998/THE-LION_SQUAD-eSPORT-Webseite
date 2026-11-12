@@ -1,7 +1,7 @@
 import {
-  PAUSE_BETWEEN, canSettleAtOnce, clockOffset, countsQuota, decisionProblem, emptyIncidentForm, incidentPayload, incidentProblem,
-  mapStateNotes, positionLabel, quotaHint, quotaText, remainingMs, remainingShare, remainingText, scoreText, settleProblem, settleSentence,
-  sortedIncidents, stateSentence,
+  PAUSE_BETWEEN, canSettleAtOnce, clockOffset, closeProblem, countsQuota, decisionProblem, emptyIncidentForm, holdNotice, incidentPayload,
+  incidentProblem, mapStateNotes, positionLabel, pulsingIncidentId, quotaHint, quotaText, remainingMs, remainingShare, remainingText, scoreText,
+  settleProblem, settleSentence, sortedIncidents, stateSentence,
 } from "./leagueIncidents";
 
 // Vorfälle im Spiel (D.5, #1619): Sätze, Prüfung und Anfrage des Formulars. Erfundene Namen.
@@ -54,18 +54,47 @@ test("öffentlich steht nur „in Klärung“ oder „zählt nicht“", () => {
   expect(mapStateNotes({})).toEqual([]);
 });
 
-test("je Stand ein Satz, der sagt, wer dran ist", () => {
+test("je Stand ein Satz, der sagt, wer dran ist - ohne Uhrzeit, die steht nur am Countdown", () => {
   const base = { answer_deadline: "2026-11-11T19:10:00Z", proposal_label: "Map wiederholen" };
-  expect(stateSentence({ ...base, state: "proposed", can_answer: true })).toMatch(/^Bitte antwortet\. Ohne Antwort bis \d\d:\d\d entscheidet die Liga-Leitung\.$/);
-  expect(stateSentence({ ...base, state: "proposed" }, { otherName: "Horst" })).toMatch(/^Wartet auf Horst\./);
+  // Wer antworten muss, wer gemeldet hat, wer nur zusieht.
+  expect(stateSentence({ ...base, state: "proposed", can_answer: true })).toBe("Ihr seid dran: stimmt zu oder lehnt ab.");
+  expect(stateSentence({ ...base, state: "proposed", reported_by: { own: true } })).toBe("Die Gegenseite antwortet noch.");
+  expect(stateSentence({ ...base, state: "proposed", reported_by: { own: false } }, { ownSide: true })).toBe("Euer Captain oder Vertreter ist dran: zustimmen oder ablehnen.");
+  expect(stateSentence({ ...base, state: "proposed" }, { otherName: "Horst" })).toBe("Horst antwortet noch.");
   expect(stateSentence({ ...base, state: "proposed", expired: true })).toContain("geht an die Liga-Leitung");
+  for (const row of [{ can_answer: true }, { reported_by: { own: true } }, {}]) {
+    expect(stateSentence({ ...base, state: "proposed", ...row })).not.toMatch(/\d\d:\d\d/);
+  }
   expect(stateSentence({ ...base, state: "agreed" })).toBe("Beide Seiten sind sich einig: Map wiederholen.");
-  expect(stateSentence({ state: "in_review", review_cause: "rejected" })).toContain("Abgelehnt");
-  expect(stateSentence({ state: "in_review", review_cause: "expired" })).toContain("Keine Antwort in der Zeit");
-  expect(stateSentence({ state: "in_review" })).toBe("Die Map ist in Klärung – die Liga-Leitung entscheidet.");
   expect(stateSentence({ state: "decided", decision: { outcome_label: "Map zugesprochen", awarded_to: "Rudel A" } })).toBe("Entscheidung der Liga-Leitung: Map zugesprochen (Rudel A).");
   expect(stateSentence({ state: "withdrawn" })).toContain("Zurückgezogen");
+  expect(stateSentence({ state: "closed", close_reason: "lead" })).toBe("Die Liga-Leitung hat den Vorfall ohne Entscheidung geschlossen.");
+  expect(stateSentence({ state: "closed", close_reason: "match_ended" })).toContain("Das Spiel ist zu Ende");
   expect(stateSentence({ between_maps: true, minutes: 7, position: 2, state: "agreed" })).toBe("Pause von 7 Minuten nach Map 2 – nur festgehalten.");
+});
+
+test("„In Klärung“ steht nicht im Satz der Karte - nur der Grund und was die Serie solange tut", () => {
+  expect(stateSentence({ state: "in_review", review_cause: "rejected" }, { mode: "continue" }))
+    .toBe("Die Gegenseite hat abgelehnt. Die Serie läuft unter Vorbehalt weiter, gewertet wird nach der Entscheidung.");
+  expect(stateSentence({ state: "in_review", review_cause: "expired" }, { mode: "pause_series" }))
+    .toBe("Keine Antwort in der Antwortzeit. Die Serie pausiert: Spätere Maps meldet ihr erst nach der Entscheidung.");
+  expect(stateSentence({ state: "in_review", review_cause: "lead" })).toBe("Von der Liga-Leitung aufgenommen.");
+  expect(stateSentence({ state: "in_review" })).toBe("");
+  for (const cause of ["rejected", "expired", "lead", undefined]) {
+    for (const mode of ["continue", "pause_series", ""]) expect(stateSentence({ state: "in_review", review_cause: cause }, { mode })).not.toMatch(/Klärung/i);
+  }
+});
+
+test("über den Karten steht nur „neu melden“; höchstens ein Abzeichen atmet", () => {
+  expect(holdNotice({ hold: { code: "rereport", text: "Map 2 wird wiederholt – danach meldet ihr die Serie neu." } })).toBe("Map 2 wird wiederholt – danach meldet ihr die Serie neu.");
+  for (const code of ["in_review", "proposed", "unsettled", "missing"]) expect(holdNotice({ hold: { code, text: "steht an der Karte" } })).toBe("");
+  expect(holdNotice({ hold: null })).toBe("");
+  expect(holdNotice(null)).toBe("");
+  expect(pulsingIncidentId([{ id: "a", state: "proposed" }, { id: "b", state: "in_review" }, { id: "c", state: "in_review" }])).toBe("b");
+  expect(pulsingIncidentId([{ id: "a", state: "decided" }])).toBeNull();
+  expect(pulsingIncidentId()).toBeNull();
+  expect(closeProblem({ reason: "ok" })).toContain("begründen");
+  expect(closeProblem({ reason: "Gegner nicht mehr da" })).toBe("");
 });
 
 test("die Feststellung der Serie sagt, was fehlt oder nicht zählt", () => {

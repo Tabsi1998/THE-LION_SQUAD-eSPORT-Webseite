@@ -236,7 +236,8 @@ async function liga(page, cam, state) {
   await page.reload();
   await expect(page.getByTestId("incident-state-v1")).toContainText("In Klärung");
   await noSideScroll(page);
-  await cam.shot("in-klaerung", page.getByTestId("incident-hold"), { area: [page.getByTestId("incident-hold"), page.getByTestId("incident-sentence-v1")] });
+  // „In Klärung“ steht am Abzeichen der Karte; der Satz darunter sagt, warum und was die Serie solange tut.
+  await cam.shot("in-klaerung", page.getByTestId("incident-state-v1"), { area: [page.getByTestId("incident-state-v1"), page.getByTestId("incident-sentence-v1")] });
 
   match = D.CONFIRM_PAGE;
   await page.reload();

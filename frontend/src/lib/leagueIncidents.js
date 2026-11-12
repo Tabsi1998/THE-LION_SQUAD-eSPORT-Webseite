@@ -109,6 +109,19 @@ export function quotaHint(info, registrationId, position, kind) {
   return `Euer Kontingent auf dieser Map ist aufgebraucht (${used} von ${limit}). Ihr könnt trotzdem melden – es braucht die Zustimmung der Gegenseite, sonst entscheidet die Liga-Leitung.`;
 }
 
+/**
+ * Der Hinweis über den Vorfällen: nur, was an keiner Karte steht - nach Neustart oder Wiederholung „Map N wird wiederholt, danach
+ * meldet ihr die Serie neu“. Alles andere, was ein Ergebnis aufhält, sagt die Karte selbst (Abzeichen, Antwortzeit, Feststellung).
+ */
+export function holdNotice(info) {
+  return info?.hold?.code === "rereport" ? info.hold.text : "";
+}
+
+/** Der eine Vorfall, dessen Abzeichen „In Klärung“ atmet - höchstens ein Element bewegt sich. */
+export function pulsingIncidentId(incidents = []) {
+  return incidents.find((incident) => incident.state === "in_review")?.id || null;
+}
+
 /** Was öffentlich zu einer Position steht: „in Klärung“ oder „zählt nicht“. „Map wiederholt“ zeigt die Map selbst. */
 export function mapStateNotes(league) {
   return (league?.map_state || []).flatMap((row) => {
@@ -118,21 +131,37 @@ export function mapStateNotes(league) {
   });
 }
 
-/** Der eine Satz zu einem Vorfall: was gilt und wer jetzt dran ist. `otherName`: die Seite, die antworten muss. */
-export function stateSentence(incident, { remaining = "", otherName = "die Gegenseite" } = {}) {
+// Warum die Leitung entscheidet - ohne den Stand zu wiederholen: „In Klärung“ steht am Abzeichen der Karte und an der Map.
+const REVIEW_CAUSE = {
+  rejected: "Die Gegenseite hat abgelehnt.",
+  expired: "Keine Antwort in der Antwortzeit.",
+  lead: "Von der Liga-Leitung aufgenommen.",
+};
+// Was die Serie solange tut - je nach Einstellung der Season (`clarification_mode`).
+const SERIES_MEANWHILE = {
+  continue: "Die Serie läuft unter Vorbehalt weiter, gewertet wird nach der Entscheidung.",
+  pause_series: "Die Serie pausiert: Spätere Maps meldet ihr erst nach der Entscheidung.",
+};
+
+/**
+ * Der eine Satz zu einem Vorfall: was gilt und wer jetzt dran ist. Jede Angabe steht an einer Stelle - die Uhrzeit der Frist nur am
+ * Countdown, „In Klärung“ nur am Abzeichen. `otherName`: die Seite, die antworten muss; `ownSide`: die Person gehört zu einer Seite;
+ * `mode`: wie die Serie bei einer Map in Klärung weitergeht.
+ */
+export function stateSentence(incident, { otherName = "die Gegenseite", ownSide = false, mode = "" } = {}) {
   if (!incident) return "";
   if (incident.between_maps) return `Pause von ${Number(incident.minutes || 0)} Minuten nach Map ${incident.position} – nur festgehalten.`;
   switch (incident.state) {
     case "proposed":
       if (incident.expired) return "Die Antwortzeit ist vorbei – der Vorfall geht an die Liga-Leitung.";
-      if (incident.can_answer) return `Bitte antwortet${remaining ? ` – noch ${remaining}` : ""}. Ohne Antwort bis ${clock(incident.answer_deadline)} entscheidet die Liga-Leitung.`;
-      return `Wartet auf ${otherName}${remaining ? ` – noch ${remaining}` : ""}. Ohne Antwort bis ${clock(incident.answer_deadline)} entscheidet die Liga-Leitung.`;
+      if (incident.can_answer) return "Ihr seid dran: stimmt zu oder lehnt ab.";
+      if (incident.reported_by?.own) return "Die Gegenseite antwortet noch.";
+      // Mitglied der Seite, die antworten muss, ohne selbst handeln zu dürfen - oder die Liga-Leitung.
+      return ownSide ? "Euer Captain oder Vertreter ist dran: zustimmen oder ablehnen." : `${otherName} antwortet noch.`;
     case "agreed":
       return `Beide Seiten sind sich einig: ${incident.proposal_label || "wie vorgeschlagen"}.`;
     case "in_review":
-      return incident.review_cause === "rejected" ? "Abgelehnt – die Map ist in Klärung, die Liga-Leitung entscheidet."
-        : incident.review_cause === "expired" ? "Keine Antwort in der Zeit – die Map ist in Klärung, die Liga-Leitung entscheidet."
-          : "Die Map ist in Klärung – die Liga-Leitung entscheidet.";
+      return [REVIEW_CAUSE[incident.review_cause], SERIES_MEANWHILE[mode]].filter(Boolean).join(" ");
     case "decided":
       return `Entscheidung der Liga-Leitung: ${incident.decision?.outcome_label || "entschieden"}${incident.decision?.awarded_to ? ` (${incident.decision.awarded_to})` : ""}.`;
     case "withdrawn":
