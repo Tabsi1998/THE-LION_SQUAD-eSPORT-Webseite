@@ -687,3 +687,38 @@ async def test_the_list_tells_a_superadmin_who_is_only_part_of_the_match(flow):
     # Für die Person der Leitung ohne Beteiligung bleibt alles frei.
     flow.act_as(world["second"])
     assert {row["conflict"] for row in (await flow.get(world["url"])).json()["items"]} == {None}
+
+
+@pytest.mark.asyncio
+async def test_the_own_appeal_against_a_team_sanction_is_in_the_export_and_leaves_with_the_account(flow):
+    """Review R1, N6: Der Einspruchstext gegen eine Teamstrafe gehört der Person, die ihn schrieb - Auskunft und Löschung kennen ihn.
+    Solange das Verfahren läuft, bleibt der Text ohne Kennung für die Entscheidung; danach ist er weg."""
+    from routes import dsgvo_routes
+    from services import account_erasure
+
+    world = await sanction_world(flow)
+    captain = world["users"]["Kapitaen"]
+    decided = (await issue(flow, world, kind="yellow_card", target_type="squad", registration_id=world["reg_a"]["id"])).json()
+    running = (await issue(flow, world, kind="warning", target_type="squad", registration_id=world["reg_a"]["id"])).json()
+    for sanction in (decided, running):
+        assert (await appeal(flow, world, sanction["id"], "Kapitaen", "Das war nicht unser Team, siehe Clip.")).status_code == 200
+    assert (await decide(flow, world, decided["id"], "second", "upheld")).status_code == 200
+
+    rows = [dsgvo_routes._team_appeal(row) async for row in flow.db.competition_sanctions.find(dsgvo_routes.team_appeal_query(captain["id"]), {"_id": 0})]
+    assert sorted(row["sanction_id"] for row in rows) == sorted([decided["id"], running["id"]])
+    assert all(row["appeal"]["text"] == "Das war nicht unser Team, siehe Clip." for row in rows)
+    assert world["lead"]["id"] not in str(rows) and world["second"]["id"] not in str(rows) and "Nachweis liegt" not in str(rows)
+    # Gegenprobe: Wer nichts eingelegt hat, bekommt nichts.
+    assert await flow.db.competition_sanctions.count_documents(dsgvo_routes.team_appeal_query(uid(world, "Tom"))) == 0
+
+    await account_erasure.erase_related(flow.db, captain, now_utc().isoformat())
+    gone = await stored(flow, decided["id"])
+    assert gone["appeal"]["by"] is None and gone["appeal"]["text"] is None and gone["appeal"]["by_erased"] is True
+    assert gone["appeal"]["state"] == "upheld" and gone["appeal"]["note"], "die Entscheidung bleibt"
+    held = await stored(flow, running["id"])
+    assert held["appeal"]["by"] is None and held["appeal"]["by_erased"] is True
+    assert held["appeal"]["text"] == "Das war nicht unser Team, siehe Clip.", "bis zur Entscheidung braucht die Leitung den Text"
+    assert captain["id"] not in str(gone) + str(held)
+    # Mit der Entscheidung fällt auch dieser Text weg.
+    assert (await decide(flow, world, running["id"], "second", "granted")).status_code == 200
+    assert (await stored(flow, running["id"]))["appeal"]["text"] is None

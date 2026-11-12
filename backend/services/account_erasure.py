@@ -605,6 +605,10 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     from services import match_flow
 
     await match_flow.scrub_person(db, user_id)
+    # Strafen der Liga (E.3): Der eigene Einspruch gegen eine Teamstrafe - Kennung weg, Text spätestens mit der Entscheidung.
+    from services import league_sanctions
+
+    await league_sanctions.scrub_person(db, user_id)
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.

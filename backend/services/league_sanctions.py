@@ -479,9 +479,10 @@ async def revoke(db, doc: dict, reason, actor_id: str | None, *, via: str = "rev
     # Ein offener Einspruch ist damit erledigt (auch einer, der gerade erst eingegangen ist): Es gibt nichts mehr zu entscheiden.
     closed = await db.competition_sanctions.update_one(
         {"id": doc["id"], "appeal.state": OPEN},
-        {"$set": {"appeal.state": MOOT, "appeal.decided_at": doc["revoked_at"], "appeal.note": MOOT_NOTE}})
+        {"$set": _closing(doc, {"appeal.state": MOOT, "appeal.decided_at": doc["revoked_at"], "appeal.note": MOOT_NOTE})})
     if closed.modified_count:
-        doc["appeal"] = {**(doc.get("appeal") or {}), "state": MOOT, "decided_at": doc["revoked_at"], "note": MOOT_NOTE}
+        doc["appeal"] = {**(doc.get("appeal") or {}), "state": MOOT, "decided_at": doc["revoked_at"], "note": MOOT_NOTE,
+                         **({"text": None} if (doc.get("appeal") or {}).get("by_erased") else {})}
     await sync_proof_hold(db, doc)
     await audit(db, "revoke", doc, actor_id, via=via, reason_length=len(reason), appeal_closed=bool(closed.modified_count))
     return doc
@@ -533,8 +534,8 @@ async def decide_appeal(db, doc: dict, actor: dict, decision: str, note) -> dict
         raise SanctionProblem("Die Entscheidung ist „Strafe bleibt“ oder „Strafe aufgehoben“.")
     note = _text(note, REASON_MIN, REASON_MAX, f"Bitte die Entscheidung begründen (mindestens {REASON_MIN} Zeichen).")
     await _claim(db, doc, {"appeal.state": OPEN, "revoked_at": None},
-                 {"appeal.state": decision, "appeal.decided_by": actor.get("id"), "appeal.decided_at": now_utc().isoformat(),
-                  "appeal.note": note}, NO_OPEN_APPEAL)
+                 _closing(doc, {"appeal.state": decision, "appeal.decided_by": actor.get("id"),
+                                "appeal.decided_at": now_utc().isoformat(), "appeal.note": note}), NO_OPEN_APPEAL)
     if decision == GRANTED:
         try:
             await revoke(db, doc, note, actor.get("id"), via="appeal")
@@ -545,6 +546,28 @@ async def decide_appeal(db, doc: dict, actor: dict, decision: str, note) -> dict
     await sync_proof_hold(db, doc)
     await audit(db, "appeal.decide", doc, actor.get("id"), decision=decision, note_length=len(note))
     return doc
+
+
+# ---------------------------------------------------------------- Kontolöschung
+
+
+async def scrub_person(db, user_id: str) -> int:
+    """Kontolöschung: der eigene Einspruch gegen die Strafe eines Co-Teams. Die Strafe gehört dem Co-Team und bleibt; Kennung
+    und Text der Person fallen heraus. Läuft das Verfahren noch, bleibt der Text ohne Kennung, bis entschieden ist (die Leitung
+    braucht ihn dafür, wie bei MOSS) - die Entscheidung löscht ihn dann. Strafen gegen die Person selbst regelt
+    ``account_erasure.RETAINED``."""
+    done = await db.competition_sanctions.update_many(
+        {"appeal.by": user_id, "user_id": {"$ne": user_id}, "appeal.state": {"$ne": OPEN}},
+        {"$set": {"appeal.by": None, "appeal.by_erased": True, "appeal.text": None}})
+    held = await db.competition_sanctions.update_many(
+        {"appeal.by": user_id, "user_id": {"$ne": user_id}, "appeal.state": OPEN},
+        {"$set": {"appeal.by": None, "appeal.by_erased": True}})
+    return done.modified_count + held.modified_count
+
+
+def _closing(doc: dict, fields: dict) -> dict:
+    """Schließt ein Schritt den Einspruch eines gelöschten Kontos, fällt dessen Text mit weg."""
+    return {**fields, "appeal.text": None} if (doc.get("appeal") or {}).get("by_erased") else fields
 
 
 # ---------------------------------------------------------------- Betroffene

@@ -3241,7 +3241,10 @@ setzen den Wert neu; der Job löscht nichts, dessen `keep_until` in der Zukunft 
 **Kontolöschung und Auskunft:** `competition_sanctions` steht in `personal_data.py` (bleibt als Nachweis der Liga-Leitung, drei
 Jahre nach der Kontolöschung endgültig gelöscht, wie `moderation_sanctions`; `account_erasure.RETAINED`). Die Auskunft enthält die
 gegen die Person verhängten Strafen mit dem eigenen Einspruch, ohne die Kennungen der Leitung. Strafen eines Co-Teams tragen keine
-Person und bleiben beim Co-Team.
+Person und bleiben beim Co-Team. Der **eigene Einspruch gegen eine Teamstrafe** (`appeal.by`) steht in der Auskunft unter
+`competition_sanction_appeals` (nur Art der Strafe und der eigene Text). Die Kontolöschung nimmt Kennung und Text heraus
+(`league_sanctions.scrub_person`, `appeal.by_erased`); läuft das Verfahren noch, bleibt der Text ohne Kennung bis zur
+Entscheidung und fällt dann weg (wie bei MOSS).
 
 **Gesperrte Staffel:** Punktabzug und Disqualifikation schreiben in die Staffel und laufen unter ihrer Schreibsperre. Eine
 gesperrte Staffel lehnt Verhängen, Widerruf und einen stattgegebenen Einspruch dieser beiden Arten mit 423 ab, bis die Leitung
