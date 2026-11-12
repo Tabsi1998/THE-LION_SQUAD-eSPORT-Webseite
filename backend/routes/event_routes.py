@@ -928,9 +928,14 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
         except pricing.PricingError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        await billing_orders.rebook_after_invoice(db, invoiced_before, reason=event_registration.REBOOKED_BY_LEAD,
-                                                  new_total_cents=int(price.get("total_cents") or 0))
-        updates.update(billing_orders.rebooked_fields(invoiced_before))
+        # Gilt der Beleg inzwischen nicht mehr (Abgleich dazwischen, #2184), gilt unten der aktuelle Preis mit eigenem Auftrag.
+        if await billing_orders.rebook_after_invoice(db, invoiced_before, reason=event_registration.REBOOKED_BY_LEAD,
+                                                     new_total_cents=int(price.get("total_cents") or 0)):
+            updates.update(billing_orders.rebooked_fields(invoiced_before))
+        else:
+            invoiced_before = None
+    if invoiced_before:
+        pass   # zurückgebucht: Preis und Stand des Belegs stehen schon in ``updates``
     elif pricing.is_paid(offer) and becomes_active and (reactivated or not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):
         try:
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
@@ -940,6 +945,8 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
         updates["price_snapshot"] = pricing.snapshot(price, recipient=recipient, source={"kind": "event", "id": event["id"], "slug": event.get("slug"), "by_admin": me["id"]},
                                                      invoice_timing=offer.get("invoice_timing") or "on_confirm")
         updates["billing_status"] = "pending"
+        if current.get("invoice_id") or current.get("invoice_ref"):
+            updates.update(billing_orders.INVOICE_LINK_CLEARED)   # der alte Beleg gilt nicht mehr - die Anmeldung zeigt ihn nicht weiter
         if seats_changed:
             await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Begleitpersonen geändert")
     elif pricing.is_paid(offer) and becomes_active and seats_changed and current.get("billing_status") in ("invoiced", "paid"):

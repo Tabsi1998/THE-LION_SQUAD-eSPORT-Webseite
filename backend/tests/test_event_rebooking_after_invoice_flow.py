@@ -441,10 +441,73 @@ async def test_voll_gutgeschriebener_oder_aufgegebener_beleg_zaehlt_nicht_mehr(f
     assert "changed_after_invoice" not in await open_cases(flow, orders[0])
     reg = await registration(flow, booked)
     assert reg["billing_status"] == "pending" and reg["price_snapshot"]["hash"] == orders[1]["snapshot"]["hash"]
+    assert not reg.get("invoice_ref") and not reg.get("invoice_id"), "der alte Beleg steht nicht mehr an der Anmeldung"
     body = (await last_note(flow, paula))["body"]
     assert KEPT_INVOICE not in body and ("40,00" if by_lead else "20,00") in body, "der neue Preis wird abgerechnet - die Nachricht nennt ihn"
     invoiced = await billing_orders.classify_due()
     assert invoiced["invoiced"] == 1, "der neue Auftrag wird ein neuer Beleg"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("by_lead", [False, True])
+@pytest.mark.parametrize("meanwhile", ["credited", "abandoned", "removed"])
+async def test_abgleich_zwischen_auswahl_und_rueckbuchung_ergibt_neuen_auftrag(flow, fake, monkeypatch, meanwhile, by_lead):
+    """Die Rückkehr hat den Beleg als gültig gelesen, da liest der Abgleich eine volle Gutschrift, ein Aufgeben oder einen
+    gelöschten Entwurf. Die Rückbuchung prüft im selben Zug noch einmal - und weicht auf den aktuellen Preis mit eigenem Auftrag aus."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    if meanwhile != "removed":
+        order = await settle(flow, fake, order, "validated")
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    if by_lead:
+        flow.act_as(kassier)
+        gone = await flow.patch(url, json={"status": "cancelled"})
+        assert gone.status_code == 200, gone.text
+    else:
+        await cancel_self(flow, event, paula)
+    original = billing_orders.invoiced_order
+    change = {"credited": lambda: fake.credit(order["invoice_id"], 40), "abandoned": lambda: fake.abandon(order["invoice_id"]),
+              "removed": lambda: fake.remove(order["invoice_id"])}[meanwhile]
+
+    async def read_then_sync(db, **kwargs):
+        found = await original(db, **kwargs)
+        assert found, "beim Auswählen gilt der Beleg noch"
+        change()
+        await billing_orders.sync_due()
+        return found
+
+    monkeypatch.setattr(billing_orders, "invoiced_order", read_then_sync)
+    if by_lead:
+        flow.act_as(kassier)
+        response = await flow.patch(url, json={"status": "registered"})
+        assert response.status_code == 200, response.text
+    else:
+        await book(flow, paula, event, companions=0)
+    monkeypatch.setattr(billing_orders, "invoiced_order", original)
+
+    orders = await flow.db.billing_orders.find({"registration_id": booked["id"]}, {"_id": 0}).to_list(5)
+    fresh = [row for row in orders if row["id"] != order["id"]]
+    new_cents = 4000 if by_lead else 2000
+    assert [(row["status"], row["total_cents"]) for row in fresh] == [("pending", new_cents)], "neuer Auftrag zum aktuellen Preis"
+    assert "changed_after_invoice" not in await open_cases(flow, order), "kein Prüffall zu einem Beleg, der nicht mehr gilt"
+    reg = await registration(flow, booked)
+    assert reg["status"] == "registered" and reg["billing_status"] == "pending" and reg["price_snapshot"]["hash"] == fresh[0]["snapshot"]["hash"]
+    assert not reg.get("invoice_ref") and not reg.get("invoice_id")
+    body = (await last_note(flow, paula))["body"]
+    assert KEPT_INVOICE not in body and ("40,00" if by_lead else "20,00") in body
+
+
+@pytest.mark.asyncio
+async def test_rueckbuchung_ist_wiederholbar(flow, fake):
+    """Ist die Buchung schon zurück, gilt eine zweite Rückbuchung als erledigt - ohne zweiten Verlaufseintrag."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    await settle(flow, fake, order, "validated")
+    await cancel_self(flow, event, paula)
+    stale = await order_of(flow, booked)
+    for _ in range(2):
+        kept = await billing_orders.rebook_after_invoice(flow.db, stale, reason=SELF_REASON, new_total_cents=2000)
+        assert kept is True
+    stored = await order_of(flow, booked)
+    assert "booking_state" not in stored and [entry["state"] for entry in stored["booking_events"]] == ["cancelled", "restored"]
 
 
 def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():

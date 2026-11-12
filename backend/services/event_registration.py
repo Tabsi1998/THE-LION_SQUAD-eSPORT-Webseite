@@ -216,14 +216,19 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
     invoiced = None
     if existing and status == "registered" and not price.get("free"):
         invoiced = await billing_orders.invoiced_order(db, kind="event", registration_id=existing["id"])
+    def frozen_price() -> dict:
+        return pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
+                                invoice_timing=offer.get("invoice_timing") or "on_confirm")
+
     # Eingefroren wird nur eine verbindliche Anmeldung - die Warteliste bekommt ihren Preis beim
     # Nachrücken (Admin setzt „registered“), nicht jetzt.
     if invoiced:
         doc.update(billing_orders.rebooked_fields(invoiced))
     elif status == "registered" and not price.get("free"):
-        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
-                                                 invoice_timing=offer.get("invoice_timing") or "on_confirm")
+        doc["price_snapshot"] = frozen_price()
         doc["billing_status"] = "pending"
+        if existing and (existing.get("invoice_id") or existing.get("invoice_ref")):
+            doc.update(billing_orders.INVOICE_LINK_CLEARED)   # der alte Beleg gilt nicht mehr (#2184) - die Anmeldung zeigt ihn nicht weiter
     elif existing:
         # Neuanmeldung nach Storno ohne Preis (Warteliste, inzwischen kostenlos): Der alte Preis gilt nicht mehr (#2127) - sonst
         # friert das Nachrücken keinen neuen ein, und es entsteht keine Rechnung.
@@ -256,6 +261,13 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         if claimed:
             await release_access_link_use(db, register_access, me)
         raise
+    if invoiced and not await billing_orders.rebook_after_invoice(db, invoiced, reason=REBOOKED_SELF, new_total_cents=int(price.get("total_cents") or 0)):
+        # Der Beleg gilt inzwischen nicht mehr (der Abgleich hat dazwischen eine volle Gutschrift, ein Aufgeben oder einen
+        # gelöschten Entwurf gelesen, #2184): Dann gilt der aktuelle Preis mit eigenem Auftrag.
+        invoiced = None
+        await db.event_registrations.update_one({"id": doc["id"]}, {"$set": {"price_snapshot": frozen_price(), "billing_status": "pending",
+                                                                             **billing_orders.INVOICE_LINK_CLEARED}})
+        doc = await db.event_registrations.find_one({"id": doc["id"]}, {"_id": 0})
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.create",
@@ -266,7 +278,6 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         "created_at": now,
     })
     if invoiced:
-        await billing_orders.rebook_after_invoice(db, invoiced, reason=REBOOKED_SELF, new_total_cents=int(price.get("total_cents") or 0))
         # Für Nachricht und Discord-Antwort (``event_notifications.kept_invoice_line``) - nicht gespeichert.
         doc["invoice_kept"] = True
     elif doc.get("price_snapshot"):

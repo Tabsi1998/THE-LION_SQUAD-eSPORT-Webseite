@@ -45,6 +45,8 @@ logger = logging.getLogger("tls.billing")
 
 OPEN_STATUSES = ("pending", "waiting_write_access", "waiting_link", "waiting_review", "ready")
 # Ein Beleg, der in Dolibarr noch gilt (#2184): nicht voll gutgeschrieben und nicht aufgegeben.
+# Die Belegfelder einer Anmeldung, wenn ihr alter Beleg nicht mehr gilt und ein neuer Auftrag kommt (#2184).
+INVOICE_LINK_CLEARED = {"invoice_id": None, "invoice_ref": None, "invoice_status": None, "payment_state": None}
 INVOICE_STILL_VALID = {"payment_state": {"$nin": ["credited", "abandoned"]}, "invoice_status": {"$ne": "abandoned"}}
 # Ein Auftrag, der nichts mehr trägt: Buchung storniert und der Beleg gutgeschrieben oder aufgegeben - er hält keine neue Buchung auf.
 SETTLED_AFTER_CANCEL = {"booking_state": "cancelled", "$or": [{"payment_state": {"$in": ["credited", "abandoned"]}}, {"invoice_status": "abandoned"}]}
@@ -206,20 +208,30 @@ def rebooked_fields(order: dict) -> dict:
     return {**({"price_snapshot": order["snapshot"]} if order.get("snapshot") else {}), **invoice_fields(order)}
 
 
-async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents: int) -> dict | None:
+async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents: int) -> bool:
     """Die stornierte Buchung ist zurück (#2184): Am Auftrag gilt sie wieder als gebucht - ohne das bliebe der Auftrag
     „storniert“, ein vorgemerkter Gutschrift-Entwurf entstünde trotzdem, eine Zahlung würde zur „Zahlung auf stornierte
     Buchung“, und ein gelöschter Entwurf beendete den Auftrag. Ein schon angelegter Gutschrift-Entwurf bleibt (die
-    Finanzverwaltung entscheidet), der Fall „Storniert, Beleg existiert“ ebenso. Dazu der Prüffall mit alt und neu."""
+    Finanzverwaltung entscheidet), der Fall „Storniert, Beleg existiert“ ebenso. Dazu der Prüffall mit alt und neu.
+
+    Vergleichen und Setzen in einem Zug: Gilt der Beleg inzwischen nicht mehr (der Abgleich hat dazwischen eine volle
+    Gutschrift, ein Aufgeben oder einen gelöschten Entwurf gelesen), gibt es ``False`` - der Aufrufer friert dann einen neuen
+    Preis mit eigenem Auftrag ein. Ist die Buchung schon zurück, ist das kein Fehler (``True``)."""
     now = now_utc().isoformat()
     # Der Verlauf behält den Storno (``booking_cancelled_at``, ``booking_events``) und bekommt die Rückkehr dazu.
-    await db.billing_orders.update_one({"id": order["id"], "booking_state": "cancelled"}, {
+    restored = await db.billing_orders.update_one({"id": order["id"], "status": "invoiced", "booking_state": "cancelled", **INVOICE_STILL_VALID}, {
         "$set": {"updated_at": now}, "$unset": {"booking_state": "", "paid_cents_at_cancel": ""},
         "$push": {"booking_events": {"state": "restored", "at": now, "reason": reason}}})
+    if restored.modified_count != 1:
+        already = await db.billing_orders.find_one({"id": order["id"], "status": "invoiced", "booking_state": {"$ne": "cancelled"}, **INVOICE_STILL_VALID},
+                                                   {"_id": 0, "id": 1})
+        if not already:
+            return False
     await db.billing_orders.update_one(
         {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
         {"$unset": {"credit_note_due_at": ""}})
-    return await note_change_after_invoice(db, kind=order["kind"], registration_id=order["registration_id"], reason=reason, new_total_cents=new_total_cents)
+    await note_change_after_invoice(db, kind=order["kind"], registration_id=order["registration_id"], reason=reason, new_total_cents=new_total_cents)
+    return True
 
 
 async def release_order(db, order_id: str, actor_id: str) -> dict | None:
