@@ -14,7 +14,7 @@ vi.mock("@/components/achievements/ceremony/queue", () => ({
   },
 }));
 
-const { AWARDED_EVENT, AchievementCatchUp, earnedTiers } = await import("./AchievementCatchUp");
+const { AWARDED_EVENT, AchievementCatchUp, earnedTiers, recountSeenKey, recountTiers } = await import("./AchievementCatchUp");
 
 function tier(code, earnedAt, extra = {}) {
   return { code, name: code, material: "bronze", earned: Boolean(earnedAt), earned_at: earnedAt, ...extra };
@@ -88,6 +88,57 @@ test("gerade vergeben: die neuesten Stufen nach der Zahl des Servers, sofort und
   window.dispatchEvent(new CustomEvent(AWARDED_EVENT));
   await settle();
   expect(apiMock.get.mock.calls.length).toBe(calls);
+});
+
+// Neuberechnung (#2340): nachgerechnete Stufen feiert keine Einzel-Zeremonie, sondern nach dem Abschluss EINE
+// Sammel-Zeremonie je Person - danach gelten sie als gesehen.
+const recounted = () => groups(
+  tier("bats_1", "2026-10-28T10:00:00Z"),
+  tier("bats_2", "2026-11-11T03:00:00Z", { recount: true }),
+  tier("bats_3", "2026-11-12T03:00:00Z", { recount: true }),
+);
+
+test("nachgerechnete Stufen zählen nicht als einzelne Erfolge, sondern für sich", () => {
+  expect(earnedTiers(recounted()).map((t) => t.code)).toEqual(["bats_1"]);
+  expect(recountTiers(recounted()).map((t) => t.code)).toEqual(["bats_3", "bats_2"]);
+});
+
+test("nach dem Abschluss eine Sammel-Zeremonie mit allen nachgerechneten Stufen - einmal", async () => {
+  localStorage.setItem("tls_ach_seen:anna", "2026-10-29T00:00:00Z");
+  apiMock.get.mockResolvedValue({ data: { groups: recounted(), recount: { marker: "2340", finished: true } } });
+  const first = render(<AchievementCatchUp />);
+  await waitFor(() => expect(ceremonies).toHaveLength(1));
+  expect(ceremonies[0].codes).toEqual(["bats_3", "bats_2"]);
+  expect(ceremonies[0].context).toEqual({ recount: true });
+  await settle();
+  // Keine Einzel-Zeremonie für die nachgerechneten, obwohl sie nach dem Merker vergeben wurden.
+  expect(ceremonies).toHaveLength(1);
+  expect(localStorage.getItem(recountSeenKey("anna", "2340"))).toBeNull();
+  ceremonies[0].options.onDone();
+  expect(localStorage.getItem(recountSeenKey("anna", "2340"))).toBeTruthy();
+  first.unmount();
+
+  render(<AchievementCatchUp />);
+  await settle();
+  expect(ceremonies).toHaveLength(1);
+});
+
+test("solange die Neuberechnung läuft, feiert niemand die nachgerechneten Stufen", async () => {
+  localStorage.setItem("tls_ach_seen:anna", "2026-10-29T00:00:00Z");
+  apiMock.get.mockResolvedValue({ data: { groups: recounted(), recount: { marker: "2340", finished: false } } });
+  render(<AchievementCatchUp />);
+  await settle();
+  expect(ceremonies).toEqual([]);
+  expect(localStorage.getItem(recountSeenKey("anna", "2340"))).toBeNull();
+});
+
+test("ohne nachgerechnete Stufen: nichts zu feiern, der Merker steht trotzdem", async () => {
+  localStorage.setItem("tls_ach_seen:anna", "2026-10-29T00:00:00Z");
+  apiMock.get.mockResolvedValue({ data: { groups: groups(tier("bats_1", "2026-10-28T10:00:00Z")), recount: { marker: "2340", finished: true } } });
+  render(<AchievementCatchUp />);
+  await settle();
+  expect(ceremonies).toEqual([]);
+  expect(localStorage.getItem(recountSeenKey("anna", "2340"))).toBeTruthy();
 });
 
 test("ohne Anmeldung hört niemand zu; ein Fehler beim Laden bleibt still", async () => {

@@ -5,6 +5,8 @@
 - Bereich und Zuständigkeit gelten nur mit bestätigter Zwei-Faktor-Anmeldung.
 - ``conflict_of_interest`` sagt, ob jemand über ein Spiel nicht entscheiden darf, weil er dazugehört. Die Prüfung gilt für
   Ergebnisse, Proteste, Strafen und den direkt gesetzten Termin; ``decided_by`` ist für Einsprüche (E.3).
+- ``side_conflict`` ist dieselbe Regel für die Anmeldung des eigenen Teams im Eingang (B.4, #2245). Den Kern (403, Notausnahme
+  mit Grund) teilen beide in ``override_reason``.
 """
 from __future__ import annotations
 
@@ -321,24 +323,67 @@ async def held_result_refusal(db, match: dict, hold: dict) -> str | None:
     return None
 
 
+def override_reason(conflict: dict | None, conflict_reason, *, detail: str = CONFLICT_DETAIL,
+                    superadmin_detail: str = CONFLICT_SUPERADMIN_DETAIL) -> str | None:
+    """Der gemeinsame Kern jeder Befangenheit: 403 ohne Notausnahme. ``None``: nicht befangen, sonst der Grund des Superadmins,
+    gekürzt und ohne Leerraum am Rand."""
+    if not conflict:
+        return None
+    if conflict["kind"] == CONFLICT_OWN_DECISION:
+        raise HTTPException(status_code=403, detail=OWN_DECISION_DETAIL)
+    if not conflict["override"]:
+        raise HTTPException(status_code=403, detail=detail)
+    reason = conflict_reason.strip() if isinstance(conflict_reason, str) else ""
+    if len(reason) < CONFLICT_REASON_MIN:
+        raise HTTPException(status_code=403, detail=superadmin_detail)
+    return reason[:CONFLICT_REASON_MAX]
+
+
+async def record_override(db, user: dict, *, action: str, target_id: str | None, reason: str, **data) -> None:
+    """Jede Notausnahme steht im Protokoll unter ``league.conflict.override`` - für Spiele und Anmeldungen gleich."""
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "league.conflict.override", "actor_id": user.get("id"), "target_id": target_id,
+        "data": {**data, "action": action, "reason": reason}, "created_at": now_utc().isoformat(),
+    })
+
+
 async def require_no_conflict(db, user: dict, match: dict, *, action: str, conflict_reason: str | None = None,
                               decided_by: str | None = None, record: bool = True) -> None:
     """Bricht mit 403 ab, wenn die Person befangen ist. Der Superadmin kommt als Notausnahme mit Grund durch, das steht im
     Protokoll (``league.conflict.override``). ``record=False`` prüft nur, für die Vorprüfung vor einer Sperre."""
-    conflict = await conflict_of_interest(db, user, match, decided_by=decided_by)
-    if not conflict:
-        return
-    if conflict["kind"] == CONFLICT_OWN_DECISION:
-        raise HTTPException(status_code=403, detail=OWN_DECISION_DETAIL)
-    if not conflict["override"]:
-        raise HTTPException(status_code=403, detail=CONFLICT_DETAIL)
-    reason = conflict_reason.strip() if isinstance(conflict_reason, str) else ""
-    if len(reason) < CONFLICT_REASON_MIN:
-        raise HTTPException(status_code=403, detail=CONFLICT_SUPERADMIN_DETAIL)
-    if record:
-        await db.audit_logs.insert_one({
-            "id": new_id(), "action": "league.conflict.override", "actor_id": user.get("id"),
-            "target_id": match.get("tournament_id"),
-            "data": {"match_id": match.get("id"), "action": action, "reason": reason[:CONFLICT_REASON_MAX]},
-            "created_at": now_utc().isoformat(),
-        })
+    reason = override_reason(await conflict_of_interest(db, user, match, decided_by=decided_by), conflict_reason)
+    if reason and record:
+        await record_override(db, user, action=action, target_id=match.get("tournament_id"), reason=reason, match_id=match.get("id"))
+
+
+# ---------------------------------------------------------------- Befangenheit bei der Anmeldung (B.4, #2245)
+
+SIDE_CONFLICT_DETAIL = "Über dein eigenes Team entscheidet eine andere Person."
+SIDE_CONFLICT_SUPERADMIN_DETAIL = ("Über dein eigenes Team entscheidet eine andere Person. Als Superadmin geht es nur als "
+                                   "Notausnahme, mit einem Grund von mindestens fünf Zeichen.")
+
+
+def side_of(application: dict) -> dict:
+    """Ein Antrag als Seite wie eine Anmeldung: wer ihn eingereicht hat, Hauptteam und Co-Team."""
+    return {"user_id": application.get("applied_by"), "team_id": application.get("team_id"), "squad_id": application.get("squad_id")}
+
+
+def belongs_to_side(user: dict | None, side: dict, team: dict | None) -> bool:
+    """Dieselbe Regel wie im Spiel (``_people_of_side``): ``team`` kommt aus ``teams_by_id`` mit den Co-Teams der Seiten."""
+    return bool(user and user.get("id") and user["id"] in _people_of_side(side, team))
+
+
+async def side_conflict(db, user: dict | None, side: dict) -> dict | None:
+    """Darf diese Person über die Anmeldung dieser Seite nicht entscheiden? Wie ``conflict_of_interest`` mit ``involved``."""
+    team = (await teams_by_id(db, [side])).get(side.get("team_id") or "")
+    if not belongs_to_side(user, side, team):
+        return None
+    return {"kind": CONFLICT_INVOLVED, "override": is_superadmin(user)}
+
+
+async def require_no_side_conflict(db, user: dict, side: dict, *, conflict_reason: str | None = None,
+                                   superadmin_detail: str = SIDE_CONFLICT_SUPERADMIN_DETAIL) -> str | None:
+    """403, wenn die Person zur Seite gehört; der Superadmin nur mit Grund. Gibt den Grund der Notausnahme zurück, das Protokoll
+    schreibt der Aufrufer, wenn die Entscheidung gelungen ist (``record_override``)."""
+    return override_reason(await side_conflict(db, user, side), conflict_reason,
+                           detail=SIDE_CONFLICT_DETAIL, superadmin_detail=superadmin_detail)

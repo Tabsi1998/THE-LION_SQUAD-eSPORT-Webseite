@@ -1,0 +1,294 @@
+{
+ "DOC": {
+  "list": true,
+  "layout": 3,
+  "categories": [
+   {
+    "label": "Waffen",
+    "sections": [
+     {
+      "label": null,
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Ohne Klasse",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Sturmgewehr",
+      "icon_url": "/api/static/uploads/klasse-1.png",
+      "state": "some",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Blitz 9",
+        "image_url": "/api/static/uploads/blitz-1.webp",
+        "not_in": [],
+        "not_at": []
+       },
+       {
+        "name": "Donner 4",
+        "image_url": null,
+        "not_in": [
+         "Suchen"
+        ],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Schrotflinte",
+      "state": "banned",
+      "not_in": [],
+      "banned": [
+       "Bö",
+       "Hagel"
+      ],
+      "entries": []
+     },
+     {
+      "label": "Pistole",
+      "state": "some",
+      "not_in": [
+       "Suchen"
+      ],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Funke",
+        "image_url": null,
+        "not_in": [
+         "Suchen"
+        ],
+        "not_at": []
+       },
+       {
+        "name": "Zunder",
+        "image_url": null,
+        "not_in": [
+         "Suchen",
+         "Stellung"
+        ],
+        "not_at": []
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "label": "Aufsätze",
+    "sections": [
+     {
+      "label": null,
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Griff",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Optik",
+      "state": "some",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Rotpunkt",
+        "image_url": null,
+        "not_in": [],
+        "not_at": [
+         {
+          "name": "Blitz 9",
+          "modes": []
+         },
+         {
+          "name": "Donner 4",
+          "modes": [
+           "Suchen"
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "label": "Perks",
+    "sections": [
+     {
+      "label": null,
+      "state": "some",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Leise Sohlen",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "NONE": {
+  "list": false,
+  "layout": 3,
+  "categories": [
+   {
+    "label": "Waffen",
+    "sections": [
+     {
+      "label": null,
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Ohne Klasse",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Sturmgewehr",
+      "icon_url": "/api/static/uploads/klasse-1.png",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Blitz 9",
+        "image_url": "/api/static/uploads/blitz-1.webp",
+        "not_in": [],
+        "not_at": []
+       },
+       {
+        "name": "Donner 4",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Schrotflinte",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Bö",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       },
+       {
+        "name": "Hagel",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Pistole",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Funke",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       },
+       {
+        "name": "Zunder",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "label": "Aufsätze",
+    "sections": [
+     {
+      "label": null,
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Griff",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     },
+     {
+      "label": "Optik",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Rotpunkt",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "label": "Perks",
+    "sections": [
+     {
+      "label": null,
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Kaltblut",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       },
+       {
+        "name": "Leise Sohlen",
+        "image_url": null,
+        "not_in": [],
+        "not_at": []
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

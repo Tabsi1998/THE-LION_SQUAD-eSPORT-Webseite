@@ -398,7 +398,8 @@ async def season_standings(slug_or_id: str):
             for group_row in (item.get("standings") or [])
         ] if tournament.get("format") == "groups" else standings
         for row in rows:
-            if "played" in row and not row.get("played"):
+            # Nur-Freilos zählt als Teilnahme (#2336): ``played`` zählt Freilose nicht mehr, ``byes`` schon.
+            if "played" in row and not (row.get("played") or row.get("byes")):
                 continue
             uid = reg_user_map.get(row.get("registration_id"))
             if not uid:

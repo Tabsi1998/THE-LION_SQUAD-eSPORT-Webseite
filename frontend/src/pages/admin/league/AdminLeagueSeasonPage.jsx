@@ -1,300 +1,252 @@
-// Eine Season verwalten (docs/LIGA.md, #1622) unter /admin/leagues/seasons/<id>: Vorgaben samt Sperrzeiten, Regeltext
-// und Sichtbarkeit, Map-Pool, Liga N und ihre Staffeln. Eine Staffel ist ein Turnier - angelegt wird es hier, die
-// Co-Teams teilt die Turnierverwaltung der Staffel zu. Änderungen an der Season gelten für bestehende Staffeln erst
-// nach „Vorgaben auf Staffeln übertragen“; was dabei nicht mehr darf (Kalender nach dem Start, Wertung nach dem ersten
-// Ergebnis), meldet der Server je Staffel mit Grund.
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, CalendarOff, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+// Eine Season verwalten (docs/LIGA.md, #1622) unter /admin/leagues/seasons/<id> - seit #2267 in Reitern nach dem Muster der Spielseite
+// (#2249): Überblick · Spielbetrieb · Termine · Anmeldung und Kader · Tabelle · Regelwerk und Sperrliste · Ligen und Staffeln, per
+// Sprungmarke ansteuerbar (#termine, Abschnitte wie #kader oder #anmeldungen führen in ihren Reiter, lib/seasonTabs.js). Jede Angabe steht
+// an genau einer Stelle; welcher Reiter welche Felder trägt, steht in TAB_FIELDS.
+//
+// Speichern je Reiter: Jeder Reiter mit Formular schickt nur seine Felder. Ungespeichertes bleibt beim Reiterwechsel (Punkt am Reiter,
+// Rückfrage mit „Jetzt speichern“), beim Verlassen der Seite fragt die Seite nach. Bausteine mit eigenem Speichern (Map-Pool,
+// Ergebnisregeln, Terminregeln, Sperrliste, Anmeldungen, Kader) bleiben nach dem ersten Besuch ihres Reiters geladen - ein Wechsel
+// verliert auch dort nichts.
+//
+// Eine Staffel ist ein Turnier - angelegt wird es hier, die Co-Teams teilt die Turnierverwaltung der Staffel zu. Änderungen an der Season
+// gelten für bestehende Staffeln erst nach „Vorgaben auf Staffeln übertragen“.
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Trash2, X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { AdminSheet } from "@/components/tls/AdminSheet";
-import { FormGrid, FormSection } from "@/components/tls/AdminForm";
-import { SeasonApplicationSection } from "./SeasonApplicationSection";
-import { SeasonApplicationsPanel } from "./SeasonApplicationsPanel";
-import { SeasonEligibilitySection } from "./SeasonEligibilitySection";
-import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { AdminTabBar } from "@/components/tls/AdminTabBar";
+import { FormSection } from "@/components/tls/AdminForm";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
-import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
-import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
-import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { useNavigationGuard } from "@/lib/navigationGuard";
+import { accentStyle } from "@/lib/leagueLook";
+import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
-import { SeasonRosterPanel } from "./SeasonRosterPanel";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { viennaDate } from "@/lib/vienna";
 import {
-  ACTIVE_STATUS_OPTIONS,
-  BEST_OF_OPTIONS,
-  LEGS_OPTIONS,
-  MAP_REPEAT_OPTIONS,
-  SEASON_STATUS_OPTIONS,
-  TIEBREAKER_LABELS,
-  VISIBILITY_OPTIONS,
-  VISIBILITY_SHORT,
-  WEEKDAY_OPTIONS,
-  modeOrderProblem,
-  overridesPayload,
-  overridesToForm,
-  seasonPayload,
-  seasonToForm,
-  settingsLine,
-  syncSummary,
+  VISIBILITY_SHORT, longestSeries, modeOrderProblem, orderLengthNote, sameOrder, seasonToForm, settingsLine,
 } from "@/lib/league";
+import { SEASON_TABS, TAB_FIELDS, dirtyTabs, rebaseForm, rulesNotice as noticeOf, seasonTarget, tabPayload } from "@/lib/seasonTabs";
+import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
+import { SeasonDatesTab } from "./SeasonDatesTab";
+import { DivisionSheet, SeasonDivisionsTab, SyncResults } from "./SeasonDivisionsTab";
+import { SeasonEntryTab } from "./SeasonEntryTab";
+import { SeasonOverviewTab } from "./SeasonOverviewTab";
+import { SeasonPlayTab } from "./SeasonPlayTab";
+import { useSeasonReadiness } from "./SeasonReadinessPanel";
+import { SeasonProtestsTab } from "./SeasonProtestsTab";
+import { SeasonRulesTab } from "./SeasonRulesTab";
+import { SeasonTablePanel } from "./SeasonTablePanel";
+import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
+import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
 
-const STAFFEL_STATUS = {
-  draft: "Entwurf", scheduled: "Angekündigt", registration_open: "Anmeldung offen", registration_closed: "Anmeldung zu",
-  check_in: "Check-in", live: "Läuft", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse veröffentlicht",
-  archived: "Archiviert", cancelled: "Abgesagt",
-};
-const SHORT_DAY = { day: "2-digit", month: "2-digit" };
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
-const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
-const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
+const SAVE_LABELS = {
+  ueberblick: "Überblick speichern", spielbetrieb: "Spielbetrieb speichern", termine: "Termine speichern", anmeldung: "Anmeldung und Kader speichern",
+  tabelle: "Tabelle speichern", ligen: "Staffelgröße speichern",
+};
+const SAVED_TEXT = {
+  ueberblick: "Überblick gespeichert.", spielbetrieb: "Spielbetrieb gespeichert.", termine: "Termine gespeichert.", anmeldung: "Anmeldung und Kader gespeichert.",
+  tabelle: "Tabelle gespeichert.", ligen: "Staffelgröße gespeichert.",
+};
+const labelOf = (key) => SEASON_TABS.find((row) => row.key === key)?.label || key;
 
-function dayText(day, options = SHORT_DAY) {
-  return day ? viennaDate(dayNoon(day), options) : "";
-}
-
-function CalendarStrip({ calendar }) {
-  if (!calendar?.weeks?.length) return null;
-  return (
-    <div className="space-y-2" data-testid="season-calendar">
-      <p className="text-sm text-white/75">
-        {calendar.weeks.length} Wochen, davon {calendar.blocked_weeks.length} gesperrt – <strong className="text-white">{calendar.active_weeks} Spielwochen</strong>.
-        {" "}Eine Staffel fasst damit höchstens <strong className="text-white">{calendar.max_teams_per_staffel} Teams</strong>; mehr Teams brauchen eine zweite Staffel.
-      </p>
-      <ol className="flex flex-wrap gap-1.5" aria-label="Spielwochen">
-        {calendar.weeks.map((week) => (
-          <li key={week.number} title={`${dayText(week.start_day)} – ${dayText(week.end_day)}`}
-            className={`rounded-sm border px-2 py-1 text-[11px] tabular-nums ${week.blocked ? "border-white/5 bg-transparent text-white/35 line-through" : "border-white/10 bg-[#0A0A0A] text-white/75"}`}>
-            <span className="font-bold">W{week.number}</span> {dayText(week.start_day)}
-          </li>
-        ))}
-      </ol>
-      <p className="text-[11px] text-white/45">Eine Woche ist gesperrt, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt. Stand nach dem letzten Speichern.</p>
-    </div>
-  );
-}
-
-function BlockedPeriods({ periods, onChange }) {
-  const update = (index, key, value) => onChange(periods.map((period, at) => (at === index ? { ...period, [key]: value } : period)));
-  return (
-    <div className="space-y-2" data-testid="season-blocked">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sperrzeiten</div>
-      {periods.length ? periods.map((period, index) => (
-        <div key={index} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto] sm:items-end">
-          <TextField label="Von" type="date" value={period.start_date} onChange={(value) => update(index, "start_date", value)} testId={`blocked-start-${index}`} />
-          <TextField label="Bis" type="date" value={period.end_date} onChange={(value) => update(index, "end_date", value)} testId={`blocked-end-${index}`} />
-          <TextField label="Bezeichnung" maxLength={60} value={period.label} onChange={(value) => update(index, "label", value)} placeholder="z. B. Weihnachtspause"
-            className="col-span-2 sm:col-span-1" testId={`blocked-label-${index}`} />
-          <button type="button" onClick={() => onChange(periods.filter((_, at) => at !== index))} aria-label="Sperrzeit entfernen"
-            className={`${ICON_DANGER} justify-self-start sm:mb-1.5`} data-testid={`blocked-remove-${index}`}>
-            <Trash2 className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </div>
-      )) : <p className="text-xs text-white/50">Keine – jede Woche wird gespielt.</p>}
-      <button type="button" onClick={() => onChange([...periods, { start_date: "", end_date: "", label: "" }])} data-testid="blocked-add"
-        className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-        <CalendarOff className="w-3.5 h-3.5" aria-hidden="true" /> Sperrzeit hinzufügen
-      </button>
-    </div>
-  );
-}
-
-function Tiebreakers({ value, onChange }) {
-  const all = Object.keys(TIEBREAKER_LABELS);
-  const toggle = (key) => onChange(value.includes(key) ? value.filter((item) => item !== key) : [...value, key]);
-  return (
-    <fieldset className="space-y-1.5">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Bei Punktgleichheit</legend>
-      <div className="flex flex-wrap gap-2">
-        {all.map((key) => {
-          const position = value.indexOf(key);
-          return (
-            <label key={key} className={`inline-flex items-center gap-2 rounded-sm border px-3 py-1.5 text-xs cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${position >= 0 ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65"}`}>
-              <input type="checkbox" checked={position >= 0} onChange={() => toggle(key)} className="accent-[#29B6E8]" data-testid={`tiebreaker-${key}`} />
-              {position >= 0 ? <span className="font-bold tabular-nums text-[#29B6E8]">{position + 1}.</span> : null}
-              {TIEBREAKER_LABELS[key]}
-            </label>
-          );
-        })}
-      </div>
-      <p className="text-xs text-white/45">In der Reihenfolge des Anklickens. Zuerst zählen immer die Punkte.</p>
-    </fieldset>
-  );
-}
-
-function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
-  // Ein Modus, den das Spiel nicht mehr hat (#2129): bleibt sichtbar gesetzt und gilt weiter, neu wählen geht nicht.
-  const gone = [...new Set(value.filter((mode) => mode && !modes.some((known) => known.mode === mode)))]
-    .map((mode) => ({ mode, label: `${poolModes.find((group) => group.mode === mode)?.label || mode} (nicht mehr im Spiel)` }));
-  const choices = [...modes, ...gone];
-  if (!choices.length) return null;
-  const count = Number(bestOf) || 1;
-  const set = (index, mode) => {
-    const next = Array.from({ length: count }, (_, at) => value[at] || "");
-    next[index] = mode;
-    onChange(next);
-  };
-  const problem = modeOrderProblem(value, bestOf);
-  return (
-    <fieldset className="space-y-1.5" data-testid="season-mode-order">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modus je Map</legend>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Array.from({ length: count }, (_, index) => (
-          <SelectField key={index} label={`Map ${index + 1}`} value={value[index] || ""} onChange={(mode) => set(index, mode)}
-            options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
-        ))}
-      </div>
-      <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
-    </fieldset>
-  );
-}
-
-function DivisionSheet({ division, season, onClose, onSaved }) {
-  const [nickname, setNickname] = useState(division?.nickname || "");
-  const [status, setStatus] = useState(division?.status || "active");
-  const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
-  const [prizes, setPrizes] = useState(() => prizesToForm(division?.prizes));
-  const [saving, setSaving] = useState(false);
-  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      // Der Stand (#2106): die API kannte ihn, das Formular schickt ihn jetzt mit - archiviert fällt aus der Ligaseite.
-      const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form), ...(division ? { status } : {}) };
-      // Eigene Gewinne (#2107) nur, wenn sie sich ändern - leer heißt wieder „wie die Season“.
-      const ownPrizes = prizesPayload(prizes);
-      if (JSON.stringify(ownPrizes) !== JSON.stringify(prizesPayload(prizesToForm(division?.prizes)))) body.prizes = ownPrizes;
-      if (division) await api.patch(`/admin/leagues/divisions/${division.id}`, body);
-      else await api.post(`/admin/leagues/seasons/${season.id}/divisions`, body);
-      toast.success(division ? "Liga gespeichert." : "Liga angelegt.");
-      onSaved();
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-      setSaving(false);
-    }
-  };
-  const points = season.scoring_rules?.match_points || {};
-  return (
-    <AdminSheet title={division ? `${division.label} bearbeiten` : "Liga N anlegen"} eyebrow={season.name} onClose={onClose} onSubmit={submit} saving={saving}
-      submitLabel={division ? "Speichern" : "Anlegen"} submitTestId="division-save" testId="division-sheet">
-      <TextField label="Beiname" maxLength={40} value={nickname} onChange={setNickname} placeholder="freiwillig, z. B. Elite"
-        hint={division ? `Anzeige „Liga ${division.level} · Beiname“.` : "Die Stufe zählt von selbst weiter: Liga 1, Liga 2 …"} testId="division-nickname" />
-      {division ? (
-        <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS}
-          hint="Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten." testId="division-status" />
-      ) : null}
-      <p className="text-xs text-white/55">Leer lassen heißt: wie die Season. Nur was diese Liga anders macht, eintragen.</p>
-      <FormGrid>
-        <SelectField label="Best of" value={form.best_of} onChange={(value) => set("best_of", value)}
-          options={[["", `wie Season (Best of ${season.best_of})`], ...BEST_OF_OPTIONS]} testId="override-best-of" />
-        <TextField label="Teamgröße" type="number" min={1} max={20} value={form.team_size} onChange={(value) => set("team_size", value)}
-          placeholder={`wie Season (${season.team_size})`} testId="override-team-size" />
-        <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)}
-          placeholder={`wie Season (${season.min_squad_size})`} testId="override-min-squad" />
-        <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)}
-          placeholder={`wie Season (${season.max_staffel_size})`} testId="override-staffel-size" />
-        <TextField label="Antwort auf Terminvorschlag (Stunden)" type="number" min={1} max={720} value={form.match_schedule_response_hours}
-          onChange={(value) => set("match_schedule_response_hours", value)} testId="override-response"
-          placeholder={season.match_schedule_response_hours ? `wie Season (${season.match_schedule_response_hours})` : "wie Season"} />
-      </FormGrid>
-      <FormGrid cols={3}>
-        <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} placeholder={String(points.win ?? 3)} testId="override-points-win" />
-        <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} placeholder={String(points.draw ?? 1)} testId="override-points-draw" />
-        <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} placeholder={String(points.loss ?? 0)} testId="override-points-loss" />
-      </FormGrid>
-      <PrizeEditor rows={prizes} onChange={setPrizes} testId="division-prizes"
-        emptyHint={season.prizes?.length ? `Wie die Season: ${season.prizes.map((row) => `${row.place}. ${row.text}`).join(" · ")}` : "Wie die Season – dort sind noch keine Gewinne eingetragen."} />
-    </AdminSheet>
-  );
-}
-
-function SyncResults({ rows }) {
-  if (!rows) return null;
-  if (!rows.length) return <p className="text-sm text-white/55" data-testid="sync-results">Noch keine Staffel – nichts zu übertragen.</p>;
-  return (
-    <ul className="space-y-2" data-testid="sync-results" aria-live="polite">
-      {rows.map((row) => {
-        const summary = syncSummary(row);
-        return (
-          <li key={row.tournament_id} className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
-            <div className="font-semibold text-white">{row.title}</div>
-            <div className="text-xs text-white/65">{summary.head}{summary.applied.length ? ` · ${summary.applied.join(", ")}` : ""}</div>
-            {summary.skipped.map((text) => <div key={text} className="mt-1 text-xs text-warn">Nicht übertragen – {text}</div>)}
-          </li>
-        );
-      })}
-    </ul>
-  );
+/** Rollt zu einem Abschnitt, sobald er da ist - manche Bausteine laden ihre Daten erst. */
+function useScrollToSection(section, tab, ready) {
+  useEffect(() => {
+    if (!section || !ready) return undefined;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const node = document.getElementById(section);
+      tries += 1;
+      if (node) {
+        node.scrollIntoView?.({ block: "start" });
+        window.clearInterval(timer);
+      } else if (tries > 40) {
+        window.clearInterval(timer);
+      }
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [section, tab, ready]);
 }
 
 export default function AdminLeagueSeasonPage() {
   const { seasonId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const confirm = useConfirm();
+  const idBase = useId().replace(/:/g, "");
+  const target = seasonTarget(location.hash);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [form, setForm] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState("");
   const [pendingSync, setPendingSync] = useState(0);
   const [syncRows, setSyncRows] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [divisionSheet, setDivisionSheet] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const navigate = useNavigate();
+  const [overrideReason, setOverrideReason] = useState("");
+  const [seasonModes, setSeasonModes] = useState(null);
+  const [poolDirty, setPoolDirty] = useState(false);
+  const [rulesView, setRulesView] = useState(null);
+  const [visited, setVisited] = useState(() => [target.tab]);
+  const savedRef = useRef(null);
 
-  const load = useCallback(async (resetForm = false) => {
+  const load = useCallback(async (reset = []) => {
     try {
       const { data: body } = await api.get(`/admin/leagues/seasons/${seasonId}`);
+      const fresh = seasonToForm(body.season);
+      const old = savedRef.current;
+      savedRef.current = fresh;
       setData(body);
       setError("");
-      if (resetForm) setForm(seasonToForm(body.season));
+      setForm((current) => rebaseForm(current, old, fresh, reset));
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail));
     }
   }, [seasonId]);
-  useEffect(() => { load(true); }, [load]);
-  const reload = useCallback(() => load(false), [load]);
+  useEffect(() => { load(); }, [load]);
+  const reload = useCallback(() => load(), [load]);
   useApiInvalidation(reload, ["leagues", "map-pools"]);
 
   // Zuständigkeiten (#2203): Der Server schickt, was diese Person hier darf - und prüft selbst noch einmal.
   const can = (capability) => !data?.capabilities || data.capabilities.includes(capability);
   const canSeason = can("season");
   const canRules = can("rules");
-  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const modes = useMemo(() => data?.game?.modes || [], [data]);
+  const season = data?.season;
+  const saved = useMemo(() => (season ? seasonToForm(season) : null), [season]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
+  const readinessVersion = data ? `${season.updated_at}-${data.map_pool?.version ?? 0}-${data.divisions.length}-${staffelCount}` : "";
+  const readiness = useSeasonReadiness(seasonId, readinessVersion);
 
-  const save = async (event) => {
-    event.preventDefault();
-    const problem = modeOrderProblem(form.game_mode_order, form.best_of);
-    if (problem) {
-      toast.error(problem);
-      return;
+  // Stand des Regelwerks (B.2) für Überblick und Reiter Regelwerk - lesen darf es nur „Regeln veröffentlichen“.
+  useEffect(() => {
+    if (!data || !canRules) return undefined;
+    let alive = true;
+    api.get(`/admin/league-rules/league_season/${seasonId}`).then(({ data: body }) => alive && setRulesView(body || null)).catch(() => alive && setRulesView(null));
+    return () => { alive = false; };
+  }, [data, canRules, seasonId]);
+  const notice = noticeOf(rulesView, readiness.result);
+  const rulesLink = canRules ? `/admin/leagues/rules/league_season/${seasonId}` : "";
+
+  // Welche Reiter diese Person sieht: Termine nur mit „Season konfigurieren“, Anmeldung und Kader mit einer der passenden Zuständigkeiten.
+  const tabs = SEASON_TABS.filter((row) => (row.key === "termine" ? canSeason : row.key === "anmeldung" ? canSeason || can("applications") || can("roster") : true));
+  const tab = tabs.some((row) => row.key === target.tab) ? target.tab : tabs[0].key;
+  useEffect(() => { setVisited((current) => (current.includes(tab) ? current : [...current, tab])); }, [tab]);
+  useScrollToSection(target.section, tab, Boolean(data));
+
+  const formDirty = useMemo(() => dirtyTabs(form, saved), [form, saved]);
+  const dirty = { ...formDirty, spielbetrieb: formDirty.spielbetrieb || poolDirty };
+  const dirtyLabels = tabs.filter((row) => dirty[row.key]).map((row) => row.label);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const discard = (key) => setForm((current) => ({ ...current, ...Object.fromEntries(TAB_FIELDS[key].map((field) => [field, saved[field]])) }));
+
+  // Seite verlassen mit Ungespeichertem: nachfragen. Ein anderer Reiter ist kein Verlassen (gleiche Adresse, andere Sprungmarke).
+  const asking = useRef(false);
+  useNavigationGuard({
+    blocks: (nextPathname) => nextPathname !== location.pathname && dirtyLabels.length > 0,
+    onBlocked: (proceed) => {
+      if (asking.current) return;
+      asking.current = true;
+      confirm({
+        title: "Nicht gespeicherte Änderungen",
+        description: `In ${dirtyLabels.join(", ")} ist noch etwas nicht gespeichert. Verlässt du die Seite, geht es verloren.`,
+        confirmLabel: "Verwerfen und weiter",
+        cancelLabel: "Zurück zur Seite",
+        tone: "danger",
+      }).then((leave) => {
+        asking.current = false;
+        if (leave) proceed();
+      });
+    },
+  });
+  useEffect(() => {
+    if (!dirtyLabels.length) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirtyLabels.length]);
+
+  // Modus je Map (#2206): inaktive und archivierte Modi nur, wo die Season sie schon hat.
+  const modes = useMemo(() => selectableModes(data?.game?.modes, data?.season?.game_mode_order), [data]);
+  // „Modus je Map“ ist so lang wie die längste Serie (#2207): Best of der Season oder einer Liga N.
+  const longest = longestSeries(form?.best_of, data?.divisions);
+  // Altbestand (#2207): Eine gespeicherte Reihenfolge, die nicht zur Serie passt, bleibt unverändert speicherbar.
+  const savedOrder = season?.game_mode_order || [];
+  const orderEdited = form ? !sameOrder(form.game_mode_order, savedOrder) : false;
+  const bestOfEdited = form ? String(form.best_of) !== String(season?.best_of) : false;
+  const draft = (season?.status || "draft") === "draft";
+  const orderNote = form && !orderEdited ? orderLengthNote(savedOrder, longest) : "";
+
+  const save = async (key) => {
+    if (!form || saving) return false;
+    if (key === "spielbetrieb") {
+      const problem = orderEdited || (draft && bestOfEdited) ? modeOrderProblem(form.game_mode_order, longest) : "";
+      if (problem) {
+        toast.error(problem);
+        return false;
+      }
     }
-    setSaving(true);
+    const body = tabPayload(key, form, saved, { maps: longest, savedOrder });
+    // Notausnahme des Superadmins beim Veröffentlichen trotz Problemen (#2207) - der Server prüft selbst.
+    if (key === "ueberblick" && overrideReason.trim()) body.readiness_override_reason = overrideReason.trim();
+    setSaving(key);
+    let ok = false;
     try {
-      // Nur „Regeln veröffentlichen“ (#2203): Der Server nimmt von dieser Person nur den Regeltext an.
-      const body = canSeason ? seasonPayload(form) : { rules_text: seasonPayload(form).rules_text };
-      const { data: saved } = await api.patch(`/admin/leagues/seasons/${seasonId}`, body);
-      toast.success(saved.changed?.length ? "Season gespeichert." : "Keine Änderung.");
-      if (saved.visibility_applied) toast.success(`Sichtbarkeit für ${saved.visibility_applied === 1 ? "1 Staffel" : `${saved.visibility_applied} Staffeln`} geändert.`);
-      setPendingSync(saved.staffeln_to_sync || 0);
-      await load(true);
+      const { data: answer } = await api.patch(`/admin/leagues/seasons/${seasonId}`, body);
+      toast.success(answer.changed?.length ? SAVED_TEXT[key] : "Keine Änderung.");
+      (answer.warnings || []).forEach((text) => toast.warning(text));
+      if (key === "ueberblick") setOverrideReason("");
+      if (answer.visibility_applied) toast.success(`Sichtbarkeit für ${answer.visibility_applied === 1 ? "1 Staffel" : `${answer.visibility_applied} Staffeln`} geändert.`);
+      setPendingSync(answer.staffeln_to_sync || 0);
+      await load([key]);
+      ok = true;
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
-    setSaving(false);
+    setSaving("");
+    return ok;
   };
 
-  const sync = async () => {
+  // Reiter wechseln: Ungespeichertes bleibt, die Seite fragt aber einmal, ob jetzt gespeichert werden soll.
+  const go = async (anchor) => {
+    const next = seasonTarget(`#${anchor}`).tab;
+    // Der Map-Pool speichert für sich („Modi und Maps speichern“): Er bleibt beim Wechsel erhalten, die Seite sagt es aber.
+    if (next !== tab && tab === "spielbetrieb" && poolDirty && !formDirty[tab]) {
+      const stay = await confirm({
+        title: "Modi und Maps sind nicht gespeichert",
+        description: "Der Map-Pool bleibt erhalten, solange die Seite offen ist – der Reiter trägt dann einen Punkt. Gespeichert wird er mit „Modi und Maps speichern“.",
+        confirmLabel: "Zurück zum Map-Pool",
+        cancelLabel: "Später speichern",
+        tone: "info",
+      });
+      if (stay) return;
+    }
+    if (next !== tab && formDirty[tab] && SAVE_LABELS[tab]) {
+      const now = await confirm({
+        title: `„${labelOf(tab)}“ ist nicht gespeichert`,
+        description: "Deine Änderungen bleiben erhalten, solange die Seite offen ist – der Reiter trägt dann einen Punkt. Jetzt speichern?",
+        confirmLabel: "Jetzt speichern",
+        cancelLabel: "Später speichern",
+        tone: "info",
+      });
+      if (now && !await save(tab)) return;
+    }
+    navigate({ pathname: location.pathname, search: location.search, hash: anchor === SEASON_TABS[0].key ? "" : `#${anchor}` }, { replace: true });
+  };
+
+  // Das Ergebnis je Staffel steht dort, wo übertragen wurde: oben unter dem Hinweis (aus jedem Reiter) oder im Reiter Ligen und Staffeln.
+  const sync = async (from = "ligen") => {
     setSyncing(true);
     try {
       const { data: body } = await api.post(`/admin/leagues/seasons/${seasonId}/sync`);
-      setSyncRows(body.staffeln || []);
+      setSyncRows({ from, rows: body.staffeln || [] });
       setPendingSync(0);
       toast.success("Vorgaben übertragen.");
       await reload();
@@ -326,13 +278,13 @@ export default function AdminLeagueSeasonPage() {
     if (kind === "season") navigate("/admin/leagues");
     else reload();
   };
-  const archive = async ({ kind, target, name }) => {
+  const archive = async ({ kind, target: item, name }) => {
     try {
-      if (kind === "season") await api.patch(`/admin/leagues/seasons/${target.id}`, { status: "archived" });
-      else await api.patch(`/admin/leagues/divisions/${target.id}`, { status: "archived" });
+      if (kind === "season") await api.patch(`/admin/leagues/seasons/${item.id}`, { status: "archived" });
+      else await api.patch(`/admin/leagues/divisions/${item.id}`, { status: "archived" });
       toast.success(`${name} archiviert.`);
       setDeleting(null);
-      await load(kind === "season");
+      await load(kind === "season" ? ["ueberblick"] : []);
       return true;
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -342,8 +294,9 @@ export default function AdminLeagueSeasonPage() {
 
   const savePool = async (body) => {
     try {
-      await api.put(`/admin/leagues/seasons/${seasonId}/map-pool`, body);
+      const response = await api.put(`/admin/leagues/seasons/${seasonId}/map-pool`, body);
       toast.success("Map-Pool gespeichert.");
+      (response?.data?.warnings || []).forEach((text) => toast.warning(text));
       await reload();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -362,7 +315,51 @@ export default function AdminLeagueSeasonPage() {
     }
   };
 
-  const season = data?.season;
+  const formProps = (key) => ({ tab: key, submitLabel: SAVE_LABELS[key], dirty: formDirty[key], saving: saving === key, onSave: save, onDiscard: discard });
+  const panels = data && form ? {
+    ueberblick: () => (
+      <SeasonOverviewTab data={data} form={form} set={set} setForm={setForm} saved={saved} canSeason={canSeason} readiness={readiness}
+        overrideReason={overrideReason} onOverrideReason={setOverrideReason} onJump={go} rulesNotice={notice} rulesLink={rulesLink}
+        formProps={formProps("ueberblick")} now={new Date()} />
+    ),
+    spielbetrieb: () => (
+      <SeasonPlayTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} readiness={readiness} formProps={formProps("spielbetrieb")}
+        modes={modes} longest={longest} orderNote={orderNote} seasonModes={seasonModes} onSeasonModes={setSeasonModes} onPoolDirty={setPoolDirty}
+        onSavePool={savePool} onClearPool={clearPool} onPendingSync={setPendingSync} reload={reload} />
+    ),
+    termine: () => <SeasonDatesTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} formProps={formProps("termine")} />,
+    anmeldung: () => (
+      <SeasonEntryTab seasonId={seasonId} season={season} form={form} set={set} canSeason={canSeason} canApplications={can("applications")} canRoster={can("roster")}
+        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0} />
+    ),
+    tabelle: () => (
+      <div className="space-y-6">
+        {canSeason ? (
+          <SeasonTabForm {...formProps("tabelle")}>
+            <FormSection title="Punkte und Gleichstand" id="punkte" className="scroll-mt-24" testId="season-points"
+              hint="Wie die Tabelle rechnet. Liga N kann die Punkte abweichend festlegen.">
+              <SeasonPointsFields form={form} set={set} />
+              <SeasonTableRules form={form} set={set} />
+            </FormSection>
+          </SeasonTabForm>
+        ) : null}
+        {/* Tabelle (E.1, #1625): Gleichstände je Staffel, Entscheid der Leitung - lesen darf jede Zuständigkeit. */}
+        <div id="gleichstand" className="scroll-mt-24"><SeasonTablePanel divisions={data.divisions} canDecide={can("results")} /></div>
+      </div>
+    ),
+    // Proteste (E.2, #1619): Eingang für „Proteste“, Einstellungen für „Season konfigurieren“ (lesen darf jede Zuständigkeit).
+    proteste: () => <SeasonProtestsTab seasonId={seasonId} canSeason={canSeason} canDisputes={can("disputes")} />,
+    regelwerk: () => (
+      <SeasonRulesTab seasonId={seasonId} season={season} canSeason={canSeason} canRules={canRules} rulesView={rulesView} rulesNotice={notice}
+        rulesLink={rulesLink} onPendingSync={setPendingSync} />
+    ),
+    ligen: () => (
+      <SeasonDivisionsTab data={data} form={form} set={set} canSeason={canSeason} formProps={formProps("ligen")} staffelCount={staffelCount} syncing={syncing}
+        syncRows={syncRows?.from === "ligen" ? syncRows.rows : null} onSync={() => sync("ligen")} onAddDivision={() => setDivisionSheet({})} onEditDivision={setDivisionSheet} onDelete={setDeleting}
+        onCreateStaffel={createStaffel} />
+    ),
+  } : {};
+
   return (
     <AdminLayout>
       <Link to="/admin/leagues" data-testid="season-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
@@ -371,7 +368,7 @@ export default function AdminLeagueSeasonPage() {
       {error ? <p className="mt-6 text-sm text-warn" role="alert" data-testid="season-error">{error}</p> : null}
       {data && form ? (
         <>
-          <div className="mt-3 mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div className="mt-3 mb-5 flex flex-wrap items-end justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3" style={accentStyle(data.league.accent_color)}>
               <LeagueEmblem src={data.look?.emblem_url} size={48} testId="season-head-emblem" />
               <div className="min-w-0">
@@ -381,7 +378,8 @@ export default function AdminLeagueSeasonPage() {
                 </p>
               </div>
             </div>
-            {/* Löschen (#2106): nur als Entwurf ohne Staffel mit Co-Teams oder Spielen - sonst bietet das Blatt Archivieren an. */}
+            {/* Löschen (#2106): nur als Entwurf ohne Staffel mit Co-Teams oder Spielen - sonst bietet das Blatt Archivieren an.
+                Platz für F.2: „Season aus Vorgänger übernehmen“ kommt als Knopf daneben. */}
             {can("manage") ? (
               <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
                 className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
@@ -391,202 +389,36 @@ export default function AdminLeagueSeasonPage() {
           </div>
 
           {pendingSync > 0 ? (
-            <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn" data-testid="season-sync-hint">
+            <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn" data-testid="season-sync-hint">
               <span>Gespeichert. Die {pendingSync === 1 ? "bestehende Staffel trägt" : `${pendingSync} bestehenden Staffeln tragen`} noch die alten Werte.</span>
-              <button type="button" onClick={sync} disabled={syncing} data-testid="season-sync-now"
+              <button type="button" onClick={() => sync("oben")} disabled={syncing} data-testid="season-sync-now"
                 className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Jetzt übertragen</button>
             </div>
           ) : null}
-
-          <div className="space-y-6">
-            {canSeason || canRules ? (
-            <form onSubmit={save} className="space-y-6" data-testid="season-form" noValidate>
-              {canSeason ? (<>
-              <FormSection title="Kalender" hint="Spielwochen laufen ab dem Beginn jeweils so viele Tage. Ohne Einigung gilt der Standardtermin der Woche.">
-                <FormGrid cols={3}>
-                  <TextField label="Name" maxLength={80} value={form.name} onChange={(value) => set("name", value)} testId="season-form-name" />
-                  <TextField label="Beginn" type="date" required value={form.start_day} onChange={(value) => set("start_day", value)} hint="00:00 Uhr Wiener Zeit" testId="season-form-start" />
-                  <TextField label="Wochen gesamt" type="number" min={1} max={52} value={form.weeks_total} onChange={(value) => set("weeks_total", value)} hint="mit Sperrwochen" testId="season-form-weeks" />
-                  <TextField label="Spielwoche (Tage)" type="number" min={1} max={31} value={form.matchday_days} onChange={(value) => set("matchday_days", value)} testId="season-form-days" />
-                  <SelectField label="Standardtag" value={form.default_match_weekday} onChange={(value) => set("default_match_weekday", value)} options={WEEKDAY_OPTIONS} testId="season-form-weekday" />
-                  <TextField label="Standardzeit" type="time" value={form.default_match_time} onChange={(value) => set("default_match_time", value)} testId="season-form-time" />
-                  <SelectField label="Runden" value={form.round_robin_legs} onChange={(value) => set("round_robin_legs", value)} options={LEGS_OPTIONS} testId="season-form-legs" />
-                  <TextField label="Meldeschluss" type="date" value={form.registration_deadline} onChange={(value) => set("registration_deadline", value)} hint="nur zur Anzeige" testId="season-form-deadline" />
-                </FormGrid>
-                <BlockedPeriods periods={form.blocked_periods} onChange={(value) => set("blocked_periods", value)} />
-                <CalendarStrip calendar={data.calendar} />
-              </FormSection>
-
-              <FormSection title="Spiel und Wertung" hint="Liga N kann Best of, Teamgröße, Mindestkader, Staffelgröße und Punkte abweichend festlegen.">
-                <FormGrid cols={3}>
-                  <SelectField label="Best of" value={form.best_of} onChange={(value) => set("best_of", value)} options={BEST_OF_OPTIONS} testId="season-form-best-of" />
-                  <TextField label="Teamgröße (je Map)" type="number" min={1} max={20} value={form.team_size} onChange={(value) => set("team_size", value)} testId="season-form-team-size" />
-                  <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)} testId="season-form-min-squad" />
-                  <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)} testId="season-form-staffel-size" />
-                </FormGrid>
-                <ModeOrder modes={modes} poolModes={data.map_pool?.modes} bestOf={form.best_of} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} />
-                <FormGrid>
-                  <SelectField label="Map-Wiederholung in einer Serie" value={form.map_repeat} onChange={(value) => set("map_repeat", value)} options={MAP_REPEAT_OPTIONS}
-                    hint="Ob dieselbe Map in einer Serie noch einmal gespielt werden darf. Die Meldung prüft es." testId="season-form-map-repeat" />
-                </FormGrid>
-                <FormGrid cols={3}>
-                  <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} testId="season-form-points-win" />
-                  <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} testId="season-form-points-draw" />
-                  <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} testId="season-form-points-loss" />
-                </FormGrid>
-                <Tiebreakers value={form.table_tiebreakers} onChange={(value) => set("table_tiebreakers", value)} />
-                <FormGrid cols={3}>
-                  <TextField label="Ergebnis gilt nach (Stunden)" type="number" min={1} max={336} value={form.result_confirm_hours} onChange={(value) => set("result_confirm_hours", value)}
-                    hint="ohne Antwort der Gegenseite" testId="season-form-confirm" />
-                  <TextField label={form.lineup_mode === "series" ? "Teilnehmerliste nachtragen bis (Stunden)" : "Aufstellung nachtragen bis (Stunden)"} type="number" min={1} max={336} value={form.lineup_amend_hours} onChange={(value) => set("lineup_amend_hours", value)}
-                    hint={form.lineup_mode === "series" ? "ab der Bestätigung, danach geht der Fall an die Leitung" : "nach dem Ergebnis"} testId="season-form-amend" />
-                  {/* Antwortfrist (#2106, F3): früher je Staffel; leer bei älteren Seasons - dann behält jede Staffel ihre. */}
-                  <TextField label="Antwort auf Terminvorschlag (Stunden)" type="number" min={1} max={720} value={form.match_schedule_response_hours}
-                    onChange={(value) => set("match_schedule_response_hours", value)} placeholder="leer: je Staffel wie bisher"
-                    hint="So lange hat die Gegenseite Zeit; gilt für neue Vorschläge" testId="season-form-response" />
-                </FormGrid>
-              </FormSection>
-
-              <SeasonEligibilitySection form={form} set={set} />
-
-              <SeasonApplicationSection form={form} set={set} />
-
-              </>) : null}
-              <FormSection title={canSeason ? "Regeltext und Sichtbarkeit" : "Regeltext"}>
-                {/* Regelwerk (#1646): Versionen, PDF und Zustimmung auf eigener Seite; der Regeltext bleibt der Rückfall ohne Regelwerk. */}
-                {canRules ? (
-                  <>
-                    <Link to={`/admin/leagues/rules/league_season/${seasonId}`} data-testid="season-rules-link"
-                      className="tls-btn tls-btn--secondary inline-flex rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Regelwerk mit Versionen pflegen</Link>
-                    <TextAreaField label="Regeltext" rows={8} value={form.rules_text} onChange={(value) => set("rules_text", value)} placeholder="Markdown, z. B. Ablauf, Fairplay, Map-Veto"
-                      hint="Gilt nur, solange es für die Season und die Liga kein Regelwerk gibt." testId="season-form-rules" />
-                  </>
-                ) : null}
-                {canSeason ? (
-                <FormGrid>
-                  <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(value) => set("visibility", value)} options={VISIBILITY_OPTIONS}
-                    hint="Gilt beim Speichern sofort für Ligaseite, Menüpunkt „Liga“ und alle Staffel-Turniere – auch gesperrte." testId="season-form-visibility" />
-                  <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
-                </FormGrid>
-                ) : null}
-              </FormSection>
-
-              {/* Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, leer heißt „wie die Liga“. Die Farbe
-                  gehört der Liga (Stift in der Ligaübersicht). Gewinne sind reine Anzeige - kein Bezug zu XP oder Pokalen. */}
-              {canSeason ? (
-              <FormSection title="Gestaltung und Gewinne" testId="season-look"
-                hint="Wirkt beim Speichern sofort auf Ligaseite, Übersicht, Teamseite und Link-Vorschau – ohne Übertragen. Das Banner bekommen auch die Staffeln (die App zeigt es beim Turnier).">
-                <FormGrid>
-                  <EmblemField value={form.emblem_url} onChange={(value) => set("emblem_url", value || "")} inherited={data.league.emblem_url}
-                    inheritedLabel="Leer: das Emblem der Liga (Vorschau)." accent={data.league.accent_color} testId="season-emblem" />
-                  <BannerField url={form.banner_url} focus={form.banner_focus} inherited={data.league.banner_url ? { url: data.league.banner_url, ...(data.league.banner_focus || {}) } : null}
-                    inheritedLabel="Leer: das Banner der Liga (Vorschau)." emblem={form.emblem_url || data.league.emblem_url} accent={data.league.accent_color} testId="season-banner"
-                    onChange={(url, focus) => setForm((current) => ({ ...current, banner_url: url || "", banner_focus: focus }))} />
-                </FormGrid>
-                <PrizeEditor rows={form.prizes} onChange={(value) => set("prizes", value)} testId="season-prizes"
-                  emptyHint="Noch keine Gewinne – die Ligaseite zeigt dann keinen Block „Um was gespielt wird“." />
-              </FormSection>
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button type="submit" disabled={saving} data-testid="season-save"
-                  className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
-                  {saving ? "Speichere …" : canSeason ? "Season speichern" : "Regeltext speichern"}
+          {syncRows?.from === "oben" ? (
+            <div className="mb-5 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="season-sync-top">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Übertragen</span>
+                <button type="button" onClick={() => setSyncRows(null)} aria-label="Ergebnis schließen" data-testid="season-sync-top-close"
+                  className="rounded-sm p-1.5 text-white/50 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
-                {staffelCount && canSeason ? <span className="text-xs text-white/50">Die Sichtbarkeit gilt sofort; alle anderen Änderungen übernehmen bestehende Staffeln erst beim Übertragen.</span> : null}
               </div>
-            </form>
-            ) : null}
+              <SyncResults rows={syncRows.rows} />
+            </div>
+          ) : null}
 
-            {canSeason ? (
-              <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
-                hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
-            ) : null}
-
-            <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-heading text-xl font-bold uppercase">Ligen und Staffeln</h2>
-                {canSeason ? (
-                  <button type="button" onClick={() => setDivisionSheet({})} data-testid="division-add"
-                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                    <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga {(data.divisions.at(-1)?.level || 0) + 1} anlegen
-                  </button>
-                ) : null}
-              </div>
-              {!data.divisions.length ? <p className="text-sm text-white/55">Noch keine Liga. Lege Liga 1 an – darin entstehen die Staffeln.</p> : null}
-              {data.divisions.map((division) => (
-                <div key={division.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0" data-testid={`division-${division.level}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-white">
-                        {division.label}
-                        {division.status === "archived" ? <span className="ml-2 rounded-sm bg-white/5 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-white/55" data-testid={`division-archived-${division.level}`}>Archiviert</span> : null}
-                      </h3>
-                      <p className="text-xs text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
-                      <p className="text-xs text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
-                    </div>
-                    {canSeason ? (
-                    <div className="flex items-center gap-1">
-                      <button type="button" className={ICON_BUTTON} onClick={() => setDivisionSheet(division)} aria-label={`${division.label} bearbeiten`} data-testid={`division-edit-${division.level}`}>
-                        <Pencil className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                      <button type="button" className={ICON_DANGER} onClick={() => setDeleting({ kind: "division", target: division, name: division.label })}
-                        aria-label={`${division.label} löschen`} data-testid={`division-delete-${division.level}`}>
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                      <button type="button" onClick={() => createStaffel(division)} data-testid={`staffel-add-${division.level}`}
-                        className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                        <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Staffel anlegen
-                      </button>
-                    </div>
-                    ) : null}
-                  </div>
-                  {division.staffeln.length ? (
-                    <ul className="mt-3 divide-y divide-white/5 rounded-sm border border-white/10 bg-[#0A0A0A]">
-                      {division.staffeln.map((staffel) => (
-                        <li key={staffel.tournament_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2" data-testid={`staffel-${division.level}-${staffel.staffel}`}>
-                          <span className="font-semibold text-white">Staffel {staffel.staffel}</span>
-                          <span className="text-xs text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams · {STAFFEL_STATUS[staffel.status] || staffel.status}</span>
-                          <span className="ml-auto inline-flex items-center gap-2">
-                            <Link to={`/admin/tournaments/${staffel.tournament_id}`} data-testid={`staffel-manage-${division.level}-${staffel.staffel}`}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">
-                              Turnierverwaltung · Co-Teams zuteilen <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                            </Link>
-                            {/* Staffel löschen (#2106) nur als Entwurf - dieselbe Sperre wie in der Turnierverwaltung prüft der Server. */}
-                            {staffel.status === "draft" && canSeason ? (
-                              <button type="button" className={ICON_DANGER} onClick={() => setDeleting({ kind: "staffel", target: staffel, name: `${division.label} · Staffel ${staffel.staffel}` })}
-                                aria-label={`Staffel ${staffel.staffel} löschen`} data-testid={`staffel-delete-${division.level}-${staffel.staffel}`}>
-                                <Trash2 className="w-4 h-4" aria-hidden="true" />
-                              </button>
-                            ) : null}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p className="mt-2 text-xs text-white/50">Noch keine Staffel.</p>}
-                </div>
-              ))}
-            </section>
-
-            {can("applications") ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
-
-            {can("roster") ? <SeasonRosterPanel seasonId={seasonId} /> : null}
-
-            {canSeason ? (
-            <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
-              hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; die Antwortfrist auf Terminvorschläge auch während der Season, nur nicht bei gesperrten; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
-              <button type="button" onClick={sync} disabled={syncing || !staffelCount} data-testid="season-sync-run"
-                className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
-                <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" /> {syncing ? "Übertrage …" : "Vorgaben übertragen"}
-              </button>
-              <SyncResults rows={syncRows} />
-            </FormSection>
-            ) : null}
-          </div>
+          <AdminTabBar tabs={tabs} active={tab} dirty={dirty} onSelect={go} idBase={idBase} label="Bereiche der Season" testPrefix="season" />
+          {tabs.filter((row) => visited.includes(row.key) || row.key === tab).map((row) => (
+            <div key={row.key} role="tabpanel" id={`${idBase}-panel-${row.key}`} aria-labelledby={`${idBase}-tab-${row.key}`} hidden={row.key !== tab}
+              data-testid={`season-panel-${row.key}`} className="min-w-0">
+              {panels[row.key]()}
+            </div>
+          ))}
 
           {divisionSheet ? (
-            <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} onClose={() => setDivisionSheet(null)}
-              onSaved={() => { setDivisionSheet(null); reload(); }} />
+            <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} nextLevel={(data.divisions.at(-1)?.level || 0) + 1}
+              onClose={() => setDivisionSheet(null)} onSaved={() => { setDivisionSheet(null); reload(); }} />
           ) : null}
           {deleting ? (
             <LeagueDeleteSheet kind={deleting.kind} target={deleting.target} name={deleting.name} onClose={() => setDeleting(null)}

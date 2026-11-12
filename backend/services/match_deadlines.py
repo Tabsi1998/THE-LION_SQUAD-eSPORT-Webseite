@@ -40,7 +40,7 @@ LIMITS = {
     "result_confirm_minutes_online": 1440,
     "result_confirm_hours_league": 336,
 }
-NO_SHOW_RULE_TEXT = {"on_site": "ab Aufruf", "online": "ab Öffnung des Spiels"}
+NO_SHOW_RULE_TEXT = {"on_site": "ab Aufruf", "online": "ab Öffnung des Spiels", "check_in": "Check-in nach dem Termin"}
 # Was die Turnierleitung nach der Frist tun kann: im Duell kampflos werten, im Lauf mit mehr als zwei Spielern nur die
 # fehlende Person markieren - der Lauf bleibt offen (#1823). Für Karte und Nachricht.
 NO_SHOW_ACTION_DUEL = "kampflos werten oder verlängern"
@@ -134,10 +134,13 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
     wie „antreten bis“ (``appear_by``): wer vor der Planzeit aufgerufen wird, hat bis zur Planzeit."""
     if not no_show_open(match):
         return None
-    # Liga-Staffel (#2201): online setzt niemand ``started_at``, ohne Check-in sagt der Termin nichts darüber, ob jemand
-    # da war. Kein automatischer Vorschlag, bis der Check-in kommt (#1652); die Leitung wertet weiter von Hand.
+    # Liga-Staffel (#2201): ohne Check-in sagt der Termin nichts darüber, ob jemand da war - kein Vorschlag, die Leitung
+    # wertet von Hand. Mit Check-in (D.2, #1652) kommt nach Fensterende der Vorschlag für die fehlende Seite (Regel
+    # ``check_in``) - nie eine Wertung.
     if is_league_staffel(tournament):
-        return None
+        from services.checkin_rules import no_show_info
+
+        return no_show_info(match, tournament)
     mode = (tournament or {}).get("event_mode") or "online"
     if match.get("called_at"):
         rule, base, key = "on_site", _parse(match.get("called_at")), "no_show_minutes_on_site"
@@ -186,8 +189,11 @@ def agreed_outside_week(match: dict, tournament: dict | None) -> bool:
 
 
 def single_report(match: dict) -> dict | None:
-    """Die eine Meldung, die nach der Frist gilt - nur wenn genau eine Seite gemeldet hat."""
-    latest = latest_reports(match.get("reports") or [])
+    """Die eine Meldung, die nach der Frist gilt - nur wenn genau eine Seite gemeldet hat. Nach einem Neustart oder einer
+    Wiederholung einer Map (Vorfälle, D.5) zählen nur Meldungen von danach."""
+    from services.league_incident_rules import current_reports
+
+    latest = latest_reports(current_reports(match))
     return next(iter(latest.values())) if len(latest) == 1 else None
 
 
@@ -197,7 +203,10 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
         return None
     if isinstance(match.get("pending_result"), dict):
         return None
-    if any(isinstance(row, dict) and not row.get("resolved_at") for row in match.get("disputes") or []):
+    # Offen ist ein Eintrag nur, solange er weder entschieden noch zurückgezogen ist (#1619, E.2): Ein zurückgezogenes Verfahren
+    # hält die Automatik nicht mehr an.
+    if any(isinstance(row, dict) and not row.get("resolved_at") and not row.get("withdrawn_at")
+           and row.get("state") not in ("withdrawn", "decided") for row in match.get("disputes") or []):
         return None
     mode = (tournament or {}).get("event_mode") or "online"
     if mode == "local" or (mode == "hybrid" and (match.get("station_id") or match.get("called_at"))):
@@ -206,6 +215,14 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
     reported = _parse((report or {}).get("at"))
     if not reported:
         return None
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Solange einer offen ist oder die Serie noch festgestellt werden muss, ruht die Frist-Automatik -
+        # danach läuft die Frist ab dem Ende der Klärung, nicht ab der Meldung.
+        from services import league_incident_rules
+
+        if league_incident_rules.result_block(match):
+            return None
+        reported = max(reported, league_incident_rules.confirm_clock(match) or reported)
     if plays_in_matchdays(tournament or {}):
         # Fabian (14.10.2026): 48 Stunden, spätestens zum Ende der Spielwoche - aber der Gegner hat immer mindestens
         # 24 Stunden. Ein vereinbart außerhalb der Woche gespieltes Spiel hat das Wochenende nicht als Obergrenze.
@@ -233,6 +250,9 @@ def no_show_due_text(match: dict, info: dict) -> str:
     extended = _parse(match.get("no_show_extended_until"))
     if due and extended and extended == due:
         return f"Verlängerung bis {clock} abgelaufen"
+    if rule == "check_in":
+        # Liga (D.2, #1652): das Fenster endet eine feste Zeit nach dem Termin, verlängert von der Leitung.
+        return f"Check-in bis {clock} abgelaufen" if clock else "Check-in abgelaufen"
     if rule == "on_site" and due and appear_by(match, match.get("called_at"), minutes) == due == _parse(match.get("scheduled_at")):
         return f"Frist {clock} (Planzeit) abgelaufen"
     return f"{minutes} Min. {NO_SHOW_RULE_TEXT.get(rule, '')} ({clock}) abgelaufen" if clock else \

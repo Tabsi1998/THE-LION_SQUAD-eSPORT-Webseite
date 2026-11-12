@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, Check, Flag, MessageSquare, RefreshCw, Send, Trophy, X } from "lucide-react";
+import { CalendarClock, ChevronDown, Flag, MessageSquare, RefreshCw, Send, ShieldCheck, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -17,6 +17,7 @@ import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { viennaDateTime } from "@/lib/vienna";
 import { formatWhen } from "@/lib/datetime";
 import { showLapTime } from "@/lib/laptime";
@@ -27,13 +28,24 @@ import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
+import { LeagueRulesNote } from "@/components/tls/league/LeagueRulesNote";
+import { AllowedEquipmentView } from "@/components/tls/league/AllowedEquipmentView";
+import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
+import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
+import { IncidentPanel, MapStateNotes } from "@/components/tls/league/IncidentPanel";
+import { VetoPanel } from "@/components/tls/league/VetoPanel";
+import { keepNewerVeto, mergeLiveVeto } from "@/lib/leagueVeto";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
+import { AppealForm, ProcedureCard } from "@/components/tls/results/DisputeCard";
 import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
+import { DoubleNoShowAction } from "@/components/tls/league/DoubleNoShowAction";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
-import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
+import { PROPOSAL_LEAD_MS, proposalTimeErrors, proposalTimeHints, proposeButtonLabel, serverTimeErrors, waitingForOtherSide } from "@/lib/scheduleProposals";
+import { weekText } from "@/lib/leagueSchedule";
+import { ProposalTimesEditor, ScheduleProposalList } from "@/components/tls/tournament/ScheduleProposalParts";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
@@ -111,15 +123,15 @@ function fromLocalInput(value) {
 
 // Terminvorschläge nur in der Zukunft (#2124): frühestens 5 Minuten ab jetzt - wie der Server
 // (services/schedule_proposal_time.py).
-const PROPOSAL_LEAD_MS = 5 * 60 * 1000;
-const PAST_PROPOSAL_TEXT = "Der Termin liegt in der Vergangenheit – bitte einen Zeitpunkt frühestens 5 Minuten ab jetzt wählen.";
-
 function earliestProposalInput(now = Date.now()) {
   return toLocalInput(new Date(now + PROPOSAL_LEAD_MS).toISOString());
 }
 
-function tooEarly(iso, now = Date.now()) {
-  return new Date(iso).getTime() < now + PROPOSAL_LEAD_MS;
+/** Der erste Satz für die Meldung oben - mit „Termin 2:“, wenn mehrere Felder da sind. */
+function firstTimeError(errors) {
+  const index = errors.findIndex(Boolean);
+  if (index < 0) return "";
+  return errors.length > 1 ? `Termin ${index + 1}: ${errors[index]}` : errors[index];
 }
 
 // Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
@@ -149,32 +161,66 @@ function MatchPageView() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [chat, setChat] = useState([]);
-  const [proposalAt, setProposalAt] = useState("");
+  // Bis zu drei Termine auf einmal (#2325), jeder mit eigenem Fehler.
+  const [proposalTimes, setProposalTimes] = useState([""]);
+  const [proposalErrors, setProposalErrors] = useState([]);
   const [proposalNote, setProposalNote] = useState("");
-  const [counterAt, setCounterAt] = useState("");
-  const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
   // Das eine Ergebnis-Fenster (#1370): dieselbe Eingabe wie in Turnierleitung, Matchplan und Stationen.
   const [resultOpen, setResultOpen] = useState(false);
+  // Liga-Verfahren (#1619, E.2): nach dem Einreichen bleibt das Formular für den Schritt „Nachweise“ offen; „Ergebnis ändern“ an
+  // einem Verfahren nimmt dessen Begründung ins Ergebnis-Fenster mit.
+  const [procedureStep, setProcedureStep] = useState(null);
+  const [decisionReason, setDecisionReason] = useState("");
   const { submitting: busy, submitOnce } = useSubmissionGuard();
   // „Stimmt nicht“ (#1159) öffnet „Problem melden“ mit „Falsches Ergebnis“.
   const [problemCategory, setProblemCategory] = useState("");
   const [actionError, setActionError] = useState("");
+
+  // Map-Veto live (#1651): der zuletzt gezeigte Stand - der kurze Abruf und das volle Laden vergleichen damit, was neuer ist.
+  const dataRef = useRef(null);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const load = useCallback(async ({ preserveDrafts = true } = {}) => {
     const [{ data: page }, { data: messages }] = await Promise.all([
       api.get(`/matches/${id}/page`),
       api.get(`/matches/${id}/chat`),
     ]);
-    setData(page);
+    // Ist der Veto-Block der vollen Antwort älter als der, den der kurze Abruf inzwischen gebracht hat, bleibt der neuere stehen - der
+    // übrige Seitenstand kommt aus dieser Antwort.
+    const next = keepNewerVeto(dataRef.current, page);
+    dataRef.current = next;
+    setData(next);
     setChat(messages || []);
     const nextMatch = page.match || {};
     if (preserveDrafts) {
-      setProposalAt((current) => current || toLocalInput(nextMatch.scheduled_at));
+      setProposalTimes((current) => (current.some(Boolean) ? current : [toLocalInput(nextMatch.scheduled_at)]));
     } else {
-      setProposalAt(toLocalInput(nextMatch.scheduled_at));
+      setProposalTimes([toLocalInput(nextMatch.scheduled_at)]);
+      setProposalErrors([]);
     }
   }, [id]);
+
+  // Map-Veto live (#1651): Der Veto-Block fragt kurz beim leichten Abruf nach statt die ganze Seite neu zu laden. Bleibt der Stand derselbe,
+  // ersetzt die Antwort nur den Block; beginnt oder endet das Veto, lädt die Seite einmal ganz.
+  const pollVeto = useCallback(async () => {
+    try {
+      const { data: live } = await api.get(`/matches/${id}/veto`);
+      const merged = mergeLiveVeto(dataRef.current, live);
+      if (!merged) {
+        await load();
+        return;
+      }
+      // Eine Antwort, die eine neuere überholt hat, ändert nichts (`mergeLiveVeto` gibt dann den Stand selbst zurück).
+      if (merged === dataRef.current) return;
+      dataRef.current = merged;
+      setData(merged);
+    } catch {
+      // Der nächste Takt fragt wieder.
+    }
+  }, [id, load]);
 
   useEffect(() => {
     const refreshVisible = () => {
@@ -218,35 +264,72 @@ function MatchPageView() {
     return false;
   };
 
-  const propose = async (e) => {
-    e.preventDefault();
-    const scheduled_at = fromLocalInput(proposalAt);
-    if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit wählen.");
-    if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
-    await runAction(async () => {
-      await api.post(`/matches/${id}/schedule-proposals`, { scheduled_at, note: proposalNote || null });
-      toast.success("Terminvorschlag gesendet.");
-      setProposalNote("");
-      await load();
-    }, "Terminvorschlag konnte nicht gesendet werden.");
+  /** Termine prüfen und senden (#2325): erst jeder einzeln hier, dann der Server - seine Fehler kommen an dieselbe Stelle.
+   * Antwort `{ ok, errors }`; gespeichert sind entweder alle oder keiner. */
+  const sendTimes = async (values, send, fallback, offered = []) => {
+    const iso = values.map(fromLocalInput);
+    const local = proposalTimeErrors(iso, { offered });
+    setActionError("");
+    // Fehler zu einem Termin stehen am Feld (role="alert"); oben nur die Meldung als Toast, nicht ein zweites Mal im Kasten.
+    if (local.some(Boolean)) {
+      toast.error(firstTimeError(local));
+      return { ok: false, errors: local };
+    }
+    const attempt = await submitOnce(() => send(iso));
+    if (!attempt.started) return { ok: false };
+    if (!attempt.error) return { ok: true };
+    const detail = attempt.error.response?.data?.detail;
+    const errors = serverTimeErrors(detail, values.length);
+    if (errors.some(Boolean)) toast.error(formatApiError(detail) || fallback);
+    else failAction(formatApiError(detail) || fallback);
+    return { ok: false, errors };
   };
 
-  const decide = async (proposal, action) => {
-    const payload = { action, note: decisionNote || null };
-    if (action === "counter") {
-      const scheduled_at = fromLocalInput(counterAt);
-      if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
-      if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
-      payload.scheduled_at = scheduled_at;
-    }
-    await runAction(async () => {
-      await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, payload);
-      toast.success(DECISION_TOASTS[action] || "Gespeichert.");
-      setDecisionNote("");
-      setCounterAt("");
-      await load();
-    }, "Terminentscheidung konnte nicht gespeichert werden.");
+  const propose = async (e) => {
+    e.preventDefault();
+    const result = await sendTimes(proposalTimes, async (scheduled_ats) => {
+      await api.post(`/matches/${id}/schedule-proposals/group`, { scheduled_ats, note: proposalNote || null });
+      toast.success(scheduled_ats.length > 1 ? `${scheduled_ats.length} Terminvorschläge gesendet.` : "Terminvorschlag gesendet.");
+      setProposalNote("");
+      await load({ preserveDrafts: false });
+    }, "Terminvorschlag konnte nicht gesendet werden.");
+    setProposalErrors(result.errors || []);
   };
+
+  // Spielwoche (#2325): nur ein Hinweis am Termin, er hält nichts auf - wie der einzelne Vorschlag aus der App.
+  const timeHints = (values, offered = []) => {
+    const block = data?.schedule_block;
+    const week = block?.window || null;
+    // Die 72-h-Regel nur nennen, wenn sie in der Staffel an ist.
+    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week), homeRule: block?.rules?.home_rule !== false, offered });
+  };
+
+  const changeProposalTimes = (next) => {
+    setProposalTimes(next);
+    setProposalErrors([]);
+  };
+
+  // Ablehnen mit optionalem Grund (#2325): er geht als Notiz an die Gegenseite. Antwort `true`, wenn es geklappt hat.
+  const decide = (proposal, action, note = null) => runAction(async () => {
+    await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, { action, note: note || null });
+    toast.success(DECISION_TOASTS[action] || "Gespeichert.");
+    await load();
+  }, "Terminentscheidung konnte nicht gespeichert werden.");
+
+  // Alle Termine einer Gruppe auf einmal ablehnen oder zurückziehen (#2325).
+  const decideGroup = (proposal, action, note = null) => runAction(async () => {
+    await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action, note: note || null });
+    toast.success(action === "withdraw" ? "Vorschläge zurückgezogen." : "Alle Termine abgelehnt.");
+    await load();
+  }, "Terminentscheidung konnte nicht gespeichert werden.");
+
+  // Gegenvorschlag mit bis zu drei Terminen - für einen Vorschlag oder die ganze Gruppe (#2325). `offered`: was schon zur Auswahl
+  // steht - so ein Termin ist eine Annahme und hält den Gegenvorschlag auf (wie der Server).
+  const counterPropose = (proposal, values, note, offered = []) => sendTimes(values, async (scheduled_ats) => {
+    await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/group-decision`, { action: "counter", scheduled_ats, note: note || null });
+    toast.success(DECISION_TOASTS.counter);
+    await load();
+  }, "Gegenvorschlag konnte nicht gesendet werden.", offered);
 
   // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
   const submitReport = async (payload) => runAction(async () => {
@@ -264,8 +347,10 @@ function MatchPageView() {
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
   const submitDispute = async (payload) => runAction(async () => {
-    await api.post(`/matches/${id}/dispute`, payload);
-    toast.success("Gemeldet. Die Turnierleitung schaut es sich an.");
+    const { data: sent } = await api.post(`/matches/${id}/dispute`, payload);
+    // Liga (#1619): Das Verfahren ist eingereicht - weiter mit den Nachweisen.
+    if (sent?.procedure_id) setProcedureStep(sent.procedure_id);
+    toast.success(sent?.procedure_id ? "Eingereicht. Die Liga-Leitung schaut es sich an." : "Gemeldet. Die Turnierleitung schaut es sich an.");
     await load({ preserveDrafts: false });
   }, "Problem konnte nicht gemeldet werden.");
 
@@ -302,6 +387,7 @@ function MatchPageView() {
   const latestProposal = (data.schedule_proposals || []).find((p) => p.status === "pending");
   const canProposeSchedule = Boolean(data.can_propose_schedule);
   const canManageSchedule = Boolean(data.can_manage_schedule);
+  const fixedTime = Boolean(data.schedule_block?.fixed);
   const canUseChat = Boolean(user && data.can_act);
   const participants = data.participants || [];
   const duelParticipants = participants.slice(0, 2);
@@ -323,7 +409,9 @@ function MatchPageView() {
   // Ergebnis (#1132): Spieler melden über das Meldeformular, die Turnierleitung trägt über /result ein. Wer beides
   // dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmit = Boolean(data.can_staff_submit_result);
-  const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted);
+  // Liga-Check-in (#1652): erst einchecken, dann melden - der Server sagt, wer fehlt; der Satz steht statt des Formulars.
+  const reportHint = !canStaffSubmit && !isCompleted && data.report_hint ? data.report_hint : null;
+  const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted && !reportHint);
   // Team-Mitglieder ohne Leitung (#1159): sie sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung.
   const showReportReadOnly = Boolean(!canPlayerReport && !canStaffSubmit && !isCompleted && data.report_state?.status === "confirm");
   const wrongResult = () => {
@@ -333,7 +421,12 @@ function MatchPageView() {
   // Turnierleitung (#1370): ein Knopf öffnet das Ergebnis-Fenster - eintragen oder, wenn es schon eins gibt, korrigieren.
   const canSubmitV2Result = Boolean(canStaffSubmit && data.result_entry && !data.result_entry.hold);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
-  const canDispute = Boolean(data.can_dispute);
+  // Liga (#1619, E.2): je Seite ein offenes Verfahren - danach wird ergänzt statt neu gemeldet; nach dem Einreichen bleibt das
+  // Formular für die Nachweise stehen.
+  const procedureForm = data.league?.procedure_form || null;
+  const procedures = data.league?.procedures || [];
+  const sideNames = Object.fromEntries((league?.sides || []).map((side) => [side.registration_id, side.name]));
+  const canDispute = Boolean(procedureForm ? (data.can_dispute && procedureForm.open) || procedureStep : data.can_dispute);
   // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
   const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
   // „Login zum Ergebnis melden“ (#2124, TP6) nur, wo Spieler selbst melden - nicht bei „Nur Turnierleitung“ oder vor Ort.
@@ -404,7 +497,21 @@ function MatchPageView() {
           )}
         </div>
 
+        {/* Regelwerk der Liga (#2269): gültige Fassung mit PDF und, für die eigene Seite, ob das Co-Team zugestimmt hat. */}
+        {data.league?.rules ? <LeagueRulesNote rules={data.league.rules} testId="match-rules" className="mt-5" /> : null}
+
         {data.call && <MatchCallBox call={data.call} />}
+        {/* Liga-Check-in (#1652): Stand, Countdown, Anwesende und Start - nur Beteiligte und Leitung bekommen den Block. */}
+        {data.checkin ? (
+          <CheckinPanel block={data.checkin} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })}
+            onPoll={pollVeto} onAskLead={canUseChat ? askStaff : null} vetoTvHref={`/display/veto/${id}`}
+            leadUrl={data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ns-${id}` : null} />
+        ) : null}
+        {/* Map-Veto für Zuschauer (#1651): wer weder dazugehört noch das Spiel leitet, sieht das laufende Veto nur lesend - live. */}
+        {!data.checkin && data.veto_view && (data.veto_view.status === "running" || data.veto_view.status === "paused") ? (
+          <VetoPanel block={data.veto_view} matchId={id} busy={busy} run={runAction} onChanged={() => load()} onPoll={pollVeto} readOnly
+            tvHref={`/display/veto/${id}`} />
+        ) : null}
         {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}
         {!finished && isV2 && data.tournament?.id && data.event_mode && data.event_mode !== "online" ? (
           <LiveQueueStatus tournamentId={data.tournament.id} eventId={data.tournament.event_id} matchId={id} hideCalled className="mt-6" />
@@ -415,7 +522,10 @@ function MatchPageView() {
         <div className="mt-8 border border-[#29B6E8]/35 bg-[#0F1D23] rounded-sm p-5" data-testid="match-result-card">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
+                {!over ? <HelpLink thema={data.league ? "liga-captains" : "turniere"} schritt="ergebnis-melden" /> : null}
+              </div>
               {!over && <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -467,6 +577,8 @@ function MatchPageView() {
 
           {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
           {data.league ? <LeagueGamesView league={league} /> : null}
+          {/* Vorfälle (D.5, #1619): öffentlich nur „in Klärung“ bzw. „zählt nicht“ je Map - „Map wiederholt“ steht an der Map selbst. */}
+          {data.league ? <MapStateNotes league={league} /> : null}
           {/* Spiel-IDs für die Lobby (#2108) - nur Beteiligte und Turnierleitung bekommen sie vom Server. */}
           {data.league ? <LeagueLobbyIds league={league} /> : null}
           {data.league ? (
@@ -492,15 +604,43 @@ function MatchPageView() {
 
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
-              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die Turnierleitung prüft und entscheidet.
+              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die {data.league ? "Liga-Leitung" : "Turnierleitung"} prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
-              {(canStaffSubmit || data.can_decide_dispute) && data.tournament ? (
+              {(canStaffSubmit || data.can_decide_dispute) && data.tournament && !procedures.length ? (
                 <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
               ) : null}
             </p>
           )}
           {/* Deine Meldung – Entscheidung (#2124): was die Turnierleitung zur eigenen Meldung entschieden hat. */}
           <OwnDisputes match={match} userId={user?.id} />
+          {/* Liga-Verfahren (#1619, E.2): öffentlich nur „in Klärung“ - Beteiligte und Leitung sehen Stand, Fristen und Entscheidung. */}
+          {data.league?.contested && !data.in_dispute ? (
+            <p className="mt-5 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 text-sm text-white/85" data-testid="match-contested">
+              <strong>In Klärung</strong> – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.
+            </p>
+          ) : null}
+          {/* Einspruch gegen eine Wertung kampflos oder eine Korrektur (Nr. 41, 45) - gegen einen Protestentscheid steht er an dessen Karte. */}
+          {procedureForm?.appealable ? (
+            <section className="mt-5 space-y-2 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="match-appealable">
+              <p className="text-sm text-white/80">
+                {procedureForm.appealable.type === "forfeit" ? "Dieses Spiel wurde kampflos gewertet." : "Das Ergebnis dieses Spiels wurde von der Liga-Leitung korrigiert."} Seid ihr nicht einverstanden, könnt ihr einmal Einspruch einlegen.
+              </p>
+              <AppealForm matchId={id} against={procedureForm.appealable} until={procedureForm.appealable.until} onChanged={() => load({ preserveDrafts: false })} testId="match-appeal" />
+            </section>
+          ) : null}
+          {procedures.length ? (
+            <section className="mt-5 space-y-3" aria-label="Verfahren zu diesem Spiel" data-testid="match-procedures">
+              {procedures.map((procedure) => (
+                <ProcedureCard key={procedure.id} matchId={id} procedure={procedure} sideNames={sideNames} proofsElsewhere={procedureStep === procedure.id} players={data.league?.moss_candidates || []}
+                  conflictOverride={Boolean(data.conflict?.override)} onChanged={() => load({ preserveDrafts: false })}
+                  onChangeResult={data.result_entry ? (reason) => { setDecisionReason(reason); setResultOpen(true); } : null} />
+              ))}
+            </section>
+          ) : null}
+
+          {reportHint ? (
+            <p className="mt-5 rounded-sm border border-honor/30 bg-honor/5 px-4 py-3 text-sm text-white/85" data-testid="match-report-hint">{reportHint}</p>
+          ) : null}
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
@@ -536,12 +676,17 @@ function MatchPageView() {
                   <p className="text-xs text-white/50">{data.result_entry.has_result ? "Korrigieren geht nur mit Grund – er steht im Protokoll." : "Mit „Nicht erschienen“ und „Aufgegeben“ je Seite. Danach 10 Sekunden „Rückgängig“."}</p>
                 </div>
               )}
+              {/* Liga-Staffel (E.1, #1625): beide nicht erschienen werten oder das Spiel neu ansetzen. */}
+              {data.league && canStaffSubmit ? <DoubleNoShowAction match={match} conflict={data.conflict} onDone={() => load()} /> : null}
               {canStaffSubmit && data.result_entry?.hold ? (
                 <p className="text-sm text-[#29B6E8]" data-testid="match-staff-result-held">{data.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${data.result_entry.hold.actor_name} trägt gerade das Ergebnis ein.`}</p>
               ) : null}
 
               {canDispute && (
-                <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} initialCategory={problemCategory} />
+                <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} initialCategory={problemCategory}
+                guide={procedureForm} sides={(league?.sides || []).map((side) => ({ id: side.registration_id, name: side.name }))}
+                createdId={procedureStep} onDone={() => setProcedureStep(null)}
+                help={data.league ? <HelpLink thema="liga-captains" schritt="problem-melden" className="-my-2" /> : null} />
               )}
 
             </div>
@@ -549,11 +694,16 @@ function MatchPageView() {
             <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
-          ) : showStaffEnters ? null : (
+          ) : showStaffEnters || reportHint ? null : (
             <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
           )}
           {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}
         </div>
+
+        {/* Vorfälle im Spiel (D.5, #1619): melden, antworten, entscheiden - nur Beteiligte und Leitung bekommen den Block. */}
+        {data.league?.incident_info ? (
+          <IncidentPanel league={league} matchId={id} busy={busy} run={runAction} onChanged={() => load()} />
+        ) : null}
 
         {/* Nach dem Ende (#1221): Ergebnis und Verlauf - keine Terminabstimmung mehr; der Matchchat bleibt für
             Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}
@@ -563,63 +713,53 @@ function MatchPageView() {
           <div className="space-y-6">
             {!over && (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
-              <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
+                {data.league ? <HelpLink thema="liga-captains" schritt="termin-vorschlagen" /> : null}
+              </div>
               {canProposeSchedule ? (
-                <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-                  <Field label="Vorschlag">
-                    <input type="datetime-local" min={earliestProposalInput()} value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" data-testid="match-proposal-at" />
-                  </Field>
-                  <Field label="Notiz">
-                    <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
-                  </Field>
-                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Vorschlagen</button>
+                <form onSubmit={propose} className="mt-4 space-y-3" data-testid="match-proposal-form" noValidate>
+                  {/* Mehrere Termine auf einmal (#2325): die Gegenseite nimmt einen davon an. */}
+                  <p className="text-xs text-white/55">Schlag bis zu 3 Termine vor – die Gegenseite nimmt einen davon an.</p>
+                  <div className="grid gap-3 md:grid-cols-2 md:items-start">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5" aria-hidden="true">{proposalTimes.length > 1 ? "Termine" : "Termin"}</div>
+                      <ProposalTimesEditor values={proposalTimes} onChange={changeProposalTimes} errors={proposalErrors} hints={timeHints(proposalTimes)} min={earliestProposalInput()} label="Termin" testId="match-proposal-at" disabled={busy} />
+                    </div>
+                    <Field label="Notiz (für alle Termine)">
+                      <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
+                    </Field>
+                  </div>
+                  <button disabled={busy} data-testid="match-proposal-send" className="tls-btn tls-btn--primary min-h-11 w-full sm:w-auto px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{proposeButtonLabel(proposalTimes.length)}</button>
                 </form>
               ) : showFixedScheduleNotice ? (
                 <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
-              ) : (
+              ) : data.schedule_block?.fixed ? null : (
                 <p className="mt-3 text-sm text-white/50">Termine können Teilnehmer, Team-Captains und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
               )}
 
               <div className="mt-5 space-y-3">
-                {(data.schedule_proposals || []).map((p, index) => {
-                  const open = p.status === "pending";
-                  // Der eigene Vorschlag (#2110): annehmen oder ablehnen kann nur die Gegenseite - hier „Zurückziehen“.
-                  const own = open && isOwnProposal(p, data, user?.id);
-                  const answer = canManageSchedule && open && !own;
-                  // Wer nicht zum Spiel gehört, bekommt keine Kennung (#2201) - dann zählt die Stelle in der Liste.
-                  const rowId = p.id || `zeile-${index}`;
-                  return (
-                  <div key={rowId} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-${rowId}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold">{formatDateTime(p.scheduled_at)}</div>
-                        <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${rowId}`}>{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
-                        {p.note && <div className="text-xs text-white/60 mt-2 [overflow-wrap:anywhere]">{p.note}</div>}
-                      </div>
-                      {answer && (
-                        <div className="flex gap-1 shrink-0">
-                          <button type="button" disabled={busy} onClick={() => decide(p, "accept")} aria-label="Termin annehmen" title="Annehmen" data-testid={`match-proposal-accept-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
-                          <button type="button" disabled={busy} onClick={() => decide(p, "decline")} aria-label="Termin ablehnen" title="Ablehnen" data-testid={`match-proposal-decline-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm disabled:opacity-50"><X className="w-3.5 h-3.5" /></button>
-                        </div>
-                      )}
-                      {own && canManageSchedule && (
-                        <button type="button" disabled={busy} onClick={() => decide(p, "withdraw")} data-testid={`match-proposal-withdraw-${p.id}`} className="tls-btn tls-btn--quiet shrink-0 min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Zurückziehen</button>
-                      )}
-                    </div>
-                    {answer && (
-                      <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                        <input type="datetime-local" min={earliestProposalInput()} aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
-                        <input aria-label="Antwort oder Grund" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
-                        <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
-                      </div>
-                    )}
-                  </div>
-                  );
-                })}
-                {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
+                {/* Vorschläge der Gegenseite als Liste (#2325): ein Klick nimmt einen Termin an, die übrigen der Gruppe schließen. */}
+                <ScheduleProposalList proposals={data.schedule_proposals} page={data} userId={user?.id} canManage={canManageSchedule}
+                  fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime}
+                  onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} hintsFor={timeHints} />
+                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
+              {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}
+              <ScheduleChangePanel block={data.schedule_block} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })} onAskLead={canUseChat ? askStaff : null} />
             </div>
             )}
+            {/* Erlaubte Ausrüstung (#2287, Nr. 99): wie im Regelwerk, aus der Liste, die für dieses Spiel gilt (nach dem Ergebnis die
+                festgehaltene). Zugeklappt, weil lang. */}
+            {data.league?.allowed_equipment ? (
+              <details className="group border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-allowed-equipment">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  <span className="font-heading text-xl font-black uppercase flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#29B6E8]" aria-hidden="true" /> Erlaubte Ausrüstung</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-white/60 transition-transform duration-fast group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <AllowedEquipmentView data={data.league.allowed_equipment} hideTitle className="mt-4" testId="match-allowed-equipment-view" />
+              </details>
+            ) : null}
           </div>
 
           {showChat && (
@@ -670,7 +810,7 @@ function MatchPageView() {
           )}
         </div>
       </section>
-      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={league} decisionReason={decisionReason} onClose={() => { setResultOpen(false); setDecisionReason(""); }} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );

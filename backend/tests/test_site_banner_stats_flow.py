@@ -54,8 +54,12 @@ async def test_a_known_banner_counts_impressions_and_clicks_without_login(flow):
     row = await flow.db.site_banner_stats.find_one({"id": banner_id}, {"_id": 0})
     assert row["impressions"] == 2 and row["clicks"] == 1
     assert row["last_impression_at"] and row["last_click_at"]
+    # Die Zahlen sind intern (#2352): öffentlich ohne ``stats``, die Banner-Verwaltung sieht sie.
     listed = (await flow.get("/api/settings/site-banners")).json()["items"][0]
-    assert listed["id"] == banner_id and listed["stats"] == {"impressions": 2, "clicks": 1}
+    assert listed["id"] == banner_id and "stats" not in listed
+    flow.act_as(await flow.add_user(role="club_admin", name="verwaltung"))
+    admin_rows = (await flow.get("/api/settings/site-banners/admin")).json()
+    assert admin_rows[0]["id"] == banner_id and admin_rows[0]["stats"] == {"impressions": 2, "clicks": 1}
 
 
 @pytest.mark.asyncio

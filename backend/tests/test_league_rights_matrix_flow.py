@@ -28,6 +28,7 @@ ACTORS = ("superadmin", "club_admin", "leagues_grant", "cap_right", "cap_other",
           "player", "no_mfa_area", "no_mfa_cap")
 DELETE_BODY = {"reason": "Testfall aufräumen"}
 RESULT_BODY = "RESULT"
+OVERRIDE_BODY = "OVERRIDE"
 FORFEIT_BODY = "FORFEIT"
 POOL_BODY = {"modes": [{"mode": "stellung", "map_ids": ["map-hafen"]}]}
 RULE_TEXT = {"title": "Regelwerk", "body_md": "# Fairplay\nText", "annexes": []}
@@ -56,7 +57,28 @@ ROUTES = [
     route("PATCH", "/api/admin/leagues/seasons/{season}", "rules", {"rules_text": "Neue Regeln"}),
     route("PUT", "/api/admin/leagues/seasons/{season}/map-pool", "season", POOL_BODY),
     route("DELETE", "/api/admin/leagues/seasons/{season}/map-pool", "season"),
+    # Maps und Pools (#2207, C.2)
+    route("GET", "/api/admin/leagues/seasons/{season}/map-pool/versions", ANY),
+    route("GET", "/api/admin/leagues/seasons/{season}/map-pool/compare?base=1&target=1", ANY),
+    route("POST", "/api/admin/leagues/seasons/{season}/map-pool/remove-map", "season", {"map_id": "map-hafen", "reason": "Grund genug"}),
+    route("GET", "/api/admin/leagues/seasons/{season}/readiness", ANY),
     route("POST", "/api/admin/leagues/seasons/{season}/sync", "season"),
+    # Ergebnisregeln (C.3, #1617)
+    route("GET", "/api/admin/leagues/seasons/{season}/result-rules", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/result-rules", "season", {"scores_required": True, "rules": {}}),
+    # Check-in (D.2, #1652): Regeln je Season
+    route("GET", "/api/admin/leagues/seasons/{season}/checkin-rules", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/checkin-rules", "season", {"min_present": 2}),
+    # Veto (D.3, #1618): Vorlage je Season
+    route("GET", "/api/admin/leagues/seasons/{season}/veto-rules", ANY),
+    route("GET", "/api/admin/leagues/seasons/{season}/veto-rules/proposal", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/veto-rules", "season", {"enabled": False, "steps": []}),
+    # Vorgabe der Woche (#2326): Map je Spielwoche
+    route("GET", "/api/admin/leagues/seasons/{season}/veto-presets", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/veto-presets", "season", {"presets": []}),
+    # Plattform je Season (#2270)
+    route("GET", "/api/admin/leagues/seasons/{season}/platform", ANY),
+    route("PATCH", "/api/admin/leagues/seasons/{season}", "season", {"crossplay": True}),
     route("POST", "/api/admin/leagues/seasons/{season}/divisions", "season", {"level": 7}),
     route("PATCH", "/api/admin/leagues/divisions/{division}", "season", {"nickname": "Neu"}),
     route("GET", "/api/admin/leagues/divisions/{division}/delete-plan", "season"),
@@ -93,6 +115,8 @@ ROUTES = [
     route("PUT", "/api/tournaments/{tid}/onsite-access", "manage", {"enabled": False}),
     route("POST", "/api/tournaments/{tid}/onsite-access/renew", "manage"),
     route("POST", "/api/tournaments/{tid}/staff", "manage", {"user_id": "{user}", "role": "referee"}),
+    # Zahlen der automatischen Banner (#2352): wie das Bearbeiten der Staffel
+    route("GET", "/api/settings/site-banners/admin/stats/tournament/{tid}", "manage"),
     # Staffel: Aufbau
     route("DELETE", "/api/tournaments/{tid}", "season"),
     route("POST", "/api/tournaments/{tid}/bracket/plan", "season", {}),
@@ -127,6 +151,13 @@ ROUTES = [
     route("POST", "/api/tournaments/{tid}/live-queue/start", "matches", {"station_id": "s", "match_id": "m"}),
     route("GET", "/api/team-day/{tid}/lineups", "matches"),
     route("PATCH", "/api/matches/{match}", "matches", {"admin_note": "Hinweis"}),
+    # Check-in (D.2, #1652): für eine Seite eintragen und starten als Leitung - Captains handeln als Seite, nicht hier.
+    route("POST", "/api/matches/{match}/checkin", "matches", {"present": [], "registration_id": "{reg}", "reason": "Grund genug"}),
+    route("POST", "/api/matches/{match}/checkin/start", "matches", {}),
+    # Veto (D.3, #1618): Eingriff der Leitung - der Zug selbst gehört den Captains (kein Liga-Recht).
+    route("POST", "/api/matches/{match}/veto/lead", "matches", {"action": "pause", "reason": "Grund genug", "version": 0}),
+    # Notfall-Start eines wartenden Vetos (#2326, Nr. 127) - „Bereit zum Veto“ gehört den Captains (kein Liga-Recht).
+    route("POST", "/api/matches/{match}/veto/start", "matches", {"reason": "Grund genug"}),
     # Staffel: lesen
     route("GET", "/api/tournaments/{tid}/staff", READ),
     route("GET", "/api/tournaments/{tid}/lead", READ),
@@ -135,6 +166,8 @@ ROUTES = [
     route("GET", "/api/tournaments/{tid}/schedule/deadlines", READ),
     # Spiel: entscheiden
     route("POST", "/api/matches/{match}/result", "results", RESULT_BODY),
+    # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“, mit Grund - Captains und andere Rechte nie.
+    route("POST", "/api/matches/{match}/result?force=true", "results", OVERRIDE_BODY),
     route("POST", "/api/matches/{match}/result/undo", "results", {}),
     route("POST", "/api/matches/{match}/forfeit", "results", FORFEIT_BODY),
     route("PUT", "/api/matches/{match}/lineups", "results", "LINEUPS"),
@@ -142,6 +175,12 @@ ROUTES = [
     route("POST", "/api/tournaments/{tid}/matches-v2/recalculate-advancement", "results"),
     route("POST", "/api/matches/{match}/dispute/decision", "disputes", {"decision": "keep", "note": "Bleibt so"}),
     route("POST", "/api/matches/{match}/dispute", "disputes", {"reason": "Falsches Ergebnis"}),
+    # Tabelle (E.1, #1625): Entscheid der Leitung, beide nicht erschienen
+    route("GET", "/api/admin/leagues/staffeln/{tid}/table", ANY),
+    route("PUT", "/api/admin/leagues/staffeln/{tid}/table-decision", "results", {"registration_ids": ["x", "y"], "reason": "Grund genug"}),
+    route("DELETE", "/api/admin/leagues/staffeln/{tid}/table-decision/nix", "results", DELETE_BODY),
+    route("POST", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", {"note": "Beide nicht da"}),
+    route("DELETE", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", DELETE_BODY),
     # PDF
     route("GET", "/api/exports/tournaments/{tid}/participants.pdf", ANY),
     route("GET", "/api/exports/tournaments/{tid}/checkin.pdf", ANY),
@@ -271,9 +310,10 @@ def fill(text: str, w: dict) -> str:
 
 def fill_body(body, w: dict):
     a, h = w["reg_a"]["id"], w["reg_h"]["id"]
-    if body == RESULT_BODY:
+    if body in (RESULT_BODY, OVERRIDE_BODY):
         return {"results": [{"registration_id": a, "rank": 1, "score": 2}, {"registration_id": h, "rank": 2, "score": 0}],
-                "reason": "Korrektur laut Protokoll"}
+                "reason": "Korrektur laut Protokoll",
+                **({"rule_override_reason": "Server stürzte ab"} if body == OVERRIDE_BODY else {})}
     if body == FORFEIT_BODY:
         return {"forfeit_registration_id": a, "note": "Nicht angetreten"}
     if body == "LINEUPS":

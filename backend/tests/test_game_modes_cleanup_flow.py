@@ -52,6 +52,19 @@ async def set_modes(flow, game: dict, modes: list[dict]) -> dict:
     return response.json()
 
 
+async def remove_like_before(flow, game: dict, keep: list[dict]) -> int:
+    """Altbestand von vor #2206: ein verwendeter Modus wurde dem Spiel entfernt und aus den Maps genommen. Heute lehnt die API
+    das ab (409, nur noch deaktivieren, siehe test_game_mode_status_flow) - alte Daten können so aber noch aussehen."""
+    refused = await flow.patch(f"/api/games/{game['id']}", json={"match_modes": keep})
+    assert refused.status_code == 409, refused.text
+    known = {mode["mode"] for mode in keep}
+    stored = (await flow.db.games.find_one({"id": game["id"]}, {"_id": 0, "match_modes": 1}))["match_modes"]
+    gone = [mode["mode"] for mode in stored if mode["mode"] not in known]
+    await flow.db.games.update_one({"id": game["id"]}, {"$set": {"match_modes": keep}})
+    cleaned = await flow.db.game_maps.update_many({"game_id": game["id"], "modes": {"$in": gone}}, {"$pull": {"modes": {"$in": gone}}})
+    return cleaned.modified_count
+
+
 async def maps_by_name(flow, game: dict) -> dict:
     body = (await flow.get(f"/api/games/{game['id']}/maps")).json()
     return {row["name"]: row for row in body["maps"]}
@@ -107,8 +120,11 @@ async def test_usage_names_the_maps_pools_and_seasons_of_each_mode(flow):
 
     modes = (await flow.get(f"/api/games/{game['id']}/usage")).json()["modes"]
 
-    assert modes["suchen"] == {"label": "Suchen & Zerstören", "maps": 2, "pools": 1, "seasons": 1, "tournaments": 1, "stages": 0}
-    assert modes["stellung"] == {"label": "Stellung", "maps": 1, "pools": 0, "seasons": 0, "tournaments": 0, "stages": 1}
+    # Seit #2206 dazu: jede Pool-Version, Staffeln, Spiele, Ergebnisblätter und ob der Modus verwendet ist.
+    assert modes["suchen"] == {"label": "Suchen & Zerstören", "maps": 2, "pools": 1, "seasons": 1, "tournaments": 1, "stages": 0,
+                               "pool_versions": 1, "staffeln": 0, "matches": 0, "references": 0, "in_use": True}
+    assert modes["stellung"] == {"label": "Stellung", "maps": 1, "pools": 0, "seasons": 0, "tournaments": 0, "stages": 1,
+                                 "pool_versions": 0, "staffeln": 0, "matches": 0, "references": 0, "in_use": True}
 
 
 @pytest.mark.asyncio
@@ -119,9 +135,9 @@ async def test_a_saved_pool_stays_readable_and_is_flagged_after_a_mode_is_remove
     tournament = await flow.create_tournament(game_id=game["id"])
     await flow.put(f"/api/map-pools/tournaments/{tournament['id']}", json={"modes": [{"mode": "suchen", "map_ids": [first["id"]]}]})
 
-    await set_modes(flow, game, MODES[:1])
+    await remove_like_before(flow, game, MODES[:1])
 
-    public = (await flow.get(f"/api/map-pools/tournaments/{tournament['id']}")).json()["tournament"]
+    public =(await flow.get(f"/api/map-pools/tournaments/{tournament['id']}")).json()["tournament"]
     assert public["modes"][0]["label"] == "Suchen & Zerstören"
     assert public["modes"][0]["maps"][0]["name"] == "Hafenkante"
     admin = (await flow.get(f"/api/map-pools/tournaments/{tournament['id']}/admin")).json()["tournament"]
@@ -182,8 +198,7 @@ async def test_a_removed_mode_does_not_stop_reporting_from_the_pool_of_a_running
     w = await world(flow)
     await library_for_world(flow)
     await as_admin(flow)
-    answer = await set_modes(flow, {"id": GAME_ID}, MODES[:1])
-    assert answer["maps_cleaned"] == 2, "Nebel und Turm verlieren „Suchen“ in der Bibliothek"
+    assert await remove_like_before(flow, {"id": GAME_ID}, MODES[:1]) == 2, "Nebel und Turm verlieren „Suchen“ in der Bibliothek"
     assert (await flow.db.game_maps.find_one({"id": "map-turm"}))["modes"] == []
 
     # Suchen & Zerstören steht weiter im Pool der Staffel - und in ihrer Reihenfolge der Modi.
@@ -232,12 +247,12 @@ async def test_a_season_keeps_its_mode_order_after_a_mode_is_removed(flow):
     game = await new_game(flow, match_modes=MODES)
     league = (await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": game["id"]})).json()
     season = await flow.post(f"/api/admin/leagues/{league['id']}/seasons",
-                             json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": ["stellung", "suchen"]})
+                             json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": ["stellung", "suchen", "stellung"]})
     assert season.status_code == 200, season.text
-    await set_modes(flow, game, MODES[:1])
+    await remove_like_before(flow, game, MODES[:1])
 
     # Ein anderes Speichern mit der alten Reihenfolge scheitert nicht am entfernten Modus - neu wählen geht aber nicht.
-    kept = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"name": "Season Eins", "game_mode_order": ["stellung", "suchen"]})
+    kept = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"name": "Season Eins", "game_mode_order": ["stellung", "suchen", "stellung"]})
     assert kept.status_code == 200, kept.text
-    refused = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"game_mode_order": ["stellung", "gibt_es_nicht"]})
+    refused = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"game_mode_order": ["stellung", "gibt_es_nicht", "stellung"]})
     assert refused.status_code == 422

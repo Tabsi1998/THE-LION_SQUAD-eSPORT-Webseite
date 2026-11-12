@@ -140,6 +140,18 @@ async def _safe_achievements_reconcile():
         _log_task_failure("achievements_reconcile", exc)
 
 
+async def _safe_discord_memberships():
+    """Überall dabei (#2338): nachts für alle mit verknüpftem Discord abgleichen, auf welchen Servern sie sind - in
+    Gruppen mit Pause; ausgewertet wird nur, wessen Stand sich geändert hat."""
+    try:
+        from database import get_db
+        from services.discord_guilds import sync_all_memberships
+        result = await sync_all_memberships(get_db())
+        logger.info(f"[scheduler] discord_memberships {result}")
+    except Exception as exc:
+        _log_task_failure("discord_memberships", exc)
+
+
 async def _safe_xp_baseline():
     """XP (#617): Konten ohne Erstberechnung nachziehen, 200 je Lauf, bis nichts mehr fehlt."""
     try:
@@ -740,6 +752,22 @@ async def _safe_match_deadlines():
         _log_task_failure("match_deadlines", exc)
 
 
+async def _safe_league_veto():
+    """Veto der Liga (#1618, D.3): abgelaufene Fristen auflösen - alle 10 Sekunden, nur laufende Vetos mit erreichter Frist. Danach
+    die Erinnerung „Map-Veto wartet“ (D.4, #1651) an Seiten, die am Zug sind und das Veto nicht offen haben."""
+    try:
+        from database import get_db
+        from services.league_veto_sweep import nudge, sweep
+        result = await sweep(get_db())
+        if result.get("auto"):
+            logger.info(f"[scheduler] league_veto auto={result['auto']}")
+        nudged = await nudge(get_db())
+        if nudged:
+            logger.info(f"[scheduler] league_veto nudged={nudged}")
+    except Exception as exc:
+        _log_task_failure("league_veto", exc)
+
+
 async def _safe_draw_show():
     """Show-Auslosung (#1590): Erinnerung an die Turnierleitung, nach der Frist lost der Server selbst."""
     try:
@@ -753,13 +781,18 @@ async def _safe_draw_show():
 
 
 async def _safe_proof_photo_retention():
-    """Fotos vom Ergebnis (#1157): nie verwendete nach 24 Stunden, sonst 30 Tage nach dem Hochladen weg."""
+    """Nachweise zu Spielen (#1157, #2360): nie verwendete nach 24 Stunden; Turniere 30 Tage nach dem Hochladen, Liga-Staffeln
+    nach Season-Ende plus Frist, MOSS nach Verfahrensende plus Einspruchsfrist (``match_proof_retention.purge``)."""
     try:
         from database import get_db
-        from services.match_proofs import purge
+        from services.match_proof_retention import purge, rescan_stuck
         removed = await purge(get_db())
         if removed:
             logger.info(f"[scheduler] proof_photo_retention removed={removed}")
+        # Bilder, deren Bildprüfung sich beim Hochladen nicht anstoßen ließ (#2360): neu einreihen.
+        requeued = await rescan_stuck(get_db())
+        if requeued:
+            logger.info(f"[scheduler] proof_photo_retention rescan={requeued}")
     except Exception as exc:
         _log_task_failure("proof_photo_retention", exc)
 
@@ -1112,6 +1145,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievements_reconcile", _safe_achievements_reconcile), CronTrigger(hour=4, minute=10, timezone="Europe/Vienna"),
                   id="achievements_reconcile", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("discord_memberships", _safe_discord_memberships, lease_seconds=900.0), CronTrigger(hour=3, minute=50, timezone="Europe/Vienna"),
+                  id="discord_memberships", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("season_rank_snapshots", _safe_season_rank_snapshots), CronTrigger(hour=3, minute=35, timezone="Europe/Vienna"),
                   id="season_rank_snapshots", max_instances=1, coalesce=True)
     # Shop (#1709): Katalogabgleich mit Printful einmal am Tag - je Variante ein Preisaufruf, unter 120 je Minute.
@@ -1217,6 +1252,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Show-Auslosung (#1590): erinnern und nach der Frist selbst auslosen - jede Minute.
     sched.add_job(_single_replica("draw_show", _safe_draw_show, lease_seconds=120.0), IntervalTrigger(seconds=60),
                   id="draw_show", max_instances=1, coalesce=True)
+    # Veto der Liga (#1618, D.3): 60 Sekunden je Schritt - alle 10 Sekunden nachsehen, ob eine Frist abgelaufen ist.
+    sched.add_job(_single_replica("league_veto", _safe_league_veto, lease_seconds=60.0), IntervalTrigger(seconds=10),
+                  id="league_veto", max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
     sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",
                   max_instances=1, coalesce=True)

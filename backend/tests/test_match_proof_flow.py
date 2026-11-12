@@ -19,7 +19,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import match_proofs  # noqa: E402
+from services import match_proof_retention, match_proofs  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -142,7 +142,7 @@ async def test_photos_go_with_the_tournament_and_after_the_retention(flow):
     long_ago = (now_utc() - timedelta(days=31)).isoformat()
     await flow.db.match_proof_photos.update_one({"id": old["id"]}, {"$set": {"status": "attached", "created_at": long_ago}})
     await flow.db.match_proof_photos.update_one({"id": unused["id"]}, {"$set": {"created_at": (now_utc() - timedelta(hours=25)).isoformat()}})
-    removed = await match_proofs.purge(flow.db)
+    removed = await match_proof_retention.purge(flow.db)
     assert removed == 2
     left = {row["id"] for row in await flow.db.match_proof_photos.find({}, {"_id": 0}).to_list(10)}
     assert left == {kept["id"]}
@@ -150,7 +150,7 @@ async def test_photos_go_with_the_tournament_and_after_the_retention(flow):
     # In Klärung bleibt ein altes Foto - die Turnierleitung braucht es noch.
     await flow.db.match_proof_photos.update_one({"id": kept["id"]}, {"$set": {"created_at": long_ago}})
     await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"status": "disputed"}})
-    assert await match_proofs.purge(flow.db) == 0
+    assert await match_proof_retention.purge(flow.db) == 0
 
     # Ein laufendes Turnier lässt sich seit #2111 (TA18) nicht mehr löschen - verschwindet ein Turnier aus der Datenbank
     # (Entwurf, leere Staffel), gehen die Fotos weiter mit.

@@ -1,0 +1,88 @@
+{
+  "slug": "konto-und-profil",
+  "titel": "Konto und Profil",
+  "kurz": "Konto anlegen, Profil einrichten, Geburtsdatum, Plattform und Spiel-IDs wie die Activision-ID eintragen.",
+  "zielgruppe": "Für alle Spieler",
+  "suchbegriffe": ["registrieren", "anmelden", "account", "einstellungen", "activision", "id", "gamertag", "alter", "playstation", "xbox", "pc"],
+  "abschnitte": [
+    {
+      "id": "konto-anlegen",
+      "titel": "Konto anlegen",
+      "schritte": [
+        {
+          "id": "registrieren",
+          "titel": "Registrieren",
+          "text": "Tippe oben auf Registrieren. Gib einen Benutzernamen, deine E-Mail und ein Passwort ein.",
+          "hinweis": "Der Benutzername steht später in der Adresse deines Profils.",
+          "bild": true,
+          "link": { "to": "/register", "label": "Zum Registrieren" }
+        },
+        {
+          "id": "zustimmen",
+          "titel": "Zustimmen und Konto erstellen",
+          "text": "Hake Datenschutz und Nutzungsbedingungen an. Tippe dann auf Account erstellen.",
+          "hinweis": "Discord, Geburtsdatum und Geschlecht sind freiwillig. Du kannst sie auch später im Profil eintragen.",
+          "bild": true
+        },
+        {
+          "id": "email-bestaetigen",
+          "titel": "E-Mail bestätigen",
+          "text": "Du bekommst eine E-Mail mit einem Link. Öffne den Link. Danach kannst du dich einloggen.",
+          "hinweis": "Keine E-Mail da? Schau im Spam-Ordner nach. Auf derselben Seite kannst du den Link neu anfordern.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "profil",
+      "titel": "Profil einrichten",
+      "schritte": [
+        {
+          "id": "einstellungen",
+          "titel": "Einstellungen öffnen",
+          "text": "Tippe oben rechts auf deinen Namen und dann auf Einstellungen. Am Handy findest du sie im Menü.",
+          "hinweis": "Es gibt keinen Speichern-Knopf. Alles, was du einträgst, speichert sich von selbst.",
+          "bild": true,
+          "link": { "to": "/profile", "label": "Zu den Einstellungen" }
+        },
+        {
+          "id": "grunddaten",
+          "titel": "Grunddaten",
+          "text": "Unter Grunddaten stehen dein Anzeigename, dein Bild und ein kurzer Text über dich. Unten siehst du, wenn alles gespeichert ist.",
+          "bild": true,
+          "link": { "to": "/profile?tab=basic", "label": "Grunddaten öffnen" }
+        },
+        {
+          "id": "geburtsdatum",
+          "titel": "Geburtsdatum eintragen",
+          "text": "Trag unter Grunddaten dein Geburtsdatum ein. Manche Ligen haben ein Mindestalter. Ohne Datum kannst du dort nicht spielen.",
+          "bild": true,
+          "link": { "to": "/profile?tab=basic", "label": "Grunddaten öffnen" }
+        },
+        {
+          "id": "plattform",
+          "titel": "Plattform wählen",
+          "text": "Öffne Gaming. Tippe unter Plattformen alles an, worauf du spielst. Mehrere sind möglich.",
+          "bild": true,
+          "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+        },
+        {
+          "id": "spiel-ids",
+          "titel": "Spiel-IDs eintragen",
+          "text": "Unter Gaming stehen die Spiel-IDs. Trag deine ID genau so ein, wie sie im Spiel steht. Für Call of Duty ist das die Activision-ID mit # und Zahlen.",
+          "hinweis": "Fragt eine Liga nach deiner Plattform, steht das Feld direkt bei der Spiel-ID. Felder mit * sind Pflicht.",
+          "bild": true,
+          "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+        },
+        {
+          "id": "liga-hinweis",
+          "titel": "Fehlt noch etwas für die Liga?",
+          "text": "Spielst du in einer Liga, zeigt ein Hinweis unter Gaming, ob noch etwas fehlt. Trag es nach. Sonst kannst du nicht einchecken und nicht aufgestellt werden.",
+          "hinweis": "Für die Liga gilt die ID, die bei der Anmeldung festgehalten wurde. Änderst du sie später, gibt die Liga-Leitung die neue frei.",
+          "bild": true,
+          "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+        }
+      ]
+    }
+  ]
+}

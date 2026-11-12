@@ -184,9 +184,18 @@ MAX_IMAGE_UPLOAD_MB=50
 MAX_VIDEO_UPLOAD_MB=1536
 MAX_ORIGINAL_UPLOAD_MB=1536
 MAX_DOCUMENT_UPLOAD_MB=50
+MAX_MOSS_UPLOAD_MB=200
 PROXY_UPLOAD_LIMIT_MB=1700
 PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
 ```
+
+**MOSS-Datei der Liga (#2297):** `MAX_MOSS_UPLOAD_MB` (200) gilt nur für die ZIP am Nachweis-Bezug „MOSS“
+(`POST /api/matches/{id}/proofs`); andere Dokumente bleiben bei `MAX_DOCUMENT_UPLOAD_MB`. Die Datei wird auf die Platte
+gestreamt, nie ganz in den Speicher geladen, und liegt im geschützten Nachweis-Ordner (nicht unter den öffentlichen Uploads).
+Das Web schickt sie über den Upload-Host (`VITE_UPLOAD_BACKEND_URL` bzw. `PUBLIC_UPLOAD_BACKEND_URL`), weil Cloudflare je
+Anfrage höchstens 100 MB durchlässt; `frontend/nginx.conf` nimmt unter `/api` bis 1700 MB an und braucht keine Änderung.
+Beim Deploy: Variable setzen (ohne sie gilt 200), der Upload-Host muss wie für Videos erreichbar sein, und auf dem Volume
+der Nachweise braucht es Platz für mehrere Dateien dieser Größe je Verfahren.
 
 Die Grenzen liest das Web über `GET /api/uploads/limits` (#2122) – das Bildfeld zeigt also, was der Server wirklich nimmt;
 die `VITE_MAX_…`-Werte gelten nur, bis die Antwort da ist. `MEDIA_CLEANUP_MIN_AGE_HOURS` (24, mindestens 1): „Ungenutzte

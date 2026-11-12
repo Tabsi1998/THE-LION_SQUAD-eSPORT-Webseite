@@ -343,9 +343,10 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         },
     )
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
+        # Über die Warteschlange (#2338): eine Auswertung je Person und Takt, nicht eine volle je Nachricht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(me["id"])
     except Exception:
-        logger.warning("[achievements] Nachricht von %s nicht ausgewertet", log_safe(me["id"]), exc_info=True)
+        logger.warning("[achievements] Nachricht von %s nicht vorgemerkt", log_safe(me["id"]), exc_info=True)
     doc.pop("_id", None)
     return _public_message(doc, {me["id"]: me, recipient["id"]: recipient})

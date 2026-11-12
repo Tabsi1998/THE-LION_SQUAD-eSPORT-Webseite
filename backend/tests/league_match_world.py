@@ -11,11 +11,48 @@ from datetime import timedelta
 
 from flow_harness import new_id
 from models import now_utc
+from services.checkin_rules import iso
 from squad_world import make_squad, make_team, squad_registration
 
 GAME_ID = "probe-shooter"
 # Eine Season mit den Regeln von vor #2204: Aufstellung je Map, keine Altersprüfung, keine Wartezeit. Für Tests, die nicht diese Regeln prüfen.
 OLD_RULES = {"lineup_mode": "per_map", "min_age": 0, "new_player_wait_days": 0, "one_team_per_season": False, "unique_game_ids": False}
+
+
+async def without_score_duty(flow, season: dict) -> None:
+    """Punkte je Map sind in neuen Seasons Pflicht (C.3, #1617) - hier aus, für Tests, die nicht diese Regel prüfen. Die Kopie der
+    Ergebnisregeln bleibt."""
+    saved = await flow.put(f"/api/admin/leagues/seasons/{season['id']}/result-rules",
+                           json={"scores_required": False, "rules": season.get("result_rules") or {}})
+    assert saved.status_code == 200, saved.text
+
+
+async def without_veto(flow, season: dict) -> None:
+    """Neue Seasons beginnen mit Veto an (D.3, #1618, Fabian Nr. 105) - hier aus, für Tests, die melden, ohne das Veto zu prüfen
+    (sonst heißt es „Erst das Veto abschließen“). Über die Route, wie die Leitung es täte."""
+    saved = await flow.put(f"/api/admin/leagues/seasons/{season['id']}/veto-rules", json={"enabled": False})
+    assert saved.status_code == 200, saved.text
+
+
+async def checked_in(flow, match_id: str) -> None:
+    """Erst einchecken, dann melden (D.2, #1652): beide Seiten gelten für den geltenden Termin als eingecheckt - die Vorbedingung jeder
+    Meldung der Captains in einer Staffel mit Check-in-Regeln (jede neue Season hat sie). Schreibt die Einträge in der Form von
+    ``match_flow.check_in`` direkt, ohne Fenster und Kader: Tests zu Maps, Pools, Tabelle und Fristen brauchen den Check-in als
+    Vorbedingung, nicht als Gegenstand (den prüft test_league_checkin_flow)."""
+    match = await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0, "slots": 1, "scheduled_at": 1, "flow": 1}) or {}
+    now_iso = now_utc().isoformat()
+    for_at = iso(match.get("scheduled_at"))
+    # Termin-Revision (Codex zu D.3): der Eintrag gehört zum geltenden Termin und seiner Revision.
+    rev = int(((match.get("flow") or {}).get("schedule_rev")) or 0)
+    entries = {
+        f"flow.checkin.{slot['registration_id']}": {"at": now_iso, "updated_at": now_iso, "user_id": None, "present": [], "via": "side",
+                                                   "by": None, "reason": None, "rule_version_id": None, "for_at": for_at, "rev": rev}
+        for slot in match.get("slots") or [] if slot.get("registration_id")}
+    assert len(entries) == 2, "zwei Seiten"
+    await flow.db.matches_v2.update_one({"id": match_id}, {"$set": {**entries, "flow.ready_at": now_iso, "flow.ready_for": for_at,
+                                                                     "flow.ready_rev": rev}})
+
+
 POOL = [
     {
         "mode": "stellung",
@@ -88,7 +125,9 @@ async def duel(flow, tournament: dict, reg_a: dict, reg_b: dict, *, matchday: in
     return match
 
 
-async def world(flow) -> dict:
+async def world(flow, *, letter: str = "A") -> dict:
+    """``letter``: Buchstabe der Staffel - eine zweite Welt im selben Test braucht einen anderen, sonst hält auf echtem MongoDB der
+    eindeutige Index ``league_staffel_unique`` (Liga N + Staffel) sie auf."""
     names = ["LoeLeitung", "Kapitaen", "Mila", "Tom", "Ida", "FalLeitung", "Falke1", "Falke2", "Falke3", "Fremd"]
     users = {name: await flow.add_user(name=name) for name in names}
     lions = await make_team(
@@ -117,7 +156,7 @@ async def world(flow) -> dict:
         game_id=GAME_ID,
     )
     season_id = new_id()
-    tournament = await staffel(flow, season_id)
+    tournament = await staffel(flow, season_id, letter)
     reg_a = await squad_registration(flow, tournament, lions, squad_a)
     reg_h = await squad_registration(flow, tournament, falcons, horst)
     match = await duel(flow, tournament, reg_a, reg_h)

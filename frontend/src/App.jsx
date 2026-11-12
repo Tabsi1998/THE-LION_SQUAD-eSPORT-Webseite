@@ -26,6 +26,7 @@ import { RouteFallback, StartSplashGate } from "@/components/tls/RouteFallback";
 // Seitenwechsel anhalten, solange in den Einstellungen etwas nicht gespeichert werden konnte (#1048): der Hörer für
 // „Zurück“ muss vor dem des Routers stehen, deshalb wird das Modul hier früh geladen.
 import "@/lib/navigationGuard";
+import { gamePageUrl } from "@/lib/gameForm";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -36,6 +37,18 @@ function MeRedirect() {
   const query = params.toString() ? `?${params.toString()}` : "";
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/u/me${query}`)}`} replace />;
   return <Navigate to={`/u/${encodeURIComponent(user.username)}${query}`} replace />;
+}
+
+// Die alte Map-Seite eines Spiels (#1616) ist seit #2249 der Reiter Maps der Spielseite - Links bleiben gültig.
+function GameMapsLegacyRedirect() {
+  const { gameId } = useParams();
+  return <Navigate to={gamePageUrl(gameId, "maps")} replace />;
+}
+
+// Ausrüstung (#2218): die vorläufige eigene Adresse führt auf den Reiter der Spielseite.
+function GameEquipmentLegacyRedirect() {
+  const { gameId } = useParams();
+  return <Navigate to={gamePageUrl(gameId, "ausruestung")} replace />;
 }
 
 function FastLapLegacyRedirect() {
@@ -103,6 +116,9 @@ const ImprintPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) 
 const TermsPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 // „Neu auf der Website“ (#1240): die letzten Neuerungen aus src/whatsnew.json.
 const WhatsNewPage = lazyPage(() => import("@/pages/public/WhatsNewPage"));
+// Hilfe für Spieler und Captains (#2295)
+const HelpIndexPage = lazyPage(() => import("@/pages/public/HelpIndexPage"));
+const HelpTopicPage = lazyPage(() => import("@/pages/public/HelpTopicPage"));
 
 const DashboardPage = lazyPage(() => import("@/pages/user/DashboardPage"));
 const YearReviewPage = lazyPage(() => import("@/pages/user/YearReviewPage"));
@@ -125,7 +141,7 @@ const AdminF1Page = lazyPage(() => import("@/pages/admin/AdminF1Page"));
 const AdminF1NewPage = lazyPage(() => import("@/pages/admin/AdminF1NewPage"));
 const AdminF1EditPage = lazyPage(() => import("@/pages/admin/AdminF1EditPage"));
 const AdminGamesPage = lazyPage(() => import("@/pages/admin/AdminGamesPage"));
-const AdminGameMapsPage = lazyPage(() => import("@/pages/admin/AdminGameMapsPage"));
+const AdminGamePage = lazyPage(() => import("@/pages/admin/games/AdminGamePage"));
 const AdminLeaguesPage = lazyPage(() => import("@/pages/admin/league/AdminLeaguesPage"));
 const AdminLeagueSeasonPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueSeasonPage"));
 const AdminLeagueRulesPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueRulesPage"));
@@ -213,6 +229,8 @@ const BracketTVPage = lazyPage(() => import("@/pages/display/BracketTVPage"));
 const StationTVPage = lazyPage(() => import("@/pages/display/StationTVPage"));
 const EventTVPage = lazyPage(() => import("@/pages/display/EventTVPage"));
 const EventCallsTVPage = lazyPage(() => import("@/pages/display/EventCallsTVPage"));
+// Map-Veto am TV (#1651): öffentlich wie Matchseite und Event-TV, mit Anzeige-Schlüssel auch für Staffeln „Nur Mitglieder“.
+const VetoTVPage = lazyPage(() => import("@/pages/display/VetoTVPage"));
 const MyPrizesPage = lazyPage(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazyPage(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazyPage(() => import("@/pages/admin/AdminPrizesPage"));
@@ -331,6 +349,8 @@ function App() {
           <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/neu" element={<WhatsNewPage />} />
+          <Route path="/hilfe" element={<HelpIndexPage />} />
+          <Route path="/hilfe/:thema" element={<HelpTopicPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -385,7 +405,10 @@ function App() {
           <Route path="/admin/f1/new" element={<ProtectedRoute requireArea="tournaments"><AdminF1NewPage /></ProtectedRoute>} />
           <Route path="/admin/f1/:id" element={<ProtectedRoute requireTournamentStaff><AdminF1EditPage /></ProtectedRoute>} />
           <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
-          <Route path="/admin/games/:gameId/maps" element={<ProtectedRoute requireArea="tournaments"><AdminGameMapsPage /></ProtectedRoute>} />
+          <Route path="/admin/games/:gameId" element={<ProtectedRoute requireArea="tournaments"><AdminGamePage /></ProtectedRoute>} />
+          <Route path="/admin/games/:gameId/maps" element={<GameMapsLegacyRedirect />} />
+          {/* Ausrüstung (#2218): Reiter der Spielseite, die alte Adresse leitet weiter. */}
+          <Route path="/admin/games/:gameId/equipment" element={<GameEquipmentLegacyRedirect />} />
           <Route path="/admin/leagues" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeaguesPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueSeasonPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueRulesPage /></ProtectedRoute>} />
@@ -475,6 +498,7 @@ function App() {
           <Route path="/display/f1/:id" element={<F1TVPage />} />
           <Route path="/display/event/:id" element={<EventTVPage />} />
           <Route path="/display/event/:id/calls" element={<EventCallsTVPage />} />
+          <Route path="/display/veto/:matchId" element={<VetoTVPage />} />
           <Route path="/display/bracket/:id" element={<BracketTvRoute />} />
           <Route path="/display/bracket/:id/station/:stationId" element={<BracketTvRoute station />} />
 

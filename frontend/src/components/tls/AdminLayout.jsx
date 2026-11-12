@@ -177,7 +177,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge", "challenges"],
   "/admin/seasons": ["wertung", "jahreswertung", "circuit", "saisons", "saison"],
-  "/admin/games": ["spiele", "games"],
+  "/admin/games": ["spiele", "games", "maps", "modi", "spielmodi", "spiel-ids", "spieler-ids", "map-pool"],
   "/admin/stations": ["geraete", "setup", "event"],
   "/admin/tv": ["tv", "beamer", "fernseher", "display", "bildschirm", "anzeige", "turnierbaum tv", "hallen-tv", "schlüssel", "schluessel", "anzeige-schlüssel", "kontrast", "schrift", "sicherer bereich", "pixel", "wach halten", "bewegung reduzieren"],
   "/admin/game-servers": ["server", "communityserver"],

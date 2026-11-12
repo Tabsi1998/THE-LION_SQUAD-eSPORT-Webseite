@@ -781,6 +781,21 @@ def _pdf_group_title(group: dict, index: int) -> str:
     return f"Gruppe {str(group['group_key']).upper()}" if group.get("group_key") else f"Gruppe {index + 1}"
 
 
+_EXIT_SUFFIX = {"withdrawn": "ausgetreten", "disqualified": "disqualifiziert"}
+
+
+def _standing_name(row: dict) -> str:
+    """Der Name in der Rangliste - am Tabellenende einer Liga-Staffel mit „(ausgetreten)“ bzw. „(disqualifiziert)“ (E.1)."""
+    name = str(row.get("display_name") or "Teilnehmer")
+    suffix = _EXIT_SUFFIX.get(((row.get("exit") or {}) if isinstance(row.get("exit"), dict) else {}).get("kind"))
+    notes = [suffix] if suffix else []
+    # Angefochtene Ergebnisse (E.2, #1619): wie in der Webtabelle - sie zählen vorläufig, die Zeile sagt es.
+    contested = row.get("contested") if isinstance(row.get("contested"), int) and not isinstance(row.get("contested"), bool) else 0
+    if contested > 0:
+        notes.append("1 Spiel in Klärung" if contested == 1 else f"{contested} Spiele in Klärung")
+    return f"{name} ({', '.join(notes)})" if notes else name
+
+
 def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
     """Die Tabellen des Ergebnis-PDFs (#2121): je Gruppe eine (mit Namen), sonst eine; Spalten je Art der Tabelle, der
     Namenskopf „Team“ bei Team-Turnieren."""
@@ -800,7 +815,7 @@ def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
             "wide": [index for index, (label, _keys, _fmt) in enumerate(columns) if label == "Erreicht"],
             "headers": ["Platz", name_head, *[label for label, _keys, _fmt in columns]],
             "rows": [
-                [str(row.get("rank", "")), str(row.get("display_name") or "Teilnehmer"),
+                [str(row.get("rank", "")), _standing_name(row),
                  *[fmt(_first(row, *keys)) for _label, keys, fmt in columns]]
                 for row in section_rows
             ],
@@ -1486,10 +1501,14 @@ _RULES_IMAGE_LINE = re.compile(r"^!\[[^\]\n]*\]\(([^)\s]+)\)$")
 _RULES_TABLE_DIVIDER = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
 
 
-def _rules_pdf_text(value) -> str:
+def _rules_pdf_text(value, keep_block: bool = False) -> str:
     """Die Standardschrift kann nur Westeuropäisches: Bekannte Zeichen bekommen eine Umschreibung, Emoji fallen weg."""
     out = []
     for char in str(value or ""):
+        if _is_block_char(char):
+            # Geschütztes Zeichen eines Bausteins (#2218): als Text das echte Zeichen; pdf_rules_inline hält es bis zum Schluss geschützt.
+            out.append(char if keep_block else _RULES_BLOCK_CHARS[ord(char) - _RULES_PROTECT_BASE])
+            continue
         try:
             char.encode("cp1252")
             out.append(char)
@@ -1507,10 +1526,28 @@ def _rules_inline_marks(raw: str) -> str:
     return re.sub(r"\*(.+?)\*", r"<i>\1</i>", html)
 
 
+# Bausteinwerte (Namen aus Bibliothek und Modus, #2218): Ihre Steuerzeichen stehen als Zeichen aus dem privaten Bereich da
+# (``services.markdown_text``), die keine Regel trifft. Erst hier am Ende werden sie wieder das echte, maskierte Zeichen. Der frei
+# geschriebene Text bleibt unberührt, auch ein Backslash darin.
+_RULES_BLOCK_CHARS = "\\`*_[]()!~+"
+_RULES_PROTECT_BASE = 0xE000
+
+
+def _is_block_char(char: str) -> bool:
+    return _RULES_PROTECT_BASE <= ord(char) < _RULES_PROTECT_BASE + len(_RULES_BLOCK_CHARS)
+
+
+def _rules_restore(markup: str) -> str:
+    return "".join(escape(_RULES_BLOCK_CHARS[ord(char) - _RULES_PROTECT_BASE]) if _is_block_char(char) else char for char in markup)
+
+
 def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
     """Eine Zeile Markdown als Absatz-Markup - alles maskiert, nur unsere Tags; Links nur auf sichere Ziele oder eigene Anker,
-    Bilder als Hinweis (das PDF lädt nichts nach)."""
-    text = _rules_pdf_text(raw)
+    Bilder als Hinweis (das PDF lädt nichts nach). Geschützte Zeichen aus Bausteinen kommen als Text heraus."""
+    return _rules_restore(_rules_inline(_rules_pdf_text(raw, keep_block=True), anchors))
+
+
+def _rules_inline(text: str, anchors) -> str:
     out = ""
     last = 0
     for match in _RULES_LINK.finditer(text):
@@ -1569,6 +1606,8 @@ def _rules_styles() -> dict:
 
 
 def _rules_table(rows: list[list[str]], styles: dict, width: float, anchors, marked: bool):
+    if tuple(rows[0]) == _RULES_GEAR_HEAD:
+        return _rules_gear_table(rows, styles, width, anchors, marked)
     columns = max(len(row) for row in rows)
     cell = styles["cell_small"] if columns > 6 else styles["cell"]
     data = [[_rules_para(Paragraph, row[index] if index < len(row) else "", cell, anchors) for index in range(columns)] for row in rows]
@@ -1578,6 +1617,73 @@ def _rules_table(rows: list[list[str]], styles: dict, width: float, anchors, mar
         ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("LEFTPADDING", (0, 0), (-1, -1), 3 if columns > 6 else 5), ("RIGHTPADDING", (0, 0), (-1, -1), 3 if columns > 6 else 5),
         *([("LINEBEFORE", (0, 0), (0, -1), 2.2, MARK_INK)] if marked else []),
+    ]))
+    table.hAlign = "LEFT"
+    return table
+
+
+# Erlaubte Ausrüstung ab layout 5 (#2305, services.loadout_bans.GEAR_HEAD und CELL_BREAK): je Kategorie eine Tabelle Bild · Waffe ·
+# Aufsätze. Nur an diesem Kopf erkannt - jede andere Tabelle bleibt, wie sie war. Ein Bild in der ersten Spalte ist ein kleines Vorschaubild
+# aus dem eigenen Upload, eine Zelle mit Zeilenwechsel (U+2028) wird mehrere Absätze, eine Zeile nur mit erster Zelle (Kopf einer
+# Waffenklasse) geht über die ganze Breite.
+_RULES_GEAR_HEAD = ("Bild", "Waffe", "Aufsätze")
+_RULES_CELL_BREAK = " "
+_RULES_GEAR_IMAGE = (2.4 * cm, 1.35 * cm)
+
+
+def _rules_cell_image(url: str):
+    """Ein kleines Vorschaubild für eine Tabellenzelle: verkleinert eingebettet (das PDF bleibt klein), Seitenverhältnis bleibt. Fehlt die
+    Datei oder ist sie kaputt: ``None``."""
+    path = _local_upload_path(url)
+    if not path:
+        return None
+    box_w, box_h = _RULES_GEAR_IMAGE
+    try:
+        with Image.open(path) as picture:
+            picture.load()
+            small = picture.convert("RGBA")
+    except (OSError, ValueError, SyntaxError, Image.DecompressionBombError):
+        return None
+    small.thumbnail((int(box_w / cm * 118), int(box_h / cm * 118)))
+    if not small.width or not small.height:
+        return None
+    buffer = io.BytesIO()
+    small.save(buffer, format="PNG", optimize=True)
+    buffer.seek(0)
+    scale = min(box_w / small.width, box_h / small.height)
+    flowable = PlatypusImage(buffer, width=small.width * scale, height=small.height * scale)
+    flowable.hAlign = "LEFT"
+    return flowable
+
+
+def _rules_gear_table(rows: list[list[str]], styles: dict, width: float, anchors, marked: bool):
+    cell = styles["cell"]
+    # Ein zweites Wort („eingeschränkt:“ nach „gesperrt:“) bekommt etwas Luft davor.
+    lead = ParagraphStyle("RulesCellLead", parent=cell, spaceBefore=3)
+    image_w = _RULES_GEAR_IMAGE[0] + 10
+    data, style = [], []
+
+    def text_cell(raw: str):
+        parts = [part for part in str(raw or "").split(_RULES_CELL_BREAK) if part.strip()]
+        paragraphs = [_rules_para(Paragraph, part, lead if index and part.startswith("**") else cell, anchors)
+                      for index, part in enumerate(parts)]
+        return paragraphs[0] if len(paragraphs) == 1 else paragraphs or ""
+
+    for index, row in enumerate(rows):
+        row = [*row, "", "", ""][:3]
+        if index and row[0] and not row[1] and not row[2]:
+            data.append([_rules_para(Paragraph, row[0], cell, anchors), "", ""])
+            style += [("SPAN", (0, index), (-1, index)), ("BACKGROUND", (0, index), (-1, index), TINT)]
+            continue
+        found = _RULES_IMAGE_LINE.match(row[0].strip()) if index else None
+        first = (_rules_cell_image(found.group(1)) or "") if found else text_cell(row[0])
+        data.append([first, text_cell(row[1]), text_cell(row[2])])
+    table = Table(data, colWidths=[image_w, (width - image_w) * 0.34, (width - image_w) * 0.66], repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), TINT), ("GRID", (0, 0), (-1, -1), 0.25, RULE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        *style, *([("LINEBEFORE", (0, 0), (0, -1), 2.2, MARK_INK)] if marked else []),
     ]))
     table.hAlign = "LEFT"
     return table

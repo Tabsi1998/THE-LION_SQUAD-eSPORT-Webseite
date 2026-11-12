@@ -6,13 +6,15 @@ import { AlertTriangle, ClipboardCheck, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
-import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, windowLine } from "@/lib/leagueApplications";
+import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
 
-export function ApplicationStateBadge({ state, testId }) {
+// ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
+export function ApplicationStateBadge({ state, testId, label }) {
   const info = APPLICATION_STATES[state] || APPLICATION_STATES.none;
   return (
-    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[info.tone]}`}>{info.label}</span>
+    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[info.tone]}`}>{label || info.label}</span>
   );
 }
 
@@ -20,15 +22,26 @@ function OwnSquadRow({ row, onWithdraw }) {
   const application = row.application;
   return (
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-white/10 py-3 first:border-t-0" data-testid={`league-application-row-${row.squad_id}`}>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-64">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
-          <ApplicationStateBadge state={row.state} />
+          <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, application)} testId={`league-application-state-${row.squad_id}`} />
         </div>
+        {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 text-sm text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
         {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
         {row.state === "accepted" && !application?.staffel ? <p className="mt-1 text-sm text-white/75">Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
         {application?.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
+        {/* Offene Punkte (#2313): Die Anmeldung läuft, gesperrt wird erst beim Check-in - bis dahin bleibt sichtbar, was fehlt.
+            Der Kasten sagt zuerst, dass die Anmeldung zählt (#2322); die Folge beim Spiel steht im Satz vom Server. */}
+        {application && (row.shortfall || row.warnings?.length) ? (
+          <div className="mt-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-2 text-sm text-white/80" data-testid={`league-application-open-${row.squad_id}`}>
+            <p className="font-semibold text-white/90">Die Anmeldung zählt – fehlende Angaben halten euch nicht aus der Liga.</p>
+            {row.shortfall ? <p className="mt-1 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
+            {row.warnings?.length ? <ul className="mt-1 space-y-0.5 text-xs text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+            {row.warnings?.length ? <p className="mt-1 text-xs text-white/60">Wer bis zum ersten Spiel nichts im Profil nachträgt, kann nicht einchecken und nicht aufgestellt werden.</p> : null}
+          </div>
+        ) : null}
       </div>
       {application?.can_withdraw ? (
         <button type="button" onClick={() => onWithdraw(row)} data-testid={`league-application-withdraw-${row.squad_id}`}
@@ -58,7 +71,9 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   useEffect(() => { load(); }, [load]);
 
   const withdraw = async (row) => {
-    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
+    // Eine automatische Zuteilung zieht das Team selbst zurück, solange der Spielplan nicht steht (#2348) - dann fällt auch der Platz in der Staffel weg.
+    const staffel = row.application?.staffel ? ` und spielt nicht mehr in ${row.application.staffel}` : "";
+    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
     if (!sure) return;
     try {
       await api.post(`${base}/applications/${row.application.id}/withdraw`, {});
@@ -77,9 +92,13 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
     <section className="tls-league-application mt-10 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby="league-application-title" data-testid="league-application">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="league-application-title" className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase">
-            <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
-          </h2>
+          {/* Das „?“ steht neben der Überschrift, nicht darin - sie benennt den Abschnitt (aria-labelledby). */}
+          <div className="flex items-center gap-2">
+            <h2 id="league-application-title" className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase">
+              <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
+            </h2>
+            <HelpLink thema="liga-captains" schritt="anmeldung-starten" />
+          </div>
           <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">{windowLine(current)}</p>
           {seats ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-seats">{seats}</p> : null}
           {current.entry_policy === "members" ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}

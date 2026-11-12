@@ -134,7 +134,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await settled(page);
     await page.screenshot({ path: `test-results/liga-gestaltung-admin-${width}.png`, fullPage: false });
 
-    await page.goto("/admin/leagues/seasons/s1");
+    // Gestaltung und Gewinne stehen seit #2267 im Überblick (Sprungmarke #gestaltung).
+    await page.goto("/admin/leagues/seasons/s1#gestaltung");
     const seasonLook = page.getByTestId("season-look");
     await expect(seasonLook).toBeVisible();
     await expect(page.getByTestId("season-prizes-text-0")).toHaveValue("Pokal und Trikot");

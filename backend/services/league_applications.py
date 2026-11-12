@@ -6,6 +6,9 @@ Der Antrag gilt der Season, die Staffel steht erst nach der Genehmigung fest - d
 Gleichzeitigkeit: Einreichen, Rückzug und Entscheidungen halten die Season-Sperre (dieselbe wie beim Zuteilen), beim Zuteilen zuerst die Turnier-Sperre. Der Status wechselt
 nur mit Bedingung auf den alten Stand, ``active_key`` hält „ein offener Antrag je Season und Co-Team“ auch ohne Sperre.
 
+Automatisch annehmen (#2348, ``application_auto_accept``): Die Season entscheidet beim Einreichen unter derselben Sperre - der letzte Platz geht so nur einmal weg.
+Mit nur einer Staffel sperrt das Einreichen sie vorher und teilt zu.
+
 Datenschutz: Andere Teams und Gäste sehen keinen Antrag. Kein Geburtsdatum: Die Prüfung liefert nur den Stand aus ``league_eligibility``.
 """
 
@@ -18,15 +21,16 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_eligibility, league_roster, league_rules, league_service, squad_registration
+from services import checkin_rules, league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
-from services.league_permissions import staff_user_ids
+from services.league_permissions import CAPABILITIES, belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.log_safe import log_safe
 from services.match_audience import responsible_ids, teams_by_id
 from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock, tournament_write_resource
+from services.permissions import is_superadmin
 from services.visibility import user_can_see
 
 logger = logging.getLogger("tls.league_applications")
@@ -59,10 +63,29 @@ WAITLIST_FULL = "Die Warteliste ist voll."
 DECIDED = "Dieser Antrag hat sich schon geändert. Bitte neu laden."
 ASSIGNED_ALREADY = "Dieses Co-Team ist schon zugeteilt. Das Herausnehmen geht über die Teilnehmerliste der Staffel."
 WITHDRAW_ASSIGNED = "Das Co-Team ist schon einer Staffel zugeteilt. Den Austritt trägt die Liga-Leitung ein."
+# Zurückziehen einer automatischen Zuteilung (#2348) wie die Turnier-Abmeldung: nach Check-in oder sobald Check-in bzw. Staffel laufen nur über die Leitung.
+WITHDRAW_STARTED = "Nach dem Check-in oder sobald Check-in oder Staffel laufen, geht der Austritt nur über die Liga-Leitung."
+TEAM_LEAVE_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed"})
 GONE = "Diesen Antrag gibt es nicht."
 BUSY = "An dieser Season wird gerade etwas geändert. Bitte gleich noch einmal versuchen."
 STAFFEL_GONE = "Diese Staffel gehört nicht zu dieser Season."
 SQUAD_GONE = "Das Co-Team gibt es nicht mehr."
+# Der Dialog „Co-Team zuteilen“ fragt nach keinem Grund: Die Notausnahme geht über den Eingang, dort steht das Feld (#2245).
+ADMIN_WAY_OVERRIDE = ("Über dein eigenes Team entscheidet eine andere Person. Das Co-Team hat einen offenen Antrag: Als Superadmin geht es nur "
+                      "als Notausnahme mit Grund, im Eingang der Season unter „Anmeldungen“.")
+# Anmeldungen automatisch annehmen (#2348): Die Season entscheidet, keine Person - darum ohne Befangenheit (Nr. 73) und ohne Kennung im Verlauf.
+AUTO_ACCEPT = "application_auto_accept"
+AUTO_ACTOR: dict = {"id": None}
+AUTO_NAME = "automatisch"
+AUTO_PLAN_FIXED = "Der Spielplan der Staffel steht schon. Das Co-Team bitte über „Austritt eintragen“ in der Teilnehmerliste herausnehmen."
+# Warum die Season nicht (ganz) entscheiden konnte (Review #2348) - steht im Antrag (``auto_problem``), im Eingang und im Hinweis an die Leitung.
+AUTO_STAFFEL_STARTED = "Die einzige Staffel hat schon begonnen."
+AUTO_STAFFEL_PLAN = "Der Spielplan der einzigen Staffel steht schon."
+AUTO_SIBLING = ("{team} hat schon ein Co-Team in der einzigen Staffel, und zwei Co-Teams eines Hauptteams spielen in dieser Season nicht in derselben "
+                "Staffel.")
+AUTO_FAILED = "Es gab einen technischen Fehler, bitte selbst prüfen."
+# Zurückstufen einer angenommenen Anmeldung (#2348): wie beim Ablehnen nur mit Grund, egal ob automatisch oder von Hand angenommen.
+DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, das Team liest ihn."
 
 
 # ---------------------------------------------------------------- Fenster und Plätze
@@ -108,6 +131,16 @@ def _waitlist_has_room(season: dict, stats: dict) -> bool:
     return bool(season.get("application_waitlist")) and (not limit or stats["waiting"] < limit)
 
 
+def _free_for_newcomers(season: dict, stats: dict) -> int | None:
+    """Freie Plätze für die Ligaseite. Mit „automatisch annehmen“ (#2348) das, was eine neue Anmeldung wirklich bekommt: Offene Anträge halten ihren Platz,
+    und wartet schon jemand, geht ein freier Platz durch die Leitung an die Warteliste (wie ``_auto_decide``). Ohne die Einstellung wie bisher."""
+    if not season.get(AUTO_ACCEPT) or not stats["slots"]:
+        return stats["free"]
+    if stats["waiting"]:
+        return 0
+    return max(0, stats["slots"] - stats["taken"] - stats["open"])
+
+
 async def public_block(db, season: dict) -> dict | None:
     """Für alle: Fenster-Stand, freie Plätze, Warteliste. Keine Personen, keine Anträge. ``None``: keine Selbstanmeldung."""
     state = window_state(season)
@@ -115,9 +148,10 @@ async def public_block(db, season: dict) -> dict | None:
         return None
     stats = await seat_stats(db, season)
     return {"state": state, "opens_at": season.get("application_opens_at"), "closes_at": season.get("application_closes_at"),
-            "slots": stats["slots"], "slots_free": stats["free"], "waitlist": bool(season.get("application_waitlist")),
+            "slots": stats["slots"], "slots_free": _free_for_newcomers(season, stats), "waitlist": bool(season.get("application_waitlist")),
             "waitlist_full": bool(season.get("application_waitlist")) and not _waitlist_has_room(season, stats),
-            "waitlist_note": season.get("application_waitlist_note"), "entry_policy": season.get("entry_policy") or "all"}
+            "waitlist_note": season.get("application_waitlist_note"), "entry_policy": season.get("entry_policy") or "all",
+            "auto_accept": bool(season.get(AUTO_ACCEPT))}
 
 
 # ---------------------------------------------------------------- Prüfung
@@ -155,6 +189,16 @@ async def _min_size(db, season: dict) -> int:
     return min(league_roster.min_squad_size(row) for row in rows)
 
 
+async def _ready_minimum(db, season: dict) -> int:
+    """Wie viele Spielberechtigte ein Team zum Einchecken braucht (#2322): die Mindestzahl Anwesender aus den Check-in-Regeln der
+    Season (bei 4 gegen 4 also 3), nicht der Mindestkader. Ohne Check-in-Regeln gilt wie bisher der Mindestkader."""
+    raw = season.get("checkin_rules")
+    if isinstance(raw, dict):
+        with contextlib.suppress(checkin_rules.FlowProblem):
+            return int(checkin_rules.normalize({key: value for key, value in raw.items() if key in checkin_rules.DEFAULTS})["min_present"])
+    return await _min_size(db, season)
+
+
 async def _non_members(db, squad: dict) -> list[str]:
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     rows = await db.users.find({"id": {"$in": members}}, {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_club_member": 1, "display_name": 1, "username": 1}).to_list(len(members) + 1)
@@ -178,15 +222,12 @@ async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *
         outsiders = await _non_members(db, squad)
         if outsiders:
             problems.append((400, f"{squad.get('name')}: Diese Season ist nur für Mitglieder. Keine Mitglieder: {', '.join(sorted(outsiders))}."))
+    # Fehlende Angaben und zu wenige Spielberechtigte halten die Anmeldung nicht auf (#2313, ersetzt Nr. 74): nur Hinweis, gesperrt wird
+    # erst beim Check-in und bei der Aufstellung. Andere Co-Teams stehen schon oben als Grund.
     rows = league_eligibility.statuses(ctx, members, squad["id"])
-    ready = [row for row in rows.values() if row["ok"]]
-    if len(members) >= minimum and len(ready) < minimum:
-        problems.append((400, f"{squad.get('name')}: Nur {len(ready)} Spieler sind spielberechtigt, die Season verlangt mindestens {minimum}. "
-                              "Fehlende Spiel-IDs tragen die Spieler im eigenen Profil ein."))
-    # Alter und andere Co-Teams stehen schon oben als Grund.
-    named = (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE, league_eligibility.OTHER_TEAM)
-    warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] not in named]
-    return {"problems": problems, "warnings": sorted(warnings)}
+    warnings = [f"{row['name']}: {row['reason']}" for row in rows.values() if not row["ok"] and row["state"] != league_eligibility.OTHER_TEAM]
+    shortfall = league_eligibility.open_points(ctx, squad, minimum=await _ready_minimum(db, season))["shortfall"]
+    return {"problems": problems, "warnings": sorted(warnings), "shortfall": shortfall}
 
 
 # ---------------------------------------------------------------- Wer darf
@@ -238,27 +279,71 @@ async def _audit(db, action: str, application: dict, actor_id: str | None, **dat
     })
 
 
-async def submit(db, league: dict, season: dict, body: dict, user: dict) -> dict:
-    """Einreichen: unter der Sperre der Season noch einmal alles prüfen, dann Antrag und Zustimmung schreiben. Wirft ``LeagueProblem``."""
+async def _audit_decision(db, action: str, application: dict, actor: dict, override: str | None, **data) -> None:
+    """Das Protokoll einer Entscheidung. Eine Notausnahme (#2245) steht mit Grund dabei und wie im Spiel unter ``league.conflict.override``."""
+    await _audit(db, action, application, actor.get("id"), **data, **({"conflict_override": override} if override else {}))
+    if override:
+        await record_override(db, actor, action=f"application_{action}", target_id=application.get("season_id"), reason=override,
+                              application_id=application.get("id"))
+
+
+async def _no_conflict(db, season: dict, application_id: str, actor: dict, conflict_reason: str | None) -> str | None:
+    """Über die Anmeldung des eigenen Teams entscheidet eine zweite Person (B.4, Entscheidung Nr. 73) - geprüft vor allem anderen, damit
+    die befangene Person schnell 403 bekommt und nicht mehr erfährt als „nicht du“. Unter der Sperre prüft ``_recheck`` noch einmal. Gibt den Grund einer
+    Notausnahme zurück."""
+    return await _recheck(db, await _load(db, season["id"], application_id), actor, conflict_reason)
+
+
+async def _recheck(db, application: dict, actor: dict, conflict_reason: str | None) -> str | None:
+    """Dieselbe Prüfung mit dem unter der Season-Sperre frisch geladenen Antrag, direkt vor dem Schreiben: Wer seit der Vorabprüfung in den Kader kam,
+    wird hier aufgehalten. Kaderänderungen selbst laufen nicht unter dieser Sperre (bekannte Grenze, #2245)."""
+    return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason)
+
+
+async def submit(db, league: dict, season: dict, body: dict, user: dict, *, refresh_previews=None) -> dict:
+    """Einreichen: unter der Sperre der Season noch einmal alles prüfen, dann Antrag und Zustimmung schreiben. Wirft ``LeagueProblem``.
+    Mit „automatisch annehmen“ (#2348) entscheidet die Season gleich unter derselben Sperre (``_auto_decide``); gibt es nur eine Staffel,
+    sperrt das Einreichen sie vorher (Turnier-Sperre vor Season-Sperre) und teilt zu. ``refresh_previews`` reicht die Route herein."""
     if not body.get("accept_rules") or not body.get("accept_privacy"):
         raise LeagueProblem(ACCEPT_BOTH)
     team, squad = await _load_side(db, body["squad_id"])
     if not squad or not await may_apply(db, user, squad):
         raise LeagueProblem(NOT_RESPONSIBLE, 403)
-    async with _season_lock(db, season["id"]):
-        fresh = await league_service.get_season(db, season["id"])
-        blocked = await season_problems(db, league, fresh)
-        if blocked:
-            raise LeagueProblem(blocked[0], 409)
-        version = await league_rules.current_version(db, league, fresh)
-        if version["id"] != body.get("rule_version_id"):
-            raise LeagueProblem(RULES_CHANGED, 409)
-        problems = (await check_squad(db, league, fresh, team, squad))["problems"]
-        if problems:
-            raise LeagueProblem(problems[0][1], problems[0][0])
-        application = await _write(db, league, fresh, version, team, squad, user)
+    locked_id = (await _auto_staffel(db, season))[0] if season.get(AUTO_ACCEPT) else None
+    decided = None
+    async with _staffel_lock(db, locked_id, wait_seconds=LOCK_WAIT_SECONDS):
+        async with _season_lock(db, season["id"]):
+            fresh = await league_service.get_season(db, season["id"])
+            blocked = await season_problems(db, league, fresh)
+            if blocked:
+                raise LeagueProblem(blocked[0], 409)
+            version = await league_rules.current_version(db, league, fresh)
+            if version["id"] != body.get("rule_version_id"):
+                raise LeagueProblem(RULES_CHANGED, 409)
+            problems = (await check_squad(db, league, fresh, team, squad))["problems"]
+            if problems:
+                raise LeagueProblem(problems[0][1], problems[0][0])
+            application = await _write(db, league, fresh, version, team, squad, user)
+            if fresh.get(AUTO_ACCEPT):
+                decided, application = await _auto_decide_safely(db, fresh, application, locked_id)
+        if decided and decided[2]:
+            await _after_auto_assign(db, decided[1], decided[2], refresh_previews)
     await _audit(db, "submit", application, user["id"], version=version.get("version"))
-    await _tell_status(db, league, season, application, SUBMITTED, squad=squad)
+    if decided and application["status"] != SUBMITTED:
+        await _audit(db, f"auto_{'accept' if application['status'] == ACCEPTED else 'waitlist'}", application, None,
+                     **({"tournament_id": decided[1]["id"]} if decided[1] else {}), **({"problem": decided[3]} if decided[3] else {}))
+        await _tell_status(db, league, season, application, application["status"], squad=squad, auto=True)
+    else:
+        # Auch wenn die Season nicht entscheiden konnte (Geschwister-Co-Team, Fehler): eingereicht wie ohne Einstellung, die Leitung hört den Grund.
+        await _tell_status(db, league, season, application, SUBMITTED, squad=squad)
+    # Fehlende Angaben (#2313): Die Anmeldung ging durch, die Betroffenen und Captain und Vertreter hören, was bis zum ersten Spiel fehlt.
+    from services import league_open_points
+
+    try:
+        await league_open_points.after_submit(db, league, fresh, application, squad, minimum=await _ready_minimum(db, fresh),
+                                              responsible=await _responsible(db, squad))
+    except Exception:  # noqa: BLE001 - der Antrag ist schon gespeichert, eine Erinnerung hält ihn nie auf
+        logger.warning("[liga] Erinnerung an fehlende Angaben nicht verschickt: %s", log_safe(application.get("id")), exc_info=True)
     return application
 
 
@@ -302,85 +387,126 @@ async def _left_over(db, application: dict) -> dict | None:
         {"league_squad_key": f"{application['season_id']}:{application['squad_id']}", "application_id": application["id"], "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0})
 
 
-async def _move(db, application: dict, status: str, actor_id: str | None, *, fields: dict | None = None, reason: str | None = None, keep_active: bool = True) -> dict:
-    """Der Statuswechsel mit Bedingung auf den alten Stand. Antwortet mit 409, wenn inzwischen etwas anderes geschah."""
+async def _move(db, application: dict, status: str, actor_id: str | None, *, fields: dict | None = None, reason: str | None = None, keep_active: bool = True,
+                override: str | None = None, auto: bool = False, drop_assignment: bool = False) -> dict:
+    """Der Statuswechsel mit Bedingung auf den alten Stand. Antwortet mit 409, wenn inzwischen etwas anderes geschah. ``override``: der Grund einer Notausnahme
+    des Superadmins (#2245), er steht im Verlauf. ``auto``: Die Season hat entschieden (#2348), der Schritt trägt ``auto``. Jede Entscheidung einer Person
+    nimmt ``auto_accepted`` und den Grund ``auto_problem`` wieder weg. ``drop_assignment``: Die automatische Zuteilung fällt weg (Ablehnen, Warteliste)."""
     now = now_utc().isoformat()
-    step = {"status": status, "by": actor_id, "at": now, **({"reason": reason} if reason else {})}
+    step = {"status": status, "by": actor_id, "at": now, **({"reason": reason} if reason else {}), **({"conflict_reason": override} if override else {}),
+            **({"auto": True} if auto else {})}
     update: dict = {"$set": {"status": status, "updated_at": now, **(fields or {})}, "$push": {"history": step}}
-    if not keep_active:
-        update["$unset"] = {"active_key": ""}
+    unset = {key: "" for key, wanted in (("active_key", not keep_active), ("assignment", drop_assignment),
+                                         ("auto_accepted", not auto and application.get("auto_accepted")),
+                                         ("auto_problem", not auto and application.get("auto_problem"))) if wanted}
+    if unset:
+        update["$unset"] = unset
     query = {"id": application["id"], "status": application["status"], "assignment": {"$exists": bool(application.get("assignment"))}}
     written = await db.league_applications.update_one(query, update)
     if not written.modified_count:
         raise LeagueProblem(DECIDED, 409)
     out = {**application, **update["$set"], "history": [*(application.get("history") or []), step]}
-    if not keep_active:
-        out.pop("active_key", None)
+    for key in unset:
+        out.pop(key, None)
     return out
 
 
-async def withdraw(db, league: dict, season: dict, application_id: str, user: dict) -> dict:
+async def withdraw(db, league: dict, season: dict, application_id: str, user: dict, *, refresh_previews=None) -> dict:
+    """Zurückziehen. Eine automatische Zuteilung (#2348) nimmt es mit aus der Staffel, solange kein fester Spielplan steht (``_auto_seat`` unter der
+    Staffel-Sperre). Die Warteliste bleibt unberührt: Über den frei gewordenen Platz entscheidet die Leitung."""
     application = await _load(db, season["id"], application_id)
     _team, squad = await _load_side(db, application["squad_id"])
     if not squad or not await may_apply(db, user, squad):
         raise LeagueProblem(NOT_RESPONSIBLE, 403)
-    async with _season_lock(db, season["id"]):
-        application = await _load(db, season["id"], application_id)
-        if application["status"] not in OPEN_STATUSES:
-            raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment") or await _left_over(db, application):
-            raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
-        now = now_utc().isoformat()
-        done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False)
-    await _audit(db, "withdraw", done, user["id"])
+    locked_id = await _auto_seat_to_lock(db, season["id"], application_id)
+    async with _staffel_lock(db, locked_id):
+        async with _season_lock(db, season["id"]):
+            application = await _load(db, season["id"], application_id)
+            if application["status"] not in OPEN_STATUSES:
+                raise LeagueProblem(DECIDED, 409)
+            seat = await _auto_seat(db, season, application, locked_id, fixed_detail=WITHDRAW_ASSIGNED)
+            if not seat and (application.get("assignment") or await _left_over(db, application)):
+                raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
+            if seat and not _team_may_leave(*seat):
+                raise LeagueProblem(WITHDRAW_STARTED, 409)
+            now = now_utc().isoformat()
+            done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False,
+                               drop_assignment=bool(seat))
+            await _unseat(db, seat)
+        await _after_unseat(db, seat, user, refresh_previews)
+    await _audit(db, "withdraw", done, user["id"], **_unseat_data(seat))
     await _tell_status(db, league, season, done, WITHDRAWN, squad=squad)
     return done
 
 
-async def review(db, league: dict, season: dict, application_id: str, actor: dict) -> dict:
+async def review(db, league: dict, season: dict, application_id: str, actor: dict, *, conflict_reason: str | None = None) -> dict:
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     async with _season_lock(db, season["id"]):
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] != SUBMITTED:
             raise LeagueProblem(DECIDED, 409)
-        done = await _move(db, application, IN_REVIEW, actor["id"])
-    await _audit(db, "review", done, actor["id"])
+        done = await _move(db, application, IN_REVIEW, actor["id"], override=override)
+    await _audit_decision(db, "review", done, actor, override)
     return done
 
 
-async def reject(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict) -> dict:
+async def reject(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict, *, conflict_reason: str | None = None,
+                 refresh_previews=None) -> dict:
+    """Ablehnen. Eine automatische Zuteilung (#2348) nimmt es mit aus der Staffel (``_auto_seat``), jede andere Zuteilung bleibt der Teilnehmerliste."""
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     text = (reason or "").strip()
     if len(text) < REASON_MIN:
         raise LeagueProblem(f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Das Team liest ihn.")
-    async with _season_lock(db, season["id"]):
-        application = await _load(db, season["id"], application_id)
-        if application["status"] not in OPEN_STATUSES:
-            raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment") or await _left_over(db, application):
-            raise LeagueProblem(ASSIGNED_ALREADY, 409)
-        now = now_utc().isoformat()
-        done = await _move(db, application, REJECTED, actor["id"], reason=text, keep_active=False,
-                           fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
-    await _audit(db, "reject", done, actor["id"], reason=text)
+    locked_id = await _auto_seat_to_lock(db, season["id"], application_id)
+    async with _staffel_lock(db, locked_id):
+        async with _season_lock(db, season["id"]):
+            application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
+            if application["status"] not in OPEN_STATUSES:
+                raise LeagueProblem(DECIDED, 409)
+            seat = await _auto_seat(db, season, application, locked_id)
+            if not seat and (application.get("assignment") or await _left_over(db, application)):
+                raise LeagueProblem(ASSIGNED_ALREADY, 409)
+            now = now_utc().isoformat()
+            done = await _move(db, application, REJECTED, actor["id"], reason=text, keep_active=False, override=override, drop_assignment=bool(seat),
+                               fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
+            await _unseat(db, seat)
+        await _after_unseat(db, seat, actor, refresh_previews)
+    await _audit_decision(db, "reject", done, actor, override, reason=text, **_unseat_data(seat))
     await _tell_status(db, league, season, done, REJECTED)
     return done
 
 
-async def waitlist(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict) -> dict:
+async def waitlist(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict, *, conflict_reason: str | None = None,
+                   refresh_previews=None) -> dict:
+    """Auf die Warteliste. Eine angenommene Anmeldung zurückstufen geht nur mit Grund (#2348), automatisch oder von Hand angenommen - das Team liest ihn.
+    Eine automatische Zuteilung fällt dabei weg."""
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     text = (reason or "").strip() or None
-    async with _season_lock(db, season["id"]):
-        fresh = await league_service.get_season(db, season["id"])
-        application = await _load(db, season["id"], application_id)
-        if application["status"] not in (SUBMITTED, IN_REVIEW, ACCEPTED):
-            raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment") or await _left_over(db, application):
-            raise LeagueProblem(ASSIGNED_ALREADY, 409)
-        if not fresh.get("application_waitlist"):
-            raise LeagueProblem(NO_WAITLIST, 409)
-        if not _waitlist_has_room(fresh, await seat_stats(db, fresh)):
-            raise LeagueProblem(WAITLIST_FULL, 409)
-        now = now_utc().isoformat()
-        done = await _move(db, application, WAITLIST, actor["id"], reason=text, fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
-    await _audit(db, "waitlist", done, actor["id"], **({"reason": text} if text else {}))
+    locked_id = await _auto_seat_to_lock(db, season["id"], application_id)
+    async with _staffel_lock(db, locked_id):
+        async with _season_lock(db, season["id"]):
+            fresh = await league_service.get_season(db, season["id"])
+            application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
+            if application["status"] not in (SUBMITTED, IN_REVIEW, ACCEPTED):
+                raise LeagueProblem(DECIDED, 409)
+            seat = await _auto_seat(db, fresh, application, locked_id)
+            if not seat and (application.get("assignment") or await _left_over(db, application)):
+                raise LeagueProblem(ASSIGNED_ALREADY, 409)
+            if not fresh.get("application_waitlist"):
+                raise LeagueProblem(NO_WAITLIST, 409)
+            if not _waitlist_has_room(fresh, await seat_stats(db, fresh)):
+                raise LeagueProblem(WAITLIST_FULL, 409)
+            if application["status"] == ACCEPTED and len(text or "") < REASON_MIN:
+                raise LeagueProblem(DEMOTE_REASON)
+            now = now_utc().isoformat()
+            done = await _move(db, application, WAITLIST, actor["id"], reason=text, override=override, drop_assignment=bool(seat),
+                               fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
+            await _unseat(db, seat)
+        await _after_unseat(db, seat, actor, refresh_previews)
+    await _audit_decision(db, "waitlist", done, actor, override, **({"reason": text} if text else {}), **_unseat_data(seat))
     await _tell_status(db, league, season, done, WAITLIST)
     return done
 
@@ -393,13 +519,13 @@ async def _load_staffel(db, season: dict, tournament_id: str) -> dict:
 
 
 @contextlib.asynccontextmanager
-async def _staffel_lock(db, tournament_id: str | None):
-    """Die Turnier-Sperre, immer vor der Season-Sperre."""
+async def _staffel_lock(db, tournament_id: str | None, *, wait_seconds: float = 2.0):
+    """Die Turnier-Sperre, immer vor der Season-Sperre. Das Einreichen mit automatischer Zuteilung (#2348) wartet so lange wie auf die Season."""
     if not tournament_id:
         yield
         return
     try:
-        async with mutation_lock(db, tournament_write_resource(tournament_id)):
+        async with mutation_lock(db, tournament_write_resource(tournament_id), wait_seconds=wait_seconds):
             yield
     except MutationLockBusy:
         raise LeagueProblem(BUSY, 409) from None
@@ -462,8 +588,10 @@ async def _left_over_under_lock(db, application: dict, tournament_id: str | None
     return left_over
 
 
-async def _place(db, season: dict, application: dict, tournament_id: str | None, actor: dict, fields: dict, left_over: dict | None) -> tuple[dict, dict | None, dict | None]:
-    """Anmeldung und Antrag gehören zusammen, eine Transaktion gibt es nicht: Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie trotzdem stehen, hilft ``_left_over``."""
+async def _place(db, season: dict, application: dict, tournament_id: str | None, actor: dict, fields: dict, left_over: dict | None,
+                 override: str | None = None, *, auto: bool = False) -> tuple[dict, dict | None, dict | None]:
+    """Anmeldung und Antrag gehören zusammen, eine Transaktion gibt es nicht: Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie trotzdem stehen, hilft ``_left_over``.
+    ``auto``: Die Season nimmt an (#2348), die Zuteilung trägt ``auto`` - nur sie nehmen Ablehnen und Warteliste wieder aus der Staffel."""
     tournament = registration = None
     if left_over:
         tournament, registration = await _staffel_for_write(db, season, left_over["tournament_id"]), left_over
@@ -472,8 +600,9 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
         registration = await _insert_registration(db, tournament, application, actor)
     try:
         if registration:
-            fields = {**fields, "assignment": await _assignment(db, tournament, registration, actor["id"])}
-        done = await _move(db, application, ACCEPTED, actor["id"], fields=fields)
+            assignment = await _assignment(db, tournament, registration, actor["id"])
+            fields = {**fields, "assignment": {**assignment, "auto": True} if auto else assignment}
+        done = await _move(db, application, ACCEPTED, actor["id"], fields=fields, override=override, auto=auto)
     except Exception:
         if registration and not left_over:
             await db.tournament_registrations.delete_one({"id": registration["id"]})
@@ -481,13 +610,16 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
     return done, tournament, registration
 
 
-async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
+async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
+                 conflict_reason: str | None = None) -> dict:
     """Annehmen, mit ``tournament_id`` gleich zuteilen. Der letzte Platz geht unter der Season-Sperre nur einmal weg."""
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
     async with _staffel_lock(db, locked_id):
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
@@ -501,15 +633,17 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
             fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
-            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over)
+            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over, override)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews) if registration else []
-    await _audit(db, "accept", done, actor["id"], **({"tournament_id": tournament_id} if tournament_id else {}))
+    await _audit_decision(db, "accept", done, actor, override, **({"tournament_id": tournament_id} if tournament_id else {}))
     await _tell_status(db, league, season, done, ACCEPTED, squad=squad)
     return {**done, "ids_missing": ids_missing}
 
 
-async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
+async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
+                 conflict_reason: str | None = None) -> dict:
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     if not tournament_id:
         raise LeagueProblem("Bitte eine Staffel wählen.")
     locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
@@ -517,6 +651,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] != ACCEPTED:
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
@@ -529,27 +664,223 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             problems = (await check_squad(db, league, fresh, team, squad, application=application, seated=bool(left_over)))["problems"]
             if problems:
                 raise LeagueProblem(problems[0][1], problems[0][0])
-            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over)
+            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over, override)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
-    await _audit(db, "assign", done, actor["id"], tournament_id=tournament_id)
+    await _audit_decision(db, "assign", done, actor, override, tournament_id=tournament_id)
     await _tell_status(db, league, season, done, "assigned")
     return {**done, "ids_missing": ids_missing}
 
 
+# ---------------------------------------------------------------- Automatisch annehmen (#2348)
+
+async def _auto_staffel(db, season: dict) -> tuple[str | None, str | None]:
+    """Die einzige Staffel der Season - nur dorthin teilt „automatisch annehmen“ gleich zu, und nur vor ihrem Start ohne feste Spiele.
+    Nur bei genau einer aktiven Liga N mit genau einer Staffel: Hat eine zweite Liga N (noch) keine Staffel, wählt die Leitung trotzdem die Liga N.
+    Gibt ``(Staffel, None)`` zurück; ``(None, Grund)``, wenn es die eine Staffel gibt, sie aber nicht mehr geht; ``(None, None)`` sonst."""
+    divisions = [row["id"] for row in await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0, "id": 1}).to_list(50)]
+    if len(divisions) != 1:
+        return None, None
+    rows = [row for row in await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": divisions[0], **ONLY_LEAGUE},
+                                                     {"_id": 0, "id": 1, "status": 1}).to_list(200)
+            if row.get("status") not in squad_registration.FINISHED_TOURNAMENT_STATUSES]
+    if len(rows) != 1:
+        return None, None
+    if rows[0].get("status") not in league_service.PRE_START_STATUSES:
+        return None, AUTO_STAFFEL_STARTED
+    if await db.matches_v2.count_documents({"tournament_id": rows[0]["id"], "is_preview": {"$ne": True}}):
+        return None, AUTO_STAFFEL_PLAN
+    return rows[0]["id"], None
+
+
+async def _sibling_problem(db, tournament_id: str, application: dict) -> str | None:
+    """Steht schon ein anderes Co-Team desselben Hauptteams in der einzigen Staffel und erlaubt die Season das nicht, nimmt die Season die Anmeldung
+    nicht an: Sie belegte einen Platz, den das Co-Team nie bekommen kann. Die Leitung entscheidet (Review #2348)."""
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "id": 1, "league_context": 1})
+    if not tournament or await squad_registration.siblings_allowed(db, tournament):
+        return None
+    other = await db.tournament_registrations.find_one({"tournament_id": tournament_id, "team_id": application.get("team_id"),
+                                                        "squad_id": {"$ne": application.get("squad_id")}}, {"_id": 1})
+    return AUTO_SIBLING.format(team=application.get("team_name") or "Das Hauptteam") if other else None
+
+
+async def _keep_submitted(db, application: dict, problem: str) -> dict:
+    """Die Season entscheidet nicht: Der Antrag bleibt eingereicht und trägt den Grund für die Leitung (``auto_problem``)."""
+    await db.league_applications.update_one({"id": application["id"], "status": SUBMITTED}, {"$set": {"auto_problem": problem}})
+    return {**application, "auto_problem": problem}
+
+
+async def _auto_decide(db, season: dict, application: dict, locked_id: str | None) -> tuple[dict, dict | None, dict | None, str | None] | None:
+    """Die Season entscheidet über eine frisch eingereichte Anmeldung: Mit freiem Platz und leerer Warteliste ist sie angenommen, sonst steht sie auf
+    der Warteliste - ein frei gewordener Platz geht nach den Regeln der Warteliste, also durch die Leitung. Wer zuerst kommt, wird zuerst bedient:
+    Offene Anmeldungen (eingereicht, in Prüfung) halten ihren Platz und zählen hier wie belegte. Keine Entscheidung einer Person, darum ohne
+    Befangenheit (Nr. 73). Lehnt die einzige Staffel ab (voll, gesperrt …), ist die Anmeldung ohne Zuteilung angenommen und trägt den Grund
+    (``auto_problem``); steht dort schon ein Geschwister-Co-Team, bleibt sie eingereicht. Was gar nicht geht, bleibt eingereicht.
+    Gibt ``(Antrag, Staffel, Anmeldung, Grund)`` zurück oder ``None``. Aufrufer halten die Sperren."""
+    stats = await seat_stats(db, season)
+    now = now_utc().isoformat()
+    decided = {"decided_by": None, "decided_at": now, "decision_reason": None}
+    # Die eben geschriebene Anmeldung steht selbst unter ``open``.
+    held = stats["taken"] + max(0, stats["open"] - 1)
+    seat_free = not stats["slots"] or held < stats["slots"]
+    try:
+        if seat_free and not stats["waiting"]:
+            target, problem = await _auto_staffel(db, season)
+            if target and target != locked_id:
+                target, problem = None, None  # Die gehaltene Sperre passt nicht mehr (sehr selten): Die Leitung teilt zu.
+            if target:
+                sibling = await _sibling_problem(db, target, application)
+                if sibling:
+                    return await _keep_submitted(db, application, sibling), None, None, sibling
+                try:
+                    done, tournament, registration = await _place(db, season, application, target, AUTO_ACTOR, {**decided, "auto_accepted": True}, None,
+                                                                  auto=True)
+                    return done, tournament, registration, None
+                except LeagueProblem as refusal:
+                    problem = refusal.message
+                    logger.info("[liga] Automatisch angenommen, die Staffel teilt die Leitung zu: %s", log_safe(application.get("id")))
+            fields = {**decided, "auto_accepted": True, **({"auto_problem": problem} if problem else {})}
+            done, _tournament, _registration = await _place(db, season, application, None, AUTO_ACTOR, fields, None, auto=True)
+            return done, None, None, problem
+        if _waitlist_has_room(season, stats):
+            return await _move(db, application, WAITLIST, None, fields=decided, auto=True), None, None, None
+    except LeagueProblem:
+        logger.warning("[liga] Automatische Annahme nicht möglich, der Antrag bleibt eingereicht: %s", log_safe(application.get("id")))
+    return None
+
+
+async def _auto_decide_safely(db, season: dict, application: dict, locked_id: str | None) -> tuple[tuple | None, dict]:
+    """``_auto_decide``, ohne dass ein unerwarteter Fehler das Einreichen kippt: Antrag und Zustimmung sind schon gespeichert. Der Antrag bleibt dann
+    eingereicht und stimmig (``_place`` nimmt eine neue Anmeldung wieder weg, ``_move`` ist der letzte Schritt), der Fehler steht im Log statt einer 500,
+    die Leitung hört den Grund. Gibt die Entscheidung und den Antrag, wie er jetzt gilt, zurück."""
+    try:
+        decided = await _auto_decide(db, season, application, locked_id)
+    except Exception:  # noqa: BLE001 - Antrag und Zustimmung sind gespeichert; ohne Entscheidung der Season bleibt er eingereicht (Review #2348)
+        logger.error("[liga] Automatisch annehmen fehlgeschlagen, der Antrag bleibt eingereicht: %s", log_safe(application.get("id")), exc_info=True)
+        stored = await db.league_applications.find_one({"id": application["id"]}, {"_id": 0}) or application
+        if stored.get("status") != SUBMITTED:
+            return (stored, None, None, None), stored
+        return None, {**stored, "auto_problem": AUTO_FAILED}
+    return decided, decided[0] if decided else application
+
+
+async def _no_refresh(_db, _tournament, _actor_id):
+    return None
+
+
+async def _after_auto_assign(db, tournament: dict, registration: dict, refresh_previews) -> None:
+    """Wie nach dem Zuteilen durch die Leitung: Vorschau auffrischen, Kader der Season festhalten. Annahme und Zuteilung stehen dann schon - ein Fehler
+    hier kippt das Einreichen nicht, er steht im Log."""
+    try:
+        await _after_assign(db, tournament, registration, AUTO_ACTOR, refresh_previews or _no_refresh)
+    except Exception:  # noqa: BLE001 - Antrag und Anmeldung sind geschrieben; Vorschau und Kader holt die nächste Änderung der Staffel nach (Review #2348)
+        logger.error("[liga] Nach der automatischen Zuteilung nicht alles erledigt: %s", log_safe(registration.get("id")), exc_info=True)
+
+
+async def _auto_seat_to_lock(db, season_id: str, application_id: str) -> str | None:
+    """Die Staffel einer automatischen Zuteilung: Ablehnen und Warteliste sperren sie vor der Season."""
+    application = await db.league_applications.find_one({"id": application_id, "season_id": season_id}, {"_id": 0, "assignment": 1})
+    assignment = (application or {}).get("assignment") or {}
+    return assignment.get("tournament_id") if assignment.get("auto") else None
+
+
+async def _auto_seat(db, season: dict, application: dict, locked_id: str | None, *, fixed_detail: str = AUTO_PLAN_FIXED) -> tuple[dict, dict] | None:
+    """Staffel und Anmeldung einer automatischen Zuteilung, die Ablehnen, Warteliste und Zurückziehen wieder herausnehmen - solange sie einen Platz hält,
+    die Staffel nicht gesperrt ist und sie in keinem festen Spiel steht. ``None``: keine solche Zuteilung, dann gilt wie bisher ``ASSIGNED_ALREADY``.
+    ``fixed_detail``: der Satz bei festem Spielplan - das Team liest einen anderen als die Leitung."""
+    assignment = application.get("assignment") or {}
+    if not assignment.get("auto"):
+        return None
+    if assignment.get("tournament_id") != locked_id:
+        raise LeagueProblem(BUSY, 409)
+    registration = await db.tournament_registrations.find_one(
+        {"id": assignment.get("registration_id"), "tournament_id": locked_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0})
+    if not registration:
+        return None
+    tournament = await _staffel_for_write(db, season, locked_id)
+    from services.tournament_guard import fixed_match_count
+
+    if await fixed_match_count(db, locked_id, registration["id"]):
+        raise LeagueProblem(fixed_detail, 409)
+    return tournament, registration
+
+
+def _team_may_leave(tournament: dict, registration: dict) -> bool:
+    """Dieselbe Regel wie bei der Turnier-Abmeldung durch das Team (``tournament_registration_routes.unregister``): nicht eingecheckt, und die Staffel steht
+    noch vor Check-in und Start. Danach trägt die Liga-Leitung den Austritt ein."""
+    return registration.get("status") != "checked_in" and (tournament.get("status") or "draft") in TEAM_LEAVE_STATUSES
+
+
+async def _auto_withdrawable(db, application: dict | None) -> bool:
+    """Darf das Team eine automatische Zuteilung noch selbst zurückziehen? Ja, solange sie einen Platz hält, nicht eingecheckt ist, die Staffel vor Check-in
+    und Start steht und kein fester Spielplan steht - für den Knopf. Geprüft wird beim Zurückziehen unter der Sperre noch einmal."""
+    assignment = (application or {}).get("assignment") or {}
+    if not assignment.get("auto") or application.get("status") != ACCEPTED:
+        return False
+    registration_id = assignment.get("registration_id")
+    registration = await db.tournament_registrations.find_one({"id": registration_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0, "status": 1})
+    tournament = await db.tournaments.find_one({"id": assignment.get("tournament_id")}, {"_id": 0, "status": 1})
+    if not registration or not tournament or not _team_may_leave(tournament, registration):
+        return False
+    from services.tournament_guard import fixed_match_count
+
+    return not await fixed_match_count(db, assignment.get("tournament_id"), registration_id)
+
+
+async def _unseat(db, seat: tuple[dict, dict] | None) -> None:
+    """Wie „Zuteilung zurücknehmen“ in der Turnierverwaltung: Die Anmeldung fällt weg, der Platz ist frei. Erst nach dem Statuswechsel des Antrags."""
+    if seat:
+        await db.tournament_registrations.delete_one({"id": seat[1]["id"], "tournament_id": seat[0]["id"]})
+
+
+async def _after_unseat(db, seat: tuple[dict, dict] | None, actor: dict, refresh_previews) -> None:
+    if seat and refresh_previews:
+        await refresh_previews(db, seat[0], actor.get("id"))
+
+
+def _unseat_data(seat: tuple[dict, dict] | None) -> dict:
+    return {"registration_removed": seat[1]["id"], "tournament_id": seat[0]["id"]} if seat else {}
+
+
 # ---------------------------------------------------------------- Sonderweg: Zuteilen ohne Antrag
 
-async def link_admin_assignment(db, tournament: dict, registration: dict, actor_id: str | None) -> None:
-    """Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen. Ohne Antrag passiert nichts. Aufrufer halten die Sperre."""
+async def _open_for_admin_way(db, tournament: dict, squad_id: str | None) -> dict | None:
+    """Der offene Antrag ohne Zuteilung, den das Zuteilen per Sonderweg annehmen würde."""
     season_id = (tournament.get("league_context") or {}).get("season_id")
-    if not season_id or not registration.get("squad_id"):
+    if not season_id or not squad_id:
+        return None
+    application = await db.league_applications.find_one({"active_key": f"{season_id}:{squad_id}"}, {"_id": 0})
+    return None if not application or application.get("assignment") else application
+
+
+async def admin_assignment_conflict(db, tournament: dict, squad_id: str | None, actor: dict, conflict_reason: str | None = None) -> str | None:
+    """Sonderweg: Zuteilen kennt keine Befangenheit (B.1) - nimmt es aber einen offenen Antrag an, entscheidet es über die Anmeldung, und dann
+    gilt dieselbe Regel wie im Eingang (#2245). 403 vor dem Schreiben; gibt den Grund einer Notausnahme zurück. Aufrufer halten die Sperre."""
+    application = await _open_for_admin_way(db, tournament, squad_id)
+    if not application:
+        return None
+    return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason, superadmin_detail=ADMIN_WAY_OVERRIDE)
+
+
+async def link_admin_assignment(db, tournament: dict, registration: dict, actor: dict, override: str | None = None) -> None:
+    """Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen. Ohne Antrag passiert nichts. Aufrufer halten die Sperre
+    und haben ``admin_assignment_conflict`` gefragt."""
+    application = await _open_for_admin_way(db, tournament, registration.get("squad_id"))
+    if not application:
         return
-    application = await db.league_applications.find_one({"active_key": f"{season_id}:{registration['squad_id']}"}, {"_id": 0})
-    if not application or application.get("assignment"):
-        return
+    try:
+        # Noch einmal direkt vor dem Schreiben (wie ``_recheck``); ``override`` ist der schon geprüfte Grund. Bei 403 fällt die neue Anmeldung wieder weg.
+        override = await require_no_side_conflict(db, actor, side_of(application), conflict_reason=override, superadmin_detail=ADMIN_WAY_OVERRIDE)
+    except Exception:
+        await db.tournament_registrations.delete_one({"id": registration["id"]})
+        raise
+    actor_id = actor.get("id")
     now = now_utc().isoformat()
     fields = {"assignment": await _assignment(db, tournament, registration, actor_id), "decided_by": actor_id, "decided_at": now}
-    with contextlib.suppress(LeagueProblem):
-        await _move(db, application, ACCEPTED, actor_id, fields=fields)
+    try:
+        done = await _move(db, application, ACCEPTED, actor_id, fields=fields, override=override)
+    except LeagueProblem:
+        return
+    await _audit_decision(db, "accept", done, actor, override, tournament_id=tournament.get("id"), via="squad_assign")
 
 
 async def clear_assignment(db, registration_id: str, actor_id: str | None) -> None:
@@ -585,12 +916,34 @@ def _texts(application: dict, title: str, status: str) -> tuple[str, str]:
     if status == REJECTED:
         return "Anmeldung abgelehnt", f"Die Liga-Leitung hat die Anmeldung von {name} für {title} abgelehnt: {application.get('decision_reason')}"
     if status == WAITLIST:
-        return "Auf der Warteliste", f"{name} steht für {title} auf der Warteliste. Wird ein Platz frei, entscheidet die Liga-Leitung."
+        # Der Grund steht dabei, wenn die Leitung einen angibt - beim Zurückstufen einer automatisch angenommenen Anmeldung ist er Pflicht (#2348).
+        reason = f" Grund: {application.get('decision_reason')}" if application.get("decision_reason") else ""
+        return "Auf der Warteliste", f"{name} steht für {title} auf der Warteliste. Wird ein Platz frei, entscheidet die Liga-Leitung.{reason}"
     return "Anmeldung zurückgezogen", f"Die Anmeldung von {name} für {title} ist zurückgezogen."
 
 
-async def _tell_status(db, league: dict, season: dict, application: dict, status: str, *, squad: dict | None = None) -> None:
-    """Eine Nachricht hält nie etwas auf: Der Antrag ist dann schon gespeichert."""
+def _lead_texts(application: dict, title: str, status: str, auto: bool) -> tuple[str, str] | None:
+    """Was die Leitung hört: neue und zurückgezogene Anmeldungen, und was die Season automatisch entschieden hat (#2348)."""
+    name = application.get("display_name")
+    # Der Grund, warum die Season nicht (ganz) entscheiden konnte (Review #2348): Staffel voll, gesperrt, Geschwister-Co-Team, Fehler.
+    problem = application.get("auto_problem")
+    if auto and status == ACCEPTED:
+        label = (application.get("assignment") or {}).get("label")
+        where = f", {label}" if label else ", Liga und Staffel teilst du noch zu"
+        why = f" Automatisch zuteilen ging nicht: {problem}" if problem else ""
+        return "Neue Anmeldung", f"{name} ist für {title} automatisch angenommen{where}.{why} Passt etwas nicht, kannst du nachträglich mit Grund ablehnen."
+    if auto and status == WAITLIST:
+        return "Neue Anmeldung", f"{name} steht für {title} automatisch auf der Warteliste. Wird ein Platz frei, entscheidest du, wer nachrückt."
+    if status == SUBMITTED:
+        why = f" Automatisch annehmen ging nicht: {problem}" if problem else ""
+        return "Neue Anmeldung", f"{name} möchte in {title} mitspielen.{why} Bitte prüfen."
+    if status == WITHDRAWN:
+        return "Anmeldung zurückgezogen", f"{name} hat die Anmeldung für {title} zurückgezogen. Rückt jemand nach, entscheidest du das."
+    return None
+
+
+async def _tell_status(db, league: dict, season: dict, application: dict, status: str, *, squad: dict | None = None, auto: bool = False) -> None:
+    """Eine Nachricht hält nie etwas auf: Der Antrag ist dann schon gespeichert. ``auto``: Die Season hat entschieden (#2348) - die Leitung hört es auch."""
     from services.user_notifications import create_user_notification
 
     try:
@@ -605,11 +958,10 @@ async def _tell_status(db, league: dict, season: dict, application: dict, status
             key = f"league-application:{application['id']}:{status}:{step}:{user_id}"
             await create_user_notification(user_id, headline, text, url=page, kind="tournament_registration", meta={**meta, "dedupe_key": key})
             await send_league_mail(db, user_id, headline, text, page, f"{key}:mail")
-        if status not in (SUBMITTED, WITHDRAWN):
+        lead = _lead_texts(application, title, status, auto)
+        if not lead:
             return
-        lead_title = "Neue Anmeldung" if status == SUBMITTED else "Anmeldung zurückgezogen"
-        lead_text = (f"{application.get('display_name')} möchte in {title} mitspielen. Bitte prüfen." if status == SUBMITTED
-                     else f"{application.get('display_name')} hat die Anmeldung für {title} zurückgezogen. Rückt jemand nach, entscheidest du das.")
+        lead_title, lead_text = lead
         inbox = f"/admin/leagues/seasons/{season['id']}#anmeldungen"
         for user_id in sorted(await staff_user_ids(db, league["id"], ("applications",)) - team_ids):
             key = f"league-application:{application['id']}:{status}:{step}:{user_id}"
@@ -630,13 +982,16 @@ async def _left_staffel(db, rows: list[dict]) -> set[str]:
     return {row["id"] for row in rows if (row.get("assignment") or {}).get("registration_id") and row["assignment"]["registration_id"] not in active}
 
 
-def team_answer(application: dict) -> dict:
-    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung."""
-    return {**own_view(application, responsible=True, can_act=True), "rule_consent": application.get("rule_consent")}
+async def team_answer(db, application: dict) -> dict:
+    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung. Ob eine eben gemachte automatische
+    Zuteilung noch zurückgeht, sagt dieselbe Regel wie auf der Ligaseite (``_auto_withdrawable``) - etwa nicht, wenn der Check-in der Staffel läuft."""
+    withdrawable = await _auto_withdrawable(db, application)
+    return {**own_view(application, responsible=True, can_act=True, withdrawable=withdrawable), "rule_consent": application.get("rule_consent")}
 
 
-def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False) -> dict | None:
-    """Ein Antrag für das eigene Team. Der Kader sieht den Stand, ``responsible`` (Captain, Vertreter, Hauptteam-Leitung) auch den Grund, zurückziehen darf nur ``can_act`` (``may_apply``)."""
+def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False, withdrawable: bool = False) -> dict | None:
+    """Ein Antrag für das eigene Team. Der Kader sieht den Stand, ``responsible`` (Captain, Vertreter, Hauptteam-Leitung) auch den Grund, zurückziehen darf nur ``can_act`` (``may_apply``).
+    Zugeteilt nur bei ``withdrawable``: eine automatische Zuteilung ohne festen Spielplan (#2348, ``_auto_withdrawable``)."""
     if not application:
         return None
     out = {"id": application["id"], "status": application["status"], "submitted_at": application.get("submitted_at"),
@@ -644,7 +999,7 @@ def own_view(application: dict | None, *, responsible: bool, can_act: bool = Fal
     if responsible:
         out.update(decided_at=application.get("decided_at"), decision_reason=application.get("decision_reason"),
                    rules_label=f"Version {(application.get('rule_consent') or {}).get('version')}" if application.get("rule_consent") else None,
-                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and not application.get("assignment"))
+                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and (not application.get("assignment") or withdrawable))
     return out
 
 
@@ -698,16 +1053,25 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         row = {"squad_id": squad["id"], "squad_name": squad.get("name"), "team_id": team["id"], "team_name": team.get("name"),
                "display_name": squad_registration.display_name(team, squad), "member_count": len([uid for uid in squad.get("member_ids") or [] if uid]),
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
-               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone))}
+               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone),
+                                       withdrawable=can_apply and await _auto_withdrawable(db, application))}
         if can_apply:
-            check = await check_squad(db, league, season, team, squad) if state == OPEN and not active else {"problems": [], "warnings": []}
-            row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"],
+            check = {"problems": [], "warnings": [], "shortfall": None}
+            if state == OPEN and not active:
+                check = await check_squad(db, league, season, team, squad)
+            elif active:
+                # Stand der Anmeldung (#2313): Was noch fehlt, bleibt nach dem Einreichen sichtbar - nur als offene Punkte.
+                found = await check_squad(db, league, season, team, squad, application=application)
+                check = {**check, "warnings": found["warnings"], "shortfall": found["shortfall"]}
+            row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"], shortfall=check.get("shortfall"),
                        can_submit=not active and not blocked and not check["problems"])
         elif user["id"] in _leads(team) and not (squad.get("captain_id") or squad.get("vice_captain_id")) and not hint:
             hint = f"Anmelden dürfen Captain und Vertreter. {squad.get('name')} hat noch keinen: Trag ihn unter Teams beim Co-Team ein."
         rows.append(row)
     return {
         "application": await public_block(db, season),
+        # Plattform je Season (#2270): was gilt, bevor die Liga N feststeht - je Liga N, wenn sie abweicht.
+        "platform": await league_platform.season_block(db, season),
         "rules": league_rules.version_view(league, season, version) if version else None,
         "privacy": {"text": season.get("application_privacy_text") or PRIVACY_PLACEHOLDER, "url": PRIVACY_URL},
         "season_problems": blocked if state else [],
@@ -734,7 +1098,9 @@ async def my_applications(db, user: dict) -> list[dict]:
         squad = by_id[squad_id]
         can_act = await may_apply(db, user, squad)
         responsible = can_act or user["id"] in _leads(teams[squad["team_id"]])
-        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone), "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
+        withdrawable = can_act and await _auto_withdrawable(db, application)
+        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone, withdrawable=withdrawable),
+                      "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
                       "url": f"/liga/{league.get('slug')}/{season.get('slug')}"})
     return items
 
@@ -768,6 +1134,11 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
         people |= {step.get("by") for step in row.get("history") or []}
     names = await _names(db, people)
     gone = await _left_staffel(db, rows)
+    # Befangenheit (#2245): dieselbe Regel wie beim Entscheiden, mit den Teams samt Co-Teams aus ``teams_by_id``.
+    sides = {row["id"]: side_of(row) for row in rows}
+    side_teams = await teams_by_id(db, sides.values())
+    # Automatisch angenommen beim Team einer Person der Liga-Leitung (#2348): Niemand hat entschieden - die anderen Zuständigen sehen es markiert.
+    leads = [{"id": uid} for uid in sorted(await staff_user_ids(db, league["id"], CAPABILITIES))] if any(row.get("auto_accepted") for row in rows) else []
     open_rows = [(row, squads[row["squad_id"]]) for row in rows if row["status"] in OPEN_STATUSES and row["squad_id"] in squads]
     items = []
     for row in rows:
@@ -786,18 +1157,26 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "privacy_at": (row.get("privacy_consent") or {}).get("at"),
             "decided_at": row.get("decided_at"), "decided_by_name": names.get(row.get("decided_by")), "decision_reason": row.get("decision_reason"),
             "assignment": {**row["assignment"], "left": row["id"] in gone} if row.get("assignment") else None,
+            # Automatisch angenommen (#2348): Zurückstufen nur mit Grund; eine automatische Zuteilung (``assignment.auto``) nehmen Ablehnen und Warteliste mit heraus.
+            "auto_accepted": bool(row.get("auto_accepted")),
+            "lead_team_auto": bool(row.get("auto_accepted")) and any(belongs_to_side(lead, sides[row["id"]], side_teams.get(row["team_id"])) for lead in leads),
+            # Warum die Season nicht annehmen bzw. zuteilen konnte (Review #2348) - bis eine Person entscheidet.
+            "auto_problem": row.get("auto_problem"),
             "member_count": len([uid for uid in (squad or {}).get("member_ids") or [] if uid]),
             "captain_name": names.get((squad or {}).get("captain_id")), "vice_name": names.get((squad or {}).get("vice_captain_id")),
-            "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"],
+            "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"], "shortfall": check.get("shortfall"),
             "shared_with": shared,
-            "own_team": user["id"] in {*((squad or {}).get("member_ids") or []), (team or {}).get("leader_id"), *((team or {}).get("co_leader_ids") or [])},
-            "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": names.get(step.get("by")) or "Gelöschter User", "reason": step.get("reason")}
+            "own_team": belongs_to_side(user, sides[row["id"]], side_teams.get(row["team_id"])),
+            "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": AUTO_NAME if step.get("auto") else names.get(step.get("by")) or "Gelöschter User",
+                         "reason": step.get("reason"), "conflict_reason": step.get("conflict_reason"), "auto": bool(step.get("auto"))}
                         for step in row.get("history") or []],
         })
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0}).sort("level", 1).to_list(50)
     staffeln = await league_service.staffeln_of(db, season["id"])
     return {
         "items": items,
+        # Beim eigenen Team (``own_team``) darf nur der Superadmin, als Notausnahme mit Grund.
+        "superadmin": is_superadmin(user),
         "stats": await seat_stats(db, season),
         "configured": bool(window_state(season)),
         "window": window_state(season),

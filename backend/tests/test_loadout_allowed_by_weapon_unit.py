@@ -1,0 +1,275 @@
+"""Erlaubte Ausrüstung: Aufsätze je Waffe (#2299) und „nur in …“ (#2298) - ohne Datenbank (docs/LIGA.md, C.4).
+
+Der Baustein nennt die Aufsätze nur an der Waffe: je Waffe die passenden (über die Waffe oder ihre Waffenklasse), davon gesperrt und je
+Slot die erlaubten - ab ``layout: 5`` (#2305) je Slot auch die gesperrten. Ist ein Eintrag in mehr Modi der Season gesperrt als erlaubt,
+heißt der Hinweis „nur in …“. Die Darstellung von layout 4 steht in test_loadout_allowed_v4_golden_unit, die von layout 5 (Tabelle) in
+test_loadout_allowed_table_unit. Erfundene Namen.
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import pdf_service  # noqa: E402
+from services import loadout_bans, markdown_text  # noqa: E402
+from test_loadout_bans_grouped_unit import CATEGORIES, DOC, ICON, IMAGE, ITEMS, ban, item, sections  # noqa: E402
+
+SEASON = [("stellung", "Stellung"), ("kapern", "Kapern"), ("suchen", "Suchen")]
+SIGHT = "/api/static/uploads/rotpunkt-3.webp"
+SLOT_ICON = "/api/static/uploads/optik-4.png"
+
+
+def modes(*keys: str) -> dict:
+    labels = dict(SEASON)
+    return {"modes": list(keys), "mode_labels": [labels.get(key, key.title()) for key in keys]}
+
+
+def weapon(data: dict, section: str, name: str) -> dict:
+    return next(row for row in sections(data, "Waffen")[section]["entries"] if row["name"] == name)
+
+
+# ---------------------------------------------------------------- Aufbau
+
+def test_attachments_stand_at_their_weapon_by_slot():
+    data = loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
+    assert data["layout"] == 5 and data["list"] is True
+    assert [(row["label"], row["role"]) for row in data["categories"]] == [("Waffen", "weapon"), ("Perks", "item")], \
+        "keine eigene Aufsatz-Liste mehr"
+    blitz, donner = sections(data, "Waffen")["Sturmgewehr"]["entries"]
+    # Blitz 9: Rotpunkt über die Klasse Sturmgewehr (an Blitz 9 gesperrt), Griff über die Waffe selbst. Der Slot Optik steht ab layout 5
+    # auch ohne erlaubten Aufsatz da - mit seinem gesperrten.
+    assert blitz == {"name": "Blitz 9", "image_url": IMAGE, "not_in": [], "attachments": {
+        "count": 2, "banned": ["Rotpunkt"], "groups": [
+            {"label": None, "not_in": [], "banned": [], "entries": [{"name": "Griff", "image_url": None, "not_in": []}]},
+            {"label": "Optik", "not_in": [], "banned": ["Rotpunkt"], "entries": []}]}}, "1 gesperrt, 1 erlaubt: keine Umkehrung"
+    # Donner 4: nur Rotpunkt passt (über die Klasse), an Donner 4 nur in Suchen gesperrt.
+    assert donner["attachments"] == {"count": 1, "banned": [], "groups": [
+        {"label": "Optik", "not_in": [], "banned": [], "entries": [{"name": "Rotpunkt", "image_url": None, "not_in": ["Suchen"]}]}]}
+    assert "attachments" not in weapon(data, None, "Ohne Klasse"), "ohne passenden Aufsatz kein Feld"
+    assert "attachments" not in weapon(data, "Pistole", "Funke")
+    assert sections(data, "Waffen")["Schrotflinte"]["state"] == "banned"
+
+
+def test_a_class_attachment_fits_every_weapon_of_the_class_a_weapon_attachment_only_its_weapon():
+    categories = [{**CATEGORIES[0]}, {**CATEGORIES[1], "subcategories": [{"key": "optik", "label": "Optik", "icon_url": SLOT_ICON},
+                                                                            {"key": "lauf", "label": "Lauf", "icon_url": None}]}]
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("w2", "waffen", "Donner 4", "sturm"), item("w3", "waffen", "Neu 1", "sturm"),
+             item("s1", "waffen", "Hagel", "schrot"),
+             item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_class_ids=["sturm"], image_url=SIGHT),
+             item("a2", "aufsaetze", "Langer Lauf", "lauf", weapon_ids=["w2", "s1"]),
+             item("a3", "aufsaetze", "Kurzer Lauf", "lauf", weapon_class_ids=["schrot"], weapon_ids=["w1"])]
+    data = loadout_bans.allowed_block(categories, items, None)
+
+    def slots(name: str, section: str = "Sturmgewehr") -> list:
+        found = weapon(data, section, name)["attachments"]
+        return [(group["label"], [entry["name"] for entry in group["entries"]]) for group in found["groups"]]
+
+    assert slots("Blitz 9") == [("Optik", ["Rotpunkt"]), ("Lauf", ["Kurzer Lauf"])], "Reihenfolge der Slots wie in der Bibliothek"
+    assert slots("Donner 4") == [("Optik", ["Rotpunkt"]), ("Lauf", ["Langer Lauf"])]
+    assert slots("Neu 1") == [("Optik", ["Rotpunkt"])], "eine neue Waffe der Klasse bekommt die Aufsätze der Klasse"
+    assert slots("Hagel", "Schrotflinte") == [("Lauf", ["Kurzer Lauf", "Langer Lauf"])]
+    optik = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]["groups"][0]
+    assert optik["icon_url"] == SLOT_ICON and optik["entries"][0]["image_url"] == SIGHT
+    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]["count"] == 2
+
+
+def test_bans_of_an_attachment_class_an_attachment_and_one_at_a_weapon():
+    categories = CATEGORIES[:2]
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("w2", "waffen", "Donner 4", "sturm"),
+             item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_class_ids=["sturm"]),
+             item("a2", "aufsaetze", "Holo", "optik", weapon_class_ids=["sturm"]),
+             item("a3", "aufsaetze", "Griff", weapon_class_ids=["sturm"]),
+             item("a4", "aufsaetze", "Laser", weapon_class_ids=["sturm"])]
+    doc = {"entries": [
+        ban("class", subcategory="optik", **modes("suchen")),
+        ban("item", item_id="a3", name="Griff"),  # „an allen Waffen sperren“ = der Aufsatz selbst
+        ban("attachments", item_id="w1", name="Blitz 9", attachments=[
+            {"item_id": "a1", "name": "Rotpunkt", **modes("stellung")}, {"item_id": "a4", "name": "Laser"}]),
+    ]}
+    data = loadout_bans.allowed_block(categories, items, doc)
+    # Griff ist an beiden Waffen ganz gesperrt, Holo an beiden über die Klasse in Suchen - beide stehen einmal oben (Fabian, 04.11.).
+    assert data["attachments_everywhere"] == [{"name": "Griff", "not_in": []}, {"name": "Holo", "not_in": ["Suchen"]}], \
+        "ganz gesperrte zuerst"
+    blitz = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]
+    assert blitz["count"] == 4 and blitz["banned"] == ["Laser"] and blitz["banned_everywhere"] == 1, "K zählt Griff weiter mit"
+    loose, optik = blitz["groups"]
+    assert (loose["label"], loose["banned"], loose["entries"]) == (None, ["Laser"], []), "ganz gesperrt steht an seinem Slot"
+    assert optik["label"] == "Optik" and optik["not_in"] == ["Suchen"], "die Klasse steht am Slot"
+    assert optik["banned"] == [], "Griff (an keiner Waffe erlaubt) zählt nur in banned_everywhere"
+    assert [(entry["name"], entry["not_in"], entry.get("everywhere")) for entry in optik["entries"]] == [
+        ("Holo", ["Suchen"], True), ("Rotpunkt", ["Suchen", "Stellung"], None)]
+    donner = weapon(data, "Sturmgewehr", "Donner 4")["attachments"]
+    assert donner["banned"] == [] and donner["banned_everywhere"] == 1, "Laser ist nur an Blitz 9 gesperrt"
+    assert [entry["name"] for group in donner["groups"] for entry in group["entries"]] == ["Laser", "Holo", "Rotpunkt"]
+    # Ganze Klasse in allen Modi: an jeder Waffe gesperrt - steht einmal oben.
+    whole = loadout_bans.allowed_block(categories, items, {"entries": [ban("class", subcategory="optik")]})
+    assert [row["name"] for row in whole["attachments_everywhere"]] == ["Holo", "Rotpunkt"]
+    assert weapon(whole, "Sturmgewehr", "Donner 4")["attachments"]["banned"] == []
+    assert weapon(whole, "Sturmgewehr", "Donner 4")["attachments"]["banned_everywhere"] == 2
+
+
+def test_nowhere_allowed_stands_once_and_only_where_it_is_the_same_everywhere():
+    """Fabian, 04.11.: Ein Aufsatz, der an jeder passenden Waffe gleich gesperrt ist, steht einmal in „An keiner Waffe erlaubt“. Andere
+    Modi an einer Waffe oder nur eine passende Waffe: bleibt bei der Waffe."""
+    categories = CATEGORIES[:2]
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("w2", "waffen", "Donner 4", "sturm"), item("w3", "waffen", "Weg", "sturm"),
+             item("a1", "aufsaetze", "Kompensator", weapon_class_ids=["sturm"]),
+             item("a2", "aufsaetze", "Holo", "optik", weapon_class_ids=["sturm"]),
+             item("a3", "aufsaetze", "Rotpunkt", "optik", weapon_class_ids=["sturm"]),
+             item("a4", "aufsaetze", "Laser", weapon_ids=["w1"])]
+    doc = {"entries": [
+        ban("item", item_id="w3"),  # gesperrte Waffe zählt nicht
+        ban("item", item_id="a1"),  # an allen Waffen
+        ban("item", item_id="a4"),  # passt nur zu Blitz 9
+        ban("attachments", item_id="w1", attachments=[{"item_id": "a2", **modes("stellung", "kapern")},
+                                                      {"item_id": "a3", **modes("suchen")}]),
+        ban("attachments", item_id="w2", attachments=[{"item_id": "a2", **modes("kapern", "stellung")},
+                                                      {"item_id": "a3", **modes("stellung")}]),
+    ]}
+    data = loadout_bans.allowed_block(categories, items, doc, SEASON)
+    assert data["attachments_everywhere"] == [{"name": "Kompensator", "not_in": []},
+                                              {"name": "Holo", "not_in": ["Stellung", "Kapern"], "only_in": ["Suchen"]}]
+    blitz = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]
+    assert (blitz["count"], blitz["banned"], blitz["banned_everywhere"]) == (4, ["Laser"], 1)
+    text = markdown_text.plain(loadout_bans.render_block(data, "text"))
+    assert "| **Blitz 9** | **gesperrt:** Laser · **eingeschränkt:** *Optik:* Rotpunkt (nicht in Suchen) |" in text, \
+        "2 gesperrt (Laser, Kompensator) zu 2 erlaubt: Gleichstand bleibt gesperrt; Kompensator und Holo stehen nur einmal unten"
+    assert "| **Donner 4** | **eingeschränkt:** *Optik:* Rotpunkt (nicht in Stellung) |" in text
+    assert text.endswith("\n\n**An keiner Waffe erlaubt:** Kompensator, Holo (nur in Suchen)")
+    for line in loadout_bans.render_block(data, "pdf").splitlines():
+        assert "<a " not in pdf_service.pdf_rules_inline(line)
+    # Ohne solche Aufsätze kein Feld.
+    assert "attachments_everywhere" not in loadout_bans.allowed_block(CATEGORIES, ITEMS, DOC)
+
+
+def test_a_weapon_whose_attachments_are_all_banned_everywhere_says_none_allowed():
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("w2", "waffen", "Donner 4", "sturm"),
+             item("a1", "aufsaetze", "Kompensator", weapon_class_ids=["sturm"])]
+    data = loadout_bans.allowed_block(CATEGORIES[:2], items, {"entries": [ban("item", item_id="a1")]})
+    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"] == {"count": 1, "banned": [], "groups": [], "banned_everywhere": 1,
+                                                                      "only_allowed": True}
+    text = markdown_text.plain(loadout_bans.render_block(data, "text"))
+    assert "| **Blitz 9** | **keine Aufsätze erlaubt** |" in text and "**An keiner Waffe erlaubt:** Kompensator" in text
+
+
+# ---------------------------------------------------------------- „nur in …“ (#2298)
+
+def perk_world(*bans: dict) -> tuple[list, list, dict]:
+    categories = [{"key": "perks", "label": "Perks", "role": "item", "subcategories": [{"key": "laut", "label": "Laut", "icon_url": None}]}]
+    items = [item("k1", "perks", "Eins"), item("k2", "perks", "Zwei"), item("k3", "perks", "Drei"), item("k4", "perks", "Vier"),
+             item("k5", "perks", "Fünf", "laut")]
+    return categories, items, {"entries": list(bans)}
+
+
+def test_only_in_when_banned_in_more_season_modes_than_allowed():
+    categories, items, doc = perk_world(
+        ban("item", item_id="k1", **modes("suchen")),  # 1 von 3
+        ban("item", item_id="k2", **modes("stellung", "kapern")),  # 2 von 3
+        ban("item", item_id="k3", **modes("stellung", "kapern", "suchen")),  # alle 3 einzeln
+        ban("item", item_id="k4"),  # alle Modi
+        ban("class", subcategory="laut", **modes("suchen", "stellung")))
+    data = loadout_bans.allowed_block(categories, items, doc, SEASON)
+    rows = {entry["name"]: entry for section in data["categories"][0]["sections"] for entry in section["entries"]}
+    assert rows["Eins"] == {"name": "Eins", "image_url": None, "not_in": ["Suchen"]}, "1 von 3: nicht in"
+    assert rows["Zwei"]["only_in"] == ["Suchen"] and rows["Zwei"]["not_in"] == ["Stellung", "Kapern"], "2 von 3: nur in"
+    assert "only_in" not in rows["Drei"], "kein erlaubter Modus bleibt: nicht in …"
+    assert "Vier" not in rows, "in allen Modi gesperrt bleibt ganz gesperrt"
+    laut = sections(data, "Perks")["Laut"]
+    assert laut["only_in"] == ["Kapern"] and rows["Fünf"]["only_in"] == ["Kapern"]
+    web = markdown_text.plain(loadout_bans.render_block(data, "markdown"))
+    assert "- ++Eins++ *nicht in Suchen*" in web and "- ++Zwei++ *nur in Suchen*" in web
+    assert "*Laut* · nur in Kapern" in web and "- ++Fünf++\n" in f"{web}\n", "die Karte wiederholt den Hinweis der Klasse nicht"
+    text = markdown_text.plain(loadout_bans.render_block(data, "text"))
+    assert "| Perks | – | Zwei | nur in Suchen |" in text and "| Perks | – | Eins | nicht in Suchen |" in text
+    assert "| Perks | Laut | alle: Fünf | nur in Kapern |" in text
+
+
+def test_a_tie_or_no_season_modes_keeps_not_in():
+    categories, items, doc = perk_world(ban("item", item_id="k1", **modes("suchen")), ban("item", item_id="k2", **modes("stellung", "kapern")))
+    two = [("stellung", "Stellung"), ("suchen", "Suchen")]
+    rows = {entry["name"]: entry for entry in loadout_bans.allowed_block(categories, items, doc, two)["categories"][0]["sections"][0]["entries"]}
+    assert "only_in" not in rows["Eins"], "Gleichstand 1:1 bleibt „nicht in“"
+    # Kapern gehört nicht zur Season: gezählt wird nur Stellung - 1 von 2.
+    assert "only_in" not in rows["Zwei"]
+    four = [*SEASON, ("abschuss", "Abschuss")]
+    rows = {entry["name"]: entry for entry in loadout_bans.allowed_block(categories, items, doc, four)["categories"][0]["sections"][0]["entries"]}
+    assert "only_in" not in rows["Zwei"], "2 von 4: Gleichstand"
+    rows = {entry["name"]: entry for entry in loadout_bans.allowed_block(categories, items, doc)["categories"][0]["sections"][0]["entries"]}
+    assert "only_in" not in rows["Zwei"], "ohne Modi der Season kein „nur in“"
+
+
+def test_only_in_also_for_an_attachment_at_a_weapon():
+    categories = CATEGORIES[:2]
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_ids=["w1"])]
+    doc = {"entries": [ban("attachments", item_id="w1", name="Blitz 9", **modes("stellung", "kapern"),
+                           attachments=[{"item_id": "a1", "name": "Rotpunkt"}])]}
+    data = loadout_bans.allowed_block(categories, items, doc, SEASON)
+    entry = weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]["groups"][0]["entries"][0]
+    assert entry["only_in"] == ["Suchen"]
+    text = markdown_text.plain(loadout_bans.render_block(data, "text"))
+    assert "| **Blitz 9** | **eingeschränkt:** *Optik:* Rotpunkt (nur in Suchen) |" in text
+
+
+# ---------------------------------------------------------------- Darstellung
+
+def test_a_weapon_without_an_allowed_attachment_says_so():
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_ids=["w1"]),
+             item("a2", "aufsaetze", "Griff", weapon_ids=["w1"])]
+    doc = {"entries": [ban("attachments", item_id="w1", name="Blitz 9", attachments=[{"item_id": "a1", "name": "Rotpunkt"},
+                                                                                    {"item_id": "a2", "name": "Griff"}])]}
+    data = loadout_bans.allowed_block(CATEGORIES[:2], items, doc)
+    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"] == {"count": 2, "banned": ["Griff", "Rotpunkt"], "only_allowed": True,
+                                                                      "groups": [{"label": None, "not_in": [], "banned": ["Griff"], "entries": []},
+                                                                                 {"label": "Optik", "not_in": [], "banned": ["Rotpunkt"], "entries": []}]}
+    assert "| **Blitz 9** | **keine Aufsätze erlaubt** |" in markdown_text.plain(loadout_bans.render_block(data, "text"))
+
+
+def test_images_of_attachments_and_slots_are_named():
+    categories = [CATEGORIES[0], {**CATEGORIES[1], "subcategories": [{"key": "optik", "label": "Optik", "icon_url": SLOT_ICON}]}]
+    items = [item("w1", "waffen", "Blitz 9", "sturm", image_url=IMAGE), item("a1", "aufsaetze", "Rotpunkt", "optik", weapon_ids=["w1"],
+                                                                             image_url=SIGHT)]
+    data = loadout_bans.allowed_block(categories, items, None)
+    assert loadout_bans.block_images(data) == [ICON, IMAGE, SLOT_ICON, SIGHT]
+
+
+# ---------------------------------------------------------------- Modi je Aufsatz in der Sperrliste (#2299)
+
+def version(*attachment_rows: dict, row_modes=()) -> dict:
+    return {"entries": [{**ban("attachments", item_id="w1", name="Blitz 9", **modes(*row_modes)), "attachments": list(attachment_rows)}]}
+
+
+def test_compare_and_sync_count_the_modes_of_each_attachment():
+    plain_row = version({"item_id": "a1", "name": "Rotpunkt"}, {"item_id": "a2", "name": "Griff"}, row_modes=("suchen",))
+    # Dieselbe Wirkung anders geschrieben: Zeile ohne Modi, jeder Aufsatz mit „Suchen“ - nichts geändert, keine neue Kopie für Staffeln.
+    spelled = version({"item_id": "a1", "name": "Rotpunkt", **modes("suchen")}, {"item_id": "a2", "name": "Griff", **modes("suchen")})
+    assert loadout_bans.compare(plain_row, spelled)["same"] is True
+    assert loadout_bans._rows_key(plain_row) == loadout_bans._rows_key(spelled)
+    changed = version({"item_id": "a1", "name": "Rotpunkt", **modes("stellung")}, {"item_id": "a2", "name": "Griff", **modes("suchen")})
+    diff = loadout_bans.compare(plain_row, changed)
+    assert diff["same"] is False and diff["changed"][0]["attachments"] == ["Rotpunkt (in Stellung)", "Griff (in Suchen)"]
+    assert loadout_bans._rows_key(plain_row) != loadout_bans._rows_key(changed)
+    shown = loadout_bans.view({**changed, "id": "v", "version": 2})["entries"][0]["attachments"]
+    assert shown[0] == {"item_id": "a1", "name": "Rotpunkt", "image_url": None, "modes": ["stellung"], "mode_labels": ["Stellung"]}
+    assert "modes" not in loadout_bans.view({**plain_row, "id": "v", "version": 1})["entries"][0]["attachments"][0], "Altbestand wie bisher"
+
+
+TRICKY = "[Klick](https://example.test/x) **fett** `code` |Rohr| \\pfad"
+
+
+def test_names_of_attachments_and_slots_stay_text():
+    categories = [CATEGORIES[0], {**CATEGORIES[1], "subcategories": [{"key": "optik", "label": TRICKY, "icon_url": None}]}]
+    items = [item("w1", "waffen", "Blitz 9", "sturm"), item("a1", "aufsaetze", TRICKY, "optik", weapon_ids=["w1"]),
+             item("a2", "aufsaetze", f"{TRICKY} 2", "optik", weapon_ids=["w1"])]
+    doc = {"entries": [ban("attachments", item_id="w1", name="Blitz 9", attachments=[
+        {"item_id": "a1", "name": TRICKY}, {"item_id": "a2", "name": f"{TRICKY} 2", "modes": ["x"], "mode_labels": [TRICKY]}])]}
+    data = loadout_bans.allowed_block(categories, items, doc)
+    assert weapon(data, "Sturmgewehr", "Blitz 9")["attachments"]["banned"] == [TRICKY], "Daten sind Klartext"
+    safe = TRICKY.replace("|", "/")
+    for variant in ("markdown", "text", "pdf"):
+        shown = loadout_bans.render_block(data, variant)
+        assert "[Klick](https://" not in shown and "**fett**" not in shown and "\\" not in shown
+        plain = markdown_text.plain(shown)
+        assert f"*{safe}:* {safe}" in plain and f"*{safe}:* {safe} 2 (nicht in {safe})" in plain, "Slot und Namen bleiben Text"
+    for line in loadout_bans.render_block(data, "pdf").splitlines():
+        assert "<a " not in pdf_service.pdf_rules_inline(line) and "<b>fett" not in pdf_service.pdf_rules_inline(line)

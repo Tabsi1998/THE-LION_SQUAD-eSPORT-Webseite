@@ -32,6 +32,7 @@ async def purge_tournament(db, tid: str) -> None:
     if stage_ids:
         pool_scopes.append({"scope": "stage", "scope_id": {"$in": stage_ids}})
     await db.map_pools.delete_many({"$or": pool_scopes})
+    await db.loadout_bans.delete_many({"scope": "tournament", "scope_id": tid})
     await db.stations.update_many({"tournament_id": tid}, {"$set": {"tournament_id": None}})
     # Fotos vom Ergebnis (#1157): persönlich - sie gehen mit dem Turnier.
     from services.match_proofs import delete_for_tournament

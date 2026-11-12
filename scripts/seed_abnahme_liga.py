@@ -84,6 +84,21 @@ SEASON = {
 ABLAUF_LEAGUE = "Liga-Probelauf"
 ABLAUF_ASSIGNED = 5  # zugeteilt vom Seed; das sechste Co-Team teilt die Spec im Browser zu
 ABLAUF_SEASON = {**{key: value for key, value in SEASON.items() if key != "name"}, "max_staffel_size": 6, "visibility": "public"}
+# Prüfung vor der Veröffentlichung (#2207): Seasons entstehen „aus“ und werden erst nach Pool, Liga N und Staffel sichtbar. Season 1
+# steht auf der Vorschau „Nur Liga-Leitung“, die nicht geprüft wird. Der Probelauf ist öffentlich, hat aber nur den Regeltext-Platzhalter,
+# kein Regelwerk - dafür nimmt der Seed (Superadmin) die Notausnahme.
+SEED_OVERRIDE = {"readiness_override_reason": "Abnahme-Stand: Regeltext-Platzhalter statt Regelwerk (erfunden)"}
+
+
+def hidden(fields: dict) -> dict:
+    """Die Vorgaben ohne Sichtbarkeit - zum Anlegen, bevor Pool und Staffel stehen."""
+    return {key: value for key, value in fields.items() if key != "visibility"}
+
+
+async def publish_season(admin: "Session", season_id: str, visibility: str) -> None:
+    await admin.call("PATCH", f"/api/admin/leagues/seasons/{season_id}", json={"visibility": visibility, **SEED_OVERRIDE})
+
+
 # Die Liga der Selbstanmeldung (#2205): je Lauf eine neue Season, Anträge bleiben als Nachweis stehen.
 ANMELDUNG_LEAGUE = "Liga-Anmeldung"
 ANMELDUNG_RULES = "# Fairplay\n\nFair spielen, immer. Platzhalter der lokalen Abnahme, erfunden.\n"
@@ -366,7 +381,8 @@ async def refresh_season(admin: Session, season: dict, fields: dict) -> None:
     zweiter Aufruf in derselben Woche ändert nichts daran. Sonst rücken sie vor - die Staffel trägt die geltenden Werte, eine
     Staffel im Entwurf rückt mit, eine gestartete bleibt (docs/LIGA.md, Abschnitt 1)."""
     still_ahead = str(season.get("start_date") or "")[:10] > datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
-    await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json=fields if still_ahead else {**fields, **season_dates()})
+    body = {**fields, **SEED_OVERRIDE} if fields.get("visibility") not in (None, "off") else fields
+    await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json=body if still_ahead else {**body, **season_dates()})
     if not still_ahead:
         await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/sync", json={})
 
@@ -382,7 +398,7 @@ async def ensure_league(admin: Session, game: dict, maps: dict) -> tuple[dict, d
         # Wieder auf den Stand des Seeds - auch die Sichtbarkeit (die schaltet der Obmann in der Abnahme selbst).
         await refresh_season(admin, season, SEASON)
     else:
-        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={**SEASON, **season_dates(), "number": 1})
+        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={**hidden(SEASON), **season_dates(), "number": 1})
     view = await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
     if not view.get("map_pool"):
         await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
@@ -394,6 +410,9 @@ async def ensure_league(admin: Session, game: dict, maps: dict) -> tuple[dict, d
     staffel = next((row for row in division.get("staffeln") or [] if row.get("staffel") == "A"), None)
     if not staffel:
         staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
+    if view["season"].get("visibility") != SEASON["visibility"]:
+        await publish_season(admin, season["id"], SEASON["visibility"])
+        view = await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
     return league, view["season"], division, staffel
 
 
@@ -439,12 +458,13 @@ async def ensure_ablauf(admin: Session, db, game: dict, maps: dict, squads: list
         # Eigener Slug: Die Verwaltung führt je Season einen Link „season-link-<slug>“, die lesende Spec sucht „season-1“.
         number = int((newest or {}).get("number") or 0) + 1
         season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={
-            **ABLAUF_SEASON, **season_dates(), "number": number, "name": f"Probelauf {number}", "slug": f"probelauf-{number}"})
+            **hidden(ABLAUF_SEASON), **season_dates(), "number": number, "name": f"Probelauf {number}", "slug": f"probelauf-{number}"})
         await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
             {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
         division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
         staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
         tid = staffel["tournament_id"]
+        await publish_season(admin, season["id"], ABLAUF_SEASON["visibility"])
     for row in squads[:ABLAUF_ASSIGNED]:
         if not await db.tournament_registrations.find_one({"tournament_id": tid, "squad_id": row["squad"]["id"]}, {"_id": 1}):
             await admin.call("POST", f"/api/tournaments/{tid}/squad-registrations",
@@ -464,7 +484,7 @@ async def ensure_anmeldung(admin: Session, db, game: dict, maps: dict) -> dict:
         league["seasons"] = []
     number = int(max((row.get("number") or 0 for row in league.get("seasons") or []), default=0)) + 1
     season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={
-        **ABLAUF_SEASON, **season_dates(), "number": number, "name": f"Anmeldung {number}", "slug": f"anmeldung-{number}"})
+        **hidden(ABLAUF_SEASON), **season_dates(), "number": number, "name": f"Anmeldung {number}", "slug": f"anmeldung-{number}"})
     await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
         {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
     division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
@@ -473,6 +493,8 @@ async def ensure_anmeldung(admin: Session, db, game: dict, maps: dict) -> dict:
     draft = await admin.call("PUT", f"{scope}/draft", json={"title": "Regelwerk Anmeldung", "body_md": ANMELDUNG_RULES, "annexes": []})
     today = datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
     await admin.call("POST", f"{scope}/publish", json={"revision": draft["revision"], "valid_from": today, "change_reason": "Fassung für die Abnahme", "requires_consent": False})
+    # Mit Regelwerk, Pool, Liga 1 und Staffel ist diese Season bereit - die Prüfung hält nichts auf.
+    await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json={"visibility": ABLAUF_SEASON["visibility"]})
     return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]}, "tournament_id": staffel["tournament_id"]}
 
 

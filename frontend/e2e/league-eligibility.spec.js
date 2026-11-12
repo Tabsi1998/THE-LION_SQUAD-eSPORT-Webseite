@@ -269,7 +269,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         if (request.method() === "POST") posts.push([path, request.postDataJSON()]);
         return undefined;
       }, ADMIN);
-      await page.goto("/admin/leagues/seasons/s1");
+      // Reiter „Anmeldung und Kader“ (#2267); der Link aus „Transfer beantragt“ zeigt auf #kader.
+      await page.goto("/admin/leagues/seasons/s1#kader");
+      await expect(page.getByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
 
       await expect(page.getByTestId("season-form-max-squad")).toHaveValue("50");
       await expect(page.getByTestId("season-form-min-age")).toHaveValue("18");

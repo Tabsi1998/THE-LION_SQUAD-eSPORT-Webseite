@@ -1,32 +1,48 @@
-"""Foto vom Ergebnis (#1157, #1158): ein Beweisfoto zur Ergebnis-Meldung oder zu „Problem melden“.
+"""Nachweise zu einem Spiel (#1157, #1158, #2360): Fotos und Video-Links zu Meldung, Vorfall, Protest, Stellungnahme und MOSS.
 
-Ein Beweisfoto ist persönlich (Gesichter, Bildschirme, Wohnzimmer). Deshalb:
+Ein Nachweis ist persönlich (Gesichter, Bildschirme, Wohnzimmer). Deshalb:
 
-- Sehen dürfen es nur die Spieler dieses Spiels (bei Teams jedes Mitglied) und die Turnierleitung dieses Turniers -
-  global oder mit Ergebnis-Recht für genau dieses Spiel. Nie öffentlich, nicht in Galerie oder Suche.
-- Ausgeliefert wird es nur über ``GET /api/matches/{id}/proof-photos/{foto}`` nach dieser Prüfung, nie über eine
+- Sehen dürfen ihn nur die Spieler dieses Spiels (bei Teams jedes Mitglied) und die Leitung dieses Turniers - global oder
+  mit Ergebnis- bzw. Protest-Recht für genau dieses Spiel. Nie öffentlich, nicht in Galerie oder Suche. Ein Nachweis mit dem
+  Bezug ``moss`` (Anti-Cheat, Regelwerk § 9a) geht nur an die Person, die ihn hochgeladen hat, an Captain und Vertreter
+  ihrer Seite und an die Leitung, die an dem Spiel nicht beteiligt ist - nicht an die übrigen Spieler der eigenen Seite
+  und nie an die Gegenseite.
+- Ein Bild wird nur über ``GET /api/matches/{id}/proof-photos/{foto}`` nach dieser Prüfung ausgeliefert, nie über eine
   öffentliche Upload-Adresse. Wer nicht darf, bekommt 404 (wie bei Chat-Anhängen - sonst ließe sich prüfen, ob es
   ein Foto gibt).
 - Beim Hochladen wird das Bild geprüft und neu gespeichert (derselbe Weg wie jeder Bild-Upload,
   ``services.image_upload._encode_image_bytes``): nur PNG, JPG oder WebP, Größe und Pixel begrenzt, Drehung übernommen,
   EXIF mit GPS-Ort und Kamera fällt dabei weg.
 - Bildprüfung wie im Chat (#415): bis das Ergebnis da ist, sieht das Foto nur, wer es hochgeladen hat.
-- Gelöscht wird es mit dem Turnier, mit dem Konto (Kontolöschung) und sonst 30 Tage nach dem Hochladen - außer das
-  Spiel ist dann noch in Klärung. Nie verwendete Fotos verschwinden nach 24 Stunden.
+- Ein Video ist ein eigener Eintrag mit einem Link (nur ``https``): Er wird nie eingebettet und nie vom Server abgerufen.
+- Aufbewahrung (``services/match_proof_retention.purge``): Turniere 30 Tage nach dem Hochladen - außer das Spiel ist dann
+  noch in Klärung. Liga-Staffeln bis Season-Ende plus ``evidence_keep_days``, länger bei offenem Vorfall oder Verfahren;
+  MOSS nur bis der Vorfall bzw. das Verfahren beendet
+  und die Einspruchsfrist vorbei ist. Nie verwendete Fotos verschwinden nach 24 Stunden. Alles geht mit dem Turnier und
+  mit dem Konto (Kontolöschung).
 
-Ablauf wie bei Chat-Anhängen: hochladen (``pending``, sichtbar nur für den Absender) → mit der Meldung oder dem
-Problem abschicken (``attached``, Bezug gespeichert) → die anderen sehen es.
+Zwei Wege: Der alte (ein Foto je Meldung oder Problem) lädt hoch (``pending``, sichtbar nur für den Absender) und hängt das
+Foto beim Abschicken an (``attached``). Der neue (``add_proof``) kennt den Bezug schon und hängt sofort an - bis zu zehn je
+Seite und Bezug, nur bei Spielen einer Liga-Staffel (docs/LIGA.md, „D.5/E.2-Vertrag“; ``services/match_proof_refs`` sagt, ob
+der Bezug noch offen ist). Wer zu einer Seite gehört, handelt dabei nie als Leitung. Zurückziehen geht nur, solange man auch
+hinzufügen dürfte; ein MOSS-Nachweis wird dabei nur verborgen (``removed``) und bleibt der Leitung, bis die Aufbewahrung
+ihn löscht.
 """
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import logging
 import pathlib
 import uuid
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException, UploadFile
 
 from models import new_id, now_utc
+from services import match_proof_refs as refs
 from storage import PROOF_DIR, ensure_directory
 
 logger = logging.getLogger("tls.match_proofs")
@@ -34,6 +50,14 @@ logger = logging.getLogger("tls.match_proofs")
 PENDING_TTL = timedelta(hours=24)
 RETENTION_DAYS = 30
 VISIBLE_SCAN_STATES = {"safe", "failed"}
+# Ein MOSS-Nachweis, den seine Seite zurückgezogen hat: bleibt für die Leitung, bis die Aufbewahrung ihn löscht.
+REMOVED = "removed"
+KEPT_STATUSES = ("attached", REMOVED)
+LINK_MAX_LENGTH = 500
+REF_ID_MAX_LENGTH = 120
+# Je Seite und Bezug - genug für „mehrere Screenshots aus verschiedenen Runden“ (Regelwerk § 9.7), zu wenig zum Zumüllen.
+MAX_PER_REF = 10
+LINK_FORBIDDEN = set("<>\"'\\^`{|}")
 
 
 def proof_path(key: str | None) -> pathlib.Path | None:
@@ -57,8 +81,171 @@ def public_proof(doc: dict) -> dict:
     }
 
 
-async def store_proof(db, match: dict, owner: dict, registration_id: str | None, file: UploadFile) -> dict:
-    """Ein Foto prüfen, neu speichern (ohne EXIF) und als „pending“ ablegen."""
+def is_link(doc: dict) -> bool:
+    return doc.get("type") == "link"
+
+
+def is_file(doc: dict) -> bool:
+    """Die MOSS-ZIP (#2297): eine Datei zum Herunterladen - kein Bild, keine Vorschau."""
+    return doc.get("type") == "file"
+
+
+def proof_type(doc: dict) -> str:
+    return "link" if is_link(doc) else "file" if is_file(doc) else "image"
+
+
+def file_url(match_id: str, proof_id: str) -> str:
+    return f"/api/matches/{match_id}/proofs/{proof_id}/file"
+
+
+# ---------------------------------------------------------------- MOSS-ZIP (#2297, Regelwerk § 9a)
+
+ZIP_MAGIC = b"PK\x03\x04"
+ZIP_MAX_ENTRIES = 5000
+# Entpackt höchstens so groß - geprüft nur am Inhaltsverzeichnis, die Datei wird auf dem Server nie entpackt.
+ZIP_MAX_UNPACKED_BYTES = 2 * 1024 * 1024 * 1024
+ZIP_MAX_RATIO = 200
+# MOSS schreibt Bildschirmfotos und Protokolle. Programme und Skripte haben in der Datei nichts verloren.
+ZIP_FORBIDDEN_SUFFIXES = frozenset({".exe", ".dll", ".bat", ".cmd", ".com", ".scr", ".msi", ".ps1", ".vbs", ".js", ".jar", ".lnk", ".sh",
+                                    ".hta", ".pif", ".reg", ".zip", ".7z", ".rar", ".gz", ".tgz", ".tar", ".bz2", ".xz", ".cab",
+                                    ".iso"})
+# Als MOSS-Datei zählt nur die ZIP, wie MOSS sie schreibt - andere Archive bekommen einen klaren Satz statt „kein Bild“.
+OTHER_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
+ONLY_ZIP = "Bitte die MOSS-Datei als ZIP hochladen, so wie MOSS sie geschrieben hat. Andere Archive (etwa .tar.gz, .7z, .rar) gehen nicht."
+ZIP_REFUSED = "Das ist keine gültige MOSS-Datei. Bitte die ZIP-Datei unverändert hochladen, so wie MOSS sie geschrieben hat."
+
+
+def looks_like_zip(file: UploadFile) -> bool:
+    """Nur die Endung zählt: ``.zip`` - ein anderer Dateityp wird nicht über den angegebenen Inhaltstyp zur MOSS-Datei."""
+    return (file.filename or "").lower().endswith(".zip")
+
+
+def looks_like_other_archive(file: UploadFile) -> bool:
+    return (file.filename or "").lower().endswith(OTHER_ARCHIVE_SUFFIXES)
+
+
+def moss_max_mb() -> int:
+    """Die Grenze nur für die MOSS-ZIP (``MAX_MOSS_UPLOAD_MB``, Vorgabe 200) - andere Dokumente bleiben bei ihrer eigenen."""
+    from services.image_upload import _upload_mb_from_env
+
+    return _upload_mb_from_env("MAX_MOSS_UPLOAD_MB", 200)
+
+
+def check_zip(path: pathlib.Path) -> dict:
+    """Die abgelegte ZIP-Datei prüfen, ohne sie zu entpacken und ohne sie ganz in den Speicher zu laden: Kennung am Anfang,
+    lesbares Inhaltsverzeichnis, keine Pfade nach außen, keine Programme, keine Archive im Archiv, kein Kennwort und keine
+    Zip-Bombe (Zahl und entpackte Größe der Einträge)."""
+    import zipfile
+
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        if handle.read(len(ZIP_MAGIC)) != ZIP_MAGIC:
+            raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            entries = archive.infolist()
+    except (zipfile.BadZipFile, ValueError, NotImplementedError, OSError):
+        raise HTTPException(status_code=422, detail=ZIP_REFUSED) from None
+    if not entries or len(entries) > ZIP_MAX_ENTRIES:
+        raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    unpacked = 0
+    for entry in entries:
+        name = entry.filename.replace("\\", "/")
+        if name.startswith("/") or ":" in name or ".." in name.split("/"):
+            raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+        if entry.flag_bits & 0x1:
+            raise HTTPException(status_code=422, detail="Die MOSS-Datei darf nicht mit einem Kennwort geschützt sein.")
+        if pathlib.PurePosixPath(name).suffix.lower() in ZIP_FORBIDDEN_SUFFIXES:
+            raise HTTPException(status_code=422, detail="Die ZIP-Datei enthält Programme oder weitere Archive. Bitte die MOSS-Datei unverändert hochladen.")
+        unpacked += entry.file_size
+    if unpacked > ZIP_MAX_UNPACKED_BYTES or unpacked > max(size, 1) * ZIP_MAX_RATIO:
+        raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    return {"entries": len(entries), "unpacked": unpacked}
+
+
+async def _store_zip(db, match: dict, owner: dict, registration_id: str | None, file: UploadFile, *, context: dict) -> dict:
+    """Die MOSS-ZIP prüfen und unverändert ablegen (§ 9a.3: „unverändert hochladen“) - mit Prüfsumme, damit die Leitung sie mit der
+    Angabe des Spielers vergleichen kann. Ausgeliefert wird sie nur als Download über ``/proofs/{id}/file``."""
+    import hashlib
+
+    from services.image_upload import _write_upload_stream_limited
+
+    limit = moss_max_mb()
+    key = f"{uuid.uuid4().hex}.zip"
+    path = PROOF_DIR / key
+    # Gestreamt auf die Platte (bis 200 MB): nie die ganze Datei im Speicher. Zu groß oder nicht beschreibbar räumt der Schreiber auf.
+    size = await _write_upload_stream_limited(file, path, b"", limit * 1024 * 1024, limit)
+    def inspect() -> tuple[dict, str]:
+        found = check_zip(path)
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return found, digest.hexdigest()
+
+    try:
+        # In einem Thread: Inhaltsverzeichnis lesen und bis zu 200 MB hashen hielte sonst alle anderen Anfragen auf.
+        checked, sha256 = await asyncio.to_thread(inspect)
+    except HTTPException:
+        # Abgelehnt: nichts davon bleibt auf dem Server liegen.
+        path.unlink(missing_ok=True)
+        raise
+    now = now_utc().isoformat()
+    doc = {
+        "id": new_id(), "type": "file", "match_id": match["id"], "tournament_id": match.get("tournament_id"), "owner_id": owner["id"],
+        "registration_id": registration_id, "storage_key": key, "mime": "application/zip", "size": size,
+        "sha256": sha256, "entries": checked["entries"], "status": "attached", "context": context,
+        "scan_state": "safe", "created_at": now, "updated_at": now,
+    }
+    await db.match_proof_photos.insert_one(dict(doc))
+    return doc
+
+
+def _is_ip_host(host: str) -> bool:
+    """Steht statt eines Namens eine IP-Adresse da? Auch IPv6 mit eingebetteter IPv4 (``::ffff:10.0.0.1``) und die Formen,
+    die ein Browser als IPv4 liest: Endet der Name auf eine Zahl (``127.1``, ``0x7f.0.0.1``), ist er eine Adresse - eine
+    Domain-Endung ist nie eine Zahl."""
+    bare = host.strip("[]").rstrip(".").split("%", 1)[0]
+    try:
+        ipaddress.ip_address(bare)
+        return True
+    except ValueError:
+        pass
+    last = bare.rsplit(".", 1)[-1].lower()
+    return last.isdigit() or (last.startswith("0x") and all(char in "0123456789abcdef" for char in last[2:]))
+
+
+def clean_link(value) -> str:
+    """Ein Video-Link: nur ``https``, begrenzt lang, ohne Zugangsdaten, auf einen Namen statt einer IP-Adresse - die Domain
+    ist frei. Der Server ruft ihn nie ab."""
+    text = str(value or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Bitte einen Link angeben.")
+    if len(text) > LINK_MAX_LENGTH:
+        raise HTTPException(status_code=422, detail=f"Der Link ist zu lang (höchstens {LINK_MAX_LENGTH} Zeichen).")
+    if any(char.isspace() or not char.isprintable() or char in LINK_FORBIDDEN for char in text):
+        raise HTTPException(status_code=422, detail="Der Link enthält Zeichen, die in einer Adresse nicht vorkommen.")
+    try:
+        parts = urlsplit(text)
+        # ``port`` wirft bei einer Angabe, die keine Portnummer ist.
+        host, user, port_ok = parts.hostname, parts.username or parts.password, parts.port != 0
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Das ist kein gültiger Link.")
+    if not port_ok:
+        raise HTTPException(status_code=422, detail="Das ist kein gültiger Link.")
+    if parts.scheme.lower() != "https":
+        raise HTTPException(status_code=422, detail="Nur Links mit https:// sind erlaubt.")
+    if user or "@" in parts.netloc:
+        raise HTTPException(status_code=422, detail="Ein Link mit Zugangsdaten ist nicht erlaubt.")
+    if host and _is_ip_host(host):
+        raise HTTPException(status_code=422, detail="Ein Link auf eine IP-Adresse ist nicht erlaubt - bitte die Adresse der Videoseite angeben.")
+    if not host or "." not in host.strip("."):
+        raise HTTPException(status_code=422, detail="Das ist kein gültiger Link.")
+    return "https://" + text[len("https://"):]
+
+
+async def _store_image(db, match: dict, owner: dict, registration_id: str | None, file: UploadFile, *,
+                       status: str, context: dict | None) -> dict:
     from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB, _encode_image_bytes, _read_upload_limited
 
     data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
@@ -84,8 +271,11 @@ async def store_proof(db, match: dict, owner: dict, registration_id: str | None,
         "size": len(encoded["data"]),
         "width": encoded["width"],
         "height": encoded["height"],
-        "status": "pending",
-        "context": None,
+        "status": status,
+        "context": context,
+        # Von Anfang an „in Prüfung“: Der neue Weg hängt sofort an - ohne den Stand sähe die Gegenseite das Bild, bis die
+        # Bildprüfung ihn setzt, und für immer, falls sie sich gar nicht anstoßen lässt.
+        "scan_state": "pending",
         "created_at": now,
         "updated_at": now,
     }
@@ -96,10 +286,17 @@ async def store_proof(db, match: dict, owner: dict, registration_id: str | None,
         scan = await media_scan.enqueue(db, kind="proof", ref_id=doc["id"], owner_id=owner["id"], path=path,
                                         context={"type": "proof", "match_id": match["id"]})
         doc["scan_state"] = "safe" if scan.get("state") == "failed" else (scan.get("state") or "pending")
-    except Exception as exc:  # noqa: BLE001 - der Upload gilt; der Sammler holt die Prüfung nach
+    # Der Upload gilt. Das Bild bleibt „in Prüfung“ (nur für den Absender sichtbar); der stündliche Job stößt die Prüfung
+    # neu an (``match_proof_retention.rescan_stuck``) - der Sammler der Bildprüfung kennt es ohne Eintrag nicht.
+    except Exception as exc:  # noqa: BLE001 - eine ausgefallene Bildprüfung darf den Upload nicht verhindern
         logger.warning("[proofs] Bildprüfung für %s nicht angestoßen: %s", doc["id"], type(exc).__name__)
         doc["scan_state"] = "pending"
-    return public_proof(doc)
+    return doc
+
+
+async def store_proof(db, match: dict, owner: dict, registration_id: str | None, file: UploadFile) -> dict:
+    """Ein Foto prüfen, neu speichern (ohne EXIF) und als „pending“ ablegen."""
+    return public_proof(await _store_image(db, match, owner, registration_id, file, status="pending", context=None))
 
 
 async def claim_proof(db, photo_id: str | None, *, owner_id: str, match_id: str, kind: str) -> dict | None:
@@ -123,27 +320,295 @@ async def visible_proofs(db, photo_ids: list[str]) -> dict[str, dict]:
     if not ids:
         return {}
     rows = await db.match_proof_photos.find({"id": {"$in": ids}, "status": "attached"}, {"_id": 0}).to_list(len(ids))
-    return {row["id"]: public_proof(row) for row in rows if (row.get("scan_state") or "safe") in VISIBLE_SCAN_STATES}
+    return {row["id"]: public_proof(row) for row in rows
+            if (row.get("scan_state") or "safe") in VISIBLE_SCAN_STATES and not is_link(row) and not is_file(row)}
+
+
+# ---------------------------------------------------------------- Wer sieht was
+
+@dataclass(frozen=True)
+class Viewer:
+    user_id: str | None = None
+    sides: frozenset = frozenset()    # Anmeldungen dieses Spiels, zu deren Spielern die Person gehört
+    acting: frozenset = frozenset()   # … für die sie handeln darf (Captain, Vertreter, wer angemeldet hat)
+    lead: bool = False                # Leitung mit Ergebnis- oder Protest-Recht für dieses Spiel - und nicht befangen
+
+
+async def viewer_for(db, match: dict, user: dict | None) -> Viewer:
+    """Als wer diese Person auf die Nachweise des Spiels schaut. Wer zu einer Seite gehört (befangen, #2203), ist hier nie
+    „Leitung“, auch mit Liga-Recht: Sie sieht und handelt wie ein Mitglied ihrer Seite - sonst könnte sie Fristen und
+    Seitenregeln umgehen und sähe MOSS der Gegenseite. Turniere ohne Liga kennen keine Befangenheit."""
+    if not user or not user.get("id"):
+        return Viewer()
+    from services.match_audience import may_act, player_ids, registrations_for_match, teams_by_id
+    from services.tournament_permissions import has_match_result_permission
+
+    registrations = await registrations_for_match(db, match)
+    teams = await teams_by_id(db, registrations)
+    sides, acting = set(), set()
+    for registration in registrations:
+        team = teams.get(registration.get("team_id") or "")
+        if user["id"] in player_ids(registration, team):
+            sides.add(registration["id"])
+        if registration.get("user_id") == user["id"] or may_act(registration, team, user["id"]):
+            acting.add(registration["id"])
+    lead = await has_match_result_permission(user, match, capability=("results", "disputes"))
+    if lead:
+        from services.league_permissions import conflict_of_interest
+
+        lead = await conflict_of_interest(db, user, match) is None
+    return Viewer(user_id=user["id"], sides=frozenset(sides), acting=frozenset(acting), lead=lead)
+
+
+def is_removed(doc: dict) -> bool:
+    """Von der Seite zurückgezogen, aber aufbewahrt - das gibt es nur bei MOSS (``remove_proof``)."""
+    return doc.get("status") == REMOVED
+
+
+def can_see_doc(doc: dict, viewer: Viewer) -> bool:
+    state = doc.get("scan_state") or "safe"
+    if not viewer.user_id or state == "blocked":
+        return False
+    if is_removed(doc):
+        # Auch wer ihn hochgeladen hat, sieht ihn nicht mehr - nur die Leitung, bis die Aufbewahrung ihn löscht.
+        return viewer.lead and state in VISIBLE_SCAN_STATES
+    if viewer.user_id == doc.get("owner_id"):
+        return True
+    if state not in VISIBLE_SCAN_STATES or doc.get("status") != "attached":
+        return False
+    if refs.kind_of(doc) == "moss":
+        # Nur wer hochgeladen hat (oben), wer für diese Seite handeln darf (Captain, Vertreter) und die nicht befangene
+        # Leitung - die übrigen Spieler der eigenen Seite nicht: Die Datei zeigt den PC einer einzelnen Person.
+        # Wer für beide Seiten handeln darf (Leitung des Hauptteams, wenn zwei seiner Co-Teams ohne Captain gegeneinander
+        # spielen), ist für jede Seite auch Gegenseite - und sieht darum MOSS keiner von beiden.
+        for_this_side = len(viewer.acting) == 1 and bool(doc.get("registration_id")) and doc["registration_id"] in viewer.acting
+        return for_this_side or viewer.lead
+    return bool(viewer.sides) or viewer.lead
 
 
 async def can_see(db, doc: dict, user: dict | None) -> bool:
-    """Nur Spieler dieses Spiels und die Turnierleitung dieses Turniers - und bis zur Bildprüfung nur der Absender."""
+    """Nur Spieler dieses Spiels und die Leitung dieses Turniers - bis zur Bildprüfung nur der Absender, MOSS nie die Gegenseite."""
     if not user or (doc.get("scan_state") or "safe") == "blocked":
         return False
-    if user.get("id") == doc.get("owner_id"):
+    if user.get("id") == doc.get("owner_id") and not is_removed(doc):
         return True
-    if (doc.get("scan_state") or "safe") not in VISIBLE_SCAN_STATES or doc.get("status") != "attached":
-        return False
     match = await db.matches_v2.find_one({"id": doc.get("match_id")}, {"_id": 0})
     if not match:
         return False
-    from services.match_audience import player_user_ids, registrations_for_match
-    from services.tournament_permissions import has_match_result_permission
+    return can_see_doc(doc, await viewer_for(db, match, user))
 
-    if user.get("id") in await player_user_ids(db, await registrations_for_match(db, match)):
-        return True
-    return await has_match_result_permission(user, match, capability=("results", "disputes"))
 
+# ---------------------------------------------------------------- Mehrere Nachweise je Bezug (#2360)
+
+def clean_ref(kind, ref_id) -> tuple[str, str]:
+    kind = str(kind or "").strip()
+    if kind not in refs.KINDS:
+        raise HTTPException(status_code=422, detail="Unbekannter Bezug für den Nachweis.")
+    ref_id = "" if kind == "report" else str(ref_id or "").strip()
+    if len(ref_id) > REF_ID_MAX_LENGTH:
+        raise HTTPException(status_code=422, detail="Unbekannter Bezug für den Nachweis.")
+    return kind, ref_id
+
+
+async def _settings(db, match: dict) -> tuple[dict | None, dict | None]:
+    """Die Staffel und ihre Season - beides ``None`` bei einem Turnier ohne Liga."""
+    from services.league_scope import is_league_staffel
+
+    tournament = await db.tournaments.find_one(
+        {"id": match.get("tournament_id")}, {"_id": 0, "id": 1, "league_context": 1, "appeal_hours": 1, "evidence_keep_days": 1})
+    if not is_league_staffel(tournament):
+        return None, None
+    season = await db.league_seasons.find_one({"id": tournament["league_context"].get("season_id")}, {"_id": 0})
+    return tournament, season
+
+
+def setting(tournament: dict | None, season: dict | None, key: str) -> int:
+    """Der Wert der Staffel, sonst der Season, sonst die Vorgabe (docs/LIGA.md, „Season-Felder“)."""
+    from services.league_presets import PRESETS
+
+    for source in (tournament, season):
+        value = (source or {}).get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    return PRESETS[key]
+
+
+async def resolve_ref(db, match: dict, kind: str, ref_id: str) -> refs.Ref:
+    """Der Bezug am Spiel. Mehrere Nachweise je Bezug gibt es nur in einer Liga-Staffel - Turniere bleiben beim einen Foto je
+    Meldung (``/proof-photos``), dort antworten Auflisten, Hinzufügen und Entfernen mit 404."""
+    tournament, season = await _settings(db, match)
+    if tournament is None:
+        raise HTTPException(status_code=404, detail="Nachweise nicht gefunden")
+    return refs.resolve(match, kind, ref_id, appeal_hours=setting(tournament, season, "appeal_hours"))
+
+
+def _own_side(kind: str, viewer: Viewer, ref: refs.Ref) -> str | None:
+    """Für welche Seite die Person hier hinzufügt - ``None``: für keine (höchstens als Leitung)."""
+    if kind == "moss":
+        # Die MOSS-Datei lädt der Spieler selbst hoch (§ 9a.3), nicht nur Captain und Vertreter.
+        return next(iter(sorted(viewer.acting or viewer.sides)), None)
+    if kind == "protest":
+        return ref.side if ref.side in viewer.acting else next(iter(sorted(viewer.acting)), None)
+    if kind == "statement":
+        return next((side for side in sorted(viewer.acting) if side != ref.side), next(iter(sorted(viewer.acting)), None))
+    return next(iter(sorted(viewer.acting)), None)
+
+
+def add_refusal(kind: str, viewer: Viewer, ref: refs.Ref, now: datetime) -> tuple[int, str] | None:
+    """Warum diese Person zu diesem Bezug nichts hinzufügen darf - ``None``: sie darf."""
+    side = _own_side(kind, viewer, ref)
+    if side is None and not viewer.lead:
+        return 403, "Nachweise fügen nur die beiden Seiten dieses Spiels hinzu."
+    if not ref.found:
+        return 404, "Den Vorfall oder das Verfahren zu diesem Nachweis gibt es nicht."
+    if not ref.open:
+        return 409, "Hier lässt sich nichts mehr hinzufügen - die Sache ist abgeschlossen."
+    if side is None:
+        return None
+    if kind == "protest" and ref.side and side != ref.side:
+        return 403, "Nachweise zum Protest reicht die Seite nach, die ihn eingelegt hat."
+    if kind == "statement" and ref.side and side == ref.side:
+        return 403, "Nachweise zur Stellungnahme fügt die Gegenseite hinzu."
+    deadline = ref.evidence_until if kind == "protest" else ref.statement_until if kind == "statement" else None
+    if deadline and now > deadline:
+        return 409, "Die Frist zum Nachreichen ist vorbei."
+    return None
+
+
+def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref, *, can_change: bool) -> dict:
+    """``can_change``: Darf diese Person zu diesem Bezug gerade hinzufügen? Nur dann darf sie Eigenes auch entfernen."""
+    context = doc.get("context") or {}
+    own = viewer.user_id == doc.get("owner_id")
+    view = {
+        "id": doc["id"],
+        "type": proof_type(doc),
+        "kind": refs.kind_of(doc),
+        "ref_id": context.get("ref_id") or "",
+        "side": doc.get("registration_id"),
+        "own": own,
+        "own_side": bool(doc.get("registration_id")) and doc["registration_id"] in viewer.sides,
+        "created_at": doc.get("created_at"),
+        # Altbestand (ohne ``ref_id``) hängt an einer Meldung oder einem Problem und bleibt dort.
+        "can_remove": own and can_change and "ref_id" in context and not is_removed(doc),
+    }
+    if is_removed(doc):
+        view = {**view, "removed": True, "removed_at": doc.get("removed_at")}
+    if is_link(doc):
+        return {**view, "link": doc.get("link")}
+    if is_file(doc):
+        # Die MOSS-ZIP: nur zum Herunterladen, mit Größe und Prüfsumme zum Vergleichen - nie eine Vorschau.
+        return {**view, "url": file_url(doc.get("match_id") or "", doc["id"]), "size": doc.get("size"), "sha256": doc.get("sha256")}
+    return {**view, **public_proof(doc)}
+
+
+async def _rows_of(db, match_id: str, kind: str, ref_id: str) -> list[dict]:
+    # Nach Spiel und Bezug gefiltert statt nach einer festen Zahl gekappt - sonst fiele bei vielen Nachweisen etwas heraus.
+    kinds = [kind, *(old for old, new in refs.LEGACY_KINDS.items() if new == kind)]
+    rows = await db.match_proof_photos.find(
+        {"match_id": match_id, "status": {"$in": list(KEPT_STATUSES)}, "context.kind": {"$in": kinds}}, {"_id": 0}).to_list(None)
+    return sorted((row for row in rows if refs.kind_of(row) == kind and ((row.get("context") or {}).get("ref_id") or "") == ref_id),
+                  key=lambda row: str(row.get("created_at") or ""))
+
+
+async def list_proofs(db, match: dict, user: dict, kind, ref_id) -> dict:
+    """Die Nachweise eines Bezugs, soweit diese Person sie sehen darf. Wer zu keiner Seite gehört und nicht leitet: 404."""
+    kind, ref_id = clean_ref(kind, ref_id)
+    viewer = await viewer_for(db, match, user)
+    ref = await resolve_ref(db, match, kind, ref_id)
+    if not (viewer.sides or viewer.acting or viewer.lead) or not ref.found:
+        raise HTTPException(status_code=404, detail="Nachweise nicht gefunden")
+    rows = [row for row in await _rows_of(db, match["id"], kind, ref_id) if can_see_doc(row, viewer)]
+    can_add = add_refusal(kind, viewer, ref, now_utc()) is None
+    return {
+        "items": [proof_view(row, viewer, ref, can_change=can_add) for row in rows],
+        "open": ref.open,
+        "can_add": can_add,
+        "limit": MAX_PER_REF,
+        "link_max_length": LINK_MAX_LENGTH,
+    }
+
+
+async def audit_proof(db, action: str, match: dict, actor_id: str | None, doc: dict, **extra) -> None:
+    # Nie die Adresse eines Links: das Protokoll bleibt länger als der Nachweis.
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "target_id": match.get("tournament_id") or match.get("id"), "actor_id": actor_id,
+        "data": {"match_id": match.get("id"), "proof_id": doc["id"], "type": proof_type(doc),
+                 "kind": refs.kind_of(doc), "ref_id": (doc.get("context") or {}).get("ref_id") or "", **extra},
+        "created_at": now_utc().isoformat(),
+    })
+
+
+async def check_add(db, match: dict, user: dict, kind, ref_id) -> tuple[str, str, Viewer, refs.Ref]:
+    """Darf diese Person zu diesem Bezug hinzufügen? Sonst die passende Absage (vor Rate-Limit und Upload)."""
+    kind, ref_id = clean_ref(kind, ref_id)
+    viewer = await viewer_for(db, match, user)
+    ref = await resolve_ref(db, match, kind, ref_id)
+    refusal = add_refusal(kind, viewer, ref, now_utc())
+    if refusal:
+        raise HTTPException(status_code=refusal[0], detail=refusal[1])
+    return kind, ref_id, viewer, ref
+
+
+async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: UploadFile | None = None, link: str | None = None) -> dict:
+    """Ein Bild oder einen Video-Link an den Bezug hängen - sofort ``attached``. ``checked`` kommt aus ``check_add``."""
+    kind, ref_id, viewer, ref = checked
+    has_link = bool(str(link or "").strip())
+    if (file is None) == (not has_link):
+        raise HTTPException(status_code=422, detail="Bitte entweder ein Bild oder einen Link angeben.")
+    url = clean_link(link) if has_link else None
+    side = _own_side(kind, viewer, ref)
+    mine = [row for row in await _rows_of(db, match["id"], kind, ref_id)
+            if not is_removed(row) and (row.get("registration_id") == side if side else row.get("owner_id") == user["id"])]
+    if len(mine) >= MAX_PER_REF:
+        raise HTTPException(status_code=409, detail=f"Mehr als {MAX_PER_REF} Nachweise je Seite gehen hier nicht.")
+    context = {"kind": kind, "ref_id": ref_id}
+    if url:
+        now = now_utc().isoformat()
+        doc = {"id": new_id(), "type": "link", "link": url, "match_id": match["id"], "tournament_id": match.get("tournament_id"),
+               "owner_id": user["id"], "registration_id": side, "status": "attached", "context": context,
+               "created_at": now, "updated_at": now}
+        await db.match_proof_photos.insert_one(dict(doc))
+    elif kind == "moss" and looks_like_other_archive(file):
+        raise HTTPException(status_code=422, detail=ONLY_ZIP)
+    elif kind == "moss" and looks_like_zip(file):
+        # Die MOSS-Datei selbst (#2297): eigener Dateityp mit eigener Prüfung - nur am Bezug ``moss``.
+        doc = await _store_zip(db, match, user, side, file, context=context)
+    else:
+        doc = await _store_image(db, match, user, side, file, status="attached", context=context)
+    await audit_proof(db, "match.proof.add", match, user["id"], doc)
+    return proof_view(doc, viewer, ref, can_change=True)
+
+
+async def remove_proof(db, match: dict, user: dict, proof_id: str) -> dict:
+    """Den eigenen Nachweis wieder entfernen - nur über den neuen Weg angehängte und nur, solange diese Person zu dem Bezug
+    auch hinzufügen dürfte (offen, eigene Seite, Frist nicht vorbei): Sonst ließe sich ein Beleg nach der Frist noch
+    zurückziehen, wenn die Gegenseite schon darauf geantwortet hat. Ein MOSS-Nachweis wird dabei nicht gelöscht, nur als
+    entfernt markiert: Die Seite sieht ihn nicht mehr, die Leitung behält ihn, bis die Aufbewahrung ihn löscht - sonst
+    könnte ein Spieler eine belastende Datei aus dem laufenden Verfahren nehmen."""
+    doc = await db.match_proof_photos.find_one({"id": proof_id, "match_id": match["id"], "owner_id": user["id"]}, {"_id": 0})
+    context = (doc or {}).get("context") or {}
+    if not doc or doc.get("status") != "attached" or "ref_id" not in context:
+        raise HTTPException(status_code=404, detail="Nachweis nicht gefunden")
+    kind = refs.kind_of(doc) or ""
+    ref = await resolve_ref(db, match, kind, context.get("ref_id") or "")
+    if not ref.found:
+        raise HTTPException(status_code=404, detail="Nachweis nicht gefunden")
+    if not ref.open:
+        raise HTTPException(status_code=409, detail="Der Nachweis lässt sich nicht mehr entfernen - die Sache ist abgeschlossen.")
+    if add_refusal(kind, await viewer_for(db, match, user), ref, now_utc()) is not None:
+        raise HTTPException(status_code=409, detail="Der Nachweis lässt sich nicht mehr entfernen - die Frist dafür ist vorbei.")
+    kept = kind == "moss"
+    if kept:
+        now = now_utc().isoformat()
+        await db.match_proof_photos.update_one({"id": doc["id"], "status": "attached"}, {"$set": {
+            "status": REMOVED, "removed_at": now, "removed_by": user["id"], "updated_at": now}})
+    else:
+        await delete_rows(db, [doc])
+    await audit_proof(db, "match.proof.remove", match, user["id"], doc, kept=kept)
+    return {"ok": True, "kept_for_lead": kept}
+
+
+# ---------------------------------------------------------------- Löschen
 
 def _remove_files(doc: dict) -> None:
     from services.image_variants import VARIANT_WIDTHS, variant_path
@@ -156,7 +621,7 @@ def _remove_files(doc: dict) -> None:
         variant_path(path, width).unlink(missing_ok=True)
 
 
-async def _delete(db, rows: list[dict]) -> int:
+async def delete_rows(db, rows: list[dict]) -> int:
     for row in rows:
         _remove_files(row)
     if rows:
@@ -165,36 +630,6 @@ async def _delete(db, rows: list[dict]) -> int:
 
 
 async def delete_for_tournament(db, tournament_id: str) -> int:
-    """Turnier gelöscht: seine Beweisfotos gleich mit."""
-    return await _delete(db, await db.match_proof_photos.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(None))
+    """Turnier gelöscht: seine Nachweise gleich mit."""
+    return await delete_rows(db, await db.match_proof_photos.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(None))
 
-
-async def delete_for_user(db, user_id: str) -> int:
-    """Kontolöschung: die eigenen Fotos und ihre Dateien weg."""
-    return await _delete(db, await db.match_proof_photos.find({"owner_id": user_id}, {"_id": 0}).to_list(None))
-
-
-async def purge(db, *, now=None) -> int:
-    """Aufräumen: nie verwendete Fotos nach 24 Stunden, alle anderen 30 Tage nach dem Hochladen - außer das Spiel ist
-    noch in Klärung -, und Fotos, deren Spiel es nicht mehr gibt."""
-    current = now or now_utc()
-    stale = await db.match_proof_photos.find(
-        {"status": "pending", "created_at": {"$lt": (current - PENDING_TTL).isoformat()}}, {"_id": 0}).to_list(500)
-    old = await db.match_proof_photos.find(
-        {"status": "attached", "created_at": {"$lt": (current - timedelta(days=RETENTION_DAYS)).isoformat()}}, {"_id": 0}).to_list(500)
-    match_ids = list({row.get("match_id") for row in old if row.get("match_id")})
-    matches = {
-        row["id"]: row for row in await db.matches_v2.find({"id": {"$in": match_ids}}, {"_id": 0, "id": 1, "status": 1}).to_list(len(match_ids) + 1)
-    } if match_ids else {}
-    expired = [row for row in old if (matches.get(row.get("match_id")) or {}).get("status") != "disputed"]
-    attached_ids = await db.match_proof_photos.distinct("match_id", {"status": "attached"})
-    known = set(await db.matches_v2.distinct("id", {"id": {"$in": attached_ids}})) if attached_ids else set()
-    orphans = await db.match_proof_photos.find(
-        {"status": "attached", "match_id": {"$nin": sorted(known)}}, {"_id": 0}).to_list(500) if attached_ids else []
-    seen: set[str] = set()
-    rows = []
-    for row in [*stale, *expired, *orphans]:
-        if row["id"] not in seen:
-            seen.add(row["id"])
-            rows.append(row)
-    return await _delete(db, rows)

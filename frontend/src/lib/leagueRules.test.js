@@ -1,6 +1,6 @@
 import {
   addAnnex, annexLabel, changeRows, clearHits, dayLabel, findRanges, insertBlock, moveAnnex, paintHits, removeAnnex, renderRulesMarkdown,
-  rulesApiPath, rulesMediaProps, rulesPagePath, tocOf,
+  renderRulesSection, rulesApiPath, rulesMediaProps, rulesPagePath, tocOf,
 } from "./leagueRules";
 
 const SECTIONS = [
@@ -62,6 +62,15 @@ describe("Markdown sicher", () => {
     expect(renderRulesMarkdown("![Plan](javascript:alert)")).toBe("<p>Plan</p>");
   });
 
+  test("ausgelieferte Abschnitte: Namen mit Escapes bleiben Text, freier Text wie geschrieben; der Editor zeigt den Text roh (#2218)", () => {
+    // So kommt `sections[].body_md` von der API (services/markdown_text.served).
+    const section = renderRulesSection("| Name | Gilt in |\n| --- | --- |\n| Schild \\[Test\\] \\*x\\* | alle |\n\nPfad C:\\\\Daten und \\\\_frei\\\\_");
+    expect(section).toContain("<td>Schild [Test] *x*</td>");
+    expect(section).toContain("Pfad C:\\Daten und \\_frei\\_");
+    expect(section).not.toContain("<em>");
+    expect(renderRulesMarkdown("Pfad C:\\Daten und \\_frei\\_")).toContain("Pfad C:\\Daten und \\_frei\\_");
+  });
+
   test("Sprünge bleiben in der Seite, Links nach außen öffnen neu, @ wird kein Profil-Link", () => {
     const html = renderRulesMarkdown("[oben](#fairplay) [außen](https://example.org) @leitung");
     expect(html).toContain('<a href="#fairplay">oben</a>');
@@ -121,4 +130,10 @@ test("Bilder im Editor: Admin-Medien nur mit der Rolle, Zuständige laden eigene
   for (const user of [{ role: "player", areas: [] }, { role: "moderator", areas: ["leagues"] }, null]) {
     expect(rulesMediaProps(user)).toEqual({ mediaScope: "user", libraryEndpoint: "/media?type=images" });
   }
+});
+
+// Codex Runde 2 (#2287): Ein Name mit „++“ in der Kartenmarke der erlaubten Ausrüstung - eine Unterstreichung, der Name wörtlich, kein Bruch.
+test("Kartenmarke mit „A++B“ im Namen bleibt eine Karte", () => {
+  const html = renderRulesSection("- ++A\\+\\+B++ *nicht in Suchen*\n- ++Zweite++");
+  expect(html).toBe("<ul><li><u>A++B</u> <em>nicht in Suchen</em></li><li><u>Zweite</u></li></ul>");
 });

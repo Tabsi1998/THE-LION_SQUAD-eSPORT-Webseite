@@ -154,6 +154,10 @@ _level_batch: ContextVar[dict | None] = ContextVar("xp_level_batch", default=Non
 
 
 async def _level_up(user_id: str, before: int, after: int, prestige: int) -> None:
+    # Neuberechnung (#2340): ein Aufstieg aus still vergebenen Erfolgen meldet sich nicht - das Level steht trotzdem.
+    from services.achievement_core import in_quiet_scope
+    if in_quiet_scope():
+        return
     batch = _level_batch.get()
     if batch is None:
         await _announce_level_up(user_id, before, after, prestige)

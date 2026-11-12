@@ -152,7 +152,8 @@ export function flattenAchievementTiers(data) {
 }
 
 export function achievementInsights(data) {
-  const tiers = flattenAchievementTiers(data);
+  // Nicht mehr Erreichbares (#2339) zählt in keinem „x von y“ - auch nicht, wenn man es hat.
+  const tiers = flattenAchievementTiers(data).filter((tier) => !tier.retired);
   const earned = tiers.filter((tier) => tier.earned);
   const openProgress = tiers
     .filter((tier) => !tier.earned && !tier.manual_only && tier.condition_status !== "planned" && Number(tier.target || 0) > 0)

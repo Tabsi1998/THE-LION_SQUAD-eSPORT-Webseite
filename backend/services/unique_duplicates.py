@@ -67,6 +67,9 @@ MANUAL = {
     **{f"shop_test_drafts.{index}": "Doppeltes Protokoll eines Testentwurfs - in Printful nachsehen, welcher Entwurf "
                                     "gilt, und die überzählige Zeile von Hand entfernen (docs/SHOP.md, Testentwurf)."
        for index in ("id", "external_id")},
+    # Nachweise zu Spielen (#2360): Belege in einem Verfahren - nie automatisch löschen.
+    "match_proof_photos.id": "Zwei Nachweise mit derselben Kennung - Nachweise sind Belege und werden nie automatisch "
+                             "gelöscht: prüfen, zu welchem Spiel jeder gehört, und einem von Hand eine neue Kennung geben.",
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

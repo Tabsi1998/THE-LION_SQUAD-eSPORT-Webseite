@@ -92,7 +92,8 @@ async def create_user_notification(
     # `in_app_only`: nur ins Postfach - etwa eine Rücknahme (#622), die niemand per Push erfahren soll.
     in_app_only = bool((meta or {}).get("in_app_only"))
     push_channel_allowed = push_allowed(user, kind, category) and not in_app_only
-    discord_channel_allowed = discord_allowed(user, kind, category) and not in_app_only
+    # `no_discord`: Postfach und Push, aber keine Direktnachricht - etwa die Sammel-Nachricht der Neuberechnung (#2340).
+    discord_channel_allowed = discord_allowed(user, kind, category) and not in_app_only and not (meta or {}).get("no_discord")
     if not in_app_allowed and not push_channel_allowed and not discord_channel_allowed:
         return None
     meta = meta or {}

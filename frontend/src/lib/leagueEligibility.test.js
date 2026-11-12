@@ -1,4 +1,4 @@
-import { ageLabel, eligibilityNotice, hasSeasonRules, requirementHint, rulesLines, windowText } from "./leagueEligibility";
+import { ELIGIBILITY_LABELS, ageLabel, eligibilityNotice, hasSeasonRules, requirementHint, rulesLines, windowText } from "./leagueEligibility";
 
 const ALL = {
   min_squad_size: 3, max_squad_size: 50, one_team_per_season: true, min_age: 18, new_player_wait_days: 7, roster_deadline: "2027-03-01",
@@ -32,6 +32,8 @@ test("der eigene Hinweis sagt, was zu tun ist", () => {
   const missing = eligibilityNotice({ title: "Liga · Season 1", state: "age_missing", ok: false, min_age: 18 });
   expect(missing.tone).toBe("warn");
   expect(missing.text).toContain("Geburtsdatum");
+  // Der Reiter heißt „Grunddaten“ (Einstellungen → Konto) - einen Reiter „Persönliches“ gibt es nicht (#2295).
+  expect(missing.text).toContain("unter „Grunddaten“");
   expect(eligibilityNotice({ title: "L", state: "waiting", ok: false, reason: "Neu im Kader: darf ab 09.11.2026, 12:00 spielen." }).text).toContain("darf ab");
   expect(eligibilityNotice({ title: "L", state: "locked", ok: true, age: "met" })).toEqual({ tone: "info", text: "L: Altersvorgabe erfüllt." });
   expect(eligibilityNotice({ title: "L", state: "locked", ok: true, age: null })).toBeNull();
@@ -42,10 +44,22 @@ test("der Hinweis im Kader-Dialog nennt nur, was die Season trägt", () => {
   const text = requirementHint({ min_size: 3, max_size: 50, min_age: 18, transfers_open: false });
   expect(text).toContain("höchstens 50");
   expect(text).toContain("Geburtsdatum");
+  expect(text).toContain("aufnehmen geht trotzdem");
   expect(text).toContain("Transfer");
 });
 
 test("Seasons ohne Regeln bleiben bei der einfachen Liste", () => {
   expect(hasSeasonRules({ one_team_per_season: false, min_age: 0, new_player_wait_days: 0 })).toBe(false);
   expect(hasSeasonRules({ min_age: 18 })).toBe(true);
+  expect(hasSeasonRules({ platform: { allowed: [], crossplay: true } })).toBe(false);
+  expect(hasSeasonRules({ platform: { allowed: ["PC"] } })).toBe(true);
+});
+
+test("die Plattform steht als eigene Sätze bei den Regeln, Stand und Grund mit eigenem Wort (#2270)", () => {
+  const lines = rulesLines({ min_squad_size: 4, platform: { field_label: "Plattform", allowed: ["PC"], crossplay: false, input_device: null } });
+  expect(lines).toEqual(["Kader: mindestens 4 Spieler", "Plattform: nur PC.", "Crossplay: aus."]);
+  expect(ELIGIBILITY_LABELS.platform_not_allowed).toBe("Plattform nicht erlaubt");
+  expect(ELIGIBILITY_LABELS.platform_missing).toBe("Plattform fehlt");
+  const own = eligibilityNotice({ title: "L", state: "platform_not_allowed", ok: false, reason: "Diese Season ist nur für PC – angegeben ist PlayStation." });
+  expect(own).toEqual({ tone: "warn", text: "L: Diese Season ist nur für PC – angegeben ist PlayStation." });
 });

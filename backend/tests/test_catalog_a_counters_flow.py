@@ -13,6 +13,7 @@ from flow_harness import make_flow  # noqa: E402
 import achievement_catalog as catalog  # noqa: E402
 import badges  # noqa: E402
 from services import achievement_counters as counters  # noqa: E402
+from services import awards  # noqa: E402
 
 KEYS = {"win_rate_qualified", "clean_sheets", "full_distance_series", "deciders_won", "comebacks", "distinct_maps", "matches_ready_on_time",
         "results_reported_accepted", "dispute_free_streak", "bracket_resets_won", "streamed_matches", "tournaments_completed_no_forfeit",
@@ -44,17 +45,14 @@ async def world(flow, me: dict, other: dict):
         {"id": "r-ot-2", "tournament_id": "t2", "user_id": other["id"], "status": "checked_in", "checked_in_at": "2026-09-08T18:20:00+00:00", "created_at": "2026-09-05T11:00:00+00:00", "updated_at": "2026-09-08T18:20:00+00:00"},
         {"id": "r-me-3", "tournament_id": "t3", "user_id": me["id"], "status": "approved", "created_at": "2026-09-12T10:00:00+00:00", "updated_at": "2026-09-12T10:00:00+00:00"},
     ])
-    await db.tournament_awards.insert_many([
-        {"id": "aw1", "tournament_id": "t1", "registration_id": "r-me-1", "place": 1},
-        {"id": "aw2", "tournament_id": "t2", "registration_id": "r-me-2", "place": 3},
-    ])
 
     def match(mid, tournament, when, winner, my_score, their_score, **extra):
+        # Ergebnisse wie der Ergebnis-Weg sie schreibt: Platz und Stand je Seite.
         return {
             "id": mid, "tournament_id": tournament, "status": "completed", "stage_number": 1, "round": 1, "order": 1, "completed_at": when, "updated_at": when,
             "slots": [{"slot": 1, "registration_id": f"r-me-{tournament[-1]}", "seed": 2}, {"slot": 2, "registration_id": f"r-ot-{tournament[-1]}", "seed": 1}],
-            "results": [{"registration_id": f"r-me-{tournament[-1]}", "outcome": "winner" if winner else "loser", "score": my_score},
-                        {"registration_id": f"r-ot-{tournament[-1]}", "outcome": "loser" if winner else "winner", "score": their_score}],
+            "results": [{"registration_id": f"r-me-{tournament[-1]}", "rank": 1 if winner else 2, "score": my_score},
+                        {"registration_id": f"r-ot-{tournament[-1]}", "rank": 2 if winner else 1, "score": their_score}],
             **extra,
         }
     await db.matches_v2.insert_many([
@@ -76,6 +74,12 @@ async def world(flow, me: dict, other: dict):
         {"id": "a2", "action": "match.result.submit", "actor_id": me["id"], "data": {"match_id": "m5"}, "created_at": "2026-09-09T18:31:00+00:00"},
         {"id": "a3", "action": "match.result.submit", "actor_id": me["id"], "data": {"match_id": "nicht-da"}, "created_at": "2026-09-09T18:32:00+00:00"},
     ])
+    # Die Plätze so, wie die Veröffentlichung sie festhält (#2337: ``tournament_awards.rank``) - nicht von Hand erfunden.
+    for tournament_id in ("t1", "t2"):
+        written = await awards.record_tournament_awards(db, tournament_id)
+        assert written == 2
+    stored = {doc["registration_id"]: doc async for doc in db.tournament_awards.find({}, {"_id": 0})}
+    assert (stored["r-me-1"]["rank"], stored["r-ot-1"]["rank"]) == (1, 2) and all("place" not in doc for doc in stored.values())
 
 
 @pytest.mark.asyncio
@@ -106,7 +110,7 @@ async def test_zaehler_aus_turnierlaeufen(flow):
     assert values["tournaments_completed_no_forfeit"] == 2, "t1 und t2 abgeschlossen, t3 läuft noch"
     assert values["checkin_streak"] == 2, "t1, t2 eingecheckt, t3 nicht"
     assert values["lower_bracket_top4"] == 1, "Platz 1 im Cup mit einem Match im Lower Bracket"
-    assert values["tournaments_won_undefeated"] == 1, "Cup gewonnen ohne Niederlage; die Liga (Platz 3) zählt nicht"
+    assert values["tournaments_won_undefeated"] == 1, "Cup gewonnen ohne Niederlage; in der Liga gab es eine (m4)"
     assert values["group_stage_firsts"] == 1, "Gruppe g1: zwei Siege gegen einen des Gegners"
     assert values["disputes_resolved_as_staff"] == 0, "als Beteiligte zählt die eigene Meldung nicht"
     # Ein eigenes Forfeit nimmt dem Turnier den Durchzieher-Zähler.

@@ -41,11 +41,21 @@ from routes.friend_routes import router as friend_router
 from routes.moderation_routes import router as moderation_router
 from routes.game_routes import router as game_router
 from routes.game_map_routes import router as game_map_router
+from routes.game_equipment_routes import router as game_equipment_router
 from routes.map_pool_routes import router as map_pool_router
 from routes.league_routes import admin_router as league_admin_router, router as league_router
 from routes.league_roster_routes import admin_router as league_roster_admin_router, me_router as league_roster_me_router
 from routes.league_application_routes import admin_router as league_application_admin_router, me_router as league_application_me_router, router as league_application_router
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
+from routes.league_table_routes import admin_router as league_table_admin_router
+from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
+from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
+from routes.league_checkin_routes import admin_router as league_checkin_admin_router, router as league_checkin_router
+from routes.league_protest_routes import admin_router as league_protest_admin_router, router as league_protest_router
+from routes.league_veto_routes import admin_router as league_veto_admin_router, router as league_veto_router
+from routes.league_incident_routes import router as league_incident_router
+from routes.league_platform_routes import admin_router as league_platform_admin_router
+from routes.league_loadout_routes import router as league_loadout_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
@@ -175,11 +185,51 @@ def validate_runtime_env():
     return validate_runtime_environment()
 
 
+_variant_sweep_task = None
+_variant_sweep_stop = None
+
+
+def _start_variant_sweep() -> None:
+    global _variant_sweep_task, _variant_sweep_stop
+    import asyncio
+    import threading
+    from services.image_variants import sweep_variants
+
+    stop = threading.Event()
+
+    async def _run() -> None:
+        try:
+            removed = await asyncio.to_thread(sweep_variants, UPLOAD_DIR, stop)
+            if removed:
+                logger.info("[media] %s kaputte Bildfassungen entfernt", removed)
+        except Exception as exc:  # noqa: BLE001 - nie den Betrieb gefährden
+            logger.warning("[media] Aufräumen der Bildfassungen fehlgeschlagen: %s", type(exc).__name__)
+
+    _variant_sweep_stop = stop
+    _variant_sweep_task = asyncio.get_running_loop().create_task(_run())
+
+
+async def _stop_variant_sweep() -> None:
+    """Beim Herunterfahren: Stoppsignal an den Lauf (er hört nach der aktuellen Datei auf) und kurz abwarten."""
+    import asyncio
+
+    if _variant_sweep_stop is not None:
+        _variant_sweep_stop.set()
+    if _variant_sweep_task is not None and not _variant_sweep_task.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(_variant_sweep_task), timeout=5)
+        except Exception:  # noqa: BLE001 - nie das Herunterfahren aufhalten
+            logger.warning("[shutdown] Aufräumen der Bildfassungen nicht rechtzeitig beendet")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_env()
     ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     ensure_storage_directories()
+    # Kaputte Bildfassungen aus früheren abgebrochenen Schreibvorgängen: nginx würde sie als leeres Bild ausliefern. Läuft im
+    # Hintergrund, damit ein großer Upload-Ordner den Start nicht aufhält.
+    _start_variant_sweep()
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
     from services.migrations import run_pending_migrations
@@ -221,6 +271,7 @@ async def lifespan(app: FastAPI):
         stop_scheduler()
     except Exception:
         logger.warning("[shutdown] Planer nicht sauber gestoppt", exc_info=True)
+    await _stop_variant_sweep()
     await close_client()
 
 
@@ -349,6 +400,7 @@ app.include_router(friend_router)
 app.include_router(moderation_router)
 app.include_router(game_router)
 app.include_router(game_map_router)  # Map-Bibliothek je Spiel (#1616)
+app.include_router(game_equipment_router)  # Ausrüstung je Spiel (#2218)
 app.include_router(map_pool_router)  # Map-Pools je Wettbewerb (#1616)
 app.include_router(league_admin_router)  # Liga verwalten (docs/LIGA.md, #1622)
 app.include_router(league_router)  # Liga lesen nach Sichtbarkeit der Season (#1622)
@@ -359,6 +411,19 @@ app.include_router(league_application_me_router)  # Stand der eigenen Co-Teams (
 app.include_router(league_application_router)  # Selbstanmeldung: einreichen, zurückziehen (#2205)
 app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md, #1646)
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
+app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)
+app.include_router(league_result_rule_admin_router)  # Ergebnisregeln der Season (docs/LIGA.md, C.3, #1617)
+app.include_router(league_schedule_admin_router)  # Terminregeln je Season (#2194)
+app.include_router(league_loadout_router)  # Sperrliste je Season (#2218)
+app.include_router(league_schedule_router)  # Verschiebung am Spiel (#2194)
+app.include_router(league_checkin_admin_router)  # Check-in-Regeln je Season (docs/LIGA.md, D.2, #1652)
+app.include_router(league_checkin_router)  # Check-in und Start am Spiel (#1652)
+app.include_router(league_protest_admin_router)  # Proteste je Season: Einstellungen und Eingang (docs/LIGA.md, E.2, #1619)
+app.include_router(league_protest_router)  # Beanstandung, Protest, Einspruch und MOSS-Datei am Spiel (#1619, #2297)
+app.include_router(league_veto_admin_router)  # Veto-Vorlage je Season (docs/LIGA.md, D.3, #1618)
+app.include_router(league_veto_router)  # Veto am Spiel: Zug und Eingriff der Leitung (#1618)
+app.include_router(league_incident_router)  # Vorfälle im Spiel: melden, antworten, entscheiden (docs/LIGA.md, D.5, #1619)
+app.include_router(league_platform_admin_router)  # Plattform je Season (#2270)
 app.include_router(game_server_router)
 app.include_router(access_link_router)
 app.include_router(admin_picker_router)
@@ -646,6 +711,15 @@ async def api_change_notifications(request, call_next):
 
 # Betriebssicht (#233): unbehandelte Ausnahmen und 5xx-Antworten werden zu
 # Fehlergruppen, Anfragen über der Schwelle zu Einträgen unter "Tempo". Die
+# Liga-Verfahren (#1619, E.2, Nr. 133/137): Jede JSON-Antwort der API läuft durch den Wächter - Spiele darin tragen ihre Verfahren
+# nur für die nicht befangene Leitung ungekürzt. Gilt für jede Route, auch für künftige (services/procedure_response_guard.py).
+@app.middleware("http")
+async def procedure_guard(request, call_next):
+    from services.procedure_response_guard import guard_response
+
+    return await guard_response(request, call_next)
+
+
 # Aufzeichnung darf nie die Antwort verhindern - die Ausnahme wird nach dem
 # Festhalten unverändert weitergereicht.
 @app.middleware("http")

@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from services import checkin_rules
 from services.tournament_rules import match_policy
 
 MATCHDAY_DAYS = 7
@@ -349,7 +350,9 @@ def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
         return ScheduleResolution(winner["_moment"], "accepted", winner.get("id"))
 
     home_id = home_registration_id(match)
-    if home_id:
+    # Liga mit Terminregeln (#2194, Nr. 17): Ein offener Heimvorschlag gilt erst nach der Frist - das schreibt der Fristen-Job
+    # als Einigung (services/league_schedule_sweep). Bis dahin gilt der Standardtermin.
+    if home_id and not _home_rule_managed(tournament):
         home_offers = [p for p in candidates if p.get("actor_registration_id") == home_id]
         if home_offers:
             # Nothing was agreed, so home advantage decides - also when the away
@@ -363,6 +366,11 @@ def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
     if fallback is None:
         return None
     return ScheduleResolution(fallback, "default", None)
+
+
+def _home_rule_managed(tournament: dict | None) -> bool:
+    """Staffel mit ``schedule_rules`` (docs/LIGA.md, D.1): dort entscheidet die 72-h-Regel statt des sofortigen Heimrechts."""
+    return isinstance((tournament or {}).get("league_context"), dict) and isinstance((tournament or {}).get("schedule_rules"), dict)
 
 
 # Only these formats play in weekly matchdays. A knockout bracket has rounds,
@@ -568,10 +576,18 @@ async def apply_schedule_writes(db, writes) -> int:
     written = 0
     for write in writes:
         expect = write.get("expect") or {}
+        change = {"$set": {**write["update"], "updated_at": now_iso}}
+        if write.get("history"):
+            # Termin-Historie einer Staffel (#2194): der Standardtermin als eigene Art.
+            change["$push"] = {"schedule_history": {"$each": [write["history"]], "$slice": -50}}
+        if write.get("unset"):
+            change["$unset"] = dict(write["unset"])
+        if write.get("inc"):
+            change["$inc"] = dict(write["inc"])
         result = await db.matches_v2.update_one(
             {"id": write["match_id"], "schedule_source": expect.get("schedule_source"), "scheduled_at": expect.get("scheduled_at"),
              "status": expect.get("status"), "started_at": None},
-            {"$set": {**write["update"], "updated_at": now_iso}},
+            change,
         )
         written += int(bool(result.matched_count))
     return written
@@ -587,6 +603,24 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
+    # Liga-Check-in (D.2, #1652): jeder Eintrag hier ist ein neuer Termin - eine Verlängerung des alten Fensters fällt damit, die
+    # Termin-Revision steigt (Codex zu D.3, #1618).
+    unset, inc = checkin_rules.new_time_unset(tournament), checkin_rules.new_time_inc(tournament)
+    for write in writes:
+        if unset:
+            write["unset"] = dict(unset)
+        if inc:
+            write["inc"] = dict(inc)
+    if _home_rule_managed(tournament):
+        # Termin-Historie (#2194), nur in Staffeln mit Terminregeln - dieselbe Form wie league_schedule.history_entry, hier ohne Import (kein Import-Kreis).
+        from uuid import uuid4
+
+        for write in writes:
+            if write["update"].get("schedule_source") == "default":
+                previous = _parse(write["expect"].get("scheduled_at"))
+                write["history"] = {"id": str(uuid4()), "at": datetime.now(timezone.utc).isoformat(), "kind": "default",
+                                    "by": None, "registration_id": None, "from": previous.isoformat() if previous else None,
+                                    "to": write["update"].get("scheduled_at"), "reason": None, "request_id": None}
     written = await apply_schedule_writes(db, writes)
     by_id = {match.get("id"): match for match in matches}
     for write in writes:

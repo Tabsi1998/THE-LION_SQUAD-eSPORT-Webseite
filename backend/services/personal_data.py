@@ -172,11 +172,16 @@ PERSONAL: dict[str, Entry] = {
                                   "die Regelversion selbst bleibt"),
     # Selbstanmeldung (#2205): Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt heraus.
     "league_applications": Entry(OVERWRITTEN, ("league_applications",), "Antrag eines Co-Teams je Liga-Season mit Zustimmung; die Kennung der Person fällt heraus, der Antrag bleibt als Nachweis"),
-    "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances"), SPORT),
+    # Liga-Termine (#2194): Verschiebungsanträge und Termin-Historie am Spiel - die Kennung fällt heraus, der Grund bleibt.
+    # Liga-Check-in (#1652): wer eingecheckt, eingetragen oder gestartet hat - die Kennung fällt heraus, die Anwesenden bleiben.
+    "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances", "league_schedule", "league_checkin"), SPORT),
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),
     "match_commendations": Entry(KEPT, ("commendations_given",), "das GG gehört zum Match wie das Ergebnis"),
-    "match_proof_photos": Entry(DELETED, ("match_proof_photos",)),
+    "match_proof_photos": Entry(DELETED, ("match_proof_photos",), note=(
+        "Ausnahme (#2360, DSGVO Art. 17 Abs. 3 lit. e): ein MOSS-Nachweis in einem laufenden Vorfall oder Verfahren bleibt ohne "
+        "Kennung der Person nur für die Liga-Leitung, bis das Verfahren samt Einspruchsfrist abgeschlossen ist - dann löscht ihn "
+        "der Job proof_photo_retention; die Einträge der Bildprüfung (media_scans, kind proof) gehen denselben Weg")),
     "tournament_staff_assignments": Entry(DELETED, ("tournament_staff",)),
     "league_staff": Entry(DELETED, ("league_staff",)),
     "f1_staff_assignments": Entry(DELETED, ("f1_staff",)),
@@ -246,6 +251,8 @@ CLUB_CONTENT = frozenset({
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",
+    # Ausrüstung je Spiel und Sperrlisten der Season (#2218) - nur die Kennung, wer angelegt bzw. gespeichert hat.
+    "game_equipment", "game_equipment_categories", "loadout_bans", "loadout_allowed",
     # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
     "leagues", "league_seasons", "league_divisions", "league_rules",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die

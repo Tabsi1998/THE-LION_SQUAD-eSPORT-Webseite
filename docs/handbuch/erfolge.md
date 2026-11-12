@@ -46,6 +46,7 @@ Mit „Saison“ ist hier die **Jahreswertung** gemeint.
 | **Negativ und Vorfälle** | Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim | Erfolge → Negativ & Vorfälle |
 | **Vorschau** | Jede Zeremonie und jedes Abzeichen in jedem Material ansehen | Erfolge → Vorschau |
 | **Statistik** | Freischaltungen je Woche, die Besten, Seltenheit je Stufe | Erfolge → Statistik |
+| **Neuberechnung** | Nach Korrekturen an den Erfolgen Ansprüche still nachvergeben, zum Schluss eine Sammel-Nachricht je Person | Erfolge → Übersicht (nur Superadmin) |
 
 ---
 
@@ -84,12 +85,103 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
 - **Turnier-Pokale nachtragen** (nur Bereich **System**): Der Knopf **Pokale nachtragen** leitet Pokale und Banner aller
   Turniere mit veröffentlichten Ergebnissen neu ab – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht nichts;
   der Lauf meldet, wie viele Turniere und Pokale es sind, und steht im Protokoll.
+- **Neuberechnung** (nur **Superadmin**): Stand des stillen Modus, **Probelauf** und **Neuberechnung abschließen** (3.10).
+
+**So zählen die Turnier- und Spiel-Erfolge.** Der Text „So schaffst du es“ steht an jedem Erfolg; die Regeln dahinter sind für alle gleich:
+
+- **Wer gespielt hat, bekommt den Erfolg.** Im Team zählt ein Spiel für alle, die laut **Aufstellung** oder
+  **Teilnehmerliste** dabei waren. Gibt es keine, zählt es für alle, die zu dem Zeitpunkt im Team waren – nicht nur für
+  die Person, die das Team angemeldet hat. Wer das Team später wechselt, behält, was er mit ihm gespielt hat.
+- **Ein Freilos ist kein Spiel:** Es zählt nicht als gespielt oder gewonnen und unterbricht keine Serie.
+- **Kampflos gewertet** zählt für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt nichts.
+- **Siegesserie:** Siege in Folge. Ein Unentschieden oder eine Niederlage beendet sie.
+- **Zwei Dinge heißen „Liga“:** die **Vereinsliga** (Season und Staffeln, Admin → Liga) und das Turnierformat
+  **Jeder gegen jeden – Hin- und Rückrunde**. Spiele der Vereinsliga zählen für die Spiel-Erfolge (Spielmacher, Sieger,
+  Teamsieger …), ihre Staffeln aber nicht als Turnier. Ein Turnier im Format Hin- und Rückrunde ist ein normales Turnier.
+- **Plätze gibt es erst nach dem Abschluss.** Champion, Podest, Top 8, Finalist und die anderen Platz-Erfolge zählen nur
+  aus Turnieren mit dem Status **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert**, nie aus einer
+  Staffel der Vereinsliga. Grundlage ist der gespeicherte Platz (derselbe wie auf dem Pokal). **Top 8** zählt erst ab mehr als
+  acht Teilnehmern.
+- **Finalist** ist, wer im Finale stand: im Endspiel, im Grand Final oder im Finallauf (dort alle). Kein Finale haben
+  Jeder gegen jeden (einfach und Hin- und Rückrunde), Schweizer System, reine Gruppenphase, die Vereinsliga, Zeitfahren
+  und Rennserie – außerdem ein K.-o. mit nur zwei Teilnehmern und ein einzelner Mehrspieler-Lauf: Ein einziges Spiel ist
+  kein Finale. Ein kampfloses Finale zählt auch nicht.
+- **Teilnahme statt Anmeldung:** Turnierveteran, Multitalent, Formatvielfalt und Teamturniere zählen, wenn die
+  Anmeldung angenommen oder eingecheckt war und die Person mindestens ein echtes Spiel gespielt hat – auch wenn sie
+  danach austritt oder disqualifiziert wird. Abgesagte Turniere zählen nicht, Staffeln der Vereinsliga auch nicht (nur
+  bei der Formatvielfalt zählt die Vereinsliga als „Hin- und Rückrunde“).
+- **Durchzieher** verlangt mehr: ein abgeschlossenes Turnier, gespielt, ohne kampflos zu verlieren, auszutreten oder
+  disqualifiziert zu werden.
+- **Topgesetzt und Riesentöter** gelten nur bei fester Setzliste (Setzliste **Manuell**, siehe
+  [Turniere](turniere.md)), nicht bei **Zufall**. Es zählt die Setznummer der Anmeldung.
+- **Preisträger** zählt Preise aus Turnieren, die vorgemerkt, abholbereit oder abgeholt sind – keine verfallenen und
+  keine aus Fast Lap oder Verlosungen.
+
+Ein einmal freigeschalteter Erfolg bleibt, auch wenn ein Ergebnis später korrigiert wird.
 
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
 [Mails und Benachrichtigungen](mails.md)). Dazu kommt eine Meldung im Thema **Erfolge** (In-App, Push, Discord; **nie** per Mail).
 Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg lässt sich teilen: Er hat eine eigene Seite
 (`/achievements/a/<id>`).
+
+**Was genau zählt (Chat, Discord, Verein, Profil):**
+
+- **Chat** (Plauderer, Teamgeist, Turnier-Plauderer, Briefeschreiber): Zurückgehaltene, abgelehnte und gelöschte Nachrichten
+  zählen nie. Je Erfolg zählen höchstens **50 Nachrichten an einem Tag** (Wiener Zeit); schreiben lässt sich weiter unbegrenzt.
+  „Plauderer“ sind Turnier- und Match-Chat zusammen. Eine Nachricht wird über die Warteschlange ausgewertet, eine später
+  freigegebene ebenso. **Sticker-Sammler** zählt verschiedene Sticker, ebenfalls nur aus sichtbaren Nachrichten – ohne
+  Tageslimit.
+- **Discord:** Gezählt wird nur mit verknüpftem Discord-Konto und nur auf **eingeschalteten** Servern – das gilt für
+  „Discord-Stimme“ und „Überall dabei“. Auf welchen Servern jemand ist, gleicht der Bot beim Verknüpfen und **jede Nacht um 03:50**
+  ab; nach dem Trennen zählt nichts mehr. „Überall dabei“: Stufe I ein Server, Stufe II die Hälfte der eingeschalteten Server
+  (mindestens zwei), Stufe III alle – nie mehr, als es Server gibt.
+- **Events:** „Eventgänger“ und „Vereinsleben“ zählen, wer unter **Anmeldungen & Einlass** eingecheckt ist (**Da**), je Event einmal;
+  **abgesagte Events** zählen nicht. Vereinsintern sind Events mit der Sichtbarkeit **Mitglieder** oder **intern** und Events der Art
+  **Vereinsabend** oder **intern**. Einen Kartenscan am Event-Einlass gibt es nicht.
+- **Datenbewusst:** erst, wenn die Person unter Einstellungen → Privatsphäre selbst etwas einstellt oder ihren Datenexport holt –
+  die Voreinstellung bei der Registrierung zählt nicht.
+- **Twitch** (Streamer, Sendezeit, Clip-Macher): nur mit **per Anmeldung verknüpftem** Twitch-Kanal; ein getippter Name zeigt den
+  Stream auf der Seite, zählt aber nicht. **Verifizierter Streamer** kommt von selbst, wenn Twitch so verknüpft ist und der Verein
+  die Person als Streamer oder Creator führt (Häkchen im Vereinsprofil, [Verein](verein.md) 3.10); von Hand vergeben geht weiter.
+- **Team:** „Teamauftritt“ braucht Logo, Banner und Teambeschreibung und zählt für Teamleitung und Co-Leitung – ausgewertet gleich
+  nach dem Speichern. „Kapitän“ zählt die Tage seit der Übernahme der Leitung (bei älteren Teams ohne diese Angabe ab der Gründung).
+- **Gruselnacht:** Der Kürbis zählt nur am **31.10. ab 18 Uhr** (Wiener Zeit) – das prüft der Server.
+
+**Kategorien abschließen und die Meta-Erfolge.** Eine Regel für alles, was andere Erfolge zählt:
+
+- **Erreichbar** ist eine Stufe, die man selbst schaffen kann: öffentlich, nicht geheim, nicht negativ, nicht von Hand
+  vergeben, nicht nur für die Leitung und nicht **nicht mehr erreichbar** (siehe 3.2). Stufen, für die man gewählt oder vom
+  Verein bestimmt werden muss (**Vorstandsarbeit**, **Verifizierter Streamer**), sind sichtbar, zählen hier aber nicht. Den
+  **Verein** gibt es nur für Mitglieder.
+- **Eine Kategorie ist abgeschlossen**, wenn jemand jede erreichbare Stufe darin hat. Auf der Erfolge-Seite steht angemeldet
+  je Kategorie **„x von y“** der erreichbaren Stufen – oder ein **Haken** und **Abgeschlossen**. Die Kategorien sind Spielen,
+  Turnier, Fast Lap, Saison, Team, Community, Streaming & Creator, Profil & Konto, Verein und Besonders; Geheim und Negativ
+  zählen nicht. Wer kein Mitglied ist, sieht beim Verein **Nur für Mitglieder**.
+- **Kategorie-Meister** zählt die abgeschlossenen Kategorien (Stufe I bis VII). Kategorie-Meister, **Hundert Prozent**,
+  **Sammler** und **Geheimnisträger** selbst zählen in keiner Kategorie mit – so hängt keiner an sich selbst. Kommt später
+  eine Stufe dazu, bleibt, was jemand schon hat.
+- **Hundert Prozent:** jede erreichbare Stufe in allen Kategorien; den Verein brauchen nur Mitglieder.
+- **Sammler** zählt jede erhaltene Stufe – auch von Hand vergebene und geheime –, aber keine negativen und keine nicht mehr
+  erreichbaren (Ziele 10 bis 450). Dieselbe Zahl steht auf der Erfolge-Seite unter „Du hast bereits … Erfolge“.
+- **Geheimnisträger** zählt gefundene geheime Erfolge, je Gruppe einmal (Ziele 1 bis 13).
+- **Comeback** und **Kartenkenner** zählen die **Maps der Vereinsliga** (Sieger je Map): Comeback ist eine gewonnene Serie,
+  in der man nach Maps hinten lag (2:1 nach 0:1, 3:2 nach 0:2). Kartenkenner zählt jede Map einmal – mit Aufstellung je Map
+  nur die, auf denen man aufgestellt war – und dazu die Karte, die die Turnierleitung an einem Turniermatch einträgt.
+  **Zugesprochene Maps** zählen bei beiden nicht: Sie sind keine gespielte Karte, und wird nach einem Rückstand eine Map
+  zugesprochen, ist die Serie kein Comeback.
+- **Pole Position** ist die Bestzeit einer Strecke in **einer** Fast-Lap-Challenge. **Streckenrekord** ist die Bestzeit über
+  **alle** Challenges desselben Spiels (gleicher Streckenname) und zählt erst, wenn die Strecke in mindestens zwei Challenges
+  gefahren wurde. Beim Namen zählen Groß- und Kleinschreibung und Leerzeichen nicht, sonst muss er gleich sein: „Monza“ und
+  „Monza (Italien)“ sind zwei Strecken – den Namen also bei jeder Challenge gleich schreiben. Challenges ohne eingetragenes
+  Spiel werden nie zusammengelegt.
+- **Treue** zählt Tage in Folge mit Anmeldung. **Eiserner Löwe** verlangt zwölf Kalendermonate in Folge mit mindestens
+  einem gespielten Match (Turnier oder Vereinsliga).
+- **Turnierleitung** und **Gastgeber** sieht nur die Turnierleitung (Bereich Turnierleitung oder ein Einsatz in einem
+  Turnier), **Schiedsrichter** zusätzlich die Liga-Leitung (Bereich Ligen oder ein Liga-Einsatz) – und alle, die sie schon
+  haben.
+
+Wer einen Erfolg nach alten Regeln bekommen hat, behält ihn.
 
 ### 3.2 Der Katalog: Gruppen, Stufen, Materialien
 
@@ -101,7 +193,8 @@ Das **Material** der Stufe steht für die Wertigkeit: **Holz, Eisen, Bronze, Sil
 **Legendär** und **Geheim**. Jede Stufe bringt **Punkte** (nach Material voreingestellt, änderbar).
 
 Je Gruppe sind sichtbar: Zahl der Stufen, **versteckt** (Name und Stufen erscheinen erst nach der Freischaltung; vorher steht nur ein
-Fragezeichen), **Sonder**, **Negativ**, **Eigen** (von euch angelegt), und der Schalter **Öffentlich** / **Intern**. In der Tabelle der Stufen
+Fragezeichen), **Sonder**, **Negativ**, **Eigen** (von euch angelegt), **nur Leitung**, **nicht mehr erreichbar** bzw.
+**erreichbar bis …** und der Schalter **Öffentlich** / **Intern**. In der Tabelle der Stufen
 steht die **Bedingung**: **Automatik · Ziel n** (ein Zähler prüft das Ziel) oder **von Hand**; dazu ein Status: **live**, **Zähler**, **geplant**
 (die Automatik ist noch nicht angeschlossen) und **nur Mitglieder**.
 
@@ -116,6 +209,21 @@ Stufen dürfen nur Materialien bekommen, die zwischen ihren Nachbarstufen Platz 
    Erfolge. Für Vereins-Abzeichen gibt es **Nur für Vereinsmitglieder**.
 3. Löschen geht nur bei Gruppen, die ihr selbst angelegt habt, und löscht **alle Vergaben** mit (Rückfrage).
 
+**Nicht mehr erreichbar.** Lässt sich ein Erfolg nicht mehr schaffen (das Format gibt es nicht mehr, die Zeit ist vorbei),
+löscht ihn nicht, sondern setzt ihn beim Bearbeiten der Gruppe oder Stufe im Kasten **Nicht mehr erreichbar**:
+
+1. Häkchen **Nicht mehr erreichbar** setzen.
+2. **Grund** eintragen – Pflicht; die Person, die den Erfolg hat, sieht ihn am Abzeichen.
+3. Wahlweise **Erreichbar bis**: Ab diesem Zeitpunkt gilt es von selbst (vorher steht in der Liste „erreichbar bis …“).
+
+Dann sieht ihn nur noch, wer ihn hat (Erfolge-Seite, Profil, öffentliches Profil – dort mit dem Hinweis **Nicht mehr
+erreichbar**). Er zählt nirgends mehr mit – nicht in „x von y“, Seltenheit, Kategorien, Kategorie-Meister, Sammler oder
+Hundert Prozent – und wird nicht mehr automatisch vergeben. **Von Hand vergeben geht weiter.** In der Liste steht an der
+Gruppe bzw. Stufe **nicht mehr erreichbar**. Ein Neustart überschreibt eure Einstellung nicht.
+
+Ab Werk nicht mehr erreichbar: **Gründungsmitglied**, **LAN-Gründer**, **Beta-Tester** und **Grand-Prix-Fahrer** (das
+Format gibt es nicht mehr). **Pionier** ist erreichbar bis zur Registrierung des hundertsten Kontos.
+
 **Katalog prüfen** läuft dieselben Regeln wie der automatische Test und listet **Fehler** und **Hinweise** mit Sprung zur Gruppe.
 **Export** speichert den Katalog als Datei; **Katalog einspielen** (nur Vorstand und Systemverwaltung) prüft eine solche Datei erst, schreibt
 bei Fehlern **nichts** und löscht nie etwas.
@@ -124,7 +232,10 @@ bei Fehlern **nichts** und löscht nie etwas.
 
 Reiter **Vergeben**.
 
-**Einzelvergabe:** Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann die Optionen:
+**Einzelvergabe** (alle mit dem Bereich **Redaktion**): Person suchen, Stufe wählen (nach Kategorie sortiert, nur Namen), dann
+die Optionen. Die Texte der Hand-Erfolge sagen, wie es läuft: bei Ehrungen wie Ehrenlöwe, Hall of Fame, Saison-MVP oder
+Ehrenamt „Der Vorstand entscheidet, die Redaktion trägt ein“; bei Teilnahmen wie Gamers Heaven, LAN-Gründer oder Beta-Tester
+trägt die Redaktion alle ein, die dabei waren:
 
 - **Grund** (steht im Protokoll),
 - **Datum** – leer heißt jetzt, sonst rückwirkend,
@@ -326,6 +437,57 @@ bekommen haben. Die Meldung geht **am Starttag einmal** an alle mit Aktivität (
 
 **Vorschau mit deinen Zahlen** zeigt euch euren eigenen Rückblick schon vor dem Start.
 
+### 3.10 Neuberechnung
+
+Wenn Erfolge korrigiert werden (etwa wie Turnier-, Spiel- oder Chat-Erfolge gezählt werden), stehen vielen Personen auf einen
+Schlag Erfolge zu, die sie längst verdient haben – zum Beispiel **Finalist** für ein Turnier aus dem Vorjahr. Damit dann nicht für
+jede Stufe eine eigene Meldung kommt, gibt es den **stillen Modus**. Er schaltet sich mit dem Update von selbst ein.
+
+**Solange der stille Modus an ist:**
+
+- Was die regelmäßigen Läufe nachvergeben (alle 15 Minuten, nachts, **Alle jetzt auswerten**), wird ganz normal gespeichert –
+  Stufe, Punkte, XP, Level. Es gibt aber **keine** Meldung im Postfach, keine Push, keine Discord-Nachricht, kein „Level erreicht“.
+  Diese Stufen erscheinen auch nicht im Laufband, nicht als Erfolg der Woche und nicht im Wochenrückblick.
+- Gleich nach dem Update werden **alle Konten** einmal still komplett ausgewertet (über die Warteschlange, je nach Größe in
+  einer Viertel- bis halben Stunde). Was ihnen schon zustand, haben sie danach – still.
+- Was jemand danach **gerade selbst** erreicht (Ergebnis gemeldet, eingecheckt, Chat-Nachricht, Konto verknüpft …), wird wie
+  immer gemeldet. Schaltet so ein Ereignis nebenbei etwas aus einem anderen Bereich frei, kommt das still dazu.
+- Ist eine Person noch nicht still ausgewertet, bleibt auch ihr eigenes Ereignis still – sonst könnte ein Check-in die alte
+  Finalist-Stufe laut melden. Diese Stufe zählt dann in der Sammel-Nachricht am Ende mit.
+- **Kronenwechsel werden erst beim Abschluss gemeldet.** Bis dahin bleibt der gespeicherte Stand der Kronen, wie er war; der
+  Abschluss rechnet sie einmal neu, und nur wer danach wirklich eine Krone gewonnen, gewechselt oder verloren hat, erfährt es.
+
+**So schließt du die Neuberechnung ab** (Admin → Content → Erfolge → **Übersicht**, Tafel **Neuberechnung**, nur Superadmin mit
+Zwei-Faktor-Anmeldung):
+
+1. Warten, bis **alle** Korrekturen an den Erfolgen veröffentlicht sind. Was danach erst korrigiert wird, käme wieder einzeln.
+2. Den Umfang ansehen: **Schon still vergeben** zeigt, wie viele Stufen an wie viele Personen bisher still nachgekommen sind,
+   mit einer Tabelle je Stufe. **Probelauf** rechnet dazu aus, was **noch fehlt** – also was der Abschluss noch nachvergeben würde –
+   und vergibt dabei nichts. Nach ein paar Minuten steht da „… Personen bekämen … Stufen neu dazu“ mit einer Tabelle **Stufe**,
+   **Gruppe**, **Personen**. Kurz nach dem Update ist das noch viel; ist die stille Auswertung aller Konten durch, meist wenig.
+   Stufen wie **Sammler**, die erst durch andere Erfolge entstehen, zählt der Probelauf nicht mit – es werden eher mehr.
+3. **Neuberechnung abschließen** klicken und die Rückfrage mit **Abschließen** bestätigen. Der Lauf ergänzt zuerst an alten Pokalen
+   nur, wer im Finale stand – Platz, Saison und alles andere daran bleibt, wie es ist, gelöscht wird nichts (anders als
+   **Pokale nachtragen**). Dann wertet er alle Konten still aus, beendet den stillen Modus und schickt danach jeder Person mit nachgerechneten Erfolgen **eine** Nachricht: „Wir haben die Erfolge
+   neu berechnet – du hast X neue.“ Sie kommt ins Postfach und als Push, nicht über Discord, und führt zu den eigenen Erfolgen.
+4. Die Tafel zeigt den Fortschritt. Am Ende steht „Abgeschlossen am … · N Sammel-Nachrichten“ und „Stiller Modus: Aus“. Ab jetzt
+   wird jeder Erfolg wieder einzeln gemeldet.
+
+**Was die Person sieht:** Beim nächsten Besuch der Webseite nach dem Abschluss kommt **eine** Zeremonie „Du hast X Erfolge
+nachträglich bekommen“ mit allen nachgerechneten Abzeichen (bis zu zwölf, der Rest als „+ n“) und dem Knopf **Alle ansehen**.
+Einzeln gefeiert werden nachgerechnete Erfolge nicht, auch nicht während des stillen Modus. Danach gelten sie als gesehen; die
+Zeremonie kommt je Gerät einmal. Ansehen könnt ihr sie vorher unter Reiter **Vorschau** → Sonderablauf **Nachträglich bekommen**.
+
+Der Abschluss ist **gefahrlos wiederholbar**: Ein zweiter Klick nach dem Ende tut nichts, und niemand bekommt die Nachricht zweimal.
+Bricht der Lauf ab (etwa durch ein Update), steht bei **Abschluss** „Unterbrochen“ – ein neuer Klick macht dort weiter. Probelauf und
+Abschluss stehen im Protokoll unter **Vergeben**. Am Server geht beides auch per Kommando:
+`python -m scripts.achievements_recount --probelauf` bzw. `--abschliessen` (im Backend-Container, ohne Schalter zeigt es den Stand).
+
+**Nach einer Katalog-Änderung während des stillen Modus aufrufen:** `python -m scripts.achievements_recount --neu-pruefen`. Dann
+gelten alle Konten wieder als nicht nachgerechnet und werden still neu ausgewertet; bis dahin meldet auch ein eigenes Ereignis
+nichts laut – sonst kämen neue Stufen für alte Ansprüche einzeln. Das Update mit den reparierten Meta-Erfolgen (Kategorie-Meister,
+Sammler, Hundert Prozent, nicht mehr Erreichbares) macht das von selbst, solange der stille Modus noch an ist; danach nicht mehr.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -333,6 +495,10 @@ bekommen haben. Die Meldung geht **am Starttag einmal** an alle mit Aktivität (
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
 | Ein Erfolg kommt nicht | Die Warteschlange läuft alle 30 Sekunden; die Stufe ist **von Hand** oder **nur Mitglieder**; die Person ist kein aktives Mitglied | Übersicht → **Alle jetzt auswerten**; Bedingung im Katalog prüfen |
+| „Champion“ oder „Podest“ kommt nicht, obwohl das Finale gespielt ist | Plätze zählen erst, wenn das Turnier beendet ist | Turnier auf **Beendet** setzen bzw. Ergebnisse veröffentlichen ([Turniere](turniere.md)) |
+| Ein Teammitglied bekommt einen Team-Erfolg nicht | Es steht nicht in der Aufstellung bzw. Teilnehmerliste des Spiels | Aufstellung prüfen; ohne Aufstellung zählen alle, die damals im Team waren (3.1) |
+| Ein Erfolg fehlt im Katalog der Erfolge-Seite | Er ist **nicht mehr erreichbar** oder gehört der Leitung (Turnierleitung, Schiedsrichter, Gastgeber) – das sieht nur, wer ihn hat bzw. die Leitung | Im Admin-Katalog steht **nicht mehr erreichbar** bzw. **nur Leitung** (3.2) |
+| Eine Kategorie ist nicht abgeschlossen, obwohl alles erreicht scheint | Es fehlt eine erreichbare Stufe; von Hand vergebene, geheime und nicht mehr erreichbare zählen nicht | Auf der Erfolge-Seite „x von y“ der Kategorie ansehen und die Kategorie aufklappen (3.1) |
 | Katalog zeigt „geplant“ bei einer Stufe | Die Automatik für diesen Zähler ist noch nicht angeschlossen | Stufe von Hand vergeben |
 | „… dürfen nur der Vorstand oder die Systemverwaltung“ | Massenvergabe, Import, XP-Korrektur und Prestige-Reset sind dafür vorbehalten | Vorstand oder System fragen |
 | Vergabe: „Diese Stufe ist nur für aktive Vereinsmitglieder“ | Die Person ist kein aktives Mitglied oder Ehrenmitglied | Mitgliedschaft klären ([Verein](verein.md)) |
@@ -348,6 +514,8 @@ bekommen haben. Die Meldung geht **am Starttag einmal** an alle mit Aktivität (
 | Jemand sieht keinen Jahresrückblick | Die Person war im Jahr nicht aktiv, oder der Zeitraum läuft nicht | Zeitraum prüfen; **Vorschau** zeigt den eigenen |
 | Das Abzeichen zeigt nur ein Fragezeichen | Die Gruppe ist **versteckt** oder Fun-Erfolg | Gewollt bis zur Freischaltung |
 | Level springt nach einer Korrektur | XP-Korrektur oder Prestige-Reset | Protokoll unter **Vergeben** ansehen |
+| Jemand hat neue Erfolge, aber keine Meldung bekommen | Der stille Modus der **Neuberechnung** ist an (3.10) | Gewollt; die Sammel-Nachricht kommt mit **Neuberechnung abschließen** |
+| Keine Tafel **Neuberechnung** in der Übersicht | Nur der Superadmin sieht sie | Superadmin fragen |
 
 ---
 
@@ -367,6 +535,9 @@ Ja, mit dem Datumsfeld bei der Vergabe.
 
 **Werden Erfolge per Mail gemeldet?**
 Nein, nur In-App, Push und Discord. Eine Mail gibt es nur im Wochenrückblick.
+
+**Warum kam für nachgerechnete Erfolge keine Meldung?**
+Während der Neuberechnung kommen sie still; zum Schluss gibt es eine Sammel-Nachricht je Person (3.10).
 
 **Wie viel XP braucht Level 60?**
 Rund 683.000 XP; Prestige macht den Weg danach je Stern um ein Viertel länger.

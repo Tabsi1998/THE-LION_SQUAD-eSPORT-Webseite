@@ -22,13 +22,26 @@ INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_
                            # Liga (#1650): der Doppel-Einsatz-Index besteht aus Konto-Kennungen.
                            "lineup_user_ids",
                            # Teilnehmerliste (#2204): Konto-Kennungen und der interne Fall bei der Leitung.
-                           "lineups", "lineup_overdue_at"})
+                           "lineups", "lineup_overdue_at",
+                           # Liga-Termine (#2194): Anträge und Historie mit Gründen und Konten, die Fälle der Leitung -
+                           # Beteiligte bekommen sie mit Namen im Block ``schedule_block`` der Matchseite.
+                           "reschedule_requests", "schedule_history", "result_reminded_at", "result_overdue_at",
+                           # Liga-Check-in (#1652, D.2): wer wann für welche Seite eingecheckt hat - mit Namen im Block
+                           # ``checkin`` der Matchseite für Beteiligte und Leitung.
+                           "flow",
+                           # Vorfälle (#1619, D.5): Beschreibung, Stand, Entscheidung und Konto-Kennungen - Beteiligte und Leitung
+                           # bekommen sie im Block ``league`` der Matchseite, öffentlich bleibt nur der Stand je Map (``map_state``).
+                           "incidents", "incident_due_at"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 # Liga (#1650): öffentlich je Map nur der Schnappschuss, Sieger und Punkte - Aufstellungen (Konto-Kennungen) bekommen
 # die Beteiligten mit Namen über den Block ``league`` der Matchseite. Gleich wie die Staffel-API (league_page).
 PUBLIC_GAME_FIELDS = ("position", "mode", "mode_label", "map_id", "map_name", "map_image_url", "winner_registration_id",
-                      "scores")
+                      "scores",
+                      # Zusatzfelder je Map (C.3, #1617), nur wenn gesetzt. Der Nachweis (``proof_id``) bleibt privat.
+                      "status", "replay_reason", "decision", "host_registration_id",
+                      # Symbol des Modus (#2266), Schnappschuss wie ``mode_label``.
+                      "mode_icon_url")
 
 
 def public_games(games: list | None) -> list:
@@ -40,6 +53,38 @@ def public_games(games: list | None) -> list:
 def _public_keys(value: dict, internal: frozenset) -> dict:
     # Wer etwas getan hat (`*_by`), sind Konto-Kennungen - die gehören nicht auf eine öffentliche Seite.
     return {key: item for key, item in value.items() if key not in internal and not key.endswith("_by")}
+
+
+# Liga-Verfahren (#1619, E.2, Nr. 133/137): Einträge in ``disputes[]`` mit ``id`` und ``kind``. Im Spiel-Datensatz stehen sie für
+# alle außer der nicht befangenen Leitung gekürzt - was eine Seite sehen darf, liefert die Matchseite im Block
+# ``league.procedures``. Die eigene Meldung behält, was alte Leser (App) brauchen: Grund, Text, Entscheidung.
+PROCEDURE_KINDS = frozenset({"objection", "protest", "appeal"})
+PROCEDURE_PUBLIC_KEYS = ("at", "id", "kind", "state")
+PROCEDURE_OWN_HIDDEN = frozenset({"moss_requests", "assignee", "resolved_by", "withdrawn_by", "statement", "additions", "target_at",
+                                  "escalate_at", "reminded_at", "escalated_at", "against", "notified_immediately"})
+
+
+def is_procedure_row(row) -> bool:
+    return isinstance(row, dict) and row.get("kind") in PROCEDURE_KINDS and bool(row.get("id"))
+
+
+def public_dispute_row(row: dict, viewer_id: str | None) -> dict:
+    """Ein Eintrag aus ``disputes[]`` für alle ohne Leitungs-Sicht: die eigene Meldung, sonst nur, dass es eine gibt."""
+    own = bool(viewer_id) and row.get("user_id") == viewer_id
+    if is_procedure_row(row):
+        if own:
+            return {key: value for key, value in row.items() if key not in PROCEDURE_OWN_HIDDEN}
+        return {key: row.get(key) for key in PROCEDURE_PUBLIC_KEYS}
+    return row if own else {"at": row.get("at")}
+
+
+def without_procedure_details(match: dict | None, viewer_id: str | None) -> dict | None:
+    """Das Spiel wie geliefert, nur die Liga-Verfahren gekürzt - für Antworten, die sonst den ganzen Datensatz zeigen (Leitung
+    ohne Recht „Proteste“ oder „Ergebnisse“, Beteiligte mit Liga-Recht, Antworten auf eigene Aktionen der Seiten)."""
+    if not isinstance(match, dict) or not isinstance(match.get("disputes"), list):
+        return match
+    return {**match, "disputes": [public_dispute_row(row, viewer_id) if is_procedure_row(row) else row
+                                  for row in match["disputes"] if isinstance(row, dict)]}
 
 
 def public_match_view(match: dict | None, viewer_id: str | None = None) -> dict | None:
@@ -61,10 +106,7 @@ def public_match_view(match: dict | None, viewer_id: str | None = None) -> dict 
             for row in match.get("reports") or [] if isinstance(row, dict)
         ]
     if "disputes" in match:
-        out["disputes"] = [
-            row if viewer_id and row.get("user_id") == viewer_id else {"at": row.get("at")}
-            for row in match.get("disputes") or [] if isinstance(row, dict)
-        ]
+        out["disputes"] = [public_dispute_row(row, viewer_id) for row in match.get("disputes") or [] if isinstance(row, dict)]
     return out
 
 

@@ -1,5 +1,5 @@
 """Pydantic v2 models for THE LION SQUAD eSports."""
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, PrivateAttr, field_validator, model_serializer, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
 import re
@@ -10,6 +10,8 @@ from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
 # Der Passwortvertrag (#1033) steht in services/password_policy.py.
 from services.password_policy import NewPassword
 from services.usernames import username_problem
+# Zeichen des Zwischenformats der Regelwerk-Bausteine (#2218) fallen aus eingegebenem Text weg (Prüfung Codex zu #2271).
+from services.markdown_text import strip_protected
 
 
 def now_utc():
@@ -335,27 +337,258 @@ def _game_key(value) -> str:
     return re.sub(r"[^a-z0-9]+", "_", text).strip("_")[:40]
 
 
+RESULT_RULE_KINDS = ("score", "rounds", "highest")
+RESULT_TARGET_MAX = 100_000
+MODE_DESCRIPTION_MAX = 500
+MODE_FORMAT_MAX = 60
+# Felder aus C.1 (#2206): fehlen sie, werden sie nicht geschrieben - alte Spiele bleiben Zeichen für Zeichen gleich.
+MODE_RULES_TEXT_MAX = 1000
+# Felder aus C.1 (#2206): fehlen sie, werden sie nicht geschrieben - alte Spiele bleiben Zeichen für Zeichen gleich. Dazu das
+# Symbol (#2266), freie Einstellungen und der Regeltext je Modus (#2271).
+MODE_EXTRA_FIELDS = ("status", "description", "players_per_side", "format", "result_rule", "icon_url", "settings", "rules_text")
+# Zeiten der Ergebnisregel in Sekunden (#2271): Zeitlimit je Map bis 600 Minuten, Zeit je Runde bis eine Stunde.
+TIME_LIMIT_SECONDS_MAX = 36_000
+ROUND_TIME_SECONDS_MAX = 3_600
+# Altbestand (vor #2271): Zeitlimit in ganzen Minuten. Beim Lesen in Sekunden umgerechnet, nie mehr geschrieben.
+LEGACY_TIME_LIMIT = "time_limit_minutes"
+
+
+def rule_time_limit_seconds(rule: dict | None) -> int | None:
+    """Das Zeitlimit je Map einer gespeicherten Regel in Sekunden - auch aus dem Altbestand in Minuten (#2271)."""
+    if not isinstance(rule, dict):
+        return None
+    seconds = rule.get("time_limit_seconds")
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and seconds > 0:
+        return int(seconds)
+    minutes = rule.get(LEGACY_TIME_LIMIT)
+    if isinstance(minutes, (int, float)) and not isinstance(minutes, bool) and minutes > 0:
+        return int(minutes * 60)
+    return None
+
+
+def normalize_rule(rule: dict | None) -> dict | None:
+    """Eine gespeicherte Regel im heutigen Vertrag: das Zeitlimit in Sekunden statt in Minuten (Altbestand, #2271)."""
+    if not isinstance(rule, dict) or LEGACY_TIME_LIMIT not in rule:
+        return rule
+    out = {key: value for key, value in rule.items() if key != LEGACY_TIME_LIMIT}
+    seconds = rule_time_limit_seconds(rule)
+    if seconds:
+        out["time_limit_seconds"] = seconds
+    return out
+
+
+class GameModeResultRule(BaseModel):
+    """Ergebnisregel eines Modus (#2206, C.1) - nur gespeichert und angezeigt; angewandt wird sie erst mit C.3 (#1617).
+    ``score``: Punkte bis zum Ziel, ``rounds``: Runden gewinnen (höchstens ``round_limit``), ``highest``: höherer Endstand
+    gewinnt. Keine Werte eines Titels: Ziel und Grenzen trägt die Verwaltung je Spiel ein.
+
+    Zeiten in Sekunden (#2271): ``time_limit_seconds`` je Map, ``round_time_seconds`` je Runde (nur Angabe für Regelwerk und
+    Anzeige). Ein Aufruf mit ``time_limit_minutes`` (Altbestand) wird umgerechnet - geschrieben werden nur Sekunden."""
+    # Unbekannte Felder werden nicht still verworfen (Prüfung #2206): ``_known`` sagt es auf Deutsch, ``forbid`` sichert ab.
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["score", "rounds", "highest"]
+    target: Optional[int] = Field(default=None, ge=1, le=RESULT_TARGET_MAX)
+    round_limit: Optional[int] = Field(default=None, ge=1, le=999)
+    time_limit_seconds: Optional[int] = Field(default=None, ge=1, le=TIME_LIMIT_SECONDS_MAX)
+    round_time_seconds: Optional[int] = Field(default=None, ge=1, le=ROUND_TIME_SECONDS_MAX)
+    draw_allowed: bool = False
+    overtime: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _known(cls, value):
+        if isinstance(value, dict):
+            unknown = sorted(str(key) for key in value if key not in cls.model_fields and key != LEGACY_TIME_LIMIT)
+            if unknown:
+                names = ", ".join(f"„{key[:40]}“" for key in unknown[:5])
+                raise ValueError(f"Ergebnisregel: unbekanntes Feld {names}. Erlaubt sind kind, target, round_limit, "
+                                 "time_limit_seconds, round_time_seconds, draw_allowed und overtime.")
+            if LEGACY_TIME_LIMIT in value:
+                minutes = value.get(LEGACY_TIME_LIMIT)
+                value = {key: item for key, item in value.items() if key != LEGACY_TIME_LIMIT}
+                if minutes is not None and value.get("time_limit_seconds") is None:
+                    if isinstance(minutes, bool) or not isinstance(minutes, (int, float)) or not 1 <= minutes <= 600:
+                        raise ValueError("Ergebnisregel: Zeitlimit von 1 bis 600 Minuten – oder leer lassen.")
+                    value["time_limit_seconds"] = int(minutes * 60)
+        return value
+
+    @model_validator(mode="after")
+    def _fits(self):
+        if self.kind in ("score", "rounds") and self.target is None:
+            raise ValueError("Ergebnisregel: Bitte das Ziel angeben (Punkte bzw. Rundensiege).")
+        if self.kind == "highest" and self.target is not None:
+            raise ValueError("Ergebnisregel: „Höherer Endstand“ hat kein Ziel - bitte das Ziel leeren oder eine andere Art wählen.")
+        if self.round_limit is not None and self.kind != "rounds":
+            raise ValueError("Ergebnisregel: Ein Rundenlimit gibt es nur bei der Art „Runden“.")
+        if self.round_limit is not None and self.target is not None and self.round_limit < self.target:
+            raise ValueError(f"Ergebnisregel: Das Rundenlimit ({self.round_limit}) ist kleiner als das Ziel ({self.target}).")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler):
+        return {key: value for key, value in handler(self).items() if value is not None}
+
+
+MODE_SETTINGS_MAX = 40
+SETTING_LABEL_MAX = 60
+SETTING_TEXT_MAX = 120
+SETTING_GROUP_MAX = 40
+SETTING_UNITS = ("seconds", "minutes", "points", "toggle", "text")
+SETTING_NUMBER_MAX = 1_000_000
+
+
+class GameModeSetting(BaseModel):
+    """Eine freie Einstellung eines Modus (#2271), etwa eine Lobby-Einstellung: Bezeichnung, Wert, Einheit und Gruppe. Keine Werte
+    eines Titels im Code. ``key`` bleibt beim Umbenennen gleich (die Season vergleicht über ihn); fehlt er, kommt er aus dem Namen.
+
+    Wert je Einheit: ``seconds`` ganze Sekunden, ``minutes`` und ``points`` Zahl, ``toggle`` an/aus, ``text`` oder ohne Einheit
+    Text."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: Optional[str] = Field(default=None, max_length=40)
+    label: str = Field(min_length=1, max_length=SETTING_LABEL_MAX)
+    value: Any = None
+    unit: Optional[Literal["seconds", "minutes", "points", "toggle", "text"]] = None
+    group: Optional[str] = Field(default=None, max_length=SETTING_GROUP_MAX)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, value):
+        return " ".join(strip_protected(value).split())
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def _group(cls, value):
+        return (" ".join(strip_protected(value).split()) or None) if value is not None else None
+
+    @model_validator(mode="after")
+    def _fits(self):
+        name = self.label
+        value = self.value
+        if self.unit == "toggle":
+            if not isinstance(value, bool):
+                raise ValueError(f"Einstellung „{name}“: bitte an oder aus wählen.")
+        elif self.unit in ("seconds", "minutes", "points"):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"Einstellung „{name}“: bitte eine Zahl angeben.")
+            if not -SETTING_NUMBER_MAX <= value <= SETTING_NUMBER_MAX:
+                raise ValueError(f"Einstellung „{name}“: Zahl zu groß.")
+            if self.unit == "seconds":
+                if not float(value).is_integer() or value < 0:
+                    raise ValueError(f"Einstellung „{name}“: Sekunden als ganze Zahl ab 0 (z. B. 1:30 = 90).")
+                self.value = int(value)
+            elif float(value).is_integer():
+                self.value = int(value)
+        else:
+            if isinstance(value, bool) or value is None or isinstance(value, (dict, list)):
+                raise ValueError(f"Einstellung „{name}“: bitte einen Wert angeben.")
+            text = " ".join(strip_protected(value).split())
+            if not text:
+                raise ValueError(f"Einstellung „{name}“: bitte einen Wert angeben.")
+            if len(text) > SETTING_TEXT_MAX:
+                raise ValueError(f"Einstellung „{name}“: Wert höchstens {SETTING_TEXT_MAX} Zeichen.")
+            self.value = text
+        given = _game_key(self.key)
+        self.key = given or _game_key(name) or "einstellung"
+        return self
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler):
+        return {key: value for key, value in handler(self).items() if key in ("key", "label", "value") or value is not None}
+
+
+def clean_mode_settings(value):
+    """Die Einstellungen eines Modus: höchstens ``MODE_SETTINGS_MAX``, jeder Schlüssel einmal - ein neuer, gleich lautender Name
+    bekommt eine Nummer dazu. Leer heißt: nicht schreiben."""
+    if value is None:
+        return None
+    if len(value) > MODE_SETTINGS_MAX:
+        raise ValueError(f"Höchstens {MODE_SETTINGS_MAX} Einstellungen je Modus.")
+    seen: set[str] = set()
+    for setting in value:
+        key, number = setting.key, 2
+        while key in seen:
+            key = f"{setting.key[:36]}_{number}"
+            number += 1
+        setting.key = key
+        seen.add(key)
+    return value or None
+
+
 class GameMatchMode(BaseModel):
     """Ein Spielmodus mit Dauer (#1554): „Grand Prix 4 Rennen“ 12 Min. je Spiel, oder 4 Min. je Einzelspiel (``per_game``),
     dann zählt Best-of als Erwartungswert (siehe ``services/match_duration.py``). Die Minuten sind freiwillig (#1616):
     ein Modus nur für Maps hat keine Dauer, dann plant das Turnier mit der nächsten Ebene. Die Kennung ``mode`` bleibt
-    beim Umbenennen gleich - Maps und Map-Pools zeigen auf sie."""
+    beim Umbenennen gleich - Maps und Map-Pools zeigen auf sie.
+
+    C.1 (#2206): Zustand, Beschreibung, Spielerzahl je Seite, Format und Ergebnisregel, alle freiwillig (docs/LIGA.md).
+    ``status`` fehlt = aktiv; „aktiv“ wird nicht geschrieben."""
     mode: Optional[str] = None
     label: str = Field(min_length=1, max_length=60)
     minutes: Optional[int] = Field(default=None, ge=1, le=600)
     per_game: bool = False
+    status: Optional[Literal["active", "inactive", "archived"]] = None
+    description: Optional[str] = Field(default=None, max_length=MODE_DESCRIPTION_MAX)
+    players_per_side: Optional[int] = Field(default=None, ge=1, le=64)
+    format: Optional[str] = Field(default=None, max_length=MODE_FORMAT_MAX)
+    result_rule: Optional[GameModeResultRule] = None
+    # Quadratisches Symbol (#2266): nur eigener Upload, geprüft in ``services/mode_icons.py``. Fehlt = Platzhalter.
+    icon_url: Optional[str] = Field(default=None, max_length=300)
+    # Freie Einstellungen und kurzer Regeltext (#2271) - die Season übernimmt beides als Kopie (C.3).
+    settings: Optional[List[GameModeSetting]] = None
+    rules_text: Optional[str] = Field(default=None, max_length=MODE_RULES_TEXT_MAX)
+    # Kam die Kennung mit der Anfrage? Ohne sie sucht ``update_game`` einen bestehenden Modus gleichen Namens (#2206).
+    _key_given: bool = PrivateAttr(default=False)
 
     @field_validator("label", mode="before")
     @classmethod
     def _label(cls, value):
         return str(value or "").strip()
 
+    @field_validator("icon_url", mode="before")
+    @classmethod
+    def _icon(cls, value):
+        return (str(value).strip() or None) if value is not None else None
+
+    @field_validator("rules_text", mode="before")
+    @classmethod
+    def _rules_text(cls, value):
+        return (strip_protected(value).strip() or None) if value is not None else None
+
+    @field_validator("settings", mode="after")
+    @classmethod
+    def _settings(cls, value):
+        return clean_mode_settings(value)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _description(cls, value):
+        return (str(value).strip() or None) if value is not None else None
+
+    @field_validator("format", mode="before")
+    @classmethod
+    def _format(cls, value):
+        return (" ".join(str(value).split()) or None) if value is not None else None
+
+    @field_validator("status", mode="after")
+    @classmethod
+    def _status(cls, value):
+        return None if value == "active" else value
+
     @model_validator(mode="after")
     def _key(self):
-        self.mode = _game_key(self.mode) or _game_key(self.label)
+        given = _game_key(self.mode)
+        self._key_given = bool(given)
+        self.mode = given or _game_key(self.label)
         if not self.mode:
             raise ValueError("Der Modus braucht einen Namen aus Buchstaben oder Ziffern.")
         return self
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler):
+        data = handler(self)
+        return {key: value for key, value in data.items() if key not in MODE_EXTRA_FIELDS or value is not None}
 
 
 def _clean_game_modes(value):
@@ -479,6 +712,9 @@ class GameUpdate(GameMatchData):
     default_team_size: Optional[int] = None
     default_format: Optional[str] = None
     player_id_fields: Optional[List[dict]] = None
+    # Schlüssel, unter denen schon Spieler-IDs stehen und die trotzdem wegfallen dürfen (#2249) - nur eine Bestätigung, wird nie
+    # gespeichert.
+    confirm_removed_keys: Optional[List[str]] = None
     discord_guild_id: Optional[str] = None
     discord_role_name: Optional[str] = Field(default=None, max_length=100)
 
@@ -1055,7 +1291,16 @@ class MatchScoreReport(BaseModel):
     lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
 
 
-class MatchGameReport(BaseModel):
+class MatchGameExtras(BaseModel):
+    """Zusatzfelder einer Map (C.3, #1617), alle freiwillig - geprüft mit deutschem Satz in services/league_result_rules.py."""
+    status: Optional[str] = Field(default=None, max_length=20)
+    replay_reason: Optional[str] = Field(default=None, max_length=500)
+    decision: Optional[str] = Field(default=None, max_length=20)
+    host_registration_id: Optional[str] = Field(default=None, max_length=100)
+    proof_id: Optional[str] = Field(default=None, max_length=100)
+
+
+class MatchGameReport(MatchGameExtras):
     """Eine Map einer Meldung - ``lineup`` ist die eigene Seite."""
     position: int = Field(ge=1, le=MATCH_GAMES_MAX)
     mode: Optional[str] = Field(default=None, max_length=40)
@@ -1065,7 +1310,7 @@ class MatchGameReport(BaseModel):
     lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_LINEUP_MAX)
 
 
-class MatchGameAdmin(BaseModel):
+class MatchGameAdmin(MatchGameExtras):
     """Eine Map der Turnierleitung - Aufstellungen beider Seiten, je Seite freiwillig."""
     position: int = Field(ge=1, le=MATCH_GAMES_MAX)
     mode: Optional[str] = Field(default=None, max_length=40)
@@ -1108,13 +1353,16 @@ class MatchV2ResultSubmit(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
     # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
     hold: bool = False
-    reason: Optional[str] = Field(default=None, max_length=500)
+    # Bis 2000 Zeichen: Die Korrektur zu einem Liga-Verfahren trägt die Begründung der Entscheidung (#1619, E.2).
+    reason: Optional[str] = Field(default=None, max_length=2000)
     # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
     games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
     # Teilnehmerlisten beider Seiten (#2204), je Seite freiwillig - nur in Staffeln mit ``lineup_mode: series``.
     lineups: Optional[Dict[str, List[str]]] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Ergebnisregel übergehen (C.3, #1617): nur der Superadmin, mit Grund im Protokoll.
+    rule_override_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchResultUndo(BaseModel):
@@ -1141,6 +1389,27 @@ class MatchScheduleProposalDecision(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
 
 
+# Mehrere Termine auf einmal (#2325): höchstens so viele je Vorschlag oder Gegenvorschlag.
+SCHEDULE_PROPOSAL_MAX_TIMES = 3
+
+
+class MatchScheduleProposalGroupCreate(BaseModel):
+    """Bis zu drei Termine mit einer gemeinsamen Notiz - die Gegenseite nimmt einen davon an (#2325)."""
+    scheduled_ats: list[datetime] = Field(min_length=1, max_length=SCHEDULE_PROPOSAL_MAX_TIMES)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+# Für die ganze Gruppe: alle ablehnen, alle zurückziehen oder mit bis zu drei Terminen antworten. Angenommen wird ein
+# einzelner Termin über die bestehende Entscheidung.
+ScheduleProposalGroupAction = Literal["decline", "counter", "withdraw"]
+
+
+class MatchScheduleProposalGroupDecision(BaseModel):
+    action: ScheduleProposalGroupAction
+    scheduled_ats: list[datetime] = Field(default_factory=list, max_length=SCHEDULE_PROPOSAL_MAX_TIMES)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 class MatchChatCreate(BaseModel):
     message: str = Field(default="", max_length=1500)
     # Höchstens vier, wie services.chat_attachments.MAX_ATTACHMENTS_PER_MESSAGE.
@@ -1161,6 +1430,8 @@ class MatchUpdate(BaseModel):
     duration_minutes: Optional[int] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203) - geht ins Protokoll, nicht ans Spiel.
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Grund zum Termin der Leitung (Liga, #2194) - in Historie und Protokoll, nicht ans Spiel.
+    schedule_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2Update(BaseModel):
@@ -1178,15 +1449,24 @@ class MatchDispute(BaseModel):
     # „Problem melden“ (#1158): Grund zum Antippen und ein Foto, vorher über /matches/{id}/proof-photos hochgeladen.
     category: Optional[str] = Field(default=None, max_length=40)
     photo_id: Optional[str] = Field(default=None, max_length=120)
+    # Liga-Staffel (#1619, E.2): Grund aus der Liste der Season, das abweichende Ergebnis, die Pflichtfrage „sofort hingewiesen?“
+    # und der Vorfall, aus dem das Verfahren folgt. Ohne diese Felder (App ohne neuen Build) gilt ``category``.
+    reason_key: Optional[str] = Field(default=None, max_length=40)
+    claimed: Optional[dict] = None
+    notified_immediately: Optional[bool] = None
+    incident_id: Optional[str] = Field(default=None, max_length=120)
 
 
 class MatchDisputeDecision(BaseModel):
     # Die Turnierleitung entscheidet (#1158): „keep“ = das Ergebnis bleibt (ohne Ergebnis: weiter wie bisher).
     # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
     decision: Literal["keep"]
-    note: Optional[str] = Field(default=None, max_length=500)
+    # Liga-Verfahren (#1619, E.2): dort Pflicht (mindestens zehn Zeichen). Überall dieselbe Länge wie an der Karte des Verfahrens.
+    note: Optional[str] = Field(default=None, max_length=2000)
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Liga (#1619): welches Verfahren, wenn an dem Spiel mehrere offen sind.
+    procedure_id: Optional[str] = Field(default=None, max_length=120)
 
 
 # ---------- F1 ----------
@@ -2459,6 +2739,13 @@ class LeagueTransferWindow(BaseModel):
     _days = field_validator("start_date", "end_date", mode="before")(_calendar_day)
 
 
+class LeaguePoolMinimum(BaseModel):
+    """Mindestens so viele Maps braucht der Pool in diesem Modus (#2207)."""
+    model_config = ConfigDict(extra="forbid")
+    mode: Optional[str] = Field(default=None, max_length=40)
+    min_maps: int = Field(ge=1, le=50)
+
+
 class LeagueSeasonFields(LeagueLookFields):
     """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern. Dazu die
     Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, ``prizes`` sind die Gewinne der Season."""
@@ -2495,20 +2782,43 @@ class LeagueSeasonFields(LeagueLookFields):
     application_privacy_text: Optional[str] = Field(default=None, max_length=2000)
     entry_policy: Optional[Literal["all", "members"]] = None
     sibling_squads_in_staffel: Optional[bool] = None
+    # Anmeldungen automatisch annehmen (#2348): Vorgabe aus, dann prüft die Leitung jede Anmeldung.
+    application_auto_accept: Optional[bool] = None
+    # Plattform je Season (#2270, docs/LIGA.md B.3): Feld mit der Plattform, erlaubte Plattformen (leer = alle), Crossplay und
+    # Eingabegerät als Angabe. Geprüft wird in ``league_platform.clean_season``; ``null`` heißt: keine Angabe.
+    platform_field: Optional[str] = Field(default=None, max_length=80)
+    allowed_platforms: Optional[List[str]] = Field(default=None, max_length=30)
+    crossplay: Optional[bool] = None
+    input_device: Optional[Literal["controller", "mouse_keyboard", "both"]] = None
     game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
     # Map-Wiederholung in einer Serie (#2096): nie, nur in anderem Modus (Vorgabe) oder immer.
     map_repeat: Optional[Literal["never", "other_mode", "always"]] = None
     scoring_rules: Optional[dict] = None
     result_confirm_hours: Optional[int] = Field(default=None, ge=1, le=336)
     lineup_amend_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    # Vorfälle im Spiel (D.5, #1619; docs/LIGA.md „D.5/E.2-Vertrag“): Standardpause, Antwortzeit der Gegenseite, Kontingent je Team
+    # und Map, Serie bei einer Map „in Klärung“. Ohne Feld gilt die Vorgabe aus ``league_presets.PRESETS``.
+    map_break_after: Optional[int] = Field(default=None, ge=1, le=7)
+    map_break_minutes: Optional[int] = Field(default=None, ge=0, le=60)
+    incident_answer_minutes: Optional[int] = Field(default=None, ge=1, le=120)
+    incident_quota_per_map: Optional[int] = Field(default=None, ge=0, le=5)
+    clarification_mode: Optional[Literal["continue", "pause_series"]] = None
     # Antwortfrist auf Terminvorschläge (#2106, F3) - wie ``TournamentCreate.match_schedule_response_hours``.
     match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
     rules_text: Optional[str] = Field(default=None, max_length=20000)
     registration_deadline: Optional[str] = None
     visibility: Optional[LeagueVisibility] = None
     status: Optional[LeagueSeasonStatus] = None
+    # Startseite (#2324): „Nächste Termine“ und Hinweis bei offener Anmeldung; Vorgabe an.
+    promote_on_home: Optional[bool] = None
+
+    # Mindestgröße je Modus im Map-Pool (#2207, C.2): überschreibt die Ableitung; ``mode: null`` bei Spielen ohne Modi.
+    pool_min_maps: Optional[List[LeaguePoolMinimum]] = Field(default=None, max_length=GAME_MODES_MAX)
+    # Notausnahme des Superadmins beim Veröffentlichen trotz Problemen (#2207) - kein Feld der Season, nur fürs Protokoll.
+    readiness_override_reason: Optional[str] = Field(default=None, max_length=500)
 
     _deadline = field_validator("registration_deadline", mode="before")(_calendar_day)
+
 
 
 class LeagueSeasonCreate(LeagueSeasonFields):
@@ -2520,6 +2830,15 @@ class LeagueSeasonUpdate(LeagueSeasonFields):
     number: Optional[int] = Field(default=None, ge=1, le=999)
 
 
+class LeagueMapRemove(BaseModel):
+    """Map in einem Schritt aus dem Pool der Season nehmen und übertragen (#2207). Ohne ``mode``: aus allen Modi."""
+    model_config = ConfigDict(extra="forbid")
+    map_id: str = Field(min_length=1, max_length=80)
+    mode: Optional[str] = Field(default=None, max_length=40)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    expected_version: Optional[int] = Field(default=None, ge=0)
+
+
 class LeagueDivisionOverrides(BaseModel):
     """Abweichung einer Liga N von ihrer Season - nur diese Felder (docs/LIGA.md, Abschnitt 2)."""
     model_config = ConfigDict(extra="forbid")
@@ -2529,6 +2848,10 @@ class LeagueDivisionOverrides(BaseModel):
     max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
     scoring_rules: Optional[dict] = None
     match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    # Plattform je Season (#2270): fehlt = wie Season, ``allowed_platforms: []`` = alle erlaubt. Werte prüft ``league_platform``.
+    allowed_platforms: Optional[List[str]] = Field(default=None, max_length=30)
+    crossplay: Optional[bool] = None
+    input_device: Optional[Literal["controller", "mouse_keyboard", "both"]] = None
 
 
 class LeagueDivisionCreate(BaseModel):
@@ -2580,3 +2903,5 @@ class LeagueApplicationDecision(BaseModel):
 
     reason: Optional[str] = Field(default=None, max_length=500)
     tournament_id: Optional[str] = Field(default=None, max_length=64)
+    # Notausnahme des Superadmins beim eigenen Team (#2245): Pflicht ab fünf Zeichen, sonst nicht gebraucht.
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)

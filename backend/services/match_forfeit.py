@@ -44,7 +44,8 @@ async def mark_heat_no_show(db, match: dict, registration_id: str, *, note: str,
 
 
 async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, note: str, actor_id: str,
-                        force: bool, reason: str | None = None, hold_id: str | None = None) -> dict:
+                        force: bool, reason: str | None = None, hold_id: str | None = None,
+                        decision_note: str | None = None) -> dict:
     """Die Wertung schreiben: Platzierung über den Ergebnis-Weg, dann Stand und Begründung am Spiel. Im offenen Lauf
     mit mehr als zwei Spielern nur die Markierung (#1823)."""
     if no_show_keeps_heat_open(match):
@@ -65,6 +66,8 @@ async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, not
         # Eine Wertung als Korrektur (#1035): ihre Pflicht-Begründung ist zugleich der Grund der Korrektur.
         reason=reason or (note if force else None),
         hold_id=hold_id,
+        # Liga-Verfahren offen (#1619, E.2): die Begründung, mit der diese Wertung das Verfahren entscheidet.
+        decision_note=decision_note,
         games=[] if drop_maps else None,
         lineups_missing=[] if drop_maps else None,
         match_lineups={} if match.get("lineups") else None,

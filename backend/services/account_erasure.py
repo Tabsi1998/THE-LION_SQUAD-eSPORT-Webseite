@@ -98,6 +98,8 @@ EXTRA_PERSONAL_USER_FIELDS = (
     "discord_servers_greeted_for", "discord_dm_blocked_at", "discord_last_message_at",
     # Mitgliederakte (#2118): welche Netzwerke geteilt wurden; Erfolge und Auszeichnung, die oben stehen sollten.
     "dolibarr_accounts_shared", "pinned_achievements", "featured_award_id", "last_twitch_live_at",
+    # Datenbewusst (#2338): wann die Person ihre Privatsphäre eingestellt bzw. ihre Daten geholt hat.
+    "privacy_reviewed_at", "data_exported_at",
 )
 
 
@@ -291,7 +293,7 @@ async def _usage(db, names: set[str]) -> tuple[set[str], dict[str, list], set[st
     personal: dict[str, list] = {}
     frozen: set[str] = set()
     async for collection, document, field, name, text in media_audit.iter_usages(db, names):
-        if media_audit.is_frozen(collection, document):
+        if media_audit.is_frozen(collection, document, field):
             frozen.add(name)
         if not _personal(collection, document):
             elsewhere.add(name)
@@ -354,6 +356,9 @@ async def _remove(db, name: str, scans: list[dict], *, documents: bool = False) 
             path = base / name
             for width in VARIANT_WIDTHS:
                 _unlink(variant_path(path, width))
+                # Zwischendateien eines abgebrochenen Builds (``.<stem>-<breite>.<zufall>.tmp``) gehören zur Person wie die Fassung.
+                for temp in variant_path(path, width).parent.glob(f".{path.stem}-{width}.*.tmp"):
+                    _unlink(temp)
             _unlink(path)
             if path.suffix.lower() == ".svg":
                 _unlink(path.with_suffix(".png"))  # PNG-Fassung eines SVG-Logos (#1952)
@@ -590,6 +595,14 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     from services.league_applications import scrub_person
 
     await scrub_person(db, user_id)
+    # Liga-Termine (#2194): Anträge und Termin-Historie bleiben am Spiel, die Kennung der Person fällt heraus.
+    from services import league_schedule
+
+    await league_schedule.scrub_person(db, user_id)
+    # Liga-Check-in (#1652): Check-ins und Start bleiben am Spiel, die Kennung der Handelnden fällt heraus.
+    from services import match_flow
+
+    await match_flow.scrub_person(db, user_id)
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.

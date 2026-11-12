@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from database import get_db
-from services import site_texts
+from services import help_topics, site_texts
 from services.league_scope import league_label
 from services.slug_utils import find_by_slug_or_history
 from services.svg_logo import raster_url
@@ -265,6 +265,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await reference_meta(db, slug, meta, origin)
     if first == "achievements" and slug == "a" and len(parts) > 2:
         return await achievement_share_meta(db, unquote(parts[2]), meta, origin)
+    if first == "hilfe":
+        return help_meta(slug.lower(), len(parts), meta, origin)
 
     static = static_page_meta(first, meta)
     if static:
@@ -549,9 +551,25 @@ async def league_rules_meta(db, league_slug: str, season_slug: str | None, base:
     return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 
 
+async def league_signup_details(db, season: dict) -> list[str]:
+    """Bei offener Anmeldung (#2324): „Anmeldung bis …“ und die freien Startplätze - sonst nichts."""
+    from services import league_applications
+    from services.calendar_items import vienna
+
+    block = await league_applications.public_block(db, season)
+    if not block or block["state"] != league_applications.OPEN:
+        return []
+    details = [f"Anmeldung bis {vienna(block['closes_at'])}"]
+    if block.get("slots"):
+        details.append(f"{block['slots_free']} von {block['slots']} Startplätzen frei" if block.get("slots_free")
+                       else "Alle Startplätze vergeben")
+    return details
+
+
 async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:
     """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ als neutrale Karte ohne Index;
     „aus“, „Nur Turnierleitung“ und Unbekanntes 404."""
+    from services.league_look import effective as effective_look
     from services.league_look import effective_banner_url
     from services.league_service import season_end
 
@@ -565,17 +583,23 @@ async def league_season_meta(db, league_slug: str, season_slug: str, base: dict,
     title = f"{league.get('name')} {season.get('name')}"
     if season.get("visibility") != "public":
         return restricted_meta("league", season, base, origin, canonical)
+    # Teilen-Karte bei offener Anmeldung (#2324): Anmeldeschluss und freie Plätze stehen vorn - so wirbt der Link in Discord
+    # und WhatsApp für die Anmeldung.
+    signup = await league_signup_details(db, season)
     description = seo_description(
         season.get("rules_text") or title,
         prefix="Liga",
-        details=[format_date_label(season.get("start_date")), format_date_label(season_end(season))],
+        details=[*signup, format_date_label(season.get("start_date")), format_date_label(season_end(season))],
     )
-    meta = {**base, "title": f"{title} · {base['site_name']}", "description": description, "url": canonical,
+    shown_title = f"{title} · Anmeldung offen" if signup else title
+    meta = {**base, "title": f"{shown_title} · {base['site_name']}", "description": description, "url": canonical,
             "canonical": canonical, "type": "website"}
-    # Gestaltung (#2107): die Vorschaukarte zeigt das Banner der Season bzw. Liga, sonst das Bild der Seite.
-    banner = effective_banner_url(league, season)
-    if banner:
-        meta["image"] = absolute_url(banner, origin)
+    # Gestaltung (#2107): die Vorschaukarte zeigt das Banner der Season bzw. Liga, sonst das Emblem (#2324), sonst das Bild
+    # der Seite.
+    look = effective_look(league, season)
+    picture = effective_banner_url(league, season) or look.get("emblem_url")
+    if picture:
+        meta["image"] = absolute_url(picture, origin)
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 
@@ -1263,6 +1287,22 @@ def origin_from_meta(meta: dict) -> str:
     if url.startswith(("http://", "https://")):
         return "/".join(url.split("/", 3)[:3])
     return url
+
+
+def help_meta(slug: str, depth: int, base: dict, origin: str) -> dict:
+    """Hilfe (#2295): Übersicht und je Thema eine eigene Karte für Discord und WhatsApp; unbekannte Themen 404."""
+    if not slug:
+        meta = {**base, "title": f"{help_topics.HELP_TITLE} · {base['site_name']}", "description": help_topics.HELP_DESCRIPTION}
+        meta["json_ld"] = webpage_json_ld(meta)
+        return add_breadcrumbs(meta, origin, current_label=help_topics.HELP_TITLE)
+    topic = help_topics.HELP_TOPICS.get(slug)
+    if not topic or depth > 2:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    title, description = topic
+    canonical = f"{origin}/hilfe/{slug}"
+    meta = {**base, "title": f"{title} · {help_topics.HELP_TITLE} · {base['site_name']}", "description": description, "url": canonical, "canonical": canonical}
+    meta["json_ld"] = webpage_json_ld(meta)
+    return add_breadcrumbs(meta, origin, [(help_topics.HELP_TITLE, "/hilfe")], title)
 
 
 def add_breadcrumbs(meta: dict, origin: str, parents: list[tuple[str, str]] | None = None, current_label: str | None = None) -> dict:

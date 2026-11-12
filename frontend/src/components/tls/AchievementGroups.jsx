@@ -54,6 +54,23 @@ export function formatPercent(value) {
   return `${n.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`;
 }
 
+/**
+ * Der Stand einer Kategorie (#2339) aus ``category_progress`` vom Server - eine Rechnung für Erfolge-Seite und Profil
+ * (Review N2): abgeschlossen, „x von y“ mit Prozent - oder null, wenn es dort nichts Erreichbares gibt. Nicht-Mitglieder
+ * (``member`` false, Review N3) sehen beim Verein „Nur für Mitglieder“ - außer sie haben ihn schon abgeschlossen.
+ */
+export function categoryProgressSummary(progress, { key = null, member = true } = {}) {
+  const total = Number(progress?.total || 0);
+  if (!progress || total <= 0) return null;
+  const earned = Math.min(Number(progress.earned || 0), total);
+  const percent = (100 * earned) / total;
+  const complete = Boolean(progress.complete) || earned >= total;
+  if (key === "club" && member === false && !complete) {
+    return { earned, total, percent: 0, complete: false, membersOnly: true, summary: "Nur für Mitglieder" };
+  }
+  return { earned, total, percent, complete, membersOnly: false, summary: complete ? "Abgeschlossen" : `${earned} von ${total} · ${formatPercent(Math.round(percent))}` };
+}
+
 // Das Abzeichen (E8, #618) in Listen: Material und Motiv aus dem Katalog, nicht erreichte Stufen als
 // Silhouette mit Fortschrittsring; der Hover sagt, wie man es schafft.
 function ListBadge({ tier, group, earned = true, size = "md", animate = false, percent = 0 }) {
@@ -318,6 +335,33 @@ function HiddenSummaryCard({ hidden }) {
   );
 }
 
+// Nicht mehr erreichbar (#2339): sieht nur, wer den Erfolg hat - der Hinweis sagt, warum er nicht mehr mitzählt. Der
+// Grund steht sichtbar in der aufgeklappten Karte und hängt per aria-describedby am Hinweis (Review N4).
+function retiredText(reason) {
+  return reason ? `Nicht mehr erreichbar: ${reason} Zählt nicht in „x von y“.` : "Nicht mehr erreichbar – zählt nicht in „x von y“.";
+}
+
+function RetiredChip({ reason, testId, describedBy }) {
+  return (
+    <span
+      className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/15 text-white/45"
+      title={retiredText(reason)}
+      aria-describedby={describedBy}
+      data-testid={testId}
+    >
+      Nicht mehr erreichbar
+    </span>
+  );
+}
+
+function RetiredReason({ reason, id, testId }) {
+  return (
+    <div id={id} className="mt-1 text-[11px] text-white/45" data-testid={testId}>
+      {retiredText(reason)}
+    </div>
+  );
+}
+
 function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, share = null }) {
   const [open, setOpen] = useState(false);
   const earnedTiers = group.tiers.filter(t => t.earned).sort((a, b) => b.level - a.level);
@@ -331,6 +375,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
   const lockedPulse = !earnedOnly && !hasAny && !isNegative && Number(nextLocked?.percent || 0) >= 80;
   const highestLabel = highest ? levelLabel(highest.level, group, highest) : "";
   const rare = !isNegative ? groupRarity(rarity, group) : null;
+  const groupRetiredReason = group.retired ? (group.tiers.find((t) => t.retired_reason)?.retired_reason || group.retired_reason) : null;
 
   return (
     <motion.div
@@ -379,6 +424,12 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
               <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
                 Verein
               </span>
+            )}
+            {group.retired && (
+              <>
+                <RetiredChip reason={groupRetiredReason} testId={`achievement-retired-${group.code}`} describedBy={`achievement-retired-reason-${group.code}`} />
+                <span id={`achievement-retired-reason-${group.code}`} className="sr-only">{retiredText(groupRetiredReason)}</span>
+              </>
             )}
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
@@ -467,8 +518,12 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
               geplant
             </span>
           )}
+          {tier.retired && !group?.retired && <RetiredChip reason={tier.retired_reason} testId={`achievement-retired-${tier.code}`} describedBy={`achievement-tier-retired-reason-${tier.code}`} />}
         </div>
         <div className="text-xs text-white/65 mt-0.5">{tier.description}</div>
+        {tier.retired && (
+          <RetiredReason reason={tier.retired_reason} id={`achievement-tier-retired-reason-${tier.code}`} testId={`achievement-tier-retired-reason-${tier.code}`} />
+        )}
         {!tier.earned && tier.target > 0 && !tier.manual_only && tier.condition_status !== "planned" && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">

@@ -108,7 +108,7 @@ describe("Formular ↔ API", () => {
   it("hin und zurück bleibt alles gleich", () => {
     const form = gameMatchDataToForm(MK8);
     expect(form.points_table).toBe("15, 12, 10, 9");
-    expect(form.match_modes[1]).toEqual({ mode: "race", label: "Einzelrennen", minutes: "4", per_game: true });
+    expect(form.match_modes[1]).toMatchObject({ mode: "race", label: "Einzelrennen", minutes: "4", per_game: true, status: "active", rule_kind: "" });
     expect(gameMatchDataPayload(form)).toEqual({
       match_modes: MK8.match_modes,
       players_per_run_local: 4, players_per_run_online: 12, station_devices: ["switch"],
@@ -130,6 +130,94 @@ describe("Formular ↔ API", () => {
 
   it("Geräte passen zu den Stationen", () => {
     expect(STATION_DEVICE_OPTIONS.map(([value]) => value)).toEqual(expect.arrayContaining(["switch", "switch2", "pc", "ps5", "xbox"]));
+  });
+});
+
+// Spielmodi mit Zustand und Ergebnisregel (#2206, C.1): dieselben Regeln wie models.GameMatchMode.
+describe("Spielmodi mit Zustand und Ergebnisregel", () => {
+  const FULL = {
+    mode: "zonen", label: "Zonen", minutes: 10, per_game: false, status: "inactive", description: "Zwei Zonen.", players_per_side: 4,
+    format: "Standard",
+    result_rule: { kind: "rounds", target: 6, round_limit: 11, time_limit_seconds: 90, round_time_seconds: 105, draw_allowed: false, overtime: true },
+    // Symbol (#2266), Einstellungen und Regeltext (#2271).
+    icon_url: "/api/static/uploads/zonen.png",
+    settings: [{ key: "uhr", label: "Uhr", value: 45, unit: "seconds", group: "Lobby" }, { key: "karte", label: "Karte", value: "klein" }],
+    rules_text: "Die Uhr läuft nur in der Zone.",
+  };
+
+  it("hin und zurück bleibt jedes neue Feld gleich", () => {
+    expect(gameMatchDataPayload(gameMatchDataToForm({ match_modes: [FULL] })).match_modes).toEqual([FULL]);
+  });
+
+  it("Zeitlimit 1:30 geht als 90 Sekunden, Altbestand in Minuten als Sekunden (#2271)", () => {
+    const form = gameMatchDataToForm({ match_modes: [{ mode: "a", label: "A", result_rule: { kind: "highest", time_limit_minutes: 10 } }] });
+    expect(form.match_modes[0].rule_time_limit).toBe("10");
+    expect(gameMatchDataPayload(form).match_modes[0].result_rule.time_limit_seconds).toBe(600);
+    form.match_modes[0] = { ...form.match_modes[0], rule_time_limit: "1:30", rule_round_time: "90 s" };
+    expect(gameMatchDataPayload(form).match_modes[0].result_rule).toEqual({
+      kind: "highest", time_limit_seconds: 90, round_time_seconds: 90, draw_allowed: false, overtime: false,
+    });
+  });
+
+  it("ohne neue Angaben bleibt ein Modus wie vor #2206 - „aktiv“ wird nicht geschickt", () => {
+    const old = { mode: "gp4", label: "Grand Prix", minutes: 12, per_game: false };
+    const form = gameMatchDataToForm({ match_modes: [old] });
+    expect(gameMatchDataPayload(form).match_modes).toEqual([old]);
+    form.match_modes[0] = { ...form.match_modes[0], status: "active", description: "  ", format: "   ", players_per_side: "" };
+    expect(gameMatchDataPayload(form).match_modes).toEqual([old]);
+  });
+
+  it("Ziel und Rundenlimit nur, wo die Art sie kennt; Leerraum im Format fällt zusammen", () => {
+    const form = gameMatchDataToForm({ match_modes: [{ mode: "a", label: "A" }] });
+    form.match_modes[0] = { ...form.match_modes[0], rule_kind: "highest", rule_target: "5", rule_round_limit: "9", format: "  Profi   Regeln " };
+    expect(gameMatchDataPayload(form).match_modes[0]).toEqual({
+      mode: "a", label: "A", minutes: null, per_game: false, format: "Profi Regeln", result_rule: { kind: "highest", draw_allowed: false, overtime: false },
+    });
+  });
+
+  it.each([
+    [{ rule_kind: "score" }, "Modus „A“, Ergebnisregel: bitte das Ziel eintragen."],
+    [{ rule_kind: "score", rule_target: "0" }, "Modus „A“, Ergebnisregel: Ziel von 1 bis 100.000."],
+    [{ rule_kind: "rounds", rule_target: "6", rule_round_limit: "5" }, "Modus „A“, Ergebnisregel: Das Rundenlimit (5) ist kleiner als das Ziel (6)."],
+    [{ rule_kind: "rounds", rule_target: "6", rule_round_limit: "1000" }, "Modus „A“, Ergebnisregel: Rundenlimit von 1 bis 999 – oder leer lassen."],
+    [{ rule_kind: "highest", rule_time_limit: "601" }, "Modus „A“, Ergebnisregel: Zeitlimit als Minuten:Sekunden (z. B. 1:30, 90 s oder 10) bis 600 Minuten – oder leer lassen."],
+    [{ rule_kind: "highest", rule_time_limit: "bald" }, "Modus „A“, Ergebnisregel: Zeitlimit als Minuten:Sekunden (z. B. 1:30, 90 s oder 10) bis 600 Minuten – oder leer lassen."],
+    [{ rule_kind: "highest", rule_round_time: "61:00" }, "Modus „A“, Ergebnisregel: Zeit je Runde als Minuten:Sekunden (z. B. 1:45) bis 60 Minuten – oder leer lassen."],
+    [{ settings: [{ label: "Uhr", value: "bald", unit: "seconds" }] }, "Modus „A“: Einstellung „Uhr“: Zeit als Sekunden oder Minuten:Sekunden (z. B. 1:30)."],
+    [{ rules_text: "x".repeat(1001) }, "Modus „A“: Regeltext höchstens 1000 Zeichen."],
+    [{ players_per_side: "65" }, "Modus „A“: Spieler je Seite von 1 bis 64 – oder leer lassen."],
+    [{ description: "x".repeat(501) }, "Modus „A“: Beschreibung höchstens 500 Zeichen."],
+  ])("sagt vor dem Speichern, was nicht passt (%o)", async (patch, message) => {
+    const { gameMatchDataProblem } = await import("./gameMatchData");
+    const form = gameMatchDataToForm({ match_modes: [{ mode: "a", label: "A" }] });
+    form.match_modes[0] = { ...form.match_modes[0], ...patch };
+    expect(gameMatchDataProblem(form)).toBe(message);
+  });
+
+  it("Auswahllisten: aktive, dazu nur die schon gesetzten mit Zustand am Namen", async () => {
+    const { modeStatusOf, selectableModes } = await import("./gameMatchData");
+    const modes = [{ mode: "a", label: "A" }, { mode: "b", label: "B", status: "inactive" }, { mode: "c", label: "C", status: "archived" }, { mode: "d", label: "D", status: "kaputt" }];
+    expect(selectableModes(modes).map((mode) => mode.mode)).toEqual(["a", "d"]);
+    expect(selectableModes(modes, ["b", "c"]).map((mode) => mode.label)).toEqual(["A", "B (inaktiv)", "C (archiviert)", "D"]);
+    expect(selectableModes(undefined, ["b"])).toEqual([]);
+    expect(modeStatusOf({})).toBe("active");
+  });
+
+  it("die Regel in einem Satzteil", async () => {
+    const { resultRuleText } = await import("./gameMatchData");
+    expect(resultRuleText(FULL.result_rule)).toBe("Runden gewinnen: 6 Siege, höchstens 11 Runden · 1:30 Min. · 1:45 Min. je Runde · Verlängerung");
+    expect(resultRuleText({ kind: "highest", time_limit_minutes: 2 })).toBe("Höherer Endstand gewinnt · 2 Min.");
+    expect(resultRuleText({ kind: "score", target: 200, draw_allowed: true })).toBe("Punkte bis zum Ziel: 200 · Remis möglich");
+    expect(resultRuleText({ kind: "rounds", target: 1 })).toBe("Runden gewinnen: 1 Sieg");
+    expect(resultRuleText(null)).toBe("");
+  });
+
+  it("verwendet, unbenutzt oder unbekannt", async () => {
+    const { modeInUse } = await import("./gameMatchData");
+    expect(modeInUse({ modes: { a: { in_use: true }, b: { in_use: false } } }, "a")).toBe(true);
+    expect(modeInUse({ modes: { a: { in_use: true }, b: { in_use: false } } }, "b")).toBe(false);
+    expect(modeInUse({ modes: { a: { maps: 2 } } }, "a")).toBeNull();
+    expect(modeInUse(null, "a")).toBeNull();
   });
 });
 

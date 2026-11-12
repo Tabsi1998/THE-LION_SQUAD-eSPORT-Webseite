@@ -1,0 +1,219 @@
+{
+  "slug": "liga-captains",
+  "titel": "Liga für Captains",
+  "kurz": "Co-Team zur Liga anmelden, offene Punkte nachtragen, Termin ausmachen, einchecken, Ergebnis melden und bestätigen.",
+  "zielgruppe": "Für Captain und Vertreter",
+  "suchbegriffe": ["anmeldung", "season", "staffel", "regelwerk", "regeln", "termin", "verschieben", "check-in", "einchecken", "ergebnis", "bestätigen", "protest", "einspruch", "veto", "map", "aufstellung", "kader", "teilnehmerliste"],
+  "videos": [
+    { "id": "liga-anmeldung", "titel": "Liga-Anmeldung im Video", "abschnitt": "anmelden" },
+    { "id": "ergebnis-melden", "titel": "Ergebnis melden im Video", "abschnitt": "nach-dem-spiel" }
+  ],
+  "abschnitte": [
+    {
+      "id": "anmelden",
+      "titel": "Co-Team anmelden",
+      "schritte": [
+        {
+          "id": "anmeldung-starten",
+          "titel": "Anmeldung starten",
+          "text": "Öffne die Ligaseite. Ist die Anmeldung offen, tippe auf Mit Co-Team anmelden.",
+          "hinweis": "Anmelden dürfen nur Captain und Vertreter eines Co-Teams. Fehlen beide, trägt die Teamleitung zuerst einen Captain ein.",
+          "bild": true,
+          "link": { "to": "/liga", "label": "Zu den Ligen" }
+        },
+        {
+          "id": "co-team-auswahl",
+          "titel": "Co-Team wählen",
+          "text": "Wähle das Co-Team, das mitspielen soll. Tippe auf Weiter.",
+          "bild": true
+        },
+        {
+          "id": "passt-alles",
+          "titel": "Passt alles?",
+          "text": "Die Seite prüft euer Co-Team. Steht dort ein grüner Haken, geht die Anmeldung. Steht dort „So geht die Anmeldung noch nicht“, löst ihr das zuerst, zum Beispiel einen zu kleinen Kader.",
+          "bild": true
+        },
+        {
+          "id": "offene-punkte",
+          "titel": "Offene Punkte",
+          "text": "Fehlt jemandem noch eine Angabe, steht sie darunter als Hinweis. Die Anmeldung geht trotzdem. Bis zum ersten Spiel muss es nachgetragen sein.",
+          "hinweis": "Wer dann noch etwas offen hat, kann nicht einchecken und nicht aufgestellt werden.",
+          "bild": true
+        },
+        {
+          "id": "regelwerk",
+          "titel": "Regelwerk zustimmen",
+          "text": "Lies das Regelwerk. Hake an, dass du für dein Co-Team zustimmst. Dasselbe beim Datenschutz. Tippe auf Weiter.",
+          "bild": true
+        },
+        {
+          "id": "einreichen",
+          "titel": "Anmeldung einreichen",
+          "text": "Prüf die Zusammenfassung und tippe auf Anmeldung einreichen. Je nach Season prüft die Liga-Leitung die Anmeldung, oder ihr seid gleich angemeldet. Die Zusammenfassung sagt dir, was gilt. Du bekommst eine Nachricht.",
+          "hinweis": "Werden Anmeldungen automatisch angenommen und ist ein Startplatz frei, steht danach Angemeldet da. Sind alle Plätze vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, außer es gibt nur eine Staffel.",
+          "bild": true
+        },
+        {
+          "id": "stand",
+          "titel": "Stand und offene Punkte",
+          "text": "Den Stand eurer Anmeldung siehst du auf der Ligaseite. „Eingereicht“: Die Liga-Leitung prüft noch. „Angemeldet“: Ihr habt einen Startplatz. Steht „Zuteilung folgt“ dabei, fehlt nur noch die Staffel. Darunter stehen die offenen Punkte, bis alle erledigt sind.",
+          "hinweis": "Zurückziehen geht, bis die Liga-Leitung euch einer Staffel zuteilt. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange noch kein Spielplan steht.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "vor-dem-spiel",
+      "titel": "Vor dem ersten Spiel",
+      "schritte": [
+        {
+          "id": "nachtragen",
+          "titel": "Offene Punkte nachtragen",
+          "text": "Jeder Spieler trägt fehlende Angaben selbst im eigenen Profil ein. Das Geburtsdatum steht unter Grunddaten, Spiel-ID und Plattform unter Gaming. Schick deinen Spielern einfach den Link zur Hilfe.",
+          "hinweis": "Betroffene Spieler bekommen auch selbst eine Nachricht.",
+          "bild": false,
+          "link": { "to": "/hilfe/konto-und-profil#liga-hinweis", "label": "Hilfe: Konto und Profil" }
+        },
+        {
+          "id": "kader",
+          "titel": "Kader im Blick",
+          "text": "Unter Teams bei Deine Teams steht bei eurem Co-Team, wer spielen darf und was fehlt. Neue Spieler in den Kader nimmt die Teamleitung auf.",
+          "bild": false,
+          "link": { "to": "/hilfe/team-und-co-team#co-team-kader", "label": "Hilfe: Co-Team und Kader" }
+        }
+      ]
+    },
+    {
+      "id": "termin",
+      "titel": "Termin ausmachen",
+      "schritte": [
+        {
+          "id": "matchseite",
+          "titel": "Die Matchseite",
+          "text": "Alles rund um ein Spiel läuft auf der Matchseite. Du kommst über die Ligaseite oder über die Benachrichtigung hin.",
+          "bild": false
+        },
+        {
+          "id": "termin-vorschlagen",
+          "titel": "Termin vorschlagen",
+          "text": "Wähle unter Terminabstimmung Datum und Uhrzeit und tippe auf Vorschlagen. Die Gegenseite bekommt eine Nachricht.",
+          "hinweis": "Je nach Season gilt ein unbeantworteter Vorschlag der Heimseite nach einer Frist. Sie steht unter „So laufen Termine in dieser Season“. Sonst gilt ohne Einigung der Standardtermin.",
+          "bild": true
+        },
+        {
+          "id": "termin-antworten",
+          "titel": "Auf einen Vorschlag antworten",
+          "text": "Hat die Gegenseite etwas vorgeschlagen? Nimm einen Vorschlag mit dem Haken an oder lehne ihn mit dem X ab. Du kannst auch einen Gegenvorschlag machen.",
+          "hinweis": "Antworte rechtzeitig. Sonst kann der Vorschlag der Heimseite gelten.",
+          "bild": true
+        },
+        {
+          "id": "verschieben",
+          "titel": "Termin verschieben",
+          "text": "Steht der Termin schon fest, trag unter Termin und Verschiebung einen neuen Termin und einen Grund ein. Tippe auf Beantragen. Die Gegenseite muss zustimmen.",
+          "hinweis": "Bis zur Zustimmung gilt der alte Termin. Wie oft und bis wann das geht, steht direkt darüber.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "spieltag",
+      "titel": "Am Spieltag",
+      "schritte": [
+        {
+          "id": "check-in",
+          "titel": "Einchecken",
+          "text": "Kurz vor dem Termin öffnet der Check-in. Hake an, wer von euch da ist, und tippe auf Einchecken.",
+          "hinweis": "Grau heißt: Diese Person darf gerade nicht spielen. Der Grund steht daneben.",
+          "bild": true
+        },
+        {
+          "id": "map-veto",
+          "titel": "Map-Veto",
+          "text": "Hat eure Season ein Map-Veto, kommt es nach dem Check-in beider Seiten. Ihr sperrt oder wählt abwechselnd Maps. Seid ihr dran, tippst du im markierten Modus eine Map-Karte an. Die Uhr zeigt, wie viel Zeit bleibt. Die Leiste darüber zeigt den ganzen Ablauf. Die Seite aktualisiert sich von selbst, der Zug der Gegenseite leuchtet kurz auf. Steht eine Map als Vorgabe der Woche da, hat die Liga-Leitung sie festgelegt. Die könnt ihr weder sperren noch wählen.",
+          "hinweis": "Nicht jede Season hat ein Veto. Ohne Veto fällt dieser Schritt weg. Fehlt die Vorgabe der Woche noch, wartet das Veto, bis die Liga-Leitung sie eingetragen hat. Gewertet wird dabei nichts. Danach tippen beide Seiten auf Bereit zum Veto. Die Seite zeigt, wer schon bereit ist. Erst wenn beide bereit sind, beginnt das Veto und läuft die Uhr.",
+          "bild": false
+        },
+        {
+          "id": "spiel-starten",
+          "titel": "Spiel starten",
+          "text": "Sobald beide eingecheckt sind und das Veto fertig ist, falls es eins gibt, tippt eine Seite auf Spiel starten. Ab dann läuft die Spielzeit.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "im-spiel",
+      "titel": "Wenn im Spiel etwas passiert",
+      "schritte": [
+        {
+          "id": "vorfall-melden",
+          "titel": "Vorfall melden",
+          "text": "Fliegt jemand raus oder braucht ihr einen Rehost? Tippe auf der Matchseite auf Vorfall melden. Wähle die Map, was passiert ist und euren Vorschlag.",
+          "hinweis": "Je Map hat jedes Team einen Rehost oder eine technische Pause. Die Seite zählt mit. Ein MOSS-Absturz zählt nicht.",
+          "bild": true
+        },
+        {
+          "id": "vorfall-antworten",
+          "titel": "Auf einen Vorfall antworten",
+          "text": "Meldet die Gegenseite einen Vorfall, bekommst du eine Nachricht. Auf der Matchseite läuft die Antwortzeit. Tippe auf Zustimmen oder Ablehnen.",
+          "hinweis": "Antwortet ihr nicht in der Zeit, entscheidet die Liga-Leitung. Wird eine Map neu gestartet oder wiederholt, meldet ihr die Serie danach neu.",
+          "bild": true
+        },
+        {
+          "id": "in-klaerung",
+          "titel": "Map in Klärung",
+          "text": "Seid ihr euch nicht einig, ist die Map in Klärung. Die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis. Hängt am Vorfall Screenshots oder einen Clip an.",
+          "hinweis": "Je nach Season spielt ihr unter Vorbehalt weiter oder die Serie pausiert. Das steht auf der Matchseite.",
+          "bild": true
+        },
+        {
+          "id": "map-pause",
+          "titel": "Pause zwischen den Maps",
+          "text": "Pausiert ihr zwischen zwei Maps anders als üblich? Haltet es fest. Tippe auf Vorfall melden und wähle Pause zwischen den Maps. Niemand muss antworten."
+        }
+      ]
+    },
+    {
+      "id": "nach-dem-spiel",
+      "titel": "Nach dem Spiel",
+      "schritte": [
+        {
+          "id": "ergebnis-melden",
+          "titel": "Ergebnis melden",
+          "text": "Wähl für jede Map Modus und Map und trag die Punkte beider Seiten ein. Wer mehr Punkte hat, steht automatisch als Sieger da. Tippe dann auf Ergebnis melden.",
+          "hinweis": "Melden geht erst, wenn beide Seiten eingecheckt sind. Nur bei Gleichstand oder ohne Punkte tippst du den Sieger selbst an.",
+          "bild": true
+        },
+        {
+          "id": "wer-hat-gespielt",
+          "titel": "Wer hat gespielt?",
+          "text": "Hake beim Melden an, wer bei euch gespielt hat. Das ist eure Teilnehmerliste.",
+          "hinweis": "In manchen Seasons wählst du stattdessen bei jeder Map „Deine Aufstellung“.",
+          "bild": true
+        },
+        {
+          "id": "bestaetigen",
+          "titel": "Ergebnis bestätigen",
+          "text": "Hat die Gegenseite gemeldet, prüf ihr Ergebnis. Stimmt es, hake an, wer bei euch gespielt hat, und tippe auf Stimmt.",
+          "hinweis": "Antwortet ihr nicht, gilt die Meldung nach Ablauf der Frist der Season.",
+          "bild": true
+        },
+        {
+          "id": "teilnehmerliste-nachtragen",
+          "titel": "Teilnehmerliste nachtragen",
+          "text": "Steht auf der Matchseite „Teilnehmerliste fehlt noch“, tragt ihr nach, wer gespielt hat. Das Ergebnis gilt schon.",
+          "hinweis": "Wer nicht auf der Liste steht, zählt nicht als Einsatz.",
+          "bild": false
+        },
+        {
+          "id": "problem-melden",
+          "titel": "Problem melden (Protest)",
+          "text": "Stimmt etwas nicht? Tippe auf Stimmt nicht oder Problem melden. Wähle den Grund, schreib kurz dazu und häng bei Bedarf ein Foto an. Die Leitung entscheidet.",
+          "hinweis": "Einen eigenen Knopf „Protest“ gibt es nicht. Bis wann es geht, steht im Formular.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}

@@ -51,8 +51,17 @@ async def test_matchday_after_the_winter_break_keeps_its_week(flow):
     match = await decided_match(flow, tournament, 5, decided)
     moment = decided + timedelta(hours=2)
     window = await dispute_window(flow.db, match, now=moment)
-    assert window["open"] is True, "der Einspruch bleibt bis zum Ende der Spielwoche offen"
-    assert window["until"] == week.end.isoformat()
+    # Liga-Staffel seit E.2 (#1619, Entscheidung Nr. 129): Protestfrist der Season ab der Bestätigung (Vorgabe 48 Stunden, ruhend in
+    # Sperrzeiten) - „Ende der Spielwoche“ gilt in der Liga nicht mehr. Die Sperrwochen 3 und 4 liegen vor diesem Spieltag.
+    assert window["open"] is True
+    assert window["until"] == (decided + timedelta(hours=48)).isoformat()
+    assert week.start < decided < week.end, "der Spieltag liegt weiter in seiner Woche nach der Pause"
+
+    # Gegenprobe: Liegt die Bestätigung in einer Sperrwoche, beginnt die Frist erst danach.
+    blocked = tournament_matchday_window(stored, 2).end + timedelta(days=1)
+    paused = await decided_match(flow, tournament, 2, blocked)
+    rested = await dispute_window(flow.db, paused, now=blocked + timedelta(hours=2))
+    assert rested["open"] is True and rested["until"] > (blocked + timedelta(days=13)).isoformat()
 
 
 @pytest.mark.asyncio

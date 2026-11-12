@@ -29,7 +29,11 @@ export const SEQUENCES = Object.freeze({
   diamond: { duration: 12000, label: "Diamant" },
   legendary: { duration: 10000, label: "Legendär" },
   levelup: { duration: 9000, label: "Level-Aufstieg" },
+  // Neuberechnung (#2340): alle nachgerechneten Stufen auf einmal, je gezeigtem Abzeichen etwas länger.
+  recount: { duration: 6500, perItem: 150, label: "Nachträglich bekommen" },
 });
+// So viele Abzeichen zeigt die Sammel-Zeremonie der Neuberechnung; der Rest steht als „+ n weitere“ daneben.
+export const RECOUNT_SHOWN = 12;
 export const SEQUENCE_KEYS = Object.freeze(Object.keys(SEQUENCES));
 
 const LEGACY_CATEGORY = { content: "creator", progression: "profile" };
@@ -109,6 +113,12 @@ export function levelTexts(levelUp) {
   return { heading: `Level ${level} erreicht`, sub: "Level-Aufstieg", phaseSub: `Level ${level} erreicht`, phaseHeading: levelUp?.title || "Aufstieg" };
 }
 
+/** Texte der Sammel-Zeremonie nach der Neuberechnung (#2340). */
+export function recountTexts(count) {
+  const n = Number(count || 0);
+  return { heading: n === 1 ? "Du hast einen Erfolg nachträglich bekommen" : `Du hast ${n} Erfolge nachträglich bekommen`, sub: "Erfolge neu berechnet" };
+}
+
 export function planCeremony(pkg) {
   // Turnier-Platz (#1180): feierlich, aber ruhig - eigener Ablauf ohne Partikel (components/tls/podium/PlacementMoment).
   if (pkg?.placement) {
@@ -124,6 +134,7 @@ export function planCeremony(pkg) {
 
   let sequence = "single";
   if (levelUp && !tiers.length) sequence = "levelup";
+  else if (context.recount) sequence = "recount";
   else if (context.firstEver) sequence = "first";
   else if (context.categoryCompleted) sequence = "category";
   else if (context.groupCompleted) sequence = "group";
@@ -132,7 +143,9 @@ export function planCeremony(pkg) {
   else if (tiers.length > 1) sequence = "stack";
 
   const meta = SEQUENCES[sequence];
-  const duration = sequence === "stack" ? meta.duration + meta.perItem * tiers.length : meta.duration;
+  let duration = meta.duration;
+  if (sequence === "stack") duration = meta.duration + meta.perItem * tiers.length;
+  if (sequence === "recount") duration = meta.duration + meta.perItem * Math.min(tiers.length, RECOUNT_SHOWN);
   const look = MATERIAL_LOOKS[material];
   return {
     id: pkg?.id || `${sequence}-${top?.code || "level"}-${Date.now()}`,
@@ -155,14 +168,14 @@ export function planCeremony(pkg) {
     sub: context.sub || null,
     shareId: top?.award_id || null,
     hidden: Boolean(top?.hidden || (top && categoryOf(top) === "hidden")),
-    sound: { material, special: sequence === "single" || sequence === "stack" ? null : sequence },
+    sound: { material, special: ["single", "stack", "recount"].includes(sequence) ? null : sequence },
     particles: particleBudget(sequence, material),
   };
 }
 
 // Partikelbudget je Ablauf: höchstens 160 am PC, 60 auf dem Handy (Ceremony.jsx halbiert bei schmalen Fenstern).
 export function particleBudget(sequence, material) {
-  const base = { single: 40, stack: 60, first: 80, group: 110, category: 120, diamond: 160, legendary: 160, levelup: 120 }[sequence] || 40;
+  const base = { single: 40, stack: 60, recount: 60, first: 80, group: 110, category: 120, diamond: 160, legendary: 160, levelup: 120 }[sequence] || 40;
   const bonus = material === "gold" ? 20 : material === "diamond" ? 30 : material === "legendary" ? 30 : 0;
   return Math.min(160, base + bonus);
 }

@@ -66,7 +66,7 @@ async def test_visibility_off_admins_members_public(flow):
         ("public", {"anonym": (1, 200), "gast": (1, 200), "mitglied": (1, 200), "leitung": (1, 200)}),
     ):
         flow.act_as(admin)
-        response = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})
+        response = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility, "readiness_override_reason": "Testaufbau ohne Prüfung"})
         assert response.status_code == 200
         assert await matrix() == expected, visibility
 
@@ -74,7 +74,7 @@ async def test_visibility_off_admins_members_public(flow):
 @pytest.mark.asyncio
 async def test_the_season_page_lists_divisions_and_staffeln_with_tournament_ids(flow):
     admin, league, season, staffel, _member, _guest = await setup(flow)
-    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "public"})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     await flow.db.tournaments.update_one({"id": staffel["tournament_id"]}, {"$set": {"status": "registration_closed"}})
     flow.act_as(None)
 
@@ -85,7 +85,8 @@ async def test_the_season_page_lists_divisions_and_staffeln_with_tournament_ids(
     page = (await flow.get("/api/leagues/probe-shooter/season-1")).json()
     assert page["league"]["name"] == "Probe-Liga"
     assert page["season"]["rules_text"] == "Regeltext"
-    assert page["season"]["match_points"] == {"win": 3, "draw": 1, "loss": 0}
+    # Neue Seasons ohne Remis (E.1, #1625): 3/0/0.
+    assert page["season"]["match_points"] == {"win": 3, "draw": 0, "loss": 0}
     assert "visibility" not in page["season"] and "created_by" not in page["season"]
     division = page["divisions"][0]
     assert division["label"] == "Liga 1 · Elite"
@@ -105,7 +106,7 @@ async def test_staffel_tournaments_follow_the_season_visibility(flow):
     assert (await flow.get(url)).status_code == 404
 
     flow.act_as(admin)
-    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "members"})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "members", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
     await flow.db.tournaments.update_one({"id": staffel["tournament_id"]}, {"$set": {"status": "live"}})
     flow.act_as(member)

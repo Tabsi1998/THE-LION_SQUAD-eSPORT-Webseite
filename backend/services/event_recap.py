@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from services import event_days
 from services.competition_read import CompetitionReadModel, observe_structure_read
-from services.competition_standings import standings_for_structure
+from services.competition_standings import games_won_text, place_paths, standings_for_structure
 from services.event_roster import registration_players
 from services.fastlap_standings import championship_totals, effective_ms, official_query
 from services.visibility import lead_can_see, user_can_see
@@ -172,8 +172,11 @@ async def tournament_tables(db, tournaments: list[dict]) -> dict[str, dict]:
             if match.get("status") in PLAYED_MATCH_STATUSES
             and len([slot for slot in match.get("slots") or [] if slot.get("registration_id")]) >= 2
         )
+        own_stages = [stage for stage in stages if stage.get("tournament_id") == tid]
         tables[tid] = {"rows": rows, "registrations": {reg["id"]: reg for reg in own_regs}, "played": played,
-                       "players": {reg["id"]: players.get(reg["id"], set()) for reg in own_regs}}
+                       "players": {reg["id"]: players.get(reg["id"], set()) for reg in own_regs},
+                       # Wie der Platz im Baum zustande kam (#2336) - dieselbe Rechnung wie die Rangliste.
+                       "paths": place_paths(structure.get("matches") or [], own_stages, tournament, own_regs)}
     return tables
 
 
@@ -191,6 +194,12 @@ def podium_from(table: dict, users: dict[str, dict]) -> list[dict]:
         if not reg:
             continue
         wins = row.get("wins") if row.get("wins") is not None else row.get("won")
+        path = (table.get("paths") or {}).get(row.get("registration_id"))
+        if path:
+            # Im Baum (#2336): erst der Weg, die gewonnenen Spiele klein darunter - die Siege allein erklären den Platz nicht.
+            podium.append({"rank": _row_rank(row, index), "name": registration_name(reg, users), "team": bool(reg.get("team_id")),
+                           "path": path, "won": int(wins or 0), "detail": games_won_text(wins)})
+            continue
         points = row.get("points")
         detail = []
         if wins:

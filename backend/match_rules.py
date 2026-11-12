@@ -47,7 +47,11 @@ def match_allows_draw(match: dict) -> bool:
     A knockout match may not: somebody has to advance. Everything played in a
     table - league, round robin, groups, Swiss - may, and until now could not,
     which silently turned every draw into a win for whoever was listed first.
+
+    Liga-Staffel ohne Remis (E.1, #1625): ``checked_results`` setzt ``allow_draws: False`` an die Prüfkopie des Spiels.
     """
+    if match.get("allow_draws") is False:
+        return False
     for field in ("bracket", "section"):
         value = str(match.get(field) or "").strip().lower()
         if value in DRAW_SECTIONS or value.startswith("group_"):

@@ -110,7 +110,10 @@ def _report_task(match: dict, policy: dict, acting_ids: set[str], now: datetime)
     mine = [rid for rid in match_registration_ids(match) if rid in acting_ids]
     if not mine or len(match_registration_ids(match)) < 2:
         return None
-    state = report_state(match.get("reports") or [], mine[0])["status"]
+    # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht - es gibt nichts zu bestätigen.
+    from services.league_incident_rules import current_reports
+
+    state = report_state(current_reports(match), mine[0])["status"]
     if state == "confirm":
         return "confirm"
     if state != "open":
@@ -270,6 +273,17 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
         waiting = [row for row in open_by_match.get(match["id"], []) if row.get("actor_registration_id") not in own]
         if waiting:
             tasks.append(("schedule", match, min(str(row.get("scheduled_at") or "") for row in waiting) or None))
+    # Verschiebung beantworten (#2194): ein offener Antrag der anderen Seite.
+    # Die kanonische Form der Spiele kennt die Anträge nicht - die Liga-Termine lesen sie selbst.
+    from services.league_schedule import matches_with_open_requests
+
+    rescheduling = await matches_with_open_requests(db, sides, sorted(SCHEDULE_TASK_CLOSED))
+    for match in rescheduling:
+        own = acting.intersection(match_registration_ids(match))
+        waiting = [row for row in match.get("reschedule_requests") or []
+                   if isinstance(row, dict) and row.get("status") == "pending" and row.get("requested_registration_id") not in own]
+        if waiting:
+            tasks.append(("reschedule", match, str(waiting[0].get("to_at") or "") or None))
     tournament_ids = sorted({match.get("tournament_id") for match in missing if match.get("tournament_id")})
     tournaments = {row["id"]: row for row in await db.tournaments.find(
         {"id": {"$in": tournament_ids}}, {"_id": 0}).to_list(len(tournament_ids) + 5)} if tournament_ids else {}
@@ -278,14 +292,19 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
         deadline = amend_deadline_for(tournaments.get(match.get("tournament_id")), match)
         if deadline and deadline >= now:
             tasks.append(("lineup", match, deadline.isoformat()))
+    # Jetzt einchecken (#1652, D.2): das Fenster ist offen, die eigene Seite fehlt noch.
+    from services.match_flow import open_checkin_tasks
+
+    for match, until in await open_checkin_tasks(db, acting, sides, now=now):
+        tasks.append(("checkin", match, until))
     if not tasks:
         return []
     summaries = await compact_match_overviews(db, [match for _task, match, _when in tasks], acting)
     return [
-        {"task": task, "match_id": match.get("id"), "until": when if task == "lineup" else None,
+        {"task": task, "match_id": match.get("id"), "until": when if task in {"lineup", "checkin"} else None,
          # Teilnehmerliste einmal je Spiel (#2204): Der Text der Aufgabe sagt, was fehlt.
          "series": (tournaments.get(match.get("tournament_id")) or {}).get("lineup_mode") == "series",
-         "proposed_at": when if task == "schedule" else None,
+         "proposed_at": when if task in {"schedule", "reschedule"} else None,
          "tournament_title": summary.get("tournament_title"), "opponent_name": summary.get("opponent_name") or ""}
         for (task, match, when), summary in zip(tasks, summaries)
     ]

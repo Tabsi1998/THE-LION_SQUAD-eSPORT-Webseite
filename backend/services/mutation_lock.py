@@ -68,6 +68,19 @@ def league_season_resource(season_id: str) -> str:
     return f"league_season:{season_id}:squads"
 
 
+def league_season_pool_resource(season_id: str) -> str:
+    """Der Map-Pool einer Liga-Season (#2207): Speichern, Entfernen und „Map aus dem Pool nehmen“ nacheinander. Nach den Turnier-Sperren
+    der Staffeln."""
+    return f"league_season:{season_id}:map_pool"
+
+
+def game_equipment_resource(game_id: str) -> str:
+    """Die Ausrüstungs-Bibliothek eines Spiels (#2287): Kategorien und Unterkategorien speichern, Einträge anlegen, ändern, verschieben,
+    übernehmen und eine Sperrliste mit ganzer Klasse speichern nacheinander - nie verweist so etwas auf eine eben entfernte Unterkategorie.
+    Nach der Pool-Sperre einer Season."""
+    return f"game:{game_id}:equipment"
+
+
 def league_resource(league_id: str) -> str:
     """Eine Liga: liga-weites Regelwerk veröffentlichen, Liga löschen (#1646). Vor den Sperren ihrer Seasons."""
     return f"league:{league_id}:rules"

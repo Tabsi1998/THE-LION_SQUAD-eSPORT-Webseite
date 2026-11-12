@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from database import get_db
 from auth import password_fields, require_super, require_any_admin
 from models import now_utc, new_id
+from services import help_topics
 from services.password_policy import NewPassword
 from services.public_site_settings import build_public_legal_settings
 from services.secret_store import encrypt_secret
@@ -283,6 +284,8 @@ STATIC_SITEMAP_PATHS = [
     "/", "/about", "/news", "/events", "/calendar", "/esports", "/tournaments", "/fastlap",
     "/teams", "/servers", "/members", "/membership/join",
     "/sponsors", "/partners", "/contact", "/board", "/galerie", "/references",
+    # Hilfe für Spieler und Captains (#2295): Übersicht und jedes Thema.
+    *help_topics.help_paths(),
 ]
 
 

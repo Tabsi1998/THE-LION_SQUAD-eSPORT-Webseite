@@ -29,7 +29,9 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     const stamp = now();
     const last = state.pending[state.pending.length - 1];
     let entry;
-    if (last && !last.placement && stamp - state.lastEnqueueAt <= bundleMs) {
+    // Die Sammel-Zeremonie der Neuberechnung (#2340) bleibt für sich - sie zählt nur die nachgerechneten Stufen.
+    const alone = (item) => Boolean(item?.placement || item?.context?.recount);
+    if (last && !alone(last) && !alone(pkg) && stamp - state.lastEnqueueAt <= bundleMs) {
       entry = mergeInto(last, pkg);
     } else if (!last && state.current && pkg.levelUp && !(pkg.tiers || []).length) {
       // Ein Level-up während einer laufenden Zeremonie wird Teil davon (am Ende gezeigt).

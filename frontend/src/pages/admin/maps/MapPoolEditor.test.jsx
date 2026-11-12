@@ -38,6 +38,19 @@ test("bietet je Modus nur freigegebene Maps an, die gewählten zuerst in ihrer R
   expect(screen.getByTestId("pool-save")).toBeDisabled();
 });
 
+// #2207: Eine inaktive Map steht nur dort zur Wahl, wo der gespeicherte Pool sie schon hat - mit „inaktiv“.
+test("eine inaktive Map bleibt, wo sie steht, und kommt nirgends neu dazu", () => {
+  const library = [{ ...LIBRARY[0], status: "inactive" }, LIBRARY[1]];
+  const { onSave } = renderEditor({ library, entry: { ...ENTRY, outdated_map_ids: [] } });
+  const snd = screen.getByTestId("pool-mode-snd");
+  expect(within(snd).getAllByTestId(/pool-map-/).map((row) => row.dataset.mapId)).toEqual(["nebel", "hafen"]);
+  expect(within(snd).getByTestId("pool-inactive-hafen")).toHaveTextContent("inaktiv");
+  expect(within(screen.getByTestId("pool-mode-stellung")).queryAllByTestId(/pool-map-/)).toEqual([]);
+  fireEvent.click(screen.getByTestId("pool-defaults"));
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel"] }] }));
+});
+
 // #2129, SP2: Bereinigter Modus und Maps ohne Modus - alles lesbar und benannt, nichts still gesperrt.
 test("ein entfernter Modus im gespeicherten Pool bleibt benannt, Speichern nimmt ihn erst bewusst heraus", () => {
   const entry = { ...ENTRY, outdated_map_ids: [], modes: [...ENTRY.modes, { mode: "alt", label: "Alter Modus", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };
@@ -57,7 +70,7 @@ test("ein Pool von vor dem ersten Modus zeigt seinen Stand, ohne etwas zu verlie
 test("Maps ohne Modus nennt der Editor und führt zur Bibliothek", () => {
   renderEditor({ library: [...LIBRARY, { id: "glut", name: "Glutsenke", modes: [] }], libraryLink: true });
   expect(screen.getByTestId("pool-without-mode")).toHaveTextContent("1 Map hat noch keinen Modus");
-  expect(within(screen.getByTestId("pool-without-mode")).getByRole("link", { name: "Zuordnen" })).toHaveAttribute("href", "/admin/games/g1/maps");
+  expect(within(screen.getByTestId("pool-without-mode")).getByRole("link", { name: "Zuordnen" })).toHaveAttribute("href", "/admin/games/g1#maps");
 });
 
 // #2129, SP3: Der Knopf heißt weiter „Vorgabe des Spiels“ und lädt den Standard-Pool, ohne ihn wie bisher alle aktiven Maps.
@@ -129,10 +142,92 @@ test("ohne Spiel oder ohne Maps sagt der Editor, was fehlt", () => {
   unmount();
   render(<MemoryRouter><MapPoolEditor title="Pool" game={GAME} library={[]} entry={null} onSave={vi.fn()} testId="pool" libraryLink /></MemoryRouter>);
   expect(screen.getByTestId("pool-no-maps")).toHaveTextContent("noch keine aktiven Maps");
-  expect(screen.getByRole("link", { name: /Maps anlegen/ })).toHaveAttribute("href", "/admin/games/g1/maps");
+  expect(screen.getByRole("link", { name: /Maps anlegen/ })).toHaveAttribute("href", "/admin/games/g1#maps");
 });
 
 test("ein Pool eines anderen Spiels gilt nicht mehr und wird so angezeigt", () => {
   renderEditor({ entry: { ...ENTRY, stale: true } });
   expect(screen.getByTestId("pool-stale")).toHaveTextContent("anderen Spiel");
+});
+
+// #2206: Inaktive und archivierte Modi kommen in keinen neuen Pool - was der gespeicherte Pool schon hat, bleibt wählbar.
+test("ein inaktiver Modus steht nur zur Wahl, wenn der Pool ihn schon hat", () => {
+  const game = { ...GAME, modes: [{ mode: "stellung", label: "Stellung", status: "inactive" }, { mode: "snd", label: "Suchen & Zerstören", status: "inactive" }] };
+  const { onSave } = renderEditor({ game, entry: { ...ENTRY, outdated_map_ids: [] } });
+  expect(screen.queryByTestId("pool-mode-stellung")).toBeNull();
+  expect(screen.getByTestId("pool-mode-snd")).toHaveTextContent("Suchen & Zerstören (inaktiv)");
+  expect(screen.getByTestId("pool-inactive")).toHaveTextContent("„Stellung“");
+  expect(screen.queryByTestId("pool-old-groups")).toBeNull();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hafenkante in Suchen & Zerstören (inaktiv)" }));
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel"] }] }));
+});
+
+test("archivierte Modi verschwinden, alle Modi nicht wählbar heißt: keine Gruppe „Alle Maps“", () => {
+  const game = { ...GAME, modes: [{ mode: "stellung", label: "Stellung", status: "archived" }, { mode: "snd", label: "Suchen & Zerstören", status: "archived" }] };
+  renderEditor({ game, entry: null });
+  expect(screen.queryByTestId("pool-mode-stellung")).toBeNull();
+  expect(screen.queryByTestId("pool-mode-alle")).toBeNull();
+  expect(screen.queryByTestId("pool-inactive")).toBeNull();
+  expect(screen.getByTestId("pool-no-modes")).toHaveTextContent("alle sind inaktiv oder archiviert");
+  expect(screen.getByTestId("pool-defaults")).toBeDisabled();
+  expect(screen.getByTestId("pool-save")).toBeDisabled();
+});
+
+// #2266: Das Symbol des Modus steht am Kopf jeder Gruppe; hat es sich am Spiel geändert, sagt der Editor es wie bei Maps.
+test("Modus-Symbol im Kopf, „Symbol geändert“ bei veraltetem Pool", () => {
+  const game = { ...GAME, modes: [{ ...GAME.modes[0] }, { ...GAME.modes[1], icon_url: "/api/static/uploads/snd.png" }] };
+  renderEditor({ game, entry: { ...ENTRY, outdated_modes: ["snd"] } });
+  expect(screen.getByTestId("pool-mode-snd-icon")).toHaveAttribute("data-icon", "image");
+  expect(screen.getByTestId("pool-mode-stellung-icon")).toHaveAttribute("data-icon", "placeholder");
+  expect(screen.getByTestId("pool-mode-snd-icon-changed")).toHaveTextContent("Symbol geändert – mit dem nächsten Speichern übernommen.");
+  expect(screen.queryByTestId("pool-mode-stellung-icon-changed")).toBeNull();
+});
+
+test("nur ein geändertes Symbol: Speichern geht, ohne dass der Pool als ungespeichert gilt", () => {
+  const onDirtyChange = vi.fn();
+  const { onSave } = renderEditor({ entry: { ...ENTRY, outdated_map_ids: [], outdated_modes: ["snd"] }, onDirtyChange });
+  expect(onDirtyChange).not.toHaveBeenCalledWith(true);
+  expect(screen.getByTestId("pool-save")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel", "hafen"] }] }));
+});
+
+// Season-Seite (#2267): Die Modi der Season stehen an einer Stelle - anhaken, darunter je Modus die Maps.
+test("Modi anhaken: nur angehakte Modi zeigen ihre Maps, ein abgehakter fällt beim Speichern aus dem Pool", () => {
+  const onModesChange = vi.fn();
+  const onDirtyChange = vi.fn();
+  const { onSave } = renderEditor({ pickModes: true, onModesChange, onDirtyChange, entry: { ...ENTRY, outdated_map_ids: [] },
+    modeAside: (mode) => <span data-testid={`aside-${mode}`}>mindestens 2</span> });
+  expect(screen.getByTestId("pool-pick-snd")).toBeChecked();
+  expect(screen.getByTestId("pool-pick-stellung")).not.toBeChecked();
+  expect(screen.queryByTestId("pool-mode-stellung")).toBeNull();
+  expect(within(screen.getByTestId("pool-mode-snd")).getByTestId("aside-snd")).toHaveTextContent("mindestens 2");
+  expect(onModesChange).toHaveBeenLastCalledWith({ picked: ["snd"], withMaps: ["snd"] });
+  expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+  fireEvent.click(screen.getByTestId("pool-pick-stellung"));
+  expect(screen.getByTestId("pool-mode-stellung")).toBeInTheDocument();
+  expect(screen.getByTestId("pool-modes")).toHaveTextContent("noch keine Map");
+  fireEvent.click(within(screen.getByTestId("pool-mode-stellung")).getByLabelText("Hafenkante in Stellung"));
+  expect(onModesChange).toHaveBeenLastCalledWith({ picked: ["stellung", "snd"], withMaps: ["stellung", "snd"] });
+
+  fireEvent.click(screen.getByTestId("pool-pick-snd"));
+  expect(screen.queryByTestId("pool-mode-snd")).toBeNull();
+  expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "stellung", map_ids: ["hafen"] }] }));
+
+  // Wieder angehakt: die gemerkte Auswahl ist zurück.
+  fireEvent.click(screen.getByTestId("pool-pick-snd"));
+  expect(within(screen.getByTestId("pool-mode-snd")).getByText("2 von 2")).toBeInTheDocument();
+});
+
+test("ohne Pool ist kein Modus angehakt - „Vorgabe des Spiels“ hakt die Modi mit Maps an", () => {
+  renderEditor({ pickModes: true, entry: null });
+  expect(screen.getByTestId("pool-pick-none")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("pool-defaults"));
+  expect(screen.getByTestId("pool-pick-snd")).toBeChecked();
+  expect(screen.getByTestId("pool-pick-stellung")).toBeChecked();
+  expect(screen.queryByTestId("pool-pick-none")).toBeNull();
 });

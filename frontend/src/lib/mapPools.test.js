@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  choosableMaps,
   defaultSelection,
   eligibleMaps,
   mapFormPayload,
+  mapStatusOf,
   mapToForm,
   moveMap,
   poolSections,
@@ -24,6 +26,23 @@ const POOL = {
   id: "p1", version: 2, origin: "tournament",
   modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "nebel", name: "Nebelwerk" }, { map_id: "hafen", name: "Hafenkante" }] }],
 };
+
+describe("Inaktive Maps (#2207)", () => {
+  const WITH_INACTIVE = [...LIBRARY, { id: "turm", name: "Turmblick", modes: ["snd"], status: "inactive" }];
+
+  it("bietet eine inaktive Map nur an, wo der gespeicherte Pool sie in diesem Modus schon hat", () => {
+    expect(choosableMaps(WITH_INACTIVE, "snd").map((item) => item.id)).toEqual(["hafen", "nebel"]);
+    expect(choosableMaps(WITH_INACTIVE, "snd", ["turm"]).map((item) => item.id)).toEqual(["hafen", "nebel", "turm"]);
+    expect(choosableMaps([{ id: "alt", modes: ["snd"], status: "archived" }], "snd", ["alt"])).toEqual([]);
+  });
+
+  it("die Vorgabe des Spiels nimmt keine inaktive Map, ein fehlender Zustand heißt aktiv", () => {
+    expect(defaultSelection(WITH_INACTIVE, MODES).snd).toEqual(["hafen", "nebel"]);
+    expect(mapStatusOf({})).toBe("active");
+    expect(mapStatusOf({ status: "inactive" })).toBe("inactive");
+    expect(mapStatusOf({ status: "kaputt" })).toBe("active");
+  });
+});
 
 describe("Auswahl je Modus", () => {
   it("bietet je Modus nur die freigegebenen Maps an – ohne Modi alle", () => {

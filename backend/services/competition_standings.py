@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from services.match_winner import won_by
-from services.round_labels import TABLE_FORMATS, section_kind
-from services.scoring_rules import rank_with_ties
+# ``is_bye`` (#2336) steht bei der einen Regel für Spiele und Siege (services/match_winner, #2337) und bleibt hier importierbar.
+from services.match_winner import is_bye, is_real_match, no_show_ids, participant_ids, won_by
+from services.round_labels import TABLE_FORMATS, TABLE_STAGE_TYPES, section_kind
+from services.scoring_rules import maps_mode, rank_with_ties
 
 
 TERMINAL_MATCH_STATUSES = {"completed", "forfeit"}
@@ -130,28 +131,39 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
             "rank_sum": 0,
             "furthest_round": 0,
             "best_rank": None,
+            # Freilos-Spiele (#2336): stehen nicht in ``played``/``won``, zählen aber für die Reihenfolge wie bisher.
+            "byes": 0,
         }
         for registration in registrations
         if registration.get("id")
     }
+    # Siege samt Freilos - nur für die Sortierung, damit sich kein Platz verschiebt (Saisonpunkte, Preise, Pokale).
+    bye_wins: dict[str, int] = {}
     for match in matches:
         if match.get("status") not in TERMINAL_MATCH_STATUSES:
             continue
+        # Ein Freilos ist kein Spiel und kein Sieg (#2336, wie #1796): angezeigt wird es nicht als Spiel.
+        bye = is_bye(match)
         for result in match.get("results") or []:
             registration_id = result.get("registration_id")
             if registration_id not in rank_map:
                 continue
             rank = _safe_int(result.get("rank"), 999)
             row = rank_map[registration_id]
-            row["played"] += 1
             row["rank_sum"] += rank
             row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")))
             row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
-            if rank == 1:
-                row["won"] += 1
+            if bye:
+                row["byes"] += 1
+                if rank == 1:
+                    bye_wins[registration_id] = bye_wins.get(registration_id, 0) + 1
             else:
-                # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
-                row["lost"] += 1
+                row["played"] += 1
+                if rank == 1:
+                    row["won"] += 1
+                else:
+                    # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
+                    row["lost"] += 1
             if rank <= 2:
                 row["top2"] += 1
             score = result.get("points")
@@ -161,13 +173,15 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
                 row["points"] += score
     rows = list(rank_map.values())
     for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
+        # Durchschnitt wie vor #2336 samt Freilos - er ist Teil der Reihenfolge.
+        entries = row["played"] + row["byes"]
+        row["avg_rank"] = round(row["rank_sum"] / entries, 2) if entries else None
     rows.sort(
         key=lambda row: (
-            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung.
+            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung - Siege samt Freilos (#2336).
             -places.get(row["registration_id"], 10_000),
             row["furthest_round"],
-            row["won"],
+            row["won"] + bye_wins.get(row["registration_id"], 0),
             row["top2"],
             row["points"],
             -(row["avg_rank"] or 999),
@@ -306,12 +320,346 @@ def _round_robin_rows(matches: list[dict], registrations: list[dict], rules: dic
     return rows
 
 
-def round_robin_standings(matches: list[dict], registrations: list[dict], rules: dict | None = None) -> list[dict]:
+def round_robin_standings(matches: list[dict], registrations: list[dict], rules: dict | None = None, *,
+                          tournament: dict | None = None) -> list[dict]:
     """Liga, Round Robin und jede Gruppe: Punkte, Differenz, Form und Bewegung seit dem letzten Spieltag. ``rules``
-    (``table_rules(tournament)``): Punkte je Sieg/Remis/Niederlage und Gleichstand einer Liga - ohne wie bisher."""
-    def compute(rows_matches, rows_registrations):
-        return _round_robin_rows(rows_matches, rows_registrations, rules)
-    return _with_form_and_movement(compute, matches, registrations)
+    (``table_rules(tournament)``): Punkte je Sieg/Remis/Niederlage und Gleichstand einer Liga - ohne wie bisher. Mit
+    ``rules`` rechnet die Tabelle der Liga-Staffel (E.1, ``_league_rows``); ``tournament`` liefert dazu Best of,
+    Punktabzüge und Entscheide der Leitung."""
+    if rules is None:
+        def compute(rows_matches, rows_registrations):
+            return _round_robin_rows(rows_matches, rows_registrations, rules)
+        return _with_form_and_movement(compute, matches, registrations)
+    effective = _league_matches(matches, registrations, rules, (tournament or {}).get("best_of"))
+    # Der ganze Spielplan: Ob unter Punktgleichen alles gespielt ist, entscheidet er - auch für die Tabelle des vorigen
+    # Spieltags (Bewegung), die nur einen Teil der Spiele sieht.
+    context = {**(tournament or {}), "_schedule": effective}
+
+    def league_compute(rows_matches, rows_registrations):
+        return _league_rows(rows_matches, rows_registrations, rules, context)
+    rows = _with_form_and_movement(league_compute, effective, registrations)
+    # Angefochtene Ergebnisse (#1619, E.2, Nr. 30): Sie zählen vorläufig mit (``contested_result_mode: counts``) - die Zeile nennt,
+    # wie viele ihrer Spiele „in Klärung“ sind. Mit ``excluded`` ist das Spiel ``disputed`` und zählt hier gar nicht.
+    contested: dict[str, int] = {}
+    for match in effective:
+        if match.get("contested") and match.get("status") in TERMINAL_MATCH_STATUSES:
+            for slot in match.get("slots") or []:
+                if isinstance(slot, dict) and slot.get("registration_id"):
+                    contested[slot["registration_id"]] = contested.get(slot["registration_id"], 0) + 1
+    for row in rows:
+        row["contested"] = contested.get(row.get("registration_id"), 0)
+    return rows
+
+
+# ---------------------------------------------------------------- Liga-Staffel (E.1, #1625, docs/LIGA.md)
+
+EXIT_STATUSES = ("withdrawn", "disqualified")
+
+
+def exit_of(registration: dict) -> dict | None:
+    """Ist die Anmeldung ausgeschieden (Austritt, Auflösung als Austritt, Disqualifikation)? ``{kind, at}`` oder ``None``.
+    ``removal_at`` setzt die öffentliche Tabelle, weil die Projektion der Anmeldung ``removal`` nicht mitgibt."""
+    status = registration.get("status")
+    if status not in EXIT_STATUSES:
+        return None
+    return {"kind": status, "at": registration.get("removal_at") or (registration.get("removal") or {}).get("at")}
+
+
+def default_win_maps(match: dict, best_of_default=None) -> int:
+    """Die Maps eines Default-Wins (Nr. 26): so viele, wie der Sieger eines Best of braucht - BO5 3, BO3 2, BO1 1."""
+    best_of = _safe_int(match.get("best_of"), 0) or _safe_int(best_of_default, 0) or 1
+    return best_of // 2 + 1
+
+
+def _rewritten(match: dict, results: list[dict], **flags) -> dict:
+    return {**match, "results": results, **flags}
+
+
+def _league_matches(matches: list[dict], registrations: list[dict], rules: dict, best_of=None) -> list[dict]:
+    """Die Spiele, wie die Tabelle einer Liga-Staffel sie zählt - als Kopien, das Spiel selbst bleibt unverändert:
+
+    - Beide nicht erschienen (beide Seiten ``forfeit``): beide verlieren, keine Maps (Nr. 27).
+    - Kampflos (Stand ``forfeit``): mit ``forfeit_score: best_of`` bekommt der Sieger die Maps des Best of (Nr. 26).
+    - ``exit_rule: all_for_opponents``: jedes Spiel eines ausgeschiedenen Teams zählt wie ein Default-Win für den Gegner,
+      ein Spiel zweier ausgeschiedener Teams für keinen (Nr. 48).
+    """
+    exits = {row["id"]: exit_of(row) for row in registrations if row.get("id")}
+    for_opponents = rules.get("exit_rule") == "all_for_opponents"
+    # Mit Map-Punkten (#2312) zählt kampflos immer mit den Maps des Best of - sonst bekäme der Sieger 0 Punkte.
+    best_of_maps = rules.get("forfeit_score") == "best_of" or maps_mode(rules)
+    out: list[dict] = []
+    for match in matches:
+        slot_a, slot_b, result_a, result_b = _duel_entries(match)
+        side_a = (slot_a or {}).get("registration_id")
+        side_b = (slot_b or {}).get("registration_id")
+        if match.get("status") not in TERMINAL_MATCH_STATUSES or not side_a or not side_b:
+            out.append(match)
+            continue
+        maps = default_win_maps(match, best_of)
+        gone_a = for_opponents and bool(exits.get(side_a))
+        gone_b = for_opponents and bool(exits.get(side_b))
+        if gone_a and gone_b:
+            continue
+        if gone_a or gone_b:
+            loser, winner = (side_a, side_b) if gone_a else (side_b, side_a)
+            score = maps if best_of_maps else None
+            out.append(_rewritten(match, [
+                {"registration_id": winner, "rank": 1, "outcome": "winner", "score": score},
+                {"registration_id": loser, "rank": 2, "outcome": "loser", "forfeit": True, "score": 0 if score else None},
+            ], table_forfeit=loser, table_exit=loser))
+            continue
+        if (result_a or {}).get("forfeit") and (result_b or {}).get("forfeit"):
+            out.append(_rewritten(match, [
+                {"registration_id": side_a, "rank": 2, "outcome": "loser", "forfeit": True, "score": None},
+                {"registration_id": side_b, "rank": 2, "outcome": "loser", "forfeit": True, "score": None},
+            ], table_double_loss=True))
+            continue
+        winner = _sole_winner(match)
+        if match.get("status") == "forfeit" and winner in (side_a, side_b):
+            loser = side_b if winner == side_a else side_a
+            if best_of_maps:
+                out.append(_rewritten(match, [
+                    {"registration_id": winner, "rank": 1, "outcome": "winner", "score": maps},
+                    {"registration_id": loser, "rank": 2, "outcome": "loser", "forfeit": True, "score": 0},
+                ], table_forfeit=loser))
+            else:
+                out.append({**match, "table_forfeit": loser})
+            continue
+        out.append(match)
+    return out
+
+
+def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, context: dict) -> list[dict]:
+    """Die Tabelle einer Liga-Staffel auf den Spielen aus ``_league_matches``: Zählung wie ``_round_robin_rows``, dazu
+    kampflos, Punktabzug, Ausscheiden und die Reihenfolge nach ``table_tiebreakers`` (``_rank_league``)."""
+    points = rules.get("match_points") or {"win": 3, "draw": 1, "loss": 0}
+    win_points, draw_points, loss_points = points.get("win", 3), points.get("draw", 1), points.get("loss", 0)
+    by_maps = maps_mode(rules)
+    stats = {}
+    for registration in registrations:
+        if not registration.get("id"):
+            continue
+        stats[registration["id"]] = {
+            "registration_id": registration["id"],
+            "user_id": registration.get("user_id"),
+            "team_id": registration.get("team_id"),
+            "display_name": _display_name(registration),
+            "played": 0, "won": 0, "lost": 0, "drawn": 0, "score_for": 0, "score_against": 0, "points": 0,
+            "forfeit_won": 0, "forfeit_lost": 0, "deducted_points": 0,
+            "exit": exit_of(registration), "tiebreak": None, "lead_decision": None,
+        }
+
+    def lose(registration_id: str | None, maps=0) -> None:
+        if registration_id in stats:
+            stats[registration_id]["lost"] += 1
+            # Map-Punkte (#2312): auch der Verlierer bekommt seine gewonnenen Maps (3:2 ergibt 3 und 2).
+            stats[registration_id]["points"] += maps if by_maps else loss_points
+
+    for match in matches:
+        if match.get("status") not in TERMINAL_MATCH_STATUSES:
+            continue
+        slot_a, slot_b, result_a, result_b = _duel_entries(match)
+        registration_a = (slot_a or {}).get("registration_id")
+        registration_b = (slot_b or {}).get("registration_id")
+        score_a = (result_a or {}).get("score")
+        score_b = (result_b or {}).get("score")
+        score_a = score_a if isinstance(score_a, (int, float)) else 0
+        score_b = score_b if isinstance(score_b, (int, float)) else 0
+        for own, own_score, other_score in ((registration_a, score_a, score_b), (registration_b, score_b, score_a)):
+            if own in stats:
+                stats[own]["played"] += 1
+                stats[own]["score_for"] += own_score
+                stats[own]["score_against"] += other_score
+        if match.get("table_double_loss"):
+            for own in (registration_a, registration_b):
+                lose(own)
+                if own in stats:
+                    stats[own]["forfeit_lost"] += 1
+            continue
+        forfeit_loser = match.get("table_forfeit")
+        winner_id = _sole_winner(match)
+        if winner_id == registration_a and registration_a in stats:
+            stats[registration_a]["won"] += 1
+            stats[registration_a]["points"] += score_a if by_maps else win_points
+            lose(registration_b, score_b)
+        elif winner_id == registration_b and registration_b in stats:
+            stats[registration_b]["won"] += 1
+            stats[registration_b]["points"] += score_b if by_maps else win_points
+            lose(registration_a, score_a)
+        else:
+            for own, own_score in ((registration_a, score_a), (registration_b, score_b)):
+                if own in stats:
+                    stats[own]["drawn"] += 1
+                    stats[own]["points"] += own_score if by_maps else draw_points
+            continue
+        if forfeit_loser:
+            if forfeit_loser in stats:
+                stats[forfeit_loser]["forfeit_lost"] += 1
+            if winner_id in stats and winner_id != forfeit_loser:
+                stats[winner_id]["forfeit_won"] += 1
+    for deduction in context.get("point_deductions") or []:
+        row = stats.get((deduction or {}).get("registration_id"))
+        amount = (deduction or {}).get("points")
+        if row is not None and isinstance(amount, (int, float)) and not isinstance(amount, bool) and amount > 0:
+            row["deducted_points"] += amount
+    rows = list(stats.values())
+    for row in rows:
+        row["points"] -= row["deducted_points"]
+        row["score_diff"] = row["score_for"] - row["score_against"]
+    _rank_league(rows, matches, rules, context.get("table_decisions") or [], schedule=context.get("_schedule"))
+    return rows
+
+
+TIEBREAK_FIELDS = {"wins": "won", "score_diff": "score_diff", "score_for": "score_for"}
+
+
+def _partition(rows: list[dict], key) -> list[list[dict]]:
+    """Gruppen gleicher Werte, größter Wert zuerst; innerhalb bleibt die Reihenfolge (stabil wie ``rank_with_ties``)."""
+    groups: list[list[dict]] = []
+    for row in sorted(rows, key=key, reverse=True):
+        if groups and key(groups[-1][0]) == key(row):
+            groups[-1].append(row)
+        else:
+            groups.append([row])
+    return groups
+
+
+def _mini_table(group: list[dict], matches: list[dict], rules: dict) -> dict[str, tuple]:
+    """Mini-Tabelle (Nr. 42): nur die Spiele der Gruppe untereinander, sortiert nach ``head_to_head_criteria``."""
+    ids = {row["registration_id"] for row in group}
+    points = rules.get("match_points") or {"win": 3, "draw": 1, "loss": 0}
+    by_maps = maps_mode(rules)
+    mini = {registration_id: {"points": 0, "score_for": 0, "score_against": 0} for registration_id in ids}
+    for match in matches:
+        if match.get("status") not in TERMINAL_MATCH_STATUSES:
+            continue
+        slot_a, slot_b, result_a, result_b = _duel_entries(match)
+        side_a = (slot_a or {}).get("registration_id")
+        side_b = (slot_b or {}).get("registration_id")
+        if side_a not in ids or side_b not in ids or side_a == side_b:
+            continue
+        for own, own_result, other_result in ((side_a, result_a, result_b), (side_b, result_b, result_a)):
+            own_score = (own_result or {}).get("score")
+            other_score = (other_result or {}).get("score")
+            mini[own]["score_for"] += own_score if isinstance(own_score, (int, float)) else 0
+            mini[own]["score_against"] += other_score if isinstance(other_score, (int, float)) else 0
+        if match.get("table_double_loss"):
+            mini[side_a]["points"] += 0 if by_maps else points.get("loss", 0)
+            mini[side_b]["points"] += 0 if by_maps else points.get("loss", 0)
+            continue
+        if by_maps:
+            # Map-Punkte (#2312): auch im direkten Vergleich zählen die gewonnenen Maps der Spiele untereinander.
+            for own, own_result in ((side_a, result_a), (side_b, result_b)):
+                own_score = (own_result or {}).get("score")
+                mini[own]["points"] += own_score if isinstance(own_score, (int, float)) else 0
+            continue
+        winner_id = _sole_winner(match)
+        if winner_id in (side_a, side_b):
+            loser = side_b if winner_id == side_a else side_a
+            mini[winner_id]["points"] += points.get("win", 3)
+            mini[loser]["points"] += points.get("loss", 0)
+        else:
+            mini[side_a]["points"] += points.get("draw", 1)
+            mini[side_b]["points"] += points.get("draw", 1)
+    criteria = rules.get("head_to_head_criteria") or ["points", "score_diff", "score_for"]
+
+    def value(entry: dict, name: str):
+        return entry["score_for"] - entry["score_against"] if name == "score_diff" else entry[name]
+    return {registration_id: tuple(value(entry, name) for name in criteria) for registration_id, entry in mini.items()}
+
+
+def _head_to_head_complete(group: list[dict], matches: list[dict], schedule: list[dict] | None) -> bool:
+    """Sind alle Spiele der Gruppe untereinander gespielt? Entscheidung des Obmanns zu E.1: sonst zählt der direkte
+    Vergleich nicht. ``schedule``: der ganze Spielplan; ``matches``: was in dieser Tabelle zählt."""
+    ids = {row["registration_id"] for row in group}
+
+    def inside(match: dict) -> bool:
+        sides = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
+        return len(sides) == 2 and set(sides) <= ids and sides[0] != sides[1]
+
+    played = {match.get("id") for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES and inside(match)}
+    return all(match.get("id") in played for match in (schedule if schedule is not None else matches)
+               if inside(match) and match.get("status") != "cancelled" and not match.get("is_preview"))
+
+
+def _decision_for(group: list[dict], decisions: list[dict]) -> dict | None:
+    """Der Entscheid der Leitung für genau diese Gruppe - der jüngste, wenn es mehrere gäbe."""
+    ids = {row["registration_id"] for row in group}
+    matching = [decision for decision in decisions
+                if isinstance(decision, dict) and set(decision.get("registration_ids") or []) == ids]
+    return max(matching, key=lambda decision: str(decision.get("decided_at") or "")) if matching else None
+
+
+def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: list[dict], *,
+                 schedule: list[dict] | None = None) -> None:
+    """Reihenfolge der Liga-Staffel: Punkte, dann ``table_tiebreakers`` der Reihe nach (Nr. 25, 42). Ausgeschiedene mit
+    ``all_for_opponents`` stehen unten (Nr. 43). Sortiert ``rows`` an Ort und Stelle und setzt ``rank`` (1, 2, 2, 4)."""
+    criteria = list(rules.get("table_tiebreakers") or [])
+
+    def separated(part: list[dict], criterion: str) -> None:
+        if len(part) == 1 and part[0]["tiebreak"] is None:
+            part[0]["tiebreak"] = criterion
+
+    def head_to_head(group: list[dict], index: int) -> list[list[dict]]:
+        if not _head_to_head_complete(group, matches, schedule):
+            # Noch nicht alles gespielt: das Kriterium fällt weg, es geht mit dem nächsten weiter.
+            return resolve(group, index + 1)
+        mini = _mini_table(group, matches, rules)
+        parts = _partition(group, lambda row: mini[row["registration_id"]])
+        if len(parts) == 1:
+            return resolve(group, index + 1)
+        out: list[list[dict]] = []
+        for part in parts:
+            separated(part, "head_to_head")
+            # Restgruppe: Mini-Tabelle neu, nur mit ihren Spielen (Nr. 42).
+            out.extend([part] if len(part) == 1 else head_to_head(part, index))
+        return out
+
+    def resolve(group: list[dict], index: int) -> list[list[dict]]:
+        if len(group) == 1 or index >= len(criteria):
+            return [group]
+        criterion = criteria[index]
+        if criterion == "head_to_head":
+            return head_to_head(group, index)
+        if criterion == "lead_decision":
+            decision = _decision_for(group, decisions)
+            if not decision:
+                return resolve(group, index + 1)
+            order = {registration_id: position for position, registration_id in enumerate(decision["registration_ids"])}
+            info = {"id": decision.get("id"), "reason": decision.get("reason"), "decided_at": decision.get("decided_at")}
+            for row in group:
+                row["tiebreak"] = "lead_decision"
+                row["lead_decision"] = info
+            return [[row] for row in sorted(group, key=lambda row: order[row["registration_id"]])]
+        field = TIEBREAK_FIELDS.get(criterion)
+        if not field:
+            return resolve(group, index + 1)
+        parts = _partition(group, lambda row: row[field])
+        out = []
+        for part in parts:
+            if len(parts) > 1:
+                separated(part, criterion)
+            out.extend(resolve(part, index + 1))
+        return out
+
+    bottom = rules.get("exit_rule") == "all_for_opponents"
+    active = [row for row in rows if not (bottom and row.get("exit"))]
+    gone = [row for row in rows if bottom and row.get("exit")]
+    blocks: list[list[dict]] = []
+    for group in _partition(active, lambda row: row["points"]):
+        blocks.extend(resolve(group, 0))
+    # Tabellenende (Nr. 43): wer später ausschied, steht weiter oben; Disqualifizierte immer unter den anderen.
+    gone.sort(key=lambda row: str(row["exit"].get("at") or ""), reverse=True)
+    gone.sort(key=lambda row: row["exit"]["kind"] == "disqualified")
+    blocks.extend([row] for row in gone)
+    position = 1
+    ordered: list[dict] = []
+    for block in blocks:
+        for row in block:
+            row["rank"] = position
+            ordered.append(row)
+        position += len(block)
+    rows[:] = ordered
 
 
 def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
@@ -347,7 +695,9 @@ def _form(matches: list[dict]) -> dict[str, list[str]]:
         for registration_id in (registration_a, registration_b):
             if not registration_id:
                 continue
-            letter = "D" if winner_id is None else "W" if winner_id == registration_id else "L"
+            # Beide nicht erschienen (E.1): für beide eine Niederlage, kein Unentschieden.
+            letter = "L" if match.get("table_double_loss") else \
+                "D" if winner_id is None else "W" if winner_id == registration_id else "L"
             form.setdefault(registration_id, []).append(letter)
     return {registration_id: letters[-FORM_LENGTH:] for registration_id, letters in form.items()}
 
@@ -473,11 +823,11 @@ def standings_for_structure(
         if format_key == "groups":
             return group_standings(stage_matches, registrations, list(groups))
         if format_key in {"round_robin", "league"}:
-            return round_robin_standings(stage_matches, registrations, table_rules(tournament))
+            return round_robin_standings(stage_matches, registrations, table_rules(tournament), tournament=tournament)
         return stage_standings(stage_matches, registrations)
     legacy_matches = [match for match in matches if match.get("source", {}).get("engine") == "legacy"]
     if format_key in {"round_robin", "league"}:
-        return round_robin_standings(legacy_matches, registrations, table_rules(tournament))
+        return round_robin_standings(legacy_matches, registrations, table_rules(tournament), tournament=tournament)
     if format_key == "swiss":
         return swiss_standings(legacy_matches, registrations)
     if format_key == "groups":
@@ -543,6 +893,129 @@ def reached_labels(matches: list[dict], stages: list[dict] = (), tournament: dic
     return labels
 
 
+# Wann ein Turnier sein Ergebnis hat - erst dann sagt der Weg „raus“ (vorher könnte noch ein Spiel kommen).
+FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
+
+
+def _round_phrase(label: str) -> str:
+    """„im Halbfinale“, „im Grand Final“ - aber „in Runde 2“, „in Loser Runde 3“."""
+    first = label.split(" ")[0].lower()
+    second = (label.split(" ")[1:2] or [""])[0].lower()
+    if first == "runde" or (first in {"winner", "loser"} and second == "runde"):
+        return f"in {label}"
+    return f"im {label}"
+
+
+def _path_label(match: dict, rounds: dict[tuple, list[int]]) -> str:
+    """Der Rundenname für den Weg: wie im Baum, aber die letzte Runde einer Baumseite heißt immer „Loser Final“ bzw.
+    „Winner Final“ - erkannt an ihrer Stelle in der Seite, nicht an der Zahl im Namen (im Loser Bracket weicht die
+    gespeicherte Runde von der gelesenen Nummer ab, „Loser Runde 6“ ist dort ``round`` 7)."""
+    label = str(match.get("round_label") or "").strip()
+    section = section_kind(match.get("section"))
+    order = rounds.get((match.get("stage_id"), section)) or []
+    last = bool(order) and _safe_int(match.get("round")) == order[-1]
+    if last and section == "loser" and (not label or label.lower().startswith("loser")):
+        return "Loser Final"
+    if last and section == "main" and label.lower().startswith("winner"):
+        # Ohne Loser Bracket (Doppel-K.-o. mit zwei Teilnehmern) ist das letzte Spiel schlicht das Finale.
+        has_loser = bool(rounds.get((match.get("stage_id"), "loser")))
+        return "Winner Final" if has_loser else "Finale"
+    return label
+
+
+def _single_winner(match: dict) -> str | None:
+    """Die eine Anmeldung auf Platz 1 - bei Unentschieden oder ohne Sieger keine."""
+    results = [row for row in match.get("results") or [] if row.get("registration_id")]
+    firsts = [row for row in results if _safe_int(row.get("rank"), 999) == 1 or row.get("outcome") == "winner"]
+    return firsts[0]["registration_id"] if len(firsts) == 1 else None
+
+
+def place_paths(matches: list[dict], stages: list[dict] = (), tournament: dict | None = None,
+                registrations: list[dict] | None = None) -> dict[str, str]:
+    """Wie der Platz im Baum zustande kam (#2336): „Finale gewonnen“, „im Finale“, „Spiel um Platz 3 gewonnen“, „im
+    Halbfinale raus“. Im K.-o. entscheidet die erreichte Runde den Platz, nicht die Zahl der Siege - das Podest sagt
+    deshalb, wo jemand zuletzt spielte und ob er dieses Spiel gewann.
+
+    Nur aus Fakten: das späteste echte Spiel (Phase, dann Runde) mit seinem Ergebnis für die Anmeldung, nur in einer
+    Phase mit Duell-Baum (keine Läufe, keine Tabelle) und nur, wenn das Turnier beendet ist. Liegt danach noch ein
+    gewonnenes Freilos (der Gegner wurde ausgeschlossen oder zog zurück), heißt es „Finale kampflos gewonnen“. Wer
+    selbst ausgeschlossen ist oder zurückzog (Status außerhalb von angenommen/eingecheckt, ``registrations``), bekommt
+    keinen Weg. Fehlt etwas davon, steht für die Anmeldung nichts da - das Podest zeigt dann wie bisher die Siege."""
+    from services.round_labels import attach_round_labels, rounds_by_section, stage_kind
+
+    if (tournament or {}).get("status") not in FINISHED_TOURNAMENT_STATUSES:
+        return {}
+    playable = [dict(match) for match in matches
+                if match.get("status") != "cancelled" and match.get("source", {}).get("engine") == "stage"]
+    if not playable:
+        return {}
+    attach_round_labels(playable, list(stages or []), tournament)
+    rounds = rounds_by_section(playable)
+    stage_types = {stage.get("id"): stage.get("stage_type") for stage in stages or [] if isinstance(stage, dict)}
+    tournament_format = (tournament or {}).get("format")
+    left = {reg.get("id") for reg in registrations or []
+            if (reg.get("status") or "approved") not in STANDING_REGISTRATION_STATUSES}
+    furthest: dict[str, tuple[tuple[int, int], dict]] = {}
+    furthest_bye: dict[str, tuple[tuple[int, int], dict]] = {}
+    for match in playable:
+        target = furthest_bye if is_bye(match) else furthest
+        position = (_safe_int(match.get("stage_number")), _safe_int(match.get("round")))
+        for slot in match.get("slots") or []:
+            registration_id = slot.get("registration_id")
+            if registration_id and (registration_id not in target or position > target[registration_id][0]):
+                target[registration_id] = (position, match)
+
+    def knockout(match: dict) -> bool:
+        kind = stage_kind(stage_types.get(match.get("stage_id")) or match.get("stage_type"), tournament_format,
+                          match.get("match_type"))
+        return kind == "knockout" and match.get("status") in TERMINAL_MATCH_STATUSES
+
+    paths: dict[str, str] = {}
+    for registration_id in set(furthest) | set(furthest_bye):
+        if registration_id in left:
+            continue
+        real = furthest.get(registration_id)
+        walkover = furthest_bye.get(registration_id)
+        if walkover and (not real or walkover[0] > real[0]):
+            # Das letzte „Spiel“ war ein Freilos: nur ein gewonnenes zählt als Weg - kampflos.
+            match = walkover[1]
+            label = _path_label(match, rounds)
+            if knockout(match) and label and _single_winner(match) == registration_id:
+                paths[registration_id] = f"{label} kampflos gewonnen"
+            continue
+        match = real[1]
+        if not knockout(match):
+            continue
+        if not any(row.get("registration_id") == registration_id for row in match.get("results") or []):
+            continue
+        winner = _single_winner(match)
+        if not winner:
+            continue  # Unentschieden oder kein Sieger: kein Weg, der sich sicher sagen lässt.
+        won = winner == registration_id
+        label = _path_label(match, rounds)
+        if not label:
+            continue
+        section = section_kind(match.get("section"))
+        main_rounds = rounds.get((match.get("stage_id"), "main")) or []
+        final_like = section in {"grand_final", "bronze"} or (
+            section == "main" and main_rounds and _safe_int(match.get("round")) == main_rounds[-1])
+        if won:
+            paths[registration_id] = f"{label} gewonnen"
+        elif final_like:
+            paths[registration_id] = _round_phrase(label)
+        else:
+            paths[registration_id] = f"{_round_phrase(label)} raus"
+    return paths
+
+
+def games_won_text(won) -> str:
+    """„4 Spiele gewonnen“, „1 Spiel gewonnen“, „kein Spiel gewonnen“ - die zweite Zeile unter dem Weg (#2336)."""
+    count = _safe_int(won)
+    if count <= 0:
+        return "kein Spiel gewonnen"
+    return f"{count} {'Spiel' if count == 1 else 'Spiele'} gewonnen"
+
+
 def public_standings(
     tournament: dict,
     snapshot: dict,
@@ -565,9 +1038,13 @@ def public_standings(
         return []
     rows = standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
     labels = reached_labels(matches, stages, tournament)
+    paths = place_paths(matches, stages, tournament, registrations)
     for row in rows:
         if row.get("registration_id") in labels:
             row["reached"] = labels[row["registration_id"]]
+        # Wie der Platz zustande kam (#2336) - nur im beendeten Duell-Baum.
+        if row.get("registration_id") in paths:
+            row["place_path"] = paths[row["registration_id"]]
     return rows
 
 
@@ -649,7 +1126,7 @@ def placements_for_structure(
     ]
     format_key = (tournament or {}).get("format")
     if not wanted_sections and format_key in {"round_robin", "league"}:
-        rows = round_robin_standings(stage_matches, registrations, table_rules(tournament))
+        rows = round_robin_standings(stage_matches, registrations, table_rules(tournament), tournament=tournament)
     elif not wanted_sections and format_key == "swiss":
         rows = swiss_standings(stage_matches, registrations)
     else:
@@ -658,7 +1135,8 @@ def placements_for_structure(
         registration_id = row.get("registration_id")
         rank = _safe_int(row.get("rank"))
         registration = registration_map.get(registration_id)
-        if not registration_id or not rank or not row.get("played") or not registration:
+        # Wer nur Freilose hatte, hat trotzdem einen Platz (#2336) - ``played`` zählt sie nicht mehr.
+        if not registration_id or not rank or not (row.get("played") or row.get("byes")) or not registration:
             continue
         placements.setdefault(rank, []).append({
             "registration_id": registration_id,
@@ -678,81 +1156,93 @@ def placement_rows_for_structure(snapshot: dict, registrations: list[dict], *, t
     ]
 
 
-def registration_badge_match_progress(matches: list[dict], registration_ids: set[str]) -> dict:
-    """Return completed-match badge counters over canonical match shapes."""
+# Formate ohne Endspiel (#2337), falls die Phase ihren Typ nicht nennt: Tabellen kennen kein Finale.
+NO_FINAL_FORMATS = frozenset({"round_robin", "league", "swiss", "time_trial", "grand_prix"})
 
-    relevant = []
-    for match in matches:
-        if match.get("status") != "completed":
-            continue
-        participants = {
-            slot.get("registration_id")
-            for slot in match.get("slots") or []
-            if slot.get("registration_id")
-        } | {
-            result.get("registration_id")
-            for result in match.get("results") or []
-            if result.get("registration_id")
-        }
-        if participants.intersection(registration_ids):
-            relevant.append(match)
-    relevant.sort(key=lambda match: (
+
+def final_match(snapshot: dict, *, tournament: dict | None = None) -> dict | None:
+    """Das Finale eines Turniers (#2337) - oder ``None``, wenn es keines gibt.
+
+    Nur die letzte Phase zählt. Mit Grand Final ist es das erste Grand-Final-Spiel (nie das Reset-Spiel), sonst das
+    eine Spiel in der höchsten Runde des Hauptbaums - im Doppel-K.-o. ohne Grand Final also das Winner-Finale. Davor muss
+    es etwas gegeben haben: eine frühere Runde oder eine frühere Phase; ein einzelner Lauf ist kein Finale. Das Spiel um
+    Platz 3 und die Verliererrunde sind nie das Finale; Tabellen (Jeder gegen jeden, Liga, Schweizer System, reine
+    Gruppenphase) haben keines."""
+    matches = [match for match in snapshot.get("matches") or [] if match.get("status") != "cancelled" and not match.get("is_preview")]
+    if not matches:
+        return None
+    last_stage = max(_safe_int(match.get("stage_number")) for match in matches)
+    stage_rows = [match for match in matches if _safe_int(match.get("stage_number")) == last_stage]
+    stage_types = {stage.get("id"): stage.get("stage_type") for stage in snapshot.get("stages") or [] if isinstance(stage, dict)}
+    stage_type = next((stage_types[match.get("stage_id")] for match in stage_rows if stage_types.get(match.get("stage_id"))), None)
+    if stage_type in TABLE_STAGE_TYPES or (not stage_type and (tournament or {}).get("format") in NO_FINAL_FORMATS):
+        return None
+
+    def position(match: dict) -> tuple:
+        return _safe_int(match.get("round")), _safe_int(match.get("order")), str(match.get("id") or "")
+
+    grand_finals = [match for match in stage_rows
+                    if _section_kind(match) == "grand_final" and "reset" not in str(match.get("round_name") or "").lower()]
+    if grand_finals:
+        return min(grand_finals, key=position)
+    main = [match for match in stage_rows if _section_kind(match) == "main"]
+    rounds = sorted({_safe_int(match.get("round")) for match in main})
+    if not rounds:
+        return None
+    top_round = [match for match in main if _safe_int(match.get("round")) == rounds[-1]]
+    came_from_somewhere = len(rounds) >= 2 or any(_safe_int(match.get("stage_number")) < last_stage for match in matches)
+    return top_round[0] if len(top_round) == 1 and came_from_somewhere else None
+
+
+def final_participants(snapshot: dict, *, tournament: dict | None = None) -> set[str]:
+    """Wer im Finale stand (#2337): beide im Endspiel bzw. Grand Final, im Mehrspieler-Finale der ganze Finallauf.
+
+    Das Finale muss gespielt sein. Ein kampfloses Finale (Gegner nicht erschienen oder Freilos) zählt für niemanden als
+    „im Finale gestanden“; wer im Finallauf als nicht erschienen steht, war nicht dabei."""
+    match = final_match(snapshot, tournament=tournament)
+    if not match or match.get("status") != "completed" or not is_real_match(match):
+        return set()
+    present = participant_ids(match) - no_show_ids(match)
+    return present if len(present) >= 2 else set()
+
+
+def badge_match_progress(pairs) -> dict:
+    """Spielmacher, Sieger und längste Siegesserie über Paare (Spiel, eigene Anmeldungen in diesem Spiel) - je Spiel steht
+    fest, für welche Anmeldung die Person angetreten ist (Team und Liga, ``services.achievement_participation``).
+
+    Was als Spiel zählt, steht in ``services.match_winner`` (#2337): ein Freilos nie, ein kampflos gewertetes Spiel
+    (``forfeit``) für den Sieger als Spiel und Sieg. Wer nicht erschienen ist, bekommt kein Spiel gezählt - die Serie
+    reißt trotzdem."""
+
+    relevant = [(match, set(own)) for match, own in pairs if is_real_match(match) and participant_ids(match) & set(own)]
+    relevant.sort(key=lambda pair: (
         # Nach Abschluss, nicht nach der letzten Änderung: eine spätere Ergebniskorrektur verschiebt die Serie nicht.
-        str(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at") or ""),
-        _safe_int(match.get("stage_number")),
-        _safe_int(match.get("round")),
-        _safe_int(match.get("order")),
-        str(match.get("id") or ""),
+        str(pair[0].get("completed_at") or pair[0].get("updated_at") or pair[0].get("scheduled_at") or ""),
+        _safe_int(pair[0].get("stage_number")),
+        _safe_int(pair[0].get("round")),
+        _safe_int(pair[0].get("order")),
+        str(pair[0].get("id") or ""),
     ))
 
+    played = 0
     won = 0
     streak = 0
     streak_max = 0
-    for match in relevant:
-        # Dieselbe Regel wie alle Sieg-Erfolge (#1796): ein Unentschieden (zwei Mal Platz 1) und ein Freilos sind
-        # kein Sieg - der Turnierbaum schreibt beides als „winner“.
-        if won_by(match, registration_ids):
+    for match, own in relevant:
+        showed_up = not (no_show_ids(match) & own)
+        played += int(showed_up)
+        # Dieselbe Regel wie alle Sieg-Erfolge (#1796): ein Unentschieden (zwei Mal Platz 1) ist kein Sieg - der
+        # Turnierbaum schreibt es als „winner“.
+        if showed_up and won_by(match, own):
             won += 1
             streak += 1
             streak_max = max(streak_max, streak)
         else:
             streak = 0
     return {
-        "matches_played": len(relevant),
+        "matches_played": played,
         "matches_won": won,
         "match_streak_max": streak_max,
-    }
-
-
-def registration_tournament_achievement_progress(
-    snapshot: dict,
-    registrations: list[dict],
-    registration_ids: set[str],
-    *,
-    tournament: dict | None = None,
-) -> dict:
-    """Return one tournament's win/podium/fourth-place badge flags."""
-
-    ranks = {
-        rank
-        for rank, group in placements_for_structure(snapshot, registrations, tournament=tournament).items()
-        for placement in group
-        if placement.get("registration_id") in registration_ids
-    }
-    legacy_fourth = any(
-        _safe_int(match.get("final_position")) == 4
-        and any(
-            result.get("registration_id") in registration_ids
-            and result.get("outcome") == "loser"
-            for result in match.get("results") or []
-        )
-        for match in snapshot.get("matches") or []
-        if match.get("source", {}).get("engine") == "legacy"
-    )
-    return {
-        "tournaments_won": int(1 in ranks),
-        "podium_finishes": int(any(1 <= rank <= 3 for rank in ranks)),
-        "rank_4_count": int(4 in ranks or legacy_fourth),
     }
 
 

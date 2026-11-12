@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, now_utc
+from services import game_modes as mode_states
 from services.media_formats import UPLOAD_URL_VERSION
 from services.slug_utils import slugify
 
@@ -32,7 +33,18 @@ SLUG_MAX = 80
 # Bilder nur aus dem eigenen Upload: eine fremde Adresse ließe jede Person beim Ansehen bei Dritten anfragen.
 IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)" + UPLOAD_URL_VERSION)
 IMAGE_REFUSED = "Bild bitte über „Hochladen“ oder die Mediathek wählen (PNG, JPG oder WebP)."
-STATUSES = ("active", "archived")
+# Zustand (#2207, C.2): fehlt = aktiv. Inaktiv: kommt in keinen neuen Pool, wo sie schon steht, bleibt sie. Archiviert: wie bisher.
+ACTIVE, INACTIVE, ARCHIVED = "active", "inactive", "archived"
+STATUSES = (ACTIVE, INACTIVE, ARCHIVED)
+STATUS_WORDS = {ACTIVE: "aktiv", INACTIVE: "inaktiv", ARCHIVED: "archiviert"}
+# Mongo-Filter „aktiv oder ohne Feld“.
+ACTIVE_QUERY = {"status": {"$nin": [INACTIVE, ARCHIVED]}}
+
+
+def status_of(row: dict | None) -> str:
+    """Der Zustand einer Map - fehlt das Feld oder ist es unbekannt, ist sie aktiv."""
+    value = (row or {}).get("status")
+    return value if value in (INACTIVE, ARCHIVED) else ACTIVE
 # Standard-Pool eines Spiels (#2129, SP3): eine Vorlage in ``map_pools``, kein Wettbewerb - zählt nicht als Verwendung.
 DEFAULT_POOL_SCOPE = "game_default"
 SLUG_TAKEN = "Der Slug „{slug}“ ist in diesem Spiel schon vergeben."
@@ -105,7 +117,7 @@ class GameMapUpdate(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
     external_ref: Optional[str] = Field(default=None, max_length=120)
     modes: Optional[List[str]] = Field(default=None, max_length=GAME_MODES_MAX)
-    status: Optional[Literal["active", "archived"]] = None
+    status: Optional[Literal["active", "inactive", "archived"]] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -149,13 +161,24 @@ def game_modes(game: dict | None) -> list[dict]:
             for mode in modes if isinstance(mode, dict) and mode.get("mode")]
 
 
-def clean_modes(game: dict, modes: list[str] | None) -> list[str]:
-    """Die Modus-Kennungen einer Map: jede einmal, in der Reihenfolge des Spiels; eine unbekannte ist ein Fehler."""
+def _mode_doc(game: dict | None, key: str) -> dict | None:
+    for mode in (game or {}).get("match_modes") or []:
+        if isinstance(mode, dict) and mode.get("mode") == key:
+            return mode
+    return None
+
+
+def clean_modes(game: dict, modes: list[str] | None, kept=()) -> list[str]:
+    """Die Modus-Kennungen einer Map: jede einmal, in der Reihenfolge des Spiels; eine unbekannte ist ein Fehler. Ein
+    archivierter Modus kommt an keine Map neu dazu (#2206), ``kept`` sind die, die sie schon hat."""
     known = [mode["mode"] for mode in game_modes(game)]
     wanted = [str(mode or "").strip() for mode in modes or [] if str(mode or "").strip()]
     unknown = [mode for mode in wanted if mode not in known]
     if unknown:
         raise MapProblem(f"Unbekannter Modus für {game.get('name') or 'dieses Spiel'}: {', '.join(unknown)}.")
+    problem = mode_states.choice_problem(game, wanted, kept, inactive_ok=True)
+    if problem:
+        raise MapProblem(problem)
     return [mode for mode in known if mode in wanted]
 
 
@@ -176,10 +199,14 @@ def public_map(doc: dict) -> dict:
     return {**{key: doc.get(key) for key in PUBLIC_FIELDS}, "aliases": doc.get("aliases") or []}
 
 
-async def maps_of(db, game_id: str, *, active_only: bool = False) -> list[dict]:
-    query = {"game_id": game_id}
+async def maps_of(db, game_id: str, *, active_only: bool = False, usable_only: bool = False) -> list[dict]:
+    """Die Maps eines Spiels in ihrer Reihenfolge. ``active_only``: nur aktive; ``usable_only``: aktive und inaktive (die
+    Bibliothek des Pool-Editors, #2207)."""
+    query: dict = {"game_id": game_id}
     if active_only:
-        query["status"] = "active"
+        query.update(ACTIVE_QUERY)
+    elif usable_only:
+        query["status"] = {"$ne": ARCHIVED}
     rows = await db.game_maps.find(query, {"_id": 0}).to_list(MAPS_PER_GAME_MAX + 50)
     return sorted(rows, key=lambda row: (row.get("order") or 0, name_key(row.get("name"))))
 
@@ -209,7 +236,7 @@ async def drop_modes(db, game_id: str, modes: list[str], user: dict) -> int:
 
 def lacks_mode(row: dict, known: set[str]) -> bool:
     """Eine aktive Map, die in keinem Pool zur Wahl steht, weil das Spiel Modi hat und sie keinem davon zugeordnet ist."""
-    return bool(known) and row.get("status") == "active" and not known & set(row.get("modes") or [])
+    return bool(known) and status_of(row) == ACTIVE and not known & set(row.get("modes") or [])
 
 
 async def count_without_mode(db, game: dict) -> int:
@@ -390,7 +417,7 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
         if key in raw:
             updates[key] = raw[key]
     if raw.get("modes") is not None:
-        updates["modes"] = clean_modes(game, raw["modes"])
+        updates["modes"] = clean_modes(game, raw["modes"], current.get("modes") or [])
     if raw.get("aliases") is not None:
         updates["aliases"] = clean_aliases(raw["aliases"], updates.get("name") or current.get("name"))
     # Name, Slug und Schreibweisen nach der Änderung: dieselbe Prüfung wie beim Anlegen - auch beim Umbenennen und bei
@@ -403,9 +430,9 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
     spellings = spelling_keys(name, slug_now, aliases)
     added = await reserve_keys(db, game["id"], current["id"], spellings)
     status = raw.get("status")
-    if status and status != current.get("status"):
+    if status and status != status_of(current):
         updates["status"] = status
-        updates["archived_at"] = now_utc().isoformat() if status == "archived" else None
+        updates["archived_at"] = now_utc().isoformat() if status == ARCHIVED else None
     updates.update({"updated_at": now_utc().isoformat(), "updated_by": user["id"]})
     try:
         await db.game_maps.update_one({"id": current["id"]}, {"$set": updates})
@@ -422,7 +449,8 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
 def mapped_modes(source: dict, game: dict, modes: list[str] | None) -> list[str]:
     """Die Modi einer Map im Zielspiel (#2129, SP4): gleiche Kennung oder gleicher Name. Was das Ziel nicht hat, fällt weg -
     die Map erscheint dann im Hinweis „noch keinen Modus“."""
-    target = game_modes(game)
+    # Archivierte Modi des Ziels nimmt keine Map neu an (#2206) - sie fallen hier weg wie unbekannte.
+    target = [mode for mode in game_modes(game) if mode_states.status_of(_mode_doc(game, mode["mode"])) != mode_states.ARCHIVED]
     by_key = {mode["mode"]: mode["mode"] for mode in target}
     by_label = {name_key(mode["label"]): mode["mode"] for mode in target}
     labels = {mode["mode"]: mode["label"] for mode in game_modes(source)}
@@ -493,11 +521,22 @@ async def in_results(db, map_id: str) -> bool:
     return bool(await db.reference_round_result_revisions.find_one({"content.matches.maps.map_id": map_id}, {"_id": 1}))
 
 
+async def in_matches(db, game_id: str, map_id: str) -> bool:
+    """Steht die Map in ``games[]``, einer Meldung oder einem gehaltenen Ergebnis eines Spiels dieses Spiels (#2207)? Heute
+    kommt eine Map nur über einen Pool ins Spiel - diese Prüfung hält auch dann, wenn die Pool-Version fehlt."""
+    tournament_ids = await db.tournaments.distinct("id", {"game_id": game_id})
+    if not tournament_ids:
+        return False
+    query = {"tournament_id": {"$in": tournament_ids},
+             "$or": [{"games.map_id": map_id}, {"reports.games.map_id": map_id}, {"pending_result.games.map_id": map_id}]}
+    return bool(await db.matches_v2.find_one(query, {"_id": 1}))
+
+
 async def delete(db, game: dict, current: dict) -> None:
     used = (await usage_counts(db, game["id"])).get(current["id"], 0)
     if used:
         raise MapProblem("Diese Map steht in einem gespeicherten Map-Pool - bitte archivieren statt löschen.", 409)
-    if await in_results(db, current["id"]):
+    if await in_results(db, current["id"]) or await in_matches(db, game["id"], current["id"]):
         raise MapProblem("Diese Map steht in einem gespeicherten Spiel - bitte archivieren statt löschen.", 409)
     await db.game_maps.delete_one({"id": current["id"]})
     await release_keys(db, game["id"], current["id"])

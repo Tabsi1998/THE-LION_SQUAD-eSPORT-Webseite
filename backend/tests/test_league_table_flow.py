@@ -382,9 +382,16 @@ async def test_the_migration_preview_sees_the_shared_place_too(flow):
 async def test_both_holders_of_a_shared_first_place_count_a_tournament_win(flow):
     from services.achievement_progress import compute_user_progress
 
-    _tournament, users, regs, winners = await shared_first_place(flow)
+    tournament, users, regs, winners = await shared_first_place(flow)
     user_of = {reg["id"]: user["id"] for reg, user in zip(regs, users)}
 
+    # Solange das Turnier läuft, gibt es keinen Turniersieg (#2337) - der Zwischenstand ist kein Platz.
+    running = [await compute_user_progress(user_of[rid]) for rid in winners]
+    assert [entry["tournaments_won"] for entry in running] == [0, 0]
+
+    for status in ("completed", "results_published"):
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": status})
+        assert response.status_code == 200, response.text
     progress = [await compute_user_progress(user_of[rid]) for rid in winners]
 
     assert [entry["tournaments_won"] for entry in progress] == [1, 1]

@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // Aufstellungen und - wenn die eigene fehlt - der Nachtrag über PUT /lineups. Erfundene Namen.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value, resolveMediaUrl: (value) => value }));
+vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", formatApiError: (value) => value, resolveMediaUrl: (value) => value }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "f1", username: "falke" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
@@ -49,6 +49,19 @@ beforeEach(() => {
   apiMock.put.mockReset();
   apiMock.post.mockResolvedValue({ data: { awaiting_confirmation: false } });
   apiMock.put.mockResolvedValue({ data: {} });
+});
+
+// Regelwerk (#2269): gültige Fassung mit PDF und „Neue Fassung, bitte zustimmen“ für die eigene Seite.
+test("zeigt das Regelwerk der Liga mit dem Stand der eigenen Zustimmung", async () => {
+  const rules = { version_id: "v2", version: 2, label: "Version 2", valid_from: "2030-03-05", url: "/liga/probe/s1/regeln",
+    pdf_url: "/api/league-rules/seasons/probe/s1/versions/v2/pdf", consent: { required: true, agreed: false, agreed_at: null, demanded_label: "Version 2" } };
+  renderMatch({ ...BASE, league: { ...LEAGUE, rules }, report_state: { status: "open" } });
+  const note = await screen.findByTestId("match-rules");
+  expect(note).toHaveAttribute("data-consent", "open");
+  expect(note).toHaveTextContent("Version 2 · gültig ab 05.03.2030");
+  expect(note).toHaveTextContent("Neue Fassung, bitte zustimmen");
+  expect(screen.getByTestId("match-rules-link")).toHaveAttribute("href", "/liga/probe/s1/regeln");
+  expect(screen.getByTestId("match-rules-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe/s1/versions/v2/pdf");
 });
 
 test("bestätigen mit eigener Aufstellung geht an /report", async () => {

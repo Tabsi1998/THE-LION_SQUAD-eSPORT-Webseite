@@ -1,6 +1,7 @@
 """Der Eingang der Leitung (docs/LIGA.md, B.4, #2205): prüfen, annehmen, ablehnen, Warteliste, zuteilen. Dazu Plätze, Sonderweg, Nachrichten, Datenschutz. Erfundene Namen."""
 import pathlib
 import sys
+import re
 
 import pytest
 import pytest_asyncio
@@ -464,12 +465,18 @@ async def test_a_second_accept_after_the_waitlist_tells_the_team_again(flow):
     side = w["teams"][0]
     application = await submitted(flow, w, side)
     ok(await decide(flow, w, application, "accept"))
-    ok(await decide(flow, w, application, "waitlist"))
+    # Zurückstufen einer angenommenen Anmeldung nur mit Grund (#2348), auch von Hand angenommen - das Team liest ihn.
+    without = await decide(flow, w, application, "waitlist")
+    assert without.status_code == 422 and "Grund" in without.json()["detail"]
+    assert (await flow.db.league_applications.find_one({"id": application["id"]}))["status"] == "accepted"
+    ok(await decide(flow, w, application, "waitlist", reason="Platz wird anders gebraucht"))
     ok(await decide(flow, w, application, "accept"))
 
     notes = await flow.db.notifications.find({"user_id": side["captain"]["id"], "meta.reason": "league_application_accepted"}, {"_id": 0}).to_list(5)
 
     assert len(notes) == 2
+    waiting = await flow.db.notifications.find_one({"user_id": side["captain"]["id"], "meta.reason": "league_application_waitlist"}, {"_id": 0})
+    assert "Grund: Platz wird anders gebraucht" in waiting["body"]
 
 
 @pytest.mark.asyncio
@@ -504,8 +511,9 @@ async def test_inbox_shows_consent_people_and_staffeln_without_birth_dates(flow)
     assert row["rules_version"] == w["rule"]["version"] and row["rules_at"] and row["privacy_at"]
     assert row["applied_by_name"] == "TeamB S0" and row["captain_name"] == "TeamB S0" and row["vice_name"] == "TeamB S1"
     assert row["member_count"] == 5
-    assert any("Geburtsdatum fehlt" in text for text in row["problems"])
-    assert "1990" not in str(body)
+    # Seit #2313 ein offener Punkt, kein Halt: Die Leitung darf trotzdem zulassen.
+    assert row["problems"] == [] and any("Geburtsdatum fehlt" in text for text in row["warnings"])
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", str(body))
     assert [staffel["staffel"] for staffel in body["divisions"][0]["staffeln"]] == ["A"]
     assert [step["status"] for step in row["history"]] == ["submitted"]
 

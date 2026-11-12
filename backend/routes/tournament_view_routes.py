@@ -146,6 +146,12 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
         viewer_id = (user or {}).get("id")
         matches_v2 = [public_match_view(match, viewer_id) for match in matches_v2]
         stages = [public_stage_view(stage) for stage in stages]
+    elif isinstance(t.get("league_context"), dict) and any(match.get("disputes") for match in matches_v2):
+        # Verfahren (E.2, #1619): im eigenen Spiel sieht auch die Leitung nur, was ihre Seite sehen darf.
+        from services.league_permissions import involved_match_ids
+        from services.league_procedures import for_viewer_list
+
+        matches_v2 = await for_viewer_list(db, user, matches_v2, await involved_match_ids(db, user, t, matches_v2))
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     raw_regs = regs
     own_ids = await _own_registration_ids(db, regs, user)
@@ -317,7 +323,12 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit
     # kampflosen Niederlagen ausgeschieden ist, bleibt mit ihnen drin.
     regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
+    # Tabellenende der Liga-Staffel (E.1, Nr. 43): wann jemand ausschied - die Projektion gibt ``removal`` nicht mit.
+    removed_at = {r.get("id"): (r.get("removal") or {}).get("at") for r in regs if r.get("removal")}
     regs = [_public_registration(r, user, is_staff) for r in regs]
+    for r in regs:
+        if removed_at.get(r.get("id")):
+            r["removal_at"] = removed_at[r["id"]]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, private_projection()).to_list(500)}

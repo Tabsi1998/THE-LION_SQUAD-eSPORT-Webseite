@@ -10,7 +10,11 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Turniere → Turnier öffnen** (`/admin/tournaments/<Turnier>`) – Reiter **Teilnehmer**,
   **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Maps** (nur mit Spiel, siehe 3.14), **Team**, **Rückmeldungen** (erst nach
   dem Ende), **Bearbeiten**
-- **Admin → eSports → Spiele → Maps** (`/admin/games/<Spiel>/maps`) – Map-Bibliothek eines Spiels mit Bildern und Modi
+- **Admin → eSports → Spiele → Zahnrad** (`/admin/games/<Spiel>`) – die Spielseite mit den Reitern **Allgemein**,
+  **Spiel-IDs**, **Modi** (`#modi`), **Maps** (`#maps`, Map-Bibliothek mit Bildern; die alte Adresse
+  `/admin/games/<Spiel>/maps` leitet dorthin weiter) und **Ausrüstung** (`#ausruestung`, Waffen, Aufsätze und übrige Ausrüstung
+  in Kategorien und Unterkategorien wie Sturmgewehr oder Optik, für die Sperrlisten der Liga; die alte Adresse `/admin/games/<Spiel>/equipment` leitet dorthin), siehe 3.12, 3.14 und
+  [Liga leiten 2.1a](liga.md#21a-ausrüstung-und-sperrliste)
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga N und Staffeln (3.15); den ganzen Weg bis zum
   Saisonende erklärt [Liga leiten](liga.md)
 - **Admin → eSports → Turnier-Leitfaden** (`/admin/tournament-guide`) – welches Format wofür, mit „Voreinstellung übernehmen“
@@ -20,7 +24,8 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
   **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Alle Turnierseiten tragen dieselben
   Brotkrumen „Start · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
-- **Terminvorschläge** auf der Matchseite gehen nur in die Zukunft – frühestens 5 Minuten ab jetzt.
+- **Terminvorschläge** auf der Matchseite gehen nur in die Zukunft – frühestens 5 Minuten ab jetzt. Bis zu 3 Termine
+  gehen auf einmal (**+ weiteren Termin**); die Gegenseite nimmt einen davon an, die übrigen sind damit erledigt.
 
 Wer was darf: Die **Turnierleitung** (Bereich „Turnierleitung“, mit bestätigter Zwei-Faktor-Anmeldung) verwaltet alle
 Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, siehe [Erste Schritte im Admin](admin.md).
@@ -54,7 +59,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Ergebnisse** | Spieler melden, oder die Turnierleitung trägt im **Ergebnis-Fenster** ein, danach 10 Sekunden **Rückgängig** | Matchplan, Stationen, Turnierleitung am Handy |
 | **Dispute** | Streitfall entscheiden mit einem Tipp | Turnierleitung am Handy |
 | **Stationen** | Spiele Geräten zuweisen, Aufruf auf dem TV | Admin → eSports → Stationen |
-| **Maps** | Map-Bibliothek je Spiel mit Bild und Modi; je Turnier und Phase ein eigener Map-Pool | Spiele → Maps, Reiter Maps |
+| **Maps** | Map-Bibliothek je Spiel mit Bild und Modi; je Turnier und Phase ein eigener Map-Pool | Spielseite → Maps, im Turnier Reiter Maps |
 | **TV** | Turnierbaum, Aufrufe, Stationen auf Fernseher und Beamer | [TV und Beamer](tv.md) |
 | **Abschluss** | Beendet, Ergebnisse veröffentlicht, Punkte, Erfolge, Gewinne | Statusauswahl im Turnier |
 
@@ -76,6 +81,16 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
    ausschließen** und, wenn das Turnier zu einem Event gehört, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
    **Planung prüfen** bei widersprüchlichen Zeiten – beim Bearbeiten genauso, direkt unter **Check-in endet** (etwa „Der
    Check-in endet vor seiner Öffnung.“). Gespeichert wird trotzdem.
+
+   Beim Bearbeiten (Reiter **Bearbeiten**, Kasten „Zeitplan und Anmeldung“) steht der Haken **Automatisches
+   Turnier-Hinweisbanner anzeigen**: Solange Anmeldung oder Check-in offen sind bzw. das Turnier innerhalb eines Tages
+   startet, läuft dann oben im Turnierbereich der Website und in der App ein Banner. Ihn sieht, wer das Turnier sehen
+   darf (Sichtbarkeit Community: Angemeldete, Vereinsmitglieder: Mitglieder); bei **Intern** läuft keiner.
+   Darunter stehen seine **Views**, **Klicks** und wann er **zuletzt angezeigt** wurde, bei mehreren Bannern
+   (Anmeldung / Check-in, Startet bald) einzeln aufgeschlüsselt. Die Zahlen bleiben, wenn der Banner nicht mehr läuft.
+   Alle laufenden automatischen Banner zeigt auch Admin → Auftritt → Branding (siehe [Auftritt](auftritt.md)).
+
+   <img src="../assets/turniere/banner-zahlen-handy.png" alt="Turnier bearbeiten am Handy: unter dem Schalter Automatisches Turnier-Hinweisbanner anzeigen stehen Views 168, Klicks 23, zuletzt angezeigt, aufgeschlüsselt nach Anmeldung / Check-in und Startet bald" width="300">
 
    <img src="../assets/turniere/planung-pruefen-bearbeiten-handy.png" alt="Turnier bearbeiten am Handy: Check-in endet liegt vor Check-in öffnet, darunter der gelbe Kasten Planung prüfen" width="300">
 6. Weiter unten, aufklappbar: **Darstellung und Regeln** (**Adresse (URL)** – sie folgt dem Titel, bis du sie selbst
@@ -706,17 +721,67 @@ weiter, auch die Liste für die App. **Archivierte zeigen** blendet es wieder ei
 **Löschen** geht nur, wenn nichts mehr daran hängt; sonst nennt der Dialog die Zählung (etwa „2 Turniere, 12 Maps“) und
 bietet das Archiv an.
 
-**Spiel-Daten pflegen:** **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere**. Alles ist
-freiwillig:
+**Die Spielseite:** **Admin → eSports → Spiele**, in der Zeile des Spiels das **Zahnrad** (oder der Name) öffnet
+`/admin/games/<Spiel>`. Alles zu einem Spiel steht dort in vier Reitern; jeder Reiter lässt sich auch direkt per Adresse
+öffnen (`#allgemein`, `#ids`, `#modi`, `#maps`):
+
+| Reiter | Was dort steht |
+| --- | --- |
+| **Allgemein** | Name, Kurzname, **Art** (Einzelspiel, Hauptspiel / Serie, Spielversion), **Adresse** (eine geänderte leitet alte Links weiter), bei einer Spielversion das **Hauptspiel**, Logo und Cover, **Discord-Server** und **Discord-Rolle** |
+| **Spiel-IDs** | Welche Spieler-ID die Anmeldung fragt: je Feld **Bezeichnung**, **Schlüssel**, **Hinweis für Spieler**, **Format**, **Beispiel**, **Auswahl** und die Haken **Pflichtfeld** und **Je Liga-Season nur einmal**. Der **Schlüssel** entsteht bei einem neuen Feld aus der Bezeichnung und ist nach dem Speichern fest – an ihm hängen die IDs der Spieler. Jedes Feld braucht einen eigenen; ergeben zwei Bezeichnungen denselben (etwa „PSN-ID“ und „PSN ID“), sagt die Seite es vor dem Speichern. Stehen unter einem Feld schon IDs (im Profil oder in einem Liga-Kader), fragt der Papierkorb mit der Zahl der Personen nach; ohne das Feld findet die Seite diese IDs nicht mehr. Legt ihr gleich danach ein Feld mit derselben Bezeichnung an, bekommt es den alten Schlüssel zurück. Dasselbe gilt, wenn ihr bei einer Spielversion die **ID-Quelle**, das **Hauptspiel** oder das Erben ändert: Gehen dadurch gespeicherte IDs verloren, fragt die Seite mit der Zahl der Personen, bevor sie speichert. Ein Spiel, an dem noch IDs hängen (auch unter seiner ID-Quelle oder in einem Liga-Kader), lässt sich nur archivieren, nicht löschen. Bei einer Spielversion dazu **ID-Quelle** und „IDs vom Hauptspiel verwenden“ |
+| **Modi** | Die Modi mit Symbol, Dauer, Ergebnisregel und Einstellungen (unten), darunter die **Vorgaben für Turniere** |
+| **Maps** | Die Map-Bibliothek als Tabelle Map × Modus (siehe 3.14) |
+
+Jeder Reiter mit Formular hat unten seinen eigenen Knopf (**Allgemein speichern**, **Spiel-IDs speichern**, **Modi
+speichern**) und speichert nur seine Felder. Was noch nicht gespeichert ist, steht unten als „Nicht gespeichert“, der
+Reiter trägt einen gelben Punkt. Ein Reiterwechsel verliert nichts; **Verwerfen** holt den gespeicherten Stand zurück. Wer
+die Seite mit Ungespeichertem verlässt, wird gefragt. Am Handy liegen die Reiter in einer Leiste; passt sie nicht mehr in
+die Breite, lässt sie sich seitlich wischen.
+
+**Neues Spiel:** In der Spieleliste **Neues Spiel**, Name und Art eintragen (bei einer Spielversion das Hauptspiel),
+**Anlegen und öffnen** – danach öffnet die Spielseite.
+
+<img src="../assets/turniere/spielseite-handy.png" alt="Spielseite am Handy (Testdaten): Reiter Allgemein, Spiel-IDs, Modi und Maps, darunter Name, Kurzname, Art und Adresse, unten Allgemein speichern" width="300">
+
+**Spiel-Daten pflegen:** Reiter **Modi**. Alles ist freiwillig:
 
 | Feld | Wofür |
 | --- | --- |
-| **Modi und Dauer** | Name und Minuten je Modus, z. B. „Grand Prix 4 Rennen“ 12 Min. Der erste Modus ist die Vorgabe; im Turnier wählt **Spielmodus** einen anderen. **Minuten je Einzelspiel** heißt: die Minuten gelten pro Spiel, Best-of zählt mit. Die Minuten sind freiwillig: ein Modus nur für Maps (etwa „Stellung“ oder „Suchen & Zerstören“) bleibt ohne Dauer. Umbenennen behält die Zuordnung der Maps (siehe 3.14). |
+| **Modi und Dauer** | Je Modus eine Zeile mit Name, Zustand, Spieler je Seite, Ergebnisregel und Dauer; ein Klick klappt alle Felder auf, **Modus hinzufügen** legt eine neue, schon aufgeklappte Zeile an. **Minuten**, z. B. „Grand Prix 4 Rennen“ 12 Min. Der erste Modus ist die Vorgabe; im Turnier wählt **Spielmodus** einen anderen. **Minuten je Einzelspiel** heißt: die Minuten gelten pro Spiel, Best-of zählt mit. Die Minuten sind freiwillig: ein Modus nur für Maps (etwa „Stellung“ oder „Suchen & Zerstören“) bleibt ohne Dauer. Umbenennen behält die Zuordnung der Maps (siehe 3.14). |
 | **Spieler je Lauf vor Ort / online** | Wie viele gleichzeitig an einer Station bzw. in einer Lobby spielen. Füllt bei Mehrspieler-Bäumen die **Spielgröße** vor. |
 | **Best-of-Vorgabe** | Füllt **Best of** vor, wenn im Turnier das Spiel gewählt wird. |
 | **Aufbau- und Wechselzeit** | Minuten je Spiel an der Station; kommt zur Dauer aus dem Modus dazu (nicht zu einer Dauer am Turnier). |
 | **Geräte für Stationen** | Der Planer nimmt nur Stationen mit einem dieser Geräte (Switch, Switch 2, PC, PS5, Xbox …). Nichts gewählt: jede Station. Eine Station, die fest diesem Spiel zugeordnet ist, passt immer. |
 | **Punktetabelle** | Punkte je Platz, z. B. `15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1` oder `4-3-2-1`. Wird gespeichert; die Wertung rechnet noch nicht damit. |
+
+**Je Modus mehr festhalten** (#2206): Die Zeile zeigt Name, **Zustand** (Aktiv, Inaktiv, Archiviert), Spieler je Seite,
+die Ergebnisregel in Kurzform (etwa „Runden gewinnen: 6 Siege · Verlängerung“) und die Dauer; am Handy steht das in zwei
+Zeilen. Ein Klick klappt die Zeile auf: Name, Zustand, Minuten und dazu:
+
+| Feld | Wofür |
+| --- | --- |
+| **Zustand** | **Aktiv** (Vorgabe). **Inaktiv**: steht für neue Map-Pools, **Modus je Map** einer Season und den **Spielmodus** eines Turniers nicht mehr zur Wahl. **Archiviert**: dazu in allen Auswahllisten der Verwaltung ausgeblendet und an keiner Map neu wählbar. Was den Modus schon hat, behält ihn: laufende Spiele, gespeicherte Pools, alte Ergebnisse, die Reihenfolge einer Season und die Dauerplanung. |
+| **Beschreibung** | Worum es im Modus geht, höchstens 500 Zeichen. Nichts Vertrauliches eintragen: Spiel-Daten sind über die Schnittstelle lesbar. |
+| **Spieler je Seite** | 4 heißt 4 gegen 4. Leer: keine Vorgabe. |
+| **Format** | Freitext bis 60 Zeichen, etwa die Regel-Variante. |
+| **Symbol (quadratisch)** | Ein kleines Bild je Modus (#2266): **Bild hochladen**, **Medien wählen** (Bibliothek) oder **Entfernen**. Es steht vor dem Namen in der Modus-Zeile, an den Maps auf Match- und Ligaseite, im Meldeformular, im Map-Pool, bei **Modus je Map** der Season und im Regelwerk (im PDF nicht). Ohne Bild steht ein neutrales Symbol. Wer keine Medienrolle hat, nimmt eigene Bilder; SVG geht nur mit Medienrolle. Ein gespeicherter Map-Pool behält das Symbol von damals – ein neues Symbol erreicht ihn erst, wenn ihr den Pool neu speichert; bis dahin steht im Pool-Editor am Modus „Symbol geändert – mit dem nächsten Speichern übernommen“. Steht das Symbol in einem gespeicherten Pool oder einem veröffentlichten Regelwerk, lässt es sich in der Mediathek nicht löschen oder drehen. |
+| **Ergebnisregel** | **Art**: Punkte bis zum Ziel, Runden gewinnen oder höherer Endstand gewinnt. Dazu **Ziel** (Punkte bzw. Runden zum Sieg), bei Runden ein **Rundenlimit**, ein **Zeitlimit je Map**, die **Zeit je Runde**, **Remis erlaubt** und **Verlängerung bei Gleichstand**. Zeiten gehen als `1:30`, `90 s` oder als Minuten (`10`); gespeichert wird in Sekunden, ältere Angaben in Minuten liest die Seite einfach weiter. Die Zeit je Runde ist nur eine Angabe für Regelwerk und Anzeige. Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand ([Liga leiten, 2.2](liga.md#22-liga-und-season-anlegen)); spätere Änderungen hier erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts. |
+| **Einstellungen** | Freie Liste je Modus (#2271), etwa Lobby-Einstellungen: je Zeile **Gruppe** (z. B. „Lobby“, „Spieler“), **Bezeichnung**, **Einheit** (Text, Sekunden, Minuten, Punkte, An/aus) und **Wert**; Sekunden gehen auch als `1:30`. Die Pfeile ändern die Reihenfolge, der Papierkorb entfernt eine Zeile; höchstens 40. Die Season übernimmt die Liste als Kopie und darf einzelne Werte ändern. |
+| **Eigene Regeln** | Kurzer Regeltext je Modus (bis 1000 Zeichen), etwa „Die Uhr läuft nur, solange keine Seite die Zone hält.“ Steht im Regelwerk unter dem Modus. |
+
+Werte eines bestimmten Titels sind nicht eingebaut; ihr tragt sie je Spiel selbst ein. Passt etwas nicht (Ziel fehlt,
+Rundenlimit kleiner als das Ziel, `1:75` als Zeit …), sagt es die Seite vor dem Speichern.
+
+<img src="../assets/turniere/spiel-modus-einstellungen.png" alt="Reiter Modi, eine Modus-Zeile aufgeklappt (Testdaten): Symbol mit Ändern, Medien wählen und Entfernen, Zeitlimit 1:30 und Zeit je Runde 1:45, drei Einstellungen mit Gruppe, Bezeichnung, Einheit und Wert, darunter Eigene Regeln" width="560">
+
+**In der Liga-Season:** Unter **Ergebnisregeln** der Season steht je Modus zusätzlich **Einstellungen und eigene Regeln** –
+die Kopie aus dem Spiel. Weicht ein Wert ab, steht an der Zeile **weicht vom Spiel ab**; **Einstellungen vom Spiel
+übernehmen** holt die Werte des Spiels. Bestehende Staffeln bekommen Änderungen mit **Vorgaben auf Staffeln übertragen**
+(Gruppe „Ergebnisregeln, Einstellungen und Punktepflicht“). Im Regelwerk zeigt der Baustein **Einstellungen je Modus**
+(`[[baustein:mode_settings]]`) Zeitlimit, Zeit je Runde, die Einstellungen als Tabelle und den Regeltext – im Web mit Symbol,
+im PDF als Tabelle ohne Symbol.
+
+<img src="../assets/turniere/spiel-modus-details.png" alt="Spielseite, Reiter Modi (Testdaten): drei Modi als Zeilen mit Zustand, Spielern, Ergebnisregel und Dauer, einer aufgeklappt mit Name, Zustand und Minuten; bei verwendeten Modi ein Schloss statt Papierkorb" width="560">
 
 **Best-of als Erwartungswert:** Ist die Dauer **je Einzelspiel** angegeben, plant der Planer die Mitte aus kürzestem und
 längstem Verlauf: Best of 1 = 1 Spiel, **Best of 3 = 2,5**, Best of 5 = 4, Best of 7 = 5,5 Spiele. Minuten = aufgerundet
@@ -769,38 +834,65 @@ Fällt am Event Netz oder Server aus, läuft das Turnier auf Papier weiter. Daru
 
 ### 3.14 Maps und Map-Pools
 
-**Map-Bibliothek je Spiel:** **Admin → eSports → Spiele**, in der Zeile des Spiels das Karten-Symbol (**Maps**). Jedes
-Spiel und jede Spielversion hat seine eigenen Maps – eine neue Version erbt keine, und gleiche Namen in zwei Spielen
-sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle selbst an. **Aus Spiel übernehmen** holt Maps aus
-einer anderen Version: Spiel wählen, Maps anhaken (schon vorhandene sind gesperrt), übernehmen. Es entstehen eigene
-Maps dieses Spiels mit demselben Bild, die Modi nur soweit dieses Spiel sie kennt. **Map hinzufügen** öffnet das Blatt:
+**Map-Bibliothek je Spiel:** Spielseite (**Admin → eSports → Spiele → Zahnrad**), Reiter **Maps**. Die alte Adresse
+`/admin/games/<Spiel>/maps` leitet dorthin weiter. Jedes Spiel und jede Spielversion hat seine eigenen Maps – eine neue
+Version erbt keine, und gleiche Namen in zwei Spielen sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle
+selbst an. **Aus Spiel übernehmen** holt Maps aus einer anderen Version: Spiel wählen, Maps anhaken (schon vorhandene
+sind gesperrt), übernehmen. Es entstehen eigene Maps dieses Spiels mit demselben Bild, die Modi nur soweit dieses Spiel
+sie kennt.
+
+Die Maps stehen als **Tabelle Map × Modus**: je Map eine Zeile mit Bild, Name und Slug, je Modus eine Spalte (darüber,
+wie viele Maps dort freigegeben sind), dann **Zustand** mit „in N Pools“ und die Aktionen. **Häkchen = in diesem Modus
+freigegeben**; nur dort lässt sich die Map in einen Pool wählen. Jedes Häkchen speichert sofort. Die Modi sind dieselben
+wie im Reiter Modi (siehe 3.12) – kein zweites Modussystem. Hat das Spiel keine Modi, gibt es keine Spalten, und jede Map
+gilt für jeden Pool; der Hinweis **Modi anlegen** führt in den Reiter Modi. Ein archivierter Modus hat nur eine Spalte,
+solange eine Map ihn noch hat, und lässt sich dort nur abwählen. Am Handy bleibt der Name links stehen, die Spalten
+wischt man seitlich.
+
+**Map hinzufügen** öffnet das Blatt:
 
 - **Name** und **Slug** (eindeutig im Spiel; bleibt beim Umbenennen gleich), **Bild** im Format 16 : 9 über
   **Hochladen** oder **Medien wählen** (nur eigene Uploads), **Notiz** und **Externe Kennung** (freiwillig).
 - **Weitere Schreibweisen**, mit Komma getrennt – etwa wie ein Veranstalter die Map nennt. Darüber ordnet das
   Ergebnisblatt einer Team-Liga einen getippten oder eingefügten Namen der Map zu (siehe [Inhalte, Serien](inhalte.md)).
-- **Modi:** dieselben Modi wie bei der Spieldauer (siehe 3.12) – kein zweites Modussystem. Eine Map kann in mehreren
-  Modi freigegeben sein und in anderen nicht; nur dort lässt sie sich in einen Pool wählen. Hat das Spiel keine Modi,
-  gilt die Map für jeden Pool.
-- Die Pfeile ändern die **Reihenfolge**, das Archiv-Symbol **archiviert** (und holt zurück). **Löschen** geht nur, solange
-  die Map in keinem gespeicherten Pool stand – sonst archivieren. Die Karte sagt, in wie vielen Pools sie steht.
+- **Freigegeben in:** die Modi für die neue Map. Danach ändert ihr sie in der Tabelle; das Blatt **Bearbeiten** (Stift)
+  hat keine Modi mehr.
+- In der Zeile ändern die Pfeile die **Reihenfolge**, das Pause-Symbol **deaktiviert** (und aktiviert wieder), das
+  Archiv-Symbol **archiviert** (und holt zurück). *Inaktiv*: in keinen neuen Pool wählbar, wo sie schon steht, bleibt sie
+  gültig und im Pool-Editor mit „inaktiv“ markiert. Vor dem Deaktivieren und Archivieren nennt eine Rückfrage die
+  Liga-Seasons, in deren Pool die Map steht – nur als Hinweis. **Löschen** geht nur, solange die Map in keinem
+  gespeicherten Pool und keinem Spiel stand – sonst archivieren.
 
-<img src="../assets/turniere/maps-bibliothek.png" alt="Map-Bibliothek eines Spiels: Karten mit Bild, Slug, Modi und wie viele Pools die Map nutzen" width="560">
+<table>
+<tr><th>Reiter Maps am PC (Testdaten)</th><th>Am Handy (Testdaten)</th></tr>
+<tr>
+<td><img src="../assets/turniere/maps-bibliothek.png" alt="Reiter Maps: Tabelle Map × Modus mit Bild, Häkchen je Modus, Zustand mit Pool-Zählung und Aktionen, darüber der Hinweis auf eine Map ohne Modus" width="560"></td>
+<td><img src="../assets/turniere/spielseite-maps-handy.png" alt="Reiter Maps am Handy: Name links fest, Modus-Spalten zum seitlichen Wischen mit Hinweis" width="260"></td>
+</tr>
+</table>
 
 **Modi ändern, ohne etwas zu sperren:**
 
-- **Modus entfernen** (Spiel bearbeiten → Für Turniere): Beim Speichern fragt die Seite mit der Zahl der betroffenen
-  Maps nach. Der Modus verschwindet dann auch aus den Maps. Gespeicherte Pools, laufende Liga-Spiele und alte Ergebnisse
-  bleiben, wie sie sind: Der Editor nennt den alten Modus („Im gespeicherten Pool steht noch …“), und gemeldet wird weiter
-  aus dem gespeicherten Pool. Erst neues Speichern des Pools nimmt ihn heraus. Steht der Modus in der Reihenfolge einer
-  Liga-Season (**Modus je Map**), ändert ihr zuerst die Reihenfolge: Einen Pool ohne diesen Modus nimmt die Season sonst nicht
-  an. Wird der Modus später wieder angelegt, haben die Maps ihn nicht mehr. Turniere und Phasen, die mit ihm planen, nehmen
-  danach den ersten Modus des Spiels.
-- **Erster Modus:** Sobald ein Spiel Modi hat, steht eine Map ohne Modus in keinem neuen Pool zur Wahl. Die Map-Seite
+- **Modus entfernen** (Spielseite → Modi) geht nur bei einem **unbenutzten** Modus. Verwendet ist er, sobald
+  er in einem Map-Pool (auch einer alten Version), in **Modus je Map** einer Season oder Staffel, als **Spielmodus** eines
+  Turniers oder einer Phase, in einem Spiel oder Ergebnisblatt steht. Dann steht statt des Papierkorbs ein Schloss mit
+  dem Hinweis „Wird verwendet – entfernen geht nicht, nur deaktivieren oder archivieren“; stellt den **Zustand** auf
+  **Inaktiv** oder **Archiviert**. Auch direkt über die Schnittstelle lehnt der Server das Entfernen ab. Einen unbenutzten
+  Modus entfernt der Papierkorb: Beim Speichern fragt die Seite mit der Zahl der betroffenen Maps nach, der Modus
+  verschwindet dann auch aus den Maps.
+- **Umbenennen** ändert nur den Namen. Die Kennung bleibt, Maps, Pools, Reihenfolgen und Spiele zeigen weiter auf den
+  Modus. Gespeicherte Pools und gemeldete Spiele zeigen den Namen von damals.
+- **Inaktiv** im laufenden Betrieb: Pools, die den Modus schon haben, gelten weiter, gemeldet wird weiter daraus. Erst ein
+  neu gespeicherter Pool ohne ihn nimmt ihn heraus; der Pool-Editor nennt inaktive Modi („Inaktiv und hier nicht zur
+  Wahl“). Steht der Modus in **Modus je Map** einer Season, ändert ihr zuerst die Reihenfolge: Einen Pool ohne diesen Modus
+  nimmt die Season sonst nicht an.
+- **Altbestand:** Ein Modus, der vor dieser Regel trotz Verwendung entfernt wurde, bleibt in gespeicherten Pools lesbar
+  („Im gespeicherten Pool steht noch …“), gemeldet wird weiter aus dem gespeicherten Pool.
+- **Erster Modus:** Sobald ein Spiel Modi hat, steht eine Map ohne Modus in keinem neuen Pool zur Wahl. Der Reiter Maps
   zeigt dann **Diese Maps haben noch keinen Modus**: Modi anhaken, **Allen … Maps zuordnen**, fertig. Auch der Pool-Editor
   weist darauf hin. Bestehende Pools ohne Modus gelten unverändert weiter.
 
-**Standard-Pool je Spiel:** Auf der Map-Seite unten unter **Standard-Pool** speichert ihr je Modus eine Auswahl. Sie ist
+**Standard-Pool je Spiel:** Im Reiter Maps unten unter **Standard-Pool** speichert ihr je Modus eine Auswahl. Sie ist
 nur eine Vorlage: **Vorgabe des Spiels** lädt sie in Turnier, Phase, Season und Saison, gespeichert wird dort wie immer
 ein eigener Stand. Gibt es keinen Standard-Pool, lädt der Knopf alle freigegebenen, aktiven Maps. Einen Standard-Pool zu
 ändern oder zu entfernen, ändert keinen gespeicherten Pool.
@@ -830,12 +922,11 @@ gewohnt. Den Rahmen legst du unter **Admin → eSports → Liga** an (nur Turnie
 
 1. **Liga anlegen:** Name und Spiel, etwa „CoD-Liga“.
 2. **Season anlegen:** nur der Beginn der ersten Spielwoche (00:00 Uhr Wien). Danach auf der Seite der Season die
-   Vorgaben festlegen: Wochen gesamt (mit Sperrwochen), Spielwoche in Tagen, Standardtag und -zeit, Runden (nur Hinrunde
-   oder Hin- und Rückrunde), **Sperrzeiten** wie die Weihnachtspause, Meldeschluss, Best of, Teamgröße, Mindestkader,
-   Teams je Staffel, Modus je Map, Punkte und Gleichstand, Fristen, **Regeltext** und **Sichtbarkeit**. Der Kalender
-   darunter zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
+   Vorgaben in ihren Reitern festlegen (Überblick, Spielbetrieb, Termine, Anmeldung und Kader, Tabelle, Regelwerk und Sperrliste,
+   Ligen und Staffeln – Einzelheiten im [Liga-Handbuch, 2.2](liga.md#22-liga-und-season-anlegen)). Der Kalender im Reiter
+   Termine zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
    und wie viele Teams eine Staffel höchstens fassen kann.
-3. **Map-Pool der Season** wählen – jede neue Staffel bekommt eine Kopie.
+3. **Modi und Maps der Season** im Reiter Spielbetrieb anhaken – jede neue Staffel bekommt eine Kopie des Map-Pools.
 4. **Liga 1 anlegen**, bei Bedarf mit Beiname und eigenen Werten (Best of, Teamgröße, Mindestkader, Teams je Staffel,
    Punkte); leer heißt „wie die Season“.
 5. **Staffel anlegen:** legt das Turnier als Entwurf mit allen Vorgaben an – ohne offene Anmeldung, ohne Discord, ohne
@@ -862,7 +953,10 @@ Website stehen sie nicht, im Profil und auf der Teamseite gekennzeichnet als „
 In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teamleitung) – auf der Matchseite im Web:
 
 1. **Melden:** je gespielter Map den Modus (steht fest, wenn die Season eine Reihenfolge vorgibt), die **Map aus dem
-   Pool** antippen, den **Sieger** antippen, auf Wunsch die Punkte. Die nächste Map erscheint, sobald die letzte einen Sieger hat – bis die
+   Pool** antippen und den **Endstand** der Map eintragen (in neuen Seasons Pflicht, sonst freiwillig). Den **Sieger**
+   ergeben die Punkte; antippen muss man ihn nur bei Gleichstand oder wenn keine Punkte eingetragen sind. An jeder Map steht, wie sie gewertet wird, etwa „Gewertet: bis 250 Punkte · 10 Min.“ oder „6 Runden,
+   höchstens 11“. Passt ein Endstand nicht dazu oder nicht zum Sieger, steht das gleich unter den Maps, etwa „Map 2: höchstens
+   11 Runden – 7:5 sind 12.“ Die nächste Map erscheint, sobald die letzte einen Sieger hat – bis die
    Serie entschieden ist. Am Schluss einmal ankreuzen, **wer bei euch gespielt hat** (mindestens 3, bei Wechseln auch mehr; ältere Staffeln stellen stattdessen je Map auf).
    Ein Map-Veto gibt es nicht im System; ihr tragt ein, was gespielt wurde.
 2. **Bestätigen:** die Gegenseite sieht die Maps in Worten, kreuzt ihre Teilnehmer an und tippt
@@ -873,7 +967,12 @@ In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teaml
 4. **Teilnehmerliste nachtragen:** wer aus der App oder durch die Automatik ohne Liste dasteht, sieht auf der
    Matchseite „Teilnehmerliste fehlt noch“ und trägt sie nach – bis 48 Stunden ab der Bestätigung, danach entscheidet die Liga-Leitung. Das Ergebnis bleibt gültig.
 
-Geprüft wird: Best of (keine Map nach der Entscheidung), Map im Pool und für den Modus freigegeben, auf der Liste nur
+Beim **Bestätigen** gelten die Punkte der ersten Meldung – ihr müsst sie nicht noch einmal eintippen.
+
+![Meldeformular mit Ergebnisregel je Map](bilder/liga-ergebnisregeln-melden.png)
+
+Geprüft wird: Best of (keine Map nach der Entscheidung), der Endstand je Map gegen Sieger und Ergebnisregel der Season
+([Liga leiten, 2.2](liga.md#22-liga-und-season-anlegen)), Map im Pool und für den Modus freigegeben, auf der Liste nur
 der eigene Kader und nur, wer spielberechtigt ist (**Spiel-ID**, Alter, Wartezeit, siehe
 [Liga leiten, 3.7](liga.md#37-spiel-ids-im-kader) und [3.9](liga.md#39-spielberechtigung-regeln-je-season)), nie jemand auf beiden Seiten und **kein Doppel-Einsatz** – niemand spielt am selben Spieltag für
 zwei Teams derselben Season.

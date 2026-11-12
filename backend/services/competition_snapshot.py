@@ -306,6 +306,10 @@ def adapt_stage_matches(matches: Iterable[dict]) -> list[dict]:
         ]
         canonical["results"] = _stage_results(match)
         canonical["advancement"] = _stage_advancement(match)
+        # Liga (#1619, E.2): Das Ergebnis zählt vorläufig, ist aber angefochten - Tabelle, Spielplan und TV zeigen „in Klärung“.
+        # Nur gesetzt, wenn es so ist: Alle anderen Spiele sehen aus wie bisher.
+        if match.get("contested"):
+            canonical["contested"] = True
         adapted.append(canonical)
     return _sort_matches(adapted)
 

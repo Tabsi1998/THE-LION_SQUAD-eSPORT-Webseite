@@ -8,6 +8,8 @@ es einen klaren Fehler statt einer stillen Lücke.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Awaitable, Callable
 from zoneinfo import ZoneInfo
 
@@ -64,8 +66,10 @@ SIGNALS = "user_signals"
 # Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
 # ``live``: zählt nur im Augenblick selbst und lässt sich nicht nachmelden (Silvester um Mitternacht, App geöffnet).
 # ``server``: zählt nur der Server selbst, wenn er das Ereignis geprüft hat (Türchen geöffnet) - ein Client kann es nicht melden.
+# ``window``: zählt nur an diesem Tag ab dieser Stunde, Wiener Zeit (#2338, Gruselnacht: 31.10. ab 18 Uhr). Nachgemeldet
+# zählt nur dieser Tag - die Stunde lässt sich dann nicht mehr prüfen.
 SIGNAL_RULES: dict[str, dict] = {
-    "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
+    "halloween_pumpkin": {"per_day": 1, "season": "halloween", "window": {"month": 10, "day": 31, "from_hour": 18}},
     "halloween_bats_scared": {"per_day": 30, "season": "halloween"},
     "halloween_ghosts_freed": {"per_day": 20, "season": "halloween"},
     "halloween_cat_petted": {"per_day": 10, "season": "halloween"},
@@ -101,3 +105,80 @@ def evaluator() -> Evaluator:
     if _evaluator is None:
         raise RuntimeError("Erfolge-Auswertung nicht angemeldet - badges.py wurde nicht geladen")
     return _evaluator
+
+
+def due_tiers(tiers: list[dict], counters: dict, earned_codes: set, *, active_member: bool, only_keys=None,
+              retired_groups=frozenset()) -> list[dict]:
+    """Die Stufen, die jetzt fällig sind: noch nicht vergeben, Zähler am Ziel, Mitglieder-Stufen nur für Mitglieder.
+    Dieselbe Prüfung für die Auswertung (badges) und den Probelauf der Neuberechnung (#2340). Nicht mehr Erreichbares
+    (#2339: die Stufe retired oder ihre Gruppe in ``retired_groups``) vergibt keine Automatik mehr."""
+    from services.achievement_reach import is_retired
+
+    due = []
+    for t in tiers:
+        if t["code"] in earned_codes:
+            continue
+        if t.get("group_code") in retired_groups or is_retired(t):
+            continue
+        if t.get("member_only") and not active_member:
+            continue
+        ck = t.get("condition_key")
+        target = t.get("progress_target") or 0
+        if not ck or not target:
+            continue
+        if only_keys is not None and ck not in only_keys:
+            continue
+        if counters.get(ck, 0) >= target:
+            due.append(t)
+    return due
+
+
+# Neuberechnung (#2340, services/achievement_recount.py): was in ``quiet_scope`` geschieht, gehört zur Neuberechnung -
+# Aufstiege melden sich nicht, Folge-Auswertungen bleiben still. Hier im Kern, damit Warteschlange und XP es fragen
+# können, ohne nach oben zu importieren.
+_recount_quiet: ContextVar[bool] = ContextVar("achievement_recount_quiet", default=False)
+
+
+@contextmanager
+def quiet_scope():
+    token = _recount_quiet.set(True)
+    try:
+        yield
+    finally:
+        _recount_quiet.reset(token)
+
+
+def in_quiet_scope() -> bool:
+    return _recount_quiet.get()
+
+
+# Laut vergebene Stufen (#2340): Was der Server der Seite als „gerade vergeben“ meldet (Signale, Türchen, Ostereier,
+# „Erfolge prüfen“), zählt nur diese - sonst zeigte die Zeremonie die neuesten n Stufen, darunter längst gesehene.
+_loud_awards: ContextVar[list | None] = ContextVar("achievement_loud_awards", default=None)
+
+
+@contextmanager
+def loud_awards():
+    """Liefert die Liste der Stufen, die in dieser Klammer laut vergeben wurden."""
+    codes: list[str] = []
+    token = _loud_awards.set(codes)
+    try:
+        yield codes
+    finally:
+        _loud_awards.reset(token)
+
+
+def note_loud_award(code: str) -> None:
+    codes = _loud_awards.get()
+    if codes is not None:
+        codes.append(code)
+
+
+# Der Eintrag des stillen Modus in ``settings`` - hier, damit auch die Kronen ihn lesen, ohne nach oben zu importieren.
+RECOUNT_SETTING_ID = "achievements_recount"
+
+
+async def recount_silent(db) -> bool:
+    """Ist der stille Modus der Neuberechnung gerade an?"""
+    doc = await db.settings.find_one({"id": RECOUNT_SETTING_ID}, {"_id": 0, "active": 1})
+    return bool(doc and doc.get("active"))

@@ -1,0 +1,255 @@
+{
+ "_hinweis": "Erzeugt aus services/loadout_bans (allowed_block, render_block, markdown_text.served) - erfundene Namen (#2299, #2298).",
+ "allowed": {
+  "list": true,
+  "layout": 4,
+  "categories": [
+   {
+    "label": "Waffen",
+    "role": "weapon",
+    "sections": [
+     {
+      "label": null,
+      "state": "some",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Ohne Klasse",
+        "image_url": "/api/static/uploads/bild-o1.png",
+        "not_in": [
+         "Suchen & Zerstören"
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Sturmgewehr",
+      "icon_url": "/api/static/uploads/klasse-sturm.png",
+      "state": "some",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Blitz 9",
+        "image_url": "/api/static/uploads/bild-w1.png",
+        "not_in": [],
+        "attachments": {
+         "count": 5,
+         "banned": [],
+         "groups": [
+          {
+           "label": null,
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Griff",
+             "image_url": "/api/static/uploads/bild-a2.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Mündung",
+           "icon_url": "/api/static/uploads/klasse-muendung.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Schalldämpfer",
+             "image_url": "/api/static/uploads/bild-a5.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "icon_url": "/api/static/uploads/klasse-optik.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Holo",
+             "image_url": "/api/static/uploads/bild-a4.png",
+             "not_in": []
+            },
+            {
+             "name": "Rotpunkt",
+             "image_url": "/api/static/uploads/bild-a1.png",
+             "not_in": []
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1
+        }
+       },
+       {
+        "name": "Donner 4",
+        "image_url": "/api/static/uploads/bild-w2.png",
+        "not_in": [],
+        "attachments": {
+         "count": 4,
+         "banned": [
+          "Rotpunkt"
+         ],
+         "groups": [
+          {
+           "label": "Mündung",
+           "icon_url": "/api/static/uploads/klasse-muendung.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Schalldämpfer",
+             "image_url": "/api/static/uploads/bild-a5.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "icon_url": "/api/static/uploads/klasse-optik.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Holo",
+             "image_url": "/api/static/uploads/bild-a4.png",
+             "not_in": [
+              "Stellung",
+              "Kapern"
+             ],
+             "only_in": [
+              "Suchen & Zerstören"
+             ]
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1
+        }
+       },
+       {
+        "name": "Kar mit einem wirklich sehr langen Namen, der nirgends hineinpasst",
+        "image_url": null,
+        "not_in": [
+         "Stellung",
+         "Kapern"
+        ],
+        "only_in": [
+         "Suchen & Zerstören"
+        ],
+        "attachments": {
+         "count": 4,
+         "banned": [],
+         "groups": [
+          {
+           "label": "Mündung",
+           "icon_url": "/api/static/uploads/klasse-muendung.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Schalldämpfer",
+             "image_url": "/api/static/uploads/bild-a5.png",
+             "not_in": []
+            }
+           ]
+          },
+          {
+           "label": "Optik",
+           "icon_url": "/api/static/uploads/klasse-optik.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Holo",
+             "image_url": "/api/static/uploads/bild-a4.png",
+             "not_in": []
+            },
+            {
+             "name": "Rotpunkt",
+             "image_url": "/api/static/uploads/bild-a1.png",
+             "not_in": []
+            }
+           ]
+          }
+         ],
+         "banned_everywhere": 1
+        }
+       }
+      ]
+     },
+     {
+      "label": "Schrotflinte",
+      "icon_url": "/api/static/uploads/klasse-schrot.png",
+      "state": "banned",
+      "not_in": [],
+      "banned": [
+       "Bö",
+       "Hagel"
+      ],
+      "entries": []
+     },
+     {
+      "label": "Pistole mit einem wirklich sehr langen Namen, der nirgends hineinpasst",
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Funke",
+        "image_url": "/api/static/uploads/bild-p1.png",
+        "not_in": [],
+        "attachments": {
+         "count": 1,
+         "banned": [],
+         "groups": [
+          {
+           "label": "Mündung",
+           "icon_url": "/api/static/uploads/klasse-muendung.png",
+           "not_in": [],
+           "entries": [
+            {
+             "name": "Schalldämpfer",
+             "image_url": "/api/static/uploads/bild-a5.png",
+             "not_in": []
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "label": "Perks",
+    "role": "item",
+    "sections": [
+     {
+      "label": null,
+      "state": "all",
+      "not_in": [],
+      "banned": [],
+      "entries": [
+       {
+        "name": "Kaltblut",
+        "image_url": "/api/static/uploads/bild-k2.png",
+        "not_in": []
+       },
+       {
+        "name": "Leise Sohlen",
+        "image_url": "/api/static/uploads/bild-k1.png",
+        "not_in": []
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "attachments_everywhere": [
+   {
+    "name": "Kompensator",
+    "not_in": []
+   }
+  ]
+ },
+ "block_md": "*Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag.*\n\n**Waffen**\n\n- ![Ausrüstung](/api/static/uploads/bild-o1.png) ++Ohne Klasse++ *nicht in Suchen & Zerstören*\n\n![Klassen-Symbol](/api/static/uploads/klasse-sturm.png) *Sturmgewehr*\n- ![Ausrüstung](/api/static/uploads/bild-w1.png) ++Blitz 9++ alle passenden Aufsätze erlaubt\n- ![Ausrüstung](/api/static/uploads/bild-w2.png) ++Donner 4++ alle passenden Aufsätze erlaubt, außer: Rotpunkt, Holo (nur in Suchen & Zerstören)\n- ++Kar mit einem wirklich sehr langen Namen, der nirgends hineinpasst++ *nur in Suchen & Zerstören* alle passenden Aufsätze erlaubt\n\n![Klassen-Symbol](/api/static/uploads/klasse-schrot.png) *Schrotflinte* · **nicht erlaubt** (Bö, Hagel)\n\n*Pistole mit einem wirklich sehr langen Namen, der nirgends hineinpasst* · alle erlaubt\n- ![Ausrüstung](/api/static/uploads/bild-p1.png) ++Funke++ alle passenden Aufsätze erlaubt\n\n**An keiner Waffe erlaubt:** Kompensator\n\n**Perks**\n\n- ![Ausrüstung](/api/static/uploads/bild-k2.png) ++Kaltblut++\n- ![Ausrüstung](/api/static/uploads/bild-k1.png) ++Leise Sohlen++"
+}

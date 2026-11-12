@@ -12,6 +12,9 @@ import { StaggerIn } from "@/components/tls/motion";
 import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
 import { standingSignature } from "@/lib/liveChanges";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
+import { byMaps, hidesDraws, pointsNote, tiebreakOrder } from "@/lib/leagueTable";
+import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
   matchWhen,
@@ -34,28 +37,45 @@ function TeamName({ side, won }) {
   ) : <span className={`tls-league-match__team ${tone}`} title={side.name}>{side.name}</span>;
 }
 
-function MapChips({ match }) {
+/** Zusatz einer Map (C.3, #1617) - wie auf der Matchseite. */
+function mapNote(game) {
+  if (game.decision === "awarded") return "zugesprochen";
+  return game.status === "replayed" ? "wiederholt" : "";
+}
+
+export function MapChips({ match }) {
   if (!match.games?.length) return null;
   return (
-    <ol className="tls-league-maps" aria-label="Maps">
-      {match.games.map((game) => {
-        const side = game.winner_registration_id === match.home?.registration_id ? "home"
-          : game.winner_registration_id === match.away?.registration_id ? "away" : null;
-        const winner = side === "home" ? match.home?.name : side === "away" ? match.away?.name : null;
-        return (
-          <li key={game.position} className="tls-league-map" data-side={side || undefined}
-            title={`Map ${game.position}: ${game.map_name || "Map"}${winner ? ` – ${winner}` : ""}`}>
-            <span className="tls-league-map__thumb" aria-hidden="true">
-              {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-[11px] font-semibold text-white/85">{game.map_name || `Map ${game.position}`}</span>
-              <span className="block truncate text-[10px] text-white/45">{winner ? `für ${winner}` : "offen"}</span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      <ol className="tls-league-maps" aria-label="Maps">
+        {match.games.map((game) => {
+          const side = game.winner_registration_id === match.home?.registration_id ? "home"
+            : game.winner_registration_id === match.away?.registration_id ? "away" : null;
+          const winner = side === "home" ? match.home?.name : side === "away" ? match.away?.name : null;
+          const note = mapNote(game);
+          const why = note === "wiederholt" && game.replay_reason ? `: ${game.replay_reason}` : "";
+          return (
+            <li key={game.position} className="tls-league-map" data-side={side || undefined} data-testid={`league-map-${match.id}-${game.position}`}
+              title={`Map ${game.position}: ${game.map_name || "Map"}${game.mode_label ? ` (${game.mode_label})` : ""}${winner ? ` – ${winner}` : ""}${note ? ` · ${note}${why}` : ""}`}>
+              <span className="tls-league-map__thumb" aria-hidden="true">
+                {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
+              </span>
+              <span className="min-w-0">
+                <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold text-white/85">
+                  {/* Modus-Symbol (#2266): Schnappschuss am Spiel, ohne Bild das neutrale Symbol. */}
+                  {game.mode ? <ModeIcon src={game.mode_icon_url} label={game.mode_label || ""} size="xs" testId={`league-map-${match.id}-${game.position}-mode`} /> : null}
+                  <span className="truncate">{game.map_name || `Map ${game.position}`}</span>
+                </span>
+                <span className="block truncate text-[10px] text-white/45">{winner ? `für ${winner}` : "offen"}{note ? ` · ${note}` : ""}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {(match.not_played || []).length ? (
+        <p className="text-[10px] text-white/45" data-testid={`league-maps-${match.id}-not-played`}>{notPlayedText(match.not_played)}</p>
+      ) : null}
+    </>
   );
 }
 
@@ -73,8 +93,12 @@ function MatchRow({ match }) {
       </div>
       <div className="tls-league-match__meta">
         {match.done
-          ? <span>{match.forfeit ? "kampflos" : "gespielt"}</span>
+          ? <span>{match.double_forfeit ? "beide nicht erschienen" : match.forfeit ? "kampflos" : "gespielt"}</span>
           : <span>{matchWhen(match)}{match.scheduled_at && SOURCE_LABELS[match.schedule_source] ? ` · ${SOURCE_LABELS[match.schedule_source]}` : ""}</span>}
+        {/* Vorfälle (D.5, #1619): öffentlich nur, dass eine Map in Klärung ist - das Ergebnis gilt bis zur Entscheidung nicht. */}
+        {match.in_clarification ? <span className="font-semibold text-warn" data-testid={`league-match-${match.id}-clarification`}>in Klärung</span> : null}
+        {/* Proteste (E.2, #1619): Das Ergebnis zählt vorläufig, ist aber angefochten - öffentlich nur „in Klärung“, wie bei einer Map in Klärung (D.5). */}
+        {match.contested ? <span className="font-semibold text-warn" data-testid={`league-match-${match.id}-contested`}>in Klärung</span> : null}
         <Link to={`/matches/${match.id}`} className="inline-flex items-center gap-1 text-brand hover:text-white">
           Spiel <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </Link>
@@ -133,6 +157,7 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel }) {
   useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 15000, tournamentId: staffel.tournament_id });
 
   const rows = useMemo(() => (Array.isArray(data?.standings) ? data.standings : []), [data]);
+  const tableRules = data?.staffel?.table_rules || null;
   const changed = useChangedKeys(rows, standingKey, standingSignature);
   const registerRow = useFlipRows(rows, standingKey);
   const weeks = data?.weeks || [];
@@ -155,7 +180,17 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel }) {
       <div className="min-w-0 space-y-6">
         <StaggerIn className="tls-league-table" aria-label={`Tabelle Staffel ${staffel.staffel}`}>
           <StandingsTable rows={rows} kind="team_league" changed={changed} registerRow={registerRow}
-            label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" />
+            label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" hideDraws={hidesDraws(tableRules, rows)} mapPoints={byMaps(tableRules)} />
+          {/* Reihenfolge bei Punktgleichheit (E.1, #1625) - dieselbe, nach der der Server sortiert. */}
+          {/* Punkte nach gewonnenen Maps (#2312): sagt, was die Spalte „Pkt“ zählt. */}
+          {pointsNote(tableRules) ? (
+            <p className="mt-2 text-[11px] text-white/55" data-testid={`league-points-note-${staffel.staffel}`}>{pointsNote(tableRules)}</p>
+          ) : null}
+          {tableRules?.tiebreakers?.length ? (
+            <p className={`${pointsNote(tableRules) ? "mt-1" : "mt-2"} text-[11px] text-white/45`} data-testid={`league-tiebreak-order-${staffel.staffel}`}>
+              Reihenfolge: {tiebreakOrder(tableRules.tiebreakers)}
+            </p>
+          ) : null}
         </StaggerIn>
         <section aria-labelledby={`league-teams-${staffel.staffel}`}>
           <h4 id={`league-teams-${staffel.staffel}`} className="tls-league-subhead"><Users className="h-4 w-4" aria-hidden="true" /> Teams</h4>

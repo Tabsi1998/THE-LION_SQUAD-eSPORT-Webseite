@@ -9,6 +9,19 @@ Drei Gruppen werden weiter von Hand vergeben (Helfende Hand, Mentor, Kreativgeis
 from __future__ import annotations
 
 from .catalog_a import _group
+from .materials import CATEGORIES
+
+# Kategorie-Meister (#2339) nennt die Kategorien beim Namen - dieselben wie services/achievement_reach.MASTER_CATEGORIES.
+_MASTER_LABELS = [
+    meta["label"] + (" (nur Mitglieder)" if meta.get("member_only") else "")
+    for _key, meta in sorted(CATEGORIES.items(), key=lambda item: item[1]["order"]) if not meta.get("hidden") and not meta.get("negative")
+]
+CATEGORY_MASTER_HOW_TO = (
+    "Schließ Kategorien ab: " + ", ".join(_MASTER_LABELS) + " – abgeschlossen, wenn du jede erreichbare Stufe darin hast. "
+    "Nicht dazu zählen geheime, negative und von Hand vergebene Stufen, Stufen nur für die Leitung oder eine Aufgabe im Verein, "
+    "nicht mehr erreichbare sowie Kategorie-Meister, Hundert Prozent, Sammler und Geheimnisträger selbst. Kommt später eine "
+    "Stufe dazu, bleibt, was du schon hast."
+)
 
 # Alte Gruppe → neue Gruppe (E1-Migration über die Zähler; Hand-Gruppen nach der alten Höhe).
 REPLACED: dict[str, str] = {
@@ -36,17 +49,18 @@ def _c(*args, **kwargs):
 COMMUNITY = [
     _c("discord_linked", "Discord verbunden", "community", "Verbinde dein Discord-Konto mit der Plattform.", "Konto → Verbindungen → Discord verknüpfen.",
        "message-square", "discord", "discord_linked", [1], "Discord verbunden.", sort_order=610),
-    _c("discord_messages", "Discord-Stimme", "community", "Schreib auf dem Vereins-Discord.", "Jede Nachricht auf dem Server zählt - mit verknüpftem Discord-Konto.",
+    _c("discord_messages", "Discord-Stimme", "community", "Schreib auf dem Vereins-Discord.", "Jede Nachricht auf einem eingeschalteten Server des Vereins zählt - mit verknüpftem Discord-Konto.",
        "messages-square", "speech-wave", "discord_messages", [1, 100, 500, 2000, 5000, 10000, 25000], "{n} Nachrichten auf Discord.", sort_order=611),
-    _c("events_attended", "Eventgänger", "community", "Sei bei Events dabei.", "Melde dich zu Events an und check dort ein - jedes zählt einmal.",
+    _c("events_attended", "Eventgänger", "community", "Sei bei Events dabei.", "Melde dich zu Events an und lass dich vor Ort einchecken - jedes zählt einmal, abgesagte Events zählen nicht.",
        "calendar-check", "ticket-stub", "events_attended", [1, 5, 15, 30, 60, 100, 200], "{n} Events besucht.", sort_order=612),
-    _c("events_hosted", "Gastgeber", "community", "Richte Events aus.", "Lege ein Event an und führ es bis zum Abschluss.",
-       "party-popper", "host", "events_hosted_completed", [1, 5, 15, 40, 100], "{n} Events ausgerichtet.", sort_order=613),
+    # Events legt nur die Turnierleitung an (#2339): Gastgeber sehen nur sie und wer ihn schon hat - wie Turnierleitung.
+    _c("events_hosted", "Gastgeber", "community", "Richte Events aus.", "Als Turnierleitung ein Event anlegen und bis zum Abschluss führen - jedes zählt einmal. Nur für die Turnierleitung sichtbar.",
+       "party-popper", "host", "events_hosted_completed", [1, 5, 15, 40, 100], "{n} Events ausgerichtet.", sort_order=613, staff_only=True),
     _c("friends", "Netzwerker", "community", "Schließ Freundschaften auf der Plattform.", "Freundschaftsanfragen senden oder annehmen - jede bestätigte Freundschaft zählt.",
        "users", "handshake", "friends_count", [1, 5, 15, 30, 60, 100, 200], "{n} Freundschaften.", sort_order=614),
-    _c("community_chat", "Plauderer", "community", "Schreib in den offenen Chats.", "Nachrichten im Turnier-Chat und im Match-Chat zählen zusammen.",
+    _c("community_chat", "Plauderer", "community", "Schreib in den offenen Chats.", "Nachrichten im Turnier-Chat und im Match-Chat zählen zusammen - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
        "message-circle", "speech-bubbles", "community_messages_sent", [1, 10, 50, 200, 500, 1500, 5000], "{n} Nachrichten in offenen Chats.", sort_order=615),
-    _c("direct_messages", "Briefeschreiber", "community", "Schreib Direktnachrichten.", "Jede gesendete Direktnachricht zählt.",
+    _c("direct_messages", "Briefeschreiber", "community", "Schreib Direktnachrichten.", "Jede gesendete Direktnachricht zählt - zurückgehaltene Nachrichten zählen nicht, höchstens 50 am Tag.",
        "mail", "envelope", "direct_messages_sent", [10, 50, 200, 500, 1500], "{n} Direktnachrichten.", sort_order=616),
     _c("news_reader", "Immer informiert", "community", "Lies die News des Vereins.", "Ein News-Beitrag, den du angemeldet öffnest, zählt einmal.",
        "newspaper", "newspaper", "news_read", [5, 25, 75, 200, 500], "{n} News gelesen.", sort_order=617),
@@ -65,33 +79,34 @@ COMMUNITY = [
     _c("app_user", "App-Nutzer", "community", "Nutz die LionsAPP.", "App öffnen, dranbleiben, Push einschalten.",
        "smartphone", "phone", "app_user_stage", [1, 2, 3], "", sort_order=624, materials=["silver", "gold", "diamond"],
        steps=["Die App genutzt.", "30 Tage mit der App.", "30 Tage mit der App und Push eingeschaltet."]),
-    _c("community_helper", "Helfende Hand", "community", "Hilf anderen in der Community.", "Wird von der Vereinsleitung vergeben, wenn du anderen weiterhilfst.",
+    _c("community_helper", "Helfende Hand", "community", "Hilf anderen in der Community.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn du anderen in der Community weitergeholfen hast. Jede Hilfe zählt einmal.",
        "hand-helping", "helping-hand", None, [1, 3, 7, 15, 30], "{n}-mal geholfen.", sort_order=625, manual=True),
-    _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Wird von der Vereinsleitung vergeben, wenn du Neue einarbeitest oder coachst.",
+    _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn du Neue einarbeitest oder coachst. Jede begleitete Person zählt einmal.",
        "graduation-cap", "mentor", None, [1, 3, 7, 15, 30], "{n} Menschen begleitet.", sort_order=626, manual=True),
     # „Überall dabei“ (#614, nachgezogen mit #615): eine Stufe je Schritt wie beim App-Nutzer, weil „alle Server“ kein
-    # festes Ziel ist. Das Motiv: drei verbundene Server (motifs/people.jsx).
-    _c("discord_servers", "Überall dabei", "community", "Sei auf den Discord-Servern des Vereins dabei.", "Mit verknüpftem Discord-Konto den Servern des Vereins beitreten - die Einladungen stehen unter „Über uns“ bei den Spielen und im Mitgliederbereich.",
+    # festes Ziel ist. Seit #2338 richten sich alle Stufen nach den eingeschalteten Servern (services/achievement_counters
+    # .servers_for_stage): einer, die Hälfte, alle - nie mehr, als es gibt. Das Motiv: drei verbundene Server.
+    _c("discord_servers", "Überall dabei", "community", "Sei auf den Discord-Servern des Vereins dabei.", "Mit verknüpftem Discord-Konto den Servern des Vereins beitreten - die Einladungen stehen unter „Über uns“ bei den Spielen und im Mitgliederbereich. Es zählen nur eingeschaltete Server; die Ziele wachsen und schrumpfen mit ihrer Zahl.",
        "server", "server-ring", "discord_servers_stage", [1, 2, 3], "", sort_order=627,
-       steps=["Auf einem Discord-Server des Vereins dabei.", "Auf drei Discord-Servern des Vereins dabei.", "Auf allen Discord-Servern des Vereins dabei."]),
+       steps=["Auf einem Discord-Server des Vereins dabei.", "Auf der Hälfte der Discord-Server des Vereins dabei.", "Auf allen Discord-Servern des Vereins dabei."]),
 ]
 
 CREATOR = [
     _c("twitch_linked", "Twitch verbunden", "creator", "Verbinde deinen Twitch-Kanal.", "Konto → Verbindungen → Twitch verknüpfen.",
        "twitch", "twitch", "twitch_linked", [1], "Twitch verbunden.", sort_order=710),
-    _c("twitch_sessions", "Streamer", "creator", "Geh mit deinem Kanal live.", "Jede erkannte Live-Session deines verknüpften Twitch-Kanals zählt.",
+    _c("twitch_sessions", "Streamer", "creator", "Geh mit deinem Kanal live.", "Jede erkannte Live-Session deines per Anmeldung verknüpften Twitch-Kanals zählt.",
        "radio", "on-air", "twitch_live_sessions", [1, 5, 10, 25, 50, 100, 250], "{n} Live-Sessions.", sort_order=711),
-    _c("twitch_minutes", "Sendezeit", "creator", "Sammle Sendeminuten.", "Die Minuten deiner erkannten Live-Sessions zählen zusammen.",
+    _c("twitch_minutes", "Sendezeit", "creator", "Sammle Sendeminuten.", "Die Minuten der erkannten Live-Sessions deines per Anmeldung verknüpften Twitch-Kanals zählen zusammen.",
        "clock", "broadcast-clock", "twitch_stream_minutes", [60, 600, 3000, 6000, 15000, 30000, 60000], "{n} Minuten gesendet.", sort_order=712),
     _c("tournament_streamer", "Live im Turnier", "creator", "Streame deine eigenen Turniermatches.", "Bist du während eines eigenen Turniers live, wird dein Stream dort gezeigt - jedes Turnier zählt einmal.",
        "tv", "tournament-live", "own_tournament_streams", [1, 5, 15, 40, 100], "{n} Turniere live gestreamt.", sort_order=713),
-    _c("clips", "Clip-Macher", "creator", "Erstelle Clips auf dem Vereinskanal.", "Clips, die du auf dem Vereinskanal erstellst, zählen, sobald sie geholt sind.",
+    _c("clips", "Clip-Macher", "creator", "Erstelle Clips auf dem Vereinskanal.", "Clips, die du mit deinem per Anmeldung verknüpften Twitch-Kanal auf dem Vereinskanal erstellst, zählen, sobald sie geholt sind.",
        "scissors", "clip", "clips_synced", [1, 5, 15, 40, 100], "{n} Clips.", sort_order=714),
     _c("youtube_linked", "YouTube verbunden", "creator", "Verbinde deinen YouTube-Kanal.", "Konto → Verbindungen → YouTube verknüpfen.",
        "youtube", "youtube", "youtube_linked", [1], "YouTube verbunden.", sort_order=715),
     _c("tiktok_linked", "TikTok verbunden", "creator", "Verbinde dein TikTok-Profil.", "Konto → Verbindungen → TikTok verknüpfen.",
        "music-2", "tiktok", "tiktok_linked", [1], "TikTok verbunden.", sort_order=716),
-    _c("creator_spirit", "Kreativgeist", "creator", "Liefer Highlights und Clips für die Community.", "Wird von der Vereinsleitung vergeben, wenn deine Inhalte den Verein zeigen.",
+    _c("creator_spirit", "Kreativgeist", "creator", "Liefer Highlights und Clips für die Community.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn deine Highlights, Clips oder Beiträge den Verein zeigen. Jeder Beitrag zählt einmal.",
        "sparkles", "spark", None, [1, 3, 7, 15, 30], "{n} Beiträge für die Community.", sort_order=717, manual=True),
     _c("viewer", "Zuschauer", "creator", "Schau Streams auf der Seite.", "Ein Stream, der eine Minute offen ist, zählt einmal je Stream und Tag.",
        "eye", "eye", "streams_watched", [5, 25, 75, 200, 500], "{n} Streams geschaut.", sort_order=718),
@@ -100,7 +115,7 @@ CREATOR = [
 ]
 
 PROFILE = [
-    _c("profile_completeness", "Steckbrief", "profile", "Füll dein Profil aus.", "Avatar, Banner, Text, Plattformen, Links - je vollständiger, desto weiter.",
+    _c("profile_completeness", "Steckbrief", "profile", "Füll dein Profil aus.", "Profilbild, Banner, Über mich, Land, Ort, Geburtsdatum, Plattformen, Eingabegeräte, Lieblingsspiele, Discord, Twitch und die Sichtbarkeit deines Profils - je vollständiger, desto weiter.",
        "user-check", "profile-card", "profile_completeness", [25, 50, 75, 90, 100], "Profil zu {n} ausgefüllt.", sort_order=810, unit=" %"),
     _c("avatar_banner", "Auftritt", "profile", "Gib deinem Profil ein Gesicht.", "Avatar und Banner hochladen.",
        "image", "portrait", "avatar_and_banner", [1], "Avatar und Banner gesetzt.", sort_order=811),
@@ -110,22 +125,26 @@ PROFILE = [
        "mail-check", "verified", "email_verified", [1], "E-Mail bestätigt.", sort_order=813, materials=["wood"]),
     _c("tutorial", "Rundgang", "profile", "Mach den Rundgang durch die Plattform.", "Beim ersten Besuch den Rundgang zu Ende gehen.",
        "compass", "compass", "onboarding_completed", [1], "Rundgang beendet.", sort_order=814, materials=["wood"]),
-    _c("privacy_aware", "Datenbewusst", "profile", "Kümmere dich um deine Privatsphäre.", "Privatsphäre-Einstellungen speichern oder deinen Datenexport holen.",
+    _c("privacy_aware", "Datenbewusst", "profile", "Kümmere dich um deine Privatsphäre.", "Unter Einstellungen → Privatsphäre selbst etwas einstellen oder deinen Datenexport holen - die Voreinstellung bei der Registrierung zählt nicht.",
        "lock", "privacy", "privacy_reviewed", [1], "Privatsphäre geprüft.", sort_order=815, materials=["iron"]),
     _c("notifications", "Auf dem Laufenden", "profile", "Stell deine Benachrichtigungen ein.", "Konto → Benachrichtigungen speichern.",
        "bell", "bell", "notification_prefs_saved", [1], "Benachrichtigungen eingestellt.", sort_order=816, materials=["iron"]),
     _c("bio_links", "Visitenkarte", "profile", "Erzähl etwas über dich.", "Profiltext und mindestens einen Social-Link eintragen.",
        "id-card", "business-card", "bio_and_socials", [1], "Profiltext und Links gesetzt.", sort_order=817),
-    _c("achievements_unlocked", "Sammler", "profile", "Sammle Erfolge.", "Jede freigeschaltete Stufe zählt.",
-       "trophy", "trophy-case", "achievements_unlocked", [10, 30, 75, 150, 300, 500, 750], "{n} Erfolge freigeschaltet.", sort_order=818),
-    _c("categories_complete", "Kategorie-Meister", "profile", "Schließ ganze Kategorien ab.", "Alle Gruppen einer Kategorie auf die höchste Stufe bringen.",
-       "layout-grid", "category-crown", "categories_completed", [1, 2, 3, 4, 5, 6, 7], "{n} Kategorien vollständig.", sort_order=819),
+    # Sammler, Kategorie-Meister, Geheimnisträger und Hundert Prozent (#2339): gezählt wie die Anzeige „x von y“
+    # (services/achievement_reach.py) - die Ziele liegen unter dem, was es gibt (Prüfung im Katalog-Test).
+    _c("achievements_unlocked", "Sammler", "profile", "Sammle Erfolge.", "Jede freigeschaltete Stufe zählt - auch von Hand vergebene und geheime. Negative und nicht mehr erreichbare zählen nicht.",
+       "trophy", "trophy-case", "achievements_unlocked", [10, 30, 75, 150, 300, 400, 450], "{n} Erfolge freigeschaltet.", sort_order=818),
+    _c("categories_complete", "Kategorie-Meister", "profile", "Schließ ganze Kategorien ab.", CATEGORY_MASTER_HOW_TO,
+       "layout-grid", "category-crown", "categories_completed", [1, 2, 3, 4, 5, 6, 7], "{n} Kategorien abgeschlossen.", sort_order=819,
+       singular="{n} Kategorie abgeschlossen."),
     _c("level_milestones", "Levelaufstieg", "profile", "Steig im Level auf.", "Punkte aus Erfolgen, Matches und Aktivität heben dein Level.",
        "arrow-up-circle", "level-up", "level", [5, 10, 20, 30, 40, 50, 60], "Level {n} erreicht.", sort_order=820),
     _c("prestige", "Prestige", "profile", "Sammle Prestige-Sterne.", "Ab Level 60 kannst du Prestige nehmen - jeder Stern zählt.",
        "star", "prestige-star", "prestige_stars", [1, 2, 3, 4, 5], "{n} Prestige-Sterne.", sort_order=821),
-    _c("hidden_found", "Geheimnisträger", "profile", "Finde die geheimen Erfolge.", "Es gibt Erfolge, die nirgends stehen - wer sie findet, sammelt sie hier.",
-       "eye-off", "secret", "hidden_unlocked", [1, 3, 7, 12, 15], "{n} geheime Erfolge gefunden.", sort_order=822),
+    _c("hidden_found", "Geheimnisträger", "profile", "Finde die geheimen Erfolge.", "Es gibt Erfolge, die nirgends stehen - wer sie findet, sammelt sie hier. Jeder gefundene geheime Erfolg zählt einmal, nicht mehr erreichbare zählen nicht.",
+       "eye-off", "secret", "hidden_unlocked", [1, 3, 7, 10, 13], "{n} geheime Erfolge gefunden.", sort_order=822,
+       singular="{n} geheimen Erfolg gefunden."),
     _c("anniversary", "Jubiläum", "profile", "Bleib uns über Jahre treu.", "Jedes volle Jahr seit deiner Registrierung zählt.",
        "cake", "anniversary", "account_years", [1, 2, 3, 4, 5, 7, 10], "{n} dabei.", sort_order=823, unit=" Jahre"),
     _c("birthday_login", "Geburtstagskind", "profile", "Schau an deinem Geburtstag vorbei.", "Geburtsdatum im Profil eintragen und am Geburtstag anmelden.",

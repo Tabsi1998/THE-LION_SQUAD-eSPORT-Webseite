@@ -23,7 +23,8 @@ export function disputeDecisionText(row) {
 }
 
 export function OwnDisputes({ match, userId }) {
-  const rows = ownDisputes(match, userId).slice(0, 3);
+  // Liga-Verfahren (#1619, E.2: Einträge mit `kind`) stehen als Karte auf der Matchseite - hier nicht noch einmal.
+  const rows = ownDisputes(match, userId).filter((row) => !row.kind).slice(0, 3);
   if (!rows.length) return null;
   return (
     <div className="mt-5 space-y-2" data-testid="match-own-disputes">

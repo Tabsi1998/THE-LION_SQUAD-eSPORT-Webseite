@@ -37,6 +37,7 @@ EXPECTED = {
     "tournament_awards": {"tournament_id_1_registration_id_1", "registration_id_1"},
     "team_squads": {"team_id_1"},
     "chat_attachments": {"owner_id_1", "status_1_created_at_1"},
+    "match_proof_photos": {"id_unique", "match_id_1"},
     "stream_watches": {"user_id_1_day_1_key_1"},
     "match_commendations": {"match_id_1_from_registration_id_1", "to_registration_id_1", "from_user_id_1"},
     "club_member_profiles": {"user_id_1", "dolibarr_member_id_1"},
@@ -70,6 +71,13 @@ EXPECTED = {
     "shop_printful_confirmations": {"order_unique", "idempotency_key_unique"},
     # Testentwürfe an Printful (#2062): je Kennung und je external_id ein Protokoll.
     "shop_test_drafts": {"id_unique", "external_id_unique"},
+    # Erfolge (#2338): Chat-Zähler je Person und Tag, besuchte Events je Person.
+    "team_chat_messages": {"user_id_1_created_at_1"},
+    "match_chat_messages": {"user_id_1_created_at_1"},
+    "tournament_chat_messages": {"user_id_1_created_at_1"},
+    "event_registrations": {"user_id_1"},
+    # Kapitän im Altbestand (#2338): letzte Übergabe je Team, neueste zuerst.
+    "audit_logs": {"action_1_target_id_1_created_at_-1"},
 }
 
 

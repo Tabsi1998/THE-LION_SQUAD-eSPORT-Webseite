@@ -188,6 +188,13 @@ async def _finish_result_side_effects(db, match: dict, force: bool, dispute_reso
             match.get("id"),
             type(exc).__name__,
         )
+    # Läuft länger (#2194): War das das letzte offene Spiel nach dem Ende, zeigt die Seite gleich „Beendet“.
+    try:
+        from services.tournament_overrun import settle
+
+        await settle(db, match.get("tournament_id"))
+    except Exception:  # noqa: BLE001 - der Fristen-Job holt es nach
+        logger.debug("Läuft-länger-Merkmal für Turnier %s nicht geprüft", match.get("tournament_id"), exc_info=True)
 
 
 def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dict], *,
@@ -234,6 +241,7 @@ async def submit_v2_result(
     games: list[dict] | None = None,
     lineups_missing: list[str] | None = None,
     match_lineups: dict | None = None,
+    decision_note: str | None = None,
 ) -> dict:
     """Persist one v2 result while the caller owns the tournament write lease.
 
@@ -272,6 +280,18 @@ async def submit_v2_result(
             "idempotent_replay": True,
         }
 
+    # Liga (#1619, E.2): Jedes Ergebnis zu einem Spiel mit offenem Verfahren entscheidet es mit - auch eine Wertung kampflos oder
+    # „nicht erschienen“. Darum hier, für jeden Weg: Recht „Proteste“, nicht befangen, beim Einspruch eine andere Person als bei der
+    # Ausgangsentscheidung, und die Begründung (bei der Wertung ihre Pflicht-Begründung) als ``decision_note``.
+    from services import league_procedures
+    # ``decision_note``: ein eigener Satz für die Seiten (etwa bei „nicht erschienen“), sonst der Grund der Korrektur bzw. die
+    # Pflicht-Begründung der Wertung.
+    decision_note = decision_note or reason or (note if audit_action == "match.forfeit" else None)
+    refusal = await league_procedures.result_decision_refusal(
+        db, match, actor_id=actor_id, note=decision_note, by_players=audit_action in PLAYER_RESULT_ACTIONS)
+    if refusal:
+        from services.match_v2_results import MatchV2ResultError
+        raise MatchV2ResultError(refusal[1], refusal[0])
     ensure_correction_allowed(match, force=force, reason=reason)
     await checked_results(db, match, raw_results)
     stage_matches = await db.matches_v2.find(
@@ -321,6 +341,12 @@ async def submit_v2_result(
         application["match_set"].update({"games": games, "lineups_missing": sorted(lineups_missing or [])})
     if match_lineups is not None:
         application["match_set"]["lineups"] = match_lineups
+    # Was galt, als das Ergebnis festgeschrieben wurde - nur Liga-Staffeln, nur beim ersten Mal: Regelwerk (#1646) und Sperrliste (#2218).
+    # Vor dem ersten Schreiben ermittelt (Review C.4): Scheitert es, bleibt das Spiel, wie es war, statt halb gespeichert.
+    from services.league_rules import match_stamp
+    from services.loadout_bans import match_stamp as loadout_stamp
+    application["match_set"].update(await match_stamp(db, match))
+    application["match_set"].update(await loadout_stamp(db, match))
 
     await db.match_reports_v2.update_one(
         {"id": report_id},
@@ -353,9 +379,6 @@ async def submit_v2_result(
     # for a completed replay.
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
-    # Regelwerk (#1646): welche Fassung galt, als das Ergebnis festgeschrieben wurde - nur Liga-Staffeln, nur beim ersten Mal.
-    from services.league_rules import match_stamp
-    application["match_set"].update(await match_stamp(db, match))
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
     if games is not None or match_lineups is not None or match.get("lineup_user_ids"):
         # Liga (#1650): mit dem Ergebnis gelten nur noch seine Maps - auch ohne Maps (etwa „Nicht erschienen“).
@@ -387,11 +410,19 @@ async def submit_v2_result(
     if application.get("draws"):
         from services.draw_records import record_draws
         await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=match.get("tournament_id"))
-    dispute_resolved = match.get("status") == "disputed"
+    # Liga (#1619, E.2): Ein Protest mit vorläufig zählendem Ergebnis lässt das Spiel „completed“ - die Korrektur entscheidet ihn ebenso.
+    open_procedures = league_procedures.has_open(match)
+    dispute_resolved = match.get("status") == "disputed" or open_procedures
     if dispute_resolved:
         unchanged = same_outcome(match.get("results"), application["results"]) and (
             games is None or games == (match.get("games") or []))
-        await _close_disputes(db, match, actor_id, now_iso, decision="keep" if unchanged else "change")
+        decision = "keep" if unchanged else "change"
+        if open_procedures:
+            await league_procedures.close_on_result(db, match, actor_id=actor_id, now_iso=now_iso, decision=decision, note=decision_note)
+            # Die Entscheidung mit Begründung verschickt das Verfahren selbst - nicht noch einmal als „Dispute entschieden“.
+            dispute_resolved = False
+        else:
+            await _close_disputes(db, match, actor_id, now_iso, decision=decision)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     await _finish_result_side_effects(db, updated, force, dispute_resolved=dispute_resolved)
     if reset_docs:

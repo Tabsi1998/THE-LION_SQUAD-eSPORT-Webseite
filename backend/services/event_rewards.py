@@ -64,7 +64,8 @@ async def apply_checkin(db, event: dict, registration: dict) -> None:
     try:
         from badges import evaluate_user_progress
 
-        await evaluate_user_progress(user_id)
+        # Im stillen Modus (#2340) meldet der Check-in die Event-Stufen laut, Altansprüche still.
+        await evaluate_user_progress(user_id, announce={"event"})
     except Exception:  # noqa: BLE001
         logger.warning("Event %s: Erfolge nicht ausgewertet", log_safe(event.get("id")), exc_info=True)
 

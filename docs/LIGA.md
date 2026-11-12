@@ -60,11 +60,12 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `min_squad_size` | int ≥ `team_size` | ja | = `team_size` |
 | `game_mode_order` | `[str]` | nein | `[]` = Modus je Map frei; sonst Modus je Position (zyklisch) |
 | `map_repeat` | `"never"` \| `"other_mode"` \| `"always"` | ja | `"other_mode"`: dieselbe Map in einer Serie nur in einem anderen Modus (#2096); `"never"` jede Map einmal, `"always"` frei |
-| `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden nur `match_points` (3/1/0) und `table_tiebreakers` |
+| `pool_min_maps` | `[{mode, min_maps}]` | nein | fehlt = abgeleitet aus Reihenfolge, Best of und `map_repeat` (C.2, Abschnitt 12) |
+| `scoring_rules` | dict | ja | neue Seasons `league_default_rules()` aus `services/scoring_rules.py`; gelesen werden `match_points` und `table_tiebreakers`, seit E.1 auch `head_to_head_criteria`, `allow_draws`, `forfeit_score`, `exit_rule` (Abschnitt 12) |
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
 | `match_schedule_response_hours` | int 1–720 | nein | 72 – Antwortfrist auf Terminvorschläge (#2106, F3); fehlt (Seasons von vorher) = jede Staffel behält ihre |
-| `rules_text` | str (Markdown) | nein | Regeltext der Season (Textfeld, #1646 später) |
+| `rules_text` | str (Markdown) | nein | Regeltext der Season - Altbestand; seit #2267 ohne Eingabefeld, die Season-Seite zeigt ihn nur noch zum Lesen, solange es kein Regelwerk gibt |
 | `registration_deadline` | Kalendertag | nein | Meldeschluss, nur Anzeige (Season 1: 6.11.) |
 | `visibility` | `"off"` \| `"admins"` \| `"members"` \| `"public"` | ja | **`off`** |
 | `status` | `"draft"` \| `"active"` \| `"completed"` \| `"archived"` | ja | `draft` |
@@ -82,7 +83,7 @@ Indizes: `id` eindeutig, (`league_id`, `number`) eindeutig, (`league_id`, `slug`
 | `league_id`, `season_id` | str | ja | |
 | `level` | int ≥ 1 | ja | „Liga N“; (`league_id`, `level`) ist die dauerhafte Stufe über Seasons |
 | `nickname` | str ≤ 40 | nein | Beiname: Anzeige „Liga 1 · Elite“ |
-| `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours` |
+| `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours`, dazu die Plattform `allowed_platforms`, `crossplay`, `input_device` (#2270, B.3) |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 | `prizes` | `[{place, text, image_url}]` | nein | eigene Gewinne (#2107); fehlt = die der Season |
 
@@ -234,13 +235,18 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Wochen gesamt, Sperrzeiten, Spielwoche, Standardtag/-zeit | Season | 10 · keine · 7 Tage · So 20:00 |
 | Runden (1 = Hinrunde, 2 = Hin/Rück) | Season | 1 |
 | Staffelgröße max., Best of, Teamgröße, Mindestkader | Season, Liga N überschreibt | 8 · 3 · 4 · 4 |
-| Punkte Sieg/Remis/Niederlage, Gleichstand | Season (`scoring_rules`), Liga N überschreibt | 3/1/0 · `score_diff`, `score_for` |
+| Punkte Sieg/Remis/Niederlage, Gleichstand, Remis, Default-Win, Ausscheiden (E.1) | Season (`scoring_rules`), Liga N überschreibt | neue Seasons 3/0/0 · direkter Vergleich, Differenz, Maps, Leitung · kein Remis · Best of · alle Spiele für die Gegner (ältere: 3/1/0 · `score_diff`, `score_for`) |
+| Punkteart: Sieg/Remis/Niederlage oder gewonnene Maps (E.1, #2312) | Season (`scoring_rules.match_points_mode`) | Sieg/Remis/Niederlage (`result`) |
 | Modus je Position | Season | frei |
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
 | Map-Pool | Season (`league_season`) | keiner = keine Liga-Meldung möglich |
+| Ergebnisregel je Modus, Punkte je Map Pflicht (C.3) | Season (`result_rules`, `scores_required`) | Kopie der Modi · an (nur neue Seasons) |
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
 | Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
+| Plattform: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (#2270, B.3) | Season (Feld), Liga N überschreibt den Rest | keines · alle · keine Angabe · keine Angabe |
+| Veto: an/aus, Team A (Heim oder Los), Zeit je Schritt, Schrittfolge (D.3, #1618) | Season (`veto_rules`) | an · Heim · 60 s · Vorschlag aus Modusfolge und Best of, zieht mit dem Pool nach, bis einmal von Hand gespeichert (ältere Seasons ohne Feld: aus) |
+| Veto: Vorgabe der Woche – je Spielwoche und Modus eine Map aus dem Pool (D.3, #2326) | Season (`veto_presets`), gilt ohne Übertragen für alle Staffeln | keine – solange sie für eine Woche fehlt, beginnt das Veto dort nicht |
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
@@ -251,6 +257,8 @@ und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich untersche
 behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
 **laufend** (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln) `match_schedule_response_hours` – sie gilt nur
 für neue Terminvorschläge; trägt weder Season noch Liga N den Wert (Seasons von vor #2106), bleibt der der Staffel;
+**Punkteart** (Gruppe `table_points`, #2312, E.1): nach dem ersten Ergebnis nur, wenn sich `match_points_mode` von der
+Staffel unterscheidet, dann mit `table_tiebreakers` und `forfeit_score` – nicht bei gesperrten oder beendeten Staffeln;
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
 `default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
 wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
@@ -364,7 +372,7 @@ Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → e
 
 | Thema | Vertrag | Stelle |
 | --- | --- | --- |
-| „Nicht erschienen?“ | Staffeln ohne Check-in haben keine Frist und keinen Vorschlag, alte offene Vorschläge räumt der Fristen-Job ab, entschiedene bleiben. „Ergebnis fehlt“ bleibt. `POST /lead/no-show/{match}` mit `confirm` gilt in Staffeln auch ohne Vorschlag, solange `no_show_open` (keine Meldung, nicht begonnen). Endgültig mit dem Check-in (#1652) | `match_deadlines.no_show_deadline`, `match_deadline_sweep`, `tournament_lead_routes` |
+| „Nicht erschienen?“ | Staffeln ohne Check-in haben keine Frist und keinen Vorschlag, alte offene Vorschläge räumt der Fristen-Job ab, entschiedene bleiben. „Ergebnis fehlt“ bleibt. `POST /lead/no-show/{match}` mit `confirm` gilt in Staffeln ohne Check-in auch ohne Vorschlag, solange `no_show_open` (keine Meldung, nicht begonnen); mit Check-in (#1652, D.2) nur mit dem Vorschlag zum abgelaufenen Fenster und nur für die Seite ohne Check-in | `match_deadlines.no_show_deadline`, `match_deadline_sweep`, `tournament_lead_routes` |
 | Karte | Mit einer Meldung gibt es in keinem Format mehr die Karte „Nicht erschienen?“ | `match_attention.attention_items` |
 | Kampflos in den Strafen | Teamstrafe des Co-Teams: Captain, Vertreter, Leitung und Co-Leitung des Hauptteams (`match_audience.team_penalty_ids`), nicht der Kader. Admin-Liste einmal je Wertung mit `team_name`. Kein persönlicher Negativ-Eintrag | `penalty_routes` |
 | Maps bei Wertung | `apply_forfeit` setzt `games` und `lineups_missing` leer, wenn das Spiel Maps hat; `match_reports_v2.previous_games` hält sie fest | `match_forfeit` |
@@ -456,7 +464,6 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
 | Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
 | Solo-Ligen (`participant_kind="solo"`) | #1629 |
-| Direkter Vergleich als Gleichstandsregel | #1559 |
 | Discord-Meldungen der Liga (Spieltag, Saisonende) | eigenes Folgepaket |
 | Map-Pool je Liga N, Statistik je Map/Spieler | später |
 
@@ -563,6 +570,7 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | Modus-Felder | C.1 | Status, Ergebnisregel | `games.match_modes[]`, Dauerplanung bleibt |
 | `season_readiness` | C.2 | Vorab-Prüfung vor der Veröffentlichung | `map_pools`, `game_mode_order` |
 | Ergebnisregeln | C.3 | Prüfung in `normalize_games`, nur mit gesetzter Regel | `games[]` |
+| `game_equipment`, `loadout_bans` | C.4 | Bibliothek je Spiel, Sperrliste in Versionen, Baustein `loadout_bans` | `game_maps`, `map_pools`, `league_rule_blocks` |
 | `matches_v2.flow`, `match_flow.py` | D.2 | Stand abgeleitet, kein neuer globaler `status`; setzt `started_at` | `no_show_deadline`, `call_view` |
 | `matches_v2.veto`, `planned_games[]` | D.3 | Zustandsautomat auf dem Server, gleiche Schlüssel wie `games[]` | `map_pools.allowed`, `map_pool_id` |
 | `matches_v2.incidents[]` | D.5 | Abbruch, Pause, Rehost, Wiederholung, Entscheidung | `games[]` |
@@ -616,6 +624,13 @@ Veröffentlichen noch einmal; passt es nicht mehr, fällt es weg (`match.result.
 beim Ablegen gesetzt war. `decided_by` ist für E.3: Einen Einspruch entscheidet nie die Person, die die Ausgangsentscheidung
 traf, auch nicht der Superadmin. Die eigene Seite handelt weiter als Captain oder Vertreter (melden, bestätigen, Termin).
 
+**Befangenheit bei der Anmeldung** (#2245, Entscheidung Nr. 73; `league_permissions.side_conflict(db, user, side)`): Dieselbe Regel für die
+Seite eines Antrags (B.4): Kader des Co-Teams, Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat.
+Über die Anmeldung des eigenen Teams entscheidet eine zweite Person: Prüfen, Annehmen, Ablehnen, Warteliste und Zuteilen antworten sonst 403.
+Notausnahme wie oben (Superadmin, `conflict_reason`, mindestens fünf Zeichen). 403 und Notausnahme teilen sich beide Prüfungen in
+`override_reason`, das Protokoll `league.conflict.override` schreibt `record_override`. Das bloße Zuteilen eines Co-Teams ohne Antrag kennt keine
+Befangenheit. Nimmt es einen offenen Antrag an (Sonderweg), gilt die Regel auch dort.
+
 **Helfer an Staffeln:** `organizer`, `referee`, `scorekeeper`, `station_manager` und `stream_operator` lesen in Staffeln wie bisher
 (`READ_STAFF_ROLES`), ändern dort aber nichts. Andere Turniere bleiben unverändert.
 
@@ -632,9 +647,16 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `DELETE …/seasons/{id}`, `GET …/seasons/{id}/delete-plan` | `manage` | – | – |
 | `PATCH …/seasons/{id}` | `season`; `rules_text` braucht `rules` | – | – |
 | `PUT`, `DELETE …/seasons/{id}/map-pool`, `POST …/seasons/{id}/sync` | `season` | – | – |
+| `GET …/seasons/{id}/result-rules` (C.3) | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/result-rules` (C.3) | `season` | – | – |
+| `POST …/seasons/{id}/map-pool/remove-map` (#2207) | `season` | – | – |
+| `GET …/seasons/{id}/map-pool/versions`, `…/map-pool/compare`, `…/readiness` (#2207) | jede Zuständigkeit der Liga | – | – |
+| `PUT`, `DELETE …/seasons/{id}/loadout-bans` (#2218) | `season` | – | – |
+| `GET …/seasons/{id}/loadout-bans`, `…/loadout-bans/compare` (#2218) | jede Zuständigkeit der Liga | – | – |
 | `POST …/seasons/{id}/divisions`, `PATCH`, `DELETE …/divisions/{id}`, `GET …/delete-plan` | `season` | – | – |
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
+| `GET`, `PUT …/seasons/{id}/schedule-rules` (Terminregeln, #2194) | `season` | – | – |
 | `GET …/{id}/staff` | `manage` | – | – |
 | `GET`, `PUT …/draft`, `DELETE …/draft`, `POST …/draft/from-version`, `…/preview`, `…/publish` unter `/api/admin/league-rules/{league\|league_season}/{id}` | `rules`; die Liga kommt aus der Adresse, bei einer Season aus der gespeicherten Season | – | – |
 | `PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}` eines Co-Teams in nicht beendeter Staffel | `roster` oder eigenes Team | – | – |
@@ -643,16 +665,22 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Staffel: `DELETE`, `bracket/*`, `reset-bracket`, `stages*`, `swiss/*`, `groups/generate`, `heat-rebuild/*`, Map-Pool | `season` | – | – |
 | Staffel: `POST`, `PUT`, `DELETE /staff` | `manage` | – | – |
 | Staffel: `GET /staff`, `/lead`, `/planning-check`, `/match-plan.csv`, `/bracket/display`, `/schedule/deadlines`, Chat, Teilnehmer intern | jede Zuständigkeit | – | lesen |
-| Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | – | – |
-| `GET …/seasons/{id}/applications`, `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | – | – |
+| Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | `POST squad-registrations` nur, wenn das Co-Team einen offenen Antrag hat | – |
+| `GET …/seasons/{id}/applications` | `applications` | – | – |
+| `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | ja, eigenes Team | – |
 | Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
 | Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
 | Spiel: Terminvorschläge entscheiden und zurückziehen | `matches`; Beteiligte nur als Captain oder Vertreter wie jede Seite | ja | – |
+| Spiel: `POST /reschedule`, `POST /reschedule/{rid}/decision` (Verschiebung, #2194) | keins – nur Captain oder Vertreter einer Seite (Seitenrecht wie beim Melden); die Leitung legt den Termin über `PATCH` fest (`matches`) | `PATCH`: ja (Notausnahme `conflict_reason`) | – |
 | Spiel: `POST /result`, `/result/undo`, `/forfeit`, `PUT /lineups` als Leitung, `POST …/lead/no-show/{id}` | `results` | ja | – |
 | Spiel: `POST /dispute/decision` | `disputes` | ja | – |
 | Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
 | Spiel: `POST /dispute` (ohne eigene Seite) | `disputes` | nein | – |
 | Spiel: `POST /proof-photos` als Leitung, `matches-v2/recalculate-advancement` | `results` | nein | – |
+| Spiel: `GET` und `POST /proofs` als Leitung (#2360) | `results` oder `disputes` | ja, ohne Notausnahme: Befangene sind hier nie Leitung, sie sehen und handeln wie ein Mitglied ihrer Seite (Seitenregeln und Fristen gelten, MOSS der Gegenseite bleibt verborgen) | – |
+| `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
+| `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
+| `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
 | PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
 | Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
 | Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
@@ -664,7 +692,7 @@ seiner Liga. Die Liga-Leitung bearbeitet aus der Kaderübersicht der Season („
 abgeben geht weiter. Alle anderen Teams und Co-Teams, auch nach dem Ende der Staffel, bleiben wie bisher.
 
 **Bewusst unverändert:** Die übrige Team-Verwaltung (`team_routes.py`, Team-Admin-Rollen) bleibt ein eigener Rechtebereich.
-Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
+Jahreswertung, Spiele, Map-Bibliothek und Ausrüstungs-Bibliothek (#2218) bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
 
 **Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die
 Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); `matches-v2` einer Staffel für die Leitung `viewer_involved` und `viewer_override`; die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
@@ -690,6 +718,8 @@ Import-Kreis), `pdf_service.pdf_league_rules`. Routen in `routes/league_rules_ro
 | `annexes` | `[{key, title, body_md}]`, höchstens 26 | Anlagen; `key` = „A“, „B“ … aus der Reihenfolge |
 | `frozen` | `{season_id: {block: {label, markdown, source}}}` | eingefrorene Bausteine; je Season, bei `scope: league` für jede Season, die nicht archiviert ist |
 | `blocks_used` | `[str]` | im Text verwendete Bausteine |
+| `frozen_vars`, `vars_used` | `{season_id: {name: {label, value}}}`, `[str]` | eingefrorene Variablen (#2269, siehe unten); bei `scope: league` zusätzlich der Schlüssel `""` für Werte ohne Season. Fassungen ohne `vars_used` (von vor #2269) bekommen beim Lesen keine Ersetzung: Ihr Text bleibt Wort für Wort, auch ein zufälliges `{{…}}` |
+| `frozen_names` | `{league, game, seasons: {season_id: name}}` | Namen von Liga, Spiel und Seasons beim Veröffentlichen (#2269): Seite (`version.names`), PDF-Kopf und PDF-Schlüssel lesen sie, eine Umbenennung ändert alte Fassungen nicht. Fassungen ohne das Feld nehmen die heutigen Namen |
 | `valid_from` | `YYYY-MM-DD` | Wiener Kalendertag; nie vor heute und nie vor dem der Vorgänger-Fassung |
 | `change_reason` | str 5–500 | Änderungsgrund |
 | `requires_consent` | bool | muss der Fassung neu zugestimmt werden |
@@ -707,9 +737,16 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 `anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
 
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
-`game_mode_order` mit den Namen der Modi). Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
-`league_rule_blocks.BLOCKS` (für #2218 die Waffenliste). Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
-Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
+`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` („Erlaubte Ausrüstung“ aus der Sperrliste, C.4), `[[baustein:mode_settings]]` (#2271: je Modus
+fett der Name, darunter Zeitlimit je Map und Zeit je Runde aus `result_rules`, die Einstellungen aus `mode_settings` als Tabelle
+Gruppe · Einstellung · Wert und der Regeltext als Zitat; ältere Seasons ohne Kopie lesen die des Spiels, Modi ohne Angaben fehlen). Wie
+jeder Baustein liefert er Daten im Klartext (`league_rule_blocks.mode_settings_data`, eingefroren als `data`); erst die Darstellung
+(`render_mode_settings`) setzt jeden Wert aus der Verwaltung über `markdown_text.text_cell` (kein Link, keine Auszeichnung, keine
+Tabellenspalte). `map_pool`, `mode_order` und `mode_settings` tragen das Symbol des Modus in `data` (nur wenn gesetzt) und zeigen es im
+Web (`markdown`), die Fassung ohne Bilder (`text`, PDF und Vergleich) nicht (siehe C.1); `images` meldet es für `frozen_images`.
+Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in `league_rule_blocks.BLOCKS`; `modes`, `format`, `table`,
+`schedule`, `eligibility` und die Variablen `{{…}}` beschreibt „Regelwerk aus den Einstellungen“ unten (#2269). Beim Veröffentlichen werden die
+Daten des Bausteins eingefroren; alte Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
 
 **Reihenfolge:** Fassungen folgen ihrer Geltung (`valid_from`, am selben Tag die zuletzt veröffentlichte), nicht dem Tag der Veröffentlichung. Eine Season erbt die Liga-Fassungen, die
@@ -775,7 +812,8 @@ Hinweis auf die Regelseite. Das schreibt das Veröffentlichen sofort und das Üb
 | `GET /api/admin/league-rules/{scope}/{id}` | Zuständigkeit `rules` oder Bereich `leagues` | Entwurf, Fassungen, Geerbtes, Bausteine, `data_changes`, Stand der Zustimmungen |
 | `PUT …/draft`, `POST …/draft/from-version`, `DELETE …/draft` | ebenso | Entwurf speichern, aus einer Fassung vorbereiten, verwerfen |
 | `POST …/preview` | ebenso | Vorschau mit heutigen Bausteinen und Änderungen zur letzten Fassung |
-| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent}`; 409 bei gleichzeitigem Veröffentlichen |
+| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent, confirm_empty}`; 409 bei gleichzeitigem Veröffentlichen; 422 `{code: "empty_vars", names, message}` bei leeren Variablen ohne `confirm_empty` |
+| `POST …/proposal/publish` (#2269) | ebenso | `{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}`: den Vorschlag „Daten geändert“ in einem Schritt freigeben; 409 mit Entwurf, veralteter Grundlage oder wenn die Datenbasis nicht mehr dem `fingerprint` des Vorschlags entspricht |
 
 `GET /api/leagues/{liga}/{season}` trägt zusätzlich `rules`: `{source, version, valid_from, url, pdf_url, consent_open}` oder `null`.
 `require_rules_editor` prüft das über `require_league`: Die Liga steht nie im Inhalt, eine Fassung aus einer anderen Liga ist im Geltungsbereich nicht zu finden (404). Die
@@ -784,6 +822,92 @@ Spiel. Bilder: Die Admin-Medien gehen über die Rolle, Zuständige ohne sie lade
 
 **Seiten:** `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` (Season-Slug `regeln` ist reserviert), Pflege unter
 `/admin/leagues/rules/{scope}/{id}`. Protokoll: `league.rules.draft`, `.draft_discard`, `.publish`, `.consent`, ohne Volltext.
+
+#### Regelwerk aus den Einstellungen: Bausteine und Variablen (#2269)
+
+Kein Wert einer Season steht fest im Regeltext. Was die Verwaltung einstellt (Modi, Ziele, Zeiten, Best of, Punkte, Fristen, Kader),
+kommt als **Baustein** (ein ganzer Absatz, Tabelle oder Liste) oder als **Variable** (ein Wert mitten im Satz) in den Text. Beides wird
+beim Veröffentlichen strukturiert eingefroren; ändert sich danach eine Einstellung, ändert sich die veröffentlichte Fassung **nie still**.
+Logik: `services/league_rule_facts.py` (die Daten und ihre Darstellung je Baustein), `services/league_rule_vars.py` (Variablen),
+Register weiter in `league_rule_blocks.BLOCKS`. Alles liest den heutigen Stand der Season; der Staffel-Stand (übertragen) ist bewusst
+nicht die Quelle, weil das Regelwerk je Season gilt.
+
+**Bausteine** (zusätzlich zu `map_pool`, `mode_order`, `loadout_bans`, `mode_settings`), je `{label, source, data}` eingefroren,
+Darstellung erst beim Lesen, jeder Wert über `markdown_text.text_cell`:
+
+| Baustein | Quelle | `data` | Darstellung |
+| --- | --- | --- | --- |
+| `[[baustein:checkin]]` „Check-in“ (D.2, #1652) | `checkin_rules` der Season (`checkin_rules.normalize`, nur Schlüssel aus `checkin_rules.DEFAULTS`); ohne gespeicherten Kasten `None` | `{rules: {…checkin_rules.DEFAULTS} \| null}` | Liste: Fenster (Minuten vor und nach dem Termin), Mindestzahl anwesender spielberechtigter Spieler je Team, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen; ohne Check-in der Satz „In dieser Season gibt es keinen Check-in.“ |
+| `[[baustein:veto]]` „Veto“ (D.3, #1618) | `veto_rules` der Season (`league_veto_rules.normalize`, `facts.veto_rules_of`: nur mit `enabled` und Schritten), Namen der Modi vom Spiel | `{enabled: false}` oder `{enabled: true, team_a, step_seconds, steps: [{kind, mode, mode_label, team, position}]}` | Liste: Team-A-Regel (Heim oder Los), Zeit je Schritt mit Zufallswahl nach Ablauf, Start nach dem Check-in; dann die Schritte nummeriert („1. Team A sperrt eine Map (Stellung)“, „11. Die übrige Map wird Map 3 (Kontrolle)“); aus heißt „In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.“ |
+| `[[baustein:modes]]` „Modi der Season“ | Modi des geltenden Pools und der Modusfolge (ohne beides: alle nicht archivierten Modi des Spiels); Regel aus `result_rules` der Season, sonst des Spiels; Symbol, `players_per_side` und Beschreibung vom Spiel | `{rows: [{mode, label, icon_url?, players_per_side, description, rule: {kind, target, round_limit, time_limit_seconds, round_time_seconds, overtime, draw_allowed} \| null}]}` | Tabelle Modus · Ergebnisregel (Klartext: „Punkte bis zum Ziel 250 · Verlängerung bei Gleichstand · kein Remis“) · Zeit („10 Min. je Map · 1:30 Min. je Runde“) · Spieler je Seite; Symbol nur in `markdown` |
+| `[[baustein:format]]` „Spielformat“ | `best_of`, `team_size`, `min_squad_size`, `max_squad_size`, `map_repeat`, `lineup_mode`, `lineup_min_players` der Season (`effective_settings`), dazu je Liga N die Abweichungen (`overrides`) | `{best_of, maps_to_win, team_size, min_squad_size, max_squad_size, map_repeat, lineup_mode, lineup_min_players, divisions: [{label, best_of, team_size, min_squad_size}]}` | Liste: Serie, Teamgröße, Kader, Map-Wiederholung, Teilnehmerliste; danach „Abweichend in Liga N: …“ |
+| `[[baustein:table]]` „Tabelle und Wertung“ | `scoring_rules` der Season (`normalize_rules`, Altbestand mit seinen Vorgaben), dazu Liga N mit eigenen `scoring_rules` | `{points: {win, draw, loss}, points_mode, allow_draws, tiebreakers, head_to_head, forfeit_score, exit_rule, divisions: [{label, …dieselben Felder}]}` (`points_mode` `result` oder `maps`, #2312; eingefrorene Fassungen ohne das Feld gelten als `result`) | Liste: Punkte (mit `maps`: „je gewonnene Map ein Punkt, 3:2 ergibt 3 und 2“), Remis, Reihenfolge bei Punktgleichheit, Kampflos, Beide nicht erschienen, Ausscheiden (E.1) |
+| `[[baustein:schedule]]` „Termine“ | Kalender der Season (`start_date`, `weeks_total`, `matchday_days`, Standardtermin, `blocked_periods`), `match_schedule_response_hours`, `schedule_rules` (D.1) | `{weeks_total, start_day, end_day, matchday_days, weekday_from, weekday_to, default_weekday, default_time, blocked_periods: [{label, start_date, end_date}], response_hours, rules: {…D.1} \| null}` | Liste: Season und Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig; ohne `schedule_rules` ein Satz, dass Verschiebungen die Leitung entscheidet |
+| `[[baustein:eligibility]]` „Spielberechtigung“ | B.3-Felder der Season (`league_eligibility.rules_view`), `entry_policy`, `unique_game_ids`, die Spiel-ID-Felder des Spiels (`player_id_fields[].label`), die Plattform je Season (#2270, `league_platform.season_block` → `values`) | `{min_age, one_team_per_season, new_player_wait_days, roster_deadline, transfer_windows: [{label, start_date, end_date}], entry_policy, auto_accept: bool | null, unique_game_ids, id_fields: [label], platform: {field, platforms, crossplay, input_device, divisions: [{label, platforms, crossplay, input_device}]} \| null}` | Liste: Zulassung, Annahme (#2348: nur mit Anmeldefenster, ältere Fassungen ohne `auto_accept` ohne Zeile), Mindestalter, Spiel-IDs, Plattform (Feld, erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster |
+
+**Variablen** stehen als `{{name}}` im Fließtext (Groß und klein egal, Leerraum in den Klammern erlaubt). Der Wert wird wie ein
+Bausteinwert eingesetzt (`text_cell`: nie Link, nie fett, nie Tabellenspalte) und beim Veröffentlichen je Season in
+`league_rules.frozen_vars` (`{season_id: {name: {label, value}}}`) als Klartext eingefroren, dazu `vars_used`. Eine Fassung der Liga friert
+zusätzlich unter dem Schlüssel `""` die Werte ein, die ohne Season gelten (`league.name`, `game.name`); auf der Seite der Liga steht
+für alles andere „(je Season)“, für eine Season, die erst nach dem Veröffentlichen dazukam, „(noch nicht festgehalten)“. Ein bekannter
+Name **ohne Wert** (die Season trägt das Feld nicht) wird nie still leer: Es steht „(nicht festgelegt)“ da, Vorschau und Vorschlag nennen
+ihn unter `empty_vars` - aus demselben Schnappschuss, den das Veröffentlichen prüft, bei einer Fassung der Liga also aus allen Seasons,
+die sie einfriert, auch wenn die Seite der Liga „(je Season)“ zeigt -, und das Veröffentlichen (normal wie über die Freigabe) verlangt
+die ausdrückliche Bestätigung `confirm_empty` - sonst 422 mit `{code: "empty_vars", names, message}` (Entscheidung Fabian; `message`
+sagt bei der Liga „in einer Season dieser Liga“). Das Web zeigt Liste und Haken auch dann, wenn erst diese Absage sie bringt. Ein
+**unbekannter** Name (`unknown_vars`, auch `mode:<kennung>` eines Modus, den das Spiel nicht hat): deutlicher
+Hinweis in der Vorschau, das Veröffentlichen antwortet 422 „Unbekannte Variable im Text: {{…}}“ mit der ganzen Liste.
+
+| Variable | Wert (Klartext) |
+| --- | --- |
+| `league.name`, `game.name` | Name der Liga und des Spiels |
+| `season.name`, `season.number`, `season.start`, `season.end`, `season.weeks` | Name, Nummer, erster und letzter Tag (Wiener Kalendertag, `TT.MM.JJJJ`), Zahl der Spielwochen |
+| `best_of`, `maps_to_win`, `team_size`, `min_squad_size`, `max_squad_size` | Serie, Maps zum Sieg (⌊N/2⌋+1), Spieler je Map, Kadergrenzen |
+| `map_repeat` | „nur in einem anderen Modus“ / „jede Map nur einmal“ / „frei“ |
+| `lineup_mode`, `lineup_min_players` | „Teilnehmerliste je Spiel“ / „Aufstellung je Map“, Mindestzahl |
+| `result_confirm_hours`, `lineup_amend_hours` | Bestätigungsfrist, Nachtragsfrist (Stunden) |
+| `veto.step_seconds`, `veto.team_a` | Veto (D.3, #1618): „60 Sekunden“ je Schritt, „das Heimteam laut Spielplan“ / „per Los je Spiel“; ohne Veto in der Season „(nicht festgelegt)“ |
+| `veto.presets` | Vorgabe der Woche (D.3, #2326): „Spielwoche 1: Hafen (Kontrolle); Spielwoche 2: Kai (Kontrolle)“ – nur Wochen mit Eintrag, nur Maps aus dem Pool; „noch keine eingetragen“ ohne Einträge, „(nicht festgelegt)“ ohne Schritt „Vorgabe der Woche“ in der Vorlage |
+| `schedule.matchday_days`, `schedule.default_weekday`, `schedule.default_time`, `schedule.default_slot` | Tage je Spielwoche, Standardtag, Uhrzeit, „Sonntag, 20:00 Uhr“ |
+| `schedule.response_hours`, `schedule.blocked_periods` | Antwortfrist auf Terminvorschläge, Sperrzeiten („Weihnachtspause 21.12.2026–03.01.2027“) |
+| `schedule.home_rule_hours`, `schedule.reschedule_max`, `schedule.reschedule_notice_hours`, `schedule.result_reminder_hours`, `schedule.result_overdue_hours` | D.1-Regeln; ohne `schedule_rules` an der Season „(nicht festgelegt)“ |
+| `table.points_win`, `table.points_draw`, `table.points_loss`, `table.draws` | Punkte, „möglich“ / „nicht möglich“ |
+| `table.points` (#2312) | Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ bzw. „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2)“ |
+| `table.tiebreakers`, `table.head_to_head`, `table.forfeit_score`, `table.exit_rule` | Reihenfolge bei Punktgleichheit in Worten, Kriterien des direkten Vergleichs, Wertung kampflos, Regel beim Ausscheiden |
+| `eligibility.min_age`, `eligibility.wait_days`, `eligibility.roster_deadline`, `eligibility.transfer_windows`, `eligibility.entry_policy`, `eligibility.id_fields` | B.3-Werte in Worten |
+| `eligibility.platform`, `eligibility.crossplay`, `eligibility.input_device` | Plattform je Season (#2270): „PC und PlayStation“ / „alle Plattformen“, „an“ / „aus“, Eingabegerät in Worten; ohne Plattform-Feld „(nicht festgelegt)“ |
+| `application.opens`, `application.closes`, `application.slots` | Anmeldefenster (Wiener Zeit) und Startplätze (B.4) |
+| `application.acceptance` (#2348) | Ganzer Satz ohne Punkt: „Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
+| `protest.hours`, `appeal.hours`, `evidence.keep_days` | **Vorab angelegt:** Season-Felder `protest_hours` (Vorgabe 48), `appeal_hours` (48), `evidence_keep_days` (30). Ohne Feld gilt die Vorgabe (`league_rule_vars.PRESETS`). Die Einstellung kommt mit E.2 (Proteste) bzw. E.3 (Strafen) und schreibt **genau diese Felder**, Texte passen sich dann über den Vorschlag an |
+| `match.break_after_map`, `match.break_minutes`, `incident.answer_minutes` | Season-Felder `map_break_after` (Vorgabe 2), `map_break_minutes` (5), `incident_answer_minutes` (10); ohne Feld gilt die Vorgabe. Einstellbar seit D.5 (#1619) im Reiter Spielbetrieb, Abschnitt „Vorfälle und Pausen“. Alle Felder für Vorfälle und Proteste stehen im Abschnitt „D.5/E.2-Vertrag“ (#2360) |
+| `mode:<kennung>.name`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus des Spiels: Name, Ergebnisregel in Klartext, Ziel, Rundenlimit, Zeitlimit („10 Min.“), Zeit je Runde, Spieler je Seite, „ja“/„nein“ |
+
+**Ablauf bei Änderungen** (Obmann 03.11.): Ändert sich eine Einstellung, vergleicht die Verwaltung wie bisher die letzte Fassung mit
+dem heutigen Stand (`data_changes`, jetzt mit `kind: "block" | "variable"` je Zeile). Dann zeigt sie **„Regelwerk muss freigegeben
+werden“** an drei Stellen: im Season-Überblick (#2267), in „Mein Dienst“ (`GET /api/users/me/duty` → `rules_pending[]` je Season mit
+`league_name`, `season_name`, `kind` `changed` | `draft`, `count`, `label`, `admin_url`; für wer in der Liga „Regeln veröffentlichen“
+darf) und auf der Regelwerk-Seite. Dort entsteht der **Vorschlag** von selbst: `admin_view.proposal` = der Text der letzten Fassung mit
+den Daten von heute (`sections` mit Markierung, `changes` gegen die Fassung) - ohne Entwurf, ohne Schreiben, solange kein Entwurf
+liegt. Der Vorschlag trägt den **Fingerabdruck** seines Schnappschusses (`fingerprint`: Bausteine und Variablenwerte aller betroffenen
+Seasons und die Namen von Liga, Spiel und Seasons - alles, was eingefroren wird, `league_rules.Snapshot`, stabil sortiert,
+`league_rules.data_fingerprint`). Die Leitung prüft, gibt mit `POST /api/admin/league-rules/{scope}/{id}/proposal/publish`
+`{base_version_id, fingerprint, valid_from, change_reason, requires_consent, confirm_empty}` frei (Recht `rules`) und wählt dabei, ob die
+Teams neu zustimmen müssen. Unter der Sperre liest der Server den Schnappschuss neu: Weicht er vom `fingerprint` ab (eine Season-Einstellung
+oder eine Umbenennung hält diese Sperre nicht), antwortet er 409 „Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu
+prüfen“, und das Web lädt den Vorschlag neu; ebenso 409, wenn inzwischen ein Entwurf liegt oder die Grundlage nicht mehr die letzte Fassung
+ist. Beide Prüfungen laufen vor dem Entwurf, es bleibt nichts liegen. Dann legt der Server den Entwurf aus der Fassung an und veröffentlicht
+genau den geprüften Schnappschuss in einem Schritt, auch die Namen; Protokoll `league.rules.publish` mit `proposal: true`. „Neue Version
+vorbereiten“ (Text vorher anpassen) bleibt der zweite Weg. Bis zur Freigabe gilt und zeigt die alte Fassung. Mit `requires_consent`
+sehen die Verantwortlichen „Neue Fassung, bitte zustimmen“ (Aufgabe, Regelseite, Season-Seite, Team-Seite, Matchseite).
+
+**Auffindbar:** `GET /api/leagues` trägt je Season `rules_url` (nur mit gültiger Fassung); die Liga-Übersicht zeigt den Link. Die
+Team-Seite (`GET /api/teams/{tid}/squads/{sid}/eligibility`, je Season `rules_doc`) und die Matchseite (Block `league.rules`) tragen
+`league_rules.rules_info`: `{url, pdf_url, label, version, valid_from, consent: {required, agreed, agreed_at} | null}` - der Stand der
+Zustimmung des eigenen Co-Teams, nie der eines anderen.
+
+**Editor:** `admin_view.variables[]` (`{name, label, hint, token, value, group}`, aufgelöst für die Season; `mode:…` je Modus des
+Spiels) und `blocks[]` zum Einfügen an der Schreibmarke, dazu die Hilfe-Liste. Die Vorschau zeigt aufgelöste Werte, `unknown_vars`
+und `empty_vars`.
 
 ### B.3 Spielberechtigung (#2204)
 
@@ -814,12 +938,58 @@ neuen Felder nicht und prüfen nichts Neues.
 
 | Feld | Typ | Bedeutung |
 | --- | --- | --- |
+| `key` | str | Pflicht, je Spiel eindeutig (#2249): Unter ihm stehen die IDs der Spieler (`users.game_ids.<spiel>.<key>`). Doppelt oder leer: 422; was schon doppelt oder leer gespeichert ist (Altbestand), hält ein anderes Speichern nicht auf. Die Verwaltung ändert einen gespeicherten Schlüssel nie, auch keinen nicht kanonischen („PSN-ID“) oder leeren, und schickt fremde Angaben am Feld unverändert zurück. **Speicherort:** Das Profil speichert alle Felder, die für ein Spiel gelten, unter dem Slug seiner **effektiven ID-Quelle** (`identity_source_game_id`, sonst bei `inherit_player_ids` das Hauptspiel, sonst das Spiel selbst), der Kader in `league_rosters.player_ids`. **Wegfallen** darf ein Schlüssel, unter dem schon IDs stehen, nur mit `confirm_removed_keys: [key]` im `PATCH` - verglichen werden die effektiven Felder und die effektive Quelle vor und nach dem Speichern, also auch bei anderer ID-Quelle, anderem Hauptspiel, ausgeschaltetem Erben oder einem ausdrücklich geänderten Slug (ein neuer Name ändert den Slug eines bestehenden Spiels nicht); gezählt wird nur, wer den Wert danach unter keinem lesbaren Pfad mehr hat. Sonst 409 mit `detail: {code: "id_keys_in_use", keys: {key: Personen}, message}`. Gezählt wird je Person einmal (ohne anonymisierte Konten) mit `distinct` auf genau dem Pfad. Bestätigt schreibt der Server `game.player_id_fields.remove` mit `{keys: {key: Personen}}` ins Protokoll; `GET /api/games/{id}/usage` trägt die Zahlen als `id_fields`, und `counts.profiles` zählt fürs Löschen auch IDs unter der ID-Quelle und Kader-Einträge des Spiels (Index `league_rosters.game_id`). Ohne gespeicherte IDs fällt ein Feld einfach weg |
 | `pattern` | str ≤ 200 | Regulärer Ausdruck für den ganzen Wert. Der Server prüft beim Speichern, ob er gültig ist |
 | `format_hint` | str ≤ 120 | Beispiel oder Beschreibung, steht im Profil und in jeder Meldung zum Format |
 | `options` | `[str]`, höchstens 30 | Auswahl statt Freitext. So wird die **Plattform** zum Feld: Pflicht über `required`, einmal je Season festgehalten wie jede ID |
 | `unique_in_season` | bool | `false` nimmt das Feld aus der Eindeutigkeit aus (Vorgabe: Felder mit `options` sind ausgenommen, alle anderen dabei) |
 
 Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern` oder `options` passen. Fehlen beide, gibt es keine Prüfung.
+
+**Plattform je Season (#2270).** Das Spiel kennzeichnet kein Feld als Plattform, darum wählt die Season das Feld. Einstellungen an `league_seasons`,
+gepflegt im Abschnitt „Plattform und Eingabegerät“ des Reiters „Anmeldung und Kader“ (`#plattform`). Gespeichert wird mit dem Reiter über
+`PATCH /api/admin/leagues/seasons/{id}` (Zuständigkeit `season`; trägt die Anfrage die vier Felder unverändert, prüft sie nichts, damit ein am Spiel
+verschwundenes Feld das Speichern des Reiters nicht aufhält; Protokoll zusätzlich `league.season.platform` mit vorher und nachher). Wählbare Felder,
+Optionen und was je Liga N gilt liefert `GET /api/admin/leagues/seasons/{id}/platform` (jede Zuständigkeit). Die Felder wirken sofort, ohne Übertragen;
+Logik in `services/league_platform.py`:
+
+| Feld | Typ | Vorgabe neu | Fehlt | Bedeutung |
+| --- | --- | --- | --- | --- |
+| `platform_field` | str | keiner | keine Prüfung | `key` des ID-Felds mit `options` (auch vom Hauptspiel geerbt), in dem die Plattform steht |
+| `allowed_platforms` | `[str]`, höchstens 30 | `[]` | `[]` | Erlaubte Plattformen aus den `options` des Felds. Leer: alle, keine Prüfung. Alle angehakt: jede erlaubt, die Angabe ist aber Pflicht |
+| `crossplay` | bool \| `null` | `null` | keine Angabe | Plattformübergreifend an oder aus. Nur Angabe für Regelwerk und Ligaseite, nicht geprüft |
+| `input_device` | `controller` \| `mouse_keyboard` \| `both` \| `null` | `null` | keine Angabe | Eingabegerät Controller, Maus und Tastatur oder beides. Nur Angabe, nicht prüfbar |
+
+Liga N weicht über `overrides` ab: `allowed_platforms`, `crossplay`, `input_device` (das Feld gilt für die ganze Season). Fehlt der Schlüssel, gilt die Season;
+`allowed_platforms: []` heißt in Liga N „alle erlaubt“, auch wenn die Season eingrenzt. Gepflegt im Liga-N-Blatt.
+
+Beim Speichern (422 mit Satz): Das Feld muss am Spiel ein Feld mit Auswahl sein. Erlaubt sind nur Werte aus seinen `options`; was die Season oder Liga N schon
+gespeichert hat, bleibt wählbar, auch wenn das Spiel den Wert nicht mehr anbietet. Erlaubte Plattformen (Season oder Liga N) brauchen das Feld. Die Season lässt
+das Feld nicht leeren oder wechseln, solange eine Liga N eigene Plattformen trägt, die zum neuen Feld nicht passen. Gibt es das gewählte Feld am Spiel nicht mehr,
+prüft die Season nichts, und der Kasten sagt das.
+
+**Die Plattform einer Person** ist der festgehaltene Wert in `league_rosters.player_ids` (nur, wenn das Feld Pflicht ist, wird er mit der ID festgehalten und
+gilt die ganze Season), sonst der Wert im Profil. Damit die Plattform je Season festgehalten wird, das Plattform-Feld am Spiel als Pflicht führen. Stand in `league_eligibility.status`, nach `age_not_met` und vor `waiting`, aber nur, wenn der ID-Stand passt:
+Ein fehlerhafter ID-Stand (`late`, `missing`, `format`, `taken`) bleibt stehen und zählt beim Zuteilen als Hinweis, nicht als andere Plattform.
+
+| Stand | Wann | Meldung |
+| --- | --- | --- |
+| `platform_not_allowed` | Wert steht nicht unter den erlaubten, die Spiel-ID passt | „Diese Season ist nur für PC – angegeben ist PlayStation.“ Grenzt Liga N selbst ein: „Liga 2 ist nur für …“ |
+| `platform_missing` | kein Wert, die Spiel-ID passt (ist das Feld Pflicht, sagt es schon `missing`) | „Plattform fehlt im Profil.“ (Name des Felds) |
+
+**Welche Regel gilt:** In einer Staffel Season plus ihre Liga N. Wo die Liga noch nicht feststeht (Prüfung der Selbstanmeldung, B.4), die weiteste aller aktiven
+Liga N: die Vereinigung ihrer erlaubten Plattformen, eine Liga N ohne Grenze hebt die Prüfung auf (wie beim Mindestkader). Die Kaderübersicht prüft je Co-Team mit der Liga N seiner Staffel.
+
+**Wirkung:** Selbstanmeldung (B.4): Wer auf einer nicht erlaubten Plattform spielt oder keine angibt, zählt nicht als spielberechtigt und steht als Hinweis da.
+Zuteilen (auch aus einem Antrag): Hinweis im Dialog (`squad-candidates`: `notes` je Co-Team, dazu `shortfall`, wenn weniger spielberechtigt sind als
+die Check-in-Mindestzahl der Staffel, `league_eligibility.ready_minimum`, #2322) – das hält seit #2313 weder Anmeldung noch Zuteilen auf (siehe
+„Fehlende Angaben“ unten). Teilnehmerliste, Aufstellung je Map und der
+Check-in lesen `status`. Die Aufnahme in einen Kader prüft die Plattform nicht. Normale Turniere kennen die Einstellung nicht.
+
+**Antworten:** `GET /api/leagues/{liga}/{season}` trägt `platform` (`null` ohne jede Angabe): `{field_label, allowed, crossplay, input_device, input_device_label,
+values, divisions: [{id, label, …, differs}]}`. `values` sind die Texte für das Regelwerk (#2269): `platforms` („PC“, „PC und PlayStation“, „alle Plattformen“),
+`crossplay` („an“, „aus“ oder `null`), `input_device` (Wort oder `null`). Dasselbe steht in `GET …/application`; ohne `divisions` und für die Liga N der Staffel
+unter `rules.platform` der Team-Seite, für die Season unter `rules.platform` der Kaderübersicht. **Seasons ohne die Felder prüfen nichts Neues.**
 
 **Felder an `league_rosters`:**
 
@@ -835,7 +1005,7 @@ Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern
 (eindeutiger Teilindex). Löschen des Kontos löscht die Zeilen, die Auskunft enthält sie.
 
 **Stand einer Person** (`league_eligibility.status`, Vorrang in dieser Reihenfolge): `banned`, `other_team`, `age_missing`, `age_not_met`,
-`waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
+`platform_not_allowed`, `platform_missing` (#2270, beide nur bei passendem ID-Stand), `waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
 `age`: `null` (keine Regel), `met` oder `missing`. Für das Unterschreiten gibt es außerhalb der Person selbst nur den Stand `age_not_met` ohne Zahl.
 
 **Regeln je Einstellung:**
@@ -845,7 +1015,7 @@ Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern
 | `max_squad_size` | Zuteilen, Aufnahme, Transfer (422) | wie viele erlaubt sind |
 | `min_squad_size` | Zuteilen (wie bisher). Abgang bleibt möglich, Warnung und Aufgabe aus #2202 | wie viele fehlen |
 | `one_team_per_season` | Zuteilen, Aufnahme (409): schon in einem anderen Co-Team oder dort gestanden, solange dieses in der Season angemeldet ist. Teilnehmerliste: aktuell in zwei Co-Teams | dass ein Transfer nötig ist |
-| `min_age` | Zuteilen, Aufnahme, Transfer (422), Teilnehmerliste | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
+| `min_age` | Teilnehmerliste, Aufstellung, Check-in. Anmeldung, Zuteilen, Aufnahme und Transfer nur Hinweis (#2313) | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
 | `new_player_wait_days` | Teilnehmerliste, Check-in. Aufnahme bleibt möglich, Hinweis an Person und Verantwortliche. Neuzugang erst nach dem Ende von Spieltag 1, Transfer immer | bis wann gewartet wird |
 | Spiel-ID, Format, Eindeutigkeit | Festhalten, Freigabe, Teilnehmerliste. Eine schon festgehaltene ID bleibt gültig. Meldung nennt nie, wem die ID gehört | was zu tun ist |
 | Transferfenster | Antrag (409 außerhalb). Entscheidung auch nach dem Fenster | wann es offen ist |
@@ -857,7 +1027,7 @@ Ein gewöhnlicher Neuzugang spielt bis zum Ende von Spieltag 1 sofort, danach wa
 **Transfers:** `POST /api/teams/{tid}/squads/{sid}/transfers` mit `user_id` (Recht wie Kader ändern, 409 außerhalb des Fensters, Person muss im Hauptteam
 stehen), `GET` dasselbe, `DELETE …/transfers/{id}` zieht zurück. Leitung: `GET /api/admin/leagues/seasons/{id}/transfers`,
 `POST …/transfers/{id}/approve`, `…/reject` mit `reason`, Recht `roster`. Genehmigen läuft unter der Season-Sperre `league_season:{id}:squads`:
-prüft Alter, Höchstkader und Rolle im alten Co-Team, nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
+prüft Höchstkader und Rolle im alten Co-Team (das Alter seit #2313 nicht mehr: ohne passendes Geburtsdatum geht der Wechsel, die Person spielt nur nicht), nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
 `.reject`, `.withdraw`. Ein Transfer ist nur nötig, wenn `one_team_per_season` gilt.
 
 **Teilnehmerliste** (`lineup_mode: series`):
@@ -888,15 +1058,43 @@ Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `p
 
 **Datenschutz:** Die Liga-Prüfung und ihre Antworten nennen nie ein Datum oder Alter der Person, weder Stand, Team-Seite, Kaderübersicht, Fehlertext, Nachricht, Mail noch Protokoll. Gelesen wird `users.birth_date` dafür an einer Stelle (`league_eligibility._ages`), heraus kommen nur `met`, `missing` oder der Stand `age_not_met` (Wächter: `test_league_birth_date_guard_unit.py`). Das öffentliche Profil kann das Feld nach der freiwilligen Sichtbarkeits-Einstellung der Person selbst zeigen (`user_routes._visible_field`); das ist kein Liga-Weg und von dieser Regel nicht berührt. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber. Die Auskunft enthält `league_rosters`, `league_transfers` und `league_appearances` (Spiele, in denen die Person auf einer Teilnehmerliste, in `games[].lineups` oder einer offenen Meldung steht, auch ohne `lineup_user_ids`, nur die eigene Seite). Das Löschen des Kontos löscht Kadereinträge und Anträge; `matches_v2` bleibt als Sportdaten, das Konto heißt dort „Gelöschter User“.
 
-**Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`.
+**Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`,
+`league.season.platform` (#2270).
 
-**Noch nicht gebaut, liest diese Prüfung später:** Check-in (D.2 ruft `check_participants`), Strafen (E.3 ergänzt den Stand).
+**Fehlende Angaben sperren erst beim Spielen (#2313, ersetzt Entscheidung Nr. 74).** Eine fehlende oder unpassende Angabe im Profil hält weder die
+Selbstanmeldung (B.4) noch das Annehmen und Zuteilen durch die Leitung auf. Gemeint sind die Stände `age_missing`, `age_not_met` (Geburtsdatum da, Alter
+darunter: wie „fehlt“), `platform_missing`, `platform_not_allowed` und die ID-Stände `missing`, `format`, `taken`, `late`, dazu „weniger spielberechtigte Spieler
+als der Mindestkader“. Gesperrt wird erst, wo gespielt wird: Wer nicht `ok` ist, kann nicht eingecheckt (D.2) und nicht aufgestellt werden (Teilnehmerliste,
+Aufstellung je Map, `check_participants`). Ein Team mit weniger spielberechtigten Spielern als `min_present` kann nicht einchecken; nach dem Fenster gibt es wie
+bisher nur den Vorschlag „nicht erschienen“ an die Leitung, nie eine Wertung. Inhaltliche Gründe bleiben Sperren: Fenster, Startplätze, offener Antrag,
+Kadergröße (Mitglieder, nicht Eignung), Höchstkader, ein Co-Team je Season, Spiel des Co-Teams, `entry_policy`, gültiges Regelwerk und die Zustimmung.
+Auch die **Aufnahme in einen Kader** einer laufenden Season und die **Genehmigung eines Transfers** gehen ohne oder mit zu jungem Geburtsdatum durch
+(Fabian 09.11., `roster_addition_problem`): Die Person steht dann im Kader, ist aber nicht spielberechtigt. Die Team-Seite führt sie bei den möglichen
+Neuzugängen als „aufnehmbar, spielen erst mit der fehlenden Angabe“ (`can_add: true` mit `reason`). Höchstkader, ein Co-Team je Season und das Transferfenster
+bleiben Sperren.
+
+`league_eligibility.open_points(ctx, squad, minimum=…)` liefert die offenen Punkte eines Co-Teams: `players` (je nicht spielberechtigter Person `id`, `name`,
+`state`, `reason`, `fixable`: selbst im Profil behebbar) und `shortfall` (Satz oder `null`, wenn weniger als `minimum` spielberechtigt sind). Selbst behebbar
+(`FIXABLE_STATES`): `age_missing`, `platform_missing`, `platform_not_allowed`, `missing`, `format`, `taken`.
+
+**Erinnerungen** (`services/league_open_points.py`, Art `tournament_registration`, `meta.reason` `league_open_points`, nur Postfach und Push): an jede
+betroffene Person mit behebbarem Stand („Für <Season> fehlt bei dir noch: <Grund>“, Link ins eigene Profil: Geburtsdatum `/profile?tab=basic`, sonst
+`/profile?tab=gaming`) und an Captain und Vertreter (ohne beide die Hauptteam-Leitung) eine Übersicht mit Namen, Ständen und `shortfall`, Link zur Ligaseite.
+Zweimal je Co-Team: beim Einreichen (Schlüssel `league-open-points:<antrag>:submit:player|team:<user>`) und vor dem ersten Spiel der Staffel
+(`league-open-points:<anmeldung>:first-match:player|team:<user>`). `player` ist die eigene Angabe, `team` die Übersicht - getrennt, damit ein Captain mit eigenem
+offenem Punkt beides bekommt. Das zweite läuft im Job `match_reminders` (alle fünf Minuten): Staffeln mit einem offenen Spiel der Seite
+innerhalb von `checkin_rules.open_points_remind_hours` (Vorgabe 48, 0 = aus; ohne Check-in-Regeln 48), nur für Anmeldungen mit aktivem Status
+(`pending`, `approved`, `checked_in`, `waitlist`; nicht zurückgezogen oder disqualifiziert) und nur solange die Anmeldung noch kein begonnenes oder
+entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der Antrag gespeichert (Fehler nur im Log). Ein zweiter Lauf findet den Schlüssel und schickt nichts. Nie ein Datum oder Alter in Texten.
+
+**Noch nicht gebaut, liest diese Prüfung später:** Strafen (E.3 ergänzt den Stand).
 
 ### B.4 Selbstanmeldung (#2205, #1623, #1665)
 
 Captain oder Vertreter melden ein vorhandenes Co-Team auf der Ligaseite für eine Season an. Die Leitung nimmt an, lehnt ab oder setzt auf die Warteliste und
 teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Zeile. Logik in `services/league_applications.py`, Routen in `routes/league_application_routes.py`.
 **Ohne Anmeldefenster an der Season gibt es keine Selbstanmeldung**, und alles bleibt wie vorher. Das Zuteilen in der Turnierverwaltung bleibt als Sonderweg.
+Mit `application_auto_accept` (#2348, Entscheidung Nr. 126) entscheidet die Season beim Einreichen selbst, siehe **Automatisch annehmen** unten.
 
 **Einstellungen an `league_seasons`** (Zuständigkeit `season`, alle optional; wirken sofort, kein Übertragen):
 
@@ -910,6 +1108,7 @@ teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Z
 | `entry_policy` | `all` \| `members` | `all` | `all` | Zulassung. `members`: Jeder im Kader muss Mitglied sein (dieselbe Regel wie Sichtbarkeit „Nur Mitglieder“) |
 | `sibling_squads_in_staffel` | bool | `false` | `false` | Zwei Co-Teams eines Hauptteams in derselben Staffel. Ein Co-Team bleibt je Season in einer Staffel. Gilt auch fürs Zuteilen. Mit `true` lautet `identity_key` `<tid>:team:<team_id>:squad:<squad_id>` |
 | `application_privacy_text` | str ≤ 2000 | leer | Platzhalter-Satz | Hinweis zum Datenschutz bei der Anmeldung. Den Wortlaut pflegt die Leitung, der Text steht mit im Antrag |
+| `application_auto_accept` (#2348) | bool | `false` | `false` | Anmeldungen automatisch annehmen. `null` lässt den Wert stehen. Kein Staffel-Feld, darum nicht in `SYNC_GROUPS`; Protokoll wie die übrigen Felder über `league.season.update` (`data.fields`), beim Umschalten dazu `league.season.auto_accept` mit `before` und `after` |
 
 **`league_applications`** (eine Zeile je Antrag, ein neuer Antrag nach Ablehnung oder Rückzug ist eine neue Zeile):
 
@@ -922,10 +1121,12 @@ teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Z
 | `applied_by`, `submitted_at` | str, ISO | Wer wann eingereicht hat |
 | `rule_consent` | `{consent_id, rule_version_id, version, user_id, at}` | Die Fassung, der zugestimmt wurde. Dieselbe Zustimmung steht in `league_rule_consents` |
 | `privacy_consent` | `{text, user_id, at}` | Der Wortlaut, dem zugestimmt wurde |
-| `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht |
+| `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht, beim Zurückstufen einer angenommenen Anmeldung auch (#2348, automatisch oder von Hand angenommen). Entscheidet die Season (#2348), ist `decided_by` `null` |
+| `auto_accepted` (#2348) | `true` | Nur solange die Annahme automatisch war. Jede Entscheidung einer Person (auch Zuteilen) nimmt das Feld weg |
+| `auto_problem` (#2348) | str | Warum die Season nicht zuteilen (bei `accepted`) bzw. nicht annehmen (bei `submitted`) konnte. Bis eine Person entscheidet |
 | `withdrawn_by`, `withdrawn_at` | str, ISO | Rückzug |
-| `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei |
-| `history` | `[{status, by, at, reason?}]` | Jeder Schritt |
+| `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at, auto?}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei. `auto: true` (#2348): beim Einreichen automatisch zugeteilt, `assigned_by` `null` |
+| `history` | `[{status, by, at, reason?, conflict_reason?, auto?}]` | Jeder Schritt. `conflict_reason`: Grund einer Notausnahme des Superadmins (#2245). `auto: true`: Die Season hat entschieden (#2348), `by` `null`; der Eingang zeigt „automatisch“ |
 | `created_at`, `updated_at` | ISO | |
 
 Indizes: `id` eindeutig, `active_key` eindeutig (sparse), (`season_id`, `status`), `squad_id`, `applied_by`.
@@ -939,23 +1140,55 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 | `submitted` | `in_review` | Leitung |
 | `submitted`, `in_review`, `waitlist` | `accepted` | Leitung, nur mit freiem Platz. Prüfung wird wiederholt. Mit `tournament_id` gleich zugeteilt |
 | `submitted`, `in_review` | `waitlist` | Leitung, nur wenn die Season eine Warteliste hat und sie nicht voll ist |
-| `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei |
+| `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei. Nur mit Grund (mindestens fünf Zeichen, sonst 422; #2348), das Team liest ihn in der Nachricht |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `rejected` | Leitung, Grund mindestens fünf Zeichen |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `withdrawn` | Captain oder Vertreter |
 | `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, die Prüfung wird wiederholt (`check_squad`), dazu die der Staffel (`build_registration`) |
+| – (beim Einreichen) | `accepted`, mit nur einer Staffel samt `assignment.auto` | Season mit `application_auto_accept`: nach allen offenen Anträgen noch ein Platz frei und niemand auf der Warteliste (#2348) |
+| – (beim Einreichen) | `waitlist` | Season mit `application_auto_accept`: alle Plätze belegt oder von offenen Anträgen gehalten, oder schon jemand auf der Warteliste, und sie hat Platz. Sonst bleibt `submitted` |
+| `accepted` mit `assignment.auto` | `withdrawn` | Captain oder Vertreter, solange kein fester Spielplan steht, die Anmeldung nicht eingecheckt ist und die Staffel vor Check-in und Start steht (`draft` bis `registration_closed`, wie die Turnier-Abmeldung; sonst 409, Austritt über die Leitung). Die Anmeldung der Staffel fällt weg, die Warteliste bleibt unberührt; `can_withdraw` in den Antworten sagt es vorab (`_auto_withdrawable`) |
+| `accepted` mit `assignment.auto` | `rejected`, `waitlist` | Leitung, Grund Pflicht. Die Anmeldung der Staffel fällt weg wie bei „Zuteilung zurücknehmen“; mit festem Spielplan 409 („Austritt eintragen“), gesperrte Staffel 423 |
 
-Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste.
+Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste - außer einer automatischen Zuteilung ohne festen Spielplan (#2348).
+
+**Automatisch annehmen** (#2348, Entscheidung Nr. 126, `application_auto_accept`): Nach derselben Prüfung wie sonst (Fenster, Regelwerk, `entry_policy`, ein Co-Team je Season, Co-Team-Regeln) entscheidet
+`_auto_decide` unter der Season-Sperre. **Wer zuerst kommt, wird zuerst bedient:** Offene Anträge (`submitted`, `in_review`) halten ihren Platz und zählen hier wie belegte
+(`taken` + offene ohne den eigenen). Ist danach ein Platz frei und die Warteliste leer: `accepted`, belegt den Platz wie eine Annahme der Leitung. Sonst `waitlist`, wenn die Warteliste Platz hat:
+Ein frei gewordener Platz geht nach den Regeln der Warteliste durch die Leitung, nicht an den nächsten Neuen. Gleichzeitig auf den letzten Platz: Die Season-Sperre lässt
+einen nach dem anderen durch, genau einer wird angenommen. Fehlende Angaben (Nr. 118) halten nichts auf.
+**Zuteilung:** Gibt es genau eine Staffel in den aktiven Liga N, vor ihrem Start (`PRE_START_STATUSES`) und ohne feste Spiele, sperrt das Einreichen sie vorher (Turnier-Sperre vor
+Season-Sperre, Wartezeit wie die Season-Sperre) und teilt zu: `build_registration`, Vorschau, Kader der Season wie beim Zuteilen, `created_by` `null`, `registered_by` wer
+eingereicht hat. Lehnt die Staffel ab (gesperrt, voll, Mindestkader der Staffel) oder hat die einzige Staffel schon begonnen bzw. steht ihr Spielplan, bleibt es bei `accepted`
+ohne Zuteilung, und der Grund steht als `auto_problem` am Antrag, im Eingang („Nicht automatisch zugeteilt: …“) und im Hinweis an die Leitung. Steht schon ein
+Geschwister-Co-Team (anderes Co-Team desselben Hauptteams) in der einzigen Staffel und erlaubt die Season das nicht (`sibling_squads_in_staffel`), nimmt die Season
+**nicht** an: Der Antrag bleibt `submitted` mit `auto_problem` („Nicht automatisch angenommen: …“), die Leitung hört den Grund. Mehrere Staffeln: Die Leitung teilt zu,
+das Team sieht „Angemeldet – Zuteilung folgt“. Was gar nicht geht, bleibt `submitted`. Jede Entscheidung einer Person nimmt `auto_problem` wieder weg.
+**Unerwartete Fehler** nach dem Schreiben des Antrags (`_auto_decide_safely`): Der Antrag bleibt `submitted` und stimmig (`_place` nimmt eine neue Anmeldung wieder weg),
+Protokoll `submit` und Nachricht gehen wie ohne Einstellung, der Fehler steht im Log statt einer 500, die Leitung liest „Es gab einen technischen Fehler, bitte selbst prüfen.“
+Ein Fehler nach der Zuteilung (Vorschau, Kader) lässt Annahme und Zuteilung stehen.
+**Befangenheit:** Keine Entscheidung einer Person, darum auch beim eigenen Team der Leitung. Ablehnen und Zurückstufen danach prüfen Nr. 73 wie immer. Gehört eine Person der
+Liga-Leitung (`staff_user_ids` mit allen Zuständigkeiten) nach `belongs_to_side` zum Team, meldet der Eingang `lead_team_auto`, die anderen Zuständigen lesen „Team der Leitung – automatisch angenommen“.
+**Später einschalten:** Offene `submitted`/`in_review`-Anträge bleiben, wie sie sind. `GET /api/admin/leagues/seasons/{id}` liefert `applications_waiting` (nur die Zahl), die
+Verwaltung zeigt beim eingeschalteten Schalter „X Anmeldungen warten auf Prüfung und halten ihren Platz frei. Entscheide sie im Eingang.“
 
 **Prüfung** (`league_applications.check_squad`, derselbe Text für Captain und Leitung): Fenster offen, Season weder beendet noch archiviert, gültige Fassung des Regelwerks, Platz oder Warteliste frei,
-kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`, mindestens Mindestkader spielberechtigte Spieler (`league_eligibility.status`). Spieler ohne gültige ID stehen als Warnung da.
-Mindestkader ist hier der kleinste aller aktiven Liga N. Beim Zuteilen zählt der genaue Wert der Staffel.
+kein offener Antrag und keine Anmeldung dieses Co-Teams in der Season, `squad_problems`, `registration_problems`, `entry_policy`. Das sind die `problems`.
+**Fehlende Angaben halten nichts auf (#2313, ersetzt Nr. 74):** Wer nicht spielberechtigt ist (Geburtsdatum, Alter, Spiel-ID, Plattform, Wartezeit), steht in
+`warnings` („Name: Grund“); sind weniger spielberechtigt als zum Einchecken nötig, sagt es `shortfall` („Nur 2 von 5 Spielern sind spielberechtigt, für ein Spiel
+braucht ein Team mindestens 3. …“). Beides zeigt die Strecke als Hinweis, der Eingang der Leitung als offene Punkte; Einreichen, Annehmen und Zuteilen gehen trotzdem.
+Maßstab für `shortfall` ist die Mindestzahl Anwesender aus den Check-in-Regeln der Season (`checkin_rules.min_present`, bei 4 gegen 4 also 3), nicht der
+Mindestkader (#2322): Mit 3 Spielberechtigten kann ein Team antreten, auch wenn sein Kader mindestens 4 Personen haben muss. Ohne Check-in-Regeln gilt der
+kleinste Mindestkader aller aktiven Liga N. Der Mindestkader selbst (Personen im Kader) bleibt eine Sperre der Anmeldung. Nach dem Einreichen gehen die
+Erinnerungen aus B.3; vor dem ersten Spiel zählt dort die Mindestzahl der Staffel.
 
 **Zustimmung:** Beim Einreichen schickt das Web `rule_version_id` (die Fassung, die es zeigt), `accept_rules` und `accept_privacy`. Passt die Fassung nicht mehr: 409. `rules_text` gilt hier nicht als Regelwerk, weil dazu keine Version existiert: Ohne gültige Fassung geht keine Anmeldung, die Prüfung nennt es.
 Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` und `accepted_privacy` auf `true`, `registered_via: "league_application"`, `source: "league_application"`, `application_id`. Das Zuteilen ohne Antrag schreibt weiter `false`.
 
-**Sonderweg:** Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen und zeigt die Zuteilung. Nimmt sie die Zuteilung zurück, bleibt der Antrag angenommen, ohne Zuteilung, und belegt einen Platz, bis sie neu zuteilt oder ablehnt.
+**Sonderweg:** Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen und zeigt die Zuteilung (Protokoll `league.application.accept` mit `via: "squad_assign"`). Nimmt sie die Zuteilung zurück, bleibt der Antrag angenommen, ohne Zuteilung, und belegt einen Platz, bis sie neu zuteilt oder ablehnt.
+Weil das Zuteilen hier über den Antrag entscheidet, gilt die Befangenheit (siehe unten): Die befangene Person bekommt 403, bevor eine Anmeldung entsteht. `POST /api/tournaments/{tid}/squad-registrations` nimmt dafür `conflict_reason` an; der Dialog „Co-Team zuteilen“ fragt nicht danach, die Absage verweist den Superadmin in den Eingang. Ohne offenen Antrag bleibt das Zuteilen ohne Befangenheit.
 
 **Sperren:** Einreichen, Rückzug und Entscheidungen halten `league_season_resource`. Beim Zuteilen zuerst die Turnier-Sperre, dann diese. Besetzt: 409. Der Status wechselt nur mit Bedingung auf den alten Stand.
+Das Einreichen mit automatischer Zuteilung und Ablehnen bzw. Warteliste einer automatischen Zuteilung (#2348) halten ebenso zuerst die Sperre ihrer Staffel.
 
 **Abgebrochenes Zuteilen:** Anmeldung und Antrag sind zwei Schreibvorgänge ohne Transaktion. Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie stehen (Prozess stirbt dazwischen), findet `_left_over` sie über `application_id`: Annehmen und Zuteilen schließen mit ihrer Staffel ab, auch wenn eine andere gewählt ist, und zwar unter deren Sperre und mit derselben Prüfung (`check_squad`). Ist die Staffel gesperrt: 423, bis die Leitung sie entsperrt (`POST /api/tournaments/{id}/unlock`). Fällt die Prüfung durch, bleibt der Antrag stehen, die Leitung nimmt die Anmeldung aus der Teilnehmerliste. Ablehnen, Warteliste und Rückzug antworten 409, bis eines von beiden geschehen ist.
 
@@ -963,24 +1196,764 @@ Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` un
 
 | Route | Wer | Zweck |
 | --- | --- | --- |
-| `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy}` oder `null`. Keine Personen |
-| `GET /api/leagues/{liga}/{season}/application` | angemeldet, Season sichtbar | `application`, `rules`, `privacy`, `season_problems`, `squads[]`: die eigenen Co-Teams des Spiels mit `can_apply`, `state`, `application`, nur für Captain und Vertreter dazu `problems`, `warnings`. `hint`, wenn das Co-Team keinen Captain hat |
-| `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403 |
+| `GET /api/leagues/{liga}/{season}` | wie Season-Sichtbarkeit | zusätzlich `application`: `{state, opens_at, closes_at, slots, slots_free, waitlist, waitlist_full, waitlist_note, entry_policy, auto_accept}` oder `null`. Keine Personen. Mit `application_auto_accept` ist `slots_free`, was eine neue Anmeldung wirklich bekommt: Plätze minus belegte minus offene Anträge, `0`, sobald jemand wartet (`_free_for_newcomers`, #2348). Der Eingang (`stats`) zählt weiter nur belegte |
+| `GET /api/leagues/{liga}/{season}/application` | angemeldet, Season sichtbar | `application`, `rules`, `privacy`, `season_problems`, `squads[]`: die eigenen Co-Teams des Spiels mit `can_apply`, `state`, `application`, nur für Captain und Vertreter dazu `problems`, `warnings`, `shortfall`. `hint`, wenn das Co-Team keinen Captain hat |
+| `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403. Antwort mit `status`: `submitted`, mit `application_auto_accept` auch `accepted` (dann `staffel`, wenn zugeteilt) oder `waitlist` |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
-| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]`, `stats`, `divisions[]` |
-| `POST …/seasons/{id}/applications/{aid}/review` | `applications` | In Prüfung |
-| `POST …/accept` (`{tournament_id?}`), `/reject` (`{reason}`), `/waitlist` (`{reason?}`), `/assign` (`{tournament_id}`) | `applications` | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404 |
+| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `auto_accepted`, `lead_team_auto`, `auto_problem`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
+| `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
+| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer angenommenen Anmeldung verlangt `reason` (422), auch wenn sie von Hand angenommen war |
 
-Befangenheit gilt hier nicht (wie beim Zuteilen, Abschnitt B.1). Der Eingang zeigt mit `own_team`, wenn es das eigene Team ist.
+**Befangenheit** (#2245, Entscheidung Nr. 73, Regel in Abschnitt B.1): Über die Anmeldung des eigenen Teams entscheidet eine zweite Person. Befangen sind Kader des Co-Teams,
+Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat, auch mit Zuständigkeit `applications` oder Bereich `leagues`. Prüfen, Annehmen, Ablehnen,
+Warteliste und Zuteilen antworten ihnen 403 („Über dein eigenes Team entscheidet eine andere Person.“), geprüft vor allem anderen und unter der Season-Sperre direkt vor dem Schreiben noch einmal (auch im Sonderweg), der Antrag bleibt unverändert. Kaderänderungen laufen nicht unter dieser Sperre. Anträge anderer Teams
+derselben Season entscheidet die Person weiter. Der Superadmin geht als Notausnahme durch, mit `conflict_reason` (mindestens fünf Zeichen, sonst 403). Der Grund steht im Verlauf
+(`history[].conflict_reason`), im Protokoll der Entscheidung (`league.application.*`, `data.conflict_override`) und unter `league.conflict.override` (`action: "application_<schritt>"`).
+Der Eingang meldet `own_team` nach derselben Regel (`belongs_to_side`) und `superadmin`: Beim eigenen Team stehen statt der Knöpfe der Satz, beim Superadmin dazu das Feld
+„Grund für die Notausnahme“.
 
 **Benachrichtigungen:** Art `tournament_registration`, `meta.reason` `league_application_submitted`, `_accepted`, `_rejected`, `_waitlist`, `_assigned`, `_withdrawn`, Schlüssel `league-application:<id>:<status>:<schritt>:<user>`. An Captain und Vertreter (ohne beide die Hauptteam-Leitung), bei `submitted` und `withdrawn` auch an die Leitung (`applications`). Mail über `send_league_mail`.
+Automatisch angenommen oder auf die Warteliste (#2348): Das Team bekommt dieselbe Nachricht wie bei einer Entscheidung der Leitung (ohne „eingereicht“), die Leitung den
+Hinweis „… ist automatisch angenommen …“ bzw. „… steht automatisch auf der Warteliste …“. Die Nachricht zur Warteliste nennt einen Grund, wenn es einen gibt.
 
-**Datenschutz:** Gäste sehen Fenster und freie Plätze, keine Anträge. Andere Teams sehen nichts von einem Antrag. Den Grund einer Ablehnung sehen Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und die Liga-Leitung, zurückziehen dürfen nur Captain und Vertreter (`can_withdraw`). Auskunft: `league_applications`, in denen die Person steht, mit den eigenen Zustimmungen und eigenen Schritten (`my_steps`), ohne Kennungen anderer. Wer nur als Liga-Leitung handelte, bekommt wie im Adminprotokoll nur den Vorgang (Kennung des Antrags, Season, Schritt, Zeitpunkt), ohne Team und Grund. Kontolöschung: Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt überall heraus (`applied_by`, Zustimmungen, `withdrawn_by`, `decided_by`, `history[].by`). Kein Geburtsdatum in Antworten.
+**Datenschutz:** Gäste sehen Fenster und freie Plätze, keine Anträge. Andere Teams sehen nichts von einem Antrag. Den Grund einer Ablehnung sehen Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und die Liga-Leitung, zurückziehen dürfen nur Captain und Vertreter (`can_withdraw`). Auskunft: `league_applications`, in denen die Person steht, mit den eigenen Zustimmungen und eigenen Schritten (`my_steps`), ohne Kennungen anderer. Wer nur als Liga-Leitung handelte, bekommt wie im Adminprotokoll nur den Vorgang (Kennung des Antrags, Season, Schritt, Zeitpunkt), ohne Team und Grund. Kontolöschung: Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt überall heraus (`applied_by`, Zustimmungen, `withdrawn_by`, `decided_by`, `history[].by`). Den Grund einer Notausnahme (`history[].conflict_reason`) enthält die Auskunft der Liga-Leitung nicht (Vorgang ohne Inhalt wie im Adminprotokoll), bei der Kontolöschung bleibt er im Verlauf, ohne Person. Kein Geburtsdatum in Antworten.
 
 **Löschen:** Eine Season mit Anträgen lässt sich nicht löschen (`delete-plan`, Hinweis auf Archivieren). Ein Co-Team mit offenem Antrag lässt sich erst nach dem Rückzug löschen, ein Hauptteam mit solchem Co-Team nicht auflösen.
 
-**Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`.
+**Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist` sowie `league.season.auto_accept` (Umschalten, `before`/`after`)
+(`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung, `data.problem`, wenn die Staffel nicht ging); `.reject`, `.waitlist` und `.withdraw` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
+
+### C.1 Spielmodi (#2206)
+
+Modi bleiben in `games.match_modes[]`, kein zweites Modussystem. C.1 **speichert, prüft und zeigt** die neuen Felder. Endstände
+gegen die Ergebnisregel prüft erst C.3 (#1617), ebenso das Übernehmen der Regel in die Season. Kein Wert eines Titels steht im
+Code; Beispiele in Seeds und Tests sind erfunden. Logik in `models.GameMatchMode`, `services/game_modes.py` (Zustand, Auswahl),
+`services/game_usage.py` (Verwendung). **Migration: keine.**
+
+**Felder je Modus** (alle neuen optional; fehlt ein Feld, wird es nicht geschrieben und alles verhält sich wie vorher):
+
+| Feld | Typ | Fehlt | Bedeutung |
+| --- | --- | --- | --- |
+| `mode` | str ≤ 40 | aus dem Namen | Kennung und Identität des Modus. Maps, Pools, Reihenfolgen, Turniere und Spiele zeigen auf sie |
+| `label` | str 1–60 | Pflicht | Name, darf sich ändern |
+| `minutes`, `per_game` | wie bisher | wie bisher | Dauerplanung (#1554), unverändert |
+| `status` | `active` \| `inactive` \| `archived` | `active` | Zustand, siehe unten |
+| `description` | str ≤ 500 | – | Beschreibung; wie alle Spieldaten über `GET /api/games` lesbar |
+| `players_per_side` | int 1–64 | – | Spielerzahl je Seite |
+| `format` | str ≤ 60 | – | Freitext, etwa die Regel-Variante des Modus |
+| `result_rule` | Objekt | keine Regel | Ergebnisregel, siehe unten |
+| `icon_url` | str ≤ 300 | Platzhalter | Quadratisches Symbol (#2266), siehe „Symbol“ unten |
+| `settings` | `[setting]`, höchstens 40 | – | Freie Einstellungen (#2271), siehe unten; leer wird nicht geschrieben |
+| `rules_text` | str ≤ 1000 | – | Kurzer Regeltext des Modus (#2271), steht im Baustein `mode_settings` |
+
+**`result_rule`** (angewandt seit C.3):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `kind` | `score` \| `rounds` \| `highest` | Pflicht. `score`: Punkte bis zum Ziel. `rounds`: Runden gewinnen. `highest`: höherer Endstand gewinnt, ohne Ziel |
+| `target` | int 1–100 000 | Pflicht bei `score` und `rounds` (Zielpunkte bzw. Rundensiege), bei `highest` nicht erlaubt |
+| `round_limit` | int 1–999 | nur bei `rounds`, mindestens `target` |
+| `time_limit_seconds` | int 1–36 000 | Zeitlimit je Map in Sekunden, freiwillig (#2271) |
+| `round_time_seconds` | int 1–3 600 | Zeit je Runde in Sekunden, freiwillig (#2271) – nur Angabe für Regelwerk und Anzeige, keine Prüfung |
+| `draw_allowed` | bool | Remis erlaubt, Vorgabe `false` |
+| `overtime` | bool | Verlängerung bei Gleichstand, Vorgabe `false` |
+
+**Zeiten in Sekunden (#2271), keine Migration:** Bis #2271 stand das Zeitlimit als `time_limit_minutes` (int 1–600). Ein Aufruf mit
+`time_limit_minutes` wird beim Speichern in `time_limit_seconds` umgerechnet und nie mehr geschrieben. Gespeicherter Altbestand bleibt,
+wie er ist, und wird beim Lesen umgerechnet (`models.normalize_rule`, `rule_time_limit_seconds`): `GET /api/games`, die Übersicht der
+Season-Regeln, der Block `league` der Matchseite und die C.3-Prüfung lesen beides. Die Verwaltung nimmt `1:30`, `90 s` oder Minuten
+(`10`) an.
+
+**`settings[]`** (#2271, `models.GameModeSetting`) – Werte eines Titels stehen nie im Code:
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Identität der Einstellung, aus der Bezeichnung, wenn sie fehlt; bleibt beim Umbenennen. Gleiche Schlüssel bekommen `_2`, `_3` … |
+| `label` | str 1–60 | Bezeichnung |
+| `unit` | `seconds` \| `minutes` \| `points` \| `toggle` \| `text` \| fehlt | Einheit; fehlt = Text |
+| `value` | je Einheit | `seconds` ganze Zahl ≥ 0, `minutes`/`points` Zahl (±1 000 000), `toggle` bool, sonst Text 1–120 Zeichen |
+| `group` | str ≤ 40 | Gruppe, etwa „Lobby“ – freiwillig |
+
+Reihenfolge wie gespeichert. Was nicht passt, lehnt der Server mit 422 und deutschem Satz ab. Zeichen des Zwischenformats der Bausteine
+(U+E000–U+E00F, `markdown_text.strip_protected`) fallen aus Bezeichnung, Gruppe, Textwert und Regeltext weg – beim Speichern am Modus und
+an der Season und beim Lesen von Altbestand (`GET /api/games`, Übersicht der Season-Regeln, Baustein `mode_settings`).
+
+**Symbol (#2266, `services/mode_icons.py`):** `icon_url` ist eine Adresse aus dem eigenen Upload (`/api/static/uploads/<name>` mit
+PNG, JPG, WebP oder SVG, optional `?v=`), die einen Eintrag in `media_uploads` hat (`filename` oder `raster_filename`). Ohne Medienrolle
+(`ADMIN_MEDIA_ROLES`) nur eigene Bilder (`media_scope: "user"` und eigene `owner_id`), SVG nur mit Medienrolle. Geprüft wird nur, was
+neu ist: Ein Symbol, das ein Modus schon trägt, hält an diesem Modus (Kennung nach `adopt_keys`) kein Speichern auf; an einen anderen
+Modus gesetzt, ist es eine neue Zuordnung und wird geprüft. Sonst 422 mit deutschem Satz. Fehlt `icon_url`, zeigt jede
+Fläche ein neutrales Platzhalter-Symbol (`components/tls/ModeIcon`).
+
+- **Schnappschuss:** Eine Pool-Version hält das Symbol je Modus wie den Namen (`map_pools.modes[].icon_url`, nur wenn gesetzt), ebenso
+  `copy_version` und „Map sperren“. Ein Liga-Spiel hält es je Map aus dem Pool (`games[].mode_icon_url`, nur wenn gesetzt), wie
+  `mode_label`. Ein neues Symbol am Modus erreicht einen gespeicherten Pool erst mit dem nächsten Speichern. Bis dahin nennt die
+  Verwaltung es wie eine geänderte Map: `admin_entry` trägt `outdated_modes` (Modi, deren Symbol im Pool nicht mehr dem des Spiels
+  gleicht), der Pool-Editor zeigt „Symbol geändert – mit dem nächsten Speichern übernommen“. Beim Übertragen Season → Staffel zählt
+  das Symbol mit (`league_service._pool_maps`): Ein nur wegen des Symbols neu gespeicherter Season-Pool kommt als neue Version in die
+  Staffeln; festgehaltene Versionen und fertige Spiele bleiben, wie sie sind.
+- **Mediathek:** Verwendung sind `games.match_modes.icon_url` und `map_pools.modes.icon_url`. In einer Pool-Version (außer dem
+  Standard-Pool `game_default`) ist das Symbol **eingefroren** (`media_audit.is_frozen` mit Feld): Drehen und Löschen gehen nicht, auch
+  nicht mit Bestätigung (409 „… Symbol eines Modus in einem gespeicherten Map-Pool …“). Map-Bilder in Pools bleiben wie bisher. Steht
+  das Symbol in einer veröffentlichten Regelversion (Baustein, `league_rules.frozen_images` aus C.4), zählt es dort ebenfalls als
+  eingefrorene Verwendung.
+- **Lesen:** `game_modes.entries` (Auswahllisten der Verwaltung) und die Übersicht der Season-Regeln tragen `icon_url`, die öffentlichen
+  Spielfelder (`match_public_view`, `league_page`) `mode_icon_url`, die Staffel-API dazu `mode_label`. Alles nur additiv.
+- **Regelwerk:** Die Bausteine `map_pool`, `mode_order` und `mode_settings` setzen ein Raster-Symbol als Markdown-Bild mit dem Text
+  `Modus-Symbol` vor den Namen, nur in der Web-Fassung (`markdown`). Das Web zeigt es klein (`rules.css`); die Fassung ohne Bilder
+  (`text`) für PDF und Vergleich hat es nicht. SVG-Symbole erscheinen im Regelwerk nicht.
+
+Unpassendes lehnt der Server mit 422 und deutschem Satz ab, gekürzt oder still verworfen wird nichts, auch kein unbekanntes Feld
+in `result_rule`.
+
+**Namen:** Innerhalb eines Spiels heißt jeder Modus anders (ohne Groß und klein, Leerraum zusammengefasst), sonst 422 beim Anlegen
+und Ändern. Gleiche Namen aus Altbestand bleiben speicherbar, solange keine neue Dublette dazukommt.
+
+**Zustände:**
+
+| Zustand | Neu wählbar | Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` (oder fehlt) | ja | sichtbar | – |
+| `inactive` | nein: neuer Map-Pool, Modus je Map der Season, Spielmodus des Turniers oder einer Phase | in Auswahllisten nur, wo er schon gesetzt ist, mit „(inaktiv)“ | bleibt gültig und sichtbar |
+| `archived` | nein, dazu keine neue Zuordnung an Maps | zusätzlich aus allen Auswahllisten ausgeblendet, außer wo er schon gesetzt ist | bleibt gültig und sichtbar |
+
+- „Neu“ heißt: Der Wert war vorher nicht gesetzt. Ein schon gesetzter Modus hält kein anderes Speichern auf (Muster
+  `game_usage.chosen_is_archived`): ein Pool mit dem Modus in seiner geltenden Version, eine Season mit ihm in `game_mode_order`, ein
+  Turnier mit ihm als `game_mode`, eine Phase mit ihm in `settings.game_mode`, eine Map mit ihm in `modes`. Wechselt ein Turnier das
+  Spiel, ist nichts „schon gesetzt“: Der mitgenommene `game_mode` wird gegen das neue Spiel geprüft, auch ohne `game_mode` im Aufruf.
+- **Unberührt:** fertige und laufende Spiele, festgehaltene Pools (`map_pool_id`), `effective_pool`, `map_pools.allowed`, das
+  Kopieren Season → Staffel (`copy_version`), `GET /api/games` (inaktive und archivierte Modi stehen weiter in `match_modes`) und
+  die Dauerplanung: `match_duration.game_mode` nimmt wie bisher den gewählten Modus, sonst den ersten, ohne Blick auf den Zustand.
+- **Meldeformular:** Es zeigt die Modi des geltenden oder festgehaltenen Pools. Ein inaktiver Modus darin bleibt meldbar, bis ein
+  neuer Pool ohne ihn gespeichert ist. So bricht eine laufende Season nicht ab.
+- Die Referenz-Ligen (`team_league_maps.py`) lesen die Modi unverändert.
+
+**Entfernen:** Nur ein unbenutzter Modus lässt sich entfernen, auch direkt über die API (`PATCH`/`PUT /api/games/{id}`, auch
+`match_modes: null`). Verwendet heißt (`game_usage.mode_usage`): steht in einer Version eines Map-Pools des Spiels (jede Version,
+außer dem Standard-Pool `game_default`), in `game_mode_order` einer Season oder Staffel, als `game_mode` eines Turniers, in
+`settings.game_mode` einer Phase, in `games[]`, einer Meldung oder einem gehaltenen Ergebnis eines Spiels oder in einem
+Ergebnisblatt einer Referenz-Serie des Spiels. Sonst 409: „Der Modus „…“ wird verwendet (…). Entfernen geht nicht – stell ihn auf
+inaktiv oder archiviert.“ Die Zuordnung an Maps zählt nicht als Verwendung: Ein unbenutzter Modus verschwindet beim Entfernen wie
+bisher auch aus den Maps (Rückfrage mit Zahl). `GET /api/games/{id}/usage` trägt je Modus zusätzlich `pool_versions`, `staffeln`,
+`matches`, `references` und `in_use`.
+
+**Umbenennen:** Die Kennung `mode` ist die Identität und ändert sich nie. Die Verwaltung schickt sie bei jedem Speichern mit.
+Ein Eintrag ohne Kennung, dessen Name einem bestehenden Modus gleicht (ohne Groß und klein), bekommt dessen Kennung; passt er zu
+mehreren noch freien Modi (Altbestand), gibt es 422 statt einer geratenen Kennung. Jeder andere
+Eintrag ohne Kennung ist ein neuer Modus; ein alter Modus, dessen Kennung fehlt, gilt als entfernt (siehe oben). Eine neue Kennung
+für einen verwendeten Modus gibt es also nicht. Gelesen werden Modi überall über die Kennung; Namen stehen nur als Schnappschuss
+in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
+
+**App:** liest `match_modes` nicht, nur `map_pool.modes` (Schnappschuss). Antworten bekommen nur Felder dazu (`icon_url`,
+`mode_icon_url`); die App zeigt sie nicht.
+
+**Bekannte Grenze:** Prüfen und Schreiben beim Entfernen sind zwei Schritte. Speichert jemand in genau diesem Moment einen Pool mit
+dem Modus, kann der Pool auf einen entfernten Modus zeigen. Das ist der Zustand von vor C.1 und wird gelesen wie bisher.
+
+### C.2 Maps und Pools (#2207)
+
+Maps bleiben in `game_maps`, Pools in `map_pools` mit unveränderlichen Versionen. C.2 gibt Maps einen Zustand wie den Modi, prüft
+Pools gegen Reihenfolge und Wiederholungsregel der Season und bündelt alles in einer Prüfung vor der Veröffentlichung. Logik in
+`services/game_maps.py` (Zustand), `services/map_pools.py` (Vergleich, Map herausnehmen), `services/league_pool_check.py`
+(Mindestgröße, Länge der Reihenfolge, betroffene Seasons) und `services/league_readiness.py` (Prüfung). Kein Wert eines Titels steht
+im Code. **Migration: keine.** Unberührt: `map_pools.allowed`, `effective_pool`, die Versionen selbst, festgehaltene Pools
+(`map_pool_id`), fertige Spiele, der Vertrag `games[]`, die Dauerplanung, die Referenz-Ligen und alle anderen Formate.
+
+**Zustand einer Map** (`game_maps.status`, fehlt = aktiv):
+
+| Zustand | Neu in einen Pool | Bibliothek der Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` (oder fehlt) | ja | sichtbar | – |
+| `inactive` | nein. Im selben Pool, wo sie schon im selben Modus steht, bleibt sie beim nächsten Speichern erlaubt | sichtbar mit „inaktiv“; der Pool-Editor zeigt sie nur, wo sie schon gewählt ist | bleibt gültig und meldbar |
+| `archived` | nein, auch nicht im selben Pool (wie bisher) | nur mit „Archivierte zeigen“ | bleibt gültig und meldbar; der Pool-Editor nennt sie als „geändert“ |
+
+- `PATCH /api/games/{id}/maps/{map_id}` nimmt `status: "inactive"` an. Die Antwort trägt zusätzlich `affected_seasons` und
+  `warning`, wenn die Map beim Deaktivieren oder Archivieren im geltenden Pool einer Season im Entwurf oder in einer laufenden
+  Season steht (Pool der Season oder einer ihrer Staffeln). **Nur Warnung, keine Sperre.** Vorab fragt die Verwaltung
+  `GET /api/games/{id}/maps/{map_id}/usage`: `{pools, affected_seasons: [{season_id, season_name, league_id, league_name, status,
+  in_season_pool, staffeln}]}`.
+- **Löschen** geht wie bisher nur, wenn die Map in keiner Pool-Version (außer dem Standard-Pool) und keinem Ergebnisblatt steht. Neu
+  zusätzlich: nicht in `games[]`, einer Meldung oder einem gehaltenen Ergebnis eines Spiels. Sonst 409 „… bitte archivieren statt
+  löschen“.
+- Gelesen wird der Zustand nur beim Speichern eines Pools und in der Verwaltung. Melden, Bestätigen, Veto und `effective_pool` lesen
+  den Snapshot im Pool, nie den Zustand der Map.
+
+**Pool-Versionen vergleichen:** `GET /api/admin/leagues/seasons/{id}/map-pool/versions` listet die Versionen der Season (neueste
+zuerst, `{id, version, saved_at, saved_by, note, cleared, maps}`). `GET …/map-pool/compare?base=<Nr>&target=<Nr>` stellt zwei
+gegenüber: `{base, target, modes: [{mode, label, added: [{map_id, name}], removed: [...], kept: Zahl, status: "added"|"removed"|"changed"|"same"}], same}`. Die Reihenfolge innerhalb eines Modus zählt nicht als Änderung. Recht: jede Zuständigkeit der Liga.
+
+**Mindestgröße je Modus** (`league_pool_check.requirements`): Die längste Serie der Season ist das größte Best of aus Season und
+aktiven Liga N (`max_maps`). Mit `game_mode_order` zählt jeder Modus so oft, wie er in den ersten `max_maps` Positionen steht
+(zyklisch wie beim Melden). Daraus je Modus:
+
+| `map_repeat` | braucht je Modus | dazu |
+| --- | --- | --- |
+| `always` | 1 | – |
+| `other_mode` (Vorgabe) | so viele Maps, wie der Modus Positionen hat | – |
+| `never` | ebenso | Modi zusammen genug verschiedene Maps (jede Teilmenge der Modi der Reihenfolge, Satz von Hall) |
+
+Ohne Reihenfolge (Modus frei) gilt: `always` 1 Map, `other_mode` so viele Paare aus Modus und Map wie `max_maps`, `never` so viele
+verschiedene Maps wie `max_maps`. Neues Season-Feld `pool_min_maps: [{mode, min_maps}]` (optional, `min_maps` 1–50, `mode` ein Modus
+des Spiels, `null` für Spiele ohne Modi) überschreibt die Ableitung je Modus nach oben oder unten; fehlt es, gilt die Ableitung. Es
+gehört nur der Season, die Staffel trägt es nicht. Zu klein: **Warnung** beim Speichern des Pools (`warnings[]` in der Antwort), in
+der Prüfung ein Problem.
+
+**Länge der Reihenfolge:** `game_mode_order` ist leer oder genau `max_maps` lang. Gespeichert wird beim Anlegen und Ändern der Season
+(nur wenn sich Reihenfolge oder Best of ändern) und beim Ändern einer Liga N (nur wenn sich ihr Best of ändert). Season im Entwurf:
+422. Season läuft schon (jeder Stand außer Entwurf): nur Warnung (`warnings[]`), damit Altbestand speicherbar bleibt.
+
+**Map in einem Schritt sperren:** `POST /api/admin/leagues/seasons/{id}/map-pool/remove-map` mit `{map_id, mode?, reason,
+expected_version?}` (Recht `season`). Ohne `mode` fällt die Map aus allen Modi. Der Server legt aus der geltenden Version eine neue an
+(Snapshot ohne neue Prüfung gegen die Bibliothek, wie `copy_version`), überträgt sie auf alle Staffeln der Season (derselbe Weg wie
+beim Übertragen, auch gesperrte und laufende Staffeln) und schreibt `league.season.map_pool.remove_map` mit Grund, Map, Modus, neuer
+Version und je Staffel dem Ergebnis. Grund mindestens fünf Zeichen. 404 ohne Pool oder wenn die Map nie im Pool stand; 422, wenn der Pool
+leer würde oder ein Modus der Reihenfolge keine Map mehr hätte; 409 bei einer älteren `expected_version`. Antwort:
+`{pool, staffeln[], warnings[], unchanged}`. Alte Versionen, festgehaltene Pools und fertige Spiele bleiben.
+
+- **Alles unter Sperren:** zuerst die Turnier-Sperren aller Staffeln der Season (feste Reihenfolge), dann die Sperre des Season-Pools
+  (`mutation_lock.league_season_pool_resource`). Dieselbe Pool-Sperre halten `PUT` und `DELETE …/map-pool` und das Anlegen einer
+  Staffel (`league_service.create_staffel`, die einzige Stelle, die einer Season eine Staffel hinzufügt; belegt: 409 „bitte gleich noch
+  einmal“). Ist eine Sperre belegt oder kommt währenddessen eine Staffel dazu: 409, es wird nichts geschrieben.
+- **Genau diese Version:** Übertragen wird die gerade angelegte Version, nie eine, die danach entsteht (`league_service.transfer_pool`
+  mit `pool`). Eine Staffel mit denselben Maps und denselben Modus-Symbolen bekommt keine neue Version.
+- **Erneut ausführen:** Steht die Map schon nicht mehr im geltenden Pool, aber in einer früheren Version, entsteht keine neue Version
+  (`unchanged: true`); übertragen wird nur, was einer Staffel noch fehlt. Das Protokoll trägt `new_version`.
+
+**`season_readiness`** (`GET /api/admin/leagues/seasons/{id}/readiness`, jede Zuständigkeit der Liga):
+`{ok, problems: [{code, text}], warnings: [{code, text}], requirements: [{mode, label, derived, override, needed, have}], max_maps,
+superadmin}`.
+
+| Code | Art | Wann |
+| --- | --- | --- |
+| `pool_missing` | Problem | kein geltender Pool der Season |
+| `pool_stale` | Problem | der Pool gehört zu einem anderen Spiel |
+| `pool_too_small` | Problem | ein Modus oder die Modi zusammen haben zu wenige Maps (Mindestgröße oben) |
+| `mode_order_length` | Problem | Reihenfolge nicht leer und nicht `max_maps` lang |
+| `mode_order_missing` | Problem | ein Modus der Reihenfolge fehlt im Pool |
+| `rules_missing` | Problem | kein gültiges Regelwerk (B.2), ein Regeltext allein reicht nicht |
+| `rules_upcoming` | Warnung | es gibt nur eine Fassung, die erst später gilt (kein Problem, wenn eine schon gilt) |
+| `divisions_missing` | Problem | keine aktive Liga N |
+| `staffel_missing` | Problem | eine aktive Liga N ohne Staffel |
+| `application_after_start` | Problem | das Anmeldefenster (B.4) endet nach dem Beginn der Season |
+| `application_closed` | Warnung | das Anmeldefenster ist schon vorbei |
+| `application_none` | Warnung | kein Anmeldefenster: keine Selbstanmeldung |
+| `inactive_mode` | Warnung | ein inaktiver oder archivierter Modus im Pool oder in der Reihenfolge |
+| `inactive_map` | Warnung | eine inaktive, archivierte oder gelöschte Map im Pool |
+
+**Veröffentlichen:** Wechselt die Sichtbarkeit einer Season von `off` oder `admins` auf `members` oder `public` (auch beim Anlegen mit
+einer dieser Sichtbarkeiten), prüft der Server vor dem Schreiben auf dem neuen Stand. `admins` („Nur Liga-Leitung“) ist **Vorschau** und
+wird nicht geprüft (Entscheidung zu #2207). Probleme: 409 „Veröffentlichen geht noch nicht: …“, nichts wird gespeichert. Warnungen halten
+nichts auf. Notausnahme nur für den Superadmin mit `readiness_override_reason` (mindestens fünf Zeichen, sonst 409) im selben Aufruf;
+Protokoll `league.season.readiness_override` mit Grund und den Codes. Von `members` auf `public` (schon veröffentlicht) und zurück auf
+`admins` oder `off` prüft nichts. Bekannte Grenze: Prüfen und Schreiben sind zwei Schritte.
+
+**Verwaltung:** Season-Seite (#2267, Abschnitt „Season-Seite der Verwaltung“): „Was fehlt noch?“ im Reiter Überblick (Probleme, Warnungen,
+jeder Punkt mit Sprung an seine Stelle, beim Superadmin das Feld für den Grund), im Reiter Spielbetrieb „Mindestgröße anpassen“ je Modus, „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer
+Bibliothek: Knopf „Deaktivieren“ mit Rückfrage, die betroffene Seasons nennt.
+
+**App:** liest nur den Snapshot `map_pool.modes` und keine Map-Zustände. Antworten bekommen nur Felder dazu.
+
+**Audit-Aktionen neu:** `league.season.map_pool.remove_map`, `league.season.readiness_override`.
+
+### C.3 Ergebnisregeln (#1617)
+
+C.3 wendet die Ergebnisregel der Modi (C.1) auf Liga-Meldungen an. Nur Staffeln sind betroffen: Andere Turniere, Seasons und
+Staffeln ohne die neuen Felder und Maps ohne Regel verhalten sich wie vorher. Logik in `services/league_result_rules.py`, Verwaltung
+in `routes/league_result_rule_routes.py`, Prüfung in `league_games.normalize_games`. Keine Werte eines Titels im Code.
+**Migration: keine.**
+
+**Season** (`league_seasons`, beide Felder optional):
+
+| Feld | Typ | Fehlt | Bedeutung |
+| --- | --- | --- | --- |
+| `result_rules` | `{mode: result_rule}` | keine Prüfung | Festgehaltene Kopie der Regeln je Modus, Form wie C.1. Eine neue Season kopiert beim Anlegen die Regeln aller Modi des Spiels, die eine haben. Je Modus darf die Season abweichen; ein Modus ohne Eintrag hat in der Season keine Regel |
+| `scores_required` | bool | `false` | Punkte je Map Pflicht, ein Feld für alle Modi (jede Map bekommt ihren Endstand). Neue Seasons: `true` |
+| `mode_settings` | `{mode: {settings, rules_text?}}` | die des Spiels | Kopie der Einstellungen und des Regeltexts je Modus (#2271), Form wie C.1. Eine neue Season kopiert sie beim Anlegen von allen Modi, die etwas davon haben. Je Modus darf die Season abweichen. Ältere Seasons ohne das Feld: Regelwerk und Verwaltung zeigen die des Spiels |
+
+- **Festgehalten wie ein Pool:** Ändert jemand später die Regel am Modus, bleibt die Season, wie sie ist. Die Verwaltung zeigt je
+  Modus die Regel der Season und die des Spiels und markiert Abweichungen. „Vom Spiel übernehmen“ ist eine Handlung der Leitung.
+- **API:** `GET /api/admin/leagues/seasons/{id}/result-rules` (jede Zuständigkeit der Liga) liefert `scores_required`, je Modus
+  `{mode, label, status, icon_url?, season_rule, game_rule, differs, season_settings, game_settings, settings_differ}`, `staffeln`
+  und `settings_held` (trägt die Season `mode_settings`?). Regeln kommen mit Sekunden (Altbestand umgerechnet). `PUT` (Recht
+  `season`) nimmt `{scores_required, rules: {mode: result_rule | null}, settings?: {mode: {settings, rules_text} | null}}` und
+  ersetzt die Kopie ganz; fehlt `settings`, bleibt `mode_settings`, wie es ist. Neue Regeln und Einstellungen nur für Modi des
+  Spiels, die schon in der Season stehenden bleiben speicherbar; geprüft wie C.1 (`GameModeResultRule`, `GameModeSetting`), sonst
+  422 mit deutschem Satz. Protokoll `league.season.result_rules` mit den geänderten Modi, `scores_required` und
+  `settings_modes`, ohne Werte. Die Verwaltung zeigt je Einstellung „weicht vom Spiel ab“ und bietet „Einstellungen vom Spiel
+  übernehmen“.
+- **Staffel:** `staffel_fields` kopiert die Felder (`result_rules`, `scores_required`, `mode_settings`), wenn die Season sie trägt.
+  Übertragen in der eigenen Gruppe `result_rules` („Ergebnisregeln, Einstellungen und Punktepflicht“), die wie **laufend** wirkt (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln): Die
+  Regel prüft nur neue Eingaben, gespeicherte Ergebnisse bleiben. Der Turnierkern liest nur `tournaments.result_rules` und
+  `tournaments.scores_required`. Tests, die nicht diese Regel prüfen, schalten die Punktepflicht mit
+  `league_match_world.without_score_duty` aus.
+
+**Prüfung je Map** (Melden, Bestätigen, Ergebnis und Korrektur der Leitung; Regel = `result_rules[mode]` der Staffel):
+
+| Fall | Regel | Satz (Beispiel) |
+| --- | --- | --- |
+| Punktepflicht | beide Seiten haben Punkte | „Map 1: bitte die Punkte beider Seiten eintragen – in dieser Liga sind sie Pflicht.“ |
+| Mit Regel | Punkte beider Seiten oder keine; bei `score` und `rounds` ganze Zahlen | „Map 1: bitte die Punkte beider Seiten eintragen.“ |
+| Sieger | der Sieger hat mehr Punkte; Gleichstand nur mit `draw_allowed` | „Map 1: Der Endstand 100:250 passt nicht zum Sieger – mehr Punkte hat Horst.“ |
+| `score` ohne `overtime` | Sieger höchstens `target`, Verlierer unter `target` | „Map 1: höchstens 250 Punkte – die Map endet beim Ziel (Endstand 251:240).“ |
+| `rounds` ohne `overtime` | Runden zusammen höchstens `round_limit`, Sieger höchstens `target` | „Map 1: höchstens 11 Runden – 7:5 sind 12.“ |
+| `score`, `rounds` ohne Zeitlimit (`time_limit_seconds`, Altbestand `time_limit_minutes`) | der Sieger erreicht `target` (die Map endet nur dort) | „Map 1: Die Map endet erst bei 6 gewonnenen Runden – der Sieger hat 5.“ |
+| `highest` | nur „Sieger hat mehr“ | – |
+
+Mit `overtime` dürfen Ziel und Rundenlimit überschritten werden. Gleichstand mit `draw_allowed` wird angenommen; die Serie braucht
+trotzdem einen Sieger der Map (Datenmodell ohne Map-Remis, offene Fachfrage). Beispiele: S&D mit Ziel 6 und Limit 11: 6:5 geht,
+7:5 nicht.
+
+**Sieger aus den Punkten (Fabian 09.11.2026):** Im Meldeformular (Captains und Leitung, `GameEditor`) setzen die Punkte den
+Sieger einer Map: Stehen beide Seiten da und sind verschieden, ist Sieger, wer mehr hat (`scoreWinner` in `leagueGames.js`; in
+allen Regelarten gewinnt der höhere Stand). Antippen gibt es nur noch ohne Punkte (Season ohne Punktepflicht), bei Gleichstand
+und bei kampflos gewerteten Maps. Bei Punktepflicht steht statt der Team-Knöpfe „Den Sieger ergeben die Punkte“; Gleichstand in
+einem Modus ohne Remis nennt gleich die Regel. Die Leitung (`staff`) behält die Knöpfe, mit dem Sieger aus den Punkten vorgewählt,
+damit sie eine Regel mit Grund übergehen kann; widersprechen sich Sieger und Punkte (Altdaten), steht „Sieger aus den Punkten
+übernehmen“ an der Map. Beim Tippen kann ein Zwischenstand die Serie kurz entscheiden: Weggefallene Maps merkt sich das
+Formular (`rememberGames`, `settleGames(games, league, memory)`) und bringt sie mit ihren Angaben zurück. Der Server bleibt
+unverändert: `winner_registration_id` wird weiter geschickt; gegen den Endstand geprüft wird er nur in Modi mit Ergebnisregel
+und ohne Übergehen (`check_map`).
+
+- **Bestätigen:** Es zählen die Punkte der ersten Meldung (unverändert). Schickt die bestätigende Seite keine Punkte, prüft der
+  Server mit denen der Gegenseite – sonst scheiterte jede Bestätigung an der Punktepflicht. Die App bestätigt ohne Maps wie bisher.
+- **Regelstand der Erstmeldung:** Jede Meldung mit Maps hält fest, mit welchem Regelstand sie geprüft wurde
+  (`reports[].result_rule_snapshot = {result_rules, scores_required}`). Es gilt die Regel, die bei der Erstmeldung galt: Die
+  Bestätigung im Browser prüft mit dem Schnappschuss der Meldung der Gegenseite, App-Bestätigung und 48-h-Automatik übernehmen deren
+  schon geprüfte Maps. Ein Regelwechsel dazwischen (Übertragen) ändert daran nichts. Meldungen ohne Schnappschuss (Altbestand)
+  prüfen nichts Neues. Die Matchseite zeigt der bestätigenden Seite den Regelstand der Erstmeldung. Die Korrektur der Leitung
+  (`/result`) prüft immer die aktuelle Regel der Staffel.
+- **Best of** (unverändert): Siegschwelle ⌊N/2⌋+1, keine Map nach der Entscheidung; im BO5 ohne Remis nur 3:0, 3:1, 3:2.
+- **Korrektur der Leitung** (`/result`, auch mit `force`): dieselben Prüfungen. Übergehen darf die **Liga-Leitung mit der
+  Zuständigkeit „Ergebnisse“** (`results`, Bereich Ligen oder Zuständigkeit dieser Liga; Entscheidung des Obmanns 03.11.) mit
+  `rule_override_reason` (Pflichtgrund, mindestens fünf Zeichen, sonst 422; ohne Recht 403) – nur Ergebnisregel und Punktepflicht,
+  nie Best of, Pool oder Aufstellung. Im eigenen Spiel entscheidet wie überall eine zweite Person (Befangenheit wie B.1,
+  `require_no_conflict`); der Superadmin bleibt Notausnahme mit `conflict_reason`. Captains nie (`/result` ist Leitung). Protokoll
+  `match.games.rule_override` mit Grund. Die Matchseite meldet es mit `league.can_override_rules` (wer Ergebnisse eintragen darf).
+
+**`games[]` erweitert** (alle optional, geschrieben nur wenn gesetzt; `same_outcome`, `derived_results`, Konsens, Tabelle und App
+lesen sie nicht):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `status` | `played` \| `replayed` | fehlt = gespielt (`played` wird nicht geschrieben). `replayed`: Endstand und Sieger stammen aus einer Wiederholung der Map |
+| `replay_reason` | str 5–200 | Pflicht bei `replayed`, sonst nicht erlaubt |
+| `decision` | `awarded` | Wertung: Map von der Leitung zugesprochen (nur `/result`), ohne Punkte; Regel und Punktepflicht entfallen |
+| `host_registration_id` | str | Seite bzw. Host der Map, eine der beiden Anmeldungen |
+| `proof_id` | str | Nachweis: ein Foto dieses Spiels (`match_proof_photos`), schon angehängt oder mit derselben Meldung angehängt |
+
+- **`not_played`** steht nie in `games` – alle Leser zählen dort gespielte Maps. Die Matchseite liefert im Block `league`
+  `not_played: [Position]`: die Positionen nach dem Serienende bis `best_of`.
+- Matchseite: „wiederholt“ und „zugesprochen“ an der Map; `proof_id` sehen nur Beteiligte und Leitung (wie Aufstellungen).
+- Öffentlich: `status`, `replay_reason`, `decision` und `host_registration_id` stehen (nur wenn gesetzt) in beiden
+  `PUBLIC_GAME_FIELDS` (`match_public_view`, `league_page`), `proof_id` nie. Die Ligaseite (`StaffelPanel`) zeigt „wiederholt“,
+  „zugesprochen“ und je Spiel `not_played` wie die Matchseite.
+
+**Meldeformular und Ergebnis-Fenster:** zeigen je Map die Regel („bis 250 Punkte“, „6 Runden, höchstens 11“), bei Punktepflicht
+die Punktefelder ohne „freiwillig“ und prüfen vorab mit denselben Sätzen (`leagueResultRules.js`). Der Server bleibt maßgeblich.
+Der Block `league` der Matchseite trägt dazu `result_rules` (nur Modi des Pools) und `scores_required`.
+
+**Map-Wiederholung** (Nr. 15) gibt es seit #2096 (`map_repeat` an Season und Staffel, Vorgabe `other_mode`); C.3 baut nichts dazu.
+
+### C.4 Ausrüstung (#2218)
+
+Waffen, Aufsätze und übrige Ausrüstung stehen einmal je Spiel in einer Bibliothek (Muster `game_maps`), die Season wählt daraus eine
+**Sperrliste** in unveränderlichen Versionen (Muster `map_pools`). Alles ist erlaubt außer dem, was auf der Sperrliste steht. Logik in
+`services/game_equipment.py` (Kategorien, Bibliothek, Import) und `services/loadout_bans.py` (Versionen, Vergleich, Staffel und Spiel,
+Baustein). Routen in `routes/game_equipment_routes.py` und `routes/league_loadout_routes.py`. Kein Wert eines Titels steht im Code.
+Verwaltung: Reiter **Ausrüstung** der Spielseite (`/admin/games/<Spiel>#ausruestung`, #2249; `…/equipment` leitet dorthin) und Abschnitt
+„Sperrliste“ der Season.
+**Migration: keine.** Ohne Sperrliste verhält sich alles wie vorher.
+
+**Grenze:** Das System prüft nicht, was im Spiel benutzt wird. Verstöße laufen über Protest und Strafe.
+
+**Kategorien je Spiel** (`game_equipment_categories`, eine Zeile je Spiel: `{game_id, categories[], updated_at, updated_by}`):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Kennung aus dem Namen beim Anlegen, ändert sich nie |
+| `label` | str 1–40 | Name, je Spiel nur einmal (ohne Groß und klein) |
+| `role` | `weapon` \| `attachment` \| `item` | Waffe (kann Aufsätze haben), Aufsatz (passt zu Waffen), sonstige Ausrüstung |
+
+Höchstens 20 Kategorien. Ohne Kategorien bietet die Verwaltung einen Vorschlag an (Waffen, Aufsätze, Perks, Ausrüstung,
+Abschussserien); gespeichert wird er erst auf Knopfdruck. Eine Kategorie mit Einträgen lässt sich nicht entfernen und ihre Rolle nicht
+ändern (409), umbenennen geht.
+
+**Einträge** (`game_equipment`):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `id`, `game_id` | str | Kennung, Spiel |
+| `category` | str | Kennung einer Kategorie des Spiels |
+| `name` | str 1–80 | je Spiel und Kategorie nur einmal (ohne Groß und klein, Leerraum zusammengefasst; 409) |
+| `image_url` | str \| `null` | nur eigener Upload (`game_maps.IMAGE_URL`) mit Eintrag in `media_uploads`; ohne Medienrolle (`ADMIN_MEDIA_ROLES`) nur eigene mit `media_scope: "user"` – wie im Regelwerk (#2230), auch beim Import; ein Bild, das der Eintrag schon trägt oder aus der Quelle mitbringt, braucht nur den Eintrag. Sonst 422. Frühere stehen in `image_history` |
+| `note` | str ≤ 500 | nur für die Verwaltung |
+| `weapon_ids` | [str] | nur Rolle `attachment`: Waffen dieses Spiels, zu denen der Aufsatz passt. **Leer = passt zu keiner Waffe** (Obmann, 03.11.): Speichern geht, an einer Waffe sperren lässt er sich erst mit Zuordnung. `GET …/equipment` nennt sie in `attachments_without_weapon`, `POST …/equipment/assign-weapons {weapon_ids}` ordnet allen nicht archivierten auf einmal Waffen zu (Protokoll `game.equipment.assign_weapons`) |
+| `status` | `active` \| `inactive` \| `archived` | Zustand wie bei Maps (C.2), fehlt = aktiv |
+| `archived_at`, `created_at`, `created_by`, `updated_at`, `updated_by` | | |
+
+Höchstens 1000 Einträge je Spiel, archivierte zählen mit. Indizes: `id` eindeutig; (`game_id`, `category`, `name_key`) eindeutig.
+
+| Zustand | Neu auf eine Sperrliste | Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` | ja | sichtbar | – |
+| `inactive` | nein. Steht er in der geltenden Version derselben Season (gleiche Art, bei Aufsätzen an derselben Waffe), bleibt er beim nächsten Speichern erlaubt | sichtbar mit „inaktiv“ | bleibt gültig |
+| `archived` | nein, auch nicht in derselben Liste | nur mit „Archivierte zeigen“; der Editor nimmt ihn mit Hinweis heraus | bleibt gültig |
+
+**Löschen** nur, wenn der Eintrag in keiner Version einer Sperrliste steht (auch nicht als Aufsatz), sonst 409 „… bitte archivieren
+statt löschen“. Wird eine unbenutzte Waffe gelöscht, fällt sie aus den `weapon_ids` der Aufsätze.
+
+**Aus einer anderen Spielversion übernehmen:** wie bei Maps. Die Kategorie passt über Kennung oder Namen; fehlt sie im Ziel, wird sie
+mit Name und Rolle angelegt (wenn noch Platz ist). Aufsätze bekommen die Waffen des Ziels mit gleichem Namen; gibt es keine davon, kommen sie
+ohne Zuordnung (passen dann zu keiner, Hinweis in der Bibliothek). Das Bild wird mitverwendet. Was schon da ist oder nicht passt, steht mit
+Grund in `skipped`.
+
+**Unterkategorien und Klassen (#2287).** Genau eine Ebene: Kategorie → Unterkategorie → Eintrag (etwa Waffen → Sturmgewehr → „Blitz 9“).
+Kein Wert eines Titels im Code. Je Kategorie in `game_equipment_categories.categories[].subcategories[]`, Reihenfolge = Reihenfolge der Liste:
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Kennung aus dem Namen beim Anlegen, **je Spiel** eindeutig (über alle Kategorien), ändert sich nie und wird **nie neu vergeben**: Entfernte stehen in `game_equipment_categories.retired_subcategory_keys` |
+| `label` | str 1–40 | Name, je Kategorie nur einmal (ohne Groß und klein) |
+| `icon_url` | str \| `null` | Symbol, optional: eigener Upload wie das Bild eines Eintrags (`checked_image`, PNG/JPG/WebP); ein schon gesetztes bleibt an derselben Unterkategorie speicherbar |
+
+Höchstens 30 je Kategorie (`SUBCATEGORIES_MAX`). Ohne Unterkategorien bietet die Verwaltung je Art einen Vorschlag aus Gattungsbegriffen an
+(`SUGGESTED_SUBCATEGORIES`; Waffe: Sturmgewehr, Maschinenpistole, Leichtes MG, Schrotflinte, Präzisionsgewehr, Scharfschützengewehr,
+Pistole, Raketenwerfer, Nahkampf; Aufsatz: Mündung, Lauf, Unterlauf, Optik, Magazin, Schaft, Griff, Laser; sonstige: keiner), gespeichert
+erst auf Knopfdruck. Gespeichert wird je Kategorie die ganze Liste (`PUT …/categories/{key}/subcategories`). Entfernen nur ohne Einträge
+(archivierte zählen mit; 409 „… hat noch N Einträge“) und wenn keine Version einer Sperrliste die Klasse ganz sperrt (409); Aufsätze
+verlieren die entfernte Klasse aus `weapon_class_ids`. Das Speichern der Kategorien lässt ihre Unterkategorien unberührt; eine entfernte
+(leere) Kategorie nimmt ihre mit, die Kennungen bleiben vergeben. **Sperre:** Alles Schreiben in die Bibliothek eines Spiels (Kategorien,
+Unterkategorien, Eintrag anlegen und ändern, Verschieben, Zuordnen, Übernehmen) und das Speichern einer Sperrliste (nach der Pool-Sperre der
+Season) läuft unter `mutation_lock.game_equipment_resource(game_id)` nacheinander und prüft erst darunter - so schreibt nie jemand eine eben
+entfernte Kennung an einen Eintrag oder in eine Klassensperre (Codex Runde 1). Besetzt: 409, bitte gleich noch einmal.
+
+Neue Felder an `game_equipment`:
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `subcategory` | str \| `null` | Kennung einer Unterkategorie **derselben** Kategorie; fehlt oder `null` = ohne Unterkategorie (Altbestand bleibt gültig, **keine Migration**). Ändern über `PATCH`, mehrere auf einmal über `POST …/equipment/move {item_ids, subcategory}` (alle aus derselben Kategorie, 422 sonst) |
+| `weapon_class_ids` | [str] | nur Aufsatz: Unterkategorien von Waffen-Kategorien (Waffenklassen). Ein Aufsatz passt zu Waffe W, wenn W in `weapon_ids` steht **oder** `W.subcategory` in `weapon_class_ids` – eine neue Waffe der Klasse passt sofort. Beide leer = passt zu keiner (Obmann 03.11., Nr. 81); `attachments_without_weapon` und `assign-weapons` (zusätzlich `weapon_class_ids`) zählen beides |
+
+**Import:** Die Unterkategorie passt über Kennung oder Namen in der Zielkategorie; fehlt sie, wird sie mit Name und Symbol angelegt (wenn
+Platz ist), sonst kommt der Eintrag ohne Unterkategorie und `notes[]` sagt es. Die Vorschau (`import-sources/{id}`) nennt je Eintrag
+`subcategory_label` und `subcategory_new` („wird angelegt“). Waffenklassen eines Aufsatzes finden sich ebenso über Kennung oder Namen.
+
+**Ganze Klasse sperren:** neue Zeilenart `kind: "class"` mit `subcategory` statt `item_id`, Modi wie bei Einzelnen. Sie sperrt **jeden
+Eintrag der Unterkategorie, auch später angelegte**. Snapshot: `{kind: "class", item_id: null, subcategory, subcategory_label, category,
+category_label, role, image_url (Symbol der Klasse), modes, mode_labels, items: [{item_id, name, image_url}], attachments: []}` – `items`
+sind die nicht archivierten Einträge zum Zeitpunkt des Speicherns. Zeilen `item` und `attachments` tragen zusätzlich `subcategory` und
+`subcategory_label` (ältere ohne = ohne Unterkategorie). Prüfung (422): Unterkategorie des Spiels; je Klasse eine Zeile; keine Einzelzeile
+(Eintrag oder Aufsätze an einer Waffe) für einen Eintrag einer in **allen** Modi gesperrten Klasse; eine leere Klasse lässt sich sperren
+(sie gilt ab dem ersten Eintrag). Vergleich der Versionen: Schlüssel (`class`, Kennung), Name = Name der Klasse.
+
+**Zur Laufzeit** heißt „Klasse gesperrt“: alle Einträge, die **heute** in ihr stehen (nicht archiviert). Ligaseite (`loadout_bans`) und
+Matchseite (neu: `league.loadout_bans`, `effective`) liefern je Klassenzeile `items` mit Namen und Bildern von heute; ein Spiel mit
+festgehaltener Version (`loadout_ban_id`) zeigt die Einträge seines Snapshots. Die Verwaltung bekommt zusätzlich `class_new_items`
+(`[{subcategory, label, names}]`: seit der Version neu in einer gesperrten Klasse – sie sind schon mitgesperrt).
+
+**Sperrliste** (`loadout_bans`): jedes Speichern legt eine neue, unveränderliche Version an. `scope` `league_season` (Vorlage) oder
+`tournament` (Kopie der Staffel). Felder: `id`, `scope`, `scope_id`, `tournament_id`, `game_id`, `version`, `cleared`, `note`,
+`created_at`, `created_by`, `entries[]`. Index (`scope`, `scope_id`, `version`) eindeutig wie bei Pools: gleichzeitiges Speichern wird 409.
+
+| Feld je Eintrag | Inhalt |
+| --- | --- |
+| `kind` | `item`: der Eintrag ist gesperrt. `attachments`: nur bei Waffen – die Waffe bleibt erlaubt, die genannten Aufsätze sind an ihr gesperrt |
+| `item_id`, `name`, `category`, `category_label`, `role`, `image_url` | Schnappschuss des Eintrags von damals |
+| `modes`, `mode_labels` | Modi, in denen die Sperre gilt; leer = alle Modi |
+| `attachments[]` | nur bei `attachments`: `{item_id, name, image_url}`, mindestens einer. Seit #2299 optional je Aufsatz eigene `modes`, `mode_labels` (nur wenn gesetzt; sonst gelten die Modi der Zeile) |
+
+Je Eintrag höchstens eine Zeile je Art, höchstens 500 Zeilen. Prüfung beim Speichern (422 mit deutschem Satz): Eintrag gehört zum Spiel,
+Zustand wie oben, Modi des Spiels (`game_modes.choice_problem`, ein schon gesetzter inaktiver Modus bleibt), `attachments` nur an Waffen,
+jeder Aufsatz ist der Waffe zugeordnet (`weapon_ids` mit der Waffe; leer: „keiner Waffe zugeordnet“), keine Aufsatz-Zeile an einer Waffe, die in allen Modi ganz gesperrt
+ist. Leere Liste: 422 „… oder die Sperrliste entfernen“. `expected_version` schützt wie beim Pool (0 = bisher keine).
+**Modi je Aufsatz (#2299):** Eine Zeile `attachments` nimmt zusätzlich `attachment_modes: {Aufsatz-Kennung: [Modi]}` an (optional, nur
+Aufsätze der Zeile, sonst 422; Modi geprüft wie oben). Leer oder fehlend heißt: die Modi der Zeile. Ältere Versionen ohne das Feld gelten
+unverändert, **keine Migration**. Vergleich, Übertragen auf Staffeln (`_rows_key`) und die Ansicht der Liste zählen die Modi je Aufsatz mit.
+
+**Season → Staffel → Spiel:** Eine neue Staffel bekommt die geltende Version als eigene (`copy_version`, unter der Pool-Sperre der
+Season). „Vorgaben auf Staffeln übertragen“ überträgt sie immer, auch auf gesperrte und laufende Staffeln (eigene Gruppe `loadout_bans`
+„Sperrliste“). Hat die Season keine mehr, fällt die Kopie der Staffel nur vor dem ersten Ergebnis und nicht gesperrt weg. Das Spiel hält
+seine Version fest: `matches_v2.loadout_ban_id` (optional) setzt das erste Festschreiben eines Ergebnisses einer Staffel, zusammen mit
+`rule_version_id` – die Kennung der geltenden Version oder ausdrücklich `null` für „keine Liste“. Eine Korrektur lässt es stehen,
+„Rückgängig“ nimmt es mit. Ein Fehler beim Ermitteln wird nicht verschluckt. Gilt für ein Spiel: Vermerk vorhanden → diese Version bzw.
+keine; ohne Vermerk und fertig (`completed`, `forfeit`, Altbestand vor C.4) → keine; sonst die Version der Staffel → keine. Andere Formate
+schreiben das Feld nie.
+
+**Regelwerk:** Baustein `[[baustein:loadout_bans]]` „Sperrliste“ (für Anlage A gedacht, steht überall). Je Kategorie eine Tabelle mit
+Bild, Name und „Gilt in“, danach die Aufsätze an erlaubten Waffen. Ohne Sperrliste: „Für diese Season ist keine Sperrliste hinterlegt –
+alles ist erlaubt.“ **Eingefroren wird strukturiert im Klartext** (Folge-Review): je Baustein `{label, source, data}` – für die Sperrliste
+`data = {list, groups: [{label, entries: [{name, image_url, modes}]}], weapons: [{name, image_url, attachments, modes}]}`, für den Map-Pool
+`{rows: [{label, maps}]}`, für die Modusfolge `{labels}`. Markdown entsteht erst beim Darstellen (`league_rule_blocks.value`): `markdown`
+mit Bildern (Web, Vorschau) und `text` ohne Bilder (PDF, Wort-Vergleich). Ältere Fassungen tragen statt `data` das fertige `markdown`/`text`
+und werden so weiter gelesen. Namen aus Bibliothek und Modus sind Text: Beim Darstellen ersetzt `markdown_text.text_cell` jedes Steuerzeichen
+(`` \`*_[]()!~+ ``, „|“ wird „/“) durch ein Zeichen aus dem privaten Unicode-Bereich (`U+E000`…), das keine Markdown-Regel trifft – in
+allen Bausteinen. Dieses Zwischenformat bleibt auf dem Server: Das PDF (`pdf_rules_inline`) setzt das echte Zeichen ein, und `sections[].body_md`
+von Regelseite und Vorschau geht durch `markdown_text.served` – Namen mit Markdown-Backslash-Escapes, ein Backslash im frei geschriebenen
+Text verdoppelt. Das Web (`renderRulesSection`, `markdownLite` mit `escapes`, auch in Codeblöcken und Adressen) zeigt so beides, wie es
+geschrieben ist; der Editor zeigt den Text ohne `escapes`. Gespeicherte Fassungen, die Antwort des Veröffentlichens, „Daten geändert“
+(`before`, `after`, `ops`) und der Vergleich sind Klartext (`markdown_text.plain`). Altbestand mit Schutzzeichen wird beim Lesen
+zurückgewandelt bzw. ausgeliefert wie neu; in keiner API-Antwort steht ein Zeichen aus `U+E000`…`U+E00F`. Eingegeben (freier Text,
+Titel, Namen im Baustein) fällt ein Zeichen aus diesem Bereich weg (`strip_protected`). Ein Name wird so nie Link oder Formatierung, und
+der frei geschriebene Regeltext bleibt unberührt, auch ein Backslash darin. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
+Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
+Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
+
+**Erlaubte Ausrüstung im Regelwerk (#2287, Fabian Nr. 99):** Der Baustein `[[baustein:loadout_bans]]` heißt in der Verwaltung **„Erlaubte
+Ausrüstung“** (die Kennung bleibt, vorhandene Texte gehen weiter) und zeigt, was **erlaubt** ist - gepflegt wird weiter die Sperrliste. Er
+liest die **aktiven** Einträge der Bibliothek von heute (inaktive und archivierte fehlen) und zieht die Sperren der geltenden Version ab
+(`loadout_bans.allowed_block`): `data = {list, layout: 3, categories: [{label, sections: [{label | null, icon_url?, state, not_in, banned,
+entries: [{name, image_url, not_in, not_at: [{name, modes}]}]}]}]}`. `state`: `all` („alle erlaubt“), `some` (mit Einschränkungen oder
+einzeln gesperrten Einträgen) oder `banned` (ganze Klasse in allen Modi gesperrt, oder alle ihre Einträge: nur eine Zeile „nicht erlaubt“ mit
+den Namen in Klammern, keine Karten). `not_in`: Modi, in denen ein Eintrag (am Abschnitt: die ganze Klasse) nicht erlaubt ist; `not_at`:
+Waffen, an denen ein Aufsatz nicht erlaubt ist. Ein **Aufsatz** zählt nur, wenn er an mindestens einer erlaubten Waffe passt (aktiv,
+nicht ganz gesperrt, auch nicht über ihre Klasse, und der Aufsatz ist dort nicht in allen Modi gesperrt) - ohne Zuordnung (Nr. 81), nur zu
+gesperrten Waffen oder an jeder passenden gesperrt fehlt er; die Verwaltung nennt solche in `unusable_attachments` (`[{id, name, reason}]`
+im Editor der Season). Ganz gesperrte Einträge fehlen, leere Unterkategorien entfallen (eine ganz gesperrte leere
+Klasse steht als „nicht erlaubt“). Ohne Sperrliste ist die ganze aktive Bibliothek erlaubt; hat das Spiel keine aktiven Einträge, bleibt
+der Baustein wie bisher („keine Sperrliste – alles ist erlaubt“). Eingefroren wird `data`; weil er die Bibliothek von heute liest, ändert
+jeder neue, umbenannte oder deaktivierte Eintrag die Daten - auch ein neuer in einer gesperrten Klasse (sein Name steht in der Klammer) -,
+und `data_changes` meldet „Regelwerk muss freigegeben werden“ samt Vorschlag (#2269). Web (`markdown`): je Kategorie fett der Name,
+Einträge ohne Unterkategorie direkt darunter, je Unterkategorie eine Zeile (Symbol als Bild mit dem Bildtext „Klassen-Symbol“, Name kursiv,
+„alle erlaubt“ / „nicht in …“ / fett „nicht erlaubt“) und darunter die Einträge als Liste von Karten (Bild mit dem Bildtext „Ausrüstung“,
+Name als Marke `++Name++` - im Web `<u>`, daran erkennt das CSS jede Kartenliste auch ohne Bild -, kursiv „nicht in …“ und „nicht an …“;
+Raster per CSS `.tls-rules-doc`, jede Kategorie mit derselben Zwischenüberschrift). PDF und Vergleich (`text`): Tabelle Kategorie ·
+Unterkategorie · Erlaubt · Einschränkungen, je Unterkategorie und Einschränkung eine Zeile („alle: A, B“, wenn die Zeile die ganze
+Unterkategorie meint). Ältere Fassungen (ohne `layout`, mit den Sperren) bleiben Wort für Wort; nach dem Einspielen schlägt die
+Verwaltung für eine Season mit dem Baustein darum einmal eine neue Fassung vor. **Liga- und Matchseite** zeigen dieselbe Sicht:
+`allowed_equipment` (gleiche Form wie `data`, `null` ohne Bibliothek) in `GET /api/leagues/{liga}/{season}` und im Block `league` der
+Matchseite (dort aus der Liste, die für das Spiel gilt). Beim ersten Festschreiben eines Ergebnisses hält das Spiel neben
+`loadout_ban_id` auch die erlaubte Ausrüstung fest: `matches_v2.loadout_allowed_id` zeigt auf eine unveränderliche Zeile in
+`loadout_allowed` (`{id = sha256 des Inhalts, game_id, data, created_at}`, viele Spiele teilen sie; Vereinsinhalt, Bilder als Verwendung in
+der Mediathek). Danach liefert die Matchseite nur noch diesen Schnappschuss; „Rückgängig“ nimmt ihn mit, ältere Spiele ohne ihn rechnen wie
+bisher (Codex Runde 1).
+
+**Aufsätze je Waffe (#2299) und „nur in …“ (#2298, Fabian 04.11.):** Neu gebaut wird der Baustein als `layout: 4` - `layout: 3` (und
+älter) bleibt eingefroren und wird Wort für Wort weiter dargestellt, in Regelwerk, Liga- und Matchseite (`loadout_allowed` von damals). Die
+neue Darstellung kommt wie jede Datenänderung über „Regelwerk muss freigegeben werden“.
+
+- **Daten:** `{list, layout: 4, categories: [{label, role, sections: [{label | null, icon_url?, state, not_in, only_in?, banned, entries:
+  [{name, image_url, not_in, only_in?, attachments?}]}]}]}`. Kategorien der Art **Aufsatz entfallen** - Aufsätze stehen nur noch an der
+  Waffe. `attachments` (nur an einer erlaubten Waffe mit mindestens einem passenden aktiven Aufsatz): `{count, banned: [Namen], groups:
+  [{label | null, icon_url?, not_in, only_in?, entries: [{name, image_url, not_in, only_in?}]}]}`. `count`: aktive Aufsätze, die zur Waffe
+  passen (`game_equipment.fits`: über die Waffe oder ihre Waffenklasse); `banned`: davon die, die **an dieser Waffe** in allen Modi nicht
+  erlaubt sind (eigene Sperre, ganze Klasse oder an dieser Waffe); `groups`: die übrigen je Unterkategorie (Slot) in der Reihenfolge der
+  Bibliothek, ohne Unterkategorie zuerst. `not_in` eines Aufsatzes führt eigene Sperre, Klasse und die Sperre an dieser Waffe zusammen;
+  `not_in` der Gruppe ist die der Klasse. `not_at` gibt es nicht mehr. Ein Aufsatz ohne passende Waffe erscheint nirgends
+  (`unusable_attachments` bleibt).
+- **An keiner Waffe erlaubt (Fabian 04.11.):** Ist ein Aufsatz an **jeder** erlaubten Waffe, zu der er passt (mindestens zwei), gleich
+  gesperrt (gleiche Modi bzw. alle), steht er einmal in `attachments_everywhere: [{name, not_in, only_in?}]` (oberste Ebene, nur wenn nicht
+  leer; ganz gesperrte zuerst). An der Waffe fehlt er dann in `banned` und zählt in `banned_everywhere` (Zahl, nur wenn > 0) - „K gesperrt“
+  bleibt ehrlich; nur in Modi gesperrt bleibt er in der Gruppe mit `everywhere: true`, der Satz zur Waffe nennt ihn nicht. Web und PDF: eine
+  Zeile „**An keiner Waffe erlaubt:** Kompensator, Holo (nur in …)“ nach der letzten Kategorie mit Waffen; Liga- und Matchseite ebenso.
+- **„nur in …“:** Grundlage sind die **Modi der Season** (`game_modes.season_mode_keys`: geltender Pool, dann Modusfolge, sonst die
+  nicht archivierten Modi des Spiels; Matchseite: die Season der Staffel). Ist ein Eintrag, ein Abschnitt oder ein Aufsatz in **mehr** Modi
+  der Season gesperrt als erlaubt, steht zusätzlich `only_in` (Namen der erlaubten Modi der Season) und der Hinweis lautet „nur in …“, sonst
+  „nicht in …“. Gleichstand, keine Modi der Season oder kein erlaubter Modus mehr: kein `only_in`. Ganz gesperrt (alle Modi) bleibt ganz
+  gesperrt. Gleich in Web, PDF, Liga- und Matchseite.
+- **Liga- und Matchseite:** je Waffe eine Karte mit „N Aufsätze · K gesperrt“; ein Knopf (`aria-expanded`) klappt darunter über die ganze
+  Breite die erlaubten Aufsätze je Slot mit Bild und Hinweis auf. Die Zeile „Gesperrt: … · dazu N Aufsätze, die an keiner Waffe erlaubt
+  sind“ steht seit #2305 **ganz oben** im Kasten, vor den Slots (Fabian 05.11.); eine Umkehrung „nur erlaubt“ gibt es dort nicht.
+- **Regelwerk Web (`markdown`):** `markdownLite` kennt kein `<details>` (rohes HTML wird maskiert, auch im PDF-Weg) - darum je Waffe die
+  Karte wie bisher, darunter der Satz zu den Aufsätzen (ohne Kursiv, daran erkennt ihn `rules.css`).
+- **PDF und Vergleich (`text`):** Kategorien der Art Waffe als Liste: je Unterkategorie die Kopfzeile wie im Web, je Waffe eine Zeile
+  „<Waffe> (Hinweis) – alle passenden Aufsätze erlaubt“ bzw. „…, außer: A, B, C (nur in S&D)“ (ganz gesperrte ohne, nur in Modi gesperrte mit
+  Hinweis in Klammern); eine Waffe ohne passende Aufsätze nur mit Namen. Die übrigen Kategorien als Tabelle wie bisher.
+- **Verwaltung (Season-Sperrliste):** „Aufsätze“ an einer Waffe zeigt nur die passenden, je Slot, mit Häkchen „gesperrt“ und je Aufsatz den
+  Modi (`attachment_modes`). „Für alle <Waffenklasse> übernehmen“ setzt an jeder anderen Waffe der Klasse dieselben Aufsätze (soweit sie
+  passen und neu sperrbar sind) mit denselben Modi; „Aufsatz an allen Waffen sperren“ macht daraus eine Zeile `item` des Aufsatzes mit
+  seinen Modi. Beides ändert nur das Formular, gespeichert wird wie bisher als neue Version.
+
+**Tabelle je Kategorie (#2305, Fabian 05.11.):** Neu gebaut wird der Baustein als `layout: 5`. `layout: 3` und `layout: 4` bleiben
+eingefroren und werden Wort für Wort dargestellt (Web, PDF, Liga- und Matchseite; Prüfung: `backend/tests/golden/loadout_allowed_v4.json`).
+Die neue Darstellung kommt über „Regelwerk muss freigegeben werden“.
+
+- **Daten:** wie `layout: 4`; an einer Waffe trägt jede Gruppe (Slot) zusätzlich `banned` (ganz gesperrte an dieser Waffe, ohne die an
+  keiner Waffe erlaubten) - eine Gruppe kann so ohne `entries` sein. `only_allowed: true`, wenn an der Waffe **mehr passende Aufsätze ganz
+  gesperrt sind als erlaubt** (die an keiner Waffe erlaubten zählen mit; nur in Modi gesperrte zählen als erlaubt). Gleichstand bleibt
+  „gesperrt“ - dieselbe Regel wie `only_in` (#2298).
+- **Darstellung:** Je Kategorie mit Waffen **eine Tabelle** Bild · Waffe · Aufsätze; je Unterkategorie eine Kopfzeile (Symbol, Name,
+  „alle erlaubt“ / „nicht in …“ / „**nicht erlaubt** (…)“), je Waffe eine Zeile: kleines Bild, Name mit Modus-Hinweis, Ausnahmen **nach
+  Slot** („Optik: A, B“, je Slot eine Zeile, Reihenfolge der Bibliothek; ein Aufsatz ohne Unterkategorie heißt „Ohne Slot“, sobald es
+  weitere Slots gibt). Ohne Ausnahme „alle passenden Aufsätze erlaubt“, ohne erlaubten „**keine Aufsätze erlaubt**“. Sonst „**gesperrt:**“
+  (ganz gesperrte) und „**eingeschränkt:**“ (nur in Modi gesperrte mit „(nur in …)“ bzw. „(nicht in …)“ - der Hinweis sagt, wo der Aufsatz
+  erlaubt ist, darum steht er nie unter „gesperrt“); bei `only_allowed` stattdessen „**nur erlaubt:**“ mit allen erlaubten je Slot, nur in
+  Modi gesperrte mit Hinweis. Was an keiner Waffe erlaubt ist, steht wie bisher einmal unter der Tabelle („An keiner Waffe erlaubt: …“);
+  in „gesperrt“/„eingeschränkt“ fehlt es, in „nur erlaubt“ steht ein dort nur in Modi gesperrter mit Hinweis. Kategorien ohne Waffen bleiben
+  wie in `layout: 4` (Web Karten, PDF Tabelle Kategorie · Unterkategorie · Erlaubt · Einschränkungen).
+- **Fassungen:** `markdown` (Web): Kopf `| Bild | ++Waffe++ | Aufsätze |` - an der Marke erkennt `rules.css` die Tabelle; je Slot eine
+  Marke `++…++` (eigene Zeile). Am Handy (< 640 px) stapelt jede Zeile (Bild und Name nebeneinander, die Aufsätze darunter), nichts scrollt
+  seitlich. `pdf` (neu, `league_rule_facts.PDF`): wie `text`, nur diese Tabelle mit Bild (`pdf_service._rules_gear_table`: erkannt am Kopf
+  Bild · Waffe · Aufsätze, Bild verkleinert eingebettet, Zeilen je Slot über U+2028, Kopf der Klasse über die ganze Breite); jede andere
+  Tabelle und jede ältere Fassung bleibt im PDF wie bisher. `text` (Vergleich, „Regelwerk muss freigegeben werden“, Markierung im PDF):
+  ohne Bildspalte, Slots mit „·“ getrennt.
+
+**Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
+
+| Route | Recht | Zweck |
+| --- | --- | --- |
+| `GET /api/games/{id}/equipment` | Bereich `tournaments` (wie Maps) | Spiel mit Modi, Kategorien, Einträge mit `in_lists`, `limit`, `suggested_categories` |
+| `PUT /api/games/{id}/equipment/categories` | ebenso | `{categories: [{key?, label, role}]}`; Protokoll `game.equipment.categories` |
+| `PUT /api/games/{id}/equipment/categories/{key}/subcategories` (#2287) | ebenso | `{subcategories: [{key?, label, icon_url?}]}` – anlegen, umbenennen, ordnen, entfernen; Protokoll `game.equipment.subcategories` |
+| `POST /api/games/{id}/equipment/move` (#2287) | ebenso | `{item_ids, subcategory}` (`null` = ohne); Protokoll `game.equipment.move` |
+| `POST`, `PATCH`, `DELETE /api/games/{id}/equipment[/{item}]` | ebenso | Eintrag anlegen, ändern (auch `status`), löschen; `game.equipment.create/.update/.delete` |
+| `GET …/equipment/import-sources[/{source}]`, `POST …/equipment/import` | ebenso | aus anderer Spielversion; `game.equipment.import` |
+| `GET /api/admin/leagues/seasons/{id}/loadout-bans` | jede Zuständigkeit der Liga | Spiel, Kategorien, Bibliothek (aktiv und inaktiv), geltende Version mit `stale` und `outdated_item_ids`, Versionen, Stand im Regelwerk |
+| `PUT …/loadout-bans` | `season` | neue Version; Antwort mit `staffeln_to_sync`; `league.season.loadout_bans.save` |
+| `DELETE …/loadout-bans` | `season` | entfernen (Version mit `cleared`); `league.season.loadout_bans.clear` |
+| `GET …/loadout-bans/compare?base=<Nr>&target=<Nr>` | jede Zuständigkeit der Liga | `{base, target, added[], removed[], changed[], same}` je Zeile (`kind`, `item_id`) |
+
+**Öffentlich** nur, was die Season zeigt: `GET /api/leagues/{liga}/{season}` trägt `loadout_bans` (Lesevertrag `{id, version, saved_at,
+entries[]}` ohne `note` und Autor, `null` ohne Liste), die Regelseite den Baustein. Die Matchseite eines Staffel-Spiels trägt im Block
+`league` dieselbe Form als `loadout_bans` (die Liste, die für dieses Spiel gilt, #2287). Die Bibliothek selbst ist nie öffentlich.
+
+**Datenschutz:** Alle drei Sammlungen sind Vereinsinhalt (`personal_data.CLUB_CONTENT`), nur die Kennung, wer angelegt oder gespeichert
+hat. Bilder: `game_equipment.image_url` und `.image_history`, `loadout_bans.entries.image_url`, `.entries.attachments.image_url` und
+`.entries.items.image_url` (#2287) sowie das Symbol einer Unterkategorie (`game_equipment_categories.categories.subcategories.icon_url`)
+stehen in den Verwendungsstellen der Mediathek (`media_audit`); die Kontolöschung behält sie, solange sie dort stehen. Jede Version einer
+Sperrliste ist unveränderlich (`media_audit.FROZEN_COLLECTIONS`): Ein Bild darin lässt sich nicht drehen und nicht löschen (409), Duplikat-
+Ersetzen und Bild-Migration schreiben sie nicht um. In der Bibliothek darf sich ein Bild ändern.
+
+**App:** liest nichts davon, Antworten bekommen nur Felder dazu.
+
+### E.1 Tabelle (#1625)
+
+Tabellen-Regeln einer Liga-Staffel: direkter Vergleich mit Mini-Tabelle, Default-Win, beide nicht erschienen, Ausscheiden
+(Austritt, Auflösung, Disqualifikation), Punktabzug und Entscheid der Leitung. Das ist der Tiebreaker-Teil von #1559 für
+Liga-Staffeln; Swiss, Playoffs und Heimrecht bleiben dort. Rechenkern in `services/competition_standings.py` (`_league_rows`),
+Regeln in `services/scoring_rules.py`, Entscheide und „beide nicht erschienen“ in `services/league_table.py`, Routen in
+`routes/league_table_routes.py`. **Migration: keine.** Kein Wert eines Titels steht im Code.
+
+**Weiche:** Ohne `scoring_rules` am Turnier rechnet die Tabelle wie bisher (`_round_robin_rows`). Mit `scoring_rules`
+(nur Liga-Staffeln, `format` `league` oder `round_robin`) rechnet `_league_rows`; mit den Vorgaben für fehlende Felder
+ergibt das genau die alte Reihenfolge (Regressionstest). Gruppen, Swiss, K.-o. und FFA bleiben unverändert. Alle Leser gehen
+über `standings_for_structure` bzw. `public_standings`: Turnierseite, Ligaseite (`/api/leagues/…/staffeln/…`), TV, PDF,
+App (`/api/tournaments/{id}/standings`), Plätze (`placements_for_structure`) und Discord.
+
+**Neue Felder in `scoring_rules`** (je Season, Liga N überschreibt wie bisher, Übertragen in der Gruppe `before_result`):
+
+| Feld | Werte | Fehlt (alte Seasons) | Vorgabe neuer Liga-Seasons |
+| --- | --- | --- | --- |
+| `table_tiebreakers` | Liste aus `head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` | `score_diff`, `score_for` | `head_to_head`, `score_diff`, `score_for`, `lead_decision` (Nr. 25) |
+| `head_to_head_criteria` | Liste aus `points`, `score_diff`, `score_for`, mindestens eines | `points`, `score_diff`, `score_for` | ebenso (Nr. 42) |
+| `allow_draws` | bool | `true` | `false` – die Tabelle zeigt keine Spalte „U“; Ergebnis der Leitung, Meldung und App-Bestätigung lehnen einen geteilten Platz mit 422 ab (`match_v2_results.checked_results` → `match_rules.match_allows_draw`). Das gilt für die Serie; ob eine einzelne Map unentschieden enden darf, sagt die Ergebnisregel des Modus (`draw_allowed`, C.3, `league_games.normalize_games`) – beide Prüfungen laufen nacheinander |
+| `forfeit_score` | `recorded` \| `best_of` | `recorded` (wie eingetragen) | `best_of`: Sieger bekommt ⌊Best of/2⌋+1 Maps, der andere 0 (BO5 3:0, Nr. 26) |
+| `exit_rule` | `half` \| `all_for_opponents` | `half` (50-%-Regel) | `all_for_opponents` (Kommentar 02.11., Nr. 43, Nr. 48) |
+| `match_points` | wie bisher | 3/1/0 | 3/0/0 |
+| `match_points_mode` (#2312) | `result` \| `maps` | `result` | `result` (die Tiroler Liga stellt auf `maps` um) |
+
+**Punkteart (`match_points_mode`, #2312):** `result` vergibt die Punkte aus `match_points` für Sieg, Remis und
+Niederlage (wie bisher). `maps` („Punkte nach gewonnenen Maps“) gibt jeder Seite so viele Punkte, wie sie Maps gewonnen
+hat (`score` am Ergebnis, in der Liga-Staffel die gewonnenen Maps aus `games[]`, `league_games.derived_results`): 3:2
+ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0; `match_points` bleibt gespeichert, zählt dann aber nicht. Siege, Remis und
+Niederlagen zählt die Tabelle weiter (`won`, `drawn`, `lost`). Bei gerader Länge (Best of 2, 4) zählen auch bei einem
+Remis die Maps (2:2 ergibt je 2). Kampflos zählt mit `maps` immer wie `forfeit_score: best_of` (BO5 3:0), auch bei
+`recorded` – sonst bekäme der Sieger 0 Punkte. Ebenso ein Spiel, das ein ausgeschiedenes Team mit `all_for_opponents` für
+den Gegner zählt. „Beide nicht erschienen“ gibt beiden 0 Punkte. Die Mini-Tabelle des direkten Vergleichs rechnet ihr
+Kriterium `points` mit derselben Punkteart, also mit den Maps der Spiele untereinander. Punktabzug wie bisher.
+**Vorschlag beim Wechsel:** Die Verwaltung setzt beim Umstellen auf `maps` die Reihenfolge bei Punktgleichheit auf
+`wins`, `head_to_head`, `score_diff`, `lead_decision` (mehr gewonnene Spiele → direkter Vergleich → Map-Differenz →
+Entscheid der Leitung, `scoring_rules.MAPS_TABLE_TIEBREAKERS`) und `forfeit_score` auf `best_of`; beides bleibt änderbar.
+Zurück auf `result` bleibt die Reihenfolge, wie sie ist. **Laufende Seasons:** Unterscheidet sich die Punkteart der
+Staffel von der Season, überträgt „Vorgaben auf Staffeln übertragen“ auch nach dem ersten Ergebnis `match_points_mode`,
+`table_tiebreakers` und `forfeit_score` in die `scoring_rules` der Staffel (Gruppe `table_points`, nicht bei gesperrten
+und nicht bei beendeten Staffeln – `completed`, `results_published`, `archived`, `cancelled`); alles andere an
+`scoring_rules` bleibt „vor dem ersten Ergebnis“. Eine abgeschlossene oder archivierte Season (`completed`, `archived`)
+bekommt gar nichts davon – ihre Tabellen rechnen weiter mit der alten Punkteart; einen gespeicherten Endstand
+(`league_final_tables`) gibt es erst mit F.1. **Liga N (#2318):** Eine Liga N legt bei der Tabelle nur eigene Punkte
+(`overrides.scoring_rules.match_points`) über die Regeln der Season (`scoring_rules.division_rules`); direkter Vergleich,
+Remis-Regel, kampflos, Ausscheiden und die Punkteart kommen immer von der Season, auch bei älteren Abweichungen mit
+vollständigen Regeln. In einer Season mit `maps` gibt es keine eigenen Punkte: Die Verwaltung blendet die Felder aus, der
+Server lehnt sie mit 422 ab, eine ältere Abweichung zählt nicht. Altbestand: Hätte eine Liga N vor #2318 vollständige
+Regeln gespeichert und schon Ergebnisse, meldete das Regelwerk einmalig „Daten geändert“, und ihre laufenden Staffeln
+rechneten weiter mit den alten Regeln. Zum Stand 09.11.2026 gibt es keine Liga N mit eigenen Punkten (Fabian), deshalb
+fängt der Code diesen Fall nicht eigens ab. Jede
+Umstellung schreibt zusätzlich `league.season.table_points` mit vorher und nachher ins Protokoll. Antworten: Die Staffel
+der Ligaseite trägt `table_rules.match_points_mode`, die Season `match_points_mode`; die Tabelle zeigt dann „Punkte =
+gewonnene Maps“. Regelwerk: Baustein „Tabelle und Wertung“ und Variable `table.points` beschreiben die Punkteart;
+ein Wechsel ändert den Baustein und schlägt damit eine neue Freigabe vor.
+
+Punkte zählen immer zuerst. `points`, `score_diff`, `score_for` und `wins` meinen Punkte, Map-Differenz, gewonnene Maps und Siege.
+
+**Reihenfolge bei Punktgleichheit** – die Kriterien in der Reihenfolge von `table_tiebreakers`:
+
+- Ein Gesamtkriterium (`score_diff`, `score_for`, `wins`) teilt die Gruppe nach dem Wert über alle Spiele.
+- `head_to_head`: Mini-Tabelle nur aus den Spielen der Gruppe untereinander (zwei Teams: direkter Vergleich), sortiert nach
+  `head_to_head_criteria`. Teilt sie die Gruppe, wird für jede Restgruppe mit mindestens zwei Teams die Mini-Tabelle neu
+  gerechnet, nur mit den Spielen der Restgruppe. Teilt sie nicht mehr, geht es mit dem nächsten Kriterium weiter (Gesamtwerte).
+  Der direkte Vergleich zählt nur, wenn **alle** Spiele der Gruppe untereinander gespielt sind (Entscheidung des Obmanns,
+  03.11.); steht eines noch aus, wird das Kriterium übersprungen und es geht mit dem nächsten weiter. Maßgeblich ist der ganze
+  Spielplan der Staffel, auch für die Tabelle des vorigen Spieltags (Bewegung). Annullierte Spiele zählen nicht mit.
+- `lead_decision`: steht ein echter Gleichstand nach allen Kriterien, gilt die Reihenfolge der Leitung, wenn sie für genau diese
+  Gruppe besteht (siehe unten). Ohne Entscheid teilen sich die Teams den Platz (1, 2, 2, 4), wie bisher.
+- Nie entscheidet der Name oder die Reihenfolge der Anmeldung.
+
+**Spiele in der Tabelle** (nur Spiele mit Stand `completed` oder `forfeit`):
+
+| Fall | Erkennung | Wertung |
+| --- | --- | --- |
+| Kampflos (Default-Win) | Stand `forfeit`, eine Seite mit `forfeit` | Sieg/Niederlage; mit `forfeit_score: best_of` Maps ⌊Best of/2⌋+1 : 0 (Best of am Spiel, sonst am Turnier). Zeile zählt `forfeit_won` bzw. `forfeit_lost` |
+| Beide nicht erschienen (Nr. 27) | `double_forfeit: true`, beide Seiten mit `forfeit` | beide verlieren: Niederlagenpunkte, keine Maps, `forfeit_lost` +1; Form „N“ für beide |
+| Ausgeschiedenes Team (`exit_rule: all_for_opponents`) | Anmeldung `withdrawn` oder `disqualified` | **jedes** Spiel des Teams, auch gespielte, zählt wie ein Default-Win für den Gegner. Das echte Ergebnis bleibt am Spiel und auf Spielplan und Matchseite sichtbar |
+| Zwei ausgeschiedene Teams gegeneinander (Nr. 48) | beide `withdrawn`/`disqualified` | zählt für keinen, auch nicht als gespielt |
+
+**Tabellenende (Nr. 43, nur mit `all_for_opponents`):** Ausgeschiedene stehen unter allen anderen, ohne Rücksicht auf Punkte.
+Zuerst Ausgetretene und Aufgelöste, darunter Disqualifizierte; innerhalb jeweils wer später ausschied (`removal.at`) weiter
+oben. Eine Auflösung trägt die Leitung als Austritt ein (Grund „Team aufgelöst“). Mit `half` bleibt alles wie bisher
+(annulliert oder kampflos verloren, Platz nach Punkten).
+
+**Ausscheiden (`tournament_events.plan_removal`):** Mit `all_for_opponents` gibt es in Staffeln keine Annullierung mehr: alle
+offenen Spiele werden kampflos verloren gewertet (wie bisher ab der Hälfte), die gespielten bleiben unverändert am Spiel; den Rest
+macht die Tabelle. Modus des Plans `opponents`, Satz „alle Spiele zählen für die Gegner, das Team steht am Tabellenende“.
+Andere Formate und Staffeln mit `half` unverändert.
+
+**Punktabzug (vorbereitet für E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, reason, source,
+sanction_id?, created_at, created_by}]`. Die Tabelle zieht die Summe je Anmeldung von den Punkten ab (`deducted_points`), in der
+Mini-Tabelle zählt er nicht. Gelesen wird nur mit `scoring_rules`. Geschrieben wird es in E.1 nirgends; den Grund zeigt die
+Tabelle nicht öffentlich.
+
+**Entscheid der Leitung** (`tournaments.table_decisions: [{id, registration_ids, reason, decided_by, decided_at}]`):
+
+- `GET /api/admin/leagues/staffeln/{tid}/table` (jede Zuständigkeit der Liga): Tabelle wie öffentlich, dazu `ties` (Gruppen mit
+  geteiltem Platz, die die Leitung ordnen darf), `decisions` (mit `applies`: gilt gerade) und `can_decide`
+  (`lead_decision` in den Regeln). Je Gleichstand und Entscheid `own_team` (die Person gehört zu einer Seite) und
+  `superadmin`: Die Verwaltung zeigt bei `own_team` ohne Superadmin „Über dein eigenes Team entscheidet eine andere Person.“
+  statt der Knöpfe, dem Superadmin das Feld „Grund für die Notausnahme“ (ab fünf Zeichen, geht als `conflict_reason` mit).
+  Die Matchseite nimmt dafür ihr `conflict` (`{kind, override}`) – ebenso bei „beide nicht erschienen“.
+- `PUT /api/admin/leagues/staffeln/{tid}/table-decision` `{registration_ids, reason, conflict_reason?}` – Zuständigkeit
+  `results`. Nur für einen echten Gleichstand: die Menge muss genau einer Gruppe mit geteiltem Platz entsprechen (ein älterer
+  Entscheid für dieselbe Menge zählt dabei nicht), sonst 409. Grund mindestens fünf Zeichen. Befangen ist, wer zu einer der
+  Seiten gehört (`require_no_side_conflict`, Notausnahme Superadmin mit Grund). Ersetzt einen Entscheid für dieselbe Menge.
+  Protokoll `league.table.decision`.
+- `DELETE /api/admin/leagues/staffeln/{tid}/table-decision/{decision_id}` `{reason, conflict_reason?}` – `results`,
+  Befangenheit wie beim Festlegen (Seiten des Entscheids, Notausnahme `table_decision_remove`), Protokoll
+  `league.table.decision.remove`.
+- Ein Entscheid gilt nur, solange genau diese Teams nach allen Kriterien gleich stehen. Ändert ein Ergebnis das, gilt er nicht mehr
+  (`applies: false`) und bleibt zur Nachvollziehbarkeit stehen.
+- Öffentlich trägt die Zeile `tiebreak: "lead_decision"` und `lead_decision: {reason, decided_at}`; die Tabelle zeigt
+  „Platz durch Entscheid der Leitung“ mit dem Grund.
+
+**Beide nicht erschienen** (`POST /api/admin/leagues/staffeln/{tid}/matches/{mid}/double-no-show` `{note, conflict_reason?}`,
+Zuständigkeit `results`, Befangenheit wie beim Ergebnis): nur in einer Staffel, nur für ein Spiel mit zwei Seiten **vor dem
+Spiel** – Stand `pending`, `ready` oder `scheduled`, ohne `started_at`, ohne Meldung (`reports`), ohne gehaltenes Ergebnis
+(`pending_result`) und ohne Ergebnis, sonst 409.
+Schreibt `status: "forfeit"`, `double_forfeit: true`, `results` beide mit `rank: 2, forfeit: true`, `games: []`, Begründung wie
+beim Forfeit (mindestens fünf Zeichen) und je Seite den Eintrag „nicht erschienen“. Protokoll `match.forfeit.double`. Danach
+dieselben Folgen wie beim kampflos (`league_table.after_change`): Station und Aufruf frei, Discord-Baum vorgemerkt,
+Anzeige-Ereignis, Stand der Wettbewerbsstruktur; beim Neu ansetzen ebenso (ohne Station).
+**Neu ansetzen:** `DELETE` auf dieselbe Adresse `{reason, conflict_reason?}` (Befangenheit wie beim Werten, Notausnahme
+`double_no_show_undo` im Protokoll) setzt das Spiel zurück (ohne Ergebnis, Stand `scheduled` mit Termin,
+sonst `ready`), Protokoll `match.forfeit.double.undo`; den Termin setzt die Leitung danach wie gewohnt.
+
+**Antworten (nur zusätzlich, die App bleibt ohne Build lauffähig):** Jede Zeile einer Staffel-Tabelle trägt dazu `tiebreak`
+(`head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` oder `null`), `forfeit_won`, `forfeit_lost`,
+`deducted_points`, `exit` (`{kind, at}` oder `null`) und `lead_decision`. Die Staffel der Ligaseite trägt `table_rules`
+(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`, `match_points`,
+`match_points_mode`).
+
+**Darstellung (Entscheidung 15.10.):** Platz und Zone, kein öffentliches Rating, Hervorhebung in Cyan (Gold bleibt dem
+Season-Meister, F.1). Bei Gleichstand ein kleiner Hinweis, was entschied („Direkter Vergleich“, „Map-Differenz“, „Mehr Maps“,
+„Mehr Siege“, „Entscheid der Leitung“), „kampflos“ bei Default-Wins, am Tabellenende „Ausgetreten“ bzw. „Disqualifiziert“.
 
 ### Darf nicht beschädigt werden
 
@@ -997,3 +1970,1168 @@ Jedes Paket prüft das per Regressionstest:
 Datenmodell und API passen zusammen, Rechte greifen, die Oberfläche trägt den ganzen Ablauf, Fehler sind verständlich,
 Daten bleiben erhalten. Dazu Tests für Haupt- und Fehlerfälle, gleichzeitige Aktionen, Protokoll, Lauf gegen echtes MongoDB,
 Browserlauf mit echter API bei 390 und 1440 px, App kompatibel, Doku und Handbuch aktuell. Mongomock allein reicht nicht.
+
+### D.1 Termine (#2194)
+
+Regelwerk § 7, Entscheidungen Nr. 17, 18 und 28. Logik in `services/league_schedule.py` (Regeln, Verschiebung, Historie, Matchseite),
+`services/league_schedule_sweep.py` (Zeit-Job), Routen in `routes/league_schedule_routes.py`. **Migration: keine.** Ohne `schedule_rules`
+an der Staffel verhält sich alles wie vorher (Heimrecht sofort, keine Verschiebung, keine Erinnerung). Nur Staffeln tragen die Regeln.
+
+**Einstellung `schedule_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Neue Seasons bekommen die Vorgabe, ältere
+nichts. Gepflegt unter `GET|PUT /api/admin/leagues/seasons/{id}/schedule-rules` (Zuständigkeit `season`), das Speichern schreibt sofort
+auf alle nicht gesperrten Staffeln der Season (eigene Gruppe `schedule` beim Übertragen, wie `running` auch nach dem Start, `staffel_fields` beim Anlegen). Protokoll
+`league.season.schedule_rules` mit altem und neuem Wert.
+
+| Feld | Typ | Vorgabe | Bedeutung |
+| --- | --- | --- | --- |
+| `home_rule` | bool | `true` | Nr. 17: unbeantworteter Vorschlag des Heimteams gilt nach der Frist |
+| `home_rule_hours` | int 1–336 | 72 | Frist ab dem Vorschlag, Sperrzeiten zählen nicht (`response_deadline`) |
+| `reschedule_notice_hours` | int 0–336 | 24 | Nr. 18: Antrag spätestens so viele Stunden vor dem geltenden Termin |
+| `reschedule_max` | int 0–10 | 2 | Verschiebungen je Spiel durch beide Teams, 0 = nur die Leitung |
+| `reschedule_same_week` | bool | `true` | Der neue Termin liegt in der Spielwoche des Spiels |
+| `result_reminder_hours` | int 1–336 | 24 | Nr. 28: so lange nach dem Termin ohne Meldung geht die Erinnerung an beide Seiten |
+| `result_overdue_hours` | int 1–720 | 48 | danach ist das Spiel bei der Leitung „überfällig“; nie kleiner als die Erinnerung |
+
+**Fester Termin:** Ein Termin steht fest, wenn das Spiel `scheduled_at` hat und `schedule_source` `accepted` (Einigung, 72-h-Regel,
+Verschiebung) oder `manual` (Leitung) ist. Davor gilt die Ersteinigung über Terminvorschläge wie bisher (der Standardtermin ist kein
+fester Termin). Steht er fest, nimmt eine Staffel mit Regeln keinen neuen Vorschlag, keinen Gegenvorschlag und keine Annahme mehr an
+(409 „Der Termin steht fest – für einen anderen Termin bitte eine Verschiebung beantragen.“); `can_propose_schedule` ist dann `false`.
+Ablehnen und Zurückziehen gehen weiter. Wird ein Vorschlag angenommen, schließen die übrigen offenen dieses Spiels mit `declined`
+(`decision_rule: "agreed_elsewhere"`).
+
+**Mehrere Termine auf einmal (#2325):** `POST /api/matches/{id}/schedule-proposals/group` mit `{scheduled_ats: [1–3], note}` legt
+je Termin einen eigenen Vorschlag an, alle mit derselben `group_id`, Notiz und `created_at`. Geprüft wird jeder Termin einzeln
+(Zukunft, Sperrzeit, doppelt); bei einem Fehler 422 mit `detail.errors[{index, detail}]`, gespeichert wird dann keiner. Ein Termin
+außerhalb der Spielwoche (Staffel mit Terminregeln) ist kein Fehler – wie beim einzelnen Vorschlag –, sondern ein Hinweis in
+`hints[{index, detail}]` (er zählt nicht für die 72-h-Regel). Das Spiel bekommt `schedule_status`/Frist erst, wenn alles gespeichert
+ist; bricht es ab, wird zurückgebaut. Doppelt gesendet (genau dieselben offenen Termine und Notiz): dieselbe Gruppe mit
+`idempotent_replay`. Die Gegenseite bekommt eine Nachricht (`dedupe_key` `match-schedule-group:<gruppe>:proposed`).
+`POST …/schedule-proposals/{id}/group-decision` mit `decline`, `withdraw` oder `counter` (+ `scheduled_ats`) gilt für alle offenen
+der Gruppe; ein Gegenvorschlag ist wieder eine Gruppe mit `parent_proposal_id` und `parent_group_id` (nur schon angebotene Termine:
+422). Angenommen wird ein Termin über `/decision` – die übrigen der Gruppe schließen dann auch ohne Terminregeln mit
+`agreed_elsewhere`; ein Gegenvorschlag über `/decision` (App) schließt sie mit `countered`. Einzeln ablehnen über `/decision` lässt
+die übrigen offen. Der einzelne Vorschlag (`POST …/schedule-proposals`) bleibt für App und ältere Seiten; 72-h-Regel und
+`after_agreement` lesen die Vorschläge weiter einzeln.
+
+**72-h-Regel (Nr. 17)** im Fristen-Job (`match_deadline_sweep.sweep` ruft `league_schedule_sweep.sweep`): Ein offener Vorschlag der
+Heimseite (`slots[0]`) gilt, wenn `home_rule` an ist, die Frist ab `created_at` abgelaufen ist, der Termin in der Spielwoche liegt,
+nicht in einer Sperrzeit, noch in der Zukunft ist, und das Spiel noch keinen festen Termin hat und nicht begonnen ist. Dann:
+Vorschlag `accepted` mit `decision_rule: "home_rule"`, Spiel `scheduled_at`, `schedule_source: "accepted"`, `schedule_status: "accepted"`,
+Historie `home_rule`, Nachricht an die Verantwortlichen beider Seiten (Art `match_schedule`, `meta.reason` `schedule_home_rule`,
+Schlüssel `schedule-home-rule:<vorschlag>`). Sonst gilt der Standardtermin. Mit Regeln zählt ein offener Heimvorschlag im Spieltag-Lauf
+nicht mehr sofort (`resolve_matchday_time` ohne Zweig „home“); ohne Regeln bleibt es beim Heimrecht wie bisher. Idempotent: geschrieben
+wird nur, solange der Vorschlag `pending` ist, unter der Turniersperre.
+
+**Verschiebung (Nr. 18)** – eigene Art am Spiel, getrennt von `match_schedule_proposals`:
+
+| Feld an `matches_v2` | Inhalt |
+| --- | --- |
+| `reschedule_requests[]` | `{id, status, from_at, to_at, reason, requested_by, requested_registration_id, requested_at, approvals[{registration_id, user_id, at}], decided_by, decided_registration_id, decided_at, decision_note}` |
+| `status` je Antrag | `pending`, `accepted`, `declined`, `withdrawn`, `expired` (alter Termin vorbei), `superseded` (Termin anders gesetzt) |
+| `reschedule_count` | angenommene Verschiebungen der Teams |
+| `schedule_history[]` | `{id, at, kind, by, registration_id, from, to, reason, request_id}`, höchstens 50, neueste zuletzt |
+
+Arten der Historie: `agreement` (Einigung), `home_rule` (72-h-Regel), `default` (Standardtermin), `reschedule` (Verschiebung), `lead`
+(Leitung). Beide Felder und `result_reminded_at`, `result_overdue_at` sind intern (`match_public_view.INTERNAL_KEYS`); die Matchseite gibt sie
+mit Namen im Block `schedule_block` an Beteiligte und Leitung.
+
+| Route | Wer | Prüfung |
+| --- | --- | --- |
+| `POST /api/matches/{id}/reschedule` `{scheduled_at, reason}` | Captain oder Vertreter einer Seite | Staffel mit Regeln, fester Termin, nicht begonnen, kein offener Antrag, `reschedule_count < reschedule_max`, jetzt ≤ Termin − `reschedule_notice_hours`, neuer Termin in der Zukunft (5 Minuten), nicht in einer Sperrzeit, anders als der alte, bei `reschedule_same_week` in der Spielwoche, Grund 5–500 Zeichen |
+| `POST /api/matches/{id}/reschedule/{rid}/decision` `{action, note?}` | `accept`, `decline`: Captain oder Vertreter der **anderen** Seite; `withdraw`: die beantragende Seite | Antrag offen, Termin unverändert seit dem Antrag (sonst `superseded`, 409), alter Termin noch nicht erreicht (sonst `expired`, 409), beim Annehmen Grenze und Sperrzeit noch einmal |
+
+Jede Grenze antwortet 409 mit deutschem Satz; was darüber geht, sagt der Satz: „Das entscheidet die Liga-Leitung – bitte im Matchchat
+@leitung schreiben.“ Annehmen setzt `scheduled_at`, `schedule_source: "accepted"`, erhöht `reschedule_count` mit Bedingung auf den alten
+Termin und den Zähler, schreibt Historie `reschedule` mit Grund und beiden Zustimmungen. Gleichzeitige Anträge oder Annahmen: Turniersperre
+plus Bedingung im Schreiben, die zweite Anfrage bekommt 409. Nachrichten an die andere Seite (Art `match_schedule`, `meta.reason`
+`reschedule_requested|accepted|declined|withdrawn`, Schlüssel `match-reschedule:<antrag>:<schritt>`). Protokoll `match.reschedule.request`,
+`.accept`, `.decline`, `.withdraw` mit Grund, ohne Personen außer `actor_id`.
+
+**Leitung:** Alles darüber (später, öfter, wochenübergreifend) setzt die Leitung über `PATCH /api/matches/{id}` (`matches`, Befangenheit wie
+Nr. 62, Superadmin-Notausnahme mit `conflict_reason`). Neu ist das freiwillige Feld `schedule_reason` (≤ 500): Es steht in der Historie
+(`lead`) und im Protokoll `match.plan.change`. Ein neuer Termin der Leitung beendet offene Anträge (`superseded`) und hebt `result_reminded_at`
+und `result_overdue_at` auf. Die Matchseite bietet der Leitung dafür ein eigenes Feld mit Grund (`schedule_block.can_lead_set`).
+
+**Überfällig (Nr. 28)** im selben Job: Ein Spiel einer Staffel mit Regeln, beide Seiten fest, Termin vorbei, ohne Meldung und ohne Ergebnis
+(Status `ready` oder `scheduled`): nach `result_reminder_hours` einmal `result_reminded_at` und Nachricht an die Verantwortlichen beider Seiten
+(`meta.reason` `result_missing_reminder`, Schlüssel `result-reminder:<spiel>:<termin>`), nach `result_overdue_hours` `result_overdue_at`,
+Nachricht an die Liga-Leitung (`matches`, `results`; Art `match_attention`, `meta.reason` `result_overdue`) und Protokoll
+`match.result.overdue`. In einer Sperrzeit läuft nichts. Erledigt ist der Fall mit Ergebnis, Wertung oder neuem Termin der Leitung.
+Für F.1: `league_schedule.open_overdue(db, season_id)` liefert die offenen Fälle einer Season; ohne Entscheidung darüber kein Saisonabschluss.
+
+**Matchseite** `schedule_block` (nur Staffeln mit Regeln, nur Beteiligte und Leitung, sonst `null`): `rules`, `fixed`, `source`,
+`scheduled_at`, `window {start, end}`, `remaining`, `request_until`, `can_request`, `request_hint` (warum nicht), `requests[]` mit Namen und
+`can_answer`/`can_withdraw`, `history[]` mit Namen, `home_rule_at` (wann ein offener Heimvorschlag gilt), `can_lead_set`, `own_registration_id`.
+
+**Datenschutz:** Anträge und Historie stehen nur in `matches_v2` (keine eigene Sammlung). Auskunft `league_schedule` (`league_schedule.export_snapshot`): je Spiel die eigenen Anträge mit Grund, als Seite entschiedene nur mit der eigenen Antwort, als Leitung nur Vorgang, Stand und Zeit; Historie ebenso, Einträge der Leitung nur Art und Zeit. Kontolöschung (`league_schedule.scrub_person`): `requested_by`, `decided_by`, `approvals[].user_id`, `schedule_history[].by` und `.requested_by` werden `null`, Termin und Grund bleiben.
+
+**Aufgaben:** `me.actions[]` `type: "match_reschedule"` („Verschiebung beantworten“, `target_type: "match"`) für die andere Seite eines offenen
+Antrags. **Mein Dienst** (`/api/users/me/duty`): `overdue_matches[]` für Liga-Leitung mit `matches` oder `results` (Spiel, Staffel, Termin,
+seit wann) und `ended_live[]` (siehe unten).
+
+**Turnier nach dem Ende noch „Live“ (für alle Turniere):** Der Fristen-Job hält am Turnier `running_past_end` (bool) aktuell: `true`, solange
+der Stand `live` ist, das Ende vorbei und noch offene Spiele da sind; sonst fällt das Feld weg. `derive_public_phase` zeigt dann weiter
+„Läuft“ (Karte, Band, Detailseite), ohne eigene Abfrage. Sind alle Spiele fertig, zeigt die Seite „Beendet“, der Stand bleibt `live`: Die
+Leitung sieht in Mein Dienst (`ended_live[]`: `{id, title, end_date, open_matches, admin_url, league}`) und in der Turnierliste den Hinweis
+„Läuft laut Stand noch, Ende war am … – beenden?“ mit Weg in die Verwaltung. Umgestellt wird nie automatisch. Turnierleitung sieht Turniere
+ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.
+
+### D.2 Check-in und Start (#1652)
+
+Regelwerk § 8 (Nr. 19, 40, 46; § 8.4 und 8.5) und die Regelwerks-Sperre des Obmanns vom 03.11. Logik in `services/checkin_rules.py`
+(Blatt-Modul ohne Datenbank: Regeln, Fenster, Stand, Vorschlag – lesen `league_service`, `match_deadlines` und der Regelwerk-Baustein) und
+`services/match_flow.py` (Check-in, Start, Matchseite, Aufgaben, Datenschutz), `services/league_checkin_sweep.py` (Zeit-Job: Erinnerungen),
+Routen in `routes/league_checkin_routes.py`. **Migration: keine.** Ohne `checkin_rules` an der Staffel verhält sich alles wie vorher: kein Check-in, kein
+Vorschlag „nicht erschienen“, `started_at` setzt online niemand. Andere Formate, die App und der TV bleiben unverändert.
+
+**Einstellung `checkin_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Gepflegt unter
+`GET|PUT /api/admin/leagues/seasons/{id}/checkin-rules` (Zuständigkeit `season`); das Speichern schreibt sofort auf alle nicht gesperrten
+Staffeln der Season (eigene Gruppe `checkin` beim Übertragen, wirkt wie `schedule`; `staffel_fields` beim Anlegen). Neue Seasons bekommen die
+Vorgabe, ältere nichts, bis die Leitung einmal speichert. Protokoll `league.season.checkin_rules` mit altem und neuem Wert.
+
+| Feld | Typ | Vorgabe | Bedeutung |
+| --- | --- | --- | --- |
+| `opens_minutes_before` | int 1–240 | 15 | Nr. 19: der Check-in öffnet so viele Minuten vor dem Termin |
+| `closes_minutes_after` | int 0–240 | 15 | und schließt so viele Minuten nach dem Termin |
+| `min_present` | int 1–50 | 3 | Nr. 46: mindestens so viele berechtigte Anwesende je Seite. Vorgabe einer neuen Season: `lineup_min_players` (Teilnehmerliste), sonst Teamgröße − 1, mindestens 1 |
+| `remind_minutes_before_close` | int 0–60 | 5 | zweite Erinnerung an Seiten ohne Check-in, so viele Minuten vor Schluss; 0 = keine |
+| `open_points_remind_hours` | int 0–168 | 48 | #2313: so viele Stunden vor dem ersten Spiel erinnert der Job an fehlende Angaben (B.3); 0 = keine. Ohne Regeln gilt 48 |
+
+**Fenster** (`match_flow.window_of`): nur mit `scheduled_at`; öffnet `scheduled_at − opens_minutes_before`, schließt
+`scheduled_at + closes_minutes_after`. „Verlängern“ der Leitung (`no_show_extended_until`, bestehender Knopf) schiebt das Ende. Gerechnet wird
+in UTC, Wiener Zeit steht nur in Texten; die Sommerzeit ändert am Fenster nichts.
+
+**`matches_v2.flow`** (optional; nur Staffeln mit Regeln schreiben es, intern wie `lineups`):
+
+| Feld | Inhalt |
+| --- | --- |
+| `checkin.<registration_id>` | `{at, updated_at, user_id, present: [user_id], via: "side" \| "lead", by, reason, rule_version_id, for_at, rev}` – wer wann für die Seite eingecheckt hat, die Anwesenden, bei der Leitung Person und Grund, die Regelfassung von damals, der Termin und die Termin-Revision, für die der Check-in gilt |
+| `schedule_rev` | ganze Zahl, Vorgabe 0 (Altbestand ohne Feld zählt als 0): die **Termin-Revision** (Codex zu D.3, #1618). Jeder Weg zu einem neuen Termin erhöht sie um eins (`checkin_rules.new_time_change` liefert `$inc` und `$unset` zusammen): Einigung, Verschiebung, 72-h-Regel, Leitung (`PATCH`), Standardtermin des Spieltag-Plans, Stationsplan und „Neu ansetzen“ (E.1, derselbe Termin). Check-ins (`rev`), `ready_rev` und das Veto (`flow.veto.rev`) zählen nur mit `for_at` **und** `rev` des geltenden Standes – Termin A → B → wieder A ist nicht derselbe Termin |
+| `ready_at`, `ready_for`, `ready_rev` | ISO, einmal je Termin und Revision gesetzt, sobald beide Seiten eingecheckt sind (Nr. 40); `ready_for`/`ready_rev` = Termin und Revision, für die es galt |
+| `start` | `{at, by, registration_id, via: "side" \| "lead"}` – der festgehaltene Beginn; zugleich `started_at` und `status: "in_progress"` am Spiel |
+| `notices` | `{open: <Termin>, closing: <Termin>}` – welche Erinnerung für welchen Termin schon ging |
+
+**Stand** (`match_flow.state(match, tournament, now)`, abgeleitet, kein neuer globaler `status`): `none` (keine Regeln, kein Termin, keine zwei
+Seiten), `waiting` (Termin da, Fenster noch zu), `open` (Fenster offen, mindestens eine Seite fehlt), `closed` (Fenster zu, eine Seite fehlt –
+Fall bei der Leitung), `veto` (beide da, Veto offen – Haken `match_flow.veto_pending`, heute immer `False`, D.3 ersetzt ihn), `ready` (beide
+da, spielbereit – Map 1 darf sofort beginnen, auch vor dem Termin), `running` (`started_at`), `finished` (entschieden, abgesagt). Der Start
+schreibt wie der Stationsstart `in_progress` – App und TV zeigen „Läuft“ aus `status` und `started_at` wie bisher.
+
+**Check-in** `POST /api/matches/{id}/checkin` `{present: [user_id], registration_id?, reason?, conflict_reason?}`:
+
+- Für die eigene Seite: Captain oder Vertreter, ohne beide die Hauptteam-Leitung (`acting_registration`). Die Liga-Leitung mit „Spiele betreuen“
+  (`matches`) trägt im Notfall für eine Seite ein (`registration_id`, `reason` mindestens fünf Zeichen), auch nach Fensterende, solange nichts
+  begonnen und nichts gemeldet ist; Befangenheit wie B.1 (403, Superadmin mit `conflict_reason`), Protokoll `match.checkin.lead`.
+- Prüfungen mit deutschem Satz: Staffel mit Regeln und zwei Seiten (409), nicht begonnen und keine Meldung (409), Fenster offen – „Der Check-in
+  öffnet erst um …“ bzw. „Der Check-in ist seit … geschlossen – das entscheidet die Liga-Leitung“ (409, nur Seiten); Anwesende: nur Kader,
+  jede Person einmal, mindestens `min_present`, nur spielberechtigt (`league_eligibility.check_participants`, Grund im Klartext, 422).
+  Hier greift die Sperre für fehlende Angaben (B.3, #2313): Die Anmeldung ließ sie durch, eingecheckt wird nur, wer `ok` ist. Trägt die Person die Angabe nach,
+  geht der Check-in sofort, ohne Zutun der Leitung. Auch die Leitung trägt niemanden ein, der nicht spielberechtigt ist.
+- **Regelwerks-Sperre:** Hat das Co-Team der Seite der geforderten Fassung (B.2, `requires_consent`) nicht zugestimmt, gibt es keinen Check-in
+  – auch nicht durch die Leitung (Entscheidung Nr. 86): 409 „Das Regelwerk hat sich geändert – bitte erst zustimmen.“ mit dem Weg zur Fassung
+  (`rules_url`). Die Matchseite zeigt denselben Satz vor dem Klick.
+- **Ergänzen bis Fensterende:** ein erneuter Aufruf derselben Seite ersetzt die Liste (`updated_at`), `at` bleibt; dieselbe Liste antwortet
+  `idempotent_replay`. Nach Fensterende ergänzt nur die Leitung.
+- Geschrieben wird unter der Turniersperre (`_serialized_match_write`) mit Bedingung auf den gelesenen Stand der Seite, `started_at` und `status`;
+  gleichzeitige Klicks beider Seiten gehen beide durch, `ready_at` setzt genau einmal je Termin (Bedingung „beide da und `ready_for` ≠ Termin“). Ein zweiter
+  gleichzeitiger Klick derselben Seite bekommt 409 „Gerade hat sich am Check-in etwas geändert – bitte neu laden.“
+- Protokoll `match.checkin` (`registration_id`, `count`, `via`, `rule_version_id`, bei der Leitung `reason`). Nachrichten (Art `match_schedule`,
+  Thema Match-Erinnerungen): an die Verantwortlichen der Gegenseite „… ist eingecheckt“ (`meta.reason` `checkin_side`, Schlüssel
+  `checkin-side:<spiel>:<seite>:<at>`), sobald beide da sind an beide Seiten „Beide Seiten eingecheckt – ihr könnt starten“ (`checkin_ready`,
+  `checkin-ready:<spiel>:<ready_at>`).
+
+**Start** `POST /api/matches/{id}/checkin/start` (ohne Inhalt, `conflict_reason?` für die Leitung): Captain oder Vertreter einer Seite oder die
+Leitung mit `matches` (Befangenheit wie oben). Nur im Stand `ready`; die Regelwerks-Sperre gilt für beide Seiten (409 nennt die Seite, die noch
+zustimmen muss – ändert sich das Regelwerk zwischen Check-in und Start, hält das den Start auf). Setzt `started_at`, `status: "in_progress"` und
+`flow.start` mit Bedingung `started_at: null`; der zweite Klick antwortet `idempotent_replay`. Protokoll `match.checkin.start`, Nachricht
+„Match startet jetzt“ an die Verantwortlichen beider Seiten (`checkin_started`, `checkin-start:<spiel>:<at>`). Ab hier gelten alle Regeln für
+begonnene Spiele (D.1: keine Verschiebung; kein Vorschlag „nicht erschienen“; „Ergebnis fehlt“ wie bisher).
+
+**Erst einchecken, dann melden** (`POST /api/matches/{id}/report`, Web und App; `match_flow.report_refusal`): In einer Staffel mit
+Check-in-Regeln nimmt der Server eine Meldung der Captains erst an, wenn beide Seiten für den aktuellen Termin eingecheckt sind – sonst 409
+„Melden geht erst, wenn beide Seiten für diesen Termin eingecheckt sind – eure Seite / <Gegenseite> hat noch nicht eingecheckt.“ (ohne
+Termin: „… der Check-in öffnet erst mit dem Termin“). Die Regelwerks-Sperre gilt dabei wie beim Start (409 nennt die Seite). Die Matchseite
+liefert denselben Satz als `report_hint` und zeigt ihn statt des Meldeformulars; die App bekommt ihn als Antwort auf die Meldung. Frei
+bleiben: ein begonnenes Spiel (`started_at` oder Stand „läuft“), die Bestätigung der Gegenseite (es liegt schon eine Meldung vor), die
+Leitung über `/result`, andere Formate und Seasons ohne Check-in. Fehlt nur der Start-Klick, setzt die erste gültige Meldung den Start
+einmal nach (`match_flow.start_by_report`: `started_at`, `status: "in_progress"`, `flow.start.via: "report"`, Protokoll
+`match.checkin.start`, keine Nachricht).
+
+**Nach Ablauf (§ 8.4, 8.5 – kein automatischer Nichtantritt):** Der Fristen-Job (`match_deadline_sweep`, Regel `check_in` in
+`match_deadlines.no_show_deadline`) legt nach Fensterende genau einen Vorschlag an das Spiel: `no_show_proposal`
+`{rule: "check_in", minutes, due_at, registration_ids, missing_registration_ids}`, Protokoll `match.no_show.proposed`, Nachricht „Nicht
+erschienen?“ an die Liga-Leitung mit `results` oder `disputes` (Art `match_attention`, `no-show:<vorschlag>`), Eintrag in Mein Dienst
+(`checkin_proposals[]`) und Karte in der Leitungsansicht (Teilnehmer = fehlende Seiten). Eine Wertung schreibt nie der Job. Die Leitung
+entscheidet wie bisher über `POST /api/tournaments/{tid}/lead/no-show/{match}`: `confirm` wertet kampflos über den Forfeit-Weg (Notiz „Nicht
+erschienen – Check-in bis … nicht erfolgt“, Teamstrafe wie bei jedem Kampflos), `extend` verlängert das Fenster und nimmt den Vorschlag zurück
+(nach Ablauf kommt er neu). Mit Check-in-Regeln geht `confirm` nur mit diesem Vorschlag (die Ausnahme „ohne Vorschlag werten“ aus #2201 gilt
+nur für Staffeln ohne Check-in), nur für eine Seite aus `missing_registration_ids` (sonst 422) und nur, solange `due_at` zum Fenster des
+aktuellen Termins passt (sonst 409 – auch wenn der Job den alten Vorschlag noch nicht weggeräumt hat); `extend` prüft den Vorschlag genauso
+(aus einem alten Vorschlag entsteht keine Verlängerung für den neuen Termin). Jeder neue Termin (Einigung, Verschiebung, 72-h-Regel,
+Leitung, Standardtermin des Spieltag-Plans, Stationsplan – alle über `checkin_rules.new_time_unset`; „Neu ansetzen“ setzt das Feld leer)
+löscht `no_show_extended_until`: Das neue Fenster endet mit seiner eigenen Regel, nicht mit der alten Verlängerung. Trägt die Leitung die fehlende Seite nach, räumt der Job den Vorschlag ab (`match.no_show.cleared`, Grund
+`checked_in`). Ein begonnenes Spiel (`started_at`) oder eins mit Meldung bekommt nie einen Vorschlag (laufendes BO5 ist kein Nichtantritt).
+Alte Vorschläge ohne Regel `check_in` räumt der Job wie seit #2201 ab.
+
+**Neuer Termin, „Beide nicht erschienen“ (E.1):** Jeder Check-in trägt den Termin, für den er galt (`for_at`); setzt die Leitung einen
+anderen Termin (`PATCH`, auch nach „Neu ansetzen“), zählen die alten Check-ins nicht mehr, beide Seiten checken für den neuen Termin neu ein,
+„beide da“ gilt wieder einmal (`ready_for`). Ein offener Vorschlag aus dem alten Fenster zeigt keine Karte mehr (die Karte prüft das Fenster
+live) und fällt im nächsten Lauf weg (`match.no_show.cleared`, Grund `rescheduled`); nach dem neuen Fenster kommt er neu. Fehlen beide Seiten,
+nennt der Vorschlag beide; die Leitung wertet dann über „Beide nicht erschienen“ (E.1, Nr. 27) oder trägt nach. Eine Wertung „beide nicht
+erschienen“ oder „kampflos“ beendet den Stand (`finished`); nach „Neu ansetzen“ ist das Spiel wieder offen, die Check-ins gelten erst mit dem
+neuen Termin.
+
+**Erinnerungen** (`league_checkin_sweep.sweep`, im Fristen-Job mit denselben laufenden Turnieren): bei Öffnung des Fensters „Check-in offen“ an
+die Verantwortlichen beider Seiten, die noch nicht eingecheckt sind (Art `match_call` – Push mit Vibration wie „Du bist dran“, Schlüssel
+`checkin-open:<spiel>:<termin>`), `remind_minutes_before_close` Minuten vor Schluss „Noch … Minuten“ an Seiten ohne Check-in
+(`checkin-closing:<spiel>:<termin>`). Merker `flow.notices` je Termin: ein neuer Termin erinnert neu, ein zweiter Lauf findet nichts mehr.
+In einer Sperrzeit läuft nichts.
+
+**Matchseite** `checkin` (nur Staffeln mit Regeln, nur Beteiligte und Leitung, sonst `null`): `rules`, `state`, `scheduled_at`, `window
+{opens_at, closes_at}`, `ready_at`, `started_at`, `sides[]` je Seite `{registration_id, name, own, checked_in, at, via, present: [{id, name}],
+present_count, consent_open, rules_url, lead_reason}` (die Anwesenden sehen beide Seiten mit Namen und die Leitung, wie Aufstellungen –
+Entscheidung Nr. 85; einen Eignungsgrund sieht nur die eigene Seite), `own_registration_id`, `can_checkin`, `checkin_hint` (warum nicht), `roster[]` der eigenen Seite
+`{id, name, blocked}` (Grund im Klartext, nicht wählbar), `eligible_count` (spielberechtigt im eigenen Kader; unter `min_present`: `can_checkin` falsch,
+`checkin_hint` „Nur 2 Spieler aus eurem Kader dürfen gerade spielen, mindestens 3 müssen anwesend sein …“, #2313), `me` (nur wer selbst in einem Kader des
+Spiels steht und nicht spielberechtigt ist: `{reason, fix_url}`, `fix_url` ins eigene Profil bei behebbarem Stand, sonst `null`; sonst `me: null`),
+`min_present`, `can_start`, `start_hint`, `proposal` (`{due_at, missing: [name]}` oder
+`null`), `lead {can_enter, conflict, rosters: {registration_id: [{id, name, blocked}]}}` für die Leitung.
+
+**Aufgabe** `me.actions[]` `type: "match_checkin"` („Jetzt einchecken“, `target_type: "match"`) für die Verantwortlichen einer Seite ohne
+Check-in, solange das Fenster offen ist; ältere Apps öffnen damit die Matchseite, eingecheckt wird im Web.
+
+**Datenschutz:** `flow` ist intern (`match_public_view.INTERNAL_KEYS`), die Matchseite gibt die Namen im Block `checkin`. Auskunft
+`league_checkin` (`match_flow.export_snapshot`): je Spiel der eigene Check-in (Zeit, Anzahl, Grund als Leitung nur Vorgang und Zeit), die eigene
+Anwesenheit, der eigene Start. Kontolöschung (`match_flow.scrub_person`): `user_id`, `by` und `start.by` werden `null`; Anwesenheitslisten
+bleiben wie Aufstellungen (Sportdaten, das Konto heißt dort „Gelöschter User“).
+
+**Rechte** (Ergänzung der Matrix in B.1):
+
+| Route | Liga-Recht | Befangenheit | Helfer |
+| --- | --- | --- | --- |
+| `GET …/seasons/{id}/checkin-rules` | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/checkin-rules` | `season` | – | – |
+| Spiel: `POST /checkin` mit `registration_id` (für eine Seite), `POST /checkin/start` als Leitung | `matches`; Beteiligte als Captain oder Vertreter wie jede Seite | ja (Notausnahme `conflict_reason`) | – |
+
+**Regelwerk:** Baustein `[[baustein:checkin]]` (`league_rule_blocks`) nennt Fenster und Mindestzahl der Season im Text; eingefroren beim
+Veröffentlichen wie jeder Baustein. Der dynamische Umbau des Regelwerks ist #2269.
+
+**Audit-Aktionen neu:** `match.checkin`, `match.checkin.lead`, `match.checkin.start`, `league.season.checkin_rules`.
+
+**Haken für D.3:** `match_flow.veto_pending(match, tournament)` – zwischen `ready_at` und Start. Seit D.3 liefert er `True`, solange in
+einer Staffel mit Veto-Vorlage das Veto noch läuft (`checkin_rules.veto_pending` liest `league_veto_rules`); der Start bleibt der Schritt danach.
+
+### D.3 Veto (#1618)
+
+Regelwerk § 6 und Anlage B (Nr. 21, 22, 23, 40, 79; Obmann 04.11.: keine Seitenwahl, Team A = Heim). Nur Liga-Staffeln (Turnier mit
+`league_context`), Team gegen Team. Turniere, andere Formate, Map-Voting und Solo bleiben unverändert; ohne Veto-Vorlage an der Season
+verhält sich alles wie vorher. Logik in `services/league_veto_rules.py` (Blatt-Modul ohne Datenbank: Vorlage prüfen, Simulation, zulässige
+Züge, Zufallswahl, Vorschlag), `services/league_veto.py` (Zustandsautomat am Spiel, Matchseite, Datenschutz), `services/league_veto_sweep.py`
+(Zeit-Job), Routen in `routes/league_veto_routes.py`. **Migration: keine.** Das Veto setzt den Check-in (D.2) voraus: Es beginnt, sobald
+beide Seiten für den geltenden Termin gültig eingecheckt sind (Nr. 40); Map 1 folgt direkt danach, auch vor oder nach dem Termin – die
+Verspätung zählt nur beim Check-in.
+
+**Einstellung `veto_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Gepflegt unter
+`GET|PUT /api/admin/leagues/seasons/{id}/veto-rules` (Zuständigkeit `season`, lesen jede Zuständigkeit); das Speichern schreibt sofort auf
+alle nicht gesperrten Staffeln der Season (eigene Gruppe `veto` beim Übertragen, wirkt wie `checkin`; `staffel_fields` beim Anlegen).
+Neue Seasons bekommen das Objekt mit `enabled: true` und der Vorlage aus `propose` (Modusfolge und Best of; ein Pool fehlt beim Anlegen
+noch, also nur Wahlen und Decider; Fabian Nr. 105) und dem Merker `auto: true` – **unberührt** (Nr. 108): Solange er steht, schlägt
+`league_veto.follow_pool` die Vorlage bei jeder Änderung des Season-Pools (`PUT …/map-pool`, „Map aus dem Pool nehmen“) neu vor und
+speichert sie wie von Hand (Season, Staffeln, Protokoll mit `via: "auto"`). Das erste Speichern über `PUT …/veto-rules` nimmt den Merker
+weg; ab dann bleibt die Vorlage, und `season_readiness` nennt mit `veto_invalid`, was mit dem Pool nicht aufgeht. `normalize` übergeht den
+Merker, die Antwort von `GET …/veto-rules` nennt ihn als `auto`. Bestehende Seasons ohne Feld bleiben aus, keine Migration. Pflicht im System, je Season abschaltbar (Nr. 21). Liga N weicht nicht ab
+(kein `overrides`-Eintrag; mit anderem Best of läuft dort kein Veto, Warnung – Nr. 106). Protokoll `league.season.veto_rules` mit altem und
+neuem Wert.
+
+| Feld | Typ | Vorgabe | Bedeutung |
+| --- | --- | --- | --- |
+| `enabled` | bool | `false` | an/aus; aus = die Maps werden wie bisher beim Ergebnis eingetragen |
+| `team_a` | `"home"` \| `"draw"` | `"home"` | Nr. 22: Team A ist das Heimteam aus dem Spielplan (`slots[0]`) – oder wird je Spiel einmal gelost |
+| `step_seconds` | int 10–600 | 60 | Nr. 23: Zeit je Schritt; nach Ablauf wählt das System |
+| `steps` | `[{kind, mode, team, position}]` | `[]` | die Vorlage, höchstens 60 Schritte: `kind` `ban` \| `pick` \| `decider` \| `preset` (Vorgabe der Woche, #2326 – siehe unten); `mode` ein Modus des Spiels; `team` `"A"` \| `"B"` (bei `decider` und `preset` `null` – das System); `position` 1…Best of bei `pick`, `decider` und `preset`, sonst `null`. Das Modell bleibt offen für weitere Schrittarten; eine Seitenwahl gibt es nicht (Seiten ergeben sich aus Heim/Gast) |
+
+**Prüfung der Vorlage** (`league_veto_rules.template_problems(rules, pool, best_of, order, repeat)` – deutsche Sätze, kein JSON). Beim
+`PUT` mit `enabled: true` lehnt der Server Probleme mit 422 ab (mit `enabled: false` wird nur die Form geprüft, so bleibt ein Entwurf
+speicherbar); `season_readiness` prüft die gespeicherte Vorlage gegen den geltenden Pool (Code `veto_invalid`, je Satz ein Problem,
+und `veto_without_checkin`, wenn die Season keinen Check-in trägt; beides nur mit `enabled: true`):
+
+- jede Position 1…Best of genau einmal durch `pick`, `decider` oder `preset`, keine Position darüber;
+- der Modus einer Position passt zu `game_mode_order` (zyklisch wie beim Melden), sofern die Reihenfolge gesetzt ist;
+- jeder Modus der Vorlage hat Maps im Pool; je Modus reicht der Pool: Sperren + Wahlen + Decider + Vorgabe ≤ Maps des Modus;
+- `decider` höchstens einmal je Modus und als letzter Schritt seines Modus (ein `preset` desselben Modus darf davor oder danach stehen);
+  bei `map_repeat` `other_mode` oder `always` bleibt nach allen Sperren, Wahlen und der Vorgabe des Modus **genau eine** Map übrig; bei
+  `never` muss die Simulation mindestens einen vollständigen Durchlauf finden (gewählte Maps fallen aus allen Modi; die Vorgabe zählt
+  dabei wie eine freie Wahl vor allen anderen Schritten – es muss also *eine* Vorgabe geben, mit der die Vorlage aufgeht);
+- `preset` höchstens einmal je Modus („höchstens eine Vorgabe der Woche je Modus“);
+- Liga N mit eigenem Best of ≠ dem der Season: Warnung `veto_division_mismatch` („Dort läuft kein Veto – die Maps werden beim Ergebnis
+  eingetragen“); in solchen Staffeln bleibt das Veto aus (`skipped`, siehe unten).
+
+Innerhalb eines Modus steht jede Map höchstens einmal in der Vorlage-Ausführung (gesperrt, gewählt oder Decider) – unabhängig von
+`map_repeat`; `map_repeat` regelt nur, ob eine in einem Modus gewählte Map in einem anderen Modus noch wählbar ist (`never`: nein,
+sonst ja). `map_pools.allowed` gibt die Maps je Modus frei.
+
+**Vorschlag** `GET …/seasons/{id}/veto-rules/proposal` (jede Zuständigkeit): eine passende Folge aus `game_mode_order`, Poolgrößen und
+dem Best of der Season (`league_veto_rules.propose`), generisch ohne Werte eines Titels, zum Anpassen – nicht gespeichert. Muster wie
+Anlage B: Modi in der Reihenfolge ihres ersten Auftretens; je Modus beginnt abwechselnd Team A, Team B, A …; hat ein Modus eine Position,
+sperren beide abwechselnd bis eine Map bleibt, dann `decider`; hat er mehrere Positionen, sperren beide abwechselnd bis so viele Maps
+bleiben wie Positionen, dann wählen beide abwechselnd, jede Wahl bekommt die nächste Position des Modus. Ohne Reihenfolge nimmt der
+Vorschlag die Modi des Pools zyklisch. Eine Vorgabe der Woche schlägt er nie vor – die setzt die Leitung bewusst.
+
+**Vorgabe der Woche** (`kind: "preset"`, #2326, Entscheidung Nr. 122 vom 09.11.). Die Liga-Leitung legt für einen Modus je Spielwoche
+eine Map fest; auf diese Map gibt es weder Sperre noch Wahl, sie steht für alle Spiele der Woche fest. Nichts davon ist auf einen Titel
+verdrahtet: Welcher Modus eine Vorgabe bekommt, sagt die Vorlage (ein Schritt `preset` mit Modus und Position, höchstens einer je Modus),
+welche Map es in welcher Woche ist, die Season. **Migration: keine** – `veto_presets` ist ein neues, freiwilliges Feld.
+
+- **Daten:** `league_seasons.veto_presets` = `[{week, mode, map_id}]`, je Spielwoche und Modus höchstens ein Eintrag, sortiert
+  (`league_veto_rules.normalize_presets`; Woche 1…60). Die Liste steht **nur an der Season**, nicht an den Staffeln: Der Start eines
+  Vetos liest sie über `league_context.season_id` (`league_veto.season_presets`) – eine Quelle, kein Übertragen, keine Gruppe in
+  `SYNC_GROUPS`. Ein von Hand verbogener Wert zählt wie „keine Vorgabe“.
+- **Spielwoche eines Spiels** (`league_veto.week_of` → `matchday_schedule.matchday_number_of`): der **Spieltag** des Spiels
+  (`matchday_number`, sonst `round`). Spieltag N liegt in der N-ten *aktiven* Spielwoche der Season (Sperrwochen zählen nicht mit,
+  `calendar_week_of`); „Spielwoche N“ in Verwaltung, Matchseite und Regelwerk meint darum immer Spieltag N. **Ein verschobenes Spiel
+  behält seinen Spieltag** – es gilt die Vorgabe seines Spieltags, nicht die der Woche, in die der neue Termin fällt (auch wenn es erst
+  Wochen später gespielt wird). Ein Spiel ohne Spieltag hat keine Spielwoche: Dort läuft kein Veto (`skipped`, „Dieses Spiel gehört zu
+  keiner Spielwoche – die Vorgabe der Woche lässt sich nicht bestimmen.“), die Maps werden beim Ergebnis eingetragen.
+- **Welche Wochen** (`league_veto.preset_weeks`): Spieltag 1 bis N, N = die Spieltage der größten Staffel laut Vorgaben
+  (`rounds_needed(max_staffel_size, round_robin_legs)`, über Season und jede aktive Liga N) oder der höchste schon angesetzte Spieltag –
+  was größer ist; ohne beides alle aktiven Wochen. Je Woche `start_day`/`end_day` (Wiener Kalendertage der N-ten aktiven Woche).
+- **Simulation:** Die vorgegebene Map ist **vom ersten Schritt an** aus ihrem Modus genommen (`league_veto_rules.reserve`; bei
+  `map_repeat: never` aus allen Modi) – egal, wo der Schritt in der Vorlage steht. Ist der Schritt an der Reihe, setzt ihn das System
+  sofort wie einen Decider (`via: "auto"`, `role: "preset"`, ohne Frist). `allowed_options` bietet die Map nie an; ein Zug auf sie
+  antwortet 422 „… ist die Vorgabe der Woche – weder sperrbar noch wählbar.“
+- **Prüfung einer Woche** (`league_veto_rules.week_problems(rules, {mode: map_id}, pool, repeat)`): je Schritt `preset` – „Kontrolle:
+  Die Vorgabe der Woche fehlt.“, „Kontrolle: Die vorgegebene Map steht nicht im Pool des Modus.“; bei `never` „Hafen ist für Stellung
+  und Kontrolle vorgegeben – in dieser Season jede Map nur einmal je Serie.“ und, wenn die übrigen Schritte nicht mehr aufgehen, „Mit
+  diesen Vorgaben lässt sich die Vorlage nicht zu Ende spielen – bitte eine andere Map vorgeben.“
+- **Fehlende Vorgabe:** Liefert `week_problems` beim Start einen Satz (fehlt, Map nicht mehr im Pool des Spiels, geht nicht auf),
+  **beginnt das Veto nicht** – kein `flow.veto`, kein `skipped`, nie eine Wertung. Der Stand bleibt `veto`; die Matchseite nennt den
+  Satz (Veto-Block `blocked`, dazu `start_hint`), Start und Zug antworten weiter 409.
+  `ensure_started` vermerkt je Termin einmal `flow.veto_wait = {for_at, rev, week, at}` (Bedingung auf Termin und Revision), schreibt
+  das Protokoll `match.veto.waiting` (`week`, `problems`) und schickt der Liga-Leitung einen Hinweis: an alle mit Zuständigkeit `season`
+  oder `matches` (`league_permissions.staff_user_ids`, wie die übrigen Hinweise an die Leitung), Art `match_attention`, Thema
+  Turnier-Updates, `meta.reason` `veto_preset_missing`, Schlüssel `veto-preset-missing:<season>:<woche>` – **eine** Nachricht je
+  Person, Season und Spielwoche, auch wenn mehrere Spiele warten; Link `/admin/leagues/seasons/<id>#veto`. Vor dem Check-in beider
+  Seiten geht kein Hinweis hinaus (die Matchseite zeigt die Lücke trotzdem schon). Die Nachricht „Beide Seiten eingecheckt“ an die
+  Teams sagt dann statt „jetzt läuft das Map-Veto“: „Das Map-Veto wartet noch auf die Vorgabe der Woche – sobald die Liga-Leitung sie
+  eingetragen hat, bekommt ihr eine Nachricht und startet das Veto auf der Matchseite.“ Welche Fassung gilt, sagt
+  `league_veto.outlook` (`running`, `waiting`, `skipped`): Entfällt das Veto in diesem Spiel, weil die Vorlage nicht passt (`skipped`),
+  heißt es „… ihr könnt starten. In diesem Spiel läuft kein Veto, die Maps tragt ihr beim Ergebnis ein. …“ – nicht mehr „jetzt läuft das
+  Map-Veto“.
+- **Nachtragen startet nicht von selbst** (Fabian 11.11., Nr. 124 und 127): Hat ein Veto auf die Vorgabe gewartet
+  (`league_veto.wait_of`: der Merker `flow.veto_wait` zum geltenden Termin und seiner Revision), beginnt es **nie mehr automatisch** –
+  weder beim Speichern der Vorgabe noch beim Lesen der Matchseite noch im Job. Sonst liefe die Zeit je Schritt, während die Teams
+  vielleicht nicht mehr da sind, und das System wählte für sie. **Der Merker allein entscheidet** (Review): Nimmt die Leitung den
+  Schritt `preset` aus der Vorlage, während ein Spiel wartet, bleibt es beim Start von Hand – keine Frist läuft los. Stattdessen:
+  1. Das Speichern der Vorgaben ruft `league_veto_sweep.announce_waiting`: Für jedes Spiel der Season mit gültigem Merker, dessen
+     Vorgabe jetzt passt, bekommen die Verantwortlichen **beider Seiten** (Captain, Vertreter – `responsible_user_ids`) „Vorgabe da –
+     Veto kann starten“ (Art `match_call`, `meta.reason` `veto_preset_ready`, Schlüssel `veto-preset-ready:<spiel>:<termin>:<rev>`).
+     Einmal je Spiel und Termin: `flow.veto_wait.ready_at` wird mit Bedingung gesetzt, Protokoll `match.veto.ready`. Ein zweites
+     Speichern meldet nicht noch einmal. Ein Spiel hält die anderen nicht auf. Dieselbe Meldung geht hinaus, wenn ein wartendes Veto
+     auf anderem Weg startbar wird (Review): nach `PUT …/veto-rules` (etwa ohne den Schritt `preset`; Antwort mit `matches_ready`),
+     nach dem Speichern des Season-Pools, nach „Map aus dem Pool nehmen“ und nach „Vorgaben auf Staffeln übertragen“. Und damit kein
+     Spiel durchrutscht, liest `_wait_for_preset` die Vorgaben nach dem Schreiben des Merkers noch einmal: Hat die Leitung sie genau
+     dazwischen gespeichert (ihr Lauf fand noch keinen Merker), geht die Meldung von dort hinaus – statt des Hinweises an die Leitung.
+  2. Die Matchseite zeigt **„Vorgabe steht – bereit zum Veto?“** und wer schon bereit ist (Veto-Block `start`, Stand weiter `veto`,
+     `start_hint` = „Das Veto beginnt, sobald beide Seiten ‚Bereit zum Veto‘ getippt haben. Vorher läuft keine Zeit.“). Bis zum Start
+     gibt es **keine Frist**.
+  3. **Beide Seiten tippen „Bereit zum Veto“** (Nr. 127): `POST /api/matches/{id}/veto/ready` `{ready: true|false}` – Captain oder
+     Vertreter der **eigenen** Seite, Rechte wie bei einem Zug (`acting_registration`; Leitung und Unbeteiligte 403), unter der
+     Turniersperre (`league_veto.set_ready`). Die Markierung steht am Merker: `flow.veto_wait.ready.<registration_id> = {at}` (ohne
+     Person – die steht im Protokoll `match.veto.ready_side` mit `registration_id` und `ready`).
+     - Ist erst **eine** Seite bereit, beginnt nichts. Die Gegenseite bekommt einmal „Gegenseite bereit zum Veto“ (`match_call`,
+       `meta.reason` `veto_side_ready`, Schlüssel `veto-side-ready:<spiel>:<termin>:<rev>:<seite>` – auch nach Zurücknehmen und
+       erneutem „Bereit“ nur einmal).
+     - **Zurücknehmen** (`ready: false`) geht, solange **kein Veto läuft** (Bedingung auf den Merker; läuft das Veto, 409). Im
+       Normalfall heißt das: solange die Gegenseite fehlt – mit der zweiten Seite beginnt das Veto im selben Aufruf.
+     - **Beide bereit, aber kein Veto** (Nachprüfung): Macht die Leitung die Woche genau zwischen den beiden Klicks wieder
+       lückenhaft, steht die zweite Markierung, aber der Start findet keine Vorgabe. Niemand sitzt dann ohne Knopf fest: Die
+       Matchseite zeigt „Veto wartet auf die Vorgabe der Woche“ **und** den Block `start` (beide bereit, `can_ready: false`,
+       `can_withdraw: true`, `lead.can_start: false`) – „Doch nicht bereit“ bleibt, auch ohne Vorgabe. Vervollständigt die Leitung
+       die Vorgaben, beginnt `announce_ready` das Veto **selbst** (`_start_both_ready`: unter der Turniersperre, Stand frisch
+       gelesen, `ensure_started(manual=True, via="ready")`, Protokoll `match.veto.start` ohne Person). Idempotent – zwei Läufe
+       gleichzeitig beginnen ein Veto; das Spiel zählt in `matches_ready` mit. Ist nur eine Seite bereit, bleibt es bei der Meldung.
+     - Mit der **zweiten** Seite ruft `set_ready` `ensure_started(manual=True, via="ready")`: Erst jetzt entsteht `flow.veto` mit der
+       dann geltenden Vorgabe, die erste Frist läuft ab diesem Moment, beide Seiten bekommen wie immer „Veto läuft“. Protokoll
+       `match.veto.start` mit `via: "ready"` und der Person, die zuletzt getippt hat.
+     - **Idempotent:** Jede Markierung und der Start schreiben mit Bedingung („noch nicht markiert“, „kein Veto für diesen Termin“) –
+       Doppelklick, zweites Gerät oder beide Seiten gleichzeitig beginnen genau ein Veto; Wiederholungen antworten 200 mit
+       `idempotent_replay: true`. Antwort `{started, status, version, ready, idempotent_replay}`. Fehlt die Vorgabe (noch oder
+       wieder), 409 mit dem Satz der Woche.
+  4. **Notfall-Start der Leitung:** `POST /api/matches/{id}/veto/start` `{reason, conflict_reason?}` – Liga-Recht `matches`,
+     Befangenheit wie B.1 (403, Superadmin mit `conflict_reason`), Grund 5–500 Zeichen (`league_veto.lead_start`). Beginnt das wartende
+     Veto, ohne dass beide Seiten bereit sind; Protokoll `match.veto.lead` mit `action: "start"` und Grund, dazu `match.veto.start` mit
+     `via: "lead"`, Eintrag in `lead_log[]` des Vetos (Datenschutz wie jeder Eingriff). Ohne wartendes Veto 409.
+  Ohne Merker bleibt alles wie in D.3: Steht die Vorgabe schon vor dem Check-in beider Seiten, beginnt das Veto von selbst. **Ein neuer
+  Termin oder eine neue Revision** macht den Merker ungültig und setzt damit die Bereit-Markierungen zurück
+  (`league_veto.ready_sides` liest sie nur zum geltenden Termin) – nach erneutem Check-in gilt wieder der automatische Start (oder ein
+  neues Warten).
+- **Änderung der Vorgabe:** Sie gilt nur für Vetos, die **noch nicht begonnen** haben. Ein begonnenes Veto trägt den Schnappschuss
+  `flow.veto.week` und `flow.veto.presets` (`[{mode, map_id}]`) – auch nach „Neu starten“ der Leitung und im fertigen Veto
+  (`planned_games` bleibt). Erst ein neuer Termin (neue Revision) beginnt ein neues Veto mit der dann geltenden Vorgabe. Protokoll
+  `league.season.veto_presets` mit `from`, `to` und `changes` (`[{week, mode, from, to}]`); daraus liest die Verwaltung die **Historie**
+  (die letzten 10 Änderungen: wann, wer, welche Woche von welcher auf welche Map).
+- **Routen:** `GET /api/admin/leagues/seasons/{id}/veto-presets` (jede Zuständigkeit) liefert `active` (Veto an und Schritt `preset`
+  in der gespeicherten Vorlage), `weeks[]` (`{week, start_day, end_day, past, started}` – `past`: der letzte Tag der Woche
+  liegt vor dem heutigen Wiener Kalendertag; `started`: in einem Spiel dieses Spieltags läuft, pausiert oder steht ein Veto), `modes[]` (`{mode, label, position, maps: [{map_id, name}]}`
+  je Schritt `preset`), `presets[]`, `problems[]` (`{week, problems}` – nur Wochen, in denen etwas fehlt oder nicht passt), `rotation[]`
+  (der Vorschlag „rotiert automatisch durch den Pool“: je Modus Woche für Woche die nächste Map in Pool-Reihenfolge, bei `never` weicht
+  ein zweiter Modus derselben Woche aus – `league_veto_rules.rotate`, nichts davon gespeichert) und `history[]`.
+  `PUT …/veto-presets` `{presets: [{week, mode, map_id}]}` (Zuständigkeit `season`) ersetzt die Liste: eine Zeile ohne Map heißt „noch
+  nicht gewählt“ und fällt weg (Lücken sind speicherbar und bleiben sichtbar); 422 mit deutschem Satz bei einer Woche, die es nicht gibt,
+  einem Modus ohne Schritt `preset`, einer Map außerhalb des Pools des Modus, zwei Maps für dieselbe Woche und denselben Modus oder
+  einer vollständigen Woche, die nicht aufgeht. **Geprüft wird nur, was sich ändert** (Review): Eine gespeicherte Zeile, die
+  unverändert wiederkommt, bleibt – auch wenn ihre Map inzwischen nicht mehr im Pool steht; neu wählen lässt sich eine solche Map
+  nicht. Gespeicherte Einträge, die die Verwaltung gar nicht zeigt (der Modus hat gerade keinen Schritt `preset`, die Woche gibt es
+  nicht mehr), bleiben beim Speichern erhalten, statt zu verschwinden. Antwort wie `GET`, dazu `changed` und `matches_ready` (so viele wartende
+  Spiele haben gerade „Vorgabe da – Veto kann starten“ bekommen).
+- **Prüfung vor der Veröffentlichung:** `season_readiness` nennt Wochen ohne (passende) Vorgabe als **Warnung** `veto_preset_missing`
+  („Veto: Für Spielwoche 3, 4 und 5 steht die Vorgabe der Woche noch nicht – …“) – kein Hindernis, die Leitung darf Woche für Woche
+  eintragen. „Was fehlt noch?“ springt an den Kasten Veto.
+
+**`matches_v2.flow.veto`** (intern wie `flow.checkin`, nur Staffeln mit Vorlage schreiben es):
+
+| Feld | Inhalt |
+| --- | --- |
+| `version` | ganze Zahl ab 1, steigt mit jeder Änderung – die optimistische Sperre jedes Zugs |
+| `status` | `running`, `paused`, `done`, `skipped` |
+| `for_at`, `rev` | Termin und Termin-Revision (`flow.schedule_rev`, D.2), für die das Veto gilt (wie `flow.ready_for`/`ready_rev`); jeder Terminweg – auch zurück auf denselben Termin oder „Neu ansetzen“ – macht es ungültig, nach erneutem Check-in beider Seiten beginnt es neu |
+| `started_at`, `finished_at` | ISO |
+| `template` | Schnappschuss der Vorlage beim Start (`team_a`, `step_seconds`, `steps`) – eine spätere Änderung der Season ändert ein laufendes Veto nicht |
+| `week`, `presets` | Vorgabe der Woche (#2326): die Spielwoche des Spiels und der Schnappschuss `[{mode, map_id}]` der Vorgaben beim Start – `null` und `[]` ohne Schritt `preset`; eine spätere Änderung der Season ändert sie nicht |
+| `map_pool_id`, `best_of`, `map_repeat` | der Pool (geltende Version, `effective_pool`) und die Werte, mit denen gespielt wird |
+| `team_a`, `team_b` | `registration_id` je Seite; `team_a_via` `home` \| `draw`; bei `draw` dazu `draw: {at}` – serverseitig einmal gelost, nie neu bei einem Reload |
+| `step` | Index des nächsten Schritts (0-basiert); gleich der Zahl der Schritte, wenn fertig |
+| `deadline_at` | Ende des laufenden Schritts (`null` bei Pause oder fertig); nach einem Zug oder einer automatischen Wahl `jetzt + step_seconds` – nie an die alte Frist gekettet, nach einem Ausfall wählt das System also nur einen Schritt, die nächste Seite hat wieder ihre volle Zeit |
+| `steps[]` | erledigte Schritte in Veto-Reihenfolge: `{index, kind, mode, mode_label, team, registration_id, position, map_id, map_name, map_image_url, role, via, by, at}`; `role` wie #1931 (`banned`, `picked`, `decider`), dazu `preset` (Vorgabe der Woche), `via` `side` (Captain/Vertreter), `auto` (Zeit abgelaufen, Decider oder Vorgabe der Woche), `by` die Person (nur bei `side`) |
+| `paused` | `{at, by, reason, remaining_seconds}` oder `null` |
+| `lead_log[]` | Eingriffe der Leitung `{action, at, by, reason}` |
+| `skipped_reason` | bei `skipped` der Satz, warum (Vorlage passt nicht zu Best of oder Pool dieses Spiels) |
+
+Beim Start liest der Server `effective_pool` und `result_best_of` des Spiels und prüft die Vorlage dagegen; passt sie nicht (anderes Best
+of einer Liga N, Pool ohne die Modi), schreibt er `status: "skipped"` mit Grund – das Spiel läuft dann wie ohne Veto (Stand `ready`), die
+Matchseite nennt den Grund. Jede Person, die am Zug ist, kommt in `flow.user_ids` (Datenschutz wie D.2). **Gesperrte Staffel**
+(`tournament.locked_at`, Codex zu D.3): `ensure_started` und `settle_due` schreiben nichts – der Seitenaufruf liest nur, Zug und Eingriff
+antworten 423, der Job lässt die Staffel aus; nach dem Entsperren holt der nächste Aufruf Start und Fristen nach. Die Übersicht je Modus
+zeigt bei `map_repeat: never` eine in einem anderen Modus gewählte Map als `elsewhere` („in anderem Modus gespielt“), nicht als `open`.
+
+**Stand:** `checkin_rules.veto_pending(match, tournament)` ist `True`, wenn die Staffel eine aktive Vorlage trägt (`enabled`, Schritte)
+und das Veto zum geltenden Termin fehlt (es beginnt beim nächsten Lesen oder Zug) oder `running`/`paused` ist. Dann zeigt
+`match_flow.state` `veto`; `done` und `skipped` ergeben `ready`. Der Start (D.2) sagt bis dahin „Erst das Veto abschließen, dann starten.“,
+die Meldung der Captains (`report_refusal`) „Erst das Veto abschließen – dann melden.“ (die Leitung über `/result` bleibt frei).
+
+**Start** (`league_veto.ensure_started`): sobald beide Seiten für den geltenden Termin eingecheckt sind – im Check-in selbst
+(`became_ready`), sonst beim nächsten Lesen der Matchseite, beim ersten Zug, beim Start oder im Job. Geschrieben wird genau einmal je Termin
+mit Bedingung „kein `flow.veto` für diesen `for_at`“; gleichzeitige Leser gewinnen nie beide. Team A nach `team_a`, erste Frist
+`jetzt + step_seconds`. Protokoll `match.veto.start` (`team_a`, `team_a_via`, `map_pool_id`), Nachricht (Art `match_call`, Thema
+Match-Erinnerungen): an die Verantwortlichen von Team A „Veto läuft – ihr seid am Zug“, an Team B „Veto läuft – … beginnt“ (`meta.reason`
+`veto_start`, Schlüssel `veto-start:<spiel>:<started_at>`). Je Schritt gibt es keine Nachricht (60 Sekunden – die Seite zeigt es).
+
+**Zug** `POST /api/matches/{id}/veto/pick` `{map_id, version}` – Captain oder Vertreter (ohne beide die Hauptteam-Leitung,
+`acting_registration`) der Seite, die laut Schritt am Zug ist; die Leitung zieht nicht (Nr. 23: nach Ablauf wählt das System). Prüfungen
+mit deutschem Satz: Staffel mit Vorlage (409), Veto läuft (`paused`: „Das Veto ist pausiert – …“, `done`: „Das Veto ist abgeschlossen.“),
+`version` gleich dem Stand (sonst 409 „Gerade hat sich am Veto etwas geändert – bitte die Seite neu laden.“), richtige Seite (sonst 409
+„Jetzt ist … am Zug.“), Unbeteiligte 403, die Map wählbar (422 „… ist hier nicht wählbar – …“: nicht im Pool für den Modus, schon
+gesperrt oder gewählt, oder sie ließe die Serie nicht vervollständigen). **Wählbar** ist nur, was `map_pools.allowed` für genau diesen
+Modus freigibt, im Modus noch offen ist und nach dem die restlichen Schritte noch aufgehen (`league_veto_rules.allowed_options`:
+Simulation, bei `never` eine Suche mit Merkliste). Vor dem Zug räumt der Server abgelaufene Fristen auf (siehe Zeit). Geschrieben wird
+unter der Turniersperre (`_serialized_match_write`) mit Bedingung auf `flow.veto.version` und `status: "running"`: Der Schritt kommt an
+`steps[]`, `step` und `version` steigen, die nächste Frist beginnt. Ist der nächste Schritt ein `decider`, setzt ihn derselbe Zug sofort
+(`via: "auto"`, einzige übrige Map). **Idempotent:** derselbe Zug (gleiche Seite, gleiche Map, `version` um eins älter, der Schritt steht
+schon) antwortet `idempotent_replay`; zwei verschiedene Züge auf denselben Stand: der zweite bekommt 409 – nichts doppelt, nichts verloren.
+Protokoll `match.veto.step` (`index`, `kind`, `mode`, `map_id`, `registration_id`, `via`).
+
+**Zeit** (Nr. 23): Ist `deadline_at` erreicht, wählt das System zufällig und gleichverteilt (`secrets.SystemRandom`) aus den wählbaren
+Maps – auch, wenn nur die Vervollständigbarkeit die Wahl einschränkt – und schreibt den Schritt mit `via: "auto"` (`league_veto.settle_due`,
+Bedingung auf `version`, deshalb auch ohne Sperre sicher). Das macht der Job `league_veto` (`scheduler`, alle 10 Sekunden, nur eine Abfrage
+auf den Teil-Index `veto_deadline` über `flow.veto.deadline_at` bei `status: "running"`, Schreiben unter der Turniersperre), dazu der
+Fristen-Job (`match_deadline_sweep`, für die Abnahme per `--job match_deadlines`) und – damit die Seite nie auf einen Job wartet – jedes
+Lesen der Matchseite und jeder Zug. Idempotent: Ein zweiter Lauf findet nichts mehr, auch nach einem Neustart des Schedulers.
+
+**Abschluss:** Nach dem letzten Schritt `status: "done"`, `finished_at`, und am Spiel `planned_games[]` (öffentlich, nach `position`
+sortiert) mit denselben Schlüsseln wie `games[]` – `{position, mode, mode_label, mode_icon_url?, map_id, map_name, map_image_url}` als
+Schnappschuss aus dem Pool – dazu `role` (`picked` \| `decider`, Begriffe wie #1931, oder `preset` für die Vorgabe der Woche an ihrer
+Position) und `by_registration_id` (die wählende Seite, bei Decider und Vorgabe `null`). `map_pool_id` wird gesetzt, wenn leer (wie `remember_pool`). Stand `ready`, Protokoll `match.veto.done`, Nachricht an
+beide Seiten „Veto abgeschlossen – die Spielreihenfolge steht, ihr könnt starten“ (`veto_done`, `veto-done:<spiel>:<finished_at>`).
+**Ergebnis:** Das Meldeformular übernimmt Modus und Map je Position aus `planned_games` (fest, nur Sieger, Punkte und Aufstellung
+werden eingetragen); der Server prüft die Meldung der Captains dagegen (`league_games.normalize_games`, 422 „Map 2: laut Veto wird hier …
+gespielt.“) – die Leitung trägt über `/result` frei ein und korrigiert. `games[]`, `same_outcome`, die App-Bestätigung ohne Maps und
+Spiele ohne `planned_games` bleiben unverändert. Nach `started_at` ändert niemand mehr still etwas am Veto.
+
+**Leitung** `POST /api/matches/{id}/veto/lead` `{action, reason, version, conflict_reason?}` – Liga-Recht `matches`, Befangenheit wie
+B.1 (403, Superadmin mit `conflict_reason`), Grund 5–500 Zeichen, `version` wie beim Zug:
+
+| `action` | Wirkung |
+| --- | --- |
+| `pause` | `running` → `paused`, `paused.remaining_seconds` = Rest der Frist |
+| `resume` | `paused` → `running`, Frist = jetzt + Rest |
+| `undo` | nimmt den letzten Zug einer Seite zurück (automatische Schritte danach – Decider, Vorgabe der Woche – gehen mit; das System setzt sie gleich wieder, wenn sie an der Reihe sind); gibt es noch keinen Zug einer Seite, 409; nur solange nichts begonnen (`started_at`) und nichts gemeldet ist – auch bei `done` (dann wieder `running`, `planned_games` fällt weg) |
+| `restart` | beginnt die Vorlage von vorn, Team A bleibt (ein Los wird nicht neu gezogen) |
+
+Jeder Eingriff steht in `lead_log[]` und im Protokoll `match.veto.lead` (`action`, `reason`); die Matchseite zeigt Pause und Grund beiden
+Seiten.
+
+**Matchseite** – Block `checkin.veto` (nur Staffeln mit Vorlage, nur Beteiligte und Leitung, sonst `null`): `status`, `skipped_reason`,
+`version`, `step_seconds`, `team_a {registration_id, name, via}`, `team_b {registration_id, name}`, `current` (`{index, number, total, kind,
+mode, mode_label, mode_icon_url?, registration_id, name, position, deadline_at, remaining_seconds}` oder `null`), `own_turn`, `can_pick`,
+`pick_hint`, `options[]` (alle Maps des Modus des laufenden Schritts `{map_id, name, image_url, allowed, hint}`), `remaining[]` je Modus
+`{mode, label, icon_url?, maps: [{map_id, name, image_url, status: open|banned|picked|decider|preset|elsewhere, by_name, position}]}`,
+`history[]` (`{index, kind, mode_label, name, map_name, position, via, at}`), `planned_games[]`, `paused {at, reason, remaining_seconds}`,
+`lead {can_act, conflict}` (nur Leitung). Vorgabe der Woche (#2326): `week` (Spielwoche des Spiels), `presets[]` (`{mode, mode_label,
+mode_icon_url?, position, map_id, map_name, map_image_url}` – vor dem Start die geltenden der Season, danach der Schnappschuss des Vetos)
+und `blocked` (`{week, text}`, nur im Stand `waiting`, wenn die Vorgabe fehlt oder nicht passt; sonst `null`). Im Brett steht die
+vorgegebene Map von Anfang an als `preset`, bei `never` in den anderen Modi als `elsewhere`. Der Veto-Block zeigt die Vorgabe schon vor
+dem Check-in („Vorgabe der Woche · Spielwoche 2“) und sagt im Wartestand „Veto wartet auf die Vorgabe der Woche“ samt dem Satz, dass
+nichts von selbst gewertet wird. `start` (nur im Stand `waiting`, sonst `null`): Die nachgetragene Vorgabe steht,
+das Veto wartet auf „Bereit zum Veto“ beider Seiten (oder die Vorgabe fehlt wieder und eine Seite ist schon bereit – dann neben
+`blocked`, nur zum Zurücknehmen) – `{sides: [{registration_id, name, ready, own}], own_ready, other_ready, can_ready,
+can_withdraw, hint, lead: {can_start, conflict} | null}`. Überschrift „Vorgabe steht – bereit zum Veto?“, je Seite „bereit“ oder „noch
+nicht bereit“, der Satz darunter je nach Stand („Ihr seid bereit – wartet auf die Gegenseite.“, „… ist bereit – tippt auf ‚Bereit zum
+Veto‘, dann beginnt es sofort.“), Knopf **Bereit zum Veto** bzw. **Doch nicht bereit** nur für die Seiten, für die Leitung der Kasten
+**Notfall: Veto starten** mit Pflichtgrund. Im Wartestand (Vorgabe fehlt oder Start steht aus) fragt die Seite alle 3 Sekunden nach,
+sobald beide Seiten eingecheckt sind – so sieht jede Seite ohne Neuladen, dass die andere bereit ist. **Detail-Runde:** Die Karte der
+Vorgabe (`.tls-veto-preset` in `index.css`) hebt sich beim Aufbau 6 px an und blendet ein (`--tls-motion-mid`, `--tls-ease`), gestaffelt
+um 40 ms je Karte wie die übrigen Map-Karten (`--tls-i`), danach leuchtet ihr Rahmen einmal auf (`--tls-motion-glow`). Bewegt werden nur
+`transform` und `opacity`; die Karte erscheint einmal, das Nachfragen baut sie nicht neu auf. Mit „Bewegung reduzieren“ ist sie sofort da. D.3 zeigt das schlicht im Check-in-Block (wer am Zug ist, Countdown, verbleibende Maps je Modus,
+Wählen, Verlauf, am Ende die Spielreihenfolge) mit kurzem Polling alle 3 Sekunden; die Live-Oberfläche mit Animationen ist D.4 (unten).
+
+**Datenschutz:** `flow.veto` ist intern (`flow` in `match_public_view.INTERNAL_KEYS`); `planned_games` ist öffentlich (keine Personen).
+Auskunft `league_checkin` (`match_flow.export_snapshot`) nennt je Spiel die eigenen Züge (`veto_step`: Schritt, Art, Zeit, Seite) und
+Eingriffe als Leitung (`veto_lead`: Vorgang und Zeit). Kontolöschung (`match_flow.scrub_person`): `steps[].by`, `paused.by` und
+`lead_log[].by` werden `null`, die Züge bleiben (Sportdaten).
+
+**Rechte** (Ergänzung der Matrix in B.1):
+
+| Route | Liga-Recht | Befangenheit | Helfer |
+| --- | --- | --- | --- |
+| `GET …/seasons/{id}/veto-rules`, `GET …/veto-rules/proposal` | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/veto-rules` | `season` | – | – |
+| `GET …/seasons/{id}/veto-presets` (#2326) | jede Zuständigkeit der Liga | – | – |
+| `PUT …/seasons/{id}/veto-presets` (#2326) | `season` | – | – |
+| Spiel: `POST /veto/pick` | keins – nur Captain oder Vertreter der Seite am Zug | – | – |
+| Spiel: `POST /veto/ready` (#2326, Nr. 127) | keins – nur Captain oder Vertreter der eigenen Seite | – | – |
+| Spiel: `POST /veto/start` (#2326, Nr. 127: Notfall-Start) | `matches` | ja (Notausnahme `conflict_reason`) | – |
+| Spiel: `POST /veto/lead` | `matches` | ja (Notausnahme `conflict_reason`) | – |
+
+**Verwaltung:** Season-Seite, Reiter Spielbetrieb, Kasten **Veto** (Sprungmarke `#veto`, nach „Serie“ – die Vorlage bezieht sich auf
+Best of und „Modus je Map“ darüber): an/aus, Team A = Heim oder Los, Zeit je Schritt, Schrittliste (hinzufügen, nach oben/unten, löschen)
+mit Prüfung live (`frontend/src/lib/leagueVeto.js`, dieselben Sätze wie der Server für Positionen und Poolgrößen; die Suche bei `never`
+und der Abgleich mit dem gespeicherten Pool kommen vom Server), Knopf **„Vorschlag aus Modusfolge und Pools“**, eigener Knopf
+**„Veto speichern“**. „Was fehlt noch?“ springt bei `veto_invalid` an den Kasten, bei `veto_without_checkin` zum Check-in.
+Die Art **„Vorgabe“** (`preset`) steht in der Auswahl neben Sperren, Wählen und Decider – ohne Team („Liga-Leitung“), mit Position.
+Enthält die gespeicherte Vorlage sie, steht **im selben Kasten** der Block **„Vorgabe der Woche“**
+(`pages/admin/league/SeasonVetoPresets.jsx`, #2326): je Spielwoche eine Zeile mit den Tagen der Woche und je Modus einer Auswahl aus dem
+Pool, oben „Es fehlen noch: Spielwoche 3, 4 und 5.“ (fehlende Wochen sind markiert), Knopf **„Rotiert automatisch durch den Pool“**
+(füllt **nur leere Wochen** als Vorschlag – was schon gewählt ist, bleibt; danach einzeln änderbar, nichts gespeichert), daneben
+**„Alle neu verteilen“** (ersetzt auch gewählte Wochen, mit Rückfrage „Das überschreibt N gewählte Wochen“ – ohne betroffene Woche
+ohne Rückfrage). **Vergangene Wochen und Wochen mit begonnenem Veto** (`past`, `started`) fasst keiner der beiden Knöpfe an; die Zeile
+nennt „vorbei“ bzw. „Veto begonnen“, von Hand bleibt sie änderbar. **Geänderte Wochen** bleiben bis zum Speichern als „geändert“
+markiert. Eigener Knopf **„Vorgaben speichern“** und darunter der **Verlauf** aus dem Protokoll. Steht die Art erst im ungespeicherten Formular, sagt der Block „Sobald das Veto damit an und gespeichert
+ist …“. **Eine Map, die den Pool verlassen hat, wird nicht still verworfen** (Review): Die Zeile zeigt „nicht mehr im Pool“ und in der
+Auswahl „Map nicht mehr im Pool – bitte neu wählen“, oben steht, welche Wochen es betrifft. Das Speichern anderer Wochen schickt sie
+unverändert mit; erst neu wählen oder ausdrücklich leeren nimmt sie heraus. `veto_preset_missing` führt hierher.
+
+**Regelwerk:** Baustein `[[baustein:veto]]` nach dem Muster der Bausteine aus den Einstellungen (#2269: Daten und Darstellung in
+`league_rule_facts.veto_data`/`render_veto`, registriert in `league_rule_blocks.BLOCKS`, eingefroren als `{label, source, data}`):
+Team-A-Regel, Zeit je Schritt und die Schritte als Liste („1. Team A sperrt eine Map (Stellung)“, „3. Team A wählt Map 1 (Stellung)“,
+„11. Die übrige Map wird Map 3 (Kontrolle)“); aus heißt „*In dieser Season gibt es kein Veto – die Maps werden beim Ergebnis eingetragen.*“.
+Dazu die Variablen `{{veto.step_seconds}}` („60 Sekunden“) und `{{veto.team_a}}` („das Heimteam laut Spielplan“ / „per Los je Spiel“).
+Vorgabe der Woche (#2326): Der Baustein nennt den Schritt („9. Die Liga-Leitung gibt Map 3 je Spielwoche vor (Kontrolle)“) und die Regel
+dazu als eigenen Punkt (gilt für alle Spiele des Spieltags, auch ein verschobenes; nicht sperrbar, nicht wählbar; ohne Vorgabe beginnt
+das Veto nicht). **Welche Map es je Woche ist, steht nicht im Baustein**, sondern in der Variable `{{veto.presets}}`
+(`league_rule_facts.veto_presets_text`) – so löst eine neue Vorgabe nur dort „Regelwerk muss freigegeben werden“ aus, wo ein Regelwerk
+die Variable verwendet, und die Regel selbst bleibt freigegeben.
+Beides ist Teil von Fingerabdruck und Vorschlag: Eine geänderte Vorlage löst „Regelwerk muss freigegeben werden“ aus (`data_changes`,
+`pending_release`), die veröffentlichte Fassung zeigt bis zur Freigabe ihren Stand von damals.
+
+**App und TV:** lesen weiter `status` und `started_at`; `mobile/` unverändert. Die TV-Ansicht des Vetos kommt mit D.4 (`/display/veto/<Spiel>`). **Audit-Aktionen neu:** `match.veto.start`,
+`match.veto.step`, `match.veto.done`, `match.veto.lead`, `league.season.veto_rules`; seit #2326 `match.veto.waiting`, `match.veto.ready`, `match.veto.ready_side`
+und `league.season.veto_presets`.
+
+### D.4 Veto live (#1651)
+
+Die Live-Oberfläche des Vetos aus D.3 für beide Captains, Zuschauer und TV. **Der Zustandsautomat bleibt unverändert** (`league_veto`:
+Start, Zug, Zeit, Leitung) - D.4 liest nur, dazu kommt die Erinnerung „Map-Veto wartet“. **Migration: keine.** Kein WebSocket: Live
+heißt kurzer Abruf, dazu der Änderungsstrom (ein Zug ist ein `POST`, der Strom meldet ihn).
+
+**Kurzer Abruf** `GET /api/matches/{id}/veto` (`routes/league_veto_routes.py`, `?display=1`, `?key=`): der Veto-Block ohne die ganze
+Matchseite, dazu `now` (Serverzeit), `state` (Stand des Check-ins, nur Beteiligte) und `match` (`{id, tournament_id, tournament_title,
+matchday_label, scheduled_at, sides[]}` - was die öffentliche Matchseite ohnehin zeigt; `tournament_id` grenzt am TV den Änderungsstrom
+auf die Staffel ein). Ohne Vorlage an der Staffel oder bei klassischen Spielen
+`{veto: null}`.
+
+| Wer | Was | Schreibt |
+| --- | --- | --- |
+| Beteiligte (Captain, Vertreter, Kader - wie `involved` der Matchseite) und Leitung (`matches`) | derselbe Block wie `checkin.veto` der Matchseite (`league_veto.live_block`) | wie die Matchseite: `ensure_started`, `settle_due`; dazu `mark_seen` für die eigene Seite (siehe Erinnerung) |
+| alle anderen, `display=1` (TV) und mit `key` | die Sicht für Zuschauer (`league_veto.spectator_view`) | nichts - Start und Fristen löst der Aufruf der Beteiligten bzw. der Job (`league_veto`, alle 10 Sekunden) |
+
+Sichtbarkeit wie die Matchseite (`_assert_match_visible`: Staffel bzw. Season - die Season reicht ihre Sichtbarkeit an die Staffeln
+weiter, `staffel_visibility`). Mit dem **Anzeige-Schlüssel** des Turniers (`key`, wie Turnierbaum und Stationen, `DISPLAY_GRANT`) auch
+ohne Anmeldung und für Staffeln „Nur Mitglieder“, aber **nie** für eine Staffel im Entwurf oder eine interne (Season „aus“ bzw. „nur
+Verwaltung“: `internal`, nicht öffentlich) - dieselbe Regel wie beim Event-TV (`tv_display.shown_on_event_tv`). Ein unbekanntes Spiel,
+ein falscher, widerrufener oder fremder Schlüssel und eine solche Staffel antworten gleich (403 „Dieser TV-Link gilt nicht mehr …“) - die
+Antwort verrät nicht, welche Spiele es gibt; abgelaufen 403 wie beim Turnierbaum. **Limit und Zwischenspeicher** (Review): Zuschauer, TV
+und Abrufe mit Schlüssel zählen je Adresse und je Schlüssel (nur ein Hash davon) höchstens 600 Abrufe je Minute (`veto_live_address`,
+`veto_live_key`, 429 mit Wartezeit). Die Zuschauer-Sicht gilt 2 Sekunden für alle (`SPECTATOR_CACHE_SECONDS`, je Spiel), solange sich am
+Spiel nichts geändert hat - der Schlüssel ist `updated_at` und der Stand des Vetos aus dem frisch gelesenen Spiel, ein neuer Zug ist also
+sofort sichtbar; `server_now` und `current.remaining_seconds` setzt jeder Abruf neu. Beteiligte und Leitung gehen nie über Limit oder
+Zwischenspeicher. **Zuschauer-Sicht:** `own_turn`/`can_pick` falsch,
+`own_side`, `options`, `lead`, `start`, `blocked` leer, bei einer Pause ohne `paused.reason` (den Grund schreibt die Leitung frei) und mit
+`pick_hint` „Das Veto ist pausiert – die Liga-Leitung setzt es fort.“; vor dem Start nur die Vorgabe der Woche. Personen stehen nie im
+Block, nur die Namen der Seiten. Die Matchseite liefert Zuschauern denselben Block als `veto_view` (nur ohne `checkin`); Beteiligte
+bekommen `veto_view: null`.
+
+**Neue Felder im Veto-Block** (Matchseite und Abruf, nur lesend): `plan[]` - der ganze Ablauf als Zeitleiste, je Schritt der Vorlage
+`{index, number, kind, mode, mode_label, mode_icon_url?, side ("A"|"B"|null), name, position, state ("done"|"current"|"open"), map_id,
+map_name, map_image_url, via}` (`league_veto._plan_rows`, ohne Personen); `remaining[].maps[].side` (welche Seite gesperrt bzw. gewählt
+hat); `own_side` (die eigene Seite, sonst `null`); `server_now` (ISO, Zeitpunkt der Antwort).
+
+**Takt** (`frontend/src/lib/leagueVeto.js`, `vetoPollMs`; `hooks/useVetoPolling.js`): läuft 2 s, Pause 5 s, Warten auf „Bereit“ oder die
+Vorgabe 3 s (nur mit beiden Seiten eingecheckt), sonst nie; im Hintergrund-Tab (`document.hidden`) gar nicht, beim Zurückkommen
+(`visibilitychange`) sofort einmal; kurz nach der Frist (800 ms) einmal extra, dann steht die Zufallswahl. Die Matchseite übernimmt die
+Antwort in den geladenen Stand (`mergeLiveVeto`): Bleiben Stand und Status gleich, ersetzt sie nur den Veto-Block; beginnt oder endet das
+Veto, lädt die Seite einmal ganz (Start-Knopf, Meldeformular). Der TV fragt vor dem Start und nach dem Ende alle 10 Sekunden.
+
+**Countdown nach der Serverzeit:** Abstand Serveruhr - Geräteuhr aus `server_now` (`vetoClockOffset`, wie `seasons/clock.serverOffset`),
+die Frist des Servers wird in Geräte-Zeit umgerechnet (`vetoDeadline(block, offset)`) - ein Gerät, das Minuten nachgeht, zählt trotzdem
+richtig. Läuft die Zeit ab, steht „Zeit um“; gewählt wird nur auf dem Server (Nr. 23).
+
+**Darstellung** (`components/tls/league/VetoLive.jsx`, Regeln in `index.css` „Map-Veto live“, TV in `tv.css`): Map-Karten mit Bild im Stil
+der Veto-Karten der Team-Liga (`maps.css`, #1616); Team A blau (`--tls-brand`), Team B orange (eigenes Rot-Orange `--tls-veto-b`, 255 112 32 in
+`styles/system.css` - bewusst keine Status-Farbe: Warn-Orange, Rot und Gold heißen schon Achtung, läuft bzw. Decider, Violett ist die Art
+„Event“; Kontrast auf dem Grund 7,2 : 1, als Schild mit dunkler Schrift 7,4 : 1), Decider gold, Vorgabe der
+Woche grün. Zustände: offen; gesperrt (gedimmt, leicht abgesenkt, Bann-Symbol, „gesperrt von …“); gewählt (Schild „Map N“ in der Farbe
+der Seite); Decider; Vorgabe der Woche (wie #2326). Ist die eigene Seite am Zug, sind die Karten des laufenden Modus die Auswahl
+(`veto-option-*`), nicht wählbare ausgegraut mit Hinweis. **Detail-Runde:** gestaffelter Aufbau (40 ms je Karte), Anheben eigener
+wählbarer Karten unter dem Zeiger (nur `hover: hover` und `pointer: fine`), Nachgeben beim Antippen, einmaliges Aufleuchten jeder Wahl und
+jeder Aktion der Gegenseite (die eigene Sperre dimmt nur; Zuschauer sehen jede Aktion als neu; `freshCards`), ein nachzeichnender Rahmen
+um den Modus des laufenden Zugs (vier Kanten, `scale`). Bewegt werden nur `transform` (auch `translate`/`scale`) und `opacity`, mit den
+Bewegungs-Variablen; „Bewegung reduzieren“ (bzw. am TV „Bewegung aus“) zeigt alles sofort, der Ring läuft dann ohne Bild-Schleife.
+Countdown: Ring und Restzeit, die letzten 10 Sekunden rot mit Sanduhr und „gleich vorbei“ (auch ohne Farbe und ohne Bewegung lesbar), der
+Ring atmet dazu ruhig (nur ohne „Bewegung reduzieren“). **Ablauf-Leiste:** jeder
+Schritt mit Art, Seite, Modus und Ziel; fertige zeigen die Map (Zufallswahl mit Symbol), der laufende ist markiert und rückt in der Leiste
+in die Mitte (nur die Leiste scrollt). **Stabile Schlüssel:** Karten `Modus:Map`, Schritte nach Index, Rahmen nach Schritt - der Abruf
+baut nichts neu auf, spielt nichts ab, der Fokus bleibt.
+
+**Barrierefreiheit:** Karten sind Knöpfe mit Namen und Zustand („Hafen: offen – antippen zum Sperren“); Schritte der Leiste mit Satz
+(„Schritt 2 von 11: Falken sperrt eine Map (Stellung) – läuft“, `aria-current="step"`); der Countdown sagt höflich nur bei 30, 10 und 5
+Sekunden und beim Ablauf an; der letzte Schritt steht in einer höflichen Ansage.
+
+**Zuschauer und TV:** Die Matchseite zeigt Zuschauern das laufende Veto nur lesend (`readOnly`, ohne Auswahl, Eingriff und Bereit-Block).
+**TV** `/display/veto/<Spiel>` (`pages/display/VetoTVPage.jsx`, fragt immer mit `display=1`): ohne Schlüssel sichtbar wie die
+Matchseite (öffentliche Staffel ohne Anmeldung, „Nur Mitglieder“ nur angemeldet); mit `?key=` (Anzeige-Schlüssel des Turniers aus TV &
+Beamer) auch ohne Anmeldung für Staffeln „Nur Mitglieder“ - nie für Entwurf oder interne Staffel (siehe oben); ein ungültiger Schlüssel
+zeigt „Dieser TV-Link gilt nicht mehr“ und nichts vom Inhalt. Links wer am Zug ist mit großem Countdown, rechts das Brett je Modus,
+darunter der Ablauf; nach dem Ende die Spielreihenfolge als große Karten; QR-Code zur Matchseite (ohne Schlüssel). Eine ältere Antwort
+überschreibt nie eine neuere (`isOlderVeto`: Serverzeit, bei gleicher Zeit die Version - wie `mergeLiveVeto` auf der Matchseite). Link
+„TV-Ansicht“ im Veto-Block der Matchseite.
+
+**Erinnerung „Map-Veto wartet“** (`league_veto.nudge_target`/`nudge_due`, Job `league_veto` nach dem Auflösen der Fristen,
+`league_veto_sweep.nudge`): an Captain und Vertreter der Seite am Zug (`responsible_user_ids`), Art `match_call`, Thema Match-Erinnerungen,
+`meta.reason` `veto_turn`, Schlüssel `veto-turn:<spiel>:<started_at>:<neustarts>:<schritt>:<seite>` - **höchstens eine je Schritt und
+Seite** (Merker `flow.veto_nudge = {key, at}` mit Bedingung auf Version und Schlüssel). `<neustarts>` zählt die Eingriffe „Schritt zurück“
+und „Neu starten“ in `lead_log` (Review): Beginnt derselbe Schritt dadurch neu, gibt es wieder eine Erinnerung; Pause und Fortsetzen
+bleiben derselbe Schritt. Fällig, wenn: das Veto läuft, der Schritt ein Zug einer
+Seite ist (nie Decider oder Vorgabe), seit **20 Sekunden** kein Zug (Zeit je Schritt minus Rest), noch mindestens **5 Sekunden** übrig,
+die Staffel nicht gesperrt und die Seite das Veto **nicht offen** hat. „Offen“ heißt: Captain oder Vertreter der Seite hat in den letzten
+**15 Sekunden** den kurzen Abruf gemacht - der sichtbare Tab fragt alle 2 Sekunden, im Hintergrund nie. Der Abruf vermerkt das als
+`flow.veto_seen.<Anmeldung> = <Zeit>` (höchstens alle 5 Sekunden ein Schreiben, nur solange das Veto läuft, ohne Person und ohne
+`updated_at`). Die Werte stehen als Konstanten in `league_veto.py` (`NUDGE_IDLE_SECONDS` usw.); einstellbar machen kann sie #1647.
+Satz: „Ihr seid im Map-Veto am Zug: sperrt eine Map (Stellung). Noch 35 Sekunden – danach wählt das System.“
+
+**Datenschutz:** `flow.veto_seen` und `flow.veto_nudge` sind intern wie `flow` (keine Personen, nur Anmeldungen und Zeiten); die
+Zuschauer-Sicht nennt keine Personen und keinen Grund einer Pause.
+
+### D.5/E.2-Vertrag: Vorfälle, Verfahren und Nachweise (#2360)
+
+Regelwerk v2 § 9, § 9a, § 10, § 12, § 13 und Anlage C; Entscheidungen Nr. 24, 29, 30, 31, 41, 45, 63, 103, 109, 121 und 129–136.
+Dieser Abschnitt ist der gemeinsame Vertrag für **D.5 Vorfälle** und **E.2 Proteste** (#1619). Gebaut ist davon mit #2360 nur der
+**Nachweis-Baustein** (Unterabschnitt „Nachweise“); alles andere legt Namen, Felder und Regeln fest, an die sich beide Pakete halten.
+Nur Liga-Staffeln (Turnier mit `league_context`). **Turniere bleiben, wie sie sind:** „Problem melden“ mit 30 Minuten
+(`match_disputes.DISPUTE_WINDOW_MINUTES`), ein Foto je Meldung, 30 Tage Aufbewahrung. **Migration: keine**, jedes Feld ist optional.
+
+#### Season-Felder
+
+Alle Felder stehen an `league_seasons` und an der Staffel (`tournaments`). Zur Laufzeit zählt der Wert der Staffel, ohne Feld der
+der Season, ohne beides die Vorgabe aus `services/league_presets.PRESETS` (die **eine** Quelle für Vorgaben, ein Blatt-Modul;
+`league_rule_vars.PRESETS` ist derselbe Wert; D.5 und E.2 tragen ihre neuen Felder dort ein). Liga N weicht nicht ab (kein `overrides`-Eintrag). Übertragen wird in zwei eigenen Gruppen von `SYNC_GROUPS`, die wie
+`checkin` auch in einer laufenden Season gelten, nicht in einer gesperrten Staffel: `incidents` (D.5) und `protests` (E.2). Jeder Vorfall
+und jedes Verfahren **speichert seine berechneten Fristen**; eine geänderte Einstellung wirkt nur auf neue Fälle.
+
+| Feld | Typ | Vorgabe | Paket | Bedeutung |
+| --- | --- | --- | --- | --- |
+| `map_break_after` | int 1–7 | 2 | D.5 | reserviert (#2269): Standardpause nach dieser Map (Anlage C.3) |
+| `map_break_minutes` | int 0–60 | 5 | D.5 | reserviert: Dauer der Standardpause |
+| `incident_answer_minutes` | int 1–120 | 10 | D.5 | neu: Antwortzeit der Gegenseite auf einen Vorfall (Nr. 131); läuft ohne Ruhen, sie liegt mitten im Spiel |
+| `incident_quota_per_map` | int 0–5 | 1 | D.5 | neu: Rehosts und technische Pausen je Team und Map (§ 9.6) |
+| `clarification_mode` | `"continue"` \| `"pause_series"` | `"continue"` | D.5 | neu: Serie bei Map „in Klärung“ (Nr. 132) |
+| `protest_hours` | int 1–336 | 48 | E.2 | reserviert: Protestfrist ab Bestätigung des Ergebnisses (Nr. 129, 63) |
+| `statement_hours` | int 1–336 | 48 | E.2 | neu: Frist der Gegenseite für die Stellungnahme, ab Benachrichtigung (Nr. 133) |
+| `protest_target_hours` | int 1–720 | 72 | E.2 | neu: Zielfrist der Leitung ab „übernommen“ (Nr. 135); danach Erinnerung und Eskalation, nie eine automatische Entscheidung |
+| `protest_escalate_hours` | int 1–336 | 24 | E.2 | neu (Entscheidung Fabian 12.11.): so lange nach der Zielfrist geht ein offenes Verfahren an `manage` |
+| `appeal_hours` | int 1–336 | 48 | E.2 | reserviert: Einspruchsfrist ab Bekanntgabe der Entscheidung (Nr. 41, 45); E.3 nutzt dasselbe Feld für Strafen |
+| `moss_upload_hours` | int 1–168 | 24 | E.2 | neu: Frist für eine angeforderte MOSS-Datei (§ 9a.3) |
+| `protest_reasons` | `[{key, label, ask_notified}]`, 1–20 | siehe unten | E.2 | neu: Gründe zum Antippen (Nr. 134); `ask_notified` stellt die Pflichtfrage „sofort hingewiesen?“ |
+| `contested_result_mode` | `"counts"` \| `"excluded"` | `"counts"` | E.2 | neu: angefochtenes Ergebnis in der Tabelle (Nr. 30) |
+| `evidence_keep_days` | int 0–365 | 30 | E.2 | reserviert: Aufbewahrung der Nachweise nach Season-Ende (Nr. 31, 136); gelesen seit #2360 |
+
+Vorgabe für `protest_reasons`: `wrong_result` „Falsches Ergebnis“, `rule_violation` „Regelverstoß“, `equipment` „Ausrüstung“
+(`ask_notified`), `lobby` „Lobby und Einstellungen“ (`ask_notified`), `player` „Spielberechtigung eines Spielers“ (`ask_notified`),
+`cheating` „Cheat-Verdacht“, `technical` „Technik“, `other` „Sonstiges“. Die vier Schlüssel von „Problem melden“
+(`match_disputes.CATEGORIES`) bleiben darin erhalten, das Alt-Feld `category` wird weiter mitgeschrieben.
+
+**Fristen in Stunden ruhen in Sperrzeiten** (Nr. 29, 133): gerechnet wird mit `matchday_schedule.response_deadline(tournament, start, hours)`
+(Sperrzeiten und Sperrwochen zählen nicht mit), gespeichert als ISO-Zeit am Fall. Neue Variablen für den Regeltext kommen mit dem
+jeweiligen Paket nach dem Muster der reservierten (`incident.answer_minutes`, `statement.hours`, `protest.target_hours`, `moss.upload_hours`).
+
+#### Vorfälle: `matches_v2.incidents[]` (D.5)
+
+Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder lehnt ab; ohne Einigung entscheidet die Leitung (Nr. 24, 131).
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `id` | str | Kennung, Bezug für Nachweise (`context.kind` `incident`, bei MOSS auch `moss`) |
+| `position` | int 1…Best of | Map-Position wie in `planned_games[]` und `games[]` |
+| `kind` | `disconnect` \| `rehost` \| `pause` \| `moss_crash` \| `restart_early` \| `replay` \| `other` | Art des Vorfalls |
+| `between_maps` | bool | nur bei `pause`: die Map-Pause nach Anlage C.3. Sie wird **nur dokumentiert** (`minutes`), ohne Vorschlag, Antwort und Kontingent, Stand sofort `agreed` |
+| `reported_by` | `{registration_id, user_id}` | meldende Seite und Person; die Leitung meldet mit `registration_id: null` |
+| `at` | ISO | Zeitpunkt der Meldung |
+| `score` | `{<registration_id>: int}` \| null | Stand beim Vorfall (Runden bzw. Punkte), `round` (int) und `players` (`[user_id]`, betroffene Personen) dazu optional |
+| `note` | str ≤ 500 | Beschreibung, Ursache soweit bekannt |
+| `proposal` | `continue_at_score` \| `rehost` \| `restart` \| `replay` | Vorschlag: beim Stand fortsetzen, Rehost beim Stand, Neustart in der frühen Phase (Anlage C.1, Nr. 103), Wiederholung der Map |
+| `state` | `proposed` \| `agreed` \| `rejected` \| `expired` \| `in_review` \| `decided` \| `withdrawn` \| `closed` | siehe Ablauf |
+| `answer_deadline` | ISO | `at` + `incident_answer_minutes` |
+| `answer` | `{registration_id, user_id, at, note}` \| null | Antwort der Gegenseite |
+| `review_cause` | `rejected` \| `expired` \| `lead` | warum die Leitung entscheidet; `lead`: sie hat den Vorfall selbst aufgenommen (Nr. 146) |
+| `counts_quota` | bool | zählt gegen das Kontingent: `rehost` und `pause` (ohne `between_maps`) ja, `moss_crash` nie (§ 9a.6), alle anderen nein |
+| `decision` | `{outcome, registration_id, reason, by, at, conflict_reason, missing_positions, surplus_positions, settled_at, settled_by, settle_reason}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen); `missing_positions` und `surplus_positions` (`[int]`) setzt die Leitung erst im Schritt „Serie feststellen“ (`settled_at`, `settled_by`, `settle_reason`), siehe „Fehlende und überzählige Maps“ |
+| `voided` | `{mode, map_id, score, round, at}` \| null | die für ungültig erklärte Erstaustragung bei `restart` oder `replay` |
+| `closed_at` | ISO \| null | gesetzt mit `agreed`, `decided`, `withdrawn` oder `closed` |
+| `close_reason` | `match_ended` \| `lead` | nur bei `closed`: Das Spiel endete ohne Austragung, oder die Leitung hat den Vorfall ohne Entscheidung geschlossen; dann dazu `close_note` (Begründung, Pflicht) und `closed_by` |
+
+- **Ablauf:** `proposed` → `agreed` (Gegenseite stimmt zu) oder `withdrawn` (meldende Seite zieht zurück, nur solange `proposed`
+  **und die Antwortzeit läuft** - danach liegt der Vorfall bei der Leitung, auch wenn der Zeit-Job ihn noch nicht weitergereicht hat).
+  Lehnt die Gegenseite ab (`rejected`) oder antwortet sie bis `answer_deadline` nicht (`expired`, Zeit-Job), geht der Vorfall im selben
+  Schritt auf `in_review`; `rejected` und `expired` sind keine Ruhezustände, der Grund steht in `review_cause`. `in_review` → `decided`
+  durch die Leitung (`disputes` oder `results`, Befangenheit wie B.1). `closed` beendet einen offenen Vorfall **ohne** Entscheidung
+  über die Map (siehe „Geschlossen ohne Entscheidung“). Offen ist ein Vorfall, solange er nicht `agreed`, `decided`, `withdrawn`
+  oder `closed` ist.
+- **Kontingent** (§ 9.6): je Team und Map zählen die eigenen Vorfälle mit `counts_quota` in `agreed` oder `decided`. Das System zählt und
+  zeigt „1 von 1 genutzt“ beiden Seiten und der Leitung; ein weiterer Vorfall bleibt meldbar, braucht aber die Zustimmung der Gegenseite
+  und geht sonst an die Leitung. Nichts wird automatisch verweigert oder bestraft (§ 13.1).
+- **Eine Map zählt nie doppelt** (§ 9.4, Anlage C.2.7): `games[]` trägt je Position genau **eine** geltende Austragung. Wird eine Map neu
+  gestartet oder wiederholt, steht die ungültige Erstaustragung nur in `incidents[].voided`; der geltende Eintrag in `games[]` bekommt
+  `status: "replayed"`, `replay_reason` (C.3) und neu `incident_id`. Kein Leser von `games[]` (Tabelle, Konsens, App) sieht die
+  Erstaustragung.
+- **Map-Stand „in Klärung“:** Quelle ist der Vorfall, kein zweites Feld. Eine Position ist in Klärung, solange ein Vorfall dieser
+  Position `in_review` ist und das Spiel nicht zu Ende ist. Die Matchseite liefert im Block `league` je Position `map_state`: `open` \| `in_clarification` \| `replayed` \|
+  `awarded` \| `played`, dazu `incidents[]` für Beteiligte und Leitung.
+- **Wie zählt die Map vor der Entscheidung?** Gar nicht (Nr. 132). Solange eine Position in Klärung ist, wird kein Ergebnis des Spiels
+  gültig: Melden bleibt möglich, **Bestätigen und die Frist-Automatik (`result_confirm_hours`) ruhen**, das Spiel ist nicht `completed`
+  und steht nicht in der Tabelle. `games[]` am Spiel entsteht wie bisher erst mit dem gültigen Ergebnis.
+  `clarification_mode` `continue` (Vorgabe): die Serie läuft unter Vorbehalt weiter, die Seiten spielen und melden die übrigen Maps;
+  nach der Entscheidung gilt eine zu Ende gespielte Map wie gemeldet (`no_action`), eine abgebrochene wird beim festgehaltenen
+  Stand zu Ende gespielt (`continue_at_score`, `rehost`), die Map wird wiederholt (`restart`, `replay`) oder zugesprochen
+  (`awarded` → `games[].decision: "awarded"`). `pause_series`: keine weitere Map beginnt, Meldungen mit einer
+  späteren Position lehnt der Server mit 409 ab, bis entschieden ist. Die Leitung kann die Serie in beiden Fällen jederzeit aussetzen
+  oder neu ansetzen (Anlage C.2.6).
+- **Keine Zusatz-Map auf Vorrat** (Entscheidung Fabian 11.11.): Unter Vorbehalt geht die Serie mit der nächsten Position weiter.
+  Niemand spielt vorsorglich eine Map mehr, das System verlangt keine und nimmt keine an (Best of bleibt die Obergrenze der
+  Positionen). Für den **vorläufigen** Stand der Serie gilt bis zur Entscheidung:
+  - Eine **zu Ende gespielte** Map in Klärung zählt vorläufig wie gemeldet. Strittig ist ihre Wertung, nicht ihr Endstand.
+  - Eine **nicht zu Ende gespielte** Map (Abbruch, offener Neustart, offene Wiederholung) hat keinen Sieger und zählt vorläufig
+    für **keine** Seite. Sie wird nicht „wie gemeldet“ behandelt: Zu melden gibt es nur den Stand beim Abbruch
+    (`incidents[].score`), kein Ergebnis. Die Seiten spielen die übrigen Positionen, solange die Serie ohne diese Map nicht
+    entschieden ist.
+- **Fehlende und überzählige Maps** stehen oft erst fest, wenn die Wiederholung gespielt ist - nicht schon mit der Entscheidung
+  über den Vorfall. Darum zwei Schritte der Leitung (`results` oder `disputes`, nicht befangen):
+  1. **Entscheidung** über den Vorfall (`decision.outcome`, `reason`). Lautet sie `restart` oder `replay`, setzt die Leitung die Map
+     an; gespielt und gemeldet wird sie auf dem üblichen Weg (Termin, Melden, Bestätigen). `missing_positions` und
+     `surplus_positions` bleiben dabei leer. Das Spiel bleibt offen: kein gültiges Ergebnis, nicht in der Tabelle.
+  2. **Serie feststellen**, sobald alle angesetzten Maps gemeldet sind (oder gleich mit der Entscheidung, wenn nichts mehr zu
+     spielen ist, etwa bei `continue_at_score`, `no_action` oder `awarded`): Erst jetzt trägt die Leitung
+     `decision.missing_positions` und `decision.surplus_positions` ein, mit `settled_at`, `settled_by` und dem Pflichttext
+     `settle_reason`.
+     - `missing_positions`: Die Serie ist auch mit dem jetzt geltenden Stand nicht entschieden. Die Leitung setzt die fehlende
+       Position an; nach ihrer Meldung stellt sie die Serie erneut fest.
+     - `surplus_positions`: Mit dem jetzt geltenden Stand war die Serie schon entschieden, bevor eine unter Vorbehalt gespielte
+       Map begann. Diese Maps **zählen nicht**: Sie kommen nicht in `games[]`, stehen in keiner Tabelle und keiner Map-Differenz,
+       und die Matchseite zeigt sie wie nicht gespielte Positionen mit dem Hinweis „zählt nicht (Entscheidung der Leitung)“.
+       Es bleibt bei der Regel „keine Map nach der Entscheidung der Serie“ (C.3).
+  Gültig wird das Ergebnis (Bestätigen, Frist-Automatik, Tabelle) erst, wenn die Serie festgestellt ist und keine Position mehr fehlt.
+
+**Gebaut mit D.5 (#1619):** `services/league_incidents.py` (Abläufe) und `services/league_incident_rules.py` (Regeln ohne
+Datenbank, Blatt-Modul), Routen in `routes/league_incident_routes.py`, Oberfläche `components/tls/league/IncidentPanel.jsx` (Sätze
+und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gilt:
+
+- **API** (nur Spiele einer Liga-Staffel, sonst 404; gesperrte Staffel 423; alle unter der Schreibsperre des Turniers):
+
+  | Aufruf | Wer | Wirkung |
+  | --- | --- | --- |
+  | `POST /api/matches/{id}/incidents` | Captain, Vertreter, wer angemeldet hat; sonst die Leitung mit `results` oder `disputes` (nicht befangen) | meldet: `position`, `kind`, `proposal`, freiwillig `score`, `round`, `players`, `note`; die Map-Pause mit `between_maps: true` und `minutes` |
+  | `POST …/incidents/{incident_id}/answer` | die Gegenseite | `{accept, note}`: `agreed` oder im selben Schritt `in_review` |
+  | `POST …/incidents/{incident_id}/withdraw` | die meldende Seite | nur solange `proposed` und die Antwortzeit läuft; danach 409, der Vorfall läuft im selben Schritt ab |
+  | `POST …/incidents/{incident_id}/decision` | Leitung, nicht befangen (Superadmin mit `conflict_reason`) | `{outcome, registration_id, reason, settle?}`; `settle` stellt die Serie gleich fest (nie bei `restart`, `replay`) |
+  | `POST …/incidents/{incident_id}/settle` | Leitung, nicht befangen | `{missing_positions, surplus_positions, reason}`, wiederholbar, bis das Ergebnis gilt; nach `restart` oder `replay` erst, wenn danach neu gemeldet ist (sonst 409) |
+  | `POST …/incidents/{incident_id}/close` | Leitung, nicht befangen (Superadmin mit `conflict_reason`) | `{reason}` (Pflicht): schließt einen **offenen** Vorfall ohne Entscheidung über die Map (`closed`, `close_reason: "lead"`) |
+
+  Antwort jeweils `{incident_id, state, result_confirmed, hold}`; `hold` nennt, was das Ergebnis jetzt aufhält - aus **allen**
+  Vorfällen des Spiels, nicht nur aus dem eben bearbeiteten. Gelesen wird über den Block `league` der Matchseite:
+  `map_state` (`[{position, state, surplus?}]`, für alle), `incidents` und `incident_info` (Rechte, Auswahl, Kontingent, `hold`,
+  `server_time`; nur Beteiligte und Leitung). Je Vorfall stehen dort die Rechte der Person (`can_answer`, `can_withdraw`,
+  `can_decide`, `can_settle`, `can_close`) und `awaits_replay`. Eine befangene Leitung sieht wie ihre Seite und bekommt
+  `incident_info.conflict`.
+- **Was ein Ergebnis aufhält** (`league_incidents.result_block`, eine Stelle für Bestätigen und Frist-Automatik). `hold` ist
+  `{code, position, text}`, geprüft in dieser Reihenfolge:
+
+  | `code` | Wann | Wer ist dran |
+  | --- | --- | --- |
+  | `in_review` | ein Vorfall ist in Klärung | die Leitung entscheidet |
+  | `proposed` | ein Vorfall wartet auf die Antwort der Gegenseite - ein **offener** Vorfall hält also schon vor `in_review` auf (Nr. 146) | die Gegenseite |
+  | `rereport` | eine Map wird neu gestartet oder wiederholt, und seither ist nicht neu gemeldet | beide Seiten melden die Serie neu |
+  | `unsettled` | entschieden, die Serie aber nicht festgestellt | die Leitung stellt fest |
+  | `missing` | festgestellt mit `missing_positions` | die Seiten spielen die Map, die Leitung stellt erneut fest |
+
+  So ist ein Spiel mit einer Map in Klärung nie `completed`. Ist das Spiel zu Ende, hält kein Vorfall mehr etwas auf.
+  **Die Leitung** trägt über `/result` nur dann nicht ein, wenn ein Vorfall **offen** ist (`in_review`, `proposed`: 409 mit dem
+  Satz, was fehlt). Ist entschieden, darf sie eintragen - ihr eingetragenes Ergebnis **stellt die Serie fest**: Sobald es gilt
+  (mit Ergebnis-Fenster erst nach dessen Ablauf), bekommt jede entschiedene, noch nicht festgestellte Serie `settled_at`,
+  `settled_by` und den festen Grund `settle_reason: "result_entered"` (`league_incidents.settle_by_result`, Protokoll
+  `match.incident.settle` mit `by_result`, keine eigene Nachricht). Die Matchseite liefert dafür `decision.settled_by_result`
+  und zeigt „Serie festgestellt: Die Liga-Leitung hat das Ergebnis eingetragen.“ „Rückgängig“ nimmt genau diese Feststellung
+  wieder zurück; eine im Formular getroffene bleibt. Eine spätere Korrektur eines beendeten Spiels hält kein Vorfall auf.
+- **Neustart und Wiederholung: Es zählt nur, was danach gemeldet ist.** Mit der Einigung oder Entscheidung auf `restart` oder
+  `replay` steht in `voided.at`, ab wann die Erstaustragung ungültig ist. Jede frühere Meldung beschreibt diese ungültige
+  Austragung und zählt nicht mehr (`league_incident_rules.current_reports`) - für die Übereinstimmung beider Seiten, für die
+  einzelne Meldung der Frist-Automatik und für die Prüfung nach jedem Schritt. Bis neu gemeldet ist, hält `rereport` auf; beide
+  Seiten und die Leitung lesen „Map N wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr.“
+  (Matchseite und Nachricht zur Einigung bzw. Entscheidung). „Serie feststellen“ gibt es erst nach der neuen Meldung
+  (`awaits_replay`) - oder die Leitung trägt das Ergebnis selbst ein.
+- **Nach jedem Schritt** (Zustimmen, Zurückziehen, Entscheiden, Feststellen, Schließen): Hält nichts mehr auf und stimmen die
+  **noch zählenden** Meldungen beider Seiten überein, gilt das Ergebnis sofort - das Bestätigen hat nur geruht. Nach `restart`
+  oder `replay` wird also mit dem Schritt selbst nie etwas gültig: Es gibt noch keine Meldung von danach. Die Frist-Automatik
+  (eine einzelne Meldung) rechnet frühestens ab dem Ende des letzten Vorfalls bzw. der Feststellung (`confirm_clock`), nicht ab
+  der Meldung.
+- **Geschlossen ohne Entscheidung** (`closed`, Nr. 146):
+  - *Das Spiel ist zu Ende, ohne dass der Vorfall abgeschlossen wurde* (`forfeit`, `cancelled`, `archived`, `bye`, `completed`): Offene Vorfälle
+    gelten sofort in jeder Sicht als geschlossen (`close_reason: "match_ended"`), **ohne Nachricht** - es gibt nichts mehr zu
+    beantworten oder zu entscheiden. Der Zeit-Job lässt sie nicht mehr ablaufen und schreibt den Stand fest, ebenso der nächste
+    Schritt an einem Vorfall dieses Spiels (er antwortet mit 409) - aber erst nach der Rechteprüfung des Aufrufs: Wer den Schritt
+    nicht tun darf, schreibt auch so nichts. „In Klärung“ verschwindet öffentlich, „Mein Dienst“ nennt das Spiel nicht mehr.
+  - *Die Leitung schließt* (`…/close`, `close_reason: "lead"`, Begründung Pflicht): beide Seiten bekommen „Vorfall geschlossen“,
+    die Begründung steht auf der Matchseite. Gedacht für den Fall, dass über die Map nichts mehr zu entscheiden ist - etwa bevor
+    das Spiel kampflos gewertet wird.
+- **Kampflos erst nach dem Vorfall** (Nr. 146): „Kampflos“ (`POST /api/matches/{id}/forfeit`), „Nicht erschienen“ (Bestätigen eines
+  Vorschlags) und „Beide nicht erschienen“ lehnt der Server mit 409 ab, solange ein Vorfall offen ist: „Zu Map N ist ein Vorfall
+  offen. Bitte zuerst über den Vorfall entscheiden oder ihn schließen – erst dann lässt sich das Spiel kampflos werten.“
+  „Verlängern“ bleibt möglich.
+- **Das gültige Ergebnis** (`league_incidents.finalize`, beim Bestätigen, in der Frist-Automatik und nach der Feststellung): Eine
+  Position mit Neustart oder Wiederholung bekommt `status: "replayed"`, `replay_reason` und `incident_id`; eine zugesprochene
+  Position Sieger, `decision: "awarded"`, keine Punkte und `incident_id`; Positionen in `surplus_positions` und jede Position nach
+  der Entscheidung der Serie fallen weg, das Ergebnis folgt dann den Maps. Passt die Meldung danach nicht (Lücke, kein Sieger der
+  Serie), wird nichts geschrieben: „… das Ergebnis trägt die Liga-Leitung ein“. Maps der Leitung (`/result`) bekommen nur die
+  Markierung, Sieger und Zahl der Maps bleiben, wie sie eingibt.
+- **Meldungen bleiben vollständig:** Eine Meldung nennt wie bisher die Positionen 1, 2, 3 … ohne Lücke bis zum Sieger der Serie.
+  Eine abgebrochene Map ohne Sieger wird daher erst mit der ganzen Serie gemeldet - nach der Entscheidung, wenn sie zu Ende
+  gespielt, wiederholt oder zugesprochen ist. Eine Meldung „mit Lücke“ gibt es nicht (offener Punkt, siehe #1619).
+- **Die Leitung meldet selbst** (`reported_by.registration_id: null`): Es gibt keine Gegenseite, die antworten müsste - der Vorfall
+  ist sofort `in_review` mit `review_cause: "lead"`. So setzt die Leitung eine Serie aus (Anlage C.2.6).
+- **Je Position ein offener Vorfall:** Ein zweiter zur selben Map wird mit 409 abgelehnt, bis der erste abgeschlossen ist (die
+  Map-Pause ausgenommen). Höchstens 30 Vorfälle je Spiel.
+- **Zeit-Job:** im Fristen-Job `match_deadlines` (jede Minute), `league_incidents.sweep`. `incident_due_at` am Spiel ist die
+  früheste offene `answer_deadline` - nur der Zeiger für den Job, kein Stand. Antwortet die Gegenseite nach der Frist oder zieht
+  die meldende Seite danach zurück, läuft der Vorfall im selben Aufruf ab (409). Der Lauf findet außerdem beendete Spiele mit
+  offenem Vorfall und schließt sie; er meldet `{expired, closed}`. Nach einem Neustart des Servers holt der nächste Lauf alles
+  nach (Nr. 146). Geschrieben wird mit Bedingung auf den gelesenen Stand: Zwei Läufe oder zwei Antworten zur selben Zeit wirken
+  genau einmal.
+- **Nachrichten:** Art `match_attention`, Schlüssel `incident:<id>:<ereignis>` (`reported`, `answered`, `review`, `decided`,
+  `withdrawn`, `closed`, `settled:<zeit>`) - je Vorfall und Ereignis einmal, sonst verschluckte der Schlüssel `incident:<id>` die
+  zweite Nachricht an dieselbe Person. „Mein Dienst“: `incident_reviews` (Map in Klärung, Serie feststellen), ohne eigene
+  Spiele. Quelle ist `league_incident_rules.lead_task` - was die Leitung jetzt tun **kann**, nicht was das Ergebnis als Erstes
+  aufhält: „Serie feststellen“ steht auch da, wenn zu einer anderen Map ein Vorschlag auf Antwort wartet; nach `restart` oder
+  `replay` erst, wenn neu gemeldet ist.
+- **Öffentlich:** `map_state` an der Matchseite und `in_clarification` am Spiel der Staffel-Seite (`league_page.public_match`).
+  `incidents` und `incident_due_at` stehen nie in der öffentlichen Sicht eines Spiels (`match_public_view`), `games[].incident_id`
+  nur bei Beteiligten und Leitung. Auch die Antworten auf `POST /report`, `POST /dispute` und `PUT /lineups` tragen das Spiel **ohne** `incidents`,
+  `incident_due_at` und `flow.user_ids` (`league_incidents.without_incidents`). Vorfälle liest nur der Block `league` der
+  Matchseite, zugeschnitten auf die Person.
+- **Oberfläche: jede Angabe an einer Stelle.** „In Klärung“ steht am Chip der Map und als Abzeichen der Vorfall-Karte, sonst
+  nirgends; höchstens ein Element atmet. Restzeit und Uhrzeit der Frist stehen nur am Countdown. Wer antworten muss, liest „Ihr
+  seid dran: stimmt zu oder lehnt ab.“, die meldende Seite „Die Gegenseite antwortet noch.“ Über den Karten steht nur, was an
+  keiner Karte steht (`hold.code: "rereport"`). Der Vorschlag steht in der Zeile „Vorschlag“, nicht noch einmal im Satz der
+  Einigung; hat die Leitung genau so entschieden, nennt ihn nur der Satz der Entscheidung. „Bis dahin gilt kein Ergebnis“ steht
+  je Karte einmal - an der Feststellung, nicht in den Formularen. Mit „Bewegung reduzieren“ zeigt der Balken die echte
+  Restzeit, ohne Übergang.
+- **Protokoll** ohne freien Text: `match.incident.report`, `.answer`, `.withdraw`, `.expire`, `.decide`, `.settle`, `.close` mit
+  Kennung, Map, Art und Stand - nie Beschreibung, Begründung oder Namen. **Datenschutz:** Auskunft und Kontolöschung über `flow.user_ids`
+  (`match_flow.export_snapshot`, `scrub_person`): der Vorfall bleibt, die Kennung der Person fällt heraus, auch aus `players`
+  und `closed_by`.
+- **App:** `mobile/` zeigt Vorfälle noch nicht (Folgepunkt in #2173). Eine Bestätigung aus der App wird bei offenem Vorfall
+  gespeichert, aber nicht gültig (`awaiting_confirmation: true`, `report_status: "clarification"`, `result_hold` mit dem Satz).
+- **TV und Druck** zeigen keinen Stand je Map - dort ändert sich nichts.
+
+#### Verfahren: Beanstandung, Protest, Einspruch (E.2)
+
+Ein Verfahren ist ein Eintrag in `matches_v2.disputes[]` (kein zweites System, Nr. 130). Neue Einträge tragen `id` und `kind`;
+Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `id` | str | Kennung, Bezug für Nachweise (`protest`, `statement`, `moss`) |
+| `kind` | `objection` \| `protest` \| `appeal` | Beanstandung (vor der Bestätigung, innerhalb `result_confirm_hours`), Protest (danach, innerhalb `protest_hours`), Einspruch |
+| `registration_id`, `user_id`, `at` | wie bisher | Seite, Person, Zeitpunkt |
+| `reason_key` | Schlüssel aus `protest_reasons` | Grund; `category` wird für alte Leser mitgeschrieben |
+| `reason` | str 10–1000 | Begründung, Pflicht |
+| `claimed` | `{results, games}` \| null | das abweichende Ergebnis. Pflicht ist die Begründung plus `claimed` **oder** ein Grund, der kein Ergebnis betrifft (Nr. 130) |
+| `notified_immediately` | bool \| null | Pflichtantwort bei Gründen mit `ask_notified` (§ 8.8) |
+| `evidence_until` | ISO | bis wann die einreichende Seite ergänzen und Nachweise nachreichen darf (Ende der Protest- bzw. Bestätigungsfrist) |
+| `statement` | `{registration_id, due_at, extended_by, text, user_id, at}` \| null | Stellungnahme der Gegenseite: `due_at` = Benachrichtigung + `statement_hours`; die Leitung kann verlängern (`extended_by`) |
+| `moss_requests` | `[{id, user_id, requested_by, at, due_at, state}]` | angeforderte MOSS-Dateien (§ 9a.3): `state` `requested` \| `uploaded` \| `missing` \| `excused` |
+| `assignee` | `{user_id, at}` \| null | wer „übernommen“ hat (Nr. 135), sichtbar für beide Seiten; Befangene können nicht übernehmen - der Superadmin nur als Notausnahme mit Pflichtgrund (Grundregel B.1, `league.conflict.override`). Das gilt für jeden Schritt der Leitung am Verfahren; sehen tut er dabei nur, was seine Seite sieht |
+| `target_at`, `escalate_at`, `reminded_at`, `escalated_at` | ISO | Zielfrist (`assignee.at` + `protest_target_hours`), gespeicherte Eskalationsfrist (`target_at` + `protest_escalate_hours`; ohne Zuständige Einreichen + `protest_target_hours`), Erinnerung an die Person, Eskalation an `manage` |
+| `state` | `open` \| `withdrawn` \| `decided` | Zurückziehen bis zur Entscheidung (`withdrawn_at`, `withdrawn_by`), protokolliert; danach kein neues Verfahren derselben Seite mit demselben `reason_key` |
+| `resolved_at`, `resolved_by`, `decision`, `decision_note` | wie bisher | Entscheidung: `keep` \| `change`; `decision_note` ist bei neuen Einträgen Pflicht (mindestens zehn Zeichen) |
+| `appeal_until` | ISO | Ende der Einspruchsfrist, gesetzt mit der Entscheidung (`appeal_hours`) |
+| `against` | `{type, ref_id}` | nur `appeal`: `protest_decision` (Kennung des Verfahrens), `forfeit` oder `correction` (Kennung des Spiels) |
+| `incident_id` | str \| null | das Verfahren folgt aus diesem Vorfall (`incidents[].id` **desselben Spiels**); ein MOSS-Nachweis am Vorfall bleibt dann bis zum Ende dieses Verfahrens. Wer es setzt, steht unter „Verfahren aus einem Vorfall“ |
+
+- **Verfahren aus einem Vorfall** (`incident_id`): Beim Einreichen wählt die Seite, ob die Beanstandung bzw. der Protest einen
+  Vorfall dieses Spiels betrifft (Auswahl aus `incidents[]`, freiwillig; betrifft der gewählte Grund eine Map mit Vorfall, schlägt
+  das Formular ihn vor). E.2 schreibt die Kennung dann als `incident_id` in den Eintrag. Solange das Verfahren offen ist, darf die
+  Leitung (`disputes`, nicht befangen) die Zuordnung nachtragen oder ändern, mit Protokoll (`match.procedure.amend`, alter und
+  neuer Wert); nach der Entscheidung bleibt sie stehen. **Der Server prüft bei jedem Schreiben, dass es den Vorfall am selben Spiel
+  gibt** - sonst 422 („Diesen Vorfall gibt es an diesem Spiel nicht.“), eine Kennung eines anderen Spiels wird nie gespeichert. Ein
+  Einspruch (`appeal`) trägt kein eigenes `incident_id`, er hängt über `against.ref_id` am Verfahren. Gelesen wird das Feld von
+  der Aufbewahrung (`match_proof_refs`, MOSS am Vorfall) und von der Matchseite (Vorfall und Verfahren zeigen aufeinander).
+- **Anzahl** (Nr. 134): je Seite und Spiel ein offenes Verfahren; die Seite ergänzt es bis `evidence_until`. Die Gegenseite kann ein
+  eigenes eröffnen.
+- **Beginn der Protestfrist** (Nr. 63, 129): Bestätigung des Ergebnisses, von Hand oder nach Frist. „Spielwochenende“ und „nächstes Spiel
+  des Siegers“ gelten in der Liga nicht mehr.
+- **Einspruch** (Nr. 41, 45, § 13.7, Anlage C.5): einmal je Ausgangsentscheidung, nur gegen Protestentscheid, Kampflos-Wertung und
+  Ergebniskorrektur (Strafen: E.3 am selben Feld `appeal_hours`). Es entscheidet eine andere Person als `resolved_by` der
+  Ausgangsentscheidung, auch nicht der Superadmin (`conflict_of_interest(…, decided_by=…)`), begründet und endgültig. Die
+  Ausgangsentscheidung gilt bis dahin weiter.
+- **Wirkung auf die Tabelle** (Nr. 30, § 11.8): Eine **Beanstandung** hält das Spiel wie heute an (`status: "disputed"`, die Automatik
+  ruht), es zählt noch nicht. Ein **Protest** lässt mit `contested_result_mode` `counts` den Stand `completed` bzw. `forfeit` stehen:
+  Das Ergebnis zählt vorläufig, Spiel und Tabellenzeile tragen die Markierung „in Klärung“ (Spiel: `contested: true`, Zeile:
+  `contested` = Zahl der betroffenen Spiele). Mit `excluded` wird das Spiel wie heute `disputed` und zählt bis zur Entscheidung nicht.
+  Eine Korrektur rechnet die Tabelle neu.
+
+#### Sichtbarkeit (Nr. 133)
+
+| Wer | Vorfall, Verfahren | Nachweise (Bilder, Links) | MOSS |
+| --- | --- | --- | --- |
+| Eigene Seite (Mitglieder des Co-Teams) | alles | ja | nur wer hochgeladen hat sowie Captain und Vertreter dieser Seite (wer für sie handeln darf; ohne Captain und Vertreter die Leitung des Hauptteams); die übrigen Spieler nicht (Entscheidung Fabian 11.11.). Wer für **beide** Seiten des Spiels handeln darf, sieht MOSS keiner Seite, nur den selbst hochgeladenen |
+| Gegenseite | Grund, Text, Vorschlag, das abweichende Ergebnis (`claimed`, Entscheidung Fabian 12.11.), Stand, Stellungnahme, Entscheidung mit Begründung, wer übernommen hat | ja | nein, nur das Ergebnis der Prüfung in der Begründung (§ 9a.3) |
+| Leitung mit `disputes` oder `results`, nicht befangen | alles | ja | ja |
+| Befangene mit Liga-Recht | wie ihre Seite | wie ihre Seite | wie ihre Seite, nie als Leitung |
+| Alle anderen, öffentlich | nur „in Klärung“ bzw. „Map wiederholt“ am Spiel und an der Tabellenzeile | nein | nein |
+
+Wer nichts sehen darf, bekommt 404, nicht 403 (wie bei Fotos vom Ergebnis). `claimed`, `notified_immediately`, `moss_requests` und
+interne Vermerke der Leitung stehen nie in öffentlichen Antworten.
+
+#### Nachweise (gebaut mit #2360)
+
+`services/match_proofs.py`, Routen in `routes/match_proof_routes.py`, Sammlung weiter `match_proof_photos` (kein neuer Name, keine
+Migration; den eindeutigen Index nach `id` und den Index nach `match_id` legt der Start an, `database.AUDIT_UNIQUE_INDEXES` bzw.
+`AUDIT_INDEXES`). Ein Bezug kann **mehrere** Nachweise tragen.
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `type` | `"image"` \| `"link"` | fehlt = Bild (Altbestand) |
+| `link` | str | nur bei `link`: die Adresse eines Videos. Nur `https`, höchstens 500 Zeichen, ohne Zugangsdaten in der Adresse, keine IP-Adresse statt eines Namens, Domain frei. Wird nie eingebettet und nie vom Server abgerufen, nur als Link angezeigt |
+| `context.kind` | `report` \| `incident` \| `protest` \| `statement` \| `moss` | Bezug; Altbestand kennt zusätzlich `dispute` (zählt wie `protest`) |
+| `context.ref_id` | str | Kennung des Vorfalls (`incidents[].id`) bzw. des Verfahrens (`disputes[].id`); bei `report` leer; bei `moss` ein Verfahren **oder** ein Vorfall. Fehlt der Schlüssel, ist es Altbestand |
+| `registration_id` | str \| null | die Seite, die hochgeladen hat (null: die Leitung) |
+| `owner_id`, `match_id`, `tournament_id`, `scan_state`, Bildfelder | wie bisher | unverändert |
+| `status` | `pending` \| `attached` \| `removed` | wie bisher; neu `removed` (nur MOSS): von der Seite zurückgezogen, für die Leitung aufbewahrt, dazu `removed_at`, `removed_by` |
+
+- **API:** `GET /api/matches/{id}/proofs?kind=&ref_id=` liefert `{items, open, can_add, limit, link_max_length}`, nur was der Aufrufer
+  sehen darf. Je Eintrag: `id`, `type`, `kind`, `ref_id`, `side` (Anmeldung), `own`, `own_side`, `can_remove`, `created_at`; ein Bild
+  dazu `url`, `width`, `height`, `scan_state`, ein Link `link`. `POST /api/matches/{id}/proofs` (Formular: `kind`, `ref_id` und entweder
+  `file` oder `link`) antwortet mit dem Eintrag, `DELETE /api/matches/{id}/proofs/{proof_id}` mit `{ok, kept_for_lead}`. Bilder liefert weiter
+  `GET /api/matches/{id}/proof-photos/{id}` aus. Die Logik zum Bezug steht in `services/match_proof_refs.py` (ohne Datenbank).
+  Die drei `/proofs`-Endpunkte gibt es **nur für Spiele einer Liga-Staffel**; bei jedem anderen Spiel antworten sie mit 404.
+  Turniere bleiben beim einen Foto je Meldung über `/proof-photos`.
+- **Hinzufügen** darf, wer für eine Seite des Spiels handelt (Captain, Vertreter, wer angemeldet hat), solange der Bezug offen ist:
+  `report` bis das Ergebnis gilt, `incident` solange der Vorfall offen ist, `protest` nur die einreichende Seite bis `evidence_until`,
+  `statement` nur die Gegenseite bis `statement.due_at`, `moss` jedes Mitglied einer Seite (der Spieler lädt selbst hoch). Die Leitung
+  mit `results` oder `disputes` darf zu jedem offenen Bezug hinzufügen, wenn sie an dem Spiel nicht beteiligt ist (Befangenheit
+  wie B.1, ohne Notausnahme); wer befangen ist, wird wie ein Mitglied seiner Seite geprüft. Höchstens zehn Nachweise je Seite und Bezug, gleiches
+  Rate-Limit wie beim Foto vom Ergebnis (gemeinsamer Zähler).
+- **Entfernen** darf nur, wer den Nachweis hinzugefügt hat, und nur **solange dieselbe Person zu dem Bezug auch hinzufügen dürfte**
+  (Bezug offen, eigene Seite, `evidence_until` bzw. `statement.due_at` nicht vorbei): Nach der Frist lässt sich ein Beleg nicht mehr
+  zurückziehen. Altbestand (über `photo_id` an Meldung oder Problem gehängt) lässt sich so nicht entfernen.
+  **MOSS wird dabei nicht gelöscht**, sondern als entfernt markiert (`status: "removed"`, `removed_at`, `removed_by`): Danach sieht
+  ihn nur noch die nicht befangene Leitung (in der Liste mit `removed: true`), nicht mehr die Seite und nicht mehr, wer ihn
+  hochgeladen hat. Endgültig löscht ihn erst die Aufbewahrung. Die Antwort nennt das mit `kept_for_lead`. Protokoll:
+  `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, bei MOSS `kept: true`, nie die Adresse).
+- **Offen** ist ein Bezug so (`match_proof_refs.resolve`, eine Stelle für Hinzufügen, Entfernen und Aufbewahrung):
+  - `report`: bis das Spiel `completed`, `forfeit` oder geschlossen (`cancelled`, `archived`, `bye`) ist.
+  - `incident`: solange der Vorfall nicht `agreed`, `decided`, `withdrawn` oder `closed` ist.
+  - `protest`, `statement`, `moss` am Verfahren: solange das Verfahren **oder ein Einspruch gegen seine Entscheidung** offen ist
+    (weder `resolved_at` noch `withdrawn_at`). Mit einem Einspruch (`kind: "appeal"`, `against.ref_id` = Kennung des Verfahrens)
+    wird der Bezug also wieder offen, bis der Einspruch entschieden ist: Die Leitung kann nachfordern, ein Spieler MOSS
+    nachreichen. Für die beiden Seiten gelten dabei weiter `evidence_until` und `statement.due_at`; neue Belege zum Einspruch
+    selbst hängen am Einspruch (`protest` mit dessen Kennung).
+  - `moss` am Vorfall: solange der Vorfall oder ein daraus folgendes Verfahren samt Einspruch offen ist.
+- **MOSS:** Der Baustein kennt den Bezug `moss` schon mit Bildern (Screenshot vom Absturz, § 9a.6) und Links. Er hängt an einem
+  Verfahren (`disputes[].id`) **oder an einem Vorfall** (`incidents[].id`, etwa `moss_crash`), mit denselben Sichtregeln; offen ist
+  er am Vorfall, solange der Vorfall oder ein daraus folgendes Verfahren (`disputes[].incident_id`) offen ist. Die ZIP-Datei selbst
+  (eigener Dateityp, eigene Größen- und Inhaltsprüfung) baut E.2 als `type: "file"` in denselben Regeln.
+
+**Aufbewahrung** (Nr. 31, 136; `services/match_proof_retention.py`, stündlicher Job `proof_photo_retention`):
+
+| Was | Gelöscht |
+| --- | --- |
+| Nie verwendetes Foto (`pending`) | 24 Stunden nach dem Hochladen (unverändert) |
+| Turnier ohne Liga | 30 Tage nach dem Hochladen, nicht solange das Spiel `disputed` ist (unverändert) |
+| Liga, alles außer MOSS | ab Season-Ende + `evidence_keep_days`, nicht solange am Spiel ein Vorfall oder Verfahren offen ist oder eine Einspruchsfrist läuft |
+| Liga, MOSS (auch als entfernt markiert) | sobald das Verfahren beendet und die Einspruchsfrist vorbei ist: letzte Entscheidung der Kette (Protest, danach Einspruch) + `appeal_hours` bzw. das gespeicherte `appeal_until`; am Vorfall: Ende des Vorfalls (`closed_at`) bzw. eines daraus folgenden Verfahrens (`disputes[].incident_id`, ganze Kette samt Einspruch) + Einspruchsfrist, **mindestens aber bis das Ergebnis des Spiels feststeht und `protest_hours` abgelaufen sind** (ruhend in Sperrzeiten; so lange kann aus dem Vorfall noch ein Protest werden; bei einem abgesagten Spiel entfällt das). Steht das Ergebnis nie fest, gilt als Obergrenze Season-Ende + `evidence_keep_days` wie für alle anderen Nachweise. Trägt ein entschiedenes Spiel keinen Zeitpunkt der Entscheidung, läuft die Protestfrist ab dem letzten bekannten Zeitpunkt (letzte Änderung am Spiel, sonst Ende des Vorfalls); ohne auffindbaren Bezug oder ohne Zeitpunkt seines Endes `appeal_hours` nach dem Hochladen |
+| Spiel oder Turnier gelöscht | sofort mit (unverändert) |
+| Konto gelöscht | sofort mit - **außer** ein MOSS-Nachweis der Person wird in einem laufenden Vorfall oder Verfahren noch gebraucht (seine Frist aus der Zeile „Liga, MOSS“ ist nicht um): Der bleibt bis dahin ohne Kennung der Person (`owner_id: null`, `owner_erased: true`, `status: "removed"`; ebenso sein Eintrag in `media_scans`) nur für die nicht befangene Leitung, dann löscht ihn der Job. Das Protokoll `match.proof.add` behält wie jedes Protokoll die Kennung des Kontos, die nur noch auf die pseudonymisierte Kontozeile zeigt (Entscheidung Fabian 11.11., DSGVO Art. 17 Abs. 3 lit. e; `match_proof_retention.delete_for_user`, Protokoll `match.proof.erasure_hold` ohne Person) |
+
+**Bildprüfung:** Ein Bild wird mit `scan_state: "pending"` gespeichert und ist bis zum Ergebnis nur für den Absender sichtbar.
+Lässt sich die Prüfung beim Hochladen nicht anstoßen, reiht derselbe stündliche Job das Bild nach einer Stunde neu ein
+(`match_proof_retention.rescan_stuck`), solange keine Prüfung für es ansteht.
+
+**Season-Ende** ist der Abschluss durch die Leitung: `league_seasons.closed_at` (reserviert für F.1). Solange F.1 nicht gebaut ist, gilt
+das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, Wiener Zeit). Lässt sich das Ende nicht bestimmen
+(Season ohne Kalender), bleibt es bei 30 Tagen ab dem Hochladen, weiter mit der Sperre bei offenem Verfahren. Die Werte liest
+`match_proofs.setting` (Staffel, sonst Season, sonst Vorgabe). Eine laufende Strafe verlängert die
+Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist `match_proof_photos.keep_until` (ISO) und noch nicht gebaut.
+
+#### E.2 gebaut (#1619, #2297)
+
+`services/league_procedures.py` (Verfahren), `league_procedure_notify.py` (Nachrichten, Schlüssel `procedure:<id>:<anlass>`),
+`league_procedure_sweep.py` (Zeit-Job im Fristen-Job), `league_protest_settings.py` (Season-Felder, Blatt-Modul), Routen in
+`routes/league_protest_routes.py`. Was über die Tabellen oben hinaus festgelegt wurde:
+
+- **Endpunkte:** `GET|PUT /api/admin/leagues/seasons/{id}/protest-settings`, `GET …/procedures` (Eingang, Recht `disputes`);
+  am Spiel `POST /appeals`, `PATCH /procedures/{pid}` (ergänzen bzw. `incident_id`), `POST …/withdraw`, `/statement`,
+  `/statement/extend`, `/assign`, `/decision` (nur `keep`), `/moss-requests`, `/moss-requests/{rid}/excuse` und
+  `GET /proofs/{proof_id}/file` (Download der MOSS-ZIP). `POST /dispute/decision` entscheidet in der Liga dasselbe Verfahren
+  (`procedure_id`, Pflichtbegründung).
+- **„Ergebnis ändern“** läuft über das Ergebnis-Fenster: Eine Korrektur der Leitung entscheidet alle offenen Verfahren des Spiels
+  mit `decision: "change"` (bei gleichem Ergebnis `keep`), ihr Grund wird `decision_note` (mindestens zehn Zeichen, sonst 422).
+  Bei einem offenen Einspruch darf die Person der Ausgangsentscheidung auch nicht korrigieren (403).
+- **Jedes Ergebnis prüft zentral** (`league_procedures.result_decision_refusal`, aufgerufen in `submit_v2_result`): Zu einem Spiel
+  mit offenem Verfahren schreibt kein Weg ein Ergebnis - auch nicht `POST /forfeit`, „nicht erschienen“ bestätigen oder ein
+  gehaltenes Ergebnis - ohne das Recht `disputes`, als Befangene (Superadmin nur als Notausnahme mit Grund), beim Einspruch durch
+  die Person der Ausgangsentscheidung (409) oder ohne Begründung von mindestens zehn Zeichen (422; bei der Wertung kampflos ist
+  ihre Pflicht-Begründung die `decision_note`). Meldungen der Spieler und die Frist-Automatik entscheiden nie ein Verfahren (409).
+  **Gehaltenes Ergebnis („Rückgängig“):** `result_hold.hold_result` prüft dasselbe schon beim Bereitlegen, die Absage kommt also
+  sofort. Entsteht das Verfahren erst in den Sekunden danach, schreibt das Veröffentlichen nichts: Das bereitliegende Ergebnis
+  bzw. die Wertung ist verworfen, die Person bekommt die Nachricht „Ergebnis nicht gespeichert“ mit dem Grund im Klartext
+  (`reason: hold_failed`), und im Protokoll steht `match.result.hold_failed`.
+- **Zurückgezogen heißt nicht mehr offen:** `match_deadlines.auto_confirm_due`, `match_disputes.open_dispute` und die Karte der
+  Leitungsansicht überspringen Einträge mit `withdrawn_at` bzw. `state` `withdrawn`/`decided`; die Frist-Automatik läuft danach weiter.
+  Bei geänderter Paarung bekommt ein Verfahren `decision: "void"` und `state: "decided"`.
+- **Zusätzliche Felder am Eintrag:** `escalate_at`, `additions[]` (`{text, user_id, at}`, höchstens zehn), `contested_mode` (der Wert von
+  `contested_result_mode` beim Einreichen), `statement.expired_at`, `against.decided_at` und `against.decided_by` (für „einmal je
+  Ausgangsentscheidung“ und „eine andere Person“), an `moss_requests[]` `registration_id`, `uploaded_at`, `missing_at`,
+  `excused_by`, `excused_at`, `excuse_reason`.
+- **Zeit-Job:** Erinnerung an die zuständige Person bei `target_at`; `protest_escalate_hours` (Vorgabe 24, ruhend in Sperrzeiten) später
+  Eskalation an `manage`. Ohne Zuständige eskaliert der Fall `protest_target_hours` nach dem Einreichen.
+- **Matchseite, Block `league`:** `procedures[]` (je Rolle gefiltert), `contested`, `procedure_form` (für handelnde Seiten),
+  `procedure_viewer`, `moss_candidates` (nur Leitung). In `match.disputes[]` stehen Verfahren für alle außer der nicht befangenen
+  Leitung gekürzt (`at`, `id`, `kind`, `state`; die eigene Meldung zusätzlich mit Grund und Entscheidung).
+- **Gegenseite mit `claimed`** (Entscheidung Fabian 12.11.): Sie sieht Grund, Begründung und das abweichende Ergebnis - die
+  Stellungnahme braucht den Bezug. `notified_immediately` und `moss_requests` bleiben der eigenen Seite und der Leitung.
+- **MOSS-ZIP:** `type: "file"`, nur am Bezug `moss`, eigene Grenze `MAX_MOSS_UPLOAD_MB` (Vorgabe 200, andere Dokumente bleiben bei 50 MB), gestreamt auf die Platte. Geprüft wird das Inhaltsverzeichnis, ohne zu
+  entpacken (`match_proofs.check_zip`); gespeichert wird unverändert mit `sha256`.
+- **Am einzelnen Spiel:** `league_page` gibt je Spiel `contested` (nur bei festem Ergebnis), die Ligaseite zeigt „in Klärung“ an derselben
+  Stelle wie D.5 die Map in Klärung (`in_clarification`); der TV-Baum schreibt es statt des Stands, die PDF-Tabelle hängt es an den Namen.
+- **„Braucht Aufmerksamkeit“:** Ein offenes Verfahren an einem Spiel mit festem Ergebnis (`counts`, Einspruch) ist ein Fall der Art
+  `procedure` mit `action: "open"` („Zum Spiel“); `match_disputes.open_procedure_rows` liest dafür ohne `league_procedures`.
+- **Verfahren im Spiel-Datensatz** (Nr. 133/137): ungekürzt nur für die nicht befangene Leitung mit `disputes` oder `results`. Alle
+  anderen - Seiten, Fremde, Liga-Personal ohne diese Rechte, Beteiligte mit Liga-Recht - bekommen `at`, `id`, `kind`, `state`; wer
+  eingereicht hat, dazu Grund, Text und Entscheidung der eigenen Meldung, nie `moss_requests`, `assignee`, `statement` oder
+  `notified_immediately`. Eine Stelle (`match_public_view.public_dispute_row`) für `public_match_view`, `GET /matches/{id}`,
+  `GET /tournaments/{id}/matches-v2`, den Baum und die Antworten von `/dispute`, `PUT /lineups` und dem Matchplan. Antworten auf
+  Aktionen, die das ganze Spiel zurückgeben (Melden und Bestätigen, Ergebnis, „Rückgängig“, Wertung kampflos, Check-in, Start,
+  Veto, Verschiebung, „beide nicht erschienen“), laufen durch `league_procedures.guard` - er sucht in der Antwort nach Spielen mit
+  Verfahren und kürzt sie für alle außer der nicht befangenen Leitung (`tests/test_league_procedures_leak_flow.py`).
+  **Strukturell abgesichert:** Zusätzlich läuft jede JSON-Antwort unter `/api/` durch die Middleware `procedure_guard`
+  (`services/procedure_response_guard.py`): ohne `"disputes"` im Inhalt unverändert (ein Byte-Vergleich), sonst durch denselben
+  Wächter, mit der Person der Anfrage. Neue Routen sind damit ohne eigenen Aufruf abgedeckt. Der Wächter sucht in jeder Tiefe; ein
+  Knoten mit Verfahren, der sich keinem Spiel zuordnen lässt (weder `id` noch `match_id` noch Turnier und Seiten), wird im Zweifel
+  für alle gekürzt. Ein Zähler (`"disputes": 3`) oder schon gekürzte Zeilen kosten weder die Benutzerabfrage noch eine Kürzung;
+  in Listen wird je Staffel einmal entschieden (ein Recht, eine Abfrage der Beteiligung). Gelesen wird jede JSON-Variante
+  (`application/json`, `…+json`); eine Komprimierung darf nie innerhalb des Wächters liegen (Test auf die Reihenfolge der
+  Middleware). **Ausnahme:** `GET /api/dsgvo/export-my-data` streamt und kürzt selbst (`league_procedures.export_view`): die eigene
+  Meldung, Stellungnahme und MOSS-Anforderung vollständig, von Verfahren anderer nur, dass es sie gibt.
+- **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
+  Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
+- **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
+- **Offen, eigenes Issue:** Das Bracket-Bild für Discord (`discord_bracket.py`) und die Teilen-Karte eines Ergebnisses
+  (`result_share.py`) zeigen Ergebnisse, die angefochten sein können, ohne Hinweis.
+- **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App meldet weiter über `/dispute` mit `category`; Art, Pflichtfragen,
+  Ergänzen, Stellungnahme, Einspruch, MOSS und die Markierung „in Klärung“ fehlen dort noch.
+
+#### Altbestand und Übergang
+
+- `disputes[]`-Einträge ohne `kind` und ohne `id` bleiben gültig und lesbar: `match_disputes.open_dispute`, „Braucht Aufmerksamkeit“
+  und `POST /dispute/decision` behandeln alte und neue Einträge gleich (offen = ohne `resolved_at`).
+- `POST /api/matches/{id}/dispute` bleibt für Turniere unverändert und schreibt dort weiter Einträge ohne `kind`. In einer Liga-Staffel
+  schreibt derselbe Endpunkt ab E.2 Einträge mit `id` und `kind` (`objection` vor, `protest` nach der Bestätigung); ein Aufruf ohne die
+  neuen Felder (App ohne neuen Build) bleibt erlaubt und wird mit `reason_key` aus `category` gespeichert.
+- Fotos über `photo_id` (Meldung, Problem) laufen unverändert weiter: `context` ohne `ref_id`, sichtbar wie bisher, eines je Meldung.
+  In der Liste eines Bezugs erscheinen sie mit `can_remove: false`.
+- Aufbewahrung: Für alte Nachweise einer Liga-Staffel gilt ab jetzt die Liga-Regel (sie bleiben also länger als bisher, nie kürzer);
+  Turniere bleiben bei 30 Tagen.
+
+#### Wer baut was
+
+| Teil | D.5 | E.2 |
+| --- | --- | --- |
+| Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `protest_escalate_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
+| Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei; `disputes[].incident_id` setzen, wenn ein Verfahren aus einem Vorfall entsteht, samt Prüfung „Vorfall am selben Spiel“ (422) |
+| Zeit-Job | `answer_deadline` → `in_review` | Erinnerung und Eskalation zur Zielfrist, Ablauf der Stellungnahme |
+| Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“ und bis die Serie festgestellt ist, `pause_series`, Schritt „Serie feststellen“ | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |
+
+**Überschneidungen** (bitte absprechen, wer zuerst mergt, der andere zieht nach):
+
+- `routes/match_routes.py`: D.5 fasst Melden und Bestätigen an (Ruhen bei „in Klärung“), E.2 `POST /dispute`, `/dispute/decision` und
+  das Fenster. Neue Endpunkte gehören in eigene Dateien (`routes/league_incident_routes.py`, `routes/league_protest_routes.py`).
+- `ProblemReportForm.jsx` und `DisputeCard.jsx`: gehören E.2 (Art, Gründe, Pflichtfrage, Nachweis-Liste). D.5 baut ein eigenes Formular
+  „Vorfall melden“ und fasst beide Dateien nicht an.
+- Matchseite, Block `league` (`league_games.page_block`): D.5 ergänzt `incidents` und `map_state`, E.2 `procedures` und `contested`;
+  jeder nur seine Schlüssel.
+- Benachrichtigungen: beide nutzen die Art `match_attention` und „Mein Dienst“. D.5: `incident:<id>`, E.2: `procedure:<id>` als
+  Schlüssel gegen doppelte Meldungen.
+- `league_presets.PRESETS`, `SYNC_GROUPS`, `seasonTabs.js`: jeder ergänzt nur seine Zeilen bzw. seine Gruppe.
+- `disputes[].incident_id`: E.2 schreibt und prüft es, D.5 liest es nur (Matchseite: „dazu läuft ein Verfahren“). Wird D.5 zuerst
+  gemergt, zeigt es den Hinweis erst, sobald E.2 das Feld füllt; ohne Feld verhält sich alles wie ohne Verfahren.
+- Nachweise: beide benutzen `match_proofs` und den Frontend-Baustein `ProofList` unverändert; fehlt etwas, kommt es als eigener Commit
+  in den Baustein, nicht als Kopie.
+
+### Season-Seite der Verwaltung (#2267)
+
+`/admin/leagues/seasons/{id}` in Reitern nach dem Muster der Spielseite (#2249). Nur Oberfläche: **Daten und API unverändert**, jeder
+Reiter schickt seine Felder an `PATCH /api/admin/leagues/seasons/{id}` (Teil-Anfrage, `exclude_unset`). Welcher Reiter welches Feld
+trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KEYS`); ein Test verlangt, dass jedes Feld von
+`seasonToForm` und `seasonPayload` genau einem Reiter gehört (#2023 „jede Angabe an genau einer Stelle“).
+
+| Reiter | Sprungmarke | Inhalt | Speichern |
+| --- | --- | --- | --- |
+| Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
+| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie`, `#veto`, `#vorfaelle` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Veto (D.3, #1618); Vorfälle und Pausen (D.5, #1619); Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`, `map_break_after`, `map_break_minutes`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Pool, Mindestgröße, Ergebnisregeln und Veto eigene Knöpfe |
+| Termine | `#termine`, `#kalender`, `#terminregeln`, `#checkin` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1), Check-in-Regeln (D.2, #1652) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln und Check-in eigene Knöpfe |
+| Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#plattform`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Plattform und Eingabegerät (#2270), Eingang, Kaderübersicht | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar), `platform_field`, `allowed_platforms`, `crossplay`, `input_device` |
+| Tabelle | `#tabelle`, `#punkte`, `#gleichstand` | Punkte, Gleichstand, Ausscheiden (E.1), Gleichstände der Staffeln | `scoring_rules` |
+| Regelwerk und Sperrliste | `#regelwerk`, `#sperrliste` | Stand des Regelwerks (B.2) mit Weg dorthin, Sperrliste (C.4) | Sperrliste eigener Knopf |
+| Ligen und Staffeln | `#ligen`, `#staffeln`, `#uebertragen` | Liga N, Staffeln, Staffelgröße, Vorgaben übertragen | `max_staffel_size` |
+
+- **Ungespeichertes:** Punkt am Reiter (auch ein geänderter, nicht gespeicherter Pool), beim Reiterwechsel eine Rückfrage mit
+  „Jetzt speichern“ / „Später speichern“ (die Eingabe bleibt), beim Verlassen der Seite die Rückfrage der Spielseite. Besuchte Reiter
+  bleiben geladen, Bausteine mit eigenem Speichern verlieren beim Wechsel nichts. Nach dem Speichern nimmt der Reiter den neuen Stand
+  an, ungespeicherte andere Reiter behalten ihre Eingaben (`rebaseForm`).
+- **Ablaufleiste** (`seasonPhases`): Vorbereitung bis zum Anmeldefenster, Anmeldung im Fenster (ohne Fenster „ohne Selbstanmeldung“),
+  Einteilung bis zum Start, Spielbetrieb ab gestarteter Staffel (mit Spielwoche), Abschluss bei Stand `completed`/`archived` oder wenn
+  alle Staffeln fertig sind. Der Stand bleibt die bewusste Schaltung der Leitung.
+- **Regeltext:** kein Eingabefeld mehr. Mit Regelwerk ausgeblendet, ohne steht ein Hinweis mit Weg zum Regelwerk und der alte Text zum
+  Lesen. Gelöscht wird nichts.
+- **Beiname der Liga N:** Hinweis, wenn er die Stufe wiederholt („Liga 1“ → Titel „Liga 1 · Liga 1“).
+- **Links:** Nachrichten zu neuen Anmeldungen zeigen weiter auf `#anmeldungen`, „Transfer beantragt“ auf `#kader`, „Zurück“ im
+  Regelwerk auf `#regelwerk`. Unbekannte Marken öffnen den Überblick.
+- Vorbereitet für F.2 „Season aus Vorgänger übernehmen“: der Knopf kommt neben „Season löschen“.

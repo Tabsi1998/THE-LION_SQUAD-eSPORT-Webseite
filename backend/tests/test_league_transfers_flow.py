@@ -2,6 +2,7 @@
 Dazu was Profil und Team-Seite über die Berechtigung sehen - nie ein Geburtsdatum. Erfundene Namen."""
 import pathlib
 import sys
+import re
 from datetime import timedelta
 
 import pytest
@@ -74,6 +75,9 @@ async def test_a_transfer_moves_the_player_after_the_approval(flow):
     assert row["status"] == "pending" and row["from_squad_id"] == w["squad_b"]["id"] and row["to_squad_id"] == w["squad_a"]["id"]
     ida = w["users"]["Ida"]["id"]
     assert ida in await squad_members(flow, w, "squad_b"), "vor der Genehmigung ändert sich nichts"
+    # Season-Seite mit Reitern (#2267): Der Link führt direkt in die Kaderübersicht, wo die Leitung entscheidet.
+    asked_note = await flow.db.notifications.find_one({"meta.reason": "league_transfer_requested"}, {"_id": 0})
+    assert asked_note["url"] == f"/admin/leagues/seasons/{w['season_id']}#kader"
 
     flow.act_as(w["staff"])
     listed = await flow.get(admin_url(w))
@@ -86,7 +90,7 @@ async def test_a_transfer_moves_the_player_after_the_approval(flow):
     assert ida in await squad_members(flow, w, "squad_a")
     assert ida not in await squad_members(flow, w, "squad_b")
     assert (await state_of(flow, w, "Ida"))["ok"] is True
-    actions = [log["action"] async for log in flow.db.audit_logs.find({"action": {"$regex": "^league.transfer"}}, {"_id": 0, "action": 1})]
+    actions = [log["action"] async for log in flow.db.audit_logs.find({"action": {"$regex": "^league.transfer"}}, {"_id": 0, "action": 1}).sort([("created_at", 1), ("_id", 1)])]
     assert actions == ["league.transfer.request", "league.transfer.approve"]
     told = {note["user_id"] async for note in flow.db.notifications.find({"meta.reason": "league_transfer_approved"}, {"_id": 0})}
     assert {ida, w["users"]["LoeLeitung"]["id"]} <= told
@@ -278,16 +282,13 @@ async def test_the_person_must_be_in_the_main_team(flow):
 
 
 @pytest.mark.asyncio
-async def test_approval_checks_age_size_and_roles_again(flow):
+async def test_approval_checks_size_and_roles_again_but_not_the_age(flow):
+    """#2313 (Fabian 09.11.): Ein fehlendes Geburtsdatum hält die Genehmigung nicht auf - die Person darf danach nur nicht spielen."""
     w = await transfer_world(flow, min_age=18, max_squad_size=4)
     row = (await ask(flow, w)).json()
     flow.act_as(w["staff"])
     approve = f"{admin_url(w)}/{row['id']}/approve"
-
     await born(flow, w, "Ida", None)
-    no_date = await flow.post(approve, json={})
-    assert no_date.status_code == 422 and "Geburtsdatum fehlt" in no_date.json()["detail"]
-    await born(flow, w, "Ida", ADULT)
 
     await rules(flow, w, max_squad_size=3)
     too_many = await flow.post(approve, json={})
@@ -299,7 +300,10 @@ async def test_approval_checks_age_size_and_roles_again(flow):
     assert captain.status_code == 409 and "Captain" in captain.json()["detail"]
     await flow.db.team_squads.update_one({"id": w["squad_b"]["id"]}, {"$unset": {"captain_id": ""}})
 
-    assert (await flow.post(approve, json={})).status_code == 200
+    approved = await flow.post(approve, json={})
+    assert approved.status_code == 200, approved.text
+    stored = await flow.db.league_transfers.find_one({"id": row["id"]}, {"_id": 0})
+    assert stored["status"] == "approved"
 
 
 @pytest.mark.asyncio
@@ -333,7 +337,7 @@ async def test_the_own_profile_shows_the_state_without_a_date(flow):
     await born(flow, w, "Ida", ADULT)
     response = await flow.get("/api/me/league-eligibility")
     assert response.json()["items"][0]["age"] == "met"
-    assert "1990" not in response.text
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", response.text)
 
 
 @pytest.mark.asyncio
@@ -353,7 +357,7 @@ async def test_the_team_page_shows_state_candidates_and_window(flow):
     response = await flow.get(f"{squad_url(w)}/eligibility")
 
     assert response.status_code == 200, response.text
-    assert "1990" not in response.text and "birth" not in response.text
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", response.text) and "birth" not in response.text
     season = response.json()["seasons"][0]
     assert season["rules"]["max_squad_size"] == 50
     assert season["rules"]["min_age"] == 18
@@ -402,7 +406,7 @@ async def test_the_roster_overview_counts_waiting_and_age_without_a_date(flow):
     overview = await flow.get(f"/api/admin/leagues/seasons/{w['season_id']}/roster")
 
     assert overview.status_code == 200, overview.text
-    assert "1990" not in overview.text and "birth_date" not in overview.text
+    assert not re.search(r"1990-\d\d-\d\d|\d\d\.\d\d\.1990", overview.text) and "birth_date" not in overview.text
     body = overview.json()
     assert body["counts"]["age"] == 1
     squad = next(row for row in body["squads"] if row["squad_id"] == w["squad_a"]["id"])

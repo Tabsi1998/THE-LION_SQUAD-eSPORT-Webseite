@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, formatApiError, formatRequestError } from "@/lib/api";
 import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
+import { AutoBannerStats } from "@/components/tls/AutoBannerStats";
 import { CheckField, TextField, SelectField as SelectInput } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
@@ -18,7 +19,7 @@ import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { tournamentFormatOptions } from "@/lib/tournamentLabels";
 import { durationSourceText, gameModes, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
-import { gamePresets } from "@/lib/gameMatchData";
+import { gamePresets, selectableModes } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
@@ -201,7 +202,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   const rules = tournamentFieldRules(f);
   // Spiel-Daten (#1554): woher die Dauer kommt, und was das Spiel für Best-of und Laufgröße vorschlägt.
   const selectedGame = games.find((game) => game.id === f.game_id) || null;
-  const modes = gameModes(selectedGame);
+  const allModes = gameModes(selectedGame);
+  // Spielmodus (#2206): inaktive und archivierte nur, wenn dieses Turnier ihn schon hat - neu wählen geht nicht.
+  const modes = selectableModes(allModes, tournament.game_id && tournament.game_id === f.game_id ? [tournament.game_mode] : []);
   const inherited = matchDurationSource({}, { tournament: { ...f, match_duration_minutes: null }, game: selectedGame });
   const presets = gamePresets(selectedGame, f);
   const runWhere = f.event_mode === "online" ? "online" : "vor Ort";
@@ -212,7 +215,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       ...current,
       game_id: value,
       best_of: next.bestOf ?? current.best_of,
-      game_mode: gameModes(game).some((mode) => mode.mode === current.game_mode) ? current.game_mode : "",
+      game_mode: selectableModes(gameModes(game), value === tournament.game_id ? [tournament.game_mode] : []).some((mode) => mode.mode === current.game_mode) ? current.game_mode : "",
     }));
     if (next.runSize && f.format === "ffa_custom_bracket") setStructure((current) => ({ ...current, match_size: next.runSize }));
   };
@@ -375,6 +378,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet die Teamleitung an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
+            {/* Zahlen der automatischen Banner (#2352): je Vorlage, auch nach dem Ende des Banners. */}
+            <AutoBannerStats kind="tournament" refId={tournament.id} />
             {/* Vor Ort startet die Turnierleitung selbst (#2111, W4): der Schalter steht dort nur noch, solange er an ist. */}
             {(f.event_mode !== "local" || f.auto_start_enabled) && <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" hint={f.event_mode === "local" ? "Vor Ort startet die Turnierleitung selbst – besser ausschalten." : undefined} checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />}
             <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
@@ -457,9 +462,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               {show && rules.advancement === "select" && f.advancement_mode === "draw_show" && (
                 <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={f.draw_show_minutes} onChange={(v)=>set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="tr-edit-draw-show-minutes" />
               )}
-              {modes.length > 0 && (
+              {allModes.length > 0 && (
                 <SelectInput label="Spielmodus" value={f.game_mode} onChange={(v)=>set("game_mode", v)} testId="tr-edit-game-mode"
-                  options={[["", `Erster Modus (${modes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}
+                  options={[["", `Erster Modus (${allModes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}
                   hint="Bestimmt die Dauer, wenn unten keine eigene steht." />
               )}
               {/* Ohne Spiele kein Best of und keine Dauer (#2111, TA4); in Läufen heißt es „Runden je Lauf“ und zählt nur für

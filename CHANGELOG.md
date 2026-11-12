@@ -1,5 +1,478 @@
 # Changelog
 
+## 1.80.0 (12.11.2026)
+
+### Neu
+
+* Hilfe – „Wenn im Spiel etwas passiert“ für Captains (#1619)
+* Liga – eingetragenes Ergebnis der Leitung stellt die Serie nach einem Vorfall fest (#1619)
+* Liga – Gegenseite stimmt einem Vorfall zu oder lehnt ab, mit laufender Antwortzeit (#1619)
+* Liga – kampflos und „nicht erschienen“ erst, wenn kein Vorfall mehr offen ist; ein beendetes Spiel schließt offene Vorfälle (#1619)
+* Liga – Kontingent für Rehosts und Pausen je Team und Map wird gezählt und angezeigt (#1619)
+* Liga – Map „in Klärung“: Liga-Leitung entscheidet und stellt die Serie fest, bis dahin gilt kein Ergebnis (#1619)
+* Liga – Vorfälle im Spiel melden: Verbindungsabbruch, Rehost, Pause und MOSS-Absturz mit Vorschlag an die Gegenseite (#1619)
+* Liga – Vorfälle und Pausen je Season einstellbar (Antwortzeit, Kontingent, Serie bei Klärung, Standardpause) (#1619)
+* Liga – wiederholte Map zählt nur einmal, nach Neustart oder Wiederholung zählen nur Meldungen von danach (#1619)
+* Liga-Leitung – offenen Vorfall ohne Entscheidung schließen (#1619)
+* Ligaseite – Spiele mit einer Map in Klärung sind gekennzeichnet (#1619)
+* Mein Dienst – „Map in Klärung“ und „Serie feststellen“ für die Liga-Leitung (#1619)
+
+### Fehlerbehebungen
+
+* Nachweise – Link-Feld bricht am Handy um statt zu schrumpfen (#1619)
+
+## 1.79.0 (11.11.2026)
+
+### Neu
+
+* Erinnerung „Map-Veto wartet“ an die Seite am Zug (#1651)
+* Liga – bei Kontolöschung bleibt ein MOSS-Nachweis eines laufenden Verfahrens bis zu dessen Abschluss für die Liga-Leitung (#2360)
+* Liga – mehrere Nachweise je Meldung, Vorfall und Protest: Bilder und Video-Links (nur https) (#2360)
+* Liga – Nachweise bleiben bis Season-Ende plus Frist, MOSS-Nachweise nur bis zum Ende des Verfahrens (#2360)
+* Map-Veto für Zuschauer nur lesend auf der Matchseite (#1651)
+* Map-Veto live – der Zug der Gegenseite erscheint ohne Neuladen und leuchtet kurz auf (#1651)
+* Map-Veto live – Map-Karten mit Bild, Countdown nach Serverzeit und Ablauf-Leiste auf der Matchseite (#1651)
+* TV-Ansicht des Map-Vetos für 1920 px (#1651)
+
+## 1.78.0 (11.11.2026)
+
+### Neu
+
+* Einstellungen zeigen die laufenden automatischen Banner mit Views, Klicks und Link zur Schaltstelle (#2352)
+* Liga – Anmeldungen je Season automatisch annehmen; wer zuerst kommt, wird zuerst bedient, offene Anmeldungen halten ihren Platz (#2348)
+* Liga – automatisch zuteilen bei genau einer Liga N mit einer Staffel, sonst teilt die Leitung zu (#2348)
+* Liga – Teams ziehen eine automatische Zuteilung bis zum Check-in selbst zurück, solange der Spielplan nicht steht (#2348)
+* Liga-Eingang – angenommene Anmeldungen nur mit Grund auf die Warteliste zurückstufen (#2348)
+* Liga-Eingang – automatisch Angenommene nachträglich mit Grund ablehnen oder zurückstufen, Team der Leitung markiert, Gründe bei nicht möglicher Annahme oder Zuteilung (#2348)
+* Liga-Leitung kann ein wartendes Veto im Notfall mit Grund starten (#2326)
+* Liga-Verwaltung – Schalter „Anmeldungen automatisch annehmen“ mit Hinweis auf offene Anmeldungen und Protokoll beim Umschalten (#2348)
+* Ligaseite – angenommene Anmeldungen zeigen „Angemeldet“ bzw. „Angemeldet – Zuteilung folgt“, freie Startplätze zählen offene Anmeldungen mit (#2348)
+* Matchseite – Veto zeigt die Vorgabe der Woche, weder sperrbar noch wählbar, in der Spielreihenfolge an ihrer Position (#2326)
+* Nach nachgetragener Vorgabe beginnt das Veto erst, wenn beide Seiten „Bereit zum Veto“ getippt haben; vorher läuft keine Zeit (#2326)
+* Regelwerk – Baustein und Variable nennen, wie Anmeldungen angenommen werden (#2348)
+* Regelwerk – Baustein Veto beschreibt die Vorgabe der Woche, neue Variable veto.presets (#2326)
+* Season-Verwaltung – „Rotiert automatisch durch den Pool“ füllt leere Wochen, „Alle neu verteilen“ fragt vor dem Überschreiben nach (#2326)
+* Season-Verwaltung – Map je Spielwoche im Kasten Veto wählen, fehlende Wochen und Verlauf sichtbar (#2326)
+* Turnier- und Fast-Lap-Bearbeitung zeigen Views, Klicks und letzte Anzeige des automatischen Banners (#2352)
+* Veto – neue Schrittart „Vorgabe der Woche“: die Liga-Leitung legt je Spielwoche eine Map fest (#2326)
+* Veto wartet bei fehlender Vorgabe, die Liga-Leitung bekommt einen Hinweis, gewertet wird nichts (#2326)
+
+### Fehlerbehebungen
+
+* Banner-Manager in den Einstellungen passt am Telefon in die Breite (#2352)
+* Check-in – „Beide Seiten eingecheckt“ kündigt kein Veto an, das in diesem Spiel entfällt (#2326)
+* Links der automatischen Banner nennen ihr Ziel für Screenreader (#2352)
+* Matchseite – sind beide Seiten bereit und die Vorgabe der Woche kommt zurück, beginnt das Veto von selbst (#2326)
+* Season-Verwaltung – Vorgabe mit einer Map außerhalb des Pools bleibt sichtbar und geht beim Speichern nicht verloren (#2326)
+* Views und Klicks der Hinweisbanner sind nicht mehr öffentlich abrufbar (#2352)
+* Zielgruppe der automatischen Hinweisbanner folgt der Sichtbarkeit von Turnier, Challenge und Server (#2352)
+
+## 1.77.1 (11.11.2026)
+
+### Fehlerbehebungen
+
+* Teamseite zeigt das eigene Banner im vollen 3:1-Format statt abgeschnitten (#2349)
+
+## 1.77.0 (11.11.2026)
+
+### Neu
+
+* Admin-Katalog – Erfolge mit Grund auf „nicht mehr erreichbar“ setzen (#2339)
+* Erfolge – nicht mehr Erreichbares sieht nur, wer es hat; es zählt nirgends mit (#2339)
+* Erfolge-Seite zeigt je Kategorie einen Haken oder „x von y“ der erreichbaren Stufen (#2339)
+
+### Fehlerbehebungen
+
+* Comeback und Kartenkenner zählen die Maps der Vereinsliga, zugesprochene nicht (#2339)
+* Kategorie-Meister zählt nur erreichbare Stufen, ohne Zirkel (#2339)
+* Nicht-Mitglieder sehen beim Verein „Nur für Mitglieder“ (#2339)
+* Pionier bleibt für frühe Konten erreichbar, die Verwaltung behält ihre Einstellung (#2339)
+* Profil, Spielerliste, Rangliste und Kachel zählen Erfolge wie die Erfolge-Seite (#2339)
+* Saison und Profil & Konto zeigen auf der Erfolge-Seite ihr eigenes Symbol (#2339)
+* Sammler, Geheimnisträger und Hundert Prozent sind erreichbar und zählen wie die Anzeige (#2339)
+* Streckenrekord und Eiserner Löwe mit eigenem Kriterium (#2339)
+* Turnierleitung, Schiedsrichter und Gastgeber sieht nur die Leitung (#2339)
+
+## 1.76.0 (11.11.2026)
+
+### Neu
+
+* „Verifizierter Streamer“ kommt automatisch mit Twitch-Verknüpfung und Creator-Kennzeichen (#2338)
+* Erfolge – eine Sammel-Zeremonie „Du hast X Erfolge nachträglich bekommen“ statt einzelner Feiern (#2340)
+* Erfolge – Kronen wechseln während der Neuberechnung nicht, gemeldet wird nur die Änderung am Ende (#2340)
+* Erfolge – nachgerechnete Stufen nicht im Laufband, Erfolg der Woche, Wochen- und Jahresrückblick und in keiner Zeitraum-Rangliste (#2340)
+* Erfolge – stiller Modus für die Neuberechnung: nachgerechnete Stufen kommen ohne Meldung, echte Ereignisse melden weiter (#2340)
+* Häkchen „Streamer oder Creator“ im Vereinsprofil der Mitgliederverwaltung (#2338)
+* Verwaltung – Neuberechnung der Erfolge mit Probelauf, Stand „schon still vergeben“, Abschluss und einer Sammel-Nachricht je Person (nur Superadmin) (#2340)
+
+### Fehlerbehebungen
+
+* „Datenbewusst“ zählt erst nach eigener Privatsphäre-Einstellung oder Datenexport (#2338)
+* „Kapitän“ zählt ab der Übernahme der Leitung, im Altbestand ab der protokollierten Übergabe (#2338)
+* „Plauderer“ zählt nur noch Turnier- und Match-Chat, ohne springenden Fortschritt (#2338)
+* „Teamauftritt“ zählt für Teamleitung und Co-Leitung, gleich beim Speichern (#2338)
+* „Überall dabei“ gleicht die Discord-Server beim Verknüpfen und jede Nacht ab (#2338)
+* „Überall dabei“ richtet die Stufen nach der Zahl der eingeschalteten Server (#2338)
+* „Vereinsleben“ erkennt interne Events auch an der Art, abgesagte Events zählen nicht (#2338)
+* Chat-Erfolge zählen keine zurückgehaltenen oder gelöschten Nachrichten und höchstens 50 am Tag (#2338)
+* Discord-Erfolge zählen nur eingeschaltete Server und nach dem Trennen nichts mehr (#2338)
+* Dolibarr-Abgleich löscht ein bekanntes Beitrittsdatum nicht mehr (#2338)
+* Erfolge – „Pünktlich“ zählt jetzt, der Check-in hält seinen Zeitpunkt fest (#2337)
+* Erfolge – „Ungeschlagen“ gilt nur, wenn das Team kein Spiel verloren hat (#2337)
+* Erfolge – Champion, Podest und alle Platz-Erfolge erst nach Abschluss des Turniers (#2337)
+* Erfolge – Durchzieher zählt nur gespielte Turniere ohne kampflose Niederlage, Austritt oder Disqualifikation (#2337)
+* Erfolge – ein Freilos zählt nicht mehr als Spiel und unterbricht keine Serie (#2337)
+* Erfolge – Erklärtexte beschreiben genau, was gezählt wird, und trennen Vereinsliga und Hin- und Rückrunde (#2337)
+* Erfolge – Finalist ist, wer im Finale stand: Endspiel, Grand Final oder der ganze Finallauf (#2337)
+* Erfolge – Finalist, Top 8, Lower-Bracket-Lauf, Ungeschlagen und Grand Slam zählen wieder (#2337)
+* Erfolge – Formatvielfalt zählt die Vereinsliga mit und Mehrspieler frei nur einmal (#2337)
+* Erfolge – im Team und in der Liga zählt, wer gespielt hat, nicht nur wer angemeldet hat (#2337)
+* Erfolge – Kaderwechsel im Co-Team nehmen niemandem seine Spiele und geben keine alten dazu (#2337)
+* Erfolge – kampflose Siege zählen als Spiel und Sieg (#2337)
+* Erfolge – Preisträger zählt nur vergebene Preise aus Turnieren (#2337)
+* Erfolge – Top 8 zählt erst ab mehr als acht Teilnehmern (#2337)
+* Erfolge – Topgesetzt und Riesentöter nur bei fester Setzliste (#2337)
+* Erfolge – Turnierveteran, Multitalent, Formatvielfalt und Teamturniere zählen die Teilnahme statt der Anmeldung, auch nach Austritt oder Disqualifikation (#2337)
+* Gruselnacht zählt am Server nur am 31.10. ab 18 Uhr Wiener Zeit (#2338)
+* Hand-Erfolge nennen Kriterium, wer entscheidet und wer einträgt; „Steckbrief“ nennt alle Felder (#2338)
+* Konto verknüpfen oder trennen wertet die Erfolge gleich aus (#2338)
+* Kontolöschung entfernt auch die Zeitpunkte von Privatsphäre-Einstellung und Datenexport (#2338)
+* Streamer, Sendezeit und Clip-Macher zählen nur mit per Anmeldung verknüpftem Twitch, auch nach einer Umbenennung (#2338)
+* Teams – Rollenwechsel und Leitungsübergabe halten das Beitrittsdatum fest (#2337)
+
+### Schneller
+
+* Chat- und Discord-Nachrichten werten Erfolge leicht über die Warteschlange aus (#2338)
+* Erfolge – Plätze und Finalisten werden je Turnier einmal ermittelt statt je Person (#2337)
+
+## 1.75.0 (10.11.2026)
+
+### Neu
+
+* „?“ an Ligaseite, Liga-Anmeldung, Matchseite, Teamseite und Spiel-IDs führt zum passenden Hilfe-Schritt (#2295)
+* Ergebnis melden – der Sieger jeder Map ergibt sich aus den Punkten, kein Team mehr zum Antippen (#2334)
+* Ergebnis-Fenster der Leitung – Sieger aus den Punkten vorgewählt, Hinweis mit „übernehmen“, wenn Sieger und Punkte nicht zusammenpassen (#2334)
+* Event-Rückblick nennt im K.-o. den Weg zum Platz statt nur der Siege (#2336)
+* Hilfe im Community-Menü und in der Fußzeile (#2295)
+* Hilfe-Bereich /hilfe mit Suche und Anleitungen mit Bildern für Konto und Profil, Team und Co-Team, Liga für Captains und Turniere (#2295)
+* Jeder Hilfe-Schritt hat einen eigenen Link zum Weiterschicken, Vorschau in Discord und WhatsApp (#2295)
+* Kurze Videos zu Liga-Anmeldung, Ergebnis melden und Team mit Co-Team anlegen (#2295)
+* Podest zeigt im K.-o., wie der Platz zustande kam, mit gewonnenen Spielen und kurzer Erklärung (#2336)
+* Terminabstimmung – alle Termine ablehnen (mit optionalem Grund), zurückziehen oder mit bis zu drei Terminen gegenvorschlagen (#2325)
+* Terminabstimmung – bis zu drei Termine auf einmal vorschlagen, Fehler direkt am betroffenen Termin, außerhalb der Spielwoche nur ein Hinweis (#2325)
+* Terminabstimmung – eine Nachricht mit allen vorgeschlagenen Terminen statt einer je Termin (#2325)
+* Terminabstimmung – Gegenseite sieht die Termine als Liste und nimmt mit einem Klick einen an, die übrigen schließen (#2325)
+
+### Fehlerbehebungen
+
+* Ergebnis melden – Gleichstand in einem Modus ohne Remis und ungültige Punkte werden gleich richtig benannt (#2334)
+* Freilos zählt in der Baum-Rangliste nicht mehr als Spiel und Sieg, die Plätze bleiben unverändert (#2336)
+* Fußzeile am Handy zeigt „Mitmachen“ in zwei Spalten, die Seiten werden kürzer (#2295)
+* Gegenvorschlag aus der App beantwortet alle Termine einer Auswahl, die 72-h-Regel greift danach nicht mehr (#2325)
+* Hilfe – Bilder zur Terminabstimmung zeigen die Auswahl mit mehreren Terminen (#2334)
+* Liga-Hinweis im Profil nennt den richtigen Reiter „Grunddaten“ fürs Geburtsdatum (#2295)
+* Turnier ohne Spielwochen bleibt nach einer Ablehnung auf „Terminvorschlag offen“, solange noch einer offen ist (#2325)
+
+## 1.74.0 (09.11.2026)
+
+### Neu
+
+* Hinweis auf offene Liga-Anmeldung auf der Startseite mit Anmeldeschluss und „Mit Co-Team anmelden“ (#2324)
+* Liga-Seasons stehen in „Nächste Termine“ auf der Startseite mit Zeitraum, freien Plätzen und Stand (#2324)
+* Schalter „Auf der Startseite bewerben“ je Season in der Liga-Verwaltung (#2324)
+* Teilen-Vorschau der Ligaseite nennt Anmeldeschluss und freie Plätze, ohne Banner mit Emblem (#2324)
+
+### Fehlerbehebungen
+
+* Hinweis zu offenen Punkten sagt, dass die Anmeldung zählt und was beim Spiel passiert (#2322)
+* Liga-Anmeldung misst Spielberechtigte an der Check-in-Mindestzahl statt am Mindestkader – mit 3 von 4 kein falscher Hinweis mehr (#2322)
+* Zuteilen-Dialog nennt zu wenige Spielberechtigte erst unter der Check-in-Mindestzahl (#2322)
+
+## 1.73.0 (09.11.2026)
+
+### Neu
+
+* Anmeldestrecke „Passt alles?“ zeigt fehlende Angaben und zu wenige Spielberechtigte als Hinweis (#2313)
+* Check-in auf der Matchseite nennt den eigenen Grund mit Link ins Profil und warnt bei zu wenigen Spielberechtigten (#2313)
+* Eingang der Leitung zeigt offene Punkte je Team, Zulassen geht trotzdem (#2313)
+* Erinnerung an fehlende Angaben an Spieler und Captain beim Einreichen und vor dem ersten Spiel (#2313)
+* Kader-Aufnahme und Transfer gehen ohne oder mit zu jungem Geburtsdatum – die Person spielt erst mit passender Angabe (#2313)
+* Liga-Tabelle rechnet auf Wunsch Punkte nach gewonnenen Maps (3:2 ergibt 3 und 2, kampflos 3:0) (#2312)
+* Ligaseite nennt die offenen Punkte einer laufenden Anmeldung (#2313)
+* Neue Punkteart lässt sich auf laufende Staffeln übertragen und wird protokolliert (#2312)
+* Punkteart in der Season-Einstellung zur Tabelle wählbar, mit vorgeschlagener Reihenfolge Siege, direkter Vergleich, Map-Differenz, Leitung (#2312)
+* Regelwerk-Baustein Tabelle und Variable table.points beschreiben die Punkteart (#2312)
+* Staffel-Tabelle und Season-Seite zeigen, dass die Punkte gewonnene Maps sind (#2312)
+* Teamseite sagt, dass nicht Spielberechtigte nicht einchecken und nicht aufgestellt werden können (#2313)
+* Vorlauf der Erinnerung an fehlende Angaben je Season einstellbar (#2313)
+
+### Fehlerbehebungen
+
+* Liga N mit eigenen Punkten behält direkten Vergleich, Remis-Regel und kampflos der Season (#2318)
+* Liga-Anmeldung und Zuteilen gehen trotz fehlender Angaben – gesperrt wird erst beim Check-in und bei der Aufstellung (#2313)
+
+## 1.72.0 (09.11.2026)
+
+### Neu
+
+* **liga:** Erlaubte Ausrüstung im Regelwerk als Tabelle je Kategorie mit Bild, Name und Ausnahmen nach Slot, im Web und im PDF (#2305)
+* **liga:** Liga- und Matchseite zeigen die gesperrten Aufsätze ganz oben im aufgeklappten Kasten (#2305)
+* **liga:** Regelwerk nennt bei Waffen mit mehr gesperrten als erlaubten Aufsätzen nur noch die erlaubten (#2305)
+* **liga:** Regelwerk-Tabelle der Ausrüstung stapelt am Handy ohne seitliches Scrollen (#2305)
+
+### Fehlerbehebungen
+
+* Sperrliste der Season lässt sich auch speichern, wenn eine Waffe oder Klasse in allen Modi gesperrt ist – überflüssige Aufsatz- und Einzel-Sperren entfallen beim Speichern, ein Hinweis sagt es vorher
+
+## 1.71.0 (05.11.2026)
+
+### Neu
+
+* Sperrliste: Notiz der Ausrüstung steht klein unter dem Namen bei Waffen, Aufsätzen und allen Kategorien, nur in der Verwaltung (#2302)
+
+## 1.70.0 (04.11.2026)
+
+### Neu
+
+* Erlaubte Ausrüstung: Aufsätze, die an keiner Waffe erlaubt sind, stehen einmal in eigener Zeile statt an jeder Waffe (#2299)
+* Erlaubte Ausrüstung: Hinweis „nur in …“, wenn ein Eintrag in mehr Modi der Season gesperrt als erlaubt ist (#2298)
+* Ligaseite und Matchseite: Aufsätze je Waffe aufklappbar mit „N Aufsätze · K gesperrt“, erlaubte Aufsätze je Slot mit Bild (#2299)
+* Regelwerk: Aufsätze stehen an der Waffe statt als eigene Liste, PDF mit einer Zeile je Waffe „alle passenden Aufsätze erlaubt, außer: …“ (#2299)
+* Sperrliste: „Für alle &lt;Waffenklasse&gt; übernehmen“ und „Aufsatz an allen Waffen sperren“ (#2299)
+* Sperrliste: Waffe aufklappen zeigt die passenden Aufsätze je Slot, gesperrt auch je Modus (#2299)
+
+## 1.69.0 (04.11.2026)
+
+### Neu
+
+* Ausrüstung: Aufsätze passen zu ganzen Waffenklassen, neue Waffen der Klasse sofort (#2287)
+* Ausrüstung: Bibliothek gruppiert nach Unterkategorien, einklappbar mit Zählern (#2287)
+* Ausrüstung: mehrere Einträge auswählen und in eine Unterkategorie verschieben (#2287)
+* Ausrüstung: Übernehmen aus einem anderen Spiel bringt Unterkategorien mit (#2287)
+* Ausrüstung: Unterkategorien je Kategorie anlegen, umbenennen, ordnen und mit Symbol versehen (#2287)
+* Liga: Eingriffe der Leitung ins Veto – Pause, Fortsetzen, Schritt zurück, Neustart mit Grund und Befangenheit (#1618)
+* Liga: Kasten „Veto“ im Reiter Spielbetrieb mit kompakter Schrittliste, Prüfung live, Vorschlag aus Modusfolge und Pools (#1618)
+* Liga: Meldeformular übernimmt die Maps laut Veto, Server prüft die Meldung der Captains dagegen (#1618)
+* Liga: Neue Seasons beginnen mit Veto an; eine unberührte Vorlage folgt dem Map-Pool automatisch (#1618)
+* Liga: Prüfung vor der Veröffentlichung nennt eine Vorlage, die nicht aufgeht (#1618)
+* Liga: Regelwerk-Baustein Veto und Variablen veto.step_seconds, veto.team_a – geänderte Vorlage löst die Freigabe aus (#1618)
+* Liga: Veto am Spiel startet nach dem Check-in; Züge mit Versionsnummer, Decider automatisch, Zufallswahl nach Ablauf (#1618)
+* Liga: Veto auf der Matchseite – wer am Zug ist, Countdown, Maps je Modus, Verlauf, Spielreihenfolge (#1618)
+* Liga: Veto je Season – Vorlage mit Sperren, Wählen und Decider je Modus, Team A Heim oder Los, Zeit je Schritt, an/aus (#1618)
+* Ligaseite und Matchseite zeigen die erlaubte Ausrüstung wie das Regelwerk, fertige Spiele halten sie fest (#2287)
+* Regelwerk: Baustein „Erlaubte Ausrüstung“ zeigt, was erlaubt ist, im Web mit Karten und im PDF als Tabelle (#2287)
+* Regelwerk: neuer Eintrag in der Bibliothek meldet „Regelwerk muss freigegeben werden“ (#2287)
+* Sperrliste: ganze Klasse sperren, auch je Modus, gilt auch für später angelegte Einträge (#2287)
+
+### Fehlerbehebungen
+
+* Aufsätze ohne erlaubte Waffe erscheinen nicht als erlaubt, die Sperrliste nennt sie (#2287)
+* Hinweis „Aufsätze ohne Waffe“ mit zugeklappter Auswahl und Suche (#2287)
+* Liga: Bei gesperrter Staffel startet der Seitenaufruf kein Veto und löst keine Frist auf (#1618)
+* Liga: Jeder neue Termin – auch zurück auf den alten und „Terminplan freigeben“ – setzt Check-in und Veto zurück (#1618)
+
+### Dokumentation
+
+* Liga D.3 im Vertrag, Handbuch Veto einrichten und durchführen, Rollen und Routen-Inventar (#1618)
+
+## 1.68.0 (04.11.2026)
+
+### Neu
+
+* „Regelwerk muss freigegeben werden“ in Mein Dienst und auf der Verwaltungs-Startseite (#2269)
+* „Regelwerk muss freigegeben werden“ mit Vorschlag der neuen Fassung, Freigabe in einem Schritt und Wahl der Zustimmungspflicht (#2269)
+* Regelwerk mit Zustimmungsstand auf Liga-Übersicht, Team-Seite und Matchseite (#2269)
+* Regelwerk-Editor: Bausteine und Variablen mit aktuellem Wert einfügen, Hilfe-Liste, Vorschau nennt unbekannte und leere Variablen (#2269)
+* Regelwerk: Bausteine Modi der Season, Spielformat, Tabelle und Wertung, Termine und Spielberechtigung aus den Einstellungen (#2269)
+* Regelwerk: leere Variablen nur mit ausdrücklicher Bestätigung veröffentlichen (#2269)
+* Regelwerk: Plattform je Season im Baustein Spielberechtigung und als Variablen (#2269)
+* Regelwerk: Variablen {{…}} im Fließtext aus der Season, je Fassung eingefroren; unbekannte halten das Veröffentlichen auf (#2269)
+* Regelwerk: Variablen für Protestfrist, Einspruchsfrist, Aufbewahrung der Beweise und Pause zwischen den Maps, heute mit Vorgabe, später einstellbar
+
+### Fehlerbehebungen
+
+* Bilder: abgebrochene verkleinerte Fassungen werden neu gebaut statt leer angezeigt (z. B. Waffen in der Ausrüstung)
+* Regelwerk: Altfassungen bleiben wörtlich, Namen werden beim Veröffentlichen festgehalten (#2269)
+* Regelwerk: Fassung der Liga nennt leere Season-Variablen in Vorschau und Vorschlag (#2269)
+* Regelwerk: Freigabe erkennt, wenn sich Einstellungen oder Namen seit dem Vorschlag geändert haben (#2269)
+
+### Dokumentation
+
+* Handbuch Regelwerk: alle Bausteine und Variablen samt Check-in, Freigabe-Ablauf (#2269)
+
+## 1.67.0 (04.11.2026)
+
+### Neu
+
+* Auskunft und Kontolöschung kennen den Check-in; Regelwerk-Baustein [[baustein:checkin]] (#1652)
+* Check-in je Season einstellbar (Fenster, Mindestzahl, Erinnerung), sofort für alle Staffeln (#1652)
+* Check-ins gelten je Termin – jeder neue Termin (auch Spieltag- und Stationsplan) lässt neu einchecken und hebt Verlängerungen auf (#1652)
+* Ergebnis melden in Staffeln mit Check-in erst nach beiden Check-ins, die erste gültige Meldung setzt den Start nach (#1652)
+* Erinnerungen „Check-in offen“ und vor Schluss, Aufgabe „Jetzt einchecken“, Mein Dienst „Check-in abgelaufen“ (#1652)
+* Liga-Check-in je Spiel – Fenster um den Termin, Anwesende mit Spielberechtigung, Start setzt den Beginn (#1652)
+* Liga-Leitung trägt den Check-in im Notfall mit Grund ein (Befangenheit wie B.1) (#1652)
+* Matchseite mit Countdown-Ring, Anwesenden-Liste, Status der Gegenseite und „Spiel starten“ (#1652)
+* Nach dem Check-in-Fenster nur ein Vorschlag „nicht erschienen“ an die Leitung, nie eine automatische Wertung (#1652)
+* Regelwerks-Sperre – ohne Zustimmung zur geforderten Fassung kein Check-in und kein Start (#1652)
+* Verlängern und „nicht erschienen“ gelten nur für die fehlende Seite und das aktuelle Fenster (#1652)
+
+### Fehlerbehebungen
+
+* Karte „Nicht erschienen?“ nennt beim Check-in auch das Nachtragen (#1652)
+
+### Dokumentation
+
+* Vertrag D.2 in LIGA.md, Handbuch für Captains und Leitung, ROLLEN.md, Routen-Inventar (#1652)
+
+## 1.66.0 (04.11.2026)
+
+### Neu
+
+* Altes Freitextfeld Regeltext ausgeblendet, Hinweis „Regelwerk muss freigegeben werden“ im Überblick (#2267)
+* Ergebnisregel: Zeitlimit mit Sekunden (z. B. 1:30) und Zeit je Runde (#2271)
+* Hinweis, wenn der Beiname einer Liga N die Stufe wiederholt („Liga 1 · Liga 1“) (#2267)
+* Liga: Anmeldung, Zuteilen, Kaderübersicht und Team-Seite nennen die Plattform mit Grund im Klartext (#2270)
+* Liga: Plattform je Season (nur PC, nur PlayStation, mehrere oder alle) in der Spielberechtigung (#2270)
+* Links auf die Season-Seite führen in den passenden Reiter, „Transfer beantragt“ direkt in die Kaderübersicht (#2267)
+* Map-Pool-Editor nennt ein geändertes Modus-Symbol und bringt es mit dem nächsten Speichern in Season und Staffeln (#2266)
+* Mediathek zählt Modus-Symbole, in gespeicherten Pools und veröffentlichten Regelwerken bleiben sie unverändert (#2266)
+* Modi der Season an einer Stelle anhaken, je Modus Maps, Mindestgröße und Ergebnisregel, Hinweis wenn Pool und Modus je Map nicht passen (#2267)
+* Modus-Symbol auf Match- und Ligaseite, im Map-Pool, bei „Modus je Map“ und im Regelwerk (Web) (#2266)
+* Regelwerk: Baustein „Einstellungen je Modus“, im PDF als Tabelle (#2271)
+* Season übernimmt Einstellungen je Modus als Kopie, mit „weicht vom Spiel ab“ und „Vom Spiel übernehmen“ (#2271)
+* Season-Seite mit Reitern: Überblick, Spielbetrieb, Termine, Anmeldung und Kader, Tabelle, Regelwerk und Sperrliste, Ligen und Staffeln, Speichern je Reiter mit Punkt und Rückfrage (#2267)
+* Spielmodi: freie Einstellungen je Modus mit Gruppe, Einheit und Reihenfolge, dazu eigene Regeln (#2271)
+* Spielmodi: quadratisches Symbol je Modus mit Hochladen, Bibliothek und Entfernen im Reiter Modi (#2266)
+* Überblick der Season mit Ablaufleiste, „Was fehlt noch?“ mit Sprung an die Stelle und Erklärung von Sichtbarkeit und Stand (#2267)
+* Verwaltung: Plattform, Crossplay und Eingabegerät im Reiter „Anmeldung und Kader“, Liga N weicht im Liga-N-Blatt ab (#2270)
+
+### Fehlerbehebungen
+
+* Ergebnis von „Jetzt übertragen“ steht dort, wo übertragen wurde (#2267)
+* Spiel-IDs: Rückfrage auch, wenn eine Spielversion ID-Quelle, Hauptspiel oder Erben wechselt; Spiele mit gespeicherten IDs lassen sich nicht löschen (#2249)
+* Spiel-IDs: Schlüssel mit gespeicherten Spieler-IDs fallen nur nach Rückfrage weg, alte Schlüssel bleiben erhalten (#2249)
+* Spiele: Umbenennen ändert die Adresse nicht mehr, ein neuer Slug mit gespeicherten Spieler-IDs nur nach Rückfrage (#2249)
+
+## 1.65.1 (03.11.2026)
+
+### Fehlerbehebungen
+
+* Ausrüstung: ungespeicherte Änderungen in Eintrags-, Kategorien- und Import-Blatt fragen beim Verlassen und beim Reiterwechsel nach (#2218)
+* Regelwerk liefert Bausteine ohne Schutzzeichen aus, Namen und freier Text erscheinen wie geschrieben (#2218)
+* Regelwerk speichert Bausteine im Klartext, keine Schutzzeichen in Fassungen, Veröffentlichen-Antwort und „Daten geändert“ (#2218)
+* Regelwerk: keine fremden Links über Backslash-Adressen (#2218)
+
+## 1.65.0 (03.11.2026)
+
+### Neu
+
+* „Beide nicht erschienen“ vor dem Spiel werten und neu ansetzen in der Staffel (#1625)
+* Austritt in der Liga-Staffel – alle Spiele zählen für die Gegner statt 50-%-Regel (#1625)
+* Entscheid der Leitung bei echtem Gleichstand mit Grund (#1625)
+* Liga-Staffel ohne Remis lehnt ein Remis beim Eintragen ab (#1625)
+* Liga-Tabelle mit direktem Vergleich (nur wenn die Gruppe alle Spiele gespielt hat), kampflos und Tabellenende (#1625)
+* Liga-Tabelle zeigt, was bei Gleichstand entschied, kampflos und ausgeschiedene Teams (#1625)
+* Neue Liga-Seasons mit den entschiedenen Tabellenregeln (#1625)
+* Tabellenregeln je Season für Liga-Staffeln: direkter Vergleich, Mini-Tabelle, Remis, Default-Win, Ausscheiden (#1625)
+* TV, Druck und Ergebnis-PDF nennen ausgeschiedene Teams (#1625)
+
+## 1.64.0 (03.11.2026)
+
+### Neu
+
+* Aufsätze ohne Waffe passen zu keiner – Hinweis und Zuordnung in einem Schritt (#2218)
+* Ausrüstungs-Bibliothek je Spiel mit Kategorien, Bild, Zustand und Import aus einer anderen Spielversion (#2218)
+* Baustein „Sperrliste“ im Regelwerk – mit Bildern im Web, als Liste im PDF, Hinweis auf eine neue Version (#2218)
+* Ligaseite zeigt die Sperrliste der Season (#2218)
+* Sperrliste der Season je Modus und je Waffe mit unveränderlichen Versionen für Staffel und Spiel (#2218)
+* Spielseite mit Reiter „Ausrüstung“ (#2218)
+
+### Fehlerbehebungen
+
+* Namen in Bausteinen des Regelwerks werden nie zu Link oder Formatierung, auch im PDF (#2218)
+* Übertragen nennt auch Terminregeln und Ergebnisregeln (#2218)
+
+## 1.63.0 (03.11.2026)
+
+### Neu
+
+* Pool-Editor, Discord-Einstellungen und Hinweise führen auf die Spielseite (#2249)
+* Verwaltung: eigene Spielseite mit Reitern Allgemein, Spiel-IDs, Modi und Maps, per Adresse ansteuerbar (#2249)
+* Verwaltung: Maps als Tabelle Map × Modus, ein Häkchen gibt frei; alte Map-Adresse leitet weiter (#2249)
+* Verwaltung: Modi als Zeilen mit Zustand, Spielern, Ergebnisregel und Dauer, aufklappbar (#2249)
+* Verwaltung: Speichern je Reiter, ungespeicherte Änderungen bleiben beim Reiterwechsel und werden beim Verlassen erfragt (#2249)
+* Verwaltung: Spiel-IDs mit beschrifteten Feldern; gespeicherte Schlüssel bleiben fest, neue müssen eindeutig sein (#2249)
+* Verwaltung: Spieleliste mit Zahnrad, neues Spiel schnell mit Name und Art (#2249)
+
+## 1.62.0 (03.11.2026)
+
+### Neu
+
+* Ergebnisregel übergehen durch die Liga-Leitung mit Grund (#1617)
+* Ergebnisregeln und Punktepflicht in den Season-Einstellungen (#1617)
+* Liga prüft den Endstand je Map gegen Ergebnisregel und Sieger (#1617)
+* Matchseite und Ligaseite zeigen wiederholte, zugesprochene und nicht gespielte Maps (#1617)
+* Meldeformular zeigt die Ergebnisregel je Map und prüft vorab (#1617)
+* Season hält die Ergebnisregeln der Modi fest, Punkte je Map Pflicht (#1617)
+
+## 1.61.0 (03.11.2026)
+
+### Neu
+
+* Beim Deaktivieren oder Archivieren einer Map nennt eine Rückfrage die Seasons, in deren Map-Pool sie steht (#2207)
+* Datenschutz: Verschiebungsanträge und Termin-Verlauf in Auskunft und Kontolöschung (#2194)
+* Liga-Termine: Erinnerung bei nie gemeldeten Spielen, danach „überfällig“ bei der Liga-Leitung in Mein Dienst (#2194)
+* Liga-Termine: Termin-Verlauf am Spiel und „Termin festlegen“ der Liga-Leitung mit Grund (#2194)
+* Liga-Termine: unbeantworteter Terminvorschlag der Heimseite gilt nach 72 Stunden (je Season einstellbar) (#2194)
+* Liga-Termine: Verschiebung mit Grund beantragen, die Gegenseite stimmt zu, Grenzen im Klartext auf der Matchseite (#2194)
+* Liga: „Modus je Map“ muss so lang sein wie die längste Serie der Season (#2207)
+* Liga: „Nur Liga-Leitung“ ist Vorschau, die Prüfung vor der Veröffentlichung greift erst bei „Nur Mitglieder“ oder „Öffentlich“ (#2207)
+* Liga: Map in einem Schritt aus dem Pool der Season nehmen und auf alle Staffeln übertragen, mit Grund im Protokoll (#2207)
+* Liga: Mindestgröße je Modus im Map-Pool, abgeleitet und je Season überschreibbar, mit Warnung beim Speichern (#2207)
+* Liga: Prüfung vor der Veröffentlichung – eine Season mit Problemen lässt sich nicht sichtbar schalten, Notausnahme nur für den Superadmin (#2207)
+* Liga: Zwei Versionen des Map-Pools einer Season vergleichen (#2207)
+* Maps lassen sich deaktivieren – sie kommen in keinen neuen Pool, wo sie schon stehen bleiben sie gültig (#2207)
+* Mein Dienst und Turnierliste: Hinweis „Läuft laut Stand noch, Ende war am … – beenden?“ (#2194)
+* Startseite: Aufgabe „Verschiebung beantworten“ für Captain und Vertreter (#2194)
+* Turniere laufen nach dem eingetragenen Ende öffentlich weiter, solange Spiele offen sind (#2194)
+* Verwaltung: Terminregeln je Season (72-h-Regel, Verschiebungen, Erinnerung, überfällig) (#2194)
+
+### Fehlerbehebungen
+
+* „Aus Spiel übernehmen“ zählt Maps ohne Zustand als aktiv (#2207)
+
+### Dokumentation
+
+* Handbuch Liga-Leitung und Captains: Termine, Verschiebung, überfällige Spiele (#2194)
+
+## 1.60.0 (03.11.2026)
+
+### Neu
+
+* Die Kennung eines Spielmodus bleibt beim Umbenennen gleich, auch über die API (#2206)
+* Inaktive Spielmodi stehen für neue Map-Pools, Modus je Map, Turniere und Phasen nicht mehr zur Wahl (#2206)
+* Liga: „Co-Team zuteilen“ verweist den Superadmin für die Notausnahme in den Eingang (#2245)
+* Liga: Anmeldefenster, Startplätze, Warteliste, Zulassung und Datenschutz-Hinweis je Season einstellbar (#2205)
+* Liga: Co-Teams melden sich selbst auf der Ligaseite an, geführt in vier Schritten (#2205)
+* Liga: Eingang für die Leitung mit Prüfen, Annehmen, Ablehnen mit Grund, Warteliste und Zuteilung zu Liga und Staffel (#2205)
+* Liga: Eingang zeigt beim eigenen Team keine Knöpfe, der Superadmin entscheidet nur mit Grund (#2245)
+* Liga: Ligaseite zeigt Anmeldefenster und freie Startplätze für alle, Stand und Zurückziehen für das eigene Co-Team (#2205)
+* Liga: Nachricht und Mail bei eingereicht, angenommen, abgelehnt, Warteliste und zurückgezogen (#2205)
+* Liga: Prüfung im Klartext vor dem Einreichen, Zustimmung zu Regeln und Datenschutz wird nachweisbar gespeichert (#2205)
+* Liga: Schalter je Season für zwei Co-Teams eines Hauptteams in derselben Staffel (#2205)
+* Liga: Team-Seite zeigt den Stand der Anmeldung je Co-Team (#2205)
+* Liga: Über die Anmeldung des eigenen Teams entscheidet eine zweite Person (#2245)
+* Spielmodi haben Zustand (aktiv, inaktiv, archiviert), Beschreibung, Spieler je Seite, Format und Ergebnisregel (#2206)
+* Verwendete Spielmodi lassen sich nur deaktivieren oder archivieren, nicht entfernen (#2206)
+
+### Fehlerbehebungen
+
+* Datenschutz: Auskunft und Kontolöschung kennen die Liga-Anmeldungen (#2205)
+
+### Dokumentation
+
+* Handbuch für Leitung und Captains zur Selbstanmeldung (#2205)
+
 ## 1.59.1 (02.11.2026)
 
 ### Fehlerbehebungen

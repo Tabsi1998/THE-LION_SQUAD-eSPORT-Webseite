@@ -115,6 +115,36 @@ test.describe("Spielplan (#1562)", () => {
   });
 });
 
+test.describe("Podest im K.-o. erklärt den Platz (#2336)", () => {
+  // Fabians Beispiel mit erfundenen Namen: Platz 2 hat weniger Siege als Platz 3 - der Weg und ein Satz erklären es.
+  const regs = fixture.finished.bracket.registrations;
+  const standings = [
+    { registration_id: regs[0].id, display_name: "NeonFalke", rank: 1, played: 4, won: 4, lost: 0, reached: "Finale", place_path: "Finale gewonnen" },
+    { registration_id: regs[1].id, display_name: "LunaByte", rank: 2, played: 2, won: 1, lost: 1, reached: "Finale", place_path: "im Finale" },
+    { registration_id: regs[2].id, display_name: "KartKönigin", rank: 3, played: 4, won: 3, lost: 1, reached: "Spiel um Platz 3", place_path: "Spiel um Platz 3 gewonnen" },
+    { registration_id: regs[3].id, display_name: "PixelPirat", rank: 4, played: 3, won: 1, lost: 2, reached: "Spiel um Platz 3", place_path: "im Spiel um Platz 3" },
+  ];
+  for (const width of [390, 1440]) {
+    test(`Weg, gewonnene Spiele und Satz - ${width} px ohne Überlauf`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await mock(page, { ...fixture.finished, standings });
+      await page.goto(`/tournaments/${fixture.finished.tournament.slug}`);
+      const podium = page.getByTestId("podium");
+      await podium.scrollIntoViewIfNeeded();
+      await expect(podium.getByTestId("podium-path")).toHaveCount(3);
+      await expect(page.getByTestId("podium-place-2")).toContainText("im Finale");
+      await expect(page.getByTestId("podium-place-2")).toContainText("1 Spiel gewonnen");
+      await expect(page.getByTestId("podium-note")).toContainText("erreichte Runde");
+      // Nichts abgeschnitten: jede Zeile des Wegs passt in ihre Stufe.
+      const clipped = await podium.locator(".tls-podium__path > span").evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).length);
+      expect(clipped).toBe(0);
+      await noSideScroll(page);
+      await page.waitForTimeout(1500);
+      if (SCREENS) await podium.screenshot({ path: path.join(SCREENS, `podest-ko-${width}.png`) });
+    });
+  }
+});
+
 test.describe("Podest und Sieger-Moment (#1339, #1180)", () => {
   test("Treppchen nach dem Ende, der eigene Platz einmal als Karte", async ({ page }) => {
     await mock(page, fixture.finished, { user: PLAYER });
