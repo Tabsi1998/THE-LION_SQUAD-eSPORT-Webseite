@@ -297,7 +297,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
                 <span className="text-white/80">{row.own ? "Deine Datei" : row.name}: <strong data-state={row.state}>{MOSS_STATE_LABELS[row.state] || row.state}</strong></span>
                 {row.state === "requested" ? <span className={`tabular-nums ${TONE[deadlineTone(row.due_at, now)]}`}>bis {when(row.due_at)} · {remainingText(row.due_at, now)}</span> : null}
                 {p.can_lead && ["requested", "missing"].includes(row.state) ? (
-                  <button type="button" disabled={busy || extra.trim().length < 5} onClick={() => run(() => api.post(`${base}/moss-requests/${row.id}/excuse`, { reason: extra.trim(), ...lead }), () => setExtra(""))}
+                  <button type="button" disabled={busy || blocked || extra.trim().length < 5} onClick={() => run(() => api.post(`${base}/moss-requests/${row.id}/excuse`, { reason: extra.trim(), ...lead }), () => setExtra(""))}
                     className="underline underline-offset-2 text-white/60 hover:text-white disabled:opacity-40" data-testid={`procedure-moss-excuse-${row.id}`}>Entschuldigen</button>
                 ) : null}
               </div>
@@ -319,7 +319,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
                       {players.map((row) => <option key={`${row.side}-${row.id}`} value={row.id}>{row.name} ({sideNames[row.side] || "Seite"})</option>)}
                     </select>
                   </label>
-                  <button type="button" disabled={busy || !player} onClick={() => run(() => api.post(`${base}/moss-requests`, { user_id: player, ...lead }), () => setPlayer(""))} className={SMALL_BUTTON} data-testid={`procedure-moss-request-${p.id}`}>MOSS-Datei anfordern</button>
+                  <button type="button" disabled={busy || blocked || !player} onClick={() => run(() => api.post(`${base}/moss-requests`, { user_id: player, ...lead }), () => setPlayer(""))} className={SMALL_BUTTON} data-testid={`procedure-moss-request-${p.id}`}>MOSS-Datei anfordern</button>
                 </div>
                 {(p.moss_requests || []).some((row) => ["requested", "missing"].includes(row.state)) ? (
                   <input value={extra} onChange={(event) => setExtra(event.target.value)} maxLength={500} className="input" placeholder="Grund, falls eine Datei entschuldigt fehlt" aria-label="Grund der Entschuldigung" data-testid={`procedure-moss-excuse-reason-${p.id}`} />
@@ -350,7 +350,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
             ) : null}
             <div className="flex flex-wrap gap-2">
               {!p.assignee?.own ? <button type="button" disabled={busy || blocked} onClick={() => run(() => api.post(`${base}/assign`, lead))} className={SMALL_BUTTON} data-testid={`procedure-assign-${p.id}`}>{p.assignee ? "Von mir übernehmen" : "Übernehmen"}</button> : null}
-              {p.statement && !p.statement.text ? <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/statement/extend`, { hours: 24, ...lead }))} className={SMALL_BUTTON} data-testid={`procedure-extend-${p.id}`}>Stellungnahme +24 Std.</button> : null}
+              {p.statement && !p.statement.text ? <button type="button" disabled={busy || blocked} onClick={() => run(() => api.post(`${base}/statement/extend`, { hours: 24, ...lead }))} className={SMALL_BUTTON} data-testid={`procedure-extend-${p.id}`}>Stellungnahme +24 Std.</button> : null}
             </div>
             <label className="block">
               <span className="mb-1 block text-sm text-white/75">Begründung der Entscheidung (Pflicht, geht an beide Seiten)</span>

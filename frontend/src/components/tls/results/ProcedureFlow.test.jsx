@@ -163,8 +163,13 @@ describe("Jede Info an einer Stelle", () => {
   });
 
   it("verlangt vom befangenen Superadmin erst den Grund der Notausnahme", async () => {
-    render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ can_lead: true })} conflictOverride />);
+    render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ can_lead: true })} conflictOverride
+      players={[{ id: "u1", name: "Mila", side: "reg-a" }]} />);
     expect(screen.getByTestId("procedure-assign-p1")).toBeDisabled();
+    // Ohne Grund ist jeder Schritt der Leitung gesperrt - auch Verlängern und MOSS anfordern.
+    expect(screen.getByTestId("procedure-extend-p1")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("procedure-moss-player-p1"), { target: { value: "u1" } });
+    expect(screen.getByTestId("procedure-moss-request-p1")).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Grund der Notausnahme"), { target: { value: "Niemand sonst ist erreichbar." } });
     fireEvent.click(screen.getByTestId("procedure-assign-p1"));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith("/matches/m1/procedures/p1/assign", { conflict_reason: "Niemand sonst ist erreichbar." }));
