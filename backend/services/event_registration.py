@@ -37,8 +37,8 @@ class RegistrationError(Exception):
 class SeatsBusy(RegistrationError):
     """Die Platzsperre war zu lange belegt (#1037) - kein „schon angemeldet“, sondern „gleich nochmal versuchen“."""
 
-    def __init__(self):
-        super().__init__(409, SEAT_BUSY)
+    def __init__(self, detail: str | None = None):
+        super().__init__(409, detail or SEAT_BUSY)
 
 
 def registration_open(event: dict) -> bool:
@@ -154,6 +154,8 @@ async def existing_registration(db, event: dict, me: dict) -> dict | None:
 # kommt ein Satz zum Wiederholen.
 SEAT_WAIT_SECONDS = 5.0
 SEAT_BUSY = "Gerade melden sich viele gleichzeitig an – bitte versuch es gleich noch einmal."
+# Abmelden bei belegter Sperre (#2184): kein „viele melden sich an“.
+CANCEL_BUSY = "Gerade ist viel los – bitte versuch es gleich noch einmal."
 
 
 def seat_resource(event_id: str) -> str:
@@ -465,7 +467,7 @@ async def cancel(db, event: dict, me: dict, *, via: str = "web") -> dict:
         async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
             return await _cancel(db, event, me, via=via)
     except MutationLockBusy:
-        raise SeatsBusy()
+        raise SeatsBusy(CANCEL_BUSY)
 
 
 async def _cancel(db, event: dict, me: dict, *, via: str) -> dict:

@@ -497,6 +497,31 @@ async def test_merker_der_rueckkehr_bleibt_nach_dem_gutschrift_lauf_nicht_liegen
     assert "credit_note_returned_at" not in stored and "credit_note_claim_at" not in stored and "credit_note_id" not in stored
 
 
+@pytest.mark.asyncio
+async def test_abmelden_bei_belegter_platzsperre_sagt_gleich_nochmal(flow, fake, monkeypatch):
+    """Hält gerade eine andere Anmeldung die Platzsperre, sagt das Abmelden nicht „viele melden sich an“, sondern „gleich nochmal“ -
+    auf der Website wie im Discord. Die Anmeldung bleibt bestehen."""
+    from datetime import timedelta
+
+    from models import now_utc
+    from services import discord_registration
+
+    await flow.db.mutation_locks.create_index("resource", unique=True)   # wie in der echten Datenbank: eine Sperre je Event
+    kassier, event, paula, booked, order = await drafted(flow)
+    await flow.db.platform_links.insert_one({"id": "l-paula", "user_id": paula["id"], "platform": "discord", "external_id": "300000000000000078",
+                                             "handle": "paula"})
+    await flow.db.mutation_locks.insert_one({"resource": event_registration.seat_resource(event["id"]), "owner": "anderer-worker",
+                                             "expires_at": now_utc() + timedelta(minutes=1)})
+    monkeypatch.setattr(event_registration, "SEAT_WAIT_SECONDS", 0.0)
+
+    flow.act_as(paula)
+    web = await flow.delete(f"/api/events/{event['id']}/registrations/me")
+    assert web.status_code == 409 and web.json()["detail"] == event_registration.CANCEL_BUSY
+    discord = await discord_registration.handle_button(flow.db, "300000000000000078", f"tls:unreg:event:{event['id']}")
+    assert discord.get("content") == event_registration.CANCEL_BUSY
+    assert (await registration(flow, booked))["status"] == "registered"
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)
