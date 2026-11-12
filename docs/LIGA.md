@@ -3055,7 +3055,11 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   (`services/procedure_response_guard.py`): ohne `"disputes"` im Inhalt unverändert (ein Byte-Vergleich), sonst durch denselben
   Wächter, mit der Person der Anfrage. Neue Routen sind damit ohne eigenen Aufruf abgedeckt. Der Wächter sucht in jeder Tiefe; ein
   Knoten mit Verfahren, der sich keinem Spiel zuordnen lässt (weder `id` noch `match_id` noch Turnier und Seiten), wird im Zweifel
-  für alle gekürzt.
+  für alle gekürzt. Ein Zähler (`"disputes": 3`) oder schon gekürzte Zeilen kosten weder die Benutzerabfrage noch eine Kürzung;
+  in Listen wird je Staffel einmal entschieden (ein Recht, eine Abfrage der Beteiligung). Gelesen wird jede JSON-Variante
+  (`application/json`, `…+json`); eine Komprimierung darf nie innerhalb des Wächters liegen (Test auf die Reihenfolge der
+  Middleware). **Ausnahme:** `GET /api/dsgvo/export-my-data` streamt und kürzt selbst (`league_procedures.export_view`): die eigene
+  Meldung, Stellungnahme und MOSS-Anforderung vollständig, von Verfahren anderer nur, dass es sie gibt.
 - **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
   Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
 - **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
