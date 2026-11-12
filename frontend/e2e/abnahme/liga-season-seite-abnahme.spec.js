@@ -17,7 +17,13 @@ const seasonUrl = (section = "") => `/liga/${show.league.slug}/${show.season.slu
 async function shot(page, name) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
+  // Die feste Leiste unten (Handy) stünde im ganzen Bild mitten auf der Seite - das Fenster wird so hoch wie die Seite.
+  const size = page.viewportSize();
+  const full = await page.evaluate(() => document.documentElement.scrollHeight);
+  await page.setViewportSize({ width: size.width, height: full });
+  await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(SHOTS, name), fullPage: true });
+  await page.setViewportSize(size);
 }
 
 async function noSideScroll(page) {

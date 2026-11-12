@@ -27,10 +27,13 @@ Dynamische Sitemap-Routen sind auf veroeffentlichte/oeffentliche Datensaetze beg
 - `/galerie/<slug>`
 - `/liga` und `/liga/<liga>/<season>` - nur Seasons mit Sichtbarkeit `public`; `/liga` nur, wenn es mindestens eine gibt
 - `/liga/<liga>/<season>/regeln` (#1646) - nur Seasons mit Sichtbarkeit `public`, die ein Regelwerk haben (eigenes oder das der Liga)
+- `/liga/<liga>/<season>/spieltage` und `/liga/<liga>/<season>/teams` (#2268) - nur Seasons mit Sichtbarkeit `public`, sobald eine Staffel über den Entwurf hinaus ist
 
 `backend/routes/setup_routes.py` verwaltet die statische Sitemap-Liste und wendet Veroeffentlichungs-/Sichtbarkeitsfilter auf dynamische Datensaetze an. Die Slug-Historie leitet auf den aktuellen kanonischen Slug weiter.
 
 Liga (docs/LIGA.md, #1622): Eine Staffel ist ein Turnier und folgt den Regeln von `/tournaments/<slug>` - in der Sitemap nur, solange sie oeffentlich und kein Entwurf ist (Season-Sichtbarkeit `public`). Die Liga selbst liest die Website ueber `GET /api/leagues` und `GET /api/leagues/<liga>/<season>`; beide liefern nur Seasons, die die Person nach `league_seasons.visibility` sehen darf (`off` antwortet 404), dazu `GET /api/leagues/<liga>/<season>/staffeln/<staffel>` (Tabelle, Spielwochen, Ergebnisse - nur sichtbare Staffeln). Die Ligaseite `/liga/<liga>/<season>` (P5, #1625) ist bei `members` erreichbar, aber `noindex` mit neutraler Vorschau; bei `admins` und `off` liefert die Vorschau 404 und die Seite sagt „Liga nicht gefunden“. Der Menüpunkt „Liga“ erscheint nur, wenn die Lese-API der Person eine Season zeigt.
+
+Season-Seite mit Unterseiten (#2268): `/liga/<liga>/<season>/spieltage` (Spielplan je Staffel, Woche in `?staffel=…&woche=…`) und `/liga/<liga>/<season>/teams` lesen dieselben Routen und folgen derselben Sichtbarkeit; die Vorschau hat eigene Adresse und eigenen Titel (`noindex` bei `members`, 404 bei `admins`/`off`). Neue öffentliche Felder, alle additiv: `GET /api/leagues/<liga>/<season>` trägt in `season` `result_rules` (je Modus nur die Regel: Art, Ziel, Grenze, Zeit, Verlängerung, Remis - keine Einstellungen der Verwaltung) und `schedule_rules` (72-h-Regel und Verschiebung; Erinnerung und „überfällig“ bleiben intern); `GET …/staffeln/<staffel>` trägt je Team `logo_url` (das Logo der öffentlichen Teamseite). Grund eines Punktabzugs, Verfahren und Vorfälle stehen in keiner dieser Antworten.
 
 Regelwerk der Liga (docs/LIGA.md, #1646): `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` lesen `GET /api/league-rules/leagues/<liga>` bzw.
 `GET /api/league-rules/seasons/<liga>/<season>`, dazu `/compare` und `/versions/<id>/pdf` unter denselben Adressen - alles nach `league_seasons.visibility`, unsichtbar antwortet 404 (die Seite der Liga, sobald
