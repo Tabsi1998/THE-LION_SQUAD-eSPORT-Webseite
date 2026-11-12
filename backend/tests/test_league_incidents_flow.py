@@ -812,6 +812,33 @@ async def test_a_single_report_from_before_a_replay_is_never_confirmed_by_the_de
 
 
 @pytest.mark.asyncio
+async def test_after_an_agreed_replay_the_page_asks_for_a_new_report_and_the_new_outcome_counts(flow):
+    """Beide hatten 2:0 gemeldet, dann einigen sie sich auf die Wiederholung von Map 2: Die Seite zeigt keine alte Meldung mehr an,
+    und gültig wird, was danach gemeldet ist - hier ein 2:1 mit der wiederholten Map für die Falken."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    assert (await both_report(flow, w))["awaiting_confirmation"] is True, "der Vorfall wartet noch auf Antwort"
+    agreed = await answered(flow, w, incident_id, True)
+    assert agreed.status_code == 200 and agreed.json()["result_confirmed"] is False and agreed.json()["hold"]["code"] == "rereport"
+
+    seen = await page(flow, w)       # die Falken, die eben zugestimmt haben
+    assert seen["league"]["incident_info"]["hold"]["code"] == "rereport"
+    assert seen["report_state"]["status"] == "open" and seen["report_state"]["own_summary"] is None, "die alte Meldung zählt nicht mehr"
+    assert (await deadline_sweep(flow.db, now=now_utc() + timedelta(days=10)))["confirmed"] == 0
+    assert (await stored(flow, w))["status"] != "completed"
+
+    again = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_one(w, falcons(w)))
+    assert again.status_code == 200 and again.json()["report_status"] == "waiting" and not again.json().get("result_hold")
+    assert league_incidents.result_block(await stored(flow, w)) is None
+    assert (await deadline_sweep(flow.db, now=now_utc() + timedelta(days=10)))["confirmed"] == 1
+    match = await stored(flow, w)
+    assert match["status"] == "completed"
+    assert [(game["position"], game.get("status"), game["winner_registration_id"]) for game in match["games"]] == [
+        (1, None, w["reg_a"]["id"]), (2, "replayed", w["reg_h"]["id"]), (3, None, w["reg_a"]["id"])]
+    assert {row["registration_id"]: row["score"] for row in match["results"]} == {w["reg_a"]["id"]: 2, w["reg_h"]["id"]: 1}
+
+
+@pytest.mark.asyncio
 async def test_a_decided_replay_is_only_settled_after_it_was_reported_again(flow):
     """Beide melden 2:0, die Leitung entscheidet „wiederholen“: Feststellen geht erst, wenn danach neu gemeldet ist."""
     w = await world(flow)
