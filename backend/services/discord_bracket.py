@@ -31,7 +31,10 @@ from datetime import datetime, timedelta
 
 from models import now_utc
 from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
-from services.bracket_common import DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, round_label, section_label
+from services.bracket_common import (
+    CLARIFICATION, DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, clarification_count, in_clarification, round_label,
+    section_label,
+)
 
 # Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
 __all__ = ["pending", "request_refresh"]
@@ -48,7 +51,12 @@ FINAL_STATUSES = {"completed", "results_published", "archived"}
 
 
 def match_line(match: dict, names: dict[str, str]) -> str:
-    """Eine Partie als Zeile: fertig mit Ergebnis (Sieger fett), offen mit Termin."""
+    """Eine Partie als Zeile: fertig mit Ergebnis (Sieger fett), offen mit Termin - „in Klärung“ wie auf der Ligaseite (#2363)."""
+    line = _match_line(match, names)
+    return f"{line} · {CLARIFICATION}" if in_clarification(match) else line
+
+
+def _match_line(match: dict, names: dict[str, str]) -> str:
     slots = sorted(match.get("slots") or [], key=lambda slot: _safe_int(slot.get("position"), 999))
     results = {row.get("registration_id"): row for row in match.get("results") or []}
 
@@ -78,6 +86,8 @@ def match_line(match: dict, names: dict[str, str]) -> str:
             return f"{left} {score_a if score_a is not None else '–'} : {score_b if score_b is not None else '–'} {right}"
         return f"{left} – {right}"
     when = _dt(match.get("scheduled_at"))
+    if in_clarification(match):
+        return f"{name_a} – {name_b}"
     tail = " · live" if status in LIVE else (f" · {when.astimezone(VIENNA).strftime('%d.%m., %H:%M')} Uhr" if when else "")
     return f"{name_a} – {name_b}{tail}"
 
@@ -107,7 +117,9 @@ def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[
         for index, row in enumerate(rows[:TOP_TABLE], start=1):
             points = row.get("points", 0)
             wins = row.get("won", row.get("wins", 0))
-            lines.append(f"{index}. {row.get('display_name') or 'Teilnehmer'} · {points} Pkt · {wins} Siege")
+            # Angefochtene Ergebnisse (#2363): wie die Zeile der Ligatabelle „1 Spiel in Klärung“ - ohne steht die Zeile wie bisher.
+            note = clarification_count(row.get("contested"))
+            lines.append(f"{index}. {row.get('display_name') or 'Teilnehmer'} · {points} Pkt · {wins} Siege" + (f" · {note}" if note else ""))
         fields.append({"name": f"{stage.get('name') or 'Tabelle'} (Top {TOP_TABLE})"[:256], "value": ("\n".join(lines) or "Noch keine Partie gespielt.")[:FIELD_LIMIT], "inline": False})
 
     # Bracket-Phasen: je Abschnitt Runden.
@@ -181,13 +193,25 @@ def content_hash(embed: dict) -> str:
     return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
+def mark_clarification(matches: list[dict], sources: list[dict]) -> list[dict]:
+    """Maps in Klärung (D.5, #2363): Die Quelle ist dieselbe wie auf der Ligaseite (``positions_in_clarification`` aus den
+    Vorfällen am Spiel). Gesetzt nur, wo es so ist - alle anderen Partien bleiben wie bisher."""
+    from services.league_incident_rules import positions_in_clarification
+
+    clarifying = {source.get("id") for source in sources if source.get("incidents") and positions_in_clarification(source)}
+    for match in matches:
+        if match.get("id") in clarifying:
+            match["in_clarification"] = True
+    return matches
+
+
 async def _load(db, tournament: dict) -> tuple[list[dict], list[dict], list[dict], str]:
     from services.competition_read import load_competition_read_model
     from services.competition_snapshot import adapt_stage_matches
     from services.platform_links import frontend_url
 
     read_model = await load_competition_read_model(db, tournament["id"])
-    matches = adapt_stage_matches(read_model.stage_matches)
+    matches = mark_clarification(adapt_stage_matches(read_model.stage_matches), read_model.stage_matches)
     registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "user_id": 1}).to_list(500)
     origin = (frontend_url() or "https://lionsquad.at").rstrip("/")
     return read_model.stages, matches, registrations, origin

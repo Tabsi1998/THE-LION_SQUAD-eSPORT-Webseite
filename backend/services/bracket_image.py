@@ -3,7 +3,8 @@
 Mit Pillow gezeichnet, ohne Browser: je Abschnitt (Winner Bracket, Loser Bracket, Grand Final …) die Runden als
 Spalten, je Partie eine Karte mit beiden Namen und dem Ergebnis. Der Sieger steht in Gold, „kampflos“ und „Freilos“ in
 Worten, eine laufende Partie mit cyanem Rahmen, eine geplante mit Termin. Halbiert sich eine Runde (K.-o.), verbinden
-Linien jede Partie mit ihrer nächsten; bleibt sie gleich groß (Loser Bracket), geht die Linie gerade weiter.
+Linien jede Partie mit ihrer nächsten; bleibt sie gleich groß (Loser Bracket), geht die Linie gerade weiter. Eine Partie
+„in Klärung“ (angefochtenes Ergebnis oder Map in Klärung, #2363) trägt Rahmen und Schildchen in Warnfarbe.
 
 Tabellenphasen (Gruppen, Liga, Swiss) bleiben Text in der Einbettung - ein Bild gibt es nur mit einer K.-o.-Phase.
 Sehr große Bäume (mehr als ``MAX_ROUND_MATCHES`` Partien in einer Runde) bleiben ohne Bild; die Einbettung zeigt dann
@@ -19,6 +20,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw
 
 from models import now_utc
+from services.bracket_common import CLARIFICATION, WARN_RGB, in_clarification
 
 FILENAME = "bracket.png"
 BOX_W, BOX_H = 250, 58
@@ -31,7 +33,7 @@ MAX_ROUND_MATCHES = 32
 MIN_WIDTH = 640
 COLORS = {"bg": (10, 10, 10), "card": (24, 24, 24), "card_done": (20, 20, 20), "border": (56, 56, 56), "live": (41, 182, 232),
           "text": (236, 236, 236), "dim": (128, 128, 128), "gold": (255, 215, 0), "line": (74, 74, 74), "title": (255, 255, 255),
-          "section": (41, 182, 232), "final": (255, 215, 0)}
+          "section": (41, 182, 232), "final": (255, 215, 0), "warn": WARN_RGB}
 
 
 def names_of(registrations: list[dict]) -> dict[str, str]:
@@ -114,9 +116,11 @@ def _slots(match: dict, names: dict[str, str]) -> list[dict]:
 
 
 def _note(match: dict) -> str:
-    """Die kleine Zeile unter der Karte: kampflos, live oder der Termin (Wiener Zeit)."""
+    """Die kleine Zeile unter der Karte: in Klärung (#2363), kampflos, live oder der Termin (Wiener Zeit)."""
     from services.bracket_common import LIVE, VIENNA, _dt
 
+    if in_clarification(match):
+        return CLARIFICATION
     status = str(match.get("status") or "").lower()
     if status == "forfeit":
         return "kampflos"
@@ -130,7 +134,10 @@ def signature(sections: list[dict]) -> str:
     """Was das Bild zeigt, als Prüfsumme - ein neues Bild nur, wenn sich daran etwas ändert (auch frühere Runden)."""
     compact = [[[{"status": match.get("status"), "slots": [(slot.get("registration_id"), (slot.get("source") or {}).get("type")) for slot in match.get("slots") or []],
                   "results": sorted((str(row.get("registration_id")), str(row.get("outcome")), str(row.get("score"))) for row in match.get("results") or []),
-                  "at": match.get("scheduled_at")} for match in round_matches] for round_matches in section["rounds"]] for section in sections]
+                  "at": match.get("scheduled_at"),
+                  # „in Klärung“ (#2363) nur, wo es gilt - ohne Verfahren bleibt die Prüfsumme wie bisher.
+                  **({"clarification": True} if in_clarification(match) else {})} for match in round_matches] for round_matches in section["rounds"]]
+               for section in sections]
     return hashlib.sha1(json.dumps(compact, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
@@ -187,9 +194,10 @@ def _card(draw: ImageDraw.ImageDraw, match: dict, names: dict[str, str], x: floa
 
     name_font, name_bold, small = fonts
     status = str(match.get("status") or "").lower()
-    border = COLORS["live"] if status in LIVE else COLORS["border"]
+    clarifying = in_clarification(match)
+    border = COLORS["warn"] if clarifying else COLORS["live"] if status in LIVE else COLORS["border"]
     draw.rounded_rectangle((x, y, x + BOX_W, y + BOX_H), radius=6, fill=COLORS["card_done"] if status in DONE else COLORS["card"], outline=border,
-                           width=2 if status in LIVE else 1)
+                           width=2 if status in LIVE or clarifying else 1)
     draw.line((x + 8, y + BOX_H / 2, x + BOX_W - 8, y + BOX_H / 2), fill=COLORS["border"], width=1)
     for index, slot in enumerate(_slots(match, names)):
         top = y + 5 + index * (BOX_H / 2)
@@ -200,8 +208,20 @@ def _card(draw: ImageDraw.ImageDraw, match: dict, names: dict[str, str], x: floa
         if slot["score"]:
             draw.text((x + BOX_W - 10 - score_width, top), slot["score"], font=font, fill=color)
     note = _note(match)
-    if note:
+    if note == CLARIFICATION:
+        _badge(draw, note, x + BOX_W - 10, y, small)
+    elif note:
         draw.text((x + 2, y + BOX_H + 1), note, font=small, fill=COLORS["live"] if note == "live" else COLORS["dim"])
+
+
+def _badge(draw: ImageDraw.ImageDraw, text: str, right: float, top: float, font) -> None:
+    """„in Klärung“ als Schildchen auf der oberen Kante der Karte (#2363) - unter der Karte reicht der Platz in einer
+    vollen Runde nicht, dort beginnt schon die nächste Karte."""
+    box = draw.textbbox((0, 0), text, font=font)
+    width, height = box[2] - box[0] + 12, box[3] - box[1] + 6
+    left, upper = right - width, top - height / 2
+    draw.rounded_rectangle((left, upper, right, upper + height), radius=4, fill=COLORS["bg"], outline=COLORS["warn"], width=1)
+    draw.text((left + 6 - box[0], upper + 3 - box[1]), text, font=font, fill=COLORS["warn"])
 
 
 def _connector(draw: ImageDraw.ImageDraw, ys: list[list[float]], column: int, row: int, x: float, body_top: float) -> None:
