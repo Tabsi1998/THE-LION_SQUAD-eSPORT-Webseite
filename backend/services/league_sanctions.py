@@ -175,15 +175,6 @@ async def require_visible_proofs(db, doc: dict, match: dict | None, user: dict) 
                               "„Ergebnisse korrigieren“ oder „Proteste“.", 403)
 
 
-async def attach_proofs(db, row: dict, doc: dict, user: dict) -> dict:
-    """Die Nachweise einer Strafe für die Verwaltung: was diese Person sehen darf, dazu wie viele es insgesamt sind."""
-    ids = set(doc.get("proof_ids") or [])
-    match = await db.matches_v2.find_one({"id": doc["match_id"]}, {"_id": 0}) if ids and doc.get("match_id") else None
-    row["proofs"] = [proof for proof in await visible_proofs(db, match, user) if proof["id"] in ids]
-    row["proof_count"] = len(ids)
-    return row
-
-
 def _period(kind: str, state: str, season: dict, registration: dict | None, body: dict, now: datetime) -> dict:
     """``starts_at``, ``ends_at``, ``matches`` - nur für Sperren. Vorläufige Sperren haben kein Ende."""
     from services.match_proof_retention import season_end
@@ -626,10 +617,10 @@ def _appeal_view(doc: dict, names: dict[str, str], *, with_text: bool) -> dict |
             "by_name": names.get(appeal.get("by") or ""), **({"text": appeal.get("text")} if with_text else {})}
 
 
-async def view(db, doc: dict, names: dict[str, str], *, now: datetime | None = None, admin: bool = False) -> dict:
+async def view(db, doc: dict, names: dict[str, str], *, now: datetime | None = None, admin: bool = False, frame=None) -> dict:
     """Die Strafe für die Betroffenen - mit ``admin`` dazu, was nur die Leitung sieht (wer verhängt hat, Nachweise, Wirkung)."""
     now = now or now_utc()
-    state = await progress(db, doc, now)
+    state = await progress(db, doc, now, frame)
     out = {
         "id": doc["id"], "kind": doc["kind"], "kind_label": KINDS[doc["kind"]]["label"], "target_type": doc.get("target_type"),
         "target_name": names.get(doc.get("user_id") or "") if doc.get("target_type") == PLAYER else names.get(f"squad:{doc.get('squad_id')}"),
@@ -696,6 +687,37 @@ async def season_targets(db, season: dict) -> list[dict]:
     return out
 
 
+async def admin_rows(db, docs: list[dict], me: dict) -> list[dict]:
+    """Die Strafen für die Verwaltung - für die ganze Liste gebündelt geladen: Namen, Spielzählung und Season-Enden (``frame_for``),
+    die Teams der betroffenen Seiten, die genannten Spiele und ihre Nachweise je einmal. Je Zeile ``conflict``: ``side`` (gehört
+    zur betroffenen Seite), ``match`` (nur am genannten Spiel beteiligt) oder ``None`` - ``own_side`` ist beides."""
+    from services import league_permissions
+    from services.match_audience import teams_by_id
+
+    names = await names_for(db, docs)
+    frame = await frame_for(db, docs)
+    teams = await teams_by_id(db, [side_of(doc) for doc in docs])
+    match_ids = sorted({doc["match_id"] for doc in docs if doc.get("match_id")})
+    matches = {row["id"]: row for row in await db.matches_v2.find({"id": {"$in": match_ids}}, {"_id": 0}).to_list(None)} if match_ids else {}
+    involved = {match_id: (me or {}).get("id") in await league_permissions.involved_user_ids(db, match) for match_id, match in matches.items()}
+    proofs: dict[str, list[dict]] = {}
+    for match_id in sorted({doc["match_id"] for doc in docs if doc.get("match_id") and doc.get("proof_ids")}):
+        proofs[match_id] = await visible_proofs(db, matches.get(match_id), me)
+    now = now_utc()
+    rows = []
+    for doc in docs:
+        row = await view(db, doc, names, now=now, admin=True, frame=frame)
+        ids = set(doc.get("proof_ids") or [])
+        row["proofs"] = [proof for proof in proofs.get(doc.get("match_id") or "", []) if proof["id"] in ids]
+        row["proof_count"] = len(ids)
+        side = league_permissions.belongs_to_side(me, side_of(doc), teams.get(doc.get("team_id") or ""))
+        row["conflict"] = "side" if side else "match" if involved.get(doc.get("match_id") or "") else None
+        row["own_side"] = bool(row["conflict"])
+        row["own_decision"] = own_decision(doc, me)
+        rows.append(row)
+    return rows
+
+
 async def overview(db, season: dict, me: dict) -> dict:
     """Der Reiter „Strafen“ der Season: Strafen der Season und liga-weite Sperren der Liga, neueste zuerst."""
     from services import league_permissions, match_proofs
@@ -703,17 +725,10 @@ async def overview(db, season: dict, me: dict) -> dict:
     docs = await db.competition_sanctions.find(
         {"league_id": season.get("league_id"),
          "$or": [{"season_id": season["id"]}, {"kind": {"$in": [key for key, row in KINDS.items() if row.get("league_wide")]}}]},
-        {"_id": 0}).sort("created_at", -1).to_list(1000)
-    names = await names_for(db, docs)
-    now = now_utc()
-    items = []
-    for doc in docs:
-        row = await attach_proofs(db, await view(db, doc, names, now=now, admin=True), doc, me)
-        conflict = await league_permissions.side_conflict(db, me, side_of(doc))
-        row["own_side"] = bool(conflict)
-        row["own_decision"] = own_decision(doc, me)
+        {"_id": 0}).sort("created_at", -1).to_list(None)
+    items = await admin_rows(db, docs, me)
+    for row, doc in zip(items, docs):
         row["other_season"] = doc.get("season_id") != season["id"]
-        items.append(row)
     return {
         "items": items,
         "open_appeals": sum(1 for row in items if (row.get("appeal") or {}).get("state") == OPEN),

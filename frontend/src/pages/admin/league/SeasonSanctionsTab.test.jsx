@@ -106,3 +106,33 @@ test("das Formular führt: Katalog füllt vor, der Knopf geht erst, wenn nichts 
     catalog_key: "cheating", registration_id: "r1", user_id: "u1" }));
   await waitFor(() => expect(screen.queryByTestId("sanction-form")).not.toBeInTheDocument());
 });
+
+test("Superadmin, der nur am genannten Spiel beteiligt ist: das Feld für die Notausnahme steht da, der Grund geht mit", async () => {
+  apiMock.get.mockImplementation(async () => ({ data: { ...DATA, superadmin: true, items: [item("s6", { own_side: true, conflict: "match", match_id: "m1" })] } }));
+  renderTab();
+  fireEvent.click(await screen.findByTestId("sanction-revoke-s6"));
+  const box = screen.getByTestId("sanction-action-revoke-s6");
+  expect(box).toHaveTextContent("Du bist an diesem Spiel selbst beteiligt");
+  fireEvent.change(within(box).getByTestId("sanction-action-text-s6"), { target: { value: "Die Wertung war ein Irrtum." } });
+  expect(within(box).getByTestId("sanction-action-run-s6")).toBeDisabled();
+  fireEvent.change(within(box).getByTestId("sanction-action-conflict-s6"), { target: { value: "Niemand sonst erreichbar" } });
+  fireEvent.click(within(box).getByTestId("sanction-action-run-s6"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/season-1/sanctions/s6/revoke",
+    { reason: "Die Wertung war ein Irrtum.", conflict_reason: "Niemand sonst erreichbar" }));
+});
+
+test("ohne Superadmin sagt die Karte beim Spiel, dass eine zweite Person entscheidet - und ein unerwartetes 403 zeigt dem Superadmin das Feld", async () => {
+  apiMock.get.mockImplementation(async () => ({ data: { ...DATA, items: [item("s7", { own_side: true, conflict: "match", match_id: "m1" })] } }));
+  const first = renderTab();
+  expect(await screen.findByTestId("sanction-own-team-s7")).toHaveTextContent("Du bist an diesem Spiel selbst beteiligt");
+  expect(screen.queryByTestId("sanction-revoke-s7")).not.toBeInTheDocument();
+  first.unmount();
+  // Die Liste kannte die Befangenheit noch nicht (etwa seit dem Laden in eine Aufstellung gekommen): Der Server lehnt ab.
+  apiMock.get.mockImplementation(async () => ({ data: { ...DATA, superadmin: true, items: [item("s8")] } }));
+  apiMock.post.mockRejectedValueOnce({ response: { status: 403, data: { detail: "Du bist an diesem Spiel selbst beteiligt." } } });
+  renderTab();
+  fireEvent.click(await screen.findByTestId("sanction-revoke-s8"));
+  fireEvent.change(screen.getByTestId("sanction-action-text-s8"), { target: { value: "Die Wertung war ein Irrtum." } });
+  fireEvent.click(screen.getByTestId("sanction-action-run-s8"));
+  expect(await screen.findByTestId("sanction-action-conflict-s8")).toBeInTheDocument();
+});

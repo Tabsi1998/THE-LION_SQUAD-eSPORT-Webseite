@@ -24,6 +24,7 @@ const CHIP = {
 };
 const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-white/45" };
 const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
+const OWN_MATCH = "Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.";
 const OWN_DECISION = "Über den Einspruch entscheidet eine andere Person: Du hast diese Strafe verhängt oder bestätigt.";
 
 function errorOf(failure, fallback) {
@@ -196,7 +197,10 @@ function CardAction({ item, action, superadmin, seasonId, onDone, onCancel }) {
   const [conflictReason, setConflictReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const needsOverride = item.own_side && superadmin;
+  // Befangen ist, wer zur betroffenen Seite gehört oder am genannten Spiel beteiligt ist (item.conflict). Lehnt der Server
+  // trotzdem mit 403 ab (seit dem Laden beteiligt), bekommt der Superadmin das Feld für die Notausnahme nachträglich.
+  const [refused, setRefused] = useState(false);
+  const needsOverride = superadmin && (item.own_side || refused);
   const base = `/admin/leagues/seasons/${seasonId}/sanctions/${item.id}`;
   const steps = {
     revoke: { label: "Grund für den Widerruf", button: "Widerrufen", url: `${base}/revoke`, body: () => ({ reason: text.trim() }), done: "Strafe widerrufen." },
@@ -216,6 +220,7 @@ function CardAction({ item, action, superadmin, seasonId, onDone, onCancel }) {
       toast.success(step.done);
       onDone();
     } catch (failure) {
+      if (failure.response?.status === 403 && superadmin && !item.own_decision) setRefused(true);
       setError(errorOf(failure, "Das hat nicht geklappt."));
       setSaving(false);
     }
@@ -231,6 +236,7 @@ function CardAction({ item, action, superadmin, seasonId, onDone, onCancel }) {
         <TextAreaField label={step.label} required rows={2} value={text} onChange={setText} testId={`sanction-action-text-${item.id}`}
           hint={action === "revoke" ? "Mindestens fünf Zeichen. Der Widerruf nimmt jede Wirkung zurück, die Betroffenen erfahren es." : "Mindestens fünf Zeichen. Die Entscheidung ist endgültig, die Betroffenen lesen die Begründung."} />
       )}
+      {needsOverride && item.conflict === "match" ? <p className="text-xs font-semibold text-white/80">{OWN_MATCH}</p> : null}
       {needsOverride ? <ConflictReasonField value={conflictReason} onChange={setConflictReason} testId={`sanction-action-conflict-${item.id}`} /> : null}
       {error ? <p className="text-sm text-warn" role="alert" data-testid={`sanction-action-error-${item.id}`}>{error}</p> : null}
       <div className="flex flex-wrap gap-2">
@@ -242,6 +248,12 @@ function CardAction({ item, action, superadmin, seasonId, onDone, onCancel }) {
       </div>
     </div>
   );
+}
+
+/** Der Satz, warum die Knöpfe fehlen: eigenes Team oder am genannten Spiel beteiligt. */
+function ConflictNote({ item }) {
+  if (item.conflict === "match") return <p className="text-xs font-semibold text-white/80" data-testid={`sanction-own-team-${item.id}`}>{OWN_MATCH}</p>;
+  return <OwnTeamNote testId={`sanction-own-team-${item.id}`} />;
 }
 
 function SanctionCard({ item, superadmin, seasonId, onChanged }) {
@@ -285,7 +297,7 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
           {appeal.note ? <p className="mt-2 break-words text-sm text-white/75">Entscheidung{item.decided_by_name ? ` von ${item.decided_by_name}` : ""}: {appeal.note}</p> : null}
           {appeal.state === "open" && !action ? (
             item.own_decision ? <p className="mt-2 text-xs font-semibold text-white/80" data-testid={`sanction-own-decision-${item.id}`}>{OWN_DECISION}</p>
-              : blocked ? <div className="mt-2"><OwnTeamNote testId={`sanction-own-team-${item.id}`} /></div> : (
+              : blocked ? <div className="mt-2"><ConflictNote item={item} /></div> : (
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setAction("upheld")} className={`${BUTTON} tls-btn--secondary`} data-testid={`sanction-appeal-uphold-${item.id}`}>Strafe bleibt</button>
                   <button type="button" onClick={() => setAction("granted")} className={`${BUTTON} tls-btn--secondary`} data-testid={`sanction-appeal-grant-${item.id}`}>Strafe aufheben</button>
@@ -300,7 +312,7 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
       ) : null}
 
       {item.status !== "revoked" && !action ? (
-        blocked ? (appeal?.state === "open" ? null : <div className="mt-3"><OwnTeamNote testId={`sanction-own-team-${item.id}`} /></div>) : (
+        blocked ? (appeal?.state === "open" ? null : <div className="mt-3"><ConflictNote item={item} /></div>) : (
           <div className="mt-3 flex flex-wrap gap-2">
             {item.status === "provisional" ? (
               <button type="button" onClick={() => setAction("confirm")} className={`${BUTTON} tls-btn--primary`} data-testid={`sanction-confirm-${item.id}`}>Sperre bestätigen</button>

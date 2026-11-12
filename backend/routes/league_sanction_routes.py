@@ -130,10 +130,7 @@ async def _staffel_write(db, doc: dict, *, changes: bool = True):
 
 
 async def _one(db, doc: dict, me: dict) -> dict:
-    row = await sanctions.attach_proofs(db, await sanctions.view(db, doc, await sanctions.names_for(db, [doc]), admin=True), doc, me)
-    row["own_side"] = bool(await league_permissions.side_conflict(db, me, sanctions.side_of(doc)))
-    row["own_decision"] = sanctions.own_decision(doc, me)
-    return row
+    return (await sanctions.admin_rows(db, [doc], me))[0]
 
 
 @admin_router.get("/seasons/{season_id}/sanctions")

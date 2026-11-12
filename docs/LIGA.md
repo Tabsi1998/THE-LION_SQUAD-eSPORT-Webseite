@@ -3212,7 +3212,7 @@ oder ganz frei eintragen.
 
 | Route | Recht | Inhalt |
 | --- | --- | --- |
-| `GET /api/admin/leagues/seasons/{season_id}/sanctions` | `sanctions` | Strafen der Season und liga-weite Sperren, Arten, Katalog, Co-Teams mit Kader je Staffel, Einspruchsfrist; je Zeile `own_side` und `own_decision` |
+| `GET /api/admin/leagues/seasons/{season_id}/sanctions` | `sanctions` | Strafen der Season und liga-weite Sperren, Arten, Katalog, Co-Teams mit Kader je Staffel, Einspruchsfrist; je Zeile `conflict` (`side`: gehört zur betroffenen Seite, `match`: nur am genannten Spiel beteiligt, sonst `null`), `own_side` (eines von beiden) und `own_decision`. Die Liste lädt gebündelt (`league_sanctions.admin_rows`) |
 | `POST /api/admin/leagues/seasons/{season_id}/sanctions` | `sanctions` | verhängen; Befangenheit, Wirkung, Protokoll, Nachricht |
 | `POST …/sanctions/{id}/confirm` | `sanctions` | vorläufig → endgültig, mit Zeitraum |
 | `POST …/sanctions/{id}/revoke` | `sanctions` | Widerruf mit `reason` |

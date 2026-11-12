@@ -661,3 +661,29 @@ async def test_the_inbox_needs_the_sanctions_right_of_that_league(flow):
     await flow.db.users.update_one({"id": person["id"]}, {"$set": {"areas": ["tournaments"]}})
     answer = await flow.get("/api/admin/penalties", params={"user_id": uid(world, "Mila")})
     assert [row for row in answer.json()["items"] if row["kind"] == "league_sanction"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_list_tells_a_superadmin_who_is_only_part_of_the_match(flow):
+    """Review R1, N5: Befangen ist auch, wer nur am genannten Spiel beteiligt ist - die Liste sagt es, damit die Verwaltung das
+    Feld für die Notausnahme zeigt."""
+    world = await sanction_world(flow)
+    # Tom spielt bei Rudel A; die Strafe trifft die Gegenseite (Horst) und nennt das gemeinsame Spiel.
+    issued = await issue(flow, world, kind="match_loss", target_type="squad", registration_id=world["reg_h"]["id"], match_id=world["match"]["id"])
+    plain = await issue(flow, world, kind="warning", target_type="squad", registration_id=world["reg_h"]["id"])
+    own = await issue(flow, world, kind="warning", target_type="squad", registration_id=world["reg_a"]["id"])
+    await flow.db.users.update_one({"id": uid(world, "Tom")}, {"$set": {"role": "superadmin"}})
+    tom = {**world["users"]["Tom"], "role": "superadmin"}
+    flow.act_as(tom)
+    rows = {row["id"]: row for row in (await flow.get(world["url"])).json()["items"]}
+    assert rows[issued.json()["id"]]["conflict"] == "match" and rows[issued.json()["id"]]["own_side"] is True
+    assert rows[own.json()["id"]]["conflict"] == "side" and rows[own.json()["id"]]["own_side"] is True
+    # Gegenprobe: ohne Spiel und ohne eigenes Team ist er nicht befangen.
+    assert rows[plain.json()["id"]]["conflict"] is None and rows[plain.json()["id"]]["own_side"] is False
+    url = f"{world['url']}/{issued.json()['id']}/revoke"
+    assert (await flow.post(url, json={"reason": "Die Wertung war ein Irrtum."})).status_code == 403
+    forced = await flow.post(url, json={"reason": "Die Wertung war ein Irrtum.", "conflict_reason": "Niemand sonst erreichbar"})
+    assert forced.status_code == 200 and forced.json()["conflict"] == "match", forced.text
+    # Für die Person der Leitung ohne Beteiligung bleibt alles frei.
+    flow.act_as(world["second"])
+    assert {row["conflict"] for row in (await flow.get(world["url"])).json()["items"]} == {None}
