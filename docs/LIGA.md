@@ -3035,9 +3035,6 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   Liga-Recht auf `at`, `id`, `kind`, `state` (`league_procedures.strip_for_involved`).
 - **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
   Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
-- **Offener Vorfall** (Fachentscheidung 12.11.): `POST /matches/{id}/forfeit`, „nicht erschienen“ bestätigen und „beide nicht
-  erschienen“ antworten mit 409, solange ein Vorfall nicht `agreed`, `decided` oder `withdrawn` ist (`match_proof_refs.has_open_incident`,
-  nur gelesen).
 - **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
 - **Offen, eigenes Issue:** Das Bracket-Bild für Discord (`discord_bracket.py`) und die Teilen-Karte eines Ergebnisses
   (`result_share.py`) zeigen Ergebnisse, die angefochten sein können, ohne Hinweis.

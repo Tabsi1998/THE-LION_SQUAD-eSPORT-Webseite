@@ -1,5 +1,5 @@
 """Verfahren der Liga (E.2, #1619) an den übrigen Stellen: „Braucht Aufmerksamkeit“, Listen der Leitung, Tabelle als PDF, TV,
-Einspruch gegen Kampflos-Wertung und Korrektur, Wertungen bei offenem Vorfall. Erfundene Namen, jede Regel mit Gegenprobe.
+Einspruch gegen Kampflos-Wertung und Korrektur. Erfundene Namen, jede Regel mit Gegenprobe.
 """
 import pathlib
 import sys
@@ -16,7 +16,7 @@ from league_match_world import world as league_world  # noqa: E402
 from match_proof_world import user  # noqa: E402
 from models import now_utc  # noqa: E402
 from pdf_service import _standing_name  # noqa: E402
-from services import match_proof_refs, match_proofs  # noqa: E402
+from services import match_proofs  # noqa: E402
 from services.competition_snapshot import adapt_stage_matches  # noqa: E402
 from services.match_attention import tournament_attention  # noqa: E402
 from services.tv_display import display_standings  # noqa: E402
@@ -79,27 +79,6 @@ async def test_lists_for_the_lead_hide_procedure_details_from_someone_involved(f
         response = await flow.get(url)
         assert response.status_code == 200, response.text
         assert row_of(response.json()) == {"at": row_of(response.json())["at"], "id": pid, "kind": "protest", "state": "open"}, url
-
-
-@pytest.mark.asyncio
-async def test_no_forfeit_while_an_incident_is_open(flow):
-    w = await league_world(flow)
-    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {"incidents": [{"id": "v1", "position": 1, "state": "in_review"}]}})
-    assert match_proof_refs.has_open_incident(await stored(flow, w)) is True
-    flow.act_as(w["staff"])
-    body = {"winner_id": w["reg_a"]["id"], "note": "Die Falken sind nicht erschienen."}
-    refused = await flow.post(f"/api/matches/{w['match']['id']}/forfeit", json=body)
-    assert refused.status_code == 409 and refused.json()["detail"] == match_proof_refs.OPEN_INCIDENT_DETAIL
-    double = await flow.post(f"/api/admin/tournaments/{w['tournament']['id']}/matches/{w['match']['id']}/double-no-show", json={"note": "Beide fehlten."})
-    assert double.status_code in (404, 409), "auch „beide nicht erschienen“ geht so lange nicht"
-    assert (await stored(flow, w))["status"] == "scheduled" and (await stored(flow, w))["incidents"][0]["state"] == "in_review"
-
-    # Gegenprobe: Ist der Vorfall entschieden, lehnt diese Regel nicht mehr ab.
-    for state in ("decided", "agreed", "withdrawn"):
-        assert match_proof_refs.has_open_incident({"incidents": [{"id": "v1", "state": state}]}) is False
-    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {"incidents": [{"id": "v1", "position": 1, "state": "decided"}]}})
-    after = await flow.post(f"/api/matches/{w['match']['id']}/forfeit", json=body)
-    assert after.status_code != 409 or after.json()["detail"] != match_proof_refs.OPEN_INCIDENT_DETAIL
 
 
 @pytest.mark.asyncio

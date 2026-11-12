@@ -1130,8 +1130,6 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 - **Entscheiden**: immer mit **Begründung** (mindestens zehn Zeichen, geht an beide Seiten). **Ergebnis bleibt** schließt
   das Verfahren; **Ergebnis ändern** öffnet das Ergebnis-Fenster, die Begründung steht dort als Grund der Korrektur.
   Wer am Spiel selbst beteiligt ist, entscheidet nicht.
-- **Erst der Vorfall, dann die Wertung**: Solange an einem Spiel ein Vorfall offen ist, lassen sich **kampflos** und
-  **nicht erschienen** nicht werten – die Seite sagt es mit einem Satz. Entscheidet zuerst den Vorfall.
 - **Einspruch**: Gegen die Entscheidung, eine Wertung kampflos oder eine Korrektur kann eine Seite innerhalb der
   Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
   ersten Entscheidung – auch der Superadmin nicht über die eigene. Bis dahin gilt die erste Entscheidung weiter.
