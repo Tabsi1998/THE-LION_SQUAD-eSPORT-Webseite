@@ -277,7 +277,8 @@ externen Anmeldelink; bearbeiten darf ihn der Bereich **Finanzen**. Kurz:
   Stornieren selbst wieder an, gilt der aktuelle Preis mit einem neuen Rechnungsauftrag. Gibt es schon eine Rechnung (auch als Entwurf in
   Dolibarr, auch bezahlt), bleibt sie: Es entsteht kein zweiter Auftrag, die Anmeldung zeigt wieder diese Rechnung, und die Änderung kommt
   als Prüffall **Buchung nach dem Beleg geändert** mit altem und neuem Betrag in die Finanzübersicht. Die Nachricht an die Person nennt dann
-  keinen Betrag. Ein in Dolibarr gelöschter Entwurf zählt nicht mehr als Rechnung.
+  keinen Betrag, sondern sagt, dass es schon eine Rechnung gibt und der Verein sie prüft. Ein vorgemerkter Gutschrift-Entwurf fällt weg.
+  Ein in Dolibarr gelöschter Entwurf zählt nicht mehr als Rechnung.
 - Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr). Teilnehmende finden sie unter **Meine
   Rechnungen**. Alles Weitere: [Abrechnung](../ABRECHNUNG.md), [Dolibarr](../DOLIBARR.md).
 
