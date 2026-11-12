@@ -332,12 +332,15 @@ def _zip(entries: dict[str, bytes]) -> bytes:
 
 
 def test_check_zip_accepts_a_moss_archive_and_refuses_everything_else(tmp_path):
-    good = {"ok": _zip({"moss/screen1.jpg": b"\xff\xd8" + b"a" * 2000, "moss/log.txt": b"hello"})}
+    # Auch eine HTML- oder SVG-Datei im Archiv ist kein Grund zur Ablehnung: Die ZIP wird nie entpackt und geht nur als Download
+    # mit ``nosniff`` hinaus - ein Fehlalarm verhinderte sonst einen echten MOSS-Upload.
+    good = {"ok": _zip({"moss/screen1.jpg": b"\xff\xd8" + b"a" * 2000, "moss/log.txt": b"hello"}),
+            "html": _zip({"index.html": b"<script>alert(1)</script>", "bild.svg": b"<svg/>"})}
     bad = {
         "traversal": _zip({"../evil.txt": b"x"}), "backslash": _zip({"..\\evil.txt": b"x"}), "absolute": _zip({"/etc/passwd": b"x"}),
         "drive": _zip({"C:/x.txt": b"x"}), "exe": _zip({"a/b.EXE": b"MZ"}), "nested": _zip({"inner.zip": _zip({"a.txt": b"x"})}),
         "nested_tar": _zip({"inner.tar.gz": b"x" * 10}), "bomb": _zip({"big.txt": b"\0" * (5 * 1024 * 1024)}),
-        "prefix_sfx": b"MZ" + _zip({"a.txt": b"x"}), "empty": _zip({}), "html": _zip({"index.html": b"<script>alert(1)</script>"}),
+        "prefix_sfx": b"MZ" + _zip({"a.txt": b"x"}), "empty": _zip({}),
     }
     for name, data in {**good, **bad}.items():
         path = tmp_path / f"{name}.zip"

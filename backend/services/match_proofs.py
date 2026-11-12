@@ -108,7 +108,7 @@ ZIP_MAX_RATIO = 200
 # MOSS schreibt Bildschirmfotos und Protokolle. Programme und Skripte haben in der Datei nichts verloren.
 ZIP_FORBIDDEN_SUFFIXES = frozenset({".exe", ".dll", ".bat", ".cmd", ".com", ".scr", ".msi", ".ps1", ".vbs", ".js", ".jar", ".lnk", ".sh",
                                     ".hta", ".pif", ".reg", ".zip", ".7z", ".rar", ".gz", ".tgz", ".tar", ".bz2", ".xz", ".cab",
-                                    ".iso", ".html", ".htm", ".svg"})
+                                    ".iso"})
 # Als MOSS-Datei zählt nur die ZIP, wie MOSS sie schreibt - andere Archive bekommen einen klaren Satz statt „kein Bild“.
 OTHER_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
 ONLY_ZIP = "Bitte die MOSS-Datei als ZIP hochladen, so wie MOSS sie geschrieben hat. Andere Archive (etwa .tar.gz, .7z, .rar) gehen nicht."
