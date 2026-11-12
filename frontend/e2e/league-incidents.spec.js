@@ -34,10 +34,12 @@ function incident(extra = {}) {
     id: "v1", position: 2, kind: "disconnect", kind_label: "Verbindungsabbruch", between_maps: false, minutes: null, at: inMinutes(-2), score: { a: 3, b: 4 }, round: 8,
     players: [{ id: "f2", name: "Falke Zwei mit langem Namen" }], note: "Falke Zwei ist in Runde 8 aus der Lobby geflogen, Ursache war ein Ausfall beim Anbieter.",
     proposal: "rehost", proposal_label: "Rehost beim Stand", reported_by: { registration_id: "b", name: NAMES[1], own: false }, state: "proposed", open: true,
-    expired: false, answer_deadline: inMinutes(8), answer: null, review_cause: null, counts_quota: true, decision: null, voided: null, closed_at: null, procedure: false,
-    can_answer: false, can_withdraw: false, can_decide: false, can_settle: false, ...extra,
+    // Wie der Server: Ein Verbindungsabbruch zählt nicht gegen das Kontingent - nur Rehost und technische Pause (REHOST unten).
+    expired: false, answer_deadline: inMinutes(8), answer: null, review_cause: null, counts_quota: false, decision: null, voided: null, closed_at: null, procedure: false,
+    close_reason: null, close_note: "", can_answer: false, can_withdraw: false, can_decide: false, can_settle: false, can_close: false, awaits_replay: false, ...extra,
   };
 }
+const REHOST = { kind: "rehost", kind_label: "Rehost", counts_quota: true };
 
 function matchPage({ incidents = [], info = {}, league = {}, page = {} } = {}) {
   const clarifying = incidents.filter((row) => row.state === "in_review").map((row) => row.position);
@@ -180,6 +182,8 @@ test.describe("Liga: Vorfälle im Spiel", () => {
       await expect(card).toContainText("Map 2 · Funkturm bei Nacht · Verbindungsabbruch");
       await expect(card).toContainText("Vorschlag: Rehost beim Stand");
       await expect(card).toContainText("Stand beim Vorfall: 3:4 · Runde 8");
+      // Ein Verbindungsabbruch zählt nicht gegen das Kontingent - die Karte nennt es darum nicht.
+      await expect(page.getByTestId("incident-quota-v1")).toHaveCount(0);
       // Wer antworten muss, liest genau das; die Uhrzeit der Frist steht nur am Countdown, kein zweiter Hinweis über der Karte.
       await expect(page.getByTestId("incident-sentence-v1")).toHaveText("Ihr seid dran: stimmt zu oder lehnt ab.");
       await expect(page.getByTestId("incident-countdown-v1")).toContainText(/Antwortzeit bis \d\d:\d\d/);
@@ -217,11 +221,15 @@ test.describe("Liga: Vorfälle im Spiel", () => {
     test(`die Liga-Leitung entscheidet und stellt die Serie fest bei ${width} px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
       const posts = [];
-      let rows = [incident({ state: "in_review", review_cause: "expired", can_decide: true })];
-      const info = { as_lead: true, can_decide: true, hold: HOLD };
+      let rows = [incident({ ...REHOST, state: "in_review", review_cause: "expired", can_decide: true, can_close: true })];
+      const info = { as_lead: true, can_decide: true, hold: HOLD, quota: { limit: 1, used: [] } };
       await setup(page, LEAD, () => matchPage({ incidents: rows, info, league: { own_registration_id: null, roster: [] }, page: { can_act: false, acting_registration_id: null } }), posts);
       await page.goto("/matches/m1");
       await expect(page.getByTestId("incident-sentence-v1")).toContainText("Keine Antwort in der Antwortzeit.");
+      // Ein Rehost zählt gegen das Kontingent - solange nicht entschieden ist, steht „0 von 1 genutzt“ da.
+      await expect(page.getByTestId("incident-v1")).toContainText("Map 2 · Funkturm bei Nacht · Rehost");
+      await expect(page.getByTestId("incident-quota-v1")).toContainText("0 von 1 genutzt");
+      await expect(page.getByTestId("incident-close-v1-open")).toBeVisible();
       await page.getByTestId("incident-decision-v1-submit").click();
       await expect(page.getByTestId("incident-decision-v1-problem")).toContainText("wie entschieden wird");
       await page.getByTestId("incident-decision-v1-replay").check();
