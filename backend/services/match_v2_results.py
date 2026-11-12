@@ -1339,6 +1339,8 @@ def _pairing_reset_fields(match: dict, now_iso: str) -> dict:
     disputes = [
         row if not isinstance(row, dict) or row.get("resolved_at") else {
             **row, "resolved_at": now_iso, "decision": "void", "decision_note": PAIRING_CHANGED_REASON,
+            # Ein Liga-Verfahren (#1619, E.2: mit ``id`` und ``kind``) ist damit auch dem Stand nach geschlossen, nicht mehr offen.
+            **({"state": "decided"} if row.get("id") and row.get("kind") else {}),
         }
         for row in match.get("disputes") or []
     ]
