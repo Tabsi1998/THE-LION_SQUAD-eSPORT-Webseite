@@ -40,6 +40,7 @@ async def test_list_bracket_table_and_draw_see_every_registration(flow):
     listed = await flow.get(f"/api/tournaments/{tournament['id']}/registrations")
     assert listed.status_code == 200, listed.text
     assert {row["id"] for row in listed.json()} == everyone, "die Teilnehmerliste zeigt jede Anmeldung"
+    assert all((row.get("user") or {}).get("id") for row in listed.json()), "jede Zeile der Liste hat ihr Profil"
 
     drawn = await flow.post(f"/api/tournaments/{tournament['id']}/groups/generate", json={"group_count": GROUPS})
     assert drawn.status_code == 200, drawn.text
@@ -51,6 +52,7 @@ async def test_list_bracket_table_and_draw_see_every_registration(flow):
     bracket = await flow.get(f"/api/tournaments/{tournament['id']}/bracket")
     assert bracket.status_code == 200, bracket.text
     assert {row["id"] for row in bracket.json()["registrations"]} == everyone, "der Baum kennt jede Anmeldung"
+    assert all((row.get("user") or {}).get("id") for row in bracket.json()["registrations"]), "jede Zeile im Baum hat ihr Profil"
 
     table = await flow.get(f"/api/tournaments/{tournament['id']}/standings")
     assert table.status_code == 200, table.text

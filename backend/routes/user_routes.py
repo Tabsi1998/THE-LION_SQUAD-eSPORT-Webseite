@@ -413,7 +413,7 @@ async def mention_search(
             team_rows = await db.teams.find(
                 {"id": {"$in": list(reg_team_ids)}},
                 {"_id": 0, "member_ids": 1},
-            ).to_list(500)
+            ).to_list(len(reg_team_ids))
             for team_row in team_rows:
                 team_member_ids.update(team_row.get("member_ids") or [])
         staff_rows = await db.tournament_staff_assignments.find(

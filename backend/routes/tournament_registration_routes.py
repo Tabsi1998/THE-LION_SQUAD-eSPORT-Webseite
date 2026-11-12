@@ -538,7 +538,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
     # Aufgelöste Teams (#2128, TM8) zeigen in alten Turnieren weiter ihren Namen.
     teams = await team_history.teams_by_id(db, team_ids)
     # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung sieht, wer (noch) beim Event angemeldet ist.

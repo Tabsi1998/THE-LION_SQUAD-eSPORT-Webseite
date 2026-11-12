@@ -92,7 +92,7 @@ async def _tournament_chat_user_ids(db, tid: str) -> set[str]:
     user_ids = {row.get("user_id") for row in regs if row.get("user_id")}
     team_ids = {row.get("team_id") for row in regs if row.get("team_id")}
     if team_ids:
-        teams = await db.teams.find({"id": {"$in": list(team_ids)}}, {"_id": 0, "member_ids": 1}).to_list(500)
+        teams = await db.teams.find({"id": {"$in": list(team_ids)}}, {"_id": 0, "member_ids": 1}).to_list(len(team_ids))
         for team in teams:
             user_ids.update(team.get("member_ids") or [])
     staff_rows = await db.tournament_staff_assignments.find(

@@ -64,7 +64,7 @@ async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
             reg_ids.update(slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id"))
         else:
             reg_ids.update([match.get("participant_a_id"), match.get("participant_b_id")])
-    regs = await db.tournament_registrations.find({"id": {"$in": list(reg_ids)}}, {"_id": 0}).to_list(1000) if reg_ids else []
+    regs = await db.tournament_registrations.find({"id": {"$in": list(reg_ids)}}, {"_id": 0}).to_list(len(reg_ids)) if reg_ids else []
     reg_map = {reg["id"]: reg for reg in regs}
 
     def _participants(match: dict) -> str:
@@ -162,7 +162,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
             r["is_mine"] = True
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
     for r in regs:
         if r.get("user_id"):
             u = users.get(r["user_id"]) or {}
@@ -331,7 +331,7 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
             r["removal_at"] = removed_at[r["id"]]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
     for r in regs:
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")

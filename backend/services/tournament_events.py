@@ -542,7 +542,7 @@ async def _load_matches(db, tournament_id: str) -> list[dict]:
 
 
 async def _names(db, tournament_id: str) -> dict[str, str]:
-    rows = await db.tournament_registrations.find({"tournament_id": tournament_id}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1}).to_list(5000)
+    rows = await db.tournament_registrations.find({"tournament_id": tournament_id}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1}).to_list(REGISTRATION_LIMIT)
     return {row["id"]: row.get("display_name") or row.get("ingame_name") or row["id"] for row in rows if row.get("id")}
 
 
