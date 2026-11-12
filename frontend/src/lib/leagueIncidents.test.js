@@ -103,6 +103,8 @@ test("die Feststellung der Serie sagt, was fehlt oder nicht zählt", () => {
   expect(settleSentence({ settled_at: "x", missing_positions: [3] })).toBe("Serie festgestellt: Es fehlt noch Map 3.");
   expect(settleSentence({ settled_at: "x", surplus_positions: [3] })).toBe("Serie festgestellt: Map 3 zählt nicht.");
   expect(settleSentence({ settled_at: "x" })).toBe("Serie festgestellt – es fehlt keine Map.");
+  // Die Leitung hat das Ergebnis selbst eingetragen: Die Karte sagt das, nie „noch nicht festgestellt“.
+  expect(settleSentence({ settled_at: "x", settled_by_result: true })).toBe("Serie festgestellt: Die Liga-Leitung hat das Ergebnis eingetragen.");
 });
 
 test("das Formular nennt den ersten fehlenden Schritt", () => {

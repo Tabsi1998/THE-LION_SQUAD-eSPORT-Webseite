@@ -2792,8 +2792,12 @@ und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gil
 
   So ist ein Spiel mit einer Map in Klärung nie `completed`. Ist das Spiel zu Ende, hält kein Vorfall mehr etwas auf.
   **Die Leitung** trägt über `/result` nur dann nicht ein, wenn ein Vorfall **offen** ist (`in_review`, `proposed`: 409 mit dem
-  Satz, was fehlt). Ist entschieden, darf sie eintragen - ihr eingetragenes Ergebnis ersetzt die Feststellung; eine spätere
-  Korrektur eines beendeten Spiels hält kein Vorfall auf.
+  Satz, was fehlt). Ist entschieden, darf sie eintragen - ihr eingetragenes Ergebnis **stellt die Serie fest**: Sobald es gilt
+  (mit Ergebnis-Fenster erst nach dessen Ablauf), bekommt jede entschiedene, noch nicht festgestellte Serie `settled_at`,
+  `settled_by` und den festen Grund `settle_reason: "result_entered"` (`league_incidents.settle_by_result`, Protokoll
+  `match.incident.settle` mit `by_result`, keine eigene Nachricht). Die Matchseite liefert dafür `decision.settled_by_result`
+  und zeigt „Serie festgestellt: Die Liga-Leitung hat das Ergebnis eingetragen.“ „Rückgängig“ nimmt genau diese Feststellung
+  wieder zurück; eine im Formular getroffene bleibt. Eine spätere Korrektur eines beendeten Spiels hält kein Vorfall auf.
 - **Neustart und Wiederholung: Es zählt nur, was danach gemeldet ist.** Mit der Einigung oder Entscheidung auf `restart` oder
   `replay` steht in `voided.at`, ab wann die Erstaustragung ungültig ist. Jede frühere Meldung beschreibt diese ungültige
   Austragung und zählt nicht mehr (`league_incident_rules.current_reports`) - für die Übereinstimmung beider Seiten, für die

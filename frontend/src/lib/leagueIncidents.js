@@ -178,6 +178,8 @@ export function stateSentence(incident, { otherName = "die Gegenseite", ownSide 
 export function settleSentence(decision) {
   if (!decision) return "";
   if (!decision.settled_at) return "Die Serie ist noch nicht festgestellt – bis dahin gilt kein Ergebnis.";
+  // Die Leitung hat das Ergebnis selbst eingetragen - damit steht die Serie fest, ein eigener Schritt war nicht nötig.
+  if (decision.settled_by_result) return "Serie festgestellt: Die Liga-Leitung hat das Ergebnis eingetragen.";
   const missing = decision.missing_positions || [];
   const surplus = decision.surplus_positions || [];
   if (missing.length) return `Serie festgestellt: Es fehlt noch Map ${missing.join(", ")}.`;

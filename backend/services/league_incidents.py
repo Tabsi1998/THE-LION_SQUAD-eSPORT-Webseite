@@ -31,7 +31,8 @@ from services.league_incident_rules import (  # noqa: F401 - weiterhin über lea
     MAX_PLAYERS, MAX_ROUND, MAX_SCORE, NOTE_MAX, NOT_A_SIDE_DETAIL, NOT_FINALIZABLE_DETAIL, NOT_FOUND_DETAIL,
     NO_ACTION, OUTCOMES, OUTCOME_LABELS, PROPOSALS, PROPOSAL_LABELS, PROPOSED, QUOTA_KINDS, REASON_MAX, REASON_MIN,
     REHOST, REJECTED, REPLAY, REPLAY_REASON_MAX, RESTART, VOIDING, WITHDRAWN, _effects, _replay_reason,
-    BY_LEAD, CLOSED, ENDED_STATUSES, MATCH_ENDED, OPEN_HOLD_CODES, REPLAY_FIRST_DETAIL, as_shown, awaits_replay, confirm_clock,
+    BY_LEAD, CLOSED, ENDED_STATUSES, MATCH_ENDED, OPEN_HOLD_CODES, REPLAY_FIRST_DETAIL, RESULT_ENTERED, as_shown, awaits_replay,
+    confirm_clock,
     counts_quota, current_reports, due_at, forfeit_refusal, match_ended, open_incidents, export_steps, final_games, find, incidents_of,
     is_open, lead_task, map_states, mark_replays, missing_positions, outcome_of, position_of, positions_in_clarification, quota_used,
     replay_cutoff, replay_pending, replay_text, report_refusal, result_block, scrub, setting_of, state_of, surplus_positions,
@@ -447,6 +448,55 @@ async def settle(db, match: dict, setup, incident_id: str, *, user: dict, body: 
     return changed
 
 
+def _unsettled(row: dict) -> bool:
+    return state_of(row) == DECIDED and not (row.get("decision") or {}).get("settled_at")
+
+
+async def settle_by_result(db, match_id: str, actor_id: str | None) -> int:
+    """Die Leitung hat das Ergebnis selbst eingetragen (``/result``): Damit steht die Serie fest. Jede entschiedene, noch nicht
+    festgestellte Serie bekommt ``settled_at``, ``settled_by`` und den festen Grund ``result_entered`` - ohne eigene Nachricht, das
+    Ergebnis kommt ohnehin bei beiden Seiten an. Gibt die Zahl der so festgestellten Vorfälle zurück."""
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0, "id": 1, "tournament_id": 1, "stage_id": 1, "match_key": 1,
+                                                            "incidents": 1})
+    rows = incidents_of(match)
+    if not any(_unsettled(row) for row in rows):
+        return 0
+    now_iso = now_utc().isoformat()
+    fields = {"settled_at": now_iso, "settled_by": actor_id, "settle_reason": RESULT_ENTERED}
+    changed = [{**row, "decision": {**row["decision"], **fields}} if _unsettled(row) else row for row in rows]
+    try:
+        await _store(db, match, changed, user_ids=[actor_id])
+    except IncidentProblem:
+        # Jemand hat im selben Augenblick an den Vorfällen geschrieben: Das Ergebnis steht, die Feststellung holt niemand nach.
+        logger.warning("Incidents of match=%s changed while its result was entered", log_safe(match_id))
+        return 0
+    settled = [row for row, before in zip(changed, rows) if _unsettled(before)]
+    for entry in settled:
+        await _audit(db, "match.incident.settle", match, actor_id, entry, missing_positions=[], surplus_positions=[],
+                     by_result=True)
+    return len(settled)
+
+
+async def unsettle_by_result(db, match_id: str) -> int:
+    """„Rückgängig“ nimmt ein eingetragenes Ergebnis zurück - und mit ihm die Feststellung, die nur aus diesem Ergebnis kam."""
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0, "id": 1, "incidents": 1})
+    rows = incidents_of(match)
+
+    def by_result(row: dict) -> bool:
+        return state_of(row) == DECIDED and (row.get("decision") or {}).get("settle_reason") == RESULT_ENTERED
+
+    if not any(by_result(row) for row in rows):
+        return 0
+    fields = {"settled_at": None, "settled_by": None, "settle_reason": None}
+    changed = [{**row, "decision": {**row["decision"], **fields}} if by_result(row) else row for row in rows]
+    try:
+        await _store(db, match, changed)
+    except IncidentProblem:
+        logger.warning("Incidents of match=%s changed while its result was undone", log_safe(match_id))
+        return 0
+    return sum(1 for row in rows if by_result(row))
+
+
 # ---------------------------------------------------------------- Zeit-Job
 
 async def expire_due(db, match: dict, *, now: datetime | None = None) -> int:
@@ -584,7 +634,10 @@ def incident_view(match: dict, entry: dict, *, names: dict[str, str], people: di
                       "reason": decision.get("reason") or "", "at": decision.get("at"),
                       "missing_positions": list(decision.get("missing_positions") or []),
                       "surplus_positions": list(decision.get("surplus_positions") or []),
-                      "settled_at": decision.get("settled_at"), "settle_reason": decision.get("settle_reason") or ""}
+                      "settled_at": decision.get("settled_at"),
+                      # Festgestellt durch das eingetragene Ergebnis der Leitung: kein freier Text, die Seite sagt es als Satz.
+                      "settled_by_result": decision.get("settle_reason") == RESULT_ENTERED,
+                      "settle_reason": "" if decision.get("settle_reason") == RESULT_ENTERED else decision.get("settle_reason") or ""}
                      if decision else None),
         "voided": entry.get("voided"), "closed_at": entry.get("closed_at"),
         # Geschlossen ohne Entscheidung: weil das Spiel zu Ende ist oder durch die Leitung (mit ihrer Begründung).

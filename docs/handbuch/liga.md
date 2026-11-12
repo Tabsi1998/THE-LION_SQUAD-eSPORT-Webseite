@@ -1058,7 +1058,9 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
 - **Im eigenen Spiel** entscheidet eine zweite berechtigte Person (Befangenheit, 2.11); die Seite sagt das. Der Superadmin kann nur
   als Notausnahme mit Grund.
 - **Ergebnis eintragen** geht, sobald kein Vorfall mehr offen ist (weder „wartet auf Antwort“ noch „in Klärung“) – die Seite nennt
-  sonst den Grund. Ist entschieden, aber die Serie noch nicht festgestellt, ersetzt euer eingetragenes Ergebnis die Feststellung.
+  sonst den Grund. Ist entschieden, aber die Serie noch nicht festgestellt, stellt euer eingetragenes Ergebnis sie fest: Am
+  Vorfall steht dann „Serie festgestellt: Die Liga-Leitung hat das Ergebnis eingetragen.“ Nehmt ihr das Ergebnis mit
+  **Rückgängig** zurück, ist auch die Serie wieder offen.
 - **Zurückziehen** kann die meldende Seite nur, solange die Antwortzeit läuft. Danach liegt der Vorfall bei euch.
 
 <img src="../assets/liga/vorfall-entscheiden-1440.png" alt="Fläche Vorfälle im Spiel für die Liga-Leitung: der Vorfall in Klärung mit Stand und Vorschlag, darunter die Entscheidung mit sechs Möglichkeiten, der Seite für die zugesprochene Map, der Begründung und dem Haken Serie gleich feststellen" width="820">

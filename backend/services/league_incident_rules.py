@@ -68,6 +68,8 @@ REPLAY_FIRST_DETAIL = ("Map {position} wird erst neu gespielt. Die Serie stellst
 # Was die Leitung am Eintragen eines Ergebnisses hindert: nur ein offener Vorfall. Ist entschieden, stellt das eingetragene Ergebnis
 # die Serie fest.
 OPEN_HOLD_CODES = frozenset({"in_review", "proposed"})
+# ``decision.settle_reason``, wenn nicht die Leitung im Formular festgestellt hat, sondern ihr eingetragenes Ergebnis (``/result``).
+RESULT_ENTERED = "result_entered"
 
 
 class IncidentProblem(Exception):

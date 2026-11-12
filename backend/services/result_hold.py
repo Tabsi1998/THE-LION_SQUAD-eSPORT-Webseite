@@ -250,6 +250,10 @@ async def _publish_one(db, match_id: str, hold_id: str | None, moment: str) -> b
                 lineups_missing=hold.get("lineups_missing") if "games" in hold else None,
                 match_lineups=hold.get("lineups") if "lineups" in hold else None,
             )
+            if match.get("incidents"):
+                # Vorfälle (D.5, #1619): Das eingetragene Ergebnis der Leitung stellt eine entschiedene Serie fest.
+                from services.league_incidents import settle_by_result
+                await settle_by_result(db, match_id, hold.get("actor_id"))
     except MatchV2ResultError as exc:
         # Inzwischen hat sich etwas geändert (etwa ein Folgespiel läuft schon): nichts schreiben, Bescheid geben.
         await _audit(db, "match.result.hold_failed", match, hold.get("actor_id"), {"hold_id": hold_id, "detail": str(exc)[:200]})
@@ -414,6 +418,10 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
     if "games" in match or match.get("lineup_user_ids"):
         from services.league_games import refresh_lineup_index
         await refresh_lineup_index(db, match["id"])
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Eine Feststellung, die nur aus diesem Ergebnis kam, geht mit ihm zurück.
+        from services.league_incidents import unsettle_by_result
+        await unsettle_by_result(db, match["id"])
     await _audit(db, "match.result.undo", match, actor_id, {
         "held": False, "report_id": meta.get("report_id"), "cleared_matches": cleared,
     })

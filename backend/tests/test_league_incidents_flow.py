@@ -17,7 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from league_match_world import ids, two_nil, world  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import league_games, league_incidents, match_deadlines  # noqa: E402
+from services import league_games, league_incidents, match_deadlines, result_hold  # noqa: E402
 from services.match_deadline_sweep import sweep as deadline_sweep  # noqa: E402
 
 
@@ -981,6 +981,82 @@ async def test_the_lead_records_an_incident_and_marks_a_replay_in_an_entered_res
 
     # „Mein Dienst“ ist leer, sobald nichts mehr zu entscheiden ist.
     assert await league_incidents.review_rows(flow.db, w["staff"]) == []
+
+
+def staff_result(w: dict, **extra) -> dict:
+    lineups = {w["reg_a"]["id"]: lions(w), w["reg_h"]["id"]: falcons(w)}
+    return {"results": two_nil(w)["results"], "games": [{**game, "lineups": lineups} for game in two_nil(w)["games"]], **extra}
+
+
+async def decided_without_settling(flow, w: dict) -> str:
+    """Ein Vorfall, über den entschieden ist („Keine Maßnahme“) - die Serie ist noch nicht festgestellt."""
+    incident_id = await reported(flow, w, proposal="continue_at_score")
+    assert (await answered(flow, w, incident_id, False)).status_code == 200
+    assert (await decide(flow, w, incident_id, "no_action")).status_code == 200
+    assert league_incidents.result_block(await stored(flow, w))["code"] == "unsettled"
+    return incident_id
+
+
+@pytest.mark.asyncio
+async def test_a_result_entered_by_the_lead_settles_a_decided_series(flow):
+    """Trägt die Leitung nach ihrer Entscheidung das Ergebnis selbst ein, steht die Serie damit fest - mit festem Grund, ohne
+    freien Text. Die Karte zeigt dann nie mehr „noch nicht festgestellt“."""
+    w = await world(flow)
+    incident_id = await decided_without_settling(flow, w)
+    flow.act_as(w["staff"])
+    entered = await flow.post(f"/api/matches/{w['match']['id']}/result", json=staff_result(w))
+    assert entered.status_code == 200, entered.text
+    match = await stored(flow, w)
+    decision = match["incidents"][0]["decision"]
+    assert match["status"] == "completed"
+    assert decision["settled_at"] and decision["settled_by"] == w["staff"]["id"] and decision["settle_reason"] == "result_entered"
+    assert decision["missing_positions"] == [] and decision["surplus_positions"] == []
+    logged = await flow.db.audit_logs.find({"action": "match.incident.settle"}, {"_id": 0}).to_list(5)
+    assert [(row["actor_id"], row["data"]["incident_id"], row["data"]["by_result"]) for row in logged] == [(w["staff"]["id"], incident_id, True)]
+    assert await flow.db.notifications.count_documents({"meta.dedupe_key": {"$regex": f"^incident:{incident_id}:settled"}}) == 0, \
+        "keine eigene Nachricht - das Ergebnis kommt ohnehin an"
+
+    flow.act_as(w["users"]["Kapitaen"])
+    seen = (await page(flow, w))["league"]
+    shown = seen["incidents"][0]["decision"]
+    assert shown["settled_at"] and shown["settled_by_result"] is True and shown["settle_reason"] == "", "der Grund ist kein Text für die Seite"
+    assert seen["incidents"][0]["can_settle"] is False and seen["incident_info"]["hold"] is None
+
+    # Gegenprobe: Eine Feststellung der Leitung im Formular bleibt, wie sie ist - das Ergebnis danach überschreibt sie nicht.
+    other = await world(flow, letter="B")
+    second = await decided_without_settling(flow, other)
+    flow.act_as(other["staff"])
+    assert (await flow.post(url(other, f"/{second}/settle"), json={**SETTLE, "reason": "Alle Maps gespielt"})).status_code == 200
+    assert (await flow.post(f"/api/matches/{other['match']['id']}/result", json=staff_result(other))).status_code == 200
+    kept = (await stored(flow, other))["incidents"][0]["decision"]
+    assert kept["settle_reason"] == "Alle Maps gespielt"
+    flow.act_as(other["users"]["Kapitaen"])
+    assert (await page(flow, other))["league"]["incidents"][0]["decision"]["settled_by_result"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_held_result_settles_when_it_is_published_and_undo_takes_it_back(flow):
+    """Mit dem Ergebnis-Fenster („Rückgängig“) steht die Serie erst fest, wenn das Ergebnis draußen ist - und „Rückgängig“ nimmt
+    die Feststellung wieder mit."""
+    w = await world(flow)
+    await decided_without_settling(flow, w)
+    flow.act_as(w["staff"])
+    held = await flow.post(f"/api/matches/{w['match']['id']}/result", json=staff_result(w, hold=True))
+    assert held.status_code == 200 and held.json()["held"] is True, held.text
+    assert (await stored(flow, w))["incidents"][0]["decision"]["settled_at"] is None, "noch liegt das Ergebnis nur bereit"
+
+    assert await result_hold.publish_due_holds(flow.db, now=now_utc() + timedelta(minutes=1)) == 1
+    match = await stored(flow, w)
+    assert match["status"] == "completed" and match["incidents"][0]["decision"]["settle_reason"] == "result_entered"
+    assert match["incidents"][0]["decision"]["settled_by"] == w["staff"]["id"]
+
+    undone = await flow.post(f"/api/matches/{w['match']['id']}/result/undo", json={})
+    assert undone.status_code == 200 and undone.json()["held"] is False, undone.text
+    match = await stored(flow, w)
+    decision = match["incidents"][0]["decision"]
+    assert match["status"] != "completed"
+    assert decision["settled_at"] is None and decision["settled_by"] is None and decision["settle_reason"] is None
+    assert league_incidents.result_block(match)["code"] == "unsettled", "ohne Ergebnis ist die Serie wieder festzustellen"
 
 
 @pytest.mark.asyncio

@@ -1551,6 +1551,9 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         lineups_missing=missing,
         match_lineups=lineups,
     )
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Das eingetragene Ergebnis stellt eine entschiedene Serie fest.
+        await league_incidents.settle_by_result(db, match["id"], me["id"])
     if games is not None and match.get("games") and not outcome.get("idempotent_replay"):
         # Liga (#1650): Maps der Turnierleitung korrigiert - eigener Eintrag mit Grund im Protokoll.
         await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
