@@ -100,7 +100,7 @@ test("Staffel (#2268): Tabelle und nur der aktuelle Spieltag, offene Spiele mit 
   expect(within(staffel).getByTestId("league-match-m2")).toHaveTextContent("Standardtermin");
   expect(within(staffel).queryByTestId("league-week-1")).toBeNull();
   expect(within(staffel).queryByTestId("league-week-7")).toBeNull();
-  expect(within(staffel).getByTestId("league-planned-m2")).toHaveTextContent("Suchen & Zerstören");
+  expect(within(staffel).getByTestId("league-planned-2")).toHaveTextContent("Suchen & Zerstören");
   expect(within(staffel).getByTestId("league-plan-link-A")).toHaveAttribute("href", "/liga/probe-liga/season-1/spieltage?staffel=probe-a");
   expect(within(staffel).getByTestId("league-teams-link-A")).toHaveTextContent("2 Teams");
   expect(within(staffel).getByTestId("league-teams-link-A")).toHaveAttribute("href", "/liga/probe-liga/season-1/teams#staffel-probe-a");
@@ -293,4 +293,12 @@ test("Läuft die Season, stehen die Tabellen vor dem Map-Pool; im Entwurf erst a
   renderPage();
   const later = await screen.findByTestId("league-division-1");
   expect(later.compareDocumentPosition(screen.getByTestId("league-map-pool")) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+});
+
+test("Liga N ohne sichtbare Staffel (nur Entwürfe): auch dann der Platzhalter statt leerer Ligen", async () => {
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1"
+    ? Promise.resolve({ data: { ...SEASON_VIEW, divisions: [{ id: "d1", level: 1, label: "Liga 1", staffeln: [] }] } }) : Promise.reject(new Error(url))));
+  renderPage();
+  expect(await screen.findByTestId("league-no-divisions")).toBeInTheDocument();
+  expect(screen.queryByTestId("league-division-1")).toBeNull();
 });

@@ -62,7 +62,8 @@ export function SeasonPlay({ league, season, pool, platform }) {
           <p className="tls-league-subhead">Reihenfolge je Serie</p>
           <ol className="tls-season-order tls-swipe" data-testid="season-map-order">
             {order.map((row) => (
-              <li key={row.position} className="tls-season-order__map" style={{ "--tls-i": row.position - 1 }} data-testid={`season-map-order-${row.position}`}>
+              <li key={row.position} className="tls-season-order__map" style={{ "--tls-i": row.position - 1 }} title={`Map ${row.position}: ${row.label}`}
+                data-testid={`season-map-order-${row.position}`}>
                 <span className="tls-season-order__nr">Map {row.position}</span>
                 <span className="flex min-w-0 items-center gap-1.5">
                   <ModeIcon src={row.icon_url} label={row.label} size="sm" />

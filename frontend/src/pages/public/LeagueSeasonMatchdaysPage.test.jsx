@@ -30,7 +30,7 @@ const played = {
     { position: 3, mode: "stellung", mode_label: "Stellung", map_name: "Turmruine", winner_registration_id: "r1" },
   ],
 };
-const forfeit = { id: "m3", matchday: 1, done: true, status: "forfeit", forfeit: true, home: side("r3", "Wölfe", "team-3", 3), away: side("r4", "Füchse", null, 0), winner_registration_id: "r3", games: [] };
+const forfeit = { id: "m3", matchday: 1, done: true, status: "forfeit", forfeit: true, home: side("r3", "Wölfe", "team-3"), away: side("r4", "Füchse", null), winner_registration_id: "r3", games: [] };
 const open = { id: "m2", matchday: 2, done: false, status: "scheduled", in_clarification: true, scheduled_at: "2026-11-22T19:00:00+00:00", schedule_source: "accepted",
   home: side("r2", "Falken · Falken A", "team-2"), away: side("r1", "Probe · Probe B", "team-1"), games: [] };
 const STAFFEL = {
@@ -74,7 +74,7 @@ test("die laufende Woche steht offen: Termin, Modus je Map, „in Klärung“; d
   const match = within(panel).getByTestId("league-match-m2");
   expect(match).toHaveTextContent("vereinbart");
   expect(within(match).getByTestId("league-match-m2-clarification")).toHaveTextContent("in Klärung");
-  expect(within(match).getByTestId("league-planned-m2")).toHaveTextContent("Suchen & Zerstören");
+  expect(within(panel).getByTestId("league-planned-2")).toHaveTextContent("Suchen & Zerstören");
   expect(within(screen.getByTestId("league-week-2")).getByRole("button")).toHaveAttribute("aria-current", "true");
   expect(screen.getByTestId("season-nav-spieltage")).toHaveAttribute("aria-current", "page");
   expect(screen.getByTestId("season-compact-head")).toHaveTextContent("Spieltage");
@@ -94,6 +94,8 @@ test("Woche wählen: Ergebnis mit Map-Chips, Modus-Symbol, wiederholter Map, kam
   expect(within(result).getByTestId("league-match-m1-replayed")).toHaveTextContent("Map wiederholt");
   expect(result.querySelector(".tls-team-mark img")).toHaveAttribute("src", expect.stringContaining("probe.png"));
   expect(within(panel).getByTestId("league-match-m3")).toHaveTextContent("kampflos");
+  // Kampflos ohne Stand: ein Strich statt „vs“.
+  expect(within(within(panel).getByTestId("league-match-m3")).getByRole("link", { name: /Zum Spiel/ })).toHaveTextContent(/^–$/);
   // Ohne Logo die Initialen.
   expect(within(result).getAllByText("FA").length).toBeGreaterThan(0);
 });

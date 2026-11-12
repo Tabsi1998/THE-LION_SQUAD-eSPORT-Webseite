@@ -7,7 +7,7 @@
 // Farben über die Marke bzw. --league-accent-rgb - auf der Ligaseite die Akzentfarbe der Liga (#2107), sonst die Vereinsfarbe.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Coffee, Crown, ExternalLink, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Coffee, Crown, ExternalLink, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
@@ -119,11 +119,12 @@ export function MapChips({ match }) {
   );
 }
 
-/** Offene Spiele: die Reihenfolge der Modi je Map (Season) - so wird gespielt. */
-function PlannedModes({ order, matchId }) {
-  if (!order?.length) return null;
+/** Woche mit offenen Spielen: die Reihenfolge der Modi je Map (Season) - einmal je Woche, sie gilt für jedes Spiel gleich. */
+function PlannedModes({ order, week }) {
+  if (!order?.length || !(week.matches || []).some((match) => !match.done)) return null;
   return (
-    <ol className="tls-league-planned" aria-label="Modus je Map" data-testid={`league-planned-${matchId}`}>
+    <ol className="tls-league-planned" aria-label="Modus je Map" data-testid={`league-planned-${week.week}`}>
+      <li className="tls-league-planned__title" aria-hidden="true">Modus je Map</li>
       {order.map((row) => (
         <li key={row.position} className="tls-league-planned__map" title={`Map ${row.position}: ${row.label}`}>
           <span className="tls-league-planned__nr" aria-hidden="true">{row.position}</span>
@@ -139,7 +140,7 @@ function Badge({ tone = "quiet", children, testId }) {
   return <span className="tls-league-badge" data-tone={tone} data-testid={testId}>{children}</span>;
 }
 
-export function MatchRow({ match, logos = {}, order }) {
+export function MatchRow({ match, logos = {} }) {
   const winner = winnerSide(match);
   const score = scoreLine(match);
   return (
@@ -147,7 +148,7 @@ export function MatchRow({ match, logos = {}, order }) {
       <div className="tls-league-match__teams">
         <TeamName side={match.home} won={winner === "home"} logo={logos[match.home?.team_id]} />
         <Link to={`/matches/${match.id}`} className="tls-league-match__score" aria-label={`Zum Spiel ${match.home?.name || ""} gegen ${match.away?.name || ""}`}>
-          {score || "vs"}
+          {score || (match.done ? "–" : "vs")}
         </Link>
         <TeamName side={match.away} won={winner === "away"} logo={logos[match.away?.team_id]} align="right" />
       </div>
@@ -168,12 +169,13 @@ export function MatchRow({ match, logos = {}, order }) {
           Spiel <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </Link>
       </div>
-      {match.done ? <MapChips match={match} /> : <PlannedModes order={order} matchId={match.id} />}
+      {match.done ? <MapChips match={match} /> : null}
     </li>
   );
 }
 
-function Week({ week, open, onToggle, logos, order }) {
+/** Der aktuelle Spieltag auf der Übersicht: offen, ohne Klappe - alle Wochen stehen unter Spieltage. */
+function Week({ week, logos, order }) {
   if (week.kind === "pause") {
     return (
       <li className="tls-league-week" data-kind="pause" data-testid={`league-week-${week.week}`}>
@@ -187,18 +189,19 @@ function Week({ week, open, onToggle, logos, order }) {
   }
   const headingId = `league-week-${week.week}-head`;
   return (
-    <li className="tls-league-week" data-kind={week.kind} data-open={open ? "true" : undefined} data-testid={`league-week-${week.week}`}>
-      <button type="button" className="tls-league-week__head tls-league-week__toggle" aria-expanded={open} aria-controls={`${headingId}-body`}
-        id={headingId} onClick={onToggle} disabled={!week.matches.length}>
+    <li className="tls-league-week" data-kind={week.kind} data-open="true" data-testid={`league-week-${week.week}`}>
+      <div className="tls-league-week__head" id={headingId}>
         <span className="font-display font-bold text-white">{week.label}</span>
         <span className="text-xs text-white/45 tabular-nums">{weekHeading(week)}</span>
         <span className="ml-auto text-[11px] text-white/45">{progressLine(week)}</span>
-        {week.matches.length ? <ChevronDown className="tls-league-week__chevron h-4 w-4 text-white/40" aria-hidden="true" /> : null}
-      </button>
-      {open && week.matches.length ? (
-        <StaggerIn as="ul" id={`${headingId}-body`} aria-labelledby={headingId} className="tls-league-week__body">
-          {week.matches.map((match) => <MatchRow key={match.id} match={match} logos={logos} order={order} />)}
-        </StaggerIn>
+      </div>
+      {week.matches.length ? (
+        <div className="tls-league-week__body">
+          <PlannedModes order={order} week={week} />
+          <StaggerIn as="ul" aria-labelledby={headingId} className="grid gap-2">
+            {week.matches.map((match) => <MatchRow key={match.id} match={match} logos={logos} />)}
+          </StaggerIn>
+        </div>
       ) : null}
     </li>
   );
@@ -252,7 +255,6 @@ const FINISHED = new Set(["completed", "finished", "archived"]);
  */
 export function StaffelPanel({ leagueSlug, seasonSlug, staffel, topLevel = false, order }) {
   const { data, error } = useStaffel(leagueSlug, seasonSlug, staffel.tournament_id);
-  const [openWeeks, setOpenWeeks] = useState(null);
   const logos = useMemo(() => logoMap(data?.teams), [data]);
 
   if (error && !data) {
@@ -264,16 +266,9 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel, topLevel = false
   const weeks = data.weeks || [];
   const currentWeek = openWeek(weeks, data.current);
   const week = weeks.find((row) => row.week === currentWeek);
-  const opened = openWeeks ?? new Set([currentWeek].filter(Boolean));
   const status = data.staffel?.status || staffel.status;
   const key = staffel.slug || staffel.tournament_id;
   const teams = data.teams || [];
-  const toggle = (number) => {
-    const next = new Set(opened);
-    if (next.has(number)) next.delete(number);
-    else next.add(number);
-    setOpenWeeks(next);
-  };
   return (
     <div className="tls-league-staffel" data-testid={`league-staffel-${staffel.staffel}`}>
       <div className="min-w-0">
@@ -285,13 +280,13 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel, topLevel = false
         </h3>
         {week ? (
           <ol className="tls-league-weeks">
-            <Week week={week} open={opened.has(week.week)} onToggle={() => toggle(week.week)} logos={logos} order={order} />
+            <Week week={week} logos={logos} order={order} />
           </ol>
         ) : <p className="text-sm text-white/55">Der Spielplan steht, sobald die Staffel startet.</p>}
         <div className="tls-league-links">
           <Link to={`${sectionPath(leagueSlug, seasonSlug, "spieltage")}?staffel=${encodeURIComponent(key)}`} className="tls-league-link"
             data-testid={`league-plan-link-${staffel.staffel}`}>
-            <CalendarDays className="h-4 w-4" aria-hidden="true" /> Alle Spieltage <ArrowRight className="tls-league-link__arrow h-4 w-4" aria-hidden="true" />
+            <CalendarDays className="h-4 w-4" aria-hidden="true" /> Spieltage <ArrowRight className="tls-league-link__arrow h-4 w-4" aria-hidden="true" />
           </Link>
           <Link to={`${sectionPath(leagueSlug, seasonSlug, "teams")}#staffel-${key}`} className="tls-league-link" data-testid={`league-teams-link-${staffel.staffel}`}>
             <Users className="h-4 w-4" aria-hidden="true" /> {teams.length} {teams.length === 1 ? "Team" : "Teams"}
@@ -319,9 +314,10 @@ function WeekPanel({ week, logos, order }) {
         <h3 className="font-heading text-2xl font-black uppercase leading-none">{week.label}</h3>
         <p className="text-xs text-white/55 tabular-nums">{weekHeading(week)}{progressLine(week) ? ` · ${progressLine(week)}` : ""}</p>
       </div>
+      <PlannedModes order={order} week={week} />
       {week.matches.length ? (
         <StaggerIn as="ul" key={week.week} className="tls-league-week__list">
-          {week.matches.map((match) => <MatchRow key={match.id} match={match} logos={logos} order={order} />)}
+          {week.matches.map((match) => <MatchRow key={match.id} match={match} logos={logos} />)}
         </StaggerIn>
       ) : <p className="mt-4 text-sm text-white/55">Reservewoche – hier landen verschobene Spiele.</p>}
     </div>
@@ -367,7 +363,7 @@ export function StaffelPlan({ leagueSlug, seasonSlug, staffel, order, week: chos
           return (
             <li key={row.week} data-testid={`league-week-${row.week}`}>
               <button type="button" className="tls-league-strip__week" data-state={weekState(row)} aria-current={current ? "true" : undefined}
-                onClick={() => onWeek(row.week)}>
+                title={`${label} · ${weekDays(row)}`} onClick={() => onWeek(row.week)}>
                 <span className="tls-league-strip__label">{label}</span>
                 <span className="tls-league-strip__days">{weekDays(row)}</span>
                 <span className="tls-league-strip__dot" aria-hidden="true" />

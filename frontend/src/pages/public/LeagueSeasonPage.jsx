@@ -42,7 +42,8 @@ function Head({ data }) {
 function Divisions({ data, hash, order }) {
   const { league, season } = data;
   const divisions = data.divisions || [];
-  if (!divisions.length) return <SeasonPlaceholder season={season} application={data.application} />;
+  // Vor der Einteilung - auch, wenn es Liga N gibt, aber noch keine Staffel sichtbar ist (Entwürfe sieht nur die Leitung).
+  if (!divisions.some((division) => division.staffeln?.length)) return <SeasonPlaceholder season={season} application={data.application} />;
   const topLevel = Math.min(...divisions.map((division) => Number(division.level) || 1));
   return divisions.map((division) => (
     <Division key={division.id} division={division} leagueSlug={league.slug} seasonSlug={season.slug} hash={hash}
