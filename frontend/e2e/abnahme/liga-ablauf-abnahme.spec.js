@@ -171,7 +171,7 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
     expect(written.written).toBe(15);
     await lead.page.goto(leagueUrl());
     const staffel = lead.page.getByTestId("league-staffel-A");
-    await expect(staffel.locator('[data-testid^="league-team-"]')).toHaveCount(6);
+    await expect(staffel.getByTestId("league-teams-link-A")).toContainText("6 Teams");
     await expect(staffel.getByTestId("league-week-1")).toContainText("So");
     await expect(staffel.getByTestId("league-week-1")).toContainText("20:00");
     await noSideScroll(lead.page);
@@ -226,11 +226,10 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       const standings = await (await lead.page.request.get(`/api/tournaments/${tid}/standings`)).json();
       expect(standings.find((row) => row.registration_id === match.home).won).toBeGreaterThanOrEqual(1);
       const guest = await as(browser, testInfo, "anon", viewport);
-      await guest.page.goto(leagueUrl());
-      const staffel = guest.page.getByTestId("league-staffel-A");
+      // Spieltage der Staffel (#2268): die Woche des Spiels gewählt, das Spiel steht als gespielt da.
+      await guest.page.goto(`${leagueUrl()}/spieltage?staffel=${tid}&woche=${round}`);
+      const staffel = guest.page.getByTestId("league-plan-A");
       await expect(staffel).toBeVisible();
-      const week = staffel.getByTestId(`league-week-${round}`);
-      if (await week.getByRole("button").first().getAttribute("aria-expanded") !== "true") await week.getByRole("button").first().click();
       await expect(staffel.getByTestId(`league-match-${match.id}`)).toHaveAttribute("data-done", "true");
       await noSideScroll(guest.page);
       await shot(guest.page, `ablauf-ligaseite-${width}.png`);
