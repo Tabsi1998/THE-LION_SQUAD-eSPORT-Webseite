@@ -19,6 +19,7 @@ CLARIFICATION_MODES = ("continue", "pause_series")
 PRESETS.update({
     "statement_hours": 48,
     "protest_target_hours": 72,
+    "protest_escalate_hours": 24,
     "moss_upload_hours": 24,
     "contested_result_mode": "counts",
     "protest_reasons": [

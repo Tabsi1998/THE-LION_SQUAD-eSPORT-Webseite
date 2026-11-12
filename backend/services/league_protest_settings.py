@@ -20,6 +20,7 @@ NUMBERS: dict[str, tuple[int, int, str]] = {
     "protest_hours": (1, 336, "Die Protestfrist"),
     "statement_hours": (1, 336, "Die Frist für die Stellungnahme"),
     "protest_target_hours": (1, 720, "Die Zielfrist der Leitung"),
+    "protest_escalate_hours": (1, 336, "Die Frist bis zur Eskalation"),
     "appeal_hours": (1, 336, "Die Einspruchsfrist"),
     "moss_upload_hours": (1, 168, "Die Frist für die MOSS-Datei"),
     "evidence_keep_days": (0, 365, "Die Aufbewahrung der Nachweise"),

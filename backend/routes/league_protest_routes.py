@@ -46,6 +46,7 @@ class ProtestSettingsBody(BaseModel):
     protest_hours: Optional[int] = None
     statement_hours: Optional[int] = None
     protest_target_hours: Optional[int] = None
+    protest_escalate_hours: Optional[int] = None
     appeal_hours: Optional[int] = None
     moss_upload_hours: Optional[int] = None
     evidence_keep_days: Optional[int] = None

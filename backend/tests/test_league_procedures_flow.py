@@ -103,6 +103,8 @@ async def test_settings_have_presets_validate_and_reach_unlocked_staffeln(flow):
     start = (await flow.get(url)).json()
     assert start["active"] is False and start["settings"] == league_protest_settings.defaults()
     assert start["settings"]["protest_hours"] == 48 and start["settings"]["contested_result_mode"] == "counts"
+    assert start["settings"]["protest_escalate_hours"] == 24
+    assert (await flow.put(url, json={"protest_escalate_hours": 0})).status_code == 422
     assert [row["key"] for row in start["settings"]["protest_reasons"] if row["ask_notified"]] == ["equipment", "lobby", "player"]
 
     too_long = await flow.put(url, json={"protest_hours": 337})
@@ -681,7 +683,10 @@ async def test_the_sweep_reminds_and_escalates_but_never_decides(flow):
     assert counts["reminded"] == 1 and counts["escalated"] == 0 and counts["statement_expired"] == 0
     reminder = await flow.db.notifications.find_one({"user_id": w["staff"]["id"], "meta.reason": "procedure_target"}, {"_id": 0})
     assert reminder and reminder["kind"] == "match_attention"
-    counts = await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=73 + league_procedures.ESCALATE_AFTER_HOURS))
+    # Eskalation je Season einstellbar (``protest_escalate_hours``, Vorgabe 24): hier sechs Stunden nach der Zielfrist.
+    await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"protest_escalate_hours": 6}})
+    assert (await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=77)))["escalated"] == 0
+    counts = await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=79))
     assert counts["reminded"] == 0 and counts["escalated"] == 1 and counts["statement_expired"] == 0
     match = await stored(flow, w)
     entry = match["disputes"][0]

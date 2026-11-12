@@ -3,7 +3,7 @@
 Er erinnert und eskaliert, **er entscheidet nie**:
 
 - **Zielfrist** (Nr. 135): Ist ``target_at`` erreicht, bekommt die zuständige Person eine Erinnerung (``reminded_at``). Bleibt das
-  Verfahren ``ESCALATE_AFTER_HOURS`` Stunden länger offen, geht es an die Leitung mit „manage“ (``escalated_at``). Hat nach
+  Verfahren ``protest_escalate_hours`` Stunden länger offen (Season-Feld, Vorgabe 24), geht es an die Leitung mit „manage“ (``escalated_at``). Hat nach
   ``protest_target_hours`` noch niemand übernommen, geht es ebenfalls an „manage“.
 - **Stellungnahme**: Läuft ``statement.due_at`` ohne Text ab, erfährt es die Leitung (``statement.expired_at``).
 - **MOSS**: Fehlt eine angeforderte Datei nach ``due_at``, steht die Anforderung auf ``missing`` und die Leitung bekommt einen Hinweis.
@@ -34,7 +34,7 @@ async def _step(db, match: dict, league, row: dict, now: datetime) -> tuple[dict
         if not row.get("reminded_at"):
             row["reminded_at"] = now.isoformat()
             todo.append((notify.target_reached, ()))
-        late = procedures.response_deadline(league.tournament, target, procedures.ESCALATE_AFTER_HOURS)
+        late = procedures.response_deadline(league.tournament, target, league.settings["protest_escalate_hours"])
         if not row.get("escalated_at") and late and now >= late:
             row["escalated_at"] = now.isoformat()
             todo.append((notify.escalated, ()))

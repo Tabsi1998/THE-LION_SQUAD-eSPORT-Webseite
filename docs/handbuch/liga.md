@@ -1125,8 +1125,8 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 - **Bearbeiten** auf der Karte des Verfahrens: **Übernehmen** (beide Seiten sehen, wer zuständig ist; ab dann läuft die
   Zielfrist, Vorgabe 72 Stunden), **Stellungnahme +24 Std.**, **MOSS-Datei anfordern** (ein Spieler, Frist 24 Stunden;
   fehlt die Datei danach, bekommt ihr einen Hinweis – gewertet wird nichts von selbst, **Entschuldigen** geht mit Grund).
-  Läuft die Zielfrist ab, erinnert die Seite die zuständige Person und meldet den Fall einen Tag später an die Leitung mit
-  **Liga verwalten**. Entschieden wird nie automatisch.
+  Läuft die Zielfrist ab, erinnert die Seite die zuständige Person und meldet den Fall nach der eingestellten Frist (Vorgabe 24 Stunden)
+  an die Leitung mit **Liga verwalten**. Entschieden wird nie automatisch.
 - **Entscheiden**: immer mit **Begründung** (mindestens zehn Zeichen, geht an beide Seiten). **Ergebnis bleibt** schließt
   das Verfahren; **Ergebnis ändern** öffnet das Ergebnis-Fenster, die Begründung steht dort als Grund der Korrektur.
   Wer am Spiel selbst beteiligt ist, entscheidet nicht.

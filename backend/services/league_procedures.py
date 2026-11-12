@@ -31,8 +31,6 @@ NOTE_MIN, NOTE_MAX = 10, 2000
 STATEMENT_MAX = 2000
 ADDITIONS_MAX = 10
 AGAINST_TYPES = ("protest_decision", "forfeit", "correction")
-# Nach der Zielfrist erinnert der Job die zuständige Person; so viele Stunden später (ruhend in Sperrzeiten) geht der Fall an „manage“.
-ESCALATE_AFTER_HOURS = 24
 RESTORABLE = {"completed", "forfeit", "pending", "ready", "scheduled", "in_progress", "running", "waiting_result"}
 KIND_LABELS = {OBJECTION: "Beanstandung", PROTEST: "Protest", APPEAL: "Einspruch"}
 WINDOW_CLOSED_DETAIL = "Die Protestfrist für dieses Spiel ist vorbei."

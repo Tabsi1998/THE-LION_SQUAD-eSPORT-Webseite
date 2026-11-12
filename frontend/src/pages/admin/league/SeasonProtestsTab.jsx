@@ -16,6 +16,7 @@ const NUMBER_FIELDS = [
   ["protest_hours", "Protestfrist (Stunden)", "ab der Bestätigung des Ergebnisses"],
   ["statement_hours", "Stellungnahme der Gegenseite (Stunden)", "ab der Benachrichtigung; die Leitung kann verlängern"],
   ["protest_target_hours", "Zielfrist der Leitung (Stunden)", "ab „Übernehmen“; danach Erinnerung und Eskalation, nie eine automatische Entscheidung"],
+  ["protest_escalate_hours", "Eskalation an die Liga-Leitung (Stunden)", "nach der Zielfrist geht ein offenes Verfahren an „Liga verwalten“"],
   ["appeal_hours", "Einspruchsfrist (Stunden)", "ab Bekanntgabe der Entscheidung"],
   ["moss_upload_hours", "MOSS-Datei hochladen (Stunden)", "ab der Anforderung durch die Leitung"],
   ["evidence_keep_days", "Nachweise aufbewahren (Tage)", "nach dem Ende der Season; MOSS-Dateien nur bis Verfahrensende plus Einspruchsfrist"],

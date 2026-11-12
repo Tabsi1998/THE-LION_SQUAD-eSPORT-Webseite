@@ -2667,6 +2667,7 @@ und jedes Verfahren **speichert seine berechneten Fristen**; eine geänderte Ein
 | `protest_hours` | int 1–336 | 48 | E.2 | reserviert: Protestfrist ab Bestätigung des Ergebnisses (Nr. 129, 63) |
 | `statement_hours` | int 1–336 | 48 | E.2 | neu: Frist der Gegenseite für die Stellungnahme, ab Benachrichtigung (Nr. 133) |
 | `protest_target_hours` | int 1–720 | 72 | E.2 | neu: Zielfrist der Leitung ab „übernommen“ (Nr. 135); danach Erinnerung und Eskalation, nie eine automatische Entscheidung |
+| `protest_escalate_hours` | int 1–336 | 24 | E.2 | neu (Entscheidung Fabian 12.11.): so lange nach der Zielfrist geht ein offenes Verfahren an `manage` |
 | `appeal_hours` | int 1–336 | 48 | E.2 | reserviert: Einspruchsfrist ab Bekanntgabe der Entscheidung (Nr. 41, 45); E.3 nutzt dasselbe Feld für Strafen |
 | `moss_upload_hours` | int 1–168 | 24 | E.2 | neu: Frist für eine angeforderte MOSS-Datei (§ 9a.3) |
 | `protest_reasons` | `[{key, label, ask_notified}]`, 1–20 | siehe unten | E.2 | neu: Gründe zum Antippen (Nr. 134); `ask_notified` stellt die Pflichtfrage „sofort hingewiesen?“ |
@@ -3017,7 +3018,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   `contested_result_mode` beim Einreichen), `statement.expired_at`, `against.decided_at` und `against.decided_by` (für „einmal je
   Ausgangsentscheidung“ und „eine andere Person“), an `moss_requests[]` `registration_id`, `uploaded_at`, `missing_at`,
   `excused_by`, `excused_at`, `excuse_reason`.
-- **Zeit-Job:** Erinnerung an die zuständige Person bei `target_at`; `ESCALATE_AFTER_HOURS` (24, ruhend in Sperrzeiten) später
+- **Zeit-Job:** Erinnerung an die zuständige Person bei `target_at`; `protest_escalate_hours` (Vorgabe 24, ruhend in Sperrzeiten) später
   Eskalation an `manage`. Ohne Zuständige eskaliert der Fall `protest_target_hours` nach dem Einreichen.
 - **Matchseite, Block `league`:** `procedures[]` (je Rolle gefiltert), `contested`, `procedure_form` (für handelnde Seiten),
   `procedure_viewer`, `moss_candidates` (nur Leitung). In `match.disputes[]` stehen Verfahren für alle außer der nicht befangenen
@@ -3045,7 +3046,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
 
 | Teil | D.5 | E.2 |
 | --- | --- | --- |
-| Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
+| Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `protest_escalate_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
 | Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei; `disputes[].incident_id` setzen, wenn ein Verfahren aus einem Vorfall entsteht, samt Prüfung „Vorfall am selben Spiel“ (422) |
 | Zeit-Job | `answer_deadline` → `in_review` | Erinnerung und Eskalation zur Zielfrist, Ablauf der Stellungnahme |
 | Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“ und bis die Serie festgestellt ist, `pause_series`, Schritt „Serie feststellen“ | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |

@@ -9,7 +9,7 @@ vi.mock("@/lib/api", () => ({ api, formatApiError: (detail) => (typeof detail ==
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const SETTINGS = {
-  protest_hours: 48, statement_hours: 48, protest_target_hours: 72, appeal_hours: 48, moss_upload_hours: 24, evidence_keep_days: 30,
+  protest_hours: 48, statement_hours: 48, protest_target_hours: 72, protest_escalate_hours: 24, appeal_hours: 48, moss_upload_hours: 24, evidence_keep_days: 30,
   contested_result_mode: "counts",
   protest_reasons: [
     { key: "wrong_result", label: "Falsches Ergebnis", ask_notified: false },

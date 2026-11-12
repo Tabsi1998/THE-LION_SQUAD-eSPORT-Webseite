@@ -59,7 +59,7 @@ SCHEDULE.schedule_rules = SCHEDULE.defaults;
 const RULES_VIEW = { current: null, inherited: null, versions: [], draft: { revision: 1, title: "Regelwerk Season 1" }, data_changes: null };
 
 const PROTEST_VALUES = {
-  protest_hours: 48, statement_hours: 48, protest_target_hours: 72, appeal_hours: 48, moss_upload_hours: 24, evidence_keep_days: 30, contested_result_mode: "counts",
+  protest_hours: 48, statement_hours: 48, protest_target_hours: 72, protest_escalate_hours: 24, appeal_hours: 48, moss_upload_hours: 24, evidence_keep_days: 30, contested_result_mode: "counts",
   protest_reasons: [["wrong_result", "Falsches Ergebnis"], ["rule_violation", "Regelverstoß"], ["equipment", "Ausrüstung", true], ["lobby", "Lobby und Einstellungen", true],
     ["player", "Spielberechtigung eines Spielers", true], ["cheating", "Cheat-Verdacht"], ["technical", "Technik"], ["other", "Sonstiges"]]
     .map(([key, label, ask]) => ({ key, label, ask_notified: Boolean(ask) })),
