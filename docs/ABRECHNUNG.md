@@ -214,7 +214,8 @@ Dolibarr noch am eingefrorenen Preis. Sie legt einen Prüffall an und sagt, was 
 | Prüffall | Wann | Was ihr tut |
 | --- | --- | --- |
 | Storniert, Beleg existiert | jemand sagt ab, die Rechnung ist schon da | Entwurf in Dolibarr löschen oder Gutschrift mit Bezug anlegen; bezahltes Geld erstatten |
-| Buchung nach dem Beleg geändert | Begleitpersonen ändern sich nach der Rechnung | in Dolibarr korrigieren (Gutschrift + neuer Beleg oder Nachberechnung); der Fall nennt alt und neu |
+| Buchung nach dem Beleg geändert | Begleitpersonen ändern sich nach der Rechnung; eine stornierte Anmeldung kommt zurück („Anmeldung wieder aktiviert“ durch die Leitung, „Nach Storno selbst neu angemeldet“) | in Dolibarr korrigieren (Gutschrift + neuer Beleg oder Nachberechnung) oder den Beleg stehen lassen; der Fall nennt alt und neu. Ein zweiter Auftrag entsteht nicht; der Fall „Storniert, Beleg existiert“ dazu bleibt offen – gilt der Beleg weiter, mit Grund erledigen („wieder angemeldet“). Ist der Beleg schon voll gutgeschrieben oder aufgegeben, gilt er nicht mehr: kein Prüffall, die Rückkehr bekommt einen neuen Auftrag zum aktuellen Preis |
+| Gutschrift-Entwurf trotz Rückkehr | die Person meldet sich wieder an, während oder nachdem die Website den vorgemerkten Gutschrift-Entwurf angelegt hat | der Beleg gilt weiter: den Gutschrift-Entwurf in Dolibarr löschen, dann Fall mit Grund erledigen. Ein offener Fall „Storniert, Beleg existiert“ zum selben Auftrag erledigt sich dabei von selbst |
 | Überzahlung | mehr bezahlt als verlangt | Differenz erstatten oder als Spende vereinbaren |
 | Zahlung auf stornierte Buchung | Geld kommt für eine abgesagte Anmeldung | nicht reaktivieren – erstatten oder klären |
 | Betrag weicht ab | der Beleg in Dolibarr lautet auf einen anderen Betrag als der eingefrorene Preis | Beleg prüfen; wenn richtig, Fall mit Grund erledigen |
@@ -239,6 +240,19 @@ der Abgleich den Fall von selbst. Die Website gibt **nie** eine Gutschrift frei.
 - Gibt es in Dolibarr schon eine Gutschrift zum Beleg, wird sie übernommen, keine zweite angelegt.
 - Scheitert das Anlegen, steht der Grund am Fall; nach drei Versuchen legt ihr ihn von Hand an.
 - Haken aus: wie bisher, vorgemerkte und noch nicht angelegte Entwürfe fallen weg.
+- Kommt die Person zurück, bevor der Entwurf angelegt ist (#2184: selbst neu angemeldet oder von der Leitung wieder aktiviert),
+  fällt die Vormerkung weg: Die Buchung gilt am Auftrag wieder als gebucht, eine Zahlung ist dann keine „Zahlung auf stornierte
+  Buchung“, und die Summen zählen sie wieder. Wird der Beleg (noch Entwurf) danach in Dolibarr gelöscht, wartet der Auftrag auf
+  **Freigeben** oder **Keine neue Rechnung**, statt mit dem Storno zu enden. Der Verlauf des Auftrags zeigt jeden Storno und jede
+  Rückkehr („Buchung wieder aufgenommen“) mit Grund.
+- Liegt der Gutschrift-Entwurf der Website schon in Dolibarr (oder entsteht er gerade, während die Person zurückkommt), bleibt er
+  am Auftrag vermerkt, und es öffnet sich der Prüffall **Gutschrift-Entwurf trotz Rückkehr**: Der Beleg gilt weiter, löscht den
+  Entwurf in Dolibarr.
+- Weil der Auftrag diesen Entwurf weiter vermerkt, merkt die Website bei einem **erneuten Storno** keine neue Gutschrift vor. Habt
+  ihr den Entwurf gelöscht, legt bei einem erneuten Storno die Gutschrift von Hand an (der Fall „Storniert, Beleg existiert“ sagt es).
+- Ein Auftrag schreibt seinen Beleg nur an die Anmeldung, solange sie seinen eingefrorenen Preis trägt; nach einer Rückkehr mit neuem
+  Auftrag bleibt ein alter, gutgeschriebener Beleg so beim alten Auftrag. Altaufträge ohne Preis-Kennung (von vor #1184) gleicht der
+  Abgleich weiter nur über die Anmeldung ab.
 
 **Gutschrift ≠ Erstattung.** Die Gutschrift gleicht den Beleg in Dolibarr aus. Erstattet ist erst,
 was tatsächlich zurücküberwiesen (oder bar zurückgegeben) wurde – das haltet ihr im Detail des
