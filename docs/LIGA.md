@@ -3051,6 +3051,11 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   Aktionen, die das ganze Spiel zurückgeben (Melden und Bestätigen, Ergebnis, „Rückgängig“, Wertung kampflos, Check-in, Start,
   Veto, Verschiebung, „beide nicht erschienen“), laufen durch `league_procedures.guard` - er sucht in der Antwort nach Spielen mit
   Verfahren und kürzt sie für alle außer der nicht befangenen Leitung (`tests/test_league_procedures_leak_flow.py`).
+  **Strukturell abgesichert:** Zusätzlich läuft jede JSON-Antwort unter `/api/` durch die Middleware `procedure_guard`
+  (`services/procedure_response_guard.py`): ohne `"disputes"` im Inhalt unverändert (ein Byte-Vergleich), sonst durch denselben
+  Wächter, mit der Person der Anfrage. Neue Routen sind damit ohne eigenen Aufruf abgedeckt. Der Wächter sucht in jeder Tiefe; ein
+  Knoten mit Verfahren, der sich keinem Spiel zuordnen lässt (weder `id` noch `match_id` noch Turnier und Seiten), wird im Zweifel
+  für alle gekürzt.
 - **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
   Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
 - **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
