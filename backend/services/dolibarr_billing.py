@@ -36,7 +36,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
-from services.billing_amounts import invoice_fields, paid_cents
+from services.billing_amounts import invoice_fields, own_registration, paid_cents
 from services.billing_facts import booking_facts, source_label
 from services.discord_plain_text import _without_tags
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, write_capable
@@ -526,7 +526,7 @@ async def _mark_invoiced(db, order: dict, state: dict, *, payments: list[dict] |
         "$inc": {"money_rev": 1}})
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": invoice_fields(state)})
+        await collection.update_one(own_registration(order), {"$set": invoice_fields(state)})
 
 
 async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: dict) -> dict:
@@ -687,7 +687,7 @@ async def _remove_draft(db, order: dict) -> bool:
         return False
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
+        await collection.update_one(own_registration(order), {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
                                                                        "$unset": {"invoice_id": "", "invoice_ref": "", "invoice_status": "", "payment_state": ""}})
     for kind in DRAFT_CASES:
         await billing_cases.auto_resolve(db, order["id"], kind, f"Der Entwurf {ref} ist in Dolibarr gelöscht.")

@@ -39,7 +39,7 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from models import new_id, now_utc
-from services.billing_amounts import credited_cents, invoice_fields, paid_cents, refunded_cents, waived_cents
+from services.billing_amounts import credited_cents, invoice_fields, own_registration, paid_cents, refunded_cents, waived_cents
 
 logger = logging.getLogger("tls.billing")
 
@@ -266,7 +266,7 @@ async def dismiss_removed(db, order: dict, actor_id: str) -> bool:
         return False
     collection ={"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled"}})
+        await collection.update_one(own_registration(order), {"$set": {"billing_status": "cancelled"}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.dismiss", "target_id": order["id"], "actor_id": actor_id,
                                     "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")}, "created_at": now})
     return True

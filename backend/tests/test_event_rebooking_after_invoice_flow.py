@@ -500,6 +500,43 @@ async def test_voll_gutgeschriebener_oder_aufgegebener_beleg_zaehlt_nicht_mehr(f
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("by_lead", [False, True])
+async def test_tagesabgleich_spiegelt_den_alten_beleg_nicht_zurueck(flow, fake, by_lead):
+    """Nach der Rückkehr mit neuem Auftrag liest der Tagesabgleich den alten, voll gutgeschriebenen Beleg wieder. Er gehört nicht
+    mehr zur Anmeldung: Sie behält den neuen Preis ohne alten Beleg, und eine spätere Änderung trifft den neuen Auftrag."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    if by_lead:
+        flow.act_as(kassier)
+        gone = await flow.patch(url, json={"status": "cancelled"})
+        assert gone.status_code == 200, gone.text
+    else:
+        await cancel_self(flow, event, paula)
+    fake.credit(order["invoice_id"], 40)
+    await billing_orders.sync_due()
+    if by_lead:
+        flow.act_as(kassier)
+        back = await flow.patch(url, json={"status": "registered"})
+        assert back.status_code == 200, back.text
+    else:
+        await book(flow, paula, event, companions=0)
+    before = await registration(flow, booked)
+
+    await flow.db.billing_orders.update_one({"id": order["id"]}, {"$set": {"synced_at": "2000-01-01T00:00:00+00:00"}})
+    looked = await billing_orders.sync_due()
+    assert looked["looked"] >= 1, "der alte Beleg wird wirklich wieder gelesen"
+    reg = await registration(flow, booked)
+    assert reg["billing_status"] == "pending" and not reg.get("invoice_id") and not reg.get("payment_state")
+    assert reg["price_snapshot"]["hash"] == before["price_snapshot"]["hash"]
+
+    flow.act_as(kassier)
+    changed = await flow.patch(url, json={"companion_count": 2})
+    assert changed.status_code == 200, changed.text
+    assert "changed_after_invoice" not in await open_cases(flow, order), "der alte Auftrag bekommt keinen Prüffall"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("by_lead", [False, True])
 @pytest.mark.parametrize("meanwhile", ["credited", "abandoned", "removed"])
 async def test_abgleich_zwischen_auswahl_und_rueckbuchung_ergibt_neuen_auftrag(flow, fake, monkeypatch, meanwhile, by_lead):
     """Die Rückkehr hat den Beleg als gültig gelesen, da liest der Abgleich eine volle Gutschrift, ein Aufgeben oder einen

@@ -28,6 +28,14 @@ def invoice_fields(source: dict) -> dict:
             "invoice_status": source.get("invoice_status"), "payment_state": source.get("payment_state")}
 
 
+def own_registration(order: dict) -> dict:
+    """Filter auf die Anmeldung, zu der dieser Auftrag gerade gehört (#2184): derselbe eingefrorene Preis. Nach einer Rückkehr mit
+    neuem Auftrag gehört ein alter (etwa voll gutgeschriebener) Beleg nicht mehr dazu - der Abgleich spiegelt ihn dann nicht
+    zurück. Aufträge ohne Preis-Kennung (Altdaten) gehören wie bisher zur Anmeldung."""
+    digest = (order.get("snapshot") or {}).get("hash")
+    return {"id": order["registration_id"], **({"price_snapshot.hash": digest} if digest else {})}
+
+
 def waived_cents(order: dict) -> int:
     """Was bei „Bezahlt (mit Abzug)“ erlassen wurde (#2226): der Rest, den Dolibarr stehen lässt. Kein Geld und keine Gutschrift -
     zählt nie zu ``paid_cents`` und damit nie zum Erstattungslimit."""
