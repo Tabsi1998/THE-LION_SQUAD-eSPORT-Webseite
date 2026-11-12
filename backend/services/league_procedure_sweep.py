@@ -3,8 +3,9 @@
 Er erinnert und eskaliert, **er entscheidet nie**:
 
 - **Zielfrist** (Nr. 135): Ist ``target_at`` erreicht, bekommt die zuständige Person eine Erinnerung (``reminded_at``). Bleibt das
-  Verfahren ``protest_escalate_hours`` Stunden länger offen (Season-Feld, Vorgabe 24), geht es an die Leitung mit „manage“ (``escalated_at``). Hat nach
-  ``protest_target_hours`` noch niemand übernommen, geht es ebenfalls an „manage“.
+  Verfahren bis ``escalate_at`` offen (Zielfrist plus ``protest_escalate_hours``, gespeichert beim „Übernehmen“), geht es an die
+  Leitung mit „manage“ (``escalated_at``). Hat nach ``protest_target_hours`` noch niemand übernommen, ebenfalls. Jede Eskalation hat
+  ihren eigenen Schlüssel - nach einer neuen Übernahme wird eine zweite zugestellt.
 - **Stellungnahme**: Läuft ``statement.due_at`` ohne Text ab, erfährt es die Leitung (``statement.expired_at``).
 - **MOSS**: Fehlt eine angeforderte Datei nach ``due_at``, steht die Anforderung auf ``missing`` und die Leitung bekommt einen Hinweis.
 
@@ -30,19 +31,18 @@ async def _step(db, match: dict, league, row: dict, now: datetime) -> tuple[dict
     row = dict(row)
     todo: list = []
     assignee, target = row.get("assignee"), parse(row.get("target_at"))
-    if assignee and target and now >= target:
-        if not row.get("reminded_at"):
-            row["reminded_at"] = now.isoformat()
-            todo.append((notify.target_reached, ()))
-        late = procedures.response_deadline(league.tournament, target, league.settings["protest_escalate_hours"])
-        if not row.get("escalated_at") and late and now >= late:
-            row["escalated_at"] = now.isoformat()
-            todo.append((notify.escalated, ()))
-    elif not assignee and not row.get("escalated_at"):
-        waited = procedures.response_deadline(league.tournament, row.get("at"), league.settings["protest_target_hours"])
-        if waited and now >= waited:
-            row["escalated_at"] = now.isoformat()
-            todo.append((notify.escalated, ()))
+    if assignee and target and now >= target and not row.get("reminded_at"):
+        row["reminded_at"] = now.isoformat()
+        todo.append((notify.target_reached, ()))
+    # Die Eskalationsfrist steht am Verfahren (``escalate_at``, gesetzt beim Einreichen und bei jedem „Übernehmen“). Nur Einträge
+    # von vor dieser Regel rechnen sie noch aus der Einstellung.
+    escalate = parse(row.get("escalate_at"))
+    if escalate is None:
+        escalate = (procedures.response_deadline(league.tournament, target, league.settings["protest_escalate_hours"]) if assignee and target
+                    else procedures.response_deadline(league.tournament, row.get("at"), league.settings["protest_target_hours"]))
+    if not row.get("escalated_at") and escalate and now >= escalate:
+        row["escalated_at"] = now.isoformat()
+        todo.append((notify.escalated, ()))
     slot = row.get("statement") or {}
     due = parse(slot.get("due_at"))
     if slot.get("registration_id") and due and now > due and not slot.get("text") and not slot.get("expired_at"):

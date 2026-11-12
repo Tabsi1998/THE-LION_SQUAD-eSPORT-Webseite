@@ -182,7 +182,7 @@ async def escalated(db, match: dict, league, row: dict) -> int:
     _, frame = await _frame(db, match, league)
     why = "ist über der Zielfrist" if row.get("assignee") else "hat noch niemand übernommen"
     return await _send(await lead_ids(db, match, league, "manage"), f"{_word(row)} wartet",
-                       f"{frame}: Den {_word(row)} {why}. Bitte klären, wer entscheidet.", match, row, "escalated",
+                       f"{frame}: Den {_word(row)} {why}. Bitte klären, wer entscheidet.", match, row, f"escalated:{row.get('escalated_at')}",
                        kind="match_attention", reason="procedure_escalated", category="tournament_updates")
 
 

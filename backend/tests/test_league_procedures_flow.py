@@ -684,16 +684,19 @@ async def test_the_sweep_reminds_and_escalates_but_never_decides(flow):
     told = await flow.db.notifications.find_one({"user_id": manager["id"], "meta.reason": "procedure_escalated"}, {"_id": 0})
     assert told and "übernommen" in told["body"] and REASON not in told["body"]
 
+    # Eskalation je Season einstellbar (``protest_escalate_hours``, Vorgabe 24): hier sechs Stunden nach der Zielfrist. Die Frist
+    # wird beim Übernehmen am Verfahren gespeichert (``escalate_at``).
+    await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"protest_escalate_hours": 6}})
     flow.act_as(w["staff"])
     assert (await act(flow, w, pid, "assign")).status_code == 200
     taken = now_utc()
+    saved = (await stored(flow, w))["disputes"][0]
+    assert timedelta(hours=77) < parse(saved["escalate_at"]) - taken < timedelta(hours=79) and saved["escalated_at"] is None
     assert (await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=71)))["reminded"] == 0
     counts = await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=73))
     assert counts["reminded"] == 1 and counts["escalated"] == 0 and counts["statement_expired"] == 0
     reminder = await flow.db.notifications.find_one({"user_id": w["staff"]["id"], "meta.reason": "procedure_target"}, {"_id": 0})
     assert reminder and reminder["kind"] == "match_attention"
-    # Eskalation je Season einstellbar (``protest_escalate_hours``, Vorgabe 24): hier sechs Stunden nach der Zielfrist.
-    await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"protest_escalate_hours": 6}})
     assert (await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=77)))["escalated"] == 0
     counts = await league_procedure_sweep.sweep(flow.db, now=taken + timedelta(hours=79))
     assert counts["reminded"] == 0 and counts["escalated"] == 1 and counts["statement_expired"] == 0

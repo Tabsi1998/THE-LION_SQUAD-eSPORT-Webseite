@@ -300,6 +300,8 @@ async def submit(db, match: dict, league: League, *, user: dict, registration_id
         "claimed": claim, "notified_immediately": notified_immediately if spec.get("ask_notified") else None,
         "evidence_until": _iso(evidence_until), "statement": _statement_slot(match, league, registration_id, now),
         "moss_requests": [], "assignee": None, "incident_id": incident, "additions": [],
+        # Ohne Zuständige geht der Fall nach der Zielfrist an „manage“ - die Frist steht am Verfahren, nicht in der Einstellung.
+        "escalate_at": _iso(_hours(league, now, league.settings["protest_target_hours"])),
         **({"contested_mode": mode} if mode else {}), **({"photo_id": photo["id"]} if photo else {}),
     }
     change: dict = {"updated_at": now.isoformat()}
@@ -350,6 +352,7 @@ async def submit_appeal(db, match: dict, league: League, *, user: dict, registra
         "reason_key": "other", "category": "other", "reason": text, "claimed": None, "notified_immediately": None,
         "evidence_until": _iso(until), "statement": _statement_slot(match, league, registration_id, now),
         "moss_requests": [], "assignee": None, "incident_id": None, "additions": [],
+        "escalate_at": _iso(_hours(league, now, league.settings["protest_target_hours"])),
         "against": {"type": against_type, "ref_id": ref_id, "decided_at": decided_iso, "decided_by": decider},
     }
     await db.matches_v2.update_one({"id": match["id"]}, {
@@ -459,6 +462,8 @@ async def assign(db, match: dict, league: League, procedure_id: str, *, user: di
     row["assignee"] = {"user_id": user["id"], "at": now.isoformat()}
     row["target_at"] = _iso(_hours(league, now, league.settings["protest_target_hours"]))
     row["reminded_at"] = row["escalated_at"] = None
+    # Gespeichert wie jede Frist: ``protest_escalate_hours`` nach der Zielfrist, ruhend in Sperrzeiten.
+    row["escalate_at"] = _iso(_hours(league, refs.parse(row["target_at"]), league.settings["protest_escalate_hours"]))
     updated = await _save_row(db, match, row)
     await audit(db, "match.procedure.assign", match, user["id"], row, taken_over=bool(before and before != user["id"]))
     from services import league_procedure_notify as notify
