@@ -1,8 +1,16 @@
-import { canShareFiles, copyResultLink, loadResultImage, prefersShareSheet, resultFileName, resultShareUrl, shareResultImage } from "./resultShare";
+import { canShareFiles, clarificationNote, copyResultLink, loadResultImage, prefersShareSheet, resultFileName, resultShareUrl, shareResultImage } from "./resultShare";
 
 // Ergebnis teilen (#1194): Handy teilt das Bild ins Teilen-Menü, PC lädt herunter oder kopiert den Link.
 
 describe("resultShare", () => {
+  it("nennt ein angefochtenes Ergebnis „in Klärung“ wie Ligaseite und Teilen-Bild (#2363)", () => {
+    expect(clarificationNote({ kind: "duel", result: "2:1" })).toBe("");
+    expect(clarificationNote({ kind: "duel", result: "2:1", contested: true })).toBe("in Klärung");
+    expect(clarificationNote({ kind: "table", result: "2 Siege", contested: 1 })).toBe("1 Spiel in Klärung");
+    expect(clarificationNote({ kind: "table", result: "2 Siege", contested: 3 })).toBe("3 Spiele in Klärung");
+    expect(clarificationNote(null)).toBe("");
+  });
+
   it("baut Adresse und Dateinamen aus dem Pfad der Teilen-Seite", () => {
     expect(resultShareUrl("/tournaments/fc26-cup/ergebnis/neonfalke", "https://verein.example")).toBe("https://verein.example/tournaments/fc26-cup/ergebnis/neonfalke");
     expect(resultFileName("/tournaments/fc26-cup/ergebnis/neonfalke")).toBe("ergebnis-fc26-cup-neonfalke-story.png");
