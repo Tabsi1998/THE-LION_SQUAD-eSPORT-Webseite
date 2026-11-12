@@ -473,7 +473,8 @@ async def revoke(db, doc: dict, reason, actor_id: str | None, *, via: str = "rev
                  {"revoked_at": now_utc().isoformat(), "revoked_by": actor_id, "revoke_reason": reason, "revoked_via": via}, ALREADY_REVOKED)
     try:
         await undo_effect(db, doc, actor_id)
-    except SanctionProblem:
+    except Exception:
+        # Auch bei einem unerwarteten Fehler: Die Strafe gilt weiter, ein zweiter Versuch bleibt möglich.
         await _save(db, doc, {"revoked_at": None, "revoked_by": None, "revoke_reason": None, "revoked_via": None})
         raise
     # Ein offener Einspruch ist damit erledigt (auch einer, der gerade erst eingegangen ist): Es gibt nichts mehr zu entscheiden.
@@ -539,13 +540,31 @@ async def decide_appeal(db, doc: dict, actor: dict, decision: str, note) -> dict
     if decision == GRANTED:
         try:
             await revoke(db, doc, note, actor.get("id"), via="appeal")
-        except SanctionProblem:
-            # Die Wirkung ließ sich nicht zurücknehmen: Der Einspruch ist wieder offen, entschieden ist nichts.
-            await _save(db, doc, {"appeal": {**appeal, "state": OPEN, "decided_by": None, "decided_at": None, "note": None}})
+        except Exception:
+            await _reopen_or_moot(db, doc, appeal)
             raise
     await sync_proof_hold(db, doc)
     await audit(db, "appeal.decide", doc, actor.get("id"), decision=decision, note_length=len(note))
     return doc
+
+
+async def _reopen_or_moot(db, doc: dict, appeal: dict) -> None:
+    """„Aufgehoben“ ließ sich nicht umsetzen. Gilt die Strafe noch, ist der Einspruch wieder offen und entschieden ist nichts.
+    Hat jemand anderes die Strafe inzwischen widerrufen, ist der Einspruch erledigt - sonst bliebe er für immer offen und hielte
+    die Nachweise fest."""
+    now = now_utc().isoformat()
+    reopened = await db.competition_sanctions.update_one(
+        {"id": doc["id"], "revoked_at": None},
+        {"$set": {"appeal": {**appeal, "state": OPEN, "decided_by": None, "decided_at": None, "note": None}, "updated_at": now}})
+    fresh = await db.competition_sanctions.find_one({"id": doc["id"]}, {"_id": 0}) or doc
+    if not reopened.modified_count:
+        moot = {"appeal.state": MOOT, "appeal.decided_by": None, "appeal.decided_at": fresh.get("revoked_at") or now,
+                "appeal.note": MOOT_NOTE, "updated_at": now}
+        await db.competition_sanctions.update_one({"id": doc["id"]}, {"$set": _closing(fresh, moot)})
+        fresh = await db.competition_sanctions.find_one({"id": doc["id"]}, {"_id": 0}) or fresh
+    doc.clear()
+    doc.update(fresh)
+    await sync_proof_hold(db, doc)
 
 
 # ---------------------------------------------------------------- Kontolöschung

@@ -779,3 +779,51 @@ async def test_many_bans_are_not_cut_off_silently(flow):
     assert (await ban(flow, world, "Mila", ends_at=at(days=3))).status_code == 200
     found = await league_sanction_bans.bans(flow.db, "liga", world["season_id"], [uid(world, "Mila")])
     assert uid(world, "Mila") in found.users and len(found.squads) == 2100
+
+
+@pytest.mark.asyncio
+async def test_a_parallel_revoke_during_granting_closes_the_appeal_instead_of_reopening_it(flow, monkeypatch):
+    """Review R2, Fund 2: „Aufgehoben“ beansprucht den Einspruch, dann widerruft jemand anderes die Strafe. Der eigene Widerruf
+    scheitert - der Einspruch darf dann nicht wieder offen stehen (sonst hielte er die Nachweise für immer)."""
+    world = await sanction_world(flow)
+    sanction = (await ban(flow, world, matches=2)).json()
+    filed = await appeal(flow, world, sanction["id"], "Mila")
+    assert filed.status_code == 200, filed.text
+    stale = await stored(flow, sanction["id"])
+    deciding = await stored(flow, sanction["id"])
+    original = league_sanctions._claim
+    calls = {"n": 0}
+
+    async def claim_then_parallel_revoke(db, doc, condition, fields, detail):
+        result = await original(db, doc, condition, fields, detail)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            monkeypatch.setattr(league_sanctions, "_claim", original)
+            await league_sanctions.revoke(db, dict(stale), "Irrtum der Leitung, parallel.", world["lead"]["id"])
+        return result
+
+    monkeypatch.setattr(league_sanctions, "_claim", claim_then_parallel_revoke)
+    status = await refused(league_sanctions.decide_appeal(flow.db, deciding, world["second"], "granted", "Verwechslung belegt."))
+    assert status == 409
+    final = await stored(flow, sanction["id"])
+    assert final["revoked_at"] and final["revoked_via"] == "revoke"
+    assert final["appeal"]["state"] == league_sanctions.MOOT
+    assert await league_sanction_bans.hold_until(flow.db, final) != league_sanction_bans.OPEN_END
+
+
+@pytest.mark.asyncio
+async def test_an_unexpected_error_while_undoing_keeps_the_sanction_and_allows_a_retry(flow, monkeypatch):
+    """Review R2, Fund 3: Scheitert das Zurücknehmen der Wirkung mit einem unerwarteten Fehler, gilt die Strafe weiter."""
+    world = await sanction_world(flow)
+    sanction = (await ban(flow, world, matches=2)).json()
+
+    async def broken_undo(db, doc, actor_id):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(league_sanctions, "undo_effect", broken_undo)
+    with pytest.raises(RuntimeError):
+        await league_sanctions.revoke(flow.db, await stored(flow, sanction["id"]), "Irrtum der Leitung belegt.", world["lead"]["id"])
+    assert not (await stored(flow, sanction["id"])).get("revoked_at")
+    monkeypatch.undo()
+    retried = await league_sanctions.revoke(flow.db, await stored(flow, sanction["id"]), "Irrtum der Leitung belegt.", world["lead"]["id"])
+    assert retried["revoked_at"]
