@@ -649,7 +649,7 @@ async def _review_cases(db, order: dict, state: dict, payments: list[dict] | Non
 INVOICE_FIELDS = ("invoice_id", "invoice_ref", "invoice_status", "invoice_type", "paid", "paid_at", "remaining", "total", "remote_total_cents", "remaining_cents",
                   "due_on", "credit_notes", "payment_state", "payments", "close_code", "close_note", "invoiced_at", "synced_at",
                   "sync_error", "sync_error_text", "sync_error_at", "pdf_built_at", "pdf_source", "pdf_missing", "pdf_error", "pdf_error_text", "pdf_error_at", "pdf_attempts",
-                  "invoice_notice_due_at", "credit_note_due_at", "credit_note_claim_at")
+                  "invoice_notice_due_at", "credit_note_due_at", "credit_note_claim_at", "credit_note_returned_at")
 # Prüffälle, die am Beleg hängen - mit dem gelöschten Entwurf sind sie gegenstandslos. „Buchung nach dem Beleg geändert“ bleibt:
 # Der eingefrorene Preis passt dann nicht mehr, das entscheidet die Finanzverwaltung.
 DRAFT_CASES = ("invoice_gone", "amount_mismatch", "recipient_mismatch", "cancelled_after_invoice")
@@ -830,7 +830,8 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
 
     async def finish(fields: dict) -> None:
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {**fields, "updated_at": now_utc().isoformat()},
-                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": ""}})
+                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": "",
+                                                                            "credit_note_returned_at": ""}})
 
     try:
         invoice = await client.invoice(int(order["invoice_id"]))
@@ -877,7 +878,8 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
         return "created"
     except DolibarrError as exc:
         attempts = int(order.get("credit_note_attempts") or 0) + 1
-        update: dict = {"$set": {"credit_note_error": exc.text, "credit_note_attempts": attempts}, "$unset": {"credit_note_claim_at": ""}}
+        update: dict = {"$set": {"credit_note_error": exc.text, "credit_note_attempts": attempts},
+                        "$unset": {"credit_note_claim_at": "", "credit_note_returned_at": ""}}
         if attempts >= CREDIT_MAX_ATTEMPTS:
             update["$unset"]["credit_note_due_at"] = ""
         await db.billing_orders.update_one({"id": order["id"]}, update)

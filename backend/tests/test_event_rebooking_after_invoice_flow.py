@@ -474,6 +474,29 @@ async def test_neuanmeldung_mitten_im_entfernen_des_entwurfs_behaelt_ihren_auftr
     assert fresh and reg["price_snapshot"]["hash"] == fresh["snapshot"]["hash"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dolibarr_fails", [False, True])
+async def test_merker_der_rueckkehr_bleibt_nach_dem_gutschrift_lauf_nicht_liegen(flow, fake, monkeypatch, dolibarr_fails):
+    """Die Rückkehr kommt, während der Lauf Dolibarr fragt (Merker gesetzt). Ob er danach nichts anlegt oder an Dolibarr scheitert:
+    Der Merker ist danach weg - sonst stünde er bei einem späteren Lauf noch da."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    original = dolibarr_client.DolibarrClient.credit_notes_of
+
+    async def back_meanwhile(self, invoice_id):
+        await book(flow, paula, event, companions=0)
+        assert (await order_of(flow, booked)).get("credit_note_returned_at"), "die Rückkehr hat den laufenden Lauf vermerkt"
+        if dolibarr_fails:
+            raise dolibarr_client.DolibarrError("unavailable", 503, None)
+        return await original(self, invoice_id)
+
+    monkeypatch.setattr(dolibarr_client.DolibarrClient, "credit_notes_of", back_meanwhile)
+    settings = await dolibarr_client.load_settings(flow.db)
+    result = await dolibarr_billing.draft_credit_note(flow.db, settings, dolibarr_client.DolibarrClient(settings), order)
+    assert result == ("failed" if dolibarr_fails else "skipped")
+    stored = await order_of(flow, booked)
+    assert "credit_note_returned_at" not in stored and "credit_note_claim_at" not in stored and "credit_note_id" not in stored
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)
