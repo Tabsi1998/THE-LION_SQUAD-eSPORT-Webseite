@@ -170,7 +170,7 @@ async def test_the_audience_follows_the_visibility(flow):
         await flow.db.tournaments.update_one({"id": tid}, {"$set": {"visibility": visibility}})
     await flow.db.f1_challenges.insert_one({"id": "c-mitglieder", "slug": "c-mitglieder", "title": "Hotlap", "status": "registration_open",
                                             "site_banner_enabled": True, "visibility": "members"})
-    await flow.db.game_servers.insert_one({"id": "srv-intern", "name": "Testserver", "status": "maintenance", "site_banner_enabled": True,
+    await flow.db.game_servers.insert_one({"id": "srv-intern", "slug": "srv-intern", "name": "Testserver", "status": "maintenance", "site_banner_enabled": True,
                                            "is_active": True, "visibility": "internal", "sort_order": 1})
     member_ids = {"auto-tournament-registration-t-mitglieder", "auto-fastlap-registration-c-mitglieder"}
     community_id = "auto-tournament-registration-t-community"
@@ -193,12 +193,12 @@ async def test_internal_entries_do_not_crowd_out_public_ones(flow):
     """Nur drei Server kommen in Frage: interne in Wartung belegen keinen Platz (#2352). Fehlende Sichtbarkeit gilt als
     öffentlich. Die Test-Mongo schneidet bei ``to_list`` wie Motor ab (#2357, ``mongomock_to_list``)."""
     for number in range(3):
-        await flow.db.game_servers.insert_one({"id": f"srv-intern-{number}", "name": f"Intern {number}", "status": "maintenance",
+        await flow.db.game_servers.insert_one({"id": f"srv-intern-{number}", "slug": f"srv-intern-{number}", "name": f"Intern {number}", "status": "maintenance",
                                                "site_banner_enabled": True, "is_active": True, "visibility": "internal",
                                                "sort_order": number})
-    await flow.db.game_servers.insert_one({"id": "srv-offen", "name": "Offen", "status": "maintenance", "site_banner_enabled": True,
+    await flow.db.game_servers.insert_one({"id": "srv-offen", "slug": "srv-offen", "name": "Offen", "status": "maintenance", "site_banner_enabled": True,
                                            "is_active": True, "visibility": "public", "sort_order": 10})
-    await flow.db.game_servers.insert_one({"id": "srv-alt", "name": "Alt", "status": "maintenance", "site_banner_enabled": True,
+    await flow.db.game_servers.insert_one({"id": "srv-alt", "slug": "srv-alt", "name": "Alt", "status": "maintenance", "site_banner_enabled": True,
                                            "is_active": True, "sort_order": 11})
     shown = await shown_ids(flow, None)
     assert {"auto-server-maintenance-srv-offen", "auto-server-maintenance-srv-alt"} <= shown

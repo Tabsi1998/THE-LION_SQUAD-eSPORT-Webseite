@@ -156,7 +156,7 @@ async def test_the_migration_removes_duplicate_tournament_points_once(flow):
     from scripts import season_points_duplicates
     from services import migrations, season_points_cleanup
 
-    await flow.db.tournaments.insert_one({"id": "t-1", "title": "Cup", "season_weight": 3.0})
+    await flow.db.tournaments.insert_one({"id": "t-1", "slug": "t-1", "title": "Cup", "season_weight": 3.0})
     base = {"season_id": "s-1", "source_id": "t-1", "team_id": None}
     await flow.db.season_points.insert_many([
         {**base, "id": "p-mini", "user_id": "anna", "source_type": "mini", "rank": 1, "total_points": 75.0, "created_at": "2026-09-01"},
@@ -205,10 +205,10 @@ async def test_duplicates_over_two_seasons_or_in_a_closed_one_are_only_reported(
     from services import season_points_cleanup
 
     await flow.db.seasons.insert_many([
-        {"id": "s-a", "name": "Saison A", "status": "completed"},
-        {"id": "s-b", "name": "Saison B", "status": "active"},
+        {"id": "s-a", "slug": "s-a", "name": "Saison A", "status": "completed"},
+        {"id": "s-b", "slug": "s-b", "name": "Saison B", "status": "active"},
     ])
-    await flow.db.tournaments.insert_many([{"id": "t-1", "season_weight": 3.0}, {"id": "t-2", "season_weight": 2.0}])
+    await flow.db.tournaments.insert_many([{"id": "t-1", "slug": "t-1", "season_weight": 3.0}, {"id": "t-2", "slug": "t-2", "season_weight": 2.0}])
     await flow.db.season_points.insert_many([
         # über zwei Saisons
         {"id": "a-1", "season_id": "s-a", "source_id": "t-1", "user_id": "anna", "team_id": None, "source_type": "mini",
@@ -398,8 +398,8 @@ async def test_with_two_active_seasons_points_keep_going_where_they_went_before(
     from services import season_service
 
     await flow.db.seasons.insert_many([
-        {"id": "alt", "status": "active", "start_date": "2025-01-01"},
-        {"id": "neu", "status": "active", "start_date": "2026-01-01"},
+        {"id": "alt", "slug": "alt", "status": "active", "start_date": "2025-01-01"},
+        {"id": "neu", "slug": "neu", "status": "active", "start_date": "2026-01-01"},
     ])
     entry = await season_service.award_points(user_id="anna", source_type="event", source_id="e-1", rank=None)
     assert entry["season_id"] == "alt"

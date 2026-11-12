@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, new_id, now_utc
 from services.tournament_visibility import public_tournament
 from services.usernames import profile_path
 
@@ -53,7 +53,7 @@ async def participant_streams(db, tournament: dict) -> list[dict]:
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"], "status": {"$nin": ["cancelled", "rejected", "withdrawn", "disqualified", "no_show"]}},
         {"_id": 0, "user_id": 1, "team_id": 1},
-    ).to_list(2000)
+    ).to_list(REGISTRATION_LIMIT)
     participants = await _participant_user_ids(db, registrations)
     if not participants:
         return []

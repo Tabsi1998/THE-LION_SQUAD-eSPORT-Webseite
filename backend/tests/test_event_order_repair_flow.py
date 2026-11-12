@@ -2,6 +2,7 @@
 Bricht der Auftrag danach ab, holt die Wiederholung derselben Anmeldung ihn nach - genau einmal, auch bei gleichzeitigen
 Wiederholungen. Gegenproben: ohne Lücke, auf der Warteliste, kostenlos oder schon abgerechnet entsteht nichts."""
 import asyncio
+import contextlib
 import pathlib
 import sys
 from datetime import timedelta
@@ -219,6 +220,11 @@ async def test_switching_billing_off_after_the_gap_still_repairs_the_frozen_pric
     assert len(await orders(flow, paula)) == 1
 
 
+@contextlib.asynccontextmanager
+async def _no_lock(*_args, **_kwargs):
+    yield
+
+
 class _LoserWaits:
     """Die erste Anfrage am Schreiben wartet, bis die andere ganz fertig ist - so verliert genau sie das Rennen am
     eindeutigen Index, nachdem sie die Link-Nutzung belegt hat."""
@@ -254,6 +260,9 @@ async def test_simultaneous_registration_with_access_link_keeps_one_use_and_repa
     _token, link = await access_link(flow, "event", event["id"], max_uses=1)
     paula = await person(flow, "paula")
     fail_once(monkeypatch)
+    # Geprüft wird die Absicherung am eindeutigen Index, falls die Platzsperre einmal nicht trennt (abgelaufene Frist):
+    # Auf echtem MongoDB wartete die zweite Anfrage sonst an der Sperre auf die erste, die hier auf sie wartet (#2216).
+    monkeypatch.setattr(event_registration, "mutation_lock", _no_lock)
     go = asyncio.Event()
     racing = _RacingDb(flow.db)
     racing.event_registrations = _LoserWaits(flow.db.event_registrations, go)

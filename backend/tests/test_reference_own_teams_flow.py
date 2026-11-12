@@ -167,9 +167,9 @@ async def test_team_league_place_and_path_use_the_best_own_team(flow):
 async def test_the_migration_takes_the_old_team_over_once(flow):
     base = {"lineage_id": "spur", "status": "active"}
     await flow.db.reference_series.insert_many([
-        {**base, "id": "alt", "team_name": " Probe Löwen "},
-        {**base, "id": "liste", "team_name": "Probe Löwen", "own_teams": [{"name": "Probe X", "aliases": []}]},
-        {**base, "id": "ohne", "team_name": None},
+        {**base, "id": "alt", "season_slug": "alt", "team_name": " Probe Löwen "},
+        {**base, "id": "liste", "season_slug": "liste", "team_name": "Probe Löwen", "own_teams": [{"name": "Probe X", "aliases": []}]},
+        {**base, "id": "ohne", "season_slug": "ohne", "team_name": None},
     ])
     assert await migrations.migrate_series_own_teams(flow.db) == "1 series own teams taken over"
     stored = {item["id"]: item async for item in flow.db.reference_series.find({}, {"_id": 0})}

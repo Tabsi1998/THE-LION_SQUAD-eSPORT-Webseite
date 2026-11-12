@@ -25,7 +25,7 @@ from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.change_events import reset_scope_cache
 from services.permissions import areas_for, can_use_area, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
-from models import (EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationSelfUpdate,
+from models import (REGISTRATION_LIMIT, GROUP_LIMIT, EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationSelfUpdate,
                     EventRegistrationUpdate, now_utc, new_id)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -231,7 +231,7 @@ async def _event_registration_summary(event: dict, exclude_registration_id: str 
 
 
 async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
-    regs = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(1000)
+    regs = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     reg_map = {reg["id"]: reg for reg in regs}
     read_model = await load_competition_read_model(db, tournament["id"])
     structure = read_model.structure_snapshot()
@@ -241,7 +241,7 @@ async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
         groups = await db.tournament_groups.find(
             {"tournament_id": tournament["id"]},
             {"_id": 0},
-        ).to_list(100)
+        ).to_list(GROUP_LIMIT)
     rows = standings_for_structure(tournament, structure, regs, groups=groups)
     if tournament.get("format") == "groups":
         rows = [row for group in rows for row in group.get("standings") or []]

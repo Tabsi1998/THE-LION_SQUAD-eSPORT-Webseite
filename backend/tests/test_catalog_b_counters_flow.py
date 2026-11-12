@@ -69,17 +69,17 @@ async def fastlap_world(db, me: str, other: str):
 async def season_world(db, me: dict, other: dict):
     """Drei Saisons: s1 abgeschlossen (zwei Turniere, eine Challenge - ich überall dabei), s2 abgeschlossen ohne mich, s3 läuft."""
     await db.seasons.insert_many([
-        {"id": "s1", "name": "Saison 1", "status": "completed", "tournament_ids": ["t1", "t2"], "f1_challenge_ids": ["c1"], "start_date": "2026-03-01T00:00:00+00:00"},
-        {"id": "s2", "name": "Saison 2", "status": "completed", "tournament_ids": ["t3"], "f1_challenge_ids": [], "start_date": "2026-06-01T00:00:00+00:00"},
-        {"id": "s3", "name": "Saison 3", "status": "active", "tournament_ids": ["t4"], "f1_challenge_ids": [], "start_date": "2026-09-01T00:00:00+00:00"},
+        {"id": "s1", "slug": "s1", "name": "Saison 1", "status": "completed", "tournament_ids": ["t1", "t2"], "f1_challenge_ids": ["c1"], "start_date": "2026-03-01T00:00:00+00:00"},
+        {"id": "s2", "slug": "s2", "name": "Saison 2", "status": "completed", "tournament_ids": ["t3"], "f1_challenge_ids": [], "start_date": "2026-06-01T00:00:00+00:00"},
+        {"id": "s3", "slug": "s3", "name": "Saison 3", "status": "active", "tournament_ids": ["t4"], "f1_challenge_ids": [], "start_date": "2026-09-01T00:00:00+00:00"},
     ])
     await db.tournaments.insert_many([
-        {"id": "t1", "title": "Auftakt", "status": "completed", "start_date": "2026-03-05T18:00:00+00:00", "format": "single_elim", "season_id": "s1"},
-        {"id": "t2", "title": "Zweites", "status": "completed", "start_date": "2026-04-05T18:00:00+00:00", "format": "single_elim", "season_id": "s1"},
-        {"id": "t3", "title": "Drittes", "status": "completed", "start_date": "2026-06-05T18:00:00+00:00", "format": "single_elim", "season_id": "s2"},
-        {"id": "t4", "title": "Viertes", "status": "in_progress", "start_date": "2026-09-05T18:00:00+00:00", "format": "single_elim", "season_id": "s3"},
-        {"id": "t-gp", "title": "Grand Prix", "status": "completed", "start_date": "2026-07-01T18:00:00+00:00", "format": "grand_prix"},
-        {"id": "t-gp2", "title": "Grand Prix 2", "status": "completed", "start_date": "2026-08-01T18:00:00+00:00", "format": "grand_prix"},
+        {"id": "t1", "slug": "t1", "title": "Auftakt", "status": "completed", "start_date": "2026-03-05T18:00:00+00:00", "format": "single_elim", "season_id": "s1"},
+        {"id": "t2", "slug": "t2", "title": "Zweites", "status": "completed", "start_date": "2026-04-05T18:00:00+00:00", "format": "single_elim", "season_id": "s1"},
+        {"id": "t3", "slug": "t3", "title": "Drittes", "status": "completed", "start_date": "2026-06-05T18:00:00+00:00", "format": "single_elim", "season_id": "s2"},
+        {"id": "t4", "slug": "t4", "title": "Viertes", "status": "in_progress", "start_date": "2026-09-05T18:00:00+00:00", "format": "single_elim", "season_id": "s3"},
+        {"id": "t-gp", "slug": "t-gp", "title": "Grand Prix", "status": "completed", "start_date": "2026-07-01T18:00:00+00:00", "format": "grand_prix"},
+        {"id": "t-gp2", "slug": "t-gp2", "title": "Grand Prix 2", "status": "completed", "start_date": "2026-08-01T18:00:00+00:00", "format": "grand_prix"},
     ])
     await db.tournament_registrations.insert_many([
         {"id": "r-t1", "tournament_id": "t1", "user_id": me["id"], "status": "approved"},

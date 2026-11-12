@@ -141,20 +141,19 @@ async def drawn_bracket(flow):
 @pytest.mark.parametrize("change", [{"called_at": "2026-10-14T12:00:00+00:00"}, {"status": "in_progress"},
                                     {"started_at": "2026-10-14T12:00:00+00:00"}])
 async def test_redraw_writes_nothing_when_a_match_changed_after_reading(flow, monkeypatch, change):
-    import routes.tournament_stage_routes as stage_routes
+    import services.v2_result_submission as submission
 
     tournament, second = await drawn_bracket(flow)
     group = second[0]["settings"]["draw_group"]
-    original = stage_routes.build_redraw_application
+    original = submission.eliminated_registration_ids
 
-    def meanwhile(stage_matches, group_key, **kwargs):
-        application = original(stage_matches, group_key, **kwargs)
-        # Zwischen Lesen und Schreiben ruft die Station das zweite Spiel auf (synchron am Speicher darunter).
-        raw = getattr(flow.db.matches_v2, "_AsyncMongoMockCollection__collection")
-        raw.update_one({"id": second[1]["id"]}, {"$set": change})
-        return application
+    async def meanwhile(db, tournament_id):
+        # Zwischen Lesen und Schreiben ruft die Station das zweite Spiel auf: Die Auslosung hat die Spiele schon gelesen
+        # und fragt noch nach den Ausgeschiedenen (#2216: über die Datenbank, nicht am Speicher von mongomock vorbei).
+        await flow.db.matches_v2.update_one({"id": second[1]["id"]}, {"$set": change})
+        return await original(db, tournament_id)
 
-    monkeypatch.setattr(stage_routes, "build_redraw_application", meanwhile)
+    monkeypatch.setattr(submission, "eliminated_registration_ids", meanwhile)
     before = {m["id"]: (m["draw"]["id"], [s["registration_id"] for s in m["slots"]]) for m in second}
     response = await flow.post(f"/api/tournaments/{tournament['id']}/stages/{second[0]['stage_id']}/redraw",
                                json={"group": group})

@@ -316,10 +316,10 @@ async def test_sponsor_is_archived_while_used_and_deleted_when_not(flow):
     admin = await editor(flow)
     sponsor = (await flow.post("/api/sponsors", json={"name": "Probe GmbH", "tier": "gold"})).json()
     sid = sponsor["id"]
-    await flow.db.events.insert_one({"id": "e-1", "name": "LAN", "sponsor_ids": [sid]})
+    await flow.db.events.insert_one({"id": "e-1", "slug": "e-1", "name": "LAN", "sponsor_ids": [sid]})
     await flow.db.tournaments.insert_many([
-        {"id": "t-1", "title": "Cup", "round_sponsors": [{"round": 1, "sponsor_id": sid}]},
-        {"id": "t-2", "title": "Cup 2", "round_sponsors": [{"round": 1, "sponsor_id": sid}]},
+        {"id": "t-1", "slug": "t-1", "title": "Cup", "round_sponsors": [{"round": 1, "sponsor_id": sid}]},
+        {"id": "t-2", "slug": "t-2", "title": "Cup 2", "round_sponsors": [{"round": 1, "sponsor_id": sid}]},
     ])
     refused = await flow.delete(f"/api/sponsors/{sid}")
     assert refused.status_code == 409

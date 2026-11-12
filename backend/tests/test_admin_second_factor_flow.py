@@ -34,7 +34,7 @@ def without_second_factor(user: dict) -> dict:
 async def make_team(flow, captain, *members, is_public=True):
     team = {
         "id": new_id(), "name": "Lions Rocket", "tag": "LRK", "leader_id": captain["id"], "co_leader_ids": [],
-        "member_ids": [captain["id"], *[m["id"] for m in members]], "join_code": "Kx7pQ2", "is_public": is_public,
+        "member_ids": [captain["id"], *[m["id"] for m in members]], "join_code": f"K{new_id()[:5]}", "is_public": is_public,
         "created_at": "2026-01-10T10:00:00+00:00",
     }
     await flow.db.teams.insert_one(dict(team))

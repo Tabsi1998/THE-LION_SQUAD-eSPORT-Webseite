@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import InterleavedReads, make_flow  # noqa: E402
 from routes import reference_round_routes  # noqa: E402
-from services import migrations  # noqa: E402
+from services import migrations, reference_series  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 PUBLIC = "/api/reference-series/public"
@@ -339,8 +339,17 @@ async def test_two_editors_at_the_same_time_one_wins_and_new_rounds_never_share_
     assert sorted([first.status_code, second.status_code]) == [200, 409]
 
     monkeypatch.setattr(reference_round_routes, "get_db", lambda gate=InterleavedReads(flow.db, "reference_series"): gate)
-    created = await asyncio.gather(*(flow.post(_rounds(series), json={"code": code, "day": "2026-12-03"})
-                                     for code in ("C", "D")))
+
+    async def create(code: str):
+        # Auf echtem MongoDB trennt die Sperre der Saison die beiden: Die zweite wartet und bekommt nach ihrer Wartezeit
+        # „gleich noch einmal versuchen“ - und versucht es wie die Oberfläche noch einmal (#2216).
+        for _attempt in range(5):
+            response = await flow.post(_rounds(series), json={"code": code, "day": "2026-12-03"})
+            if response.status_code != 409 or response.json().get("detail") != reference_series.SERIES_BUSY:
+                return response
+        return response
+
+    created = await asyncio.gather(*(create(code) for code in ("C", "D")))
     assert [response.status_code for response in created] == [200, 200]
     orders = [row["order"] async for row in flow.db.reference_rounds.find({}, {"order": 1})]
     assert len(orders) == len(set(orders)) == 4

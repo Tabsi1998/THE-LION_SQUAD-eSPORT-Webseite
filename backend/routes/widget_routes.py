@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 
 from database import get_db
+from models import REGISTRATION_LIMIT
 from services.visibility import user_can_see
 from services.slug_utils import find_by_slug_or_history
 from services.access_links import validate_access_link
@@ -81,7 +82,7 @@ async def widget_bracket(slug_or_id: str):
     regs = await db.tournament_registrations.find(
         {"tournament_id": t["id"]},
         {"_id": 0},
-    ).to_list(500)
+    ).to_list(REGISTRATION_LIMIT)
     return {
         "tournament": {"id": t["id"], "title": t["title"], "format": t["format"], "status": t["status"]},
         "matches": [],
