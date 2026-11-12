@@ -279,6 +279,16 @@ async def submit_v2_result(
             "idempotent_replay": True,
         }
 
+    # Liga (#1619, E.2): Jedes Ergebnis zu einem Spiel mit offenem Verfahren entscheidet es mit - auch eine Wertung kampflos oder
+    # „nicht erschienen“. Darum hier, für jeden Weg: Recht „Proteste“, nicht befangen, beim Einspruch eine andere Person als bei der
+    # Ausgangsentscheidung, und die Begründung (bei der Wertung ihre Pflicht-Begründung) als ``decision_note``.
+    from services import league_procedures
+    decision_note = reason or (note if audit_action == "match.forfeit" else None)
+    refusal = await league_procedures.result_decision_refusal(
+        db, match, actor_id=actor_id, note=decision_note, by_players=audit_action in PLAYER_RESULT_ACTIONS)
+    if refusal:
+        from services.match_v2_results import MatchV2ResultError
+        raise MatchV2ResultError(refusal[1], refusal[0])
     ensure_correction_allowed(match, force=force, reason=reason)
     await checked_results(db, match, raw_results)
     stage_matches = await db.matches_v2.find(
@@ -398,7 +408,6 @@ async def submit_v2_result(
         from services.draw_records import record_draws
         await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=match.get("tournament_id"))
     # Liga (#1619, E.2): Ein Protest mit vorläufig zählendem Ergebnis lässt das Spiel „completed“ - die Korrektur entscheidet ihn ebenso.
-    from services import league_procedures
     open_procedures = league_procedures.has_open(match)
     dispute_resolved = match.get("status") == "disputed" or open_procedures
     if dispute_resolved:
@@ -406,7 +415,7 @@ async def submit_v2_result(
             games is None or games == (match.get("games") or []))
         decision = "keep" if unchanged else "change"
         if open_procedures:
-            await league_procedures.close_on_result(db, match, actor_id=actor_id, now_iso=now_iso, decision=decision, note=reason)
+            await league_procedures.close_on_result(db, match, actor_id=actor_id, now_iso=now_iso, decision=decision, note=decision_note)
             # Die Entscheidung mit Begründung verschickt das Verfahren selbst - nicht noch einmal als „Dispute entschieden“.
             dispute_resolved = False
         else:

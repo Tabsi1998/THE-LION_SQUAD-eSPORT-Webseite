@@ -589,6 +589,33 @@ def result_refusal(match: dict, user: dict, reason: str | None, *, force: bool) 
     return None
 
 
+async def result_decision_refusal(db, match: dict, *, actor_id: str | None, note: str | None, by_players: bool) -> tuple[int, str] | None:
+    """Die eine Stelle für jeden Weg, der ein Ergebnis schreibt (Ergebnis-Fenster, Korrektur, Wertung kampflos, „nicht erschienen“,
+    gehaltenes Ergebnis): Zu einem Spiel mit offenem Verfahren entscheidet das Ergebnis das Verfahren mit. ``None``: es darf.
+    Sonst Status und Klartext - geschrieben wird dann nichts."""
+    pending = open_rows(match)
+    if not pending:
+        return None
+    if by_players:
+        return 409, "Zu diesem Spiel läuft ein Verfahren. Das Ergebnis entscheidet die Liga-Leitung."
+    from services.league_permissions import CONFLICT_DETAIL, OWN_DECISION_DETAIL, conflict_of_interest
+    from services.tournament_permissions import has_match_result_permission
+
+    account = await db.users.find_one({"id": actor_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_active": 1, "is_banned": 1,
+                                                       "mfa_enabled": 1}) if actor_id else None
+    person = {**account, "auth_mfa_verified": True} if account else None
+    if not person or not await has_match_result_permission(person, match, capability="disputes"):
+        return 409, "Zu diesem Spiel läuft ein Verfahren. Ein Ergebnis oder eine Wertung entscheidet es mit – das geht nur mit dem Recht „Proteste“."
+    if any(decided_by(row) and decided_by(row) == actor_id for row in pending):
+        return 409, OWN_DECISION_DETAIL
+    conflict = await conflict_of_interest(db, person, match)
+    if conflict and not conflict["override"]:
+        return 409, CONFLICT_DETAIL
+    if len(str(note or "").strip()) < NOTE_MIN:
+        return 422, f"Zu diesem Spiel läuft ein Verfahren. Bitte die Entscheidung in mindestens {NOTE_MIN} Zeichen begründen."
+    return None
+
+
 async def close_on_result(db, match: dict, *, actor_id: str, now_iso: str, decision: str, note: str | None) -> None:
     """Die Leitung hat ein Ergebnis zu einem Spiel mit offenem Verfahren eingetragen: Damit sind alle offenen Einträge entschieden -
     Altbestand wie bisher, Verfahren mit Begründung (der Grund der Korrektur) und Einspruchsfrist."""
