@@ -1923,7 +1923,9 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     try:
         # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - nach der Turnier-Sperre die Season-Sperre.
         async with league_games.season_lock(db, tournament):
-            return await _report_v2(db, m, body, me, tournament, stage)
+            # Vorfälle (D.5, #1619): nie roh in der Antwort auf eine Meldung - sie tragen Begründungen, den Grund einer
+            # Notausnahme und Konto-Kennungen. Die Seite liest ihre gefilterte Sicht im Block ``league`` der Matchseite.
+            return league_incidents.without_incidents(await _report_v2(db, m, body, me, tournament, stage))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
@@ -1979,7 +1981,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     if is_duplicate_dispute(m, me["id"], reason):
         m.pop("_id", None)
         m["idempotent_replay"] = True
-        return m
+        return league_incidents.without_incidents(m)
     if not reason:
         raise HTTPException(status_code=422, detail="Bitte kurz beschreiben, was nicht stimmt.")
     # „Problem melden“ (#1158): ein Grund zum Antippen - ohne Angabe „Sonstiges“.
@@ -2017,7 +2019,8 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     except Exception:
         logger.warning("[achievements] Dispute in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
     m["idempotent_replay"] = False
-    return m
+    # Vorfälle (D.5, #1619) gehören nie roh in eine Antwort - die Seite liest sie gefiltert im Block ``league`` der Matchseite.
+    return league_incidents.without_incidents(m)
 
 
 @router.post("/{match_id}/dispute/decision")

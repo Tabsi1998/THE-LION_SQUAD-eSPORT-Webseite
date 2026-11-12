@@ -107,6 +107,22 @@ def is_open(entry: dict) -> bool:
     return state_of(entry) not in CLOSED_INCIDENT_STATES
 
 
+# Was an einem Spiel zu den Vorfällen gespeichert ist - nie roh in einer Antwort an eine Seite.
+RAW_KEYS = ("incidents", "incident_due_at")
+
+
+def without_incidents(doc):
+    """Ein Spiel-Datensatz ohne die rohen Vorfälle (Beschreibung, Begründung, Grund einer Notausnahme, Konto-Kennungen). Die Seiten
+    lesen ihre gefilterte Sicht im Block ``league`` der Matchseite (``league_incidents.page_block``). Mit den Vorfällen fällt der
+    Zeiger ``flow.user_ids`` heraus: Er nennt jedes Konto, das an einem Vorfall gehandelt hat - auch das der Leitung."""
+    if not isinstance(doc, dict):
+        return doc
+    out = {key: value for key, value in doc.items() if key not in RAW_KEYS}
+    if isinstance(out.get("flow"), dict) and "user_ids" in out["flow"]:
+        out["flow"] = {key: value for key, value in out["flow"].items() if key != "user_ids"}
+    return out
+
+
 def position_of(entry: dict) -> int:
     try:
         return int(entry.get("position") or 0)

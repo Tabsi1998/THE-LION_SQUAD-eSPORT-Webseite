@@ -380,6 +380,59 @@ async def test_a_biased_superadmin_decides_only_as_an_emergency_with_a_reason(fl
 
 
 @pytest.mark.asyncio
+async def test_answers_to_reports_and_problems_never_carry_raw_incidents(flow):
+    """Die Antworten auf Meldung und „Problem melden“ liefern die Vorfälle nie roh aus: kein Grund der Notausnahme, keine Kennung
+    der Leitung. Die Seite liest nur ihre gefilterte Sicht im Block ``league`` der Matchseite."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    assert (await answered(flow, w, incident_id, False)).status_code == 200
+    boss = w["users"]["LoeLeitung"]
+    boss["role"] = "superadmin"
+    await flow.db.users.update_one({"id": boss["id"]}, {"$set": {"role": "superadmin"}})
+    flow.act_as(boss)
+    forced = await flow.post(url(w, f"/{incident_id}/decision"), json={
+        "outcome": "no_action", "reason": "Beide Seiten gehört", "conflict_reason": "Niemand sonst erreichbar XYZ"})
+    assert forced.status_code == 200, forced.text
+    raw = await stored(flow, w)
+    assert raw["incidents"][0]["decision"]["conflict_reason"] == "Niemand sonst erreichbar XYZ", "Gegenprobe: gespeichert ist beides"
+    assert raw["incidents"][0]["decision"]["by"] == boss["id"]
+
+    def clean(response) -> None:
+        assert response.status_code == 200, response.text
+        assert "incidents" not in response.json() and "incident_due_at" not in response.json()
+        assert "Niemand sonst erreichbar XYZ" not in response.text and boss["id"] not in response.text
+        assert "Verbindung der Löwen weg" not in response.text, "auch die Beschreibung der Gegenseite steht nicht in der Antwort"
+
+    # Meldung, die noch kein Ergebnis ist (die Serie ist nicht festgestellt) - und dieselbe Meldung noch einmal.
+    flow.act_as(w["users"]["Falke1"])
+    held = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=falcons(w)))
+    clean(held)
+    assert held.json()["report_status"] == "clarification" and held.json()["result_hold"]
+    again = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=falcons(w)))
+    clean(again)
+    assert again.json()["idempotent_replay"] is True
+    # „Problem melden“ - neu und wiederholt.
+    problem = {"reason": "Map 1 haben wir gewonnen, nicht verloren.", "category": "wrong_result"}
+    clean(await flow.post(f"/api/matches/{w['match']['id']}/dispute", json=problem))
+    clean(await flow.post(f"/api/matches/{w['match']['id']}/dispute", json=problem))
+
+    # Die gefilterte Sicht der Seite kennt den Vorfall - ohne Grund der Notausnahme und ohne Kennung der Leitung.
+    seen = (await page(flow, w))["league"]
+    assert [row["id"] for row in seen["incidents"]] == [incident_id] and seen["incidents"][0]["decision"]["reason"] == "Beide Seiten gehört"
+    assert "Niemand sonst erreichbar XYZ" not in str(seen) and boss["id"] not in str(seen)
+
+
+@pytest.mark.asyncio
+async def test_a_confirming_report_does_not_carry_raw_incidents_either(flow):
+    w = await world(flow)
+    incident_id = await reported(flow, w, proposal="continue_at_score")
+    assert (await answered(flow, w, incident_id, True)).status_code == 200
+    confirmed = await both_report(flow, w)
+    assert confirmed["awaiting_confirmation"] is False and "incidents" not in confirmed and "incident_due_at" not in confirmed
+    assert (await stored(flow, w))["incidents"][0]["id"] == incident_id, "Gegenprobe: am Spiel steht der Vorfall weiter"
+
+
+@pytest.mark.asyncio
 async def test_inputs_answer_with_a_german_sentence(flow):
     w = await world(flow)
     flow.act_as(w["users"]["Kapitaen"])
