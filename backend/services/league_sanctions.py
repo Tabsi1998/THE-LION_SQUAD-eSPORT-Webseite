@@ -310,6 +310,12 @@ async def apply_effect(db, doc: dict, registration: dict | None, tournament: dic
         await _publish_table(tournament["id"])
         return {"deduction_id": entry["id"]}
     if kind == "disqualification":
+        # Der Stand der noch offenen Spiele vor dem Ausscheiden - damit der Widerruf sie genau so zurückgibt (auch ein laufendes).
+        live = await db.matches_v2.find(
+            {"tournament_id": tournament["id"], "slots.registration_id": registration["id"],
+             "status": {"$nin": ["completed", "forfeit", "cancelled"]}},
+            {"_id": 0, "id": 1, "status": 1, "results": 1, "completed_at": 1}).to_list(None)
+        before = {match["id"]: {key: match.get(key) for key in ("status", "results", "completed_at")} for match in live}
         try:
             proposal = await tournament_events.propose_removal(db, tournament, registration, kind="disqualified",
                                                                reason=REMOVAL_REASON, actor_id=actor.get("id"))
@@ -319,22 +325,35 @@ async def apply_effect(db, doc: dict, registration: dict | None, tournament: dic
         except tournament_events.TournamentEventError as problem:
             raise SanctionProblem(problem.detail, problem.status_code) from None
         return {"removal": {"plan_id": plan.get("id"), "previous_status": registration.get("status"),
-                            "match_ids": list(done.get("changed_match_ids") or [])}}
+                            "match_ids": list(done.get("changed_match_ids") or []), "before": before}}
     return {}
 
 
-async def _reopen_match(db, tournament: dict, match: dict, registration_id: str, plan_id: str | None, now_iso: str) -> bool:
-    """Ein Spiel, das das Ausscheiden kampflos gewertet oder abgesagt hat, wieder offen - nur, wenn es noch so dasteht."""
+STARTED_MATCH = frozenset({"in_progress", "running", "waiting_result", "disputed"})
+
+
+async def _reopen_match(db, tournament: dict, match: dict, registration_id: str, removal: dict, now_iso: str) -> bool:
+    """Ein Spiel, das das Ausscheiden kampflos gewertet oder abgesagt hat, wieder so, wie es davor stand - nur, wenn es noch so
+    dasteht. Gespielte Maps (``games``) bleiben immer; ein laufendes Spiel läuft weiter, ein offenes beginnt Check-in und Veto neu."""
     from services import checkin_rules, league_table
+
+    plan_id, was = removal.get("plan_id"), (removal.get("before") or {}).get(match["id"])
 
     meta = match.get("result_meta") or {}
     if meta.get("removed_registration_id") != registration_id or meta.get("reason") != "disqualified":
         return False
     if match.get("status") == "forfeit" and match.get("forfeit_registration_id") == registration_id:
-        update = {"$set": league_table.undo_fields(match, now_iso),
+        fields = {key: value for key, value in league_table.undo_fields(match, now_iso).items() if key != "games"}
+        if was:
+            fields.update({"status": was.get("status") or fields["status"], "results": was.get("results") or [],
+                           "completed_at": was.get("completed_at")})
+        update = {"$set": fields,
                   "$unset": {"forfeit_registration_id": "", "admin_decision_note": "", "admin_decision_by": "", "admin_decision_at": "",
                              "result_meta": "", "completed_by": ""}}
-        await db.matches_v2.update_one({"id": match["id"], "status": "forfeit"}, checkin_rules.new_time_change(tournament, update))
+        if fields["status"] not in STARTED_MATCH:
+            # Ein noch nicht begonnenes Spiel: alter Check-in und altes Veto zählen nicht mehr (Termin-Revision wie „Neu ansetzen“).
+            update = checkin_rules.new_time_change(tournament, update)
+        await db.matches_v2.update_one({"id": match["id"], "status": "forfeit"}, update)
         if plan_id:
             await db.match_reports_v2.delete_one({"id": f"removal-{plan_id}-{match['id']}"})
         return True
@@ -372,13 +391,24 @@ async def undo_effect(db, doc: dict, actor_id: str | None) -> None:
     await db.tournament_registrations.update_one(
         {"id": registration["id"]},
         {"$set": {"status": previous, "updated_at": now_iso, **({"league_squad_key": key} if key else {})}, "$unset": {"removal": ""}})
-    matches = await db.matches_v2.find({"tournament_id": tournament_id, "slots.registration_id": registration["id"]}, {"_id": 0}).to_list(500)
+    matches = await db.matches_v2.find({"tournament_id": tournament_id, "slots.registration_id": registration["id"]}, {"_id": 0}).to_list(None)
+    reopened: list[dict] = []
     for match in matches:
-        if await _reopen_match(db, tournament, match, registration["id"], effect["removal"].get("plan_id"), now_iso):
+        if await _reopen_match(db, tournament, match, registration["id"], effect["removal"], now_iso):
+            reopened.append(match)
             await league_table.after_change(db, tournament, match, scored=False)
+    # Stationen und Termine wie nach dem Ausscheiden neu rechnen lassen (derselbe Aufrufpunkt des Planers).
+    from services.heat_rebuild import _replan_schedule
+
+    stage_ids = sorted({match.get("stage_id") for match in reopened if match.get("stage_id")})
+    for stage in await db.tournament_stages.find({"id": {"$in": stage_ids}}, {"_id": 0}).to_list(None) if stage_ids else []:
+        await _replan_schedule(db, tournament, stage)
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "tournament.participant.reinstated", "actor_id": actor_id, "target_id": tournament_id,
-        "data": {"registration_id": registration["id"], "sanction_id": doc["id"], "status": previous}, "created_at": now_iso})
+        "data": {"registration_id": registration["id"], "sanction_id": doc["id"], "status": previous,
+                 "reopened_match_ids": [match["id"] for match in reopened],
+                 # Startgeld: Ein durch das Ausscheiden geschlossener Auftrag wird nie von selbst wieder geöffnet (Geld) - nur vermerkt.
+                 "billing_closed": registration.get("billing_status") == "cancelled"}, "created_at": now_iso})
     await _publish_table(tournament_id)
 
 

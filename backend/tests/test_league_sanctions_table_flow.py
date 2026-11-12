@@ -239,3 +239,49 @@ async def test_in_a_locked_staffel_the_appeal_can_still_be_refused_but_not_grant
     stored = await flow.db.competition_sanctions.find_one({"id": ids[1]}, {"_id": 0})
     assert stored["appeal"]["state"] == "open" and stored["revoked_at"] is None
     assert (await rows(flow, staffel))["reg-1"]["deducted_points"] == 3
+
+
+async def disqualify_and_revoke(flow, world, registration_id: str):
+    issued = await issue(flow, world, kind="disqualification", target_type="squad", registration_id=registration_id)
+    assert issued.status_code == 200, issued.text
+    flow.act_as(world["admin"])
+    revoked = await flow.post(f"{world['url']}/{issued.json()['id']}/revoke", json={"reason": "Vorwurf hat sich nicht bestätigt."})
+    assert revoked.status_code == 200, revoked.text
+
+
+def fingerprint(match: dict) -> dict:
+    return {key: match.get(key) for key in ("status", "results", "games", "completed_at", "scheduled_at", "started_at")}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exit_rule", ["half", "all_for_opponents"])
+async def test_revoking_a_disqualification_gives_every_match_back_as_it_was(flow, exit_rule):
+    """Review R1, N4: mit der 50-%-Regel (annulliert) wie mit „alle Spiele für die Gegner“ - gespielte Spiele, begonnene Spiele mit
+    schon gespielten Maps und offene Spiele stehen nach dem Widerruf wieder da wie davor."""
+    world = await setup(flow)
+    staffel = world["staffel"]
+    tour = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "scoring_rules": 1})
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"scoring_rules": {**(tour.get("scoring_rules") or {}), "exit_rule": exit_rule}}})
+    await play_round(flow, staffel)
+    before_table = await rows(flow, staffel)
+    winner = next(reg_id for reg_id, row in before_table.items() if row["won"] == 1)
+    mine = [m for m in await matches_of(flow, staffel) if winner in [s["registration_id"] for s in m["slots"]]]
+    # Ein Spiel läuft schon: eine Map ist gespielt.
+    running = next(m for m in mine if m["status"] != "completed")
+    games = [{"position": 1, "mode": "stellung", "map_id": "map-1", "winner_registration_id": winner}]
+    await flow.db.matches_v2.update_one({"id": running["id"]}, {"$set": {"status": "in_progress", "started_at": now_utc().isoformat(), "games": games}})
+    before = {m["id"]: fingerprint(m) for m in await matches_of(flow, staffel)}
+
+    await disqualify_and_revoke(flow, world, winner)
+
+    after = {m["id"]: fingerprint(m) for m in await matches_of(flow, staffel)}
+    for match_id, was in before.items():
+        now = after[match_id]
+        if match_id == running["id"]:
+            assert now["games"] == games, "die gespielte Map bleibt"
+            assert now["status"] not in ("forfeit", "cancelled", "completed") and not now["results"]
+        else:
+            assert now == was, (match_id, was, now)
+    back = await rows(flow, staffel)
+    assert {key: row["points"] for key, row in back.items()} == {key: row["points"] for key, row in before_table.items()}
+    assert not (back[winner].get("exit") or None)

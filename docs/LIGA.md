@@ -3182,8 +3182,12 @@ Co-Team). Der Grundtext nennt nur die Sperre und ihr Ende („Gesperrt durch die
 **Widerruf** (`revoke`, Pflichtgrund ab fünf Zeichen): nimmt jede Wirkung zurück. Sperre: sofort wieder spielberechtigt.
 Punktabzug: Eintrag aus `point_deductions` entfernt, die Tabelle rechnet neu. Disqualifikation: Anmeldung zurück auf den Stand
 davor (`removal.previous_status`), Platz in der Season (`league_squad_key`) wieder belegt, Spiele, die das Ausscheiden kampflos
-gewertet oder abgesagt hat, wieder offen (Termin bleibt, Check-in und Veto beginnen neu); gespielte Ergebnisse standen nie anders
-am Spiel. Ist der Platz in der Season inzwischen anders vergeben, lehnt der Widerruf mit 409 ab. Eine widerrufene Strafe bleibt
+gewertet oder abgesagt hat, wieder so, wie sie davor standen (`effect.removal.before` je Spiel: Stand, Ergebnis, Zeitpunkt): ein
+offenes behält den Termin und beginnt Check-in und Veto neu, ein laufendes läuft weiter, schon gespielte Maps (`games`) bleiben
+immer. Das gilt für beide Regeln der Season (`all_for_opponents` und `half` mit Annullierung). Der Planer rechnet Stationen und
+Termine neu (`_replan_schedule`). **Bewusst nicht zurückgenommen:** Ein durch das Ausscheiden geschlossener Startgeld-Auftrag
+(`tournament_fees.close_price`) bleibt geschlossen und steht im Protokoll `tournament.participant.reinstated` als
+`billing_closed` - Geld bewegt der Widerruf nie von selbst. Ist der Platz in der Season inzwischen anders vergeben, lehnt der Widerruf mit 409 ab. Eine widerrufene Strafe bleibt
 als Zeile mit Grund stehen. Ein noch offener Einspruch ist mit dem Widerruf erledigt (`moot`, Vermerk „Strafe widerrufen“); danach
 lehnt die Entscheidung über ihn mit 409 ab, und die Nachweise sind nicht länger gehalten.
 
