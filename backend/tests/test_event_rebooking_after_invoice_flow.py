@@ -47,7 +47,8 @@ async def drafted(flow, name="paula"):
     event = await paid_event(flow, kassier)
     who = await person(flow, name)
     booked = await book(flow, who, event, companions=1)
-    assert (await billing_orders.classify_due())["invoiced"] == 1
+    classified = await billing_orders.classify_due()
+    assert classified["invoiced"] == 1
     order = await order_of(flow, booked)
     assert order["invoice_status"] == "draft"
     return kassier, event, who, booked, order
@@ -98,7 +99,8 @@ async def assert_review(flow, booked, order, *, reason, new_cents, billing_statu
     assert changed, "Finanzen bekommt einen Prüffall"
     assert changed["detail"]["reason"] == reason
     assert changed["detail"]["invoiced_cents"] == 4000 and changed["detail"]["new_total_cents"] == new_cents
-    assert (await billing_orders.classify_due())["looked"] == 0, "nichts wird neu abgerechnet"
+    classified = await billing_orders.classify_due()
+    assert classified["looked"] == 0, "nichts wird neu abgerechnet"
 
     reg = await registration(flow, booked)
     assert reg["status"] == "registered"
@@ -185,7 +187,8 @@ async def test_geloeschter_entwurf_ist_kein_beleg_mehr(flow, fake, removed_befor
     assert await flow.db.billing_cases.count_documents({"registration_id": booked["id"], "status": "open"}) == 0
     reg = await registration(flow, booked)
     assert reg["billing_status"] == "pending" and reg["price_snapshot"]["total_cents"] == 2000
-    assert (await billing_orders.classify_due())["invoiced"] == 1
+    classified = await billing_orders.classify_due()
+    assert classified["invoiced"] == 1
 
 
 @pytest.mark.asyncio
