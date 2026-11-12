@@ -1087,7 +1087,7 @@ innerhalb von `checkin_rules.open_points_remind_hours` (Vorgabe 48, 0 = aus; ohn
 (`pending`, `approved`, `checked_in`, `waitlist`; nicht zurückgezogen oder disqualifiziert) und nur solange die Anmeldung noch kein begonnenes oder
 entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der Antrag gespeichert (Fehler nur im Log). Ein zweiter Lauf findet den Schlüssel und schickt nichts. Nie ein Datum oder Alter in Texten.
 
-**Strafen (E.3):** Eine laufende Sperre setzt den Stand `sanctioned` (`league_sanctions.bans`, Abschnitt „E.3 Strafen“). Er geht jedem Stand außer `banned` vor, sperrt Check-in, Aufstellung und Anmeldung und ist keine „fehlende Angabe“.
+**Strafen (E.3):** Eine laufende Sperre setzt den Stand `sanctioned` (`league_sanction_bans.bans`, Abschnitt „E.3 Strafen“). Er geht jedem Stand außer `banned` vor, sperrt Check-in, Aufstellung und Anmeldung und ist keine „fehlende Angabe“.
 
 ### B.4 Selbstanmeldung (#2205, #1623, #1665)
 
@@ -3109,7 +3109,7 @@ dessen `keep_until` in der Zukunft liegt (E.3, Abschnitt „E.3 Strafen“, Aufb
 ### E.3 Strafen (Sanktionen im Wettbewerb)
 
 Regelwerk § 13, Anlage C.4 bis C.6; Entscheidungen Nr. 11c, 31, 32, 34b, 41, 43, 44, 45, 101, 104, 136. Logik in
-`services/league_sanctions.py`, Routen in `routes/league_sanction_routes.py`, eigene Strafen in `routes/penalty_routes.py`.
+`services/league_sanctions.py` (Sperren und Aufbewahrung im Blatt-Modul `services/league_sanction_bans.py`), Routen in `routes/league_sanction_routes.py`, eigene Strafen in `routes/penalty_routes.py`.
 **Keine Automatik (Nr. 32):** Jede Strafe wählt und begründet die Leitung von Hand. Die Moderation der Community
 (`moderation_sanctions`, Verwarnungen und Kontosperren) bleibt getrennt und wirkt hier nur über den Stand `banned`.
 
@@ -3168,7 +3168,7 @@ Index: `id` eindeutig; `(league_id, season_id)`; `user_id`; `squad_id`; `registr
 - **Spielsperre über das Season-Ende hinaus** lehnt der Server ab (422): Was darüber hinausgeht, ist Teamsperre oder Ligaausschluss.
   Season-Ende wie bei der Aufbewahrung (`match_proof_retention.season_end`); ohne bestimmbares Ende gilt nur „in dieser Season“.
 
-**Spielberechtigung (B.3):** `league_eligibility` lädt je Kontext die laufenden Sperren (`league_sanctions.bans`) und setzt den
+**Spielberechtigung (B.3):** `league_eligibility` lädt je Kontext die laufenden Sperren (`league_sanction_bans.bans`) und setzt den
 Stand `sanctioned` (`ok: false`, `reason`, `until`). Er geht jedem Stand außer `banned` vor. Damit sperrt dieselbe Prüfung
 Aufstellung und Teilnehmerliste, Check-in und die Anmeldung (`registration_problems`: 403 bei gesperrtem oder ausgeschlossenem
 Co-Team). Der Grundtext nennt nur die Sperre und ihr Ende („Gesperrt durch die Liga-Leitung bis …“, „… für noch 2 Liga-Spiele“,
@@ -3226,7 +3226,7 @@ Begründung: „… ist gesperrt“), damit sie aufstellen können. Link `/my/pe
 
 **Aufbewahrung (Nr. 31, 136):** Nachweise in `proof_ids` tragen `match_proof_photos.keep_until` (ISO), solange die Strafe läuft,
 ein Einspruch offen ist oder die Einspruchsfrist läuft: Ende der Sperre bzw. `appeal_until`, das spätere von beiden; ohne
-bestimmbares Ende `9999-12-31`. Jede Änderung an der Strafe und der stündliche Job (`league_sanctions.refresh_proof_holds`)
+bestimmbares Ende `9999-12-31`. Jede Änderung an der Strafe und der stündliche Job (`league_sanction_bans.refresh_proof_holds`)
 setzen den Wert neu; der Job löscht nichts, dessen `keep_until` in der Zukunft liegt.
 
 **Kontolöschung und Auskunft:** `competition_sanctions` steht in `personal_data.py` (bleibt als Nachweis der Liga-Leitung, drei

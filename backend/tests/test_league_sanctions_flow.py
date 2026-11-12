@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 from league_match_world import OLD_RULES, ids, world as league_world  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import league_eligibility, league_sanctions, match_proof_retention  # noqa: E402
+from services import league_eligibility, league_sanction_bans, match_proof_retention  # noqa: E402
 from services.match_flow import DEFAULTS  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
@@ -205,13 +205,13 @@ async def test_team_ban_exclusion_and_external_ban_block_the_squad_the_person_an
     # Externe Sperre (Nr. 104) und Ligaausschluss gelten in jeder Season der Liga.
     external = await issue(flow, world, kind="external", target_type="player", user_id=uid(world, "Tom"), rule_ref="Anlage C.6")
     assert external.status_code == 200, external.text
-    other_season = await league_sanctions.bans(flow.db, "liga", "andere-season", [uid(world, "Tom"), uid(world, "Mila")])
+    other_season = await league_sanction_bans.bans(flow.db, "liga", "andere-season", [uid(world, "Tom"), uid(world, "Mila")])
     assert "Extern gesperrt" in other_season.users[uid(world, "Tom")]["reason"] and uid(world, "Mila") not in other_season.users
-    other_league = await league_sanctions.bans(flow.db, "andere-liga", world["season_id"], [uid(world, "Tom")])
+    other_league = await league_sanction_bans.bans(flow.db, "andere-liga", world["season_id"], [uid(world, "Tom")])
     assert other_league.users == {}
     # Gegenprobe: Eine Spielsperre gilt nur in ihrer Season.
     assert (await ban(flow, world, "Mila", matches=1)).status_code == 200
-    assert uid(world, "Mila") not in (await league_sanctions.bans(flow.db, "liga", "andere-season", [uid(world, "Mila")])).users
+    assert uid(world, "Mila") not in (await league_sanction_bans.bans(flow.db, "liga", "andere-season", [uid(world, "Mila")])).users
     excluded = await issue(flow, world, kind="league_exclusion", target_type="player", user_id=uid(world, "Kapitaen"))
     assert excluded.status_code == 200 and "ausgeschlossen" in (await eligibility(flow, world, "Kapitaen"))["reason"]
 

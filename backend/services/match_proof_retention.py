@@ -7,7 +7,7 @@
   an einem Vorfall mindestens, bis das Ergebnis des Spiels feststeht und die Protestfrist abgelaufen ist (``moss_due``).
 - Alles, dessen Spiel es nicht mehr gibt.
 - Strafen (E.3, Nr. 31, 136): Ein Nachweis an einer Strafe bleibt, solange sie läuft, ein Einspruch offen ist oder die
-  Einspruchsfrist läuft (``keep_until``, gesetzt von ``league_sanctions``) - auch ein MOSS-Nachweis.
+  Einspruchsfrist läuft (``keep_until``, gesetzt von ``league_sanction_bans``) - auch ein MOSS-Nachweis.
 - Kontolöschung (``delete_for_user``): alles sofort - außer MOSS in einem laufenden Vorfall oder Verfahren, der pseudonym
   für die Leitung bleibt, bis seine Frist um ist.
 
@@ -254,7 +254,7 @@ async def rescan_stuck(db, *, now=None) -> int:
 async def purge(db, *, now=None) -> int:
     """Aufräumen: nie verwendete Fotos nach 24 Stunden, Turniere 30 Tage nach dem Hochladen, Liga-Staffeln nach ihrer Regel
     (``_expired_league``) und alles, dessen Spiel es nicht mehr gibt."""
-    from services import league_sanctions
+    from services import league_sanction_bans as league_sanctions
 
     current = now or now_utc()
     # Strafen (E.3): erst die Sperrfristen der Nachweise an Strafen nachziehen, dann aufräumen.

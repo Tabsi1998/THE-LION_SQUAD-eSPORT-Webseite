@@ -15,13 +15,13 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 
 from models import now_utc
-from services import checkin_rules, league_platform, league_roster, league_sanctions
+from services import checkin_rules, league_platform, league_roster, league_sanction_bans
 from services.dolibarr_policy import club_today
 from services.matchday_schedule import LOCAL_TZ
 
 OTHER_TEAM, AGE_MISSING, AGE_NOT_MET_STATE, WAITING = "other_team", "age_missing", "age_not_met", "waiting"
 # Strafen (E.3): eine laufende Sperre der Liga-Leitung - geht jedem Stand außer ``banned`` vor.
-SANCTIONED = league_sanctions.SANCTIONED
+SANCTIONED = league_sanction_bans.SANCTIONED
 ACTIVE_STATUSES = league_roster.ACTIVE_REGISTRATION_STATUSES
 AGE_MET, AGE_NO_DATE = "met", "missing"
 
@@ -49,7 +49,7 @@ class EligibilityContext:
     platform: league_platform.PlatformRule | None = None
     division: dict | None = None
     # Strafen (E.3): die laufenden Sperren dieser Personen und der Co-Teams der Liga.
-    sanctions: league_sanctions.Bans | None = None
+    sanctions: league_sanction_bans.Bans | None = None
 
     @property
     def season(self) -> dict:
@@ -146,7 +146,7 @@ async def _with_rules(db, roster: league_roster.RosterContext, user_ids, *, matc
     wanted = {user_id for user_id in user_ids or [] if user_id}
     return EligibilityContext(roster=roster, ages=await _ages(db, roster.season, wanted),
                               memberships=await _memberships(db, roster.season),
-                              sanctions=await league_sanctions.bans(db, roster.league_id, roster.season_id, wanted, match=match))
+                              sanctions=await league_sanction_bans.bans(db, roster.league_id, roster.season_id, wanted, match=match))
 
 
 def platform_state(ctx: EligibilityContext | None, user_id: str) -> tuple[str, str, str] | None:
@@ -167,7 +167,7 @@ def status(ctx: EligibilityContext | None, user_id: str, squad_id: str | None = 
     if not ctx or row["state"] == league_roster.BANNED:
         return out
     # Strafen (E.3): Eine laufende Sperre geht allem anderen vor - der Satz nennt nur die Sperre und ihr Ende, nie den Verstoß.
-    sanction = league_sanctions.eligibility_row(ctx.sanctions, user_id, squad_id)
+    sanction = league_sanction_bans.eligibility_row(ctx.sanctions, user_id, squad_id)
     if sanction:
         return {**out, **sanction}
     age = ctx.ages.get(user_id)
@@ -472,7 +472,7 @@ def registration_problems(ctx: EligibilityContext | None, squad: dict) -> list[t
     name = squad.get("name") or "Das Co-Team"
     problems: list[tuple[int, str]] = []
     # Strafen (E.3): Ein gesperrtes oder ausgeschlossenes Co-Team meldet sich nicht an.
-    ban = league_sanctions.squad_ban(ctx.sanctions, squad.get("id"))
+    ban = league_sanction_bans.squad_ban(ctx.sanctions, squad.get("id"))
     if ban:
         problems.append((403, f"{name}: {ban['reason']}"))
     too_many = _too_many(ctx.season, len(members))
