@@ -37,6 +37,16 @@ def price_to_bill(registration: dict) -> dict | None:
     return snapshot
 
 
+KEPT_INVOICE = "Für deine Anmeldung gibt es schon eine Rechnung – der Verein prüft sie und meldet sich bei dir, falls sich etwas ändert."
+
+
+def kept_invoice_line(registration: dict) -> str:
+    """Zurück nach einem Storno, der Beleg gilt weiter (#2184): kein Betrag, aber auch kein Schweigen - sonst wirkt die Anmeldung kostenlos."""
+    if registration.get("status") in ACTIVE and registration.get("billing_status") in ("invoiced", "paid"):
+        return KEPT_INVOICE
+    return ""
+
+
 def _cost_line(registration: dict) -> str:
     """Der Satz zum Kostenbeitrag - nur, wenn wirklich abgerechnet wird (``price_to_bill``). Kommt die Rechnung erst nach der
     Freigabe in der Finanzübersicht, steht sie noch nicht in „Meine Rechnungen“."""
@@ -62,7 +72,7 @@ def registration_message(event: dict, registration: dict, status: str, previous:
             headline, text = "Du bist wieder dabei", "Die Turnierleitung hat deine Anmeldung wieder aktiviert."
         else:
             headline, text = "Du bist dabei", "Deine Anmeldung ist gespeichert."
-        return {"headline": headline, "detail": " ".join(part for part in (text, _cost_line(registration)) if part)}
+        return {"headline": headline, "detail": " ".join(part for part in (text, _cost_line(registration) or kept_invoice_line(registration)) if part)}
     if status == "waitlist":
         first = ("Die Turnierleitung hat dich auf die Warteliste gesetzt." if previous else "Das Event ist voll – du stehst auf der Warteliste.")
         detail = f"{first} Wird ein Platz frei, kann dich die Turnierleitung nachholen; dann bekommst du Bescheid."

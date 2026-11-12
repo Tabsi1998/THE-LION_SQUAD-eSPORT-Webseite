@@ -205,6 +205,7 @@ async def test_back_after_cancelling_with_an_invoice_names_no_amount(flow):
 
     back = await discord_registration.handle_button(flow.db, DISCORD_ID, f"tls:reg:event:{paid['id']}")
     assert "angemeldet" in text_of(back) and "Kosten" not in text_of(back) and "20,00" not in text_of(back)
+    assert "schon eine Rechnung" in text_of(back), "kein Betrag, aber der Hinweis auf die bestehende Rechnung"
     assert await flow.db.billing_orders.count_documents({"registration_id": reg["id"]}) == 1
     assert await flow.db.billing_cases.count_documents({"registration_id": reg["id"], "kind": "changed_after_invoice", "status": "open"}) == 1
 

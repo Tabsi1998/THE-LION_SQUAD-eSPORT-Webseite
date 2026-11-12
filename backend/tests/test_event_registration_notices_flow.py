@@ -153,7 +153,9 @@ async def test_wieder_aktiviert_mit_gestellter_rechnung_kein_zweiter_auftrag_und
     assert order["booking_change"] == "Anmeldung wieder aktiviert", "Finanzen bekommt den Prüffall"
     back = (await notes(flow, erste))[-1]
     assert back["title"] == "Du bist wieder dabei: Herbst-LAN"
-    assert "Kostenbeitrag" not in back["body"] and "Rechnung" not in back["body"]
+    assert "Kostenbeitrag" not in back["body"] and "Meine Rechnungen" not in back["body"] and "10,00" not in back["body"]
+    # Kein Betrag, aber auch kein Schweigen (#2184): Die bestehende Rechnung gilt weiter, der Verein prüft sie.
+    assert "schon eine Rechnung" in back["body"]
 
 
 async def _storno_platz_weg_warteliste(flow, event, a, b):

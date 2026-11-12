@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from dolibarr_fake import FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from services import billing_cases, billing_orders, dolibarr_client  # noqa: E402
-from services.event_notifications import KIND, price_to_bill  # noqa: E402
+from services.event_notifications import KEPT_INVOICE, KIND, kept_invoice_line, price_to_bill  # noqa: E402
 from test_billing_dolibarr_flow import TERMS, book, connect, order_of, paid_event, person  # noqa: E402
 
 SELF_REASON = "Nach Storno selbst neu angemeldet"
@@ -126,6 +126,7 @@ async def test_selbst_storniert_und_neu_angemeldet_mit_beleg_ergibt_einen_prueff
 
     note = await last_note(flow, paula)
     assert note["title"].startswith("Du bist dabei") and "Kostenbeitrag" not in note["body"] and "20,00" not in note["body"]
+    assert KEPT_INVOICE in note["body"], "kein Betrag, aber der Hinweis auf die bestehende Rechnung"
 
     flow.act_as(paula)
     own = (await flow.get(f"/api/events/{event['slug']}")).json()["own_registration"]
@@ -158,7 +159,8 @@ async def test_noch_kein_beleg_neuer_preis_mit_eigenem_auftrag(flow, fake):
     assert await flow.db.billing_cases.count_documents({"registration_id": booked["id"]}) == 0
     reg = await registration(flow, booked)
     assert reg["billing_status"] == "pending" and reg["price_snapshot"]["total_cents"] == 2000
-    assert "20,00" in (await last_note(flow, paula))["body"], "der neue Preis wird abgerechnet - die Nachricht nennt ihn"
+    fresh = (await last_note(flow, paula))["body"]
+    assert "20,00" in fresh and KEPT_INVOICE not in fresh, "der neue Preis wird abgerechnet - die Nachricht nennt ihn"
 
 
 @pytest.mark.asyncio
@@ -261,7 +263,7 @@ async def test_leitung_aktiviert_nach_dem_abgleich_wieder_auch_dann_ein_prueffal
     assert response.status_code == 200, response.text
     await assert_review(flow, booked, order, reason=LEAD_REASON, new_cents=4000, billing_status="invoiced")
     note = await last_note(flow, paula)
-    assert note["title"].startswith("Du bist wieder dabei") and "Kostenbeitrag" not in note["body"]
+    assert note["title"].startswith("Du bist wieder dabei") and "Kostenbeitrag" not in note["body"] and KEPT_INVOICE in note["body"]
 
 
 def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
@@ -273,3 +275,11 @@ def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
         assert price_to_bill({"price_snapshot": snapshot, "billing_status": status}) is None
     assert price_to_bill({"price_snapshot": {"total_cents": 0}}) is None and price_to_bill({}) is None
 
+
+def test_hinweis_auf_die_bestehende_rechnung_nur_wenn_sie_weiter_gilt():
+    for billing_status in ("invoiced", "paid"):
+        assert kept_invoice_line({"status": "registered", "billing_status": billing_status}) == KEPT_INVOICE
+    assert kept_invoice_line({"status": "checked_in", "billing_status": "paid"}) == KEPT_INVOICE
+    for row in ({"status": "registered", "billing_status": "pending"}, {"status": "registered"}, {"status": "cancelled", "billing_status": "invoiced"},
+                {"status": "waitlist", "billing_status": "invoiced"}):
+        assert kept_invoice_line(row) == ""
