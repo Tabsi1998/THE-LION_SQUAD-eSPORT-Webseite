@@ -3,7 +3,9 @@ Instagram-Story (1080×1920), breit als Link-Vorschau (1200×630). Gezeichnet mi
 
 Geteilt wird nur, was öffentlich ist: das Profil der Person ist öffentlich, das Turnier ist öffentlich und hat
 Ergebnisse. Bei Teams steht der Teamname drauf (jedes Mitglied kann teilen), bei Durchgängen die Plätze je Runde.
-Gegner stehen nicht auf dem Bild - nur Runde und Ergebnis.
+Gegner stehen nicht auf dem Bild - nur Runde und Ergebnis. Ein angefochtenes Ergebnis (Liga, E.2) steht „in Klärung“
+da wie auf der Ligaseite (#2363): im Hochformat eine Zeile in Warnfarbe unter dem Schritt, breit am Schildchen. Der
+Zwischenspeicher (``share_image_cache``) zeichnet neu, sobald sich der Stand ändert - er steht in den Daten des Bildes.
 
 Die Seite zum Teilen ist /tournaments/<turnier>/ergebnis/<benutzername>; Discord, WhatsApp & Co. bekommen dort das
 breite Bild als Vorschau (seo_render_routes).
@@ -13,6 +15,7 @@ from __future__ import annotations
 from PIL import ImageDraw
 
 from services import share_image
+from services.bracket_common import WARN_RGB
 from services.profile_references import (
     REFERENCE_REGISTRATION_STATUSES,
     RESULT_TOURNAMENT_STATUSES,
@@ -21,7 +24,11 @@ from services.profile_references import (
     _visible_tournament,
 )
 from services.team_history import team_by_id
-from services.tournament_path import chip_text, path_kind, tournament_path
+from services.tournament_path import chip_text, clarification_note, path_kind, tournament_path
+
+WARN = (*WARN_RGB, 255)
+CLARIFICATION_ROW = 40
+
 
 async def _tournament(db, ref: str) -> dict | None:
     return await db.tournaments.find_one({"$or": [{"id": ref}, {"slug": ref}]}, {"_id": 0})
@@ -71,7 +78,8 @@ async def share_payload(db, tournament_ref: str, username: str) -> dict | None:
         "participant_count": participant_count,
         "participant_word": "Teams" if team_mode else "Spieler",
         "kind": path_kind(steps),
-        "steps": [{"label": step["label"], "result": step["result"], "outcome": step["outcome"], "kind": step["kind"]} for step in steps],
+        "steps": [{"label": step["label"], "result": step["result"], "outcome": step["outcome"], "kind": step["kind"],
+                   **({"contested": step["contested"]} if step.get("contested") else {})} for step in steps],
         "chips": [chip_text(step) for step in steps][:8],
         "club_name": branding.get("club_name") or "THE LION SQUAD",
         "domain": str(branding.get("domain") or "lionsquad.at").replace("https://", "").replace("http://", "").strip("/"),
@@ -109,6 +117,23 @@ def _step_colors(step: dict, accent: tuple) -> tuple[tuple, tuple]:
 
 def _rank_color(rank) -> tuple:
     return share_image.hex_color(share_image.RANK_COLORS.get(int(rank or 0), "#FFFFFF"))
+
+
+def _rows_that_fit(rows: list[dict], room: int) -> list[dict]:
+    """Die Schritte, die ins Hochformat passen: alle, wenn genug Platz ist - sonst die letzten, mit einer Zeile Platz für den
+    Hinweis „+ 2 frühere Runden“. Ein Schritt braucht 92 Punkte, mit „in Klärung“ darunter mehr (#2363)."""
+    def cost(step: dict) -> int:
+        return 92 + (CLARIFICATION_ROW if clarification_note(step) else 0)
+    room = max(room, 92)
+    if sum(cost(step) for step in rows) <= room:
+        return rows
+    budget, shown = room - 92, []
+    for step in reversed(rows):
+        if cost(step) > budget:
+            break
+        budget -= cost(step)
+        shown.insert(0, step)
+    return shown
 
 
 def render(payload: dict, fmt: str = "story") -> bytes:
@@ -155,18 +180,23 @@ def render(payload: dict, fmt: str = "story") -> bytes:
         if rows:
             draw.text((left, y), "UNSER WEG" if payload.get("team_name") else "MEIN WEG", font=share_image.font(30), fill=(255, 255, 255, 140))
             y += 56
-            room = max(1, (height - 260 - y) // 92)
-            if len(rows) > room:
+            shown = _rows_that_fit(rows, height - 260 - y)
+            if len(shown) < len(rows):
                 # Zu viele Runden: die letzten zählen (Finale, Halbfinale …), davor ein Hinweis.
-                earlier = len(rows) - room + 1
+                earlier = len(rows) - len(shown)
                 draw.text((left, y + 18), f"+ {earlier} {'frühere Runde' if earlier == 1 else 'frühere Runden'}", font=share_image.font(30, bold=False), fill=(255, 255, 255, 130))
                 y += 92
-                rows = rows[earlier:]
+                rows = shown
             row_font = share_image.font(38)
             for step in rows:
                 mark, value_color = _step_colors(step, accent)
                 share_image.row(draw, left, y, right - left, step.get("label") or "", step.get("result") or "", row_font, mark=mark, value_color=value_color)
                 y += 92
+                note = clarification_note(step)
+                if note:
+                    # Angefochten (#2363): unter dem Schritt, in Warnfarbe - das Ergebnis zählt vorläufig.
+                    draw.text((left + 40, y - 12), f"{note} – zählt vorläufig", font=share_image.font(28, bold=False), fill=WARN)
+                    y += CLARIFICATION_ROW
         foot_font = share_image.font(34)
         draw.text((left, height - 170), payload["domain"].upper(), font=foot_font, fill=accent)
         if count:
@@ -191,7 +221,9 @@ def render(payload: dict, fmt: str = "story") -> bytes:
     y += 76
     chip_font = share_image.font(24)
     x = left
-    for text in payload.get("chips") or []:
+    steps = payload.get("steps") or []
+    for index, text in enumerate(payload.get("chips") or []):
+        warn = index < len(steps) and bool(clarification_note(steps[index]))
         text = share_image.ellipsis(draw, text, chip_font, right - left - 20)
         chip_width = draw.textlength(text, font=chip_font) + 28
         if x + chip_width > right:
@@ -199,7 +231,7 @@ def render(payload: dict, fmt: str = "story") -> bytes:
             y += 52
         if y > height - 140:
             break
-        x += share_image.chip(draw, x, y, text, chip_font, color=accent) + 10
+        x += share_image.chip(draw, x, y, text, chip_font, color=WARN if warn else accent) + 10
     foot_font = share_image.font(24)
     draw.text((70, height - 92), payload["domain"].upper(), font=foot_font, fill=(255, 255, 255, 160))
     if count:
