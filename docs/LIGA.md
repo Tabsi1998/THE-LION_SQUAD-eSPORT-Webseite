@@ -3019,6 +3019,10 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   gehaltenes Ergebnis - ohne das Recht `disputes`, als Befangene (Superadmin nur als Notausnahme mit Grund), beim Einspruch durch
   die Person der Ausgangsentscheidung (409) oder ohne Begründung von mindestens zehn Zeichen (422; bei der Wertung kampflos ist
   ihre Pflicht-Begründung die `decision_note`). Meldungen der Spieler und die Frist-Automatik entscheiden nie ein Verfahren (409).
+  **Gehaltenes Ergebnis („Rückgängig“):** `result_hold.hold_result` prüft dasselbe schon beim Bereitlegen, die Absage kommt also
+  sofort. Entsteht das Verfahren erst in den Sekunden danach, schreibt das Veröffentlichen nichts: Das bereitliegende Ergebnis
+  bzw. die Wertung ist verworfen, die Person bekommt die Nachricht „Ergebnis nicht gespeichert“ mit dem Grund im Klartext
+  (`reason: hold_failed`), und im Protokoll steht `match.result.hold_failed`.
 - **Zurückgezogen heißt nicht mehr offen:** `match_deadlines.auto_confirm_due`, `match_disputes.open_dispute` und die Karte der
   Leitungsansicht überspringen Einträge mit `withdrawn_at` bzw. `state` `withdrawn`/`decided`; die Frist-Automatik läuft danach weiter.
   Bei geänderter Paarung bekommt ein Verfahren `decision: "void"` und `state: "decided"`.
