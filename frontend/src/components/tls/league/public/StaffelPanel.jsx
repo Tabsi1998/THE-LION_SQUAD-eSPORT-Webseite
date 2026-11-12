@@ -97,6 +97,8 @@ function MatchRow({ match }) {
           : <span>{matchWhen(match)}{match.scheduled_at && SOURCE_LABELS[match.schedule_source] ? ` · ${SOURCE_LABELS[match.schedule_source]}` : ""}</span>}
         {/* Vorfälle (D.5, #1619): öffentlich nur, dass eine Map in Klärung ist - das Ergebnis gilt bis zur Entscheidung nicht. */}
         {match.in_clarification ? <span className="font-semibold text-warn" data-testid={`league-match-${match.id}-clarification`}>in Klärung</span> : null}
+        {/* Proteste (E.2, #1619): Das Ergebnis zählt vorläufig, ist aber angefochten - öffentlich nur „in Klärung“, wie bei einer Map in Klärung (D.5). */}
+        {match.contested ? <span className="font-semibold text-warn" data-testid={`league-match-${match.id}-contested`}>in Klärung</span> : null}
         <Link to={`/matches/${match.id}`} className="inline-flex items-center gap-1 text-brand hover:text-white">
           Spiel <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </Link>

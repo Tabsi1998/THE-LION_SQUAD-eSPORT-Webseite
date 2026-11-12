@@ -137,7 +137,8 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
   // dazu, um wie viel es später wird. Sonst wie bisher „geplant ca. 14:20“.
   const ahead = !fate && !live && !done ? tree.forecast?.get(match.id) : null;
   const late = ahead && ahead.eta !== null && ahead.delayMinutes >= DELAY_SHOWN_FROM ? ahead : null;
-  const status = fate ? fate.label : live ? "" : walkover ? "kampflos" : solo ? "Freilos" : done ? formatMatchStatus(match.status)
+  // Angefochtenes Ergebnis einer Liga-Staffel (E.2, #1619): zählt vorläufig - am TV nur „in Klärung“, nie Grund oder Seite.
+  const status = fate ? fate.label : live ? "" : match.contested && done ? "in Klärung" : walkover ? "kampflos" : solo ? "Freilos" : done ? formatMatchStatus(match.status)
     : late ? forecastText({ ...late, station: "" }) : shortPlanned(match) || formatMatchStatus(match.status);
   const goldCard = tree.goldCards.has(match.id);
   const meta = heat && !matchFate(match) ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
