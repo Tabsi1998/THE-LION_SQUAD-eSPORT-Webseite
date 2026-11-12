@@ -517,6 +517,7 @@ async def request_moss(db, match: dict, league: League, procedure_id: str, *, us
 async def excuse_moss(db, match: dict, league: League, procedure_id: str, request_id: str, *, user: dict, reason: str) -> dict:
     """Technische Probleme kann die Leitung begründet entschuldigen (Nr. 109)."""
     row = dict(find(match, procedure_id))
+    _require_open(row)
     note = _text(reason, 5, 500, "Bitte kurz begründen, warum die Datei entschuldigt fehlt.")
     requests = [dict(item) for item in row.get("moss_requests") or []]
     target = next((item for item in requests if item.get("id") == request_id), None)
