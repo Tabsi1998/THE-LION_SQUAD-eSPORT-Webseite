@@ -25,6 +25,9 @@ from starlette.responses import Response
 logger = logging.getLogger("tls.procedure_guard")
 
 MARKER = b'"disputes"'
+# Diese Wege streamen ihre Antwort und kürzen selbst (mit eigenem Test) - sie werden hier nicht gepuffert:
+# die Auskunft nach DSGVO schreibt tausende Zeilen und kürzt in ``league_procedures.export_view``.
+SELF_GUARDED_PATHS = frozenset({"/api/dsgvo/export-my-data"})
 
 
 def is_json(content_type: str | None) -> bool:
@@ -56,7 +59,7 @@ def _rebuilt(response, body: bytes) -> Response:
 async def guard_response(request, call_next):
     """Als ``@app.middleware("http")`` eingehängt (server.py)."""
     response = await call_next(request)
-    if not request.url.path.startswith("/api/") or not is_json(response.headers.get("content-type")):
+    if not request.url.path.startswith("/api/") or request.url.path in SELF_GUARDED_PATHS or not is_json(response.headers.get("content-type")):
         return response
     body = b"".join([chunk async for chunk in response.body_iterator])
     if MARKER not in body:

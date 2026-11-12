@@ -421,10 +421,11 @@ async def test_many_matches_with_procedures_cost_one_decision_per_staffel(flow, 
 
 def test_the_guard_reads_every_json_variant_and_sits_outside_any_compression():
     import server
-    from services.procedure_response_guard import is_json
+    from services.procedure_response_guard import SELF_GUARDED_PATHS, is_json
 
     assert all(is_json(kind) for kind in ("application/json", "application/json; charset=utf-8", "application/problem+json", "APPLICATION/VND.API+JSON"))
     assert not any(is_json(kind) for kind in (None, "", "text/html", "text/csv", "application/zip", "text/event-stream"))
+    assert SELF_GUARDED_PATHS == {"/api/dsgvo/export-my-data"}, "jede Ausnahme braucht ihre eigene Kürzung und ihren eigenen Test"
 
     def name_of(entry) -> str:
         options = getattr(entry, "kwargs", None) or getattr(entry, "options", None) or {}
@@ -436,3 +437,39 @@ def test_the_guard_reads_every_json_variant_and_sits_outside_any_compression():
     inside = names[names.index("procedure_guard") + 1:]
     assert not [name for name in inside if "gzip" in name.lower() or "compress" in name.lower() or "brotli" in name.lower()], \
         "eine Komprimierung darf nie innerhalb des Wächters liegen - er sähe nur komprimierte Bytes"
+
+
+@pytest.mark.asyncio
+async def test_the_gdpr_export_streams_and_keeps_only_what_concerns_the_person(flow):
+    from routes.dsgvo_routes import _user_data_export
+
+    w = await scene(flow)
+    raw = await stored(flow, w)
+    falke1, falke2, captain = user(w, "Falke1")["id"], user(w, "Falke2")["id"], user(w, "Kapitaen")["id"]
+
+    def row_for(user_id: str) -> dict:
+        return league_procedures.export_view({"matches": [raw]}, user_id)["matches"][0]["disputes"][0]
+
+    # Wer eingereicht hat: die eigene Meldung vollständig - aber nicht die MOSS-Anforderung an eine andere Person samt Vermerk.
+    own = row_for(falke1)
+    assert own["reason"] and own["notified_immediately"] is False and own["withdrawn_by"] == falke1 and own["moss_requests"] == []
+    assert SECRET not in json.dumps(own, ensure_ascii=False)
+    # Wessen MOSS-Datei angefordert war: die eigene Anforderung samt Entschuldigung, sonst nur, dass es das Verfahren gibt.
+    asked = row_for(falke2)
+    assert set(asked) == {"at", "id", "kind", "state", "moss_requests"}
+    assert [item["user_id"] for item in asked["moss_requests"]] == [falke2] and asked["moss_requests"][0]["excuse_reason"] == SECRET
+    # Die Gegenseite: nur, dass es das Verfahren gibt.
+    assert set(row_for(captain)) == {"at", "id", "kind", "state"}
+
+    # Die Route: gestreamt (nicht vom Wächter gepuffert) und mit derselben Kürzung für die Person der Anmeldung.
+    # Die Auskunft führt die Spiele der eigenen Anmeldungen - hier hat der Captain der Löwen sein Co-Team angemeldet.
+    owner_id = captain
+    await flow.db.tournament_registrations.update_one({"id": w["reg_a"]["id"]}, {"$set": {"user_id": owner_id}})
+    flow.act_as(user(w, "Kapitaen"))
+    answer = await flow.get("/api/dsgvo/export-my-data")
+    assert answer.status_code == 200 and "content-length" not in answer.headers, "gestreamt - die Middleware hat nichts gepuffert"
+    exported = answer.json()
+    assert exported["competition_matches"] == (await _user_data_export(flow.db, owner_id))["competition_matches"]
+    text = json.dumps(exported["competition_matches"], ensure_ascii=False)
+    assert raw["id"] in text, "das Spiel steht in der Auskunft"
+    assert not [key for key in FORBIDDEN if key in text], "fremde Verfahrensinhalte nie"

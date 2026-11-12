@@ -822,6 +822,40 @@ async def guard(db, payload, user: dict | None):
     return rebuild(payload)
 
 
+def export_view(payload, user_id: str):
+    """Für die Auskunft nach DSGVO (``/api/dsgvo/export-my-data``): Die Person bekommt, was sie selbst betrifft - ihre eigene
+    Meldung vollständig, ihre eigene Stellungnahme, ihre eigene MOSS-Anforderung. Von Verfahren anderer bleibt nur, dass es sie
+    gibt; Anforderungen und Vermerke der Leitung zu Dritten stehen nie in ihrer Auskunft."""
+    def own_requests(row: dict) -> list[dict]:
+        return [dict(item) for item in row.get("moss_requests") or [] if isinstance(item, dict) and item.get("user_id") == user_id]
+
+    def one(row: dict) -> dict:
+        if not is_procedure(row):
+            return row
+        requests = own_requests(row)
+        if row.get("user_id") == user_id:
+            return {**row, "moss_requests": requests}
+        out = {key: row.get(key) for key in ("at", "id", "kind", "state")}
+        slot = row.get("statement") or {}
+        if slot.get("user_id") == user_id:
+            out["statement"] = {key: slot.get(key) for key in ("registration_id", "text", "at", "due_at")}
+        if requests:
+            out["moss_requests"] = requests
+        return out
+
+    def rebuild(node, depth: int = 0):
+        if not isinstance(node, (dict, list)) or depth > 400:
+            return node if not isinstance(node, (dict, list)) else None
+        if isinstance(node, list):
+            return [rebuild(value, depth + 1) for value in node]
+        out = {key: (value if key == "disputes" else rebuild(value, depth + 1)) for key, value in node.items()}
+        if isinstance(node.get("disputes"), list):
+            out["disputes"] = [one(row) if isinstance(row, dict) else row for row in node["disputes"]]
+        return out
+
+    return rebuild(payload)
+
+
 async def for_viewer_list(db, user: dict | None, matches: list[dict], involved: set[str]) -> list[dict]:
     """Die Spiele einer Staffel für eine Person mit Liga-Recht (Spielplan, Baum): Verfahren ungekürzt nur mit „Proteste“ oder
     „Ergebnisse“ und nur in Spielen, an denen sie nicht beteiligt ist. Das Recht gilt für die ganze Staffel - eine Prüfung reicht."""
