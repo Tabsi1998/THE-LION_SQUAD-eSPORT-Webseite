@@ -241,6 +241,7 @@ async def submit_v2_result(
     games: list[dict] | None = None,
     lineups_missing: list[str] | None = None,
     match_lineups: dict | None = None,
+    decision_note: str | None = None,
 ) -> dict:
     """Persist one v2 result while the caller owns the tournament write lease.
 
@@ -283,7 +284,9 @@ async def submit_v2_result(
     # „nicht erschienen“. Darum hier, für jeden Weg: Recht „Proteste“, nicht befangen, beim Einspruch eine andere Person als bei der
     # Ausgangsentscheidung, und die Begründung (bei der Wertung ihre Pflicht-Begründung) als ``decision_note``.
     from services import league_procedures
-    decision_note = reason or (note if audit_action == "match.forfeit" else None)
+    # ``decision_note``: ein eigener Satz für die Seiten (etwa bei „nicht erschienen“), sonst der Grund der Korrektur bzw. die
+    # Pflicht-Begründung der Wertung.
+    decision_note = decision_note or reason or (note if audit_action == "match.forfeit" else None)
     refusal = await league_procedures.result_decision_refusal(
         db, match, actor_id=actor_id, note=decision_note, by_players=audit_action in PLAYER_RESULT_ACTIONS)
     if refusal:

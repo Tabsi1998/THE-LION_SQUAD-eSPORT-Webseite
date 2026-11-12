@@ -25,6 +25,24 @@ from test_league_procedures_flow import opened, stored  # noqa: E402
 REASON = "Die Falken sind zum Termin nicht erschienen."
 
 
+@pytest.mark.asyncio
+async def test_confirming_a_no_show_decides_an_open_procedure_with_a_readable_reason(flow):
+    from services.match_forfeit import apply_forfeit
+
+    w = await league_world(flow)
+    await opened(flow, w)
+    match = await stored(flow, w)
+    machine = "Nicht erschienen – Check-in bis 20:15 nicht erfolgt"
+    note = await league_procedures.no_show_decision_note(flow.db, match, w["reg_h"]["id"], machine)
+    name = (await flow.db.tournament_registrations.find_one({"id": w["reg_h"]["id"]}, {"_id": 0})).get("display_name")
+    assert name and note == f"Kampflos gewertet: {name} ist nicht erschienen (Check-in bis 20:15 nicht erfolgt)."
+    await apply_forfeit(flow.db, match, w["reg_h"]["id"], note=machine, actor_id=w["staff"]["id"], force=False, decision_note=note)
+    after = await stored(flow, w)
+    assert after["status"] == "forfeit" and after["disputes"][0]["decision_note"] == note, "die Seiten lesen einen Satz, keinen Kurztext"
+    # Gegenprobe: Ohne offenes Verfahren gibt es keine eigene Begründung - die Wertung läuft wie bisher.
+    assert await league_procedures.no_show_decision_note(flow.db, after, w["reg_h"]["id"], machine) is None
+
+
 @pytest_asyncio.fixture
 async def flow(tmp_path, monkeypatch):
     monkeypatch.setattr(match_proofs, "PROOF_DIR", tmp_path / "proofs")

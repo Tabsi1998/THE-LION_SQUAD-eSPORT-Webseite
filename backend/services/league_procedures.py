@@ -595,6 +595,17 @@ def result_refusal(match: dict, user: dict, reason: str | None, *, force: bool) 
     return None
 
 
+async def no_show_decision_note(db, match: dict, registration_id: str, note: str) -> str | None:
+    """Die Begründung, mit der „nicht erschienen“ ein offenes Verfahren mitentscheidet: ein verständlicher Satz mit dem Namen der
+    Seite statt des Kurztexts der Automatik („Nicht erschienen – Check-in bis 20:15 nicht erfolgt“). ``None`` ohne offenes Verfahren."""
+    if not has_open(match):
+        return None
+    gone = await db.tournament_registrations.find_one({"id": registration_id}, {"_id": 0, "display_name": 1, "team_name": 1}) or {}
+    name = gone.get("display_name") or gone.get("team_name") or "Eine Seite"
+    detail = str(note or "").split(" – ", 1)[-1].strip().replace("Turnierleitung", "Liga-Leitung")
+    return f"Kampflos gewertet: {name} ist nicht erschienen ({detail})." if detail else f"Kampflos gewertet: {name} ist nicht erschienen."
+
+
 async def result_decision_refusal(db, match: dict, *, actor_id: str | None, note: str | None, by_players: bool) -> tuple[int, str] | None:
     """Die eine Stelle für jeden Weg, der ein Ergebnis schreibt (Ergebnis-Fenster, Korrektur, Wertung kampflos, „nicht erschienen“,
     gehaltenes Ergebnis): Zu einem Spiel mit offenem Verfahren entscheidet das Ergebnis das Verfahren mit. ``None``: es darf.

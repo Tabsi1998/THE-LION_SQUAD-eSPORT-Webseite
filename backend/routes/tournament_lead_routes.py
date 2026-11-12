@@ -174,7 +174,12 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     per_person = no_show_keeps_heat_open(match)
     try:
         ensure_no_hold(match)
-        decided = await apply_forfeit(db, match, body.registration_id, note=note, actor_id=me["id"], force=False)
+        # Liga-Verfahren offen (#1619, E.2): Die Wertung entscheidet es mit - als Begründung bekommen die Seiten einen Satz,
+        # nicht den Kurztext der Automatik.
+        from services import league_procedures
+        decision_note = await league_procedures.no_show_decision_note(db, match, body.registration_id, note)
+        decided = await apply_forfeit(db, match, body.registration_id, note=note, actor_id=me["id"], force=False,
+                                      decision_note=decision_note)
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
     if per_person and proposal:
