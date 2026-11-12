@@ -243,7 +243,8 @@ der Abgleich den Fall von selbst. Die Website gibt **nie** eine Gutschrift frei.
   fällt die Vormerkung weg: Die Buchung gilt am Auftrag wieder als gebucht, eine Zahlung ist dann keine „Zahlung auf stornierte
   Buchung“, und die Summen zählen sie wieder. Ein schon angelegter Gutschrift-Entwurf bleibt – löscht ihn in Dolibarr, wenn der
   Beleg weiter gilt. Wird der Beleg (noch Entwurf) danach in Dolibarr gelöscht, wartet der Auftrag auf **Freigeben** oder **Keine
-  neue Rechnung**, statt mit dem Storno zu enden.
+  neue Rechnung**, statt mit dem Storno zu enden. Der Verlauf des Auftrags zeigt jeden Storno und jede Rückkehr („Buchung wieder
+  aufgenommen“) mit Grund. Kommt die Person zurück, während der Lauf den Entwurf gerade anlegt, legt er keinen an.
 
 **Gutschrift ≠ Erstattung.** Die Gutschrift gleicht den Beleg in Dolibarr aus. Erstattet ist erst,
 was tatsächlich zurücküberwiesen (oder bar zurückgegeben) wurde – das haltet ihr im Detail des
