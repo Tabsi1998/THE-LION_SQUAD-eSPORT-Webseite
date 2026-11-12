@@ -44,9 +44,9 @@ from services.billing_amounts import credited_cents, invoice_fields, own_registr
 logger = logging.getLogger("tls.billing")
 
 OPEN_STATUSES = ("pending", "waiting_write_access", "waiting_link", "waiting_review", "ready")
-# Ein Beleg, der in Dolibarr noch gilt (#2184): nicht voll gutgeschrieben und nicht aufgegeben.
 # Die Belegfelder einer Anmeldung, wenn ihr alter Beleg nicht mehr gilt und ein neuer Auftrag kommt (#2184).
 INVOICE_LINK_CLEARED = {"invoice_id": None, "invoice_ref": None, "invoice_status": None, "payment_state": None}
+# Ein Beleg, der in Dolibarr noch gilt (#2184): nicht voll gutgeschrieben und nicht aufgegeben.
 INVOICE_STILL_VALID = {"payment_state": {"$nin": ["credited", "abandoned"]}, "invoice_status": {"$ne": "abandoned"}}
 # Ein Auftrag, der nichts mehr trägt: Buchung storniert und der Beleg gutgeschrieben oder aufgegeben - er hält keine neue Buchung auf.
 SETTLED_AFTER_CANCEL = {"booking_state": "cancelled", "$or": [{"payment_state": {"$in": ["credited", "abandoned"]}}, {"invoice_status": "abandoned"}]}
