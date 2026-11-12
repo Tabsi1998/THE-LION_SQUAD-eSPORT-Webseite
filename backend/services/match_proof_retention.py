@@ -6,6 +6,8 @@
   oder eine Einspruchsfrist läuft. MOSS (Anti-Cheat) nur, bis das Verfahren beendet und die Einspruchsfrist vorbei ist -
   an einem Vorfall mindestens, bis das Ergebnis des Spiels feststeht und die Protestfrist abgelaufen ist (``moss_due``).
 - Alles, dessen Spiel es nicht mehr gibt.
+- Strafen (E.3, Nr. 31, 136): Ein Nachweis an einer Strafe bleibt, solange sie läuft, ein Einspruch offen ist oder die
+  Einspruchsfrist läuft (``keep_until``, gesetzt von ``league_sanctions``) - auch ein MOSS-Nachweis.
 - Kontolöschung (``delete_for_user``): alles sofort - außer MOSS in einem laufenden Vorfall oder Verfahren, der pseudonym
   für die Leitung bleibt, bis seine Frist um ist.
 
@@ -252,7 +254,11 @@ async def rescan_stuck(db, *, now=None) -> int:
 async def purge(db, *, now=None) -> int:
     """Aufräumen: nie verwendete Fotos nach 24 Stunden, Turniere 30 Tage nach dem Hochladen, Liga-Staffeln nach ihrer Regel
     (``_expired_league``) und alles, dessen Spiel es nicht mehr gibt."""
+    from services import league_sanctions
+
     current = now or now_utc()
+    # Strafen (E.3): erst die Sperrfristen der Nachweise an Strafen nachziehen, dann aufräumen.
+    await league_sanctions.refresh_proof_holds(db, current)
     stale = [row async for rows in _pages(db, {"status": "pending", "created_at": {"$lt": (current - match_proofs.PENDING_TTL).isoformat()}})
              for row in rows]
     staffeln = {row["id"]: row for row in await db.tournaments.find(ONLY_LEAGUE, STAFFEL_FIELDS).to_list(None)}
@@ -262,9 +268,11 @@ async def purge(db, *, now=None) -> int:
     known = set(await db.matches_v2.distinct("id", {"id": {"$in": attached_ids}})) if attached_ids else set()
     orphans = [row async for rows in _pages(db, {**kept, "match_id": {"$nin": sorted(known)}}) for row in rows] if attached_ids else []
     seen: set[str] = set()
+    orphan_ids = {row["id"] for row in orphans}
     rows = []
     for row in [*stale, *expired, *orphans]:
-        if row["id"] not in seen:
+        # Ein verwaister Nachweis (Spiel gelöscht) geht immer; sonst hält ihn eine laufende Strafe.
+        if row["id"] not in seen and (row["id"] in orphan_ids or not league_sanctions.held(row, current)):
             seen.add(row["id"])
             rows.append(row)
     return await match_proofs.delete_rows(db, rows)
