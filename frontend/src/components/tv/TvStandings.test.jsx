@@ -45,3 +45,17 @@ test("große Schrift: weniger Gruppen je Bild, der nächste Durchgang zeigt die 
   expect((await screen.findByTestId("tv-standings-slide"))).toHaveAttribute("data-page", "2/4");
   expect(screen.getByTestId("tv-standings-group-g-c")).toBeInTheDocument();
 });
+
+test("Punktabzug (E.3): am TV steht die Höhe an der Zeile, ohne Abzug nichts", async () => {
+  const standings = [{ group: { id: "g-a", group_key: "a" }, standings: [
+    { registration_id: "r1", display_name: "Nordlicht", rank: 1, played: 1, won: 1, drawn: 0, lost: 0, score_diff: 1, points: 3 },
+    { registration_id: "r2", display_name: "Steinbock", rank: 2, played: 1, won: 1, drawn: 0, lost: 0, score_diff: 1, points: 1, deducted_points: 2 },
+  ] }];
+  render(
+    <MemoryRouter initialEntries={["/display/bracket/t1"]}>
+      <TvScreen><TvStandingsSlide standings={standings} turn={0} /></TvScreen>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("tv-deducted-r2")).toHaveTextContent("−2 Punkte Abzug");
+  expect(screen.queryByTestId("tv-deducted-r1")).not.toBeInTheDocument();
+});
