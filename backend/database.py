@@ -709,6 +709,10 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # gäbe es doch eine, bleibt der Start heil und der Index steht unter Betrieb → Checks als fehlend.
     ("match_proof_photos", "id", "id", {}),
     ("shop_test_drafts", "external_id", "external_id", {}),
+    # Liga-Erinnerungen (#1647): je Person und Schlüssel eine Nachricht - ein doppelter Joblauf legt keine zweite an
+    # (services/user_notifications.py). Nur Zeilen mit ``unique_dedupe_key`` zählen, also nur die Liga-Arten.
+    ("notifications", [("user_id", 1), ("unique_dedupe_key", 1)], "user_unique_dedupe",
+     {"partialFilterExpression": {"unique_dedupe_key": {"$type": "string"}}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
