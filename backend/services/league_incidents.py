@@ -33,7 +33,7 @@ from services.league_incident_rules import (  # noqa: F401 - weiterhin über lea
     REHOST, REJECTED, REPLAY, REPLAY_REASON_MAX, RESTART, VOIDING, WITHDRAWN, _effects, _replay_reason,
     BY_LEAD, CLOSED, ENDED_STATUSES, MATCH_ENDED, OPEN_HOLD_CODES, REPLAY_FIRST_DETAIL, as_shown, awaits_replay, confirm_clock,
     counts_quota, current_reports, due_at, forfeit_refusal, match_ended, open_incidents, export_steps, final_games, find, incidents_of,
-    is_open, map_states, mark_replays, missing_positions, outcome_of, position_of, positions_in_clarification, quota_used,
+    is_open, lead_task, map_states, mark_replays, missing_positions, outcome_of, position_of, positions_in_clarification, quota_used,
     replay_cutoff, replay_pending, replay_text, report_refusal, result_block, scrub, setting_of, state_of, surplus_positions,
     without_incidents,
 )
@@ -677,15 +677,17 @@ async def review_rows(db, user: dict, limit: int = 50) -> list[dict]:
     matches = await db.matches_v2.find(
         {"tournament_id": {"$in": sorted(allowed)}, "incidents.state": {"$in": [IN_REVIEW, DECIDED]},
          "status": {"$nin": sorted(FINAL_STATUSES | CLOSED_STATUSES)}, "is_preview": {"$ne": True}},
+        # ``status`` und ``reports``: ob das Spiel noch läuft und ob nach einer Wiederholung schon neu gemeldet ist.
         {"_id": 0, "id": 1, "tournament_id": 1, "incidents": 1, "round_name": 1, "matchday_label": 1, "matchday_number": 1, "round": 1,
-         "slots": 1, "games": 1, "lineups": 1}).to_list(500)
+         "slots": 1, "games": 1, "lineups": 1, "status": 1, "reports": 1}).to_list(500)
     rows = []
     for tournament_id in sorted({match["tournament_id"] for match in matches}):
         own = [match for match in matches if match["tournament_id"] == tournament_id]
         involved = await involved_match_ids(db, user, allowed[tournament_id], own)
         for match in own:
-            hold = result_block(match)
-            if match["id"] in involved or not hold or hold["code"] not in ("in_review", "unsettled", "missing"):
+            # Was die Leitung tun kann - nicht, was das Ergebnis als Erstes aufhält (ein wartender Vorschlag verdeckt nichts).
+            hold = lead_task(match)
+            if match["id"] in involved or not hold:
                 continue
             since = [row.get("at") for row in incidents_of(match) if state_of(row) in (IN_REVIEW, DECIDED) and row.get("at")]
             rows.append({

@@ -869,6 +869,36 @@ async def test_my_duty_lists_open_reviews_for_an_unbiased_lead(flow):
 
 
 @pytest.mark.asyncio
+async def test_my_duty_keeps_settle_the_series_while_another_incident_waits_for_an_answer(flow):
+    """„Serie feststellen“ bleibt in „Mein Dienst“, auch wenn zu einer anderen Map gerade ein Vorschlag auf Antwort wartet."""
+    w = await world(flow)
+
+    async def codes() -> list[tuple]:
+        return [(row["code"], row["position"]) for row in await league_incidents.review_rows(flow.db, w["staff"])]
+
+    first = await reported(flow, w, position=1, proposal="continue_at_score")
+    assert (await answered(flow, w, first, False)).status_code == 200
+    assert (await decide(flow, w, first, "no_action")).status_code == 200
+    assert await codes() == [("unsettled", 1)]
+    await reported(flow, w, position=2)
+    assert league_incidents.result_block(await stored(flow, w))["code"] == "proposed", "das Ergebnis hält zuerst der Vorschlag auf"
+    assert await codes() == [("unsettled", 1)], "die Aufgabe der Leitung bleibt sichtbar"
+
+    # Gegenprobe: Nach einer entschiedenen Wiederholung gibt es nichts festzustellen, bis neu gemeldet ist.
+    other = await world(flow, letter="B")
+    second = await reported(flow, other)
+    assert (await answered(flow, other, second, False)).status_code == 200
+    flow.act_as(other["staff"])
+    assert (await flow.post(url(other, f"/{second}/decision"), json={"outcome": "replay", "reason": "Serverausfall belegt"})).status_code == 200
+    rows = await league_incidents.review_rows(flow.db, other["staff"])
+    assert other["match"]["id"] not in {row["match_id"] for row in rows}
+    flow.act_as(other["users"]["Kapitaen"])
+    assert (await flow.post(f"/api/matches/{other['match']['id']}/report", json=two_nil(other, lineup=lions(other)))).status_code == 200
+    rows = await league_incidents.review_rows(flow.db, other["staff"])
+    assert [(row["code"], row["position"]) for row in rows if row["match_id"] == other["match"]["id"]] == [("unsettled", 2)]
+
+
+@pytest.mark.asyncio
 async def test_settings_come_from_staffel_then_season_then_preset(flow):
     w = await world(flow)
     tournament = await flow.db.tournaments.find_one({"id": w["tournament"]["id"]}, {"_id": 0})

@@ -243,6 +243,27 @@ def replay_text(entry: dict) -> str:
     return f"Map {position_of(entry)} wird {how} – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr."
 
 
+def lead_task(match: dict | None) -> dict | None:
+    """Was die Leitung an diesem Spiel jetzt tun kann - für „Mein Dienst“. ``{code, position}``: ``in_review`` (entscheiden),
+    ``unsettled`` (Serie feststellen) oder ``missing`` (fehlende Map, danach erneut feststellen). Anders als ``result_block`` fragt
+    das nicht, was das Ergebnis als Erstes aufhält: „Serie feststellen“ steht auch da, wenn zu einer anderen Map gerade ein Vorschlag
+    auf die Antwort der Gegenseite wartet. Nach Neustart oder Wiederholung erst, wenn neu gemeldet ist - vorher ist nichts zu tun."""
+    if match_ended(match):
+        return None
+    rows = incidents_of(match)
+    review = [row for row in rows if state_of(row) == IN_REVIEW]
+    if review:
+        return {"code": "in_review", "position": min(position_of(row) for row in review)}
+    ready = [row for row in rows if state_of(row) == DECIDED and not (row.get("decision") or {}).get("settled_at")
+             and not awaits_replay(match, row)]
+    if ready:
+        return {"code": "unsettled", "position": min(position_of(row) for row in ready)}
+    missing = missing_positions(match)
+    if missing:
+        return {"code": "missing", "position": missing[0]}
+    return None
+
+
 def result_block(match: dict | None) -> dict | None:
     """Warum gerade kein Ergebnis dieses Spiels gültig wird - ``None``: nichts hält es auf. ``{code, position, text}``.
 
