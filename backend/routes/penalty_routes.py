@@ -248,6 +248,12 @@ async def appeal_sanction(sanction_id: str, body: SanctionAppealBody, me: dict =
     return (await _sanction_rows(db, [doc]))[0]["sanction"]
 
 
+async def _nothing():
+    """Leerer Lauf: wer keine Liga mit „Strafen“ leitet, liest die Sammlung gar nicht."""
+    for item in ():
+        yield item
+
+
 async def _without_foreign_staffeln(db, items: list[dict], me: dict) -> list[dict]:
     """Die Strafen einer Staffel gehören der Liga (#2203): Der Bereich Turnierleitung allein sieht sie im Eingang nicht."""
     from services.league_permissions import staffel_access
@@ -257,9 +263,19 @@ async def _without_foreign_staffeln(db, items: list[dict], me: dict) -> list[dic
     staffeln = await db.tournaments.find({"id": {"$in": ids}, **ONLY_LEAGUE}, {"_id": 0, "id": 1, "league_context": 1}).to_list(None) if ids else []
     access = await staffel_access(db, me)
     foreign = {row["id"] for row in staffeln if not access.covers(row)}
-    # Strafen der Liga (E.3) tragen ihre Liga selbst - auch ohne Staffel (Sperre einer Person).
+    # Strafen der Liga (E.3) tragen ihre Liga selbst - auch ohne Staffel (Sperre einer Person). Sie liest nur, wer dort die
+    # Zuständigkeit „Strafen“ hat: Ergebnisse oder Proteste allein reichen nicht.
+    allowed = await _sanction_leagues(db, me)
     return [item for item in items if item.get("tournament_id") not in foreign
-            and (not item.get("league_id") or access.all or item["league_id"] in access.league_ids)]
+            and (not item.get("league_id") or item["league_id"] in allowed)]
+
+
+async def _sanction_leagues(db, me: dict) -> set[str]:
+    """Die Ligen, deren Strafen diese Person im Eingang liest: dort mit der Zuständigkeit „Strafen“ (oder dem Bereich Ligen)."""
+    from services.league_permissions import capabilities_of
+
+    league_ids = [value for value in await db.competition_sanctions.distinct("league_id") if value]
+    return {league_id for league_id in league_ids if "sanctions" in await capabilities_of(db, me, league_id)}
 
 
 @admin_router.get("")
@@ -306,7 +322,8 @@ async def all_penalties(
                     user_ids.add(a["user_id"])
         # Strafen der Liga (E.3): Personen hier, Co-Teams unten einmal je Strafe.
         squad_sanctions = []
-        async for doc in db.competition_sanctions.find({}, {"_id": 0}):
+        allowed = sorted(await _sanction_leagues(db, me))
+        async for doc in db.competition_sanctions.find({"league_id": {"$in": allowed}}, {"_id": 0}) if allowed else _nothing():
             if doc.get("target_type") == league_sanctions.SQUAD:
                 squad_sanctions.append(doc)
             elif doc.get("user_id"):

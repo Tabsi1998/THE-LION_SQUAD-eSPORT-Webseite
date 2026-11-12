@@ -633,3 +633,31 @@ async def test_a_ban_by_matches_survives_a_withdrawn_team_and_a_transfer_only_un
     # Gegenprobe: Eine Sperre bis zu einem Zeitpunkt und ein Ligaausschluss enden nicht mit der Season.
     assert (await issue(flow, world, kind="league_exclusion", target_type="player", user_id=uid(world, "Tom"))).status_code == 200
     assert (await eligibility(flow, world, "Tom"))["ok"] is False
+
+
+@pytest.mark.asyncio
+async def test_the_inbox_needs_the_sanctions_right_of_that_league(flow):
+    """Review R1, N3: Eine andere Zuständigkeit der Liga (Ergebnisse, Proteste) reicht für die Strafen im Eingang nicht."""
+    world = await sanction_world(flow)
+    await ban(flow, world, "Mila", matches=1)
+    await issue(flow, world, kind="warning", target_type="squad", registration_id=world["reg_a"]["id"])
+
+    async def seen(*capabilities: str) -> int:
+        person = await flow.add_user(name="Eingang")
+        await flow.db.users.update_one({"id": person["id"]}, {"$set": {"areas": ["tournaments"]}})
+        if capabilities:
+            await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "liga", "user_id": person["id"], "capabilities": list(capabilities)})
+        flow.act_as({**person, "areas": ["tournaments"]})
+        answer = await flow.get("/api/admin/penalties")
+        assert answer.status_code == 200, answer.text
+        return len([row for row in answer.json()["items"] if row["kind"] == "league_sanction"])
+
+    assert await seen("results", "disputes", "matches") == 0
+    assert await seen() == 0
+    assert await seen("sanctions") == 2
+    # Auch gezielt nach einer Person gefragt, bleibt die Strafe ohne das Recht draußen.
+    person = await flow.add_user(name="Eingang")
+    flow.act_as({**person, "areas": ["tournaments"]})
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"areas": ["tournaments"]}})
+    answer = await flow.get("/api/admin/penalties", params={"user_id": uid(world, "Mila")})
+    assert [row for row in answer.json()["items"] if row["kind"] == "league_sanction"] == []
