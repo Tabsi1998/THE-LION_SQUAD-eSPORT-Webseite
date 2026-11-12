@@ -1136,7 +1136,9 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
   ersten Entscheidung – auch der Superadmin nicht über die eigene. Bis dahin gilt die erste Entscheidung weiter.
 - **Tabelle und TV**: Mit **Zählt vorläufig** (Vorgabe) bleibt ein Ergebnis mit laufendem Protest in der Tabelle; Spiel
-  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV und in der Tabelle als PDF. Unter **Braucht
+  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV, in der Tabelle als PDF, auf dem Teilen-Bild eines
+  Ergebnisses und im Turnierweg im Profil. Nach der Entscheidung zeigen alle wieder das gültige
+  Ergebnis ohne Hinweis. Unter **Braucht
   Aufmerksamkeit** steht der Fall mit **Zum Spiel**. Mit **Zählt bis zur Entscheidung nicht** fällt das Spiel so lange heraus.
 - **Einstellen**: Season → **Proteste** → **Fristen, Gründe und Tabelle**. Speichern gilt sofort in allen nicht
   gesperrten Staffeln; laufende Verfahren behalten ihre Fristen. Die vier Grundgründe bleiben in der Liste, damit auch
