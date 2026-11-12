@@ -38,7 +38,7 @@ import logging
 import uuid
 from collections import defaultdict
 
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from services.change_events import publish_api_change, publish_tournament_event
 from services.competition_graph_validation import validate_competition_graph
 from services.competition_snapshot import build_structure_snapshot
@@ -548,7 +548,7 @@ async def _names(db, tournament_id: str) -> dict[str, str]:
 
 async def _eliminated(db, tournament_id: str) -> set[str]:
     rows = await db.tournament_registrations.find(
-        {"tournament_id": tournament_id, "status": {"$in": list(REMOVAL_KINDS)}}, {"_id": 0, "id": 1}).to_list(1000)
+        {"tournament_id": tournament_id, "status": {"$in": list(REMOVAL_KINDS)}}, {"_id": 0, "id": 1}).to_list(REGISTRATION_LIMIT)
     return {row["id"] for row in rows if row.get("id")}
 
 

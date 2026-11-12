@@ -5,7 +5,7 @@ import io
 from fastapi import HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from database import get_db
-from models import GROUP_LIMIT, now_utc
+from models import REGISTRATION_LIMIT, GROUP_LIMIT, now_utc
 from auth import get_current_user, get_optional_user
 from services import onsite_access
 from services.access_links import touch_access_link, validate_access_link
@@ -152,7 +152,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
         from services.league_procedures import for_viewer_list
 
         matches_v2 = await for_viewer_list(db, user, matches_v2, await involved_match_ids(db, user, t, matches_v2))
-    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     raw_regs = regs
     own_ids = await _own_registration_ids(db, regs, user)
     regs = [_public_registration(r, user, is_staff) for r in regs]
@@ -317,7 +317,7 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     if read_model is None:
         read_model = await load_competition_read_model(db, tid)
     if regs is None:
-        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     if own_ids is None:
         own_ids = await _own_registration_ids(db, regs, user)
     # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit

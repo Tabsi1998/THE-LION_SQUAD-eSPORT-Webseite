@@ -14,7 +14,7 @@ import re
 from datetime import datetime
 
 from match_rules import match_allows_draw
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from services.match_attention import attention_items
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
@@ -221,7 +221,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
             {"tournament_id": tournament_id}, {"_id": 0, "creation_key": 0}).to_list(50) if row.get("id")
     }
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tournament_id}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(2000)
+        {"tournament_id": tournament_id}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(REGISTRATION_LIMIT)
     regs_by_id = {row["id"]: row for row in registrations if row.get("id")}
     by_stage: dict[str, list[dict]] = {}
     for match in matches:

@@ -29,7 +29,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.bracket_common import DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, round_label, section_label
 
@@ -188,7 +188,7 @@ async def _load(db, tournament: dict) -> tuple[list[dict], list[dict], list[dict
 
     read_model = await load_competition_read_model(db, tournament["id"])
     matches = adapt_stage_matches(read_model.stage_matches)
-    registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "user_id": 1}).to_list(500)
+    registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "user_id": 1}).to_list(REGISTRATION_LIMIT)
     origin = (frontend_url() or "https://lionsquad.at").rstrip("/")
     return read_model.stages, matches, registrations, origin
 

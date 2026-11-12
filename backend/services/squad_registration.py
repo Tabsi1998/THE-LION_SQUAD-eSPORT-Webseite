@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pymongo.errors import DuplicateKeyError
 
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_eligibility, league_roster
 from services.discord_roles import load_games, top_game
 from services.league_roster import active_league_registrations, min_squad_size
@@ -203,7 +203,7 @@ async def _staffel_state(db, tournament: dict) -> tuple[dict[str, str | None], i
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid},
         {"_id": 0, "team_id": 1, "squad_id": 1, "status": 1},
-    ).to_list(2000)
+    ).to_list(REGISTRATION_LIMIT)
     taken_teams: dict[str, str | None] = {}
     for reg in regs:
         key = reg.get("squad_id") if siblings else reg.get("team_id")

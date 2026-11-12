@@ -39,7 +39,7 @@ from services.bracket_fill_in import (
 from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
-from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
+from models import REGISTRATION_LIMIT, RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
 from services import league_roster, onsite_access, team_history, tournament_event_gate, tournament_fees, tournament_guard, word_filter
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
@@ -514,7 +514,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
     else:
         t_doc = await _get_visible_tournament(tid, user)
     is_staff = await _is_tournament_staff(tid, user)
-    regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     if not is_staff:
         # Weggenommene Ablehnung (#2113): die Person sieht wieder „Anmelden“, die Leitung sieht den Eintrag weiter.
         regs = [r for r in regs if not tournament_guard.rejection_dismissed(r)]

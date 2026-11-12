@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import io
 
 from database import get_db
+from models import REGISTRATION_LIMIT
 from auth import get_optional_user, require_area
 from routes.tournament_common import require_lead_of
 from services.league_permissions import ANY
@@ -277,7 +278,7 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
-    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
     from services.team_history import teams_by_id
     teams = await teams_by_id(db, team_ids)
@@ -297,7 +298,7 @@ async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_lea
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
-    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
@@ -331,7 +332,7 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_lea
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="match_pdf")
     matches = structure["matches"]
-    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     reg_map = {r["id"]: r for r in regs}
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)

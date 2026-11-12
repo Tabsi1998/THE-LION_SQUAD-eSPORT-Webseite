@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from services.league_incident_rules import current_reports
 from services.league_scope import is_league_staffel
 from services.match_deadlines import no_show_action, no_show_candidates, no_show_deadline, no_show_due_text
@@ -178,7 +178,7 @@ async def tournament_attention(db, tournament: dict, *, now: datetime | None = N
     await attach_station_info(db, matches)
     stations = await db.stations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(500)
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(2000)
+        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(REGISTRATION_LIMIT)
     regs_by_id = {row["id"]: row for row in registrations if row.get("id")}
     stages = {row["id"]: row for row in await db.tournament_stages.find(
         {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "settings": 1, "stage_type": 1}).to_list(200) if row.get("id")}

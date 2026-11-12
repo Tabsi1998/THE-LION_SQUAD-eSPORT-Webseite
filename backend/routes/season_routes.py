@@ -15,7 +15,7 @@ from services.competition_read import load_competition_read_model, observe_struc
 from services.competition_standings import standings_for_structure
 from services.private_fields import private_projection
 from services.league_scope import NOT_LEAGUE, league_tournament_ids
-from models import GROUP_LIMIT, now_utc, new_id
+from models import REGISTRATION_LIMIT, GROUP_LIMIT, now_utc, new_id
 
 season_router = APIRouter(prefix="/api/seasons", tags=["seasons"])
 
@@ -380,7 +380,7 @@ async def season_standings(slug_or_id: str):
         regs = await db.tournament_registrations.find(
             {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
             {"_id": 0},
-        ).to_list(500)
+        ).to_list(REGISTRATION_LIMIT)
         reg_user_map = {r["id"]: r.get("user_id") for r in regs}
         read_model = await load_competition_read_model(db, tid)
         snapshot = read_model.structure_snapshot()

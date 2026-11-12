@@ -9,7 +9,7 @@ from services.league_scope import is_league_staffel
 from services.permissions import is_tournament_lead
 from services import moderation_standing
 from auth import get_current_user
-from models import now_utc, new_id
+from models import REGISTRATION_LIMIT, now_utc, new_id
 from services.user_notifications import create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments, register_chat_access
 from services import word_filter
@@ -88,7 +88,7 @@ async def _tournament_chat_user_ids(db, tid: str) -> set[str]:
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
         {"_id": 0, "user_id": 1, "team_id": 1},
-    ).to_list(1000)
+    ).to_list(REGISTRATION_LIMIT)
     user_ids = {row.get("user_id") for row in regs if row.get("user_id")}
     team_ids = {row.get("team_id") for row in regs if row.get("team_id")}
     if team_ids:

@@ -15,7 +15,7 @@ from services.graph_swiss import (
 )
 from services.competition_versions import persist_competition_versions
 from services import tournament_guard
-from models import GROUP_LIMIT, now_utc, new_id
+from models import REGISTRATION_LIMIT, GROUP_LIMIT, now_utc, new_id
 from routes.tournament_common import (
     require_lead_of,
     _audit_tournament_action,
@@ -83,7 +83,7 @@ async def _swiss_next_round_graph(db, tournament: dict, actor_id: str | None) ->
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
         {"_id": 0},
-    ).to_list(500)
+    ).to_list(REGISTRATION_LIMIT)
     documents = swiss_round_documents(
         tournament, stage, regs, played, round_number=round_number,
     )
@@ -195,7 +195,7 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
         {"_id": 0},
-    ).to_list(500)
+    ).to_list(REGISTRATION_LIMIT)
     if len(regs) < 2:
         raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
     try:
