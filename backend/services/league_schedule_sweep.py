@@ -34,7 +34,7 @@ async def _audit(db, action: str, match: dict, data: dict) -> None:
     })
 
 
-async def _tell_sides(db, match: dict, title: str, text: str, reason: str, dedupe: str) -> None:
+async def _tell_sides(db, match: dict, title: str, text: str, reason: str, dedupe: str, *, extra: dict | None = None) -> None:
     from services.match_audience import registrations_for_match, responsible_user_ids
     from services.match_notifications import match_title
     from services.user_notifications import create_user_notification
@@ -48,7 +48,7 @@ async def _tell_sides(db, match: dict, title: str, text: str, reason: str, dedup
             await create_user_notification(
                 user_id, title, body, url=f"/matches/{match.get('id')}", kind="match_schedule",
                 meta={"category": "match_reminders", "match_id": match.get("id"), "tournament_id": match.get("tournament_id"),
-                      "reason": reason, "dedupe_key": dedupe})
+                      "reason": reason, "dedupe_key": dedupe, **(extra or {})})
     except Exception:  # noqa: BLE001 - der Schritt ist schon gespeichert
         logger.warning("[league_schedule_sweep] Nachricht zu %s nicht verschickt", match.get("id"), exc_info=True)
 
@@ -174,10 +174,21 @@ async def expire_requests(db, tournament: dict, now: datetime) -> int:
     return count
 
 
+def result_reminder_held(match: dict) -> bool:
+    """„Ergebnis fehlt“ wartet, solange ein Vorfall (D.5) oder ein Verfahren (E.2) am Spiel offen ist (#1647) - danach kommt sie."""
+    from services import league_incident_rules, league_procedures
+
+    return bool(league_incident_rules.open_incidents(match)) or league_procedures.has_open(match)
+
+
 async def overdue(db, tournament: dict, rules: dict, now: datetime) -> tuple[int, int]:
-    """Erinnerung an beide Seiten, danach „überfällig“ bei der Leitung - je Termin einmal."""
+    """Erinnerung an beide Seiten, danach „überfällig“ bei der Leitung - je Termin einmal. Die Erinnerung lässt sich je Season
+    abschalten (``reminder_rules.result_missing``, #1647) und wartet auf offene Vorfälle und Verfahren."""
+    from services import league_reminder_rules
     from services.league_permissions import staff_user_ids
     from services.user_notifications import create_user_notification
+
+    reminders = league_reminder_rules.rules_of(tournament) or league_reminder_rules.defaults()
 
     matches = await db.matches_v2.find(
         {"tournament_id": tournament["id"], "status": {"$in": list(league_schedule.OVERDUE_OPEN_STATUSES)},
@@ -191,7 +202,8 @@ async def overdue(db, tournament: dict, rules: dict, now: datetime) -> tuple[int
             continue
         base = {"id": match["id"], "scheduled_at": match["scheduled_at"], "reports.0": {"$exists": False},
                 "status": {"$in": list(league_schedule.OVERDUE_OPEN_STATUSES)}}
-        if not match.get("result_reminded_at") and now >= moment + timedelta(hours=int(rules["result_reminder_hours"])):
+        if (not match.get("result_reminded_at") and reminders["result_missing"] and not result_reminder_held(match)
+                and now >= moment + timedelta(hours=int(rules["result_reminder_hours"]))):
             done = await db.matches_v2.update_one({**base, "result_reminded_at": None},
                                                   {"$set": {"result_reminded_at": now.isoformat()}})
             if done.modified_count:
@@ -200,7 +212,8 @@ async def overdue(db, tournament: dict, rules: dict, now: datetime) -> tuple[int
                     db, match, "Ergebnis fehlt",
                     f"Das Spiel war am {league_schedule.when_text(moment)} angesetzt, es ist noch kein Ergebnis gemeldet. "
                     "Bitte jetzt melden – oder im Matchchat @leitung schreiben, wenn es nicht stattgefunden hat.",
-                    "result_missing_reminder", f"result-reminder:{match['id']}:{match['scheduled_at']}")
+                    "result_missing_reminder", f"result-reminder:{match['id']}:{match['scheduled_at']}",
+                    extra=league_reminder_rules.notice_meta(reminders, "result_missing"))
         if not match.get("result_overdue_at") and now >= moment + timedelta(hours=int(rules["result_overdue_hours"])):
             done = await db.matches_v2.update_one({**base, "result_overdue_at": None},
                                                   {"$set": {"result_overdue_at": now.isoformat()}})
