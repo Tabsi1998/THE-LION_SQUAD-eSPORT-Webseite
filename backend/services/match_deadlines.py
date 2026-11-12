@@ -189,8 +189,11 @@ def agreed_outside_week(match: dict, tournament: dict | None) -> bool:
 
 
 def single_report(match: dict) -> dict | None:
-    """Die eine Meldung, die nach der Frist gilt - nur wenn genau eine Seite gemeldet hat."""
-    latest = latest_reports(match.get("reports") or [])
+    """Die eine Meldung, die nach der Frist gilt - nur wenn genau eine Seite gemeldet hat. Nach einem Neustart oder einer
+    Wiederholung einer Map (Vorfälle, D.5) zählen nur Meldungen von danach."""
+    from services.league_incident_rules import current_reports
+
+    latest = latest_reports(current_reports(match))
     return next(iter(latest.values())) if len(latest) == 1 else None
 
 

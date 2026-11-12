@@ -1072,7 +1072,10 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
     from services.v2_match_flows import latest_reports
 
     match = setup.match
-    latest = latest_reports(match.get("reports"))
+    # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht - das Formular fragt neu.
+    from services.league_incident_rules import current_reports
+
+    latest = latest_reports(current_reports(match))
     own_report = latest.get(side_id) if side_id else None
     other_reports = [report for key, report in latest.items() if key != side_id]
     # Regelstand fürs Formular (C.3): Wer bestätigt, wird nach der Regel der Erstmeldung geprüft; sonst gilt die der Staffel.

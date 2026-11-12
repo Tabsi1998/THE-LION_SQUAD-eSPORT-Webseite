@@ -499,7 +499,8 @@ async def test_a_decided_replay_is_settled_in_two_steps(flow):
     at_once = await decide(flow, w, incident_id, "replay", settle=SETTLE)
     assert at_once.status_code == 422 and "erst gespielt" in at_once.json()["detail"]
     decided = await decide(flow, w, incident_id, "replay")
-    assert decided.status_code == 200 and decided.json()["hold"]["code"] == "unsettled", decided.text
+    assert decided.status_code == 200 and decided.json()["hold"]["code"] == "rereport", decided.text
+    assert "Map 2 wird wiederholt – danach meldet ihr die Serie neu" in decided.json()["hold"]["text"]
     entry = (await stored(flow, w))["incidents"][0]
     assert entry["voided"]["score"] == {w["reg_a"]["id"]: 3, w["reg_h"]["id"]: 4} and entry["decision"]["settled_at"] is None
 
@@ -526,6 +527,117 @@ async def test_a_decided_replay_is_settled_in_two_steps(flow):
 
 
 @pytest.mark.asyncio
+async def test_agreeing_to_a_replay_never_confirms_reports_made_before_it(flow):
+    """Beide Seiten melden 2:0 unter Vorbehalt, danach einigen sie sich auf die Wiederholung von Map 2: Die alten Meldungen
+    beschreiben die ungültige Austragung und werden nie zum Ergebnis."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    held = await both_report(flow, w)
+    assert held["report_status"] == "clarification"
+
+    agreed = await answered(flow, w, incident_id, True)
+    assert agreed.status_code == 200, agreed.text
+    assert agreed.json()["result_confirmed"] is False and agreed.json()["hold"]["code"] == "rereport"
+    match = await stored(flow, w)
+    assert match["status"] != "completed" and "games" not in match and not match.get("results")
+    assert len(match["reports"]) == 2, "die alten Meldungen bleiben als Verlauf stehen"
+    assert league_incidents.current_reports(match) == []
+
+    # Beide Seiten und die Leitung lesen, was jetzt gilt; die Seiten bekommen wieder das leere Meldeformular.
+    for viewer in (w["users"]["Kapitaen"], w["users"]["Falke1"], w["staff"]):
+        flow.act_as(viewer)
+        seen = await page(flow, w)
+        assert "Map 2 wird wiederholt – danach meldet ihr die Serie neu" in seen["league"]["incident_info"]["hold"]["text"]
+        assert seen["league"]["incident_info"]["hold"]["code"] == "rereport"
+    flow.act_as(w["users"]["Falke1"])
+    seen = await page(flow, w)
+    assert seen["report_state"]["status"] == "open" and seen["league"]["proposal_games"] == [] and seen["league"]["own_games"] == []
+    told = await flow.db.notifications.find({"meta.dedupe_key": f"incident:{incident_id}:answered"}, {"_id": 0, "body": 1}).to_list(5)
+    assert told and all("danach meldet ihr die Serie neu" in row["body"] for row in told)
+
+    # Dieselbe Meldung noch einmal ist keine Wiederholung der alten: Sie zählt neu. Erst die zweite neue Meldung bestätigt.
+    flow.act_as(w["users"]["Kapitaen"])
+    first = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=lions(w)))
+    assert first.status_code == 200 and first.json()["idempotent_replay"] is False and first.json()["report_status"] == "waiting"
+    assert (await stored(flow, w))["status"] != "completed"
+    flow.act_as(w["users"]["Falke1"])
+    second = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=falcons(w)))
+    assert second.status_code == 200 and second.json()["awaiting_confirmation"] is False
+    match = await stored(flow, w)
+    assert match["status"] == "completed" and match["games"][1]["status"] == "replayed" and match["games"][1]["incident_id"] == incident_id
+
+
+@pytest.mark.asyncio
+async def test_agreeing_to_continue_confirms_matching_reports_at_once(flow):
+    """Gegenprobe: Ohne Neustart oder Wiederholung bleiben die Meldungen gültig - das Bestätigen hat nur geruht."""
+    w = await world(flow)
+    incident_id = await reported(flow, w, proposal="continue_at_score")
+    await both_report(flow, w)
+    agreed = await answered(flow, w, incident_id, True)
+    assert agreed.status_code == 200 and agreed.json()["result_confirmed"] is True, agreed.text
+    match = await stored(flow, w)
+    assert match["status"] == "completed" and all("status" not in game for game in match["games"])
+
+
+@pytest.mark.asyncio
+async def test_a_single_report_from_before_a_replay_is_never_confirmed_by_the_deadline(flow):
+    w = await world(flow)
+    tournament = await flow.db.tournaments.find_one({"id": w["tournament"]["id"]}, {"_id": 0})
+    flow.act_as(w["users"]["Kapitaen"])
+    assert (await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=lions(w)))).status_code == 200
+    incident_id = await reported(flow, w, who="Falke1")
+    assert (await answered(flow, w, incident_id, True, who="Kapitaen")).status_code == 200
+    match = await stored(flow, w)
+    assert match_deadlines.single_report(match) is None and match_deadlines.auto_confirm_due(match, tournament) is None
+    swept = await deadline_sweep(flow.db, now=now_utc() + timedelta(days=5))
+    assert swept["confirmed"] == 0
+    match = await stored(flow, w)
+    assert match["status"] != "completed" and "games" not in match
+
+    # Gegenprobe: Eine Meldung nach der Wiederholung läuft wieder in die Frist-Automatik und trägt die Markierung.
+    flow.act_as(w["users"]["Kapitaen"])
+    assert (await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=lions(w)))).status_code == 200
+    match = await stored(flow, w)
+    assert match_deadlines.auto_confirm_due(match, tournament) is not None
+    swept = await deadline_sweep(flow.db, now=now_utc() + timedelta(days=5))
+    assert swept["confirmed"] == 1
+    match = await stored(flow, w)
+    assert match["status"] == "completed" and match["games"][1]["status"] == "replayed"
+
+
+@pytest.mark.asyncio
+async def test_a_decided_replay_is_only_settled_after_it_was_reported_again(flow):
+    """Beide melden 2:0, die Leitung entscheidet „wiederholen“: Feststellen geht erst, wenn danach neu gemeldet ist."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    assert (await answered(flow, w, incident_id, False)).status_code == 200
+    await both_report(flow, w)
+    assert (await decide(flow, w, incident_id, "replay")).status_code == 200
+    flow.act_as(w["staff"])
+    early = await flow.post(url(w, f"/{incident_id}/settle"), json={**SETTLE, "reason": "Sofort festgestellt"})
+    assert early.status_code == 409 and "Map 2 wird erst neu gespielt" in early.json()["detail"]
+    match = await stored(flow, w)
+    assert match["status"] != "completed" and match["incidents"][0]["decision"]["settled_at"] is None
+    seen = (await page(flow, w))["league"]
+    assert seen["incidents"][0]["can_settle"] is False and seen["incidents"][0]["awaits_replay"] is True
+    assert seen["incident_info"]["hold"]["code"] == "rereport"
+
+    # Eine Seite meldet neu: Jetzt lässt sich feststellen; gültig wird das Ergebnis mit der zweiten neuen Meldung.
+    flow.act_as(w["users"]["Kapitaen"])
+    again = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=lions(w)))
+    assert again.status_code == 200 and "stellt die Serie noch fest" in again.json()["result_hold"]
+    flow.act_as(w["staff"])
+    assert (await page(flow, w))["league"]["incidents"][0]["can_settle"] is True
+    settled = await flow.post(url(w, f"/{incident_id}/settle"), json={**SETTLE, "reason": "Wiederholung gespielt und gemeldet"})
+    assert settled.status_code == 200 and settled.json()["result_confirmed"] is False, settled.text
+    flow.act_as(w["users"]["Falke1"])
+    confirmed = await flow.post(f"/api/matches/{w['match']['id']}/report", json=two_nil(w, lineup=falcons(w)))
+    assert confirmed.status_code == 200 and confirmed.json()["awaiting_confirmation"] is False
+    match = await stored(flow, w)
+    assert match["status"] == "completed" and match["games"][1]["status"] == "replayed"
+
+
+@pytest.mark.asyncio
 async def test_the_lead_records_an_incident_and_marks_a_replay_in_an_entered_result(flow):
     w = await world(flow)
     flow.act_as(w["staff"])
@@ -534,8 +646,11 @@ async def test_the_lead_records_an_incident_and_marks_a_replay_in_an_entered_res
     entry = (await stored(flow, w))["incidents"][0]
     assert entry["reported_by"]["registration_id"] is None and entry["review_cause"] is None
     assert (await decide(flow, w, entry["id"], "replay")).status_code == 200
+    # Niemand hat nach der Wiederholung gemeldet: Festzustellen gibt es noch nichts - die Leitung trägt das Ergebnis selbst ein,
+    # damit steht die Serie fest.
     flow.act_as(w["staff"])
-    assert (await flow.post(url(w, f"/{entry['id']}/settle"), json={**SETTLE, "reason": "Wiederholung gespielt"})).status_code == 200
+    early = await flow.post(url(w, f"/{entry['id']}/settle"), json={**SETTLE, "reason": "Wiederholung gespielt"})
+    assert early.status_code == 409 and "wird erst neu gespielt" in early.json()["detail"]
 
     lineups = {w["reg_a"]["id"]: lions(w), w["reg_h"]["id"]: falcons(w)}
     games = [{**game, "lineups": lineups} for game in two_nil(w)["games"]]

@@ -120,10 +120,12 @@ async def _side(match: dict, user: dict) -> str:
 
 async def _after_change(db, match_id: str, tournament: dict, setup, user: dict) -> dict:
     """Nach jedem Schritt: Hält nichts mehr das Ergebnis auf und stimmen die Meldungen beider Seiten überein, gilt es jetzt - das
-    Bestätigen hat nur geruht. Sonst bleibt alles, wie es ist (eine einzelne Meldung nimmt die Frist-Automatik)."""
+    Bestätigen hat nur geruht. Sonst bleibt alles, wie es ist (eine einzelne Meldung nimmt die Frist-Automatik). Nach einem Neustart
+    oder einer Wiederholung zählen dabei nur Meldungen von danach: Eine Einigung auf „wiederholen“ macht nie ein Ergebnis gültig,
+    das vorher gemeldet wurde."""
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     hold = league_incidents.result_block(match)
-    agreed = None if hold else report_consensus((match or {}).get("reports") or [])
+    agreed = None if hold else report_consensus(league_incidents.current_reports(match))
     if not agreed or str(match.get("status") or "") in league_incidents.FINAL_STATUSES or isinstance(match.get("pending_result"), dict):
         return {"result_confirmed": False, "hold": hold}
     try:

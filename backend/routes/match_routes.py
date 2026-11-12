@@ -671,7 +671,8 @@ def _accepts_reports(match: dict) -> bool:
 
 
 async def _report_view(db, match: dict, acting_reg: dict, can_confirm: bool = True) -> dict:
-    state = report_state(match.get("reports") or [], acting_reg.get("id"))
+    # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht - die Seite fragt neu.
+    state = report_state(league_incidents.current_reports(match), acting_reg.get("id"))
     registrations = await _registrations_for_match(match)
     regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
     own, proposal = state["own"], state["proposal"]
@@ -1508,10 +1509,11 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
-    # Vorfälle (D.5, #1619): Erst entscheiden und die Serie feststellen, dann gilt ein Ergebnis - auch das der Leitung.
+    # Vorfälle (D.5, #1619): Solange ein Vorfall offen ist, trägt auch die Leitung kein Ergebnis ein - erst entscheiden. Ist
+    # entschieden, stellt das eingetragene Ergebnis die Serie fest (auch nach einer Wiederholung, die niemand neu gemeldet hat).
     hold = league_incidents.result_block(match)
-    if hold:
-        raise HTTPException(status_code=409, detail=f"{hold['text']} Bitte zuerst über den Vorfall entscheiden und die Serie feststellen.")
+    if hold and hold["code"] in league_incidents.OPEN_HOLD_CODES:
+        raise HTTPException(status_code=409, detail=f"{hold['text']} Bitte zuerst über den Vorfall entscheiden.")
     try:
         # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“ und Grund - nie Best of, Pool oder Aufstellung.
         override = await league_result_rules.override_reason(db, me, match, body.rule_override_reason)
@@ -1764,6 +1766,10 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         raise HTTPException(status_code=409, detail="Dieses Spiel ist in Klärung – die Turnierleitung entscheidet.")
     if status in REPORT_CLOSED_STATUSES:
         raise HTTPException(status_code=409, detail="Dieses Spiel ist schon entschieden.")
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Wird eine Map neu gestartet oder wiederholt, beschreiben frühere Meldungen die ungültige Austragung -
+        # für Vergleich, Wiederholung derselben Meldung und Bestätigung zählt nur, was danach gemeldet wurde.
+        match = {**match, "reports": league_incidents.current_reports(match)}
     # Liga-Check-in (D.2, #1652): mit Check-in-Regeln melden die Captains erst, wenn beide Seiten für diesen Termin eingecheckt
     # sind und keine Regelfassung offen ist - der Satz sagt, wer fehlt. Die Leitung trägt über /result weiter ohne Check-in ein.
     checkin_sides = None
@@ -1829,12 +1835,13 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
     })
 
     stored = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or match
-    agreed = report_consensus(stored.get("reports") or [])
     # Vorfälle (D.5, #1619): Solange einer offen ist oder die Serie noch festgestellt werden muss, ruht das Bestätigen - die
-    # Meldung ist gespeichert, gültig wird nichts.
+    # Meldung ist gespeichert, gültig wird nichts. Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht mehr.
+    current = league_incidents.current_reports(stored)
+    agreed = report_consensus(current)
     hold = league_incidents.result_block(stored) if league else None
     if not agreed or hold:
-        conflict = reports_conflict(stored.get("reports") or [])
+        conflict = reports_conflict(current)
         # Wer gemeldet hat, sieht auf der Seite, wie es weitergeht; die anderen bekommen eine Nachricht (#1132).
         try:
             if conflict:
@@ -1865,11 +1872,12 @@ async def _confirm_agreed_result(db, stored: dict, league, agreed: list[dict], *
                                  note: str | None = None) -> dict:
     """Zwei übereinstimmende Meldungen werden zum Ergebnis - beim Bestätigen und, wenn das Bestätigen wegen eines Vorfalls geruht
     hat, sobald nichts mehr dagegen steht (``league_incident_routes``). Der Aufrufer hält Turnier- und Season-Sperre."""
-    final_games, missing = (league_games.consensus_games(stored.get("reports"), league.reg_ids) if league
+    reports = league_incidents.current_reports(stored)
+    final_games, missing = (league_games.consensus_games(reports, league.reg_ids) if league
                             else (None, []))
     final_lineups = None
     if league and league.is_series and final_games is not None:
-        final_lineups, missing = league_games.consensus_lineups(stored.get("reports"), league.reg_ids)
+        final_lineups, missing = league_games.consensus_lineups(reports, league.reg_ids)
     if league and final_games is not None and stored.get("incidents"):
         # Vorfälle (D.5): je Position genau eine geltende Austragung - wiederholt, zugesprochen oder nicht gezählt.
         final_games, agreed = await league_incidents.finalize(db, stored, final_games, agreed)

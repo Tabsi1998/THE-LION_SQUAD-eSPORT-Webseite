@@ -31,9 +31,9 @@ from services.league_incident_rules import (  # noqa: F401 - weiterhin über lea
     MAX_PLAYERS, MAX_ROUND, MAX_SCORE, NOTE_MAX, NOT_A_SIDE_DETAIL, NOT_FINALIZABLE_DETAIL, NOT_FOUND_DETAIL,
     NO_ACTION, OUTCOMES, OUTCOME_LABELS, PROPOSALS, PROPOSAL_LABELS, PROPOSED, QUOTA_KINDS, REASON_MAX, REASON_MIN,
     REHOST, REJECTED, REPLAY, REPLAY_REASON_MAX, RESTART, VOIDING, WITHDRAWN, _effects, _replay_reason,
-    confirm_clock, counts_quota, due_at, export_steps, final_games, find, incidents_of, is_open, map_states,
-    mark_replays, missing_positions, outcome_of, position_of, positions_in_clarification, quota_used, report_refusal,
-    result_block, scrub, setting_of, state_of, surplus_positions,
+    OPEN_HOLD_CODES, REPLAY_FIRST_DETAIL, awaits_replay, confirm_clock, counts_quota, current_reports, due_at, export_steps, final_games, find, incidents_of,
+    is_open, map_states, mark_replays, missing_positions, outcome_of, position_of, positions_in_clarification, quota_used,
+    replay_cutoff, replay_pending, replay_text, report_refusal, result_block, scrub, setting_of, state_of, surplus_positions,
 )
 from services.league_presets import INCIDENT_FIELDS
 from services.log_safe import log_safe
@@ -329,8 +329,10 @@ async def answer(db, match: dict, setup, incident_id: str, *, user: dict, regist
     side = setup.names.get(registration_id, "Die Gegenseite")
     where = f"Map {position_of(entry)}"
     if accept:
+        # Neustart oder Wiederholung: Frühere Meldungen zählen nicht mehr - das steht gleich in der Nachricht.
+        again = f" {replay_text(changed)}" if changed.get("voided") else ""
         await _tell(db, stored, [reporter], "Vorfall: Einigung",
-                    f"{side} stimmt eurem Vorschlag zu {where} zu: {PROPOSAL_LABELS.get(entry.get('proposal'), 'Vorschlag')}.",
+                    f"{side} stimmt eurem Vorschlag zu {where} zu: {PROPOSAL_LABELS.get(entry.get('proposal'), 'Vorschlag')}.{again}",
                     "answered", changed, skip=user.get("id"))
     else:
         await _tell_review(db, stored, changed, f"{side} hat den Vorschlag zu {where} abgelehnt.", skip=user.get("id"))
@@ -401,9 +403,10 @@ async def decide(db, match: dict, setup, incident_id: str, *, user: dict, outcom
     await _audit(db, "match.incident.decide", match, user.get("id"), changed, outcome=outcome, settled=settle is not None,
                  **({"awarded_to": awarded_to} if awarded_to else {}))
     extra = f" ({setup.names.get(awarded_to, 'Seite')})" if awarded_to else ""
+    again = f" {replay_text(changed)}" if outcome in VOIDING else ""
     await _tell(db, stored, setup.reg_ids, "Vorfall entschieden",
-                f"Die Liga-Leitung hat zu Map {position_of(entry)} entschieden: {OUTCOME_LABELS[outcome]}{extra}. Die Begründung steht "
-                "auf der Matchseite.", "decided", changed, skip=user.get("id"))
+                f"Die Liga-Leitung hat zu Map {position_of(entry)} entschieden: {OUTCOME_LABELS[outcome]}{extra}.{again} Die Begründung "
+                "steht auf der Matchseite.", "decided", changed, skip=user.get("id"))
     return changed
 
 
@@ -415,6 +418,8 @@ async def settle(db, match: dict, setup, incident_id: str, *, user: dict, body: 
         raise IncidentProblem("Die Serie stellst du fest, nachdem über den Vorfall entschieden ist.", 409)
     if str(match.get("status") or "") in FINAL_STATUSES:
         raise IncidentProblem("Das Ergebnis des Spiels steht schon fest.", 409)
+    if awaits_replay(match, entry):
+        raise IncidentProblem(REPLAY_FIRST_DETAIL.format(position=position_of(entry)), 409)
     now_iso = (now or now_utc()).isoformat()
     fields = _settle_fields(setup, body, user=user, now_iso=now_iso)
     changed = {**entry, "decision": {**(entry.get("decision") or {}), **fields}}
@@ -536,7 +541,9 @@ def incident_view(match: dict, entry: dict, *, names: dict[str, str], people: di
         "can_answer": bool(can_act and own_id and reporter and own_id != reporter and waiting),
         "can_withdraw": bool(can_act and own_id and own_id == reporter and state == PROPOSED),
         "can_decide": bool(lead and state == IN_REVIEW),
-        "can_settle": bool(lead and state == DECIDED and not final),
+        # Nach Neustart oder Wiederholung erst, wenn danach neu gemeldet ist - vorher gibt es nichts festzustellen.
+        "can_settle": bool(lead and state == DECIDED and not final and not awaits_replay(match, entry)),
+        "awaits_replay": awaits_replay(match, entry),
     }
 
 

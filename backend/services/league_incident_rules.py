@@ -57,6 +57,11 @@ ANSWERED_DETAIL = "Dieser Vorfall ist schon beantwortet oder abgeschlossen."
 LATE_DETAIL = "Die Antwortzeit ist vorbei – der Vorfall liegt jetzt bei der Liga-Leitung."
 NOT_FINALIZABLE_DETAIL = ("Die Meldungen passen nicht zur Entscheidung der Liga-Leitung über den Vorfall – das Ergebnis trägt die "
                           "Liga-Leitung ein.")
+REPLAY_FIRST_DETAIL = ("Map {position} wird erst neu gespielt. Die Serie stellst du fest, sobald das Ergebnis danach neu gemeldet "
+                       "ist – oder du trägst es selbst ein.")
+# Was die Leitung am Eintragen eines Ergebnisses hindert: nur ein offener Vorfall. Ist entschieden, stellt das eingetragene Ergebnis
+# die Serie fest.
+OPEN_HOLD_CODES = frozenset({"in_review", "proposed"})
 
 
 class IncidentProblem(Exception):
@@ -142,11 +147,54 @@ def missing_positions(match: dict | None) -> list[int]:
     return sorted(out)
 
 
+def replay_cutoff(match: dict | None) -> datetime | None:
+    """Ab wann Meldungen wieder zählen: der späteste Zeitpunkt, zu dem eine Map für ungültig erklärt wurde (Neustart oder
+    Wiederholung, per Einigung oder Entscheidung). ``None``: keine Map wird neu gespielt."""
+    moments = []
+    for row in incidents_of(match):
+        if outcome_of(row) in VOIDING:
+            voided_at = moment((row.get("voided") or {}).get("at"))
+            if voided_at:
+                moments.append(voided_at)
+    return max(moments) if moments else None
+
+
+def current_reports(match: dict | None) -> list[dict]:
+    """Die Meldungen, die noch zählen. Wird eine Map neu gestartet oder wiederholt, beschreibt jede frühere Meldung die ungültige
+    Austragung: Für Übereinstimmung, Einzelmeldung und Frist-Automatik zählt nur, was **danach** gemeldet wurde."""
+    reports = [row for row in (match or {}).get("reports") or [] if isinstance(row, dict)]
+    cutoff = replay_cutoff(match)
+    if cutoff is None:
+        return reports
+    return [row for row in reports if (moment(row.get("at")) or cutoff) > cutoff]
+
+
+def replay_pending(match: dict | None) -> dict | None:
+    """Der Vorfall, dessen Neustart oder Wiederholung noch nicht neu gemeldet ist - ``None``: nichts steht aus."""
+    cutoff = replay_cutoff(match)
+    if cutoff is None or current_reports(match):
+        return None
+    voiding = [row for row in incidents_of(match) if outcome_of(row) in VOIDING and moment((row.get("voided") or {}).get("at"))]
+    return max(voiding, key=lambda row: moment(row["voided"]["at"])) if voiding else None
+
+
+def awaits_replay(match: dict | None, entry: dict) -> bool:
+    """Dieser Vorfall hat die Map für ungültig erklärt, und seither ist nicht neu gemeldet: Die Serie lässt sich noch nicht
+    feststellen."""
+    return outcome_of(entry) in VOIDING and bool(replay_cutoff(match)) and not current_reports(match)
+
+
+def replay_text(entry: dict) -> str:
+    how = "neu gestartet" if outcome_of(entry) == RESTART else "wiederholt"
+    return f"Map {position_of(entry)} wird {how} – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr."
+
+
 def result_block(match: dict | None) -> dict | None:
     """Warum gerade kein Ergebnis dieses Spiels gültig wird - ``None``: nichts hält es auf. ``{code, position, text}``.
 
-    Offen ist ein Vorfall, solange er nicht ``agreed``, ``decided`` oder ``withdrawn`` ist. Nach einer Entscheidung der Leitung gilt
-    das Ergebnis erst, wenn sie die Serie festgestellt hat und keine Position mehr fehlt."""
+    Offen ist ein Vorfall, solange er nicht ``agreed``, ``decided`` oder ``withdrawn`` ist. Wird eine Map neu gestartet oder
+    wiederholt, gilt nichts, bis danach neu gemeldet ist (``rereport``). Nach einer Entscheidung der Leitung gilt das Ergebnis erst,
+    wenn sie die Serie festgestellt hat und keine Position mehr fehlt."""
     rows = incidents_of(match)
     review = [row for row in rows if state_of(row) == IN_REVIEW]
     if review:
@@ -158,6 +206,9 @@ def result_block(match: dict | None) -> dict | None:
         position = min(position_of(row) for row in waiting)
         return {"code": "proposed", "position": position,
                 "text": f"Zu Map {position} ist ein Vorfall gemeldet – die Gegenseite antwortet noch. Bis dahin gilt kein Ergebnis."}
+    pending = replay_pending(match)
+    if pending:
+        return {"code": "rereport", "position": position_of(pending), "text": replay_text(pending)}
     decided = [row for row in rows if state_of(row) == DECIDED]
     unsettled = [row for row in decided if not (row.get("decision") or {}).get("settled_at")]
     if unsettled:
