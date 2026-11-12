@@ -137,12 +137,34 @@ test("ist die Antwortzeit um, lädt die Seite einmal neu", async () => {
   expect(screen.getByTestId("incident-countdown-text-v1")).toHaveTextContent("vorbei");
 });
 
-test("mit „Bewegung reduzieren“ steht der Balken, nur die Zahl zählt", async () => {
+/** Der Anteil, den der Balken zeigt (0 bis 1). */
+function barShare(bar) {
+  return Number(bar.style.transform.match(/scaleX\(([\d.]+)\)/)?.[1]);
+}
+
+test("mit „Bewegung reduzieren“ zeigt der Balken die echte Restzeit - nur ohne Gleiten", async () => {
   window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
+  const frames = vi.spyOn(window, "requestAnimationFrame");
   await show({ ...LEAGUE, incidents: [incident()] });
   const bar = screen.getByTestId("incident-countdown-v1").querySelector(".tls-incident-bar");
-  expect(bar.style.transform).toBe("scaleX(1)");
+  // Gemeldet vor 60 Sekunden, noch 247 Sekunden: rund vier Fünftel - nicht voll.
+  expect(barShare(bar)).toBeGreaterThan(0.78);
+  expect(barShare(bar)).toBeLessThan(0.82);
+  expect(bar).toHaveAttribute("data-moving", "false");
+  expect(frames).not.toHaveBeenCalled();
   expect(screen.getByTestId("incident-countdown-text-v1").textContent).toMatch(/^4:0\d$/);
+  frames.mockRestore();
+});
+
+test("Gegenprobe: mit Bewegung läuft der Balken je Bild", async () => {
+  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const frames = vi.spyOn(window, "requestAnimationFrame");
+  await show({ ...LEAGUE, incidents: [incident()] });
+  const bar = screen.getByTestId("incident-countdown-v1").querySelector(".tls-incident-bar");
+  expect(bar).toHaveAttribute("data-moving", "true");
+  expect(barShare(bar)).toBeGreaterThan(0.78);
+  expect(frames).toHaveBeenCalled();
+  frames.mockRestore();
 });
 
 test("die Liga-Leitung entscheidet mit Begründung und stellt die Serie fest", async () => {

@@ -292,7 +292,7 @@ test.describe("Liga: Vorfälle im Spiel", () => {
     });
   }
 
-  test("mit „Bewegung reduzieren“ steht der Balken voll und nichts atmet", async ({ page }) => {
+  test("mit „Bewegung reduzieren“ zeigt der Balken die echte Restzeit ohne Gleiten, und nichts atmet", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 390, height: 1000 });
     const rows = [incident({ can_answer: true }), incident({ id: "v2", position: 1, state: "in_review", can_answer: false })];
@@ -300,7 +300,14 @@ test.describe("Liga: Vorfälle im Spiel", () => {
     await page.goto("/matches/m1");
     await expect(page.getByTestId("incident-countdown-text-v1")).toHaveText(/^[78]:\d\d$/);
     const bar = page.getByTestId("incident-countdown-v1").locator(".tls-incident-bar");
-    await expect(bar).toHaveAttribute("style", /scaleX\(1\)/);
+    const share = async () => Number((await bar.getAttribute("style")).match(/scaleX\(([\d.]+)\)/)?.[1]);
+    // Gemeldet vor 2 Minuten, noch 8 von 10: rund vier Fünftel - nicht voll. Ohne Gleiten: nur ein Schritt je Sekunde.
+    await expect(bar).toHaveAttribute("data-moving", "false");
+    const first = await share();
+    expect(first).toBeGreaterThan(0.7);
+    expect(first).toBeLessThan(0.85);
+    await expect.poll(share, { timeout: 5000 }).toBeLessThan(first);
+    expect(first - (await share())).toBeLessThan(0.02);
     const pulse = await page.getByTestId("incident-state-v2").evaluate((node) => window.getComputedStyle(node, "::after").animationName);
     expect(pulse).toBe("none");
   });

@@ -50,7 +50,10 @@ export function MapStateNotes({ league }) {
   );
 }
 
-/** Der Countdown der Antwortzeit: Zahl im Sekundentakt, der Balken je Bild ohne React-Durchlauf (nur transform). */
+/**
+ * Der Countdown der Antwortzeit: Zahl im Sekundentakt, der Balken je Bild ohne React-Durchlauf (nur transform). Mit „Bewegung
+ * reduzieren“ zeigt der Balken dieselbe echte Restzeit - er springt nur mit der Zahl einmal je Sekunde weiter, ohne zu gleiten.
+ */
 function AnswerCountdown({ incident, offset, onDone }) {
   const bar = useRef(null);
   const fired = useRef(false);
@@ -84,7 +87,8 @@ function AnswerCountdown({ incident, offset, onDone }) {
         <span className="font-display text-xl font-bold tabular-nums text-white" data-testid={`incident-countdown-text-${incident.id}`}>{left > 0 ? remainingText(left) : "vorbei"}</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
-        <div ref={bar} className="tls-incident-bar h-full rounded-full bg-honor" style={{ transform: `scaleX(${moving ? remainingShare(incident, now, offset) : 1})` }} />
+        <div ref={bar} className="tls-incident-bar h-full rounded-full bg-honor" data-moving={moving ? "true" : "false"}
+          style={{ transform: `scaleX(${remainingShare(incident, now, offset)})` }} />
       </div>
     </div>
   );

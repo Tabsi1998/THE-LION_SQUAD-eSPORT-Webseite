@@ -3595,7 +3595,8 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 /* Vorfälle im Spiel (D.5, #1619): Ein Formular oder eine Antwortfläche hebt sich beim Aufklappen 6 px an und blendet ein;
    „In Klärung“ atmet leise - der Rahmen-Schein steht fest, nur seine Deckkraft läuft; der Balken der Antwortzeit schrumpft
    von links (nur transform, je Bild in IncidentPanel.jsx gesetzt). Der Haken einer Einigung nutzt .tls-checkin-tick.
-   „Bewegung reduzieren“: nichts hebt sich, nichts atmet, der Balken steht voll - nur die Zahl zählt. */
+   Höchstens ein Abzeichen atmet. „Bewegung reduzieren“: nichts hebt sich, nichts atmet; der Balken zeigt weiter die echte
+   Restzeit, rückt aber nur mit der Zahl einmal je Sekunde nach - ohne Übergang, ohne Gleiten. */
 @keyframes tls-incident-open { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes tls-incident-pulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
 .tls-incident-open { animation: tls-incident-open var(--tls-motion-mid) var(--tls-ease) both; }
