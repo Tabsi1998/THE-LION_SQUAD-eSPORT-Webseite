@@ -61,7 +61,9 @@ const PROOFS = { items: [{ id: "n1", type: "link", kind: "protest", ref_id: "p1"
 const MOSS = { items: [{ id: "z1", type: "file", kind: "moss", ref_id: "p1", side: "a", own: false, own_side: false, can_remove: false,
   url: "/api/matches/m1/proofs/z1/file", size: 18400000, sha256: "9f2c".repeat(16) }], open: true, can_add: true, limit: 10, link_max_length: 500 };
 
-async function setup(page, first, { role = "player", next = null } = {}) {
+// `canAdd`: zu welchem Bezug der Server dieser Rolle das Hinzufügen erlaubt - wie services/match_proofs.add_refusal. Die Gegenseite
+// reicht zum Protest nichts nach, nur zur Stellungnahme; MOSS lädt nur hoch, wessen Datei angefordert ist, oder die Leitung.
+async function setup(page, first, { role = "player", next = null, canAdd = { protest: true } } = {}) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
@@ -80,7 +82,10 @@ async function setup(page, first, { role = "player", next = null } = {}) {
       if (next) payload = next;
       return route.fulfill(json({ id: "m1", procedure_id: "p1", idempotent_replay: false }));
     }
-    if (where.pathname === "/api/matches/m1/proofs") return route.fulfill(json(where.searchParams.get("kind") === "moss" ? MOSS : PROOFS));
+    if (where.pathname === "/api/matches/m1/proofs") {
+      const kind = where.searchParams.get("kind");
+      return route.fulfill(json({ ...(kind === "moss" ? MOSS : PROOFS), can_add: Boolean(canAdd[kind]) }));
+    }
     if (where.pathname === "/api/matches/m1/appeals" && request.method() === "POST") {
       calls.posts.push(["appeals", request.postDataJSON()]);
       return route.fulfill(json({ procedures: [], contested: true, procedure_id: "e1" }));
@@ -144,16 +149,20 @@ test.describe("Liga: Beanstandung, Protest und Einspruch", () => {
       await expect(page.getByTestId("procedure-proofs-link-input")).toBeVisible();
       await expect(page.getByTestId("match-contested")).toContainText("In Klärung");
       await expect(page.getByTestId("procedure-p1")).toBeVisible();
+      // Jede Info an einer Stelle: Solange Schritt 3 offen ist, zeigt die Karte darunter die Nachweis-Liste nicht noch einmal.
+      await expect(page.getByTestId("procedure-proofs-elsewhere-p1")).toBeVisible();
+      await expect(page.getByTestId("procedure-proofs-p1")).toHaveCount(0);
       await noSideScroll(page);
       await shot(page, page.getByTestId("match-dispute-form"), "problem-melden-nachweise", width);
       await page.getByTestId("procedure-done").click();
       await expect(page.getByTestId("match-dispute-form")).toHaveCount(0);
       await expect(page.getByTestId("procedure-withdraw-p1")).toBeVisible();
+      await expect(page.getByTestId("procedure-proofs-p1")).toBeVisible();
     });
 
     test(`die Gegenseite sieht bei ${width} px Grund, Fristen und nimmt Stellung`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      const calls = await setup(page, OPPONENT);
+      const calls = await setup(page, OPPONENT, { canAdd: { statement: true } });
       await page.goto("/matches/m1");
       const card = page.getByTestId("procedure-p1");
       await expect(card.getByTestId("procedure-reason-p1")).toContainText("falsch gemeldet");
@@ -162,6 +171,11 @@ test.describe("Liga: Beanstandung, Protest und Einspruch", () => {
       await expect(card.getByTestId("procedure-assignee-p1")).toContainText("Übernommen von Liga-Leitung Nord");
       await expect(card.getByTestId("procedure-lead-p1")).toHaveCount(0);
       await expect(card.getByTestId("procedure-moss-p1")).toHaveCount(0);
+      // Zum Protest reicht die Gegenseite nichts nach - Upload-Knöpfe gibt es für sie nur an der Stellungnahme.
+      await expect(card.getByTestId("procedure-proofs-p1-closed")).toBeVisible();
+      await expect(card.getByTestId("procedure-proofs-p1-add")).toHaveCount(0);
+      await expect(card.getByTestId("procedure-statement-proofs-p1-add")).toBeVisible();
+      await expect(card.getByText(/Nachweise sehen nur die beiden Seiten/)).toHaveCount(1);
       await expect(page.getByTestId("match-dispute-form")).toHaveCount(0);
       await card.getByTestId("procedure-statement-input-p1").fill("Die Map wurde korrekt gemeldet, die Aufzeichnung liegt bei.");
       await noSideScroll(page);
@@ -172,13 +186,15 @@ test.describe("Liga: Beanstandung, Protest und Einspruch", () => {
 
     test(`die Leitung übernimmt, fordert MOSS an und entscheidet bei ${width} px nur mit Begründung`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      const calls = await setup(page, LEAD, { role: "admin" });
+      const calls = await setup(page, LEAD, { role: "admin", canAdd: { protest: true, statement: true, moss: true } });
       await page.goto("/matches/m1");
       const card = page.getByTestId("procedure-p1");
       await expect(card.getByTestId("procedure-claimed-p1")).toContainText("1 : 2");
       await expect(card.getByTestId("procedure-target-p1")).toContainText("noch");
       await expect(card.getByTestId("procedure-moss-request-r1")).toContainText("angefordert");
       await expect(card.getByTestId("procedure-moss-proofs-p1-file-z1")).toContainText("MOSS-Datei (ZIP, 17,5 MB)");
+      // Für die Leitung sind die Nebenlisten eingeklappt - die Karte bleibt kurz.
+      await expect(card.getByTestId("procedure-moss-fold-p1")).not.toHaveAttribute("open", /.*/);
       await expect(card.getByTestId("procedure-keep-p1")).toBeDisabled();
       await card.getByTestId("procedure-note-p1").fill("Die Aufzeichnung bestätigt das gemeldete Ergebnis.");
       await noSideScroll(page);
