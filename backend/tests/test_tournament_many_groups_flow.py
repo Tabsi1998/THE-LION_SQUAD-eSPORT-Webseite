@@ -1,8 +1,8 @@
 """Viele Gruppen (#2216): Was die Auslosung anlegt, zeigen auch Gruppenliste und Tabelle.
 
 Die Auslosung legt so viele Gruppen an, wie verlangt - höchstens eine je zwei Teilnehmer. Gruppenliste und Tabelle lasen
-die Gruppen eines Turniers aber nur bis 50, Auszeichnungen, Profil, Event-Rückblick und Jahreswertung bis 100. Mongomock
-ignoriert die Länge bei ``to_list``, deshalb ist der Fehler nur mit ``FLOW_MONGO_URL`` zu sehen.
+die Gruppen eines Turniers aber nur bis 50, Auszeichnungen, Profil, Event-Rückblick und Jahreswertung bis 100.
+``to_list(n)`` liefert auf mongomock wie bei Motor höchstens n Einträge (#2357), der Fehler ist auf beiden Datenbanken zu sehen.
 """
 import pathlib
 import sys
