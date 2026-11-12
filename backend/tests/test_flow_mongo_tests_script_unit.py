@@ -1,4 +1,4 @@
-"""Auswahl der Ablauf-Tests auf echtem MongoDB (#2216): Gebiet für die CI, ``--all`` für alle Harness-Dateien, ``--chunk``."""
+"""Auswahl der Ablauf-Tests auf echtem MongoDB (#2216): Gebiet für die CI, ``--all`` für jede Datei mit der Harness, ``--chunk``."""
 import importlib.util
 from pathlib import Path
 
@@ -14,7 +14,7 @@ def test_all_takes_every_harness_file_and_the_area_is_a_part_of_it():
     everything = script.selected_files(everything=True)
     assert area and set(area) < set(everything)
     assert "backend/tests/test_tournament_many_registrations_flow.py" in everything
-    assert all("make_flow" in (script.ROOT / path).read_text(encoding="utf-8") for path in everything)
+    assert all(script.USES_HARNESS.search((script.ROOT / path).read_text(encoding="utf-8")) for path in everything)
 
 
 def test_options_are_taken_out_and_the_rest_goes_to_pytest():

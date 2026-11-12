@@ -10,7 +10,7 @@ mongomock und meldeten trotzdem Grün.
     python scripts/flow_mongo_tests.py --list [--all]
 
 ``--all`` nimmt jede Datei, die ``make_flow`` nutzt, nicht nur das Gebiet (#2216) - für einen Lauf außerhalb des CI-Budgets
-(über 500 Dateien, lokal rund 45 Minuten mit ``-n 4``). Viele Dateien in einem Aufruf sammeln sehr langsam; ``--chunk N``
+(über 500 Dateien, lokal rund 21 Minuten mit ``-n 4``). Viele Dateien in einem Aufruf sammeln sehr langsam; ``--chunk N``
 teilt sie in Aufrufe zu N Dateien. Rot ist der Lauf, sobald ein Aufruf rot ist.
 
 Alle weiteren Argumente gehen an pytest. Welche Adressen erlaubt sind, prüft ``backend/tests/flow_mongo.py``.

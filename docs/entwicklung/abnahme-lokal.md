@@ -298,5 +298,5 @@ In der CI läuft das als Job „Backend-Abläufe auf MongoDB“, in `scripts/loc
 Dateien gehen auch direkt mit `FLOW_MONGO_URL=… python -m pytest backend/tests/test_x_flow.py`.
 
 Alle Ablauf-Dateien, nicht nur das Gebiet der CI (#2216): `python scripts/flow_mongo_tests.py --all --chunk 60 -n 4`
-(über 500 Dateien, lokal rund 45 Minuten). `--chunk` teilt sie in mehrere pytest-Aufrufe, weil das Sammeln vieler Dateien
-in einem Aufruf sehr langsam wird.
+(über 500 Dateien, rund 7500 Tests, lokal rund 21 Minuten). `--chunk` teilt sie in mehrere pytest-Aufrufe, weil das
+Sammeln vieler Dateien in einem Aufruf sehr langsam wird.
