@@ -234,7 +234,8 @@ async def test_zurueck_nach_storno_gilt_am_auftrag_wieder_als_gebucht(flow, fake
     else:
         await book(flow, paula, event, companions=0)
     stored = await order_of(flow, booked)
-    assert "booking_state" not in stored and "credit_note_due_at" not in stored and stored.get("booking_restored_at")
+    assert "booking_state" not in stored and "credit_note_due_at" not in stored and stored.get("booking_cancelled_at")
+    assert [entry["state"] for entry in stored["booking_events"]] == ["cancelled", "restored"]
 
     fake.pay(order["invoice_id"])
     counts = await billing_orders.sync_due()
@@ -294,6 +295,23 @@ async def test_rueckkehr_mitten_im_gutschrift_lauf_legt_keinen_entwurf_an(flow, 
     assert result == "skipped"
     stored = await order_of(flow, booked)
     assert "credit_note_id" not in stored and "credit_note_due_at" not in stored and "credit_note_claim_at" not in stored
+
+
+@pytest.mark.asyncio
+async def test_verlauf_zeigt_jeden_storno_und_jede_rueckkehr(flow, fake):
+    """Der Verlauf des Auftrags verliert den Storno nicht, wenn die Person zurückkommt, und zeigt die Rückkehr - auch zweimal."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    for _ in range(2):
+        await cancel_self(flow, event, paula)
+        await book(flow, paula, event, companions=0)
+    flow.act_as(kassier)
+    detail = (await flow.get(f"/api/admin/finance/orders/{order['id']}")).json()
+    texts = [item["text"] for item in detail["timeline"]]
+    assert texts.count("Buchung storniert: Anmeldung storniert") == 2
+    assert texts.count(f"Buchung wieder aufgenommen: {SELF_REASON}") == 2
+    stored = await order_of(flow, booked)
+    assert "booking_state" not in stored and [entry["state"] for entry in stored["booking_events"]] == ["cancelled", "restored"] * 2
 
 
 async def sync_with(flow, order):

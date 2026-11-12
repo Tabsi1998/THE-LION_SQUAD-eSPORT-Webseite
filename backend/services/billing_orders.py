@@ -163,7 +163,7 @@ async def cancel_orders_for(db, *, kind: str, registration_id: str, reason: str)
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {
             "booking_state": "cancelled", "booking_cancelled_at": now, "cancel_reason": reason, "paid_cents_at_cancel": paid_cents(order), "updated_at": now,
             **({"credit_note_due_at": now} if credit_draft and not order.get("credit_note_id") else {}),
-        }})
+        }, "$push": {"booking_events": {"state": "cancelled", "at": now, "reason": reason}}})
         await billing_cases.open_case(db, order, "cancelled_after_invoice", {"reason": reason, "invoice_ref": order.get("invoice_ref") or "", "paid_cents": paid_cents(order),
                                                                             "invoice_status": order.get("invoice_status")})
         count += 1
@@ -212,9 +212,10 @@ async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents:
     Buchung“, und ein gelöschter Entwurf beendete den Auftrag. Ein schon angelegter Gutschrift-Entwurf bleibt (die
     Finanzverwaltung entscheidet), der Fall „Storniert, Beleg existiert“ ebenso. Dazu der Prüffall mit alt und neu."""
     now = now_utc().isoformat()
+    # Der Verlauf behält den Storno (``booking_cancelled_at``, ``booking_events``) und bekommt die Rückkehr dazu.
     await db.billing_orders.update_one({"id": order["id"], "booking_state": "cancelled"}, {
-        "$set": {"booking_restored_at": now, "updated_at": now},
-        "$unset": {"booking_state": "", "booking_cancelled_at": "", "paid_cents_at_cancel": ""}})
+        "$set": {"updated_at": now}, "$unset": {"booking_state": "", "paid_cents_at_cancel": ""},
+        "$push": {"booking_events": {"state": "restored", "at": now, "reason": reason}}})
     await db.billing_orders.update_one(
         {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
         {"$unset": {"credit_note_due_at": ""}})
