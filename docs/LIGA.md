@@ -606,7 +606,7 @@ je Person läuft über den Index `user_id`, Löschen des Kontos und Auskunft (`p
 | Spiele betreuen | `matches` | Termine, Terminvorschläge entscheiden, Spielplan freigeben, Aufstellungen lesen, Check-in |
 | Ergebnisse korrigieren | `results` | Ergebnis eintragen und korrigieren, Rückgängig, kampflos, nicht erschienen, Aufstellung nachtragen als Leitung |
 | Proteste | `disputes` | Streitfälle entscheiden (zusammen mit `results` auch über eine Korrektur) |
-| Strafen | `sanctions` | Vorgesehen für E.3, heute noch ohne eigene Route |
+| Strafen | `sanctions` | Strafen verhängen, vorläufige Sperren bestätigen, widerrufen, über Einsprüche entscheiden (E.3, Abschnitt „E.3 Strafen“) |
 | Regeln veröffentlichen | `rules` | Regeltext der Season, Regelwerk der Liga und der Season: Entwurf, Vorschau, Veröffentlichen, Stand der Zustimmungen, Hinweis „Daten geändert“ (B.2) |
 
 Regeln: Wer den Bereich hat, darf alle Ligen. Zuständige haben nur ihre Liga und nur ihre Zuständigkeiten. Liga anlegen und löschen
@@ -1087,7 +1087,7 @@ innerhalb von `checkin_rules.open_points_remind_hours` (Vorgabe 48, 0 = aus; ohn
 (`pending`, `approved`, `checked_in`, `waitlist`; nicht zurückgezogen oder disqualifiziert) und nur solange die Anmeldung noch kein begonnenes oder
 entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der Antrag gespeichert (Fehler nur im Log). Ein zweiter Lauf findet den Schlüssel und schickt nichts. Nie ein Datum oder Alter in Texten.
 
-**Noch nicht gebaut, liest diese Prüfung später:** Strafen (E.3 ergänzt den Stand).
+**Strafen (E.3):** Eine laufende Sperre setzt den Stand `sanctioned` (`league_sanctions.bans`, Abschnitt „E.3 Strafen“). Er geht jedem Stand außer `banned` vor, sperrt Check-in, Aufstellung und Anmeldung und ist keine „fehlende Angabe“.
 
 ### B.4 Selbstanmeldung (#2205, #1623, #1665)
 
@@ -1907,10 +1907,10 @@ offenen Spiele werden kampflos verloren gewertet (wie bisher ab der Hälfte), di
 macht die Tabelle. Modus des Plans `opponents`, Satz „alle Spiele zählen für die Gegner, das Team steht am Tabellenende“.
 Andere Formate und Staffeln mit `half` unverändert.
 
-**Punktabzug (vorbereitet für E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, reason, source,
+**Punktabzug (geschrieben von E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, reason, source,
 sanction_id?, created_at, created_by}]`. Die Tabelle zieht die Summe je Anmeldung von den Punkten ab (`deducted_points`), in der
-Mini-Tabelle zählt er nicht. Gelesen wird nur mit `scoring_rules`. Geschrieben wird es in E.1 nirgends; den Grund zeigt die
-Tabelle nicht öffentlich.
+Mini-Tabelle zählt er nicht. Gelesen wird nur mit `scoring_rules`. Geschrieben wird es von der Strafe „Punktabzug“ (E.3, `source: "sanction"`), der Widerruf
+entfernt den Eintrag; den Grund zeigt die Tabelle nicht öffentlich.
 
 **Entscheid der Leitung** (`tournaments.table_decisions: [{id, registration_ids, reason, decided_by, decided_at}]`):
 
@@ -2998,7 +2998,8 @@ Lässt sich die Prüfung beim Hochladen nicht anstoßen, reiht derselbe stündli
 das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, Wiener Zeit). Lässt sich das Ende nicht bestimmen
 (Season ohne Kalender), bleibt es bei 30 Tagen ab dem Hochladen, weiter mit der Sperre bei offenem Verfahren. Die Werte liest
 `match_proofs.setting` (Staffel, sonst Season, sonst Vorgabe). Eine laufende Strafe verlängert die
-Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist `match_proof_photos.keep_until` (ISO) und noch nicht gebaut.
+Aufbewahrung ebenfalls (Nr. 136): Nachweise an einer Strafe tragen `match_proof_photos.keep_until` (ISO), der Job löscht nichts,
+dessen `keep_until` in der Zukunft liegt (E.3, Abschnitt „E.3 Strafen“, Aufbewahrung).
 
 #### E.2 gebaut (#1619, #2297)
 
@@ -3104,6 +3105,143 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   gemergt, zeigt es den Hinweis erst, sobald E.2 das Feld füllt; ohne Feld verhält sich alles wie ohne Verfahren.
 - Nachweise: beide benutzen `match_proofs` und den Frontend-Baustein `ProofList` unverändert; fehlt etwas, kommt es als eigener Commit
   in den Baustein, nicht als Kopie.
+
+### E.3 Strafen (Sanktionen im Wettbewerb)
+
+Regelwerk § 13, Anlage C.4 bis C.6; Entscheidungen Nr. 11c, 31, 32, 34b, 41, 43, 44, 45, 101, 104, 136. Logik in
+`services/league_sanctions.py`, Routen in `routes/league_sanction_routes.py`, eigene Strafen in `routes/penalty_routes.py`.
+**Keine Automatik (Nr. 32):** Jede Strafe wählt und begründet die Leitung von Hand. Die Moderation der Community
+(`moderation_sanctions`, Verwarnungen und Kontosperren) bleibt getrennt und wirkt hier nur über den Stand `banned`.
+
+**Sammlung `competition_sanctions`** (eine Zeile je Strafe; neue Sammlung, keine Migration):
+
+| Feld | Inhalt |
+| --- | --- |
+| `id`, `league_id`, `season_id` | Kennung, Liga und Season, in der die Strafe verhängt wurde |
+| `kind` | Art, siehe Tabelle unten |
+| `target_type` | `player` oder `squad` |
+| `user_id` | betroffene Person (nur `player`) |
+| `squad_id`, `team_id` | Co-Team und sein Hauptteam; bei `player` das Co-Team der Person in dieser Season, soweit eindeutig |
+| `tournament_id`, `registration_id` | Staffel und Anmeldung des Co-Teams; Pflicht bei `squad`, bei Sperren nach Spielen und bei allem mit Wirkung auf Tabelle oder Spiel |
+| `match_id` | Spiel, auf das sich der Verstoß bezieht (frei; Pflicht bei Map- und Spielverlust) |
+| `rule_ref` | Regelverstoß: Verweis auf den Paragrafen oder Katalogeintrag, 2 bis 200 Zeichen (Pflicht) |
+| `catalog_key` | Schlüssel des gewählten Katalogeintrags, wenn die Leitung aus dem Katalog gewählt hat |
+| `reason` | Begründung, 5 bis 2000 Zeichen (Pflicht) |
+| `proof_ids[]` | Nachweise aus dem Nachweis-Baustein (`match_proof_photos` des Spiels `match_id`), höchstens 10 |
+| `points` | Höhe des Punktabzugs, 1 bis 99 (nur `point_deduction`) |
+| `starts_at`, `ends_at`, `matches` | Zeitraum einer Sperre: ab, bis bzw. Anzahl Liga-Spiele (1 bis 50) |
+| `state` | `provisional` (vorläufig, Nr. 44) oder `final` (endgültig) |
+| `final_at`, `final_by` | wann und durch wen endgültig |
+| `appeal_until` | Ende der Einspruchsfrist: `final_at` + `appeal_hours` der Season (Vorgabe 48 h) |
+| `appeal` | `null` oder `{id, by, at, text, state: open/upheld/granted, decided_by, decided_at, note}` |
+| `revoked_at`, `revoked_by`, `revoke_reason`, `revoked_via` | Widerruf mit Pflichtgrund; `revoked_via`: `revoke` (Leitung) oder `appeal` (Einspruch stattgegeben) |
+| `effect` | was die Strafe geschrieben hat: `{deduction_id}` bzw. `{removal: {plan_id, previous_status, match_ids}}` |
+| `conflict_reason` | Grund der Notausnahme, wenn der Superadmin über die eigene Seite entschied |
+| `created_at`, `created_by`, `updated_at` | Protokoll |
+
+Index: `id` eindeutig; `(league_id, season_id)`; `user_id`; `squad_id`; `registration_id`.
+
+**Arten und Wirkung**
+
+| Art | `kind` | betrifft | Zeitraum | Wirkung |
+| --- | --- | --- | --- | --- |
+| Verwarnung | `warning` | Person, Co-Team | – | keine, dokumentiert |
+| Gelbe Karte | `yellow_card` | Person, Co-Team | – | keine, dokumentiert (kein automatischer Abzug, Anlage C.4) |
+| Rote Karte | `red_card` | Person, Co-Team | – | keine; die sportliche Maßnahme ist eine eigene Strafe |
+| Punktabzug | `point_deduction` | Co-Team | – | Eintrag in `tournaments.point_deductions` (`source: "sanction"`, `sanction_id`), die Tabelle (E.1) zieht ab |
+| Mapverlust | `map_loss` | Co-Team, Spiel | – | dokumentiert am Spiel; das Ergebnis ändert die Leitung über die Ergebniskorrektur (Recht `results`), nie von selbst |
+| Spielverlust | `match_loss` | Co-Team, Spiel | – | wie Mapverlust |
+| Spielsperre | `player_ban` | Person | `matches` (mindestens 1) **oder** `ends_at`, höchstens bis Season-Ende (Nr. 101); gilt in dieser Season | nicht spielberechtigt (`league_eligibility`) |
+| Teamsperre | `team_ban` | Co-Team | `ends_at` (auch über die Season hinaus); gilt in der ganzen Liga | alle Spieler des Co-Teams nicht spielberechtigt, keine Anmeldung |
+| Disqualifikation | `disqualification` | Co-Team (Anmeldung) | – | Ausscheiden über `tournament_events` (Art `disqualified`): Regel der Season (`exit_rule`, Nr. 11c), Tabellenende (Nr. 43), zählt nicht als „alle Teilnehmer“ (Nr. 34b) |
+| Ligaausschluss | `league_exclusion` | Person, Co-Team | ohne Ende; gilt in der ganzen Liga | nicht spielberechtigt, keine Anmeldung |
+| Externe Sperre | `external` | Person | `ends_at` frei (ohne: bis zum Widerruf); gilt in der ganzen Liga | nicht spielberechtigt für die Dauer (Nr. 104). Nur Sperren des Herstellers oder einer Plattform wegen Cheating, Manipulation oder Betrug |
+
+- **Vorläufig (Nr. 44):** nur `player_ban` und `team_ban`. Eine vorläufige Sperre wirkt sofort, braucht kein Ende und gilt, bis die
+  Leitung sie bestätigt (`confirm`, dann mit Zeitraum) oder widerruft. Alle anderen Arten sind sofort endgültig.
+- **Sperre nach Spielen:** Es zählen die Liga-Spiele der Anmeldung (`registration_id`) mit Stand `completed` oder `forfeit` und
+  `completed_at` ab `starts_at`, in dieser Reihenfolge. Die ersten `matches` davon sind die gesperrten Spiele. Solange weniger gezählt
+  sind, ist die Person in jedem offenen Spiel gesperrt; danach bleibt sie es für die gesperrten Spiele (Nachtrag der
+  Teilnehmerliste). Abgesagte Spiele zählen nicht.
+- **Sperre nach Zeit:** gilt von `starts_at` bis `ends_at`. Für ein bereits entschiedenes Spiel zählt dessen `completed_at`
+  (Nachtrag), sonst jetzt.
+- **Spielsperre über das Season-Ende hinaus** lehnt der Server ab (422): Was darüber hinausgeht, ist Teamsperre oder Ligaausschluss.
+  Season-Ende wie bei der Aufbewahrung (`match_proof_retention.season_end`); ohne bestimmbares Ende gilt nur „in dieser Season“.
+
+**Spielberechtigung (B.3):** `league_eligibility` lädt je Kontext die laufenden Sperren (`league_sanctions.bans`) und setzt den
+Stand `sanctioned` (`ok: false`, `reason`, `until`). Er geht jedem Stand außer `banned` vor. Damit sperrt dieselbe Prüfung
+Aufstellung und Teilnehmerliste, Check-in und die Anmeldung (`registration_problems`: 403 bei gesperrtem oder ausgeschlossenem
+Co-Team). Der Grundtext nennt nur die Sperre und ihr Ende („Gesperrt durch die Liga-Leitung bis …“, „… für noch 2 Liga-Spiele“,
+„Vorläufig gesperrt, die Liga-Leitung prüft.“), nie Verstoß oder Begründung. `sanctioned` ist keine „fehlende Angabe“
+(`NOT_OPEN_POINTS`).
+
+**Widerruf** (`revoke`, Pflichtgrund ab fünf Zeichen): nimmt jede Wirkung zurück. Sperre: sofort wieder spielberechtigt.
+Punktabzug: Eintrag aus `point_deductions` entfernt, die Tabelle rechnet neu. Disqualifikation: Anmeldung zurück auf den Stand
+davor (`removal.previous_status`), Platz in der Season (`league_squad_key`) wieder belegt, Spiele, die das Ausscheiden kampflos
+gewertet oder abgesagt hat, wieder offen (Termin bleibt, Check-in und Veto beginnen neu); gespielte Ergebnisse standen nie anders
+am Spiel. Ist der Platz in der Season inzwischen anders vergeben, lehnt der Widerruf mit 409 ab. Eine widerrufene Strafe bleibt
+als Zeile mit Grund stehen.
+
+**Einspruch (Nr. 41, 45):** einmal je Strafe, nur gegen endgültige, nicht widerrufene Strafen, bis `appeal_until`. Einlegen
+dürfen: die betroffene Person; beim Co-Team Captain, Vertreter, Leitung und Co-Leitung des Hauptteams. Text 10 bis 2000 Zeichen.
+Die Strafe gilt weiter. Es entscheidet eine Person mit `sanctions`, die die Strafe weder verhängt (`created_by`) noch bestätigt
+(`final_by`) hat - auch nicht der Superadmin (`OWN_DECISION_DETAIL`) - und die nicht zur betroffenen Seite gehört. Entscheidung
+`upheld` (Strafe bleibt) oder `granted` (Strafe aufgehoben, Wirkung zurück wie beim Widerruf, `revoked_via: "appeal"`), mit
+Pflichtbegründung ab fünf Zeichen, endgültig. Vorläufige Sperren kennen keinen Einspruch: Sie werden ohnehin geprüft, die Frist
+läuft ab der Bestätigung.
+
+**Befangenheit (B.1):** Wer zur betroffenen Seite gehört (`require_no_side_conflict`: Kader, Captain, Vertreter, Leitung und
+Co-Leitung des Hauptteams) oder selbst betroffen ist, verhängt, bestätigt und widerruft nicht. Nennt die Strafe ein Spiel, gilt
+zusätzlich die Befangenheit am Spiel (`require_no_conflict`). Notausnahme nur für den Superadmin mit `conflict_reason` (ab fünf
+Zeichen), Protokoll `league.conflict.override`; nicht beim Einspruch über die eigene Entscheidung.
+
+**Katalog:** `league_sanctions.CATALOG` bildet Anlage C.4 ab (Schlüssel, Verstoß, Ausgangssanktion als Vorschlag der Art,
+Paragraf). Die Verwaltung bietet ihn zur Auswahl an und füllt `rule_ref` und die Art vor; die Leitung kann beides frei ändern
+oder ganz frei eintragen.
+
+**Routen**
+
+| Route | Recht | Inhalt |
+| --- | --- | --- |
+| `GET /api/admin/leagues/seasons/{season_id}/sanctions` | `sanctions` | Strafen der Season und liga-weite Sperren, Arten, Katalog, Co-Teams mit Kader je Staffel, Einspruchsfrist; je Zeile `own_side` und `own_decision` |
+| `POST /api/admin/leagues/seasons/{season_id}/sanctions` | `sanctions` | verhängen; Befangenheit, Wirkung, Protokoll, Nachricht |
+| `POST …/sanctions/{id}/confirm` | `sanctions` | vorläufig → endgültig, mit Zeitraum |
+| `POST …/sanctions/{id}/revoke` | `sanctions` | Widerruf mit `reason` |
+| `POST …/sanctions/{id}/appeal/decision` | `sanctions`, nicht die Ausgangsperson | `{decision: upheld/granted, note}` |
+| `GET /api/penalties/me` | angemeldet | zusätzlich Zeilen `kind: "league_sanction"` mit Block `sanction` (Art, Stand, Zeitraum, Frist, `can_appeal`, Einspruch); Teamstrafen für Captain, Vertreter und Hauptteam-Leitung |
+| `POST /api/penalties/sanctions/{id}/appeal` | Betroffene | Einspruch einlegen `{text}` |
+| `GET /api/admin/penalties` | Verwaltung | Eingang: zeigt Liga-Strafen neben Fast-Lap-, Kampflos- und Vorfall-Einträgen, nur für Ligen, die die Person leitet |
+
+**Öffentlich:** Die Tabelle zeigt Punktabzug („−N Punkte Abzug“) und Disqualifikation als Hinweis an der Zeile (Web, TV, Druck;
+die App liest dieselben Felder `deducted_points` und `exit`). Den Grund zeigt sie nicht. Personensperren stehen nirgends
+öffentlich mit Namen: Kader und Matchseite zeigen sie nur den Beteiligten (Stand `sanctioned` wie jeder andere Stand).
+
+**Benachrichtigungen** (`create_user_notification`, Schlüssel `sanction:<id>:<ereignis>:<user>`): `issued` (verhängt), `confirmed`,
+`revoked`, `appeal` (an die Leitung mit `sanctions`, ohne die Ausgangsperson), `appeal_decided`. An die betroffene Person bzw. an
+Captain, Vertreter und Hauptteam-Leitung; bei einer Spielsperre zusätzlich an Captain und Vertreter des Co-Teams (ohne Verstoß und
+Begründung: „… ist gesperrt“), damit sie aufstellen können. Link `/my/penalties` („Meine Strafen“).
+
+**Protokoll** (`audit_logs`, ohne Namen und ohne Begründungstext): `league.sanction.create`, `.confirm`, `.revoke`, `.appeal`,
+`.appeal.decide` mit `sanction_id`, `kind`, `target_type`, `registration_id`, `state`, Längen der Texte.
+
+**Aufbewahrung (Nr. 31, 136):** Nachweise in `proof_ids` tragen `match_proof_photos.keep_until` (ISO), solange die Strafe läuft,
+ein Einspruch offen ist oder die Einspruchsfrist läuft: Ende der Sperre bzw. `appeal_until`, das spätere von beiden; ohne
+bestimmbares Ende `9999-12-31`. Jede Änderung an der Strafe und der stündliche Job (`league_sanctions.refresh_proof_holds`)
+setzen den Wert neu; der Job löscht nichts, dessen `keep_until` in der Zukunft liegt.
+
+**Kontolöschung und Auskunft:** `competition_sanctions` steht in `personal_data.py` (bleibt als Nachweis der Liga-Leitung, drei
+Jahre nach der Kontolöschung endgültig gelöscht, wie `moderation_sanctions`; `account_erasure.RETAINED`). Die Auskunft enthält die
+gegen die Person verhängten Strafen mit dem eigenen Einspruch, ohne die Kennungen der Leitung. Strafen eines Co-Teams tragen keine
+Person und bleiben beim Co-Team.
+
+**Gesperrte Staffel:** Punktabzug und Disqualifikation schreiben in die Staffel und laufen unter ihrer Schreibsperre. Eine
+gesperrte Staffel lehnt Verhängen, Widerruf und einen stattgegebenen Einspruch dieser beiden Arten mit 423 ab, bis die Leitung
+sie entsperrt.
+
+**Season-Einstellungen:** keine neuen. Die Einspruchsfrist ist `appeal_hours` (E.2), die Regel beim Ausscheiden `exit_rule` (E.1).
+
+**App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App zeigt den Stand `sanctioned` wie jeden anderen Stand der
+Spielberechtigung und die Tabelle mit Abzug; eigene Strafen mit Einspruch fehlen dort noch.
 
 ### Season-Seite der Verwaltung (#2267)
 
