@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from models import now_utc
 from services.league_calendar import season_end_at
@@ -174,9 +174,15 @@ async def bans(db, league_id: str | None, season_id: str | None, user_ids, *, ma
     if not league_id:
         return out
     wanted = {user_id for user_id in user_ids or [] if user_id}
+    # Nur, was noch gelten kann: nicht widerrufen, für diese Personen oder ein Co-Team, und nicht schon vor dem maßgeblichen
+    # Zeitpunkt abgelaufen (mit einem Tag Abstand - genau gerechnet wird unten). Ohne Obergrenze: Nichts fällt still weg.
+    decided = bool(match and str(match.get("status") or "") in DECIDED_MATCH)
+    at = (parse(match.get("completed_at")) if decided else None) or now or now_utc()
     rows = await db.competition_sanctions.find(
-        {"league_id": league_id, "kind": {"$in": list(BAN_KINDS)}, "revoked_at": None}, {"_id": 0}).to_list(2000)
-    rows = [row for row in rows if row.get("target_type") == SQUAD or row.get("user_id") in wanted]
+        {"league_id": league_id, "kind": {"$in": list(BAN_KINDS)}, "revoked_at": None,
+         "$and": [{"$or": [{"target_type": SQUAD}, {"user_id": {"$in": sorted(wanted)}}]},
+                  {"$or": [{"ends_at": None}, {"ends_at": {"$gt": (at - timedelta(days=1)).isoformat()}}]}]},
+        {"_id": 0}).to_list(None)
     frame = await frame_for(db, rows)
     for row in rows:
         is_squad = row.get("target_type") == SQUAD
@@ -235,7 +241,7 @@ async def sync_proof_hold(db, doc: dict, now: datetime | None = None) -> None:
         return
     until = await hold_until(db, doc, now)
     # Mehrere Strafen können denselben Nachweis halten - es gilt das späteste Ende.
-    others = await db.competition_sanctions.find({"proof_ids": {"$in": ids}, "id": {"$ne": doc["id"]}}, {"_id": 0}).to_list(200)
+    others = await db.competition_sanctions.find({"proof_ids": {"$in": ids}, "id": {"$ne": doc["id"]}}, {"_id": 0}).to_list(None)
     for proof_id in ids:
         ends = [until, *[await hold_until(db, other, now) for other in others if proof_id in (other.get("proof_ids") or [])]]
         latest = max((end for end in ends if end), default=None)
@@ -244,7 +250,8 @@ async def sync_proof_hold(db, doc: dict, now: datetime | None = None) -> None:
 
 async def refresh_proof_holds(db, now: datetime | None = None) -> None:
     """Vor dem Aufräumen: ``keep_until`` aller Nachweise an Strafen neu rechnen (eine Sperre nach Spielen endet ohne Schreibvorgang)."""
-    async for doc in db.competition_sanctions.find({"proof_ids.0": {"$exists": True}}, {"_id": 0}):
+    # Nur Strafen, die noch etwas halten können (nicht widerrufen) und Nachweise tragen - über den Index auf ``proof_ids``.
+    async for doc in db.competition_sanctions.find({"revoked_at": None, "proof_ids": {"$gt": ""}}, {"_id": 0}):
         try:
             await sync_proof_hold(db, doc, now)
         except Exception as exc:  # noqa: BLE001 - ein Fehler an einer Strafe hält das Aufräumen nicht auf; ihr alter Wert bleibt

@@ -3140,7 +3140,11 @@ Regelwerk § 13, Anlage C.4 bis C.6; Entscheidungen Nr. 11c, 31, 32, 34b, 41, 43
 | `conflict_reason` | Grund der Notausnahme, wenn der Superadmin über die eigene Seite entschied |
 | `created_at`, `created_by`, `updated_at` | Protokoll |
 
-Index: `id` eindeutig; `(league_id, season_id)`; `user_id`; `squad_id`; `registration_id`.
+Index: `id` eindeutig; `(league_id, season_id)`; `user_id`; `squad_id`; `registration_id`; `proof_ids` und `appeal.by` (beide sparse).
+
+**Leistung:** `league_sanction_bans.bans` liest nur, was noch gelten kann (nicht widerrufen, gefragte Personen oder Co-Teams, nicht
+vor dem maßgeblichen Zeitpunkt abgelaufen), ohne Obergrenze; die Spiele aller Sperren nach Spielen kommen aus einer Abfrage
+(`frame_for`). Liste der Verwaltung und Eingang laden gebündelt bzw. nach Liga gefiltert.
 
 **Arten und Wirkung**
 

@@ -722,3 +722,60 @@ async def test_the_own_appeal_against_a_team_sanction_is_in_the_export_and_leave
     # Mit der Entscheidung fällt auch dieser Text weg.
     assert (await decide(flow, world, running["id"], "second", "granted")).status_code == 200
     assert (await stored(flow, running["id"]))["appeal"]["text"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_ban_check_reads_only_what_can_still_apply(flow):
+    """Review R1, N7: Die Prüfung liest nur laufende Sperren der gefragten Personen und der Co-Teams - abgelaufene, widerrufene und
+    fremde bleiben in der Datenbank, und die Spiele mehrerer Sperren kommen aus einer Abfrage."""
+    world = await sanction_world(flow)
+    assert (await ban(flow, world, "Mila", matches=1)).status_code == 200
+    assert (await ban(flow, world, "Tom", matches=2)).status_code == 200
+    expired = (await ban(flow, world, "Kapitaen", ends_at=at(days=3))).json()
+    await flow.db.competition_sanctions.update_one({"id": expired["id"]}, {"$set": {"ends_at": at(days=-2), "starts_at": at(days=-9)}})
+    gone = (await ban(flow, world, "Ida", ends_at=at(days=3))).json()
+    assert (await revoke(flow, world, gone["id"])).status_code == 200
+
+    reads = {"sanctions": [], "matches": 0}
+
+    class Counted:
+        """Die Datenbank mit Zähler: welche Abfragen ``bans`` an Strafen und Spiele stellt."""
+
+        def __init__(self, collection, name):
+            self.collection, self.name = collection, name
+
+        def find(self, query, *args, **kwargs):
+            if self.name == "competition_sanctions":
+                reads["sanctions"].append(query)
+            else:
+                reads["matches"] += 1
+            return self.collection.find(query, *args, **kwargs)
+
+    class CountingDb:
+        def __getattr__(self, name):
+            collection = getattr(flow.db, name)
+            return Counted(collection, name) if name in ("competition_sanctions", "matches_v2") else collection
+
+    wanted = [uid(world, name) for name in ("Mila", "Tom", "Kapitaen")]
+    found = await league_sanction_bans.bans(CountingDb(), "liga", world["season_id"], wanted)
+    assert sorted(found.users) == sorted([uid(world, "Mila"), uid(world, "Tom")])
+    assert len(reads["sanctions"]) == 1 and reads["matches"] == 1, "eine Abfrage für die Sperren, eine für die Spiele aller Sperren"
+    rows = await flow.db.competition_sanctions.find(reads["sanctions"][0], {"_id": 0, "id": 1}).to_list(None)
+    assert len(rows) == 2, "abgelaufen, widerrufen und nicht gefragt (Ida) kommen gar nicht erst aus der Datenbank"
+    # Gegenprobe: Für ein entschiedenes Spiel zählt dessen Zeitpunkt - eine damals laufende, heute abgelaufene Sperre gilt dort noch.
+    played = {**world["match"], "status": "completed", "completed_at": at(days=-5)}
+    then = await league_sanction_bans.bans(flow.db, "liga", world["season_id"], wanted, match=played)
+    assert uid(world, "Kapitaen") in then.users
+
+
+@pytest.mark.asyncio
+async def test_many_bans_are_not_cut_off_silently(flow):
+    world = await sanction_world(flow)
+    now_iso = now_utc().isoformat()
+    await flow.db.competition_sanctions.insert_many([
+        {"id": f"alt-{index}", "league_id": "liga", "season_id": world["season_id"], "kind": "team_ban", "target_type": "squad",
+         "squad_id": f"fremd-{index}", "state": "final", "starts_at": now_iso, "ends_at": at(days=30), "revoked_at": None}
+        for index in range(2100)])
+    assert (await ban(flow, world, "Mila", ends_at=at(days=3))).status_code == 200
+    found = await league_sanction_bans.bans(flow.db, "liga", world["season_id"], [uid(world, "Mila")])
+    assert uid(world, "Mila") in found.users and len(found.squads) == 2100
