@@ -67,7 +67,7 @@ export function SeasonPlay({ league, season, pool, platform }) {
                 <span className="tls-season-order__nr">Map {row.position}</span>
                 <span className="flex min-w-0 items-center gap-1.5">
                   <ModeIcon src={row.icon_url} label={row.label} size="sm" />
-                  <span className="truncate font-semibold">{row.label}</span>
+                  <span className="tls-season-order__label">{row.label}</span>
                 </span>
               </li>
             ))}
@@ -217,7 +217,7 @@ export function SeasonPlaceholder({ season, application }) {
           <li key={step.key} className="tls-apply-steps__item" data-state={step.state} data-testid={`season-step-${step.key}`}>
             <span className="tls-apply-steps__mark" aria-hidden="true">{index + 1}</span>
             <span className="tls-apply-steps__label">{step.title}</span>
-            <span className="mt-1 block text-xs text-white/60">{step.text}</span>
+            <span className="mt-1 block text-center text-xs text-white/60">{step.text}</span>
           </li>
         ))}
       </StaggerIn>

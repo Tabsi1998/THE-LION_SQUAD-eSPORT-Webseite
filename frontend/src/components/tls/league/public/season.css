@@ -109,7 +109,7 @@
 .tls-season-order__map {
   position: relative;
   display: grid;
-  flex: 1 0 9.5rem;
+  flex: 1 0 7rem;
   min-width: 0;
   gap: 0.375rem;
   border: 1px solid rgb(255 255 255 / 0.1);
@@ -132,6 +132,16 @@
   transform-origin: left center;
   animation: tls-season-draw var(--tls-motion-slow) var(--tls-ease) both;
   animation-delay: calc(var(--tls-motion-mid) + var(--tls-i, 0) * 90ms * var(--tls-motion-on));
+}
+.tls-season-order__label {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.2;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .tls-season-order__nr { font-size: 10px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: rgb(var(--season-accent)); }
 
@@ -200,6 +210,8 @@
     radial-gradient(90% 120% at 100% 0%, rgb(var(--season-accent) / 0.1), transparent 60%),
     var(--tls-surface-1);
 }
+
+.tls-season-placeholder .tls-apply-steps { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 
 /* Liga N und Staffeln */
 .tls-season-division { margin-top: 3.5rem; }
