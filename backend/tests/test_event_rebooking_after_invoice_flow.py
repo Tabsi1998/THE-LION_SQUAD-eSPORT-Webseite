@@ -589,6 +589,27 @@ async def test_warteliste_und_zurueck_mit_gueltigem_neuen_beleg_ist_keine_reakti
     assert (await registration(flow, booked))["price_snapshot"]["hash"] == before["price_snapshot"]["hash"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("finance_did", ["deleted", "resolved_only"])
+async def test_erneute_rueckkehr_oeffnet_den_gutschrift_fall_nicht_wieder(flow, fake, finance_did):
+    """Der Fall „Gutschrift-Entwurf trotz Rückkehr“ ist erledigt (der Entwurf gelöscht oder bewusst behalten). Storniert die Person
+    erneut und kommt wieder, öffnet er sich nicht noch einmal für denselben Entwurf."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    await billing_orders.sync_due()
+    await book(flow, paula, event, companions=0)
+    case = (await open_cases(flow, order))["credit_after_return"]
+    await billing_cases.resolve_case(flow.db, case["id"], "kassier", "Entwurf in Dolibarr gelöscht")
+    if finance_did == "deleted":
+        fake.core_invoices.pop((await stored_order(flow, order))["credit_note_id"], None)
+    await flow.db.billing_orders.update_one({"id": order["id"]}, {"$set": {"synced_at": "2000-01-01T00:00:00+00:00"}})
+    await billing_orders.sync_due()
+    await cancel_self(flow, event, paula)
+    await billing_orders.sync_due()
+    await book(flow, paula, event, companions=0)
+    assert "credit_after_return" not in await open_kinds(flow, order)
+    assert "booking_state" not in await stored_order(flow, order), "die Rückkehr selbst gilt"
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)

@@ -257,13 +257,26 @@ async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents:
     # Liegt der Gutschrift-Entwurf der Website schon in Dolibarr, öffnet die Rückkehr den Fall selbst - so ist jede Reihenfolge
     # mit dem Gutschrift-Lauf abgedeckt, auch eine Rückkehr Tage nach dem Anlegen.
     credit = await db.billing_orders.find_one({"id": order["id"], "credit_note_id": {"$exists": True}, "credit_note_source": "website"},
-                                              {"_id": 0, "credit_note_ref": 1})
-    if credit:
+                                              {"_id": 0, "credit_note_id": 1, "credit_note_ref": 1, "credit_note_created_at": 1, "credit_notes": 1, "synced_at": 1})
+    if credit and await _credit_draft_still_open(db, order["id"], credit):
         from services.dolibarr_billing import credit_after_return_case
 
         await credit_after_return_case(db, order, credit.get("credit_note_ref") or "", now)
     await note_change_after_invoice(db, order, reason=reason, new_total_cents=new_total_cents)
     return True
+
+
+async def _credit_draft_still_open(db, order_id: str, credit: dict) -> bool:
+    """Gibt es zum Website-Entwurf noch etwas zu tun (#2184)? Nur solange er laut zuletzt gelesenem Stand Entwurf ist (gelöscht oder
+    freigegeben: nein) und die Finanzverwaltung den Fall dazu nicht schon erledigt hat - sonst öffnete jede weitere Rückkehr ihn neu."""
+    note = next((row for row in credit.get("credit_notes") or [] if int(row.get("id") or 0) == int(credit["credit_note_id"])), None)
+    if note is not None and note.get("status") != "draft":
+        return False
+    if note is None and str(credit.get("synced_at") or "") > str(credit.get("credit_note_created_at") or ""):
+        return False   # seit dem Anlegen gelesen und nicht mehr da: in Dolibarr gelöscht
+    done = await db.billing_cases.find_one({"order_id": order_id, "kind": "credit_after_return", "status": "resolved",
+                                            "detail.credit_note_ref": credit.get("credit_note_ref") or ""}, {"_id": 0, "id": 1})
+    return done is None
 
 
 async def release_order(db, order_id: str, actor_id: str) -> dict | None:
