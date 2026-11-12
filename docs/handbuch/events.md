@@ -278,7 +278,8 @@ externen Anmeldelink; bearbeiten darf ihn der Bereich **Finanzen**. Kurz:
   Dolibarr, auch bezahlt), bleibt sie: Es entsteht kein zweiter Auftrag, die Anmeldung zeigt wieder diese Rechnung, und die Änderung kommt
   als Prüffall **Buchung nach dem Beleg geändert** mit altem und neuem Betrag in die Finanzübersicht. Die Nachricht an die Person nennt dann
   keinen Betrag, sondern sagt, dass es schon eine Rechnung gibt und der Verein sie prüft. Ein vorgemerkter Gutschrift-Entwurf fällt weg.
-  Ein in Dolibarr gelöschter Entwurf zählt nicht mehr als Rechnung.
+  Ein in Dolibarr gelöschter Entwurf zählt nicht mehr als Rechnung, ebenso eine voll gutgeschriebene oder aufgegebene: Dann gilt der
+  aktuelle Preis mit einem neuen Rechnungsauftrag, und die Nachricht nennt ihn.
 - Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr). Teilnehmende finden sie unter **Meine
   Rechnungen**. Alles Weitere: [Abrechnung](../ABRECHNUNG.md), [Dolibarr](../DOLIBARR.md).
 

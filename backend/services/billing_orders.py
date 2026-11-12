@@ -44,6 +44,10 @@ from services.billing_amounts import credited_cents, invoice_fields, paid_cents,
 logger = logging.getLogger("tls.billing")
 
 OPEN_STATUSES = ("pending", "waiting_write_access", "waiting_link", "waiting_review", "ready")
+# Ein Beleg, der in Dolibarr noch gilt (#2184): nicht voll gutgeschrieben und nicht aufgegeben.
+INVOICE_STILL_VALID = {"payment_state": {"$nin": ["credited", "abandoned"]}, "invoice_status": {"$ne": "abandoned"}}
+# Ein Auftrag, der nichts mehr trägt: Buchung storniert und der Beleg gutgeschrieben oder aufgegeben - er hält keine neue Buchung auf.
+SETTLED_AFTER_CANCEL = {"booking_state": "cancelled", "$or": [{"payment_state": {"$in": ["credited", "abandoned"]}}, {"invoice_status": "abandoned"}]}
 STATUS_LABELS = {
     "pending": "neu",
     "waiting_write_access": "wartet auf Schreibzugriff",
@@ -108,7 +112,8 @@ async def create_order(db, *, kind: str, source_id: str, registration_id: str, u
         same = await db.billing_orders.find_one({"booking_key": key}, {"_id": 0})
         if same:
             return same
-    existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]}}, {"_id": 0})
+    existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]},
+                                                 "$nor": [SETTLED_AFTER_CANCEL]}, {"_id": 0})
     if existing:
         return existing
     order = {
@@ -181,9 +186,10 @@ async def note_change_after_invoice(db, *, kind: str, registration_id: str, reas
 
 
 async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
-    """Der Auftrag, zu dem es in Dolibarr einen Beleg gibt - Entwurf, freigegeben, bezahlt, auch mit Abzug. Ein in Dolibarr
-    gelöschter Entwurf (#2226) zählt nicht mehr: Sein Auftrag wartet oder ist zu."""
-    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced"}, {"_id": 0})
+    """Der Auftrag, zu dem es in Dolibarr einen gültigen Beleg gibt - Entwurf, freigegeben, bezahlt, auch mit Abzug. Ein in Dolibarr
+    gelöschter Entwurf (#2226) zählt nicht mehr: Sein Auftrag wartet oder ist zu. Ein voll gutgeschriebener oder aufgegebener
+    Beleg auch nicht (#2184): Wer danach zurückkommt, bekommt einen neuen Auftrag zum aktuellen Preis."""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", **INVOICE_STILL_VALID}, {"_id": 0})
 
 
 async def booking_cancelled_with_invoice(db, *, kind: str, registration_id: str) -> bool:

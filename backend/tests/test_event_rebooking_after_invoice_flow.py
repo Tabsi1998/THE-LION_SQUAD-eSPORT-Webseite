@@ -288,6 +288,47 @@ async def test_leitung_storno_warteliste_abgleich_dann_dabei_ein_prueffall(flow,
     assert KEPT_INVOICE in (await last_note(flow, paula))["body"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("by_lead", [False, True])
+@pytest.mark.parametrize("settled", ["credited", "abandoned"])
+async def test_voll_gutgeschriebener_oder_aufgegebener_beleg_zaehlt_nicht_mehr(flow, fake, settled, by_lead):
+    """Der Beleg ist in Dolibarr voll gutgeschrieben oder aufgegeben: Er gilt nicht mehr. Wer zurückkommt, bekommt den aktuellen
+    Preis mit eigenem Auftrag (und daraus einen neuen Beleg), keinen Prüffall und keinen Hinweis auf eine bestehende Rechnung."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    if by_lead:
+        flow.act_as(kassier)
+        gone = await flow.patch(url, json={"status": "cancelled"})
+        assert gone.status_code == 200, gone.text
+    else:
+        await cancel_self(flow, event, paula)
+    if settled == "credited":
+        fake.credit(order["invoice_id"], 40)
+    else:
+        fake.abandon(order["invoice_id"])
+    await billing_orders.sync_due()
+    assert (await order_of(flow, booked))["payment_state"] == settled
+
+    if by_lead:
+        flow.act_as(kassier)
+        response = await flow.patch(url, json={"status": "registered"})
+        assert response.status_code == 200, response.text
+    else:
+        await book(flow, paula, event, companions=0)
+    orders = await flow.db.billing_orders.find({"registration_id": booked["id"]}, {"_id": 0}).sort("created_at", 1).to_list(5)
+    new_cents = 4000 if by_lead else 2000
+    assert [(row["status"], row.get("booking_state")) for row in orders] == [("invoiced", "cancelled"), ("pending", None)]
+    assert orders[1]["total_cents"] == new_cents
+    assert "changed_after_invoice" not in await open_cases(flow, orders[0])
+    reg = await registration(flow, booked)
+    assert reg["billing_status"] == "pending" and reg["price_snapshot"]["hash"] == orders[1]["snapshot"]["hash"]
+    body = (await last_note(flow, paula))["body"]
+    assert KEPT_INVOICE not in body and ("40,00" if by_lead else "20,00") in body, "der neue Preis wird abgerechnet - die Nachricht nennt ihn"
+    invoiced = await billing_orders.classify_due()
+    assert invoiced["invoiced"] == 1, "der neue Auftrag wird ein neuer Beleg"
+
+
 def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
     """Dieselbe Regel für Glocke, Mail und die Discord-Antwort: kein Betrag, wenn schon ein Beleg da ist oder storniert wurde."""
     snapshot = {"total_cents": 2000, "currency": "EUR"}
