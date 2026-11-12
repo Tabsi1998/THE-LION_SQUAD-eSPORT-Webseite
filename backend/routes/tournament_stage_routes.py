@@ -253,8 +253,8 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
                 match["viewer_involved"] = match["id"] in own
                 match["viewer_override"] = match["id"] in own and is_superadmin(user)
             # Verfahren (E.2, #1619): im eigenen Spiel sieht auch die Leitung nur, was ihre Seite sehen darf.
-            from services.league_procedures import strip_for_involved
-            matches = [strip_for_involved(match, (user or {}).get("id"), match["id"] in own) for match in matches]
+            from services.league_procedures import for_viewer_list
+            matches = await for_viewer_list(db, user, matches, own)
         return matches
     # Ohne Turnier-Recht dieselbe Sicht wie auf der Spielseite und im Turnierbaum.
     viewer_id = (user or {}).get("id")

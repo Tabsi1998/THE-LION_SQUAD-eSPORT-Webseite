@@ -667,32 +667,34 @@ async def viewer_for(db, match: dict, user: dict | None) -> Viewer:
     return Viewer(user_id=seen.user_id, sides=seen.sides, acting=seen.acting, lead=seen.lead, can_decide=can_decide)
 
 
-PUBLIC_ROW_KEYS = ("at", "id", "kind", "state")
-OWN_ROW_HIDDEN = frozenset({"moss_requests", "assignee", "resolved_by", "withdrawn_by", "statement", "additions", "target_at",
-                            "reminded_at", "escalated_at", "against", "user_id"})
-
-
 def strip_rows(match: dict | None, viewer: Viewer) -> dict | None:
     """Die Verfahren im Spiel-Datensatz für alle außer der nicht befangenen Leitung: Die Einzelheiten stehen, je nach Rolle, im Block
     ``league.procedures`` der Matchseite - im Datensatz bleibt nur, was alte Leser (App) für die eigene Meldung brauchen."""
-    if not isinstance(match, dict) or viewer.lead or not isinstance(match.get("disputes"), list):
+    from services.match_public_view import without_procedure_details
+
+    return match if viewer.lead else without_procedure_details(match, viewer.user_id)
+
+
+async def for_viewer(db, match: dict, user: dict | None) -> dict:
+    """Ein einzelnes Spiel für diese Person: vollständig nur für die nicht befangene Leitung mit „Proteste“ oder „Ergebnisse“."""
+    if not rows(match):
         return match
-    out = []
-    for row in match["disputes"]:
-        if not is_procedure(row):
-            out.append(row)
-        elif viewer.user_id and row.get("user_id") == viewer.user_id:
-            out.append({key: value for key, value in row.items() if key not in OWN_ROW_HIDDEN} | {"user_id": viewer.user_id})
-        else:
-            out.append({key: row.get(key) for key in PUBLIC_ROW_KEYS})
-    return {**match, "disputes": out}
+    return strip_rows(match, await viewer_for(db, match, user))
 
 
-def strip_for_involved(match: dict, user_id: str | None, involved: bool) -> dict:
-    """Für Listen und Einzelabrufe der Leitung (Spielplan, Baum, ``GET /matches/{id}``): Wer an dem Spiel beteiligt ist, bekommt
-    die Verfahren auch mit Liga-Recht nur gekürzt - keine MOSS-Anforderungen, keine Antwort auf „sofort hingewiesen?“, keine
-    Konten. Was die eigene Seite sehen darf, steht auf der Matchseite im Block ``league.procedures``."""
-    return strip_rows(match, Viewer(user_id=user_id)) if involved and rows(match) else match
+async def for_viewer_list(db, user: dict | None, matches: list[dict], involved: set[str]) -> list[dict]:
+    """Die Spiele einer Staffel für eine Person mit Liga-Recht (Spielplan, Baum): Verfahren ungekürzt nur mit „Proteste“ oder
+    „Ergebnisse“ und nur in Spielen, an denen sie nicht beteiligt ist. Das Recht gilt für die ganze Staffel - eine Prüfung reicht."""
+    from services.match_public_view import without_procedure_details
+    from services.tournament_permissions import has_match_result_permission
+
+    probe = next((match for match in matches if rows(match)), None)
+    if probe is None:
+        return matches
+    lead = bool(user) and await has_match_result_permission(user, probe, capability=("results", "disputes"))
+    viewer_id = (user or {}).get("id")
+    return [without_procedure_details(match, viewer_id) if rows(match) and (not lead or match.get("id") in involved) else match
+            for match in matches]
 
 
 def _moss_view(row: dict, viewer: Viewer, names: dict) -> list[dict]:

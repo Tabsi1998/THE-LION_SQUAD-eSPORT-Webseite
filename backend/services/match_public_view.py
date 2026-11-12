@@ -55,6 +55,38 @@ def _public_keys(value: dict, internal: frozenset) -> dict:
     return {key: item for key, item in value.items() if key not in internal and not key.endswith("_by")}
 
 
+# Liga-Verfahren (#1619, E.2, Nr. 133/137): Einträge in ``disputes[]`` mit ``id`` und ``kind``. Im Spiel-Datensatz stehen sie für
+# alle außer der nicht befangenen Leitung gekürzt - was eine Seite sehen darf, liefert die Matchseite im Block
+# ``league.procedures``. Die eigene Meldung behält, was alte Leser (App) brauchen: Grund, Text, Entscheidung.
+PROCEDURE_KINDS = frozenset({"objection", "protest", "appeal"})
+PROCEDURE_PUBLIC_KEYS = ("at", "id", "kind", "state")
+PROCEDURE_OWN_HIDDEN = frozenset({"moss_requests", "assignee", "resolved_by", "withdrawn_by", "statement", "additions", "target_at",
+                                  "escalate_at", "reminded_at", "escalated_at", "against", "notified_immediately"})
+
+
+def is_procedure_row(row) -> bool:
+    return isinstance(row, dict) and row.get("kind") in PROCEDURE_KINDS and bool(row.get("id"))
+
+
+def public_dispute_row(row: dict, viewer_id: str | None) -> dict:
+    """Ein Eintrag aus ``disputes[]`` für alle ohne Leitungs-Sicht: die eigene Meldung, sonst nur, dass es eine gibt."""
+    own = bool(viewer_id) and row.get("user_id") == viewer_id
+    if is_procedure_row(row):
+        if own:
+            return {key: value for key, value in row.items() if key not in PROCEDURE_OWN_HIDDEN}
+        return {key: row.get(key) for key in PROCEDURE_PUBLIC_KEYS}
+    return row if own else {"at": row.get("at")}
+
+
+def without_procedure_details(match: dict | None, viewer_id: str | None) -> dict | None:
+    """Das Spiel wie geliefert, nur die Liga-Verfahren gekürzt - für Antworten, die sonst den ganzen Datensatz zeigen (Leitung
+    ohne Recht „Proteste“ oder „Ergebnisse“, Beteiligte mit Liga-Recht, Antworten auf eigene Aktionen der Seiten)."""
+    if not isinstance(match, dict) or not isinstance(match.get("disputes"), list):
+        return match
+    return {**match, "disputes": [public_dispute_row(row, viewer_id) if is_procedure_row(row) else row
+                                  for row in match["disputes"] if isinstance(row, dict)]}
+
+
 def public_match_view(match: dict | None, viewer_id: str | None = None) -> dict | None:
     """Der Spiel-Datensatz ohne Internes. `viewer_id`: wer schaut - seine eigene Meldung und sein Einspruch bleiben."""
     if not isinstance(match, dict):
@@ -74,10 +106,7 @@ def public_match_view(match: dict | None, viewer_id: str | None = None) -> dict 
             for row in match.get("reports") or [] if isinstance(row, dict)
         ]
     if "disputes" in match:
-        out["disputes"] = [
-            row if viewer_id and row.get("user_id") == viewer_id else {"at": row.get("at")}
-            for row in match.get("disputes") or [] if isinstance(row, dict)
-        ]
+        out["disputes"] = [public_dispute_row(row, viewer_id) for row in match.get("disputes") or [] if isinstance(row, dict)]
     return out
 
 

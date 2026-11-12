@@ -1643,10 +1643,8 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
     m, _collection = await _find_match_any(match_id)
     await _assert_match_visible(m, user)
     if await _sees_internal(m, user):
-        # Verfahren (E.2, #1619): im eigenen Spiel sieht auch die Leitung nur, was ihre Seite sehen darf.
-        if league_procedures.rows(m) and await league_permissions.conflict_of_interest(get_db(), user, m):
-            return league_procedures.strip_for_involved(m, (user or {}).get("id"), True)
-        return m
+        # Verfahren (E.2, #1619, Nr. 133/137): ungekürzt nur für die nicht befangene Leitung mit „Proteste“ oder „Ergebnisse“.
+        return await league_procedures.for_viewer(get_db(), m, user)
     return public_match_view(m, (user or {}).get("id"))
 
 
@@ -1753,7 +1751,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             await evaluate_after_write(db, v2_match.get("tournament_id"), actor_id=me.get("id"), trigger="match_update")
         await _record_plan_change(db, before, updated, me, schedule_reason)
         await league_schedule.lead_changed(db, before, updated, me, schedule_reason)
-        return {**updated, "idempotent_replay": False}
+        return {**await league_procedures.for_viewer(db, updated, me), "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
 
@@ -1990,8 +1988,8 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
-    # Vorfälle (D.5, #1619): wie bei Meldung und „Problem melden“ nie roh in der Antwort.
-    return {**league_incidents.without_incidents(updated), "idempotent_replay": False}
+    # Die Antwort ist das ganze Spiel: Verfahren nur, soweit diese Person sie sehen darf (E.2, #1619), Vorfälle nie roh (D.5).
+    return {**league_incidents.without_incidents(await league_procedures.for_viewer(db, updated, me)), "idempotent_replay": False}
 
 
 @router.post("/{match_id}/dispute")
@@ -2011,8 +2009,8 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
                if not (league_procedures.is_procedure(row) and league_procedures.state_of(row) != league_procedures.OPEN)]
     if is_duplicate_dispute({"disputes": pending}, me["id"], reason):
         m.pop("_id", None)
-        m["idempotent_replay"] = True
-        return m
+        # Auch die Wiederholung zeigt fremde Verfahren nur gekürzt (#1619, Nr. 133).
+        return {**league_incidents.without_incidents(await league_procedures.for_viewer(db, m, me)), "idempotent_replay": True}
     # Liga-Staffel (#1619, E.2): derselbe Endpunkt schreibt ein Verfahren mit ``id`` und ``kind`` - Beanstandung vor, Protest nach
     # der Bestätigung. Turniere laufen darunter unverändert weiter.
     league = await league_procedures.context(db, m) if collection == "matches_v2" else None
