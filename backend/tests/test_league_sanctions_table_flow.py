@@ -180,3 +180,37 @@ async def test_a_granted_appeal_takes_the_deduction_back_and_a_locked_staffel_re
     locked = await issue(flow, world, kind="point_deduction", target_type="squad", registration_id="reg-2", points=1)
     assert locked.status_code == 423, locked.text
     assert await flow.db.competition_sanctions.count_documents({"registration_id": "reg-2"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_reason_and_issuer_of_a_sanction_never_reach_public_tournament_views(flow):
+    """Das Turnier-Dokument ist öffentlich lesbar: Grund, Regelverstoß und wer verhängt hat, stehen dort nicht."""
+    world = await setup(flow)
+    staffel = world["staffel"]
+    await play_round(flow, staffel)
+    deduction = await issue(flow, world, kind="point_deduction", target_type="squad", registration_id="reg-1", points=2,
+                            rule_ref="Paragraf 13 Beleidigung im Chat")
+    assert deduction.status_code == 200, deduction.text
+    banned = await issue(flow, world, kind="disqualification", target_type="squad", registration_id="reg-2",
+                         rule_ref="Matchabsprache Spieltag 1")
+    assert banned.status_code == 200, banned.text
+    captain = await flow.db.users.find_one({"display_name": "Captain 1"}, {"_id": 0})
+    secrets = ("Beleidigung", "Matchabsprache", "geprüft", deduction.json()["id"])
+    for viewer in (None, captain):
+        flow.act_as(viewer)
+        for url in (f"/api/tournaments/{staffel['id']}", "/api/tournaments", f"/api/tournaments/{staffel['id']}/registrations",
+                    f"/api/tournaments/{staffel['id']}/standings", f"{PAGE}/staffeln/{staffel['slug']}"):
+            answer = await flow.get(url)
+            assert answer.status_code == 200, (url, answer.text)
+            for secret in secrets:
+                assert secret not in answer.text, (url, secret)
+        single = (await flow.get(f"/api/tournaments/{staffel['id']}")).json()
+        assert "point_deductions" not in single and "table_decisions" not in single
+    # Die Tabelle zeigt den Abzug weiter, und das Ausscheiden nennt öffentlich nur, dass es eine Strafe ist.
+    assert (await rows(flow, staffel))["reg-1"]["deducted_points"] == 2
+    removal = (await flow.db.tournament_registrations.find_one({"id": "reg-2"}, {"_id": 0}))["removal"]
+    assert removal["reason"] == "Strafe der Liga-Leitung"
+    # Gegenprobe: Die Leitung liest die Einträge am Turnier weiter - ohne Grund und ohne Person.
+    flow.act_as(world["admin"])
+    lead = (await flow.get(f"/api/tournaments/{staffel['id']}")).json()
+    assert [sorted(row) for row in lead["point_deductions"]] == [["created_at", "id", "points", "registration_id", "sanction_id", "source"]]

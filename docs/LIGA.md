@@ -1907,8 +1907,9 @@ offenen Spiele werden kampflos verloren gewertet (wie bisher ab der Hälfte), di
 macht die Tabelle. Modus des Plans `opponents`, Satz „alle Spiele zählen für die Gegner, das Team steht am Tabellenende“.
 Andere Formate und Staffeln mit `half` unverändert.
 
-**Punktabzug (geschrieben von E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, reason, source,
-sanction_id?, created_at, created_by}]`. Die Tabelle zieht die Summe je Anmeldung von den Punkten ab (`deducted_points`), in der
+**Punktabzug (geschrieben von E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, source,
+sanction_id, created_at}]` - ohne Grund und ohne Person, beides steht an der Strafe. `point_deductions` und `table_decisions` gibt
+`GET /api/tournaments/{id}` und die Turnierliste nur der Leitung der Staffel aus (`league_table.strip_lead_fields`). Die Tabelle zieht die Summe je Anmeldung von den Punkten ab (`deducted_points`), in der
 Mini-Tabelle zählt er nicht. Gelesen wird nur mit `scoring_rules`. Geschrieben wird es von der Strafe „Punktabzug“ (E.3, `source: "sanction"`), der Widerruf
 entfernt den Eintrag; den Grund zeigt die Tabelle nicht öffentlich.
 
@@ -3153,7 +3154,7 @@ Index: `id` eindeutig; `(league_id, season_id)`; `user_id`; `squad_id`; `registr
 | Spielverlust | `match_loss` | Co-Team, Spiel | – | wie Mapverlust |
 | Spielsperre | `player_ban` | Person | `matches` (mindestens 1) **oder** `ends_at`, höchstens bis Season-Ende (Nr. 101); gilt in dieser Season | nicht spielberechtigt (`league_eligibility`) |
 | Teamsperre | `team_ban` | Co-Team | `ends_at` (auch über die Season hinaus); gilt in der ganzen Liga | alle Spieler des Co-Teams nicht spielberechtigt, keine Anmeldung |
-| Disqualifikation | `disqualification` | Co-Team (Anmeldung) | – | Ausscheiden über `tournament_events` (Art `disqualified`): Regel der Season (`exit_rule`, Nr. 11c), Tabellenende (Nr. 43), zählt nicht als „alle Teilnehmer“ (Nr. 34b) |
+| Disqualifikation | `disqualification` | Co-Team (Anmeldung) | – | Ausscheiden über `tournament_events` (Art `disqualified`, öffentlicher Grund an der Anmeldung nur „Strafe der Liga-Leitung“): Regel der Season (`exit_rule`, Nr. 11c), Tabellenende (Nr. 43), zählt nicht als „alle Teilnehmer“ (Nr. 34b) |
 | Ligaausschluss | `league_exclusion` | Person, Co-Team | ohne Ende; gilt in der ganzen Liga | nicht spielberechtigt, keine Anmeldung |
 | Externe Sperre | `external` | Person | `ends_at` frei (ohne: bis zum Widerruf); gilt in der ganzen Liga | nicht spielberechtigt für die Dauer (Nr. 104). Nur Sperren des Herstellers oder einer Plattform wegen Cheating, Manipulation oder Betrug |
 

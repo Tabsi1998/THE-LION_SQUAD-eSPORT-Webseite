@@ -35,6 +35,18 @@ class TableProblem(Exception):
         self.status = status
 
 
+# Was am Turnier nur die Leitung liest: Punktabzüge (E.3, Kennung der Strafe) und Entscheide (wer entschieden hat). Die Tabelle
+# selbst trägt, was öffentlich ist (``deducted_points``, ``lead_decision.reason``).
+LEAD_ONLY_FIELDS = ("point_deductions", "table_decisions")
+
+
+def strip_lead_fields(tournament: dict | None) -> dict | None:
+    """Nimmt aus einer Turnier-Ansicht, was nur die Leitung der Staffel lesen darf."""
+    for key in LEAD_ONLY_FIELDS:
+        (tournament or {}).pop(key, None)
+    return tournament
+
+
 def reason_text(value, *, minimum: int = REASON_MIN) -> str:
     text = " ".join(str(value or "").split())
     if len(text) < minimum:

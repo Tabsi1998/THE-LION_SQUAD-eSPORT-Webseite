@@ -53,6 +53,8 @@ CATALOG: tuple[dict, ...] = (
 CATALOG_KEYS = frozenset(row["key"] for row in CATALOG)
 
 NOT_FOUND = "Diese Strafe gibt es nicht."
+# Der Grund des Ausscheidens steht öffentlich an der Anmeldung - dort nie der Regelverstoß, nur dass es eine Strafe ist.
+REMOVAL_REASON = "Strafe der Liga-Leitung"
 SEASON_END_DETAIL = ("Eine Spielsperre endet spätestens mit der laufenden Season. Was darüber hinausgeht, ist eine Teamsperre "
                      "oder ein Ligaausschluss.")
 
@@ -300,18 +302,20 @@ async def apply_effect(db, doc: dict, registration: dict | None, tournament: dic
 
     kind = doc["kind"]
     if kind == "point_deduction":
-        entry = {"id": new_id(), "registration_id": registration["id"], "points": doc["points"], "reason": doc["rule_ref"],
-                 "source": "sanction", "sanction_id": doc["id"], "created_at": doc["created_at"], "created_by": actor.get("id")}
+        # Am Turnier steht nur, was die Tabelle braucht: kein Grund, keine Person - das Turnier-Dokument ist öffentlich lesbar.
+        # Verstoß, Begründung und wer verhängt hat, stehen an der Strafe (``sanction_id``).
+        entry = {"id": new_id(), "registration_id": registration["id"], "points": doc["points"],
+                 "source": "sanction", "sanction_id": doc["id"], "created_at": doc["created_at"]}
         await db.tournaments.update_one({"id": tournament["id"]}, {"$push": {"point_deductions": entry}})
         await _publish_table(tournament["id"])
         return {"deduction_id": entry["id"]}
     if kind == "disqualification":
         try:
             proposal = await tournament_events.propose_removal(db, tournament, registration, kind="disqualified",
-                                                               reason=doc["rule_ref"], actor_id=actor.get("id"))
+                                                               reason=REMOVAL_REASON, actor_id=actor.get("id"))
             plan = proposal.get("plan") or {}
             done = await tournament_events.confirm_removal(db, tournament, registration, plan.get("id"), kind="disqualified",
-                                                           actor_id=actor.get("id"), reason=doc["rule_ref"])
+                                                           actor_id=actor.get("id"), reason=REMOVAL_REASON)
         except tournament_events.TournamentEventError as problem:
             raise SanctionProblem(problem.detail, problem.status_code) from None
         return {"removal": {"plan_id": plan.get("id"), "previous_status": registration.get("status"),
