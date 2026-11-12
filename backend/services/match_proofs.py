@@ -30,6 +30,7 @@ ihn löscht.
 """
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import logging
 import pathlib
@@ -106,13 +107,21 @@ ZIP_MAX_UNPACKED_BYTES = 2 * 1024 * 1024 * 1024
 ZIP_MAX_RATIO = 200
 # MOSS schreibt Bildschirmfotos und Protokolle. Programme und Skripte haben in der Datei nichts verloren.
 ZIP_FORBIDDEN_SUFFIXES = frozenset({".exe", ".dll", ".bat", ".cmd", ".com", ".scr", ".msi", ".ps1", ".vbs", ".js", ".jar", ".lnk", ".sh",
-                                    ".hta", ".pif", ".reg", ".zip", ".7z", ".rar"})
+                                    ".hta", ".pif", ".reg", ".zip", ".7z", ".rar", ".gz", ".tgz", ".tar", ".bz2", ".xz", ".cab",
+                                    ".iso", ".html", ".htm", ".svg"})
+# Als MOSS-Datei zählt nur die ZIP, wie MOSS sie schreibt - andere Archive bekommen einen klaren Satz statt „kein Bild“.
+OTHER_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
+ONLY_ZIP = "Bitte die MOSS-Datei als ZIP hochladen, so wie MOSS sie geschrieben hat. Andere Archive (etwa .tar.gz, .7z, .rar) gehen nicht."
 ZIP_REFUSED = "Das ist keine gültige MOSS-Datei. Bitte die ZIP-Datei unverändert hochladen, so wie MOSS sie geschrieben hat."
 
 
 def looks_like_zip(file: UploadFile) -> bool:
-    name = (file.filename or "").lower()
-    return name.endswith(".zip") or (file.content_type or "").lower() in {"application/zip", "application/x-zip-compressed"}
+    """Nur die Endung zählt: ``.zip`` - ein anderer Dateityp wird nicht über den angegebenen Inhaltstyp zur MOSS-Datei."""
+    return (file.filename or "").lower().endswith(".zip")
+
+
+def looks_like_other_archive(file: UploadFile) -> bool:
+    return (file.filename or "").lower().endswith(OTHER_ARCHIVE_SUFFIXES)
 
 
 def moss_max_mb() -> int:
@@ -166,12 +175,17 @@ async def _store_zip(db, match: dict, owner: dict, registration_id: str | None, 
     path = PROOF_DIR / key
     # Gestreamt auf die Platte (bis 200 MB): nie die ganze Datei im Speicher. Zu groß oder nicht beschreibbar räumt der Schreiber auf.
     size = await _write_upload_stream_limited(file, path, b"", limit * 1024 * 1024, limit)
-    try:
-        checked = check_zip(path)
+    def inspect() -> tuple[dict, str]:
+        found = check_zip(path)
         digest = hashlib.sha256()
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(chunk)
+        return found, digest.hexdigest()
+
+    try:
+        # In einem Thread: Inhaltsverzeichnis lesen und bis zu 200 MB hashen hielte sonst alle anderen Anfragen auf.
+        checked, sha256 = await asyncio.to_thread(inspect)
     except HTTPException:
         # Abgelehnt: nichts davon bleibt auf dem Server liegen.
         path.unlink(missing_ok=True)
@@ -180,7 +194,7 @@ async def _store_zip(db, match: dict, owner: dict, registration_id: str | None, 
     doc = {
         "id": new_id(), "type": "file", "match_id": match["id"], "tournament_id": match.get("tournament_id"), "owner_id": owner["id"],
         "registration_id": registration_id, "storage_key": key, "mime": "application/zip", "size": size,
-        "sha256": digest.hexdigest(), "entries": checked["entries"], "status": "attached", "context": context,
+        "sha256": sha256, "entries": checked["entries"], "status": "attached", "context": context,
         "scan_state": "safe", "created_at": now, "updated_at": now,
     }
     await db.match_proof_photos.insert_one(dict(doc))
@@ -554,6 +568,8 @@ async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: Upload
                "owner_id": user["id"], "registration_id": side, "status": "attached", "context": context,
                "created_at": now, "updated_at": now}
         await db.match_proof_photos.insert_one(dict(doc))
+    elif kind == "moss" and looks_like_other_archive(file):
+        raise HTTPException(status_code=422, detail=ONLY_ZIP)
     elif kind == "moss" and looks_like_zip(file):
         # Die MOSS-Datei selbst (#2297): eigener Dateityp mit eigener Prüfung - nur am Bezug ``moss``.
         doc = await _store_zip(db, match, user, side, file, context=context)

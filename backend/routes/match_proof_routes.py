@@ -56,6 +56,10 @@ async def get_proof_photo(match_id: str, photo_id: str, w: int | None = None, us
     path = match_proofs.proof_path(doc.get("storage_key"))
     if path is None or not path.is_file():
         raise HTTPException(status_code=404, detail="Foto nicht gefunden")
+    if match_proofs.is_file(doc):
+        # Die MOSS-ZIP (#2297) geht auch über diesen Weg nur als Download hinaus - nie „inline“ im Browser.
+        headers = {key: value for key, value in FILE_HEADERS.items() if key != "Content-Disposition"}
+        return FileResponse(path, media_type="application/zip", filename=f"moss-{photo_id[:8]}.zip", headers=headers)
     if w is not None:
         variant = resolve_variant(path, w)
         if variant is not None:
