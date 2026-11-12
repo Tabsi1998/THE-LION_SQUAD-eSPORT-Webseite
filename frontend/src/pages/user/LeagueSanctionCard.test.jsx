@@ -32,6 +32,9 @@ test("zeigt Verstoß, Begründung, Zeitraum und Frist - der Einspruch braucht ei
   expect(card).toHaveTextContent("Strafe der Liga-Leitung gegen dich");
   expect(card).toHaveTextContent("Anlage C.4");
   expect(card).toHaveTextContent("Makro nachgewiesen");
+  // Wer verhängt hat, steht für Betroffene nie da - auch wenn die Antwort einen Namen trüge.
+  expect(card).toHaveTextContent("durch die Liga-Leitung");
+  expect(card).not.toHaveTextContent("Strafleitung");
   expect(screen.getByTestId("sanction-period-s1")).toHaveTextContent("2 Liga-Spiele, noch 2");
   expect(screen.getByTestId("sanction-deadline-s1")).toHaveTextContent("Einspruch möglich bis");
   fireEvent.click(screen.getByTestId("sanction-appeal-open-s1"));

@@ -3210,7 +3210,7 @@ oder ganz frei eintragen.
 | `POST …/sanctions/{id}/confirm` | `sanctions` | vorläufig → endgültig, mit Zeitraum |
 | `POST …/sanctions/{id}/revoke` | `sanctions` | Widerruf mit `reason` |
 | `POST …/sanctions/{id}/appeal/decision` | `sanctions`, nicht die Ausgangsperson | `{decision: upheld/granted, note}` |
-| `GET /api/penalties/me` | angemeldet | zusätzlich Zeilen `kind: "league_sanction"` mit Block `sanction` (Art, Stand, Zeitraum, Frist, `can_appeal`, Einspruch); Teamstrafen für Captain, Vertreter und Hauptteam-Leitung |
+| `GET /api/penalties/me` | angemeldet | zusätzlich Zeilen `kind: "league_sanction"` mit Block `sanction` (Art, Stand, Zeitraum, Frist, `can_appeal`, Einspruch); Teamstrafen für Captain, Vertreter und Hauptteam-Leitung. Wer verhängt hat, steht nicht dabei (`issued_by_name: "Liga-Leitung"`, kein `issued_by`) |
 | `POST /api/penalties/sanctions/{id}/appeal` | Betroffene | Einspruch einlegen `{text}` |
 | `GET /api/admin/penalties` | Verwaltung | Eingang: zeigt Liga-Strafen neben Fast-Lap-, Kampflos- und Vorfall-Einträgen, nur für Ligen, die die Person leitet |
 

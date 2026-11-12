@@ -219,6 +219,10 @@ async def my_penalties(me: dict = Depends(get_current_user)):
         item.pop("results_locked", None)
         item.pop("tournament_id", None)
         item.pop("league_id", None)
+        if item.get("kind") == "league_sanction":
+            # Strafen der Liga (E.3): Betroffene lesen, dass die Liga-Leitung entschieden hat - nicht, welche Person.
+            item.pop("issued_by", None)
+            item["issued_by_name"] = "Liga-Leitung"
     return {"count": len(items), "items": items}
 
 

@@ -558,3 +558,20 @@ async def test_a_revoke_closes_an_open_appeal_and_releases_the_proofs(flow):
     assert (await appeal(flow, world, kept["id"], "Tom")).status_code == 200
     assert (await decide(flow, world, kept["id"], "second", "upheld")).status_code == 200
     assert (await revoke(flow, world, kept["id"])).json()["appeal"]["state"] == "upheld"
+
+
+@pytest.mark.asyncio
+async def test_the_affected_do_not_learn_who_issued_the_sanction(flow):
+    """Review R1, M2: Betroffene lesen „Liga-Leitung“, nie Kennung oder Name der Person - die Verwaltung liest sie weiter."""
+    world = await sanction_world(flow)
+    await issue(flow, world, kind="yellow_card", target_type="squad", registration_id=world["reg_a"]["id"])
+    await ban(flow, world, "Mila", matches=1)
+    for name in ("Kapitaen", "Mila"):
+        flow.act_as(world["users"][name])
+        answer = await flow.get("/api/penalties/me")
+        row = next(item for item in answer.json()["items"] if item["kind"] == "league_sanction")
+        assert row["issued_by_name"] == "Liga-Leitung" and "issued_by" not in row
+        assert world["lead"]["id"] not in answer.text and "Strafleitung" not in answer.text
+    flow.act_as(await flow.add_staff())
+    inbox = [row for row in (await flow.get("/api/admin/penalties")).json()["items"] if row["kind"] == "league_sanction"]
+    assert {row["issued_by_name"] for row in inbox} == {"Strafleitung"}
