@@ -417,3 +417,22 @@ async def test_many_matches_with_procedures_cost_one_decision_per_staffel(flow, 
         seen.update(viewer_for=0, involved=0)
         again = await league_procedures.guard(flow.db, out, viewer_user)
         assert again == out and (full or seen == {"viewer_for": 0, "involved": 0})
+
+
+def test_the_guard_reads_every_json_variant_and_sits_outside_any_compression():
+    import server
+    from services.procedure_response_guard import is_json
+
+    assert all(is_json(kind) for kind in ("application/json", "application/json; charset=utf-8", "application/problem+json", "APPLICATION/VND.API+JSON"))
+    assert not any(is_json(kind) for kind in (None, "", "text/html", "text/csv", "application/zip", "text/event-stream"))
+
+    def name_of(entry) -> str:
+        options = getattr(entry, "kwargs", None) or getattr(entry, "options", None) or {}
+        dispatch = options.get("dispatch")
+        return getattr(dispatch, "__name__", "") or getattr(entry.cls, "__name__", "")
+
+    names = [name_of(entry) for entry in server.app.user_middleware]   # von außen nach innen
+    assert "procedure_guard" in names
+    inside = names[names.index("procedure_guard") + 1:]
+    assert not [name for name in inside if "gzip" in name.lower() or "compress" in name.lower() or "brotli" in name.lower()], \
+        "eine Komprimierung darf nie innerhalb des Wächters liegen - er sähe nur komprimierte Bytes"

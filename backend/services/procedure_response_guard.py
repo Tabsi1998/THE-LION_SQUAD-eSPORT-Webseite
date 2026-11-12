@@ -8,6 +8,11 @@ selbst abgedeckt - eine vergessene Zeile in einer Route öffnet nichts mehr.
 
 Die Person kommt aus der Anfrage, über dieselbe Abhängigkeit wie in den Routen (``auth.get_optional_user``, in Tests deren
 Ersatz). Lässt sie sich nicht bestimmen, gilt die Anfrage als nicht angemeldet - es wird also gekürzt.
+
+**Reihenfolge der Middleware:** Der Wächter liest den Inhalt der Antwort als JSON. Eine Komprimierung (``GZipMiddleware`` o. ä.)
+darf deshalb nie *innerhalb* des Wächters liegen - also nie nach ihm eingehängt werden, ohne dass sie außen sitzt: Er sähe sonst
+nur komprimierte Bytes, fände den Marker nicht und ließe alles durch. ``tests/test_league_procedures_leak_flow.py`` prüft die
+Reihenfolge.
 """
 from __future__ import annotations
 
@@ -20,6 +25,12 @@ from starlette.responses import Response
 logger = logging.getLogger("tls.procedure_guard")
 
 MARKER = b'"disputes"'
+
+
+def is_json(content_type: str | None) -> bool:
+    """Jede JSON-Variante: ``application/json`` und alles auf ``+json`` (etwa ``application/problem+json``)."""
+    kind = str(content_type or "").split(";", 1)[0].strip().lower()
+    return kind == "application/json" or kind.endswith("+json")
 
 
 async def _user_of(request) -> dict | None:
@@ -45,7 +56,7 @@ def _rebuilt(response, body: bytes) -> Response:
 async def guard_response(request, call_next):
     """Als ``@app.middleware("http")`` eingehängt (server.py)."""
     response = await call_next(request)
-    if not request.url.path.startswith("/api/") or "application/json" not in (response.headers.get("content-type") or ""):
+    if not request.url.path.startswith("/api/") or not is_json(response.headers.get("content-type")):
         return response
     body = b"".join([chunk async for chunk in response.body_iterator])
     if MARKER not in body:
