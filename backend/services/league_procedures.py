@@ -661,6 +661,7 @@ class Viewer:
     acting: frozenset = frozenset()   # … für die sie handeln darf
     lead: bool = False                # Leitung mit „Proteste“ oder „Ergebnisse“ - und nicht befangen
     can_decide: bool = False          # … mit „Proteste“
+    override: bool = False            # befangener Superadmin mit „Proteste“: handelt nur als Notausnahme mit Pflichtgrund (B.1)
 
 
 async def viewer_for(db, match: dict, user: dict | None) -> Viewer:
@@ -671,8 +672,17 @@ async def viewer_for(db, match: dict, user: dict | None) -> Viewer:
     from services.tournament_permissions import has_match_result_permission
 
     seen = await match_proofs.viewer_for(db, match, user)
-    can_decide = seen.lead and await has_match_result_permission(user, match, capability="disputes")
-    return Viewer(user_id=seen.user_id, sides=seen.sides, acting=seen.acting, lead=seen.lead, can_decide=can_decide)
+    may = await has_match_result_permission(user, match, capability="disputes")
+    override = False
+    if may and not seen.lead:
+        # Die Grundregel aus B.1 bleibt: Der Superadmin darf im eigenen Spiel als Notausnahme handeln, mit Pflichtgrund im
+        # Protokoll. Sehen tut er dabei weiter nur, was seine Seite sieht.
+        from services.league_permissions import conflict_of_interest
+
+        conflict = await conflict_of_interest(db, user, match)
+        override = bool(conflict and conflict["override"])
+    return Viewer(user_id=seen.user_id, sides=seen.sides, acting=seen.acting, lead=seen.lead, can_decide=seen.lead and may,
+                  override=override)
 
 
 def strip_rows(match: dict | None, viewer: Viewer) -> dict | None:
@@ -753,8 +763,8 @@ def view(row: dict, match: dict, viewer: Viewer, league: League, names: dict, no
         "can_amend": is_open and acting_own and not (evidence_until and now > evidence_until),
         "can_withdraw": is_open and (acting_own or (not row.get("registration_id") and row.get("user_id") == viewer.user_id)),
         "can_state": is_open and acting_opponent and not (due and now > due),
-        "can_lead": is_open and viewer.can_decide and decided_by(row) != viewer.user_id,
-        "own_decision": is_open and viewer.can_decide and decided_by(row) == viewer.user_id,
+        "can_lead": is_open and (viewer.can_decide or viewer.override) and decided_by(row) != viewer.user_id,
+        "own_decision": is_open and (viewer.can_decide or viewer.override) and decided_by(row) == viewer.user_id,
         "can_appeal": (state == DECIDED and row["kind"] != APPEAL and bool(viewer.acting)
                        and bool(refs.parse(row.get("appeal_until")) and now < refs.parse(row["appeal_until"]))
                        and not any(other["kind"] == APPEAL and (other.get("against") or {}).get("ref_id") == row["id"] for other in rows(match))),
@@ -805,7 +815,7 @@ async def page_block(db, match: dict, league: League, user: dict | None, *, now:
         if until and now < until and not taken and not by_procedure:
             appealable = {"type": kind, "ref_id": match["id"], "until": until.isoformat()}
     players: list[dict] = []
-    if viewer.can_decide and open_rows(match):
+    if (viewer.can_decide or viewer.override) and open_rows(match):
         # Für „MOSS-Datei anfordern“: die Spieler beider Seiten - nur für die Leitung, die entscheiden darf.
         from services.match_audience import player_ids, registrations_for_match, teams_by_id
 
@@ -829,5 +839,5 @@ async def page_block(db, match: dict, league: League, user: dict | None, *, now:
                           for row in match.get("incidents") or [] if isinstance(row, dict) and row.get("id")],
             "appealable": appealable,
         } if viewer.acting else None),
-        "procedure_viewer": {"lead": viewer.lead, "can_decide": viewer.can_decide},
+        "procedure_viewer": {"lead": viewer.lead, "can_decide": viewer.can_decide, "override": viewer.override},
     }

@@ -2886,7 +2886,7 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 | `evidence_until` | ISO | bis wann die einreichende Seite ergänzen und Nachweise nachreichen darf (Ende der Protest- bzw. Bestätigungsfrist) |
 | `statement` | `{registration_id, due_at, extended_by, text, user_id, at}` \| null | Stellungnahme der Gegenseite: `due_at` = Benachrichtigung + `statement_hours`; die Leitung kann verlängern (`extended_by`) |
 | `moss_requests` | `[{id, user_id, requested_by, at, due_at, state}]` | angeforderte MOSS-Dateien (§ 9a.3): `state` `requested` \| `uploaded` \| `missing` \| `excused` |
-| `assignee` | `{user_id, at}` \| null | wer „übernommen“ hat (Nr. 135), sichtbar für beide Seiten; Befangene können nicht übernehmen |
+| `assignee` | `{user_id, at}` \| null | wer „übernommen“ hat (Nr. 135), sichtbar für beide Seiten; Befangene können nicht übernehmen - der Superadmin nur als Notausnahme mit Pflichtgrund (Grundregel B.1, `league.conflict.override`). Das gilt für jeden Schritt der Leitung am Verfahren; sehen tut er dabei nur, was seine Seite sieht |
 | `target_at`, `escalate_at`, `reminded_at`, `escalated_at` | ISO | Zielfrist (`assignee.at` + `protest_target_hours`), gespeicherte Eskalationsfrist (`target_at` + `protest_escalate_hours`; ohne Zuständige Einreichen + `protest_target_hours`), Erinnerung an die Person, Eskalation an `manage` |
 | `state` | `open` \| `withdrawn` \| `decided` | Zurückziehen bis zur Entscheidung (`withdrawn_at`, `withdrawn_by`), protokolliert; danach kein neues Verfahren derselben Seite mit demselben `reason_key` |
 | `resolved_at`, `resolved_by`, `decision`, `decision_note` | wie bisher | Entscheidung: `keep` \| `change`; `decision_note` ist bei neuen Einträgen Pflicht (mindestens zehn Zeichen) |
