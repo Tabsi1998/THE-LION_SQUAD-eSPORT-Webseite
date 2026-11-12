@@ -1,5 +1,5 @@
 import fixture from "../../e2e/fixtures/tableScheduleGenerated.json";
-import { PLACEMENT_LOOKS, markPlacementShown, placementFor, placementShown, podiumPlaces } from "./placementMoment";
+import { PLACEMENT_LOOKS, gamesWonText, markPlacementShown, placementFor, placementShown, podiumPlaces, podiumRoundNote } from "./placementMoment";
 
 // Sieger-Moment und Podest (#1180, #1339): wer aus der echten Rangliste (scripts/make_table_schedule_fixture.py) einen
 // Moment bekommt - nur Platz 1 bis 3, nur nach dem Ende, nur die eigene Anmeldung, einmal je Browser.
@@ -81,4 +81,24 @@ test("Podest bei Gleichstand: nur belegte Stufen - geteilter 1. als eine breite 
   expect(twoSecond.map((place) => [place.rank, place.rows.length])).toEqual([[2, 2], [1, 1]]);
   // Ein wirklich fehlender Platz (nur zwei haben gespielt) bleibt als „–“ stehen.
   expect(podiumPlaces(standings.filter((row) => row.rank <= 2)).map((place) => place.rank)).toEqual([2, 1, 3]);
+});
+
+describe("podiumRoundNote (#2336)", () => {
+  const row = (rank, won, extra = {}) => ({ rank, won, place_path: "im Finale", ...extra });
+  test("nur im Baum und nur, wenn ein besserer Platz weniger Siege hat", () => {
+    expect(podiumRoundNote([row(1, 4), row(2, 1), row(3, 3)])).toMatch(/erreichte Runde/);
+    expect(podiumRoundNote([row(1, 4), row(2, 3), row(3, 3)])).toBe("");
+    expect(podiumRoundNote([{ rank: 1, won: 1 }, { rank: 2, won: 3 }])).toBe("");
+    expect(podiumRoundNote([])).toBe("");
+  });
+  test("Doppel-K.-o. nennt die Verliererrunde, der Rückblick liest `path` und `won`", () => {
+    expect(podiumRoundNote([row(1, 4), row(2, 1), row(3, 3, { reached: "Loser Final" })])).toMatch(/Verliererrunde/);
+    expect(podiumRoundNote([row(1, 4), row(2, 1), row(3, 3)])).not.toMatch(/Verliererrunde/);
+    expect(podiumRoundNote([{ rank: 1, won: 1, path: "Finale gewonnen" }, { rank: 3, won: 2, path: "Spiel um Platz 3 gewonnen" }])).toMatch(/Freilos/);
+  });
+  test("gewonnene Spiele in Worten", () => {
+    expect(gamesWonText(4)).toBe("4 Spiele gewonnen");
+    expect(gamesWonText(1)).toBe("1 Spiel gewonnen");
+    expect(gamesWonText(0)).toBe("kein Spiel gewonnen");
+  });
 });

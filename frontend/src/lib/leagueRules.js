@@ -2,6 +2,7 @@
 // Vergleich rechnet der Server - Web und PDF zeigen dieselben.
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { dayNoon, viennaDate } from "@/lib/vienna";
+import { mediaPropsFor } from "@/lib/mediaAccess";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const SEARCH_MIN = 2;
@@ -10,10 +11,8 @@ const ACTIVE_HIT = "tls-rules-hit-active";
 
 // Bilder im Editor und in der Gestaltung der Liga (#2230): Die Admin-Medien gehen über die Rolle (upload_routes), Zuständigkeiten öffnen sie nicht. Wer sie nicht hat, nimmt wie jedes
 // Konto die eigenen Bilder - sonst wäre das Hochladen auf dieser Seite für Zuständige immer ein 403.
-const ADMIN_MEDIA_ROLES = ["admin", "tournament_admin", "club_admin", "superadmin"];
-
 export function rulesMediaProps(user) {
-  return ADMIN_MEDIA_ROLES.includes(user?.role) ? {} : { mediaScope: "user", libraryEndpoint: "/media?type=images" };
+  return mediaPropsFor(user);
 }
 
 export function rulesApiPath(league, season) {
@@ -51,12 +50,30 @@ export function isOwnUpload(address) {
   return OWN_UPLOAD.test(String(address || ""));
 }
 
-/** Optionen für Markdown im Regelwerk - auch für die Vorschau im Editor. */
+/** Optionen für Markdown im Regelwerk - auch für die Vorschau im Editor (dort der Text, wie er geschrieben ist). */
 export const RULES_MARKDOWN = { linkMentions: false, anchorLinksInPage: true, imageAllowed: isOwnUpload };
 
 /** Markdown wie überall im Projekt (maskiert, nur sichere Elemente); Sprünge bleiben in der Seite, „@“ wird kein Profil-Link. */
 export function renderRulesMarkdown(markdown) {
   return renderMarkdownLite(markdown, RULES_MARKDOWN);
+}
+
+// Abschnitte, wie die API sie ausliefert (#2218): Namen in Bausteinen mit Backslash-Escapes, ein Backslash im freien Text verdoppelt -
+// `escapes` zeigt beides, wie geschrieben; ein Name wird nie Link oder fett. Wie im PDF.
+const SECTION_MARKDOWN = { ...RULES_MARKDOWN, escapes: true };
+
+/** Ein Abschnitt der Regelseite oder der Vorschau aus `sections[].body_md`. */
+export function renderRulesSection(markdown) {
+  return markGearTables(renderMarkdownLite(markdown, SECTION_MARKDOWN));
+}
+
+// Erlaubte Ausrüstung ab layout 5 (#2305, loadout_bans.GEAR_HEAD): Nur eine Tabelle mit genau diesem Kopf wird als Ausrüstungstabelle
+// markiert (`data-gear-table`, rules.css) - eine andere Tabelle mit unterstrichenem Kopf (`++Status++`) bleibt eine normale Tabelle.
+const TABLE_OPEN = "<div class=\"prose-cms-table\">";
+const GEAR_HEAD = "<table><thead><tr><th>Bild</th><th><u>Waffe</u></th><th>Aufsätze</th></tr></thead>";
+
+function markGearTables(html) {
+  return html.split(`${TABLE_OPEN}${GEAR_HEAD}`).join(`<div class="prose-cms-table" data-gear-table="">${GEAR_HEAD}`);
 }
 
 // ---------------------------------------------------------------- Suche in der Seite
@@ -124,4 +141,40 @@ export function moveAnnex(annexes, index, step) {
 export function insertBlock(body, token) {
   const text = String(body || "").trimEnd();
   return `${text}${text ? "\n\n" : ""}${token}\n`;
+}
+
+// ---------------------------------------------------------------- Variablen und Freigabe (#2269)
+
+/** Die Variablen der Verwaltung nach Gruppen, in der Reihenfolge des Servers; ``query`` filtert nach Name, Bezeichnung und Wert. */
+export function variableGroups(variables = [], query = "") {
+  const needle = String(query || "").trim().toLowerCase();
+  const groups = [];
+  for (const row of variables) {
+    if (needle && !`${row.name} ${row.label} ${row.value || ""}`.toLowerCase().includes(needle)) continue;
+    let group = groups.find((item) => item.name === row.group);
+    if (!group) {
+      group = { name: row.group || "Weitere", rows: [] };
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+  return groups;
+}
+
+/** Der Wert einer Variable, wie die Auswahl ihn zeigt: ohne Wert steht da, was auch im Text stünde. */
+export function variableValueText(row) {
+  return row?.value == null || row.value === "" ? "(nicht festgelegt)" : String(row.value);
+}
+
+export const CHANGE_KIND_WORDS = { block: "Baustein", variable: "Variable" };
+
+/** Der vorgeschlagene Änderungsgrund aus den geänderten Stellen: „Einstellungen geändert: Map-Pool, Teamgröße“. */
+export function proposedReason(changes) {
+  const labels = [];
+  for (const row of changes?.rows || []) {
+    const label = row.kind === "variable" ? String(row.label || "").split(" · ").slice(1).join(" · ") || row.label : row.label;
+    if (label && !labels.includes(label)) labels.push(label);
+  }
+  const text = `Einstellungen geändert: ${labels.join(", ")}`;
+  return labels.length ? (text.length > 500 ? `${text.slice(0, 497)}…` : text) : "Einstellungen geändert";
 }

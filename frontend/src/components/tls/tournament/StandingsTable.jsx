@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FORM_LETTERS, STANDING_COLUMNS, formLabel, rankMove, standingCell } from "@/lib/standingsTable";
+import { standingNotes } from "@/lib/leagueTable";
 import { CountUp } from "@/components/tls/motion/CountUp";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
@@ -40,14 +41,38 @@ function Form({ form }) {
   );
 }
 
+// Liga-Staffel (E.1, #1625): unter dem Namen, was bei Punktgleichheit entschied, kampflos, Abzug und das Ausscheiden.
+// Gibt es die Felder nicht (andere Turniere), bleibt die Zeile wie bisher.
+function Notes({ row }) {
+  const notes = standingNotes(row);
+  if (!notes.length) return null;
+  return (
+    <span className="tls-standing-notes" data-testid={`standing-notes-${row.registration_id}`}>
+      {notes.map((note) => (
+        <span key={note.key} className="tls-standing-note" data-tone={note.tone} title={note.title}>
+          {note.text}{note.reason ? <span className="tls-standing-note__reason">: {note.reason}</span> : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /**
  * `rows`: Zeilen einer Tabelle; `kind`: league, swiss, ffa oder knockout (lib/standingsTable.tableKind); `changed`: Schlüssel
  * frisch geänderter Zeilen; `registerRow`: useFlipRows - Zeilen gleiten an ihren neuen Platz; `certificateHref`: Link
  * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile; `nameLabel`: Kopf der Namensspalte („Team“
- * bei Team-Turnieren, lib/standingsTable.nameHead).
+ * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable);
+ * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit).
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name" }) {
-  const columns = STANDING_COLUMNS[kind] || STANDING_COLUMNS.league;
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false }) {
+  const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league)
+    .filter((column) => !(hideDraws && column.key === "drawn"))
+    .map((column) => {
+      if (!mapPoints) return column;
+      if (column.key === "won") return { ...column, wide: false };
+      if (column.key === "points") return { ...column, title: "Punkte = gewonnene Maps" };
+      return column;
+    });
   const span = columns.length + 2 + (certificateHref ? 1 : 0);
   return (
     // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.
@@ -90,6 +115,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                     <span className="tls-standing-name text-white font-medium">{row.display_name || "Teilnehmer"}</span>
                     {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
+                  <Notes row={row} />
                 </td>
                 {columns.map((column) => (
                   <td key={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-display text-base font-bold text-white" : "text-white/70"}`}>

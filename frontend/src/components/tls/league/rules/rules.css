@@ -98,7 +98,235 @@
 .tls-rules-doc .prose-cms pre { overflow-wrap: normal; }
 .tls-rules-doc .prose-cms .prose-cms-table { overflow-wrap: normal; }
 .tls-rules-doc .prose-cms td, .tls-rules-doc .prose-cms th { overflow-wrap: break-word; }
-
+/* Bilder in Tabellen (Sperrliste, #2218): kleines Vorschaubild statt voller Breite, Seitenverhältnis wie in der Bibliothek. */
+.tls-rules-doc .prose-cms td img { display: block; width: 5.5rem; max-width: none; aspect-ratio: 16 / 9; object-fit: contain; margin: 0; padding: 0.25rem; background: #0a0a0a; }
+/* Symbol eines Modus aus den Bausteinen (#2266, league_rule_blocks.ICON_ALT): klein vor dem Namen, quadratisch, auch in Tabelle und Liste. */
+.tls-rules-doc .prose-cms img[alt="Modus-Symbol"] {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  max-width: none;
+  aspect-ratio: 1 / 1;
+  margin: 0 0.4em 0.15em 0;
+  padding: 0;
+  background: none;
+  vertical-align: middle;
+  object-fit: contain;
+  border-radius: 2px;
+}
+/* Erlaubte Ausrüstung (#2287, loadout_bans.CARD_ALT und CLASS_ICON_ALT): je Unterkategorie eine Zeile mit Symbol und Namen, darunter
+   die Einträge als Karten im Raster - wie die Ligaseite. Eine ganz gesperrte Klasse ist nur die Zeile („nicht erlaubt“ fett). Ein Eintrag
+   ohne Bild bekommt eine leere Bildfläche, damit das Raster ruhig bleibt. */
+.tls-rules-doc .prose-cms img[alt="Klassen-Symbol"] {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  max-width: none;
+  margin: 0 0.4em 0.15em 0;
+  padding: 0;
+  border: 0;
+  vertical-align: middle;
+  object-fit: contain;
+  border-radius: 2px;
+}
+/* Kopf einer Unterkategorie: vor Karten, mit Symbol oder als Zeile „nicht erlaubt“. */
+.tls-rules-doc .prose-cms p:is(:has(+ ul > li > u):has(> em), :has(> img[alt="Klassen-Symbol"]:first-child), :has(> em:first-child + strong)) {
+  margin-top: 1.1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+.tls-rules-doc .prose-cms p:is(:has(+ ul > li > u):has(> em), :has(> img[alt="Klassen-Symbol"]:first-child), :has(> em:first-child + strong)) > em:first-of-type {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--league-accent-rgb, var(--tls-brand-rgb)));
+}
+.tls-rules-doc .prose-cms p:is(:has(+ ul > li > u):has(> em), :has(> img[alt="Klassen-Symbol"]:first-child), :has(> em:first-child + strong)) > strong { color: #ff9f0a; }
+/* Die Kategorie (nur fett, danach Karten, eine Unterkategorie oder eine Tabelle mit Bildern): bei allen Kategorien dieselbe
+   Zwischenüberschrift - Waffen wie Aufsätze wie Perks (Codex Runde 1). */
+.tls-rules-doc .prose-cms p:has(> strong:only-child):has(+ ul > li > u, + p > img[alt="Klassen-Symbol"], + p > em:first-child, + .prose-cms-table td img, + .prose-cms-table[data-gear-table]) {
+  margin-top: 1.75rem;
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 1rem;
+  color: #fff;
+}
+.tls-rules-doc .prose-cms p:has(> strong:only-child):has(+ ul > li > u, + p > img[alt="Klassen-Symbol"], + p > em:first-child, + .prose-cms-table td img, + .prose-cms-table[data-gear-table]) > strong {
+  font-family: 'Unbounded', 'Arial Black', 'Segoe UI Black', sans-serif;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+/* Karten: jede trägt ihren Namen als Marke (++Name++ → <u>, loadout_bans._allowed_card) - auch ohne Bild. */
+.tls-rules-doc .prose-cms ul:has(> li > u) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+/* Text ohne Auszeichnung in der Karte ist der Satz zu den Aufsätzen einer Waffe (#2299, loadout_bans.attachments_text): klein und leise
+   unter Name und Hinweis. Name (u) und Hinweis (em) tragen eigene Größe und Farbe. */
+.tls-rules-doc .prose-cms ul:has(> li > u) > li {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.62);
+}
+.tls-rules-doc .prose-cms ul:has(> li > u) > li > u {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: #fff;
+}
+.tls-rules-doc .prose-cms ul:has(> li > u) > li:not(:has(> img))::before {
+  content: "";
+  display: block;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  background: #0a0a0a;
+}
+.tls-rules-doc .prose-cms img[alt="Ausrüstung"] {
+  display: block;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 0.4rem;
+  padding: 0.25rem;
+  object-fit: contain;
+  background: #0a0a0a;
+}
+.tls-rules-doc .prose-cms ul:has(> li > u) > li > em {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+  color: #ff9f0a;
+}
+/* Erlaubte Ausrüstung ab layout 5 (#2305, loadout_bans._weapon_table): je Kategorie mit Waffen eine Tabelle Bild · Waffe · Aufsätze über
+   die volle Breite, erkannt am Kopf Bild · ++Waffe++ · Aufsätze (leagueRules.markGearTables setzt data-gear-table). Eine Zeile ohne Waffen-Namen (zweite Zelle ohne u) ist der Kopf
+   einer Waffenklasse. In der dritten Spalte steht je Slot eine Marke (u) auf eigener Zeile; „gesperrt“ und „eingeschränkt“ (fett) sind
+   orange, „nur erlaubt“ und „alle passenden Aufsätze erlaubt“ (kursiv) grün - das Wort sagt es auch ohne Farbe. Am Handy stapelt jede
+   Zeile: Bild und Name nebeneinander, die Aufsätze darunter über die ganze Breite - nichts scrollt seitlich. Am PC ist die Tabelle ein
+   Raster (feste Bildspalte, Name zu Aufsätzen etwa 1 : 2), damit der Kopf einer Waffenklasse über Name und Aufsätze reicht - Markdown kennt
+   kein colspan. */
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] { overflow-x: visible; margin: 0.6rem 0 1.5rem; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] table {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 0.5fr) minmax(0, 1fr);
+  min-width: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] :is(thead, tbody, tr) { display: contents; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] :is(th, td) {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] th > u { text-decoration: none; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td { padding: 0.55rem 0.75rem; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td:nth-child(2) { grid-column: 2 / -1; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td:nth-child(3) { display: none; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td img[alt="Ausrüstung"] { width: 5rem; margin: 0; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:has(> td:nth-child(2) > u) > td:first-child:empty::before {
+  content: "";
+  display: block;
+  width: 5rem;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  background: #0a0a0a;
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(2) > u { display: block; font-weight: 600; text-decoration: none; color: #fff; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(2) > u + em {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+  color: #ff9f0a;
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) { font-size: 0.8125rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > u { display: block; text-decoration: none; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > u > em { font-style: normal; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > :is(strong, em):not(:only-child) {
+  display: block;
+  font-size: 0.6875rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > :is(strong, em):not(:only-child):not(:first-child) { margin-top: 0.45rem; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > strong { color: #ff9f0a; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > em { font-style: normal; color: var(--tls-rules-new, #7ee2a8); }
+/* Kopf einer Waffenklasse: wie die Zwischenzeile der Karten - Name in Akzentfarbe, „nicht erlaubt“ orange. */
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td { background: rgba(255, 255, 255, 0.035); font-size: 0.8125rem; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td:nth-child(2) > em {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--league-accent-rgb, var(--tls-brand-rgb)));
+}
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td:nth-child(2) > strong { color: #ff9f0a; }
+@media (max-width: 639px) {
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] :is(table, tbody) { display: block; width: 100%; border: 0; }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] thead {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tbody { border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.45rem 0.75rem;
+    align-items: start;
+    padding: 0.65rem 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td { display: block; min-width: 0; border: 0; padding: 0; background: none; }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td img[alt="Ausrüstung"],
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:has(> td:nth-child(2) > u) > td:first-child:empty::before { width: 4.5rem; }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) { grid-column: 1 / -1; }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3):empty { display: none; }
+  /* Kopf einer Waffenklasse: Symbol und Name in einer Zeile. */
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    background: rgba(255, 255, 255, 0.035);
+    padding: 0.45rem 0.5rem;
+  }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td { background: none; }
+  .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td:empty { display: none; }
+}
 .tls-rules-section {
   position: relative;
   margin-top: 2.25rem;

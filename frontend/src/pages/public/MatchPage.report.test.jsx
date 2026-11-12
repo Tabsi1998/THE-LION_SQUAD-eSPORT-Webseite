@@ -85,6 +85,14 @@ test("Foto vom Ergebnis: sofort hochgeladen, die Kennung geht mit der Meldung", 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", expect.objectContaining({ photo_id: "p1" })));
 });
 
+test("Liga-Check-in (#1652): erst einchecken, dann melden - der Satz steht statt des Formulars", async () => {
+  renderMatch({ ...PAGE, can_dispute: true, report_hint: "Melden geht erst, wenn beide Seiten für diesen Termin eingecheckt sind – eure Seite hat noch nicht eingecheckt." });
+  expect(await screen.findByTestId("match-report-hint")).toHaveTextContent("eure Seite hat noch nicht eingecheckt");
+  expect(screen.queryByTestId("match-report-form")).toBeNull();
+  expect(screen.queryByText("Ergebnis wird durch die Turnierleitung gepflegt.")).toBeNull();
+  expect(screen.getByTestId("match-dispute-form")).toBeInTheDocument();
+});
+
 test("Nur Turnierleitung (#1157): kein Melde-Knopf, sondern wer das Ergebnis einträgt", async () => {
   renderMatch({ ...PAGE, result_entry_mode: "staff_only", event_mode: "local", can_player_report_result: false, can_report_score: false, report_state: null, acting_registration_id: "r1" });
   expect(await screen.findByTestId("match-staff-enters")).toHaveTextContent("Das Ergebnis trägt die Turnierleitung ein.");

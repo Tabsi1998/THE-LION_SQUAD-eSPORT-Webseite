@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { AlertTriangle, ChevronDown, IdCard, Trophy } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { viennaDateTime } from "@/lib/vienna";
 import { LineupPicker, ParticipantsPicker } from "./LeagueReportForm";
 import { followLineups, gamesProblem, isSeries, lineupAmendClosed, participantsProblem, personIds } from "./leagueGames";
+import { notPlayedText } from "./leagueResultRules";
 
 // Die gespielten Maps eines Liga-Spiels (docs/LIGA.md, #1650): je Map Bild, Name, Modus, Sieger, Punkte und die
 // Aufstellungen beider Seiten - fehlt eine noch, steht es da. Wer darf, trägt die eigene Aufstellung hier nach.
@@ -32,7 +34,11 @@ export function LeagueGamesView({ league }) {
                 <LazyImg src={game.map_image_url} alt="" sizes="(min-width: 768px) 360px, 92vw" className="h-full w-full object-cover opacity-60" />
               ) : <span className="block h-full bg-white/5" />}
               <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 to-transparent px-3 py-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/65">Map {game.position}{game.mode_label ? ` · ${game.mode_label}` : ""}</span>
+                <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/65">
+                  {/* Modus-Symbol (#2266): Schnappschuss am Spiel, ohne Bild das neutrale Symbol. */}
+                  {game.mode ? <ModeIcon src={game.mode_icon_url} size="xs" testId={`league-games-${game.position}-mode`} /> : null}
+                  <span className="truncate">Map {game.position}{game.mode_label ? ` · ${game.mode_label}` : ""}</span>
+                </span>
                 <span className="truncate font-heading text-lg font-black text-white">{game.map_name || "Map"}</span>
               </div>
             </div>
@@ -58,10 +64,20 @@ export function LeagueGamesView({ league }) {
                   </div>
                 );
               })}
+              {/* Zusatzfelder (C.3, #1617): wiederholt mit Grund, von der Leitung zugesprochen. */}
+              {game.status === "replayed" ? (
+                <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>Wiederholt: {game.replay_reason}</p>
+              ) : null}
+              {game.decision === "awarded" ? (
+                <p className="text-xs text-warn" data-testid={`league-games-${game.position}-awarded`}>Zugesprochen von der Liga-Leitung</p>
+              ) : null}
             </div>
           </li>
         ))}
       </ol>
+      {(league.not_played || []).length ? (
+        <p className="text-xs text-white/50" data-testid="league-games-not-played">{notPlayedText(league.not_played)}</p>
+      ) : null}
       {series ? <ParticipantsView league={league} missing={missing} /> : null}
     </div>
   );

@@ -3,6 +3,7 @@
 // damals), rechnet nichts. Bewegung in maps.css: gestaffeltes Erscheinen, dezentes Anheben bei Maus und Antippen.
 import { Map as MapIcon } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import "./maps.css";
 
 const STAGGER_STEPS = 8;
@@ -48,7 +49,9 @@ export function MapPoolView({ pool, title = "Map-Pool", hint = "", headingId = "
         {groups.map((group) => (
           <div key={group.mode || "alle"} data-testid="map-pool-mode">
             {showModes ? (
-              <h3 className="mb-2 flex items-baseline gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+              <h3 className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+                {/* Modus-Symbol (#2266) aus dem Snapshot des Pools - ohne Bild das neutrale Symbol. */}
+                {group.mode ? <ModeIcon src={group.icon_url} size="sm" testId="map-pool-mode-icon" /> : null}
                 {group.label || group.mode}
                 <span className="text-white/45 tracking-normal normal-case font-semibold tabular-nums">{countText(group.maps.length)}</span>
               </h3>

@@ -422,6 +422,9 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             pause_unset = {**pause_unset, "check_in_closed_at": ""}
         if pause_unset:
             change["$unset"] = pause_unset
+        if status != "live" and "running_past_end" in t:
+            # Läuft länger (#2194): nicht mehr „live“ - das Merkmal fällt sofort weg, nicht erst im nächsten Lauf.
+            change["$unset"] = {**change.get("$unset", {}), "running_past_end": ""}
         await db.tournaments.update_one({"id": tid}, change)
         reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
         await _audit_tournament_action(
@@ -538,7 +541,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             from services.achievement_queue import request_evaluation
             from services.match_notifications import _participant_user_ids
             regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0, "user_id": 1, "team_id": 1}).to_list(2000)
-            await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}")
+            # Im stillen Modus (#2340) laut nur, was zum Turnier und zur Jahreswertung gehört.
+            await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}", announce={"tournament", "season"})
         except Exception:
             import logging
             logging.getLogger("tls.tournament").warning("[achievements] Auswertung nach Turnierabschluss %s fehlgeschlagen", log_safe(tid), exc_info=True)

@@ -110,7 +110,8 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     # Ein bestätigtes Ergebnis kann für alle Beteiligten Erfolge auslösen (#301).
     try:
         from services.achievement_queue import request_evaluation
-        await request_evaluation(user_ids, "match_result")
+        # Im stillen Modus der Neuberechnung (#2340) melden sich Spiel- und Turnier-Stufen laut, Altansprüche still.
+        await request_evaluation(user_ids, "match_result", announce={"match", "tournament"})
     except Exception as exc:  # noqa: BLE001 - Erfolge halten kein Ergebnis auf
         logger.warning("[achievements] Ergebnis nicht zur Auswertung vorgemerkt type=%s", type(exc).__name__)
 
@@ -360,13 +361,36 @@ SCHEDULE_EVENTS = {
 }
 
 
+# Mehrere Termine auf einmal (#2325): eine Nachricht für die ganze Gruppe. ``{count}`` in Worten, ``{when}`` alle Termine.
+SCHEDULE_GROUP_EVENTS = {
+    "proposed": ("Neue Terminvorschläge", "{who} schlägt {count} Termine vor: {when}. Bitte einen davon annehmen, alle "
+                                          "ablehnen oder einen Gegenvorschlag machen.", " oder "),
+    "countered": ("Gegenvorschlag zum Termin", "{who} schlägt stattdessen {count} Termine vor: {when}. Bitte einen davon "
+                                               "annehmen, alle ablehnen oder einen Gegenvorschlag machen.", " oder "),
+    "declined": ("Terminvorschläge abgelehnt", "{who} hat alle {count} Termine abgelehnt ({when}). Bitte einen anderen "
+                                               "Termin vorschlagen.", " und "),
+    "withdrawn": ("Terminvorschläge zurückgezogen", "{who} hat die {count} vorgeschlagenen Termine zurückgezogen ({when}).",
+                  " und "),
+}
+_COUNT_WORDS = {2: "zwei", 3: "drei"}
+
+
+def _when_list(proposals: list[dict], last_joiner: str) -> str:
+    """„Mo 16.11. 20:00 Uhr, Di 17.11. 19:00 Uhr oder Mi 18.11. 20:30 Uhr“ - früheste zuerst."""
+    texts = [_when_text(row.get("scheduled_at")) for row in sorted(proposals, key=lambda row: str(row.get("scheduled_at") or ""))]
+    return texts[0] if len(texts) == 1 else ", ".join(texts[:-1]) + last_joiner + texts[-1]
+
+
 async def notify_schedule_event(db, match: dict, *, event: str, proposal: dict, actor_id: str | None,
-                                actor_registration_id: str | None, note: str | None = None) -> int:
+                                actor_registration_id: str | None, note: str | None = None,
+                                proposals: list[dict] | None = None) -> int:
     """Termin vorgeschlagen, Gegenvorschlag, angenommen, abgelehnt oder zurückgezogen (#2110): die Verantwortlichen
     der anderen Seite (Captain und Vertreter eines Co-Teams, sonst die Teamleitung - ``responsible_user_ids``) bekommen
     es sofort ins Postfach und per Push. Ein Ereignis, keine Erinnerung; wer gehandelt hat, bekommt nichts. Handelt die
-    Turnierleitung (ohne eigene Seite), erfahren es beide Seiten."""
-    if event not in SCHEDULE_EVENTS:
+    Turnierleitung (ohne eigene Seite), erfahren es beide Seiten. ``proposals``: mehrere Termine einer Gruppe (#2325) -
+    dann genau eine Nachricht mit allen Terminen."""
+    group = [row for row in proposals or [] if row]
+    if event not in (SCHEDULE_GROUP_EVENTS if len(group) > 1 else SCHEDULE_EVENTS):
         return 0
     tournament, registrations, regs_by_id = await _match_context(db, match)
     others = [reg for reg in registrations if reg.get("id") != actor_registration_id]
@@ -374,12 +398,18 @@ async def notify_schedule_event(db, match: dict, *, event: str, proposal: dict, 
     if not recipient_ids:
         return 0
     who = _name(regs_by_id.get(actor_registration_id), "Die Gegenseite") if actor_registration_id else "Die Turnierleitung"
-    title, sentence = SCHEDULE_EVENTS[event]
-    text = sentence.format(who=who, when=_when_text(proposal.get("scheduled_at")))
+    if len(group) > 1:
+        title, sentence, joiner = SCHEDULE_GROUP_EVENTS[event]
+        text = sentence.format(who=who, count=_COUNT_WORDS.get(len(group), str(len(group))), when=_when_list(group, joiner))
+        dedupe = f"match-schedule-group:{group[0].get('group_id') or proposal.get('id')}:{event}"
+    else:
+        title, sentence = SCHEDULE_EVENTS[event]
+        text = sentence.format(who=who, when=_when_text(proposal.get("scheduled_at")))
+        dedupe = f"match-schedule:{proposal.get('id')}:{event}"
     if (note or "").strip():
         text = f"{text} Notiz: „{_short(note or '', 120)}“"
     body = f"{tournament.get('title') or 'Turnier'} · {match_title(match, regs_by_id)}: {text}"
-    meta = {"category": "match_reminders", "dedupe_key": f"match-schedule:{proposal.get('id')}:{event}",
+    meta = {"category": "match_reminders", "dedupe_key": dedupe,
             "match_id": match.get("id"), "tournament_id": match.get("tournament_id"), "reason": f"schedule_{event}"}
     sent = 0
     for user in await users_for(db, recipient_ids):

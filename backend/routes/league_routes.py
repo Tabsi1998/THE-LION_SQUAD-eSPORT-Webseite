@@ -11,6 +11,8 @@ Die Logik steht in ``services/league_service.py``.
 """
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
+
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.errors import DuplicateKeyError
 
@@ -21,6 +23,7 @@ from models import (
     LeagueDelete,
     LeagueDivisionCreate,
     LeagueDivisionUpdate,
+    LeagueMapRemove,
     LeagueSeasonCreate,
     LeagueSeasonUpdate,
     LeagueStaffUpdate,
@@ -32,7 +35,12 @@ from models import (
 from services import game_maps
 from services import league_applications
 from services import league_look
+from services import league_platform
+from services import league_pool_check
+from services import league_readiness
 from services import league_service as leagues
+from services import league_veto
+from services import league_veto_sweep
 from services.league_permissions import (
     ANY,
     CAPABILITIES,
@@ -51,7 +59,7 @@ from services.game_maps import MapProblem
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.map_pools import MapPoolSave
-from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+from services.mutation_lock import MutationLockBusy, league_season_pool_resource, mutation_lock, tournament_write_resource
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
@@ -143,6 +151,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         "default_pool": await map_pools.default_pool(db, game),
         "map_pool": await map_pools.admin_entry(db, pool, league.get("game_id"), "league_season"),
         "divisions": rows,
+        # Hinweis bei „automatisch annehmen“ (#2348): Offene Anmeldungen von vorher nimmt die Season nicht nachträglich an - nur die Zahl, keine Teams.
+        "applications_waiting": await db.league_applications.count_documents({"season_id": season_id, "status": {"$in": ["submitted", "in_review"]}}),
     }
 
 
@@ -315,12 +325,35 @@ async def admin_delete_league(league_id: str, body: LeagueDelete, me: dict = Dep
 
 # ---------------------------------------------------------------- Verwaltung: Season
 
+def _readiness_gate(db, league: dict, before: dict | None, me: dict, reason, passed: dict):
+    """Prüfung vor der Veröffentlichung (#2207) als Schritt vor dem Schreiben - merkt sich eine Notausnahme fürs Protokoll."""
+    async def check(after: dict) -> None:
+        try:
+            override = await league_readiness.gate(db, league, before, after, me, reason)
+        except league_readiness.ReadinessBlocked as blocked:
+            raise LeagueProblem(blocked.message, blocked.status) from None
+        if override:
+            passed.update(override)
+    return check
+
+
+async def _record_readiness_override(db, me: dict, season_id: str, passed: dict) -> None:
+    if passed:
+        await _audit(db, "league.season.readiness_override", me, season_id,
+                     {"reason": passed["reason"], "problems": passed["codes"]})
+
+
 @admin_router.post("/{league_id}/seasons")
 async def admin_create_season(league_id: str, body: LeagueSeasonCreate, me: dict = Depends(require_league("manage"))):
     db = get_db()
     league = await _call(leagues.get_league(db, league_id))
-    doc = await _call(leagues.create_season(db, league, body.model_dump(exclude_unset=True), me))
+    payload = body.model_dump(exclude_unset=True)
+    reason = payload.pop("readiness_override_reason", None)
+    passed: dict = {}
+    doc = await _call(leagues.create_season(db, league, payload, me,
+                                            before_write=_readiness_gate(db, league, None, me, reason, passed)))
     await _audit(db, "league.season.create", me, doc["id"], {"league_id": league_id, "number": doc["number"]})
+    await _record_readiness_override(db, me, doc["id"], passed)
     await leagues.mark_published(db, league_id, doc.get("visibility"))
     return doc
 
@@ -331,13 +364,34 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
     payload = body.model_dump(exclude_unset=True)
+    reason = payload.pop("readiness_override_reason", None)
     # Der Regeltext gehört „Regeln veröffentlichen“, alles andere „Season konfigurieren“.
     capabilities = await capabilities_of(db, me, season["league_id"])
     if ("rules" if "rules_text" in payload else "season") not in capabilities or (set(payload) - {"rules_text"} and "season" not in capabilities):
         raise HTTPException(status_code=403, detail=NO_LEAGUE_RIGHT)
-    doc, changed = await _call(leagues.update_season(db, season, payload))
+    league = await _call(leagues.get_league(db, season["league_id"]))
+    passed: dict = {}
+    warnings: list[str] = []
+    doc, changed = await _call(leagues.update_season(db, season, payload, warnings=warnings,
+                                                     before_write=_readiness_gate(db, league, season, me, reason, passed)))
+    await _record_readiness_override(db, me, season_id, passed)
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
+    before_mode = (season.get("scoring_rules") or {}).get("match_points_mode") or "result"
+    after_mode = (doc.get("scoring_rules") or {}).get("match_points_mode") or "result"
+    if before_mode != after_mode:
+        # Punkteart der Tabelle (#2312): vorher und nachher, dazu die Reihenfolge bei Punktgleichheit.
+        await _audit(db, "league.season.table_points", me, season_id, {
+            "season_id": season_id, "before": before_mode, "after": after_mode,
+            "tiebreakers": list((doc.get("scoring_rules") or {}).get("table_tiebreakers") or [])})
+    if set(changed) & set(league_platform.SEASON_KEYS):
+        # Plattform je Season (#2270): vorher und nachher - nur Auswahlwerte des Spiels, keine Personen.
+        await _audit(db, "league.season.platform", me, season_id, {"season_id": season_id, "before": league_platform.settings_of(season),
+                                                                  "after": league_platform.settings_of(doc)})
+    if bool(season.get("application_auto_accept")) != bool(doc.get("application_auto_accept")):
+        # Anmeldungen automatisch annehmen (#2348): Umschalten mit Wert vorher und nachher - ein Fehlen zählt als aus.
+        await _audit(db, "league.season.auto_accept", me, season_id, {"season_id": season_id, "before": bool(season.get("application_auto_accept")),
+                                                                     "after": bool(doc.get("application_auto_accept"))})
     visibility_applied = 0
     if "visibility" in changed:
         # „Aus“ heißt sofort aus: die Sichtbarkeit geht ohne „Übertragen“ auf alle Staffeln, auch gesperrte.
@@ -350,7 +404,7 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     # Alle übrigen Werte tragen die Staffeln selbst: sie wirken erst über „Vorgaben auf Staffeln übertragen“.
     needs_sync = bool(set(changed) & leagues.STAFFEL_SOURCE_FIELDS)
     return {**doc, "changed": changed, "staffeln_to_sync": staffeln if needs_sync else 0,
-            "visibility_applied": visibility_applied}
+            "visibility_applied": visibility_applied, "warnings": warnings}
 
 
 @admin_router.get("/seasons/{season_id}/delete-plan")
@@ -382,16 +436,168 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
         names = [f"„{labels[mode]}“" for mode in dict.fromkeys(missing) if mode in labels]
         what = ", ".join(names) if names else "ein Modus der Reihenfolge"  # dem Spiel schon entfernt: nie eine rohe Kennung
         raise HTTPException(status_code=422, detail=f"Im neuen Pool fehlt {what}. Bitte „Modus je Map“ zuerst ändern und speichern.")
-    doc = await _call(map_pools.save(db, scope="league_season", scope_id=season_id, game=game, body=body, user=me))
+    # Dieselbe Sperre wie „Map aus dem Pool nehmen“ (#2207): beide nacheinander, nie verschränkt.
+    try:
+        async with mutation_lock(db, league_season_pool_resource(season_id)):
+            doc = await _call(map_pools.save(db, scope="league_season", scope_id=season_id, game=game, body=body, user=me))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=POOL_BUSY) from None
     await _audit(db, "league.season.map_pool.save", me, season_id, {"version": doc["version"], "pool_id": doc["id"]})
-    return map_pools.saved_view(doc, "league_season", admin=True)
+    # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem neuen Pool nach.
+    await league_veto.follow_pool(db, season, actor_id=me.get("id"))
+    # Vorgabe der Woche (#2326): Geht mit dem neuen Pool (oder der nachgezogenen Vorlage) ein wartendes Veto auf, erfahren es die Seiten.
+    await league_veto_sweep.announce_waiting(db, season_id)
+    # Mindestgröße je Modus (#2207): nur Warnung - die Prüfung vor der Veröffentlichung nennt es als Problem.
+    warnings = league_pool_check.pool_problems(season, await league_pool_check.divisions_of(db, season_id), doc, game)
+    return {**map_pools.saved_view(doc, "league_season", admin=True), "warnings": warnings}
+
+
+@admin_router.get("/seasons/{season_id}/map-pool/versions")
+async def admin_season_pool_versions(season_id: str, _me: dict = Depends(require_league(ANY, via="season_id"))):
+    """Die Versionen des Season-Pools, neueste zuerst (#2207) - für „Versionen vergleichen“."""
+    db = get_db()
+    await _call(leagues.get_season(db, season_id))
+    return {"versions": await map_pools.versions(db, "league_season", season_id)}
+
+
+@admin_router.get("/seasons/{season_id}/map-pool/compare")
+async def admin_season_pool_compare(season_id: str, base: int, target: int,
+                                    _me: dict = Depends(require_league(ANY, via="season_id"))):
+    """Zwei Versionen des Season-Pools gegenübergestellt (#2207): je Modus hinzu, weg, geblieben."""
+    db = get_db()
+    await _call(leagues.get_season(db, season_id))
+    docs = {}
+    for number in (base, target):
+        docs[number] = await db.map_pools.find_one({"scope": "league_season", "scope_id": season_id, "version": number}, {"_id": 0})
+        if not docs[number]:
+            raise HTTPException(status_code=404, detail=f"Version {number} gibt es nicht.")
+    return map_pools.compare(docs[base], docs[target])
+
+
+@admin_router.post("/seasons/{season_id}/map-pool/remove-map")
+async def admin_season_pool_remove_map(season_id: str, body: LeagueMapRemove,
+                                       me: dict = Depends(require_league("season", via="season_id"))):
+    """Map in einem Schritt sperren (#2207): neue Version ohne die Map, übertragen auf alle Staffeln, Protokoll mit Grund.
+
+    Alles unter den Sperren: zuerst die Turnier-Sperren aller Staffeln (feste Reihenfolge), dann die Sperre des Season-Pools - dieselbe
+    wie beim Speichern. Ist eine belegt: 409, nichts geschrieben. Übertragen wird genau die neue Version, nie eine, die danach entsteht.
+    Steht die Map schon nicht mehr im Pool, aber in einer früheren Version, entsteht keine neue: Dann wird nur noch übertragen, was
+    einer Staffel fehlt (erneutes Ausführen nach einem Abbruch legt nichts doppelt an)."""
+    db = get_db()
+    reason = _reason(LeagueDelete(reason=body.reason))
+    season = await _call(leagues.get_season(db, season_id))
+    league = await _call(leagues.get_league(db, season["league_id"]))
+    game = await _season_game(db, season)
+    try:
+        async with AsyncExitStack() as locks:
+            staffeln = sorted(row["id"] for row in await leagues.staffeln_of(db, season_id))
+            for tournament_id in staffeln:
+                await locks.enter_async_context(mutation_lock(db, tournament_write_resource(tournament_id)))
+            await locks.enter_async_context(mutation_lock(db, league_season_pool_resource(season_id)))
+            if sorted(row["id"] for row in await leagues.staffeln_of(db, season_id)) != staffeln:
+                raise HTTPException(status_code=409, detail=leagues.CHANGED_MEANWHILE)
+            fresh = await _call(leagues.get_season(db, season_id))
+            previous, doc, created = await _remove_map_version(db, fresh, league, game, body, me, reason)
+            results = await _transfer_version(db, fresh, staffeln, doc, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=f"{POOL_BUSY} Es wurde nichts geändert.") from None
+    finally:
+        reset_scope_cache()
+    name = next((item.get("name") for group in (previous or {}).get("modes") or [] for item in group.get("maps") or []
+                 if item.get("map_id") == body.map_id), None)
+    await _audit(db, "league.season.map_pool.remove_map", me, season_id, {
+        "reason": reason, "map_id": body.map_id, "map_name": name, "mode": body.mode, "version": doc["version"],
+        "pool_id": doc["id"], "from_version": (previous or {}).get("version"), "new_version": created,
+        "staffeln": [{"tournament_id": entry["tournament_id"], "applied": entry["applied"]} for entry in results]})
+    if created:
+        # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem kleineren Pool nach.
+        await league_veto.follow_pool(db, fresh, actor_id=me.get("id"))
+    # Vorgabe der Woche (#2326): Der neue Pool steht schon an den Staffeln - passt ein wartendes Veto jetzt, erfahren es die Seiten.
+    await league_veto_sweep.announce_waiting(db, season_id)
+    divisions = await league_pool_check.divisions_of(db, season_id)
+    warnings = league_pool_check.pool_problems(fresh, divisions, doc, game)
+    return {"pool": map_pools.saved_view(doc, "league_season", admin=True), "staffeln": results, "warnings": warnings,
+            "unchanged": not created}
+
+
+POOL_BUSY = "Der Map-Pool oder eine Staffel wird gerade bearbeitet – bitte gleich noch einmal."
+
+
+def _has_map(doc: dict | None, map_id: str, mode: str | None) -> bool:
+    return any(item.get("map_id") == map_id for group in (doc or {}).get("modes") or []
+               if mode is None or group.get("mode") == mode for item in group.get("maps") or [])
+
+
+async def _remove_map_version(db, season: dict, league: dict, game: dict | None, body: LeagueMapRemove, me: dict,
+                              reason: str) -> tuple[dict | None, dict, bool]:
+    """Unter der Pool-Sperre: die neue Version ohne die Map - oder, wenn sie schon draußen ist, die geltende (``created`` False)."""
+    current = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
+    if not current:
+        raise HTTPException(status_code=404, detail="Es gibt keinen Map-Pool.")
+    if not _has_map(current, body.map_id, body.mode):
+        earlier = await db.map_pools.find_one({"scope": "league_season", "scope_id": season["id"],
+                                               "modes.maps.map_id": body.map_id}, {"_id": 0})
+        if not earlier:
+            raise HTTPException(status_code=404, detail="Diese Map steht nicht im Map-Pool.")
+        return earlier, current, False
+    if body.expected_version is not None and int(current.get("version") or 0) != body.expected_version:
+        raise HTTPException(status_code=409, detail=map_pools.CHANGED_MEANWHILE)
+    # Wie beim Speichern: Ein Modus aus „Modus je Map“ darf nicht leer werden (#2129).
+    left = {group.get("mode"): [item.get("map_id") for item in group.get("maps") or []
+                                if body.mode not in (None, group.get("mode")) or item.get("map_id") != body.map_id]
+            for group in current.get("modes") or []}
+    empty = [mode for mode in dict.fromkeys(season.get("game_mode_order") or []) if mode and not left.get(mode)]
+    if empty:
+        labels = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
+        names = ", ".join(f"„{labels.get(mode) or mode}“" for mode in empty)
+        raise HTTPException(status_code=422, detail=f"Ohne diese Map hätte {names} keine Map mehr, steht aber in „Modus je Map“. "
+                                                    "Bitte zuerst eine andere Map aufnehmen oder „Modus je Map“ ändern.")
+    previous, doc = await _call(map_pools.without_map(
+        db, scope="league_season", scope_id=season["id"], map_id=body.map_id, mode=body.mode, user=me,
+        note=f"Map gesperrt: {reason}", expected_version=body.expected_version))
+    return previous, doc, True
+
+
+async def _transfer_version(db, season: dict, staffel_ids: list[str], doc: dict, me: dict) -> list[dict]:
+    """Genau ``doc`` auf jede Staffel - die Sperren hält der Aufrufer. Hat eine Staffel dieselben Maps schon, entsteht nichts."""
+    from routes.tournament_common import _is_tournament_locked
+
+    divisions = {row["id"] for row in await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0, "id": 1}).to_list(50)}
+    results = []
+    for tournament_id in staffel_ids:
+        tournament = await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 0})
+        if not tournament or (tournament.get("league_context") or {}).get("division_id") not in divisions:
+            continue
+        entry = {"tournament_id": tournament_id, "title": tournament.get("title"), "applied": False, "notes": []}
+        applied, skipped, changed = [], [], []
+        try:
+            await leagues.transfer_pool(db, tournament, season, me, pool=doc, locked=_is_tournament_locked(tournament),
+                                        applied=applied, skipped=skipped, changed=changed)
+        except (LeagueProblem, MapProblem) as problem:
+            skipped.append({"reason": problem.message})
+        entry.update({"applied": "map_pool" in applied, "notes": [item["reason"] for item in skipped]})
+        results.append(entry)
+    return results
+
+
+@admin_router.get("/seasons/{season_id}/readiness")
+async def admin_season_readiness(season_id: str, me: dict = Depends(require_league(ANY, via="season_id"))):
+    """Prüfung vor der Veröffentlichung (#2207): Probleme halten das Veröffentlichen auf, Warnungen nicht."""
+    db = get_db()
+    season = await _call(leagues.get_season(db, season_id))
+    league = await _call(leagues.get_league(db, season["league_id"]))
+    return await league_readiness.season_readiness(db, league, season, me)
 
 
 @admin_router.delete("/seasons/{season_id}/map-pool")
 async def admin_clear_season_pool(season_id: str, me: dict = Depends(require_league("season", via="season_id"))):
     db = get_db()
     await _call(leagues.get_season(db, season_id))
-    doc = await _call(map_pools.clear(db, scope="league_season", scope_id=season_id, user=me))
+    try:
+        async with mutation_lock(db, league_season_pool_resource(season_id)):
+            doc = await _call(map_pools.clear(db, scope="league_season", scope_id=season_id, user=me))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=POOL_BUSY) from None
     if doc:
         await _audit(db, "league.season.map_pool.clear", me, season_id, {"version": doc["version"]})
     return {"ok": True}
@@ -439,6 +645,8 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league("s
     finally:
         # Auch nach einem Abbruch: was schon geschrieben ist, soll die Live-Meldung neu nachschlagen.
         reset_scope_cache()
+    # Vorgabe der Woche (#2326): Mit dem übertragenen Pool oder der Vorlage kann ein wartendes Veto jetzt starten - die Seiten erfahren es.
+    await league_veto_sweep.announce_waiting(db, season_id)
     return {"staffeln": results}
 
 
@@ -452,9 +660,10 @@ async def admin_create_division(season_id: str, body: LeagueDivisionCreate,
     payload = body.model_dump(exclude_unset=True)
     if body.overrides is not None:
         payload["overrides"] = body.overrides.model_dump(exclude_none=True)
-    doc = await _call(leagues.create_division(db, season, payload, me))
+    warnings: list[str] = []
+    doc = await _call(leagues.create_division(db, season, payload, me, warnings=warnings))
     await _audit(db, "league.division.create", me, doc["id"], {"season_id": season_id, "level": doc["level"]})
-    return doc
+    return {**doc, "warnings": warnings}
 
 
 @admin_router.patch("/divisions/{division_id}")
@@ -465,10 +674,11 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     payload = body.model_dump(exclude_unset=True)
     if "overrides" in payload:
         payload["overrides"] = body.overrides.model_dump(exclude_none=True) if body.overrides else {}
-    doc, changed = await _call(leagues.update_division(db, division, payload))
+    warnings: list[str] = []
+    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
-    return doc
+    return {**doc, "warnings": warnings}
 
 
 @admin_router.get("/divisions/{division_id}/delete-plan")
@@ -522,8 +732,16 @@ async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: 
 
 @router.get("")
 async def public_leagues(user: dict | None = Depends(get_optional_user)):
-    """Ligen mit den für die Person sichtbaren Seasons - leer heißt: die Navigation zeigt „Liga“ nicht."""
-    return {"leagues": await leagues.visible_leagues(get_db(), user)}
+    """Ligen mit den für die Person sichtbaren Seasons - leer heißt: die Navigation zeigt „Liga“ nicht. Je Season ``rules_url``, wenn ein
+    Regelwerk gilt (#2269), damit die Liga-Übersicht es verlinkt - hier in der Route, der Liga-Service importiert nicht nach oben."""
+    from services.league_rules import current_version, page_path
+
+    db = get_db()
+    rows = await leagues.visible_leagues(db, user)
+    for league in rows:
+        for season in league["seasons"]:
+            season["rules_url"] = page_path(league, season) if await current_version(db, league, season) else None
+    return {"leagues": rows}
 
 
 @router.get("/{league_slug}/{season_slug}")
@@ -539,7 +757,9 @@ async def public_season(league_slug: str, season_slug: str, user: dict | None = 
     season = await db.league_seasons.find_one({"id": view["season"]["id"]}, {"_id": 0})
     # Regelwerk (#1646): Link mit Version und Stand statt des Aufklappblocks; ``None`` - der Regeltext bleibt.
     return {**view, "rules": await rules_summary(db, view["league"]["id"], view["season"]["id"], user),
-            "application": await league_applications.public_block(db, season)}
+            "application": await league_applications.public_block(db, season),
+            # Plattform je Season (#2270): erlaubte Plattformen, Crossplay, Eingabegerät, je Liga N; ``None`` ohne jede Angabe.
+            "platform": await league_platform.season_block(db, season)}
 
 
 @router.get("/{league_slug}/{season_slug}/staffeln/{staffel_ref}")
@@ -567,18 +787,27 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
                "staffel": tournament["league_context"].get("staffel"), "status": tournament.get("status"),
                "max_participants": tournament.get("max_participants")}
     division = {**division, "label": leagues.division_label(division)}
+    # Ausgeschiedene behalten ihren Namen im Spielplan - ihre echten Ergebnisse bleiben sichtbar (E.1, #1625).
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tournament["id"], "status": {"$in": list(league_page.PUBLIC_REGISTRATION_STATUSES)}},
-        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1}).to_list(200)
+        {"tournament_id": tournament["id"],
+         "status": {"$in": [*league_page.PUBLIC_REGISTRATION_STATUSES, "withdrawn", "disqualified"]}},
+        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1, "status": 1}).to_list(200)
     names = {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+    active_ids = {row["id"] for row in registrations
+                  if row.get("id") and row.get("status") in league_page.PUBLIC_REGISTRATION_STATUSES}
     matches = await db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}},
                                        {"_id": 0}).to_list(500)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tournament["id"]},
                                                        {"_id": 0, "match_collection": 0}).to_list(2000)
     table = await tournament_standings(tournament["id"], None, user)
+    from services.league_table import public_rules
+
     return {
-        "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"]},
+        "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"],
+                    # Regeln der Tabelle (E.1, #1625): Remis, Reihenfolge bei Gleichstand - für Spalten und Legende.
+                    "table_rules": public_rules(tournament)},
         "standings": table,
-        "teams": sorted(names.values(), key=lambda row: str(row["display_name"]).casefold()),
+        "teams": sorted((row for key, row in names.items() if key in active_ids),
+                        key=lambda row: str(row["display_name"]).casefold()),
         **league_page.staffel_weeks(tournament, matches, names, proposals),
     }

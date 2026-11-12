@@ -15,6 +15,7 @@ Public/profile listing rules:
     a `locked=True` flag plus current/target progress so the UI can grey them out.
 """
 import logging
+from contextlib import nullcontext
 
 from pymongo.errors import DuplicateKeyError
 
@@ -25,8 +26,10 @@ from achievement_catalog import (
     CONDITION_KEY_STATUS, apply_category_overrides, annotate_tier, material_color, material_name,
 )
 from services.membership_service import get_membership, is_active_member
-from services import achievement_core
+from services import achievement_core, achievement_reach
+from services import achievement_recount as recount
 from services.achievement_core import NEGATIVE_INCIDENTS  # umgezogen (#1420), hier weiter erreichbar
+from services.achievement_core import due_tiers, note_loud_award, quiet_scope
 from services.achievement_progress import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
     PROFILE_FIELDS,
     compute_profile_completeness,
@@ -57,21 +60,37 @@ async def seed_badges():
         )
         logger.info("[achievements] v4 migration complete — legacy collections dropped.")
 
+    # „Nicht mehr erreichbar“ (#2339) schreibt der Seed nicht jedes Mal über, sondern nur, wenn sich die Entscheidung im
+    # Code ändert - was die Verwaltung setzt, bleibt (services/achievement_reach.apply_catalog_retirement).
+    seeded_groups: list[dict] = []
     for g in ACHIEVEMENT_GROUPS:
         g = apply_category_overrides(g)
+        flags = {key: g.pop(key) for key in achievement_reach.RETIRED_FIELDS if key in g}
+        # Ausdrücklich (Review N6): Was der Code nicht als Leitung oder Aufgabe im Verein führt, ist es auch in der
+        # Datenbank nicht - auch wenn ein älterer Stand es dort stehen hat.
+        g.setdefault("staff_only", False)
+        g.setdefault("role_only", False)
         await db.achievement_groups.update_one(
             {"code": g["code"]},
             {"$set": {**g, "id": g["code"]},
              "$setOnInsert": {"created_at": now_utc().isoformat(), "is_admin_created": False}},
             upsert=True,
         )
-    for t in ACHIEVEMENT_TIERS:
+        seeded_groups.append({"code": g["code"], **flags})
+    seeded_tiers: list[dict] = []
+    for tier_doc in ACHIEVEMENT_TIERS:
+        t = {key: value for key, value in tier_doc.items() if key not in achievement_reach.RETIRED_FIELDS}
+        flags = {key: tier_doc[key] for key in achievement_reach.RETIRED_FIELDS if key in tier_doc}
         await db.achievements.update_one(
             {"code": t["code"]},
             {"$set": {**t, "id": t["code"]},
              "$setOnInsert": {"created_at": now_utc().isoformat()}},
             upsert=True,
         )
+        seeded_tiers.append({"code": t["code"], **flags})
+    await achievement_reach.apply_catalog_retirement(db.achievement_groups, seeded_groups)
+    await achievement_reach.apply_catalog_retirement(db.achievements, seeded_tiers)
+    await achievement_reach.apply_rules(db)
     # Von Hand angelegte Stufen (Admin) bekommen Material und Rang nachgetragen (#611).
     async for t in db.achievements.find({"material": {"$exists": False}}, {"_id": 0}):
         group = await db.achievement_groups.find_one({"code": t.get("group_code")}, {"_id": 0})
@@ -105,7 +124,9 @@ async def can_award_tier_to_user(user_id: str, tier: dict | None) -> bool:
 
 
 async def award_achievement(user_id: str, tier_code: str, context: dict | None = None,
-                             awarded_by: str | None = None) -> bool:
+                             awarded_by: str | None = None, *, recount_id: str | None = None) -> bool:
+    """Eine Stufe vergeben. Mit ``recount_id`` (#2340) still aus der Neuberechnung: gespeichert wie jede Vergabe (XP,
+    Kronen), aber ohne Meldung und markiert - gemeldet wird sie mit der Sammel-Nachricht am Ende."""
     db = get_db()
     tier = await db.achievements.find_one({"code": tier_code}, {"_id": 0})
     if not tier:
@@ -119,12 +140,15 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
     if existing:
         return False
     doc = award_doc(user_id, tier, group, context=context, awarded_by=awarded_by)
+    if recount_id:
+        doc.update({"recount": True, "recount_id": recount_id})
     try:
         await db.user_achievements.insert_one(doc)
     except DuplicateKeyError:
         # concurrent evaluation already awarded this tier — not an error
         return False
-    await after_award([user_id], tier, group, notify=(context or {}).get("notify") is not False)
+    await after_award([user_id], tier, group, notify=not recount_id and (context or {}).get("notify") is not False,
+                      quiet=bool(recount_id))
     return True
 
 
@@ -145,30 +169,35 @@ def award_doc(user_id: str, tier: dict, group: dict, *, context: dict | None = N
     }
 
 
-async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: bool = True) -> None:
+async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: bool = True, quiet: bool = False) -> None:
     """Was auf eine neue Vergabe folgt - für eine Person oder viele (Massenvergabe, E10): XP, die Schlange für
     Sammler und Co., die Kronen und die gebündelte Meldung. ``notify`` aus (Admin: „ohne Benachrichtigung“)
-    lässt nur die Meldung weg. Negative Gruppen bringen nichts davon."""
+    lässt nur die Meldung weg. ``quiet`` (Neuberechnung, #2340): dazu meldet sich kein Aufstieg, und die
+    Folge-Auswertung bleibt still. Negative Gruppen bringen nichts davon."""
     if group.get("is_negative") or not user_ids:
         return
-    # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code. Viele auf
-    # einmal (Massenvergabe) gebündelt in wenigen Schreibzügen.
-    try:
-        if len(user_ids) == 1:
-            await xp.grant_achievement(user_ids[0], tier)
-        else:
-            await xp.grant_achievement_many(user_ids, tier)
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"xp for achievement failed: {e}")
-    # Sammler, Kategorie-Meister, Geheimnisträger (#616): über die Schlange, nicht im selben Lauf.
-    try:
-        from services.achievement_queue import request_evaluation
-        await request_evaluation(user_ids, "award", sources={"achievement"})
-    except Exception as e:  # noqa: BLE001
-        logger.debug(f"queue after award failed: {e}")
+    with quiet_scope() if quiet else nullcontext():
+        # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code. Viele auf
+        # einmal (Massenvergabe) gebündelt in wenigen Schreibzügen.
+        try:
+            if len(user_ids) == 1:
+                await xp.grant_achievement(user_ids[0], tier)
+            else:
+                await xp.grant_achievement_many(user_ids, tier)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"xp for achievement failed: {e}")
+        # Sammler, Kategorie-Meister, Geheimnisträger (#616): über die Schlange, nicht im selben Lauf. Im stillen
+        # Modus (#2340) meldet diese Folge-Auswertung nie laut - sie ist selbst schon Neuberechnung.
+        try:
+            from services.achievement_queue import request_evaluation
+            await request_evaluation(user_ids, "award", sources={"achievement"}, announce=())
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"queue after award failed: {e}")
+    # Kronen: eine stille Vergabe (#2340) stößt keinen Abgleich an - die Kronen rechnet der Abschluss einmal neu.
     try:
         from services.crown_events import schedule_crown_sync
-        schedule_crown_sync()
+        if not quiet:
+            schedule_crown_sync()
     except Exception as e:
         logger.debug(f"crown sync scheduling failed: {e}")
     if not notify:
@@ -255,12 +284,23 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
         progress = await achievement_counters.stats(user_id)
     awarded_codes = {a["tier_code"]: a for a in awards}
     earned_group_codes = {a.get("group_code") for a in awards if a.get("group_code")}
+    # Gruppen der Leitung (#2339, Turnierleitung, Schiedsrichter, Gastgeber): ganz sieht sie nur, wer sie schaffen kann -
+    # gemeint ist die Person, um deren Erfolge es geht (ohne Person: wer schaut). Alle anderen nur, was sie schon haben.
+    subject = viewer if viewer and (not user_id or viewer.get("id") == user_id) else None
+    if user_id and subject is None:
+        subject = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1})
+    # Je Gruppe (Review N5): Turnierleitung und Gastgeber die Turnierleitung, Schiedsrichter auch die Liga-Leitung.
+    scopes = await achievement_reach.staff_scopes(db, subject)
+    now = now_utc()
 
     out = []
     for g in groups:
         is_negative = bool(g.get("is_negative"))
         # Geheime Gruppen (#611) tauchen wie negative erst nach der ersten Freischaltung auf - Admins sehen alles.
         is_hidden = bool(g.get("hidden")) and not is_negative
+        # Nicht mehr erreichbar (#2339): nur wer etwas davon hat, sieht die Gruppe - und dann nur das Erhaltene.
+        group_retired = achievement_reach.is_retired(g, now)
+        only_earned = group_retired or not achievement_reach.sees_staff_group(g, scopes)
         if is_negative:
             if not user_id or g["code"] not in earned_group_codes:
                 continue
@@ -269,9 +309,16 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 continue
         elif not g.get("public") and not is_admin:
             continue
+        if only_earned and (not user_id or g["code"] not in earned_group_codes):
+            continue
         gtiers = [t for t in tiers if t.get("group_code") == g["code"]]
-        if is_negative or (is_hidden and not is_admin):
+        if is_negative or (is_hidden and not is_admin) or only_earned:
             gtiers = [t for t in gtiers if t["code"] in awarded_codes]
+        elif gtiers:
+            # Eine einzelne Stufe kann nicht mehr erreichbar sein - auch sie sieht nur, wer sie hat.
+            gtiers = [t for t in gtiers if t["code"] in awarded_codes or not achievement_reach.is_retired(t, now)]
+            if not gtiers:
+                continue
         gtiers.sort(key=lambda x: (x.get("rank") or 0, x.get("level", 0)))
         out_tiers = []
         for t in gtiers:
@@ -285,6 +332,8 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 "earned": bool(earned_doc),
                 "earned_at": earned_doc["earned_at"] if earned_doc else None,
                 "silent": bool(earned_doc.get("silent")) if earned_doc else False,
+                # Nachgerechnet (#2340): die Zeremonie feiert solche Stufen gesammelt, nicht einzeln.
+                "recount": bool(earned_doc.get("recount_id")) if earned_doc else False,
                 "current": min(cur, target) if target else cur,
                 "target": target,
                 "percent": (round(100 * min(cur, target) / target) if target else (100 if earned_doc else 0)),
@@ -293,6 +342,9 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 "condition_status": CONDITION_KEY_STATUS.get(ck) if ck else None,
                 "is_negative": is_negative,
                 "secret": is_negative,
+                # Nicht mehr erreichbar (#2339): zählt nirgends mit - die Seite zeigt es an der erhaltenen Stufe.
+                "retired": achievement_reach.tier_retired(t, g, now),
+                "retired_reason": achievement_reach.retired_reason(t, g) if achievement_reach.tier_retired(t, g, now) else None,
             }
             if is_negative:
                 tier_payload.update({
@@ -310,6 +362,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
         out.append({
             **g,
             "hidden": is_hidden,
+            "retired": group_retired,
             "description": _safe_negative_group_description() if is_negative else g.get("description"),
             "tiers": out_tiers,
             "highest_earned_level": max(earned_levels) if earned_levels else 0,
@@ -350,19 +403,26 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
             **material_fields(t, g),
             "earned_at": a["earned_at"],
             "silent": bool(a.get("silent")),
+            # Nicht mehr erreichbar (#2339): bleibt bei der Person, zählt aber in keinem „x von y“.
+            "retired": achievement_reach.tier_retired(t, g),
         })
     return out
 
 
 # ---------------- Auto-eval ----------------
-async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True) -> int:
+async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True, *, announce=None) -> int:
     """Stufen prüfen und vergeben. Mit ``sources`` (#616) werden nur die betroffenen Zähler neu gerechnet
     und nur Stufen mit diesen Schlüsseln angesehen; ohne Quelle alles. ``legacy`` aus (#678, nur mit ``sources``):
-    der alte Block bleibt liegen und nur die Stufen dieser Zähler werden geladen - leicht genug für jede Meldung."""
+    der alte Block bleibt liegen und nur die Stufen dieser Zähler werden geladen - leicht genug für jede Meldung.
+    ``announce`` (#2340): die Quellen des auslösenden Ereignisses, ohne Angabe ``sources``. Im stillen Modus der
+    Neuberechnung meldet sich nur eine Stufe laut, deren Zähler zu ihnen gehört - und nur bei einer Person, die schon
+    einmal voll und still ausgewertet wurde; alles andere kommt still und markiert. Eine Auswertung ohne Quelle (Sweep,
+    Nachtlauf, Profilbesuch) ist im stillen Modus ganz still und setzt diese Marke."""
     db = get_db()
     from services import achievement_counters
     light = bool(sources) and not legacy
-    counters = await achievement_counters.refresh(user_id, sources, legacy=not light)
+    with achievement_counters.counting() as failed_counters:
+        counters = await achievement_counters.refresh(user_id, sources, legacy=not light)
     only_keys = None if not sources else (achievement_counters.keys_for_sources(sources) | (frozenset() if light else achievement_counters.LEGACY_KEYS))
     active_member = is_active_member(await get_membership(user_id))
     earned_codes = {a["tier_code"] async for a in db.user_achievements.find({"user_id": user_id})}
@@ -371,29 +431,29 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     if light:
         query["condition_key"] = {"$in": sorted(only_keys)}
     tiers = await db.achievements.find(query, {"_id": 0}).to_list(2000)
+    # Altansprüche vor „erreichbar bis“ (Pionier: das Konto ist älter) bleiben offen - Review M1.
+    retired_groups = await achievement_reach.retired_group_codes(db, user_id=user_id)
+    decide = recount.Decider(user_id, sources if announce is None else announce)
     # Mehrere Stufen auf einmal (#1296): eine Meldung „Level X erreicht“ mit dem erreichten Level, nicht eine je Aufstieg.
     async with xp.collected_level_ups():
-        for t in tiers:
-            if t["code"] in earned_codes:
-                continue
-            if t.get("member_only") and not active_member:
-                continue
-            ck = t.get("condition_key")
-            target = t.get("progress_target") or 0
-            if not ck or not target:
-                continue
-            if only_keys is not None and ck not in only_keys:
-                continue
-            if counters.get(ck, 0) >= target:
-                ok = await award_achievement(user_id, t["code"], {"auto_progress": True, "current": counters.get(ck), "target": target})
-                if ok:
-                    new_count += 1
+        for t in due_tiers(tiers, counters, earned_codes, active_member=active_member, only_keys=only_keys, retired_groups=retired_groups):
+            ck = t["condition_key"]
+            context = {"auto_progress": True, "current": counters.get(ck), "target": t["progress_target"]}
+            marker = await decide.marker_for(ck)
+            if await award_achievement(user_id, t["code"], context, recount_id=marker):
+                new_count += 1
+                if not marker:
+                    note_loud_award(t["code"])
+    # Die Marke der Neuberechnung (#2340) nur nach einer vollständigen Auswertung - fiel ein Zähler aus, stand er auf 0.
+    if not sources and not failed_counters:
+        await decide.after_full_evaluation()
     return new_count
 
 
 # ---------------- Hooks (preserve old function names) ----------------
 async def evaluate_membership_badges(user_id: str):
-    await evaluate_user_progress(user_id)
+    # Mitgliedschaft geändert (#2340): im stillen Modus melden sich die Vereins-Stufen laut, alles andere still.
+    await evaluate_user_progress(user_id, announce={"club"})
 
 
 async def _xp(user_id: str | None, source: str, ref: str, **kwargs) -> None:

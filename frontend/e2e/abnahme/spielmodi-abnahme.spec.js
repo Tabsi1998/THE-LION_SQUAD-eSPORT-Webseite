@@ -41,10 +41,12 @@ async function apiJson(page, method, url, data) {
   return { status: response.status(), body: await response.json().catch(() => null) };
 }
 
+// Seit #2249 stehen die Modi auf der Spielseite im Reiter Modi - erreicht über das Zahnrad der Spieleliste.
 async function openGameSheet(page) {
   await page.goto("/admin/games");
-  await page.getByTestId(`game-edit-${game.slug}`).click();
-  await expect(page.getByTestId("game-sheet")).toBeVisible();
+  await page.getByTestId(`game-settings-${game.slug}`).click();
+  await page.getByTestId("game-tab-modi").click();
+  await expect(page.getByTestId("game-tab-modi")).toHaveAttribute("aria-selected", "true");
 }
 
 test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
@@ -67,8 +69,8 @@ test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
       test.skip(index >= 19, "Das Spiel hat fast 20 Modi - Stand neu aufsetzen");
       await openGameSheet(page);
       await page.getByTestId("game-edit-mode-add").click();
+      // Eine neue Zeile kommt aufgeklappt.
       await page.getByTestId(`game-edit-mode-label-${index}`).fill(label);
-      await page.getByTestId(`game-edit-mode-more-${index}`).click();
       await page.getByTestId(`game-edit-mode-players-${index}`).fill("4");
       await page.getByTestId(`game-edit-mode-rule-kind-${index}`).selectOption("rounds");
       await page.getByTestId(`game-edit-mode-rule-target-${index}`).fill("6");
@@ -77,7 +79,7 @@ test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
       await expect(page.getByTestId(`game-edit-mode-more-${index}`)).toContainText("Runden gewinnen: 6 Siege, höchstens 11 Runden");
       await noSideScroll(page);
       await shot(page, `spielmodi-anlegen-${width}.png`);
-      await page.getByTestId("game-edit-save").click();
+      await page.getByTestId("game-save-modi").click();
       await expect(page.getByText("Spiel gespeichert.", { exact: false }).first()).toBeVisible();
       const created = (await apiJson(page, "GET", `/api/games/${game.id}`)).body.match_modes.find((mode) => mode.label === label);
       expect(created).toMatchObject({ players_per_side: 4, result_rule: { kind: "rounds", target: 6, round_limit: 11, overtime: true } });
@@ -88,7 +90,9 @@ test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
       const maps = (await apiJson(page, "GET", `/api/games/${game.id}/maps`)).body.maps;
       const map = maps.find((row) => row.name === MAP);
       expect((await apiJson(page, "PATCH", `/api/games/${game.id}/maps/${map.id}`, { modes: [...map.modes, key] })).status).toBe(200);
-      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}`);
+      // Reiter Spielbetrieb (#2267): den Modus der Season anhaken, dann erscheinen seine Maps.
+      await page.goto(`/admin/leagues/seasons/${anmeldung.season.id}#modi`);
+      await page.getByTestId(`season-pool-pick-${key}`).check();
       const group = page.getByTestId(`season-pool-mode-${key}`);
       await expect(group).toContainText(label);
       await group.getByRole("checkbox", { name: `${MAP} in ${label}` }).check();
@@ -109,11 +113,12 @@ test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
       expect(refused.body.detail).toContain("wird verwendet");
 
       // 4. Deaktivieren.
+      await page.getByTestId(`game-edit-mode-more-${index}`).click();
       await page.getByTestId(`game-edit-mode-status-${index}`).selectOption("inactive");
       await expect(page.getByTestId(`game-edit-mode-status-hint-${index}`)).toContainText("nicht mehr zur Wahl");
       await noSideScroll(page);
       await shot(page, `spielmodi-inaktiv-${width}.png`);
-      await page.getByTestId("game-edit-save").click();
+      await page.getByTestId("game-save-modi").click();
       await expect(page.getByText("Spiel gespeichert.", { exact: false }).first()).toBeVisible();
 
       // 5. In einem neuen Pool nicht mehr wählbar: der Editor nennt ihn, der Server lehnt ihn ab.

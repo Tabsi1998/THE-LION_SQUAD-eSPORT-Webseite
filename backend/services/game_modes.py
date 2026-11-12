@@ -28,6 +28,22 @@ def _modes(game: dict | None) -> list[dict]:
     return [mode for mode in modes if isinstance(mode, dict) and mode.get("mode")]
 
 
+def season_mode_keys(season: dict, game: dict | None, pool: dict | None) -> list[str]:
+    """Die Modi der Season: die des geltenden Pools (in seiner Reihenfolge), dann die der Modusfolge; ohne beides alle nicht
+    archivierten Modi des Spiels. Hier im Blatt-Modul, weil Regelwerk-Bausteine und Sperrliste (#2298 „nur in …“) sie brauchen."""
+    keys: list[str] = []
+    for group in (pool or {}).get("modes") or []:
+        if group.get("mode") and group["mode"] not in keys:
+            keys.append(group["mode"])
+    for key in season.get("game_mode_order") or []:
+        if key and key not in keys:
+            keys.append(key)
+    if not keys:
+        docs = {mode["mode"]: mode for mode in _modes(game)}
+        keys = [key for key, mode in docs.items() if mode.get("status") != ARCHIVED]
+    return keys
+
+
 def status_of(mode: dict | None) -> str:
     """Der Zustand eines Modus - alles Unbekannte und ein fehlendes Feld heißen aktiv."""
     value = (mode or {}).get("status")
@@ -35,9 +51,19 @@ def status_of(mode: dict | None) -> str:
 
 
 def entries(game: dict | None) -> list[dict]:
-    """Die Modi für Auswahllisten der Verwaltung: ``{mode, label, status}`` in ihrer Reihenfolge."""
-    return [{"mode": mode["mode"], "label": mode.get("label") or mode["mode"], "status": status_of(mode)}
+    """Die Modi für Auswahllisten der Verwaltung: ``{mode, label, status}`` in ihrer Reihenfolge, dazu ``icon_url``, wenn der Modus
+    ein Symbol hat (#2266)."""
+    return [{"mode": mode["mode"], "label": mode.get("label") or mode["mode"], "status": status_of(mode),
+             **({"icon_url": mode["icon_url"]} if mode.get("icon_url") else {})}
             for mode in _modes(game)]
+
+
+def icon_of(game: dict | None, key: str | None) -> str | None:
+    """Das Symbol eines Modus (#2266) - ``None`` ohne Symbol oder ohne den Modus."""
+    for mode in _modes(game):
+        if mode["mode"] == key:
+            return mode.get("icon_url") or None
+    return None
 
 
 def choice_problem(game: dict | None, wanted: Iterable, kept: Iterable = (), *, inactive_ok: bool = False) -> str | None:
@@ -54,7 +80,7 @@ def choice_problem(game: dict | None, wanted: Iterable, kept: Iterable = (), *, 
         if status == ARCHIVED or (status == INACTIVE and not inactive_ok):
             label = mode.get("label") or mode["mode"]
             return (f"Der Modus „{label}“ ist {STATUS_WORDS[status]} und steht für Neues nicht mehr zur Wahl. "
-                    "Unter Spiele → Spiel bearbeiten lässt er sich wieder aktivieren.")
+                    "Auf der Spielseite (Spiele → Spiel → Modi) lässt er sich wieder aktivieren.")
     return None
 
 

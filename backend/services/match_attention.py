@@ -26,9 +26,10 @@ import logging
 from datetime import datetime
 
 from models import now_utc
+from services.league_incident_rules import current_reports
 from services.league_scope import is_league_staffel
-from services.match_deadlines import no_show_action, no_show_candidates, no_show_due_text
-from services.match_disputes import category_label, open_dispute
+from services.match_deadlines import no_show_action, no_show_candidates, no_show_deadline, no_show_due_text
+from services.match_disputes import DECIDED_STATUSES, PROCEDURE_WORDS, category_label, open_dispute, open_procedure_rows
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
 from services.round_labels import rounds_by_section, side_round_label, stage_kind
@@ -70,6 +71,18 @@ def _labeler(tournament: dict, matches: list[dict], stages: dict[str, dict] | No
     return label
 
 
+def _dispute_words(tournament: dict, row: dict) -> tuple[str, str, str]:
+    """Titel, Grund und wer ohne Seite gemeldet hat - in einer Liga-Staffel mit dem Grund aus der Liste der Season (etwa
+    „Cheat-Verdacht“, den ``category`` nur als „Sonstiges“ kennt) und „Liga-Leitung“ statt „Turnierleitung“ (#1619, E.2)."""
+    if not is_league_staffel(tournament):
+        return "Streitfall gemeldet", category_label(row.get("category")), "Turnierleitung"
+    from services import league_protest_settings
+
+    reason = league_protest_settings.reason_label(league_protest_settings.effective(tournament, None), row.get("reason_key") or row.get("category"))
+    title = f"{PROCEDURE_WORDS[row['kind']]} eingegangen" if row.get("kind") in PROCEDURE_WORDS else "Streitfall gemeldet"
+    return title, reason, "Liga-Leitung"
+
+
 def attention_items(tournament: dict, matches: list[dict], stations: list[dict], regs_by_id: dict[str, dict],
                     now: datetime, *, stages: dict[str, dict] | None = None, game: dict | None = None) -> list[dict]:
     """Die Fälle eines Turniers - ``matches``: alle Spiele des Turniers, mit Stationstext (attach_station_info)."""
@@ -77,34 +90,57 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
     _label = _labeler(tournament, matches, stages)
     for match in matches:
         status = str(match.get("status") or "pending")
+        procedures = open_procedure_rows(match) if status in DECIDED_STATUSES else []
+        if procedures and len(filled_slots(match)) >= 2 and not match.get("is_preview"):
+            # Liga (E.2, #1619): Ein Protest oder Einspruch, dessen Ergebnis vorläufig zählt, lässt das Spiel „completed“ - der Fall
+            # steht trotzdem hier. Entschieden wird auf der Matchseite, an der Karte des Verfahrens.
+            row = procedures[-1]
+            title, reason, lead_word = _dispute_words(tournament, row)
+            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else lead_word
+            items.append({"match_id": match.get("id"), "station_text": "", "label": _label(match), "names": _names(match, regs_by_id),
+                          "id": f"vf-{match.get('id')}", "kind": "procedure", "title": title,
+                          "detail": f"{by}: „{reason}“ – das Ergebnis zählt vorläufig",
+                          "action": "open", "since": row.get("at")})
+            continue
         if status not in OPEN_STATUSES or len(filled_slots(match)) < 2 or match.get("is_preview"):
             continue
         base = {"match_id": match.get("id"), "station_text": match.get("station_text") or "", "label": _label(match),
                 "names": _names(match, regs_by_id)}
         if status == "disputed":
             row = open_dispute(match) or {}
-            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else "Turnierleitung"
-            items.append({**base, "id": f"ds-{match.get('id')}", "kind": "dispute", "title": "Streitfall gemeldet",
-                          "detail": f"{by}: „{category_label(row.get('category'))}“", "action": "view", "since": row.get("at")})
+            title, reason, lead_word = _dispute_words(tournament, row)
+            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else lead_word
+            items.append({**base, "id": f"ds-{match.get('id')}", "kind": "dispute", "title": title,
+                          "detail": f"{by}: „{reason}“", "action": "view", "since": row.get("at")})
             continue
         if isinstance(match.get("pending_result"), dict):
             continue
         proposal = match.get("no_show_proposal")
         # Je Person (#1823): im Lauf bleibt der Fall offen für alle, die noch nicht als nicht erschienen markiert sind.
         candidates = no_show_candidates(match)
-        # Liga-Staffel (#2201): kein Vorschlag ohne Check-in - ein alter zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
-        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and not is_league_staffel(tournament)
+        # Liga-Staffel: ein Vorschlag nur aus dem Check-in (D.2, #1652: Regel ``check_in``, Teilnehmer = die fehlenden Seiten);
+        # ein alter ohne Check-in (#2201) zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
+        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and (
+            not is_league_staffel(tournament) or proposal.get("rule") == "check_in")
+        if open_proposal and proposal.get("rule") == "check_in":
+            # Nur, solange das Fenster wirklich zu ist und die Seite noch fehlt - nach einem neuen Termin (E.1 „Neu ansetzen“)
+            # oder dem Nachtragen räumt der Fristen-Job den Vorschlag ab, die Karte verschwindet sofort.
+            due = no_show_deadline(match, tournament, (stages or {}).get(match.get("stage_id") or ""))
+            open_proposal = bool(due and due["due_at"] <= now and set(due.get("missing") or []) & set(candidates))
+            candidates = [item for item in candidates if item in set(due.get("missing") or [])] if open_proposal else []
         # Mit einer Meldung gilt der Vorschlag nicht mehr (Bestätigen gäbe 409) - sie darf „Ergebnis fehlt“ nicht verdecken.
         if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and not match.get("reports") and candidates:
+            # Liga-Check-in (D.2): die Leitung kann die fehlende Seite auch nachtragen - das steht in der Karte mit.
+            action = "kampflos werten, Seite nachtragen oder verlängern" if proposal.get("rule") == "check_in" else no_show_action(match)
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
-                          "detail": f"{no_show_due_text(match, proposal)} – "
-                                    f"{no_show_action(match)}.",
+                          "detail": f"{no_show_due_text(match, proposal)} – {action}.",
                           "action": "no_show", "since": proposal.get("due_at"),
                           "participants": [{"registration_id": registration_id,
                                             "name": registration_name(regs_by_id.get(registration_id))}
                                            for registration_id in candidates]})
             continue
-        if reports_conflict(match.get("reports") or []):
+        # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht mehr.
+        if reports_conflict(current_reports(match)):
             items.append({**base, "id": f"rc-{match.get('id')}", "kind": "report_conflict", "title": "Meldungen weichen ab",
                           "detail": "Die Spieler melden verschiedene Ergebnisse.", "action": "enter", "since": None})
             continue

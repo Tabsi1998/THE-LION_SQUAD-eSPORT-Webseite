@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from typing import NamedTuple
 
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -20,6 +21,9 @@ from models import new_id, now_utc
 from services import game_maps, league_look, media_audit, uploads_inventory
 from services.league_rules_cache import rules_cache
 from services import league_rule_blocks as blocks
+from services import league_rule_facts as facts
+from services import league_rule_vars as variables
+from services import markdown_text
 from services import league_rules_text as text
 from services import league_service as leagues
 from services.dolibarr_policy import club_today
@@ -94,17 +98,38 @@ async def _chain(db, league: dict, season: dict | None) -> dict:
     return _chain_of(league_rows, await _published(db, SEASON, season["id"]) if season else None)
 
 
-def _frozen_values(version: dict, season: dict | None) -> dict[str, str]:
+def _frozen_values(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> dict[str, str]:
+    """Die eingefrorenen Bausteine - ``variant`` ``text``: die Fassung ohne Bilder (PDF, Wort-Vergleich, #2218), sonst ``markdown``.
+    ``plain``: die geschützten Zeichen der Bausteinwerte als echte Zeichen - für den Wort-Vergleich, der Text und kein Markdown zeigt."""
     frozen = (version.get("frozen") or {}).get((season or {}).get("id") or "") or {}
-    return {key: row.get("markdown") or "" for key, row in frozen.items()}
+    # Neu eingefroren: strukturiert im Klartext (``data``), erst hier Markdown; ältere Fassungen: das gespeicherte Markdown (#2218).
+    values = {key: blocks.value(key, row, variant) for key, row in frozen.items()}
+    return {key: markdown_text.plain(value) for key, value in values.items()} if plain else values
 
 
-def _sections(version: dict, season: dict | None) -> list[dict]:
-    """Die Abschnitte einer Fassung auf dieser Seite - mit den eingefrorenen Bausteinen."""
-    values = _frozen_values(version, season)
-    missing = blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT
+def _frozen_vars(version: dict, season: dict | None) -> dict[str, dict] | None:
+    """Die eingefrorenen Variablen dieser Season (#2269) - ``{name: {label, value}}``; die Seite der Liga liest den Schlüssel ``""``.
+    ``None`` für Fassungen von vor #2269 (ohne ``vars_used``): Ihr Text bleibt Wort für Wort, auch ein zufälliges „{{…}}“ darin
+    (Prüfung Codex)."""
+    if "vars_used" not in version:
+        return None
+    return (version.get("frozen_vars") or {}).get((season or {}).get("id") or "") or {}
+
+
+def _fill(body: str, values: dict[str, str], var_values: dict[str, dict] | None, season: dict | None, plain: bool = False, keep=()) -> str:
+    """Erst die Variablen im Satz, dann die Bausteine als Absatz - beide mit dem Hinweis, wenn für die Seite nichts eingefroren ist.
+    ``keep``: unbekannte Variablen, die in der Vorschau als Marke stehen bleiben. ``var_values`` ``None``: keine Variablen (Altfassung)."""
+    filled = body if var_values is None else variables.fill_vars(
+        body, var_values, missing=variables.NOT_FROZEN_VALUE if season else variables.NO_SEASON_VALUE, plain=plain, keep=keep)
+    return text.fill_blocks(filled, values, missing=blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT)
+
+
+def _sections(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> list[dict]:
+    """Die Abschnitte einer Fassung auf dieser Seite - mit den eingefrorenen Bausteinen und Variablen."""
+    values = _frozen_values(version, season, variant, plain)
+    var_values = _frozen_vars(version, season)
     return text.sections_of(version.get("body_md"), version.get("annexes"),
-                            fill=lambda body: text.fill_blocks(body, values, missing=missing))
+                            fill=lambda body: _fill(body, values, var_values, season, plain))
 
 
 def _label(version: dict) -> str:
@@ -114,6 +139,56 @@ def _label(version: dict) -> str:
 def _head(version: dict, current: dict | None) -> dict:
     return {**{key: version.get(key) for key in PUBLIC_FIELDS}, "label": _label(version),
             "is_current": bool(current and current.get("id") == version.get("id"))}
+
+
+def _names_of(version: dict, league: dict, season: dict | None) -> dict:
+    """Liga- und Season-Name, wie die Fassung sie zeigt (Prüfung Codex): beim Veröffentlichen eingefroren (``frozen_names``), damit eine
+    Umbenennung alte Fassungen, PDF und ``?version=`` nicht ändert; Fassungen ohne diese Daten nehmen die heutigen Namen."""
+    frozen = version.get("frozen_names") or {}
+    season_name = ((frozen.get("seasons") or {}).get(season["id"]) if season else None) or (season or {}).get("name")
+    return {"league": frozen.get("league") or league.get("name"), "season": season_name}
+
+
+class RulesProblem(LeagueProblem):
+    """Eine Absage mit Code und Liste für die Oberfläche (``payload`` wird ``detail``), zusätzlich zur deutschen Meldung."""
+
+    def __init__(self, payload: dict, status: int = 422):
+        super().__init__(str(payload.get("message") or ""), status)
+        self.payload = payload
+
+
+def data_fingerprint(frozen: dict, frozen_vars: dict, frozen_names: dict) -> str:
+    """Der Fingerabdruck einer Datenbasis (#2269, Prüfung Codex): Bausteine, Variablenwerte und die Namen von Liga, Spiel und Seasons,
+    stabil sortiert. Die Freigabe veröffentlicht nur, was der Vorschlag gezeigt hat - weicht etwas ab, auch nur ein Name, 409."""
+    return fingerprint({"blocks": frozen, "vars": frozen_vars, "names": frozen_names})
+
+
+class Snapshot(NamedTuple):
+    """Die Datenbasis einer Fassung, wie sie eingefroren wird (``_freeze``): Bausteine und Variablenwerte je Season, dazu die Namen von
+    Liga, Spiel und Seasons. Vorschlag und Freigabe reden über denselben Schnappschuss - sein Fingerabdruck sagt, ob er noch gilt."""
+    blocks: dict
+    vars: dict
+    names: dict
+
+    @property
+    def fingerprint(self) -> str:
+        return data_fingerprint(self.blocks, self.vars, self.names)
+
+
+def _empty_names(frozen_vars: dict) -> list[str]:
+    """Bekannte Variablen ohne Wert in einer der eingefrorenen Seasons - sie stehen als „(nicht festgelegt)“ im Text. Bei einer Fassung
+    der Liga zählt jede Season, die sie einfriert, auch wenn die Seite der Liga „(je Season)“ zeigt (zweite Prüfung Codex)."""
+    return sorted({name for rows in frozen_vars.values() for name in variables.empty(list(rows or {}), rows or {})})
+
+
+def _check_empty(frozen_vars: dict, body: dict, scope: str) -> None:
+    """Leere Variablen nur mit ausdrücklicher Bestätigung (Entscheidung Fabian): sonst 422 mit Code und Liste."""
+    empty = _empty_names(frozen_vars)
+    if empty and not body.get("confirm_empty"):
+        where = "in einer Season dieser Liga" if scope == LEAGUE else "in dieser Season"
+        raise RulesProblem({"code": "empty_vars", "names": empty,
+                            "message": f"Ohne Wert {where}: " + ", ".join("{{" + name + "}}" for name in empty)
+                            + " - im Text steht dann „(nicht festgelegt)“. Zum Veröffentlichen bitte bestätigen."})
 
 
 def page_path(league: dict, season: dict | None) -> str:
@@ -187,11 +262,17 @@ async def page_view(db, league: dict, season: dict | None, user: dict | None, *,
     sections, result = document["sections"], document["result"]
     return {
         **out, "source": "rules", "fallback_text": None,
-        "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf"},
-        "sections": [{**row, "mark": result["marks"].get(row["anchor"])} for row in sections],
+        "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf",
+                    "names": _names_of(version, league, season)},
+        "sections": _served(sections, result),
         "changes": {"base": _head(previous, current) if previous else None,
                     **{key: result[key] for key in ("new", "changed", "removed")}},
     }
+
+
+def _served(sections: list[dict], result: dict) -> list[dict]:
+    """Abschnitte für die API: Markierung dazu, ``body_md`` ohne Schutzzeichen - Namen mit Backslash-Escapes (Folge-Review #2218)."""
+    return [{**row, "body_md": markdown_text.served(row["body_md"]), "mark": result["marks"].get(row["anchor"])} for row in sections]
 
 
 def _page_document(version: dict, previous: dict | None, season: dict | None) -> dict:
@@ -218,17 +299,20 @@ async def compare_view(db, league: dict, season: dict | None, base_id: str | Non
     base, target = _find(chain["rows"], base_id), _find(chain["rows"], target_id)
     sections = await rules_cache.get_or_make_json(
         ("compare", base["id"], target["id"], (season or {}).get("id")),
-        lambda: text.diff_view(_sections(base, season), _sections(target, season)))
+        lambda: text.diff_view(_sections(base, season, blocks.TEXT, plain=True), _sections(target, season, blocks.TEXT, plain=True)))
     return {"base": _head(base, chain["current"]), "target": _head(target, chain["current"]), "sections": sections}
 
 
 def _pdf_document(league: dict, season: dict | None, version: dict, previous: dict | None, marks: bool) -> dict:
-    """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt."""
-    sections = _sections(version, season)
-    result = text.compare(_sections(previous, season) if previous else None, sections)
+    """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt. Bausteine in ihrer Fassung ohne Bilder (#2218),
+    nur die Waffen-Tabelle der erlaubten Ausrüstung zeigt ihr kleines Bild (``pdf``, #2305). Markiert wird wie im Wort-Vergleich: im
+    Klartext ohne Bilder."""
+    sections = _sections(version, season, blocks.PDF)
+    result = text.compare(_sections(previous, season, blocks.TEXT) if previous else None, _sections(version, season, blocks.TEXT))
+    names = _names_of(version, league, season)
     return {
         "title": version.get("title") or "Regelwerk",
-        "context": " · ".join(str(part) for part in (league.get("name"), (season or {}).get("name")) if part),
+        "context": " · ".join(str(part) for part in (names["league"], names["season"]) if part),
         "version": version.get("version"), "label": _label(version), "valid_from": version.get("valid_from"),
         "published_at": version.get("published_at"), "change_reason": version.get("change_reason"),
         "sections": [{**row, "mark": result["marks"].get(row["anchor"]) if marks else None} for row in sections],
@@ -238,12 +322,13 @@ def _pdf_document(league: dict, season: dict | None, version: dict, previous: di
 
 
 async def pdf_file(db, league: dict, season: dict | None, version_id: str, *, marks: bool, branding: dict | None) -> tuple[bytes, str]:
-    """Das PDF einer Fassung und sein Dateiname - einmal je Fassung und Markierung gebaut. Name von Liga und Season und die Marke stehen
-    in der Datei, darum auch im Schlüssel; die Fassungen ändern sich nie."""
+    """Das PDF einer Fassung und sein Dateiname - einmal je Fassung und Markierung gebaut. Name von Liga und Season (wie die Fassung sie
+    zeigt) und die Marke stehen in der Datei, darum auch im Schlüssel; die Fassungen ändern sich nie."""
     chain = await _chain(db, league, season)
     version = _find(chain["rows"], version_id)
     previous = _previous(chain["rows"], version)
-    looks = fingerprint([league.get("name"), (season or {}).get("name"), branding])
+    names = _names_of(version, league, season)
+    looks = fingerprint([names["league"], names["season"], branding])
     key = ("pdf", version["id"], (previous or {}).get("id"), (season or {}).get("id"), marks, looks)
 
     def build() -> bytes:
@@ -306,22 +391,73 @@ async def _inheriting_seasons(db, league: dict) -> list[dict]:
 
 
 async def data_changes(db, league: dict, season: dict | None, version: dict | None) -> dict | None:
-    """Vorschlag „Daten geändert“: Bausteine der letzten Fassung gegen den heutigen Stand der Quellen. Veröffentlicht nichts."""
+    """Vorschlag „Daten geändert“: Bausteine und Variablen (#2269) der letzten Fassung gegen den heutigen Stand der Quellen. Veröffentlicht
+    nichts. Je Zeile ``kind`` ``block`` oder ``variable``."""
     keys = (version or {}).get("blocks_used") or []
-    if not keys:
+    names = (version or {}).get("vars_used") or []
+    if not keys and not names:
         return None
     seasons = [season] if season else await _inheriting_seasons(db, league)
     rows: list[dict] = []
     for row in seasons:
         frozen = _frozen_values(version, row)
+        frozen_text = _frozen_values(version, row, blocks.TEXT, plain=True)
         for key, now in (await blocks.resolve(db, keys, league, row)).items():
             before = frozen.get(key)
-            if before == now["markdown"]:
+            if before == blocks.value(key, now):
                 continue
-            rows.append({"block": key, "label": now["label"], "season_id": row["id"], "season_name": row.get("name"),
-                         "status": "missing" if before is None else "changed", "before": before or "", "after": now["markdown"],
-                         "ops": text.word_ops(before or "", now["markdown"])})
+            # Geändert ist, was sich samt Bild änderte; markiert wird Wort für Wort im Klartext ohne Bilder (#2218) - auch ``before`` und
+            # ``after`` sind Klartext, nie das Darstellungs-Zwischenformat mit Schutzzeichen.
+            after = blocks.plain_value(key, now)
+            rows.append({"kind": "block", "block": key, "label": now["label"], "season_id": row["id"], "season_name": row.get("name"),
+                         "status": "missing" if before is None else "changed", "before": frozen_text.get(key) or "", "after": after,
+                         "ops": text.word_ops(frozen_text.get(key) or "", after)})
+        if names:
+            frozen_vars = _frozen_vars(version, row)
+            now_vars = variables.resolve(names, await variables.context(db, league, row))
+            for name in names:
+                if name not in now_vars:
+                    continue
+                before_var = (frozen_vars.get(name) or {}).get("value") if name in frozen_vars else None
+                after_var = now_vars[name].get("value")
+                if name in frozen_vars and before_var == after_var:
+                    continue
+                rows.append({"kind": "variable", "block": name, "label": f"{{{{{name}}}}} · {now_vars[name]['label']}", "season_id": row["id"],
+                             "season_name": row.get("name"), "status": "changed" if name in frozen_vars else "missing",
+                             "before": before_var or "", "after": after_var or "", "ops": text.word_ops(before_var or "", after_var or "")})
     return {"version_id": version["id"], "version": version.get("version"), "label": _label(version), "rows": rows} if rows else None
+
+
+async def pending_release(db, league: dict, season: dict) -> dict | None:
+    """„Regelwerk muss freigegeben werden“ für eine Season (#2269): Daten geändert (``changed``, mit Zahl der Stellen) oder ein Entwurf
+    wartet (``draft``) - sonst ``None``. Nur ein Hinweis, veröffentlicht nichts."""
+    own = await _published(db, SEASON, season["id"])
+    current = (await _chain(db, league, season))["current"]
+    latest = own[-1] if own else (current if current and current.get("scope") == LEAGUE else None)
+    scope, scope_id = (SEASON, season["id"]) if own else (LEAGUE, league["id"])
+    admin_url = f"/admin/leagues/rules/{scope}/{scope_id}"
+    changes = await data_changes(db, league, season, latest) if latest else None
+    if changes and changes["rows"]:
+        return {"kind": "changed", "count": len(changes["rows"]), "label": changes["label"], "admin_url": admin_url}
+    draft = await draft_of(db, scope, scope_id)
+    if draft:
+        return {"kind": "draft", "count": 0, "label": _label(latest) if latest else None, "admin_url": admin_url}
+    return None
+
+
+async def block_state(db, league: dict, season: dict, key: str) -> dict:
+    """Für die Verwaltung einer Datenquelle (Sperrliste, #2218): Steht der Baustein in der letzten Fassung dieser Season, und zeigt sie noch
+    den heutigen Stand? Nur ein Hinweis - eine neue Fassung bereitet die Leitung im Regelwerk vor."""
+    own = await _published(db, SEASON, season["id"])
+    current = (await _chain(db, league, season))["current"]
+    latest = own[-1] if own else (current if current and current.get("scope") == LEAGUE else None)
+    if not latest or key not in (latest.get("blocks_used") or []):
+        return {"uses_block": False, "outdated": False, "version": None, "admin_url": None}
+    changes = await data_changes(db, league, season, latest)
+    outdated = any(row["block"] == key and row["season_id"] == season["id"] for row in (changes or {}).get("rows") or [])
+    scope, scope_id = (SEASON, season["id"]) if latest.get("scope") == SEASON else (LEAGUE, league["id"])
+    return {"uses_block": True, "outdated": outdated, "version": latest.get("version"),
+            "admin_url": f"/admin/leagues/rules/{scope}/{scope_id}"}
 
 
 async def _names(db, user_ids: set[str]) -> dict[str, str]:
@@ -337,28 +473,90 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
     inherited = current if season and current and current.get("scope") == LEAGUE else None
     latest = own[-1] if own else inherited
     consent_state = await admin_consents(db, league, season, chain) if season else None
+    draft = await draft_of(db, scope, scope_id)
+    changes = await data_changes(db, league, season, latest)
     return {
         "scope": scope, "scope_id": scope_id,
         "league": {key: league.get(key) for key in ("id", "name", "slug")},
         "season": {key: season.get(key) for key in ("id", "name", "slug", "visibility", "status")} if season else None,
-        "draft": await draft_of(db, scope, scope_id),
+        "draft": draft,
         "versions": [{**_head(row, current), "published_by": row.get("published_by")} for row in reversed(own)],
         "inherited": _head(inherited, current) if inherited else None,
         "current": _head(current, current) if current else None,
         "blocks": blocks.catalog(),
-        "data_changes": await data_changes(db, league, season, latest),
+        # Variablen (#2269) mit ihrem heutigen Wert - auf der Seite der Liga nur, was ohne Season gilt.
+        "variables": variables.catalog(await variables.context(db, league, season)),
+        "data_changes": changes,
+        # Der Vorschlag entsteht von selbst (#2269): der Text der letzten Fassung mit den Daten von heute, markiert gegen die Fassung.
+        "proposal": await _proposal(db, scope, league, season, latest, current) if changes and latest and not draft else None,
         "consents": consent_state,
         "public_url": page_path(league, season),
         "today": _today(),
     }
 
 
+async def _rendered(db, scope: str, league: dict, season: dict | None, body_md: str | None, annexes: list[dict], previous: dict | None) -> dict:
+    """Ein Text mit den Bausteinen und Variablen von heute, verglichen mit ``previous`` - für Vorschau und Vorschlag. Speichert nichts.
+    Alles kommt aus demselben Schnappschuss, den das Veröffentlichen prüft - darum nennt ``empty_vars`` auf der Seite der Liga die leeren
+    Variablen jeder Season, die die Fassung einfriert (zweite Prüfung Codex)."""
+    keys = text.block_keys(body_md, *[row["body_md"] for row in annexes])
+    names = variables.var_names(body_md, *[row["body_md"] for row in annexes])
+    snapshot = await _freeze(db, scope, league, season, keys, names)
+    own = season["id"] if season else ""
+    values = {key: blocks.value(key, row) for key, row in snapshot.blocks.get(own, {}).items()}
+    var_values = snapshot.vars.get(own, {})
+    unknown_vars = variables.unknown(names, await facts.game_of(db, league))
+    sections = text.sections_of(body_md, annexes, fill=lambda value: _fill(value, values, var_values, season, keep=unknown_vars))
+    result = await _compared(previous, season, sections)
+    return {"sections": _served(sections, result), "blocks_used": [key for key in keys if key in blocks.BLOCKS],
+            "unknown_blocks": blocks.unknown(keys), "vars_used": [name for name in names if name in var_values],
+            "unknown_vars": unknown_vars, "empty_vars": _empty_names(snapshot.vars), "result": result, "snapshot": snapshot}
+
+
+def _used_in(version: dict) -> tuple[list[str], list[str]]:
+    """Bausteine und Variablen im Text einer Fassung - aus dem Text, nicht aus den gespeicherten Listen (Altfassungen haben keine)."""
+    texts = [version.get("body_md"), *[row.get("body_md") for row in version.get("annexes") or []]]
+    return text.block_keys(*texts), variables.var_names(*texts)
+
+
+async def _freeze(db, scope: str, league: dict, season: dict | None, keys: list[str], names: list[str]) -> Snapshot:
+    """Die Datenbasis einer Fassung: je Season die Bausteine und Variablen von heute, bei einer Fassung der Liga zusätzlich unter ``""``
+    die Werte ohne Season, dazu die Namen von Liga, Spiel und Seasons. So wird eingefroren - und so lautet der Fingerabdruck des Vorschlags."""
+    frozen: dict[str, dict] = {}
+    frozen_vars: dict[str, dict] = {}
+    if keys or names:
+        for row in await _seasons_to_freeze(db, league, season):
+            if keys:
+                frozen[row["id"]] = await blocks.resolve(db, keys, league, row)
+            if names:
+                frozen_vars[row["id"]] = variables.resolve(names, await variables.context(db, league, row))
+    if names and scope == LEAGUE:
+        frozen_vars[""] = variables.resolve(names, await variables.context(db, league, None))
+    return Snapshot(frozen, frozen_vars, await _frozen_names(db, league, season))
+
+
+async def _frozen_names(db, league: dict, season: dict | None) -> dict:
+    """Liga-, Spiel- und Season-Namen, wie sie beim Veröffentlichen heißen - sie stehen an der Fassung fest (Prüfung Codex)."""
+    game = await facts.game_of(db, league)
+    return {"league": league.get("name"), "game": (game or {}).get("name"),
+            "seasons": {row["id"]: row.get("name") for row in await _seasons_to_freeze(db, league, season)}}
+
+
+async def _proposal(db, scope: str, league: dict, season: dict | None, base: dict, current: dict | None) -> dict:
+    rendered = await _rendered(db, scope, league, season, base.get("body_md"), base.get("annexes") or [], base)
+    return {"base": _head(base, current), "sections": rendered["sections"],
+            "changes": {"base": _head(base, current), **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
+            "unknown_vars": rendered["unknown_vars"], "empty_vars": rendered["empty_vars"],
+            # Der Schnappschuss, den dieser Vorschlag zeigt - die Freigabe schickt seinen Fingerabdruck mit und veröffentlicht nur genau ihn.
+            "fingerprint": rendered["snapshot"].fingerprint}
+
+
 # ---------------------------------------------------------------- Verwaltung: Schreiben
 
 def _annexes(raw: list[dict] | None) -> list[dict]:
     """Die Anlagen mit ihrem Buchstaben aus der Reihenfolge."""
-    return [{"key": chr(ord("A") + index), "title": str(row.get("title") or "").strip(), "body_md": str(row.get("body_md") or "")}
-            for index, row in enumerate(raw or [])]
+    return [{"key": chr(ord("A") + index), "title": markdown_text.strip_protected(row.get("title")).strip(),
+             "body_md": markdown_text.strip_protected(row.get("body_md"))} for index, row in enumerate(raw or [])]
 
 
 def _check_size(body_md: str | None, annexes: list[dict] | None) -> None:
@@ -432,7 +630,8 @@ async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict, *, c
     kept = set(carried or ()) | set(_upload_files((existing or {}).get("body_md"), (existing or {}).get("annexes")))
     await _check_images(db, body.get("body_md"), body.get("annexes"), user, kept)
     now = now_utc().isoformat()
-    fields = {"title": str(body.get("title") or "").strip(), "body_md": str(body.get("body_md") or ""),
+    # Ein eingegebenes Schutzzeichen (Zwischenformat der Bausteine, #2218) wird nicht gespeichert.
+    fields = {"title": markdown_text.strip_protected(body.get("title")).strip(), "body_md": markdown_text.strip_protected(body.get("body_md")),
               "annexes": _annexes(body.get("annexes")), "updated_at": now, "updated_by": user["id"]}
     if existing is None:
         doc = {"id": new_id(), "scope": scope, "scope_id": scope_id, "league_id": league["id"],
@@ -482,17 +681,12 @@ async def preview(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
     annexes = _annexes(body.get("annexes"))
     draft = await draft_of(db, scope, scope_id) or {}
     _check_size(body.get("body_md"), annexes)
-    keys = text.block_keys(body.get("body_md"), *[row["body_md"] for row in annexes])
-    values = {key: row["markdown"] for key, row in (await blocks.resolve(db, keys, league, season)).items()} if season else {}
-    missing = blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT
-    sections = text.sections_of(body.get("body_md"), annexes, fill=lambda value: text.fill_blocks(value, values, missing=missing))
     chain = await _chain(db, league, season)
     previous = chain["rows"][-1] if chain["rows"] else None
-    result = await _compared(previous, season, sections)
-    return {"sections": [{**row, "mark": result["marks"].get(row["anchor"])} for row in sections],
+    rendered = await _rendered(db, scope, league, season, markdown_text.strip_protected(body.get("body_md")), annexes, previous)
+    return {**{key: rendered[key] for key in ("sections", "blocks_used", "unknown_blocks", "vars_used", "unknown_vars", "empty_vars")},
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
-                        **{key: result[key] for key in ("new", "changed", "removed")}},
-            "blocks_used": [key for key in keys if key in blocks.BLOCKS], "unknown_blocks": blocks.unknown(keys),
+                        **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
             "foreign_images": await _refused_images(db, body.get("body_md"), annexes, user, set(_upload_files(draft.get("body_md"), draft.get("annexes"))))}
 
 
@@ -528,9 +722,10 @@ async def publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
         raise LeagueProblem(SCOPE_BUSY, 409) from None
 
 
-async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
+async def _publish(db, scope: str, scope_id: str, body: dict, user: dict, *, frozen: Snapshot | None = None) -> dict:
     """Macht den Entwurf zur Fassung, in einem Schritt: Hat ihn inzwischen jemand geändert oder veröffentlicht, passt der Filter
-    nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index."""
+    nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index. ``frozen``: ein schon geprüfter Schnappschuss (Freigabe des
+    Vorschlags) - dann wird genau er veröffentlicht, auch die Namen, nichts neu gelesen."""
     league, season = await resolve_scope(db, scope, scope_id)
     draft = await draft_of(db, scope, scope_id)
     if not draft or draft.get("revision") != body.get("revision"):
@@ -539,27 +734,61 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dic
     predecessor = own[-1] if own else None
     reason, valid_from, keys = _check_publish(draft, body, predecessor)
     await _check_images(db, draft.get("body_md"), draft.get("annexes"))  # nur der Eintrag: Wer was hineingestellt hat, zählte beim Speichern
-    frozen: dict[str, dict] = {}
-    if keys:
-        for row in await _seasons_to_freeze(db, league, season):
-            frozen[row["id"]] = await blocks.resolve(db, keys, league, row)
+    names = variables.var_names(draft.get("body_md"), *[row.get("body_md") for row in draft.get("annexes") or []])
+    wrong = variables.unknown(names, await facts.game_of(db, league)) if names else []
+    if wrong:
+        # Nie still leer (#2269): Eine unbekannte Variable hält das Veröffentlichen auf, mit der ganzen Liste.
+        raise LeagueProblem("Unbekannte Variable im Text: " + ", ".join("{{" + name + "}}" for name in wrong) + ".")
+    snapshot = frozen if frozen is not None else await _freeze(db, scope, league, season, keys, names)
+    _check_empty(snapshot.vars, body, scope)
     now = now_utc().isoformat()
     try:
         doc = await db.league_rules.find_one_and_update(
             {"id": draft["id"], "status": DRAFT, "revision": draft["revision"]},
-            {"$set": {"status": PUBLISHED, "version": int((predecessor or {}).get("version") or 0) + 1, "frozen": frozen,
-                      "blocks_used": keys, "valid_from": valid_from, "change_reason": reason,
-                      "requires_consent": bool(body.get("requires_consent")), "published_at": now, "published_by": user["id"],
-                      "updated_at": now}},
+            {"$set": {"status": PUBLISHED, "version": int((predecessor or {}).get("version") or 0) + 1, "frozen": snapshot.blocks,
+                      # Bilder der eingefrorenen Bausteine (#2218): Die Mediathek dreht und löscht sie nicht, solange die Fassung steht.
+                      "frozen_images": blocks.frozen_images(snapshot.blocks),
+                      "blocks_used": keys, "frozen_vars": snapshot.vars, "vars_used": names,
+                      # Namen von Liga, Spiel und Seasons aus demselben Schnappschuss - eine Umbenennung ändert die Fassung nicht mehr.
+                      "frozen_names": snapshot.names,
+                      "valid_from": valid_from, "change_reason": reason, "requires_consent": bool(body.get("requires_consent")),
+                      "published_at": now, "published_by": user["id"], "updated_at": now}},
             return_document=ReturnDocument.AFTER)
     except DuplicateKeyError:
         raise LeagueProblem(CHANGED_MEANWHILE, 409) from None
     if not doc:
         raise LeagueProblem(CHANGED_MEANWHILE, 409)
     doc.pop("_id", None)
-    doc.pop("_id", None)
     await _point_staffeln(db, league, season)
     return doc
+
+
+async def publish_proposal(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
+    """Den Vorschlag „Daten geändert“ in einem Schritt freigeben (#2269): Entwurf aus der letzten Fassung und veröffentlichen, unter der
+    Sperre von Season oder Liga. Die Leitung wählt dabei, ob neu zugestimmt werden muss."""
+    resource = league_resource(scope_id) if scope == LEAGUE else league_season_resource(scope_id)
+    try:
+        async with mutation_lock(db, resource):
+            league, season = await resolve_scope(db, scope, scope_id)
+            if await draft_of(db, scope, scope_id):
+                raise LeagueProblem("Es liegt schon ein Entwurf - bitte dort weiterarbeiten oder ihn verwerfen.", 409)
+            own = await _published(db, scope, scope_id)
+            current = (await _chain(db, league, season))["current"]
+            latest = own[-1] if own else (current if season and current and current.get("scope") == LEAGUE else None)
+            if not latest or latest["id"] != body.get("base_version_id"):
+                raise LeagueProblem("Die Grundlage ist nicht mehr die letzte Fassung - bitte die Seite neu laden.", 409)
+            # Unter der Sperre den Schnappschuss neu lesen: Nur was der Vorschlag gezeigt hat, wird veröffentlicht (Prüfung Codex) - eine
+            # Season-Einstellung oder Umbenennung hält diese Sperre nicht, darum zählt der Fingerabdruck samt Namen. Beide Prüfungen vor
+            # dem Entwurf: Nichts bleibt liegen.
+            keys, names = _used_in(latest)
+            snapshot = await _freeze(db, scope, league, season, keys, names)
+            if snapshot.fingerprint != body.get("fingerprint"):
+                raise LeagueProblem("Die Einstellungen haben sich inzwischen geändert - bitte den Vorschlag neu prüfen.", 409)
+            _check_empty(snapshot.vars, body, scope)
+            draft = await draft_from_version(db, scope, scope_id, latest["id"], user)
+            return await _publish(db, scope, scope_id, {**body, "revision": draft["revision"]}, user, frozen=snapshot)
+    except MutationLockBusy:
+        raise LeagueProblem(SCOPE_BUSY, 409) from None
 
 
 async def _point_staffeln(db, league: dict, season: dict | None) -> None:
@@ -604,6 +833,31 @@ async def _agreed(db, season_id: str, version_ids: list[str]) -> dict[str, dict]
     rows = await db.league_rule_consents.find({"season_id": season_id, "rule_version_id": {"$in": version_ids}},
                                               {"_id": 0}).sort("created_at", 1).to_list(None)
     return {row["squad_id"]: row for row in rows}
+
+
+async def sides_consent(db, tournament: dict | None, registrations: list[dict]) -> dict[str, dict | None]:
+    """Regelwerks-Sperre für Check-in und Start (D.2, #1652; Obmann 03.11.): je Anmeldung einer Staffel der Stand der Zustimmung ihres
+    Co-Teams - ``None``, wenn nichts gefordert ist (kein Regelwerk, keine Fassung mit ``requires_consent``, kein Co-Team); sonst
+    ``{open, version_id, label, rules_url}``. ``open``: Die Seite muss erst zustimmen."""
+    out: dict[str, dict | None] = {reg["id"]: None for reg in registrations if reg.get("id")}
+    context = (tournament or {}).get("league_context") or {}
+    if not context.get("season_id") or not any(reg.get("squad_id") for reg in registrations):
+        return out
+    season = await db.league_seasons.find_one({"id": context["season_id"]}, {"_id": 0})
+    league = await db.leagues.find_one({"id": (season or {}).get("league_id")}, {"_id": 0}) if season else None
+    if not league:
+        return out
+    chain = await _chain(db, league, season)
+    demand = _demand(chain)
+    if not demand:
+        return out
+    agreed = await _agreed(db, season["id"], _covers(demand, chain))
+    current = chain["current"]
+    for reg in registrations:
+        if reg.get("id") and reg.get("squad_id"):
+            out[reg["id"]] = {"open": reg["squad_id"] not in agreed, "version_id": current["id"], "label": _label(current),
+                              "rules_url": page_path(league, season)}
+    return out
 
 
 async def consent_view(db, league: dict, season: dict | None, chain: dict, user: dict | None) -> dict | None:
@@ -687,9 +941,44 @@ async def record_consent(db, league_id: str, version: dict, season_id: str, squa
     return {**doc, "replay": False}
 
 
+async def rules_state(db, league: dict, season: dict) -> dict:
+    """``{current, upcoming}`` für die Prüfung vor der Veröffentlichung (#2207): die heute gültige Fassung und die nächste."""
+    chain = await _chain(db, league, season)
+    return {"current": chain["current"], "upcoming": chain["upcoming"]}
+
+
 async def current_version(db, league: dict, season: dict) -> dict | None:
     """Die Fassung, die heute für diese Season gilt - eigene, sonst die der Liga. ``None``: Es gibt keine, auch wenn ein Regeltext da ist."""
     return (await _chain(db, league, season))["current"]
+
+
+async def rules_info(db, league: dict, season: dict, squad_id: str | None) -> dict | None:
+    """Das Regelwerk für Team-Seite und Matchseite (#2269): die gültige Fassung mit Wegen zu Text und PDF und der Stand der Zustimmung des
+    eigenen Co-Teams (``consent``: ``{required, agreed, agreed_at}``, ``None`` ohne Forderung oder ohne Co-Team). ``None`` ohne Regelwerk."""
+    chain = await _chain(db, league, season)
+    current = chain["current"]
+    if not current:
+        return None
+    info = {**version_view(league, season, current), "consent": None}
+    demand = _demand(chain)
+    if demand and squad_id:
+        row = (await _agreed(db, season["id"], _covers(demand, chain))).get(squad_id)
+        info["consent"] = {"required": True, "agreed": bool(row), "agreed_at": (row or {}).get("created_at"), "demanded_label": _label(demand)}
+    return info
+
+
+async def match_rules_info(db, tournament: dict | None, squad_id: str | None) -> dict | None:
+    """``rules_info`` für ein Spiel einer Staffel - ``None`` bei anderen Turnieren. Darf die Matchseite nie aufhalten."""
+    context = (tournament or {}).get("league_context") or {}
+    if not context.get("season_id"):
+        return None
+    try:
+        season = await db.league_seasons.find_one({"id": context["season_id"]}, {"_id": 0})
+        league = await db.leagues.find_one({"id": (season or {}).get("league_id")}, {"_id": 0}) if season else None
+        return await rules_info(db, league, season, squad_id) if league else None
+    except Exception:  # noqa: BLE001 - die Matchseite geht vor, der Hinweis fehlt dann
+        logger.exception("Regelwerk für die Matchseite nicht ermittelt")
+        return None
 
 
 def version_view(league: dict, season: dict, version: dict) -> dict:
@@ -730,7 +1019,7 @@ async def own_consent_tasks(db, user: dict, registrations: list[dict]) -> list[d
 
     versions = await db.league_rules.find(
         {"status": PUBLISHED, "$or": [{"scope": SEASON, "scope_id": {"$in": sorted(seasons)}}, {"scope": LEAGUE, "scope_id": {"$in": sorted(league_rows)}}]},
-        {"_id": 0, "body_md": 0, "annexes": 0, "frozen": 0}).sort("version", 1).to_list(None)
+        {"_id": 0, "body_md": 0, "annexes": 0, "frozen": 0, "frozen_vars": 0}).sort("version", 1).to_list(None)
     chains = {}
     for season_id, season in seasons.items():
         chains[season_id] = _chain_of([row for row in versions if row["scope"] == LEAGUE and row["scope_id"] == season.get("league_id")],
@@ -789,7 +1078,7 @@ async def search_results(db, pattern: str, user: dict | None, limit: int) -> lis
     """Treffer der Website-Suche: gültige Fassungen, deren Seite die Person sehen darf. Alte Fassungen und Entwürfe nie."""
     rows = await db.league_rules.find(
         {"status": PUBLISHED, "$or": [{key: {"$regex": pattern, "$options": "i"}} for key in ("title", "body_md", "annexes.body_md")]},
-        {"_id": 0, "frozen": 0}).sort("published_at", -1).to_list(limit * 5)
+        {"_id": 0, "frozen": 0, "frozen_vars": 0}).sort("published_at", -1).to_list(limit * 5)
     out: list[dict] = []
     for row in rows:
         current = _current(await _published(db, row["scope"], row["scope_id"]))

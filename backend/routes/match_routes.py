@@ -9,6 +9,7 @@ from database import get_db
 from services.chat_attachments import register_chat_access
 from services import league_permissions
 from services.league_permissions import READ
+from services import checkin_rules
 from services.permissions import is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
@@ -27,6 +28,8 @@ from models import (
     MatchChatCreate,
     MatchScheduleProposalCreate,
     MatchScheduleProposalDecision,
+    MatchScheduleProposalGroupCreate,
+    MatchScheduleProposalGroupDecision,
     MatchResultUndo,
     MatchV2ResultSubmit,
     MatchUpdate,
@@ -44,6 +47,7 @@ from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
     STATION_GONE,
     restore_change,
+    undo_revision,
     written_state,
     ensure_plan_keeps_result_state,
     ensure_station_open,
@@ -60,6 +64,7 @@ from match_rules import match_allows_draw
 from services.match_audience import acting_registration, player_ids, player_user_ids, teams_by_id
 # Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
 from services.match_calls import CALL_OPEN_STATUSES, call_view
+from services import league_procedures
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
     proposal_sentence,
@@ -75,6 +80,10 @@ from services.tournament_rules import match_policy, players_can_report, schedule
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services import league_games
+from services import league_incidents
+from services import league_result_rules
+from services import league_schedule
+from services import match_flow
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -410,8 +419,16 @@ async def _require_result_permission(user: dict, match: dict, *, capability="res
 
 async def _require_undisputed_or_both(user: dict, match: dict) -> None:
     """Staffel (#2203): Bei offenem Streitfall schließt eine Korrektur den Protest - dafür braucht es auch „Proteste“."""
-    if str(match.get("status") or "") == "disputed":
+    if str(match.get("status") or "") == "disputed" or league_procedures.has_open(match):
         await _require_result_permission(user, match, capability="disputes")
+
+
+def _require_procedure_result(user: dict, match: dict, reason: str | None, force: bool) -> None:
+    """Liga (#1619, E.2): Ein Ergebnis zu einem Spiel mit offenem Verfahren entscheidet es mit - nur mit Begründung, und über einen
+    Einspruch nie durch die Person der Ausgangsentscheidung."""
+    refusal = league_procedures.result_refusal(match, user, reason, force=force)
+    if refusal:
+        raise HTTPException(status_code=refusal[0], detail=refusal[1])
 
 
 async def _result_conflict(db, user: dict | None, match: dict) -> dict | None:
@@ -514,6 +531,57 @@ def _refuse_blocked_moment(tournament: dict | None, moment) -> None:
                                                 f"{span}) – bitte einen anderen Termin vorschlagen.")
 
 
+DUPLICATE_TIME_DETAIL = "Diesen Termin hast du schon eingetragen – bitte einen anderen wählen."
+OFFERED_TIME_DETAIL = "Steht schon zur Auswahl – passt er, einfach „Annehmen“ tippen; sonst einen anderen Termin wählen."
+
+
+def _proposal_time_problems(tournament: dict | None, match: dict, moments: list[datetime]) -> list[dict]:
+    """Mehrere Termine auf einmal (#2325): jeder Termin einzeln - in der Zukunft, nicht in einer Sperrzeit, nicht doppelt.
+    Je Problem eine Zeile mit der Stelle in der Eingabe; leer: alle passen. Dieselben Sätze wie beim einzelnen Vorschlag -
+    und nicht strenger als er: die Spielwoche ist nur ein Hinweis (``_proposal_time_hints``)."""
+    problems: list[dict] = []
+    seen: list[datetime] = []
+    for index, raw in enumerate(moments):
+        moment = raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+        try:
+            refuse_past_proposal(moment)
+            _refuse_blocked_moment(tournament, moment)
+        except HTTPException as refusal:
+            problems.append({"index": index, "detail": refusal.detail})
+            continue
+        if moment in seen:
+            problems.append({"index": index, "detail": DUPLICATE_TIME_DETAIL})
+            continue
+        seen.append(moment)
+    return problems
+
+
+def _proposal_time_hints(tournament: dict | None, match: dict, moments: list[datetime]) -> list[dict]:
+    """Hinweise je Termin (#2325), die nichts aufhalten: In einer Staffel mit Terminregeln zählt ein Termin außerhalb der
+    Spielwoche nicht für die 72-h-Regel (``home_rule_at``) - er gilt nur, wenn die Gegenseite annimmt. Die 72-h-Regel nennt der
+    Satz nur, wenn sie in der Staffel an ist."""
+    rules = league_schedule.rules_of(tournament)
+    window = league_schedule.window_of(tournament, match) if rules else None
+    if not window:
+        return []
+    last = window.end - timedelta(minutes=1)
+    text = (f"Liegt außerhalb der Spielwoche ({league_schedule.when_text(window.start)} bis {league_schedule.when_text(last)}) – "
+            "gilt nur, wenn die Gegenseite annimmt" + ("; die 72-h-Regel greift hier nicht." if rules.get("home_rule") else "."))
+    return [{"index": index, "detail": text} for index, raw in enumerate(moments)
+            if not window.contains(raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc))]
+
+
+def _refuse_time_problems(problems: list[dict], count: int) -> None:
+    """422 mit allen Problemen je Termin - gespeichert wird dann keiner (#2325)."""
+    if not problems:
+        return
+    if len(problems) == 1:
+        message = problems[0]["detail"] if count == 1 else f"Termin {problems[0]['index'] + 1}: {problems[0]['detail']}"
+    else:
+        message = "Nicht jeder Termin passt – bitte die markierten Termine ändern."
+    raise HTTPException(status_code=422, detail={"code": "schedule_times_invalid", "message": message, "errors": problems})
+
+
 async def _refresh_schedule_escalation(match: dict, collection: str) -> dict:
     status = match.get("schedule_status")
     deadline = match.get("schedule_deadline_at")
@@ -612,7 +680,8 @@ def _accepts_reports(match: dict) -> bool:
 
 
 async def _report_view(db, match: dict, acting_reg: dict, can_confirm: bool = True) -> dict:
-    state = report_state(match.get("reports") or [], acting_reg.get("id"))
+    # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht - die Seite fragt neu.
+    state = report_state(league_incidents.current_reports(match), acting_reg.get("id"))
     registrations = await _registrations_for_match(match)
     regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
     own, proposal = state["own"], state["proposal"]
@@ -690,7 +759,35 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     can_decide = not conflict or conflict["override"]
     can_submit_result = can_decide and await _can_submit_result_for_match(match, user)
     can_player_report = bool(acting_reg and _players_can_report(policy) and _accepts_reports(match))
-    can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
+    can_manage_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
+    # Liga-Termine (#2194): Steht der Termin fest, gibt es keinen neuen Vorschlag mehr - alte offene lassen sich weiter
+    # ablehnen und zurückziehen (``can_manage_schedule``, so liest es auch die App).
+    can_propose_schedule = can_manage_schedule and not league_schedule.blocks_proposals(tournament, match)
+    plans_as_lead = bool(user) and await has_match_result_permission(user, match, capability="matches")
+    schedule_block = await league_schedule.page_block(
+        db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
+        # Befangen (auch der Superadmin): das Feld fehlt hier - die Notausnahme mit Grund geht über den Matchplan.
+        can_lead_set=plans_as_lead and not conflict, proposals=proposals)
+    # Liga-Check-in (#1652, D.2): Stand, Fenster, Anwesende, Hinweise - nur Beteiligte und Leitung; die Leitung trägt im Notfall
+    # für eine Seite ein (befangen nur der Superadmin mit Grund).
+    checkin_block = await match_flow.page_block(
+        db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
+        can_lead_enter=plans_as_lead and (not conflict or conflict["override"]), conflict=conflict if plans_as_lead else None,
+        viewer_id=(user or {}).get("id"))
+    # Map-Veto für Zuschauer (D.4, #1651): Wer weder dazugehört noch das Spiel leitet, sieht das Veto nur lesend - ohne Wahl, ohne
+    # Eingriff, ohne Grund einer Pause. Liest nur; Start und Fristen löst der Aufruf der Beteiligten bzw. der Job.
+    veto_view = None
+    if checkin_block is None and collection == "matches_v2":
+        from services import league_veto
+        if league_veto.rules_mod.rules_of(tournament):
+            veto_view = await league_veto.live_block(db, match, tournament, spectator=True)
+    # Erst einchecken, dann melden (D.2): der Satz, den auch /report gäbe - die Seite zeigt ihn statt des Meldeformulars.
+    report_hint = None
+    if can_player_report and checkin_block:
+        rows = checkin_block.get("sides") or []
+        report_hint = match_flow.report_refusal(
+            match, tournament, own_id=acting_reg["id"], names={row["registration_id"]: row["name"] for row in rows},
+            consent={row["registration_id"]: {"open": True, "rules_url": row.get("rules_url")} for row in rows if row.get("consent_open")})
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
@@ -711,11 +808,32 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
             report_view = await _report_view(db, match, member_reg, can_confirm=False)
     # Liga (#1650): Maps, Sieger und Aufstellungen - zum Melden, Bestätigen, Nachtragen und Anzeigen.
     league_block = None
+    procedure_viewer = None
     league = await league_games.setup(db, match, tournament, stage)
     if league:
         side = acting_reg or (await _member_registration_for_match(db, match, user.get("id")) if user else None)
         league_block = await league_games.page_block(db, league, side_id=(side or {}).get("id"),
-                                                     can_act=bool(acting_reg), staff=bool(can_submit_result))
+                                                     can_act=bool(acting_reg), staff=bool(can_submit_result),
+                                                     can_override=bool(can_submit_result))
+        # Regelwerk (#2269): gültige Fassung mit PDF und, für die eigene Seite, der Stand der Zustimmung ihres Co-Teams.
+        from services.league_rules import match_rules_info
+        league_block["rules"] = await match_rules_info(db, tournament, (side or {}).get("squad_id"))
+        # Sperrliste (#2287): die Liste, die für dieses Spiel gilt - festgehalten oder die der Staffel, ganze Klassen mit Einträgen.
+        from services import loadout_bans
+        league_block["loadout_bans"] = await loadout_bans.effective(db, tournament, match)
+        # Erlaubte Ausrüstung (Nr. 99): dieselbe Sicht wie im Regelwerk - nach dem Ergebnis der Schnappschuss von damals.
+        league_block["allowed_equipment"] = await loadout_bans.match_allowed(db, tournament, match)
+        # Verfahren (#1619, E.2): Beanstandung, Protest, Einspruch - je nach Rolle; öffentlich nur „in Klärung“ (``contested``).
+        procedure_league = await league_procedures.context(db, match)
+        if procedure_league is not None:
+            procedure_viewer = await league_procedures.viewer_for(db, match, user)
+            league_block.update(await league_procedures.page_block(db, match, procedure_league, user, viewer=procedure_viewer))
+        # Vorfälle (D.5, #1619): ``map_state`` für alle, ``incidents`` und ``incident_info`` nur für Beteiligte und die nicht befangene
+        # Leitung - wer befangen ist, sieht wie seine Seite.
+        from services.match_proofs import viewer_for
+        league_block.update(await league_incidents.page_block(
+            db, league, viewer=await viewer_for(db, match, user), conflict=conflict,
+            can_lead=bool(user) and await has_match_result_permission(user, match, capability=("results", "disputes"))))
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
@@ -738,6 +856,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
         canonical_match = public_match_view(canonical_match, viewer_id)
+    if procedure_viewer is not None:
+        # Verfahren (#1619, Nr. 133): Einzelheiten stehen je nach Rolle im Block ``league.procedures`` - den Datensatz selbst sieht
+        # nur die nicht befangene Leitung vollständig, auch wer sonst Internes sieht (befangen: wie die eigene Seite).
+        match = league_procedures.strip_rows(match, procedure_viewer)
+        canonical_match = league_procedures.strip_rows(canonical_match, procedure_viewer)
     # Die Dauer, die gilt (#1554) - die App rechnet die Kette nicht selbst.
     duration_game = await load_duration_game(db, tournament)
     with_effective_durations([match, canonical_match], stages=[stage], tournament=tournament, game=duration_game)
@@ -760,13 +883,14 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_submit_result": can_submit_result,
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
-        "can_manage_schedule": can_propose_schedule,
+        "can_manage_schedule": can_manage_schedule,
         "can_dispute": bool(acting_reg and window["open"]),
         "dispute_until": window["until"],
         "in_dispute": str(match.get("status") or "") == "disputed",
         "call": call,
         "result_entry": result_entry,
         "report_entry": report_entry_info if can_player_report else None,
+        "report_hint": report_hint,
         "can_forfeit": can_decide and await _can_forfeit_match(match, user),
         "can_decide_dispute": can_decide and bool(user) and await has_match_result_permission(user, match, capability="disputes"),
         "conflict": conflict,
@@ -778,6 +902,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "matchday": round_number,
         "matchday_label": matchday_label,
         "league": league_block,
+        "schedule_block": schedule_block,
+        "checkin": checkin_block,
+        "veto_view": veto_view,
     }
 
 
@@ -816,6 +943,8 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung dürfen Termine vorschlagen")
+    if league_schedule.blocks_proposals(tournament, match):
+        raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
     _refuse_blocked_moment(tournament, body.scheduled_at)
     now_iso = now_utc().isoformat()
     normalized_note = (body.note or "").strip() or None
@@ -860,12 +989,212 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     return doc
 
 
+# ---------------------------------------------------------------- Mehrere Termine auf einmal (#2325)
+# Eine Gruppe sind bis zu drei offene Vorschläge mit gemeinsamer ``group_id``, Notiz und ``created_at``. Jeder bleibt ein
+# eigener Vorschlag: Annehmen, 72-h-Regel (frühester gültiger Heimvorschlag) und App lesen sie wie bisher einzeln.
+
+
+async def _schedule_write_context(db, match_id: str, me: dict) -> tuple[dict, str, dict | None, dict | None]:
+    """Spiel, Ablage, Turnier und eigene Seite - mit denselben Prüfungen wie beim einzelnen Vorschlag."""
+    match, collection = await _find_match_any(match_id)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
+    if not _schedule_proposals_enabled(_match_policy(match, tournament, stage)):
+        raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
+    if not await _can_act_for_match(match, me):
+        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung dürfen Termine vorschlagen")
+    return match, collection, tournament, await _acting_registration_for_match(match, me)
+
+
+def _public_proposal(doc: dict) -> dict:
+    return {key: value for key, value in doc.items() if key not in {"_id", "match_collection"}}
+
+
+async def _insert_proposal_group(db, match: dict, collection: str, me: dict,
+                                 acting_reg: dict | None, moments: list[datetime], note: str | None, *,
+                                 kind: str = "proposal", parent: dict | None = None) -> list[dict]:
+    """Alle Termine einer Gruppe auf einmal - entweder alle oder keiner. Das Spiel schreibt danach ``_mark_proposed``."""
+    now_iso = now_utc().isoformat()
+    group_id = new_id()
+    docs = []
+    for moment in sorted(moments, key=lambda value: value if value.tzinfo else value.replace(tzinfo=timezone.utc)):
+        doc = {
+            "id": new_id(), "match_id": match["id"], "match_collection": collection, "tournament_id": match.get("tournament_id"),
+            "stage_id": match.get("stage_id"), "actor_user_id": me["id"],
+            "actor_registration_id": acting_reg.get("id") if acting_reg else None,
+            "scheduled_at": moment.isoformat(), "note": note, "status": "pending", "kind": kind, "group_id": group_id,
+            "created_at": now_iso, "updated_at": now_iso,
+        }
+        if parent:
+            doc["parent_proposal_id"] = parent["id"]
+            if parent.get("group_id"):
+                doc["parent_group_id"] = parent["group_id"]
+        docs.append(doc)
+    try:
+        await db.match_schedule_proposals.insert_many([dict(doc) for doc in docs], ordered=True)
+    except BaseException:
+        # Nichts halb gespeichert - auch nicht, wenn die Anfrage mittendrin abbricht (CancelledError): was schon drin ist,
+        # geht wieder raus.
+        await _drop_group(db, group_id)
+        raise
+    return [_public_proposal(doc) for doc in docs]
+
+
+async def _drop_group(db, group_id: str) -> None:
+    await db.match_schedule_proposals.delete_many({"group_id": group_id, "status": "pending"})
+
+
+async def _mark_proposed(db, match: dict, collection: str, tournament: dict | None) -> None:
+    """Das Spiel wartet auf eine Antwort, mit neuer Frist - erst, wenn alle Termine (und beim Gegenvorschlag das Schließen der
+    alten) gespeichert sind; ein gescheiterter Versuch lässt keine verlängerte Frist zurück."""
+    await getattr(db, collection).update_one({"id": match["id"]}, {"$set": {
+        "schedule_status": "proposed",
+        "schedule_deadline_at": _schedule_deadline(match, tournament),
+        "updated_at": now_utc().isoformat(),
+    }, "$unset": {"schedule_escalated_at": ""}})
+
+
+async def _replayed_group(db, query: dict, isos: list[str]) -> list[dict] | None:
+    """Doppelt gesendet (#2325, wie beim einzelnen Vorschlag): eine offene Gruppe derselben Person mit derselben Notiz, deren
+    offene Termine genau die gesendeten sind - nicht mehr und nicht weniger."""
+    hits = await db.match_schedule_proposals.find(
+        {**query, "status": "pending", "group_id": {"$exists": True}, "scheduled_at": {"$in": isos}},
+        {"_id": 0, "group_id": 1}).to_list(50)
+    for group_id in dict.fromkeys(row["group_id"] for row in hits):
+        members = await db.match_schedule_proposals.find(
+            {**query, "status": "pending", "group_id": group_id}, {"_id": 0, "match_collection": 0}).to_list(50)
+        if sorted(row["scheduled_at"] for row in members) == sorted(isos):
+            return sorted(members, key=lambda row: row["scheduled_at"])
+    return None
+
+
+@router.post("/{match_id}/schedule-proposals/group")
+async def create_schedule_proposal_group(match_id: str, body: MatchScheduleProposalGroupCreate,
+                                         me: dict = Depends(get_current_user),
+                                         _mutation: None = Depends(_serialized_match_write)):
+    """Bis zu drei Termine auf einmal (#2325): jeder einzeln geprüft, gespeichert werden alle oder keiner, die Gegenseite
+    bekommt genau eine Nachricht. Der einzelne Vorschlag (``POST /schedule-proposals``) bleibt für App und ältere Seiten."""
+    db = get_db()
+    match, collection, tournament, acting_reg = await _schedule_write_context(db, match_id, me)
+    if league_schedule.blocks_proposals(tournament, match):
+        raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
+    note = (body.note or "").strip() or None
+    isos = [moment.isoformat() for moment in body.scheduled_ats]
+    replay = await _replayed_group(db, {"match_id": match_id, "actor_user_id": me["id"], "kind": "proposal", "note": note}, isos)
+    if replay:
+        return {"group_id": replay[0]["group_id"], "proposals": replay, "idempotent_replay": True}
+    _refuse_time_problems(_proposal_time_problems(tournament, match, body.scheduled_ats), len(isos))
+    docs = await _insert_proposal_group(db, match, collection, me, acting_reg, body.scheduled_ats, note)
+    await _mark_proposed(db, match, collection, tournament)
+    await _tell_schedule(db, match, "proposed", docs[0], me, docs[0]["actor_registration_id"], note, group=docs)
+    return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False,
+            "hints": _proposal_time_hints(tournament, match, body.scheduled_ats)}
+
+
+async def _open_group_members(db, proposal: dict) -> list[dict]:
+    """Die noch offenen Vorschläge der Gruppe - ohne Gruppe nur der Vorschlag selbst, solange er offen ist."""
+    if proposal.get("group_id"):
+        return await db.match_schedule_proposals.find(
+            {"match_id": proposal["match_id"], "group_id": proposal["group_id"], "status": "pending"},
+            {"_id": 0, "match_collection": 0}).sort("scheduled_at", 1).to_list(50)
+    return [_public_proposal(proposal)] if proposal.get("status") == "pending" else []
+
+
+def _own_proposal(proposal: dict, me: dict, acting_reg: dict | None) -> bool:
+    """Hat die eigene Seite (ohne Seite: die Person selbst) den Vorschlag gemacht? Wie beim Zurückziehen (#2110)."""
+    if acting_reg:
+        return bool(proposal.get("actor_registration_id") and proposal.get("actor_registration_id") == acting_reg.get("id"))
+    return proposal.get("actor_user_id") == me["id"]
+
+
+@router.post("/{match_id}/schedule-proposals/{proposal_id}/group-decision")
+async def decide_schedule_proposal_group(match_id: str, proposal_id: str, body: MatchScheduleProposalGroupDecision,
+                                         me: dict = Depends(get_current_user),
+                                         _mutation: None = Depends(_serialized_match_write)):
+    """Für alle offenen Termine der Gruppe eines Vorschlags (#2325): alle ablehnen, alle zurückziehen oder mit bis zu drei
+    Terminen gegenvorschlagen. Ohne Gruppe gilt es für den einen Vorschlag. Angenommen wird ein Termin über ``/decision``."""
+    db = get_db()
+    match, collection, tournament, acting_reg = await _schedule_write_context(db, match_id, me)
+    proposal = await db.match_schedule_proposals.find_one({"id": proposal_id, "match_id": match_id}, {"_id": 0})
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Terminvorschlag nicht gefunden")
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
+    note = (body.note or "").strip() or None
+    members = await _open_group_members(db, proposal)
+    completed = {"decline": "declined", "counter": "countered", "withdraw": "withdrawn"}[body.action]
+    if not members:
+        if proposal.get("status") == completed and proposal.get("decision_user_id") == me["id"]:
+            if completed == "countered":
+                counters = await db.match_schedule_proposals.find(
+                    {"match_id": match_id, "parent_proposal_id": proposal_id, "actor_user_id": me["id"]},
+                    {"_id": 0, "match_collection": 0}).sort("scheduled_at", 1).to_list(50)
+                if counters:
+                    return {"group_id": counters[0].get("group_id"), "proposals": counters, "idempotent_replay": True}
+            return {"ok": True, "status": completed, "idempotent_replay": True}
+        raise HTTPException(status_code=409, detail="Über diesen Terminvorschlag wurde bereits entschieden")
+    own = _own_proposal(proposal, me, acting_reg)
+    lead = await _plans_as_lead(match, me)
+    if body.action == "withdraw" and not (own or await leads_tournament(me, match.get("tournament_id"), "matches")):
+        raise HTTPException(status_code=403, detail="Zurückziehen kann nur die Seite, die den Termin vorgeschlagen hat.")
+    if body.action == "decline" and own and acting_reg and not lead:
+        raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestätigt werden – "
+                                                    "zurückziehen geht mit „Zurückziehen“.")
+    if body.action == "counter":
+        if not body.scheduled_ats:
+            raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
+        if league_schedule.blocks_proposals(tournament, match):
+            raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
+        # Ein Termin, der schon zur Auswahl steht, ist kein Gegenvorschlag, sondern eine Annahme - am Termin selbst gesagt, sonst
+        # schlösse der Gegenvorschlag genau den Termin, der passt (#2325).
+        problems = _proposal_time_problems(tournament, match, body.scheduled_ats)
+        offered = {_moment(row.get("scheduled_at")) for row in members}
+        flagged = {row["index"] for row in problems}
+        problems += [{"index": index, "detail": OFFERED_TIME_DETAIL} for index, raw in enumerate(body.scheduled_ats)
+                     if index not in flagged and (raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)) in offered]
+        _refuse_time_problems(sorted(problems, key=lambda row: row["index"]), len(body.scheduled_ats))
+    now_iso = now_utc().isoformat()
+    member_ids = [row["id"] for row in members]
+    change = {"status": completed, "decision_user_id": me["id"], "updated_at": now_iso}
+    if body.action != "withdraw":
+        change["decision_note"] = note
+    actor_reg_id = (acting_reg or {}).get("id")
+    if body.action == "counter":
+        # Erst die neuen Termine, dann die alten schließen - scheitert das, gehen die neuen wieder raus (alle oder keiner).
+        docs = await _insert_proposal_group(db, match, collection, me, acting_reg, body.scheduled_ats, note,
+                                            kind="counter", parent=proposal)
+        try:
+            await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
+        except BaseException:
+            # Alle oder keiner: die neuen Termine wieder raus, schon geschlossene alte wieder offen.
+            await _drop_group(db, docs[0]["group_id"])
+            try:
+                await db.match_schedule_proposals.update_many(
+                    {"id": {"$in": member_ids}, "status": completed, "decision_user_id": me["id"], "updated_at": now_iso},
+                    {"$set": {"status": "pending"}, "$unset": {"decision_user_id": "", "decision_note": ""}})
+            except Exception:  # noqa: BLE001 - der ursprüngliche Fehler zählt, er geht gleich weiter
+                logger.warning("[match] Gegenvorschlag für %s nicht ganz zurückgebaut", _log_safe(match.get("id")), exc_info=True)
+            raise
+        await _mark_proposed(db, match, collection, tournament)
+        await _tell_schedule(db, match, "countered", docs[0], me, actor_reg_id, note, group=docs)
+        return {"group_id": docs[0]["group_id"], "proposals": docs, "idempotent_replay": False,
+                "hints": _proposal_time_hints(tournament, match, body.scheduled_ats)}
+    await db.match_schedule_proposals.update_many({"id": {"$in": member_ids}, "status": "pending"}, {"$set": change})
+    if body.action == "withdraw":
+        await _after_withdraw(db, match, collection, now_iso)
+        await _tell_schedule(db, match, "withdrawn", members[0], me, actor_reg_id, group=members)
+        return {"ok": True, "status": "withdrawn", "count": len(members), "idempotent_replay": False}
+    await _status_after_decline(db, match, collection, tournament, stage, now_iso)
+    await _tell_schedule(db, match, "declined", members[0], me, actor_reg_id, note, group=members)
+    return {"ok": True, "status": "declined", "count": len(members), "idempotent_replay": False}
+
+
 async def _tell_schedule(db, match: dict, event: str, proposal: dict, me: dict, actor_registration_id: str | None,
-                         note: str | None = None) -> None:
-    """Die andere Seite erfährt jede Terminaktion sofort (#2110). Eine Nachricht hält die Aktion nie auf."""
+                         note: str | None = None, group: list[dict] | None = None) -> None:
+    """Die andere Seite erfährt jede Terminaktion sofort (#2110) - mehrere Termine einer Gruppe in einer Nachricht (#2325).
+    Eine Nachricht hält die Aktion nie auf."""
     try:
         await notify_schedule_event(db, match, event=event, proposal=proposal, actor_id=me.get("id"),
-                                    actor_registration_id=actor_registration_id, note=note)
+                                    actor_registration_id=actor_registration_id, note=note, proposals=group)
     except Exception:  # noqa: BLE001 - die Terminaktion ist schon gespeichert
         logger.warning("[match] Terminnachricht für %s nicht verschickt", _log_safe(match.get("id")), exc_info=True)
 
@@ -875,11 +1204,7 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
     """Den eigenen, noch offenen Vorschlag zurückziehen (#2110) - die Seite, die vorgeschlagen hat, oder die
     Turnierleitung. Bleibt danach nichts offen, ist die Partie wieder ohne Vorschlag (oder beim angenommenen Termin)."""
     # Mit eigener Seite zählt die Seite; nur ohne Seite (etwa die Turnierleitung) die eigene Person.
-    if acting_reg:
-        own = bool(proposal.get("actor_registration_id") and proposal.get("actor_registration_id") == acting_reg.get("id"))
-    else:
-        own = proposal.get("actor_user_id") == me["id"]
-    if not (own or await leads_tournament(me, match.get("tournament_id"), "matches")):
+    if not (_own_proposal(proposal, me, acting_reg) or await leads_tournament(me, match.get("tournament_id"), "matches")):
         raise HTTPException(status_code=403, detail="Zurückziehen kann nur die Seite, die den Termin vorgeschlagen hat.")
     if proposal.get("status") == "withdrawn" and proposal.get("decision_user_id") == me["id"]:
         return {"ok": True, "status": "withdrawn", "idempotent_replay": True}
@@ -891,6 +1216,14 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
         "decision_user_id": me["id"],
         "updated_at": now_iso,
     }})
+    await _after_withdraw(db, match, collection, now_iso)
+    # Wer handelt, ist die eigene Seite - oder die Turnierleitung ohne Seite: dann erfahren es beide Seiten.
+    await _tell_schedule(db, match, "withdrawn", proposal, me, (acting_reg or {}).get("id"))
+    return {"ok": True, "status": "withdrawn", "idempotent_replay": False}
+
+
+async def _after_withdraw(db, match: dict, collection: str, now_iso: str) -> None:
+    """Der Stand nach dem Zurückziehen (#2110) - für einen Vorschlag wie für eine ganze Gruppe (#2325)."""
     if not await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"}):
         # Nichts mehr offen: keine Antwortfrist, keine Eskalation - der angenommene Termin gilt weiter, sonst Heimrecht
         # oder Standardtermin (der Planer schreibt ihn gleich nach).
@@ -902,9 +1235,6 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
                       "$unset": {"schedule_status": "", "schedule_deadline_at": "", "schedule_escalated_at": ""}}
         await getattr(db, collection).update_one({"id": match["id"]}, change)
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
-    # Wer handelt, ist die eigene Seite - oder die Turnierleitung ohne Seite: dann erfahren es beide Seiten.
-    await _tell_schedule(db, match, "withdrawn", proposal, me, (acting_reg or {}).get("id"))
-    return {"ok": True, "status": "withdrawn", "idempotent_replay": False}
 
 
 async def _status_after_decline(db, match: dict, collection: str, tournament: dict | None, stage: dict | None,
@@ -916,7 +1246,10 @@ async def _status_after_decline(db, match: dict, collection: str, tournament: di
 
     target = getattr(db, collection)
     if not plays_in_matchdays(tournament or {}, stage):
-        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
+        # Ist noch ein anderer Vorschlag offen (etwa ein Termin einer Gruppe, #2325), wartet das Spiel weiter auf Antwort.
+        still_open = await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"})
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "proposed" if still_open else "declined",
+                                                               "updated_at": now_iso}})
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
         return
     if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"}):
@@ -986,6 +1319,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         return response
     if proposal.get("status") != "pending":
         raise HTTPException(status_code=409, detail="Über diesen Terminvorschlag wurde bereits entschieden")
+    if body.action in {"accept", "counter"} and league_schedule.blocks_proposals(tournament, match):
+        raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
     if body.action == "accept":
         scheduled_at = proposal.get("scheduled_at")
         # Abgelaufen (#2124): ein Termin, der schon vorbei ist, lässt sich nicht mehr annehmen.
@@ -996,7 +1331,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "decision_note": normalized_note,
             "updated_at": now_iso,
         }})
-        await getattr(db, collection).update_one({"id": match_id}, {"$set": {
+        # Liga-Check-in (D.2, #1652): eine Verlängerung gehört zum alten Fenster; die Termin-Revision steigt (Codex zu D.3, #1618).
+        await getattr(db, collection).update_one({"id": match_id}, checkin_rules.new_time_change(tournament, {"$set": {
             "scheduled_at": scheduled_at,
             "schedule_status": "accepted",
             # Der geltende Termin steht in der Partie, mit Quelle (#235).
@@ -1004,7 +1340,14 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "schedule_written_at": now_iso,
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
-        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})  # Der Termin steht: keine Frist mehr.
+        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}}))  # Der Termin steht: keine Frist mehr.
+        # Mehrere Termine (#2325): die übrigen derselben Gruppe sind erledigt - in jedem Format, nicht nur in der Liga.
+        if proposal.get("group_id"):
+            await db.match_schedule_proposals.update_many(
+                {"match_id": match_id, "group_id": proposal["group_id"], "status": "pending", "id": {"$ne": proposal_id}},
+                {"$set": {"status": "declined", "decision_rule": "agreed_elsewhere", "updated_at": now_iso}})
+        # Liga-Termine (#2194): Einigung in die Historie; mit Regeln schließen die übrigen offenen Vorschläge.
+        await league_schedule.after_agreement(db, match, tournament, proposal, me, (acting_reg or {}).get("id"))
         await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
@@ -1021,12 +1364,6 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
     _refuse_blocked_moment(tournament, body.scheduled_at)
     refuse_past_proposal(body.scheduled_at)
-    await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
-        "status": "countered",
-        "decision_user_id": me["id"],
-        "decision_note": normalized_note,
-        "updated_at": now_iso,
-    }})
     counter = {
         "id": new_id(),
         "match_id": match_id,
@@ -1043,12 +1380,31 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         "created_at": now_iso,
         "updated_at": now_iso,
     }
-    await db.match_schedule_proposals.insert_one(counter)
-    await getattr(db, collection).update_one({"id": match_id}, {"$set": {
-        "schedule_status": "proposed",
-        "schedule_deadline_at": _schedule_deadline(match, tournament),
-        "updated_at": now_iso,
-    }, "$unset": {"schedule_escalated_at": ""}})
+    if proposal.get("group_id"):
+        counter["parent_group_id"] = proposal["group_id"]
+    # Wie im Web (#2325): erst der Gegenvorschlag, dann den beantworteten Vorschlag schließen - scheitert das, geht der
+    # Gegenvorschlag wieder raus und schon geschlossene sind wieder offen. Das Spiel schreibt erst danach.
+    await db.match_schedule_proposals.insert_one(dict(counter))
+    closed = {"status": "countered", "decision_user_id": me["id"], "decision_note": normalized_note, "updated_at": now_iso}
+    try:
+        await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": closed})
+        if proposal.get("group_id"):
+            # Gegenvorschlag aus der App zu einem Termin einer Gruppe: er antwortet auf die ganze Gruppe - sonst bliebe der Rest
+            # offen, und die 72-h-Regel setzte trotz Gegenvorschlag den Heimtermin.
+            await db.match_schedule_proposals.update_many(
+                {"match_id": match_id, "group_id": proposal["group_id"], "status": "pending", "id": {"$ne": proposal_id}},
+                {"$set": closed})
+    except BaseException:
+        await db.match_schedule_proposals.delete_one({"id": counter["id"], "status": "pending"})
+        try:
+            await db.match_schedule_proposals.update_many(
+                {"match_id": match_id, "status": "countered", "decision_user_id": me["id"], "updated_at": now_iso,
+                 "$or": [{"id": proposal_id}, *([{"group_id": proposal["group_id"]}] if proposal.get("group_id") else [])]},
+                {"$set": {"status": "pending"}, "$unset": {"decision_user_id": "", "decision_note": ""}})
+        except Exception:  # noqa: BLE001 - der ursprüngliche Fehler zählt, er geht gleich weiter
+            logger.warning("[match] Gegenvorschlag für %s nicht ganz zurückgebaut", _log_safe(match_id), exc_info=True)
+        raise
+    await _mark_proposed(db, match, collection, tournament)
     counter.pop("_id", None)
     counter.pop("match_collection", None)
     counter["idempotent_replay"] = False
@@ -1123,10 +1479,11 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         except Exception:
             logger.warning("[match] Chat-Benachrichtigung zu %s fehlgeschlagen", _log_safe(match_id), exc_info=True)
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
+        # Über die Warteschlange (#2338): eine Auswertung je Person und Takt, nicht eine volle je Nachricht.
+        from services.achievement_queue import request_chat_evaluation
+        await request_chat_evaluation(me["id"])
     except Exception:
-        logger.warning("[achievements] Chatnachricht in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
+        logger.warning("[achievements] Chatnachricht in %s nicht vorgemerkt", _log_safe(match_id), exc_info=True)
     doc.pop("_id", None)
     doc["author"] = {
         "id": me.get("id"),
@@ -1155,12 +1512,13 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
             await _require_undisputed_or_both(me, match)
+            _require_procedure_result(me, match, body.reason, force)
             await league_permissions.require_no_conflict(db, me, match, action="result", conflict_reason=body.conflict_reason)
             raw_results = [entry.model_dump() for entry in body.results]
             tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "league_context": 1})
             # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - Prüfen und Schreiben unter der Season-Sperre.
             async with league_games.season_lock(db, tournament):
-                return await _submit_staff_result(db, match, body, raw_results, me, force)
+                return await league_procedures.guard(db, await _submit_staff_result(db, match, body, raw_results, me, force), me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
@@ -1172,7 +1530,19 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
-    games, missing, league, lineups = await _staff_games(db, match, body, raw_results)
+    # Vorfälle (D.5, #1619): Solange ein Vorfall offen ist, trägt auch die Leitung kein Ergebnis ein - erst entscheiden. Ist
+    # entschieden, stellt das eingetragene Ergebnis die Serie fest (auch nach einer Wiederholung, die niemand neu gemeldet hat).
+    hold = league_incidents.result_block(match)
+    if hold and hold["code"] in league_incidents.OPEN_HOLD_CODES:
+        raise HTTPException(status_code=409, detail=f"{hold['text']} Bitte zuerst über den Vorfall entscheiden.")
+    try:
+        # Ergebnisregel übergehen (C.3, #1617): Liga-Leitung mit „Ergebnisse“ und Grund - nie Best of, Pool oder Aufstellung.
+        override = await league_result_rules.override_reason(db, me, match, body.rule_override_reason)
+    except league_result_rules.RuleProblem as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+    games, missing, league, lineups = await _staff_games(db, match, body, raw_results, skip_rules=bool(override))
+    # Keine Map zählt doppelt (§ 9.4): Eine neu gestartete oder wiederholte Position trägt „wiederholt“ und ihren Vorfall.
+    games = league_incidents.mark_replays(match, games)
     saved = league_games.with_series(games, lineups)
     if body.hold:
         # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
@@ -1184,6 +1554,8 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         if league and saved:
             await league_games.lock_lineup_ids(db, league, saved, league.reg_ids)
             await league_games.log_both_sides_kept(db, league, saved, league.reg_ids, me.get("id"))
+        if override and games:
+            await _audit_match_action(db, "match.games.rule_override", match, me.get("id"), {"reason": override})
         return held
     ensure_no_hold(match)
     outcome = await submit_v2_result(
@@ -1200,6 +1572,9 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         lineups_missing=missing,
         match_lineups=lineups,
     )
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Das eingetragene Ergebnis stellt eine entschiedene Serie fest.
+        await league_incidents.settle_by_result(db, match["id"], me["id"])
     if games is not None and match.get("games") and not outcome.get("idempotent_replay"):
         # Liga (#1650): Maps der Turnierleitung korrigiert - eigener Eintrag mit Grund im Protokoll.
         await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
@@ -1209,11 +1584,13 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         # Spiel-ID je Season (#2108): erst nach dem Speichern des Ergebnisses festhalten.
         await league_games.lock_lineup_ids(db, league, saved, league.reg_ids)
         await league_games.log_both_sides_kept(db, league, saved, league.reg_ids, me.get("id"))
+    if override and games and not outcome.get("idempotent_replay"):
+        await _audit_match_action(db, "match.games.rule_override", match, me.get("id"), {"reason": override})
     return outcome
 
 
 async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
-                       raw_results: list[dict]) -> tuple[list[dict] | None, list[str] | None,
+                       raw_results: list[dict], *, skip_rules: bool = False) -> tuple[list[dict] | None, list[str] | None,
                                                          "league_games.LeagueSetup | None", dict | None]:
     """Liga (#1650): Maps der Turnierleitung prüfen. Ohne Maps bleiben die des Spiels - außer das neue Ergebnis passt
     nicht mehr zu ihnen, dann fallen sie weg (eine Korrektur des Stands ohne Maps). Andere Turniere: nichts. Dazu der
@@ -1223,11 +1600,12 @@ async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
         return None, None, None, None
     normalized = await checked_results(db, match, raw_results)
     if body.games and league.is_series:
-        games, lineups, missing = league_games.admin_series(league, [game.model_dump() for game in body.games], body.lineups, normalized)
+        games, lineups, missing = league_games.admin_series(league, [game.model_dump() for game in body.games], body.lineups, normalized,
+                                                            skip_rules=skip_rules)
         await league_games.check_double_use(db, league, league_games.with_series(None, lineups), set(league.reg_ids))
         return games, missing, league, lineups
     if body.games:
-        games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized)
+        games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized, skip_rules=skip_rules)
         await league_games.check_double_use(db, league, games, set(league.reg_ids))
         return games, missing, league, None
     if match.get("games"):
@@ -1253,7 +1631,7 @@ async def undo_match_result(match_id: str, body: MatchResultUndo | None = None, 
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
             match, _collection = await _find_match_any(match_id)
             await league_permissions.require_no_conflict(db, me, match, action="result_undo", conflict_reason=conflict_reason)
-            return await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None))
+            return await league_procedures.guard(db, await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None)), me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
@@ -1265,11 +1643,12 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
     m, _collection = await _find_match_any(match_id)
     await _assert_match_visible(m, user)
     if await _sees_internal(m, user):
-        return m
+        # Verfahren (E.2, #1619, Nr. 133/137): ungekürzt nur für die nicht befangene Leitung mit „Proteste“ oder „Ergebnisse“.
+        return await league_procedures.for_viewer(get_db(), m, user)
     return public_match_view(m, (user or {}).get("id"))
 
 
-async def _record_plan_change(db, before: dict, after: dict, me: dict) -> None:
+async def _record_plan_change(db, before: dict, after: dict, me: dict, reason: str | None = None) -> None:
     """Termin oder Best of je Spiel von der Turnierleitung geändert (#2201): immer ins Protokoll, mit altem und neuem Wert.
     In Spielwochen erfahren es die Verantwortlichen beider Seiten; sonst plant die Leitung am Stück um, dort keine Nachricht."""
     changes = {}
@@ -1279,7 +1658,8 @@ async def _record_plan_change(db, before: dict, after: dict, me: dict) -> None:
         changes["best_of"] = {"from": before.get("best_of"), "to": after.get("best_of")}
     if not changes:
         return
-    await _audit_match_action(db, "match.plan.change", after, me.get("id"), {"changes": changes})
+    await _audit_match_action(db, "match.plan.change", after, me.get("id"),
+                              {"changes": changes, **({"reason": reason} if reason else {})})
     from services.matchday_schedule import plays_in_matchdays
 
     tournament = await db.tournaments.find_one({"id": after.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
@@ -1310,6 +1690,8 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         raw = body.model_dump(exclude_unset=True)
         # Termin des eigenen Spiels (#2203): setzt eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
         await league_permissions.require_no_conflict(db, me, v2_match, action="match_plan", conflict_reason=raw.pop("conflict_reason", None))
+        # Grund zum Termin (#2194): in Historie und Protokoll, nie am Spiel selbst.
+        schedule_reason = " ".join(str(raw.pop("schedule_reason", None) or "").split()) or None
         for result_field in ("score_a", "score_b", "winner_id"):
             raw.pop(result_field, None)
         updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1326,7 +1708,8 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             await ensure_station_open(db, new_station)
         await ensure_station_slot_available(db, v2_match, updates, "matches_v2")
         if updates and all(v2_match.get(key) == value for key, value in updates.items()):
-            return {**v2_match, "idempotent_replay": True}
+            # Auch die Wiederholung zeigt Verfahren nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+            return {**await league_procedures.for_viewer(db, v2_match, me), "idempotent_replay": True}
         updates["updated_at"] = now_utc().isoformat()
         change: dict = {"$set": updates}
         # Ein Aufruf (#1122) endet, wenn das Spiel losgeht, entschieden wird oder an eine andere Station wandert.
@@ -1334,13 +1717,20 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         station_moved = "station_id" in updates and updates["station_id"] != v2_match.get("station_id")
         if v2_match.get("called_at") and (status_moved or station_moved):
             change["$unset"] = {"called_at": ""}
+        if "scheduled_at" in updates and _moment(updates["scheduled_at"]) != _moment(v2_match.get("scheduled_at")):
+            # Liga-Check-in (D.2, #1652): eine Verlängerung der Leitung gehört zum alten Fenster - der neue Termin bringt sein eigenes;
+            # die Termin-Revision steigt (Codex zu D.3, #1618), auch zurück auf den alten Termin.
+            tournament_scope = await db.tournaments.find_one({"id": v2_match["tournament_id"]},
+                                                             {"_id": 0, "league_context": 1, "checkin_rules": 1})
+            change = checkin_rules.new_time_change(tournament_scope, change)
         before = await db.matches_v2.find_one_and_update({"id": match_id}, change, projection={"_id": 0},
                                                          return_document=ReturnDocument.BEFORE) or v2_match
         if new_station and not await station_open_for_matches(db, new_station):
             # Die Station wurde zwischen Prüfung und Schreiben gelöscht (Codex zu #1611): exakt zurück auf den Stand vor
             # dem Schreiben (auch ein entferntes „aufgerufen um“) - nur, wenn das Spiel noch so dasteht wie geschrieben.
-            back = await db.matches_v2.update_one(
-                written_state(match_id, change), restore_change(before, [*updates, *change.get("$unset", {})]))
+            # Auch die Termin-Revision (Codex-Nachprüfung zu D.3): sonst wären Check-ins und Veto ungültig, obwohl der Termin blieb.
+            rollback = undo_revision(before, change, restore_change(before, [*updates, *change.get("$unset", {})]))
+            back = await db.matches_v2.update_one(written_state(match_id, change), rollback)
             if not back.matched_count:
                 logger.warning("[match] %s an gelöschter Station %s, inzwischen fremd geändert - nicht zurückgesetzt",
                                _log_safe(match_id), _log_safe(new_station))
@@ -1360,8 +1750,9 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             # hält schon ``_serialized_match_write``; sie ist nicht wiedereintrittsfähig, also direkt auswerten.
             from services.heat_rebuild import evaluate_after_write
             await evaluate_after_write(db, v2_match.get("tournament_id"), actor_id=me.get("id"), trigger="match_update")
-        await _record_plan_change(db, before, updated, me)
-        return {**updated, "idempotent_replay": False}
+        await _record_plan_change(db, before, updated, me, schedule_reason)
+        await league_schedule.lead_changed(db, before, updated, me, schedule_reason)
+        return {**await league_procedures.for_viewer(db, updated, me), "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
 
@@ -1401,6 +1792,19 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         raise HTTPException(status_code=409, detail="Dieses Spiel ist in Klärung – die Turnierleitung entscheidet.")
     if status in REPORT_CLOSED_STATUSES:
         raise HTTPException(status_code=409, detail="Dieses Spiel ist schon entschieden.")
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Wird eine Map neu gestartet oder wiederholt, beschreiben frühere Meldungen die ungültige Austragung -
+        # für Vergleich, Wiederholung derselben Meldung und Bestätigung zählt nur, was danach gemeldet wurde.
+        match = {**match, "reports": league_incidents.current_reports(match)}
+    # Liga-Check-in (D.2, #1652): mit Check-in-Regeln melden die Captains erst, wenn beide Seiten für diesen Termin eingecheckt
+    # sind und keine Regelfassung offen ist - der Satz sagt, wer fehlt. Die Leitung trägt über /result weiter ohne Check-in ein.
+    checkin_sides = None
+    if match_flow.rules_of(tournament):
+        checkin_sides = await match_flow.sides(db, match, tournament)
+        refusal = match_flow.report_refusal(match, tournament, own_id=my_registration["id"], names=checkin_sides.names,
+                                            consent=checkin_sides.consent)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
     # Jede Meldung wird geprüft wie ein Ergebnis der Turnierleitung: alle Teilnehmer genau einmal, Plätze passend
     # zum Spielstand. So vergleicht der Server zwei Meldungen inhaltlich - nicht nur ihre Schreibweise.
@@ -1411,10 +1815,17 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
     # Liga (docs/LIGA.md, #1650): Maps, Sieger und die eigene Aufstellung je Map - ohne Maps nur als Bestätigung.
     league = await league_games.setup(db, match, tournament, stage)
     games = lineup = None
+    if league and match.get("incidents"):
+        # Vorfälle (D.5, #1619): Mit „Serie pausiert“ beginnt keine weitere Map, solange eine in Klärung ist.
+        paused = league_incidents.report_refusal(match, (await league_incidents.settings_for(db, tournament))["clarification_mode"],
+                                                 [game.position for game in body.games or []])
+        if paused:
+            raise HTTPException(status_code=409, detail=paused)
     if league:
         try:
             games, lineup = await league_games.prepare_report(
-                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results, body.lineup)
+                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results, body.lineup,
+                photo_id=body.photo_id)
         except league_games.LeagueGamesError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     if is_duplicate_report(match, me["id"], results) and (
@@ -1429,8 +1840,13 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
                          photo_id=(photo or {}).get("id"))
     if games:
         entry["games"] = games
+        # Der Regelstand, mit dem geprüft wurde (C.3): Bestätigungen richten sich nach ihm, nicht nach einer späteren Regel.
+        entry[league_result_rules.SNAPSHOT_KEY] = league.rule_snapshot()
     if lineup:
         entry["lineup"] = lineup
+    if checkin_sides is not None:
+        # Fehlte nur der Start-Klick, setzt die erste gültige Meldung den Start nach - einmal (D.2, #1652).
+        await match_flow.start_by_report(db, match, tournament, user=me, registration_id=my_registration["id"])
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},
@@ -1445,35 +1861,62 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
     })
 
     stored = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or match
-    agreed = report_consensus(stored.get("reports") or [])
-    if not agreed:
-        conflict = reports_conflict(stored.get("reports") or [])
+    # Vorfälle (D.5, #1619): Solange einer offen ist oder die Serie noch festgestellt werden muss, ruht das Bestätigen - die
+    # Meldung ist gespeichert, gültig wird nichts. Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht mehr.
+    current = league_incidents.current_reports(stored)
+    agreed = report_consensus(current)
+    hold = league_incidents.result_block(stored) if league else None
+    if not agreed or hold:
+        conflict = reports_conflict(current)
         # Wer gemeldet hat, sieht auf der Seite, wie es weitergeht; die anderen bekommen eine Nachricht (#1132).
         try:
             if conflict:
                 await notify_report_conflict(db, stored, my_registration["id"], me.get("id"))
-            else:
+            elif not agreed:
                 await notify_result_reported(db, stored, entry, me.get("id"))
         except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Meldung auf
             logger.warning("Report notification failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
-        stored["idempotent_replay"] = False
-        stored["awaiting_confirmation"] = True
-        stored["report_status"] = "conflict" if conflict else "waiting"
-        return stored
+        return _awaiting(stored, "conflict" if conflict else "clarification" if hold else "waiting", (hold or {}).get("text"))
+    try:
+        return await _confirm_agreed_result(db, stored, league, agreed, actor_id=me["id"], proof_url=body.screenshot_url, note=body.note)
+    except league_incidents.IncidentProblem as problem:
+        # Die Meldungen passen nicht zur Entscheidung über einen Vorfall: Das Ergebnis trägt die Leitung ein.
+        return _awaiting(stored, "clarification", problem.detail)
 
-    final_games, missing = (league_games.consensus_games(stored.get("reports"), league.reg_ids) if league
+
+def _awaiting(stored: dict, status: str, hold: str | None = None) -> dict:
+    """Die Antwort auf eine Meldung, die noch kein Ergebnis ist: ``report_status`` ``waiting`` | ``conflict`` | ``clarification``."""
+    stored["idempotent_replay"] = False
+    stored["awaiting_confirmation"] = True
+    stored["report_status"] = status
+    if hold:
+        stored["result_hold"] = hold
+    return stored
+
+
+async def _confirm_agreed_result(db, stored: dict, league, agreed: list[dict], *, actor_id: str, proof_url: str | None = None,
+                                 note: str | None = None) -> dict:
+    """Zwei übereinstimmende Meldungen werden zum Ergebnis - beim Bestätigen und, wenn das Bestätigen wegen eines Vorfalls geruht
+    hat, sobald nichts mehr dagegen steht (``league_incident_routes``). Der Aufrufer hält Turnier- und Season-Sperre."""
+    reports = league_incidents.current_reports(stored)
+    final_games, missing = (league_games.consensus_games(reports, league.reg_ids) if league
                             else (None, []))
     final_lineups = None
     if league and league.is_series and final_games is not None:
-        final_lineups, missing = league_games.consensus_lineups(stored.get("reports"), league.reg_ids)
+        final_lineups, missing = league_games.consensus_lineups(reports, league.reg_ids)
+    if league and final_games is not None and stored.get("incidents"):
+        # Vorfälle (D.5): je Position genau eine geltende Austragung - wiederholt, zugesprochen oder nicht gezählt.
+        final_games, agreed = await league_incidents.finalize(db, stored, final_games, agreed)
+        if not league.is_series:
+            missing = league_games.missing_lineups(final_games, league.reg_ids)
     try:
         outcome = await submit_v2_result(
             db,
             stored,
             agreed,
-            actor_id=me["id"],
-            proof_url=body.screenshot_url,
-            note=body.note,
+            actor_id=actor_id,
+            proof_url=proof_url,
+            note=note,
             force=False,
             audit_action="match.result.auto_resolution",
             games=final_games,
@@ -1506,7 +1949,10 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     try:
         # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - nach der Turnier-Sperre die Season-Sperre.
         async with league_games.season_lock(db, tournament):
-            return await _report_v2(db, m, body, me, tournament, stage)
+            # Die Antwort trägt das ganze Spiel: Verfahren darin nur, soweit diese Person sie sehen darf (E.2, #1619, Nr. 133/137),
+            # Vorfälle nie roh (D.5) - die Seite liest ihre gefilterte Sicht im Block ``league`` der Matchseite.
+            return league_incidents.without_incidents(
+                await league_procedures.guard(db, await _report_v2(db, m, body, me, tournament, stage), me))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
@@ -1544,7 +1990,8 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
-    return {**updated, "idempotent_replay": False}
+    # Die Antwort ist das ganze Spiel: Verfahren nur, soweit diese Person sie sehen darf (E.2, #1619), Vorfälle nie roh (D.5).
+    return {**league_incidents.without_incidents(await league_procedures.for_viewer(db, updated, me)), "idempotent_replay": False}
 
 
 @router.post("/{match_id}/dispute")
@@ -1559,10 +2006,33 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     if not acting_reg and not await leads_tournament(me, m.get("tournament_id"), "disputes"):
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     reason = body.reason.strip()
-    if is_duplicate_dispute(m, me["id"], reason):
+    # Ein beendetes Liga-Verfahren (zurückgezogen, entschieden) ist keine Wiederholung derselben Meldung mehr.
+    pending = [row for row in m.get("disputes") or []
+               if not (league_procedures.is_procedure(row) and league_procedures.state_of(row) != league_procedures.OPEN)]
+    if is_duplicate_dispute({"disputes": pending}, me["id"], reason):
         m.pop("_id", None)
-        m["idempotent_replay"] = True
-        return m
+        # Auch die Wiederholung zeigt fremde Verfahren nur gekürzt (#1619, Nr. 133).
+        return {**league_incidents.without_incidents(await league_procedures.for_viewer(db, m, me)), "idempotent_replay": True}
+    # Liga-Staffel (#1619, E.2): derselbe Endpunkt schreibt ein Verfahren mit ``id`` und ``kind`` - Beanstandung vor, Protest nach
+    # der Bestätigung. Turniere laufen darunter unverändert weiter.
+    league = await league_procedures.context(db, m) if collection == "matches_v2" else None
+    if league is not None:
+        stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0, "creation_key": 0})
+        try:
+            opened = await league_procedures.submit(
+                db, m, league, user=me, registration_id=(acting_reg or {}).get("id"), reason=reason, reason_key=body.reason_key,
+                category=body.category, claimed=body.claimed, notified_immediately=body.notified_immediately,
+                incident_id=body.incident_id, photo_id=body.photo_id, stage=stage)
+        except league_procedures.ProcedureProblem as problem:
+            raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+        try:
+            from badges import on_dispute_opened
+            await on_dispute_opened(me["id"], match_id=match_id)
+        except Exception:
+            logger.warning("[achievements] Dispute in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
+        viewer = await league_procedures.viewer_for(db, opened["match"], me)
+        return {**league_incidents.without_incidents(league_procedures.strip_rows(opened["match"], viewer)), "idempotent_replay": False,
+                "procedure_id": opened["entry"]["id"]}
     if not reason:
         raise HTTPException(status_code=422, detail="Bitte kurz beschreiben, was nicht stimmt.")
     # „Problem melden“ (#1158): ein Grund zum Antippen - ohne Angabe „Sonstiges“.
@@ -1600,7 +2070,8 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     except Exception:
         logger.warning("[achievements] Dispute in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
     m["idempotent_replay"] = False
-    return m
+    # Vorfälle (D.5, #1619) gehören nie roh in eine Antwort - die Seite liest sie gefiltert im Block ``league`` der Matchseite.
+    return league_incidents.without_incidents(m)
 
 
 @router.post("/{match_id}/dispute/decision")
@@ -1614,6 +2085,20 @@ async def decide_dispute(match_id: str, body: MatchDisputeDecision, me: dict = D
     await _require_result_permission(me, m, capability="disputes")
     await league_permissions.require_no_conflict(db, me, m, action="dispute_decision", conflict_reason=body.conflict_reason)
     await _ensure_match_tournament_unlocked(db, m)
+    pending = league_procedures.open_rows(m)
+    if pending:
+        # Liga (#1619, E.2): je Verfahren eine Entscheidung mit Pflichtbegründung - derselbe Weg wie ``/procedures/{id}/decision``.
+        target = next((row for row in pending if row["id"] == body.procedure_id), pending[0] if len(pending) == 1 else None)
+        if target is None:
+            raise HTTPException(status_code=409, detail="Zu diesem Spiel laufen mehrere Verfahren. Bitte je Verfahren entscheiden.")
+        if league_procedures.decided_by(target) == me.get("id"):
+            raise HTTPException(status_code=403, detail=league_permissions.OWN_DECISION_DETAIL)
+        league = await league_procedures.context(db, m)
+        try:
+            decided = await league_procedures.decide_keep(db, m, league, target["id"], user=me, note=body.note or "")
+        except league_procedures.ProcedureProblem as problem:
+            raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+        return {"ok": True, "decision": "keep", "status": decided.get("status"), "procedure_id": target["id"]}
     if str(m.get("status") or "") != "disputed":
         raise HTTPException(status_code=409, detail="Zu diesem Spiel ist kein Dispute offen.")
     now_iso = now_utc().isoformat()
@@ -1688,6 +2173,10 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     m, collection = await _find_match_any(match_id)
     await _require_result_permission(me, m)
     await league_permissions.require_no_conflict(db, me, m, action="forfeit", conflict_reason=body.get("conflict_reason"))
+    # Vorfälle (D.5, #1619, Nr. 146): Solange ein Vorfall offen ist, wird nicht kampflos gewertet - erst entscheiden oder schließen.
+    blocked = league_incidents.forfeit_refusal(m)
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
     await _ensure_match_tournament_unlocked(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
-    return await _forfeit_v2(db, m, body, me, force)
+    return await league_procedures.guard(db, await _forfeit_v2(db, m, body, me, force), me)

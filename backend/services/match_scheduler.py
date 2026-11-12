@@ -34,11 +34,12 @@ from zoneinfo import ZoneInfo
 
 from pymongo import ReturnDocument
 
+from services import checkin_rules
 from services.advancement_draw import draw_group_of, match_mode, prerequisite_ids
 from services.match_audience import playing_ids, teams_by_id
 from services.match_v2_results import group_awaits_draw
 from services.match_duration import effective_match_duration, load_duration_game, load_duration_games
-from services.match_planning import restore_change, station_open_for_matches, written_state
+from services.match_planning import restore_change, station_open_for_matches, undo_revision, written_state
 from services.matchday_schedule import plays_in_matchdays, schedule_writes
 from services.tournament_rules import match_policy
 
@@ -756,7 +757,9 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
     """
     now_iso = datetime.now(timezone.utc).isoformat()
     written = 0
-    on_station: list[tuple[dict, dict]] = []
+    on_station: list[tuple[dict, dict, dict]] = []
+    # Liga-Check-in (D.2, #1652): ein neuer Termin lässt eine Verlängerung des alten Check-in-Fensters fallen.
+    new_time_unset = checkin_rules.new_time_unset(tournament)
     for item in plan.get("assignments") or []:
         if not item.get("changed"):
             continue
@@ -788,12 +791,16 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
             guard["called_at"] = None
         if previous.get("schedule_source") in KEPT_SOURCES or previous.get("status") in RUNNING_STATUSES | DONE_STATUSES:
             continue
-        before = await db.matches_v2.find_one_and_update(guard, {"$set": update}, projection={"_id": 0},
+        change: dict = {"$set": update}
+        if new_time_unset and item.get("scheduled_at") != previous.get("scheduled_at"):
+            # Dazu die Termin-Revision (Codex zu D.3, #1618).
+            change = checkin_rules.new_time_change(tournament, change)
+        before = await db.matches_v2.find_one_and_update(guard, change, projection={"_id": 0},
                                                          return_document=ReturnDocument.BEFORE)
         if before is not None:
             written += 1
             if update.get("station_id"):
-                on_station.append((before, update))
+                on_station.append((before, update, change))
     for item in plan.get("releases") or []:
         # Termin des Planers lösen (#1608): Compare-and-Set wie oben - nur, wenn das Spiel noch so dasteht wie in der
         # Vorschau, nicht aufgerufen und nicht begonnen. Was inzwischen von Hand gesetzt wurde, bleibt.
@@ -802,20 +809,25 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
             continue
         guard = {"id": item["match_id"], "scheduled_at": previous.get("scheduled_at"), "station_id": previous.get("station_id"),
                  "schedule_source": "planner", "status": previous.get("status"), "started_at": None, "called_at": None}
-        result = await db.matches_v2.update_one(guard, {"$set": {
+        release: dict = {"$set": {
             "scheduled_at": None, "station_id": None, "schedule_source": None, "schedule_forecast": False,
             "schedule_written_at": now_iso, "updated_at": now_iso,
-        }})
+        }}
+        if new_time_unset and previous.get("scheduled_at"):
+            release = checkin_rules.new_time_change(tournament, release)
+        result = await db.matches_v2.update_one(guard, release)
         written += result.modified_count
     warnings = list(plan.get("warnings") or [])
     # Nachprüfen (Codex zu #1611): eine Station, die zwischen Vorschau und Schreiben gelöscht wurde, bekommt nichts.
-    for station_id in {update["station_id"] for _item, update in on_station}:
+    for station_id in {update["station_id"] for _item, update, _change in on_station}:
         if await station_open_for_matches(db, station_id):
             continue
-        for before, update in [row for row in on_station if row[1]["station_id"] == station_id]:
-            # Alles, was der Plan gesetzt hat, exakt wie vorher (auch Prognose und Schreib-Metadaten) - nur, wenn das
-            # Spiel noch so dasteht wie geschrieben.
-            back = await db.matches_v2.update_one(written_state(before["id"], {"$set": update}), restore_change(before, update))
+        for before, update, change in [row for row in on_station if row[1]["station_id"] == station_id]:
+            # Alles, was der Plan gesetzt hat, exakt wie vorher (auch Prognose, Schreib-Metadaten und eine entfernte
+            # Verlängerung) - nur, wenn das Spiel noch so dasteht wie geschrieben.
+            # Die Termin-Revision (D.3, #1618) ebenso - exakt der Stand vor dem Schreiben.
+            rollback = undo_revision(before, change, restore_change(before, [*update, *(change.get("$unset") or {})]))
+            back = await db.matches_v2.update_one(written_state(before["id"], change), rollback)
             if back.matched_count:
                 written -= 1
             else:

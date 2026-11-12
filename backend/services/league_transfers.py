@@ -94,7 +94,7 @@ async def request(db, team: dict, squad: dict, user_id: str, actor: dict) -> dic
         person = league_roster.person_name((ctx.people if ctx else {}).get(user_id))
         await _tell(await staff_user_ids(db, season.get("league_id"), ("roster",)), title="Transfer beantragt",
                     body=f"{team.get('name') or 'Ein Team'} möchte {person} ins Co-Team {squad.get('name') or ''} holen. Bitte entscheiden.",
-                    url=f"/admin/leagues/seasons/{season['id']}", reason="league_transfer_requested", row=row, status=PENDING)
+                    url=f"/admin/leagues/seasons/{season['id']}#kader", reason="league_transfer_requested", row=row, status=PENDING)
         return row
     raise league_eligibility.EligibilityError(NOT_NEEDED, 409)
 

@@ -578,6 +578,7 @@ async def list_public_users(
     xp_docs = {row["user_id"]: row async for row in db.user_xp.find({"user_id": {"$in": user_ids}}, {"_id": 0, "user_id": 1, "total": 1, "prestige": 1})}
 
     from services.achievement_visibility import achievements_public
+    from services.achievement_reach import countable
     out = []
     for u in users:
         score = compute_profile_completeness(u)
@@ -608,7 +609,9 @@ async def list_public_users(
             "user_type": derived_user_type(u, memberships.get(u["id"])),
             "created_at": u.get("created_at"),
             "profile_completeness": score,
-            "achievements_count": len(ua),
+            # Gezählt wie „N Erfolge freigeschaltet“ auf der Erfolge-Seite und wie Sammler (#2339): ohne Negatives und
+            # ohne nicht mehr Erreichbares (services/achievement_reach.countable).
+            "achievements_count": sum(1 for a in ua if countable(tiers.get(a["tier_code"]), group_map.get((tiers.get(a["tier_code"]) or {}).get("group_code")))),
             "top_achievement": top,
             "achievement_level": level_view((xp_docs.get(u["id"]) or {}).get("total", 0), (xp_docs.get(u["id"]) or {}).get("prestige", 0)),
         })
@@ -916,6 +919,14 @@ async def _check_game_id_formats(db, user_id: str, game_ids: dict | None) -> Non
                 raise HTTPException(status_code=422, detail=problem)
 
 
+# Die Felder unter Einstellungen → Privatsphäre (#2338): wer eines davon selbst speichert, hat sich um seine
+# Privatsphäre gekümmert („Datenbewusst“).
+PRIVACY_SETTING_FIELDS = frozenset({
+    "privacy_public_profile", "privacy_achievements_public", "privacy_season_finds_public",
+    "privacy_friends_see_registrations", "profile_visibility", "dm_privacy",
+})
+
+
 @router.put("/me")
 @router.patch("/me")
 async def update_me(
@@ -945,6 +956,10 @@ async def update_me(
         await _attach_membership(me)
         return me
     updates["updated_at"] = now_utc().isoformat()
+    # Datenbewusst (#2338): eine Privatsphäre-Einstellung, die die Person selbst speichert - nicht die Voreinstellung
+    # der Registrierung. Web und App schicken nur geänderte Felder.
+    if PRIVACY_SETTING_FIELDS & set(updates):
+        updates["privacy_reviewed_at"] = updates["updated_at"]
     # Verknüpfte Konten (#260): wer das Feld von Hand ändert, verliert das Häkchen - der Text bleibt.
     # Verglichen wird mit dem gespeicherten Stand, nicht mit dem Sitzungsobjekt.
     from services.platform_links import changed_verified_platforms, unlink

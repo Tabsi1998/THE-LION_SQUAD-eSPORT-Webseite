@@ -206,6 +206,13 @@ Plattformen. **Profil erstellen** legt nur das Vereinsprofil an; ein Profil ist 
 Website-Konto verknüpft ihr im Profil im Kasten **Konto** (optional). Funktionen wie Obmann oder Kassier kommen automatisch aus
 dem Vorstand. Mit Dolibarr kommen Mitglieder mit Einwilligung von selbst ins Verzeichnis (`/members`).
 
+**Streamer oder Creator des Vereins:** Im Profil (Abschnitt **Person**, unter dem Kasten **Konto**) setzt ihr das Häkchen für
+alle, die der Verein als Streamer oder Creator führt. Hat die Person ihr Twitch-Konto **per Anmeldung** verknüpft
+(Einstellungen → Verbindungen, nicht nur den Namen eingetippt), bekommt sie damit den Erfolg **Verifizierter Streamer** –
+gleich nach dem Speichern über die Warteschlange. Das Häkchen dürfen alle mit dem Bereich **Vereinsverwaltung** setzen; es steht
+wie jede Änderung am Profil im Protokoll. Wegnehmen nimmt den Erfolg nicht zurück; das geht nur unter Erfolge → Vergeben
+([Erfolge](erfolge.md), 3.3).
+
 <img src="../assets/verwaltung/oeffentliche-profile.png" alt="Seite Mitglieder mit dem Reiter Öffentliche Profile und den Profilkarten" width="720">
 
 **Admin → Mitglieder → Mitglieder** (Reiter **Mitgliedschaften** und **Öffentliche Profile**): Die Liste zeigt höchstens 500 Konten und sagt es, wenn es mehr sein können. Der **CSV-Export** (aktive Mitglieder oder auch ehemalige) enthält Nummer, Name, Benutzername, E-Mail, Status, Art, Beginn und Aufgabe im Verein, keine Notizen, und steht im Protokoll; führt Dolibarr die Mitglieder, gibt es ihn dort. Daneben führt **Offene Bewerbungen (N)** zu den Anträgen; der Filter **Entwurf (Dolibarr)** erscheint nur, wenn es solche Entwürfe gibt. Ein **Statuswechsel** kommt mit Rückfrage: Sie nennt die Mail, die hinausgeht; nach einem Fehlklick lässt sich der Haken **Person informieren** abwählen. Eine neue Notiz löst keine Mail aus. Hat ein Mitglied den Austritt erklärt, steht das in der Liste und im Blatt. Hält die Person einen Vorstandsposten, geht der Wechsel auf einen nicht aktiven Status erst, wenn der Posten neu besetzt ist; sonst behielte sie die Vereinsverwaltung. Suche

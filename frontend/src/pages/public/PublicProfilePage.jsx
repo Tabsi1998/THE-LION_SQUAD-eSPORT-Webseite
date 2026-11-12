@@ -424,7 +424,8 @@ export default function PublicProfilePage() {
   const pinned = Array.isArray(achievementsData?.pinned) ? achievementsData.pinned : [];
   const achievementsHidden = achievementsData?.achievements_hidden === true;
   const hiddenFound = Number(achievementsData?.hidden?.earned || 0);
-  const categoryBars = categoryProgress(achievementsData?.groups || []).filter((row) => row.earned > 0);
+  // Stand je Kategorie vom Server (#2339, Review N2) - dieselbe Rechnung wie auf der Erfolge-Seite.
+  const categoryBars = categoryProgress(achievementsData?.progress).filter((row) => row.earned > 0);
   const teams = Array.isArray(profile.teams) ? profile.teams : [];
   const tournaments = Array.isArray(profile.tournaments) ? profile.tournaments : [];
   const fastLaps = Array.isArray(profile.f1_bests) ? profile.f1_bests : [];

@@ -1,10 +1,13 @@
 // Spielberechtigung in der Liga (docs/LIGA.md, B.3, #2204): nur die Darstellung, geprüft wird im Server
 // (services/league_eligibility.py). Ein Geburtsdatum kommt hier nie an, nur „erfüllt“ oder „fehlt“.
+import { platformLines } from "@/lib/leaguePlatform";
 
 export const ELIGIBILITY_LABELS = {
   other_team: "in zwei Co-Teams",
   age_missing: "Geburtsdatum fehlt",
   age_not_met: "Altersvorgabe nicht erfüllt",
+  platform_not_allowed: "Plattform nicht erlaubt",
+  platform_missing: "Plattform fehlt",
   waiting: "Wartezeit",
   banned: "gesperrt",
   late: "wartet auf Freigabe",
@@ -57,7 +60,7 @@ export function rulesLines(rules) {
     if (!windows.length) lines.push("Transfers gibt es in dieser Season nicht.");
     else lines.push(`Transferfenster: ${windows.map(windowText).join("; ")}${rules.transfer_open ? " (gerade offen)" : ""}.`);
   }
-  return lines;
+  return [...lines, ...platformLines(rules.platform)];
 }
 
 /** Der Hinweis im Kader-Dialog: was die Season beim Aufnehmen verlangt. */
@@ -65,7 +68,8 @@ export function requirementHint(requirement) {
   if (!requirement) return "";
   const parts = [];
   if (requirement.max_size) parts.push(`höchstens ${requirement.max_size} Spieler`);
-  if (requirement.min_age) parts.push(`neue Spieler brauchen ein Geburtsdatum im Profil (mindestens ${requirement.min_age} Jahre)`);
+  // #2313: Aufnehmen geht immer, spielen erst mit passendem Geburtsdatum.
+  if (requirement.min_age) parts.push(`spielen dürfen neue Spieler erst mit Geburtsdatum im Profil (mindestens ${requirement.min_age} Jahre), aufnehmen geht trotzdem`);
   if (requirement.transfers_open !== undefined) parts.push("wer schon in einem anderen Co-Team der Season steht, kommt nur per Transfer");
   return parts.length ? `Diese Season verlangt: ${parts.join(", ")}.` : "";
 }
@@ -75,7 +79,7 @@ export function eligibilityNotice(item) {
   if (!item) return null;
   const title = item.title || "Liga";
   if (item.state === "age_missing") {
-    return { tone: "warn", text: `${title}: Trag dein Geburtsdatum unter „Persönliches“ ein. Die Season verlangt mindestens ${item.min_age} Jahre – ohne Datum kannst du nicht spielen.` };
+    return { tone: "warn", text: `${title}: Trag dein Geburtsdatum unter „Grunddaten“ ein. Die Season verlangt mindestens ${item.min_age} Jahre – ohne Datum kannst du nicht spielen.` };
   }
   if (item.ok) {
     return item.age === "met" ? { tone: "info", text: `${title}: Altersvorgabe erfüllt.` } : null;
@@ -85,5 +89,5 @@ export function eligibilityNotice(item) {
 
 /** Darf die Kaderübersicht eine vollständige Liste zeigen, auch wenn das Spiel keine Pflicht-ID hat? */
 export function hasSeasonRules(rules) {
-  return Boolean(rules && (rules.one_team_per_season || rules.min_age || rules.new_player_wait_days));
+  return Boolean(rules && (rules.one_team_per_season || rules.min_age || rules.new_player_wait_days || rules.platform?.allowed?.length));
 }

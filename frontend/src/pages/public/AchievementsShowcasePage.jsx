@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Trophy, Crown, Medal, Sparkles, Target, Flame, CircleHelp, Gem, ArrowDownWideNarrow, Layers, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { AchievementCategoryGroups, CATEGORY_META, formatPercent } from "@/components/tls/AchievementGroups";
+import { AchievementCategoryGroups, CATEGORY_META, categoryProgressSummary, formatPercent } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
@@ -12,6 +12,7 @@ import { SkeletonTable } from "@/components/tls/Skeleton";
 import { SizedImage } from "@/components/tls/SizedImage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { useAuth } from "@/context/AuthContext";
 import { viennaDate } from "@/lib/vienna";
 
@@ -49,6 +50,10 @@ export const PERIODS = [
   { key: "season", label: "Diese Saison" },
   { key: "month", label: "Dieser Monat" },
 ];
+
+// Kategorie-Meister (#2339): „x von y“ zählt nur, was man selbst erreichen kann - wie der Erfolg selbst.
+export const CATEGORY_PROGRESS_HINT = "Gezählt werden die Stufen, die du selbst erreichen kannst – ohne geheime, von Hand vergebene, nicht mehr erreichbare und die der Leitung. Hast du alle, ist die Kategorie abgeschlossen und zählt für Kategorie-Meister.";
+export const CLUB_MEMBERS_ONLY_HINT = "Die Stufen im Verein gibt es nur für Vereinsmitglieder – für Kategorie-Meister zählt der Verein nur bei Mitgliedern.";
 
 /** Die Zeilen der Kategorien: alles aus der Übersicht außer Negativ - das bekommt nur, wer selbst etwas davon hat. */
 export function categoryRows(overview, mine) {
@@ -223,20 +228,22 @@ export default function AchievementsShowcasePage() {
             <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Kategorien</h2>
           </div>
           <p className="mb-2 sm:mb-4 text-[10px] uppercase tracking-widest text-white/40" data-testid="categories-caption">
-            {mine ? "Dein Fortschritt je Kategorie" : `Fortschritt der Community · ${overview?.rarity?.base ?? 0} Konten`}
+            {mine ? "Dein Fortschritt je Kategorie · was du selbst erreichen kannst" : `Fortschritt der Community · ${overview?.rarity?.base ?? 0} Konten`}
             <span className="hidden sm:inline"> · antippen zeigt die Abzeichen</span>
           </p>
           {loading && rows.length === 0 ? (
             <SkeletonTable rows={4} columns={2} label="Lade Kategorien" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 md:gap-3">
-              {rows.map((category) => {
+              {rows.map((category, index) => {
                 const entry = catalog[category.key];
                 return (
                   <CategoryRow
                     key={category.key}
+                    index={index}
                     category={category}
                     own={mine ? Number(mine.categories?.[category.key] || 0) : null}
+                    progress={mine ? categoryProgressSummary(mine.category_progress?.[category.key], { key: category.key, member: mine.member }) : null}
                     negativeCount={Number(mine?.negative || 0)}
                     hidden={hidden}
                     open={open.has(category.key)}
@@ -389,15 +396,19 @@ export default function AchievementsShowcasePage() {
 
 // Eine Kategorie als Zeile (#1229): Name, Fortschritt und ein dünner Balken; aufgeklappt nimmt sie am Tablet und
 // am PC die ganze Breite, darunter die Gruppen.
-function CategoryRow({ category, own, negativeCount = 0, hidden, open, onToggle, children }) {
+function CategoryRow({ category, own, progress = null, index = 0, negativeCount = 0, hidden, open, onToggle, children }) {
   const meta = CATEGORY_META[category.key] || {};
   const accent = category.accent || meta.accent || "#29B6E8";
   const isHidden = category.key === "hidden";
   const isNegative = category.key === "negative";
   const total = Number(category.tiers || 0);
   const panelId = `achievement-category-panel-${category.key}`;
+  const reduced = useReducedMotion();
+  // Gestaffelt (#2339): die Zeilen füllen und haken sich nacheinander, nicht alle auf einen Schlag.
+  const delay = reduced ? 0 : Math.min(index, 10) * 0.06;
   let summary;
   let percent;
+  let complete = false;
   if (isNegative) {
     summary = `${negativeCount} gefunden`;
     percent = 100;
@@ -406,6 +417,9 @@ function CategoryRow({ category, own, negativeCount = 0, hidden, open, onToggle,
     const all = Number(hidden?.total || category.groups || 0);
     summary = `${found} von ${all} gefunden`;
     percent = all ? (100 * found) / all : 0;
+  } else if (progress) {
+    // Eigener Stand wie Kategorie-Meister (#2339): Haken, wenn jede erreichbare Stufe da ist, sonst „x von y“.
+    ({ summary, percent, complete } = progress);
   } else if (own != null) {
     percent = total ? (100 * own) / total : 0;
     summary = `${own} von ${total} · ${formatPercent(Math.round(percent))}`;
@@ -413,17 +427,18 @@ function CategoryRow({ category, own, negativeCount = 0, hidden, open, onToggle,
     percent = Math.max(0, Math.min(100, Number(category.community_percent || 0)));
     summary = `${formatPercent(percent)} · ${zahlwort(category.groups, "Gruppe", "Gruppen")}`;
   }
+  const width = Math.max(0, Math.min(100, percent));
   const detail = isNegative
     ? "Nur für dich sichtbar"
     : isHidden
       ? "Zeigen sich erst, wenn du sie gefunden hast"
       : [
         zahlwort(category.groups, "Gruppe", "Gruppen"),
-        zahlwort(total, "Stufe", "Stufen"),
+        progress ? zahlwort(progress.total, "erreichbare Stufe", "erreichbare Stufen") : zahlwort(total, "Stufe", "Stufen"),
         own == null && category.holders != null ? `${zahlwort(category.holders, "Person", "Personen")} dabei` : null,
       ].filter(Boolean).join(" · ");
   return (
-    <div className={`-mt-px first:mt-0 md:mt-0 border rounded-sm bg-[#0F0F10] transition-colors ${open ? "relative z-10 md:col-span-2 border-white/25" : "border-white/10 hover:border-white/25"}`} data-testid={`category-row-${category.key}`}>
+    <div className={`-mt-px first:mt-0 md:mt-0 border rounded-sm bg-[#0F0F10] transition-colors ${open ? "relative z-10 md:col-span-2 border-white/25" : "border-white/10 hover:border-white/25"}`} data-testid={`category-row-${category.key}`} data-complete={complete ? "true" : undefined}>
       <button
         type="button"
         onClick={onToggle}
@@ -439,10 +454,38 @@ function CategoryRow({ category, own, negativeCount = 0, hidden, open, onToggle,
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-heading font-bold uppercase text-sm md:text-base truncate">{category.label}</span>
-            <span className="font-display font-bold text-sm tabular-nums shrink-0" style={{ color: accent }} data-testid={`category-progress-${category.key}`}>{summary}</span>
+            <span
+              className="font-display font-bold text-sm tabular-nums shrink-0 inline-flex items-center gap-1.5 self-center"
+              style={{ color: accent }}
+              title={progress ? (progress.membersOnly ? CLUB_MEMBERS_ONLY_HINT : CATEGORY_PROGRESS_HINT) : undefined}
+              data-testid={`category-progress-${category.key}`}
+            >
+              {complete && <CategoryCheck accent={accent} delay={delay} reduced={reduced} testId={`category-complete-${category.key}`} />}
+              {summary}
+            </span>
           </div>
-          <div className="mt-1.5 h-1 bg-white/5 rounded-sm overflow-hidden" aria-hidden="true">
-            <div className="h-full" style={{ width: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: accent }} />
+          <div className="relative mt-1.5 h-1 bg-white/5 rounded-sm overflow-hidden" aria-hidden="true">
+            {progress && !reduced ? (
+              <motion.div
+                className="h-full"
+                style={{ backgroundColor: accent }}
+                initial={{ width: 0 }}
+                animate={{ width: `${width}%` }}
+                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay }}
+              />
+            ) : (
+              <div className="h-full" style={{ width: `${width}%`, backgroundColor: accent }} />
+            )}
+            {complete && !reduced && (
+              // Aufleuchten: ein einmaliger Lichtstreif über den vollen Balken, nachdem er sich gefüllt hat.
+              <motion.span
+                className="absolute inset-y-0 left-0 w-1/3"
+                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent)" }}
+                initial={{ x: "-120%", opacity: 0 }}
+                animate={{ x: "320%", opacity: [0, 1, 0] }}
+                transition={{ duration: 0.9, ease: "easeOut", delay: delay + 0.55 }}
+              />
+            )}
           </div>
           <div className="mt-1 hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40" data-testid={`category-detail-${category.key}`}>
             <span className="truncate">{detail}</span>
@@ -457,6 +500,36 @@ function CategoryRow({ category, own, negativeCount = 0, hidden, open, onToggle,
         </div>
       )}
     </div>
+  );
+}
+
+// Der Haken einer abgeschlossenen Kategorie (#2339): hebt sich an (Feder), zeichnet sich nach und leuchtet kurz auf -
+// gestaffelt mit der Zeile. Bei reduzierter Bewegung steht er einfach da.
+function CategoryCheck({ accent, delay = 0, reduced = false, testId }) {
+  return (
+    <motion.svg
+      viewBox="0 0 16 16"
+      className="w-3.5 h-3.5 shrink-0"
+      aria-hidden="true"
+      data-testid={testId}
+      initial={reduced ? false : { scale: 0.5, opacity: 0, y: 2 }}
+      animate={reduced ? undefined : { scale: 1, opacity: 1, y: 0, filter: [`drop-shadow(0 0 0px ${accent}00)`, `drop-shadow(0 0 6px ${accent})`, `drop-shadow(0 0 2px ${accent}88)`] }}
+      transition={reduced ? undefined : { type: "spring", stiffness: 420, damping: 18, delay, filter: { duration: 0.9, delay: delay + 0.3 } }}
+      style={reduced ? { filter: `drop-shadow(0 0 2px ${accent}88)` } : undefined}
+    >
+      <circle cx="8" cy="8" r="7" fill={`${accent}26`} stroke={accent} strokeWidth="1.4" />
+      <motion.path
+        d="M4.7 8.4 7 10.6 11.3 5.7"
+        fill="none"
+        stroke={accent}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={reduced ? false : { pathLength: 0 }}
+        animate={reduced ? undefined : { pathLength: 1 }}
+        transition={reduced ? undefined : { duration: 0.35, ease: "easeOut", delay: delay + 0.15 }}
+      />
+    </motion.svg>
   );
 }
 

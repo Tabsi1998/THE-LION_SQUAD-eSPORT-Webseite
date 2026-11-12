@@ -69,7 +69,8 @@ export function FormActions({ accent = "#29B6E8", submitLabel = "Speichern", sav
 
 // Ein benannter Abschnitt mit optionaler Erklärung in der Überschrift. Einklappbar für alles,
 // was beim Anlegen nicht im Weg stehen soll; `plain` für einen Unterabschnitt ohne eigene Karte.
-export function FormSection({ title, hint, accent = "#29B6E8", collapsible = false, defaultOpen = false, plain = false, testId, className = "", children }) {
+// `id`: Sprungziel (etwa #kader auf der Season-Seite, #2267).
+export function FormSection({ title, hint, accent = "#29B6E8", collapsible = false, defaultOpen = false, plain = false, testId, id, className = "", children }) {
   const shell = plain ? "" : "border border-white/10 bg-[#121212] rounded-sm p-4 md:p-5";
   const head = (
     <>
@@ -79,14 +80,14 @@ export function FormSection({ title, hint, accent = "#29B6E8", collapsible = fal
   );
   if (collapsible) {
     return (
-      <details open={defaultOpen || undefined} data-testid={testId} className={`${shell} ${plain ? "border border-white/10 bg-[#0A0A0A] rounded-sm p-3" : ""} ${className}`}>
+      <details id={id} open={defaultOpen || undefined} data-testid={testId} className={`${shell} ${plain ? "border border-white/10 bg-[#0A0A0A] rounded-sm p-3" : ""} ${className}`}>
         <summary className="cursor-pointer select-none">{head}</summary>
         <div className="mt-4 space-y-4">{children}</div>
       </details>
     );
   }
   return (
-    <section data-testid={testId} className={`${shell} space-y-4 ${className}`}>
+    <section id={id} data-testid={testId} className={`${shell} space-y-4 ${className}`}>
       <div>{head}</div>
       {children}
     </section>

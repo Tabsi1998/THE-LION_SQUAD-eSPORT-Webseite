@@ -137,11 +137,26 @@ describe("Formular ↔ API", () => {
 describe("Spielmodi mit Zustand und Ergebnisregel", () => {
   const FULL = {
     mode: "zonen", label: "Zonen", minutes: 10, per_game: false, status: "inactive", description: "Zwei Zonen.", players_per_side: 4,
-    format: "Standard", result_rule: { kind: "rounds", target: 6, round_limit: 11, time_limit_minutes: 2, draw_allowed: false, overtime: true },
+    format: "Standard",
+    result_rule: { kind: "rounds", target: 6, round_limit: 11, time_limit_seconds: 90, round_time_seconds: 105, draw_allowed: false, overtime: true },
+    // Symbol (#2266), Einstellungen und Regeltext (#2271).
+    icon_url: "/api/static/uploads/zonen.png",
+    settings: [{ key: "uhr", label: "Uhr", value: 45, unit: "seconds", group: "Lobby" }, { key: "karte", label: "Karte", value: "klein" }],
+    rules_text: "Die Uhr läuft nur in der Zone.",
   };
 
   it("hin und zurück bleibt jedes neue Feld gleich", () => {
     expect(gameMatchDataPayload(gameMatchDataToForm({ match_modes: [FULL] })).match_modes).toEqual([FULL]);
+  });
+
+  it("Zeitlimit 1:30 geht als 90 Sekunden, Altbestand in Minuten als Sekunden (#2271)", () => {
+    const form = gameMatchDataToForm({ match_modes: [{ mode: "a", label: "A", result_rule: { kind: "highest", time_limit_minutes: 10 } }] });
+    expect(form.match_modes[0].rule_time_limit).toBe("10");
+    expect(gameMatchDataPayload(form).match_modes[0].result_rule.time_limit_seconds).toBe(600);
+    form.match_modes[0] = { ...form.match_modes[0], rule_time_limit: "1:30", rule_round_time: "90 s" };
+    expect(gameMatchDataPayload(form).match_modes[0].result_rule).toEqual({
+      kind: "highest", time_limit_seconds: 90, round_time_seconds: 90, draw_allowed: false, overtime: false,
+    });
   });
 
   it("ohne neue Angaben bleibt ein Modus wie vor #2206 - „aktiv“ wird nicht geschickt", () => {
@@ -165,7 +180,11 @@ describe("Spielmodi mit Zustand und Ergebnisregel", () => {
     [{ rule_kind: "score", rule_target: "0" }, "Modus „A“, Ergebnisregel: Ziel von 1 bis 100.000."],
     [{ rule_kind: "rounds", rule_target: "6", rule_round_limit: "5" }, "Modus „A“, Ergebnisregel: Das Rundenlimit (5) ist kleiner als das Ziel (6)."],
     [{ rule_kind: "rounds", rule_target: "6", rule_round_limit: "1000" }, "Modus „A“, Ergebnisregel: Rundenlimit von 1 bis 999 – oder leer lassen."],
-    [{ rule_kind: "highest", rule_time_limit: "601" }, "Modus „A“, Ergebnisregel: Zeitlimit von 1 bis 600 Minuten – oder leer lassen."],
+    [{ rule_kind: "highest", rule_time_limit: "601" }, "Modus „A“, Ergebnisregel: Zeitlimit als Minuten:Sekunden (z. B. 1:30, 90 s oder 10) bis 600 Minuten – oder leer lassen."],
+    [{ rule_kind: "highest", rule_time_limit: "bald" }, "Modus „A“, Ergebnisregel: Zeitlimit als Minuten:Sekunden (z. B. 1:30, 90 s oder 10) bis 600 Minuten – oder leer lassen."],
+    [{ rule_kind: "highest", rule_round_time: "61:00" }, "Modus „A“, Ergebnisregel: Zeit je Runde als Minuten:Sekunden (z. B. 1:45) bis 60 Minuten – oder leer lassen."],
+    [{ settings: [{ label: "Uhr", value: "bald", unit: "seconds" }] }, "Modus „A“: Einstellung „Uhr“: Zeit als Sekunden oder Minuten:Sekunden (z. B. 1:30)."],
+    [{ rules_text: "x".repeat(1001) }, "Modus „A“: Regeltext höchstens 1000 Zeichen."],
     [{ players_per_side: "65" }, "Modus „A“: Spieler je Seite von 1 bis 64 – oder leer lassen."],
     [{ description: "x".repeat(501) }, "Modus „A“: Beschreibung höchstens 500 Zeichen."],
   ])("sagt vor dem Speichern, was nicht passt (%o)", async (patch, message) => {
@@ -186,7 +205,8 @@ describe("Spielmodi mit Zustand und Ergebnisregel", () => {
 
   it("die Regel in einem Satzteil", async () => {
     const { resultRuleText } = await import("./gameMatchData");
-    expect(resultRuleText(FULL.result_rule)).toBe("Runden gewinnen: 6 Siege, höchstens 11 Runden · 2 Min. · Verlängerung");
+    expect(resultRuleText(FULL.result_rule)).toBe("Runden gewinnen: 6 Siege, höchstens 11 Runden · 1:30 Min. · 1:45 Min. je Runde · Verlängerung");
+    expect(resultRuleText({ kind: "highest", time_limit_minutes: 2 })).toBe("Höherer Endstand gewinnt · 2 Min.");
     expect(resultRuleText({ kind: "score", target: 200, draw_allowed: true })).toBe("Punkte bis zum Ziel: 200 · Remis möglich");
     expect(resultRuleText({ kind: "rounds", target: 1 })).toBe("Runden gewinnen: 1 Sieg");
     expect(resultRuleText(null)).toBe("");

@@ -1,4 +1,4 @@
-import { deletionGroups, modeOrderProblem, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
+import { deletionGroups, longestSeries, modeOrderProblem, orderLengthNote, sameOrder, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
 
 // Liga verwalten (docs/LIGA.md, #1622): Formular ↔ Anfrage. Der Beginn ist ein Wiener Kalendertag (00:00 Wien).
 
@@ -39,11 +39,55 @@ test("Modus je Map: alle frei oder jede Position belegt", () => {
   expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: ["snd", "stellung", "snd", "x"] }).game_mode_order).toEqual(["snd", "stellung", "snd"]);
 });
 
+test("Modus je Map ist so lang wie die längste Serie aus Season und aktiven Liga N (#2207)", () => {
+  expect(longestSeries(3, [])).toBe(3);
+  expect(longestSeries("3", [{ overrides: { best_of: 5 } }, { overrides: {} }])).toBe(5);
+  expect(longestSeries(3, [{ status: "archived", overrides: { best_of: 7 } }])).toBe(3);
+  const order = ["snd", "stellung", "snd", "stellung", "snd"];
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: order }, 5).game_mode_order).toEqual(order);
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: order }).game_mode_order).toEqual(["snd", "stellung", "snd"]);
+});
+
+test("eine unveränderte alte Reihenfolge geht unverändert mit – nicht gekürzt, nicht geleert (#2207)", () => {
+  const tooLong = ["snd", "stellung", "snd", "stellung", "snd"];
+  const tooShort = ["snd", "stellung"];
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: tooLong }, 3, tooLong).game_mode_order).toEqual(tooLong);
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: tooShort }, 3, tooShort).game_mode_order).toEqual(tooShort);
+  // Geändert gilt die Länge der Serie.
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: ["snd", "snd", "snd", "x"] }, 3, tooShort).game_mode_order).toEqual(["snd", "snd", "snd"]);
+  expect(sameOrder(["a", "b"], ["a", "b"])).toBe(true);
+  expect(sameOrder(["a", "b", ""], ["a", "b"])).toBe(false);
+  expect(sameOrder(undefined, [])).toBe(true);
+});
+
+test("der Hinweis nennt eine Reihenfolge, die nicht zur längsten Serie passt (#2207)", () => {
+  expect(orderLengthNote(["snd", "stellung"], 3)).toMatch("2 Einträge");
+  expect(orderLengthNote(["snd", "stellung"], 3)).toMatch("Best of 3");
+  expect(orderLengthNote([], 3)).toBe("");
+  expect(orderLengthNote(["a", "b", "c"], 3)).toBe("");
+});
+
 test("Liga N: nur abweichende Werte, leer heißt wie die Season", () => {
   expect(overridesPayload(overridesToForm({}))).toEqual({});
   const form = { ...overridesToForm({}), best_of: "5", points_win: "2" };
   expect(overridesPayload(form)).toEqual({ best_of: 5, scoring_rules: { match_points: { win: 2, draw: 1, loss: 0 } } });
   expect(overridesToForm({ team_size: 5 }).team_size).toBe("5");
+});
+
+// #2312, #2318: In einer Season mit Punkten nach gewonnenen Maps gibt es keine eigenen Punkte - ein alter Wert fällt beim Speichern weg.
+test("Liga N in einer Map-Season: keine eigenen Punkte, Kurztext nennt die Punkteart", () => {
+  const form = { ...overridesToForm({ scoring_rules: { match_points: { win: 2, draw: 0, loss: 0 } } }), best_of: "5" };
+  expect(overridesPayload(form, { mapPoints: true })).toEqual({ best_of: 5 });
+  expect(overridesPayload(form)).toEqual({ best_of: 5, scoring_rules: { match_points: { win: 2, draw: 0, loss: 0 } } });
+  expect(settingsLine({ best_of: 5, scoring_rules: { match_points_mode: "maps", match_points: { win: 3, draw: 0, loss: 0 } } }))
+    .toBe("Best of 5 · Punkte je gewonnene Map");
+});
+
+test("Liga N: die Plattform-Abweichung bleibt beim Speichern anderer Werte erhalten (#2270)", () => {
+  const saved = { best_of: 5, allowed_platforms: ["PlayStation"], crossplay: false, input_device: "controller" };
+  expect(overridesPayload(overridesToForm(saved))).toEqual(saved);
+  expect(overridesPayload({ ...overridesToForm(saved), best_of: "" })).toEqual({ allowed_platforms: ["PlayStation"], crossplay: false, input_device: "controller" });
+  expect(overridesPayload(overridesToForm({ allowed_platforms: [] }))).toEqual({ allowed_platforms: [] });
 });
 
 test("Texte für Liga N und das Übertragen", () => {
@@ -66,6 +110,12 @@ test("Antwortfrist auf Terminvorschläge: Season-Wert, leer bleibt leer, Liga N 
   expect(overridesPayload({ ...overridesToForm({}), match_schedule_response_hours: "24" })).toEqual({ match_schedule_response_hours: 24 });
   expect(overridesToForm({ match_schedule_response_hours: 12 }).match_schedule_response_hours).toBe("12");
   expect(syncSummary({ applied: ["running"], changed: ["match_schedule_response_hours"] }).applied).toEqual(["Antwortfrist auf Terminvorschläge"]);
+});
+
+// Jede Gruppe, die der Server beim Übertragen meldet (SYNC_GROUP_LABELS), hat ihren Namen - auch Terminregeln, Ergebnisregeln, Sperrliste.
+test("Übertragen nennt Terminregeln, Ergebnisregeln und Sperrliste", () => {
+  expect(syncSummary({ applied: ["schedule", "result_rules", "loadout_bans"], changed: [] }).applied)
+    .toEqual(["Terminregeln", "Ergebnisregeln und Punktepflicht", "Sperrliste"]);
 });
 
 test("Löschen: was mitgeht, je Gruppe - leere Gruppen fallen weg", () => {

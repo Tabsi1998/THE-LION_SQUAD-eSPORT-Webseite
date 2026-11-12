@@ -14,7 +14,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import GAME_ID, OLD_RULES, ids, two_nil, world  # noqa: E402
+from league_match_world import GAME_ID, OLD_RULES, checked_in, ids, two_nil, without_score_duty, without_veto, world  # noqa: E402
 from models import new_id, now_utc  # noqa: E402
 
 MODES = [{"mode": "stellung", "label": "Stellung"}, {"mode": "suchen", "label": "Suchen & Zerstören"}]
@@ -43,9 +43,15 @@ async def real_season(flow, w, *, order=("stellung", "suchen"), with_result=True
     league = await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": GAME_ID})
     assert league.status_code == 200, league.text
     season = await flow.post(f"/api/admin/leagues/{league.json()['id']}/seasons",
-                             json={**OLD_RULES, "name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": list(order), "best_of": 3, "team_size": 2})
+                             json={**OLD_RULES, "name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "best_of": 3, "team_size": 2,
+                                   # Seit #2207 so lang wie die Serie - zyklisch dasselbe wie die kurze Reihenfolge.
+                                   "game_mode_order": [order[index % len(order)] for index in range(3)] if order else []})
     assert season.status_code == 200, season.text
     season_id = season.json()["id"]
+    await without_score_duty(flow, season.json())
+    await without_veto(flow, season.json())
+    # Die Season läuft (die Staffel spielt schon): eine kürzere Reihenfolge ist dann nur eine Warnung (#2207).
+    await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"status": "active"}})
     division = await flow.post(f"/api/admin/leagues/seasons/{season_id}/divisions", json={"level": 1})
     assert division.status_code == 200, division.text
     await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"league_context": {
@@ -87,6 +93,7 @@ async def staffel_order(flow, w) -> list[str]:
 async def assert_reports_with_the_new_pool(flow, w) -> None:
     """Die Staffel behält ihre alte Reihenfolge; ihr Pool hat nur noch Stellung: Beide Seiten melden und bestätigen."""
     captain = w["users"]["Kapitaen"]
+    await checked_in(flow, w["match"]["id"])
     flow.act_as(captain)
     page = (await flow.get(f"/api/matches/{w['match']['id']}/page")).json()
     assert page["league"]["mode_order"] == [], "die Reihenfolge gilt nicht mehr, Web und Prüfung lesen denselben Wert"
@@ -172,6 +179,7 @@ async def test_the_last_archived_map_of_a_mode_takes_the_same_way(flow):
     assert (await flow.put(f"/api/admin/leagues/seasons/{season_id}/map-pool", json=only_hafen)).status_code == 200
     await sync(flow, season_id)
 
+    await checked_in(flow, w["match"]["id"])
     flow.act_as(w["users"]["Kapitaen"])
     second_map = body_with(w, [("stellung", "map-hafen"), ("suchen", "map-turm")], ids(w, "Kapitaen", "Mila"))
     answer = await flow.post(f"/api/matches/{w['match']['id']}/report", json=second_map)
@@ -195,6 +203,7 @@ async def test_a_held_pool_keeps_its_order(flow):
     page = (await flow.get(f"/api/matches/{w['match']['id']}/page")).json()
     assert page["league"]["mode_order"] == ["stellung", "suchen"]
     lineup = ids(w, "Kapitaen", "Mila")
+    await checked_in(flow, w["match"]["id"])
     wrong = await flow.post(f"/api/matches/{w['match']['id']}/report", json=body_with(w, [("stellung", "map-hafen"), ("stellung", "map-nebel")], lineup))
     assert wrong.status_code == 422 and "gespielt wird hier" in wrong.json()["detail"]
     right = await flow.post(f"/api/matches/{w['match']['id']}/report", json=body_with(w, [("stellung", "map-hafen"), ("suchen", "map-turm")], lineup))
@@ -232,6 +241,7 @@ async def test_before_the_first_result_order_and_pool_travel_together_without_a_
     flow.act_as(w["users"]["Kapitaen"])
     page = (await flow.get(f"/api/matches/{w['match']['id']}/page")).json()
     assert page["league"]["mode_order"] == ["stellung"]
+    await checked_in(flow, w["match"]["id"])
     answer = await flow.post(f"/api/matches/{w['match']['id']}/report", json=body_with(w, [("stellung", "map-hafen"), ("stellung", "map-nebel")], ids(w, "Kapitaen", "Mila")))
     assert answer.status_code == 200, answer.text
 

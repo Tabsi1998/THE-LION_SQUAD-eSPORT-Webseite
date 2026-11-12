@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from database import get_db
 from auth import require_super, get_current_user
-from services import account_erasure, league_applications
+from services import account_erasure, league_applications, league_schedule, match_flow
 from services.competition_privacy import league_appearance_snapshot, registration_match_snapshot
 from models import now_utc, new_id
 
@@ -39,8 +39,9 @@ UPLOAD = ("id", "media_scope", "media_type", "kind", "mime", "size", "width", "h
 UPLOAD_EVENT = ("id", "created_at", "endpoint", "media_scope", "kind", "mime", "size", "status", "status_code", "duration_ms",
                 "ip", "user_agent")
 ATTACHMENT = ("id", "kind", "mime", "size", "width", "height", "status", "context", "created_at", "updated_at")
-PROOF_PHOTO = ("id", "match_id", "tournament_id", "registration_id", "mime", "size", "width", "height", "status", "created_at",
-               "updated_at")
+# Nachweise (#2360): ``type`` und ``link`` (Video-Link) und der Bezug (``context``) gehören zur Auskunft.
+PROOF_PHOTO = ("id", "match_id", "tournament_id", "registration_id", "type", "link", "context", "mime", "size", "width", "height",
+               "status", "created_at", "updated_at")
 
 
 def _clean(row: dict, *drop: str) -> dict:
@@ -156,7 +157,10 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
 
     async def matches():
         registration_ids = [row["id"] async for row in _paged(db.tournament_registrations, me) if row.get("id")]
-        return await registration_match_snapshot(db, registration_ids, limit=None)
+        # Liga-Verfahren (#1619, E.2): die eigene Meldung, Stellungnahme und MOSS-Anforderung vollständig - von Verfahren anderer
+        # nur, dass es sie gibt. Diese Route streamt und ist vom Wächter der Antworten ausgenommen, sie kürzt hier selbst.
+        from services.league_procedures import export_view
+        return export_view(await registration_match_snapshot(db, registration_ids, limit=None), user_id)
 
     async def league_appearances():
         return await league_appearance_snapshot(db, user_id)
@@ -187,6 +191,10 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("league_applications", _rows(db.league_applications, league_applications.export_query(user_id), league_applications.export_row(user_id))),
         # Spielberechtigung (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur die eigene Zugehörigkeit.
         ("league_appearances", _value(league_appearances)),
+        # Liga-Termine (#2194): eigene Verschiebungsanträge mit Grund, eigene Antworten; als Leitung nur der Vorgang.
+        ("league_schedule", _value(lambda: league_schedule.export_snapshot(db, user_id))),
+        # Liga-Check-in (#1652): eigene Check-ins, eigene Anwesenheit, eigener Start; als Leitung nur der Vorgang.
+        ("league_checkin", _value(lambda: match_flow.export_snapshot(db, user_id))),
         # Regelwerk (#1646): welcher Fassung die Person für welches Co-Team zugestimmt hat.
         ("league_rule_consents", _rows(db.league_rule_consents, me)),
         ("competition_matches", _value(matches)),
@@ -374,8 +382,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     await db.tournament_chat_messages.update_many({"user_id": user_id}, {"$set": {"message": "[Nachricht gelöscht]", "author_anonymized": True}})
     from services.chat_attachments import delete_user_attachments
     await delete_user_attachments(db, user_id)
-    # Fotos vom Ergebnis (#1157): Dateien und Einträge weg; Meldungen behalten nur die (dann tote) Kennung.
-    from services.match_proofs import delete_for_user as delete_user_proofs
+    # Nachweise zu Spielen (#1157, #2360): Dateien und Einträge weg; Meldungen behalten nur die (dann tote) Kennung. Nur ein
+    # MOSS-Nachweis in einem laufenden Verfahren bleibt ohne Bezug zur Person, bis es abgeschlossen ist (Art. 17 Abs. 3 lit. e).
+    from services.match_proof_retention import delete_for_user as delete_user_proofs
     await delete_user_proofs(db, user_id)
     # Eingesandte Galerie-Fotos (#1186): offene samt Dateien weg, „Foto: Name“ an freigegebenen weg.
     from services.event_photos import delete_for_user as delete_user_photo_submissions
@@ -415,7 +424,12 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
 
 @dsgvo_router.get("/export-my-data")
 async def export_my_data(me: dict = Depends(get_current_user)):
-    sections = await _user_data_sections(get_db(), me["id"])
+    db = get_db()
+    sections = await _user_data_sections(db, me["id"])
+    # Datenbewusst (#2338): wer seine Daten holt, hat sich um seine Privatsphäre gekümmert.
+    await db.users.update_one({"id": me["id"]}, {"$set": {"data_exported_at": now_utc().isoformat()}})
+    from services.achievement_queue import request_evaluation
+    await request_evaluation([me["id"]], "data_export", sources={"profile"})
     return StreamingResponse(_stream(sections), media_type="application/json")
 
 

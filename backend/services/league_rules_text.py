@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
+from services.markdown_text import strip_protected
 from services.slug_utils import slugify
 
 ANCHOR_MAX = 80
@@ -60,20 +61,24 @@ def _anchor(title: str | None, prefix: str, seen: dict[str, int]) -> str:
 
 def sections_of(body_md: str | None, annexes: list[dict] | None = None, *, fill=None) -> list[dict]:
     """Haupttext und Anlagen als Abschnitte ``{anchor, title, level, kind, body_md}``. ``fill``: Text → Text, setzt die
-    Bausteine ein, bevor geschnitten wird."""
-    fill = fill or (lambda value: value)
+    Bausteine ein, bevor geschnitten wird. Ein eingegebenes Zeichen aus dem Bereich der Schutzzeichen fällt vorher weg (#2218)."""
+    given = fill or (lambda value: value)
+
+    def filled(value: str) -> str:
+        return given(strip_protected(value))
+
     seen: dict[str, int] = {}
     out: list[dict] = []
-    for row in _split(fill(body_md or "")):
+    for row in _split(filled(body_md or "")):
         out.append({"anchor": _anchor(row["title"], "", seen), "title": row["title"], "level": row["level"],
                     "kind": "main", "body_md": row["body_md"]})
     for annex in annexes or []:
         key = str(annex.get("key") or "").upper()
         prefix = f"anlage-{key.lower()}"
-        parts = _split(fill(annex.get("body_md") or ""))
+        parts = _split(filled(annex.get("body_md") or ""))
         lead = parts.pop(0)["body_md"] if parts and parts[0]["title"] is None else ""
         seen[prefix] = seen.get(prefix, 0) + 1
-        out.append({"anchor": prefix, "title": f"Anlage {key}: {annex.get('title') or ''}".rstrip(": "), "level": 1,
+        out.append({"anchor": prefix, "title": f"Anlage {key}: {strip_protected(annex.get('title'))}".rstrip(": "), "level": 1,
                     "kind": "annex", "body_md": lead})
         for row in parts:
             out.append({"anchor": _anchor(row["title"], prefix, seen), "title": row["title"], "level": max(row["level"], 2),

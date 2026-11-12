@@ -65,7 +65,10 @@ Die Ansicht „Turnierleitung“ (`/tournaments/<slug>/leitung`, in der App „T
 Helfer des Turniers; eintragen, „Rückgängig“ (nur der letzte Eintrag) und Streitfälle entscheiden (#1158) darf je Spiel
 nur, wer dort Ergebnis-Recht hat – die Station-Crew nur an ihrer Station. „Braucht Aufmerksamkeit“ (#1160: Ergebnis
 fehlt, Station defekt) geht an genau diese Leute. Fotos vom Ergebnis (#1157) sehen nur die Spieler des Spiels und die
-Turnierleitung dieses Turniers; Moderatoren nur, wenn die Bildprüfung ein Foto zur Prüfung vorlegt.
+Turnierleitung dieses Turniers; Moderatoren nur, wenn die Bildprüfung ein Foto zur Prüfung vorlegt. Dasselbe gilt für
+weitere Nachweise in der Liga (Bilder und Video-Links zu Vorfall, Protest und Stellungnahme, #2360). Einen MOSS-Nachweis
+sehen nur, wer ihn hochgeladen hat, Captain und Vertreter dieser Seite und die Liga-Leitung mit „Proteste“ oder „Ergebnisse
+korrigieren“, die an dem Spiel nicht beteiligt ist – nicht die übrigen Spieler der eigenen Seite und nie die Gegenseite.
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
 kommen nur aus dem Bereich Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin oder einem solchen
 Einsatz – auch für Moderatoren.
@@ -342,6 +345,11 @@ im Verlauf des Antrags und im Protokoll.
 **Helfer an Staffeln** lesen, ändern aber nichts. Sonstige Turniere bleiben unverändert. Die Matrix je Route steht in
 [`LIGA.md`](LIGA.md), Abschnitt 12. Code: `services/league_permissions.py`.
 
+**Ausrüstung und Sperrliste (#2218):** Die Bibliothek (Waffen, Aufsätze, Ausrüstung je Spiel) pflegt wie die Maps die **Turnierleitung**
+(`tournaments`) - auch Unterkategorien und das Verschieben von Einträgen (#2287, `…/equipment/categories/{key}/subcategories`,
+`…/equipment/move`). Die Sperrliste einer Season speichert und entfernt, wer **Season konfigurieren** hat oder den Bereich Ligen; lesen und
+Versionen vergleichen darf jede Zuständigkeit der Liga. Öffentlich steht sie nur auf der Ligaseite einer sichtbaren Season und im Regelwerk.
+
 ## Liga: Co-Team mit Captain und Vertreter (#1649)
 
 In der Liga spielt ein **Co-Team** eines Vereinsteams – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
@@ -355,7 +363,9 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | Kader, Captain, Vertreter, Status, Löschen, solange das Co-Team in einer nicht beendeten Staffel spielt (#2203) | ja, „Kader prüfen“ | ja | nein | nein | nein |
 | Dasselbe bei allen anderen Co-Teams | Team-Admin-Rollen wie bisher | ja | nein | nein | nein |
 | Die eigene Rolle abgeben („Rolle abgeben“, #2110) | – | – | ja | ja | nein |
-| Termin vorschlagen, annehmen; einchecken | ja | nur ohne Captain und Vertreter | ja | ja | nein |
+| Termin vorschlagen, annehmen; einchecken (Anwesende wählen) und das Spiel starten (#1652) | ja, „Spiele betreuen“ – im Notfall für eine Seite mit Grund, nicht im eigenen Spiel (Befangenheit) | nur ohne Captain und Vertreter | ja | ja | nein |
+| Im Veto ziehen (Map sperren oder wählen, #1618) | nein – nach Ablauf der Zeit wählt das System | nur ohne Captain und Vertreter | ja | ja | nein |
+| Ins Veto eingreifen: Pause, Fortsetzen, Schritt zurück, Neustart – mit Grund (#1618) | ja, „Spiele betreuen“, nicht im eigenen Spiel (Befangenheit) | nein | nein | nein | nein |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur ohne Captain und Vertreter | ja | ja | nein |
 | Matchchat schreiben, Spiel-Hinweise (Aufruf, Erinnerung, Ergebnis) | ja | ja | ja | ja | ja |
 
@@ -386,7 +396,7 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
 Spielberechtigung (#2204): Die Zuständigkeit „Kader prüfen“ (`roster`) hebt auch die Wartezeit auf (`POST …/roster/{uid}/waive-wait`, Pflichtgrund, `league.roster.wait_waive`) und entscheidet Transfers
 (`GET`, `POST …/seasons/{id}/transfers…`, `league.transfer.*`). Beantragen darf, wer den Kader des Ziel-Co-Teams ändern darf. Den eigenen Stand und den des Kaders (`GET /api/teams/{tid}/squads/{sid}/eligibility`)
-sehen Teamleitung, Co-Leitung, Captain, Vertreter und `roster`; vom Alter nur „erfüllt“ oder „Geburtsdatum fehlt“. Eine Teilnehmerliste tragen Captain oder Vertreter der eigenen Seite bis 48 Stunden ab der Bestätigung nach, danach die Liga-Leitung mit `results` und Grund.
+sehen Teamleitung, Co-Leitung, Captain, Vertreter und `roster`; vom Alter nur „erfüllt“ oder „Geburtsdatum fehlt“. Die Plattform je Season (#2270) liest jede Zuständigkeit der Liga (`GET …/seasons/{id}/platform`) und speichert `season` mit der Season (`PATCH`, `league.season.platform`). Eine Teilnehmerliste tragen Captain oder Vertreter der eigenen Seite bis 48 Stunden ab der Bestätigung nach, danach die Liga-Leitung mit `results` und Grund.
 - **Regelwerk (#1646):** Pflegen und veröffentlichen, den Stand der Zustimmungen und den Hinweis „Daten geändert“ sehen darf der Bereich `leagues` oder die Zuständigkeit
   `rules` in dieser Liga, mit bestätigter Zwei-Faktor-Anmeldung. Die Rolle `tournament_admin` und die Freigabe `tournaments` geben dort nichts. Zustimmen dürfen die
   Verantwortlichen des Co-Teams: Captain und Vertreter, ohne beide die Leitung des Hauptteams. Die Turnierleitung stimmt nicht für ein Co-Team zu.

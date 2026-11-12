@@ -125,6 +125,11 @@ async def apply_summary(db, settings: dict, link: dict, summary: dict) -> str:
         "updated_at": now,
         "updated_by": ACTOR,
     }
+    if not projected["member_since"] and (existing or {}).get("member_since"):
+        # Kein Datum aus Dolibarr heißt nicht „kein Beitritt“ (#2338): ein vorhandenes Datum bleibt - sonst fielen
+        # Vereinsmitglied, Jubiläum und Gründungsmitglied still auf null.
+        update.pop("member_since")
+        update.pop("member_since_precision")
     number = projected["member_number"]
     if number:
         clash = await db.memberships.find_one({"member_number": number, "user_id": {"$ne": user_id}}, {"_id": 0, "user_id": 1})

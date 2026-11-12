@@ -1,7 +1,12 @@
+const nodePath = require("path");
 const { test, expect } = require("@playwright/test");
 
 // Selbstanmeldung mit Co-Team (docs/LIGA.md, B.4, #2205) bei 390 und 1440 px, Server nachgestellt, nur erfundene Namen: Ligaseite für Gäste und Captains, die vier Schritte,
-// die Team-Seite und der Eingang der Leitung. Kein seitliches Scrollen.
+// die Team-Seite und der Eingang der Leitung. Kein seitliches Scrollen. Bilder (#2348): E2E_SHOTS_DIR, sonst die Testausgabe.
+
+function shotPath(testInfo, name) {
+  return process.env.E2E_SHOTS_DIR ? nodePath.join(process.env.E2E_SHOTS_DIR, name) : testInfo.outputPath(name);
+}
 
 const CONSENT = () => window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
   essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
@@ -26,7 +31,10 @@ const MINE = {
 };
 const ROW = {
   id: "a1", status: "submitted", squad_id: "sq1", team_id: "t1", display_name: "Loewen Langername · Rudel Alpha mit sehr langem Namen", submitted_at: "2026-11-02T18:00:00+00:00", applied_by_name: "Mila Mustermann", rules_version: 2, rules_at: "2026-11-02T18:00:00+00:00",
-  privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: ["Rudel Alpha: Geburtsdatum fehlt bei Tom Beispiel. Bitte im eigenen Profil eintragen, dann geht die Anmeldung."], warnings: ["Ida: Die Spiel-ID fehlt im Profil."], shared_with: [], own_team: false,
+  // Seit #2313 offene Punkte statt Sperre: Die Leitung lässt trotzdem zu.
+  privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: [],
+  shortfall: "Nur 3 von 5 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 4. Bis zum ersten Spiel im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.",
+  warnings: ["Ida: Die Spiel-ID fehlt im Profil.", "Tom Beispiel: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."], shared_with: [], own_team: false,
   history: [{ status: "submitted", at: "2026-11-02T18:00:00+00:00", by_name: "Mila Mustermann" }, { status: "in_review", at: "2026-11-02T19:00:00+00:00", by_name: "Leitung" }],
 };
 const INBOX = {
@@ -105,8 +113,10 @@ for (const [width, height] of WIDTHS) {
 
       await page.getByTestId("apply-squad-sq1").check();
       await page.getByTestId("apply-next").click();
-      await expect(page.getByTestId("apply-check-ok")).toBeVisible();
+      await expect(page.getByTestId("apply-check-ok")).toContainText("kann angemeldet werden");
       await expect(page.getByTestId("apply-warnings")).toContainText("Spiel-ID fehlt");
+      await expect(page.getByTestId("apply-warnings")).toContainText("Die Anmeldung geht trotzdem");
+      await expect(page.getByTestId("apply-next")).toBeEnabled();
       await noSideScroll(page);
       await page.getByTestId("apply-next").click();
 
@@ -136,6 +146,45 @@ for (const [width, height] of WIDTHS) {
       await noSideScroll(page);
     });
 
+    // Automatisch annehmen (#2348): Das Team liest „Angemeldet“, ohne Staffel „Angemeldet – Zuteilung folgt“; eingereicht nennt die Prüfung durch die Leitung.
+    test("Status auf der Ligaseite: Angemeldet, Zuteilung folgt, eingereicht", async ({ page }, testInfo) => {
+      await mock(page, CAPTAIN, seasonRoutes({ ...MINE, application: { ...BLOCK, slots_free: 1, auto_accept: true }, squads: [
+        { ...SQUAD, state: "accepted", warnings: [], application: { id: "a1", status: "accepted", staffel: "Liga 1 · Staffel A", can_withdraw: false }, can_submit: false },
+        { ...BLOCKED, state: "accepted", problems: [], application: { id: "a2", status: "accepted", staffel: null, can_withdraw: true }, can_submit: false },
+        { ...SQUAD, squad_id: "sq3", squad_name: "Meute", display_name: "Loewen Langername · Meute", state: "submitted", warnings: [], application: { id: "a3", status: "submitted", can_withdraw: true }, can_submit: false },
+      ] }));
+      await page.goto("/liga/probe-liga/season-1");
+      await expect(page.getByTestId("league-application-state-sq1")).toHaveText("Angemeldet");
+      await expect(page.getByTestId("league-application-row-sq1")).toContainText("Spielt in Liga 1 · Staffel A.");
+      await expect(page.getByTestId("league-application-state-sq2")).toHaveText("Angemeldet – Zuteilung folgt");
+      await expect(page.getByTestId("league-application-row-sq3")).toContainText("Die Liga-Leitung prüft die Anmeldung und meldet sich.");
+      await expect(page.getByTestId("league-application-seats")).toHaveText("1 von 8 Startplätzen frei");
+      await noSideScroll(page);
+      await page.getByTestId("league-application").screenshot({ path: shotPath(testInfo, `liga-angemeldet-${width}.png`) });
+    });
+
+    test("Leitung: automatisch annehmen mit offenen Anmeldungen von vorher", async ({ page }, testInfo) => {
+      await mock(page, ADMIN, (path) => {
+        if (path === "/admin/leagues/seasons/s1") return { ...ADMIN_SEASON, applications_waiting: 2, season: { ...ADMIN_SEASON.season, application_auto_accept: true } };
+        if (path === "/admin/leagues/seasons/s1/applications") return { ...INBOX, items: [
+          { ...ROW, id: "a6", status: "accepted", problems: [], warnings: [], shortfall: null, auto_accepted: true, decided_at: "2026-11-02T18:00:00+00:00",
+            assignment: { tournament_id: "t1", label: "Liga 1 · Staffel A", auto: true },
+            history: [ROW.history[0], { status: "accepted", at: "2026-11-02T18:00:00+00:00", by_name: "automatisch", auto: true }] },
+          ROW,
+        ] };
+        return undefined;
+      });
+      await page.goto("/admin/leagues/seasons/s1#selbstanmeldung");
+      await expect(page.getByTestId("season-form-application-auto-accept")).toBeChecked();
+      await expect(page.getByTestId("season-form-application-auto-waiting")).toContainText("2 Anmeldungen warten auf Prüfung und halten ihren Platz frei");
+      await expect(page.getByTestId("application-auto-a6")).toContainText("Automatisch angenommen");
+      await expect(page.getByTestId("application-auto-seat-a6")).toBeVisible();
+      await expect(page.getByTestId("application-waitlist-open-a6")).toBeVisible();
+      await expect(page.getByTestId("application-assign-a6")).toHaveCount(0);
+      await noSideScroll(page);
+      await page.getByTestId("season-application-settings").screenshot({ path: shotPath(testInfo, `liga-verwaltung-auto-annehmen-${width}.png`) });
+    });
+
     test("Leitung: Einstellungen und Eingang", async ({ page }) => {
       await mock(page, ADMIN, (path) => {
         if (path === "/admin/leagues/seasons/s1") return ADMIN_SEASON;
@@ -143,9 +192,12 @@ for (const [width, height] of WIDTHS) {
         return undefined;
       });
       await page.goto("/admin/leagues/seasons/s1#anmeldungen");
+      // Die Marke aus den Nachrichten des Servers öffnet seit #2267 den Reiter „Anmeldung und Kader“.
+      await expect(page.getByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("season-applications-stats")).toContainText("5 von 8 Startplätzen belegt");
-      await expect(page.getByTestId("application-a1")).toContainText("Geburtsdatum fehlt");
-      await expect(page.getByTestId("application-accept-a1")).toBeVisible();
+      await expect(page.getByTestId("application-open-points-a1")).toContainText("Geburtsdatum fehlt");
+      await expect(page.getByTestId("application-open-points-a1")).toContainText("Zulassen geht trotzdem");
+      await expect(page.getByTestId("application-accept-a1")).toBeEnabled();
       await expect(page.getByTestId("application-assign-a3")).toBeDisabled();
       await page.getByTestId("application-reject-open-a1").click();
       await expect(page.getByTestId("application-reject-send-a1")).toBeDisabled();

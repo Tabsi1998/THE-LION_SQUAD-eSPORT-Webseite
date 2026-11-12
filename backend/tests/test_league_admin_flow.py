@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from services import league_service, map_pools  # noqa: E402
-from services.scoring_rules import normalize_rules  # noqa: E402
+from services.scoring_rules import league_default_rules, normalize_rules  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
 SHOOTER = {
@@ -89,7 +89,9 @@ async def test_a_season_starts_with_the_documented_defaults(flow):
     assert season["best_of"] == 3 and season["team_size"] == 4 and season["min_squad_size"] == 3
     assert season["result_confirm_hours"] == 48 and season["lineup_amend_hours"] == 48
     assert season["visibility"] == "off" and season["status"] == "draft"
-    assert season["scoring_rules"] == normalize_rules({})
+    # Tabelle (E.1, #1625): neue Seasons mit den entschiedenen Vorgaben - direkter Vergleich, kein Remis, Default-Win.
+    assert season["scoring_rules"] == league_default_rules()
+    assert season["scoring_rules"] != normalize_rules({})
     assert season["start_date"] == "2026-11-09T23:00:00+00:00"  # 00:00 Wien
     assert season["blocked_periods"][0]["label"] == "Weihnachtspause"
     assert season["registration_deadline"] == "2026-11-06"
@@ -101,8 +103,9 @@ async def test_a_season_starts_with_the_documented_defaults(flow):
     assert view["calendar"]["max_teams_per_staffel"] == 8
     assert view["map_pool"]["origin"] == "league_season"
     assert view["divisions"][0]["label"] == "Liga 1"
+    # Nach dem Pool zieht die unberührte Veto-Vorlage nach (D.3, Nr. 108) - ein eigener Eintrag mit via "auto".
     assert await audit_actions(flow) == ["league.create", "league.season.create", "league.season.map_pool.save",
-                                         "league.division.create"]
+                                         "league.season.veto_rules", "league.division.create"]
 
 
 @pytest.mark.asyncio
@@ -127,7 +130,7 @@ async def test_creating_a_staffel_copies_every_setting_into_the_tournament(flow)
         "result_entry_mode": "player_confirmed", "registration_enabled": False, "discord_registration": False,
         "discord_skip": True, "season_weight": 0, "visibility": "internal", "is_public": False, "status": "draft",
         "round_robin_legs": 1, "matchday_blocked_weeks": [7, 8], "matchday_weeks_total": 10,
-        "scoring_rules": normalize_rules({}), "game_mode_order": [], "lineup_amend_hours": 48,
+        "scoring_rules": league_default_rules(), "game_mode_order": [], "lineup_amend_hours": 48,
         "blocked_periods": [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "Weihnachtspause"}],
     }
     assert {key: tournament.get(key) for key in expected} == expected
@@ -212,7 +215,7 @@ async def test_sync_before_the_start_applies_everything(flow):
     staffel = await _staffel(flow, division)
 
     changed = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={
-        "visibility": "public", "rules_text": "Neu", "best_of": 5, "weeks_total": 12, "default_match_time": "19:30"})
+        "visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung", "rules_text": "Neu", "best_of": 5, "weeks_total": 12, "default_match_time": "19:30"})
     assert changed.status_code == 200, changed.text
     assert changed.json()["staffeln_to_sync"] == 1
     untouched = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
@@ -243,7 +246,7 @@ async def test_sync_keeps_the_calendar_after_the_start_and_the_scoring_after_the
                                          "slots": []})
 
     await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={
-        "visibility": "members", "rules_text": "Später", "best_of": 5, "weeks_total": 12})
+        "visibility": "members", "readiness_override_reason": "Testaufbau ohne Prüfung", "rules_text": "Später", "best_of": 5, "weeks_total": 12})
     result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"][0]
 
     assert sorted(item["group"] for item in result["skipped"]) == ["before_result", "before_start"]
@@ -287,7 +290,7 @@ async def test_season_input_is_checked(flow):
     assert response.status_code == 422
     bad_points = await flow.patch(url, json={"scoring_rules": {"table_tiebreakers": ["los"]}})
     assert bad_points.status_code == 422 and "Gleichstand" in bad_points.json()["detail"]
-    ok = await flow.patch(url, json={"game_mode_order": ["snd", "stellung"], "team_size": 5})
+    ok = await flow.patch(url, json={"game_mode_order": ["snd", "stellung", "snd"], "team_size": 5})
     assert ok.status_code == 200, ok.text
     assert ok.json()["min_squad_size"] == 5  # Mindestkader wächst mit der Teamgröße mit
     duplicate = await flow.post(f"{ADMIN}/{league['id']}/seasons", json={**SEASON_ONE, "number": 1})
@@ -542,7 +545,7 @@ async def test_hidden_league_fields_are_refused_unchanged_values_pass(flow):
 
 @pytest.mark.asyncio
 async def test_the_season_admin_path_goes_only_to_the_management(flow):
-    _admin, _game, _league, _season, division, _maps = await setup_league(flow, season={"visibility": "public"})
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow, season={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     staffel = await _staffel(flow, division)
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})  # sichtbar, kein Entwurf
     flow.act_as(await flow.add_user(name="Mitglied"))

@@ -6,8 +6,9 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout, canOpenAdminLink } from "@/components/tls/AdminLayout";
-import { canUseArea, hasHelperAssignment } from "@/lib/permissions";
+import { canUseArea, hasHelperAssignment, hasLeagueStaff } from "@/lib/permissions";
 import { DutyList } from "@/pages/admin/duty/DutyList";
+import { DutyAttention, hasDutyAttention } from "@/pages/admin/duty/DutyAttention";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet, Star } from "lucide-react";
@@ -30,6 +31,8 @@ export default function AdminDashboardPage() {
   const canGrowth = canUseArea(user, "club", "system");
   const isSuperAdmin = user?.role === "superadmin";
   const helper = hasHelperAssignment(user);
+  // Leitung (#2194): Turniere nach dem Ende noch „Live“ und überfällige Liga-Spiele kommen aus demselben Dienst.
+  const leads = canUseArea(user, "tournaments") || hasLeagueStaff(user) || canUseArea(user, "leagues");
   const may = (to) => canOpenAdminLink(user, to);
   const [duty, setDuty] = useState(null);
   const [data, setData] = useState(null);
@@ -53,8 +56,8 @@ export default function AdminDashboardPage() {
     }
     if (isSuperAdmin) api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
     // Eigene Helfer-Einsätze stehen oben (#1352) - aus demselben Dienst wie „Mein Dienst“.
-    if (helper) api.get("/users/me/duty").then(({ data }) => setDuty(data)).catch(() => {});
-  }, [canSystem, canGrowth, isSuperAdmin, helper]);
+    if (helper || leads) api.get("/users/me/duty").then(({ data }) => setDuty(data)).catch(() => {});
+  }, [canSystem, canGrowth, isSuperAdmin, helper, leads]);
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, [], { fallbackMs: 30000 });
 
@@ -311,7 +314,7 @@ export default function AdminDashboardPage() {
     { to: "/admin/events", label: "Events", testId: "quick-events" },
     { to: "/admin/stations", label: "Stationen", testId: "quick-stations" },
   ].filter((action) => may(action.to));
-  const dutyRows = duty?.assignments || [];
+  const dutyRows = helper ? duty?.assignments || [] : [];
 
   const growthData = (growth?.days || []).map((d) => ({
     ...d,
@@ -340,6 +343,14 @@ export default function AdminDashboardPage() {
           {refreshedAt ? viennaTime(refreshedAt, { hour: "2-digit", minute: "2-digit" }) : "Aktualisieren"}
         </button>
       </div>
+
+      {/* Entscheidungen der Leitung (#2194): stehen ganz oben. */}
+      {hasDutyAttention(duty) && (
+        <section className="mb-6" data-testid="dashboard-attention" aria-labelledby="dashboard-attention-heading">
+          <h2 id="dashboard-attention-heading" className="mb-3 font-heading font-bold uppercase text-lg">Braucht deine Entscheidung</h2>
+          <DutyAttention duty={duty} testId="dashboard-attention-list" />
+        </section>
+      )}
 
       {/* Eigene Helfer-Einsätze (#1352): stehen oben, vor allem anderen. */}
       {dutyRows.length > 0 && (

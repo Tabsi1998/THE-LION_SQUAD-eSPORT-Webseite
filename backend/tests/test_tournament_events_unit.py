@@ -307,6 +307,40 @@ def test_league_withdrawal_after_two_of_five_matchdays_annuls_all_games_of_the_p
     assert "annulliert" in text and "2 von 5" in text
 
 
+def test_league_staffel_with_all_for_opponents_never_annuls_and_the_table_counts_every_game():
+    """E.1 (#1625, Kommentar 02.11.): nach 2 von 5 Spieltagen keine Annullierung - die offenen Spiele werden kampflos
+    verloren gewertet, die gespielten bleiben am Spiel, die Tabelle zählt alle für die Gegner, das Team steht unten."""
+    from services.competition_standings import round_robin_standings, table_rules
+    from services.scoring_rules import LEAGUE_TABLE_DEFAULTS
+    from services.tournament_events import exit_rule_of
+
+    staffel = {"format": "league", "best_of": 3, "scoring_rules": copy.deepcopy(LEAGUE_TABLE_DEFAULTS)}
+    assert exit_rule_of(staffel) == "all_for_opponents"
+    assert exit_rule_of({"format": "league"}) == "half"
+    assert exit_rule_of({"scoring_rules": {"match_points": {"win": 3, "draw": 1, "loss": 0}}}) == "half"
+    matches = league_of_six()
+    play(matches, "r1", 2)
+    plan = plan_removal(matches, "r1", kind="withdrawn", now_iso=NOW, exit_rule=exit_rule_of(staffel))
+    assert plan["mode"] == "opponents" and (plan["played"], plan["total"]) == (2, 5)
+    mine = matches_of(matches, "r1")
+    assert sorted(m["status"] for m in mine) == ["completed", "completed", "forfeit", "forfeit", "forfeit"]
+    assert not any((m.get("result_meta") or {}).get("annulled") for m in mine)
+    assert [op["kind"] for op in plan["ops"]] == ["forfeit"] * 3
+    text = describe_removal(plan)
+    assert "alle 5 Spiele zählen für die Gegner" in text and "3 offene werden" in text and "Tabellenende" in text
+    snapshot = build_structure_snapshot("t", stage_matches=matches)
+    regs = registrations(6)
+    regs[0].update({"status": "withdrawn", "removal": {"at": NOW, "mode": "opponents"}})
+    rows = round_robin_standings(snapshot["matches"], regs, table_rules(staffel), tournament=staffel)
+    assert rows[-1]["registration_id"] == "r1" and rows[-1]["exit"]["kind"] == "withdrawn"
+    assert rows[-1]["points"] == 0 and rows[-1]["played"] == 5
+    assert all(row["points"] == 3 and row["forfeit_won"] == 1 for row in rows[:-1] if row["played"])
+    # Ohne die Einstellung bleibt es bei der 50-%-Regel.
+    again = league_of_six()
+    play(again, "r1", 2)
+    assert plan_removal(again, "r1", kind="withdrawn", now_iso=NOW, exit_rule="half")["mode"] == "annulled"
+
+
 def test_league_withdrawal_after_three_of_five_matchdays_forfeits_the_rest():
     matches = league_of_six()
     play(matches, "r1", 3)

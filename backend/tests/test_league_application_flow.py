@@ -51,6 +51,7 @@ async def test_a_new_season_carries_the_defaults_and_no_window(flow):
     assert stored["entry_policy"] == "all"
     assert stored["sibling_squads_in_staffel"] is False
     assert stored["application_waitlist"] is True
+    assert stored["application_auto_accept"] is False, "Vorgabe aus: Die Leitung prüft jede Anmeldung (#2348)"
     assert "application_opens_at" not in stored and "application_slots" not in stored
 
 
@@ -312,15 +313,17 @@ async def test_a_smaller_minimum_of_liga_n_counts_for_the_application(flow):
 
 
 @pytest.mark.asyncio
-async def test_missing_birth_dates_block_without_any_date_in_the_answer(flow):
+async def test_missing_birth_dates_only_warn_without_any_date_in_the_answer(flow):
+    """Seit #2313 (ersetzt Nr. 74): Die Anmeldung geht, gesperrt wird erst beim Check-in und bei der Aufstellung."""
     w = await application_world(flow, min_age=18)
     side = w["teams"][0]
 
     row = await problems_of(flow, w, side)
 
-    assert any("Geburtsdatum fehlt" in text for text in row["problems"])
+    assert row["problems"] == [], row
+    assert any("Geburtsdatum fehlt" in text for text in row["warnings"])
     assert "birth_date" not in str(row)
-    assert (await submit(flow, w, side)).status_code in (400, 409)
+    assert (await submit(flow, w, side)).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -358,16 +361,20 @@ async def test_a_squad_already_in_the_season_cannot_apply(flow):
 
 
 @pytest.mark.asyncio
-async def test_too_few_players_with_a_valid_id_block_and_the_others_are_warnings(flow):
+async def test_too_few_players_with_a_valid_id_are_a_hint_not_a_block(flow):
+    """Seit #2313 (ersetzt Nr. 74): zu wenige Spielberechtigte stehen als ``shortfall`` da, die Anmeldung geht."""
     w = await application_world(flow, min_squad_size=4)
     await flow.db.games.update_one({"id": w["game"]["id"]}, {"$set": {"player_id_fields": [{"key": "probe_id", "label": "Probe-ID", "required": True}]}})
     side = w["teams"][0]
 
     row = await problems_of(flow, w, side)
-    assert any("spielberechtigt" in text for text in row["problems"])
+    assert row["problems"] == [], row
+    assert "Nur 0 von 4 Spielern sind spielberechtigt" in row["shortfall"]
+    assert len(row["warnings"]) == 4
 
     await flow.db.games.update_one({"id": w["game"]["id"]}, {"$set": {"player_id_fields": []}})
-    assert (await problems_of(flow, w, side))["problems"] == []
+    row = await problems_of(flow, w, side)
+    assert row["problems"] == [] and row["shortfall"] is None
 
 
 @pytest.mark.asyncio
@@ -449,7 +456,8 @@ async def test_withdrawing_an_application_of_another_season_is_404(flow):
     side = w["teams"][0]
     application = await submitted(flow, w, side)
     flow.act_as(w["lead"])
-    other = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"name": "Season Zwei", "start_date": "2030-01-08T00:00:00", "visibility": "public"}))
+    other = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"name": "Season Zwei", "start_date": "2030-01-08T00:00:00", "visibility": "public",
+                                                                                         "readiness_override_reason": "Testaufbau ohne Prüfung"}))
     flow.act_as(side["captain"])
 
     answer = await flow.post(f"/api/leagues/{w['league']['slug']}/{other['slug']}/applications/{application['id']}/withdraw", json={})
@@ -472,7 +480,8 @@ async def test_guests_see_window_and_seats_but_nobody_else_sees_an_application(f
     assert public["slots"] == 4 and public["slots_free"] == 3
     assert public["waitlist"] is True and public["waitlist_note"] == "Die Leitung entscheidet nach Eingang."
     assert public["opens_at"] and public["closes_at"]
-    assert set(public) == {"state", "opens_at", "closes_at", "slots", "slots_free", "waitlist", "waitlist_full", "waitlist_note", "entry_policy"}
+    assert set(public) == {"state", "opens_at", "closes_at", "slots", "slots_free", "waitlist", "waitlist_full", "waitlist_note", "entry_policy", "auto_accept"}
+    assert public["auto_accept"] is False, "Vorgabe aus: Die Leitung prüft jede Anmeldung (#2348)"
 
     flow.act_as(w["teams"][1]["captain"])
     view = ok(await flow.get(f"{base_url(w)}/application"))

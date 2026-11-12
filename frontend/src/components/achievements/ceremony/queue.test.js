@@ -81,4 +81,18 @@ describe("Turnier-Platz in der Warteschlange", () => {
     expect(queue.advance().id).toBe("platz");
     expect(queue.advance().id).toBe("wartet");
   });
+
+  it("hält die Sammel-Zeremonie der Neuberechnung (#2340) für sich - nichts wird hinein- oder herausgebündelt", () => {
+    let t = 0;
+    const queue = createCeremonyQueue({ now: () => t });
+    queue.enqueue({ id: "läuft", tiers: [tier("a")] });
+    t += 100;
+    queue.enqueue({ id: "nachgerechnet", tiers: [tier("r1"), tier("r2")], context: { recount: true } });
+    t += 100;
+    queue.enqueue({ id: "neu", tiers: [tier("b")] });
+    expect(queue.getPendingCount()).toBe(2);
+    expect(queue.advance().id).toBe("nachgerechnet");
+    expect(queue.getCurrent().tiers.map((x) => x.code)).toEqual(["r1", "r2"]);
+    expect(queue.advance().id).toBe("neu");
+  });
 });

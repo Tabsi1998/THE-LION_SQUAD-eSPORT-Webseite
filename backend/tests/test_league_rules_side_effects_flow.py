@@ -80,7 +80,7 @@ async def test_sitemap_lists_the_rules_only_of_public_seasons_with_rules(flow):
     await publish(flow, w)
     assert url in (await flow.get("/api/sitemap.xml")).text
     flow.act_as(w["lead"])
-    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "members"}))
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "members", "readiness_override_reason": "Testaufbau ohne Prüfung"}))
     assert url not in (await flow.get("/api/sitemap.xml")).text
 
 
@@ -95,7 +95,7 @@ async def test_preview_card_of_the_rules_page(flow):
     assert meta["canonical"] == f"{ORIGIN}/liga/{league}/{season}/regeln"
     assert "Regeln" in meta["title"] and meta.get("robots") != "noindex, nofollow"
     flow.act_as(w["lead"])
-    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "members"}))
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "members", "readiness_override_reason": "Testaufbau ohne Prüfung"}))
     restricted = await league_rules_meta(flow.db, league, season, BASE, ORIGIN)
     assert restricted["robots"] == "noindex, nofollow"
     ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "off"}))

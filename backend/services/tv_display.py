@@ -183,7 +183,9 @@ MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type",
                 # „Als Nächstes“ mit Prognose (#1564): ist die Zeit nur eine Prognose des Planers, und woher stammt sie.
                 "schedule_forecast", "schedule_source",
                 # „Nicht erschienen“ im offenen Lauf (#1823): nur wer, nie die Begründung (``no_show_notes``).
-                "no_show_registration_ids")
+                "no_show_registration_ids",
+                # Angefochtenes Ergebnis einer Liga-Staffel (E.2, #1619): nur „in Klärung“, nie Grund oder Seite.
+                "contested")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).
 CHECKIN_STATUSES = ("approved", "checked_in")
 SEAT_STATUSES = ("pending", "approved", "checked_in")
@@ -267,7 +269,11 @@ def seat_summary(tournament: dict | None, registrations: list[dict] | None) -> d
 # Die Tabelle am TV (#2121): Liga, Jeder gegen jeden, Schweizer System und Gruppen - Platz, Name und die Zahlen der
 # Tabelle, nie Konto (user_id) oder Team-Kennung.
 STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "played", "won", "drawn", "lost",
-                   "score_for", "score_against", "score_diff", "buchholz", "points", "form")
+                   "score_for", "score_against", "score_diff", "buchholz", "points", "form",
+                   # Liga-Staffel (E.1, #1625): was den Gleichstand entschied, kampflos, Abzug, Ausscheiden.
+                   "tiebreak", "forfeit_won", "forfeit_lost", "deducted_points", "exit",
+                   # Angefochtene Ergebnisse (E.2, #1619): wie viele Spiele der Zeile „in Klärung“ sind - nur die Zahl.
+                   "contested")
 STANDING_GROUP_FIELDS = ("id", "group_key", "name")
 
 

@@ -20,7 +20,8 @@ freigegeben ist, jede einmal je Modus. Fremde Kennungen (anderes Spiel, unbekann
 in zwei Spielen sind kein gemeinsamer Pool. ``allowed`` ist dieselbe Regel für die Wahl im Veto (#1618).
 
 Der Lesevertrag ``view`` ist für Website, App und TV gleich: ``{id, version, origin, game_id, saved_at, modes: [{mode,
-label, maps: [{map_id, slug, name, image_url}]}]}``; die Verwaltung bekommt dazu ``saved_by`` und ``note``.
+label, icon_url?, maps: [{map_id, slug, name, image_url}]}]}``; die Verwaltung bekommt dazu ``saved_by`` und ``note``.
+``icon_url`` (#2266) ist das Symbol des Modus von damals und steht nur, wenn der Modus beim Speichern eines hatte.
 """
 from __future__ import annotations
 
@@ -85,12 +86,17 @@ def view(doc: dict | None, origin: str | None = None, *, admin: bool = False) ->
     return saved_view(doc, origin, admin=admin) if doc else None
 
 
+def _group_head(group: dict) -> dict:
+    """Modus einer Gruppe im Snapshot: Kennung, Name und - nur wenn gesetzt - das Symbol von damals (#2266)."""
+    return {"mode": group.get("mode"), "label": group.get("label"), **({"icon_url": group["icon_url"]} if group.get("icon_url") else {})}
+
+
 def saved_view(doc: dict, origin: str | None = None, *, admin: bool = False) -> dict:
     """Der Lesevertrag einer vorhandenen Version."""
     out = {
         "id": doc.get("id"), "version": doc.get("version"), "origin": origin or doc.get("scope"),
         "game_id": doc.get("game_id"), "saved_at": doc.get("created_at"),
-        "modes": [{"mode": group.get("mode"), "label": group.get("label"),
+        "modes": [{**_group_head(group),
                    "maps": [{key: item.get(key) for key in ("map_id", "slug", "name", "image_url")}
                             for item in group.get("maps") or []]}
                   for group in doc.get("modes") or []],
@@ -127,7 +133,8 @@ async def outdated_map_ids(db, doc: dict | None) -> list[str]:
     for group in doc.get("modes") or []:
         for item in group.get("maps") or []:
             row = rows.get(item.get("map_id"))
-            changed = (not row or row.get("status") != "active" or row.get("name") != item.get("name")
+            # Inaktiv (#2207) ändert am Snapshot nichts - nur archiviert, gelöscht, umbenannt, neues Bild, Modus entzogen.
+            changed = (not row or game_maps.status_of(row) == game_maps.ARCHIVED or row.get("name") != item.get("name")
                        or row.get("image_url") != item.get("image_url")
                        or (group.get("mode") is not None and group.get("mode") not in (row.get("modes") or [])))
             if changed and item.get("map_id") not in out:
@@ -136,20 +143,34 @@ async def outdated_map_ids(db, doc: dict | None) -> list[str]:
 
 
 async def admin_entry(db, doc: dict | None, game_id: str | None, origin: str) -> dict | None:
-    """Ein Pool für die Verwaltung: Lesevertrag plus ``stale`` (anderes Spiel) und ``outdated_map_ids``."""
+    """Ein Pool für die Verwaltung: Lesevertrag plus ``stale`` (anderes Spiel), ``outdated_map_ids`` und ``outdated_modes`` (#2266)."""
     if not doc:
         return None
     return {**saved_view(doc, origin, admin=True), "stale": doc.get("game_id") != game_id,
-            "outdated_map_ids": await outdated_map_ids(db, doc)}
+            "outdated_map_ids": await outdated_map_ids(db, doc), "outdated_modes": await outdated_modes(db, doc)}
+
+
+async def outdated_modes(db, doc: dict | None) -> list[str]:
+    """Modi des Pools, deren Symbol sich am Spiel seither geändert hat (#2266) - neu, anders oder entfernt. Wie bei den Maps nur ein
+    Hinweis: Erst das nächste Speichern übernimmt das Symbol."""
+    if not doc or not doc.get("game_id"):
+        return []
+    game = await db.games.find_one({"id": doc["game_id"]}, {"_id": 0, "match_modes": 1})
+    if not game:
+        return []
+    known = {mode["mode"] for mode in game_maps.game_modes(game)}
+    return [group["mode"] for group in doc.get("modes") or []
+            if group.get("mode") in known and (group.get("icon_url") or None) != game_modes.icon_of(game, group["mode"])]
 
 
 async def library(db, game: dict | None) -> list[dict]:
-    """Was zur Wahl steht: die aktiven Maps des Spiels in ihrer Reihenfolge."""
+    """Was zur Wahl steht: die aktiven und inaktiven Maps des Spiels in ihrer Reihenfolge, je mit ``status``. Inaktive bietet
+    der Editor nur an, wo der gespeicherte Pool sie schon hat (#2207)."""
     if not game:
         return []
     return [{**{key: row.get(key) for key in ("id", "slug", "name", "image_url", "modes", "order")},
-             "aliases": row.get("aliases") or []}
-            for row in await game_maps.maps_of(db, game["id"], active_only=True)]
+             "aliases": row.get("aliases") or [], "status": game_maps.status_of(row)}
+            for row in await game_maps.maps_of(db, game["id"], usable_only=True)]
 
 
 def game_summary(game: dict | None) -> dict | None:
@@ -210,7 +231,15 @@ def _kept_modes(previous: dict | None, game: dict) -> set:
     return {group.get("mode") for group in previous.get("modes") or [] if group.get("mode")}
 
 
-async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None = None) -> list[dict]:
+def _kept_maps(previous: dict | None, game: dict) -> set:
+    """Paare (Modus, Map) der geltenden Version - eine inaktive Map darin bleibt im selben Modus erlaubt (#2207)."""
+    if not previous or previous.get("cleared") or previous.get("game_id") != game.get("id"):
+        return set()
+    return {(group.get("mode"), item.get("map_id")) for group in previous.get("modes") or [] for item in group.get("maps") or []}
+
+
+async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None = None,
+                           kept_maps: set | None = None) -> list[dict]:
     modes = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
     game_name = game.get("name") or "dieses Spiel"
     seen_modes: set = set()
@@ -236,8 +265,12 @@ async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None =
             row = rows.get(map_id)
             if not row or row.get("game_id") != game["id"]:
                 raise MapProblem(f"Eine der gewählten Maps gehört nicht zu {game_name}.")
-            if row.get("status") != "active":
+            status = game_maps.status_of(row)
+            if status == game_maps.ARCHIVED:
                 raise MapProblem(f"Die Map „{row.get('name')}“ ist archiviert und kommt in keinen neuen Pool.")
+            if status == game_maps.INACTIVE and (mode, map_id) not in (kept_maps or set()):
+                raise MapProblem(f"Die Map „{row.get('name')}“ ist inaktiv und kommt in {label} nicht neu dazu. "
+                                 "Auf der Spielseite (Spiele → Spiel → Maps) lässt sie sich wieder aktivieren.")
             if mode is not None and mode not in (row.get("modes") or []):
                 raise MapProblem(f"Die Map „{row.get('name')}“ ist für {label} nicht freigegeben.")
             if any(item["map_id"] == map_id for item in maps):
@@ -245,7 +278,9 @@ async def _snapshot_groups(db, game: dict, body: MapPoolSave, kept: set | None =
             maps.append({"map_id": row["id"], "slug": row.get("slug"), "name": row.get("name"),
                          "image_url": row.get("image_url")})
         if maps:
-            groups.append({"mode": mode, "label": label, "maps": maps})
+            # Symbol des Modus als Schnappschuss wie der Name (#2266) - nur wenn gesetzt.
+            icon = game_modes.icon_of(game, mode) if mode else None
+            groups.append({"mode": mode, "label": label, **({"icon_url": icon} if icon else {}), "maps": maps})
     if not groups:
         raise MapProblem("Bitte mindestens eine Map wählen - oder den Pool entfernen.")
     return groups
@@ -287,7 +322,7 @@ async def save(db, *, scope: str, scope_id: str, game: dict | None, body: MapPoo
     previous = await latest(db, scope, scope_id)
     if body.expected_version is not None and _current_version(previous) != body.expected_version:
         raise MapProblem(CHANGED_MEANWHILE, 409)
-    groups = await _snapshot_groups(db, game, body, _kept_modes(previous, game))
+    groups = await _snapshot_groups(db, game, body, _kept_modes(previous, game), _kept_maps(previous, game))
     return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=game["id"], user=user,
                         groups=groups, cleared=False, note=body.note, tournament_id=tournament_id)
 
@@ -297,8 +332,7 @@ async def copy_version(db, source: dict, *, scope: str, scope_id: str, user: dic
     """Eine vorhandene Version als neue Version eines anderen Wettbewerbs - mit genau denselben Maps samt Namen und
     Bildern von damals (Snapshot), ohne neue Prüfung gegen die Bibliothek. Für die Liga: Season → Staffel."""
     previous = await latest(db, scope, scope_id)
-    groups = [{"mode": group.get("mode"), "label": group.get("label"),
-               "maps": [dict(item) for item in group.get("maps") or []]} for group in source.get("modes") or []]
+    groups = [{**_group_head(group), "maps": [dict(item) for item in group.get("maps") or []]} for group in source.get("modes") or []]
     return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=source.get("game_id"),
                         user=user, groups=groups, cleared=False, note=note, tournament_id=tournament_id)
 
@@ -311,6 +345,76 @@ async def clear(db, *, scope: str, scope_id: str, user: dict, tournament_id: str
         return None
     return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=(previous or {}).get("game_id"),
                         user=user, groups=[], cleared=True, note=None, tournament_id=tournament_id)
+
+
+# ---------------------------------------------------------------- Versionen vergleichen, Map herausnehmen (#2207)
+
+async def versions(db, scope: str, scope_id: str) -> list[dict]:
+    """Alle Versionen eines Wettbewerbs, neueste zuerst - für Auswahl und Vergleich in der Verwaltung."""
+    rows = await db.map_pools.find({"scope": scope, "scope_id": scope_id}, {"_id": 0}).sort("version", -1).to_list(500)
+    return [{"id": row.get("id"), "version": row.get("version"), "saved_at": row.get("created_at"),
+             "saved_by": row.get("created_by"), "note": row.get("note"), "cleared": bool(row.get("cleared")),
+             "maps": sum(len(group.get("maps") or []) for group in row.get("modes") or [])}
+            for row in rows]
+
+
+def _group_maps(doc: dict | None) -> dict:
+    """Je Modus (Kennung) Name des Modus und die Maps als ``{map_id: name}`` in ihrer Reihenfolge."""
+    out: dict = {}
+    for group in ((doc or {}).get("modes") or []) if doc and not doc.get("cleared") else []:
+        out[group.get("mode")] = {"label": group.get("label"),
+                                  "maps": {item.get("map_id"): item.get("name") for item in group.get("maps") or []}}
+    return out
+
+
+def compare(base: dict | None, target: dict | None) -> dict:
+    """Zwei Versionen gegenübergestellt: je Modus hinzu, weg und wie viele blieben. Die Reihenfolge innerhalb eines Modus zählt
+    nicht. Ein entfernter Pool (``cleared``) zählt als leer."""
+    old, new = _group_maps(base), _group_maps(target)
+    order = list(dict.fromkeys([*new, *old]))
+    rows = []
+    for mode in order:
+        before, after = (old.get(mode) or {}).get("maps") or {}, (new.get(mode) or {}).get("maps") or {}
+        added = [{"map_id": key, "name": name} for key, name in after.items() if key not in before]
+        removed = [{"map_id": key, "name": name} for key, name in before.items() if key not in after]
+        kept = sum(1 for key in after if key in before)
+        status = "added" if not before else "removed" if not after else "changed" if added or removed else "same"
+        label = (new.get(mode) or old.get(mode) or {}).get("label") or (NO_MODE_LABEL if mode is None else mode)
+        rows.append({"mode": mode, "label": label, "added": added, "removed": removed, "kept": kept, "status": status})
+
+    def head(doc: dict | None) -> dict | None:
+        return {"id": doc.get("id"), "version": doc.get("version"), "saved_at": doc.get("created_at"),
+                "cleared": bool(doc.get("cleared"))} if doc else None
+
+    return {"base": head(base), "target": head(target), "modes": rows, "same": all(row["status"] == "same" for row in rows)}
+
+
+async def without_map(db, *, scope: str, scope_id: str, map_id: str, mode: str | None, user: dict, note: str | None,
+                      expected_version: int | None = None, tournament_id: str | None = None) -> tuple[dict, dict]:
+    """Eine neue Version ohne ``map_id`` (in ``mode`` oder, ohne Modus, in allen) - der Snapshot der übrigen Maps bleibt wie er
+    war, ohne neue Prüfung gegen die Bibliothek. Gibt (alte, neue) Version zurück. 404 ohne Pool oder ohne die Map, 422 wenn der
+    Pool leer würde, 409 bei gleichzeitigem Speichern."""
+    previous = await latest(db, scope, scope_id)
+    if not _current_version(previous):
+        raise MapProblem("Es gibt keinen Map-Pool.", 404)
+    if expected_version is not None and _current_version(previous) != expected_version:
+        raise MapProblem(CHANGED_MEANWHILE, 409)
+    groups, found = [], False
+    for group in previous.get("modes") or []:
+        maps = [dict(item) for item in group.get("maps") or []]
+        if mode is None or group.get("mode") == mode:
+            kept = [item for item in maps if item.get("map_id") != map_id]
+            found = found or len(kept) != len(maps)
+            maps = kept
+        if maps:
+            groups.append({**_group_head(group), "maps": maps})
+    if not found:
+        raise MapProblem("Diese Map steht nicht im Map-Pool." if mode is None else "Diese Map steht in diesem Modus nicht im Map-Pool.", 404)
+    if not groups:
+        raise MapProblem("Ohne diese Map wäre der Pool leer - bitte den Pool entfernen oder zuerst andere Maps aufnehmen.")
+    doc = await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=previous.get("game_id"), user=user,
+                       groups=groups, cleared=False, note=note, tournament_id=tournament_id)
+    return previous, doc
 
 
 # ---------------------------------------------------------------- Turnier und Phase

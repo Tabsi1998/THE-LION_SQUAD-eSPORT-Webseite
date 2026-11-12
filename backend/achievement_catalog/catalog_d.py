@@ -23,9 +23,12 @@ def _d(*args, **kwargs):
     return _group(*args, catalog="D", **kwargs)
 
 
-def _special(code, name, description, how_to, icon, art, key, *, sort_order, target=1, manual=False, step="Erreicht."):
-    """Besonders: eine legendäre Stufe - von Hand oder mit einem Zähler und Ziel."""
-    return _d(code, name, "special", description, how_to, icon, art, None if manual else key, [target], step, sort_order=sort_order, materials=["legendary"], manual=manual)
+def _special(code, name, description, how_to, icon, art, key, *, sort_order, target=1, manual=False, step="Erreicht.", retired=None,
+             role_only=False):
+    """Besonders: eine legendäre Stufe - von Hand oder mit einem Zähler und Ziel. ``retired``: der Grund, warum sie nicht
+    mehr erreichbar ist; ``role_only``: nur mit einer Aufgabe im Verein (#2339)."""
+    return _d(code, name, "special", description, how_to, icon, art, None if manual else key, [target], step, sort_order=sort_order,
+              materials=["legendary"], manual=manual, retired=retired, role_only=role_only)
 
 
 def _hidden(code, name, description, how_to, icon, art, key, *, sort_order, target=1, step="Gefunden."):
@@ -38,16 +41,18 @@ CLUB = [
        "crown", "membership-card", "membership_days", [1, 180, 365, 730, 1095, 1825, 3650], "{n} Mitglied.", sort_order=910, unit=" Tage"),
     _d("member_card", "Mitgliedskarte", "club", "Hol dir deine Mitgliedskarte aufs Handy.", "Karte in die Wallet oder in die LionsAPP legen.",
        "id-card", "member-card", "member_card_added", [1], "Mitgliedskarte hinzugefügt.", sort_order=911),
-    _d("club_events", "Vereinsleben", "club", "Sei bei vereinsinternen Events dabei.", "Zu internen Events anmelden und einchecken - jedes zählt einmal.",
+    _d("club_events", "Vereinsleben", "club", "Sei bei vereinsinternen Events dabei.", "Zu vereinsinternen Events anmelden und vor Ort einchecken lassen - Events nur für Mitglieder, Vereinsabende und interne Veranstaltungen. Jedes zählt einmal, abgesagte nicht.",
        "users", "club-house", "club_events_attended", [1, 5, 15, 30, 60], "{n} interne Events besucht.", sort_order=912),
-    _d("volunteer", "Ehrenamt", "club", "Pack im Verein mit an.", "Wird vom Vorstand vergeben, wenn du dich ehrenamtlich einbringst.",
+    _d("volunteer", "Ehrenamt", "club", "Pack im Verein mit an.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn du dich ehrenamtlich im Verein einbringst. Jeder Einsatz zählt einmal.",
        "heart-handshake", "volunteer", None, [1, 3, 7, 15, 30], "{n}-mal ehrenamtlich dabei.", sort_order=913, manual=True),
     _d("founding_member", "Gründungsmitglied", "club", "Von Anfang an dabei.", "Mitglied seit dem Gründungsjahr des Vereins - das lässt sich nicht nachholen.",
-       "flag", "founding-flag", "member_since_founding_year", [1], "Seit dem Gründungsjahr dabei.", sort_order=914, materials=["gold"]),
+       "flag", "founding-flag", "member_since_founding_year", [1], "Seit dem Gründungsjahr dabei.", sort_order=914, materials=["gold"],
+       retired="Nur für Mitglieder seit dem Gründungsjahr – das lässt sich nicht mehr erreichen."),
     _d("documents_read", "Papierkram", "club", "Lies, was der Verein beschließt.", "Dokumente im Mitgliederbereich öffnen - jedes zählt einmal.",
        "file-text", "clipboard", "member_documents_opened", [1, 5, 15], "{n} Vereinsdokumente gelesen.", sort_order=915),
-    _d("board_service", "Vorstandsarbeit", "club", "Übernimm Verantwortung im Vorstand.", "Tage in einem Vorstandsamt - die Zeit läuft von selbst, solange du im Amt bist.",
-       "landmark", "gavel", "board_days", [90, 365, 730, 1095, 1825], "{n} im Vorstand.", sort_order=916, unit=" Tage"),
+    # Ein Vorstandsamt vergibt die Generalversammlung (#2339): sichtbar für alle, zählt aber nicht für Kategorie-Meister.
+    _d("board_service", "Vorstandsarbeit", "club", "Übernimm Verantwortung im Vorstand.", "Tage in einem Vorstandsamt - die Zeit läuft von selbst, solange du im Amt bist. Zählt nicht für Kategorie-Meister und Hundert Prozent, weil das Amt gewählt wird.",
+       "landmark", "gavel", "board_days", [90, 365, 730, 1095, 1825], "{n} im Vorstand.", sort_order=916, unit=" Tage", role_only=True),
     # Jubiläen (#848): runde Jahre ab dem Mitgliedsbeginn aus der Mitgliederverwaltung - mit eigenem Abzeichen.
     _d("membership_jubilee", "Vereinsjubiläum", "club", "Feiere runde Jahre im Verein.", "Volle Jahre seit deinem Mitgliedsbeginn - 5, 10 und 25 Jahre sind ein Jubiläum.",
        "award", "jubilee", "membership_years", [5, 10, 25], "{n} im Verein.", sort_order=917, unit=" Jahre"),
@@ -64,18 +69,25 @@ CLUB = [
 ]
 
 SPECIAL = [
-    _special("ehrenloewe", "Ehrenlöwe", "Die höchste Ehrung des Vereins.", "Wird vom Vorstand verliehen.", "crown", "honor-lion", None, sort_order=1010, manual=True, step="Ehrenlöwe des Vereins."),
-    _special("gamers_heaven", "Gamers Heaven", "Live beim Gamers Heaven dabei gewesen.", "Wird nach dem Event von der Vereinsleitung vergeben.", "rocket", "gamers-heaven", None, sort_order=1011, manual=True, step="Beim Gamers Heaven dabei."),
-    _special("lan_founder", "LAN-Gründer", "Bei der ersten LAN mit dabei.", "Wird von der Vereinsleitung vergeben.", "server", "lan-founder", None, sort_order=1012, manual=True, step="Bei der ersten LAN dabei."),
-    _special("beta_tester", "Beta-Tester", "Die Plattform vor dem Start getestet.", "Wird von der Vereinsleitung vergeben.", "flask-conical", "beta", None, sort_order=1013, manual=True, step="Plattform vor dem Start getestet."),
-    _special("streamer_verified", "Verifizierter Streamer", "Vom Verein bestätigter Kanal.", "Wird von der Vereinsleitung vergeben.", "badge-check", "verified-stream", None, sort_order=1014, manual=True, step="Kanal bestätigt."),
-    _special("sponsor_friend", "Sponsorenfreund", "Hat dem Verein einen Sponsor gebracht.", "Wird von der Vereinsleitung vergeben.", "handshake", "sponsor", None, sort_order=1015, manual=True, step="Sponsor vermittelt."),
-    _special("hall_of_fame", "Hall of Fame", "Ein Name, der bleibt.", "Wird von der Vereinsleitung verliehen.", "landmark", "hall-of-fame", None, sort_order=1016, manual=True, step="In der Hall of Fame."),
-    _special("season_mvp", "Saison-MVP", "Die Spielerin oder der Spieler der Saison.", "Wird je Saison von der Vereinsleitung gewählt.", "star", "mvp", None, sort_order=1017, manual=True, step="MVP einer Saison."),
+    _special("ehrenloewe", "Ehrenlöwe", "Die höchste Ehrung des Vereins.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - für besondere Verdienste um den Verein.", "crown", "honor-lion", None, sort_order=1010, manual=True, step="Ehrenlöwe des Vereins."),
+    _special("gamers_heaven", "Gamers Heaven", "Live beim Gamers Heaven dabei gewesen.", "Von Hand vergeben: Nach dem Event trägt die Redaktion ihn bei allen ein, die beim Gamers Heaven dabei waren.", "rocket", "gamers-heaven", None, sort_order=1011, manual=True, step="Beim Gamers Heaven dabei."),
+    _special("lan_founder", "LAN-Gründer", "Bei der ersten LAN mit dabei.", "Von Hand vergeben: Die Redaktion trägt ihn bei allen ein, die bei der ersten LAN des Vereins dabei waren.", "server", "lan-founder", None, sort_order=1012, manual=True, step="Bei der ersten LAN dabei.",
+             retired="Die erste LAN des Vereins ist vorbei – wer dabei war, hat ihn."),
+    _special("beta_tester", "Beta-Tester", "Die Plattform vor dem Start getestet.", "Von Hand vergeben: Die Redaktion trägt ihn bei allen ein, die die Plattform vor dem Start getestet haben.", "flask-conical", "beta", None, sort_order=1013, manual=True, step="Plattform vor dem Start getestet.",
+             retired="Die Testphase vor dem Start der Plattform ist vorbei."),
+    # Seit #2338 automatisch (Zähler streamer_verified) - und weiter von Hand vergebbar; Handvergaben bleiben.
+    _special("streamer_verified", "Verifizierter Streamer", "Vom Verein bestätigter Kanal.", "Dein Twitch-Konto ist per Anmeldung verknüpft und der Verein führt dich als Streamer oder Creator. Zählt nicht für Kategorie-Meister und Hundert Prozent, weil der Verein entscheidet.", "badge-check", "verified-stream", "streamer_verified", sort_order=1014, step="Kanal bestätigt.",
+             role_only=True),
+    _special("sponsor_friend", "Sponsorenfreund", "Hat dem Verein einen Sponsor gebracht.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - wenn du dem Verein einen Sponsor vermittelt hast.", "handshake", "sponsor", None, sort_order=1015, manual=True, step="Sponsor vermittelt."),
+    _special("hall_of_fame", "Hall of Fame", "Ein Name, der bleibt.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - für Menschen, die den Verein nachhaltig geprägt haben.", "landmark", "hall-of-fame", None, sort_order=1016, manual=True, step="In der Hall of Fame."),
+    _special("season_mvp", "Saison-MVP", "Die Spielerin oder der Spieler der Saison.", "Von Hand vergeben: Der Vorstand entscheidet, die Redaktion trägt ein - je Saison für die Spielerin oder den Spieler der Saison.", "star", "mvp", None, sort_order=1017, manual=True, step="MVP einer Saison."),
     _special("pioneer", "Pionier", "Eines der ersten hundert Konten.", "Nur die ersten hundert Konten der Plattform - lässt sich nicht nachholen.", "compass", "pioneer", "pioneer_account", sort_order=1018, step="Unter den ersten hundert."),
     _special("grand_slam", "Grand Slam", "Drei Spiele in einer Saison gewonnen.", "Turniere in drei verschiedenen Spielen in ein und derselben Saison gewinnen.", "trophy", "grand-slam", "distinct_game_wins_one_season", sort_order=1019, target=3, step="Drei Spiele in einer Saison gewonnen."),
-    _special("iron_lion", "Eiserner Löwe", "365 Tage in Folge angemeldet.", "Ein Jahr lang jeden Tag vorbeischauen.", "shield", "iron-lion", "login_streak_max", sort_order=1020, target=365, step="365 Tage in Folge angemeldet."),
-    _special("completionist", "Hundert Prozent", "Alle sichtbaren Erfolge freigeschaltet.", "Jede messbare Stufe, die du sehen kannst, ist erreicht.", "check-circle-2", "hundred", "all_visible_achievements", sort_order=1021, step="Alle sichtbaren Erfolge freigeschaltet."),
+    # Eiserner Löwe (#2339): nicht mehr dasselbe wie Treue VII (365 Tage in Folge angemeldet) - ein Jahr lang Monat für
+    # Monat gespielt. Wer ihn über die Anmeldeserie schon hat, behält ihn.
+    _special("iron_lion", "Eiserner Löwe", "Ein Jahr lang Monat für Monat im Wettkampf.", "Zwölf Kalendermonate in Folge (Wien) in jedem Monat mindestens ein Match spielen - in Turnieren oder der Vereinsliga. Freilose und nicht angetretene Spiele zählen nicht, kampflose Siege schon. Die längste Folge zählt.", "shield", "iron-lion", "match_months_streak_max", sort_order=1020, target=12, step="Zwölf Monate in Folge gespielt."),
+    # Hundert Prozent (#2339): dieselbe Rechnung wie Kategorie-Meister, über alle Kategorien (services/achievement_reach.py).
+    _special("completionist", "Hundert Prozent", "Alle erreichbaren Erfolge freigeschaltet.", "Jede erreichbare Stufe in allen Kategorien ist erreicht - gezählt wie bei Kategorie-Meister: ohne geheime, negative und von Hand vergebene Stufen, ohne die der Leitung oder einer Aufgabe im Verein und ohne nicht mehr erreichbare. Den Verein brauchen nur Mitglieder.", "check-circle-2", "hundred", "all_visible_achievements", sort_order=1021, step="Alle erreichbaren Erfolge freigeschaltet."),
     _special("new_year", "Silvester dabei", "Um Mitternacht zu Silvester online gewesen.", "Am 31.12. um Mitternacht auf der Seite oder in der App sein.", "party-popper", "fireworks", "online_at_new_year", sort_order=1022, step="Silvester um Mitternacht dabei."),
     _special("advent_all", "Alle Türchen", "Alle 24 Türchen des Adventkalenders geöffnet.", "Jeden Tag im Advent das Türchen öffnen.", "calendar-heart", "advent", "advent_doors_opened", sort_order=1023, target=24, step="Alle 24 Türchen geöffnet."),
     _special("halloween", "Gruselnacht", "Am 31. Oktober abends den Kürbis angeklickt.", "Am 31.10. ab 18 Uhr den Kürbis oder die Laterne anklicken.", "ghost", "pumpkin-night", "halloween_pumpkin", sort_order=1024, step="Gruselnacht erlebt."),

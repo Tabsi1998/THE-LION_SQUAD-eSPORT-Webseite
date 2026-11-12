@@ -131,7 +131,7 @@ async def test_recap_counts_only_published_results_and_what_guests_may_see(flow)
     recap = res.json()
     assert recap["available"] is True and recap["mine"] is None
     assert [w["id"] for w in recap["winners"]] == ["t-mk", "t-rl"], "laufend, Entwurf und „Nur Mitglieder“ fehlen"
-    assert recap["winners"][0]["podium"][0] == {"rank": 1, "name": "Gast Eins", "team": False, "detail": "1 Sieg, 3 Punkte"}
+    assert recap["winners"][0]["podium"][0] == {"rank": 1, "name": "Gast Eins", "team": False, "path": "Finale gewonnen", "won": 1, "detail": "1 Spiel gewonnen"}
     assert recap["winners"][1]["team"] is True and recap["winners"][1]["podium"][0]["name"] == "Lions Rocket"
     assert recap["fastlaps"][0]["podium"] == [
         {"rank": 1, "name": "lena", "time_ms": 91234, "detail": "1:31.234"},
@@ -219,7 +219,7 @@ async def test_names_of_blocked_or_deleted_accounts_are_neutral(flow, change):
     await flow.db.users.update_one({"id": lena["id"]}, {"$set": change})
     flow.act_as(None)
     recap = (await flow.get("/api/events/sommer-lan/recap")).json()
-    assert recap["winners"][0]["podium"][1] == {"rank": 2, "name": "Teilnehmer", "team": False, "detail": "1 Punkt"}, "Rang bleibt, Name neutral"
+    assert recap["winners"][0]["podium"][1] == {"rank": 2, "name": "Teilnehmer", "team": False, "path": "im Finale", "won": 0, "detail": "kein Spiel gewonnen"}, "Rang bleibt, Name neutral"
     assert recap["fastlaps"][0]["podium"][0]["name"] == "Teilnehmer" and recap["fastlaps"][0]["podium"][0]["detail"] == "1:31.234"
     assert "Lena" not in str(recap["winners"]) and "lena" not in str(recap["fastlaps"])
     # Gegenprobe: aktives Konto mit Namen.

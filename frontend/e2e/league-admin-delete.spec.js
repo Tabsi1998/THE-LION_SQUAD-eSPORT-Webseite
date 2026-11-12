@@ -102,10 +102,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
     });
     page.on("dialog", (dialog) => { throw new Error(`Browser-Rückfrage: ${dialog.message()}`); });
-    await page.goto("/admin/leagues/seasons/s1");
+    // Season-Seite mit Reitern (#2267): Antwortfrist im Reiter Termine, Staffeln im Reiter Ligen und Staffeln.
+    await page.goto("/admin/leagues/seasons/s1#termine");
+    await expect(page.getByTestId("season-form-response")).toHaveValue("72");
+    await page.getByTestId("season-tab-ligen").click();
     await expect(page.getByTestId("staffel-1-A")).toBeVisible();
     await expect(page.getByTestId("staffel-delete-1-B")).toHaveCount(0);
-    await expect(page.getByTestId("season-form-response")).toHaveValue("72");
     await noSideScroll(page);
 
     await page.getByTestId("staffel-delete-1-A").click();

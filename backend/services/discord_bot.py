@@ -123,7 +123,8 @@ async def count_message(db, user_id: str) -> None:
 async def handle_message(db, view: dict, guild_id: str, author_id: str, author_is_bot: bool) -> str | None:
     """Eine Nachricht auf einem Server des Bots (#302, #631): zählt für die Statistik dieses Servers und - bei
     verknüpftem Konto - für die Erfolge der Person. **Ein** Zähler je Person über alle Server. Gibt den Nutzer zurück,
-    dem sie zählt; gelesen wird nie, was in der Nachricht steht."""
+    dem sie zählt; gelesen wird nie, was in der Nachricht steht. Für die Erfolge zählen nur eingeschaltete Server, die
+    der Bot nicht verlassen hat (#2338) - die Statistik eines Servers zählt weiter."""
     if not view.get("count_messages") or author_is_bot:
         return None
     user_id = counted_user(author_id, author_is_bot, await linked_discord_ids(db))
@@ -132,9 +133,16 @@ async def handle_message(db, view: dict, guild_id: str, author_id: str, author_i
         await discord_stats.note_message(db, guild_id, user_id)
     except Exception as exc:  # noqa: BLE001 - die Statistik hält das Zählen für die Erfolge nie auf
         logger.warning("[discord-bot] Statistik: %s", type(exc).__name__)
-    if user_id:
-        await count_message(db, user_id)
+    if not user_id or not await _counts_for_achievements(db, guild_id):
+        return None
+    await count_message(db, user_id)
     return user_id
+
+
+async def _counts_for_achievements(db, guild_id: str) -> bool:
+    from services.discord_guild_store import COLLECTION, _usable
+
+    return _usable(await db[COLLECTION].find_one({"guild_id": str(guild_id)}, {"_id": 0, "enabled": 1, "left_at": 1}))
 
 
 async def note_guild_member(db, guild_id: str, joined: bool, is_bot: bool = False) -> None:

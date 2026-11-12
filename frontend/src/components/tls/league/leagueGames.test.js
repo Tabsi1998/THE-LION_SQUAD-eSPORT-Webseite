@@ -1,4 +1,4 @@
-import { changeGame, followLineups, confirmPayload, gamesProblem, mapsFor, modeFor, reportPayload, seriesSentence, settleGames, startGames, toggleLineup } from "./leagueGames";
+import { changeGame, followLineups, confirmPayload, gamesProblem, mapsFor, modeFor, plannedFor, reportPayload, seriesSentence, settleGames, startGames, toggleLineup } from "./leagueGames";
 
 // Ergebnis je Map (#1650): wie das Formular rechnet - Serie, nächste Map, Sätze und was an den Server geht.
 
@@ -82,4 +82,24 @@ test("eine Aufstellung zieht in späteren Maps mit, solange sie dort gleich war"
   expect(followLineups({ 1: [], 2: [] }, 2, ["u1"])).toEqual({ 1: [], 2: ["u1"] });
   const games = changeGame([{ position: 1, lineup: [] }, { position: 2, lineup: [] }], 1, { position: 1, lineup: ["u1"], winner: "a" });
   expect(games).toEqual([{ position: 1, lineup: ["u1"], winner: "a" }, { position: 2, lineup: ["u1"] }]);
+});
+// Veto (#1618, D.3): Modus und Map je Position stehen fest - das Formular übernimmt sie und fragt nur Sieger, Punkte und Aufstellung.
+test("mit Spielreihenfolge aus dem Veto kommen Modus und Map je Map fest, nichts geht an den Server dazu", () => {
+  const league = { ...LEAGUE, planned_games: [
+    { position: 1, mode: "stellung", mode_label: "Stellung", map_id: "nebel", map_name: "Nebel", role: "picked", by_registration_id: "a" },
+    { position: 2, mode: "suchen", mode_label: "Suchen", map_id: "turm", map_name: "Turm", role: "picked", by_registration_id: "b" },
+    { position: 3, mode: "stellung", mode_label: "Stellung", map_id: "hafen", map_name: "Hafen", role: "decider", by_registration_id: null },
+  ] };
+  expect(plannedFor(2, league).map_id).toBe("turm");
+  expect(plannedFor(2, LEAGUE)).toBeNull();
+  let games = startGames(league);
+  expect(games).toEqual([{ position: 1, mode: "stellung", map_id: "nebel", winner: "", scores: {}, lineup: [], planned: true }]);
+  expect(gamesProblem(games, league)).toBe("Map 1: bitte antippen, wer die Map gewonnen hat.");
+  games = settleGames([{ ...games[0], winner: "a", lineup: ["u1", "u2"] }], league);
+  expect(games[1]).toMatchObject({ position: 2, mode: "suchen", map_id: "turm", planned: true, lineup: ["u1", "u2"] });
+  games = settleGames([games[0], { ...games[1], winner: "b" }], league);
+  expect(games[2]).toMatchObject({ position: 3, mode: "stellung", map_id: "hafen", planned: true });
+  const payload = reportPayload(settleGames([games[0], games[1], { ...games[2], winner: "a" }], league), league);
+  expect(payload.games.map((game) => [game.position, game.mode, game.map_id])).toEqual([[1, "stellung", "nebel"], [2, "suchen", "turm"], [3, "stellung", "hafen"]]);
+  expect(payload.games.every((game) => !("planned" in game))).toBe(true);
 });

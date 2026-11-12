@@ -96,7 +96,11 @@ export function StatsTab() {
             <tbody className="divide-y divide-white/5">
               {rows.slice(0, shown).map((r) => (
                 <tr key={r.code} data-testid={`stats-row-${r.code}`}>
-                  <td className="py-1.5 pr-3">{r.name} <MaterialChip tier={r} className="ml-1" /></td>
+                  <td className="py-1.5 pr-3">
+                    {r.name} <MaterialChip tier={r} className="ml-1" />
+                    {/* Review N7: nicht mehr Erreichbares bleibt in der Statistik - mit Vermerk. */}
+                    {r.retired && <span className="ml-1 text-[9px] uppercase tracking-widest text-white/45" data-testid={`stats-retired-${r.code}`}>nicht mehr erreichbar</span>}
+                  </td>
                   <td className="py-1.5 pr-3 text-white/60">{r.group_name}</td>
                   <td className="py-1.5 pr-3 text-white/50">{categoryLabel(r.category)}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums">{r.holders}</td>

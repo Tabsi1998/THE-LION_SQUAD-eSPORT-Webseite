@@ -70,6 +70,40 @@ test("der ganze Weg: wählen, prüfen, zustimmen, einreichen, zurück zur Ligase
   expect(toastMock.success).toHaveBeenCalled();
 });
 
+// #2348: Mit „automatisch annehmen“ zählt das Einreichen gleich - Zusammenfassung und Meldung sagen das, ohne die Prüfung durch die Leitung.
+test("mit automatischer Annahme sagt die Zusammenfassung, dass ihr gleich angemeldet seid", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, application: { ...VIEW.application, auto_accept: true } } });
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "accepted" } });
+  renderPage();
+  await toConsent();
+  fireEvent.click(screen.getByTestId("apply-accept-rules"));
+  fireEvent.click(screen.getByTestId("apply-accept-privacy"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-summary-auto")).toHaveTextContent("seid ihr mit dem Einreichen angemeldet");
+  expect(screen.getByTestId("apply-summary-auto")).toHaveTextContent("Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste.");
+  expect(screen.getByTestId("apply-summary-auto")).toHaveTextContent("Zurückziehen geht dann bis zum Check-in, solange noch kein Spielplan steht.");
+  expect(screen.getByTestId("apply-summary")).not.toHaveTextContent("Die Liga-Leitung prüft die Anmeldung");
+  fireEvent.click(screen.getByTestId("apply-submit"));
+
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Angemeldet. Ihr habt einen Startplatz."));
+});
+
+test("ohne automatische Annahme prüft die Leitung", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "submitted" } });
+  renderPage();
+  await toConsent();
+  fireEvent.click(screen.getByTestId("apply-accept-rules"));
+  fireEvent.click(screen.getByTestId("apply-accept-privacy"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-summary")).toHaveTextContent("Die Liga-Leitung prüft die Anmeldung");
+  expect(screen.queryByTestId("apply-summary-auto")).toBeNull();
+  fireEvent.click(screen.getByTestId("apply-submit"));
+
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt."));
+});
+
 test("die Prüfung sagt im Klartext, was fehlt, und hält den Weg an", async () => {
   renderPage();
 
@@ -90,6 +124,53 @@ test("Warnungen halten nicht auf", async () => {
 
   expect(await screen.findByTestId("apply-warnings")).toHaveTextContent("Spiel-ID fehlt");
   expect(screen.getByTestId("apply-next")).toBeEnabled();
+});
+
+test("fehlende Angaben und zu wenige Spielberechtigte sind nur ein Hinweis, die Anmeldung geht weiter (#2313)", async () => {
+  const shortfall = "Nur 2 von 4 Spielern sind spielberechtigt, für ein Spiel braucht ein Team mindestens 3. Bis zum ersten Spiel im Profil nachtragen. Sonst kann das Team nicht einchecken und gilt als nicht angetreten – die Liga-Leitung kann das Spiel dann kampflos werten.";
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, squads: [{ ...SQUAD, shortfall, warnings: ["Mila: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein.", "Tom: Probe-ID fehlt im Profil."] }] } });
+  renderPage();
+
+  fireEvent.click(await screen.findByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-check-ok")).toHaveTextContent("Loewen · Rudel kann angemeldet werden.");
+  expect(screen.queryByTestId("apply-problems")).toBeNull();
+  expect(screen.queryByText(/Das fehlt noch/)).toBeNull();
+  const hints = screen.getByTestId("apply-warnings");
+  expect(hints).toHaveTextContent("Die Anmeldung geht trotzdem.");
+  expect(hints).toHaveTextContent("Geburtsdatum fehlt");
+  expect(hints).toHaveTextContent("kann nicht einchecken");
+  expect(screen.getByTestId("apply-shortfall")).toHaveTextContent("Nur 2 von 4 Spielern");
+  expect(screen.getByTestId("apply-next")).toBeEnabled();
+});
+
+test("die Prüfung nennt die Plattform der Season und abweichende Ligen (#2270)", async () => {
+  const platform = { field_label: "Plattform", allowed: ["PC"], crossplay: false, input_device: null, divisions: [
+    { id: "d1", label: "Liga 1", allowed: ["PC"], crossplay: false, input_device: null, differs: false },
+    { id: "d2", label: "Liga 2", allowed: [], crossplay: true, input_device: null, differs: true },
+  ] };
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, platform, squads: [{ ...SQUAD, warnings: ["Tom: Diese Season ist nur für PC – angegeben ist PlayStation."] }] } });
+  renderPage();
+
+  fireEvent.click(await screen.findByTestId("apply-squad-s1"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+
+  const note = await screen.findByTestId("apply-platform");
+  expect(note).toHaveTextContent("Plattform: nur PC.");
+  expect(note).toHaveTextContent("Crossplay: aus.");
+  expect(note).toHaveTextContent("Abweichend: Liga 2: alle Plattformen · Crossplay an.");
+  expect(note).not.toHaveTextContent("Liga 1");
+  expect(screen.getByTestId("apply-warnings")).toHaveTextContent("angegeben ist PlayStation");
+});
+
+test("ohne Plattform-Angabe steht nichts dazu", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, platform: null, squads: [SQUAD] } });
+  renderPage();
+
+  fireEvent.click(await screen.findByTestId("apply-next"));
+
+  expect(await screen.findByTestId("apply-check-ok")).toBeInTheDocument();
+  expect(screen.queryByTestId("apply-platform")).toBeNull();
 });
 
 test("ein einziges Co-Team ist schon gewählt", async () => {

@@ -34,7 +34,7 @@ async function mockServer(page) {
   await page.route("**/api/auth/me", json(ADMIN));
   await page.route("**/api/games", json(GAMES));
   await page.route("**/api/games/discord-servers", json([]));
-  const calls = { patch: [], delete: [], assign: [], imported: [], defaultPool: [] };
+  const calls = { patch: [], delete: [], assign: [], imported: [], defaultPool: [], mapPatch: [] };
   await page.route("**/api/games/g1", (route) => {
     calls[route.request().method().toLowerCase()]?.push?.(route.request().postDataJSON?.() ?? null);
     return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...GAMES[0], maps_cleaned: 3, maps_without_mode: 2 }) });
@@ -46,6 +46,10 @@ async function mockServer(page) {
       snd: { label: "Suchen & Zerstören", maps: 2, pools: 1, seasons: 1, pool_versions: 2, in_use: true } },
   }));
   await page.route("**/api/games/g1/maps", json({ game: { id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", modes: MODES }, maps: MAPS, limit: 200, default_pool: null }));
+  await page.route("**/api/games/g1/maps/nebel", (route) => {
+    calls.mapPatch.push(route.request().postDataJSON());
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...MAPS[1], ...route.request().postDataJSON(), affected_seasons: [], warning: null }) });
+  });
   await page.route("**/api/games/g1/maps/assign-modes", (route) => {
     calls.assign.push(route.request().postDataJSON());
     return route.fulfill({ contentType: "application/json", body: JSON.stringify({ updated: 2 }) });
@@ -82,6 +86,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(row).toBeVisible();
     await expect(page.getByTestId("game-row-altspiel")).toHaveCount(0);
     await expect(page.getByTestId("game-archive-probe-shooter")).toBeVisible();
+    // Spielseite (#2249): ein Zahnrad statt Stift und Karte.
+    await expect(page.getByTestId("game-settings-probe-shooter")).toHaveAttribute("href", "/admin/games/g1");
+    await expect(page.getByTestId("game-edit-probe-shooter")).toHaveCount(0);
+    await expect(page.getByTestId("game-maps-probe-shooter")).toHaveCount(0);
     await noSideScroll(page);
 
     await page.getByTestId("games-show-archived").check();
@@ -109,11 +117,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
   test(`Modus entfernen (${width} px): Rückfrage mit Zahl der Maps vor dem Speichern`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     const calls = await mockServer(page);
-    await page.goto("/admin/games");
-    await page.getByTestId("game-edit-probe-shooter").click();
+    await page.goto("/admin/games/g1#modi");
     await page.getByTestId("game-edit-mode-remove-0").click();
     await expect(page.getByTestId("game-edit-genre")).toHaveCount(0);
-    await page.getByTestId("game-edit-save").click();
+    await page.getByTestId("game-save-modi").click();
     const dialog = page.getByTestId("confirm-dialog-confirm").locator("xpath=ancestor::*[@role='dialog'][1]");
     await expect(dialog).toContainText("Modus „Stellung“ entfernen?");
     await expect(dialog).toContainText("3 Maps verlieren diesen Modus");
@@ -127,16 +134,16 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
   test(`Spielmodi (${width} px): verwendeter Modus mit Schloss, Zustand und Ergebnisregel geführt eintragen`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     const calls = await mockServer(page);
-    await page.goto("/admin/games");
-    await page.getByTestId("game-edit-probe-shooter").click();
+    await page.goto("/admin/games/g1#modi");
     await expect(page.getByTestId("game-edit-mode-locked-1")).toBeVisible();
     await expect(page.getByTestId("game-edit-mode-remove-1")).toHaveCount(0);
     await expect(page.getByTestId("game-edit-mode-used-1")).toContainText("nur deaktivieren oder archivieren");
     await expect(page.getByTestId("game-edit-mode-remove-0")).toBeEnabled();
 
-    await page.getByTestId("game-edit-mode-status-1").selectOption("inactive");
-    await expect(page.getByTestId("game-edit-mode-status-hint-1")).toContainText("nicht mehr zur Wahl");
     await page.getByTestId("game-edit-mode-more-1").click();
+    await page.getByTestId("game-edit-mode-status-1").selectOption("inactive");
+    await expect(page.getByTestId("game-edit-mode-chip-1")).toHaveText("Inaktiv");
+    await expect(page.getByTestId("game-edit-mode-status-hint-1")).toContainText("nicht mehr zur Wahl");
     await page.getByTestId("game-edit-mode-players-1").fill("4");
     await page.getByTestId("game-edit-mode-format-1").fill("Standard-Regeln");
     await page.getByTestId("game-edit-mode-rule-kind-1").selectOption("rounds");
@@ -150,11 +157,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
 
     // Passt die Regel nicht, sagt es die Seite vor dem Speichern - nichts geht an den Server.
     await page.getByTestId("game-edit-mode-rule-limit-1").fill("5");
-    await page.getByTestId("game-edit-save").click();
+    await page.getByTestId("game-save-modi").click();
     await expect(page.getByText("Das Rundenlimit (5) ist kleiner als das Ziel (6).", { exact: false })).toBeVisible();
     expect(calls.patch).toHaveLength(0);
     await page.getByTestId("game-edit-mode-rule-limit-1").fill("11");
-    await page.getByTestId("game-edit-save").click();
+    await page.getByTestId("game-save-modi").click();
     await expect.poll(() => calls.patch.length).toBe(1);
     expect(calls.patch[0].match_modes[1]).toEqual({
       mode: "snd", label: "Suchen & Zerstören", minutes: null, per_game: false, status: "inactive", players_per_side: 4, format: "Standard-Regeln",
@@ -167,6 +174,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     const calls = await mockServer(page);
     await page.goto("/admin/games/g1/maps");
+    await expect(page).toHaveURL(/\/admin\/games\/g1#maps$/);
     const notice = page.getByTestId("game-maps-without-mode");
     await expect(notice).toContainText("Diese Maps haben noch keinen Modus");
     await expect(notice).toContainText("Nebelwerk, Glutsenke");
@@ -176,6 +184,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await notice.getByTestId("game-maps-assign").click();
     await expect.poll(() => calls.assign.length).toBe(1);
     expect(calls.assign[0]).toEqual({ modes: ["snd"] });
+
+    // Tabelle Map × Modus (#2249): ein Häkchen gibt frei und speichert sofort.
+    await page.getByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" }).check();
+    await expect.poll(() => calls.mapPatch.length).toBe(1);
+    expect(calls.mapPatch[0]).toEqual({ modes: ["stellung"] });
+    await noSideScroll(page);
 
     await page.getByTestId("game-maps-import").click();
     const sheet = page.getByTestId("map-import-sheet");

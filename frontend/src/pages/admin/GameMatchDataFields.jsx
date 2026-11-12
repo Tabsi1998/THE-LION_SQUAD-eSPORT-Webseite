@@ -1,20 +1,32 @@
-// Spiel-Daten für Turniere (#1554) im Seitenblatt „Spiel bearbeiten“: Dauer je Modus, Spieler je Lauf, Best-of,
-// Aufbauzeit, Geräte für Stationen und Punktetabelle. Alles freiwillig; Umrechnen in lib/gameMatchData.js.
-// Je Modus dazu (#2206, C.1): Zustand, Beschreibung, Spieler je Seite, Format und Ergebnisregel. Verwendete Modi lassen sich
-// nur deaktivieren oder archivieren - der Knopf zum Entfernen steht nur bei unbenutzten.
+// Spiel-Daten für Turniere (#1554) und Spielmodi (#2206, C.1) im Reiter „Modi“ der Spielseite (#2249). Umrechnen in
+// lib/gameMatchData.js.
+// - GameModesEditor: je Modus eine Zeile mit Name, Zustand, Spieler je Seite, Ergebnisregel und Dauer; ein Klick klappt alle
+//   Felder auf. Verwendete Modi lassen sich nur deaktivieren oder archivieren - statt des Papierkorbs steht ein Schloss.
+// - GameTournamentPresets: Spieler je Lauf, Best-of, Aufbauzeit, Geräte für Stationen und Punktetabelle. Alles freiwillig.
 import { useState } from "react";
 import { ChevronDown, Lock, Plus, Trash2 } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { ImageUpload } from "@/components/tls/ImageUpload";
+import { ModeIcon } from "@/components/tls/ModeIcon";
+import { useOptionalAuth } from "@/context/AuthContext";
 import {
   MODES_MAX, MODE_DESCRIPTION_MAX, MODE_FORMAT_MAX, MODE_STATUS_OPTIONS, RESULT_RULE_KINDS, STATION_DEVICE_OPTIONS,
   emptyMode, modeInUse, parsePointsTable, resultRuleText,
 } from "@/lib/gameMatchData";
+import { hasMediaRole, mediaPropsFor } from "@/lib/mediaAccess";
+import { parseDuration } from "@/lib/modeSettings";
 import { formatDeviceType } from "@/lib/tournamentLabels";
+import { ModeSettingsEditor } from "./ModeSettingsEditor";
 
 const STATUS_HINTS = {
   inactive: "Inaktiv: steht für neue Map-Pools, „Modus je Map“ und Turniere nicht mehr zur Wahl. Laufende Spiele, gespeicherte Pools und alte Ergebnisse zeigen ihn weiter.",
   archived: "Archiviert: wie inaktiv, dazu in allen Auswahllisten der Verwaltung ausgeblendet und an keiner Map neu wählbar. Bestehendes zeigt ihn weiter.",
+};
+const STATUS_CHIPS = {
+  active: ["Aktiv", "border-ok/30 text-ok"],
+  inactive: ["Inaktiv", "border-warn/40 text-warn"],
+  archived: ["Archiviert", "border-white/15 text-white/50"],
 };
 const RULE_HINTS = {
   "": "Ohne Regel wird jeder Endstand angenommen.",
@@ -24,13 +36,35 @@ const RULE_HINTS = {
 };
 const TARGET_LABELS = { score: "Ziel (Punkte)", rounds: "Runden zum Sieg" };
 
-function rowSummary(mode) {
-  const rule = resultRuleText({
-    kind: mode.rule_kind, target: mode.rule_target, round_limit: mode.rule_round_limit, time_limit_minutes: mode.rule_time_limit,
-    draw_allowed: mode.rule_draw, overtime: mode.rule_overtime,
+function ruleOf(mode) {
+  return resultRuleText({
+    kind: mode.rule_kind, target: mode.rule_target, round_limit: mode.rule_round_limit, time_limit_seconds: parseDuration(mode.rule_time_limit),
+    round_time_seconds: parseDuration(mode.rule_round_time), draw_allowed: mode.rule_draw, overtime: mode.rule_overtime,
   });
-  const players = String(mode.players_per_side || "").trim() ? `${mode.players_per_side} je Seite` : "";
-  return [players, String(mode.format || "").trim(), rule].filter(Boolean).join(" · ") || "Beschreibung, Spieler je Seite, Format, Ergebnisregel";
+}
+
+// Symbol des Modus (#2266): quadratisch, Hochladen, aus der Bibliothek wählen oder entfernen. Ohne Medienrolle eigene Bilder (wie im
+// Regelwerk, #2230), mit Medienrolle auch SVG über die Logo-Route.
+function ModeIconField({ mode, index, setMode, testPrefix }) {
+  const user = useOptionalAuth()?.user;
+  const media = hasMediaRole(user);
+  return (
+    <div className="min-w-0">
+      <ImageUpload value={mode.icon_url} onChange={(value) => setMode(index, { icon_url: value || "" })} label="Symbol (quadratisch)"
+        variant="square" crop="square" allowLibrary logo={media} logoPreview={false} endpoint={media ? "/uploads/logo" : "/uploads/image"}
+        testId={`${testPrefix}-mode-icon-${index}`} {...mediaPropsFor(user)} />
+      <p className="mt-1 text-xs text-white/45">Erscheint vor dem Namen auf Match- und Ligaseite, im Map-Pool und im Regelwerk. Ohne Bild steht ein neutrales Symbol.</p>
+    </div>
+  );
+}
+
+const playersOf = (mode) => (String(mode.players_per_side || "").trim() ? `${mode.players_per_side} je Seite` : "");
+const durationOf = (mode) => (String(mode.minutes || "").trim() ? `${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : "");
+
+/** Was eingetragen ist, in einer Zeile - für die Handy-Ansicht der Modus-Zeile. */
+export function modeSummary(mode) {
+  return [playersOf(mode), String(mode.format || "").trim(), ruleOf(mode), durationOf(mode)].filter(Boolean).join(" · ")
+    || "Noch nichts festgelegt – aufklappen für Spieler je Seite, Ergebnisregel und Dauer";
 }
 
 // Entfernen nur bei unbenutzten Modi: neue Zeilen immer, gespeicherte erst, wenn die Zählung „unbenutzt“ sagt. Lädt sie noch
@@ -63,9 +97,8 @@ function RemoveOrLock({ mode, index, usage, onRemove, testPrefix }) {
 
 function ModeDetails({ mode, index, setMode, testPrefix }) {
   const kind = mode.rule_kind || "";
-  const id = `${testPrefix}-mode-details-${index}`;
   return (
-    <div id={id} className="space-y-3 border-t border-white/10 pt-3" data-testid={id}>
+    <>
       <TextAreaField label="Beschreibung" rows={2} value={mode.description} onChange={(value) => setMode(index, { description: value.slice(0, MODE_DESCRIPTION_MAX) })}
         placeholder="Kurz, worum es in diesem Modus geht."
         hint={`${String(mode.description || "").length} / ${MODE_DESCRIPTION_MAX} Zeichen`} testId={`${testPrefix}-mode-description-${index}`} />
@@ -92,9 +125,13 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
                   onChange={(value) => setMode(index, { rule_round_limit: value })} placeholder="z. B. 11" hint="Höchstens so viele Runden. Leer: offen."
                   testId={`${testPrefix}-mode-rule-limit-${index}`} />
               )}
-              <TextField label="Zeitlimit Min." type="number" min="1" max="600" value={mode.rule_time_limit}
-                onChange={(value) => setMode(index, { rule_time_limit: value })} placeholder="z. B. 10" hint="Je Map. Leer: ohne Zeitlimit."
-                testId={`${testPrefix}-mode-rule-time-${index}`} />
+              <TextField label="Zeitlimit je Map" value={mode.rule_time_limit}
+                onChange={(value) => setMode(index, { rule_time_limit: value })} placeholder="z. B. 10 oder 1:30"
+                hint="Minuten, 1:30 oder 90 s. Leer: ohne Zeitlimit." testId={`${testPrefix}-mode-rule-time-${index}`} />
+            </FormGrid>
+            <FormGrid cols={2}>
+              <TextField label="Zeit je Runde" value={mode.rule_round_time} onChange={(value) => setMode(index, { rule_round_time: value })}
+                placeholder="z. B. 1:45" hint="Etwa bei Runden-Modi. Nur Angabe für Regelwerk und Anzeige." testId={`${testPrefix}-mode-rule-round-time-${index}`} />
             </FormGrid>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <CheckField label="Remis erlaubt" checked={mode.rule_draw} onChange={(value) => setMode(index, { rule_draw: value })} testId={`${testPrefix}-mode-rule-draw-${index}`} />
@@ -102,9 +139,164 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
             </div>
           </>
         )}
-        <p className="text-xs text-white/45">Die Regel wird gespeichert und hier angezeigt. Gemeldete Endstände prüft die Seite damit noch nicht.</p>
+        {/* Seit C.3 (#1617): Die Season übernimmt die Regel als Kopie und prüft damit - der Hinweis sagt das (docs/handbuch/turniere.md 3.12). */}
+        <p className="text-xs text-white/45" data-testid={`${testPrefix}-mode-rule-note-${index}`}>
+          Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand. Spätere Änderungen hier
+          erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts.
+        </p>
       </fieldset>
-    </div>
+      {/* Freie Einstellungen und Regeltext (#2271): die Season übernimmt sie mit der Regel als Kopie. */}
+      <ModeSettingsEditor value={{ settings: mode.settings || [], rules_text: mode.rules_text || "" }}
+        onChange={(next) => setMode(index, { settings: next.settings, rules_text: next.rules_text })} testPrefix={`${testPrefix}-mode-settings-${index}`} />
+    </>
+  );
+}
+
+// Spalten der Modus-Zeile ab 768 px: Name, Zustand, Spieler je Seite, Ergebnisregel, Dauer. Darunter steht alles in zwei Zeilen.
+const ROW_GRID = "grid grid-cols-[1rem_minmax(0,1fr)] md:grid-cols-[1rem_minmax(0,1.3fr)_6.5rem_6.5rem_minmax(0,2fr)_6rem] gap-x-3 gap-y-1 items-center";
+
+function ModeRow({ mode, index, open, onToggle, setMode, usage, onRemove, isFirst, testPrefix }) {
+  const status = mode.status || "active";
+  const [chip, chipClass] = STATUS_CHIPS[status] || STATUS_CHIPS.active;
+  const detailsId = `${testPrefix}-mode-details-${index}`;
+  const rule = ruleOf(mode);
+  return (
+    <li className={`border rounded-sm bg-[#0A0A0A] ${open ? "border-[#29B6E8]/40" : "border-white/10"}`} data-testid={`${testPrefix}-mode-row-${index}`}>
+      <div className="flex items-center gap-1 pr-1">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={detailsId}
+          data-testid={`${testPrefix}-mode-more-${index}`}
+          className={`${ROW_GRID} min-w-0 flex-1 px-3 py-2.5 text-left rounded-sm hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]`}
+        >
+          <ChevronDown className={`w-4 h-4 text-[#29B6E8] transition-transform duration-fast ease-tls ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+          <span className="flex min-w-0 items-center gap-2">
+            <ModeIcon src={mode.icon_url} size="sm" testId={`${testPrefix}-mode-icon-thumb-${index}`} />
+            <span className="min-w-0 truncate font-semibold text-white" data-testid={`${testPrefix}-mode-name-${index}`}>
+              {String(mode.label || "").trim() || <span className="font-normal text-white/45">Neuer Modus</span>}
+            </span>
+          </span>
+          <span className="col-start-2 md:col-start-auto">
+            <span className={`inline-block rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${chipClass}`} data-testid={`${testPrefix}-mode-chip-${index}`}>{chip}</span>
+          </span>
+          <span className="hidden md:block text-xs text-white/70 tabular-nums">{playersOf(mode) || <span className="text-white/35">–</span>}</span>
+          <span className="hidden md:block min-w-0 truncate text-xs text-white/70" title={rule}>{rule || <span className="text-white/35">keine Regel</span>}</span>
+          <span className="hidden md:block text-xs text-white/70 tabular-nums">{durationOf(mode) || <span className="text-white/35">–</span>}</span>
+          <span className="col-start-2 md:hidden min-w-0 text-xs text-white/55 [overflow-wrap:anywhere]" data-testid={`${testPrefix}-mode-summary-${index}`}>{modeSummary(mode)}</span>
+        </button>
+        <RemoveOrLock mode={mode} index={index} usage={usage} onRemove={onRemove} testPrefix={testPrefix} />
+      </div>
+      {mode.mode && modeInUse(usage, mode.mode) && (
+        <p className="px-3 pb-2 -mt-1 text-[11px] text-white/50" data-testid={`${testPrefix}-mode-used-${index}`}>
+          Wird verwendet (Pool, Reihenfolge, Turnier oder Spiel) – entfernen geht nicht, nur deaktivieren oder archivieren.
+        </p>
+      )}
+      {open && (
+        <div id={detailsId} className="space-y-4 border-t border-white/10 p-3 md:p-4" data-testid={detailsId}>
+          <FormGrid cols={2}>
+            <TextField label="Name" required maxLength={60} value={mode.label} onChange={(value) => setMode(index, { label: value })}
+              placeholder={index === 0 ? "z. B. Grand Prix 4 Rennen" : "z. B. Suchen & Zerstören"} hint="Umbenennen behält die Zuordnung der Maps."
+              testId={`${testPrefix}-mode-label-${index}`} />
+            <SelectField label="Zustand" value={status} onChange={(value) => setMode(index, { status: value })} options={MODE_STATUS_OPTIONS}
+              testId={`${testPrefix}-mode-status-${index}`} />
+          </FormGrid>
+          {STATUS_HINTS[status] && (
+            <p className="text-xs text-warn/90" data-testid={`${testPrefix}-mode-status-hint-${index}`}>{STATUS_HINTS[status]}</p>
+          )}
+          <ModeIconField mode={mode} index={index} setMode={setMode} testPrefix={testPrefix} />
+          <fieldset className="space-y-2">
+            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Dauer für die Turnierplanung</legend>
+            <div className="grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center">
+              <TextField label="Minuten" type="number" min="1" max="600" value={mode.minutes} onChange={(value) => setMode(index, { minutes: value })}
+                placeholder="z. B. 12" testId={`${testPrefix}-mode-minutes-${index}`} />
+              <CheckField label="Minuten je Einzelspiel – Best-of zählt mit" checked={mode.per_game} onChange={(value) => setMode(index, { per_game: value })}
+                testId={`${testPrefix}-mode-per-game-${index}`} className="md:mt-5" />
+            </div>
+            <p className="text-xs text-white/45">
+              Freiwillig. Ein Modus ohne Dauer dient nur den Maps und der Reihenfolge einer Liga.
+              {isFirst ? " Der erste Modus ist die Vorgabe für die Dauer, wenn ein Turnier keinen Modus wählt." : ""}
+            </p>
+          </fieldset>
+          <ModeDetails mode={mode} index={index} setMode={setMode} testPrefix={testPrefix} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+export function GameModesEditor({ modes = [], onChange, usage, testPrefix = "game-edit" }) {
+  const setMode = (index, patch) => onChange(modes.map((mode, i) => (i === index ? { ...mode, ...patch } : mode)));
+  // Aufgeklappte Zeilen; eine neue Zeile kommt aufgeklappt, damit man gleich den Namen tippt.
+  const [open, setOpen] = useState(() => new Set());
+  const toggle = (index) => setOpen((current) => {
+    const next = new Set(current);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    return next;
+  });
+  const add = () => {
+    onChange([...modes, emptyMode()]);
+    setOpen((current) => new Set([...current, modes.length]));
+  };
+  const removeMode = (index) => {
+    onChange(modes.filter((_, i) => i !== index));
+    setOpen((current) => new Set([...current].filter((at) => at !== index).map((at) => (at > index ? at - 1 : at))));
+  };
+
+  return (
+    <FormSection
+      title="Modi"
+      hint="Ein Modus ist eine Spielart, etwa „Suchen & Zerstören“ oder „Grand Prix“. Im Reiter Maps gibst du je Modus die Maps frei; Turniere planen mit seiner Dauer, Liga-Seasons spielen ihn in ihrer Reihenfolge."
+      testId={`${testPrefix}-modes`}
+    >
+      {modes.length === 0 ? (
+        <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 text-sm text-white/55" data-testid={`${testPrefix}-modes-empty`}>
+          Noch kein Modus. Ohne Modus gilt die Matchdauer des Turniers, sonst 30 Minuten, und jede Map gilt für jeden Pool.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <div className={`${ROW_GRID} hidden md:grid px-3 pr-12 text-[10px] font-bold uppercase tracking-widest text-white/40`} aria-hidden="true">
+            <span />
+            <span>Modus</span>
+            <span>Zustand</span>
+            <span>Spieler</span>
+            <span>Ergebnisregel</span>
+            <span>Dauer</span>
+          </div>
+          <ul className="space-y-2">
+            {modes.map((mode, index) => (
+              <ModeRow key={index} mode={mode} index={index} open={open.has(index)} onToggle={() => toggle(index)} setMode={setMode} usage={usage}
+                onRemove={() => removeMode(index)} isFirst={index === 0 && modes.length > 1} testPrefix={testPrefix} />
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={add}
+          disabled={modes.length >= MODES_MAX}
+          className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+          data-testid={`${testPrefix}-mode-add`}
+        >
+          <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Modus hinzufügen
+        </button>
+        {modes.length >= MODES_MAX && (
+          <span className="text-xs text-white/45" data-testid={`${testPrefix}-modes-full`}>Höchstens {MODES_MAX} Modi je Spiel.</span>
+        )}
+      </div>
+      {modes.some((mode) => mode.per_game) && (
+        <p className="text-xs text-white/45">Je Einzelspiel: ein Best of 3 plant 2,5 Spiele, ein Best of 5 vier.</p>
+      )}
+      {modes.length > 0 && (
+        <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-maps`}>
+          Entfernen geht nur bei unbenutzten Modi und nimmt sie beim Speichern auch aus den Maps. Einen verwendeten Modus stellst du
+          auf „Inaktiv“ oder „Archiviert“.
+        </p>
+      )}
+    </FormSection>
   );
 }
 
@@ -118,23 +310,9 @@ function pointsPreview(points) {
   return `${points.length === 1 ? "1 Platz" : `${points.length} Plätze`}: ${shown}${rest}`;
 }
 
-export function GameMatchDataFields({ value, onChange, testPrefix = "game-edit", usage }) {
+export function GameTournamentPresets({ value, onChange, testPrefix = "game-edit" }) {
   const data = value;
   const set = (key, next) => onChange({ ...data, [key]: next });
-  const modes = data.match_modes || [];
-  const setMode = (index, patch) => set("match_modes", modes.map((mode, i) => (i === index ? { ...mode, ...patch } : mode)));
-  // Aufgeklappte Details je Zeile; eine neue Zeile kommt zugeklappt.
-  const [open, setOpen] = useState(() => new Set());
-  const toggle = (index) => setOpen((current) => {
-    const next = new Set(current);
-    if (next.has(index)) next.delete(index);
-    else next.add(index);
-    return next;
-  });
-  const removeMode = (index) => {
-    set("match_modes", modes.filter((_, i) => i !== index));
-    setOpen((current) => new Set([...current].filter((at) => at !== index).map((at) => (at > index ? at - 1 : at))));
-  };
   const devices = data.station_devices || [];
   const knownDevices = STATION_DEVICE_OPTIONS.map(([key]) => key);
   const deviceOptions = [...STATION_DEVICE_OPTIONS, ...devices.filter((key) => !knownDevices.includes(key)).map((key) => [key, formatDeviceType(key)])];
@@ -145,121 +323,10 @@ export function GameMatchDataFields({ value, onChange, testPrefix = "game-edit",
 
   return (
     <FormSection
-      title="Für Turniere"
-      hint="Alles freiwillig. Hat ein Turnier keine eigene Matchdauer, plant es mit dem gewählten Modus, sonst mit dem ersten. Best-of und Spieler je Lauf füllen das Turnierformular vor."
+      title="Vorgaben für Turniere"
+      hint="Alles freiwillig. Best-of und Spieler je Lauf füllen das Turnierformular vor, die Aufbauzeit kommt zur Dauer aus dem Modus dazu."
       testId={`${testPrefix}-match-data`}
     >
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modi und Dauer</div>
-          <button
-            type="button"
-            onClick={() => set("match_modes", [...modes, emptyMode()])}
-            disabled={modes.length >= MODES_MAX}
-            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm"
-            data-testid={`${testPrefix}-mode-add`}
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Modus
-          </button>
-        </div>
-        {modes.length === 0 ? (
-          <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-empty`}>
-            Noch kein Modus. Ohne Modus gilt die Matchdauer des Turniers, sonst 30 Minuten.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {modes.map((mode, index) => (
-              <li key={index} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2.5 space-y-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_auto] gap-2 items-center">
-                  <input
-                    value={mode.label}
-                    onChange={(e) => setMode(index, { label: e.target.value })}
-                    maxLength={60}
-                    placeholder={index === 0 ? "z. B. Grand Prix 4 Rennen" : "z. B. Einzelrennen"}
-                    aria-label={`Modus ${index + 1}: Name`}
-                    data-testid={`${testPrefix}-mode-label-${index}`}
-                    className="min-w-0 w-full bg-[#121212] border border-white/10 focus:border-[#29B6E8] px-2.5 py-2 rounded-sm text-sm text-white focus:outline-none"
-                  />
-                  <label className="relative block">
-                    <input
-                      type="number"
-                      min="1"
-                      max="600"
-                      inputMode="numeric"
-                      value={mode.minutes}
-                      onChange={(e) => setMode(index, { minutes: e.target.value })}
-                      aria-label={`Modus ${index + 1}: Minuten`}
-                      data-testid={`${testPrefix}-mode-minutes-${index}`}
-                      className="w-full bg-[#121212] border border-white/10 focus:border-[#29B6E8] pl-2.5 pr-9 py-2 rounded-sm text-sm text-white tabular-nums focus:outline-none"
-                    />
-                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-white/45">Min.</span>
-                  </label>
-                  <RemoveOrLock mode={mode} index={index} usage={usage} onRemove={() => removeMode(index)} testPrefix={testPrefix} />
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  <label className="inline-flex items-center gap-2 text-xs text-white/70">
-                    <input
-                      type="checkbox"
-                      checked={!!mode.per_game}
-                      onChange={(e) => setMode(index, { per_game: e.target.checked })}
-                      data-testid={`${testPrefix}-mode-per-game-${index}`}
-                      className="accent-[#29B6E8]"
-                    />
-                    Minuten je Einzelspiel – Best-of zählt mit
-                  </label>
-                  <label className="inline-flex min-w-0 items-center gap-2 text-xs text-white/70">
-                    <span className="shrink-0">Zustand</span>
-                    <select
-                      value={mode.status || "active"}
-                      onChange={(e) => setMode(index, { status: e.target.value })}
-                      aria-label={`Modus ${index + 1}: Zustand`}
-                      data-testid={`${testPrefix}-mode-status-${index}`}
-                      className="min-w-0 max-w-[15rem] bg-[#121212] border border-white/10 focus:border-[#29B6E8] px-2 py-1.5 rounded-sm text-xs text-white focus:outline-none"
-                    >
-                      {MODE_STATUS_OPTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                    </select>
-                  </label>
-                </div>
-                {index === 0 && modes.length > 1 && <p className="text-[11px] text-white/45">Vorgabe für die Dauer, wenn das Turnier keinen Modus wählt</p>}
-                {STATUS_HINTS[mode.status] && (
-                  <p className="text-[11px] text-warn/90" data-testid={`${testPrefix}-mode-status-hint-${index}`}>{STATUS_HINTS[mode.status]}</p>
-                )}
-                {mode.mode && modeInUse(usage, mode.mode) && (
-                  <p className="text-[11px] text-white/50" data-testid={`${testPrefix}-mode-used-${index}`}>
-                    Wird verwendet (Pool, Reihenfolge, Turnier oder Spiel) – entfernen geht nicht, nur deaktivieren oder archivieren.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => toggle(index)}
-                  aria-expanded={open.has(index)}
-                  aria-controls={`${testPrefix}-mode-details-${index}`}
-                  data-testid={`${testPrefix}-mode-more-${index}`}
-                  className="flex w-full min-w-0 items-center gap-2 text-left text-xs text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm"
-                >
-                  <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform duration-fast${open.has(index) ? "rotate-180" : ""}`} aria-hidden="true" />
-                  <span className="min-w-0 truncate">{rowSummary(mode)}</span>
-                </button>
-                {open.has(index) && <ModeDetails mode={mode} index={index} setMode={setMode} testPrefix={testPrefix} />}
-              </li>
-            ))}
-          </ul>
-        )}
-        {modes.length >= MODES_MAX && (
-          <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-full`}>Höchstens {MODES_MAX} Modi je Spiel.</p>
-        )}
-        {modes.some((mode) => mode.per_game) && (
-          <p className="text-xs text-white/45">Je Einzelspiel: ein Best of 3 plant 2,5 Spiele, ein Best of 5 vier.</p>
-        )}
-        {modes.length > 0 && (
-          <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-maps`}>
-            Minuten freiwillig – ein Modus ohne Dauer dient nur den Maps (Spiele → Maps). Umbenennen behält die Zuordnung.
-            Entfernen geht nur bei unbenutzten Modi und nimmt sie beim Speichern auch aus den Maps. Einen verwendeten Modus
-            stellst du auf „Inaktiv“ oder „Archiviert“.
-          </p>
-        )}
-      </div>
-
       <FormGrid cols={2}>
         <TextField label="Spieler je Lauf vor Ort" type="number" min="1" max="64" value={data.players_per_run_local} onChange={(v) => set("players_per_run_local", v)} placeholder="z. B. 4" hint="Wie viele an einer Station gleichzeitig spielen." testId={`${testPrefix}-run-local`} />
         <TextField label="Spieler je Lauf online" type="number" min="1" max="64" value={data.players_per_run_online} onChange={(v) => set("players_per_run_online", v)} placeholder="z. B. 12" hint="Wie viele in einer Online-Lobby spielen." testId={`${testPrefix}-run-online`} />

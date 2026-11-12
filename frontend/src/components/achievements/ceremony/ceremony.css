@@ -38,6 +38,22 @@
 .tls-ceremony__vitrine { position: absolute; inset: 1rem 2.5rem; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 40%, rgba(255, 255, 255, 0.05)); transform-origin: center; }
 .tls-ceremony__levelnum { font-family: var(--font-display, inherit); font-weight: 900; font-size: 5.5rem; line-height: 1; color: var(--cer-accent, #29B6E8); text-shadow: 0 0 24px color-mix(in srgb, var(--cer-accent, #29B6E8) 60%, transparent); }
 .tls-ceremony__live-text { position: absolute; left: -9999px; }
+/* Neuberechnung (#2340): Zahl, nachgezeichnete Linie, Raster der nachgerechneten Abzeichen mit Glanz. */
+.tls-ceremony__recount { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0 1rem; width: 100%; }
+.tls-ceremony__recount-count { font-family: var(--font-display, inherit); font-weight: 900; font-size: 3.25rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--cer-accent, var(--tls-honor)); text-shadow: 0 0 24px color-mix(in srgb, var(--cer-accent, var(--tls-honor)) 55%, transparent); }
+.tls-ceremony__recount-trace { display: block; width: 7rem; height: 2px; border-radius: 1px; background: linear-gradient(90deg, transparent, var(--cer-accent, var(--tls-honor)), transparent); transform-origin: center; }
+.tls-ceremony__recount-grid { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; max-width: 24rem; padding-top: 0.35rem; }
+.tls-ceremony__recount-item { position: relative; }
+.tls-ceremony__recount-glow { position: absolute; inset: -8px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--cer-accent, var(--tls-honor)) 45%, transparent), transparent 70%); pointer-events: none; }
+.tls-ceremony__recount-more { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--cer-accent, var(--tls-honor)) 50%, transparent); color: var(--cer-accent, var(--tls-honor)); font-size: 0.8rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.tls-ceremony__recount-shine { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 6px; }
+.tls-ceremony__recount-sheen { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; background: linear-gradient(100deg, transparent 35%, color-mix(in srgb, var(--cer-accent, var(--tls-honor)) 35%, transparent) 50%, transparent 65%); mix-blend-mode: screen; }
+@media (max-width: 640px) {
+  .tls-ceremony__recount-count { font-size: 2.75rem; }
+  .tls-ceremony__recount-grid { gap: 0.375rem; max-width: 19rem; }
+  .tls-ceremony__stage .tls-ceremony__recount .tls-badge { width: 40px; height: 40px; }
+  .tls-ceremony__recount-more { width: 40px; height: 40px; }
+}
 
 @keyframes tls-cer-flash { 0% { opacity: 0; } 20% { opacity: 0.35; } 100% { opacity: 0; } }
 @keyframes tls-cer-flood { 0% { opacity: 0; } 30% { opacity: 0.55; } 100% { opacity: 0; } }

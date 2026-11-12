@@ -1,4 +1,4 @@
-import { MOTIONS, MOTION_KEYS, SEQUENCE_KEYS, describePackage, groupTier, levelTexts, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
+import { MOTIONS, MOTION_KEYS, SEQUENCE_KEYS, describePackage, groupTier, levelTexts, particleBudget, particleKind, planCeremony, recountTexts, sortByRank } from "./select";
 
 // Auswahl-Logik (E8): welcher Ablauf für welches Paket, welche Bewegung für welche Kategorie.
 
@@ -25,10 +25,10 @@ describe("planCeremony", () => {
     expect(plan.sound).toEqual({ material: "gold", special: null });
   });
 
-  it("kennt elf Bewegungen und acht Abläufe", () => {
+  it("kennt elf Bewegungen und neun Abläufe (die Sammel-Zeremonie der Neuberechnung kam mit #2340)", () => {
     expect(Object.keys(MOTIONS)).toHaveLength(11);
     expect(MOTION_KEYS).toHaveLength(11);
-    expect(SEQUENCE_KEYS).toEqual(["single", "stack", "first", "group", "category", "diamond", "legendary", "levelup"]);
+    expect(SEQUENCE_KEYS).toEqual(["single", "stack", "first", "group", "category", "diamond", "legendary", "levelup", "recount"]);
   });
 
   it("wählt die Sonderabläufe in der richtigen Rangfolge", () => {
@@ -96,6 +96,25 @@ describe("describePackage", () => {
     ];
     expect(describePackage(done, [{ code: "b3" }]).categoryCompleted).toBe("season");
     expect(describePackage(done, [{ code: "b3" }]).groupCompleted).toBe("b");
+  });
+});
+
+describe("planCeremony: Neuberechnung (#2340)", () => {
+  it("macht aus den nachgerechneten Stufen eine Sammel-Zeremonie - vor jedem anderen Sonderablauf", () => {
+    const tiers = [tier("a", "bronze", 3, "match"), tier("b", "gold", 5, "team"), tier("c", "diamond", 7, "season")];
+    const plan = planCeremony({ tiers, context: { recount: true, firstEver: true, groupCompleted: "x" } });
+    expect(plan.sequence).toBe("recount");
+    expect(plan.tiers.map((t) => t.code)).toEqual(["c", "b", "a"]);
+    expect(plan.duration).toBe(6500 + 150 * 3);
+    expect(plan.sound).toEqual({ material: "diamond", special: null });
+    expect(plan.particles).toBe(particleBudget("recount", "diamond"));
+    // Gezeigt werden höchstens zwölf Abzeichen - länger dauert es auch mit vierzig nicht.
+    expect(planCeremony({ tiers: Array.from({ length: 40 }, (_, i) => tier(`t${i}`, "wood", 1, "match")), context: { recount: true } }).duration).toBe(6500 + 150 * 12);
+  });
+
+  it("spricht im Singular und Plural", () => {
+    expect(recountTexts(1)).toEqual({ heading: "Du hast einen Erfolg nachträglich bekommen", sub: "Erfolge neu berechnet" });
+    expect(recountTexts(7).heading).toBe("Du hast 7 Erfolge nachträglich bekommen");
   });
 });
 

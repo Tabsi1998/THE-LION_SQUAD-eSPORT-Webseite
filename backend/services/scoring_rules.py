@@ -16,8 +16,11 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
 - **Vorrang bei Gleichstand** (``tiebreakers``): ``wins``, ``podiums``, ``countback`` (mehr Siege, dann mehr zweite
   Plätze …), ``best_place`` und ``latest_result`` (besseres Ergebnis in der letzten gemeinsamen Runde, dann davor).
   Entscheidet keines, teilen sich beide den Platz (``rank_with_ties``: 1, 2, 2, 4).
-- **Team-Liga:** Punkte für Sieg, Unentschieden und Niederlage (``match_points``) statt fest 3/1/0, Tabelle mit
-  ``table_tiebreakers`` (``score_diff``, ``score_for``, ``wins``).
+- **Team-Liga:** Punkte für Sieg, Unentschieden und Niederlage (``match_points``) statt fest 3/1/0 oder je gewonnene Map
+  (``match_points_mode: maps``, #2312), Tabelle mit
+  ``table_tiebreakers`` (``score_diff``, ``score_for``, ``wins``; in der Liga-Staffel auch ``head_to_head`` und
+  ``lead_decision``). Nur für die Liga-Staffel (E.1, #1625, docs/LIGA.md): ``head_to_head_criteria``, ``allow_draws``,
+  ``forfeit_score``, ``exit_rule``; Vorgaben neuer Liga-Seasons in ``LEAGUE_TABLE_DEFAULTS``.
 - **Turniertage (#1961):** ``day_rounds`` - Runden innerhalb eines Termins (``count`` Spalten R1…Rn als Vorgabe,
   0 = aus, und ihr Punkteschema, Vorgabe 8…1), ``custom_bonuses`` - eigene Sonderboni je Saison (Name und Punkte, etwa
   „Bingo 3P“), ``tiebreak_top_n`` - das N der Gleichstand-Regel ``top_n`` („mehr Plätze unter den besten N“).
@@ -34,6 +37,7 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
 """
 from __future__ import annotations
 
+import copy
 import math
 from typing import Callable
 
@@ -43,7 +47,15 @@ from services.series_identity import normalize_name
 POINTS_MODES = ("scheme", "organizer")
 COUNT_MODES = ("all", "best_n", "drop_n")
 TIEBREAKERS = ("wins", "top_n", "podiums", "countback", "best_place", "latest_result")
-TABLE_TIEBREAKERS = ("score_diff", "score_for", "wins")
+TABLE_TIEBREAKERS = ("score_diff", "score_for", "wins", "head_to_head", "lead_decision")
+# Tabelle einer Liga-Staffel (E.1, #1625, docs/LIGA.md): Kriterien der Mini-Tabelle, Default-Win und Ausscheiden.
+HEAD_TO_HEAD_CRITERIA = ("points", "score_diff", "score_for")
+FORFEIT_SCORES = ("recorded", "best_of")
+EXIT_RULES = ("half", "all_for_opponents")
+# Punkteart der Team-Liga (#2312): Punkte aus ``match_points`` für Sieg/Remis/Niederlage oder je gewonnene Map (3:2 = 3 und 2).
+MATCH_POINTS_MODES = ("result", "maps")
+# Vorschlag der Reihenfolge bei Punktgleichheit für Map-Punkte (#2312): mehr Siege, direkter Vergleich, Map-Differenz, Leitung.
+MAPS_TABLE_TIEBREAKERS = ("wins", "head_to_head", "score_diff", "lead_decision")
 MARKS = ("dnf", "dns", "dsq", "fastest_lap", "pole", "left")
 BONUS_MARKS = ("fastest_lap", "pole")
 POINT_SOURCES = ("scheme", "organizer", "manual")
@@ -79,7 +91,14 @@ DEFAULT_RULES: dict = {
     # Mindestzahl Teilnehmer je Termin (#1960): darunter warnt das Eintragen - der Termin bleibt dann ohne Wertung.
     "min_participants": None,
     "match_points": {"win": 3, "draw": 1, "loss": 0},
+    "match_points_mode": "result",
     "table_tiebreakers": ["score_diff", "score_for"],
+    # E.1 (#1625): ohne Feld wie bisher - Mini-Tabelle nach Punkten, Differenz, Maps; Remis erlaubt; kampflos wie
+    # eingetragen; Ausscheiden nach der 50-%-Regel.
+    "head_to_head_criteria": ["points", "score_diff", "score_for"],
+    "allow_draws": True,
+    "forfeit_score": "recorded",
+    "exit_rule": "half",
     # Turniertage (#1961): aus, bis eine Saison Runden je Termin führt; Rundenpunkte Vorgabe 8…1.
     "day_rounds": {"count": 0, "points_by_place": [8, 7, 6, 5, 4, 3, 2, 1]},
     "custom_bonuses": [],
@@ -212,7 +231,15 @@ def normalize_rules(raw: dict | None) -> dict:
     rules["min_participants"] = _whole(rules["min_participants"], "min_participants", allow_none=True, minimum=1)
     points = {**DEFAULT_RULES["match_points"], **(raw.get("match_points") or {})}
     rules["match_points"] = {key: _number(points.get(key), f"match_points.{key}") for key in ("win", "draw", "loss")}
+    rules["match_points_mode"] = _choice(rules["match_points_mode"] or "result", "match_points_mode", MATCH_POINTS_MODES)
     rules["table_tiebreakers"] = _criteria(rules["table_tiebreakers"], "table_tiebreakers", TABLE_TIEBREAKERS)
+    rules["head_to_head_criteria"] = _criteria(rules["head_to_head_criteria"], "head_to_head_criteria",
+                                               HEAD_TO_HEAD_CRITERIA)
+    if not rules["head_to_head_criteria"]:
+        raise ValueError("head_to_head_criteria: mindestens ein Kriterium für den direkten Vergleich.")
+    rules["allow_draws"] = bool(rules["allow_draws"])
+    rules["forfeit_score"] = _choice(rules["forfeit_score"], "forfeit_score", FORFEIT_SCORES)
+    rules["exit_rule"] = _choice(rules["exit_rule"], "exit_rule", EXIT_RULES)
     rules["day_rounds"] = _day_rounds(raw.get("day_rounds"))
     rules["custom_bonuses"] = _custom_bonuses(raw.get("custom_bonuses"))
     rules["tiebreak_top_n"] = _whole(rules["tiebreak_top_n"], "tiebreak_top_n", minimum=1)
@@ -270,6 +297,41 @@ def _custom_bonuses(value) -> list[dict]:
         out.append({"key": key, "label": label,
                     "points": _number(item.get("points"), f"custom_bonuses.{index}.points", minimum=0)})
     return out
+
+
+# Vorgaben einer neuen Liga-Season (E.1, #1625): Punkte, direkter Vergleich (Mini-Tabelle), Map-Differenz, gewonnene
+# Maps, zuletzt die Leitung (Nr. 25, 42); kein Remis (BO-Serie 3/0); Default-Win mit den Maps des Best of (Nr. 26); alle
+# Spiele ausgeschiedener Teams für die Gegner (Kommentar 02.11.). Ältere Seasons tragen die Felder nicht.
+LEAGUE_TABLE_DEFAULTS: dict = {
+    "match_points": {"win": 3, "draw": 0, "loss": 0},
+    "table_tiebreakers": ["head_to_head", "score_diff", "score_for", "lead_decision"],
+    "head_to_head_criteria": ["points", "score_diff", "score_for"],
+    "allow_draws": False,
+    "forfeit_score": "best_of",
+    "exit_rule": "all_for_opponents",
+}
+
+
+def division_rules(season_rules: dict | None, own: dict | None) -> dict | None:
+    """Die Tabellenregeln einer Liga N (#2312, #2318): die der Season, darüber nur die eigenen Punkte (``match_points``). Die
+    Punkteart kommt immer von der Season - mit Punkten nach gewonnenen Maps gelten keine eigenen Punkte. Ältere Abweichungen
+    trugen vollständige Regeln mit den alten Vorgaben; auch von ihnen zählen nur die Punkte, sonst fielen direkter Vergleich,
+    Remis-Regel und kampflos der Season still weg."""
+    points = own.get("match_points") if isinstance(own, dict) else None
+    if not isinstance(points, dict):
+        return season_rules
+    try:
+        base = normalize_rules(copy.deepcopy(season_rules) if isinstance(season_rules, dict) else {})
+        if not maps_mode(base):
+            base["match_points"] = normalize_rules({"match_points": points})["match_points"]
+    except ValueError:
+        return season_rules
+    return base
+
+
+def league_default_rules() -> dict:
+    """Die vollständigen Regeln einer neuen Liga-Season (``normalize_rules`` mit ``LEAGUE_TABLE_DEFAULTS``)."""
+    return normalize_rules(copy.deepcopy(LEAGUE_TABLE_DEFAULTS))
 
 
 # ---------------------------------------------------------------- Rang
@@ -404,10 +466,16 @@ def counted_results(results: list[dict], rules: dict, total_rounds: int) -> tupl
 
 
 # ---------------------------------------------------------------- Team-Liga
+def maps_mode(rules: dict | None) -> bool:
+    """Punkte nach gewonnenen Maps (#2312, ``match_points_mode: maps``)?"""
+    return (rules or {}).get("match_points_mode") == "maps"
+
+
 def match_points(score_for, score_against, rules: dict) -> tuple[str, float]:
-    """Ausgang und Punkte eines Spiels aus eigener Sicht: ``("win" | "draw" | "loss", Punkte)``."""
+    """Ausgang und Punkte eines Spiels aus eigener Sicht: ``("win" | "draw" | "loss", Punkte)``. Mit Map-Punkten (#2312)
+    sind die Punkte die eigenen gewonnenen Maps."""
     outcome = "win" if score_for > score_against else "loss" if score_for < score_against else "draw"
-    return outcome, rules["match_points"][outcome]
+    return outcome, (score_for if maps_mode(rules) else rules["match_points"][outcome])
 
 
 def _score(value) -> float:
@@ -445,5 +513,6 @@ def league_table(matches: list[dict], rules: dict) -> list[dict]:
         entry["score_diff"] = entry["score_for"] - entry["score_against"]
     criteria = rules["table_tiebreakers"]
     field = {"score_diff": "score_diff", "score_for": "score_for", "wins": "won"}
-    rank_with_ties(rows, lambda item: (item["points"], *(item[field[name]] for name in criteria)))
+    # Direkter Vergleich und Entscheid der Leitung gibt es nur in der Liga-Staffel (E.1) - hier zählen sie nicht.
+    rank_with_ties(rows, lambda item: (item["points"], *(item[field[name]] for name in criteria if name in field)))
     return rows

@@ -103,6 +103,16 @@ async def _greet_linked(user_id: str, discord_id: str) -> None:
         logger.warning("[platform-links] Discord-Gruß: %s", type(exc).__name__)
 
 
+async def _sync_discord_servers(user_id: str) -> None:
+    """Nach dem Verknüpfen (#2338): auf welchen Servern des Vereins das neue Konto ist - für „Überall dabei“."""
+    from services.discord_guilds import sync_memberships
+
+    try:
+        await sync_memberships(get_db(), user_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[platform-links] Discord-Server abgleichen: %s", type(exc).__name__)
+
+
 @router.get("/platform-links/{platform}/callback")
 async def platform_link_callback(platform: str, request: Request, background: BackgroundTasks):
     """Rückruf der Plattform. Immer eine Weiterleitung ins Profil - nie eine nackte Fehlerseite."""
@@ -129,6 +139,7 @@ async def platform_link_callback(platform: str, request: Request, background: Ba
         return _finish(RedirectResponse(platform_links.callback_target(error=exc.code), status_code=302), platform, consumed_cookie)
     await _audit(db, user_id, "platform_link.linked", platform, {"handle": link.get("handle")})
     if platform == "discord":
+        background.add_task(_sync_discord_servers, user_id)
         background.add_task(_greet_linked, user_id, str(link.get("external_id") or ""))
     return _finish(RedirectResponse(platform_links.callback_target(linked=platform), status_code=302), platform, consumed_cookie)
 

@@ -517,9 +517,24 @@ def _match_task_actions(tasks: list[dict]) -> list[dict]:
         if kind == "rules_consent":
             actions.append(_rules_task_action(task))
             continue
-        if kind not in {"schedule", "lineup"}:
+        if kind not in {"schedule", "lineup", "reschedule", "checkin"}:
             continue
         opponent = f"gegen {task['opponent_name']}" if task.get("opponent_name") else ""
+        if kind == "checkin":
+            # Jetzt einchecken (#1652, D.2): Ältere Apps zeigen die Zeile und öffnen die Matchseite, eingecheckt wird im Web.
+            until = _vienna_time(task.get("until"))
+            detail = " · ".join(part for part in (task.get("tournament_title"), opponent, f"bis {until}, im Web" if until else "im Web") if part)
+            actions.append({"id": f"match-checkin-{task.get('match_id')}", "type": "match_checkin", "label": "Jetzt einchecken",
+                            "detail": detail or "Liga-Spiel", "target_type": "match", "target_id": task.get("match_id"), "priority": 10})
+            continue
+        if kind == "reschedule":
+            # Verschiebung beantworten (#2194): Ältere Apps zeigen die Zeile und öffnen die Matchseite, beantwortet wird im Web.
+            when = _vienna_time(task.get("proposed_at"))
+            detail = " · ".join(part for part in (task.get("tournament_title"), opponent, f"auf {when}, im Web" if when else "im Web") if part)
+            actions.append({"id": f"match-reschedule-{task.get('match_id')}", "type": "match_reschedule",
+                            "label": "Verschiebung beantworten", "detail": detail or "Liga-Spiel", "target_type": "match",
+                            "target_id": task.get("match_id"), "priority": 8})
+            continue
         if kind == "schedule":
             when = _vienna_time(task.get("proposed_at"))
             extra = f"Vorschlag {when}" if when else ""

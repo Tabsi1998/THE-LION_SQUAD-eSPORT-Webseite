@@ -37,7 +37,7 @@ beforeEach(() => {
 test("Spiele auf diesem Server (#626): eigene und geerbte; der Hauptserver nimmt alle ohne eigenen", async () => {
   renderPanel();
   expect(await screen.findByTestId("discord-guild-2-games")).toHaveTextContent("Rocket League, RL Classic (vom Hauptspiel)");
-  expect(screen.getByTestId("discord-guild-2-games").querySelector("a")).toHaveAttribute("href", "/admin/games");
+  expect(screen.getByTestId("discord-guild-2-games").querySelector("a")).toHaveAttribute("href", "/admin/games/g1");
   expect(screen.getByTestId("discord-guild-1-games")).toHaveTextContent("alle Spiele ohne eigenen Server");
   expect(screen.queryByTestId("discord-guild-3-games")).toBeNull();
 });

@@ -102,7 +102,7 @@ async def test_league_context_queries_carry_the_partial_index_condition(flow, mo
 
 @pytest.mark.asyncio
 async def test_switching_the_season_off_hides_every_staffel_at_once_even_locked_ones(flow):
-    admin, season, division, staffel = await setup_staffel(flow, season={"visibility": "public"})
+    admin, season, division, staffel = await setup_staffel(flow, season={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     second = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     await flow.db.tournaments.update_many({}, {"$set": {"status": "live", "visibility": "public", "is_public": True}})
     await flow.db.tournaments.update_one({"id": second["tournament_id"]},
@@ -145,7 +145,14 @@ async def test_a_locked_staffel_still_takes_rules_text_but_keeps_its_calendar(fl
     assert {item["group"]: item["reason"] for item in result["skipped"]} == {
         # Seit #2106 auch die Antwortfrist auf Terminvorschläge (läuft sonst auch nach dem Start).
         "running": "Die Staffel ist gesperrt.", "before_start": "Die Staffel ist gesperrt.",
-        "before_result": "Die Staffel ist gesperrt."}
+        # Seit #2194 die Terminregeln einer neuen Season (eigene Gruppe, wie die Antwortfrist), seit #1652 der Check-in.
+        "schedule": "Die Staffel ist gesperrt.",
+        "checkin": "Die Staffel ist gesperrt.",
+        # Seit D.3 (#1618) die Veto-Vorlage, eigene Gruppe wie der Check-in.
+        "veto": "Die Staffel ist gesperrt.",
+        "before_result": "Die Staffel ist gesperrt.",
+        # Seit C.3 (#1617) auch die Ergebnisregeln - eine gesperrte Staffel behält ihre.
+        "result_rules": "Die Staffel ist gesperrt."}
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert after["rules"] == "Neu" and after["matchday_weeks_total"] == 10
 
@@ -258,7 +265,7 @@ async def test_a_season_listing_only_staffeln_does_not_fall_back_to_every_tourna
 
 @pytest.mark.asyncio
 async def test_the_public_season_lists_only_staffeln_the_person_could_open(flow):
-    admin, season, division, draft = await setup_staffel(flow, season={"visibility": "public"})
+    admin, season, division, draft = await setup_staffel(flow, season={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     running = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     hidden = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     await flow.db.tournaments.update_one({"id": running["tournament_id"]}, {"$set": {"status": "live"}})

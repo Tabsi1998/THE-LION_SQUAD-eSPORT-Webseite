@@ -134,6 +134,197 @@ def test_a_variant_is_written_once_and_then_reused(bild):
     assert erste.stat().st_mtime_ns == stempel, "die zweite Anfrage rechnet nicht neu"
 
 
+@pytest.mark.parametrize("weg", ["resolve", "build", "build_all"])
+def test_an_empty_variant_from_an_interrupted_write_is_rebuilt(bild, weg):
+    """Ein abgebrochener Schreibvorgang ließ eine leere Datei liegen. Sie galt als fertig und wurde als leeres Bild ausgeliefert -
+    in der Ausrüstung blieben so einzelne Waffen ohne Bild. Eine leere Fassung wird neu gebaut."""
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    leer = variant_path(quelle, 160)
+    leer.parent.mkdir(parents=True, exist_ok=True)
+    leer.write_bytes(b"")
+
+    if weg == "resolve":
+        fertig = resolve_variant(quelle, 160)
+    elif weg == "build":
+        fertig = build_variant(quelle, 160)
+    else:
+        fertig = next(path for path in build_all_variants(quelle) if path == leer)
+
+    assert fertig == leer and leer.stat().st_size > 0
+    with Image.open(fertig) as im:
+        assert im.size == (160, 60)
+
+
+def test_a_failed_write_leaves_no_empty_variant_behind(bild, monkeypatch):
+    """Scheitert das Schreiben, bleibt weder eine leere Fassung noch eine Zwischendatei - ausgeliefert wird das Original."""
+    quelle = bild(width=1280, height=480, name="waffe.png")
+
+    def kaputt(self, fp, *args, **kwargs):
+        open(fp, "wb").close()
+        raise OSError("Platte voll")
+
+    monkeypatch.setattr(Image.Image, "save", kaputt)
+
+    assert resolve_variant(quelle, 160) is None
+    ordner = variant_path(quelle, 160).parent
+    assert not ordner.exists() or list(ordner.iterdir()) == []
+
+
+def test_any_other_error_while_writing_leaves_no_temp_file(bild, monkeypatch):
+    quelle = bild(width=1280, height=480, name="waffe.png")
+
+    def kaputt(self, fp, *args, **kwargs):
+        open(fp, "wb").write(b"halb")
+        raise RuntimeError("unerwartet")
+
+    monkeypatch.setattr(Image.Image, "save", kaputt)
+
+    with pytest.raises(RuntimeError):
+        build_variant(quelle, 160)
+    ordner = variant_path(quelle, 160).parent
+    assert list(ordner.iterdir()) == [], "keine Zwischendatei, keine Fassung"
+
+
+def test_the_start_sweep_clears_empty_variants_and_stale_temps(bild, tmp_path):
+    """nginx liefert, was auf der Platte liegt - darum räumt der Start leere Fassungen und alte Zwischendateien weg."""
+    import os
+    import time
+
+    from services.image_variants import remove_broken_variants
+
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    gut = build_variant(quelle, 320)
+    leer = variant_path(quelle, 160)
+    leer.write_bytes(b"")
+    alt = gut.parent / ".waffe-400.abc.tmp"
+    alt.write_bytes(b"x")
+    os.utime(alt, (time.time() - 7200, time.time() - 7200))
+    frisch = gut.parent / ".waffe-800.def.tmp"
+    frisch.write_bytes(b"x")
+
+    assert remove_broken_variants(tmp_path) == 2
+    assert not leer.exists() and not alt.exists()
+    assert frisch.exists(), "eine laufende Zwischendatei bleibt"
+    assert gut.stat().st_size > 0
+
+
+def test_a_stopped_sweep_ends_early_and_keeps_the_deep_check_for_next_time(bild, tmp_path):
+    """Beim Herunterfahren hört der Lauf auf; der Merker bleibt weg, damit der nächste Start gründlich weitermacht."""
+    import threading
+
+    from services.image_variants import CHECKED_MARKER, sweep_variants
+
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    leer = variant_path(quelle, 160)
+    leer.parent.mkdir(parents=True, exist_ok=True)
+    leer.write_bytes(b"")
+    stop = threading.Event()
+    stop.set()
+
+    assert sweep_variants(tmp_path, stop) == 0
+    assert leer.exists() and not (tmp_path / CHECKED_MARKER).exists()
+
+
+def test_a_running_sweep_stops_after_the_current_file(bild, tmp_path, monkeypatch):
+    """Das Signal kommt mitten im Lauf: nach der aktuellen Datei ist Schluss, kein Merker."""
+    import threading
+
+    from services import image_variants
+    from services.image_variants import CHECKED_MARKER, sweep_variants
+
+    for name in ("a.png", "b.png", "c.png"):
+        quelle = bild(width=1280, height=480, name=name)
+        build_variant(quelle, 320)
+    stop = threading.Event()
+    gelesen = []
+
+    def lesen(path):
+        gelesen.append(path.name)
+        stop.set()
+        return True
+
+    monkeypatch.setattr(image_variants, "_loads", lesen)
+
+    assert sweep_variants(tmp_path, stop) == 0
+    assert len(gelesen) == 1, "nach der ersten Datei hört der Lauf auf"
+    assert not (tmp_path / CHECKED_MARKER).exists()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_signals_the_sweep_and_waits_for_it(monkeypatch):
+    """Der Lifespan setzt beim Herunterfahren das Signal und wartet, bis der Lauf zu Ende ist."""
+    import pathlib
+    import sys
+    import threading
+
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from flow_harness import make_flow
+
+    instance, shutdown = make_flow()
+    try:
+        import server
+
+        stop = threading.Event()
+        fertig = []
+
+        async def lauf():
+            while not stop.is_set():
+                await asyncio.sleep(0.01)
+            fertig.append(True)
+
+        monkeypatch.setattr(server, "_variant_sweep_stop", stop)
+        monkeypatch.setattr(server, "_variant_sweep_task", asyncio.get_running_loop().create_task(lauf()))
+        await server._stop_variant_sweep()
+
+        assert stop.is_set() and fertig == [True]
+    finally:
+        await shutdown()
+
+
+def test_erasing_an_upload_also_removes_temp_files_of_its_variants(bild, tmp_path, monkeypatch):
+    """Zwischendateien eines abgebrochenen Builds gehören zum Bild der Person - die Kontolöschung nimmt sie mit, fremde nicht."""
+    from services import account_erasure
+
+    monkeypatch.setattr(account_erasure, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(account_erasure, "UPLOAD_DIR", tmp_path / "andere")
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    build_variant(quelle, 320)
+    ordner = variant_path(quelle, 160).parent
+    eigene = ordner / ".waffe-160.abc.tmp"
+    eigene.write_bytes(b"x")
+    fremde = ordner / ".schild-160.abc.tmp"
+    fremde.write_bytes(b"x")
+
+    class Sammlung:
+        async def delete_many(self, query):
+            return None
+
+    class Db:
+        media_uploads = Sammlung()
+        media_scans = Sammlung()
+
+    assert asyncio.run(account_erasure._remove(Db(), "waffe.png", [])) is None
+    assert not eigene.exists() and not quelle.exists() and not variant_path(quelle, 320).exists()
+    assert fremde.exists()
+
+
+def test_the_deep_sweep_also_clears_cut_off_variants_with_content(bild, tmp_path):
+    """Vor dem atomaren Schreiben konnte eine Fassung auch mit Inhalt abgebrochen sein. Das gründliche Lesen läuft einmal."""
+    from services.image_variants import CHECKED_MARKER, remove_broken_variants, sweep_variants
+
+    quelle = bild(width=1280, height=480, name="waffe.png")
+    gut = build_variant(quelle, 320)
+    halb = build_variant(quelle, 400)
+    halb.write_bytes(halb.read_bytes()[:40])
+
+    assert remove_broken_variants(tmp_path) == 0, "ohne gründliches Lesen bleibt sie"
+    assert sweep_variants(tmp_path) == 1
+    assert not halb.exists() and gut.is_file()
+    assert (tmp_path / CHECKED_MARKER).exists()
+    halb.write_bytes(b"kaputt")
+    assert sweep_variants(tmp_path) == 0, "das gründliche Lesen läuft nur einmal"
+
+
 def test_a_picture_smaller_than_the_request_is_left_alone(bild):
     """Hochskalieren kostet Bytes und bringt nichts."""
     klein = bild(width=300, height=200, name="klein.webp")

@@ -478,6 +478,35 @@ async def migrate_one_hide_field(db) -> str:
     return f"{len(hidden)} sponsors hidden, {len(rows)} contract statuses cleared, {len(archived)} references renamed"
 
 
+async def migrate_achievements_recount(db) -> str:
+    """Stiller Modus für die Neuberechnung der Erfolge (#2340): an, bevor die korrigierten Zähler (#2337, #2338, #2339)
+    kommen. Steht der Eintrag schon, bleibt er; ohne Konten gibt es nichts nachzurechnen. Abgeschlossen wird von Hand
+    (Admin → Erfolge → Übersicht oder backend/scripts/achievements_recount.py)."""
+    from services.achievement_recount import begin
+    return await begin(db)
+
+
+CATALOG_RECHECK_2339 = "2339"
+
+
+async def migrate_achievements_catalog_recheck(db) -> str:
+    """#2339 ändert den Erfolge-Katalog (nicht mehr Erreichbares, Kategorie-Meister, Sammler, Geheimnisträger, Hundert
+    Prozent, Comeback, Streckenrekord, Eiserner Löwe): Läuft der stille Modus (#2340) noch, prüft ``recheck`` alle Konten
+    still neu - sonst meldete ein Ereignis Altansprüche zu geänderten Stufen laut. Ist er schon beendet, geschieht nichts.
+    Idempotent: Die Kennung landet im Eintrag des stillen Modus, ein zweiter Lauf prüft nicht noch einmal.
+    Ausgewertet wird über die Warteschlange - erst nach dem Seed, der den neuen Katalog schreibt (server.py)."""
+    from services.achievement_recount import SETTING_ID, recheck
+
+    doc = await db.settings.find_one({"id": SETTING_ID, "active": True}, {"_id": 0, "id": 1, "rechecked_for": 1})
+    if not doc:
+        return "silent mode off - nothing to recheck"
+    if CATALOG_RECHECK_2339 in (doc.get("rechecked_for") or []):
+        return "already rechecked for 2339"
+    result = await recheck(db)
+    await db.settings.update_one({"id": SETTING_ID}, {"$addToSet": {"rechecked_for": CATALOG_RECHECK_2339}})
+    return result
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -512,6 +541,10 @@ MIGRATIONS = (
     (20, "squad_game_names", migrate_squad_game_names),
     # #2130: Sponsor und Referenz blenden nur noch über ``is_active`` aus; die Sichtbarkeit bleibt, wie sie war.
     (21, "one_hide_field", migrate_one_hide_field),
+    # #2340: Erfolge still nachrechnen, bis die Neuberechnung abgeschlossen ist (services/achievement_recount.py).
+    (22, "achievements_recount_silent", migrate_achievements_recount),
+    # #2339: neuer Katalog - im stillen Modus alle still neu prüfen (services/achievement_recount.recheck), sonst nichts.
+    (23, "achievements_catalog_recheck_2339", migrate_achievements_catalog_recheck),
 )
 
 

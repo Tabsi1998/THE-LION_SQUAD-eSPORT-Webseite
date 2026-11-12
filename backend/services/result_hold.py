@@ -46,8 +46,9 @@ HOLD_SECONDS = 10
 # Das „Rückgängig“ der Oberfläche zählt 10 Sekunden ab der Antwort; der Server wartet etwas länger.
 GRACE_SECONDS = 2
 NO_SHOW_NOTE = "Nicht erschienen"
-# Was mit dem Ergebnis gilt und beim Zurücknehmen mit weggeht (Liga: #1650, Regelwerk: #1646).
-RESULT_ONLY_FIELDS = ("games", "lineups_missing", "rule_version_id", "lineups", "lineup_overdue_at")
+# Was mit dem Ergebnis gilt und beim Zurücknehmen mit weggeht (Liga: #1650, Regelwerk: #1646, Sperrliste: #2218).
+RESULT_ONLY_FIELDS = ("games", "lineups_missing", "rule_version_id", "lineups", "lineup_overdue_at", "loadout_ban_id",
+                      "loadout_allowed_id")
 BUSY_DETAIL = "Für dieses Spiel wird gerade ein Ergebnis gespeichert. Bitte kurz warten oder „Rückgängig“ nutzen."
 # Felder einer Ergebniszeile, die das gehaltene Ergebnis aufhebt - dieselben, die der Ergebnis-Weg liest.
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "time_ms", "dnf", "forfeit", "note")
@@ -113,6 +114,14 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
     ensure_correction_allowed(match, force=force, reason=reason_text)
     forfeiting = _no_show(match, normalized)
     note_text = (note or "").strip() or (NO_SHOW_NOTE if forfeiting else "")
+    # Liga (#1619, E.2): Läuft an dem Spiel ein Verfahren, entscheidet dieses Ergebnis es mit. Das wird schon jetzt geprüft - die
+    # Leitung bekommt die Absage sofort und nicht erst, wenn „Rückgängig“ abgelaufen ist. Beim Veröffentlichen prüft
+    # ``submit_v2_result`` noch einmal: Kam das Verfahren dazwischen, wird das Ergebnis verworfen und die Person benachrichtigt.
+    from services import league_procedures
+    refusal = await league_procedures.result_decision_refusal(
+        db, match, actor_id=actor.get("id"), note=reason_text or (note_text if forfeiting else None), by_players=False)
+    if refusal:
+        raise MatchV2ResultError(refusal[1], refusal[0])
     # Probelauf: würde das Ergebnis so durchgehen (belegte Folgespiele, abgesagtes Spiel …)? Dann jetzt sagen, nicht in
     # 10 Sekunden.
     stage_matches = await db.matches_v2.find({"stage_id": match.get("stage_id")}, {"_id": 0}).to_list(3000)
@@ -249,6 +258,10 @@ async def _publish_one(db, match_id: str, hold_id: str | None, moment: str) -> b
                 lineups_missing=hold.get("lineups_missing") if "games" in hold else None,
                 match_lineups=hold.get("lineups") if "lineups" in hold else None,
             )
+            if match.get("incidents"):
+                # Vorfälle (D.5, #1619): Das eingetragene Ergebnis der Leitung stellt eine entschiedene Serie fest.
+                from services.league_incidents import settle_by_result
+                await settle_by_result(db, match_id, hold.get("actor_id"))
     except MatchV2ResultError as exc:
         # Inzwischen hat sich etwas geändert (etwa ein Folgespiel läuft schon): nichts schreiben, Bescheid geben.
         await _audit(db, "match.result.hold_failed", match, hold.get("actor_id"), {"hold_id": hold_id, "detail": str(exc)[:200]})
@@ -413,6 +426,10 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
     if "games" in match or match.get("lineup_user_ids"):
         from services.league_games import refresh_lineup_index
         await refresh_lineup_index(db, match["id"])
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Eine Feststellung, die nur aus diesem Ergebnis kam, geht mit ihm zurück.
+        from services.league_incidents import unsettle_by_result
+        await unsettle_by_result(db, match["id"])
     await _audit(db, "match.result.undo", match, actor_id, {
         "held": False, "report_id": meta.get("report_id"), "cleared_matches": cleared,
     })

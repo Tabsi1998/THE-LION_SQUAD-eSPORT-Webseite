@@ -108,7 +108,7 @@ async def test_sieger_nur_als_winner_id_kommt_durch_die_projektionen(flow):
     mit - Spiele, Gruppenspiele und Teamspiele haben je eine eigene Projektion."""
     me = await flow.add_user(name="Spielerin")
     other = await flow.add_user(name="Gegner")
-    await flow.db.tournaments.insert_one({"id": "t1", "title": "Alt", "status": "completed", "is_public": True})
+    await flow.db.tournaments.insert_one({"id": "t1", "title": "Alt", "status": "completed", "is_public": True, "seeding_mode": "manual"})
     await flow.db.teams.insert_one({"id": "T1", "name": "Lions", "member_ids": [me["id"]], "leader_id": me["id"], "created_by": me["id"],
                                     "created_at": "2026-01-01T00:00:00+00:00"})
     await flow.db.team_members.insert_one({"team_id": "T1", "user_id": me["id"], "role": "leader", "joined_at": "2026-01-02T00:00:00+00:00"})

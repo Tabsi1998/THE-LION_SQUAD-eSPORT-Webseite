@@ -5,7 +5,7 @@ import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, res
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
 import { GameEditor, ParticipantsPicker } from "@/components/tls/league/LeagueReportForm";
 import { sidesInSlotOrder } from "@/components/tls/league/leagueGames";
-import { changeStaffGame, isSeries, seriesSentence, settleStaffGames, staffListsStart, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
+import { changeStaffGame, isSeries, rememberGames, seriesSentence, settleStaffGames, staffListsStart, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
 
 // Das eine Ergebnis-Fenster (#1156, #1370): Turnierleitung am Handy, Matchplan, Stationen und Matchseite öffnen es -
 // dieselben Felder, dieselben Wörter („Nicht erschienen“, „Aufgegeben“), derselbe Satz vor dem Speichern und danach
@@ -30,7 +30,10 @@ function rememberHeatMode(mode) {
   }
 }
 
-export function ResultWindow({ entry, league = null, onClose, onSaved, testId = "result-window" }) {
+export function ResultWindow({ entry, league = null, onClose, onSaved, testId = "result-window", decisionReason = "" }) {
+  // Liga-Verfahren (#1619, E.2): Das Ergebnis entscheidet ein offenes Verfahren mit - die Begründung der Entscheidung kommt von der
+  // Karte des Verfahrens und geht als Grund mit, auch wenn noch kein Ergebnis feststand.
+  const deciding = Boolean(decisionReason);
   // Inzwischen eingetragen (#2124, TP9): kam jemand zuvor, bietet das Fenster an, als Korrektur zu speichern.
   const [forceCorrection, setForceCorrection] = useState(false);
   const [offerCorrection, setOfferCorrection] = useState(false);
@@ -45,18 +48,34 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [mapGames, setMapGames] = useState(() => (mapsPossible ? staffStart(league) : []));
   // Teilnehmerlisten (#2204): einmal je Spiel statt je Map, je Seite freiwillig.
   const [mapLists, setMapLists] = useState(() => staffListsStart(league));
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(decisionReason);
   // Befangen (#2203): Der Superadmin darf als Notausnahme, mit Grund im Protokoll. Der Server prüft das selbst.
   const [conflictReason, setConflictReason] = useState("");
+  // Ergebnisregel übergehen (C.3, #1617): die Liga-Leitung mit „Ergebnisse“, mit Grund im Protokoll - nie Best of, Pool oder
+  // Aufstellung. Im eigenen Spiel entscheidet eine zweite Person (Befangenheit wie oben).
+  const [ruleOverride, setRuleOverride] = useState("");
+  const overriding = Boolean(league?.can_override_rules) && ruleOverride.trim().length >= 5;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const panelRef = useRef(null);
+  // Gedächtnis je Map (#2334): Ein Zwischenstand beim Tippen der Punkte kann die Serie kurz entscheiden - die Maps danach
+  // kommen mit ihren Angaben zurück, sobald sie wieder offen ist. Je Spiel neu.
+  const mapMemory = useRef({ entryId: entry?.id, games: {} });
+  const changeMap = (position, next) => {
+    if (mapMemory.current.entryId !== entry?.id) mapMemory.current = { entryId: entry?.id, games: {} };
+    // Auch gemerkte, gerade ausgeblendete Maps ziehen bei einer Aufstellung mit - sonst kämen sie mit der alten zurück.
+    const all = Object.values(rememberGames(mapMemory.current.games, mapGames)).sort((a, b) => a.position - b.position);
+    const changedAll = changeStaffGame(all, position, next);
+    mapMemory.current.games = rememberGames({}, changedAll);
+    const changed = changedAll.filter((row) => mapGames.some((shown) => shown.position === row.position));
+    setMapGames(settleStaffGames(changed, league, mapMemory.current.games));
+  };
   const kind = withMaps ? "maps" : inputKind(entry, heatMode);
   const outcome = useMemo(() => {
     if (!withMaps) return resultsFor(entry, kind, state);
-    const problem = staffProblem(mapGames, league, mapLists);
+    const problem = staffProblem(mapGames, league, mapLists, { skipRules: overriding });
     return problem ? { error: problem } : staffPayload(mapGames, league, mapLists);
-  }, [entry, kind, state, withMaps, mapGames, mapLists, league]);
+  }, [entry, kind, state, withMaps, mapGames, mapLists, league, overriding]);
   const sentence = withMaps ? (outcome.results ? seriesSentence(mapGames, league) : "")
     : outcome.results ? resultSentence(entry, outcome.results) : "";
 
@@ -99,6 +118,10 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
       setError(outcome.error);
       return;
     }
+    if (deciding && reason.trim().length < 10) {
+      setError("Bitte die Entscheidung in mindestens zehn Zeichen begründen.");
+      return;
+    }
     if (correcting && reason.trim().length < 5) {
       setError("Bitte kurz den Grund der Korrektur angeben (mindestens 5 Zeichen).");
       return;
@@ -114,8 +137,9 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
         ...(entry.conflict_override ? { conflict_reason: conflictReason.trim() } : {}),
         results: outcome.results,
         ...(withMaps ? { games: outcome.games } : {}),
+        ...(withMaps && overriding ? { rule_override_reason: ruleOverride.trim() } : {}),
         hold: true,
-        reason: correcting ? reason.trim() : null,
+        reason: correcting || deciding ? reason.trim() : null,
       });
       onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence, ...(entry.conflict_override ? { conflictReason: conflictReason.trim() } : {}) });
       onClose?.();
@@ -186,7 +210,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           ) : null}
           {withMaps && mapGames.map((game, index) => (
             <GameEditor key={game.position} staff index={index} game={game} games={mapGames} league={league}
-              onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
+              onChange={(next) => changeMap(game.position, next)} />
           ))}
           {withMaps && isSeries(league) ? league.sides.map((side) => (
             <ParticipantsPicker key={side.registration_id} roster={league.rosters?.[side.registration_id] || []} value={mapLists[side.registration_id] || []} league={league}
@@ -206,10 +230,18 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           {kind === "order" && <OrderInput entry={entry} state={state} onChange={setState} />}
           {kind === "points" && <PointsInput entry={entry} state={state} onChange={setState} />}
 
-          {correcting ? (
+          {correcting || deciding ? (
             <label className="block">
-              <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Grund der Korrektur (steht im Protokoll)</span>
-              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+              <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{deciding ? "Begründung der Entscheidung (geht an beide Seiten)" : "Grund der Korrektur (steht im Protokoll)"}</span>
+              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={deciding ? 2000 : 500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+            </label>
+          ) : null}
+
+          {withMaps && league?.can_override_rules ? (
+            <label className="block rounded-sm border border-white/10 bg-white/5 px-3 py-2" data-testid="result-rule-override">
+              <span className="block text-sm font-bold text-white">Ergebnisregel übergehen (Liga-Leitung, mit Grund)</span>
+              <span className="mt-0.5 mb-2 block text-xs text-white/70">Nur wenn ein Endstand wirklich so war und nicht zur Regel passt. Best of, Pool und Aufstellung gelten trotzdem; der Grund steht im Protokoll.</span>
+              <input value={ruleOverride} onChange={(event) => setRuleOverride(event.target.value)} maxLength={500} className="input" placeholder="Grund, mindestens 5 Zeichen" aria-label="Grund für das Übergehen der Ergebnisregel" data-testid="result-rule-override-reason" />
             </label>
           ) : null}
 

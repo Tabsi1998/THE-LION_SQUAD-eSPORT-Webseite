@@ -3,6 +3,8 @@
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { divisionPlatformPayload, divisionPlatformToForm, platformPayload, platformToForm } from "@/lib/leaguePlatform";
+import { byMaps, tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
@@ -17,15 +19,26 @@ export const BEST_OF_OPTIONS = [["1", "Best of 1"], ["3", "Best of 3"], ["5", "B
 export const LEGS_OPTIONS = [["1", "Nur Hinrunde"], ["2", "Hin- und Rückrunde"]];
 // Map-Wiederholung in einer Serie (#2096): Vorgabe „gleiche Map nur in anderem Modus“.
 export const MAP_REPEAT_OPTIONS = [["other_mode", "Gleiche Map nur in anderem Modus"], ["never", "Aus – jede Map nur einmal"], ["always", "Immer erlaubt"]];
-export const TIEBREAKER_LABELS = { score_diff: "Differenz", score_for: "Mehr gewonnene Maps", wins: "Mehr Siege" };
+// Vorfälle im Spiel (D.5, #1619): Vorgaben wie im Server (league_presets.PRESETS) und die beiden Arten, wie eine Serie bei einer
+// Map „in Klärung“ weitergeht.
+export const INCIDENT_PRESETS = { map_break_after: 2, map_break_minutes: 5, incident_answer_minutes: 10, incident_quota_per_map: 1, clarification_mode: "continue" };
+export const CLARIFICATION_MODE_OPTIONS = [["continue", "Weiterspielen unter Vorbehalt"], ["pause_series", "Serie pausiert, bis entschieden ist"]];
 // Stand einer Liga und einer Liga N (#2106): archiviert heißt ausgeblendet, aber erhalten.
 export const ACTIVE_STATUS_OPTIONS = [["active", "Aktiv"], ["archived", "Archiviert"]];
 export const SYNC_GROUP_TEXT = {
   always: "Sichtbarkeit und Regeltext",
   running: "Antwortfrist auf Terminvorschläge",
+  // Wie SYNC_GROUP_LABELS im Server (league_service.py): Terminregeln (#2194), Ergebnisregeln (#1617), Sperrliste (#2218).
+  schedule: "Terminregeln",
+  checkin: "Check-in",
+  veto: "Veto",
+  // Vorfälle (D.5, #1619): Standardpause, Antwortzeit, Kontingent und Serie bei einer Map in Klärung.
+  incidents: "Vorfälle und Pausen",
+  result_rules: "Ergebnisregeln und Punktepflicht",
   before_start: "Termine und Kalender",
   before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
   map_pool: "Map-Pool",
+  loadout_bans: "Sperrliste",
 };
 
 const number = (value) => (value === "" || value == null ? null : Number(value));
@@ -61,22 +74,33 @@ export function seasonToForm(season = {}) {
     lineup_mode: season.lineup_mode || "per_map",
     lineup_min_players: season.lineup_min_players != null ? String(season.lineup_min_players) : "",
     transfer_windows: (season.transfer_windows || []).map((window) => ({ ...window })),
+    // Plattform je Season (#2270): Feld, erlaubte Plattformen, Crossplay, Eingabegerät.
+    ...platformToForm(season),
     // Selbstanmeldung (#2205): Ohne Fenster gibt es sie nicht.
     ...applicationToForm(season),
     points_win: String(points.win ?? 3),
     points_draw: String(points.draw ?? 1),
     points_loss: String(points.loss ?? 0),
-    table_tiebreakers: rules.table_tiebreakers || ["score_diff", "score_for"],
+    // Tabelle (E.1, #1625): Gleichstand, Mini-Tabelle, Remis, Default-Win, Ausscheiden.
+    ...tableRulesToForm(rules),
     game_mode_order: season.game_mode_order || [],
     map_repeat: season.map_repeat || "other_mode",
     result_confirm_hours: String(season.result_confirm_hours ?? 48),
     lineup_amend_hours: String(season.lineup_amend_hours ?? 48),
+    // Vorfälle (D.5, #1619): ohne Feld an der Season gilt die Vorgabe des Servers (league_presets.PRESETS).
+    map_break_after: String(season.map_break_after ?? INCIDENT_PRESETS.map_break_after),
+    map_break_minutes: String(season.map_break_minutes ?? INCIDENT_PRESETS.map_break_minutes),
+    incident_answer_minutes: String(season.incident_answer_minutes ?? INCIDENT_PRESETS.incident_answer_minutes),
+    incident_quota_per_map: String(season.incident_quota_per_map ?? INCIDENT_PRESETS.incident_quota_per_map),
+    clarification_mode: season.clarification_mode || INCIDENT_PRESETS.clarification_mode,
     // Antwortfrist (#2106, F3): leer bei Seasons von vorher - dann behält jede Staffel ihre eigene.
     match_schedule_response_hours: season.match_schedule_response_hours != null ? String(season.match_schedule_response_hours) : "",
     rules_text: season.rules_text || "",
     registration_deadline: season.registration_deadline || "",
     visibility: season.visibility || "off",
     status: season.status || "draft",
+    // Startseite (#2324): Vorgabe an - auch für Seasons, die das Feld noch nicht tragen.
+    promote_on_home: season.promote_on_home !== false,
     blocked_periods: (season.blocked_periods || []).map((period) => ({ ...period })),
     scoring_rules: rules,
     // Gestaltung (#2107): leer heißt „wie die Liga“; Gewinne der Season.
@@ -94,9 +118,34 @@ export function modeOrderProblem(order, bestOf) {
   return filled.length === Number(bestOf) ? "" : "Bitte für jede Map einen Modus wählen – oder alle frei lassen.";
 }
 
-/** Das Formular als Anfrage. ``season`` ist der gespeicherte Stand: die übrigen Punkte-Regeln bleiben, wie sie sind. */
-export function seasonPayload(form) {
-  const order = (form.game_mode_order || []).slice(0, Number(form.best_of) || 0);
+/** Die längste Serie der Season (#2207): Best of der Season oder einer aktiven Liga N mit eigenem Best of. So lang ist „Modus je Map“. */
+export function longestSeries(bestOf, divisions = []) {
+  const own = (divisions || []).filter((row) => (row.status || "active") === "active").map((row) => Number(row.overrides?.best_of) || 0);
+  return Math.max(Number(bestOf) || 1, ...own);
+}
+
+/** Gleiche Reihenfolge wie gespeichert? Fehlt eine, ist sie leer. */
+export function sameOrder(a, b) {
+  const left = a || [];
+  const right = b || [];
+  return left.length === right.length && left.every((mode, index) => mode === right[index]);
+}
+
+/** Hinweis, wenn eine gesetzte Reihenfolge nicht so lang ist wie die längste Serie (#2207) - Altbestand in laufenden Seasons. */
+export function orderLengthNote(order, maps) {
+  const filled = (order || []).filter(Boolean);
+  const count = Number(maps) || 0;
+  if (!filled.length || (order || []).length === count) return "";
+  return `Gespeichert sind ${(order || []).length} ${(order || []).length === 1 ? "Eintrag" : "Einträge"}, die längste Serie hat ${count} Maps (Best of ${count}). `
+    + "In einer laufenden Season gilt die Reihenfolge weiter (zyklisch) - ändern heißt: für jede Map einen Modus wählen.";
+}
+
+/** Das Formular als Anfrage. ``season`` ist der gespeicherte Stand: die übrigen Punkte-Regeln bleiben, wie sie sind. ``maps``: Länge von
+ * „Modus je Map“, Vorgabe das Best of der Season. ``savedOrder``: die gespeicherte Reihenfolge - ist sie unverändert, geht sie genau so
+ * mit, auch wenn sie nicht zur Serie passt (#2207: Altbestand laufender Seasons, der Server warnt nur). */
+export function seasonPayload(form, maps = form.best_of, savedOrder = undefined) {
+  const kept = savedOrder !== undefined && sameOrder(form.game_mode_order, savedOrder);
+  const order = kept ? [...(savedOrder || [])] : (form.game_mode_order || []).slice(0, Number(maps) || 0);
   return {
     name: form.name.trim() || null,
     start_date: form.start_day ? fromViennaInput(`${form.start_day}T00:00`) : null,
@@ -118,21 +167,28 @@ export function seasonPayload(form) {
     ...(form.had_rules || (form.lineup_mode && form.lineup_mode !== "per_map") ? { lineup_mode: form.lineup_mode || "per_map" } : {}),
     lineup_min_players: number(form.lineup_min_players),
     transfer_windows: (form.transfer_windows || []).filter((window) => window.start_date && window.end_date),
+    ...platformPayload(form),
     ...applicationPayload(form),
     scoring_rules: {
       ...(form.scoring_rules || {}),
       match_points: { win: number(form.points_win) ?? 0, draw: number(form.points_draw) ?? 0, loss: number(form.points_loss) ?? 0 },
-      table_tiebreakers: form.table_tiebreakers,
+      ...tableRulesPayload(form),
     },
     game_mode_order: order.every(Boolean) ? order : [],
     map_repeat: form.map_repeat || "other_mode",
     result_confirm_hours: number(form.result_confirm_hours),
     lineup_amend_hours: number(form.lineup_amend_hours),
+    map_break_after: number(form.map_break_after),
+    map_break_minutes: number(form.map_break_minutes),
+    incident_answer_minutes: number(form.incident_answer_minutes),
+    incident_quota_per_map: number(form.incident_quota_per_map),
+    clarification_mode: form.clarification_mode || INCIDENT_PRESETS.clarification_mode,
     match_schedule_response_hours: number(form.match_schedule_response_hours),
     rules_text: form.rules_text.trim() || null,
     registration_deadline: form.registration_deadline || null,
     visibility: form.visibility,
     status: form.status,
+    promote_on_home: form.promote_on_home !== false,
     blocked_periods: (form.blocked_periods || []).filter((period) => period.start_date && period.end_date)
       .map((period) => ({ start_date: period.start_date, end_date: period.end_date, label: (period.label || "").trim() })),
     emblem_url: form.emblem_url || null,
@@ -170,16 +226,18 @@ export function leagueLookChanges(form, saved = {}) {
   return out;
 }
 
-/** Welche Werte eine Liga N anders hat als ihre Season - nur geänderte Felder, leer heißt „wie die Season“. */
-export function overridesPayload(form) {
+/** Welche Werte eine Liga N anders hat als ihre Season - nur geänderte Felder, leer heißt „wie die Season“. ``mapPoints``: Die
+ *  Season vergibt Punkte nach gewonnenen Maps (#2312) - dann gibt es keine eigenen Punkte, ein alter Wert fällt beim Speichern weg. */
+export function overridesPayload(form, { mapPoints = false } = {}) {
   const out = {};
   for (const key of ["best_of", "team_size", "min_squad_size", "max_staffel_size", "match_schedule_response_hours"]) {
     if (form[key] !== "" && form[key] != null) out[key] = Number(form[key]);
   }
-  if (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "") {
+  if (!mapPoints && (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "")) {
     out.scoring_rules = { match_points: { win: number(form.points_win) ?? 3, draw: number(form.points_draw) ?? 1, loss: number(form.points_loss) ?? 0 } };
   }
-  return out;
+  // Plattform je Season (#2270): mitschicken, sonst ginge die Abweichung der Liga N beim nächsten Speichern verloren.
+  return { ...out, ...divisionPlatformPayload(form) };
 }
 
 export function overridesToForm(overrides = {}) {
@@ -193,6 +251,7 @@ export function overridesToForm(overrides = {}) {
     points_win: points ? String(points.win) : "",
     points_draw: points ? String(points.draw) : "",
     points_loss: points ? String(points.loss) : "",
+    ...divisionPlatformToForm(overrides),
   };
 }
 
@@ -203,7 +262,8 @@ export function settingsLine(settings = {}) {
   if (settings.team_size) parts.push(`${settings.team_size} gegen ${settings.team_size}`);
   if (settings.max_staffel_size) parts.push(`bis ${settings.max_staffel_size} Teams je Staffel`);
   const points = settings.scoring_rules?.match_points;
-  if (points) parts.push(`Punkte ${points.win}/${points.draw}/${points.loss}`);
+  if (byMaps(settings.scoring_rules)) parts.push("Punkte je gewonnene Map");
+  else if (points) parts.push(`Punkte ${points.win}/${points.draw}/${points.loss}`);
   return parts.join(" · ");
 }
 

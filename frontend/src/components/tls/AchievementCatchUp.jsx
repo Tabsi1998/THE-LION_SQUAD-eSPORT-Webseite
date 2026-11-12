@@ -5,20 +5,32 @@ import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
 import { describePackage } from "@/components/achievements/ceremony/select";
 
 const seenKey = (id) => `tls_ach_seen:${id}`;
+// Die Sammel-Zeremonie der Neuberechnung (#2340) läuft je Person und Kennung der Neuberechnung einmal.
+export const recountSeenKey = (id, marker) => `tls_ach_recount_seen:${id}:${marker}`;
 /** Der Server hat gerade Stufen vergeben (z. B. nach einem Saison-Signal, #678) - `detail.count` sagt, wie viele. */
 export const AWARDED_EVENT = "tls:achievements-awarded";
 export const MAX_TIERS = 8;
 
-/** Alle erreichten, nicht stillen Stufen aus /achievements/me - die neueste zuerst. */
-export function earnedTiers(groups = []) {
+function collect(groups, wanted) {
   const earned = [];
   for (const group of groups) {
     if (group.is_negative) continue;
     for (const tier of group.tiers || []) {
-      if (tier.earned && tier.earned_at && !tier.silent) earned.push({ ...tier, category: group.category, group_name: group.name, group_code: group.code, hidden: group.hidden });
+      if (tier.earned && tier.earned_at && !tier.silent && wanted(tier)) earned.push({ ...tier, category: group.category, group_name: group.name, group_code: group.code, hidden: group.hidden });
     }
   }
   return earned.sort((a, b) => new Date(b.earned_at) - new Date(a.earned_at));
+}
+
+/** Alle erreichten, nicht stillen Stufen aus /achievements/me - die neueste zuerst. Nachgerechnete (#2340) feiert die
+ * Sammel-Zeremonie, nicht der einzelne Ablauf. */
+export function earnedTiers(groups = []) {
+  return collect(groups, (tier) => !tier.recount);
+}
+
+/** Die nachgerechneten Stufen (#2340) - für die eine Sammel-Zeremonie nach dem Abschluss der Neuberechnung. */
+export function recountTiers(groups = []) {
+  return collect(groups, (tier) => Boolean(tier.recount));
 }
 
 function remember(key) {
@@ -56,6 +68,13 @@ export function AchievementCatchUp() {
     const catchUp = async () => {
       try {
         const { data } = await api.get("/achievements/me");
+        // Neuberechnung (#2340): erst nach dem Abschluss, einmal - alle nachgerechneten Stufen in einer Zeremonie.
+        const marker = data?.recount?.finished ? data.recount.marker : null;
+        if (marker && !lastSeen(recountSeenKey(userId, marker))) {
+          const late = recountTiers(data?.groups || []);
+          if (late.length) enqueueCeremony(late, { recount: true }, { onDone: () => remember(recountSeenKey(userId, marker)) });
+          else remember(recountSeenKey(userId, marker));
+        }
         const last = lastSeen(key);
         if (!last) {
           remember(key);

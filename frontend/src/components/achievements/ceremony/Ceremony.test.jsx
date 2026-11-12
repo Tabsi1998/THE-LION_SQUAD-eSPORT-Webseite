@@ -174,4 +174,51 @@ describe("Ceremony", () => {
     expect(onClose).toHaveBeenCalled();
     vi.useRealTimers();
   });
+
+  // Neuberechnung (#2340): eine Sammel-Zeremonie mit allen nachgerechneten Abzeichen statt einzelner Abläufe.
+  const recounted = (n) => Array.from({ length: n }, (_, i) => tier(`r${i}`, ["gold", "silver", "bronze", "wood"][i % 4], 5 - (i % 4), "match"));
+
+  it("Neuberechnung: Zahl, Raster der Abzeichen, „+ n“ für den Rest, Link zu allen - keine Einzelliste", () => {
+    renderPlan({ tiers: recounted(14), context: { recount: true, firstEver: true } });
+    const overlay = screen.getByTestId("achievement-unlock-overlay");
+    expect(overlay).toHaveAttribute("data-sequence", "recount");
+    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Du hast 14 Erfolge nachträglich bekommen");
+    expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Erfolge neu berechnet");
+    const grid = screen.getByTestId("ceremony-recount-grid");
+    expect(grid.querySelectorAll("svg.tls-badge")).toHaveLength(12);
+    expect(screen.getByTestId("ceremony-recount-more")).toHaveTextContent("+2");
+    expect(screen.getByTestId("ceremony-recount-top")).toBeInTheDocument();
+    expect(screen.getByTestId("ceremony-recount-sheen")).toBeInTheDocument();
+    expect(screen.getByTestId("ceremony-particles")).toBeInTheDocument();
+    expect(screen.queryByTestId("ceremony-list")).toBeNull();
+    expect(screen.queryByTestId("ceremony-stack-nav")).toBeNull();
+    expect(screen.getByTestId("ceremony-recount-link")).toHaveAttribute("href", "/u/me?tab=achievements");
+    expect(screen.getByTestId("ceremony-points")).toHaveTextContent(`+${recounted(14).reduce((sum, t) => sum + t.points, 0)} Punkte`);
+    expect(screen.getByTestId("ceremony-live")).toHaveTextContent("Du hast 14 Erfolge nachträglich bekommen. Name r0");
+  });
+
+  it("Neuberechnung mit einem Abzeichen spricht im Singular", () => {
+    renderPlan({ tiers: recounted(1), context: { recount: true } });
+    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Du hast einen Erfolg nachträglich bekommen");
+    expect(screen.queryByTestId("ceremony-recount-more")).toBeNull();
+  });
+
+  it("Neuberechnung, reduziert: die Zahl steht sofort, kein Glanz, kein Anheben, keine Partikel", () => {
+    vi.useFakeTimers();
+    const { onClose } = renderPlan({ tiers: recounted(5), context: { recount: true } }, { reduced: true });
+    expect(screen.getByTestId("achievement-unlock-overlay")).toHaveAttribute("data-reduced", "true");
+    expect(screen.getByTestId("ceremony-recount-count")).toHaveTextContent("5");
+    expect(screen.queryByTestId("ceremony-recount-sheen")).toBeNull();
+    expect(screen.queryByTestId("ceremony-recount-top")).toBeNull();
+    expect(screen.queryByTestId("ceremony-particles")).toBeNull();
+    act(() => { vi.advanceTimersByTime(4600); });
+    expect(onClose).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("Neuberechnung, bewegt: die Zahl zählt von null hoch", async () => {
+    renderPlan({ tiers: recounted(6), context: { recount: true } });
+    expect(screen.getByTestId("ceremony-recount-count")).toHaveTextContent("0");
+    await screen.findByText("6", { selector: "[data-testid='ceremony-recount-count']" }, { timeout: 3000 });
+  });
 });

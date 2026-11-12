@@ -159,4 +159,85 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         "series": await captain_series(db, user),
         "moderation": moderation,
         "lead_today": await lead_today_rows(db, now) if is_confirmed_tournament_lead(user) else [],
+        # Nach dem Ende noch „Live“ (#2194) und überfällige Liga-Spiele (Nr. 28): Hinweise für die Leitung.
+        "ended_live": await ended_live_rows(db, user, now=now),
+        "overdue_matches": await overdue_match_rows(db, user),
+        # Regelwerk muss freigegeben werden (#2269): für wer in der Liga „Regeln veröffentlichen“ darf.
+        "rules_pending": await rules_pending_rows(db, user),
+        # Check-in abgelaufen (#1652, § 8.4): der Vorschlag „nicht erschienen“ - entschieden wird nur von Hand.
+        "checkin_proposals": await checkin_proposal_rows(db, user),
+        # Vorfälle (#1619, D.5): Map in Klärung oder Serie noch festzustellen - für wer in der Liga entscheiden darf.
+        "incident_reviews": await incident_review_rows(db, user),
     }
+
+
+async def rules_pending_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    """Seasons, deren Regelwerk freigegeben werden muss (#2269): Einstellungen geändert oder ein Entwurf wartet - je Liga, in der die
+    Person „Regeln veröffentlichen“ darf. Beendete und archivierte Seasons zählen nicht."""
+    from services import league_rules
+    from services.league_permissions import can, has_leagues_area, staffed_league_ids
+
+    if not user or needs_mfa(user):
+        return []
+    query = {"status": "active"} if has_leagues_area(user) else {"status": "active", "id": {"$in": sorted(await staffed_league_ids(db, user))}}
+    rows: list[dict] = []
+    for league in await db.leagues.find(query, {"_id": 0, "id": 1, "name": 1, "slug": 1, "game_id": 1}).sort("name", 1).to_list(200):
+        if not await can(user, "rules", league["id"], db=db):
+            continue
+        seasons = await db.league_seasons.find({"league_id": league["id"], "status": {"$nin": ["completed", "archived"]}},
+                                               {"_id": 0}).sort("number", -1).to_list(20)
+        for season in seasons:
+            pending = await league_rules.pending_release(db, league, season)
+            if pending:
+                rows.append({"league_id": league["id"], "league_name": league.get("name"), "season_id": season["id"],
+                             "season_name": season.get("name"), **pending})
+            if len(rows) >= limit:
+                return rows
+    return rows
+
+
+async def checkin_proposal_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    from services.match_flow import proposal_rows
+
+    return await proposal_rows(db, user, limit)
+
+
+async def incident_review_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    from services.league_incidents import review_rows
+
+    if not user or needs_mfa(user):
+        return []
+    return await review_rows(db, user, limit)
+
+
+async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[dict]:
+    from services.tournament_overrun import ended_live_rows as rows
+
+    return await rows(db, user, now=now)
+
+
+async def overdue_match_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    """Überfällige Liga-Spiele (#2194, Nr. 28) für die Liga-Leitung mit „Spiele betreuen“ oder „Ergebnisse korrigieren“."""
+    from services.league_permissions import can, staffel_access
+    from services.league_schedule import overdue_query
+
+    query = (await staffel_access(db, user)).query()
+    if query is None:
+        return []
+    staffeln = await db.tournaments.find({**query, "status": {"$nin": ["draft", "archived", "cancelled"]}},
+                                         {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
+    allowed = {}
+    for row in staffeln:
+        if await can(user, ("matches", "results"), row["league_context"].get("league_id"), db=db):
+            allowed[row["id"]] = row
+    if not allowed:
+        return []
+    matches = await db.matches_v2.find(overdue_query(sorted(allowed)), {
+        "_id": 0, "id": 1, "tournament_id": 1, "scheduled_at": 1, "result_overdue_at": 1, "round_name": 1,
+        "matchday_label": 1, "matchday_number": 1, "round": 1}).sort("scheduled_at", 1).to_list(limit)
+    return [{
+        "match_id": row["id"], "tournament_id": row["tournament_id"], "title": allowed[row["tournament_id"]].get("title"),
+        "label": row.get("matchday_label") or row.get("round_name") or (f"Spieltag {row.get('matchday_number') or row.get('round')}"
+                                                                         if row.get("matchday_number") or row.get("round") else "Spiel"),
+        "scheduled_at": row.get("scheduled_at"), "overdue_since": row.get("result_overdue_at"), "url": f"/matches/{row['id']}",
+    } for row in matches]

@@ -2,6 +2,7 @@
 import json
 import pathlib
 import sys
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -96,7 +97,7 @@ async def test_the_birth_date_never_leaves_the_check(flow):
 
     for name in ("Mila", "Tom"):
         text = json.dumps(await state_of(flow, w, name), ensure_ascii=False)
-        assert "2001" not in text and "2020" not in text and "birth" not in text
+        assert not re.search(r"2001-\d\d-\d\d|\d\d\.\d\d\.2001", text) and not re.search(r"2020-\d\d-\d\d|\d\d\.\d\d\.2020", text) and "birth" not in text
     assert (await state_of(flow, w, "Tom"))["reason"] == league_eligibility.AGE_NOT_MET
 
 

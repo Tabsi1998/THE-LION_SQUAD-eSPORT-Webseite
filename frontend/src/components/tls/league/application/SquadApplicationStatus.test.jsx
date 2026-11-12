@@ -29,7 +29,9 @@ test("der Stand steht beim richtigen Co-Team, mit Staffel, Grund und Link", asyn
   render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
 
   const first = await screen.findByTestId("squad-application-a1");
-  expect(first).toHaveTextContent("Angenommen");
+  // Das eigene Team liest „Angemeldet“ (#2348), die Leitung weiter „Angenommen“.
+  expect(first).toHaveTextContent("Angemeldet");
+  expect(first).not.toHaveTextContent("Angenommen");
   expect(first).toHaveTextContent("Liga 1 · Staffel A");
   expect(first.querySelector("a")).toHaveAttribute("href", "/liga/probe-liga/season-1");
   expect(screen.getByTestId("squad-application-a2")).toHaveTextContent("Kader zu klein");

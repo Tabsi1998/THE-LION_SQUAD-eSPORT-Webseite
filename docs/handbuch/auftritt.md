@@ -112,6 +112,14 @@ Live, Warnung, Erfolg), **Design** (Neon, Signal, Minimal), **Animation** (Lauft
 **Läuft auf** (Website und/oder App), **Anzeigen ab/bis** und optional ein **Link**. Eine Vorschau zeigt den
 Banner. **Banner erstellen** speichert, mit **Edit** ändert ihr einen.
 
+**Automatische Banner:** Unter der Banner-Liste stehen die Banner, die gerade von selbst laufen: Anmeldung bzw. Check-in
+offen oder „startet bald“ bei Turnieren und Fast-Lap-Challenges, dazu Server in Wartung. Je Banner seht ihr Art,
+Titel, Text, Zeitraum, **Views**, **Klicks** und wann er zuletzt angezeigt wurde. Ändern lässt er sich hier nicht: Der
+Link **Zum Turnier**, **Zur Challenge** bzw. **Zu den Servern** führt dorthin, wo ihr ihn ein- oder ausschaltet. Die
+Zahlen sieht nur die Verwaltung.
+
+<img src="../assets/verwaltung/automatische-banner.png" alt="Einstellungen, Branding: Kasten Automatische Banner mit einem Turnier-Banner (Views 128, Klicks 17, Link Zum Turnier) und einem Wartungs-Banner (Link Zu den Servern)" width="420">
+
 ### 3.2 Farben und Schriften
 
 - **Akzentfarbe:** Ein HEX-Wert wie `#29B6E8`. Sie bestimmt die Farbe der Browser-Leiste am Handy, die Mitte der

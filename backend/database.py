@@ -118,6 +118,15 @@ async def init_indexes():
     await db.map_pools.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
     await db.map_pools.create_index([("tournament_id", 1), ("scope", 1)])
     await db.map_pools.create_index("game_id")
+    # Ausrüstung je Spiel und Sperrlisten mit Versionen (#2218): Name je Spiel und Kategorie nur einmal, Version je Liste nur einmal.
+    await db.game_equipment.create_index("id", unique=True)
+    await db.game_equipment.create_index([("game_id", 1), ("category", 1), ("name_key", 1)], unique=True)
+    await db.game_equipment_categories.create_index("game_id", unique=True)
+    await db.loadout_bans.create_index("id", unique=True)
+    await db.loadout_bans.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
+    await db.loadout_bans.create_index("game_id")
+    # Erlaubte Ausrüstung am Spiel (#2287): je Inhalt eine Zeile, Kennung = Fingerabdruck.
+    await db.loadout_allowed.create_index("id", unique=True)
     # Maps in Ergebnisblättern der Team-Liga (#1616): nur fürs Löschen einer Map gefragt (``game_maps.in_results``).
     await db.reference_round_results.create_index("matches.maps.map_id", sparse=True)
     await db.reference_round_results.create_index("pending_draft.matches.maps.map_id", sparse=True)
@@ -147,6 +156,9 @@ async def init_indexes():
     # Registrations
     await db.tournament_registrations.create_index("id", unique=True)
     await db.tournament_registrations.create_index([("tournament_id", 1), ("user_id", 1)])
+    # Erfolge (#2337): alle Anmeldungen einer Person und die ihrer Teams - ohne Durchlauf durch die ganze Sammlung.
+    await db.tournament_registrations.create_index("user_id")
+    await db.tournament_registrations.create_index("team_id")
     await db.tournament_registrations.create_index("identity_key", unique=True, sparse=True)
     # Liga Stufe 1 – Co-Teams und Spiele (B), docs/LIGA.md: Anmeldungen je Co-Team, Co-Teams je Captain/Vertreter.
     await db.tournament_registrations.create_index(
@@ -159,9 +171,16 @@ async def init_indexes():
     await db.matches_v2.create_index("lineup_user_ids", sparse=True)
     # Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110): Spiele je Seite ohne Aufstellung (Mehrfachwert).
     await db.matches_v2.create_index("lineups_missing", sparse=True)
+    # Veto (#1618, D.3): der Zeit-Job fragt nur laufende Vetos mit abgelaufener Frist.
+    await db.matches_v2.create_index([("flow.veto.deadline_at", 1)], name="veto_deadline",
+                                     partialFilterExpression={"flow.veto.status": "running"})
+    # Liga-Verfahren (#1619, E.2): der Zeit-Job fragt nur Spiele mit offenem Verfahren - Altbestand ohne ``state`` steht nicht im Index.
+    await db.matches_v2.create_index("disputes.state", sparse=True, name="procedure_state")
     # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
     await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
     await db.league_rosters.create_index("user_id")
+    # Spiel-ID-Schlüssel (#2249): Wer im Kader eines Spiels eine ID unter einem Schlüssel hat - Zählung vor dem Entfernen.
+    await db.league_rosters.create_index("game_id")
     # Spielberechtigung (#2204): Jede Spiel-ID nur einmal je Season - nur Seasons mit ``unique_game_ids`` schreiben ``id_keys``.
     await db.league_rosters.create_index(
         [("season_id", 1), ("id_keys", 1)], unique=True, name="league_roster_unique_id",
@@ -323,6 +342,8 @@ async def init_indexes():
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")
+    # Erfolge (#2337): Team-Beitritte und -Austritte je Person (wer war wann im Team) und die eigenen Ergebnismeldungen.
+    await db.audit_logs.create_index([("action", 1), ("actor_id", 1)])
     # Cross-worker mutation leases.  These protect multi-document tournament
     # operations when multiple API workers receive the same action at once.
     await db.mutation_locks.create_index("resource", unique=True)
@@ -455,6 +476,8 @@ async def init_indexes():
     await db.achievements.create_index([("group_code", 1), ("level", 1)])
     await db.user_achievements.create_index([("user_id", 1), ("tier_code", 1)], unique=True)
     await db.user_achievements.create_index([("user_id", 1), ("earned_at", -1)])
+    # Neuberechnung (#2340): Stand „schon still vergeben“ und Sammel-Nachricht lesen nur die nachgerechneten Stufen.
+    await db.user_achievements.create_index("recount_id", sparse=True)
     # Phase 8: Mail queue
     await db.mail_jobs.create_index("id", unique=True)
     await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])
@@ -681,6 +704,10 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
      "base_version", {"partialFilterExpression": {"purpose": "base"}}),
     # Testentwürfe an Printful (#2062): je Kennung und je external_id genau ein Protokoll.
     ("shop_test_drafts", "id", "id", {}),
+    # Nachweise zu Spielen (#2360): je Abruf eines Bildes nach ``id``, der Aufräum-Job blättert aufsteigend danach. Die
+    # Kennung kommt an beiden Schreibstellen aus ``models.new_id`` (uuid4) - Dubletten im Altbestand sind nicht zu erwarten;
+    # gäbe es doch eine, bleibt der Start heil und der Index steht unter Betrieb → Checks als fehlend.
+    ("match_proof_photos", "id", "id", {}),
     ("shop_test_drafts", "external_id", "external_id", {}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
@@ -711,6 +738,8 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("team_squads", "team_id"),
     ("chat_attachments", "owner_id"),
     ("chat_attachments", [("status", 1), ("created_at", 1)]),
+    # Nachweise zu Spielen (#2360): je Liste nach ``match_id``. Der eindeutige Index nach ``id`` steht oben.
+    ("match_proof_photos", "match_id"),
     ("stream_watches", [("user_id", 1), ("day", 1), ("key", 1)]),
     ("match_commendations", [("match_id", 1), ("from_registration_id", 1)]),
     ("match_commendations", "to_registration_id"),
@@ -739,6 +768,13 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("shop_products", "id"),
     ("shop_variants", "id"),
     ("shop_variants", "product_id"),
+    # Erfolge (#2338): Chat-Zähler je Person und Tag, besuchte Events je Person.
+    ("team_chat_messages", [("user_id", 1), ("created_at", 1)]),
+    ("match_chat_messages", [("user_id", 1), ("created_at", 1)]),
+    ("tournament_chat_messages", [("user_id", 1), ("created_at", 1)]),
+    ("event_registrations", "user_id"),
+    # Kapitän im Altbestand (#2338): die letzte Übergabe je Team aus dem Protokoll (achievement_counters._last_handover).
+    ("audit_logs", [("action", 1), ("target_id", 1), ("created_at", -1)]),
 )
 
 

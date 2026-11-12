@@ -208,6 +208,8 @@ NOTIFICATION_KIND_CATEGORY = {
     # Erfolge II (#622): Prestige und Rücknahme stehen im Postfach unter „Erfolge“.
     "prestige": "achievements",
     "achievement_revoked": "achievements",
+    # Neuberechnung abgeschlossen (#2340): eine Sammel-Nachricht je Person.
+    "achievement_recount": "achievements",
     # Jahresrückblick (#1195): „Dein Jahr ist da“ einmal im Dezember - unter „Erfolge“.
     "year_review": "achievements",
     # Kronen und Level (#2119 ML2): gehören zu „Erfolge“ - wer das ausschaltet, bekommt sie auch nicht.

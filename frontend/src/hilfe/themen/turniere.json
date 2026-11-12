@@ -1,0 +1,87 @@
+{
+  "slug": "turniere",
+  "titel": "Turniere",
+  "kurz": "Zum Turnier anmelden, einchecken, Ergebnis melden und den Turnierbaum lesen.",
+  "zielgruppe": "Für alle Spieler",
+  "suchbegriffe": ["turnier", "cup", "anmeldung", "check-in", "einchecken", "ergebnis", "bracket", "turnierbaum", "runde", "warteliste"],
+  "abschnitte": [
+    {
+      "id": "anmeldung",
+      "titel": "Anmelden",
+      "schritte": [
+        {
+          "id": "anmelden",
+          "titel": "Zum Turnier anmelden",
+          "text": "Öffne das Turnier und tippe auf Jetzt anmelden. Bei Teamturnieren heißt der Knopf Team anmelden.",
+          "hinweis": "Ein Team anmelden kann nur die Teamleitung oder Co-Leitung.",
+          "bild": true,
+          "link": { "to": "/tournaments", "label": "Zu den Turnieren" }
+        },
+        {
+          "id": "anmeldung-pruefen",
+          "titel": "Prüfen und verbindlich anmelden",
+          "text": "Im Fenster stehen Start, Check-in und die wichtigsten Regeln. Prüf alles und tippe auf Verbindlich anmelden.",
+          "hinweis": "Ist das Turnier voll, heißt der Knopf Auf die Warteliste.",
+          "bild": true
+        },
+        {
+          "id": "dein-stand",
+          "titel": "Dein Stand",
+          "text": "Danach zeigt die Turnierseite die Karte Dein Stand. Dort siehst du, ob du dabei bist und wann der Check-in ist.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "check-in-turnier",
+      "titel": "Einchecken",
+      "schritte": [
+        {
+          "id": "einchecken",
+          "titel": "Check-in",
+          "text": "Während des Check-ins tippst du auf der Turnierseite auf Check-in. Bei Teamturnieren checkt die Teamleitung oder Co-Leitung ein.",
+          "hinweis": "Bei Turnieren vor Ort checkst du bei der Turnierleitung ein.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "ergebnis",
+      "titel": "Ergebnis",
+      "schritte": [
+        {
+          "id": "ergebnis-melden",
+          "titel": "Ergebnis melden",
+          "text": "Öffne nach dem Spiel dein Match. Stell mit Plus und Minus den Spielstand ein und tippe auf Ergebnis melden.",
+          "hinweis": "Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.",
+          "bild": true
+        },
+        {
+          "id": "ergebnis-bestaetigen",
+          "titel": "Ergebnis bestätigen",
+          "text": "Hat die Gegenseite zuerst gemeldet, steht ihr Ergebnis da. Tippe auf Stimmt oder auf Stimmt nicht.",
+          "hinweis": "Bei Online-Turnieren gilt die Meldung nach einer kurzen Frist, wenn du nicht widersprichst. Vor Ort bestätigt die Turnierleitung.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "baum-lesen",
+      "titel": "Turnierbaum lesen",
+      "schritte": [
+        {
+          "id": "turnierbaum",
+          "titel": "Dein Spiel im Turnierbaum",
+          "text": "Unter Turnierbaum siehst du alle Runden. Dein Spiel ist hervorgehoben und mit „Du“ markiert. Der Sieger steht fett.",
+          "bild": true
+        },
+        {
+          "id": "weg-zeigen",
+          "titel": "Weg durch den Baum",
+          "text": "Tippe auf einen Namen, dann leuchtet sein Weg durch alle Runden auf. Am Handy blätterst du mit den Pfeilen von Runde zu Runde.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}

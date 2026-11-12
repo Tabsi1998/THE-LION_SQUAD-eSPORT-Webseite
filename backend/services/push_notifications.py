@@ -102,6 +102,7 @@ PUSH_CHANNELS = {
     # Erfolge, Level, Kronen, Jahresrückblick.
     "achievement": "lion_achievements",
     "achievement_revoked": "lion_achievements",
+    "achievement_recount": "lion_achievements",
     "prestige": "lion_achievements",
     "level": "lion_achievements",
     "crown_gained": "lion_achievements",

@@ -16,6 +16,7 @@ from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, ann
 from achievement_catalog.validate import validate_catalog
 from models import new_id, now_utc
 from services import achievement_visibility as visibility
+from services.achievement_reach import MANUAL_FLAG, retired_changes
 
 logger = logging.getLogger("tls.achievements.admin")
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -84,13 +85,14 @@ async def overview(db) -> dict:
         per_category[cat] = per_category.get(cat, 0) + 1
         if str(award.get("earned_at") or "") >= since7:
             unlocks7 += 1
-    rarity = await visibility.rarity(db)
+    # Die Verwaltung sieht auch nicht mehr Erreichbares - mit Vermerk (Review N7).
+    rarity = await visibility.rarity(db, include_retired=True)
     rarest = None
     for code, row in rarity["tiers"].items():
         if row["holders"] <= 0:
             continue
         if rarest is None or (row["holders"], -int(tiers[code].get("rank") or 0)) < (rarest["holders"], -int(tiers[rarest["code"]].get("rank") or 0)):
-            rarest = {"code": code, "holders": row["holders"], "percent": row["percent"]}
+            rarest = {"code": code, "holders": row["holders"], "percent": row["percent"], "retired": bool(row.get("retired"))}
     if rarest:
         t = tiers[rarest["code"]]
         rarest.update({"name": t.get("name"), "material": t.get("material"), "material_name": t.get("material_name"), "group_name": groups.get(t.get("group_code"), {}).get("name")})
@@ -132,8 +134,11 @@ async def export_catalog(db) -> dict:
     return {"format": "tls-achievements/1", "exported_at": now_utc().isoformat(), "groups": groups, "tiers": tiers}
 
 
-GROUP_FIELDS = ("name", "category", "icon", "art", "accent_color", "description", "how_to", "public", "is_special", "is_negative", "hidden", "sort_order", "member_only", "staff_only")
-TIER_FIELDS = ("group_code", "name", "description", "how_to", "art", "icon", "material", "level", "condition_key", "progress_target", "points", "manual_only", "member_only")
+# „Nicht mehr erreichbar“ (#2339) wandert mit Export und Import - an Gruppe und Stufe, mit Grund und „erreichbar bis“.
+GROUP_FIELDS = ("name", "category", "icon", "art", "accent_color", "description", "how_to", "public", "is_special", "is_negative", "hidden", "sort_order", "member_only", "staff_only",
+                "role_only", "retired", "retired_reason", "available_until")
+TIER_FIELDS = ("group_code", "name", "description", "how_to", "art", "icon", "material", "level", "condition_key", "progress_target", "points", "manual_only", "member_only",
+               "retired", "retired_reason", "available_until")
 
 
 async def import_catalog(db, payload: dict, actor: dict | None, *, dry_run: bool = False) -> dict:
@@ -148,16 +153,23 @@ async def import_catalog(db, payload: dict, actor: dict | None, *, dry_run: bool
     merged_groups = dict(existing_groups)
     for g in incoming_groups:
         base = dict(existing_groups.get(g["code"]) or {"code": g["code"], "id": g["code"], "is_admin_created": True, "public": True, "is_special": False, "is_negative": False})
+        # Ändert der Import „nicht mehr erreichbar“, ist das eine Entscheidung der Verwaltung (Review M2) - wie im Admin.
+        manual = retired_changes(base, g)
         for key in GROUP_FIELDS:
             if key in g:
                 base[key] = g[key]
+        if manual:
+            base[MANUAL_FLAG] = True
         merged_groups[g["code"]] = base
     merged_tiers = dict(existing_tiers)
     for t in incoming_tiers:
         base = dict(existing_tiers.get(t["code"]) or {"code": t["code"], "id": t["code"]})
+        manual = retired_changes(base, t)
         for key in TIER_FIELDS:
             if key in t:
                 base[key] = t[key]
+        if manual:
+            base[MANUAL_FLAG] = True
         group = merged_groups.get(base.get("group_code"))
         merged_tiers[t["code"]] = annotate_tier(base, group) if group else base
     report = validate_catalog(list(merged_groups.values()), list(merged_tiers.values()), CONDITION_KEY_STATUS)
@@ -473,14 +485,15 @@ async def prestige_reset(db, actor: dict, user_id: str, reason: str) -> dict:
 
 async def stats(db, *, weeks: int = 12) -> dict:
     groups, tiers = await visibility._catalog(db)
-    rarity = await visibility.rarity(db)
+    # Auch nicht mehr Erreichbares - die Zeile trägt den Vermerk ``retired`` (Review N7).
+    rarity = await visibility.rarity(db, include_retired=True)
     rows = []
     for code, row in rarity["tiers"].items():
         t = tiers.get(code) or {}
         g = groups.get(t.get("group_code")) or {}
         rows.append({"code": code, "name": t.get("name"), "group_code": t.get("group_code"), "group_name": g.get("name"), "category": category_v2(g.get("category")),
                      "material": t.get("material"), "material_name": t.get("material_name") or MATERIALS.get(t.get("material") or "", {}).get("name"), "rank": int(t.get("rank") or 0),
-                     "holders": row["holders"], "percent": row["percent"], "points": int(t.get("points") or 0)})
+                     "holders": row["holders"], "percent": row["percent"], "points": int(t.get("points") or 0), "retired": bool(row.get("retired"))})
     rows.sort(key=lambda r: (r["percent"], r["holders"], r["name"] or ""))
     negative = {code for code, g in groups.items() if g.get("is_negative")}
     now = now_utc().astimezone(VIENNA)
@@ -511,9 +524,10 @@ async def stats(db, *, weeks: int = 12) -> dict:
 def stats_csv(data: dict) -> str:
     out = io.StringIO()
     writer = csv.writer(out, delimiter=";")
-    writer.writerow(["Stufe", "Name", "Gruppe", "Kategorie", "Material", "Rang", "Punkte", "Personen", "Prozent"])
+    writer.writerow(["Stufe", "Name", "Gruppe", "Kategorie", "Material", "Rang", "Punkte", "Personen", "Prozent", "Nicht mehr erreichbar"])
     for r in data.get("rarity", []):
-        writer.writerow([r["code"], r["name"], r["group_name"], r["category"], r["material_name"], r["rank"], r["points"], r["holders"], str(r["percent"]).replace(".", ",")])
+        writer.writerow([r["code"], r["name"], r["group_name"], r["category"], r["material_name"], r["rank"], r["points"], r["holders"], str(r["percent"]).replace(".", ","),
+                         "ja" if r.get("retired") else ""])
     writer.writerow([])
     writer.writerow(["Woche", "Freischaltungen"])
     for w in data.get("weekly", []):

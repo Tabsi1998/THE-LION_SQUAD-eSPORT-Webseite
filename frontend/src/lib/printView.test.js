@@ -128,6 +128,11 @@ describe("Tabelle (#2121)", () => {
     expect(knockout.rows[0].cells).toEqual(["2", "0", "2"]);
   });
 
+  test("Liga-Staffel (E.1, #1625): am Tabellenende steht, wer ausschied", () => {
+    const [league] = standingsSections([row("Nordlicht", 1), row("Steinbock", 2, { exit: { kind: "withdrawn" } }), row("Eisfuchs", 3, { exit: { kind: "disqualified" } })]);
+    expect(league.rows.map((item) => item.name)).toEqual(["Nordlicht", "Steinbock (ausgetreten)", "Eisfuchs (disqualifiziert)"]);
+  });
+
   test("lange Tabellen gehen auf der nächsten Seite weiter, nichts über den Rand", () => {
     const rows = Array.from({ length: 60 }, (_, index) => row(`Spieler ${index + 1}`, index + 1));
     const pages = standingsPages(rows, { orientation: "portrait" });

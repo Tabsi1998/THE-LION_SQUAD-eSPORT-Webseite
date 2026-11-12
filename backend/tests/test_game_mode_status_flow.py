@@ -19,7 +19,7 @@ from services import match_duration  # noqa: E402
 
 MODES = [{"mode": "stellung", "label": "Stellung", "minutes": 12, "per_game": False},
          {"mode": "suchen", "label": "Suchen & Zerstören", "minutes": None, "per_game": False}]
-RULE = {"kind": "rounds", "target": 4, "round_limit": 7, "time_limit_minutes": 2, "draw_allowed": False, "overtime": True}
+RULE = {"kind": "rounds", "target": 4, "round_limit": 7, "time_limit_seconds": 120, "draw_allowed": False, "overtime": True}
 
 
 @pytest_asyncio.fixture
@@ -286,15 +286,15 @@ async def test_inactive_modes_are_not_chosen_anew_for_a_season_order(flow):
     game = await new_game(flow)
     league = (await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": game["id"]})).json()
     season = (await flow.post(f"/api/admin/leagues/{league['id']}/seasons",
-                              json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": ["suchen"]})).json()
+                              json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": ["suchen", "suchen", "suchen"]})).json()
     assert (await patch_modes(flow, game, with_status("archived"))).status_code == 200
     url = f"/api/admin/leagues/seasons/{season['id']}"
 
-    assert (await flow.patch(url, json={"name": "Season Eins", "game_mode_order": ["suchen"]})).status_code == 200
+    assert (await flow.patch(url, json={"name": "Season Eins", "game_mode_order": ["suchen", "suchen", "suchen"]})).status_code == 200
     moved = await flow.patch(url, json={"game_mode_order": ["stellung", "suchen", "suchen"]})
     assert moved.status_code == 200, "dieselbe Kennung an anderer Stelle ist nichts Neues"
     other = (await flow.post(f"/api/admin/leagues/{league['id']}/seasons",
-                             json={"name": "Season 2", "start_date": "2031-01-06T18:00:00+00:00", "game_mode_order": ["suchen"]}))
+                             json={"name": "Season 2", "start_date": "2031-01-06T18:00:00+00:00", "game_mode_order": ["suchen", "suchen", "suchen"]}))
     assert other.status_code == 422
     assert "archiviert" in other.text
 
