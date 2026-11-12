@@ -19,7 +19,7 @@ from services.mutation_lock import MutationLockBusy  # noqa: E402
 async def flow():
     instance, shutdown = make_flow()
     await xp.ensure_indexes(instance.db)
-    await instance.db.seasons.insert_one({"id": "s1", "name": "Wertung 2026", "status": "active", "start_date": "2026-01-01T00:00:00+00:00"})
+    await instance.db.seasons.insert_one({"id": "s1", "slug": "s1", "name": "Wertung 2026", "status": "active", "start_date": "2026-01-01T00:00:00+00:00"})
     try:
         yield instance
     finally:
@@ -94,7 +94,7 @@ async def test_abgeschlossene_wertung_bleibt_und_kein_zweiter_eintrag(flow):
     _lead, event, player, reg = await setup(flow)
     await set_status(flow, event, reg, "checked_in")
     await flow.db.seasons.update_one({"id": "s1"}, {"$set": {"status": "completed"}})
-    await flow.db.seasons.insert_one({"id": "s2", "name": "Wertung 2027", "status": "active", "start_date": "2027-01-01T00:00:00+00:00"})
+    await flow.db.seasons.insert_one({"id": "s2", "slug": "s2", "name": "Wertung 2027", "status": "active", "start_date": "2027-01-01T00:00:00+00:00"})
 
     await set_status(flow, event, reg, "registered")
     points, events, _total = await rewards(flow, player)
