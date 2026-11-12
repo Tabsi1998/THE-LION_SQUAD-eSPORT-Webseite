@@ -69,7 +69,9 @@ AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "l
 RETENTION_YEARS = 3
 RETAINED = (("consent_records", "user_id"), ("consent_decisions", "user_id"), ("moderation_strikes", "user_id"),
             ("moderation_sanctions", "user_id"), ("user_reports", "reporter_id"), ("user_reports", "target_user_id"),
-            ("match_reports_v2", "reporter_user_id"))
+            ("match_reports_v2", "reporter_user_id"),
+            # Strafen im Wettbewerb (E.3): die gegen die Person verhängten - Strafen eines Co-Teams bleiben beim Co-Team.
+            ("competition_sanctions", "user_id"))
 RETAINED_COLLECTIONS = tuple(dict.fromkeys(name for name, _field in RETAINED)) + ("contact_messages",)
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).
