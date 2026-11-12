@@ -955,7 +955,9 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
         except pricing.PricingError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=registration_id, reason="Begleitpersonen geändert", new_total_cents=int(price.get("total_cents") or 0))
+        # Am Auftrag, zu dem die Anmeldung gerade gehört - nicht an einem alten, gutgeschriebenen (#2184).
+        current_order = await billing_orders.current_invoiced_order(db, kind="event", registration=current)
+        await billing_orders.note_change_after_invoice(db, current_order, reason="Begleitpersonen geändert", new_total_cents=int(price.get("total_cents") or 0))
     if proposed_status in {"cancelled", "no_show"} and current.get("status") not in {"cancelled", "no_show"}:
         await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Anmeldung durch Verwaltung beendet")
         if current.get("price_snapshot"):

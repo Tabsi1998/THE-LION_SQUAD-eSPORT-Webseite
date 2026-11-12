@@ -172,12 +172,15 @@ async def cancel_orders_for(db, *, kind: str, registration_id: str, reason: str)
     return count
 
 
-async def note_change_after_invoice(db, *, kind: str, registration_id: str, reason: str, new_total_cents: int) -> dict | None:
+async def note_change_after_invoice(db, order: dict | None, *, reason: str, new_total_cents: int) -> dict | None:
     """Begleitpersonen, Roster oder Positionen ändern sich, obwohl der Beleg schon existiert: der
-    eingefrorene Preis bleibt, die Finanzverwaltung bekommt einen Prüffall mit alt und neu."""
+    eingefrorene Preis bleibt, die Finanzverwaltung bekommt einen Prüffall mit alt und neu. Am übergebenen Auftrag (#2184) -
+    eine Anmeldung kann mehrere haben (ein alter, gutgeschriebener und der aktuelle), gesucht wird hier nichts."""
     from services import billing_cases
 
-    order = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced"}, {"_id": 0})
+    if not order:
+        return None
+    order = await db.billing_orders.find_one({"id": order["id"], "status": "invoiced"}, {"_id": 0})
     if not order:
         return None
     now = now_utc().isoformat()
@@ -191,14 +194,24 @@ async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
     """Der Auftrag, zu dem es in Dolibarr einen gültigen Beleg gibt - Entwurf, freigegeben, bezahlt, auch mit Abzug. Ein in Dolibarr
     gelöschter Entwurf (#2226) zählt nicht mehr: Sein Auftrag wartet oder ist zu. Ein voll gutgeschriebener oder aufgegebener
     Beleg auch nicht (#2184): Wer danach zurückkommt, bekommt einen neuen Auftrag zum aktuellen Preis."""
-    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", **INVOICE_STILL_VALID}, {"_id": 0})
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", **INVOICE_STILL_VALID}, {"_id": 0},
+                                            sort=[("created_at", -1)])
+
+
+async def current_invoiced_order(db, *, kind: str, registration: dict) -> dict | None:
+    """Der Auftrag mit gültigem Beleg, zu dem die Anmeldung gerade gehört (derselbe eingefrorene Preis, #2184) - nicht ein alter,
+    gutgeschriebener derselben Anmeldung. Ohne Preis-Kennung (Altdaten) der jüngste gültige."""
+    digest = (registration.get("price_snapshot") or {}).get("hash")
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration["id"], "status": "invoiced", **INVOICE_STILL_VALID,
+                                             **({"snapshot.hash": digest} if digest else {})}, {"_id": 0}, sort=[("created_at", -1)])
 
 
 async def booking_cancelled_with_invoice(db, *, kind: str, registration_id: str) -> bool:
-    """Ist die Buchung am Auftrag storniert, obwohl der Beleg existiert? Das entscheidet über die Rückkehr (#2184) - nicht der
-    Stand der Anmeldung, den der Abgleich zwischendurch wieder auf den des Belegs setzt."""
-    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", "booking_state": "cancelled"},
-                                            {"_id": 0, "id": 1}) is not None
+    """Ist die Buchung am Auftrag storniert, obwohl der Beleg existiert und noch gilt? Das entscheidet über die Rückkehr (#2184) -
+    nicht der Stand der Anmeldung, den der Abgleich zwischendurch wieder auf den des Belegs setzt. Ein alter, voll gutgeschriebener
+    oder aufgegebener Auftrag bleibt für immer „storniert“ und zählt hier nicht."""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", "booking_state": "cancelled",
+                                             **INVOICE_STILL_VALID}, {"_id": 0, "id": 1}) is not None
 
 
 def rebooked_fields(order: dict) -> dict:
@@ -249,7 +262,7 @@ async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents:
         from services.dolibarr_billing import credit_after_return_case
 
         await credit_after_return_case(db, order, credit.get("credit_note_ref") or "", now)
-    await note_change_after_invoice(db, kind=order["kind"], registration_id=order["registration_id"], reason=reason, new_total_cents=new_total_cents)
+    await note_change_after_invoice(db, order, reason=reason, new_total_cents=new_total_cents)
     return True
 
 

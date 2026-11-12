@@ -522,6 +522,73 @@ async def test_abmelden_bei_belegter_platzsperre_sagt_gleich_nochmal(flow, fake,
     assert (await registration(flow, booked))["status"] == "registered"
 
 
+async def credited_then_new_invoice(flow, fake):
+    """Beleg A freigegeben, Storno, volle Gutschrift, Neuanmeldung: Auftrag B mit eigenem Beleg - zwei Aufträge an einer Anmeldung."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    await cancel_self(flow, event, paula)
+    fake.credit(order["invoice_id"], 40)
+    await billing_orders.sync_due()
+    await book(flow, paula, event, companions=0)
+    classified = await billing_orders.classify_due()
+    assert classified["invoiced"] == 1
+    old, new = await flow.db.billing_orders.find({"registration_id": booked["id"]}, {"_id": 0}).sort("created_at", 1).to_list(5)
+    assert old["id"] == order["id"] and new["status"] == "invoiced" and old["payment_state"] == "credited"
+    return kassier, event, paula, booked, old, new
+
+
+async def open_kinds(flow, order):
+    return set(await open_cases(flow, order))
+
+
+async def stored_order(flow, order):
+    return await flow.db.billing_orders.find_one({"id": order["id"]}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+async def test_aenderung_nach_neuem_beleg_trifft_den_neuen_auftrag(flow, fake):
+    """Ändert die Leitung die Begleitpersonen, gehören Prüffall und Vermerk an den Auftrag mit dem gültigen Beleg (B), nicht an den
+    alten, gutgeschriebenen (A)."""
+    kassier, event, paula, booked, old, new = await credited_then_new_invoice(flow, fake)
+    flow.act_as(kassier)
+    changed = await flow.patch(f"/api/events/{event['id']}/registrations/{booked['id']}", json={"companion_count": 2})
+    assert changed.status_code == 200, changed.text
+    assert "changed_after_invoice" in await open_kinds(flow, new)
+    assert "changed_after_invoice" not in await open_kinds(flow, old)
+    assert (await stored_order(flow, new))["booking_change"] == "Begleitpersonen geändert"
+    assert not (await stored_order(flow, old)).get("booking_change")
+
+
+@pytest.mark.asyncio
+async def test_zweiter_zyklus_rueckkehr_trifft_den_neuen_auftrag(flow, fake):
+    """Auch B wird storniert, die Person kommt wieder: Rückbuchung, Prüffall und Vermerk gehören an B."""
+    kassier, event, paula, booked, old, new = await credited_then_new_invoice(flow, fake)
+    await cancel_self(flow, event, paula)
+    await book(flow, paula, event, companions=0)
+    assert await flow.db.billing_orders.count_documents({"registration_id": booked["id"]}) == 2
+    stored = await stored_order(flow, new)
+    assert "booking_state" not in stored and stored["booking_change"] == SELF_REASON
+    assert "changed_after_invoice" in await open_kinds(flow, new)
+    assert "changed_after_invoice" not in await open_kinds(flow, old)
+    assert not (await stored_order(flow, old)).get("booking_changed_at")
+
+
+@pytest.mark.asyncio
+async def test_warteliste_und_zurueck_mit_gueltigem_neuen_beleg_ist_keine_reaktivierung(flow, fake):
+    """Der alte Auftrag A bleibt für immer „storniert“ - das macht ein Hin und Her über die Warteliste mit gültigem Beleg B nicht zur
+    Rückkehr nach einem Storno: kein Prüffall, kein neuer Preis."""
+    kassier, event, paula, booked, old, new = await credited_then_new_invoice(flow, fake)
+    before = await registration(flow, booked)
+    flow.act_as(kassier)
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    for status in ("waitlist", "registered"):
+        response = await flow.patch(url, json={"status": status})
+        assert response.status_code == 200, response.text
+    assert await open_kinds(flow, new) == set() and "changed_after_invoice" not in await open_kinds(flow, old)
+    assert await flow.db.billing_orders.count_documents({"registration_id": booked["id"]}) == 2
+    assert (await registration(flow, booked))["price_snapshot"]["hash"] == before["price_snapshot"]["hash"]
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)
