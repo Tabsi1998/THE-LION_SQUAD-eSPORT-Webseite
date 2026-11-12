@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.79.0 (11.11.2026)
+
+### Neu
+
+* Erinnerung „Map-Veto wartet“ an die Seite am Zug (#1651)
+* Liga – bei Kontolöschung bleibt ein MOSS-Nachweis eines laufenden Verfahrens bis zu dessen Abschluss für die Liga-Leitung (#2360)
+* Liga – mehrere Nachweise je Meldung, Vorfall und Protest: Bilder und Video-Links (nur https) (#2360)
+* Liga – Nachweise bleiben bis Season-Ende plus Frist, MOSS-Nachweise nur bis zum Ende des Verfahrens (#2360)
+* Map-Veto für Zuschauer nur lesend auf der Matchseite (#1651)
+* Map-Veto live – der Zug der Gegenseite erscheint ohne Neuladen und leuchtet kurz auf (#1651)
+* Map-Veto live – Map-Karten mit Bild, Countdown nach Serverzeit und Ablauf-Leiste auf der Matchseite (#1651)
+* TV-Ansicht des Map-Vetos für 1920 px (#1651)
+
 ## 1.78.0 (11.11.2026)
 
 ### Neu
