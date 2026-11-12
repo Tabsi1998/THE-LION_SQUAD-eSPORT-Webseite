@@ -13,7 +13,8 @@ zu oder lehnt ab; ohne Einigung - oder ohne Antwort bis ``answer_deadline`` - en
 - **Kontingent** (§ 9.6): gezählt und angezeigt, nie erzwungen.
 
 Geschrieben wird immer die ganze Liste mit Bedingung auf den gelesenen Stand; die Routen halten dazu die Schreibsperre des Turniers.
-Die Regeln ohne Datenbank stehen in ``league_incident_rules`` (Blatt-Modul); schwere Module (Rechte, Nachrichten) werden erst in den`nFunktionen geladen.
+Die Regeln ohne Datenbank stehen in ``league_incident_rules`` (Blatt-Modul); schwere Module (Rechte, Nachrichten) werden erst in den
+Funktionen geladen.
 """
 from __future__ import annotations
 
