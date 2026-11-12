@@ -804,6 +804,15 @@ async def _credit_case(db, order: dict, text: str, ref: str = "") -> None:
     await billing_cases.open_case(db, order, "cancelled_after_invoice", {"credit_note": text, **({"credit_note_ref": ref} if ref else {})})
 
 
+async def credit_after_return_case(db, order: dict, ref: str, returned_at: str) -> None:
+    """Der Gutschrift-Entwurf der Website liegt in Dolibarr, aber die Person ist zurück (#2184): Die Finanzverwaltung löscht ihn."""
+    from services import billing_cases
+
+    await billing_cases.open_case(db, order, "credit_after_return", {
+        "credit_note_ref": ref, "returned_at": returned_at,
+        "credit_note": f"Gutschrift-Entwurf {ref} liegt in Dolibarr, die Person ist aber wieder angemeldet – in Dolibarr löschen."})
+
+
 async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: dict) -> str:
     """Den vorgemerkten Gutschrift-Entwurf anlegen: „created“, „linked“ (in Dolibarr gibt es schon eine Gutschrift),
     „draft_invoice“ (der Beleg ist noch Entwurf - löschen statt gutschreiben), „skipped“ oder „failed“."""
@@ -851,18 +860,16 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
             ref = ""
         ref = ref or f"(PROV{credit_id})"
         # Das letzte Fenster (#2184): Kam die Person zurück, während Dolibarr den Entwurf anlegte, bleibt er vermerkt - die
-        # Finanzverwaltung löscht ihn. Frisch gelesen; den Merker ``credit_note_returned_at`` setzt die Rückbuchung.
-        after = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "credit_note_returned_at": 1}) or {}
+        # Finanzverwaltung löscht ihn. Erst den Entwurf an den Auftrag schreiben, dann den Stand frisch lesen: Kommt die Rückkehr
+        # davor, sieht der Lauf sie (Stand und Merker ``credit_note_returned_at``); kommt sie danach, sieht die Rückbuchung den
+        # Entwurf und öffnet den Fall selbst (``billing_orders.rebook_after_invoice``).
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"credit_note_id": credit_id, "credit_note_ref": ref, "credit_note_source": "website",
                                                                           "credit_note_created_at": now, "updated_at": now_utc().isoformat()},
-                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": "",
-                                                                            "credit_note_returned_at": ""}})
+                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": ""}})
+        after = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "credit_note_returned_at": 1}) or {}
+        await db.billing_orders.update_one({"id": order["id"]}, {"$unset": {"credit_note_returned_at": ""}})
         if after.get("booking_state") != "cancelled":
-            from services import billing_cases
-
-            await billing_cases.open_case(db, order, "credit_after_return", {
-                "credit_note_ref": ref, "returned_at": after.get("credit_note_returned_at") or "",
-                "credit_note": f"Gutschrift-Entwurf {ref} entstand, während die Person zurückkam – in Dolibarr löschen."})
+            await credit_after_return_case(db, order, ref, after.get("credit_note_returned_at") or now)
             return "created"
         await _credit_case(db, order, f"Gutschrift-Entwurf {ref} über den ganzen Betrag liegt in Dolibarr bereit – prüfen (Teilbetrag?) und freigeben.", ref)
         logger.info("[billing] Gutschrift-Entwurf %s zu Beleg %s", ref, state["invoice_ref"])

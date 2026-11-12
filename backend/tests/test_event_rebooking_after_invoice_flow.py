@@ -382,6 +382,60 @@ async def test_altauftrag_ohne_verlaufsliste_behaelt_den_ersten_storno(flow, fak
     assert texts.count("Buchung storniert: Anmeldung storniert") == 3 and texts.count(f"Buchung wieder aufgenommen: {SELF_REASON}") == 3
 
 
+@pytest.mark.asyncio
+async def test_rueckkehr_nach_dem_anlegen_der_gutschrift_wird_ein_prueffall(flow, fake):
+    """Der Gutschrift-Entwurf liegt schon in Dolibarr, dann kommt die Person zurück: Der Beleg gilt weiter, der Entwurf muss weg."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    counts = await billing_orders.sync_due()
+    assert counts["credit_drafts"] == 1
+    await book(flow, paula, event, companions=0)
+    stored = await order_of(flow, booked)
+    assert "booking_state" not in stored and stored.get("credit_note_id")
+    case = (await open_cases(flow, order)).get("credit_after_return")
+    assert case and case["detail"]["credit_note_ref"] == stored["credit_note_ref"]
+
+
+class _ReturnAfterRead:
+    """Die Datenbank des Gutschrift-Laufs: Gleich nachdem er den Stand der Buchung gelesen hat, kommt die Person zurück."""
+
+    def __init__(self, db, comeback):
+        self._db, self._comeback, self.fired = db, comeback, False
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _ReturnAfterReadCollection(target, self) if name == "billing_orders" else target
+
+
+class _ReturnAfterReadCollection:
+    def __init__(self, collection, gate):
+        self._collection, self._gate = collection, gate
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+    async def find_one(self, *args, **kwargs):
+        document = await self._collection.find_one(*args, **kwargs)
+        projection = args[1] if len(args) > 1 else kwargs.get("projection") or {}
+        if "credit_note_returned_at" in projection and not self._gate.fired:
+            self._gate.fired = True
+            await self._gate._comeback()
+        return document
+
+
+@pytest.mark.asyncio
+async def test_rueckkehr_gleich_nach_dem_lesen_im_gutschrift_lauf_wird_ein_prueffall(flow, fake):
+    """Das Fenster nach dem letzten Lesen: Der Lauf hat „storniert“ gelesen, dann kommt die Person zurück, dann schreibt er den
+    Entwurf an den Auftrag. Auch so bekommt die Finanzverwaltung den Fall „Gutschrift-Entwurf trotz Rückkehr“."""
+    event, paula, booked, order = await cancelled_with_credit_draft_due(flow, fake)
+    gate = _ReturnAfterRead(flow.db, lambda: book(flow, paula, event, companions=0))
+    settings = await dolibarr_client.load_settings(flow.db)
+    result = await dolibarr_billing.draft_credit_note(gate, settings, dolibarr_client.DolibarrClient(settings), await order_of(flow, booked))
+    assert result == "created" and gate.fired
+    stored = await order_of(flow, booked)
+    assert "booking_state" not in stored and stored.get("credit_note_id") and "credit_note_returned_at" not in stored
+    assert "credit_after_return" in await open_cases(flow, order)
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)

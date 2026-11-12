@@ -241,6 +241,14 @@ async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents:
     # Anlegen und meldet einen Entwurf, der trotz Rückkehr entstand, als Prüffall (``dolibarr_billing.draft_credit_note``).
     await db.billing_orders.update_one({"id": order["id"], "credit_note_claim_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
                                        {"$set": {"credit_note_returned_at": now}})
+    # Liegt der Gutschrift-Entwurf der Website schon in Dolibarr, öffnet die Rückkehr den Fall selbst - so ist jede Reihenfolge
+    # mit dem Gutschrift-Lauf abgedeckt, auch eine Rückkehr Tage nach dem Anlegen.
+    credit = await db.billing_orders.find_one({"id": order["id"], "credit_note_id": {"$exists": True}, "credit_note_source": "website"},
+                                              {"_id": 0, "credit_note_ref": 1})
+    if credit:
+        from services.dolibarr_billing import credit_after_return_case
+
+        await credit_after_return_case(db, order, credit.get("credit_note_ref") or "", now)
     await note_change_after_invoice(db, kind=order["kind"], registration_id=order["registration_id"], reason=reason, new_total_cents=new_total_cents)
     return True
 
