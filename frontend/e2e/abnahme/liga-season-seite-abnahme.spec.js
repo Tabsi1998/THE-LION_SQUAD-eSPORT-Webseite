@@ -128,12 +128,18 @@ test.describe("Abnahme: Season-Seite als Gast gegen den echten Server", () => {
     await close();
   });
 
-  test("TV-Ansicht einer Staffel lädt (1440 px)", async ({ browser }, testInfo) => {
-    const { page, problems, close } = await guest(browser, testInfo, { width: 1440, height: 900 });
+  test("TV-Ansicht einer Staffel lädt für die Turnierleitung (1440 px)", async ({ browser }, testInfo) => {
+    const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: { width: 1440, height: 900 }, locale: "de-AT", timezoneId: "Europe/Vienna" });
+    const page = await context.newPage();
+    await signIn(page, "lead");
+    const problems = watch(page);
     await page.goto(`/display/bracket/${show.staffeln[0]}`);
+    await expect(page).toHaveURL(/\/display\/bracket\//);
     await expect(page.locator("body")).not.toContainText("nicht gefunden");
+    await expect(page.locator("body")).toContainText("Nebelwölfe");
     await page.waitForTimeout(1500);
+    if (process.env.ABNAHME_CHECK_SHOTS) await page.screenshot({ path: path.join(process.env.ABNAHME_CHECK_SHOTS, "tv.png") });
     expect(problems).toEqual([]);
-    await close();
+    await context.close();
   });
 });

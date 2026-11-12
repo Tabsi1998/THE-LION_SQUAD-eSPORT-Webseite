@@ -520,6 +520,8 @@ def flat_png(size: tuple[int, int], color: tuple[int, int, int], label: str, sma
     from PIL import Image, ImageDraw, ImageFont
 
     width, height = size
+    # Die eingebaute Schrift kann keine Umlaute - auf dem Bild umschreiben, der Name in den Daten bleibt.
+    label = label.translate(str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss"}))
     image = Image.new("RGB", size, color)
     draw = ImageDraw.Draw(image)
     for row in range(height):
@@ -566,7 +568,7 @@ async def ensure_bans(admin: Session, game: dict, season_id: str) -> None:
     items = {}
     for kind, name, color in EQUIPMENT:
         items[name] = known.get(name) or await admin.call("POST", base, json={
-            "category": role[kind], "name": name, "image_url": await upload(admin, f"ausruestung-{len(items)}.png", flat_png((640, 360), color, name, "Test-Ausrüstung"))})
+            "category": role[kind], "name": name, "image_url": await upload(admin, f"ausruestung-{len(items)}.png", flat_png((640, 360), color, name, "Testbild"))})
     await admin.call("PUT", f"/api/admin/leagues/seasons/{season_id}/loadout-bans", json={"expected_version": 0, "entries": [
         {"item_id": items["Donnerbüchse"]["id"], "kind": "item"},
         {"item_id": items["Rauchwolke"]["id"], "kind": "item", "modes": ["suchen"]}]})
