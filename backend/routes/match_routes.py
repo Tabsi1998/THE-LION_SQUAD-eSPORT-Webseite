@@ -1708,7 +1708,8 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             await ensure_station_open(db, new_station)
         await ensure_station_slot_available(db, v2_match, updates, "matches_v2")
         if updates and all(v2_match.get(key) == value for key, value in updates.items()):
-            return {**v2_match, "idempotent_replay": True}
+            # Auch die Wiederholung zeigt Verfahren nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+            return {**await league_procedures.for_viewer(db, v2_match, me), "idempotent_replay": True}
         updates["updated_at"] = now_utc().isoformat()
         change: dict = {"$set": updates}
         # Ein Aufruf (#1122) endet, wenn das Spiel losgeht, entschieden wird oder an eine andere Station wandert.
