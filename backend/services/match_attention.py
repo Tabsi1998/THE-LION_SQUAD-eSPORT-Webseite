@@ -71,6 +71,18 @@ def _labeler(tournament: dict, matches: list[dict], stages: dict[str, dict] | No
     return label
 
 
+def _dispute_words(tournament: dict, row: dict) -> tuple[str, str, str]:
+    """Titel, Grund und wer ohne Seite gemeldet hat - in einer Liga-Staffel mit dem Grund aus der Liste der Season (etwa
+    „Cheat-Verdacht“, den ``category`` nur als „Sonstiges“ kennt) und „Liga-Leitung“ statt „Turnierleitung“ (#1619, E.2)."""
+    if not is_league_staffel(tournament):
+        return "Streitfall gemeldet", category_label(row.get("category")), "Turnierleitung"
+    from services import league_protest_settings
+
+    reason = league_protest_settings.reason_label(league_protest_settings.effective(tournament, None), row.get("reason_key") or row.get("category"))
+    title = f"{PROCEDURE_WORDS[row['kind']]} eingegangen" if row.get("kind") in PROCEDURE_WORDS else "Streitfall gemeldet"
+    return title, reason, "Liga-Leitung"
+
+
 def attention_items(tournament: dict, matches: list[dict], stations: list[dict], regs_by_id: dict[str, dict],
                     now: datetime, *, stages: dict[str, dict] | None = None, game: dict | None = None) -> list[dict]:
     """Die Fälle eines Turniers - ``matches``: alle Spiele des Turniers, mit Stationstext (attach_station_info)."""
@@ -83,10 +95,11 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
             # Liga (E.2, #1619): Ein Protest oder Einspruch, dessen Ergebnis vorläufig zählt, lässt das Spiel „completed“ - der Fall
             # steht trotzdem hier. Entschieden wird auf der Matchseite, an der Karte des Verfahrens.
             row = procedures[-1]
-            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else "Liga-Leitung"
+            title, reason, lead_word = _dispute_words(tournament, row)
+            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else lead_word
             items.append({"match_id": match.get("id"), "station_text": "", "label": _label(match), "names": _names(match, regs_by_id),
-                          "id": f"vf-{match.get('id')}", "kind": "procedure", "title": f"{PROCEDURE_WORDS[row['kind']]} eingegangen",
-                          "detail": f"{by}: „{category_label(row.get('category'))}“ – das Ergebnis zählt vorläufig",
+                          "id": f"vf-{match.get('id')}", "kind": "procedure", "title": title,
+                          "detail": f"{by}: „{reason}“ – das Ergebnis zählt vorläufig",
                           "action": "open", "since": row.get("at")})
             continue
         if status not in OPEN_STATUSES or len(filled_slots(match)) < 2 or match.get("is_preview"):
@@ -95,9 +108,10 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
                 "names": _names(match, regs_by_id)}
         if status == "disputed":
             row = open_dispute(match) or {}
-            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else "Turnierleitung"
-            items.append({**base, "id": f"ds-{match.get('id')}", "kind": "dispute", "title": "Streitfall gemeldet",
-                          "detail": f"{by}: „{category_label(row.get('category'))}“", "action": "view", "since": row.get("at")})
+            title, reason, lead_word = _dispute_words(tournament, row)
+            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else lead_word
+            items.append({**base, "id": f"ds-{match.get('id')}", "kind": "dispute", "title": title,
+                          "detail": f"{by}: „{reason}“", "action": "view", "since": row.get("at")})
             continue
         if isinstance(match.get("pending_result"), dict):
             continue
