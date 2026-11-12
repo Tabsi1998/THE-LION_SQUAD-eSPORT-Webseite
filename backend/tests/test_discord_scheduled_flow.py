@@ -196,7 +196,7 @@ async def game_server(flow):
     db = flow.db
     await discord_guilds.reconcile(db, [seen(MAIN, "LION"), seen(COD, "CoD-Server")], configured_main=MAIN)
     await discord_guilds.update_guild(db, COD, {"enabled": True})
-    await db.games.insert_many([{"id": "g-cod", "name": "Call of Duty", "discord_guild_id": COD}, {"id": "g-chess", "name": "Schach"}])
+    await db.games.insert_many([{"id": "g-cod", "slug": "g-cod", "name": "Call of Duty", "discord_guild_id": COD}, {"id": "g-chess", "slug": "g-chess", "name": "Schach"}])
 
 
 @pytest.mark.asyncio

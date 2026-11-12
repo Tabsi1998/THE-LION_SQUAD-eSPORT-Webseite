@@ -33,9 +33,9 @@ async def seed(flow):
         {"id": "g-1", "name": "Teil 1", "kind": "edition", "parent_game_id": "g-reihe", "slug": "teil-1"},
     ])
     await flow.db.events.insert_many([
-        {"id": "e-offen", "name": "Offenes Event", "status": "published", "visibility": "public", "tournaments": ["x"]},
-        {"id": "e-entwurf", "name": "Entwurf", "status": "draft", "visibility": "public"},
-        {"id": "e-intern", "name": "Internes Event", "status": "published", "visibility": "members"},
+        {"id": "e-offen", "slug": "e-offen", "name": "Offenes Event", "status": "published", "visibility": "public", "tournaments": ["x"]},
+        {"id": "e-entwurf", "slug": "e-entwurf", "name": "Entwurf", "status": "draft", "visibility": "public"},
+        {"id": "e-intern", "slug": "e-intern", "name": "Internes Event", "status": "published", "visibility": "members"},
     ])
     await flow.db.partners.insert_many([
         {"id": "p-1", "slug": "partner-1", "name": "Partner 1", "kind": "club"},
@@ -76,7 +76,7 @@ async def test_the_list_says_the_same_as_each_single_tournament(flow):
 @pytest.mark.asyncio
 async def test_the_long_list_asks_once_not_per_tournament(flow, monkeypatch):
     await flow.db.games.insert_one({"id": "g-1", "name": "Teil 1", "slug": "teil-1"})
-    await flow.db.events.insert_one({"id": "e-1", "name": "Event", "status": "published", "visibility": "public"})
+    await flow.db.events.insert_one({"id": "e-1", "slug": "e-1", "name": "Event", "status": "published", "visibility": "public"})
     for number in range(40):
         await flow.create_tournament(id=f"t-{number:02d}", slug=f"t-{number:02d}", game_id="g-1", event_id="e-1", partner_ids=["p-1"])
     staff = await flow.add_staff()

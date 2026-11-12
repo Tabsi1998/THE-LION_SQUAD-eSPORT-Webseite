@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from database import get_db
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, new_id, now_utc
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placements_for_structure
 
@@ -59,7 +59,7 @@ async def auto_create_for_tournament(tid: str) -> int:
     if not prize_places:
         return 0
 
-    regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     read_model = await load_competition_read_model(db, tid)
     snapshot = read_model.structure_snapshot()
     observe_structure_read(snapshot, surface="prize_pickups")

@@ -148,7 +148,8 @@ async def test_without_frozen_price_the_retry_freezes_it_for_the_payer_only(flow
 
 @pytest.mark.asyncio
 async def test_play_along_retry_counts_the_repaired_order_in_the_sum(flow, monkeypatch):
-    admin = await person(flow, "chef", role="superadmin")
+    # "chef" legt gleich paid_cup an - eine E-Mail gehört nur zu einem Konto (eindeutiger Index, #2216).
+    admin = await person(flow, "leitung", role="superadmin")
     flow.act_as(admin)
     created = await flow.post("/api/events", json={"name": "Vereins-LAN", "status": "registration_open", "visibility": "public", "has_registration": True,
                                                     "start_date": (now_utc() + timedelta(days=10)).isoformat()})

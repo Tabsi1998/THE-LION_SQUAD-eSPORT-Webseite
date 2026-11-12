@@ -125,9 +125,9 @@ async def test_the_deadline_removes_attachments_invites_and_unused_images(flow, 
     monkeypatch.setattr(chat_attachments, "_remove_files", lambda row: removed.append(row["id"]))
     leader, _co, member, team, _squad = await world(flow)
     await flow.db.teams.update_one({"id": team["id"]}, {"$set": {"logo_url": "/api/static/uploads/nur-team.webp", "banner_url": "/api/static/uploads/geteilt.webp"}})
-    await flow.db.news_posts.insert_one({"id": new_id(), "title": "Bild", "banner_url": "/api/static/uploads/geteilt.webp"})
+    await flow.db.news_posts.insert_one({"id": new_id(), "slug": new_id(), "title": "Bild", "banner_url": "/api/static/uploads/geteilt.webp"})
     for name in ("nur-team.webp", "geteilt.webp"):
-        await flow.db.media_uploads.insert_one({"filename": name, "media_scope": "user", "owner_id": leader["id"]})
+        await flow.db.media_uploads.insert_one({"id": f"upload-{name}", "filename": name, "media_scope": "user", "owner_id": leader["id"]})
     await flow.db.team_chat_messages.insert_one({"id": new_id(), "team_id": team["id"], "user_id": member["id"], "message": "x", "attachments": [{"id": "a1"}]})
     await flow.db.chat_attachments.insert_one({"id": "a1", "owner_id": member["id"], "status": "attached", "storage_key": "chat/a1.png", "context": {"type": "team", "team_id": team["id"]}})
     await flow.db.chat_attachments.insert_one({"id": "a2", "owner_id": member["id"], "status": "attached", "storage_key": "chat/a2.png", "context": {"type": "team", "team_id": "anderes-team"}})
@@ -153,7 +153,7 @@ async def test_the_deadline_removes_attachments_invites_and_unused_images(flow, 
 async def test_an_image_from_the_club_library_stays(flow):
     leader, _co, _member, team, _squad = await world(flow)
     await flow.db.teams.update_one({"id": team["id"]}, {"$set": {"logo_url": "/api/static/uploads/vereinslogo.webp"}})
-    await flow.db.media_uploads.insert_one({"filename": "vereinslogo.webp", "media_scope": "branding"})
+    await flow.db.media_uploads.insert_one({"id": "uploads-1", "filename": "vereinslogo.webp", "media_scope": "branding"})
     await dissolve(flow, leader, team)
     await purge_dissolved_teams(flow.db, now_utc() + timedelta(days=DISSOLVED_TEAM_RETENTION_DAYS + 1))
     assert await flow.db.media_uploads.find_one({"filename": "vereinslogo.webp"})

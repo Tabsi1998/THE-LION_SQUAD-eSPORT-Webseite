@@ -155,7 +155,7 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
     }
     everyone = set().union(*rosters.values()) if rosters else set()
     # Die eine Prüfung (#2204): über dem Stand der Spiel-ID liegen die Regeln der Season - ohne Regeln bleibt es der ID-Stand.
-    eligibility = await league_eligibility.context_for_tournament(db, tournament, everyone)
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, everyone, match=match)
     pool = await map_pools.effective_pool(db, tournament, stage=stage, match=match)
     return LeagueSetup(
         tournament=tournament,

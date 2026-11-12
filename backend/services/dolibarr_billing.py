@@ -36,7 +36,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
-from services.billing_amounts import paid_cents
+from services.billing_amounts import invoice_fields, own_registration, paid_cents
 from services.billing_facts import booking_facts, source_label
 from services.discord_plain_text import _without_tags
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, write_capable
@@ -524,13 +524,9 @@ async def _mark_invoiced(db, order: dict, state: dict, *, payments: list[dict] |
     }, "$unset": {"sync_error": "", "sync_error_at": ""},
         # Zahlungen neu gelesen: eine schon vorbereitete Erstattung rechnet neu (#1034, ``billing_orders.add_refund``).
         "$inc": {"money_rev": 1}})
-    billing_status = "paid" if state.get("paid") else "invoiced"
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": {
-            "billing_status": billing_status, "invoice_id": state["invoice_id"], "invoice_ref": state["invoice_ref"], "invoice_status": state["invoice_status"],
-            "payment_state": state.get("payment_state"),
-        }})
+        await collection.update_one(own_registration(order), {"$set": invoice_fields(state)})
 
 
 async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: dict) -> dict:
@@ -632,9 +628,11 @@ async def _review_cases(db, order: dict, state: dict, payments: list[dict] | Non
         await billing_cases.open_case(db, order, "overpaid", {"over_cents": -int(state.get("remaining_cents") or 0), "invoice_ref": state["invoice_ref"]})
     else:
         await billing_cases.auto_resolve(db, order["id"], "overpaid", "Die Überzahlung ist in Dolibarr ausgeglichen.")
-    if order.get("booking_state") == "cancelled":
+    # Der Stand der Buchung frisch gelesen: Kommt die Person während des Abgleichs zurück (#2184), ist eine Zahlung keine auf eine stornierte Buchung.
+    booking = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "paid_cents_at_cancel": 1}) or {}
+    if booking.get("booking_state") == "cancelled":
         paid_now = paid_cents({**order, **{k: v for k, v in state.items() if k != "remote_socid"}}, payments)
-        if paid_now > int(order.get("paid_cents_at_cancel") or 0):
+        if paid_now > int(booking.get("paid_cents_at_cancel") or 0):
             opened += 1
             await billing_cases.open_case(db, order, "paid_after_cancel", {"paid_cents": paid_now, "invoice_ref": state["invoice_ref"]})
         # Dolibarr hat den Storno aufgelöst: Gutschrift über den ganzen Betrag oder Beleg aufgegeben.
@@ -651,7 +649,7 @@ async def _review_cases(db, order: dict, state: dict, payments: list[dict] | Non
 INVOICE_FIELDS = ("invoice_id", "invoice_ref", "invoice_status", "invoice_type", "paid", "paid_at", "remaining", "total", "remote_total_cents", "remaining_cents",
                   "due_on", "credit_notes", "payment_state", "payments", "close_code", "close_note", "invoiced_at", "synced_at",
                   "sync_error", "sync_error_text", "sync_error_at", "pdf_built_at", "pdf_source", "pdf_missing", "pdf_error", "pdf_error_text", "pdf_error_at", "pdf_attempts",
-                  "invoice_notice_due_at", "credit_note_due_at", "credit_note_claim_at")
+                  "invoice_notice_due_at", "credit_note_due_at", "credit_note_claim_at", "credit_note_returned_at")
 # Prüffälle, die am Beleg hängen - mit dem gelöschten Entwurf sind sie gegenstandslos. „Buchung nach dem Beleg geändert“ bleibt:
 # Der eingefrorene Preis passt dann nicht mehr, das entscheidet die Finanzverwaltung.
 DRAFT_CASES = ("invoice_gone", "amount_mismatch", "recipient_mismatch", "cancelled_after_invoice")
@@ -673,13 +671,15 @@ async def _remove_draft(db, order: dict) -> bool:
     from services import billing_cases
 
     now = now_utc().isoformat()
-    cancelled = order.get("booking_state") == "cancelled"
+    # Frisch gelesen und im Filter festgehalten: Kommt die Person gerade zurück (#2184), endet der Auftrag nicht mit dem Storno.
+    fresh = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "booking_changed_at": 1}) or {}
+    cancelled = fresh.get("booking_state") == "cancelled"
     ref = str(order.get("invoice_ref") or order.get("invoice_id"))
     note = "" if cancelled else f"Entwurf {ref} wurde in Dolibarr gelöscht. Soll neu abgerechnet werden: „Freigeben“. Sonst: „Keine neue Rechnung“."
-    if order.get("booking_changed_at") and not cancelled:
+    if fresh.get("booking_changed_at") and not cancelled:
         note += " Die Buchung wurde nach dem Beleg geändert – Preis prüfen."
     done = await db.billing_orders.update_one(
-        {"id": order["id"], "status": "invoiced", "invoice_id": order["invoice_id"]},
+        {"id": order["id"], "status": "invoiced", "invoice_id": order["invoice_id"], "booking_state": "cancelled" if cancelled else {"$ne": "cancelled"}},
         {"$set": {"status": "cancelled" if cancelled else "held", "note": note, "attempts": 0, "updated_at": now},
          "$unset": {field: "" for field in INVOICE_FIELDS},
          "$push": {"removed_invoices": {"invoice_id": order["invoice_id"], "invoice_ref": ref, "at": now}}})
@@ -687,7 +687,8 @@ async def _remove_draft(db, order: dict) -> bool:
         return False
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
+        # Nur die Anmeldung, die genau diesen Beleg trägt (#2184) - eine Neuanmeldung dazwischen hat ihren eigenen Auftrag.
+        await collection.update_one({**own_registration(order), "invoice_id": order["invoice_id"]}, {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
                                                                        "$unset": {"invoice_id": "", "invoice_ref": "", "invoice_status": "", "payment_state": ""}})
     for kind in DRAFT_CASES:
         await billing_cases.auto_resolve(db, order["id"], kind, f"Der Entwurf {ref} ist in Dolibarr gelöscht.")
@@ -804,13 +805,35 @@ async def _credit_case(db, order: dict, text: str, ref: str = "") -> None:
     await billing_cases.open_case(db, order, "cancelled_after_invoice", {"credit_note": text, **({"credit_note_ref": ref} if ref else {})})
 
 
+async def credit_after_return_case(db, order: dict, ref: str, returned_at: str) -> None:
+    """Der Gutschrift-Entwurf der Website liegt in Dolibarr, aber die Person ist zurück (#2184): Die Finanzverwaltung löscht ihn."""
+    from services import billing_cases
+
+    await billing_cases.open_case(db, order, "credit_after_return", {
+        "credit_note_ref": ref, "returned_at": returned_at,
+        "credit_note": f"Gutschrift-Entwurf {ref} liegt in Dolibarr, die Person ist aber wieder angemeldet – in Dolibarr löschen."})
+    await _settle_contradicting_cancel_case(db, order["id"])
+
+
+async def _settle_contradicting_cancel_case(db, order_id: str) -> None:
+    """„Storniert, Beleg existiert“ sagt „Entwurf freigeben“, „Gutschrift-Entwurf trotz Rückkehr“ sagt „löschen“ (#2184): Ist der
+    zweite offen, ist der erste erledigt - die Person ist zurück."""
+    from services import billing_cases
+
+    if await db.billing_cases.find_one({"order_id": order_id, "kind": "credit_after_return", "status": "open"}, {"_id": 0, "id": 1}):
+        await billing_cases.auto_resolve(db, order_id, "cancelled_after_invoice",
+                                         "Die Person ist wieder angemeldet – den Gutschrift-Entwurf nicht freigeben, sondern löschen (Fall „Gutschrift-Entwurf trotz Rückkehr“).")
+
+
 async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: dict) -> str:
     """Den vorgemerkten Gutschrift-Entwurf anlegen: „created“, „linked“ (in Dolibarr gibt es schon eine Gutschrift),
     „draft_invoice“ (der Beleg ist noch Entwurf - löschen statt gutschreiben), „skipped“ oder „failed“."""
     now = now_utc().isoformat()
-    # Der Merker vor allem anderen: ein zweiter Lauf zur selben Zeit legt nichts doppelt an.
+    # Der Merker vor allem anderen: ein zweiter Lauf zur selben Zeit legt nichts doppelt an. Nur solange die Buchung storniert ist -
+    # ist die Person zurück (#2184), gibt es nichts gutzuschreiben, auch wenn die Vormerkung noch steht.
     claimed = await db.billing_orders.update_one(
-        {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
+        {"id": order["id"], "booking_state": "cancelled", "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False},
+         "credit_note_claim_at": {"$exists": False}},
         {"$set": {"credit_note_claim_at": now}},
     )
     if claimed.modified_count != 1:
@@ -818,7 +841,8 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
 
     async def finish(fields: dict) -> None:
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {**fields, "updated_at": now_utc().isoformat()},
-                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": ""}})
+                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": "",
+                                                                            "credit_note_returned_at": ""}})
 
     try:
         invoice = await client.invoice(int(order["invoice_id"]))
@@ -837,6 +861,10 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
             await finish({"credit_note_id": int(found["id"]), "credit_note_ref": ref, "credit_note_source": "dolibarr"})
             await _credit_case(db, order, f"In Dolibarr gibt es schon eine Gutschrift ({ref}) – keine zweite angelegt.", ref)
             return "linked"
+        # Während Dolibarr gefragt wurde, kann die Person zurückgekommen sein (#2184): dann keine Gutschrift.
+        if not await db.billing_orders.find_one({"id": order["id"], "booking_state": "cancelled"}, {"_id": 0, "id": 1}):
+            await finish({"credit_note_note": "booking_restored"})
+            return "skipped"
         note = f"Gutschrift zu {state['invoice_ref']} – Abmeldung" + (f": {order['cancel_reason']}" if order.get("cancel_reason") else "")
         credit_id = await client.create_invoice(credit_note_payload(invoice, ref_ext=credit_ref_ext(order), note=note))
         try:
@@ -844,13 +872,27 @@ async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: d
         except DolibarrError:
             ref = ""
         ref = ref or f"(PROV{credit_id})"
-        await finish({"credit_note_id": credit_id, "credit_note_ref": ref, "credit_note_source": "website", "credit_note_created_at": now})
+        # Das letzte Fenster (#2184): Kam die Person zurück, während Dolibarr den Entwurf anlegte, bleibt er vermerkt - die
+        # Finanzverwaltung löscht ihn. Erst den Entwurf an den Auftrag schreiben, dann den Stand frisch lesen: Kommt die Rückkehr
+        # davor, sieht der Lauf sie (Stand und Merker ``credit_note_returned_at``); kommt sie danach, sieht die Rückbuchung den
+        # Entwurf und öffnet den Fall selbst (``billing_orders.rebook_after_invoice``).
+        await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"credit_note_id": credit_id, "credit_note_ref": ref, "credit_note_source": "website",
+                                                                          "credit_note_created_at": now, "updated_at": now_utc().isoformat()},
+                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": ""}})
+        after = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "booking_state": 1, "credit_note_returned_at": 1}) or {}
+        await db.billing_orders.update_one({"id": order["id"]}, {"$unset": {"credit_note_returned_at": ""}})
+        if after.get("booking_state") != "cancelled":
+            await credit_after_return_case(db, order, ref, after.get("credit_note_returned_at") or now)
+            return "created"
         await _credit_case(db, order, f"Gutschrift-Entwurf {ref} über den ganzen Betrag liegt in Dolibarr bereit – prüfen (Teilbetrag?) und freigeben.", ref)
+        # Kam die Rückkehr gerade zwischen Lesen und hier, ist „Gutschrift-Entwurf trotz Rückkehr“ schon offen - dann gilt der Storno-Fall nicht.
+        await _settle_contradicting_cancel_case(db, order["id"])
         logger.info("[billing] Gutschrift-Entwurf %s zu Beleg %s", ref, state["invoice_ref"])
         return "created"
     except DolibarrError as exc:
         attempts = int(order.get("credit_note_attempts") or 0) + 1
-        update: dict = {"$set": {"credit_note_error": exc.text, "credit_note_attempts": attempts}, "$unset": {"credit_note_claim_at": ""}}
+        update: dict = {"$set": {"credit_note_error": exc.text, "credit_note_attempts": attempts},
+                        "$unset": {"credit_note_claim_at": "", "credit_note_returned_at": ""}}
         if attempts >= CREDIT_MAX_ATTEMPTS:
             update["$unset"]["credit_note_due_at"] = ""
         await db.billing_orders.update_one({"id": order["id"]}, update)
@@ -864,8 +906,8 @@ async def draft_credit_notes_due(db, settings: dict, client: DolibarrClient, lim
     """Vorgemerkte Gutschrift-Entwürfe anlegen - nur mit Schalter und Schreibzugriff. Gibt die Zahl der neuen zurück."""
     if not settings.get(CREDIT_SETTING) or not write_capable(settings):
         return 0
-    rows = await db.billing_orders.find({"status": "invoiced", "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
-                                        {"_id": 0}).sort("credit_note_due_at", 1).to_list(limit)
+    rows = await db.billing_orders.find({"status": "invoiced", "booking_state": "cancelled", "credit_note_due_at": {"$exists": True},
+                                         "credit_note_id": {"$exists": False}}, {"_id": 0}).sort("credit_note_due_at", 1).to_list(limit)
     created = 0
     for order in rows:
         if await draft_credit_note(db, settings, client, order) == "created":

@@ -39,11 +39,17 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from models import new_id, now_utc
-from services.billing_amounts import credited_cents, paid_cents, refunded_cents, waived_cents
+from services.billing_amounts import credited_cents, invoice_fields, own_registration, paid_cents, refunded_cents, waived_cents
 
 logger = logging.getLogger("tls.billing")
 
 OPEN_STATUSES = ("pending", "waiting_write_access", "waiting_link", "waiting_review", "ready")
+# Die Belegfelder einer Anmeldung, wenn ihr alter Beleg nicht mehr gilt und ein neuer Auftrag kommt (#2184).
+INVOICE_LINK_CLEARED = {"invoice_id": None, "invoice_ref": None, "invoice_status": None, "payment_state": None}
+# Ein Beleg, der in Dolibarr noch gilt (#2184): nicht voll gutgeschrieben und nicht aufgegeben.
+INVOICE_STILL_VALID = {"payment_state": {"$nin": ["credited", "abandoned"]}, "invoice_status": {"$ne": "abandoned"}}
+# Ein Auftrag, der nichts mehr trägt: Buchung storniert und der Beleg gutgeschrieben oder aufgegeben - er hält keine neue Buchung auf.
+SETTLED_AFTER_CANCEL = {"booking_state": "cancelled", "$or": [{"payment_state": {"$in": ["credited", "abandoned"]}}, {"invoice_status": "abandoned"}]}
 STATUS_LABELS = {
     "pending": "neu",
     "waiting_write_access": "wartet auf Schreibzugriff",
@@ -108,7 +114,8 @@ async def create_order(db, *, kind: str, source_id: str, registration_id: str, u
         same = await db.billing_orders.find_one({"booking_key": key}, {"_id": 0})
         if same:
             return same
-    existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]}}, {"_id": 0})
+    existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]},
+                                                 "$nor": [SETTLED_AFTER_CANCEL]}, {"_id": 0})
     if existing:
         return existing
     order = {
@@ -158,19 +165,22 @@ async def cancel_orders_for(db, *, kind: str, registration_id: str, reason: str)
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {
             "booking_state": "cancelled", "booking_cancelled_at": now, "cancel_reason": reason, "paid_cents_at_cancel": paid_cents(order), "updated_at": now,
             **({"credit_note_due_at": now} if credit_draft and not order.get("credit_note_id") else {}),
-        }})
+        }, "$push": {"booking_events": {"state": "cancelled", "at": now, "reason": reason}}})
         await billing_cases.open_case(db, order, "cancelled_after_invoice", {"reason": reason, "invoice_ref": order.get("invoice_ref") or "", "paid_cents": paid_cents(order),
                                                                             "invoice_status": order.get("invoice_status")})
         count += 1
     return count
 
 
-async def note_change_after_invoice(db, *, kind: str, registration_id: str, reason: str, new_total_cents: int) -> dict | None:
+async def note_change_after_invoice(db, order: dict | None, *, reason: str, new_total_cents: int) -> dict | None:
     """Begleitpersonen, Roster oder Positionen ändern sich, obwohl der Beleg schon existiert: der
-    eingefrorene Preis bleibt, die Finanzverwaltung bekommt einen Prüffall mit alt und neu."""
+    eingefrorene Preis bleibt, die Finanzverwaltung bekommt einen Prüffall mit alt und neu. Am übergebenen Auftrag (#2184) -
+    eine Anmeldung kann mehrere haben (ein alter, gutgeschriebener und der aktuelle), gesucht wird hier nichts."""
     from services import billing_cases
 
-    order = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced"}, {"_id": 0})
+    if not order:
+        return None
+    order = await db.billing_orders.find_one({"id": order["id"], "status": "invoiced"}, {"_id": 0})
     if not order:
         return None
     now = now_utc().isoformat()
@@ -178,6 +188,103 @@ async def note_change_after_invoice(db, *, kind: str, registration_id: str, reas
     return await billing_cases.open_case(db, order, "changed_after_invoice", {
         "reason": reason, "invoiced_cents": int(order.get("total_cents") or 0), "new_total_cents": int(new_total_cents), "invoice_ref": order.get("invoice_ref") or "",
     })
+
+
+async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
+    """Der Auftrag, zu dem es in Dolibarr einen gültigen Beleg gibt - Entwurf, freigegeben, bezahlt, auch mit Abzug. Ein in Dolibarr
+    gelöschter Entwurf (#2226) zählt nicht mehr: Sein Auftrag wartet oder ist zu. Ein voll gutgeschriebener oder aufgegebener
+    Beleg auch nicht (#2184): Wer danach zurückkommt, bekommt einen neuen Auftrag zum aktuellen Preis."""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", **INVOICE_STILL_VALID}, {"_id": 0},
+                                            sort=[("created_at", -1)])
+
+
+def _own_order_filter(kind: str, registration: dict) -> dict:
+    """Der Auftrag, zu dem die Anmeldung gerade gehört: derselbe eingefrorene Preis (#2184). Die Kennung bestimmt ihn eindeutig -
+    auch wenn sein Beleg inzwischen gutgeschrieben ist. Ohne Kennung (Altdaten) alle Aufträge der Anmeldung."""
+    digest = (registration.get("price_snapshot") or {}).get("hash")
+    return {"kind": kind, "registration_id": registration["id"], "status": "invoiced", **({"snapshot.hash": digest} if digest else {})}
+
+
+async def current_invoiced_order(db, *, kind: str, registration: dict) -> dict | None:
+    """Der Auftrag mit Beleg, zu dem die Anmeldung gerade gehört - nicht ein alter derselben Anmeldung (#2184). Mit Preis-Kennung
+    genau dieser, auch voll gutgeschrieben (die Finanzverwaltung soll die Änderung sehen); ohne Kennung (Altdaten) der jüngste gültige."""
+    query = _own_order_filter(kind, registration)
+    if "snapshot.hash" not in query:
+        query.update(INVOICE_STILL_VALID)
+    return await db.billing_orders.find_one(query, {"_id": 0}, sort=[("created_at", -1)])
+
+
+async def booking_cancelled_with_invoice(db, *, kind: str, registration: dict) -> bool:
+    """Ist die Buchung am Auftrag der Anmeldung storniert, obwohl der Beleg existiert? Das entscheidet über die Rückkehr (#2184) -
+    nicht der Stand der Anmeldung, den der Abgleich zwischendurch wieder auf den des Belegs setzt. Gefragt wird nur der Auftrag,
+    zu dem die Anmeldung gehört: Ein alter, gutgeschriebener bleibt für immer „storniert“, nachdem es einen neuen gibt. Ist der
+    eigene Beleg inzwischen gutgeschrieben, zählt die Rückkehr trotzdem - dann mit neuem Preis (``invoiced_order`` findet ihn nicht)."""
+    return await db.billing_orders.find_one({**_own_order_filter(kind, registration), "booking_state": "cancelled"}, {"_id": 0, "id": 1}) is not None
+
+
+def rebooked_fields(order: dict) -> dict:
+    """Nach einem Storno wieder dabei, obwohl der Beleg schon existiert (#2127 Leitung, #2184 selbst neu angemeldet): Die
+    Anmeldung bekommt keinen neuen Preis, sondern wieder den des Belegs und seinen Stand - wie nach dem nächsten Abgleich.
+    Den Prüffall dazu öffnet ``note_change_after_invoice``; ein zweiter Auftrag entsteht nicht."""
+    return {**({"price_snapshot": order["snapshot"]} if order.get("snapshot") else {}), **invoice_fields(order)}
+
+
+async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents: int) -> bool:
+    """Die stornierte Buchung ist zurück (#2184): Am Auftrag gilt sie wieder als gebucht - ohne das bliebe der Auftrag
+    „storniert“, ein vorgemerkter Gutschrift-Entwurf entstünde trotzdem, eine Zahlung würde zur „Zahlung auf stornierte
+    Buchung“, und ein gelöschter Entwurf beendete den Auftrag. Ein schon angelegter Gutschrift-Entwurf bleibt (die
+    Finanzverwaltung entscheidet), der Fall „Storniert, Beleg existiert“ ebenso. Dazu der Prüffall mit alt und neu.
+
+    Vergleichen und Setzen in einem Zug: Gilt der Beleg inzwischen nicht mehr (der Abgleich hat dazwischen eine volle
+    Gutschrift, ein Aufgeben oder einen gelöschten Entwurf gelesen), gibt es ``False`` - der Aufrufer friert dann einen neuen
+    Preis mit eigenem Auftrag ein. Ist die Buchung schon zurück, ist das kein Fehler (``True``)."""
+    now = now_utc().isoformat()
+    # Altaufträge kennen nur den letzten Storno (``booking_cancelled_at``): Er kommt zuerst in den Verlauf, sonst überschriebe ihn
+    # der nächste Storno.
+    legacy = await db.billing_orders.find_one({"id": order["id"], "booking_events": {"$exists": False}, "booking_cancelled_at": {"$exists": True}},
+                                              {"_id": 0, "booking_cancelled_at": 1, "cancel_reason": 1})
+    if legacy:
+        await db.billing_orders.update_one({"id": order["id"], "booking_events": {"$exists": False}}, {"$set": {"booking_events": [
+            {"state": "cancelled", "at": legacy["booking_cancelled_at"], "reason": legacy.get("cancel_reason") or ""}]}})
+    # Der Verlauf behält den Storno (``booking_cancelled_at``, ``booking_events``) und bekommt die Rückkehr dazu.
+    restored = await db.billing_orders.update_one({"id": order["id"], "status": "invoiced", "booking_state": "cancelled", **INVOICE_STILL_VALID}, {
+        "$set": {"updated_at": now}, "$unset": {"booking_state": "", "paid_cents_at_cancel": ""},
+        "$push": {"booking_events": {"state": "restored", "at": now, "reason": reason}}})
+    if restored.modified_count != 1:
+        already = await db.billing_orders.find_one({"id": order["id"], "status": "invoiced", "booking_state": {"$ne": "cancelled"}, **INVOICE_STILL_VALID},
+                                                   {"_id": 0, "id": 1})
+        if not already:
+            return False
+    await db.billing_orders.update_one(
+        {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
+        {"$unset": {"credit_note_due_at": ""}})
+    # Läuft gerade ein Gutschrift-Lauf (Merker gesetzt), geht die Rückkehr nicht still durch: Der Lauf liest diesen Merker nach dem
+    # Anlegen und meldet einen Entwurf, der trotz Rückkehr entstand, als Prüffall (``dolibarr_billing.draft_credit_note``).
+    await db.billing_orders.update_one({"id": order["id"], "credit_note_claim_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
+                                       {"$set": {"credit_note_returned_at": now}})
+    # Liegt der Gutschrift-Entwurf der Website schon in Dolibarr, öffnet die Rückkehr den Fall selbst - so ist jede Reihenfolge
+    # mit dem Gutschrift-Lauf abgedeckt, auch eine Rückkehr Tage nach dem Anlegen.
+    credit = await db.billing_orders.find_one({"id": order["id"], "credit_note_id": {"$exists": True}, "credit_note_source": "website"},
+                                              {"_id": 0, "credit_note_id": 1, "credit_note_ref": 1, "credit_note_created_at": 1, "credit_notes": 1, "synced_at": 1})
+    if credit and await _credit_draft_still_open(db, order["id"], credit):
+        from services.dolibarr_billing import credit_after_return_case
+
+        await credit_after_return_case(db, order, credit.get("credit_note_ref") or "", now)
+    await note_change_after_invoice(db, order, reason=reason, new_total_cents=new_total_cents)
+    return True
+
+
+async def _credit_draft_still_open(db, order_id: str, credit: dict) -> bool:
+    """Gibt es zum Website-Entwurf noch etwas zu tun (#2184)? Nur solange er laut zuletzt gelesenem Stand Entwurf ist (gelöscht oder
+    freigegeben: nein) und die Finanzverwaltung den Fall dazu nicht schon erledigt hat - sonst öffnete jede weitere Rückkehr ihn neu."""
+    note = next((row for row in credit.get("credit_notes") or [] if int(row.get("id") or 0) == int(credit["credit_note_id"])), None)
+    if note is not None and note.get("status") != "draft":
+        return False
+    if note is None and str(credit.get("synced_at") or "") > str(credit.get("credit_note_created_at") or ""):
+        return False   # seit dem Anlegen gelesen und nicht mehr da: in Dolibarr gelöscht
+    done = await db.billing_cases.find_one({"order_id": order_id, "kind": "credit_after_return", "status": "resolved",
+                                            "detail.credit_note_ref": credit.get("credit_note_ref") or ""}, {"_id": 0, "id": 1})
+    return done is None
 
 
 async def release_order(db, order_id: str, actor_id: str) -> dict | None:
@@ -201,7 +308,7 @@ async def dismiss_removed(db, order: dict, actor_id: str) -> bool:
         return False
     collection ={"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled"}})
+        await collection.update_one(own_registration(order), {"$set": {"billing_status": "cancelled"}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.dismiss", "target_id": order["id"], "actor_id": actor_id,
                                     "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")}, "created_at": now})
     return True

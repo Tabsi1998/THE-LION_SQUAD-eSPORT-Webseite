@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from services.match_notifications import notify_match_result_confirmed
 from services.match_v2_results import (
     build_v2_result_application,
@@ -128,7 +128,7 @@ async def eliminated_registration_ids(db, tournament_id: str | None) -> set[str]
         return set()
     rows = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": {"$in": ["withdrawn", "disqualified"]}}, {"_id": 0, "id": 1},
-    ).to_list(1000)
+    ).to_list(REGISTRATION_LIMIT)
     return {row["id"] for row in rows if row.get("id")}
 
 

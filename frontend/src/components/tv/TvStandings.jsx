@@ -1,3 +1,4 @@
+import { deductionText } from "@/lib/leagueTable";
 import { standingCell } from "@/lib/standingsTable";
 import { tvTableColumns, tvTableSections } from "@/lib/tvTable";
 import { useTv } from "./TvScreen";
@@ -60,6 +61,8 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               <td className="tv-standings__name" data-tv-name="1">
                 {row.display_name || "Teilnehmer"}
                 {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
+                {/* Punktabzug (E.3): am TV nur die Höhe, nie der Grund. */}
+                {deductionText(row) ? <span className="tv-standings__exit" data-testid={`tv-deducted-${row.registration_id}`}> · {deductionText(row)}</span> : null}
                 {/* Angefochtenes Ergebnis (E.2, #1619): zählt vorläufig - am TV nur der Hinweis, nie Grund oder Seite. */}
                 {Number(row.contested) > 0 ? <span className="tv-standings__exit" data-testid={`tv-contested-${row.registration_id}`}> · in Klärung</span> : null}
               </td>

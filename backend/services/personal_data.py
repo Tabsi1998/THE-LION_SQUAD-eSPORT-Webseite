@@ -78,6 +78,12 @@ PERSONAL: dict[str, Entry] = {
     "moderation_items": Entry(OVERWRITTEN, ("moderation_items",)),
     "moderation_strikes": Entry(KEPT, ("moderation_strikes",), f"{MODERATION}; {THREE_YEARS}"),
     "moderation_sanctions": Entry(KEPT, ("moderation_sanctions",), f"{MODERATION}; {THREE_YEARS}"),
+    # Strafen im Wettbewerb (E.3): gegen die Person verhängte Strafen der Liga samt eigenem Einspruch. Strafen eines Co-Teams
+    # tragen keine Person.
+    "competition_sanctions": Entry(KEPT, ("competition_sanctions", "competition_sanction_appeals"),
+                                   f"Nachweis der Liga-Leitung; die Kennung zeigt danach auf „Gelöschter User“; {THREE_YEARS}. Der eigene "
+                                   "Einspruch gegen die Strafe eines Co-Teams verliert Kennung und Text - läuft das Verfahren noch, bleibt "
+                                   "der Text ohne Kennung bis zur Entscheidung"),
     "contact_messages": Entry(OVERWRITTEN, ("contact_messages",),
                               f"nur angemeldet geschriebene, spätestens {THREE_YEARS}; ohne Konto mit derselben Adresse nicht sicher "
                               "zuzuordnen - gezählt. Unabhängig vom Konto laufen erledigte und Spam nach der Frist unter Betrieb → "

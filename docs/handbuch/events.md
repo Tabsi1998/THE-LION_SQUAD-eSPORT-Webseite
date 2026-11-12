@@ -273,8 +273,13 @@ externen Anmeldelink; bearbeiten darf ihn der Bereich **Finanzen**. Kurz:
   haken die Teilnehmenden sie selbst an.
 - **Rechnung anlegen:** **gleich nach der verbindlichen Anmeldung** oder **erst nach Freigabe in der Finanzübersicht**.
 - Der Preis wird bei der **verbindlichen** Anmeldung eingefroren; spätere Änderungen betreffen nur neue Anmeldungen. Die
-  **Warteliste** bezahlt erst beim Nachrücken. Holt die Leitung eine stornierte Anmeldung zurück, gilt der aktuelle Preis mit einem neuen
-  Rechnungsauftrag; gibt es schon eine Rechnung, bleibt sie, und die Änderung kommt als Prüffall in die Finanzübersicht.
+  **Warteliste** bezahlt erst beim Nachrücken. Holt die Leitung eine stornierte Anmeldung zurück oder meldet sich jemand nach dem
+  Stornieren selbst wieder an, gilt der aktuelle Preis mit einem neuen Rechnungsauftrag. Gibt es schon eine Rechnung (auch als Entwurf in
+  Dolibarr, auch bezahlt), bleibt sie: Es entsteht kein zweiter Auftrag, die Anmeldung zeigt wieder diese Rechnung, und die Änderung kommt
+  als Prüffall **Buchung nach dem Beleg geändert** mit altem und neuem Betrag in die Finanzübersicht. Die Nachricht an die Person nennt dann
+  keinen Betrag, sondern sagt, dass es schon eine Rechnung gibt und der Verein sie prüft. Ein vorgemerkter Gutschrift-Entwurf fällt weg.
+  Ein in Dolibarr gelöschter Entwurf zählt nicht mehr als Rechnung, ebenso eine voll gutgeschriebene oder aufgegebene: Dann gilt der
+  aktuelle Preis mit einem neuen Rechnungsauftrag, und die Nachricht nennt ihn.
 - Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr). Teilnehmende finden sie unter **Meine
   Rechnungen**. Alles Weitere: [Abrechnung](../ABRECHNUNG.md), [Dolibarr](../DOLIBARR.md).
 

@@ -26,7 +26,7 @@ async def flow():
 
 
 async def _season(db, sid: str, sheet: dict | None, rules: dict | None = None) -> dict:
-    series = {"id": sid, "lineage_id": "spur-1", "season": "2026", "status": "active",
+    series = {"id": sid, "lineage_id": "spur-1", "season": "2026", "season_slug": sid, "status": "active",
               "rules": normalize_rules(rules or {"points_by_place": SCHEME})}
     series["rules"].pop("double_up_points")  # so gespeichert vor #2015
     if rules and "double_up_points" in rules:

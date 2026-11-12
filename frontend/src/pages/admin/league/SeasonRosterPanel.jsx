@@ -20,6 +20,7 @@ const STATE_CLASS = {
   missing: "border-warn/50 text-warn",
   late: "border-warn/50 text-warn",
   banned: "border-warn/50 text-warn",
+  sanctioned: "border-warn/50 text-warn",
   free: "border-white/15 text-white/55",
 };
 

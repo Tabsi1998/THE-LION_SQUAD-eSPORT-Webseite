@@ -18,7 +18,7 @@ from match_rules import participant_source_ids
 
 from auth import get_current_user
 from database import get_db
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, new_id, now_utc
 from services.league_scope import is_league_staffel
 from services.match_audience import registrations_for_match, teams_by_id
 from services.permissions import MFA_MESSAGE, ROLE_AREAS, holds_area, is_superadmin, needs_mfa
@@ -264,7 +264,7 @@ async def involved_match_ids(db, user: dict | None, tournament: dict | None, mat
     wie ``involved_user_ids``. Andere Turniere: keine."""
     if not user or not user.get("id") or not is_league_staffel(tournament) or not matches:
         return set()
-    registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(2000)
+    registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     teams = await teams_by_id(db, registrations)
     own = {row["id"] for row in registrations if user["id"] in _people_of_side(row, teams.get(row.get("team_id") or ""))}
     return {match["id"] for match in matches

@@ -261,9 +261,9 @@ async def test_event_announcement_names_time_in_vienna_place_and_deadline(flow, 
                                      "start_date": start.isoformat(), "end_date": (start + timedelta(days=1)).isoformat(),
                                      "location": "Vereinsheim", "city": "Telfs", "has_registration": True, "max_participants": 40,
                                      "registration_closes_at": (start - timedelta(days=2)).isoformat(), "banner_url": "uploads/public/lan.webp"})
-    await flow.db.events.insert_one({**base, "id": "e2", "name": "Vorstandssitzung", "visibility": "internal", "start_date": start.isoformat()})
-    await flow.db.events.insert_one({**base, "id": "e3", "name": "Entwurf", "status": "draft", "start_date": start.isoformat()})
-    await flow.db.events.insert_one({**base, "id": "e4", "name": "Vorbei", "start_date": (now_utc() - timedelta(days=1)).isoformat()})
+    await flow.db.events.insert_one({**base, "id": "e2", "slug": "e2", "name": "Vorstandssitzung", "visibility": "internal", "start_date": start.isoformat()})
+    await flow.db.events.insert_one({**base, "id": "e3", "slug": "e3", "name": "Entwurf", "status": "draft", "start_date": start.isoformat()})
+    await flow.db.events.insert_one({**base, "id": "e4", "slug": "e4", "name": "Vorbei", "start_date": (now_utc() - timedelta(days=1)).isoformat()})
 
     result = await discord_announcements.announce_due()
     # Das interne Event hat seit #605 seinen eigenen Schalter (Vorstandskanal) - aus, also nicht gesendet.
@@ -378,8 +378,8 @@ async def test_queue_holds_each_person_once_and_a_result_queues_everyone(flow, m
 @pytest.mark.asyncio
 async def test_sweep_queues_recently_active_and_once_a_day_everyone(flow):
     active, sleepy = await player(flow, "aktiv"), await player(flow, "ruhig")
-    await flow.db.auth_sessions.insert_one({"user_id": active["id"], "last_active": now_utc()})
-    await flow.db.auth_sessions.insert_one({"user_id": sleepy["id"], "last_active": now_utc() - timedelta(days=2)})
+    await flow.db.auth_sessions.insert_one({"id": "s-aktiv", "family_id": "f-aktiv", "user_id": active["id"], "last_active": now_utc()})
+    await flow.db.auth_sessions.insert_one({"id": "s-ruhig", "family_id": "f-ruhig", "user_id": sleepy["id"], "last_active": now_utc() - timedelta(days=2)})
     assert (await achievement_queue.sweep())["queued"] == 1
     first = await achievement_queue.scheduled_sweep()
     assert first["everyone"] is True and first["queued"] >= 2

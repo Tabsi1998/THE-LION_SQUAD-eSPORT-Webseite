@@ -21,7 +21,7 @@ from services.heat_rebuild import evaluate_after_write
 from services.competition_standings import placement_rows_for_structure
 from services.competition_versions import persist_competition_versions
 from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from services.log_safe import log_safe
 from services.league_scope import is_league_staffel
 from services.league_service import season_follows_first_staffel
@@ -461,7 +461,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             regs = await db.tournament_registrations.find(
                 {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
                 {"_id": 0},
-            ).to_list(500)
+            ).to_list(REGISTRATION_LIMIT)
             num_participants = len(regs)
             read_model = await load_competition_read_model(db, tid)
             snapshot = read_model.structure_snapshot()
@@ -540,7 +540,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         try:
             from services.achievement_queue import request_evaluation
             from services.match_notifications import _participant_user_ids
-            regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0, "user_id": 1, "team_id": 1}).to_list(2000)
+            regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0, "user_id": 1, "team_id": 1}).to_list(REGISTRATION_LIMIT)
             # Im stillen Modus (#2340) laut nur, was zum Turnier und zur Jahreswertung gehört.
             await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}", announce={"tournament", "season"})
         except Exception:

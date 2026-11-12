@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from auth import get_current_user
 from database import get_db
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, new_id, now_utc
 from routes.match_routes import _find_match_any, _serialized_match_write
 from services import league_procedures as procedures
 from services import league_protest_settings as protest_settings
@@ -171,7 +171,7 @@ async def list_procedures(season_id: str, me: dict = Depends(require_disputes)):
         if not matches:
             continue
         involved = await involved_match_ids(db, me, staffel, matches)
-        registrations = await db.tournament_registrations.find({"tournament_id": staffel["id"]}, {"_id": 0}).to_list(2000)
+        registrations = await db.tournament_registrations.find({"tournament_id": staffel["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
         sides = {row["id"]: row.get("display_name") or row.get("team_name") or "Team" for row in registrations if row.get("id")}
         league = procedures.League(staffel, season, protest_settings.effective(staffel, season))
         for match in matches:

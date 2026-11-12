@@ -198,10 +198,11 @@ async def _registrations_for_match(match: dict) -> list[dict]:
     reg_ids = _registration_ids_for_match(match)
     if not reg_ids:
         return []
+    # So viele, wie das Spiel Plätze hat (#2216): Free for All und Battle Royale legen alle Anmeldungen in ein Spiel.
     return await get_db().tournament_registrations.find(
         {"id": {"$in": reg_ids}},
         {"_id": 0},
-    ).to_list(64)
+    ).to_list(len(reg_ids))
 
 
 async def _public_user_map(user_ids: list[str]) -> dict[str, dict]:

@@ -354,7 +354,14 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
         items.append({"at": payment.get("date") or order.get("synced_at"), "kind": "payment", "text": f"Zahlung {money(payment.get('amount_cents'))}" + (f" ({payment['type']})" if payment.get("type") else "") + (f" – {payment['ref']}" if payment.get("ref") else "")})
     for note in order.get("credit_notes") or []:
         items.append({"at": order.get("synced_at"), "kind": "credit", "text": f"Gutschrift {note.get('ref') or ''} über {money(note.get('total_cents'))}" + ("" if note.get("status") != "draft" else " (Entwurf)")})
-    if order.get("booking_cancelled_at"):
+    # Storno und Rückkehr (#2184) je Mal; ältere Aufträge kennen nur den letzten Storno (``booking_cancelled_at``).
+    events = order.get("booking_events") or []
+    for event in events:
+        if event.get("state") == "restored":
+            items.append({"at": event.get("at"), "kind": "restore", "text": f"Buchung wieder aufgenommen: {event.get('reason') or ''}"})
+        else:
+            items.append({"at": event.get("at"), "kind": "cancel", "text": f"Buchung storniert: {event.get('reason') or ''}"})
+    if order.get("booking_cancelled_at") and not any(event.get("state") == "cancelled" and event.get("at") == order["booking_cancelled_at"] for event in events):
         items.append({"at": order["booking_cancelled_at"], "kind": "cancel", "text": f"Buchung storniert: {order.get('cancel_reason') or ''}"})
     if order.get("booking_changed_at"):
         items.append({"at": order["booking_changed_at"], "kind": "change", "text": f"Buchung geändert: {order.get('booking_change') or ''}"})

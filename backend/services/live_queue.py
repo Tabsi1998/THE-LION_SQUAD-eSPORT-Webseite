@@ -22,6 +22,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 
+from models import REGISTRATION_LIMIT
 from services.match_calls import report_by, report_minutes
 from services.match_deadlines import no_show_deadline
 from services.match_duration import effective_match_duration
@@ -325,7 +326,7 @@ async def load_live_queue(db, tournament: dict, now: datetime | None = None) -> 
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"]},
         {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
-    ).to_list(3000)
+    ).to_list(REGISTRATION_LIMIT)
     names = {
         row["id"]: row.get("display_name") or row.get("ingame_name") or row.get("team_name") or "Teilnehmer"
         for row in registrations
