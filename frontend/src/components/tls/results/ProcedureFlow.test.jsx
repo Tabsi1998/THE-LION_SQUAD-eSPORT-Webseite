@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProblemReportForm } from "./ProblemReportForm";
-import { ProcedureCard } from "./DisputeCard";
+import { AppealForm, ProcedureCard } from "./DisputeCard";
 import { ProofList } from "./ProofList";
 
 const { api, uploadApi } = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() }, uploadApi: { post: vi.fn() } }));
@@ -85,6 +85,46 @@ describe("Problem melden, geführt", () => {
     render(<ProblemReportForm matchId="m1" onSubmit={vi.fn()} />);
     expect(screen.getByTestId("match-dispute-btn")).toHaveTextContent("An die Turnierleitung schicken");
     expect(screen.queryByTestId("procedure-steps")).toBeNull();
+  });
+});
+
+describe("Einspruch", () => {
+  it("fragt erst nach dem Knopf nach der Begründung und schickt dann genau einen Einspruch", async () => {
+    const onChanged = vi.fn();
+    render(<AppealForm matchId="m1" against={{ type: "forfeit", ref_id: "m1" }} until="2099-01-01T12:00:00Z" onChanged={onChanged} testId="match-appeal" />);
+    expect(screen.getByTestId("match-appeal-until")).toHaveTextContent("noch");
+    expect(screen.queryByTestId("match-appeal-input")).toBeNull();
+    fireEvent.click(screen.getByTestId("match-appeal-open"));
+    expect(screen.getByTestId("match-appeal-send")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("match-appeal-input"), { target: { value: "Wir waren da, der Check-in hing." } });
+    fireEvent.click(screen.getByTestId("match-appeal-send"));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/matches/m1/appeals",
+      { against_type: "forfeit", ref_id: "m1", reason: "Wir waren da, der Check-in hing." }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  it("steht an der Karte eines entschiedenen Verfahrens nur, solange Einspruch möglich ist", () => {
+    const decided = { state: "decided", decision: "keep", decision_note: "Die Aufzeichnung bestätigt die Meldung.", appeal_until: "2099-01-01T12:00:00Z" };
+    const { rerender } = render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ ...decided, can_appeal: true })} />);
+    expect(screen.getByTestId("procedure-appeal-p1-open")).toBeInTheDocument();
+    rerender(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ ...decided, can_appeal: false })} />);
+    expect(screen.queryByTestId("procedure-appeal-p1-open")).toBeNull();
+  });
+});
+
+describe("Hinweis zu Nachweisen", () => {
+  it("steht in der Karte einmal, nicht unter jeder Liste", async () => {
+    api.get.mockResolvedValue({ data: { items: [], open: true, can_add: true, limit: 10 } });
+    render(<ProcedureCard matchId="m1" sideNames={NAMES} onChanged={vi.fn()} procedure={procedure({ can_lead: true, can_state: true })} />);
+    expect(await screen.findByTestId("procedure-moss-proofs-p1-add")).toBeInTheDocument();
+    expect(screen.getAllByText(/Ingame-Uhr/)).toHaveLength(1);
+    expect(screen.getByTestId("procedure-proof-hint-p1")).toHaveTextContent("Höchstens 10 Nachweise je Seite");
+  });
+
+  it("bleibt an einer einzelnen Liste, wie sie war", async () => {
+    api.get.mockResolvedValue({ data: { items: [], open: true, can_add: true, limit: 10 } });
+    render(<ProofList matchId="m1" kind="report" />);
+    expect(await screen.findByTestId("proof-list-hint")).toHaveTextContent("Ingame-Uhr");
   });
 });
 
