@@ -252,6 +252,9 @@ test("die Liga-Leitung schließt einen offenen Vorfall ohne Entscheidung - mit B
   await show({ ...LEAGUE, own_registration_id: null, incidents: [row], incident_info: { ...INFO, as_lead: true, can_decide: true } });
   expect(screen.queryByTestId("incident-close-v1")).toBeNull();
   fireEvent.click(screen.getByTestId("incident-close-v1-open"));
+  // Die Folge steht da, bevor geschlossen wird - einmal, im Formular.
+  expect(screen.getByTestId("incident-close-v1-effect")).toHaveTextContent("Haben beide Seiten dasselbe Ergebnis gemeldet, gilt es mit dem Schließen.");
+  expect(screen.getByTestId("incident-panel").textContent.match(/gilt es mit dem Schließen/g)).toHaveLength(1);
   fireEvent.click(screen.getByTestId("incident-close-v1-submit"));
   expect(screen.getByTestId("incident-close-v1-problem")).toHaveTextContent("begründen");
   expect(apiMock.post).not.toHaveBeenCalled();

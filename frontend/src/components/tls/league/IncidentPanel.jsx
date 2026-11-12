@@ -309,7 +309,7 @@ function CloseForm({ info, incident, matchId, busy, run, onChanged }) {
   }
   return (
     <form onSubmit={submit} className="tls-incident-open mt-3 space-y-3 rounded-sm border border-white/15 bg-black/20 p-3" data-testid={`incident-close-${incident.id}`} noValidate>
-      <p className="text-xs text-white/65">Schließt den Vorfall, ohne über die Map zu entscheiden – etwa wenn das Spiel kampflos gewertet wird. Solange ein Vorfall offen ist, geht „kampflos“ und „nicht erschienen“ nicht.</p>
+      <p className="text-xs text-white/65" data-testid={`incident-close-${incident.id}-effect`}>Schließt den Vorfall, ohne über die Map zu entscheiden – etwa bevor das Spiel kampflos gewertet wird. Haben beide Seiten dasselbe Ergebnis gemeldet, gilt es mit dem Schließen.</p>
       <label className="block">
         <span className={LEGEND}>Begründung (Pflicht, beide Seiten lesen sie)</span>
         <textarea value={form.reason} maxLength={500} rows={2} onChange={(event) => set("reason", event.target.value)} className="input mt-1 w-full resize-y" data-testid={`incident-close-${incident.id}-reason`} />

@@ -1050,7 +1050,8 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
   Seiten – so setzt ihr eine Serie aus (Anlage C.2.6).
 - **Ohne Entscheidung schließen:** Gibt es über die Map nichts mehr zu entscheiden (etwa weil ein Team gar nicht mehr antritt),
   schließt ihr den offenen Vorfall am Vorfall mit **Ohne Entscheidung schließen** und einer Begründung. Beide Seiten bekommen
-  „Vorfall geschlossen“, die Begründung steht am Vorfall.
+  „Vorfall geschlossen“, die Begründung steht am Vorfall. Haben beide Seiten schon dasselbe Ergebnis gemeldet, gilt es mit dem
+  Schließen – das Formular sagt das.
 - **Kampflos und „nicht erschienen“ erst nach dem Vorfall:** Solange ein Vorfall offen ist, lehnt die Seite „Kampflos“, „Nicht
   erschienen“ und „Beide nicht erschienen“ ab und sagt, zu welcher Map der Vorfall offen ist. Entscheidet zuerst oder schließt
   ihn. Endet ein Spiel auf anderem Weg (abgesagt, archiviert), schließt die Seite offene Vorfälle von selbst und ohne Nachricht;
