@@ -56,6 +56,10 @@ const RESULT_RULES = { scores_required: true, staffeln: 0, rules: GAME.modes.map
 const SCHEDULE = { active: true, defaults: { home_rule: true, home_rule_hours: 72, reschedule_notice_hours: 24, reschedule_max: 2, reschedule_same_week: true,
   result_reminder_hours: 24, result_overdue_hours: 48 } };
 SCHEDULE.schedule_rules = SCHEDULE.defaults;
+// Erinnerungen (E.5, #1647): eine Season ohne gespeicherte Werte - der Server liefert die Vorgaben.
+const REMINDERS = { active: false, reminder_rules: null, result_reminder_hours: 24, staffeln: 2, defaults: { upcoming: true, upcoming_early_hours: 24,
+  upcoming_late_minutes: 60, unscheduled: true, unscheduled_week_percent: 50, result_missing: true, veto_turn: true, veto_idle_seconds: 20,
+  veto_min_left_seconds: 5, discord: false } };
 const RULES_VIEW = { current: null, inherited: null, versions: [], draft: { revision: 1, title: "Regelwerk Season 1" }, data_changes: null };
 
 const PROTEST_VALUES = {
@@ -80,7 +84,7 @@ async function mockServer(page) {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
       saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
-  const calls = { patch: [] };
+  const calls = { patch: [], reminders: [] };
   await page.route("**/api/**", (route) => {
     const request = route.request();
     const where = new URL(request.url()).pathname.replace(/^\/api/, "");
@@ -90,11 +94,16 @@ async function mockServer(page) {
       calls.patch.push(request.postDataJSON());
       return json({ ...SEASON, changed: Object.keys(request.postDataJSON()), staffeln_to_sync: 0, warnings: [] })(route);
     }
+    if (where === "/admin/leagues/seasons/s1/reminder-rules" && request.method() === "PUT") {
+      calls.reminders.push(request.postDataJSON());
+      return json({ ...REMINDERS, active: true, reminder_rules: request.postDataJSON(), staffeln_updated: 2 })(route);
+    }
     const bodies = {
       "/admin/leagues/seasons/s1": SEASON_PAGE,
       "/admin/leagues/seasons/s1/readiness": READINESS,
       "/admin/leagues/seasons/s1/result-rules": RESULT_RULES,
       "/admin/leagues/seasons/s1/schedule-rules": SCHEDULE,
+      "/admin/leagues/seasons/s1/reminder-rules": REMINDERS,
       "/admin/leagues/seasons/s1/roster": { fields: [], rules: {}, squads: [], season: {} },
       "/admin/leagues/seasons/s1/applications": { configured: true, items: [], stats: { taken: 3, slots: 16, open: 2, waiting: 0, unassigned: 0 }, divisions: [] },
       "/admin/leagues/seasons/s1/loadout-bans": { game: { id: "g1", name: "Probe Shooter", modes: GAME.modes }, categories: [], library: [], list: null, versions: [] },
@@ -218,6 +227,39 @@ test.describe("Liga: Season-Seite mit Reitern", () => {
       await page.getByTestId("season-save-spielbetrieb").click();
       await expect.poll(() => calls.patch.length).toBe(1);
       expect(calls.patch[0]).toMatchObject({ incident_answer_minutes: 15, incident_quota_per_map: 1, clarification_mode: "pause_series", map_break_after: 2, map_break_minutes: 5 });
+    });
+  }
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`Termine: Erinnerungen mit Schalter je Art und Vorgaben, bei ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const calls = await mockServer(page);
+      await page.goto("/admin/leagues/seasons/s1#erinnerungen");
+      await expect(page.getByTestId("season-tab-termine")).toHaveAttribute("aria-selected", "true");
+      const box = page.getByTestId("season-reminder-rules");
+      await expect(box).toBeInViewport();
+      await expect(page.getByTestId("reminder-rules-early")).toHaveValue("24");
+      await expect(page.getByTestId("reminder-rules-late")).toHaveValue("60");
+      await expect(page.getByTestId("reminder-rules-week-percent")).toHaveValue("50");
+      await expect(page.getByTestId("reminder-rules-veto-idle")).toHaveValue("20");
+      await expect(page.getByTestId("reminder-rules-veto-left")).toHaveValue("5");
+      await expect(page.getByTestId("reminder-rules-result-box")).toContainText("24 h nach dem Termin");
+      await expect(page.getByTestId("reminder-rules-discord")).not.toBeChecked();
+      await noSideScroll(page);
+      // Fürs Bild hoch genug, dass der ganze Kasten unter der festen Kopfleiste steht (die Sprungmarke hält Abstand zu ihr).
+      await page.setViewportSize({ width, height: 1700 });
+      await page.evaluate(() => document.getElementById("erinnerungen").scrollIntoView());
+      const file = `liga-season-erinnerungen-${width === 390 ? "handy" : "pc"}.png`;
+      await box.screenshot({ path: test.info().outputPath(file), animations: "disabled" });
+      if (process.env.E2E_SCREENS_DIR) await box.screenshot({ path: path.join(process.env.E2E_SCREENS_DIR, file), animations: "disabled" });
+      // Eine Art aus: ihre Zeiten sind gesperrt; Speichern schickt alle Schalter und Zahlen.
+      await page.getByTestId("reminder-rules-unscheduled").uncheck();
+      await expect(page.getByTestId("reminder-rules-week-percent")).toBeDisabled();
+      await page.getByTestId("reminder-rules-early").fill("12");
+      await page.getByTestId("reminder-rules-save").click();
+      await expect.poll(() => calls.reminders.length).toBe(1);
+      expect(calls.reminders[0]).toEqual({ ...REMINDERS.defaults, unscheduled: false, upcoming_early_hours: 12 });
+      await expect(page.getByTestId("reminder-rules-inactive")).toHaveCount(0);
     });
   }
 
