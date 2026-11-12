@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 from league_match_world import OLD_RULES, ids, world as league_world  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import league_eligibility, league_sanction_bans, match_proof_retention  # noqa: E402
+from services import league_eligibility, league_sanction_bans, league_sanctions, match_proof_retention  # noqa: E402
 from services.match_flow import DEFAULTS  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
@@ -454,3 +454,85 @@ async def test_proofs_of_a_running_sanction_are_kept_and_released_afterwards(flo
     assert "keep_until" not in await flow.db.match_proof_photos.find_one({"id": "beweis-1"}, {"_id": 0})
     await match_proof_retention.purge(flow.db)
     assert await flow.db.match_proof_photos.count_documents({}) == 0
+
+
+# ---------------------------------------------------------------- Gleichzeitige Schritte (Review R1, M1)
+
+
+async def stored(flow, sanction_id: str) -> dict:
+    return await flow.db.competition_sanctions.find_one({"id": sanction_id}, {"_id": 0})
+
+
+async def refused(step) -> int | None:
+    """Der Status, mit dem ein Schritt abgelehnt wird - ``None``: Er ging durch."""
+    try:
+        await step
+    except league_sanctions.SanctionProblem as problem:
+        return problem.status
+    return None
+
+
+@pytest.mark.asyncio
+async def test_two_revokes_on_the_same_reading_happen_once(flow):
+    """Zwei Personen lesen dieselbe Strafe und widerrufen beide: Die zweite bekommt 409, Protokoll und Wirkung gibt es einmal."""
+    world = await sanction_world(flow)
+    sanction = (await ban(flow, world, matches=2)).json()
+    first, second = await stored(flow, sanction["id"]), await stored(flow, sanction["id"])
+    assert await refused(league_sanctions.revoke(flow.db, first, "Irrtum der Leitung eins.", world["lead"]["id"])) is None
+    assert await refused(league_sanctions.revoke(flow.db, second, "Irrtum der Leitung zwei.", world["second"]["id"])) == 409
+    final = await stored(flow, sanction["id"])
+    assert final["revoked_by"] == world["lead"]["id"] and final["revoke_reason"] == "Irrtum der Leitung eins."
+    assert await flow.db.audit_logs.count_documents({"action": "league.sanction.revoke"}) == 1
+    # Über die Route: genau eine Nachricht an die betroffene Person.
+    other = (await ban(flow, world, "Tom", matches=1)).json()
+    assert (await revoke(flow, world, other["id"])).status_code == 200
+    assert (await revoke(flow, world, other["id"], "second")).status_code == 409
+    assert await flow.db.notifications.count_documents({"meta.sanction_id": other["id"], "meta.dedupe_key": {"$regex": ":revoked:"},
+                                                        "user_id": uid(world, "Tom")}) == 1
+
+
+@pytest.mark.asyncio
+async def test_two_appeal_decisions_on_the_same_reading_leave_one_consistent_result(flow):
+    """„Aufgehoben“ gegen „bleibt“: Es gilt, wer zuerst schreibt - nie eine aufgehobene Strafe mit dem Vermerk „bleibt“."""
+    world = await sanction_world(flow)
+    third = await lead_of(flow, "Drittleitung", "sanctions")
+    sanction = (await ban(flow, world, matches=2)).json()
+    assert (await appeal(flow, world, sanction["id"], "Mila")).status_code == 200
+    first, second = await stored(flow, sanction["id"]), await stored(flow, sanction["id"])
+    assert await refused(league_sanctions.decide_appeal(flow.db, first, world["second"], "granted", "Verwechslung belegt.")) is None
+    assert await refused(league_sanctions.decide_appeal(flow.db, second, third, "upheld", "Strafe bleibt bestehen.")) == 409
+    final = await stored(flow, sanction["id"])
+    assert final["appeal"]["state"] == "granted" and final["appeal"]["decided_by"] == world["second"]["id"]
+    assert final["revoked_via"] == "appeal" and final["revoke_reason"] == "Verwechslung belegt."
+    assert await flow.db.audit_logs.count_documents({"action": "league.sanction.appeal.decide"}) == 1
+    assert await flow.db.audit_logs.count_documents({"action": "league.sanction.revoke"}) == 1
+    assert (await eligibility(flow, world, "Mila"))["ok"] is True
+
+    # Umgekehrt: „bleibt“ zuerst - die Strafe gilt weiter, das spätere „aufgehoben“ ändert nichts.
+    kept = (await ban(flow, world, "Tom", matches=1)).json()
+    assert (await appeal(flow, world, kept["id"], "Tom")).status_code == 200
+    first, second = await stored(flow, kept["id"]), await stored(flow, kept["id"])
+    assert await refused(league_sanctions.decide_appeal(flow.db, first, world["second"], "upheld", "Strafe bleibt bestehen.")) is None
+    assert await refused(league_sanctions.decide_appeal(flow.db, second, third, "granted", "Verwechslung belegt.")) == 409
+    final = await stored(flow, kept["id"])
+    assert final["appeal"]["state"] == "upheld" and final["revoked_at"] is None
+    assert (await eligibility(flow, world, "Tom"))["ok"] is False
+
+
+@pytest.mark.asyncio
+async def test_confirming_next_to_a_revoke_does_not_revive_the_ban(flow):
+    world = await sanction_world(flow)
+    sanction = (await ban(flow, world, state="provisional")).json()
+    first, second = await stored(flow, sanction["id"]), await stored(flow, sanction["id"])
+    assert await refused(league_sanctions.revoke(flow.db, first, "Verdacht hat sich nicht bestätigt.", world["lead"]["id"])) is None
+    assert await refused(league_sanctions.confirm(flow.db, second, {"matches": 2}, world["second"])) == 409
+    final = await stored(flow, sanction["id"])
+    assert final["state"] == "provisional" and final["final_at"] is None and final["revoked_at"] and final["appeal_until"] is None
+    assert await flow.db.audit_logs.count_documents({"action": "league.sanction.confirm"}) == 0
+    # Gegenprobe: Zweimal bestätigen auf demselben Stand geht einmal.
+    again = (await ban(flow, world, "Tom", state="provisional")).json()
+    first, second = await stored(flow, again["id"]), await stored(flow, again["id"])
+    assert await refused(league_sanctions.confirm(flow.db, first, {"matches": 1}, world["lead"])) is None
+    assert await refused(league_sanctions.confirm(flow.db, second, {"matches": 3}, world["second"])) == 409
+    assert (await stored(flow, again["id"]))["matches"] == 1
+    assert await flow.db.audit_logs.count_documents({"action": "league.sanction.confirm"}) == 1

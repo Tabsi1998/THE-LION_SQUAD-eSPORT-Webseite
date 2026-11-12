@@ -406,27 +406,54 @@ async def create(db, doc: dict, registration: dict | None, tournament: dict | No
     return doc
 
 
+async def _claim(db, doc: dict, condition: dict, fields: dict, detail: str) -> dict:
+    """Ein Schritt als Anspruch: schreibt nur, wenn die Strafe noch so dasteht, wie der Schritt es voraussetzt - sonst 409, ohne
+    Wirkung, Protokoll und Nachricht. ``doc`` trägt danach den gespeicherten Stand (auch für Felder mit Punkt im Namen)."""
+    fields = {**fields, "updated_at": now_utc().isoformat()}
+    result = await db.competition_sanctions.update_one({"id": doc["id"], **condition}, {"$set": fields})
+    if result.modified_count != 1:
+        raise SanctionProblem(detail, 409)
+    fresh = await db.competition_sanctions.find_one({"id": doc["id"]}, {"_id": 0})
+    doc.clear()
+    doc.update(fresh)
+    return doc
+
+
+ALREADY_REVOKED = "Diese Strafe ist schon widerrufen."
+NOT_PROVISIONAL = "Diese Strafe ist nicht mehr vorläufig."
+NO_OPEN_APPEAL = "Zu dieser Strafe ist kein Einspruch offen."
+
+
 async def confirm(db, doc: dict, body: dict, actor: dict) -> dict:
     """Vorläufig → endgültig, jetzt mit Zeitraum. Die Sperre läuft ab ihrem ursprünglichen Beginn weiter."""
     if doc.get("revoked_at") or doc.get("state") != PROVISIONAL:
-        raise SanctionProblem("Diese Strafe ist nicht mehr vorläufig.", 409)
+        raise SanctionProblem(NOT_PROVISIONAL, 409)
     now = now_utc()
     season, tournament = await _season_frame(db, doc.get("season_id"), doc.get("tournament_id"))
     registration = await db.tournament_registrations.find_one({"id": doc.get("registration_id")}, {"_id": 0}) if doc.get("registration_id") else None
     period = _period(doc["kind"], FINAL, season or {"id": doc.get("season_id")}, registration, {**body, "starts_at": None}, now)
     fields = {"state": FINAL, "final_at": now.isoformat(), "final_by": actor.get("id"), "ends_at": period["ends_at"],
               "matches": period["matches"], "appeal_until": _appeal_until(season, tournament, now)}
-    await _save(db, doc, fields)
+    # Nur, solange sie noch vorläufig und nicht widerrufen ist - ein gleichzeitiger Widerruf gewinnt.
+    await _claim(db, doc, {"state": PROVISIONAL, "revoked_at": None}, fields, NOT_PROVISIONAL)
+    await sync_proof_hold(db, doc)
     await audit(db, "confirm", doc, actor.get("id"), matches=doc.get("matches"))
     return doc
 
 
 async def revoke(db, doc: dict, reason, actor_id: str | None, *, via: str = "revoke") -> dict:
+    """Erst der Anspruch (nur eine Person widerruft), dann die Wirkung zurück. Scheitert das Zurücknehmen, gilt die Strafe weiter."""
     if doc.get("revoked_at"):
-        raise SanctionProblem("Diese Strafe ist schon widerrufen.", 409)
+        raise SanctionProblem(ALREADY_REVOKED, 409)
     reason = _text(reason, REASON_MIN, REASON_MAX, f"Bitte den Widerruf begründen (mindestens {REASON_MIN} Zeichen).")
-    await undo_effect(db, doc, actor_id)
-    await _save(db, doc, {"revoked_at": now_utc().isoformat(), "revoked_by": actor_id, "revoke_reason": reason, "revoked_via": via})
+    await _claim(db, doc, {"revoked_at": None},
+                 {"revoked_at": now_utc().isoformat(), "revoked_by": actor_id, "revoke_reason": reason, "revoked_via": via}, ALREADY_REVOKED)
+    try:
+        await undo_effect(db, doc, actor_id)
+    except SanctionProblem:
+        await _save(db, doc, {"revoked_at": None, "revoked_by": None, "revoke_reason": None, "revoked_via": None})
+        raise
+    await sync_proof_hold(db, doc)
     await audit(db, "revoke", doc, actor_id, via=via, reason_length=len(reason))
     return doc
 
@@ -469,16 +496,24 @@ def own_decision(doc: dict, user: dict | None) -> bool:
 
 
 async def decide_appeal(db, doc: dict, actor: dict, decision: str, note) -> dict:
+    """Erst der Anspruch auf den offenen Einspruch (nur eine Person entscheidet), dann bei „aufgehoben“ der Widerruf."""
     appeal = doc.get("appeal") or {}
-    if appeal.get("state") != OPEN:
-        raise SanctionProblem("Zu dieser Strafe ist kein Einspruch offen.", 409)
+    if appeal.get("state") != OPEN or doc.get("revoked_at"):
+        raise SanctionProblem(NO_OPEN_APPEAL, 409)
     if decision not in (UPHELD, GRANTED):
         raise SanctionProblem("Die Entscheidung ist „Strafe bleibt“ oder „Strafe aufgehoben“.")
     note = _text(note, REASON_MIN, REASON_MAX, f"Bitte die Entscheidung begründen (mindestens {REASON_MIN} Zeichen).")
-    if decision == GRANTED and not doc.get("revoked_at"):
-        await revoke(db, doc, note, actor.get("id"), via="appeal")
-    decided = {**appeal, "state": decision, "decided_by": actor.get("id"), "decided_at": now_utc().isoformat(), "note": note}
-    await _save(db, doc, {"appeal": decided})
+    await _claim(db, doc, {"appeal.state": OPEN, "revoked_at": None},
+                 {"appeal.state": decision, "appeal.decided_by": actor.get("id"), "appeal.decided_at": now_utc().isoformat(),
+                  "appeal.note": note}, NO_OPEN_APPEAL)
+    if decision == GRANTED:
+        try:
+            await revoke(db, doc, note, actor.get("id"), via="appeal")
+        except SanctionProblem:
+            # Die Wirkung ließ sich nicht zurücknehmen: Der Einspruch ist wieder offen, entschieden ist nichts.
+            await _save(db, doc, {"appeal": {**appeal, "state": OPEN, "decided_by": None, "decided_at": None, "note": None}})
+            raise
+    await sync_proof_hold(db, doc)
     await audit(db, "appeal.decide", doc, actor.get("id"), decision=decision, note_length=len(note))
     return doc
 
