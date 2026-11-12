@@ -341,11 +341,11 @@ async def confirm(db, discord_user_id, kind: str, item_id: str, then: str | None
         else:
             text = f"✅ Du bist angemeldet: „{name}“."
         # Nur ein Preis, der jetzt abgerechnet wird - nach einem Storno mit schon gestelltem Beleg prüft das die Finanzverwaltung (#2184).
-        billed = price_to_bill(doc)
+        billed, kept = price_to_bill(doc), kept_invoice_line(doc)
         if billed:
             text += f"\nKosten: {pricing.describe(billed)} – die Rechnung kommt über die Website."
-        elif kept_invoice_line(doc):
-            text += f"\n{kept_invoice_line(doc)}"
+        elif kept:
+            text += f"\n{kept}"
         buttons = list(link)
         if then:
             tournament = await _find_tournament(db, then)
