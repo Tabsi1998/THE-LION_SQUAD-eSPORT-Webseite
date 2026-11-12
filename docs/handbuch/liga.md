@@ -1130,11 +1130,14 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 - **Entscheiden**: immer mit **Begründung** (mindestens zehn Zeichen, geht an beide Seiten). **Ergebnis bleibt** schließt
   das Verfahren; **Ergebnis ändern** öffnet das Ergebnis-Fenster, die Begründung steht dort als Grund der Korrektur.
   Wer am Spiel selbst beteiligt ist, entscheidet nicht.
+- **Erst der Vorfall, dann die Wertung**: Solange an einem Spiel ein Vorfall offen ist, lassen sich **kampflos** und
+  **nicht erschienen** nicht werten – die Seite sagt es mit einem Satz. Entscheidet zuerst den Vorfall.
 - **Einspruch**: Gegen die Entscheidung, eine Wertung kampflos oder eine Korrektur kann eine Seite innerhalb der
   Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
   ersten Entscheidung – auch der Superadmin nicht über die eigene. Bis dahin gilt die erste Entscheidung weiter.
 - **Tabelle und TV**: Mit **Zählt vorläufig** (Vorgabe) bleibt ein Ergebnis mit laufendem Protest in der Tabelle; Spiel
-  und Tabellenzeile tragen „in Klärung“. Mit **Zählt bis zur Entscheidung nicht** fällt das Spiel so lange heraus.
+  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV und in der Tabelle als PDF. Unter **Braucht
+  Aufmerksamkeit** steht der Fall mit **Zum Spiel**. Mit **Zählt bis zur Entscheidung nicht** fällt das Spiel so lange heraus.
 - **Einstellen**: Season → **Proteste** → **Fristen, Gründe und Tabelle**. Speichern gilt sofort in allen nicht
   gesperrten Staffeln; laufende Verfahren behalten ihre Fristen. Die vier Grundgründe bleiben in der Liste, damit auch
   die App melden kann.

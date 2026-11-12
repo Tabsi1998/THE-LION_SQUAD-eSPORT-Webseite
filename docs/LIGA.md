@@ -3027,6 +3027,20 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
   Stellungnahme braucht den Bezug. `notified_immediately` und `moss_requests` bleiben der eigenen Seite und der Leitung.
 - **MOSS-ZIP:** `type: "file"`, nur am Bezug `moss`, eigene Grenze `MAX_MOSS_UPLOAD_MB` (Vorgabe 200, andere Dokumente bleiben bei 50 MB), gestreamt auf die Platte. Geprüft wird das Inhaltsverzeichnis, ohne zu
   entpacken (`match_proofs.check_zip`); gespeichert wird unverändert mit `sha256`.
+- **Am einzelnen Spiel:** `league_page` gibt je Spiel `contested` (nur bei festem Ergebnis), die Ligaseite zeigt „in Klärung“ an derselben
+  Stelle wie D.5 die Map in Klärung (`in_clarification`); der TV-Baum schreibt es statt des Stands, die PDF-Tabelle hängt es an den Namen.
+- **„Braucht Aufmerksamkeit“:** Ein offenes Verfahren an einem Spiel mit festem Ergebnis (`counts`, Einspruch) ist ein Fall der Art
+  `procedure` mit `action: "open"` („Zum Spiel“); `match_disputes.open_procedure_rows` liest dafür ohne `league_procedures`.
+- **Listen der Leitung:** `GET /matches/{id}`, `GET /tournaments/{id}/matches-v2` und der Baum kürzen Verfahren für Beteiligte mit
+  Liga-Recht auf `at`, `id`, `kind`, `state` (`league_procedures.strip_for_involved`).
+- **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
+  Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
+- **Offener Vorfall** (Fachentscheidung 12.11.): `POST /matches/{id}/forfeit`, „nicht erschienen“ bestätigen und „beide nicht
+  erschienen“ antworten mit 409, solange ein Vorfall nicht `agreed`, `decided` oder `withdrawn` ist (`match_proof_refs.has_open_incident`,
+  nur gelesen).
+- **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
+- **Offen, eigenes Issue:** Das Bracket-Bild für Discord (`discord_bracket.py`) und die Teilen-Karte eines Ergebnisses
+  (`result_share.py`) zeigen Ergebnisse, die angefochten sein können, ohne Hinweis.
 - **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App meldet weiter über `/dispute` mit `category`; Art, Pflichtfragen,
   Ergänzen, Stellungnahme, Einspruch, MOSS und die Markierung „in Klärung“ fehlen dort noch.
 
