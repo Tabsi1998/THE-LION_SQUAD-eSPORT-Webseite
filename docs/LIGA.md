@@ -2697,20 +2697,23 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
 | `score` | `{<registration_id>: int}` \| null | Stand beim Vorfall (Runden bzw. Punkte), `round` (int) und `players` (`[user_id]`, betroffene Personen) dazu optional |
 | `note` | str ≤ 500 | Beschreibung, Ursache soweit bekannt |
 | `proposal` | `continue_at_score` \| `rehost` \| `restart` \| `replay` | Vorschlag: beim Stand fortsetzen, Rehost beim Stand, Neustart in der frühen Phase (Anlage C.1, Nr. 103), Wiederholung der Map |
-| `state` | `proposed` \| `agreed` \| `rejected` \| `expired` \| `in_review` \| `decided` \| `withdrawn` | siehe Ablauf |
+| `state` | `proposed` \| `agreed` \| `rejected` \| `expired` \| `in_review` \| `decided` \| `withdrawn` \| `closed` | siehe Ablauf |
 | `answer_deadline` | ISO | `at` + `incident_answer_minutes` |
 | `answer` | `{registration_id, user_id, at, note}` \| null | Antwort der Gegenseite |
-| `review_cause` | `rejected` \| `expired` | warum die Leitung entscheidet |
+| `review_cause` | `rejected` \| `expired` \| `lead` | warum die Leitung entscheidet; `lead`: sie hat den Vorfall selbst aufgenommen (Nr. 146) |
 | `counts_quota` | bool | zählt gegen das Kontingent: `rehost` und `pause` (ohne `between_maps`) ja, `moss_crash` nie (§ 9a.6), alle anderen nein |
 | `decision` | `{outcome, registration_id, reason, by, at, conflict_reason, missing_positions, surplus_positions, settled_at, settled_by, settle_reason}` \| null | Entscheidung der Leitung: `outcome` `continue_at_score` \| `rehost` \| `restart` \| `replay` \| `awarded` \| `no_action`; `registration_id` nur bei `awarded`; `reason` Pflicht (mindestens fünf Zeichen); `missing_positions` und `surplus_positions` (`[int]`) setzt die Leitung erst im Schritt „Serie feststellen“ (`settled_at`, `settled_by`, `settle_reason`), siehe „Fehlende und überzählige Maps“ |
 | `voided` | `{mode, map_id, score, round, at}` \| null | die für ungültig erklärte Erstaustragung bei `restart` oder `replay` |
-| `closed_at` | ISO \| null | gesetzt mit `agreed`, `decided` oder `withdrawn` |
+| `closed_at` | ISO \| null | gesetzt mit `agreed`, `decided`, `withdrawn` oder `closed` |
+| `close_reason` | `match_ended` \| `lead` | nur bei `closed`: Das Spiel endete ohne Austragung, oder die Leitung hat den Vorfall ohne Entscheidung geschlossen; dann dazu `close_note` (Begründung, Pflicht) und `closed_by` |
 
-- **Ablauf:** `proposed` → `agreed` (Gegenseite stimmt zu) oder `withdrawn` (meldende Seite zieht zurück, nur solange `proposed`).
+- **Ablauf:** `proposed` → `agreed` (Gegenseite stimmt zu) oder `withdrawn` (meldende Seite zieht zurück, nur solange `proposed`
+  **und die Antwortzeit läuft** - danach liegt der Vorfall bei der Leitung, auch wenn der Zeit-Job ihn noch nicht weitergereicht hat).
   Lehnt die Gegenseite ab (`rejected`) oder antwortet sie bis `answer_deadline` nicht (`expired`, Zeit-Job), geht der Vorfall im selben
   Schritt auf `in_review`; `rejected` und `expired` sind keine Ruhezustände, der Grund steht in `review_cause`. `in_review` → `decided`
-  durch die Leitung (`disputes` oder `results`, Befangenheit wie B.1). Offen ist ein Vorfall, solange er nicht `agreed`, `decided`
-  oder `withdrawn` ist.
+  durch die Leitung (`disputes` oder `results`, Befangenheit wie B.1). `closed` beendet einen offenen Vorfall **ohne** Entscheidung
+  über die Map (siehe „Geschlossen ohne Entscheidung“). Offen ist ein Vorfall, solange er nicht `agreed`, `decided`, `withdrawn`
+  oder `closed` ist.
 - **Kontingent** (§ 9.6): je Team und Map zählen die eigenen Vorfälle mit `counts_quota` in `agreed` oder `decided`. Das System zählt und
   zeigt „1 von 1 genutzt“ beiden Seiten und der Leitung; ein weiterer Vorfall bleibt meldbar, braucht aber die Zustimmung der Gegenseite
   und geht sonst an die Leitung. Nichts wird automatisch verweigert oder bestraft (§ 13.1).
@@ -2719,7 +2722,7 @@ Eine Seite meldet einen Vorfall mit Vorschlag, die Gegenseite stimmt zu oder leh
   `status: "replayed"`, `replay_reason` (C.3) und neu `incident_id`. Kein Leser von `games[]` (Tabelle, Konsens, App) sieht die
   Erstaustragung.
 - **Map-Stand „in Klärung“:** Quelle ist der Vorfall, kein zweites Feld. Eine Position ist in Klärung, solange ein Vorfall dieser
-  Position `in_review` ist. Die Matchseite liefert im Block `league` je Position `map_state`: `open` \| `in_clarification` \| `replayed` \|
+  Position `in_review` ist und das Spiel nicht zu Ende ist. Die Matchseite liefert im Block `league` je Position `map_state`: `open` \| `in_clarification` \| `replayed` \|
   `awarded` \| `played`, dazu `incidents[]` für Beteiligte und Leitung.
 - **Wie zählt die Map vor der Entscheidung?** Gar nicht (Nr. 132). Solange eine Position in Klärung ist, wird kein Ergebnis des Spiels
   gültig: Melden bleibt möglich, **Bestätigen und die Frist-Automatik (`result_confirm_hours`) ruhen**, das Spiel ist nicht `completed`
@@ -2765,20 +2768,57 @@ und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gil
   | --- | --- | --- |
   | `POST /api/matches/{id}/incidents` | Captain, Vertreter, wer angemeldet hat; sonst die Leitung mit `results` oder `disputes` (nicht befangen) | meldet: `position`, `kind`, `proposal`, freiwillig `score`, `round`, `players`, `note`; die Map-Pause mit `between_maps: true` und `minutes` |
   | `POST …/incidents/{incident_id}/answer` | die Gegenseite | `{accept, note}`: `agreed` oder im selben Schritt `in_review` |
-  | `POST …/incidents/{incident_id}/withdraw` | die meldende Seite | nur solange `proposed` |
+  | `POST …/incidents/{incident_id}/withdraw` | die meldende Seite | nur solange `proposed` und die Antwortzeit läuft; danach 409, der Vorfall läuft im selben Schritt ab |
   | `POST …/incidents/{incident_id}/decision` | Leitung, nicht befangen (Superadmin mit `conflict_reason`) | `{outcome, registration_id, reason, settle?}`; `settle` stellt die Serie gleich fest (nie bei `restart`, `replay`) |
-  | `POST …/incidents/{incident_id}/settle` | Leitung, nicht befangen | `{missing_positions, surplus_positions, reason}`, wiederholbar, bis das Ergebnis gilt |
+  | `POST …/incidents/{incident_id}/settle` | Leitung, nicht befangen | `{missing_positions, surplus_positions, reason}`, wiederholbar, bis das Ergebnis gilt; nach `restart` oder `replay` erst, wenn danach neu gemeldet ist (sonst 409) |
+  | `POST …/incidents/{incident_id}/close` | Leitung, nicht befangen (Superadmin mit `conflict_reason`) | `{reason}` (Pflicht): schließt einen **offenen** Vorfall ohne Entscheidung über die Map (`closed`, `close_reason: "lead"`) |
 
-  Antwort jeweils `{incident_id, state, result_confirmed, hold}`. Gelesen wird über den Block `league` der Matchseite:
+  Antwort jeweils `{incident_id, state, result_confirmed, hold}`; `hold` nennt, was das Ergebnis jetzt aufhält - aus **allen**
+  Vorfällen des Spiels, nicht nur aus dem eben bearbeiteten. Gelesen wird über den Block `league` der Matchseite:
   `map_state` (`[{position, state, surplus?}]`, für alle), `incidents` und `incident_info` (Rechte, Auswahl, Kontingent, `hold`,
-  `server_time`; nur Beteiligte und Leitung). Eine befangene Leitung sieht wie ihre Seite und bekommt `incident_info.conflict`.
-- **Was ein Ergebnis aufhält** (`league_incidents.result_block`, eine Stelle für Bestätigen, Frist-Automatik und `/result`): ein
-  **offener** Vorfall - also auch `proposed`, nicht erst `in_review` -, eine Entscheidung ohne Feststellung und eine Feststellung mit
-  `missing_positions`. So ist ein Spiel mit einer Map in Klärung nie `completed`. Auch die Leitung trägt über `/result` erst ein,
-  wenn nichts mehr aufhält (409 mit dem Satz, was fehlt). „Nicht erschienen“ und „Kampflos“ bleiben frei (Entscheidung der Leitung).
-- **Nach jedem Schritt** (Zustimmen, Zurückziehen, Entscheiden, Feststellen): Hält nichts mehr auf und stimmen die Meldungen beider
-  Seiten überein, gilt das Ergebnis sofort - das Bestätigen hat nur geruht. Die Frist-Automatik (eine einzelne Meldung) rechnet
-  frühestens ab dem Ende des letzten Vorfalls bzw. der Feststellung (`confirm_clock`), nicht ab der Meldung.
+  `server_time`; nur Beteiligte und Leitung). Je Vorfall stehen dort die Rechte der Person (`can_answer`, `can_withdraw`,
+  `can_decide`, `can_settle`, `can_close`) und `awaits_replay`. Eine befangene Leitung sieht wie ihre Seite und bekommt
+  `incident_info.conflict`.
+- **Was ein Ergebnis aufhält** (`league_incidents.result_block`, eine Stelle für Bestätigen und Frist-Automatik). `hold` ist
+  `{code, position, text}`, geprüft in dieser Reihenfolge:
+
+  | `code` | Wann | Wer ist dran |
+  | --- | --- | --- |
+  | `in_review` | ein Vorfall ist in Klärung | die Leitung entscheidet |
+  | `proposed` | ein Vorfall wartet auf die Antwort der Gegenseite - ein **offener** Vorfall hält also schon vor `in_review` auf (Nr. 146) | die Gegenseite |
+  | `rereport` | eine Map wird neu gestartet oder wiederholt, und seither ist nicht neu gemeldet | beide Seiten melden die Serie neu |
+  | `unsettled` | entschieden, die Serie aber nicht festgestellt | die Leitung stellt fest |
+  | `missing` | festgestellt mit `missing_positions` | die Seiten spielen die Map, die Leitung stellt erneut fest |
+
+  So ist ein Spiel mit einer Map in Klärung nie `completed`. Ist das Spiel zu Ende, hält kein Vorfall mehr etwas auf.
+  **Die Leitung** trägt über `/result` nur dann nicht ein, wenn ein Vorfall **offen** ist (`in_review`, `proposed`: 409 mit dem
+  Satz, was fehlt). Ist entschieden, darf sie eintragen - ihr eingetragenes Ergebnis ersetzt die Feststellung; eine spätere
+  Korrektur eines beendeten Spiels hält kein Vorfall auf.
+- **Neustart und Wiederholung: Es zählt nur, was danach gemeldet ist.** Mit der Einigung oder Entscheidung auf `restart` oder
+  `replay` steht in `voided.at`, ab wann die Erstaustragung ungültig ist. Jede frühere Meldung beschreibt diese ungültige
+  Austragung und zählt nicht mehr (`league_incident_rules.current_reports`) - für die Übereinstimmung beider Seiten, für die
+  einzelne Meldung der Frist-Automatik und für die Prüfung nach jedem Schritt. Bis neu gemeldet ist, hält `rereport` auf; beide
+  Seiten und die Leitung lesen „Map N wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr.“
+  (Matchseite und Nachricht zur Einigung bzw. Entscheidung). „Serie feststellen“ gibt es erst nach der neuen Meldung
+  (`awaits_replay`) - oder die Leitung trägt das Ergebnis selbst ein.
+- **Nach jedem Schritt** (Zustimmen, Zurückziehen, Entscheiden, Feststellen, Schließen): Hält nichts mehr auf und stimmen die
+  **noch zählenden** Meldungen beider Seiten überein, gilt das Ergebnis sofort - das Bestätigen hat nur geruht. Nach `restart`
+  oder `replay` wird also mit dem Schritt selbst nie etwas gültig: Es gibt noch keine Meldung von danach. Die Frist-Automatik
+  (eine einzelne Meldung) rechnet frühestens ab dem Ende des letzten Vorfalls bzw. der Feststellung (`confirm_clock`), nicht ab
+  der Meldung.
+- **Geschlossen ohne Entscheidung** (`closed`, Nr. 146):
+  - *Das Spiel ist zu Ende, ohne dass der Vorfall abgeschlossen wurde* (`forfeit`, `cancelled`, `archived`, `bye`, `completed`): Offene Vorfälle
+    gelten sofort in jeder Sicht als geschlossen (`close_reason: "match_ended"`), **ohne Nachricht** - es gibt nichts mehr zu
+    beantworten oder zu entscheiden. Der Zeit-Job lässt sie nicht mehr ablaufen und schreibt den Stand fest, ebenso der nächste
+    Schritt an einem Vorfall dieses Spiels (er antwortet mit 409). „In Klärung“ verschwindet öffentlich, „Mein Dienst“ nennt das
+    Spiel nicht mehr.
+  - *Die Leitung schließt* (`…/close`, `close_reason: "lead"`, Begründung Pflicht): beide Seiten bekommen „Vorfall geschlossen“,
+    die Begründung steht auf der Matchseite. Gedacht für den Fall, dass über die Map nichts mehr zu entscheiden ist - etwa bevor
+    das Spiel kampflos gewertet wird.
+- **Kampflos erst nach dem Vorfall** (Nr. 146): „Kampflos“ (`POST /api/matches/{id}/forfeit`), „Nicht erschienen“ (Bestätigen eines
+  Vorschlags) und „Beide nicht erschienen“ lehnt der Server mit 409 ab, solange ein Vorfall offen ist: „Zu Map N ist ein Vorfall
+  offen. Bitte zuerst über den Vorfall entscheiden oder ihn schließen – erst dann lässt sich das Spiel kampflos werten.“
+  „Verlängern“ bleibt möglich.
 - **Das gültige Ergebnis** (`league_incidents.finalize`, beim Bestätigen, in der Frist-Automatik und nach der Feststellung): Eine
   Position mit Neustart oder Wiederholung bekommt `status: "replayed"`, `replay_reason` und `incident_id`; eine zugesprochene
   Position Sieger, `decision: "awarded"`, keine Punkte und `incident_id`; Positionen in `surplus_positions` und jede Position nach
@@ -2789,21 +2829,34 @@ und Prüfung in `lib/leagueIncidents.js`). Was über die Tabelle oben hinaus gil
   Eine abgebrochene Map ohne Sieger wird daher erst mit der ganzen Serie gemeldet - nach der Entscheidung, wenn sie zu Ende
   gespielt, wiederholt oder zugesprochen ist. Eine Meldung „mit Lücke“ gibt es nicht (offener Punkt, siehe #1619).
 - **Die Leitung meldet selbst** (`reported_by.registration_id: null`): Es gibt keine Gegenseite, die antworten müsste - der Vorfall
-  ist sofort `in_review` (`review_cause: null`). So setzt die Leitung eine Serie aus (Anlage C.2.6).
+  ist sofort `in_review` mit `review_cause: "lead"`. So setzt die Leitung eine Serie aus (Anlage C.2.6).
 - **Je Position ein offener Vorfall:** Ein zweiter zur selben Map wird mit 409 abgelehnt, bis der erste abgeschlossen ist (die
   Map-Pause ausgenommen). Höchstens 30 Vorfälle je Spiel.
 - **Zeit-Job:** im Fristen-Job `match_deadlines` (jede Minute), `league_incidents.sweep`. `incident_due_at` am Spiel ist die
-  früheste offene `answer_deadline` - nur der Zeiger für den Job, kein Stand. Antwortet die Gegenseite nach der Frist, läuft der
-  Vorfall im selben Aufruf ab (409).
+  früheste offene `answer_deadline` - nur der Zeiger für den Job, kein Stand. Antwortet die Gegenseite nach der Frist oder zieht
+  die meldende Seite danach zurück, läuft der Vorfall im selben Aufruf ab (409). Der Lauf findet außerdem beendete Spiele mit
+  offenem Vorfall und schließt sie; er meldet `{expired, closed}`. Nach einem Neustart des Servers holt der nächste Lauf alles
+  nach (Nr. 146). Geschrieben wird mit Bedingung auf den gelesenen Stand: Zwei Läufe oder zwei Antworten zur selben Zeit wirken
+  genau einmal.
 - **Nachrichten:** Art `match_attention`, Schlüssel `incident:<id>:<ereignis>` (`reported`, `answered`, `review`, `decided`,
-  `withdrawn`, `settled:<zeit>`) - je Vorfall und Ereignis einmal, sonst verschluckte der Schlüssel `incident:<id>` die zweite
-  Nachricht an dieselbe Person. „Mein Dienst“: `incident_reviews` (Map in Klärung, Serie feststellen), ohne eigene Spiele.
+  `withdrawn`, `closed`, `settled:<zeit>`) - je Vorfall und Ereignis einmal, sonst verschluckte der Schlüssel `incident:<id>` die
+  zweite Nachricht an dieselbe Person. „Mein Dienst“: `incident_reviews` (Map in Klärung, Serie feststellen), ohne eigene
+  Spiele. Quelle ist `league_incident_rules.lead_task` - was die Leitung jetzt tun **kann**, nicht was das Ergebnis als Erstes
+  aufhält: „Serie feststellen“ steht auch da, wenn zu einer anderen Map ein Vorschlag auf Antwort wartet; nach `restart` oder
+  `replay` erst, wenn neu gemeldet ist.
 - **Öffentlich:** `map_state` an der Matchseite und `in_clarification` am Spiel der Staffel-Seite (`league_page.public_match`).
   `incidents` und `incident_due_at` stehen nie in der öffentlichen Sicht eines Spiels (`match_public_view`), `games[].incident_id`
-  nur bei Beteiligten und Leitung.
-- **Protokoll** ohne freien Text: `match.incident.report`, `.answer`, `.withdraw`, `.expire`, `.decide`, `.settle` mit Kennung, Map,
-  Art und Stand - nie Beschreibung, Begründung oder Namen. **Datenschutz:** Auskunft und Kontolöschung über `flow.user_ids`
-  (`match_flow.export_snapshot`, `scrub_person`): der Vorfall bleibt, die Kennung der Person fällt heraus, auch aus `players`.
+  nur bei Beteiligten und Leitung. Auch die Antworten auf `POST /report` und `POST /dispute` tragen das Spiel **ohne** `incidents`,
+  `incident_due_at` und `flow.user_ids` (`league_incidents.without_incidents`). Vorfälle liest nur der Block `league` der
+  Matchseite, zugeschnitten auf die Person.
+- **Oberfläche: jede Angabe an einer Stelle.** „In Klärung“ steht am Chip der Map und als Abzeichen der Vorfall-Karte, sonst
+  nirgends; höchstens ein Element atmet. Restzeit und Uhrzeit der Frist stehen nur am Countdown. Wer antworten muss, liest „Ihr
+  seid dran: stimmt zu oder lehnt ab.“, die meldende Seite „Die Gegenseite antwortet noch.“ Über den Karten steht nur, was an
+  keiner Karte steht (`hold.code: "rereport"`). Mit „Bewegung reduzieren“ zeigt der Balken die echte Restzeit, ohne Übergang.
+- **Protokoll** ohne freien Text: `match.incident.report`, `.answer`, `.withdraw`, `.expire`, `.decide`, `.settle`, `.close` mit
+  Kennung, Map, Art und Stand - nie Beschreibung, Begründung oder Namen. **Datenschutz:** Auskunft und Kontolöschung über `flow.user_ids`
+  (`match_flow.export_snapshot`, `scrub_person`): der Vorfall bleibt, die Kennung der Person fällt heraus, auch aus `players`
+  und `closed_by`.
 - **App:** `mobile/` zeigt Vorfälle noch nicht (Folgepunkt in #2173). Eine Bestätigung aus der App wird bei offenem Vorfall
   gespeichert, aber nicht gültig (`awaiting_confirmation: true`, `report_status: "clarification"`, `result_hold` mit dem Satz).
 - **TV und Druck** zeigen keinen Stand je Map - dort ändert sich nichts.
@@ -2906,7 +2959,7 @@ Migration; den eindeutigen Index nach `id` und den Index nach `match_id` legt de
   `match.proof.add`, `match.proof.remove` (Kennung, Art und Bezug, bei MOSS `kept: true`, nie die Adresse).
 - **Offen** ist ein Bezug so (`match_proof_refs.resolve`, eine Stelle für Hinzufügen, Entfernen und Aufbewahrung):
   - `report`: bis das Spiel `completed`, `forfeit` oder geschlossen (`cancelled`, `archived`, `bye`) ist.
-  - `incident`: solange der Vorfall nicht `agreed`, `decided` oder `withdrawn` ist.
+  - `incident`: solange der Vorfall nicht `agreed`, `decided`, `withdrawn` oder `closed` ist.
   - `protest`, `statement`, `moss` am Verfahren: solange das Verfahren **oder ein Einspruch gegen seine Entscheidung** offen ist
     (weder `resolved_at` noch `withdrawn_at`). Mit einem Einspruch (`kind: "appeal"`, `against.ref_id` = Kennung des Verfahrens)
     wird der Bezug also wieder offen, bis der Einspruch entschieden ist: Die Leitung kann nachfordern, ein Spieler MOSS

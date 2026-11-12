@@ -157,7 +157,7 @@
           "id": "vorfall-antworten",
           "titel": "Auf einen Vorfall antworten",
           "text": "Meldet die Gegenseite einen Vorfall, bekommst du eine Nachricht. Auf der Matchseite läuft die Antwortzeit. Tippe auf Zustimmen oder Ablehnen.",
-          "hinweis": "Antwortet ihr nicht in der Zeit, entscheidet die Liga-Leitung.",
+          "hinweis": "Antwortet ihr nicht in der Zeit, entscheidet die Liga-Leitung. Wird eine Map neu gestartet oder wiederholt, meldet ihr die Serie danach neu.",
           "bild": true
         },
         {

@@ -1024,7 +1024,9 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
 
 - **Einigen sich die Seiten**, habt ihr nichts zu tun. Der Vorfall steht mit Stand, Vorschlag und Nachweisen am Spiel. Wird eine Map
   neu gestartet oder wiederholt, zählt sie trotzdem nur einmal: Beim gültigen Ergebnis trägt die Map „Wiederholt“, die erste
-  Austragung steht nur im Vorfall.
+  Austragung steht nur im Vorfall. **Meldungen von vor dem Neustart oder der Wiederholung zählen nicht mehr** – sie beschreiben die
+  ungültige Austragung. Beide Seiten und ihr lest über den Vorfällen „Map 2 wird wiederholt – danach meldet ihr die Serie neu“,
+  bis neu gemeldet ist. Das gilt genauso, wenn ihr selbst auf Neustart oder Wiederholung entscheidet.
 - **Lehnt die Gegenseite ab oder antwortet sie nicht in der Antwortzeit** (2.7e), ist die Map **in Klärung**. Ihr bekommt eine
   Nachricht, der Fall steht unter **Mein Dienst → Braucht deine Entscheidung** („Map in Klärung“). Bis ihr entscheidet, gilt
   kein Ergebnis: Melden bleibt möglich, Bestätigen und die 48-Stunden-Regel ruhen, das Spiel steht nicht in der Tabelle.
@@ -1036,8 +1038,9 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
 - **Serie feststellen** – der zweite Schritt, erst danach kann ein Ergebnis gültig werden:
   - Ist nichts mehr zu spielen (etwa bei „Keine Maßnahme“ oder „Map zugesprochen“), hakt ihr gleich bei der Entscheidung
     **Serie gleich feststellen** an.
-  - Nach „Neustart“ oder „Map wiederholen“ wird die Map erst gespielt und gemeldet. Danach steht am Vorfall das Formular
-    **Serie feststellen**: **Fehlt noch eine Map?** (dann setzt ihr sie an und stellt später noch einmal fest) und **Welche Maps
+  - Nach „Neustart“ oder „Map wiederholen“ wird die Map erst gespielt und die Serie **neu gemeldet**. Vorher gibt es „Serie
+    feststellen“ nicht, und „Mein Dienst“ nennt das Spiel solange nicht. Sobald eine Seite neu gemeldet hat, steht am Vorfall das
+    Formular **Serie feststellen**: **Fehlt noch eine Map?** (dann setzt ihr sie an und stellt später noch einmal fest) und **Welche Maps
     zählen nicht?** – Maps, die unter Vorbehalt gespielt wurden, obwohl die Serie mit eurer Entscheidung schon entschieden war. Sie
     stehen in keiner Wertung, die Matchseite zeigt „zählt nicht (Entscheidung der Liga-Leitung)“.
   - Haben beide Seiten schon dasselbe gemeldet, gilt das Ergebnis mit der Feststellung sofort. Hat nur eine Seite gemeldet, läuft
@@ -1045,9 +1048,18 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
     **Ergebnis eintragen** ein (3.2).
 - **Selbst einen Vorfall aufnehmen:** **Vorfall aufnehmen** in derselben Fläche. Die Map ist dann sofort in Klärung, ohne Antwort der
   Seiten – so setzt ihr eine Serie aus (Anlage C.2.6).
+- **Ohne Entscheidung schließen:** Gibt es über die Map nichts mehr zu entscheiden (etwa weil ein Team gar nicht mehr antritt),
+  schließt ihr den offenen Vorfall am Vorfall mit **Ohne Entscheidung schließen** und einer Begründung. Beide Seiten bekommen
+  „Vorfall geschlossen“, die Begründung steht am Vorfall.
+- **Kampflos und „nicht erschienen“ erst nach dem Vorfall:** Solange ein Vorfall offen ist, lehnt die Seite „Kampflos“, „Nicht
+  erschienen“ und „Beide nicht erschienen“ ab und sagt, zu welcher Map der Vorfall offen ist. Entscheidet zuerst oder schließt
+  ihn. Endet ein Spiel auf anderem Weg (abgesagt, archiviert), schließt die Seite offene Vorfälle von selbst und ohne Nachricht;
+  „in Klärung“ verschwindet dann überall.
 - **Im eigenen Spiel** entscheidet eine zweite berechtigte Person (Befangenheit, 2.11); die Seite sagt das. Der Superadmin kann nur
   als Notausnahme mit Grund.
-- **Ergebnis eintragen** geht erst, wenn kein Vorfall mehr offen und die Serie festgestellt ist – die Seite nennt sonst den Grund.
+- **Ergebnis eintragen** geht, sobald kein Vorfall mehr offen ist (weder „wartet auf Antwort“ noch „in Klärung“) – die Seite nennt
+  sonst den Grund. Ist entschieden, aber die Serie noch nicht festgestellt, ersetzt euer eingetragenes Ergebnis die Feststellung.
+- **Zurückziehen** kann die meldende Seite nur, solange die Antwortzeit läuft. Danach liegt der Vorfall bei euch.
 
 <img src="../assets/liga/vorfall-entscheiden-1440.png" alt="Fläche Vorfälle im Spiel für die Liga-Leitung: der Vorfall in Klärung mit Stand und Vorschlag, darunter die Entscheidung mit sechs Möglichkeiten, der Seite für die zugesprochene Map, der Begründung und dem Haken Serie gleich feststellen" width="820">
 
@@ -1303,7 +1315,10 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | „Ein Dispute ist nur bis 30 Minuten nach dem Ergebnis möglich …“ | Einspruchsfrist vorbei | Matchchat mit **@leitung**; die Turnierleitung korrigiert |
 | „Bitte kurz den Grund der Korrektur angeben (mindestens 5 Zeichen).“ (Ergebnis-Fenster) bzw. „Bitte einen Grund für die Korrektur angeben (mindestens 5 Zeichen).“ | Korrektur ohne Grund | Grund mit mindestens fünf Zeichen |
 | Season gespeichert, die Staffel zeigt noch alte Werte | Noch nicht übertragen | **Vorgaben übertragen** (Grenzen siehe 2.7) |
-| „Map 2 ist in Klärung – die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis.“ (auch beim Ergebnis eintragen: „Bitte zuerst über den Vorfall entscheiden und die Serie feststellen.“) | Zu dem Spiel ist ein Vorfall offen | Auf der Matchseite unter **Vorfälle im Spiel** entscheiden und die Serie feststellen (3.1d) |
+| „Map 2 ist in Klärung – die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis.“ (auch beim Ergebnis eintragen, dort mit „Bitte zuerst über den Vorfall entscheiden.“) | Zu dem Spiel ist ein Vorfall offen | Auf der Matchseite unter **Vorfälle im Spiel** entscheiden und die Serie feststellen (3.1d) |
+| „Zu Map 2 ist ein Vorfall offen. Bitte zuerst über den Vorfall entscheiden oder ihn schließen – erst dann lässt sich das Spiel kampflos werten.“ | Kampflos, „Nicht erschienen“ oder „Beide nicht erschienen“ bei offenem Vorfall | Am Vorfall entscheiden oder **Ohne Entscheidung schließen** (3.1d), dann werten |
+| „Map 2 wird erst neu gespielt. Die Serie stellst du fest, sobald das Ergebnis danach neu gemeldet ist – oder du trägst es selbst ein.“ | „Serie feststellen“ nach Neustart oder Wiederholung, bevor neu gemeldet ist | Auf die neue Meldung warten oder **Ergebnis eintragen** (3.2) |
+| „Map 2 wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr.“ | Einigung oder Entscheidung auf Neustart bzw. Wiederholung | Die Teams spielen die Map und melden die ganze Serie neu |
 | „Map 1 ist in Klärung und die Serie pausiert – Map 2 lässt sich erst melden, wenn die Liga-Leitung entschieden hat.“ | Die Season spielt mit „Serie pausiert, bis entschieden ist“ (2.7e) | Entscheiden; danach geht die Meldung |
 | „Die Meldungen passen nicht zur Entscheidung der Liga-Leitung über den Vorfall – das Ergebnis trägt die Liga-Leitung ein.“ | Nach „Map zugesprochen“ oder nicht zählenden Maps ergibt die Meldung der Teams keine entschiedene Serie | **Ergebnis eintragen** mit den geltenden Maps (3.2) |
 
