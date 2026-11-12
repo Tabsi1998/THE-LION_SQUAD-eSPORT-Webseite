@@ -214,3 +214,28 @@ async def test_reason_and_issuer_of_a_sanction_never_reach_public_tournament_vie
     flow.act_as(world["admin"])
     lead = (await flow.get(f"/api/tournaments/{staffel['id']}")).json()
     assert [sorted(row) for row in lead["point_deductions"]] == [["created_at", "id", "points", "registration_id", "sanction_id", "source"]]
+
+
+@pytest.mark.asyncio
+async def test_in_a_locked_staffel_the_appeal_can_still_be_refused_but_not_granted(flow):
+    """Review R1, N2: „Strafe bleibt“ ändert nichts an der Staffel und geht auch, wenn sie gesperrt ist."""
+    world = await setup(flow)
+    staffel = world["staffel"]
+    await play_round(flow, staffel)
+    captain = await flow.db.users.find_one({"display_name": "Captain 1"}, {"_id": 0})
+    ids = []
+    for points in (1, 2):
+        ids.append((await issue(flow, world, kind="point_deduction", target_type="squad", registration_id="reg-1", points=points)).json()["id"])
+        flow.act_as(captain)
+        filed = await flow.post(f"/api/penalties/sanctions/{ids[-1]}/appeal", json={"text": "Der Abzug trifft das falsche Team."})
+        assert filed.status_code == 200, filed.text
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"locked_at": now_utc().isoformat()}})
+    flow.act_as(world["second"])
+    kept = await flow.post(f"{world['url']}/{ids[0]}/appeal/decision", json={"decision": "upheld", "note": "Der Abzug bleibt bestehen."})
+    assert kept.status_code == 200 and kept.json()["appeal"]["state"] == "upheld", kept.text
+    # Gegenprobe: Aufheben ändert die Tabelle - das lehnt die gesperrte Staffel ab, der Einspruch bleibt offen.
+    lifted = await flow.post(f"{world['url']}/{ids[1]}/appeal/decision", json={"decision": "granted", "note": "Verwechslung belegt."})
+    assert lifted.status_code == 423, lifted.text
+    stored = await flow.db.competition_sanctions.find_one({"id": ids[1]}, {"_id": 0})
+    assert stored["appeal"]["state"] == "open" and stored["revoked_at"] is None
+    assert (await rows(flow, staffel))["reg-1"]["deducted_points"] == 3

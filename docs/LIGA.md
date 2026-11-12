@@ -3238,7 +3238,7 @@ Person und bleiben beim Co-Team.
 
 **Gesperrte Staffel:** Punktabzug und Disqualifikation schreiben in die Staffel und laufen unter ihrer Schreibsperre. Eine
 gesperrte Staffel lehnt Verhängen, Widerruf und einen stattgegebenen Einspruch dieser beiden Arten mit 423 ab, bis die Leitung
-sie entsperrt.
+sie entsperrt. „Strafe bleibt“ ändert nichts an der Staffel und geht auch in einer gesperrten.
 
 **Season-Einstellungen:** keine neuen. Die Einspruchsfrist ist `appeal_hours` (E.2), die Regel beim Ausscheiden `exit_rule` (E.1).
 

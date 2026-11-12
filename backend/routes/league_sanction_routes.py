@@ -114,12 +114,12 @@ async def _record_override(db, me: dict, doc: dict, reason: str | None, action: 
 
 
 @asynccontextmanager
-async def _staffel_write(db, doc: dict):
+async def _staffel_write(db, doc: dict, *, changes: bool = True):
     """Strafen, die in die Staffel schreiben (Punktabzug, Disqualifikation), laufen unter ihrer Schreibsperre; eine gesperrte
-    Staffel lehnt ab (423)."""
+    Staffel lehnt ab (423). ``changes=False``: Dieser Schritt ändert an der Staffel nichts („Strafe bleibt“) - keine Sperre."""
     from routes.tournament_common import _ensure_tournament_unlocked
 
-    if not sanctions.KINDS[doc["kind"]].get("staffel") or not doc.get("tournament_id"):
+    if not changes or not sanctions.KINDS[doc["kind"]].get("staffel") or not doc.get("tournament_id"):
         yield None
         return
     try:
@@ -214,7 +214,7 @@ async def decide_sanction_appeal(season_id: str, sanction_id: str, body: AppealD
         raise HTTPException(status_code=403, detail=league_permissions.OWN_DECISION_DETAIL)
     override = await _no_conflict(db, me, doc, await _match_of(db, doc), body.conflict_reason)
     try:
-        async with _staffel_write(db, doc):
+        async with _staffel_write(db, doc, changes=body.decision == "granted"):
             doc = await sanctions.decide_appeal(db, doc, me, body.decision, body.note)
     except sanctions.SanctionProblem as problem:
         raise _refuse(problem) from None
