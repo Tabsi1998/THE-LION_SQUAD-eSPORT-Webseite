@@ -28,11 +28,11 @@ COST_ENDED = ("Ein offener Kostenbeitrag wird nicht verrechnet; wurde schon eine
 
 
 def price_to_bill(registration: dict) -> dict | None:
-    """Der Preis, der mit diesem Schritt abgerechnet wird - nur ein gerade eingefrorener (noch ohne Beleg). Trägt die Anmeldung
-    schon einen Beleg, ist sie nach einem Storno zurückgekommen, und die Finanzverwaltung prüft ihn (#2184): Dann nennt keine
-    Nachricht einen Betrag, der so vielleicht nicht gilt. Storniert: ebenfalls keiner."""
+    """Der Preis, der zu dieser Anmeldung abgerechnet wird. Nach einem Storno mit schon gestelltem Beleg zurückgebucht
+    (``invoice_kept``, #2184), prüft die Finanzverwaltung den Beleg: Dann nennt keine Nachricht einen Betrag, der so vielleicht
+    nicht gilt. Storniert: ebenfalls keiner."""
     snapshot = registration.get("price_snapshot") or {}
-    if int(snapshot.get("total_cents") or 0) <= 0 or registration.get("billing_status") not in (None, "pending"):
+    if int(snapshot.get("total_cents") or 0) <= 0 or registration.get("billing_status") == "cancelled" or registration.get("invoice_kept"):
         return None
     return snapshot
 
@@ -41,8 +41,9 @@ KEPT_INVOICE = "Für deine Anmeldung gibt es schon eine Rechnung – der Verein 
 
 
 def kept_invoice_line(registration: dict) -> str:
-    """Zurück nach einem Storno, der Beleg gilt weiter (#2184): kein Betrag, aber auch kein Schweigen - sonst wirkt die Anmeldung kostenlos."""
-    if registration.get("status") in ACTIVE and registration.get("billing_status") in ("invoiced", "paid"):
+    """Zurück nach einem Storno, der Beleg gilt weiter (#2184): kein Betrag, aber auch kein Schweigen - sonst wirkt die Anmeldung kostenlos.
+    Nur nach der Rückbuchung selbst (``invoice_kept``, nur in der Antwort, nie gespeichert): Ohne sie gibt es nichts zu prüfen."""
+    if registration.get("invoice_kept") and registration.get("status") in ACTIVE and registration.get("billing_status") in ("invoiced", "paid"):
         return KEPT_INVOICE
     return ""
 

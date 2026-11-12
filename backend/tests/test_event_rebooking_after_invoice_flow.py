@@ -330,19 +330,36 @@ async def test_voll_gutgeschriebener_oder_aufgegebener_beleg_zaehlt_nicht_mehr(f
 
 
 def test_nur_ein_jetzt_abgerechneter_preis_wird_genannt():
-    """Dieselbe Regel für Glocke, Mail und die Discord-Antwort: kein Betrag, wenn schon ein Beleg da ist oder storniert wurde."""
+    """Dieselbe Regel für Glocke, Mail und die Discord-Antwort: kein Betrag nach der Rückbuchung auf einen Beleg oder nach dem Storno."""
     snapshot = {"total_cents": 2000, "currency": "EUR"}
-    assert price_to_bill({"price_snapshot": snapshot, "billing_status": "pending"}) == snapshot
-    assert price_to_bill({"price_snapshot": snapshot}) == snapshot
-    for status in ("invoiced", "paid", "cancelled"):
-        assert price_to_bill({"price_snapshot": snapshot, "billing_status": status}) is None
+    for status in (None, "pending", "invoiced", "paid"):
+        assert price_to_bill({"price_snapshot": snapshot, "billing_status": status}) == snapshot
+        assert price_to_bill({"price_snapshot": snapshot, "billing_status": status, "invoice_kept": True}) is None
+    assert price_to_bill({"price_snapshot": snapshot, "billing_status": "cancelled"}) is None
     assert price_to_bill({"price_snapshot": {"total_cents": 0}}) is None and price_to_bill({}) is None
 
 
-def test_hinweis_auf_die_bestehende_rechnung_nur_wenn_sie_weiter_gilt():
+def test_hinweis_auf_die_bestehende_rechnung_nur_nach_einer_rueckbuchung():
     for billing_status in ("invoiced", "paid"):
-        assert kept_invoice_line({"status": "registered", "billing_status": billing_status}) == KEPT_INVOICE
-    assert kept_invoice_line({"status": "checked_in", "billing_status": "paid"}) == KEPT_INVOICE
-    for row in ({"status": "registered", "billing_status": "pending"}, {"status": "registered"}, {"status": "cancelled", "billing_status": "invoiced"},
-                {"status": "waitlist", "billing_status": "invoiced"}):
+        assert kept_invoice_line({"status": "registered", "billing_status": billing_status, "invoice_kept": True}) == KEPT_INVOICE
+    assert kept_invoice_line({"status": "checked_in", "billing_status": "paid", "invoice_kept": True}) == KEPT_INVOICE
+    for row in ({"status": "registered", "billing_status": "invoiced"}, {"status": "registered", "billing_status": "pending", "invoice_kept": True},
+                {"status": "cancelled", "billing_status": "invoiced", "invoice_kept": True}, {"status": "waitlist", "billing_status": "invoiced", "invoice_kept": True}):
         assert kept_invoice_line(row) == ""
+
+
+@pytest.mark.asyncio
+async def test_warteliste_und_zurueck_ohne_storno_kein_hinweis_auf_eine_pruefung(flow, fake):
+    """Ohne Storno (Leitung setzt auf die Warteliste und wieder zurück) gibt es keinen Prüffall - also auch keinen Satz, dass der
+    Verein die Rechnung prüft. Die Nachricht bleibt wie bisher."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    await settle(flow, fake, order, "validated")
+    flow.act_as(kassier)
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    for status in ("waitlist", "registered"):
+        response = await flow.patch(url, json={"status": status})
+        assert response.status_code == 200, response.text
+    assert await open_cases(flow, order) == {}
+    note = await last_note(flow, paula)
+    assert note["title"].startswith("Nachgerückt") and KEPT_INVOICE not in note["body"]
+    assert "40,00" in note["body"], "wie bisher: der Kostenbeitrag der bestehenden Rechnung"

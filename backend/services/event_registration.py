@@ -267,6 +267,8 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
     })
     if invoiced:
         await billing_orders.rebook_after_invoice(db, invoiced, reason=REBOOKED_SELF, new_total_cents=int(price.get("total_cents") or 0))
+        # Für Nachricht und Discord-Antwort (``event_notifications.kept_invoice_line``) - nicht gespeichert.
+        doc["invoice_kept"] = True
     elif doc.get("price_snapshot"):
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
                                           snapshot=doc["price_snapshot"], timing=pricing.order_timing(doc["price_snapshot"], offer))

@@ -973,6 +973,8 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
                  **({"rewards_revoked": revoked} if revoked else {})},
         "created_at": now_utc().isoformat(),
     })
+    if invoiced_before:
+        updated["invoice_kept"] = True   # für die Nachricht (#2184), nicht gespeichert
     return current, updated
 
 
