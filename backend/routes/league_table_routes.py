@@ -157,6 +157,12 @@ async def admin_double_no_show(tournament_id: str, match_id: str, body: DoubleNo
             tournament = await _staffel(db, tournament_id)
             await ensure_tournament_accepts_results(db, tournament_id)
             match = await _match(db, tournament_id, match_id)
+            # Vorfälle (D.5, #1619, Nr. 146): Solange ein Vorfall offen ist, wird nicht „nicht erschienen“ gewertet.
+            from services.league_incident_rules import forfeit_refusal
+
+            blocked = forfeit_refusal(match)
+            if blocked:
+                raise league_table.TableProblem(blocked, 409)
             sides = league_table.check_double_no_show(tournament, match)
             await league_permissions.require_no_conflict(db, me, match, action="double_no_show",
                                                          conflict_reason=body.conflict_reason)

@@ -240,10 +240,14 @@ def _static() -> list[Variable]:
                  "Proteste und Strafen", _preset("appeal_hours", PRESETS["appeal_hours"], facts.hours)),
         Variable("evidence.keep_days", "Aufbewahrung der Beweise", "Tage nach Season-Ende (Vorgabe 30 Tage, einstellbar mit E.2).",
                  "Proteste und Strafen", _preset("evidence_keep_days", PRESETS["evidence_keep_days"], facts.days)),
-        Variable("match.break_after_map", "Pause nach Map", "Nach welcher Map die Standardpause liegt (Vorgabe 2, einstellbar mit D.5).",
+        # Vorfälle (D.5, #1619): einstellbar im Reiter Spielbetrieb der Season, Abschnitt „Vorfälle und Pausen“.
+        Variable("match.break_after_map", "Pause nach Map", "Nach welcher Map die Standardpause liegt (Vorgabe 2).",
                  "Matchablauf", _preset("map_break_after", PRESETS["map_break_after"], _count)),
-        Variable("match.break_minutes", "Länge der Pause", "Standardpause zwischen den Maps (Vorgabe 5 Minuten, einstellbar mit D.5).",
+        Variable("match.break_minutes", "Länge der Pause", "Standardpause zwischen den Maps (Vorgabe 5 Minuten).",
                  "Matchablauf", _preset("map_break_minutes", PRESETS["map_break_minutes"], lambda value: facts.duration(int(value) * 60))),
+        Variable("incident.answer_minutes", "Antwortzeit bei einem Vorfall", "Minuten, in denen die Gegenseite auf einen gemeldeten Vorfall "
+                 "antwortet (Vorgabe 10 Minuten); danach entscheidet die Liga-Leitung.",
+                 "Matchablauf", _preset("incident_answer_minutes", PRESETS["incident_answer_minutes"], lambda value: facts.duration(int(value) * 60))),
     ]
 
 

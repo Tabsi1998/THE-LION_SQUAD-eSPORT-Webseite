@@ -169,9 +169,38 @@ test.describe("Liga: Season-Seite mit Reitern", () => {
     await expect(page.getByTestId("season-pool-mode-kontrolle")).toBeVisible();
     await page.getByTestId("season-save-spielbetrieb").click();
     await expect.poll(() => calls.patch.length).toBe(1);
-    expect(Object.keys(calls.patch[0]).sort()).toEqual(["best_of", "game_mode_order", "lineup_amend_hours", "map_repeat", "result_confirm_hours", "team_size"]);
+    // Vorfälle (D.5, #1619): die fünf Felder der Gruppe „Vorfälle und Pausen“ gehören zum Reiter Spielbetrieb.
+    expect(Object.keys(calls.patch[0]).sort()).toEqual(["best_of", "clarification_mode", "game_mode_order", "incident_answer_minutes", "incident_quota_per_map",
+      "lineup_amend_hours", "map_break_after", "map_break_minutes", "map_repeat", "result_confirm_hours", "team_size"]);
     expect(calls.patch[0].team_size).toBe(5);
   });
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`Spielbetrieb: Vorfälle und Pausen mit Vorgaben, gespeichert wird, was eingestellt ist, bei ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const calls = await mockServer(page);
+      await page.goto("/admin/leagues/seasons/s1#vorfaelle");
+      const box = page.getByTestId("season-incidents");
+      await expect(box).toBeInViewport();
+      // Eine Season ohne die Felder zeigt die Vorgaben des Servers.
+      await expect(page.getByTestId("season-form-incident-answer")).toHaveValue("10");
+      await expect(page.getByTestId("season-form-incident-quota")).toHaveValue("1");
+      await expect(page.getByTestId("season-form-break-after")).toHaveValue("2");
+      await expect(page.getByTestId("season-form-break-minutes")).toHaveValue("5");
+      await expect(page.getByTestId("season-form-clarification-mode")).toHaveValue("continue");
+      await page.getByTestId("season-form-incident-answer").fill("15");
+      await page.getByTestId("season-form-clarification-mode").selectOption("pause_series");
+      await expect(box).toContainText("Spätere Maps lassen sich erst nach der Entscheidung melden.");
+      await noSideScroll(page);
+      // Nur der Kasten: das Bild der ganzen Seite zeigt ihn sonst unter dem Map-Pool.
+      const file = `liga-season-vorfaelle-${width === 390 ? "handy" : "pc"}.png`;
+      await box.screenshot({ path: test.info().outputPath(file), animations: "disabled" });
+      if (process.env.E2E_SCREENS_DIR) await box.screenshot({ path: path.join(process.env.E2E_SCREENS_DIR, file), animations: "disabled" });
+      await page.getByTestId("season-save-spielbetrieb").click();
+      await expect.poll(() => calls.patch.length).toBe(1);
+      expect(calls.patch[0]).toMatchObject({ incident_answer_minutes: 15, incident_quota_per_map: 1, clarification_mode: "pause_series", map_break_after: 2, map_break_minutes: 5 });
+    });
+  }
 
   test("Ligen und Staffeln: Beiname „Liga 1“ bekommt einen freundlichen Hinweis", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

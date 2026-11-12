@@ -189,8 +189,11 @@ def agreed_outside_week(match: dict, tournament: dict | None) -> bool:
 
 
 def single_report(match: dict) -> dict | None:
-    """Die eine Meldung, die nach der Frist gilt - nur wenn genau eine Seite gemeldet hat."""
-    latest = latest_reports(match.get("reports") or [])
+    """Die eine Meldung, die nach der Frist gilt - nur wenn genau eine Seite gemeldet hat. Nach einem Neustart oder einer
+    Wiederholung einer Map (Vorfälle, D.5) zählen nur Meldungen von danach."""
+    from services.league_incident_rules import current_reports
+
+    latest = latest_reports(current_reports(match))
     return next(iter(latest.values())) if len(latest) == 1 else None
 
 
@@ -209,6 +212,14 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
     reported = _parse((report or {}).get("at"))
     if not reported:
         return None
+    if match.get("incidents"):
+        # Vorfälle (D.5, #1619): Solange einer offen ist oder die Serie noch festgestellt werden muss, ruht die Frist-Automatik -
+        # danach läuft die Frist ab dem Ende der Klärung, nicht ab der Meldung.
+        from services import league_incident_rules
+
+        if league_incident_rules.result_block(match):
+            return None
+        reported = max(reported, league_incident_rules.confirm_clock(match) or reported)
     if plays_in_matchdays(tournament or {}):
         # Fabian (14.10.2026): 48 Stunden, spätestens zum Ende der Spielwoche - aber der Gegner hat immer mindestens
         # 24 Stunden. Ein vereinbart außerhalb der Woche gespieltes Spiel hat das Wochenende nicht als Obergrenze.

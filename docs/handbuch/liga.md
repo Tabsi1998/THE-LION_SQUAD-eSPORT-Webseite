@@ -480,6 +480,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Check-in (Kasten „Check-in vor dem Spiel“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
 | Veto (Kasten „Veto“, 2.7d) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen; ein laufendes Veto behält seinen Stand |
 | Vorgabe der Woche (im Kasten „Veto“, 2.7d) | sofort mit **Vorgaben speichern**, für alle Staffeln und ohne Übertragen; gilt für Spiele, deren Veto noch nicht begonnen hat |
+| Vorfälle und Pausen (Abschnitt im Reiter Spielbetrieb, 2.7e) | beim Übertragen, auch während der Season; nicht bei gesperrten Staffeln. Ein schon gemeldeter Vorfall behält seine Antwortzeit |
 
 ### 2.7a Termine und Verschiebungen (Regelwerk § 7)
 
@@ -580,6 +581,26 @@ Was gilt:
   (auch **Was fehlt noch?** im Überblick nennt sie). Die alte Auswahl bleibt gespeichert, bis ihr sie ändert – speichert ihr eine andere
   Woche, geht dabei nichts verloren. „Rotiert automatisch durch den Pool“ fasst solche Wochen nicht an, „Alle neu verteilen“ schon.
 - Im Regelwerk beschreibt der Baustein `[[baustein:veto]]` die Regel; `{{veto.presets}}` nennt die Maps je Woche (2.11).
+
+### 2.7e Vorfälle und Pausen (Regelwerk § 9, Anlage C)
+
+Auf der Season-Seite im Reiter **Spielbetrieb** steht zwischen „Veto“ und „Nach dem Spiel“ der Abschnitt **Vorfälle und Pausen**
+(Zuständigkeit „Season konfigurieren“). Er gehört zum Formular des Reiters: **Spielbetrieb speichern**, danach **Vorgaben
+übertragen** (2.7) – die Werte gehen auch in eine laufende Staffel, nur nicht in eine gesperrte. Eine Season, die die Felder noch
+nicht trägt, zeigt die Vorgaben und spielt mit ihnen.
+
+| Feld | Vorgabe | Wirkung |
+| --- | --- | --- |
+| **Antwortzeit der Gegenseite (Minuten)** | 10 | So lange hat die Gegenseite, um einem gemeldeten Vorfall zuzustimmen oder abzulehnen. Danach ist die Map **in Klärung** und ihr entscheidet. Jeder Vorfall behält die Zeit, mit der er gemeldet wurde |
+| **Rehosts und Pausen je Team und Map** | 1 | § 9.6: Die Seite zählt Rehosts und technische Pausen je Team und Map und zeigt „1 von 1 genutzt“. **Nichts wird verweigert:** Ein weiterer Vorfall bleibt meldbar, braucht aber die Zustimmung der Gegenseite, sonst entscheidet ihr. Ein MOSS-Absturz zählt nie, die Pause zwischen den Maps auch nicht |
+| **Serie bei einer Map in Klärung** | Weiterspielen unter Vorbehalt | „Weiterspielen unter Vorbehalt“: Die Teams spielen und melden die übrigen Maps, die Map in Klärung zählt erst nach eurer Entscheidung. „Serie pausiert, bis entschieden ist“: Eine Meldung mit einer späteren Map lehnt die Seite ab, bis ihr entschieden habt |
+| **Standardpause nach Map** und **Länge der Standardpause (Minuten)** | nach Map 2, 5 Minuten | Steht so im Regelwerk (`{{match.break_after_map}}`, `{{match.break_minutes}}`). Eine andere Pause halten die Teams am Spiel fest – nur dokumentiert, ohne Antwort |
+
+<img src="../assets/liga/season-vorfaelle-1440.png" alt="Abschnitt Vorfälle und Pausen im Reiter Spielbetrieb: Antwortzeit der Gegenseite, Rehosts und Pausen je Team und Map, Serie bei einer Map in Klärung, Standardpause nach Map und ihre Länge" width="820">
+
+In beiden Fällen gilt: Solange ein Vorfall offen ist, wird **kein Ergebnis des Spiels gültig** – weder durch Bestätigen noch nach
+der 48-Stunden-Regel, und das Spiel steht nicht in der Tabelle. Wie ihr entscheidet, steht in 3.1d. Im Regeltext nennt
+`{{incident.answer_minutes}}` die Antwortzeit (2.11).
 
 ### 2.7c Plattform und Eingabegerät
 
@@ -799,7 +820,8 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{application.opens}}`, `{{application.closes}}`, `{{application.slots}}` | Anmeldefenster und Startplätze (2.5a) |
    | `{{application.acceptance}}` | Ein ganzer Satz ohne Punkt (2.5a): „Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
    | `{{protest.hours}}`, `{{appeal.hours}}`, `{{evidence.keep_days}}` | Protestfrist, Einspruchsfrist, Aufbewahrung der Beweise. Heute gelten die Vorgaben 48 Stunden, 48 Stunden, 30 Tage; einstellbar werden sie mit den Paketen Proteste und Strafen |
-   | `{{match.break_after_map}}`, `{{match.break_minutes}}` | Standardpause zwischen den Maps (Vorgabe nach Map 2, 5 Min.); einstellbar mit dem Paket Vorfälle |
+   | `{{match.break_after_map}}`, `{{match.break_minutes}}` | Standardpause zwischen den Maps (Vorgabe nach Map 2, 5 Min.); einstellbar im Abschnitt „Vorfälle und Pausen“ (2.7e) |
+   | `{{incident.answer_minutes}}` | Antwortzeit der Gegenseite auf einen gemeldeten Vorfall (Vorgabe 10 Min., 2.7e) |
    | `{{mode:<kennung>.name}}`, `.rule`, `.target`, `.round_limit`, `.time_limit`, `.round_time`, `.players`, `.overtime`, `.draw` | je Modus: Name, Regel in Klartext, Ziel, Rundenlimit, Zeitlimit, Zeit je Runde, Spieler je Seite, Verlängerung und Remis („ja“/„nein“). Die Kennung steht in der Liste. |
 
 5. **Vorschau** zeigt die Seite mit den Werten von heute und den Änderungen zur letzten Version.
@@ -994,6 +1016,55 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
 <img src="../assets/liga/veto-live-390.png" alt="Matchseite am Handy im laufenden Veto: Countdown in Orange für Team B, darunter die Ablauf-Leiste mit dem laufenden Schritt, die Frage Welche Map sperrt ihr und das Brett mit Map-Karten - die gesperrte Hafenkante gedimmt mit Bann-Zeichen" width="300"> <img src="../assets/liga/veto-live-1440.png" alt="Matchseite am PC im laufenden Veto: Ablauf-Leiste mit elf Schritten, darunter je Modus die Map-Karten mit Bild; gesperrte Karten gedimmt, Nebelwerk als Map 1 von Team A in Blau gewählt, der Modus des laufenden Zugs gerahmt" width="640">
 
 <img src="../assets/liga/veto-live-tv-1920.png" alt="TV-Ansicht des Vetos: links großer Countdown und das Team am Zug, rechts je Modus die Map-Karten, unten der ganze Ablauf mit den fertigen Schritten und ihren Maps" width="640">
+
+### 3.1d Vorfälle im Spiel (Regelwerk § 9, Anlage C)
+
+Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die Teams das auf der **Matchseite** in der Fläche
+**Vorfälle im Spiel** (was sie dort tun, steht im [Spickzettel](liga-captains.md)). Für euch heißt das:
+
+- **Einigen sich die Seiten**, habt ihr nichts zu tun. Der Vorfall steht mit Stand, Vorschlag und Nachweisen am Spiel. Wird eine Map
+  neu gestartet oder wiederholt, zählt sie trotzdem nur einmal: Beim gültigen Ergebnis trägt die Map „Wiederholt“, die erste
+  Austragung steht nur im Vorfall. **Meldungen von vor dem Neustart oder der Wiederholung zählen nicht mehr** – sie beschreiben die
+  ungültige Austragung. Beide Seiten und ihr lest über den Vorfällen „Map 2 wird wiederholt – danach meldet ihr die Serie neu“,
+  bis neu gemeldet ist. Das gilt genauso, wenn ihr selbst auf Neustart oder Wiederholung entscheidet.
+- **Lehnt die Gegenseite ab oder antwortet sie nicht in der Antwortzeit** (2.7e), ist die Map **in Klärung**. Ihr bekommt eine
+  Nachricht, der Fall steht unter **Mein Dienst → Braucht deine Entscheidung** („Map in Klärung“). Bis ihr entscheidet, gilt
+  kein Ergebnis: Melden bleibt möglich, Bestätigen und die 48-Stunden-Regel ruhen, das Spiel steht nicht in der Tabelle.
+  Öffentlich steht am Spiel nur „in Klärung“, nie der Vorfall selbst.
+- **Entscheiden** (Zuständigkeit „Ergebnisse“ oder „Proteste“): auf der Matchseite am Vorfall unter **Entscheidung der
+  Liga-Leitung**. Seht euch zuerst die **Nachweise** beider Seiten an (aufklappen; ihr könnt selbst welche anhängen). Dann wählt ihr:
+  *Beim Stand fortsetzen*, *Rehost beim Stand*, *Neustart (frühe Phase)*, *Map wiederholen*, *Map zugesprochen* (mit der Seite)
+  oder *Keine Maßnahme*. Die **Begründung** ist Pflicht, beide Seiten lesen sie.
+- **Serie feststellen** – der zweite Schritt, erst danach kann ein Ergebnis gültig werden:
+  - Ist nichts mehr zu spielen (etwa bei „Keine Maßnahme“ oder „Map zugesprochen“), hakt ihr gleich bei der Entscheidung
+    **Serie gleich feststellen** an.
+  - Nach „Neustart“ oder „Map wiederholen“ wird die Map erst gespielt und die Serie **neu gemeldet**. Vorher gibt es „Serie
+    feststellen“ nicht, und „Mein Dienst“ nennt das Spiel solange nicht. Sobald eine Seite neu gemeldet hat, steht am Vorfall das
+    Formular **Serie feststellen**: **Fehlt noch eine Map?** (dann setzt ihr sie an und stellt später noch einmal fest) und **Welche Maps
+    zählen nicht?** – Maps, die unter Vorbehalt gespielt wurden, obwohl die Serie mit eurer Entscheidung schon entschieden war. Sie
+    stehen in keiner Wertung, die Matchseite zeigt „zählt nicht (Entscheidung der Liga-Leitung)“.
+  - Haben beide Seiten schon dasselbe gemeldet, gilt das Ergebnis mit der Feststellung sofort. Hat nur eine Seite gemeldet, läuft
+    die Bestätigungsfrist ab der Feststellung neu. Passen die Meldungen nicht zu eurer Entscheidung, tragt ihr das Ergebnis über
+    **Ergebnis eintragen** ein (3.2).
+- **Selbst einen Vorfall aufnehmen:** **Vorfall aufnehmen** in derselben Fläche. Die Map ist dann sofort in Klärung, ohne Antwort der
+  Seiten – so setzt ihr eine Serie aus (Anlage C.2.6).
+- **Ohne Entscheidung schließen:** Gibt es über die Map nichts mehr zu entscheiden (etwa weil ein Team gar nicht mehr antritt),
+  schließt ihr den offenen Vorfall am Vorfall mit **Ohne Entscheidung schließen** und einer Begründung. Beide Seiten bekommen
+  „Vorfall geschlossen“, die Begründung steht am Vorfall. Haben beide Seiten schon dasselbe Ergebnis gemeldet, gilt es mit dem
+  Schließen – das Formular sagt das.
+- **Kampflos und „nicht erschienen“ erst nach dem Vorfall:** Solange ein Vorfall offen ist, lehnt die Seite „Kampflos“, „Nicht
+  erschienen“ und „Beide nicht erschienen“ ab und sagt, zu welcher Map der Vorfall offen ist. Entscheidet zuerst oder schließt
+  ihn. Endet ein Spiel auf anderem Weg (abgesagt, archiviert), schließt die Seite offene Vorfälle von selbst und ohne Nachricht;
+  „in Klärung“ verschwindet dann überall.
+- **Im eigenen Spiel** entscheidet eine zweite berechtigte Person (Befangenheit, 2.11); die Seite sagt das. Der Superadmin kann nur
+  als Notausnahme mit Grund.
+- **Ergebnis eintragen** geht, sobald kein Vorfall mehr offen ist (weder „wartet auf Antwort“ noch „in Klärung“) – die Seite nennt
+  sonst den Grund. Ist entschieden, aber die Serie noch nicht festgestellt, stellt euer eingetragenes Ergebnis sie fest: Am
+  Vorfall steht dann „Serie festgestellt: Die Liga-Leitung hat das Ergebnis eingetragen.“ Nehmt ihr das Ergebnis mit
+  **Rückgängig** zurück, ist auch die Serie wieder offen.
+- **Zurückziehen** kann die meldende Seite nur, solange die Antwortzeit läuft. Danach liegt der Vorfall bei euch.
+
+<img src="../assets/liga/vorfall-entscheiden-1440.png" alt="Fläche Vorfälle im Spiel für die Liga-Leitung: der Vorfall in Klärung mit Stand und Vorschlag, darunter die Entscheidung mit sechs Möglichkeiten, der Seite für die zugesprochene Map, der Begründung und dem Haken Serie gleich feststellen" width="820">
 
 ### 3.1a Turnier nach dem Ende noch „Live“
 
@@ -1247,6 +1318,12 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | „Ein Dispute ist nur bis 30 Minuten nach dem Ergebnis möglich …“ | Einspruchsfrist vorbei | Matchchat mit **@leitung**; die Turnierleitung korrigiert |
 | „Bitte kurz den Grund der Korrektur angeben (mindestens 5 Zeichen).“ (Ergebnis-Fenster) bzw. „Bitte einen Grund für die Korrektur angeben (mindestens 5 Zeichen).“ | Korrektur ohne Grund | Grund mit mindestens fünf Zeichen |
 | Season gespeichert, die Staffel zeigt noch alte Werte | Noch nicht übertragen | **Vorgaben übertragen** (Grenzen siehe 2.7) |
+| „Map 2 ist in Klärung – die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis.“ (auch beim Ergebnis eintragen, dort mit „Bitte zuerst über den Vorfall entscheiden.“) | Zu dem Spiel ist ein Vorfall offen | Auf der Matchseite unter **Vorfälle im Spiel** entscheiden und die Serie feststellen (3.1d) |
+| „Zu Map 2 ist ein Vorfall offen. Bitte zuerst über den Vorfall entscheiden oder ihn schließen – erst dann lässt sich das Spiel kampflos werten.“ | Kampflos, „Nicht erschienen“ oder „Beide nicht erschienen“ bei offenem Vorfall | Am Vorfall entscheiden oder **Ohne Entscheidung schließen** (3.1d), dann werten |
+| „Map 2 wird erst neu gespielt. Die Serie stellst du fest, sobald das Ergebnis danach neu gemeldet ist – oder du trägst es selbst ein.“ | „Serie feststellen“ nach Neustart oder Wiederholung, bevor neu gemeldet ist | Auf die neue Meldung warten oder **Ergebnis eintragen** (3.2) |
+| „Map 2 wird wiederholt – danach meldet ihr die Serie neu. Frühere Meldungen zählen nicht mehr.“ | Einigung oder Entscheidung auf Neustart bzw. Wiederholung | Die Teams spielen die Map und melden die ganze Serie neu |
+| „Map 1 ist in Klärung und die Serie pausiert – Map 2 lässt sich erst melden, wenn die Liga-Leitung entschieden hat.“ | Die Season spielt mit „Serie pausiert, bis entschieden ist“ (2.7e) | Entscheiden; danach geht die Meldung |
+| „Die Meldungen passen nicht zur Entscheidung der Liga-Leitung über den Vorfall – das Ergebnis trägt die Liga-Leitung ein.“ | Nach „Map zugesprochen“ oder nicht zählenden Maps ergibt die Meldung der Teams keine entschiedene Serie | **Ergebnis eintragen** mit den geltenden Maps (3.2) |
 
 ---
 

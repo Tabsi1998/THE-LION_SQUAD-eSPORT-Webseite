@@ -11,7 +11,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
 import { PoolMapLock } from "@/pages/admin/maps/PoolMapLock";
 import { PoolVersionCompare } from "@/pages/admin/maps/PoolVersionCompare";
-import { BEST_OF_OPTIONS, MAP_REPEAT_OPTIONS, modeOrderProblem } from "@/lib/league";
+import { BEST_OF_OPTIONS, CLARIFICATION_MODE_OPTIONS, MAP_REPEAT_OPTIONS, modeOrderProblem } from "@/lib/league";
 import { orderPoolHints } from "@/lib/seasonTabs";
 import { SeasonPoolMinimum } from "./SeasonReadinessPanel";
 import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
@@ -143,6 +143,23 @@ export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness,
           <div id="veto" className="scroll-mt-24">
             <SeasonVetoRulesPanel seasonId={seasonId} />
           </div>
+          {/* Vorfälle (D.5, #1619): was im laufenden Spiel gilt - steht darum vor „Nach dem Spiel“. */}
+          <FormSection title="Vorfälle und Pausen" id="vorfaelle" className="scroll-mt-24" testId="season-incidents"
+            hint="Verbindungsabbruch, Rehost, Pause: Eine Seite meldet mit Vorschlag, die Gegenseite antwortet. Ohne Einigung entscheidet die Liga-Leitung (Regelwerk § 9, Anlage C).">
+            <FormGrid cols={3}>
+              <TextField label="Antwortzeit der Gegenseite (Minuten)" type="number" min={1} max={120} value={form.incident_answer_minutes}
+                onChange={(value) => set("incident_answer_minutes", value)} hint="danach ist die Map in Klärung" testId="season-form-incident-answer" />
+              <TextField label="Rehosts und Pausen je Team und Map" type="number" min={0} max={5} value={form.incident_quota_per_map}
+                onChange={(value) => set("incident_quota_per_map", value)} hint="wird gezählt und angezeigt, nichts wird verweigert" testId="season-form-incident-quota" />
+              <SelectField label="Serie bei einer Map in Klärung" value={form.clarification_mode} onChange={(value) => set("clarification_mode", value)}
+                options={CLARIFICATION_MODE_OPTIONS} hint={form.clarification_mode === "pause_series" ? "Spätere Maps lassen sich erst nach der Entscheidung melden." : "Die Map zählt erst nach der Entscheidung."}
+                testId="season-form-clarification-mode" />
+              <TextField label="Standardpause nach Map" type="number" min={1} max={7} value={form.map_break_after}
+                onChange={(value) => set("map_break_after", value)} hint="steht so im Regelwerk" testId="season-form-break-after" />
+              <TextField label="Länge der Standardpause (Minuten)" type="number" min={0} max={60} value={form.map_break_minutes}
+                onChange={(value) => set("map_break_minutes", value)} hint="andere Pausen dokumentieren die Teams am Spiel" testId="season-form-break-minutes" />
+            </FormGrid>
+          </FormSection>
           <FormSection title="Nach dem Spiel" testId="season-after-match" hint="Fristen fürs Bestätigen und Nachtragen.">
             <FormGrid>
               <TextField label="Ergebnis gilt nach (Stunden)" type="number" min={1} max={336} value={form.result_confirm_hours} onChange={(value) => set("result_confirm_hours", value)}

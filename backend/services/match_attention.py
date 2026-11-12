@@ -26,6 +26,7 @@ import logging
 from datetime import datetime
 
 from models import now_utc
+from services.league_incident_rules import current_reports
 from services.league_scope import is_league_staffel
 from services.match_deadlines import no_show_action, no_show_candidates, no_show_deadline, no_show_due_text
 from services.match_disputes import category_label, open_dispute
@@ -113,7 +114,8 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
                                             "name": registration_name(regs_by_id.get(registration_id))}
                                            for registration_id in candidates]})
             continue
-        if reports_conflict(match.get("reports") or []):
+        # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht mehr.
+        if reports_conflict(current_reports(match)):
             items.append({**base, "id": f"rc-{match.get('id')}", "kind": "report_conflict", "title": "Meldungen weichen ab",
                           "detail": "Die Spieler melden verschiedene Ergebnisse.", "action": "enter", "since": None})
             continue

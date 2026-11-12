@@ -166,6 +166,8 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         "rules_pending": await rules_pending_rows(db, user),
         # Check-in abgelaufen (#1652, § 8.4): der Vorschlag „nicht erschienen“ - entschieden wird nur von Hand.
         "checkin_proposals": await checkin_proposal_rows(db, user),
+        # Vorfälle (#1619, D.5): Map in Klärung oder Serie noch festzustellen - für wer in der Liga entscheiden darf.
+        "incident_reviews": await incident_review_rows(db, user),
     }
 
 
@@ -198,6 +200,14 @@ async def checkin_proposal_rows(db, user: dict, limit: int = 50) -> list[dict]:
     from services.match_flow import proposal_rows
 
     return await proposal_rows(db, user, limit)
+
+
+async def incident_review_rows(db, user: dict, limit: int = 50) -> list[dict]:
+    from services.league_incidents import review_rows
+
+    if not user or needs_mfa(user):
+        return []
+    return await review_rows(db, user, limit)
 
 
 async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[dict]:

@@ -999,6 +999,8 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
                 # Zusatzfelder (C.3) nur, wenn gesetzt; den Nachweis sehen nur Beteiligte und Leitung - wie Aufstellungen.
                 **{key: game[key] for key in ("mode_icon_url", "status", "replay_reason", "decision", "host_registration_id") if game.get(key)},
                 **({"proof_id": game["proof_id"]} if with_lineups and game.get("proof_id") else {}),
+                # Vorfall zur Map (D.5, #1619): nur Beteiligte und Leitung - öffentlich bleibt „wiederholt“ bzw. „zugesprochen“.
+                **({"incident_id": game["incident_id"]} if with_lineups and game.get("incident_id") else {}),
                 "lineups": (
                     {
                         reg_id: [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in lineup or []]
@@ -1070,7 +1072,10 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
     from services.v2_match_flows import latest_reports
 
     match = setup.match
-    latest = latest_reports(match.get("reports"))
+    # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht - das Formular fragt neu.
+    from services.league_incident_rules import current_reports
+
+    latest = latest_reports(current_reports(match))
     own_report = latest.get(side_id) if side_id else None
     other_reports = [report for key, report in latest.items() if key != side_id]
     # Regelstand fürs Formular (C.3): Wer bestätigt, wird nach der Regel der Erstmeldung geprüft; sonst gilt die der Staffel.

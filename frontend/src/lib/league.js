@@ -19,6 +19,10 @@ export const BEST_OF_OPTIONS = [["1", "Best of 1"], ["3", "Best of 3"], ["5", "B
 export const LEGS_OPTIONS = [["1", "Nur Hinrunde"], ["2", "Hin- und Rückrunde"]];
 // Map-Wiederholung in einer Serie (#2096): Vorgabe „gleiche Map nur in anderem Modus“.
 export const MAP_REPEAT_OPTIONS = [["other_mode", "Gleiche Map nur in anderem Modus"], ["never", "Aus – jede Map nur einmal"], ["always", "Immer erlaubt"]];
+// Vorfälle im Spiel (D.5, #1619): Vorgaben wie im Server (league_presets.PRESETS) und die beiden Arten, wie eine Serie bei einer
+// Map „in Klärung“ weitergeht.
+export const INCIDENT_PRESETS = { map_break_after: 2, map_break_minutes: 5, incident_answer_minutes: 10, incident_quota_per_map: 1, clarification_mode: "continue" };
+export const CLARIFICATION_MODE_OPTIONS = [["continue", "Weiterspielen unter Vorbehalt"], ["pause_series", "Serie pausiert, bis entschieden ist"]];
 // Stand einer Liga und einer Liga N (#2106): archiviert heißt ausgeblendet, aber erhalten.
 export const ACTIVE_STATUS_OPTIONS = [["active", "Aktiv"], ["archived", "Archiviert"]];
 export const SYNC_GROUP_TEXT = {
@@ -28,6 +32,8 @@ export const SYNC_GROUP_TEXT = {
   schedule: "Terminregeln",
   checkin: "Check-in",
   veto: "Veto",
+  // Vorfälle (D.5, #1619): Standardpause, Antwortzeit, Kontingent und Serie bei einer Map in Klärung.
+  incidents: "Vorfälle und Pausen",
   result_rules: "Ergebnisregeln und Punktepflicht",
   before_start: "Termine und Kalender",
   before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
@@ -81,6 +87,12 @@ export function seasonToForm(season = {}) {
     map_repeat: season.map_repeat || "other_mode",
     result_confirm_hours: String(season.result_confirm_hours ?? 48),
     lineup_amend_hours: String(season.lineup_amend_hours ?? 48),
+    // Vorfälle (D.5, #1619): ohne Feld an der Season gilt die Vorgabe des Servers (league_presets.PRESETS).
+    map_break_after: String(season.map_break_after ?? INCIDENT_PRESETS.map_break_after),
+    map_break_minutes: String(season.map_break_minutes ?? INCIDENT_PRESETS.map_break_minutes),
+    incident_answer_minutes: String(season.incident_answer_minutes ?? INCIDENT_PRESETS.incident_answer_minutes),
+    incident_quota_per_map: String(season.incident_quota_per_map ?? INCIDENT_PRESETS.incident_quota_per_map),
+    clarification_mode: season.clarification_mode || INCIDENT_PRESETS.clarification_mode,
     // Antwortfrist (#2106, F3): leer bei Seasons von vorher - dann behält jede Staffel ihre eigene.
     match_schedule_response_hours: season.match_schedule_response_hours != null ? String(season.match_schedule_response_hours) : "",
     rules_text: season.rules_text || "",
@@ -166,6 +178,11 @@ export function seasonPayload(form, maps = form.best_of, savedOrder = undefined)
     map_repeat: form.map_repeat || "other_mode",
     result_confirm_hours: number(form.result_confirm_hours),
     lineup_amend_hours: number(form.lineup_amend_hours),
+    map_break_after: number(form.map_break_after),
+    map_break_minutes: number(form.map_break_minutes),
+    incident_answer_minutes: number(form.incident_answer_minutes),
+    incident_quota_per_map: number(form.incident_quota_per_map),
+    clarification_mode: form.clarification_mode || INCIDENT_PRESETS.clarification_mode,
     match_schedule_response_hours: number(form.match_schedule_response_hours),
     rules_text: form.rules_text.trim() || null,
     registration_deadline: form.registration_deadline || null,

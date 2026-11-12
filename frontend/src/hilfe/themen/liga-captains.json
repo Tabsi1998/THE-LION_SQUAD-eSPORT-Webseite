@@ -143,6 +143,38 @@
       ]
     },
     {
+      "id": "im-spiel",
+      "titel": "Wenn im Spiel etwas passiert",
+      "schritte": [
+        {
+          "id": "vorfall-melden",
+          "titel": "Vorfall melden",
+          "text": "Fliegt jemand raus oder braucht ihr einen Rehost? Tippe auf der Matchseite auf Vorfall melden. Wähle die Map, was passiert ist und euren Vorschlag.",
+          "hinweis": "Je Map hat jedes Team einen Rehost oder eine technische Pause. Die Seite zählt mit. Ein MOSS-Absturz zählt nicht.",
+          "bild": true
+        },
+        {
+          "id": "vorfall-antworten",
+          "titel": "Auf einen Vorfall antworten",
+          "text": "Meldet die Gegenseite einen Vorfall, bekommst du eine Nachricht. Auf der Matchseite läuft die Antwortzeit. Tippe auf Zustimmen oder Ablehnen.",
+          "hinweis": "Antwortet ihr nicht in der Zeit, entscheidet die Liga-Leitung. Wird eine Map neu gestartet oder wiederholt, meldet ihr die Serie danach neu.",
+          "bild": true
+        },
+        {
+          "id": "in-klaerung",
+          "titel": "Map in Klärung",
+          "text": "Seid ihr euch nicht einig, ist die Map in Klärung. Die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis. Hängt am Vorfall Screenshots oder einen Clip an.",
+          "hinweis": "Je nach Season spielt ihr unter Vorbehalt weiter oder die Serie pausiert. Das steht auf der Matchseite.",
+          "bild": true
+        },
+        {
+          "id": "map-pause",
+          "titel": "Pause zwischen den Maps",
+          "text": "Pausiert ihr zwischen zwei Maps anders als üblich? Haltet es fest. Tippe auf Vorfall melden und wähle Pause zwischen den Maps. Niemand muss antworten."
+        }
+      ]
+    },
+    {
       "id": "nach-dem-spiel",
       "titel": "Nach dem Spiel",
       "schritte": [

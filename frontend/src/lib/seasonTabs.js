@@ -25,6 +25,8 @@ export const SEASON_SECTIONS = {
   ergebnisregeln: "spielbetrieb",
   serie: "spielbetrieb",
   veto: "spielbetrieb",
+  // Vorfälle (D.5, #1619): Standardpause, Antwortzeit, Kontingent, Serie bei einer Map in Klärung.
+  vorfaelle: "spielbetrieb",
   kalender: "termine",
   terminregeln: "termine",
   checkin: "termine",
@@ -81,7 +83,8 @@ export function tabLabelOf(anchor) {
 // gespeichert war, und reisen mit ihrem Reiter.
 export const TAB_FIELDS = {
   ueberblick: ["name", "visibility", "status", "promote_on_home", "emblem_url", "banner_url", "banner_focus", "prizes"],
-  spielbetrieb: ["best_of", "team_size", "game_mode_order", "map_repeat", "result_confirm_hours", "lineup_amend_hours"],
+  spielbetrieb: ["best_of", "team_size", "game_mode_order", "map_repeat", "result_confirm_hours", "lineup_amend_hours",
+    "map_break_after", "map_break_minutes", "incident_answer_minutes", "incident_quota_per_map", "clarification_mode"],
   termine: ["start_day", "weeks_total", "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs", "blocked_periods",
     "match_schedule_response_hours"],
   anmeldung: ["application_opens", "application_closes", "application_slots", "application_waitlist", "application_waitlist_limit",
@@ -97,7 +100,8 @@ export const TAB_FIELDS = {
 // Welche Felder der Anfrage (seasonPayload) ein Reiter schickt.
 export const TAB_PAYLOAD_KEYS = {
   ueberblick: ["name", "visibility", "status", "promote_on_home", "emblem_url", "banner_url", "banner_focus", "prizes"],
-  spielbetrieb: ["best_of", "team_size", "game_mode_order", "map_repeat", "result_confirm_hours", "lineup_amend_hours"],
+  spielbetrieb: ["best_of", "team_size", "game_mode_order", "map_repeat", "result_confirm_hours", "lineup_amend_hours",
+    "map_break_after", "map_break_minutes", "incident_answer_minutes", "incident_quota_per_map", "clarification_mode"],
   termine: ["start_date", "weeks_total", "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs", "blocked_periods",
     "match_schedule_response_hours"],
   anmeldung: ["application_opens_at", "application_closes_at", "application_slots", "application_waitlist", "application_waitlist_limit",

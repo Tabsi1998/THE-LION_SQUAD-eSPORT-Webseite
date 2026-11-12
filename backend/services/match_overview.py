@@ -110,7 +110,10 @@ def _report_task(match: dict, policy: dict, acting_ids: set[str], now: datetime)
     mine = [rid for rid in match_registration_ids(match) if rid in acting_ids]
     if not mine or len(match_registration_ids(match)) < 2:
         return None
-    state = report_state(match.get("reports") or [], mine[0])["status"]
+    # Vorfälle (D.5, #1619): Meldungen von vor einem Neustart oder einer Wiederholung zählen nicht - es gibt nichts zu bestätigen.
+    from services.league_incident_rules import current_reports
+
+    state = report_state(current_reports(match), mine[0])["status"]
     if state == "confirm":
         return "confirm"
     if state != "open":
