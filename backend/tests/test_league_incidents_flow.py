@@ -3,6 +3,7 @@
 Mit echten Routen in einer Liga-Staffel (Löwen gegen Falken, Best of 3): melden, zustimmen, ablehnen, Fristablauf, Entscheidung
 der Leitung mit „Serie feststellen“, beide Modi der Serie, Rechte je Rolle. Jede Regel mit Gegenprobe.
 """
+import asyncio
 import pathlib
 import sys
 from datetime import timedelta
@@ -16,7 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from league_match_world import ids, two_nil, world  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import league_incidents, match_deadlines  # noqa: E402
+from services import league_games, league_incidents, match_deadlines  # noqa: E402
 from services.match_deadline_sweep import sweep as deadline_sweep  # noqa: E402
 
 
@@ -149,6 +150,29 @@ async def test_without_an_incident_nothing_changes(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_match_from_before_incidents_reads_as_before_and_the_job_leaves_it_alone(flow):
+    """Ein Spiel ohne das Feld ``incidents`` (alles vor D.5): nichts hält das Ergebnis auf, die Seite zeigt offene Maps, der Job
+    schreibt nichts hinein."""
+    w = await world(flow)
+    match = await stored(flow, w)
+    assert "incidents" not in match and "incident_due_at" not in match
+    assert league_incidents.result_block(match) is None
+
+    flow.act_as(None)
+    public = (await page(flow, w))["league"]
+    assert public["map_state"] == [{"position": position, "state": "open"} for position in (1, 2, 3)]
+    assert public["incidents"] == [] and public["incident_info"] is None
+
+    flow.act_as(w["users"]["Kapitaen"])
+    own = (await page(flow, w))["league"]
+    assert own["incidents"] == [] and own["incident_info"]["can_report"] is True and own["incident_info"]["hold"] is None
+
+    assert await league_incidents.sweep(flow.db, now=now_utc() + timedelta(days=1)) == {"expired": 0, "closed": 0}
+    after = await stored(flow, w)
+    assert "incidents" not in after and "incident_due_at" not in after and after.get("updated_at") == match.get("updated_at")
+
+
+@pytest.mark.asyncio
 async def test_a_rejected_incident_holds_the_result_until_the_series_is_settled(flow):
     w = await world(flow)
     incident_id = await reported(flow, w)
@@ -263,6 +287,65 @@ async def test_withdrawing_after_the_answer_time_is_refused(flow):
     assert (await page(flow, other))["league"]["incidents"][0]["can_withdraw"] is True
     in_time = await flow.post(url(other, f"/{second}/withdraw"))
     assert in_time.status_code == 200 and in_time.json()["state"] == "withdrawn"
+
+
+@pytest.mark.asyncio
+async def test_two_answers_at_once_count_exactly_once(flow):
+    """Zustimmen und Ablehnen zur selben Zeit: Genau eine Antwort gilt, die andere hört einen Satz - nie beides."""
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    stale = await stored(flow, w)
+    flow.act_as(w["users"]["Falke1"])
+    both = await asyncio.gather(flow.post(url(w, f"/{incident_id}/answer"), json={"accept": True}),
+                                flow.post(url(w, f"/{incident_id}/answer"), json={"accept": False}))
+    assert sorted(response.status_code for response in both) == [200, 409], [response.text for response in both]
+    winner = next(response for response in both if response.status_code == 200).json()["state"]
+    loser = next(response for response in both if response.status_code == 409).json()["detail"]
+    assert winner in ("agreed", "in_review") and "schon beantwortet" in loser
+    entry = (await stored(flow, w))["incidents"][0]
+    assert entry["state"] == winner and entry["answer"]["user_id"] == w["users"]["Falke1"]["id"]
+    assert (entry["closed_at"] is not None) is (winner == "agreed")
+    assert await flow.db.audit_logs.count_documents({"action": "match.incident.answer", "data.incident_id": incident_id}) == 1
+    review = await flow.db.notifications.count_documents({"meta.dedupe_key": f"incident:{incident_id}:review"})
+    assert (review > 0) is (winner == "in_review"), "die Leitung hört nur von einer Ablehnung, die auch gilt"
+
+    # Wer mit einem alten Stand schreibt (zwei Prozesse, der zweite las vor der ersten Antwort), gewinnt nicht still.
+    tournament = await flow.db.tournaments.find_one({"id": stale["tournament_id"]}, {"_id": 0})
+    setup = await league_games.setup(flow.db, stale, tournament)
+    with pytest.raises(league_incidents.IncidentProblem) as refused:
+        await league_incidents.answer(flow.db, stale, setup, incident_id, user=w["users"]["Falke1"],
+                                      registration_id=w["reg_h"]["id"], accept=winner != "agreed")
+    assert refused.value.status_code == 409 and refused.value.detail == league_incidents.CHANGED_DETAIL
+    assert (await stored(flow, w))["incidents"][0] == entry
+    assert await flow.db.notifications.count_documents({"meta.dedupe_key": f"incident:{incident_id}:review"}) == review
+
+
+@pytest.mark.asyncio
+async def test_two_reports_for_the_same_map_at_once_store_one_incident(flow):
+    w = await world(flow)
+    flow.act_as(w["users"]["Kapitaen"])
+    both = await asyncio.gather(flow.post(url(w), json=incident(w)), flow.post(url(w), json=incident(w)))
+    assert sorted(response.status_code for response in both) == [200, 409], [response.text for response in both]
+    assert "läuft schon ein Vorfall" in next(response for response in both if response.status_code == 409).json()["detail"]
+    match = await stored(flow, w)
+    assert len(match["incidents"]) == 1 and match["incidents"][0]["state"] == "proposed"
+    told = await flow.db.notifications.find({"meta.dedupe_key": f"incident:{match['incidents'][0]['id']}:reported"}, {"_id": 0}).to_list(50)
+    assert told and len({row["user_id"] for row in told}) == len(told), "jede Person der Gegenseite einmal"
+
+
+@pytest.mark.asyncio
+async def test_two_runs_of_the_job_at_once_expire_an_incident_once(flow):
+    w = await world(flow)
+    incident_id = await reported(flow, w)
+    later = now_utc() + timedelta(minutes=11)
+    runs = await asyncio.gather(league_incidents.sweep(flow.db, now=later), league_incidents.sweep(flow.db, now=later))
+    assert sum(run["expired"] for run in runs) == 1, runs
+    entry = (await stored(flow, w))["incidents"][0]
+    assert entry["state"] == "in_review" and entry["review_cause"] == "expired"
+    told = await flow.db.notifications.find({"meta.dedupe_key": f"incident:{incident_id}:review"}, {"_id": 0}).to_list(50)
+    receivers = [row["user_id"] for row in told]
+    assert w["staff"]["id"] in receivers and len(receivers) == len(set(receivers)), "jede Person genau eine Nachricht"
+    assert await flow.db.audit_logs.count_documents({"action": "match.incident.expire", "data.incident_id": incident_id}) == 1
 
 
 @pytest.mark.asyncio
