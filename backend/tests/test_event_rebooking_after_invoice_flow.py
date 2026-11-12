@@ -359,6 +359,29 @@ async def test_rueckkehr_kurz_vor_dem_anlegen_der_gutschrift_wird_ein_prueffall(
     assert (await registration(flow, booked))["status"] == "registered"
 
 
+@pytest.mark.asyncio
+async def test_altauftrag_ohne_verlaufsliste_behaelt_den_ersten_storno(flow, fake):
+    """Ein Auftrag von vor dieser Änderung kennt nur ``booking_cancelled_at``. Die erste Rückkehr übernimmt diesen Storno in den
+    Verlauf, sonst überschriebe ihn der nächste Storno, und er ginge verloren."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    order = await settle(flow, fake, order, "validated")
+    await cancel_self(flow, event, paula)
+    await flow.db.billing_orders.update_one({"id": order["id"]}, {"$unset": {"booking_events": ""}})
+    legacy = await order_of(flow, booked)
+    first_cancel = legacy["booking_cancelled_at"]
+    for _ in range(2):
+        await book(flow, paula, event, companions=0)
+        await cancel_self(flow, event, paula)
+    await book(flow, paula, event, companions=0)
+
+    stored = await order_of(flow, booked)
+    assert [entry["state"] for entry in stored["booking_events"]] == ["cancelled", "restored"] * 3
+    assert stored["booking_events"][0]["at"] == first_cancel
+    flow.act_as(kassier)
+    texts = [item["text"] for item in (await flow.get(f"/api/admin/finance/orders/{order['id']}")).json()["timeline"]]
+    assert texts.count("Buchung storniert: Anmeldung storniert") == 3 and texts.count(f"Buchung wieder aufgenommen: {SELF_REASON}") == 3
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)

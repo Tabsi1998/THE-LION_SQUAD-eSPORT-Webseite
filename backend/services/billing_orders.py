@@ -218,6 +218,13 @@ async def rebook_after_invoice(db, order: dict, *, reason: str, new_total_cents:
     Gutschrift, ein Aufgeben oder einen gelöschten Entwurf gelesen), gibt es ``False`` - der Aufrufer friert dann einen neuen
     Preis mit eigenem Auftrag ein. Ist die Buchung schon zurück, ist das kein Fehler (``True``)."""
     now = now_utc().isoformat()
+    # Altaufträge kennen nur den letzten Storno (``booking_cancelled_at``): Er kommt zuerst in den Verlauf, sonst überschriebe ihn
+    # der nächste Storno.
+    legacy = await db.billing_orders.find_one({"id": order["id"], "booking_events": {"$exists": False}, "booking_cancelled_at": {"$exists": True}},
+                                              {"_id": 0, "booking_cancelled_at": 1, "cancel_reason": 1})
+    if legacy:
+        await db.billing_orders.update_one({"id": order["id"], "booking_events": {"$exists": False}}, {"$set": {"booking_events": [
+            {"state": "cancelled", "at": legacy["booking_cancelled_at"], "reason": legacy.get("cancel_reason") or ""}]}})
     # Der Verlauf behält den Storno (``booking_cancelled_at``, ``booking_events``) und bekommt die Rückkehr dazu.
     restored = await db.billing_orders.update_one({"id": order["id"], "status": "invoiced", "booking_state": "cancelled", **INVOICE_STILL_VALID}, {
         "$set": {"updated_at": now}, "$unset": {"booking_state": "", "paid_cents_at_cancel": ""},
