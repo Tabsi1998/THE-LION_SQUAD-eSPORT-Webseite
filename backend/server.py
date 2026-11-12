@@ -711,6 +711,15 @@ async def api_change_notifications(request, call_next):
 
 # Betriebssicht (#233): unbehandelte Ausnahmen und 5xx-Antworten werden zu
 # Fehlergruppen, Anfragen über der Schwelle zu Einträgen unter "Tempo". Die
+# Liga-Verfahren (#1619, E.2, Nr. 133/137): Jede JSON-Antwort der API läuft durch den Wächter - Spiele darin tragen ihre Verfahren
+# nur für die nicht befangene Leitung ungekürzt. Gilt für jede Route, auch für künftige (services/procedure_response_guard.py).
+@app.middleware("http")
+async def procedure_guard(request, call_next):
+    from services.procedure_response_guard import guard_response
+
+    return await guard_response(request, call_next)
+
+
 # Aufzeichnung darf nie die Antwort verhindern - die Ausnahme wird nach dem
 # Festhalten unverändert weitergereicht.
 @app.middleware("http")

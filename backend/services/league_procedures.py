@@ -701,16 +701,19 @@ async def for_viewer(db, match: dict, user: dict | None) -> dict:
     return strip_rows(match, await viewer_for(db, match, user))
 
 
-def _carries_procedures(node, depth: int = 0) -> bool:
-    if depth > 6:
-        return False
-    if isinstance(node, dict):
-        entries = node.get("disputes")
-        if isinstance(entries, list) and any(is_procedure(row) for row in entries):
-            return True
-        return any(_carries_procedures(value, depth + 1) for value in node.values() if isinstance(value, (dict, list)))
-    if isinstance(node, list):
-        return any(_carries_procedures(value, depth + 1) for value in node)
+def _carries_procedures(node) -> bool:
+    """Steckt irgendwo in der Antwort ein Spiel mit Verfahren? In jeder Tiefe - ohne Rekursion, damit auch tief verschachtelte
+    Antworten sicher durchsucht werden."""
+    todo = [node]
+    while todo:
+        current = todo.pop()
+        if isinstance(current, dict):
+            entries = current.get("disputes")
+            if isinstance(entries, list) and any(is_procedure(row) for row in entries):
+                return True
+            todo.extend(value for value in current.values() if isinstance(value, (dict, list)))
+        elif isinstance(current, list):
+            todo.extend(value for value in current if isinstance(value, (dict, list)))
     return False
 
 
@@ -725,16 +728,24 @@ async def guard(db, payload, user: dict | None):
     leads: dict[str, bool] = {}
 
     async def lead_of(match: dict) -> bool:
-        key = str(match.get("id") or "")
+        # Welches Spiel ist das? Die eigene Kennung, sonst ``match_id``. Lässt es sich nicht bestimmen (Knoten ohne Kennung und
+        # ohne Turnier und Seiten), gilt: im Zweifel kürzen.
+        key = str(match.get("id") or match.get("match_id") or "")
         if key not in leads:
             full = match if match.get("tournament_id") and match.get("slots") else (
                 await db.matches_v2.find_one({"id": key}, {"_id": 0}) if key else None)
-            leads[key] = bool(full) and (await viewer_for(db, full, user)).lead
+            verdict = bool(full) and (await viewer_for(db, full, user)).lead
+            if not key:
+                return verdict
+            leads[key] = verdict
         return leads[key]
 
     async def walk(node, depth: int = 0):
-        if depth > 6 or not isinstance(node, (dict, list)):
+        if not isinstance(node, (dict, list)):
             return node
+        if depth > 200:
+            # So tief verschachtelt ist keine Antwort der API - sicherheitshalber ohne Verfahren statt ungeprüft.
+            return None if _carries_procedures(node) else node
         if isinstance(node, list):
             return [await walk(value, depth + 1) for value in node]
         out = {key: (value if key == "disputes" else await walk(value, depth + 1)) for key, value in node.items()}
