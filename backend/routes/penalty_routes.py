@@ -7,12 +7,18 @@ log so players can see exactly why and when they were penalized.
 Endpoints:
   GET /api/penalties/me              — own penalties (auth)
   GET /api/admin/penalties           — all penalties (admin), with filters
+  POST /api/penalties/sanctions/{id}/appeal — Einspruch gegen eine Strafe der Liga (E.3), nur Betroffene
+
+Strafen der Liga (E.3, ``competition_sanctions``, docs/LIGA.md „E.3 Strafen“) stehen als ``kind: "league_sanction"`` in beiden
+Listen - die eigene und die des Co-Teams, für das die Person verantwortlich ist. Die Moderation der Community bleibt getrennt.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 
 from database import get_db
 from auth import get_current_user, require_admin
+from services import league_sanctions
 from services.competition_penalties import load_forfeit_penalties
 from services.match_audience import team_penalty_registrations
 
@@ -62,6 +68,40 @@ async def _forfeit_rows(db, forfeits: list[dict], team_names: dict[str, str]) ->
             "tournament_id": item.get("tournament_id"),
             "match_source": item.get("source"),
             "admin_url": f"/admin/tournaments/{item.get('tournament_id')}" if item.get("tournament_id") else "",
+            **({"team_penalty": True, "team_name": team_name} if team_name else {}),
+        })
+    return rows
+
+
+async def _sanction_rows(db, docs: list[dict]) -> list[dict]:
+    """Strafen der Liga (E.3) als Zeilen der Liste: Art, Verstoß, Begründung, Zeitraum, Frist und Stand des Einspruchs."""
+    if not docs:
+        return []
+    names = await league_sanctions.names_for(db, docs)
+    season_ids = sorted({doc["season_id"] for doc in docs if doc.get("season_id")})
+    seasons = {row["id"]: row for row in await db.league_seasons.find(
+        {"id": {"$in": season_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "league_id": 1}).to_list(len(season_ids) + 1)}
+    league_ids = sorted({doc["league_id"] for doc in docs if doc.get("league_id")})
+    leagues = {row["id"]: row for row in await db.leagues.find(
+        {"id": {"$in": league_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(len(league_ids) + 1)}
+    rows = []
+    for doc in docs:
+        view = await league_sanctions.view(db, doc, names)
+        season, league = seasons.get(doc.get("season_id")) or {}, leagues.get(doc.get("league_id")) or {}
+        team_name = view["squad_name"] if doc.get("target_type") == league_sanctions.SQUAD else None
+        rows.append({
+            "kind": "league_sanction",
+            "label": view["kind_label"],
+            "reason": doc.get("reason") or "(keine Begründung)",
+            "context_title": " · ".join(part for part in (league.get("name"), season.get("name")) if part) or "Liga",
+            "context_url": f"/leagues/{league['slug']}/{season['slug']}" if league.get("slug") and season.get("slug") else "",
+            "context_subtitle": " · ".join(part for part in (doc.get("rule_ref"), team_name) if part),
+            "issued_by": doc.get("created_by"),
+            "issued_at": doc.get("created_at"),
+            "ref_id": doc["id"],
+            "league_id": doc.get("league_id"),
+            "admin_url": f"/admin/leagues/seasons/{doc.get('season_id')}#strafen",
+            "sanction": view,
             **({"team_penalty": True, "team_name": team_name} if team_name else {}),
         })
     return rows
@@ -161,6 +201,9 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             "admin_url": "/admin/achievements?tab=negative",
         })
 
+    # --- Strafen der Liga (E.3): die eigenen und die der Co-Teams, für die die Person verantwortlich ist ---
+    out.extend(await _sanction_rows(db, await league_sanctions.for_user(db, user_id)))
+
     await _attach_issuer_names(db, out)
     out.sort(key=lambda x: x.get("issued_at") or "", reverse=True)
     return out
@@ -175,7 +218,40 @@ async def my_penalties(me: dict = Depends(get_current_user)):
         item.pop("admin_url", None)
         item.pop("results_locked", None)
         item.pop("tournament_id", None)
+        item.pop("league_id", None)
+        if item.get("kind") == "league_sanction":
+            # Strafen der Liga (E.3): Betroffene lesen, dass die Liga-Leitung entschieden hat - nicht, welche Person.
+            item.pop("issued_by", None)
+            item["issued_by_name"] = "Liga-Leitung"
     return {"count": len(items), "items": items}
+
+
+class SanctionAppealBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(max_length=league_sanctions.APPEAL_MAX + 50)
+
+
+@router.post("/sanctions/{sanction_id}/appeal")
+async def appeal_sanction(sanction_id: str, body: SanctionAppealBody, me: dict = Depends(get_current_user)):
+    """Einspruch gegen eine Strafe der Liga (E.3, Nr. 41): einmal je Strafe, innerhalb der Frist, nur Betroffene - die Person
+    selbst, beim Co-Team Captain, Vertreter und Hauptteam-Leitung. Für alle anderen gibt es die Strafe nicht (404)."""
+    db = get_db()
+    doc = await db.competition_sanctions.find_one({"id": sanction_id}, {"_id": 0})
+    if not doc or me["id"] not in await league_sanctions.affected_user_ids(db, doc):
+        raise HTTPException(status_code=404, detail=league_sanctions.NOT_FOUND)
+    try:
+        doc = await league_sanctions.submit_appeal(db, doc, me, body.text)
+    except league_sanctions.SanctionProblem as problem:
+        raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    await league_sanctions.notify(db, doc, "appeal", actor_id=me["id"])
+    return (await _sanction_rows(db, [doc]))[0]["sanction"]
+
+
+async def _nothing():
+    """Leerer Lauf: wer keine Liga mit „Strafen“ leitet, liest die Sammlung gar nicht."""
+    for item in ():
+        yield item
 
 
 async def _without_foreign_staffeln(db, items: list[dict], me: dict) -> list[dict]:
@@ -185,18 +261,28 @@ async def _without_foreign_staffeln(db, items: list[dict], me: dict) -> list[dic
 
     ids = sorted({item.get("tournament_id") for item in items if item.get("tournament_id")})
     staffeln = await db.tournaments.find({"id": {"$in": ids}, **ONLY_LEAGUE}, {"_id": 0, "id": 1, "league_context": 1}).to_list(None) if ids else []
-    if not staffeln:
-        return items
     access = await staffel_access(db, me)
     foreign = {row["id"] for row in staffeln if not access.covers(row)}
-    return [item for item in items if item.get("tournament_id") not in foreign]
+    # Strafen der Liga (E.3) tragen ihre Liga selbst - auch ohne Staffel (Sperre einer Person). Sie liest nur, wer dort die
+    # Zuständigkeit „Strafen“ hat: Ergebnisse oder Proteste allein reichen nicht.
+    allowed = await _sanction_leagues(db, me)
+    return [item for item in items if item.get("tournament_id") not in foreign
+            and (not item.get("league_id") or item["league_id"] in allowed)]
+
+
+async def _sanction_leagues(db, me: dict) -> set[str]:
+    """Die Ligen, deren Strafen diese Person im Eingang liest: dort mit der Zuständigkeit „Strafen“ (oder dem Bereich Ligen)."""
+    from services.league_permissions import capabilities_of
+
+    league_ids = [value for value in await db.competition_sanctions.distinct("league_id") if value]
+    return {league_id for league_id in league_ids if "sanctions" in await capabilities_of(db, me, league_id)}
 
 
 @admin_router.get("")
 async def all_penalties(
     me: dict = Depends(require_admin()),
     user_id: Optional[str] = Query(None),
-    kind: Optional[str] = Query(None, description="lap_invalid|lap_penalty|match_forfeit|incident"),
+    kind: Optional[str] = Query(None, description="lap_invalid|lap_penalty|match_forfeit|incident|league_sanction"),
     limit: int = Query(200, le=1000),
 ):
     """Admin penalty inbox across all users."""
@@ -234,6 +320,14 @@ async def all_penalties(
             async for a in db.user_achievements.find({"group_code": {"$in": sorted(groups)}, "context.manual": True}, {"_id": 0, "user_id": 1}):
                 if a.get("user_id"):
                     user_ids.add(a["user_id"])
+        # Strafen der Liga (E.3): Personen hier, Co-Teams unten einmal je Strafe.
+        squad_sanctions = []
+        allowed = sorted(await _sanction_leagues(db, me))
+        async for doc in db.competition_sanctions.find({"league_id": {"$in": allowed}}, {"_id": 0}) if allowed else _nothing():
+            if doc.get("target_type") == league_sanctions.SQUAD:
+                squad_sanctions.append(doc)
+            elif doc.get("user_id"):
+                user_ids.add(doc["user_id"])
 
         items = []
         for uid in user_ids:
@@ -253,6 +347,7 @@ async def all_penalties(
             it["user_display_name"] = u.get("display_name") or u.get("username")
             it["user_avatar_url"] = u.get("avatar_url")
         team_rows = await _forfeit_rows(db, [item for item in forfeits if item.get("registration_id") in team_names], team_names)
+        team_rows.extend(await _sanction_rows(db, squad_sanctions))
         await _attach_issuer_names(db, team_rows)
         items.extend({**row, "user_id": None, "user_username": None, "user_display_name": None} for row in team_rows)
 

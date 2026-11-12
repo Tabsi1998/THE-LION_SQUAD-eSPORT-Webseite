@@ -744,7 +744,7 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 | **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b), ins Veto eingreifen (3.1c) |
 | **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
 | **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
-| **Strafen** | Vorgesehen, kommt später |
+| **Strafen** | Strafen verhängen, vorläufige Sperren bestätigen, widerrufen und über Einsprüche gegen Strafen entscheiden ([3.4a](#34a-strafen-regelwerk--13-anlage-c)) |
 | **Regeln veröffentlichen** | Regelwerk der Liga und der Season (2.11) |
 
 - Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
@@ -762,8 +762,8 @@ oder der Matchplan fragt dann nach dem Grund, er steht im Protokoll (`league.con
 **Ergebnis mit „Rückgängig“:** Verliert jemand in den 10 Sekunden die Zuständigkeit oder wird befangen, geht das Ergebnis nicht hinaus. Die Person bekommt eine
 Nachricht, der Vorgang steht im Protokoll.
 
-**Bekannte Grenze – Strafen-Eingang:** Admin → eSports → Strafen hängt bis #2208 am Bereich Turnierleitung. Kampflos-Wertungen einer Staffel siehst du dort nur mit
-beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie. Am Spiel selbst bleibt die Wertung sichtbar.
+**Bekannte Grenze – Strafen-Eingang:** Admin → eSports → Strafen hängt bis #2208 am Bereich Turnierleitung. Kampflos-Wertungen einer Staffel und Strafen der Liga siehst du dort nur mit
+beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie. Am Spiel selbst bleibt die Wertung sichtbar, Strafen der Liga stehen immer im Reiter **Strafen** der Season.
 
 ---
 
@@ -1157,6 +1157,65 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 - **Wiederholte und zugesprochene Maps**: Über die Schnittstelle kann eine Map als **wiederholt** (mit Grund) markiert
   oder von der Leitung **zugesprochen** werden (ohne Punkte, ohne Regel). Die Matchseite zeigt beides an der Map; nach
   dem Serienende steht dort, welche Maps nicht gespielt wurden.
+
+### 3.4a Strafen (Regelwerk § 13, Anlage C)
+
+Wettbewerbsstrafen stehen im Reiter **Strafen** der Season (Admin → Liga → Season). Dafür braucht es die Zuständigkeit
+**Strafen** ([2.11](#211-bereich-ligen-und-zuständige)). Nichts davon passiert von selbst: Jede Strafe wählt und
+begründet ihr von Hand. Verwarnungen der Community-Moderation (Chat, Verhalten) sind etwas anderes und stehen nicht hier.
+
+<img src="../assets/liga/strafen-reiter-1440.png" alt="Reiter Strafen der Season am PC: oben die Zahl der laufenden Strafen und der Knopf Strafe verhängen, darunter eine Spielsperre mit Stand Gilt, Regelverstoß, Begründung, Zeitraum 1 Liga-Spiel und dem Knopf Widerrufen sowie ein Punktabzug mit laufender Einspruchsfrist" width="760">
+
+**Strafe verhängen** führt euch in dieser Reihenfolge:
+
+1. **Aus dem Strafkatalog** wählen (Anlage C) – das füllt Art und Regelverstoß vor. Oder **Frei eintragen**.
+2. **Art der Strafe**, dann **Staffel**, **Co-Team** und bei einer Strafe gegen eine Person die **Person**.
+3. **Spiel**, wenn die Strafe eines betrifft (Pflicht bei Map- und Spielverlust). Dann könnt ihr **Nachweise aus dem
+   Spiel** ankreuzen – Bilder, Video-Links und MOSS-Dateien, die ihr am Spiel sehen dürft. Angehängte Nachweise bleiben
+   aufbewahrt, solange die Strafe läuft oder ein Einspruch offen ist.
+4. **Regelverstoß** (Paragraf oder Katalogeintrag) und **Begründung** – beides Pflicht. Die Betroffenen lesen beides.
+5. Je nach Art die **Höhe** oder die **Dauer**. Der Knopf geht erst, wenn nichts mehr fehlt; daneben steht, was fehlt.
+
+<img src="../assets/liga/strafe-verhaengen-390.png" alt="Formular Strafe verhängen am Handy: Katalog, Art Punktabzug, Staffel, Co-Team, Spiel, Regelverstoß, Begründung, Punktabzug 2 und der Knopf Strafe verhängen" width="300">
+
+| Art | Für wen | Was sie bewirkt |
+| --- | --- | --- |
+| **Verwarnung, Gelbe Karte, Rote Karte** | Person oder Co-Team | Steht bei den Betroffenen, sonst nichts. Die Rote Karte braucht die sportliche Maßnahme als eigene Strafe |
+| **Punktabzug** | Co-Team | Die Tabelle zieht die Punkte sofort ab – Website, App, TV und Druck zeigen „−2 Punkte Abzug“, nie den Grund |
+| **Mapverlust, Spielverlust** | Co-Team, mit Spiel | Steht bei den Betroffenen. Das Ergebnis ändert ihr danach selbst über **Ergebnis korrigieren** am Spiel (3.4) |
+| **Spielsperre** | Person | Nicht spielberechtigt: kein Check-in, keine Aufstellung. Dauer: **Anzahl Liga-Spiele** (mindestens eines) oder **bis zu einem Zeitpunkt**, höchstens bis zum Ende der Season |
+| **Teamsperre** | Co-Team | Alle Spieler des Co-Teams sind gesperrt, das Co-Team kann sich nicht anmelden. Mit Ende, auch über die Season hinaus |
+| **Disqualifikation** | Co-Team | Das Co-Team scheidet aus: alle Spiele zählen nach der Regel der Season für die Gegner, offene werden kampflos gewertet, das Team steht am Tabellenende (3.5) |
+| **Ligaausschluss** | Person oder Co-Team | Gesperrt in jeder Season dieser Liga, ohne Ende |
+| **Externe Sperre** | Person | Sperre des Herstellers oder einer Plattform wegen Cheating, Manipulation oder Betrug: für ihre Dauer nicht spielberechtigt. Reine Chat-Sperren tragt ihr nicht ein |
+
+- **Vorläufig** (nur Spielsperre und Teamsperre, etwa bei Cheating-Verdacht): Die Sperre wirkt sofort und braucht noch
+  keine Dauer. Nach der Prüfung **Sperre bestätigen** (mit Dauer) oder **Widerrufen**.
+- **Sperre nach Spielen:** Gezählt werden die nächsten entschiedenen Liga-Spiele des Co-Teams. In diesen Spielen bleibt
+  die Person auch beim Nachtragen der Teilnehmerliste gesperrt. Spätestens mit dem Ende der Season ist die Sperre vorbei,
+  auch wenn Spiele fehlen (Team ausgeschieden, Person gewechselt) – die Liste zeigt dann „mit dem Ende der Season beendet“.
+- **Wer es erfährt:** die Person bzw. Captain, Vertreter und Leitung des Hauptteams – mit Regelverstoß und Begründung unter
+  **Meine Strafen**. Dort steht „durch die Liga-Leitung“, nicht euer Name. Bei einer Sperre erfahren Captain und Vertreter zusätzlich nur „… ist gesperrt“, damit sie aufstellen
+  können. Mitspieler und Gegner sehen beim Aufstellen „Sperre der Liga“ ohne Grund. Öffentlich steht nur, was in der
+  Tabelle steht: Punktabzug und Disqualifikation.
+- **Widerrufen** geht nur mit Grund (mindestens fünf Zeichen) und nimmt jede Wirkung zurück: Die Person ist wieder
+  spielberechtigt, die Tabelle rechnet neu, ein disqualifiziertes Co-Team ist wieder dabei und seine dadurch kampflos
+  gewerteten oder abgesagten Spiele stehen wieder da wie davor (ein offenes behält den Termin, der Check-in beginnt neu;
+  ein laufendes läuft weiter, gespielte Maps bleiben). Ein dabei geschlossener Startgeld-Auftrag bleibt geschlossen – das
+  klärt ihr mit dem Kassier. Ein noch offener Einspruch ist mit dem Widerruf erledigt. Die Strafe bleibt mit dem Grund in der Liste.
+- **Einspruch:** Betroffene können innerhalb der Einspruchsfrist (Reiter **Proteste**, Vorgabe 48 Stunden ab der
+  endgültigen Entscheidung) einmal Einspruch einlegen. Die Strafe gilt bis zur Entscheidung weiter. Der Reiter zeigt
+  „Einspruch wartet“. Es entscheidet eine **andere Person** mit der Zuständigkeit Strafen als die, die verhängt oder
+  bestätigt hat – auch der Superadmin nicht über die eigene Strafe: **Strafe bleibt** oder **Strafe aufheben**, mit
+  Begründung, endgültig.
+- **Eigenes Team:** Wer zur betroffenen Seite gehört (Kader, Captain, Vertreter, Hauptteam-Leitung), verhängt, bestätigt und
+  widerruft dort nichts; an der Strafe steht „Über dein eigenes Team entscheidet eine andere Person“. Nennt die Strafe
+  ein Spiel, gilt das auch für alle, die an dem Spiel beteiligt sind. Der Superadmin bekommt in beiden Fällen das Feld
+  **Grund für die Notausnahme**.
+- **Gesperrte Staffel:** Punktabzug und Disqualifikation ändern die Staffel. Ist sie gesperrt, erst entsperren. „Strafe
+  bleibt“ bei einem Einspruch geht auch in einer gesperrten Staffel.
+- **Eingang:** Unter **Admin → eSports → Strafen** stehen die Strafen der Ligen, in denen ihr die Zuständigkeit **Strafen** habt, neben Strafzeiten und kampflosen
+  Wertungen; **Öffnen** führt in den Reiter.
 
 ### 3.5 Tabelle und Ligaseite
 

@@ -15,6 +15,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, MessageCircleQuestion, ShieldAlert, ArrowRight } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { showLapTime } from "@/lib/laptime";
+import { LeagueSanctionCard } from "./LeagueSanctionCard";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
@@ -37,6 +38,7 @@ export default function MyPenaltiesPage() {
         <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Meine Strafen</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Hier siehst du jede Strafe, ungültige Runde oder kampflose Niederlage – inklusive der vollständigen Begründung. Hältst du etwas für falsch? Stell über „Rückfrage“ an der Strafe eine Frage, wir schauen es uns an.
+          Gegen eine Strafe der Liga-Leitung kannst du innerhalb der Frist einmal Einspruch einlegen, direkt an der Strafe.
         </p>
 
         {/* Verwarnungen mit Stufen (#416): der eigene Stand bei der Moderation samt Einspruch. */}
@@ -57,7 +59,10 @@ export default function MyPenaltiesPage() {
           >
             {(data) => (
               <div className="space-y-3">
-                {data.items.map((p) => <PenaltyCard key={p.ref_id} p={p} />)}
+                {/* Strafen der Liga (E.3): eigene Karte mit Zeitraum, Frist und Einspruch. */}
+                {data.items.map((p) => (p.kind === "league_sanction" && p.sanction
+                  ? <LeagueSanctionCard key={p.ref_id} p={p} onChanged={penalties.reload} />
+                  : <PenaltyCard key={p.ref_id} p={p} />))}
               </div>
             )}
           </LoadState>
