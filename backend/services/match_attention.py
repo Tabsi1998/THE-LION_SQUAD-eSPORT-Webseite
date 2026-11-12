@@ -29,7 +29,7 @@ from models import now_utc
 from services.league_incident_rules import current_reports
 from services.league_scope import is_league_staffel
 from services.match_deadlines import no_show_action, no_show_candidates, no_show_deadline, no_show_due_text
-from services.match_disputes import category_label, open_dispute
+from services.match_disputes import DECIDED_STATUSES, PROCEDURE_WORDS, category_label, open_dispute, open_procedure_rows
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
 from services.round_labels import rounds_by_section, side_round_label, stage_kind
@@ -78,6 +78,17 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
     _label = _labeler(tournament, matches, stages)
     for match in matches:
         status = str(match.get("status") or "pending")
+        procedures = open_procedure_rows(match) if status in DECIDED_STATUSES else []
+        if procedures and len(filled_slots(match)) >= 2 and not match.get("is_preview"):
+            # Liga (E.2, #1619): Ein Protest oder Einspruch, dessen Ergebnis vorläufig zählt, lässt das Spiel „completed“ - der Fall
+            # steht trotzdem hier. Entschieden wird auf der Matchseite, an der Karte des Verfahrens.
+            row = procedures[-1]
+            by = registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else "Liga-Leitung"
+            items.append({"match_id": match.get("id"), "station_text": "", "label": _label(match), "names": _names(match, regs_by_id),
+                          "id": f"vf-{match.get('id')}", "kind": "procedure", "title": f"{PROCEDURE_WORDS[row['kind']]} eingegangen",
+                          "detail": f"{by}: „{category_label(row.get('category'))}“ – das Ergebnis zählt vorläufig",
+                          "action": "open", "since": row.get("at")})
+            continue
         if status not in OPEN_STATUSES or len(filled_slots(match)) < 2 or match.get("is_preview"):
             continue
         base = {"match_id": match.get("id"), "station_text": match.get("station_text") or "", "label": _label(match),

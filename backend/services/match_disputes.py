@@ -35,6 +35,18 @@ def category_label(code: str | None) -> str:
     return CATEGORIES.get(str(code or ""), CATEGORIES["other"])
 
 
+PROCEDURE_KINDS = ("objection", "protest", "appeal")
+PROCEDURE_WORDS = {"objection": "Beanstandung", "protest": "Protest", "appeal": "Einspruch"}
+
+
+def open_procedure_rows(match: dict) -> list[dict]:
+    """Die offenen Liga-Verfahren eines Spiels (#1619, E.2: Einträge mit ``id`` und ``kind``) - hier ohne Abhängigkeit zu
+    ``league_procedures``, damit auch „Braucht Aufmerksamkeit“ sie lesen kann."""
+    return [row for row in match.get("disputes") or []
+            if isinstance(row, dict) and row.get("id") and row.get("kind") in PROCEDURE_KINDS
+            and (row.get("state") or ("decided" if row.get("resolved_at") else "withdrawn" if row.get("withdrawn_at") else "open")) == "open"]
+
+
 def open_dispute(match: dict) -> dict | None:
     """Der jüngste offene Dispute eines Spiels - der, über den die Turnierleitung gerade entscheidet."""
     rows = [row for row in match.get("disputes") or [] if isinstance(row, dict) and not row.get("resolved_at")]
