@@ -334,7 +334,8 @@ async def _audit(db, action: str, match: dict, actor_id: str | None, data: dict)
     })
 
 
-async def _tell(db, match: dict, targets: list[str], title: str, text: str, reason: str, dedupe: str, *, kind: str = "match_call") -> int:
+async def _tell(db, match: dict, targets: list[str], title: str, text: str, reason: str, dedupe: str, *, kind: str = "match_call",
+                extra: dict | None = None) -> int:
     """Nachricht an die Verantwortlichen der genannten Seiten - eine Nachricht hält die Aktion nie auf."""
     from services.match_audience import registrations_for_match, responsible_user_ids
     from services.match_notifications import match_title
@@ -350,7 +351,7 @@ async def _tell(db, match: dict, targets: list[str], title: str, text: str, reas
             if await create_user_notification(
                 user_id, title, body, url=f"/matches/{match.get('id')}", kind=kind,
                 meta={"category": "match_reminders", "match_id": match.get("id"), "tournament_id": match.get("tournament_id"),
-                      "reason": reason, "dedupe_key": dedupe}):
+                      "reason": reason, "dedupe_key": dedupe, **(extra or {})}):
                 sent += 1
         return sent
     except Exception:  # noqa: BLE001 - der Schritt ist schon gespeichert
@@ -1119,7 +1120,8 @@ SPECTATOR_PAUSE_HINT = "Das Veto ist pausiert – die Liga-Leitung setzt es fort
 # SEEN_THROTTLE_SECONDS, als „offen“ gilt ein Abruf der letzten NUDGE_SEEN_SECONDS.
 SEEN_THROTTLE_SECONDS = 5
 NUDGE_SEEN_SECONDS = 15
-# „Map-Veto wartet“: frühestens nach NUDGE_IDLE_SECONDS ohne Zug im laufenden Schritt, nicht mehr in den letzten Sekunden.
+# „Map-Veto wartet“: frühestens nach NUDGE_IDLE_SECONDS ohne Zug im laufenden Schritt, nicht mehr in den letzten Sekunden. Je Season
+# einstellbar (#1647, Nr. 140: ``reminder_rules.veto_idle_seconds`` / ``veto_min_left_seconds``) - das hier sind die Vorgaben.
 NUDGE_IDLE_SECONDS = 20
 NUDGE_MIN_LEFT_SECONDS = 5
 
@@ -1180,12 +1182,15 @@ async def mark_seen(db, match: dict, registration_id: str | None, *, now: dateti
     return bool(written.modified_count)
 
 
-def nudge_target(match: dict, *, now: datetime) -> dict | None:
+def nudge_target(match: dict, *, now: datetime, rules: dict | None = None) -> dict | None:
     """Ist jetzt eine Erinnerung „Map-Veto wartet“ fällig (#1651)? Nur im laufenden Veto, nur für den Zug einer Seite (nie Decider oder
     Vorgabe), frühestens NUDGE_IDLE_SECONDS nach Beginn des Schritts, nicht in den letzten NUDGE_MIN_LEFT_SECONDS, nur wenn die Seite das
-    Veto gerade nicht offen hat - und je Schritt und Seite einmal (``flow.veto_nudge.key``). Gibt Schritt, Seite und Schlüssel zurück."""
+    Veto gerade nicht offen hat - und je Schritt und Seite einmal (``flow.veto_nudge.key``). Gibt Schritt, Seite und Schlüssel zurück.
+    ``rules``: die Erinnerungen der Staffel (#1647) - Schalter und beide Sekundenwerte; ohne gelten die Vorgaben."""
+    idle = int((rules or {}).get("veto_idle_seconds", NUDGE_IDLE_SECONDS))
+    min_left = int((rules or {}).get("veto_min_left_seconds", NUDGE_MIN_LEFT_SECONDS))
     veto = veto_of(match)
-    if not veto or veto.get("status") != RUNNING or match.get("started_at"):
+    if (rules or {}).get("veto_turn") is False or not veto or veto.get("status") != RUNNING or match.get("started_at"):
         return None
     template = veto.get("template") or {}
     steps = template.get("steps") or []
@@ -1198,7 +1203,7 @@ def nudge_target(match: dict, *, now: datetime) -> dict | None:
     if not turn_id or not deadline:
         return None
     left = (deadline - now).total_seconds()
-    if int(template.get("step_seconds") or 60) - left < NUDGE_IDLE_SECONDS or left < NUDGE_MIN_LEFT_SECONDS:
+    if int(template.get("step_seconds") or 60) - left < idle or left < min_left:
         return None
     flow = match.get("flow") or {}
     seen = moment((flow.get("veto_seen") or {}).get(turn_id)) if isinstance(flow.get("veto_seen"), dict) else None
@@ -1217,11 +1222,14 @@ def nudge_target(match: dict, *, now: datetime) -> dict | None:
 async def nudge_due(db, match: dict, tournament: dict | None, *, now: datetime | None = None) -> bool:
     """Erinnerung „Map-Veto wartet“ (#1651) an die Verantwortlichen der Seite am Zug, wenn ``nudge_target`` sie fällig nennt. Der Merker
     ``flow.veto_nudge`` wird mit Bedingung auf Version und Schlüssel gesetzt - zwei Läufe gleichzeitig schicken eine Nachricht. Am Veto
-    ändert sich nichts. Gesperrte Staffel: nichts."""
+    ändert sich nichts. Gesperrte Staffel: nichts. Schalter und Sekunden aus den Erinnerungen der Staffel (#1647)."""
+    from services import league_reminder_rules
+
     now = now or now_utc()
     if (tournament or {}).get("locked_at"):
         return False
-    target = nudge_target(match, now=now)
+    rules = league_reminder_rules.rules_of(tournament) or league_reminder_rules.defaults()
+    target = nudge_target(match, now=now, rules=rules)
     if not target:
         return False
     veto = veto_of(match) or {}
@@ -1237,7 +1245,7 @@ async def nudge_due(db, match: dict, tournament: dict | None, *, now: datetime |
     label = _mode_head(pool, step.get("mode"))["mode_label"]
     sent = await _tell(db, match, [target["registration_id"]], "Map-Veto wartet – ihr seid am Zug",
                        f"Ihr seid im Map-Veto am Zug: {what} ({label}). Noch {target['left']} Sekunden – danach wählt das System.",
-                       "veto_turn", target["key"])
+                       "veto_turn", target["key"], extra=league_reminder_rules.notice_meta(rules, "veto_turn"))
     return sent > 0
 
 
