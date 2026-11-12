@@ -49,7 +49,9 @@ def open_procedure_rows(match: dict) -> list[dict]:
 
 def open_dispute(match: dict) -> dict | None:
     """Der jüngste offene Dispute eines Spiels - der, über den die Turnierleitung gerade entscheidet."""
-    rows = [row for row in match.get("disputes") or [] if isinstance(row, dict) and not row.get("resolved_at")]
+    # Zurückgezogene und entschiedene Liga-Verfahren (#1619, E.2: ``state``, ``withdrawn_at``) sind nicht mehr offen.
+    rows = [row for row in match.get("disputes") or [] if isinstance(row, dict) and not row.get("resolved_at")
+            and not row.get("withdrawn_at") and row.get("state") not in ("withdrawn", "decided")]
     return rows[-1] if rows else None
 
 
