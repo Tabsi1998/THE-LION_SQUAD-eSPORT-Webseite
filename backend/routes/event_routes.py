@@ -876,6 +876,9 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     return _public_event_registration(updated, is_staff=True)
 
 
+AUDIT_SKIPPED_FIELDS = {"updated_at", "price_snapshot", "billing_status", "invoice_id", "invoice_ref", "invoice_status", "payment_state"}
+
+
 async def _update_event_registration(db, event: dict, registration_id: str, body: EventRegistrationUpdate, me: dict) -> tuple[dict, dict]:
     current = await db.event_registrations.find_one(
         {"id": registration_id, "event_id": event["id"]},
@@ -969,7 +972,8 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
         "actor_id": me["id"],
         # Notizen nur als „geändert“: ihr Text steht an der Anmeldung, nicht noch einmal im Protokoll (#2127, EV15).
         "data": {"registration_id": registration_id,
-                 "updates": {k: ("geändert" if k in nullable else v) for k, v in updates.items() if k != "updated_at"},
+                 # Preis (mit E-Mail und Name) und Belegfelder stehen am Auftrag, nicht im Protokoll (#2184) - wie bei ``self_update``.
+                 "updates": {k: ("geändert" if k in nullable else v) for k, v in updates.items() if k not in AUDIT_SKIPPED_FIELDS},
                  **({"rewards_revoked": revoked} if revoked else {})},
         "created_at": now_utc().isoformat(),
     })

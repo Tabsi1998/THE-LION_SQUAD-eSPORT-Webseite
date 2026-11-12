@@ -314,6 +314,21 @@ async def test_verlauf_zeigt_jeden_storno_und_jede_rueckkehr(flow, fake):
     assert "booking_state" not in stored and [entry["state"] for entry in stored["booking_events"]] == ["cancelled", "restored"] * 2
 
 
+@pytest.mark.asyncio
+async def test_protokoll_der_leitung_ohne_preis_und_belegfelder(flow, fake):
+    """Das Protokoll nennt, was die Leitung geändert hat - nicht den eingefrorenen Preis (mit E-Mail und Name der Person) und nicht
+    die Belegfelder, die mit der Rückbuchung kommen. Wie beim Ändern durch die Person selbst."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    await settle(flow, fake, order, "validated")
+    flow.act_as(kassier)
+    url = f"/api/events/{event['id']}/registrations/{booked['id']}"
+    for status in ("cancelled", "registered"):
+        response = await flow.patch(url, json={"status": status})
+        assert response.status_code == 200, response.text
+    rows = await flow.db.audit_logs.find({"action": "event.registration.update", "target_id": event["id"]}, {"_id": 0}).to_list(10)
+    assert [row["data"]["updates"] for row in rows] == [{"status": "cancelled"}, {"status": "registered"}]
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)
