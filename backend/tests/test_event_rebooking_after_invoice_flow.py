@@ -436,6 +436,44 @@ async def test_rueckkehr_gleich_nach_dem_lesen_im_gutschrift_lauf_wird_ein_pruef
     assert "credit_after_return" in await open_cases(flow, order)
 
 
+class _ReturnAfterDraftRemoved(_ReturnAfterRead):
+    """Die Datenbank des Abgleichs: Gleich nachdem er den gelöschten Entwurf am Auftrag vermerkt hat, meldet sich die Person neu an."""
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _ReturnAfterDraftRemovedCollection(target, self) if name == "billing_orders" else target
+
+
+class _ReturnAfterDraftRemovedCollection(_ReturnAfterReadCollection):
+    async def find_one(self, *args, **kwargs):
+        return await self._collection.find_one(*args, **kwargs)
+
+    async def update_one(self, query, update, *args, **kwargs):
+        result = await self._collection.update_one(query, update, *args, **kwargs)
+        if "removed_invoices" in (update.get("$push") or {}) and not self._gate.fired:
+            self._gate.fired = True
+            await self._gate._comeback()
+        return result
+
+
+@pytest.mark.asyncio
+async def test_neuanmeldung_mitten_im_entfernen_des_entwurfs_behaelt_ihren_auftrag(flow, fake):
+    """Der Abgleich hat den gelöschten Entwurf am Auftrag vermerkt, da meldet sich die Person neu an (neuer Preis, neuer Auftrag).
+    Sein zweiter Schritt - die Anmeldung auf „storniert“ setzen - trifft nur die Anmeldung, die zu genau diesem Beleg gehört."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    await cancel_self(flow, event, paula)
+    stale = await order_of(flow, booked)
+    fake.remove(order["invoice_id"])
+    gate = _ReturnAfterDraftRemoved(flow.db, lambda: book(flow, paula, event, companions=0))
+    settings = await dolibarr_client.load_settings(flow.db)
+    await dolibarr_billing.sync_one(gate, settings, dolibarr_client.DolibarrClient(settings), stale)
+    assert gate.fired
+    reg = await registration(flow, booked)
+    assert reg["status"] == "registered" and reg["billing_status"] == "pending", "die Neuanmeldung bleibt abzurechnen"
+    fresh = await flow.db.billing_orders.find_one({"registration_id": booked["id"], "status": "pending"}, {"_id": 0})
+    assert fresh and reg["price_snapshot"]["hash"] == fresh["snapshot"]["hash"]
+
+
 async def sync_with(flow, order):
     """Ein Abgleich, der den Auftrag gelesen hat, bevor die Person zurückkam - er hält den alten Stand in der Hand."""
     settings = await dolibarr_client.load_settings(flow.db)

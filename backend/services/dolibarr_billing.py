@@ -687,7 +687,8 @@ async def _remove_draft(db, order: dict) -> bool:
         return False
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one(own_registration(order), {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
+        # Nur die Anmeldung, die genau diesen Beleg trägt (#2184) - eine Neuanmeldung dazwischen hat ihren eigenen Auftrag.
+        await collection.update_one({**own_registration(order), "invoice_id": order["invoice_id"]}, {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
                                                                        "$unset": {"invoice_id": "", "invoice_ref": "", "invoice_status": "", "payment_state": ""}})
     for kind in DRAFT_CASES:
         await billing_cases.auto_resolve(db, order["id"], kind, f"Der Entwurf {ref} ist in Dolibarr gelöscht.")
