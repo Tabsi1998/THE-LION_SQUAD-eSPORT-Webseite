@@ -2667,6 +2667,7 @@ und jedes Verfahren **speichert seine berechneten Fristen**; eine geänderte Ein
 | `protest_hours` | int 1–336 | 48 | E.2 | reserviert: Protestfrist ab Bestätigung des Ergebnisses (Nr. 129, 63) |
 | `statement_hours` | int 1–336 | 48 | E.2 | neu: Frist der Gegenseite für die Stellungnahme, ab Benachrichtigung (Nr. 133) |
 | `protest_target_hours` | int 1–720 | 72 | E.2 | neu: Zielfrist der Leitung ab „übernommen“ (Nr. 135); danach Erinnerung und Eskalation, nie eine automatische Entscheidung |
+| `protest_escalate_hours` | int 1–336 | 24 | E.2 | neu (Entscheidung Fabian 12.11.): so lange nach der Zielfrist geht ein offenes Verfahren an `manage` |
 | `appeal_hours` | int 1–336 | 48 | E.2 | reserviert: Einspruchsfrist ab Bekanntgabe der Entscheidung (Nr. 41, 45); E.3 nutzt dasselbe Feld für Strafen |
 | `moss_upload_hours` | int 1–168 | 24 | E.2 | neu: Frist für eine angeforderte MOSS-Datei (§ 9a.3) |
 | `protest_reasons` | `[{key, label, ask_notified}]`, 1–20 | siehe unten | E.2 | neu: Gründe zum Antippen (Nr. 134); `ask_notified` stellt die Pflichtfrage „sofort hingewiesen?“ |
@@ -2885,8 +2886,8 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 | `evidence_until` | ISO | bis wann die einreichende Seite ergänzen und Nachweise nachreichen darf (Ende der Protest- bzw. Bestätigungsfrist) |
 | `statement` | `{registration_id, due_at, extended_by, text, user_id, at}` \| null | Stellungnahme der Gegenseite: `due_at` = Benachrichtigung + `statement_hours`; die Leitung kann verlängern (`extended_by`) |
 | `moss_requests` | `[{id, user_id, requested_by, at, due_at, state}]` | angeforderte MOSS-Dateien (§ 9a.3): `state` `requested` \| `uploaded` \| `missing` \| `excused` |
-| `assignee` | `{user_id, at}` \| null | wer „übernommen“ hat (Nr. 135), sichtbar für beide Seiten; Befangene können nicht übernehmen |
-| `target_at`, `reminded_at`, `escalated_at` | ISO | Zielfrist (`assignee.at` + `protest_target_hours`), Erinnerung an die Person, Eskalation an `manage` |
+| `assignee` | `{user_id, at}` \| null | wer „übernommen“ hat (Nr. 135), sichtbar für beide Seiten; Befangene können nicht übernehmen - der Superadmin nur als Notausnahme mit Pflichtgrund (Grundregel B.1, `league.conflict.override`). Das gilt für jeden Schritt der Leitung am Verfahren; sehen tut er dabei nur, was seine Seite sieht |
+| `target_at`, `escalate_at`, `reminded_at`, `escalated_at` | ISO | Zielfrist (`assignee.at` + `protest_target_hours`), gespeicherte Eskalationsfrist (`target_at` + `protest_escalate_hours`; ohne Zuständige Einreichen + `protest_target_hours`), Erinnerung an die Person, Eskalation an `manage` |
 | `state` | `open` \| `withdrawn` \| `decided` | Zurückziehen bis zur Entscheidung (`withdrawn_at`, `withdrawn_by`), protokolliert; danach kein neues Verfahren derselben Seite mit demselben `reason_key` |
 | `resolved_at`, `resolved_by`, `decision`, `decision_note` | wie bisher | Entscheidung: `keep` \| `change`; `decision_note` ist bei neuen Einträgen Pflicht (mindestens zehn Zeichen) |
 | `appeal_until` | ISO | Ende der Einspruchsfrist, gesetzt mit der Entscheidung (`appeal_hours`) |
@@ -2920,7 +2921,7 @@ Einträge ohne `kind` sind Altbestand (siehe „Altbestand und Übergang“).
 | Wer | Vorfall, Verfahren | Nachweise (Bilder, Links) | MOSS |
 | --- | --- | --- | --- |
 | Eigene Seite (Mitglieder des Co-Teams) | alles | ja | nur wer hochgeladen hat sowie Captain und Vertreter dieser Seite (wer für sie handeln darf; ohne Captain und Vertreter die Leitung des Hauptteams); die übrigen Spieler nicht (Entscheidung Fabian 11.11.). Wer für **beide** Seiten des Spiels handeln darf, sieht MOSS keiner Seite, nur den selbst hochgeladenen |
-| Gegenseite | Grund, Text, Vorschlag, Stand, Stellungnahme, Entscheidung mit Begründung, wer übernommen hat | ja | nein, nur das Ergebnis der Prüfung in der Begründung (§ 9a.3) |
+| Gegenseite | Grund, Text, Vorschlag, das abweichende Ergebnis (`claimed`, Entscheidung Fabian 12.11.), Stand, Stellungnahme, Entscheidung mit Begründung, wer übernommen hat | ja | nein, nur das Ergebnis der Prüfung in der Begründung (§ 9a.3) |
 | Leitung mit `disputes` oder `results`, nicht befangen | alles | ja | ja |
 | Befangene mit Liga-Recht | wie ihre Seite | wie ihre Seite | wie ihre Seite, nie als Leitung |
 | Alle anderen, öffentlich | nur „in Klärung“ bzw. „Map wiederholt“ am Spiel und an der Tabellenzeile | nein | nein |
@@ -2999,6 +3000,74 @@ das Ende des letzten Tages der letzten Spielwoche (`league_service.week_days`, W
 `match_proofs.setting` (Staffel, sonst Season, sonst Vorgabe). Eine laufende Strafe verlängert die
 Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist `match_proof_photos.keep_until` (ISO) und noch nicht gebaut.
 
+#### E.2 gebaut (#1619, #2297)
+
+`services/league_procedures.py` (Verfahren), `league_procedure_notify.py` (Nachrichten, Schlüssel `procedure:<id>:<anlass>`),
+`league_procedure_sweep.py` (Zeit-Job im Fristen-Job), `league_protest_settings.py` (Season-Felder, Blatt-Modul), Routen in
+`routes/league_protest_routes.py`. Was über die Tabellen oben hinaus festgelegt wurde:
+
+- **Endpunkte:** `GET|PUT /api/admin/leagues/seasons/{id}/protest-settings`, `GET …/procedures` (Eingang, Recht `disputes`);
+  am Spiel `POST /appeals`, `PATCH /procedures/{pid}` (ergänzen bzw. `incident_id`), `POST …/withdraw`, `/statement`,
+  `/statement/extend`, `/assign`, `/decision` (nur `keep`), `/moss-requests`, `/moss-requests/{rid}/excuse` und
+  `GET /proofs/{proof_id}/file` (Download der MOSS-ZIP). `POST /dispute/decision` entscheidet in der Liga dasselbe Verfahren
+  (`procedure_id`, Pflichtbegründung).
+- **„Ergebnis ändern“** läuft über das Ergebnis-Fenster: Eine Korrektur der Leitung entscheidet alle offenen Verfahren des Spiels
+  mit `decision: "change"` (bei gleichem Ergebnis `keep`), ihr Grund wird `decision_note` (mindestens zehn Zeichen, sonst 422).
+  Bei einem offenen Einspruch darf die Person der Ausgangsentscheidung auch nicht korrigieren (403).
+- **Jedes Ergebnis prüft zentral** (`league_procedures.result_decision_refusal`, aufgerufen in `submit_v2_result`): Zu einem Spiel
+  mit offenem Verfahren schreibt kein Weg ein Ergebnis - auch nicht `POST /forfeit`, „nicht erschienen“ bestätigen oder ein
+  gehaltenes Ergebnis - ohne das Recht `disputes`, als Befangene (Superadmin nur als Notausnahme mit Grund), beim Einspruch durch
+  die Person der Ausgangsentscheidung (409) oder ohne Begründung von mindestens zehn Zeichen (422; bei der Wertung kampflos ist
+  ihre Pflicht-Begründung die `decision_note`). Meldungen der Spieler und die Frist-Automatik entscheiden nie ein Verfahren (409).
+  **Gehaltenes Ergebnis („Rückgängig“):** `result_hold.hold_result` prüft dasselbe schon beim Bereitlegen, die Absage kommt also
+  sofort. Entsteht das Verfahren erst in den Sekunden danach, schreibt das Veröffentlichen nichts: Das bereitliegende Ergebnis
+  bzw. die Wertung ist verworfen, die Person bekommt die Nachricht „Ergebnis nicht gespeichert“ mit dem Grund im Klartext
+  (`reason: hold_failed`), und im Protokoll steht `match.result.hold_failed`.
+- **Zurückgezogen heißt nicht mehr offen:** `match_deadlines.auto_confirm_due`, `match_disputes.open_dispute` und die Karte der
+  Leitungsansicht überspringen Einträge mit `withdrawn_at` bzw. `state` `withdrawn`/`decided`; die Frist-Automatik läuft danach weiter.
+  Bei geänderter Paarung bekommt ein Verfahren `decision: "void"` und `state: "decided"`.
+- **Zusätzliche Felder am Eintrag:** `escalate_at`, `additions[]` (`{text, user_id, at}`, höchstens zehn), `contested_mode` (der Wert von
+  `contested_result_mode` beim Einreichen), `statement.expired_at`, `against.decided_at` und `against.decided_by` (für „einmal je
+  Ausgangsentscheidung“ und „eine andere Person“), an `moss_requests[]` `registration_id`, `uploaded_at`, `missing_at`,
+  `excused_by`, `excused_at`, `excuse_reason`.
+- **Zeit-Job:** Erinnerung an die zuständige Person bei `target_at`; `protest_escalate_hours` (Vorgabe 24, ruhend in Sperrzeiten) später
+  Eskalation an `manage`. Ohne Zuständige eskaliert der Fall `protest_target_hours` nach dem Einreichen.
+- **Matchseite, Block `league`:** `procedures[]` (je Rolle gefiltert), `contested`, `procedure_form` (für handelnde Seiten),
+  `procedure_viewer`, `moss_candidates` (nur Leitung). In `match.disputes[]` stehen Verfahren für alle außer der nicht befangenen
+  Leitung gekürzt (`at`, `id`, `kind`, `state`; die eigene Meldung zusätzlich mit Grund und Entscheidung).
+- **Gegenseite mit `claimed`** (Entscheidung Fabian 12.11.): Sie sieht Grund, Begründung und das abweichende Ergebnis - die
+  Stellungnahme braucht den Bezug. `notified_immediately` und `moss_requests` bleiben der eigenen Seite und der Leitung.
+- **MOSS-ZIP:** `type: "file"`, nur am Bezug `moss`, eigene Grenze `MAX_MOSS_UPLOAD_MB` (Vorgabe 200, andere Dokumente bleiben bei 50 MB), gestreamt auf die Platte. Geprüft wird das Inhaltsverzeichnis, ohne zu
+  entpacken (`match_proofs.check_zip`); gespeichert wird unverändert mit `sha256`.
+- **Am einzelnen Spiel:** `league_page` gibt je Spiel `contested` (nur bei festem Ergebnis), die Ligaseite zeigt „in Klärung“ an derselben
+  Stelle wie D.5 die Map in Klärung (`in_clarification`); der TV-Baum schreibt es statt des Stands, die PDF-Tabelle hängt es an den Namen.
+- **„Braucht Aufmerksamkeit“:** Ein offenes Verfahren an einem Spiel mit festem Ergebnis (`counts`, Einspruch) ist ein Fall der Art
+  `procedure` mit `action: "open"` („Zum Spiel“); `match_disputes.open_procedure_rows` liest dafür ohne `league_procedures`.
+- **Verfahren im Spiel-Datensatz** (Nr. 133/137): ungekürzt nur für die nicht befangene Leitung mit `disputes` oder `results`. Alle
+  anderen - Seiten, Fremde, Liga-Personal ohne diese Rechte, Beteiligte mit Liga-Recht - bekommen `at`, `id`, `kind`, `state`; wer
+  eingereicht hat, dazu Grund, Text und Entscheidung der eigenen Meldung, nie `moss_requests`, `assignee`, `statement` oder
+  `notified_immediately`. Eine Stelle (`match_public_view.public_dispute_row`) für `public_match_view`, `GET /matches/{id}`,
+  `GET /tournaments/{id}/matches-v2`, den Baum und die Antworten von `/dispute`, `PUT /lineups` und dem Matchplan. Antworten auf
+  Aktionen, die das ganze Spiel zurückgeben (Melden und Bestätigen, Ergebnis, „Rückgängig“, Wertung kampflos, Check-in, Start,
+  Veto, Verschiebung, „beide nicht erschienen“), laufen durch `league_procedures.guard` - er sucht in der Antwort nach Spielen mit
+  Verfahren und kürzt sie für alle außer der nicht befangenen Leitung (`tests/test_league_procedures_leak_flow.py`).
+  **Strukturell abgesichert:** Zusätzlich läuft jede JSON-Antwort unter `/api/` durch die Middleware `procedure_guard`
+  (`services/procedure_response_guard.py`): ohne `"disputes"` im Inhalt unverändert (ein Byte-Vergleich), sonst durch denselben
+  Wächter, mit der Person der Anfrage. Neue Routen sind damit ohne eigenen Aufruf abgedeckt. Der Wächter sucht in jeder Tiefe; ein
+  Knoten mit Verfahren, der sich keinem Spiel zuordnen lässt (weder `id` noch `match_id` noch Turnier und Seiten), wird im Zweifel
+  für alle gekürzt. Ein Zähler (`"disputes": 3`) oder schon gekürzte Zeilen kosten weder die Benutzerabfrage noch eine Kürzung;
+  in Listen wird je Staffel einmal entschieden (ein Recht, eine Abfrage der Beteiligung). Gelesen wird jede JSON-Variante
+  (`application/json`, `…+json`); eine Komprimierung darf nie innerhalb des Wächters liegen (Test auf die Reihenfolge der
+  Middleware). **Ausnahme:** `GET /api/dsgvo/export-my-data` streamt und kürzt selbst (`league_procedures.export_view`): die eigene
+  Meldung, Stellungnahme und MOSS-Anforderung vollständig, von Verfahren anderer nur, dass es sie gibt.
+- **Einspruch in der Oberfläche:** `procedure_form.appealable` (`{type, ref_id, until}`) für Kampflos-Wertung und Korrektur, an der
+  Karte für den Protestentscheid. Kam die Korrektur als Entscheidung eines Verfahrens, gibt es nur den Einspruch an dessen Karte.
+- **Index:** `matches_v2.disputes.state` (sparse, `procedure_state`) für den Zeit-Job.
+- **Offen, eigenes Issue:** Das Bracket-Bild für Discord (`discord_bracket.py`) und die Teilen-Karte eines Ergebnisses
+  (`result_share.py`) zeigen Ergebnisse, die angefochten sein können, ohne Hinweis.
+- **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App meldet weiter über `/dispute` mit `category`; Art, Pflichtfragen,
+  Ergänzen, Stellungnahme, Einspruch, MOSS und die Markierung „in Klärung“ fehlen dort noch.
+
 #### Altbestand und Übergang
 
 - `disputes[]`-Einträge ohne `kind` und ohne `id` bleiben gültig und lesbar: `match_disputes.open_dispute`, „Braucht Aufmerksamkeit“
@@ -3015,7 +3084,7 @@ Aufbewahrung ebenfalls (Nr. 136); diese Sperre ergänzt E.3, das Feld dafür ist
 
 | Teil | D.5 | E.2 |
 | --- | --- | --- |
-| Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
+| Season-Felder und Einstellung | `map_break_*`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Gruppe `incidents` | `protest_hours`, `statement_hours`, `protest_target_hours`, `protest_escalate_hours`, `appeal_hours`, `moss_upload_hours`, `protest_reasons`, `contested_result_mode`, `evidence_keep_days`; Gruppe `protests` |
 | Daten | `incidents[]`, `games[].incident_id`, `map_state` | `disputes[]` mit `kind`, Stellungnahme, Zuständige, Einspruch, `contested` in Spiel und Tabelle, MOSS-Datei; `disputes[].incident_id` setzen, wenn ein Verfahren aus einem Vorfall entsteht, samt Prüfung „Vorfall am selben Spiel“ (422) |
 | Zeit-Job | `answer_deadline` → `in_review` | Erinnerung und Eskalation zur Zielfrist, Ablauf der Stellungnahme |
 | Ergebnis | Bestätigung und Automatik ruhen bei „in Klärung“ und bis die Serie festgestellt ist, `pause_series`, Schritt „Serie feststellen“ | Protestfenster der Liga in `match_disputes.dispute_window`, Tabelle |

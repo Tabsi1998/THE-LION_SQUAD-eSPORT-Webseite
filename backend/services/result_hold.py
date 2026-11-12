@@ -114,6 +114,14 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
     ensure_correction_allowed(match, force=force, reason=reason_text)
     forfeiting = _no_show(match, normalized)
     note_text = (note or "").strip() or (NO_SHOW_NOTE if forfeiting else "")
+    # Liga (#1619, E.2): Läuft an dem Spiel ein Verfahren, entscheidet dieses Ergebnis es mit. Das wird schon jetzt geprüft - die
+    # Leitung bekommt die Absage sofort und nicht erst, wenn „Rückgängig“ abgelaufen ist. Beim Veröffentlichen prüft
+    # ``submit_v2_result`` noch einmal: Kam das Verfahren dazwischen, wird das Ergebnis verworfen und die Person benachrichtigt.
+    from services import league_procedures
+    refusal = await league_procedures.result_decision_refusal(
+        db, match, actor_id=actor.get("id"), note=reason_text or (note_text if forfeiting else None), by_players=False)
+    if refusal:
+        raise MatchV2ResultError(refusal[1], refusal[0])
     # Probelauf: würde das Ergebnis so durchgehen (belegte Folgespiele, abgesagtes Spiel …)? Dann jetzt sagen, nicht in
     # 10 Sekunden.
     stage_matches = await db.matches_v2.find({"stage_id": match.get("stage_id")}, {"_id": 0}).to_list(3000)

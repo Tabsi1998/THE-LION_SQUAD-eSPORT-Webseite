@@ -174,6 +174,8 @@ async def init_indexes():
     # Veto (#1618, D.3): der Zeit-Job fragt nur laufende Vetos mit abgelaufener Frist.
     await db.matches_v2.create_index([("flow.veto.deadline_at", 1)], name="veto_deadline",
                                      partialFilterExpression={"flow.veto.status": "running"})
+    # Liga-Verfahren (#1619, E.2): der Zeit-Job fragt nur Spiele mit offenem Verfahren - Altbestand ohne ``state`` steht nicht im Index.
+    await db.matches_v2.create_index("disputes.state", sparse=True, name="procedure_state")
     # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
     await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
     await db.league_rosters.create_index("user_id")

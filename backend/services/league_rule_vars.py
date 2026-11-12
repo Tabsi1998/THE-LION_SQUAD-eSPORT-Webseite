@@ -240,6 +240,13 @@ def _static() -> list[Variable]:
                  "Proteste und Strafen", _preset("appeal_hours", PRESETS["appeal_hours"], facts.hours)),
         Variable("evidence.keep_days", "Aufbewahrung der Beweise", "Tage nach Season-Ende (Vorgabe 30 Tage, einstellbar mit E.2).",
                  "Proteste und Strafen", _preset("evidence_keep_days", PRESETS["evidence_keep_days"], facts.days)),
+        # E.2 (#1619): Stellungnahme, Zielfrist der Leitung und MOSS-Datei - einstellbar je Season (Reiter „Proteste“).
+        Variable("statement.hours", "Frist für die Stellungnahme", "Frist der Gegenseite ab der Benachrichtigung (Vorgabe 48 Stunden).",
+                 "Proteste und Strafen", _preset("statement_hours", PRESETS["statement_hours"], facts.hours)),
+        Variable("protest.target_hours", "Zielfrist der Leitung", "Zielfrist für die Entscheidung, ab der Übernahme (Vorgabe 72 Stunden).",
+                 "Proteste und Strafen", _preset("protest_target_hours", PRESETS["protest_target_hours"], facts.hours)),
+        Variable("moss.upload_hours", "Frist für die MOSS-Datei", "Frist für eine angeforderte MOSS-Datei (Vorgabe 24 Stunden).",
+                 "Proteste und Strafen", _preset("moss_upload_hours", PRESETS["moss_upload_hours"], facts.hours)),
         # Vorfälle (D.5, #1619): einstellbar im Reiter Spielbetrieb der Season, Abschnitt „Vorfälle und Pausen“.
         Variable("match.break_after_map", "Pause nach Map", "Nach welcher Map die Standardpause liegt (Vorgabe 2).",
                  "Matchablauf", _preset("map_break_after", PRESETS["map_break_after"], _count)),

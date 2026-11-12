@@ -38,6 +38,7 @@ import { keepNewerVeto, mergeLiveVeto } from "@/lib/leagueVeto";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
+import { AppealForm, ProcedureCard } from "@/components/tls/results/DisputeCard";
 import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { DoubleNoShowAction } from "@/components/tls/league/DoubleNoShowAction";
@@ -167,6 +168,10 @@ function MatchPageView() {
   const [message, setMessage] = useState("");
   // Das eine Ergebnis-Fenster (#1370): dieselbe Eingabe wie in Turnierleitung, Matchplan und Stationen.
   const [resultOpen, setResultOpen] = useState(false);
+  // Liga-Verfahren (#1619, E.2): nach dem Einreichen bleibt das Formular für den Schritt „Nachweise“ offen; „Ergebnis ändern“ an
+  // einem Verfahren nimmt dessen Begründung ins Ergebnis-Fenster mit.
+  const [procedureStep, setProcedureStep] = useState(null);
+  const [decisionReason, setDecisionReason] = useState("");
   const { submitting: busy, submitOnce } = useSubmissionGuard();
   // „Stimmt nicht“ (#1159) öffnet „Problem melden“ mit „Falsches Ergebnis“.
   const [problemCategory, setProblemCategory] = useState("");
@@ -342,8 +347,10 @@ function MatchPageView() {
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
   const submitDispute = async (payload) => runAction(async () => {
-    await api.post(`/matches/${id}/dispute`, payload);
-    toast.success("Gemeldet. Die Turnierleitung schaut es sich an.");
+    const { data: sent } = await api.post(`/matches/${id}/dispute`, payload);
+    // Liga (#1619): Das Verfahren ist eingereicht - weiter mit den Nachweisen.
+    if (sent?.procedure_id) setProcedureStep(sent.procedure_id);
+    toast.success(sent?.procedure_id ? "Eingereicht. Die Liga-Leitung schaut es sich an." : "Gemeldet. Die Turnierleitung schaut es sich an.");
     await load({ preserveDrafts: false });
   }, "Problem konnte nicht gemeldet werden.");
 
@@ -414,7 +421,12 @@ function MatchPageView() {
   // Turnierleitung (#1370): ein Knopf öffnet das Ergebnis-Fenster - eintragen oder, wenn es schon eins gibt, korrigieren.
   const canSubmitV2Result = Boolean(canStaffSubmit && data.result_entry && !data.result_entry.hold);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
-  const canDispute = Boolean(data.can_dispute);
+  // Liga (#1619, E.2): je Seite ein offenes Verfahren - danach wird ergänzt statt neu gemeldet; nach dem Einreichen bleibt das
+  // Formular für die Nachweise stehen.
+  const procedureForm = data.league?.procedure_form || null;
+  const procedures = data.league?.procedures || [];
+  const sideNames = Object.fromEntries((league?.sides || []).map((side) => [side.registration_id, side.name]));
+  const canDispute = Boolean(procedureForm ? (data.can_dispute && procedureForm.open) || procedureStep : data.can_dispute);
   // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
   const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
   // „Login zum Ergebnis melden“ (#2124, TP6) nur, wo Spieler selbst melden - nicht bei „Nur Turnierleitung“ oder vor Ort.
@@ -592,15 +604,39 @@ function MatchPageView() {
 
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
-              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die Turnierleitung prüft und entscheidet.
+              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die {data.league ? "Liga-Leitung" : "Turnierleitung"} prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
-              {(canStaffSubmit || data.can_decide_dispute) && data.tournament ? (
+              {(canStaffSubmit || data.can_decide_dispute) && data.tournament && !procedures.length ? (
                 <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
               ) : null}
             </p>
           )}
           {/* Deine Meldung – Entscheidung (#2124): was die Turnierleitung zur eigenen Meldung entschieden hat. */}
           <OwnDisputes match={match} userId={user?.id} />
+          {/* Liga-Verfahren (#1619, E.2): öffentlich nur „in Klärung“ - Beteiligte und Leitung sehen Stand, Fristen und Entscheidung. */}
+          {data.league?.contested && !data.in_dispute ? (
+            <p className="mt-5 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 text-sm text-white/85" data-testid="match-contested">
+              <strong>In Klärung</strong> – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.
+            </p>
+          ) : null}
+          {/* Einspruch gegen eine Wertung kampflos oder eine Korrektur (Nr. 41, 45) - gegen einen Protestentscheid steht er an dessen Karte. */}
+          {procedureForm?.appealable ? (
+            <section className="mt-5 space-y-2 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="match-appealable">
+              <p className="text-sm text-white/80">
+                {procedureForm.appealable.type === "forfeit" ? "Dieses Spiel wurde kampflos gewertet." : "Das Ergebnis dieses Spiels wurde von der Liga-Leitung korrigiert."} Seid ihr nicht einverstanden, könnt ihr einmal Einspruch einlegen.
+              </p>
+              <AppealForm matchId={id} against={procedureForm.appealable} until={procedureForm.appealable.until} onChanged={() => load({ preserveDrafts: false })} testId="match-appeal" />
+            </section>
+          ) : null}
+          {procedures.length ? (
+            <section className="mt-5 space-y-3" aria-label="Verfahren zu diesem Spiel" data-testid="match-procedures">
+              {procedures.map((procedure) => (
+                <ProcedureCard key={procedure.id} matchId={id} procedure={procedure} sideNames={sideNames} proofsElsewhere={procedureStep === procedure.id} players={data.league?.moss_candidates || []}
+                  conflictOverride={Boolean(data.conflict?.override)} onChanged={() => load({ preserveDrafts: false })}
+                  onChangeResult={data.result_entry ? (reason) => { setDecisionReason(reason); setResultOpen(true); } : null} />
+              ))}
+            </section>
+          ) : null}
 
           {reportHint ? (
             <p className="mt-5 rounded-sm border border-honor/30 bg-honor/5 px-4 py-3 text-sm text-white/85" data-testid="match-report-hint">{reportHint}</p>
@@ -648,6 +684,8 @@ function MatchPageView() {
 
               {canDispute && (
                 <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} initialCategory={problemCategory}
+                guide={procedureForm} sides={(league?.sides || []).map((side) => ({ id: side.registration_id, name: side.name }))}
+                createdId={procedureStep} onDone={() => setProcedureStep(null)}
                 help={data.league ? <HelpLink thema="liga-captains" schritt="problem-melden" className="-my-2" /> : null} />
               )}
 
@@ -772,7 +810,7 @@ function MatchPageView() {
           )}
         </div>
       </section>
-      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={league} decisionReason={decisionReason} onClose={() => { setResultOpen(false); setDecisionReason(""); }} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );

@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
-from services import league_schedule
+from services import league_procedures, league_schedule
 from routes.match_routes import (
     _acting_registration_for_match,
     _assert_match_visible,
@@ -118,7 +118,9 @@ async def request_reschedule(match_id: str, body: RescheduleBody, me: dict = Dep
                              _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, acting_reg = await _context(match_id, me)
     try:
-        return await league_schedule.request_reschedule(db, match, tournament, acting_reg, me, body.scheduled_at, body.reason)
+        # Verfahren in der Antwort nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+        return await league_procedures.guard(
+            db, await league_schedule.request_reschedule(db, match, tournament, acting_reg, me, body.scheduled_at, body.reason), me)
     except league_schedule.ScheduleProblem as problem:
         _raise(problem)
 
@@ -128,6 +130,7 @@ async def decide_reschedule(match_id: str, request_id: str, body: RescheduleDeci
                             me: dict = Depends(get_current_user), _mutation: None = Depends(_serialized_match_write)):
     db, match, tournament, acting_reg = await _context(match_id, me)
     try:
-        return await league_schedule.decide_reschedule(db, match, tournament, acting_reg, me, request_id, body.action, body.note)
+        return await league_procedures.guard(
+            db, await league_schedule.decide_reschedule(db, match, tournament, acting_reg, me, request_id, body.action, body.note), me)
     except league_schedule.ScheduleProblem as problem:
         _raise(problem)

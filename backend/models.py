@@ -1351,7 +1351,8 @@ class MatchV2ResultSubmit(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
     # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
     hold: bool = False
-    reason: Optional[str] = Field(default=None, max_length=500)
+    # Bis 2000 Zeichen: Die Korrektur zu einem Liga-Verfahren trägt die Begründung der Entscheidung (#1619, E.2).
+    reason: Optional[str] = Field(default=None, max_length=2000)
     # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
     games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
     # Teilnehmerlisten beider Seiten (#2204), je Seite freiwillig - nur in Staffeln mit ``lineup_mode: series``.
@@ -1446,15 +1447,24 @@ class MatchDispute(BaseModel):
     # „Problem melden“ (#1158): Grund zum Antippen und ein Foto, vorher über /matches/{id}/proof-photos hochgeladen.
     category: Optional[str] = Field(default=None, max_length=40)
     photo_id: Optional[str] = Field(default=None, max_length=120)
+    # Liga-Staffel (#1619, E.2): Grund aus der Liste der Season, das abweichende Ergebnis, die Pflichtfrage „sofort hingewiesen?“
+    # und der Vorfall, aus dem das Verfahren folgt. Ohne diese Felder (App ohne neuen Build) gilt ``category``.
+    reason_key: Optional[str] = Field(default=None, max_length=40)
+    claimed: Optional[dict] = None
+    notified_immediately: Optional[bool] = None
+    incident_id: Optional[str] = Field(default=None, max_length=120)
 
 
 class MatchDisputeDecision(BaseModel):
     # Die Turnierleitung entscheidet (#1158): „keep“ = das Ergebnis bleibt (ohne Ergebnis: weiter wie bisher).
     # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
     decision: Literal["keep"]
-    note: Optional[str] = Field(default=None, max_length=500)
+    # Liga-Verfahren (#1619, E.2): dort Pflicht (mindestens zehn Zeichen). Überall dieselbe Länge wie an der Karte des Verfahrens.
+    note: Optional[str] = Field(default=None, max_length=2000)
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Liga (#1619): welches Verfahren, wenn an dem Spiel mehrere offen sind.
+    procedure_id: Optional[str] = Field(default=None, max_length=120)
 
 
 # ---------- F1 ----------

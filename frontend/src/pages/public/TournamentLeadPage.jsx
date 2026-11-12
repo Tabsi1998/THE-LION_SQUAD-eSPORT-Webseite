@@ -369,6 +369,9 @@ function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, mov
         </div>
         {item.action === "move" ? (
           <button type="button" disabled={busy} onClick={onMove} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-move-${item.id}`}>Umlegen</button>
+        ) : item.action === "open" ? (
+          // Liga-Verfahren (E.2, #1619): entschieden wird auf der Matchseite, an der Karte des Verfahrens.
+          <a href={`/matches/${item.match_id}`} className="tls-btn tls-btn--secondary inline-flex shrink-0 min-h-[44px] items-center px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-open-${item.id}`}>Zum Spiel</a>
         ) : item.action === "no_show" ? null : canEnter ? (
           <button type="button" disabled={busy} onClick={onEnter} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-enter-${item.id}`}>Eintragen</button>
         ) : null}

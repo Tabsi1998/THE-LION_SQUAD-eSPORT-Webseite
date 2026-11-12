@@ -203,7 +203,10 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
         return None
     if isinstance(match.get("pending_result"), dict):
         return None
-    if any(isinstance(row, dict) and not row.get("resolved_at") for row in match.get("disputes") or []):
+    # Offen ist ein Eintrag nur, solange er weder entschieden noch zurückgezogen ist (#1619, E.2): Ein zurückgezogenes Verfahren
+    # hält die Automatik nicht mehr an.
+    if any(isinstance(row, dict) and not row.get("resolved_at") and not row.get("withdrawn_at")
+           and row.get("state") not in ("withdrawn", "decided") for row in match.get("disputes") or []):
         return None
     mode = (tournament or {}).get("event_mode") or "online"
     if mode == "local" or (mode == "hybrid" and (match.get("station_id") or match.get("called_at"))):

@@ -31,7 +31,7 @@ from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
 from services.league_scope import ONLY_LEAGUE
-from services import checkin_rules, league_veto_rules
+from services import checkin_rules, league_protest_settings, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.log_safe import log_safe
 from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
@@ -489,6 +489,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     # Veto (#1618, D.3): ebenso - ohne Feld (oder aus) gibt es in der Staffel kein Veto.
     if isinstance(season.get("veto_rules"), dict):
         fields["veto_rules"] = copy.deepcopy(season["veto_rules"])
+    # Proteste (#1619, E.2): ebenso - ohne Feld gilt in der Staffel die Vorgabe (league_presets).
+    fields.update({key: copy.deepcopy(season[key]) for key in league_protest_settings.FIELDS if key in season})
     # Vorfälle (#1619, D.5): nur, was die Season trägt - ohne Feld gilt in der Staffel die Vorgabe.
     fields.update({key: season[key] for key in INCIDENT_FIELDS if season.get(key) is not None})
     return fields
@@ -508,6 +510,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "checkin": ("checkin_rules",),
     # Veto (#1618, D.3): ebenso - ein laufendes Veto behält seinen Schnappschuss der Vorlage.
     "veto": ("veto_rules",),
+    # Proteste (#1619, E.2): ebenso - jedes Verfahren behält seine gespeicherten Fristen, neue Werte gelten für neue Fälle.
+    "protests": league_protest_settings.FIELDS,
     # Vorfälle (#1619, D.5): ebenso - jeder Vorfall hält seine Frist fest, neue Werte gelten nur für neue Fälle.
     "incidents": INCIDENT_FIELDS,
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
@@ -524,6 +528,7 @@ SYNC_GROUP_LABELS = {
     "schedule": "Terminregeln",
     "checkin": "Check-in",
     "veto": "Veto",
+    "protests": "Proteste, Einspruch und MOSS",
     "incidents": "Vorfälle und Pausen",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",

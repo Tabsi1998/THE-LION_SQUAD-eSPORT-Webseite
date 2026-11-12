@@ -788,7 +788,12 @@ def _standing_name(row: dict) -> str:
     """Der Name in der Rangliste - am Tabellenende einer Liga-Staffel mit „(ausgetreten)“ bzw. „(disqualifiziert)“ (E.1)."""
     name = str(row.get("display_name") or "Teilnehmer")
     suffix = _EXIT_SUFFIX.get(((row.get("exit") or {}) if isinstance(row.get("exit"), dict) else {}).get("kind"))
-    return f"{name} ({suffix})" if suffix else name
+    notes = [suffix] if suffix else []
+    # Angefochtene Ergebnisse (E.2, #1619): wie in der Webtabelle - sie zählen vorläufig, die Zeile sagt es.
+    contested = row.get("contested") if isinstance(row.get("contested"), int) and not isinstance(row.get("contested"), bool) else 0
+    if contested > 0:
+        notes.append("1 Spiel in Klärung" if contested == 1 else f"{contested} Spiele in Klärung")
+    return f"{name} ({', '.join(notes)})" if notes else name
 
 
 def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:

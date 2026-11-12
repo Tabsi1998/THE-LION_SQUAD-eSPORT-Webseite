@@ -30,7 +30,10 @@ function rememberHeatMode(mode) {
   }
 }
 
-export function ResultWindow({ entry, league = null, onClose, onSaved, testId = "result-window" }) {
+export function ResultWindow({ entry, league = null, onClose, onSaved, testId = "result-window", decisionReason = "" }) {
+  // Liga-Verfahren (#1619, E.2): Das Ergebnis entscheidet ein offenes Verfahren mit - die Begründung der Entscheidung kommt von der
+  // Karte des Verfahrens und geht als Grund mit, auch wenn noch kein Ergebnis feststand.
+  const deciding = Boolean(decisionReason);
   // Inzwischen eingetragen (#2124, TP9): kam jemand zuvor, bietet das Fenster an, als Korrektur zu speichern.
   const [forceCorrection, setForceCorrection] = useState(false);
   const [offerCorrection, setOfferCorrection] = useState(false);
@@ -45,7 +48,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [mapGames, setMapGames] = useState(() => (mapsPossible ? staffStart(league) : []));
   // Teilnehmerlisten (#2204): einmal je Spiel statt je Map, je Seite freiwillig.
   const [mapLists, setMapLists] = useState(() => staffListsStart(league));
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(decisionReason);
   // Befangen (#2203): Der Superadmin darf als Notausnahme, mit Grund im Protokoll. Der Server prüft das selbst.
   const [conflictReason, setConflictReason] = useState("");
   // Ergebnisregel übergehen (C.3, #1617): die Liga-Leitung mit „Ergebnisse“, mit Grund im Protokoll - nie Best of, Pool oder
@@ -115,6 +118,10 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
       setError(outcome.error);
       return;
     }
+    if (deciding && reason.trim().length < 10) {
+      setError("Bitte die Entscheidung in mindestens zehn Zeichen begründen.");
+      return;
+    }
     if (correcting && reason.trim().length < 5) {
       setError("Bitte kurz den Grund der Korrektur angeben (mindestens 5 Zeichen).");
       return;
@@ -132,7 +139,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
         ...(withMaps ? { games: outcome.games } : {}),
         ...(withMaps && overriding ? { rule_override_reason: ruleOverride.trim() } : {}),
         hold: true,
-        reason: correcting ? reason.trim() : null,
+        reason: correcting || deciding ? reason.trim() : null,
       });
       onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence, ...(entry.conflict_override ? { conflictReason: conflictReason.trim() } : {}) });
       onClose?.();
@@ -223,10 +230,10 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           {kind === "order" && <OrderInput entry={entry} state={state} onChange={setState} />}
           {kind === "points" && <PointsInput entry={entry} state={state} onChange={setState} />}
 
-          {correcting ? (
+          {correcting || deciding ? (
             <label className="block">
-              <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Grund der Korrektur (steht im Protokoll)</span>
-              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+              <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{deciding ? "Begründung der Entscheidung (geht an beide Seiten)" : "Grund der Korrektur (steht im Protokoll)"}</span>
+              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={deciding ? 2000 : 500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
             </label>
           ) : null}
 

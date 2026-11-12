@@ -24,7 +24,7 @@ from routes.match_routes import (
     _find_match_any,
     _serialized_match_write,
 )
-from services import match_flow
+from services import league_procedures, match_flow
 from services.league_permissions import ANY, require_league, require_no_conflict
 from services.tournament_permissions import has_match_result_permission
 
@@ -157,8 +157,10 @@ async def check_in(match_id: str, body: CheckinBody, me: dict = Depends(get_curr
     _require_rules(tournament)
     setup = await match_flow.sides(db, match, tournament)
     try:
-        return await match_flow.check_in(db, match, tournament, setup, registration_id=registration_id, present=body.present, user=me,
+        done = await match_flow.check_in(db, match, tournament, setup, registration_id=registration_id, present=body.present, user=me,
                                          via=via, reason=body.reason)
+        # Verfahren in der Antwort nur, soweit diese Person sie sehen darf (#1619, Nr. 133/137).
+        return await league_procedures.guard(db, done, me)
     except match_flow.FlowProblem as problem:
         _raise(problem)
 
@@ -175,6 +177,7 @@ async def start_match(match_id: str, body: StartBody | None = None, me: dict = D
     _require_rules(tournament)
     setup = await match_flow.sides(db, match, tournament)
     try:
-        return await match_flow.start(db, match, tournament, setup, user=me, registration_id=registration_id, via=via)
+        return await league_procedures.guard(
+            db, await match_flow.start(db, match, tournament, setup, user=me, registration_id=registration_id, via=via), me)
     except match_flow.FlowProblem as problem:
         _raise(problem)

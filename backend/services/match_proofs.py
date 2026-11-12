@@ -30,6 +30,7 @@ ihn löscht.
 """
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import logging
 import pathlib
@@ -82,6 +83,122 @@ def public_proof(doc: dict) -> dict:
 
 def is_link(doc: dict) -> bool:
     return doc.get("type") == "link"
+
+
+def is_file(doc: dict) -> bool:
+    """Die MOSS-ZIP (#2297): eine Datei zum Herunterladen - kein Bild, keine Vorschau."""
+    return doc.get("type") == "file"
+
+
+def proof_type(doc: dict) -> str:
+    return "link" if is_link(doc) else "file" if is_file(doc) else "image"
+
+
+def file_url(match_id: str, proof_id: str) -> str:
+    return f"/api/matches/{match_id}/proofs/{proof_id}/file"
+
+
+# ---------------------------------------------------------------- MOSS-ZIP (#2297, Regelwerk § 9a)
+
+ZIP_MAGIC = b"PK\x03\x04"
+ZIP_MAX_ENTRIES = 5000
+# Entpackt höchstens so groß - geprüft nur am Inhaltsverzeichnis, die Datei wird auf dem Server nie entpackt.
+ZIP_MAX_UNPACKED_BYTES = 2 * 1024 * 1024 * 1024
+ZIP_MAX_RATIO = 200
+# MOSS schreibt Bildschirmfotos und Protokolle. Programme und Skripte haben in der Datei nichts verloren.
+ZIP_FORBIDDEN_SUFFIXES = frozenset({".exe", ".dll", ".bat", ".cmd", ".com", ".scr", ".msi", ".ps1", ".vbs", ".js", ".jar", ".lnk", ".sh",
+                                    ".hta", ".pif", ".reg", ".zip", ".7z", ".rar", ".gz", ".tgz", ".tar", ".bz2", ".xz", ".cab",
+                                    ".iso"})
+# Als MOSS-Datei zählt nur die ZIP, wie MOSS sie schreibt - andere Archive bekommen einen klaren Satz statt „kein Bild“.
+OTHER_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")
+ONLY_ZIP = "Bitte die MOSS-Datei als ZIP hochladen, so wie MOSS sie geschrieben hat. Andere Archive (etwa .tar.gz, .7z, .rar) gehen nicht."
+ZIP_REFUSED = "Das ist keine gültige MOSS-Datei. Bitte die ZIP-Datei unverändert hochladen, so wie MOSS sie geschrieben hat."
+
+
+def looks_like_zip(file: UploadFile) -> bool:
+    """Nur die Endung zählt: ``.zip`` - ein anderer Dateityp wird nicht über den angegebenen Inhaltstyp zur MOSS-Datei."""
+    return (file.filename or "").lower().endswith(".zip")
+
+
+def looks_like_other_archive(file: UploadFile) -> bool:
+    return (file.filename or "").lower().endswith(OTHER_ARCHIVE_SUFFIXES)
+
+
+def moss_max_mb() -> int:
+    """Die Grenze nur für die MOSS-ZIP (``MAX_MOSS_UPLOAD_MB``, Vorgabe 200) - andere Dokumente bleiben bei ihrer eigenen."""
+    from services.image_upload import _upload_mb_from_env
+
+    return _upload_mb_from_env("MAX_MOSS_UPLOAD_MB", 200)
+
+
+def check_zip(path: pathlib.Path) -> dict:
+    """Die abgelegte ZIP-Datei prüfen, ohne sie zu entpacken und ohne sie ganz in den Speicher zu laden: Kennung am Anfang,
+    lesbares Inhaltsverzeichnis, keine Pfade nach außen, keine Programme, keine Archive im Archiv, kein Kennwort und keine
+    Zip-Bombe (Zahl und entpackte Größe der Einträge)."""
+    import zipfile
+
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        if handle.read(len(ZIP_MAGIC)) != ZIP_MAGIC:
+            raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            entries = archive.infolist()
+    except (zipfile.BadZipFile, ValueError, NotImplementedError, OSError):
+        raise HTTPException(status_code=422, detail=ZIP_REFUSED) from None
+    if not entries or len(entries) > ZIP_MAX_ENTRIES:
+        raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    unpacked = 0
+    for entry in entries:
+        name = entry.filename.replace("\\", "/")
+        if name.startswith("/") or ":" in name or ".." in name.split("/"):
+            raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+        if entry.flag_bits & 0x1:
+            raise HTTPException(status_code=422, detail="Die MOSS-Datei darf nicht mit einem Kennwort geschützt sein.")
+        if pathlib.PurePosixPath(name).suffix.lower() in ZIP_FORBIDDEN_SUFFIXES:
+            raise HTTPException(status_code=422, detail="Die ZIP-Datei enthält Programme oder weitere Archive. Bitte die MOSS-Datei unverändert hochladen.")
+        unpacked += entry.file_size
+    if unpacked > ZIP_MAX_UNPACKED_BYTES or unpacked > max(size, 1) * ZIP_MAX_RATIO:
+        raise HTTPException(status_code=422, detail=ZIP_REFUSED)
+    return {"entries": len(entries), "unpacked": unpacked}
+
+
+async def _store_zip(db, match: dict, owner: dict, registration_id: str | None, file: UploadFile, *, context: dict) -> dict:
+    """Die MOSS-ZIP prüfen und unverändert ablegen (§ 9a.3: „unverändert hochladen“) - mit Prüfsumme, damit die Leitung sie mit der
+    Angabe des Spielers vergleichen kann. Ausgeliefert wird sie nur als Download über ``/proofs/{id}/file``."""
+    import hashlib
+
+    from services.image_upload import _write_upload_stream_limited
+
+    limit = moss_max_mb()
+    key = f"{uuid.uuid4().hex}.zip"
+    path = PROOF_DIR / key
+    # Gestreamt auf die Platte (bis 200 MB): nie die ganze Datei im Speicher. Zu groß oder nicht beschreibbar räumt der Schreiber auf.
+    size = await _write_upload_stream_limited(file, path, b"", limit * 1024 * 1024, limit)
+    def inspect() -> tuple[dict, str]:
+        found = check_zip(path)
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return found, digest.hexdigest()
+
+    try:
+        # In einem Thread: Inhaltsverzeichnis lesen und bis zu 200 MB hashen hielte sonst alle anderen Anfragen auf.
+        checked, sha256 = await asyncio.to_thread(inspect)
+    except HTTPException:
+        # Abgelehnt: nichts davon bleibt auf dem Server liegen.
+        path.unlink(missing_ok=True)
+        raise
+    now = now_utc().isoformat()
+    doc = {
+        "id": new_id(), "type": "file", "match_id": match["id"], "tournament_id": match.get("tournament_id"), "owner_id": owner["id"],
+        "registration_id": registration_id, "storage_key": key, "mime": "application/zip", "size": size,
+        "sha256": sha256, "entries": checked["entries"], "status": "attached", "context": context,
+        "scan_state": "safe", "created_at": now, "updated_at": now,
+    }
+    await db.match_proof_photos.insert_one(dict(doc))
+    return doc
 
 
 def _is_ip_host(host: str) -> bool:
@@ -204,7 +321,7 @@ async def visible_proofs(db, photo_ids: list[str]) -> dict[str, dict]:
         return {}
     rows = await db.match_proof_photos.find({"id": {"$in": ids}, "status": "attached"}, {"_id": 0}).to_list(len(ids))
     return {row["id"]: public_proof(row) for row in rows
-            if (row.get("scan_state") or "safe") in VISIBLE_SCAN_STATES and not is_link(row)}
+            if (row.get("scan_state") or "safe") in VISIBLE_SCAN_STATES and not is_link(row) and not is_file(row)}
 
 
 # ---------------------------------------------------------------- Wer sieht was
@@ -364,7 +481,7 @@ def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref, *, can_change: bool) ->
     own = viewer.user_id == doc.get("owner_id")
     view = {
         "id": doc["id"],
-        "type": "link" if is_link(doc) else "image",
+        "type": proof_type(doc),
         "kind": refs.kind_of(doc),
         "ref_id": context.get("ref_id") or "",
         "side": doc.get("registration_id"),
@@ -378,6 +495,9 @@ def proof_view(doc: dict, viewer: Viewer, ref: refs.Ref, *, can_change: bool) ->
         view = {**view, "removed": True, "removed_at": doc.get("removed_at")}
     if is_link(doc):
         return {**view, "link": doc.get("link")}
+    if is_file(doc):
+        # Die MOSS-ZIP: nur zum Herunterladen, mit Größe und Prüfsumme zum Vergleichen - nie eine Vorschau.
+        return {**view, "url": file_url(doc.get("match_id") or "", doc["id"]), "size": doc.get("size"), "sha256": doc.get("sha256")}
     return {**view, **public_proof(doc)}
 
 
@@ -412,7 +532,7 @@ async def audit_proof(db, action: str, match: dict, actor_id: str | None, doc: d
     # Nie die Adresse eines Links: das Protokoll bleibt länger als der Nachweis.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "target_id": match.get("tournament_id") or match.get("id"), "actor_id": actor_id,
-        "data": {"match_id": match.get("id"), "proof_id": doc["id"], "type": "link" if is_link(doc) else "image",
+        "data": {"match_id": match.get("id"), "proof_id": doc["id"], "type": proof_type(doc),
                  "kind": refs.kind_of(doc), "ref_id": (doc.get("context") or {}).get("ref_id") or "", **extra},
         "created_at": now_utc().isoformat(),
     })
@@ -448,6 +568,11 @@ async def add_proof(db, match: dict, user: dict, checked: tuple, *, file: Upload
                "owner_id": user["id"], "registration_id": side, "status": "attached", "context": context,
                "created_at": now, "updated_at": now}
         await db.match_proof_photos.insert_one(dict(doc))
+    elif kind == "moss" and looks_like_other_archive(file):
+        raise HTTPException(status_code=422, detail=ONLY_ZIP)
+    elif kind == "moss" and looks_like_zip(file):
+        # Die MOSS-Datei selbst (#2297): eigener Dateityp mit eigener Prüfung - nur am Bezug ``moss``.
+        doc = await _store_zip(db, match, user, side, file, context=context)
     else:
         doc = await _store_image(db, match, user, side, file, status="attached", context=context)
     await audit_proof(db, "match.proof.add", match, user["id"], doc)

@@ -105,6 +105,12 @@ export function standingNotes(row) {
   if (lost && !row.exit) notes.push({ key: "forfeit_lost", tone: "forfeit", text: `${lost}× kampflos verloren` });
   const deducted = Number(row.deducted_points) || 0;
   if (deducted) notes.push({ key: "deducted", tone: "exit", text: `−${String(deducted).replace(".", ",")} ${deducted === 1 ? "Punkt" : "Punkte"} Abzug` });
+  // Angefochtene Ergebnisse (E.2, #1619): Sie zählen vorläufig mit - die Zeile sagt, wie viele Spiele noch „in Klärung“ sind.
+  const contested = Number(row.contested) || 0;
+  if (contested) {
+    notes.push({ key: "contested", tone: "decision", text: contested === 1 ? "1 Spiel in Klärung" : `${contested} Spiele in Klärung`,
+      title: "Das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest." });
+  }
   return notes;
 }
 

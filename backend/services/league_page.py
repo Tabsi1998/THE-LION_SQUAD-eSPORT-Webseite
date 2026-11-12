@@ -70,6 +70,8 @@ def public_match(match: dict, names: dict, scheduled: dict | None = None, best_o
         "matchday": matchday_number_of(match),
         "status": match.get("status"),
         "done": done,
+        # Proteste (E.2, #1619): öffentlich nur, dass das Ergebnis angefochten ist und vorläufig zählt - nie das Verfahren selbst.
+        "contested": bool(match.get("contested")) and done,
         "scheduled_at": entry.get("scheduled_at") or match.get("scheduled_at"),
         "schedule_source": entry.get("schedule_source") or match.get("schedule_source"),
         "home": _side(match, 0, names, results if done else {}),

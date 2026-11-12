@@ -157,7 +157,10 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
 
     async def matches():
         registration_ids = [row["id"] async for row in _paged(db.tournament_registrations, me) if row.get("id")]
-        return await registration_match_snapshot(db, registration_ids, limit=None)
+        # Liga-Verfahren (#1619, E.2): die eigene Meldung, Stellungnahme und MOSS-Anforderung vollständig - von Verfahren anderer
+        # nur, dass es sie gibt. Diese Route streamt und ist vom Wächter der Antworten ausgenommen, sie kürzt hier selbst.
+        from services.league_procedures import export_view
+        return export_view(await registration_match_snapshot(db, registration_ids, limit=None), user_id)
 
     async def league_appearances():
         return await league_appearance_snapshot(db, user_id)
