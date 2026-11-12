@@ -1192,14 +1192,17 @@ begründet ihr von Hand. Verwarnungen der Community-Moderation (Chat, Verhalten)
 - **Vorläufig** (nur Spielsperre und Teamsperre, etwa bei Cheating-Verdacht): Die Sperre wirkt sofort und braucht noch
   keine Dauer. Nach der Prüfung **Sperre bestätigen** (mit Dauer) oder **Widerrufen**.
 - **Sperre nach Spielen:** Gezählt werden die nächsten entschiedenen Liga-Spiele des Co-Teams. In diesen Spielen bleibt
-  die Person auch beim Nachtragen der Teilnehmerliste gesperrt.
+  die Person auch beim Nachtragen der Teilnehmerliste gesperrt. Spätestens mit dem Ende der Season ist die Sperre vorbei,
+  auch wenn Spiele fehlen (Team ausgeschieden, Person gewechselt) – die Liste zeigt dann „mit dem Ende der Season beendet“.
 - **Wer es erfährt:** die Person bzw. Captain, Vertreter und Leitung des Hauptteams – mit Regelverstoß und Begründung unter
-  **Meine Strafen**. Bei einer Sperre erfahren Captain und Vertreter zusätzlich nur „… ist gesperrt“, damit sie aufstellen
+  **Meine Strafen**. Dort steht „durch die Liga-Leitung“, nicht euer Name. Bei einer Sperre erfahren Captain und Vertreter zusätzlich nur „… ist gesperrt“, damit sie aufstellen
   können. Mitspieler und Gegner sehen beim Aufstellen „Sperre der Liga“ ohne Grund. Öffentlich steht nur, was in der
   Tabelle steht: Punktabzug und Disqualifikation.
 - **Widerrufen** geht nur mit Grund (mindestens fünf Zeichen) und nimmt jede Wirkung zurück: Die Person ist wieder
   spielberechtigt, die Tabelle rechnet neu, ein disqualifiziertes Co-Team ist wieder dabei und seine dadurch kampflos
-  gewerteten Spiele sind wieder offen (Termin bleibt, Check-in beginnt neu). Die Strafe bleibt mit dem Grund in der Liste.
+  gewerteten oder abgesagten Spiele stehen wieder da wie davor (ein offenes behält den Termin, der Check-in beginnt neu;
+  ein laufendes läuft weiter, gespielte Maps bleiben). Ein dabei geschlossener Startgeld-Auftrag bleibt geschlossen – das
+  klärt ihr mit dem Kassier. Ein noch offener Einspruch ist mit dem Widerruf erledigt. Die Strafe bleibt mit dem Grund in der Liste.
 - **Einspruch:** Betroffene können innerhalb der Einspruchsfrist (Reiter **Proteste**, Vorgabe 48 Stunden ab der
   endgültigen Entscheidung) einmal Einspruch einlegen. Die Strafe gilt bis zur Entscheidung weiter. Der Reiter zeigt
   „Einspruch wartet“. Es entscheidet eine **andere Person** mit der Zuständigkeit Strafen als die, die verhängt oder
@@ -1207,9 +1210,11 @@ begründet ihr von Hand. Verwarnungen der Community-Moderation (Chat, Verhalten)
   Begründung, endgültig.
 - **Eigenes Team:** Wer zur betroffenen Seite gehört (Kader, Captain, Vertreter, Hauptteam-Leitung), verhängt, bestätigt und
   widerruft dort nichts; an der Strafe steht „Über dein eigenes Team entscheidet eine andere Person“. Nennt die Strafe
-  ein Spiel, gilt das auch für alle, die an dem Spiel beteiligt sind.
-- **Gesperrte Staffel:** Punktabzug und Disqualifikation ändern die Staffel. Ist sie gesperrt, erst entsperren.
-- **Eingang:** Unter **Admin → eSports → Strafen** stehen die Strafen eurer Ligen neben Strafzeiten und kampflosen
+  ein Spiel, gilt das auch für alle, die an dem Spiel beteiligt sind. Der Superadmin bekommt in beiden Fällen das Feld
+  **Grund für die Notausnahme**.
+- **Gesperrte Staffel:** Punktabzug und Disqualifikation ändern die Staffel. Ist sie gesperrt, erst entsperren. „Strafe
+  bleibt“ bei einem Einspruch geht auch in einer gesperrten Staffel.
+- **Eingang:** Unter **Admin → eSports → Strafen** stehen die Strafen der Ligen, in denen ihr die Zuständigkeit **Strafen** habt, neben Strafzeiten und kampflosen
   Wertungen; **Öffnen** führt in den Reiter.
 
 ### 3.5 Tabelle und Ligaseite
