@@ -300,6 +300,10 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
     from services import league_checkin_sweep
 
     checkin = await league_checkin_sweep.sweep(db, tournaments, now=now)
+    # Liga-Erinnerungen (#1647, E.5): Spiel steht an (24 h / 1 h) und Termin offen - dieselben laufenden Turniere.
+    from services import league_reminders
+
+    reminders = await league_reminders.sweep(db, tournaments, now=now)
     # Veto (#1618, D.3): abgelaufene Fristen - dieselben laufenden Turniere (der eigene Job league_veto läuft dazu alle 10 Sekunden).
     from services import league_veto_sweep
 
@@ -323,4 +327,4 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
         logger.warning("Stand „läuft länger“ nicht aktualisiert", exc_info=True)
         overrun = {}
     return {"proposed": proposed, "confirmed": confirmed, "overdue_lineups": overdue, "schedule": schedule, "checkin": checkin,
-            "veto": veto, "procedures": procedures, "incidents": incidents, "overrun": overrun}
+            "veto": veto, "procedures": procedures, "incidents": incidents, "overrun": overrun, "reminders": reminders}
