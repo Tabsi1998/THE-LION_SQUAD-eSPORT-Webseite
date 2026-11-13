@@ -188,3 +188,10 @@ def test_zusaetzliche_push_dienste_werden_geprueft():
     assert web_push.valid_hostname("push.example.test")
     for bad in ("localhost", "a.localhost", "127.0.0.1", "1.2.3.4", "nodot", "under_score.example", "-x.example", ""):
         assert not web_push.valid_hostname(bad), bad
+
+
+def test_ziel_ohne_steuerzeichen():
+    base = "https://club.example"
+    for raw in ("/\t/evil.example", "/x\n/y", "/x\r/y", "https://club.example/a\tb", "/a\x00b", "/a\x7fb"):
+        assert web_push.safe_path(raw, base) == "/notifications", repr(raw)
+    assert web_push.safe_path("/a b", base) == "/a b"

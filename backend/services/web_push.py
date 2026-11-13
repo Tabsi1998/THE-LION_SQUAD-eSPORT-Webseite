@@ -270,7 +270,8 @@ def vapid_headers(endpoint: str, config: VapidConfig, now: float | None = None) 
 def safe_path(url: Any, base_url: str = "") -> str:
     """Das Ziel einer Meldung als Pfad dieser Website. Fremde Adressen werden zur Startseite des Postfachs."""
     raw = str(url or "").strip()
-    if not raw:
+    # Steuerzeichen (Tab, Zeilenumbruch …) gehören in keinen Link - der Browser würde sie still entfernen.
+    if not raw or any(ord(char) < 0x20 or ord(char) == 0x7F for char in raw):
         return "/notifications"
     if raw.startswith("/") and not raw.startswith("//") and "\\" not in raw:
         return raw
