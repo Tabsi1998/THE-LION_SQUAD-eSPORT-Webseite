@@ -67,6 +67,8 @@ export default function TournamentLeadPage() {
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
   const scrolledTo = useRef("");
+  // Jeder Tipp auf einen Fall im Cockpit springt hin - auch ein zweites Mal auf denselben (Review M2).
+  const [caseJump, setCaseJump] = useState(0);
   // Aus „Verzug“ im Cockpit (#1653): ?station=<id> - die Station leuchtet auf und rückt ins Bild.
   const stationParam = searchParams.get("station") || "";
   const stationScrolled = useRef("");
@@ -182,17 +184,18 @@ export default function TournamentLeadPage() {
       return;
     }
     scrolledTo.current = "";
+    setCaseJump((value) => value + 1);
     setTab("attention");
   };
 
   useEffect(() => {
-    if (!fall || !data || scrolledTo.current === fall) return;
+    if (!fall || !data || activeTab !== "attention" || scrolledTo.current === fall) return;
     const target = document.getElementById(`fall-${fall}`);
     if (target) {
       scrolledTo.current = fall;
       target.scrollIntoView?.({ block: "center" });
     }
-  }, [fall, data]);
+  }, [fall, data, activeTab, caseJump]);
 
   // Aufrufen, Starten, Freigeben, Defekt und Umlegen (#1556, #1162): zwei Helfer zugleich - der Server nimmt genau einen,
   // der andere bekommt die Meldung (409) und sieht danach den neuen Stand.

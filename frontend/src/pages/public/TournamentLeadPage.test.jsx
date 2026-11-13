@@ -422,3 +422,34 @@ test("Check-in vor Ort ohne Fälle: kein 20-Sekunden-Takt - erst im Cockpit", as
   fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
   await waitFor(() => expect(pagePolls()).toEqual([COCKPIT_POLL_MS, COCKPIT_POLL_MS]));
 });
+
+// Review M2 (#1653): Derselbe Fall ein zweites Mal aus dem Cockpit angetippt springt wieder hin - auch nach einem
+// ?fall=-Link, der schon einmal hingesprungen ist.
+test("Cockpit: zweiter Tipp auf denselben Fall springt erneut - auch nach einem ?fall=-Link", async () => {
+  const jumps = [];
+  const original = window.Element.prototype.scrollIntoView;
+  window.Element.prototype.scrollIntoView = function scrollIntoView() { jumps.push(this.id); };
+  try {
+    const queue = { applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, stations: [] };
+    const lead = {
+      tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+      attention: [{ id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 }],
+    };
+    apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung?fall=rm-m8"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByTestId("lead-case-rm-m8");
+    await waitFor(() => expect(jumps).toEqual(["fall-rm-m8"]));
+    for (const round of [2, 3]) {
+      fireEvent.click(await screen.findByTestId("lead-tab-cockpit"));
+      fireEvent.click(await screen.findByTestId("cockpit-problem-rm-m8"));
+      await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+      await waitFor(() => expect(jumps.filter((id) => id === "fall-rm-m8")).toHaveLength(round));
+    }
+  } finally {
+    window.Element.prototype.scrollIntoView = original;
+  }
+});
