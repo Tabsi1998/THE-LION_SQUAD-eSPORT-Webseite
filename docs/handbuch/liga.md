@@ -496,7 +496,7 @@ Verschiebung, bis ihr einmal speichert.
 
 | Feld | Vorgabe | Wirkung |
 | --- | --- | --- |
-| **72-h-Regel** (an/aus) und **Frist (Stunden)** | an, 72 | Antwortet die Gastseite nicht auf einen Vorschlag der Heimseite, gilt er nach der Frist – nur in der Spielwoche, nicht in einer Sperrzeit, nur in der Zukunft. Sonst gilt der Standardtermin. Sperrzeiten zählen nicht mit |
+| **72-h-Regel** (an/aus) und **Frist (Stunden)** | an, 72 | Antwortet die Gastseite nicht auf einen Vorschlag der Heimseite, gilt er nach der Frist – nur in der Spielwoche, nicht in einer Sperrzeit, nur in der Zukunft. Sonst gilt der Standardtermin. Sperrzeiten zählen nicht mit. Das Regelwerk nennt die Regel nach der eingestellten Frist, bei 48 Stunden also „48-h-Regel“ |
 | **Verschieben bis (Stunden vor dem Termin)** | 24 | später beantragen geht nicht mehr |
 | **Verschiebungen je Spiel** | 2 | 0 heißt: nur die Leitung verschiebt |
 | **Verschieben nur innerhalb der Spielwoche** | an | wochenübergreifend entscheidet die Leitung |
