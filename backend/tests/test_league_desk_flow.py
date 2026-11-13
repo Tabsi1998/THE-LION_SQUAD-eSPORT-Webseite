@@ -420,12 +420,40 @@ async def test_a_broadcast_stuck_in_sending_is_continued_on_replay_without_sendi
 
     await flow.db.audit_logs.update_one({"id": claim}, {"$set": {"data.progress_at": at(minutes=-5)}})
     resumed = await send(flow, world, request_id=request_id)
-    assert resumed.status_code == 200 and resumed.json()["state"] == "sent"
+    assert resumed.status_code == 200 and resumed.json()["resumed"] is True
     assert len(await inbox(flow, world, "Falke1")) == 1 and len(await inbox(flow, world, "Kapitaen")) == 1
     entry = await flow.db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1})
     assert entry["data"]["state"] == "sent" and entry["data"]["delivered"] == 2 and entry["data"]["processed"] == 2
     again = await send(flow, world, request_id=request_id)
     assert again.json()["state"] == "sent" and len(await inbox(flow, world, "Falke1")) == 1
+
+
+@pytest.mark.asyncio
+async def test_broadcast_answers_at_once_and_sends_in_the_background(flow, monkeypatch):
+    """N3: Die Anfrage wartet nicht auf den Versand - sie antwortet mit „sending“, der Dialog liest den Fortschritt nach."""
+    from services import league_desk
+
+    world = await desk_world(flow)
+    jobs = []
+    real = league_desk.deliver
+
+    async def recorded(db, **job):
+        jobs.append(job)
+        return await real(db, **job)
+
+    monkeypatch.setattr(league_desk, "deliver", recorded)
+    request_id = new_id()
+    answer = await send(flow, world, request_id=request_id)
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["state"] == "sending" and answer.json()["processed"] == 0 and answer.json()["recipients"] == 2
+    assert len(jobs) == 1 and "Check-in" in jobs[0]["text"]
+    flow.act_as(world["staff"])
+    state = (await flow.get(f"{world['broadcast']}/{request_id}")).json()
+    assert state == {**state, "state": "sent", "processed": 2, "delivered": 2, "recipients": 2}
+    assert (await flow.get(f"{world['broadcast']}/gibt-es-nicht")).status_code == 404
+    only_matches = await lead_of(flow, "Spielleitung", "matches")
+    flow.act_as(only_matches)
+    assert (await flow.get(f"{world['broadcast']}/{request_id}")).status_code == 403
 
 
 @pytest.mark.asyncio

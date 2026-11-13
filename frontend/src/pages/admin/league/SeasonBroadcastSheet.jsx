@@ -2,13 +2,16 @@
 // (ganze Season, eine Liga N, eine Staffel). Vor dem Senden steht die Zahl der Empfänger (Vorschau des Servers), beim Senden fragt der
 // Dialog noch einmal nach. Zustellung über Glocke und Push, Mail auf Wunsch. Gegen Doppelklick: Der Knopf sperrt, solange gesendet wird,
 // und der Server schickt je Kennung des Dialogs (``request_id``) genau einmal. Im Protokoll steht die Nachricht mit Absender.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
 import { AUDIENCES, BROADCAST_LIMITS, broadcastProblem, broadcastResultText, newRequestId, peopleText, scopeOptions, splitScope } from "@/lib/leagueDesk";
+
+const POLL_MS = 1500;
+const POLL_LIMIT_MS = 2 * 60 * 1000;
 
 export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent }) {
   const confirm = useConfirm();
@@ -23,7 +26,35 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
   const [preview, setPreview] = useState({ status: "loading", recipients: null });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  // Nach dem Senden (N3): Der Server antwortet sofort mit „sending“ und verschickt im Hintergrund - der Dialog liest den Stand nach.
+  const [progress, setProgress] = useState(null);
   const options = useMemo(() => scopeOptions(divisions), [divisions]);
+
+  const finish = useCallback((data) => {
+    (data.state === "failed" ? toast.error : toast.success)(broadcastResultText(data));
+    onSent?.(data);
+  }, [onSent]);
+
+  useEffect(() => {
+    if (!progress || progress.state !== "sending") return undefined;
+    let alive = true;
+    const started = Date.now();
+    const timer = window.setInterval(async () => {
+      try {
+        const { data } = await api.get(`/admin/leagues/seasons/${seasonId}/broadcast/${requestId.current}`);
+        if (!alive) return;
+        if (data.state !== "sending") {
+          window.clearInterval(timer);
+          finish(data);
+          return;
+        }
+        setProgress({ ...data, slow: Date.now() - started > POLL_LIMIT_MS });
+      } catch {
+        // Ein Aussetzer beim Nachlesen ändert nichts am Versand - der nächste Abruf holt den Stand.
+      }
+    }, POLL_MS);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [progress, seasonId, finish]);
 
   useEffect(() => {
     let alive = true;
@@ -37,7 +68,7 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
   const count = preview.recipients;
   const submit = async (event) => {
     event.preventDefault();
-    if (sending || busy.current) return;
+    if (sending || busy.current || progress) return;
     const problem = broadcastProblem({ title, text });
     if (problem) {
       setError(problem);
@@ -66,8 +97,8 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
       const { data } = await api.post(`/admin/leagues/seasons/${seasonId}/broadcast`, {
         request_id: requestId.current, title: title.trim(), text: text.trim(), audience, mail, ...splitScope(scope),
       });
-      (data.state === "failed" ? toast.error : toast.success)(broadcastResultText(data));
-      onSent?.(data);
+      if (data.state === "sending") setProgress(data);
+      else finish(data);
     } catch (failure) {
       setError(formatApiError(failure.response?.data?.detail) || "Die Nachricht ließ sich nicht verschicken.");
       setSending(false);
@@ -78,7 +109,7 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
   return (
     <AdminSheet title="Rundnachricht" eyebrow="Leitstand" onClose={onClose} onSubmit={submit} saving={sending} noValidate
       submitLabel={count ? `An ${peopleText(count)} schicken` : "Schicken"} savingLabel="Wird verschickt …" submitTestId="broadcast-send"
-      submitDisabled={preview.status !== "ready" || !count} testId="broadcast-sheet">
+      submitDisabled={preview.status !== "ready" || !count || Boolean(progress)} testId="broadcast-sheet">
       <fieldset>
         <legend className="mb-2 text-[11px] font-bold uppercase tracking-widest text-white/50">Empfänger</legend>
         <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
@@ -114,6 +145,19 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
         <input type="checkbox" checked={mail} onChange={(event) => setMail(event.target.checked)} className="mt-1 accent-[#29B6E8]" />
         <span>Auch per Mail<span className="block text-xs text-white/50">Glocke und Push gehen immer. Die Mail kommt nur bei denen an, die Liga-Hinweise per Mail bekommen.</span></span>
       </label>
+      {progress ? (
+        <div className="rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-3 text-sm" role="status" aria-live="polite" data-testid="broadcast-progress">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-bold text-white">Wird verschickt …</span>
+            <span className="tabular-nums text-white/70">{progress.processed || 0} von {progress.recipients || 0}</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-[#29B6E8] transition-[width] duration-300 ease-out motion-reduce:transition-none"
+              style={{ width: `${progress.recipients ? Math.round(((progress.processed || 0) / progress.recipients) * 100) : 0}%` }} />
+          </div>
+          {progress.slow ? <p className="mt-2 text-xs text-white/60" data-testid="broadcast-progress-slow">Das dauert länger. Der Versand läuft im Hintergrund weiter – du kannst den Dialog schließen, den Endstand zeigt das Protokoll.</p> : null}
+        </div>
+      ) : null}
       {error ? <p className="text-sm text-warn" role="alert" data-testid="broadcast-error">{error}</p> : null}
     </AdminSheet>
   );

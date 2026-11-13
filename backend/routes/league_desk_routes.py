@@ -4,7 +4,9 @@
   Zuständigkeiten, eigene Spiele mit dem Hinweis auf die Befangenheit.
 - ``GET  …/desk/log?page=``: das Protokoll der Season, seitenweise, ohne freien Text.
 - ``POST …/broadcast/preview``: wie viele Personen eine Rundnachricht bekämen - vor dem Senden.
-- ``POST …/broadcast``: die Rundnachricht verschicken, einmal je ``request_id`` (Doppelklick, zweiter Versuch).
+- ``POST …/broadcast``: die Rundnachricht anlegen, einmal je ``request_id`` (Doppelklick, zweiter Versuch). Die Antwort kommt sofort
+  mit ``state: sending``, verschickt wird danach im Hintergrund - kein Zeitlimit eines Proxys lässt jemanden mit neuer Kennung doppelt senden.
+- ``GET  …/broadcast/{request_id}``: Stand und Fortschritt für den Dialog.
 
 Lesen darf jede Zuständigkeit der Liga, schicken nur „Liga verwalten“ oder „Season konfigurieren“. Logik in
 ``services/league_desk.py``.
@@ -13,7 +15,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from database import get_db
@@ -75,7 +77,7 @@ async def broadcast_preview(season_id: str, body: AudienceBody, me: dict = Depen
 
 
 @admin_router.post("/seasons/{season_id}/broadcast")
-async def broadcast_send(season_id: str, body: BroadcastBody, me: dict = Depends(require_broadcast)):
+async def broadcast_send(season_id: str, body: BroadcastBody, background: BackgroundTasks, me: dict = Depends(require_broadcast)):
     db = get_db()
     season = await _season(db, season_id)
     try:
@@ -84,5 +86,15 @@ async def broadcast_send(season_id: str, body: BroadcastBody, me: dict = Depends
     except desk.BroadcastProblem as problem:
         _raise(problem)
     if job:
-        answer = {**await desk.deliver(db, **job), "replay": answer["replay"]}
+        background.add_task(desk.deliver, db, **job)
     return answer
+
+
+@admin_router.get("/seasons/{season_id}/broadcast/{request_id}")
+async def broadcast_status(season_id: str, request_id: str, _me: dict = Depends(require_broadcast)):
+    db = get_db()
+    season = await _season(db, season_id)
+    try:
+        return await desk.status(db, season, request_id)
+    except desk.BroadcastProblem as problem:
+        _raise(problem)

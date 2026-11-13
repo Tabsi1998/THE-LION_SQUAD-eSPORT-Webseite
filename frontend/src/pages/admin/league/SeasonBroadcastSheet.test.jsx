@@ -107,3 +107,18 @@ test("ein Doppelklick vor der Antwort auf die Rückfrage fragt nur einmal", asyn
   await waitFor(() => expect(screen.getByTestId("broadcast-send")).not.toBeDisabled());
   expect(confirmMock).toHaveBeenCalledTimes(1);
 });
+
+test("der Server verschickt im Hintergrund: der Dialog zeigt den Fortschritt und schließt mit dem Endstand", async () => {
+  apiMock.post.mockImplementation(async (url) => (url === PREVIEW ? { data: { recipients: 4 } }
+    : { data: { recipients: 4, processed: 0, state: "sending", replay: false } }));
+  apiMock.get.mockResolvedValue({ data: { recipients: 4, processed: 4, delivered: 4, state: "sent" } });
+  const { onSent } = renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen"));
+  fill();
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  expect(await screen.findByTestId("broadcast-progress")).toHaveTextContent("0 von 4");
+  expect(screen.getByTestId("broadcast-send")).toBeDisabled();
+  await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1), { timeout: 4000 });
+  expect(apiMock.get).toHaveBeenCalledWith(expect.stringMatching(/^\/admin\/leagues\/seasons\/s1\/broadcast\/.{8,}$/));
+  expect(toastMock.success).toHaveBeenCalledWith("Rundnachricht an 4 Personen verschickt.");
+});
