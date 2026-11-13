@@ -169,7 +169,7 @@ def test_inhalt_verbergen_zeigt_nur_dass_etwas_da_ist():
 
 
 def test_adressen_mit_sonderzeichen_im_host_werden_abgelehnt():
-    for endpoint in ("https://evil.example\.fcm.googleapis.com/x", "https://evil.example%2f.fcm.googleapis.com/x",
+    for endpoint in (r"https://evil.example\.fcm.googleapis.com/x", "https://evil.example%2f.fcm.googleapis.com/x",
                      "https://evil.example;.fcm.googleapis.com/x", "https://evil.example&.fcm.googleapis.com/x",
                      "https://evil.example .fcm.googleapis.com/x", "https://fcm.googleapis.com\t.evil.example/x",
                      "https://fcm.googleapis.com/x\r\nX-Test: 1", "https://evil.example\u3002fcm.googleapis.com/x",

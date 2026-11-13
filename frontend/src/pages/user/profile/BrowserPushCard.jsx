@@ -89,7 +89,7 @@ export function BrowserPushCard({ user, config, onChanged }) {
         <div className="mt-3">
           <SwitchRow
             label="Inhalt verbergen"
-            description="Dieser Browser zeigt nur „Neue Benachrichtigung“ – nichts vom Inhalt, etwa auf einem geteilten Rechner. Nachrichten und Beträge stehen ohnehin nie in der Meldung."
+            description="Dieser Browser zeigt nur „Neue Benachrichtigung“ – nichts vom Inhalt, etwa auf einem geteilten Rechner. Nachrichtentexte und Rechnungsbeträge stehen ohnehin nicht in der Meldung."
             checked={hidden}
             onCheckedChange={toggleHidden}
             testId="profile-browser-push-private"
