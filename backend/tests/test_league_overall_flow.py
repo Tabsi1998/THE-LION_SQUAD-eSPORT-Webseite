@@ -605,3 +605,20 @@ async def test_prizes_of_the_overall_standing_belong_to_the_league_lead(flow):
     assert (await flow.get("/api/prizes", params={"tournament_id": scope})).status_code == 403
     flow.act_as(manager)
     assert (await flow.get("/api/prizes", params={"tournament_id": "overall:fremd:1"})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_partial_view_has_no_overall_winner_for_guests(flow):
+    world = await two_seasons(flow)
+    await configure(flow, world)
+    flow.act_as(world["admin"])
+    ok(await flow.post(f"{cockpit_url(world)}/levels/1/close", json={"confirm": True}))
+    assert level_of(await public(flow, world))["complete"] is True
+    assert ok(await flow.get("/api/teams/team-2"))["league_overall"][0]["complete"] is True
+    # Season 2 nach dem Abschluss auf „Aus“: Platz 1 der Teilansicht (Probe 1) ist nicht der Gesamtsieger.
+    flow.act_as(world["admin"])
+    ok(await flow.patch(f"{ADMIN}/seasons/{world['seasons'][1]['id']}", json={"visibility": "off"}))
+    block = level_of(await public(flow, world, season=world["seasons"][0]))
+    assert block["closed"] is True and block["complete"] is False and block["teams"][0]["name"] == "Probe 1"
+    team = ok(await flow.get("/api/teams/team-1"))["league_overall"][0]
+    assert team["place"] == 1 and team["closed"] is True and team["complete"] is False

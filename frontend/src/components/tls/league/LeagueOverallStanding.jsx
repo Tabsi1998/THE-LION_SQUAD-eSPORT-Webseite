@@ -21,11 +21,11 @@ export function LeagueOverallStanding({ rows, showTeam = false, testId = "league
                   {row.url ? <Link to={row.url} className="hover:text-[#29B6E8]">{title}</Link> : title}
                 </p>
                 <p className="text-xs text-white/60 [overflow-wrap:anywhere] hyphens-auto">
-                  {[row.division_label, showTeam ? row.name : "", row.closed ? "Endstand" : "laufend"].filter(Boolean).join(" · ")}
+                  {[row.division_label, showTeam ? row.name : "", row.closed ? (row.complete ? "Endstand" : "Endstand ohne nicht öffentliche Seasons") : "laufend"].filter(Boolean).join(" · ")}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm tabular-nums">
-                {row.closed && row.place === 1 ? <span className="inline-flex items-center gap-1 font-bold text-honor"><Trophy className="h-4 w-4" aria-hidden="true" /> Gesamtsieger</span> : null}
+                {row.closed && row.complete && row.place === 1 ? <span className="inline-flex items-center gap-1 font-bold text-honor"><Trophy className="h-4 w-4" aria-hidden="true" /> Gesamtsieger</span> : null}
                 {row.closed ? <Lock className="h-3.5 w-3.5 text-white/40" aria-label="Abgeschlossen" /> : null}
                 <span className="text-white/80">Platz {row.place} von {row.of}</span>
                 <span className="text-white/60">{pointsWord(row.points)}</span>

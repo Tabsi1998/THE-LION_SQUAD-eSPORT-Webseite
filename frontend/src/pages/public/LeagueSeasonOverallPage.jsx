@@ -105,7 +105,7 @@ function StandingTable({ block, kind, columns, testId }) {
         <StaggerIn as="tbody" key={`${kind}-${block.level}`} className="tls-overall-body">
           {rows.map((row, index) => (
             <Row key={row.key || `privat-${index}`} row={row} index={index} columns={columns} kind={kind} testId={testId}
-              leader={Boolean(leaderPlace) && row.place === 1 && block.closed} />
+              leader={Boolean(leaderPlace) && row.place === 1 && block.closed && Boolean(block.complete)} />
           ))}
         </StaggerIn>
       </table>
@@ -142,7 +142,8 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
           ))}
         </div>
       </div>
-      {block.closed && leader.length === 1 ? (
+      {/* Gesamtsieger nur, wenn die Person die ganze Fassung sieht - sonst ist Platz 1 nicht der echte Sieger. */}
+      {block.closed && block.complete && leader.length === 1 ? (
         <p className="tls-league-champion mt-4" data-testid={`${testId}-winner`}>
           <Crown className="h-4 w-4 shrink-0" aria-hidden="true" /> Gesamtsieger <span className="min-w-0 text-white [overflow-wrap:anywhere] hyphens-auto">{leader[0].name}</span>
         </p>

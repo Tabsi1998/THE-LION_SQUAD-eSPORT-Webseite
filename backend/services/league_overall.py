@@ -366,6 +366,9 @@ async def public_view(db, league: dict, season: dict, viewer: dict | None, *, hi
             "level": level, "label": label, "closed": bool(final),
             "final": {"version": final.get("version"), "closed_at": final.get("closed_at")} if final else None,
             "season_ids": view_order, "rewards_granted": bool(final) and complete,
+            # Sieht die Person die ganze Fassung? Nur dann gibt es einen „Gesamtsieger“ - sonst ist es ein Endstand ohne nicht öffentliche
+            # Seasons, und Platz 1 ist nicht der echte Sieger.
+            "complete": bool(final) and complete,
             # Wie diese Wertung rechnet - bei einer abgeschlossenen die Regeln der Fassung, nicht die von heute.
             "settings": rules.public_settings(used),
             "teams": team_rows(team_list, view_order, previous), "players": player_rows(player_list, view_order, people, internal=False),
@@ -420,11 +423,11 @@ async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hi
     for level in sorted(set(live["levels"]) | set(finals)):
         if level in finals:
             view = await from_final(db, finals[level], viewer=viewer, hidden=hidden, internal=False)
-            out[level] = {"teams": view["teams"], "players": view["players"], "closed": True,
+            out[level] = {"teams": view["teams"], "players": view["players"], "closed": True, "complete": view["complete"],
                           "label": (finals[level].get("title") or {}).get("division") or f"Liga {level}"}
         else:
             data = live["levels"][level]
-            out[level] = {"teams": data["teams"], "players": data["players"], "closed": False, "label": data["label"]}
+            out[level] = {"teams": data["teams"], "players": data["players"], "closed": False, "complete": False, "label": data["label"]}
     return out, live["seasons"]
 
 
@@ -447,7 +450,8 @@ async def _periods_with(db, query: dict) -> list[tuple[dict, dict]]:
 
 def _entry(league: dict, period: dict, level: int, data: dict, row: dict, rows: list[dict], url: str | None) -> dict:
     return {"league_name": league.get("name"), "period_name": period.get("name"), "division_label": data["label"], "level": level,
-            "place": row["place"], "of": len(rows), "points": row["total"], "closed": data["closed"], "url": url}
+            "place": row["place"], "of": len(rows), "points": row["total"], "closed": data["closed"],
+            "complete": bool(data.get("complete")), "url": url}
 
 
 def url_for(league: dict, seasons: list[dict]) -> str | None:

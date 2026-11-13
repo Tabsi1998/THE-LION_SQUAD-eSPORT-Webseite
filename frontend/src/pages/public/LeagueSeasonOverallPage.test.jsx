@@ -20,7 +20,7 @@ const OVERALL = {
   seasons: [{ id: "s1", name: "Season 1" }, { id: "s2", name: "Season 2" }],
   settings: { points_mode: "teams", champion_bonus: 2, counting: "best", best_count: 1, tiebreakers: [{ key: "wins", label: "Mehr Staffelsiege" }] },
   levels: [
-    { level: 1, label: "Liga 1", closed: true, final: { version: 1, closed_at: "2027-01-12T19:30:00+00:00" }, season_ids: ["s1", "s2"], rewards: [],
+    { level: 1, label: "Liga 1", closed: true, complete: true, final: { version: 1, closed_at: "2027-01-12T19:30:00+00:00" }, season_ids: ["s1", "s2"], rewards: [],
       teams: [
         { key: "squad:a", name: "Nordlicht", team_id: "team-1", place: 1, total: 6, tie: false, climbed: true, wins: 1, lead_decision: null,
           seasons: [cell("s1", 3, { place: 2, counted: false }), cell("s2", 6, { champion: true })] },
@@ -91,4 +91,14 @@ test("Ohne Gesamtwertung ein Hinweis statt einer Tabelle", async () => {
   apiMock.get.mockImplementation((url) => (url.endsWith("/overall") ? Promise.reject({ response: { status: 404 } }) : Promise.resolve({ data: SEASON_VIEW })));
   renderPage();
   expect(await screen.findByTestId("overall-missing")).toHaveTextContent("keine Gesamtwertung");
+});
+
+test("Teilansicht (eine Season nicht öffentlich): kein Gesamtsieger, keine Hervorhebung, ehrlicher Stand", async () => {
+  const partial = { ...OVERALL, levels: [{ ...OVERALL.levels[0], complete: false }] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/overall") ? partial : SEASON_VIEW }));
+  renderPage();
+  const table = await screen.findByTestId("overall-1-teams-table");
+  expect(screen.queryByTestId("overall-1-winner")).toBeNull();
+  expect(within(table).getByTestId("overall-1-teams-table-row-0")).not.toHaveAttribute("data-leader");
+  expect(screen.getByTestId("overall-1-state")).toHaveTextContent("Endstand ohne nicht öffentliche Seasons");
 });

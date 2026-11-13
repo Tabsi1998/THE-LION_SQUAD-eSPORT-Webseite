@@ -155,5 +155,7 @@ export function decisionProblem(decision) {
 export function stateLine(block, formatDate) {
   if (!block?.closed) return "Laufende Wertung – rechnet mit jedem neuen Endstand einer Season neu.";
   const when = block.final?.closed_at && formatDate ? formatDate(block.final.closed_at) : "";
+  // Teilansicht: Eine Season der Fassung ist für die Person nicht sichtbar - die Plätze sind ohne sie gerechnet.
+  if (block.complete === false) return `Endstand ohne nicht öffentliche Seasons${when ? ` · abgeschlossen am ${when}` : ""}`;
   return `Endstand${when ? ` seit ${when}` : ""}${block.final?.version > 1 ? ` · Fassung ${block.final.version}` : ""}`;
 }
