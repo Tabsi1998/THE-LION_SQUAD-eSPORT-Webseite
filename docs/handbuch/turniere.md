@@ -18,7 +18,8 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga N und Staffeln (3.15); den ganzen Weg bis zum
   Saisonende erklärt [Liga leiten](liga.md)
 - **Admin → eSports → Turnier-Leitfaden** (`/admin/tournament-guide`) – welches Format wofür, mit „Voreinstellung übernehmen“
-- **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle, Spiele zuweisen
+- **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle anlegen und planen; live bedient
+  werden sie in der Turnierleitung
 - **Admin → eSports → Gewinne**, **Strafen**, **Jahreswertung** – was nach dem Turnier daraus wird
 - **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung
 - **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
@@ -58,7 +59,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Turnierbaum, Gruppen** | Vorschau wächst mit den Anmeldungen, fix wird sie mit dem Ende des Check-ins | Reiter Turnierbaum, Matchplan, Gruppen |
 | **Ergebnisse** | Spieler melden, oder die Turnierleitung trägt im **Ergebnis-Fenster** ein, danach 10 Sekunden **Rückgängig** | Matchplan, Stationen, Turnierleitung am Handy |
 | **Dispute** | Streitfall entscheiden mit einem Tipp | Turnierleitung am Handy |
-| **Stationen** | Spiele Geräten zuweisen, Aufruf auf dem TV | Admin → eSports → Stationen |
+| **Stationen** | Anlegen und planen; am Turniertag aufrufen, starten, freigeben, defekt, umlegen | Admin → eSports → Stationen; Turnierleitung → Stationen |
 | **Maps** | Map-Bibliothek je Spiel mit Bild und Modi; je Turnier und Phase ein eigener Map-Pool | Spielseite → Maps, im Turnier Reiter Maps |
 | **TV** | Turnierbaum, Aufrufe, Stationen auf Fernseher und Beamer | [TV und Beamer](tv.md) |
 | **Abschluss** | Beendet, Ergebnisse veröffentlicht, Punkte, Erfolge, Gewinne | Statusauswahl im Turnier |
@@ -517,15 +518,15 @@ mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt 
 
 ### 3.8 Stationen
 
-**Admin → eSports → Stationen** (Seite „Stationen & Spiel-Zuweisung“). Oben das **Aktive Turnier** wählen.
+**Admin → eSports → Stationen** (Seite „Stationen & Spiel-Zuweisung“). Oben das **Aktive Turnier** wählen. Die Seite ist
+zum Vorbereiten da: anlegen, bearbeiten, planen, Aushang. Am Turniertag bedient ihr die Stationen in der
+**Turnierleitung** (siehe unten, **Stationen live bedienen**) – der Knopf oben auf der Seite führt direkt dorthin.
 
 - **Einzelne Station** (Name, Gerätetyp, öffentlicher Hinweis) oder **Schnell-Setup** (Präfix und Anzahl, zum Beispiel
   „Switch“ mal 8) – nur für die Turnierleitung.
 - **Station bearbeiten:** Der Stift an der Station ändert **Name**, **Gerät**, **Spiel** und **Hinweis** – ebenfalls nur für die
   Turnierleitung. Jede Änderung steht im Protokoll.
-- **Spiel zuweisen** an einer Station: **Zuweisen** reserviert, **Direkt starten** startet gleich. **Starten** und
-  **Freigeben** stehen an der belegten Station.
-- **Zeitplan füllen** plant offene Spiele mit Vorschau, **Freie Stationen starten** startet, was bereit ist. Im
+- **Zeitplan füllen** plant offene Spiele mit Vorschau. Im
   Turnier öffnet **Werkzeuge → Planen** den Matchplan (unten): Der Spielplaner zeigt je Spiel Zeit und Station,
   dazu Konflikte, und schreibt erst bei **Übernehmen** alles auf einmal. Er plant ab jetzt (Erledigtes und Laufendes
   bleibt), hält die Reihenfolge des Turnierbaums ein (spätere Runden stehen als „voraussichtlich“), setzt keinen
@@ -535,9 +536,32 @@ mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt 
   Kennt das Spiel **Geräte für Stationen** (3.12), nimmt der Planer nur Stationen mit passendem Gerätetyp; die Dauer je
   Spiel kommt aus der einen Dauer-Regel (3.12).
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
-- Der Status einer Station (frei, belegt, reserviert, defekt) lässt sich ändern.
+- An jeder Station steht ihr Zustand (frei, belegt, reserviert, defekt) und das Spiel, das sie hält; dort gibt es auch
+  **Ergebnis eintragen**.
 - **Belegung je Station** zeigt dieselbe Zeitleiste wie der Matchplan (unten), live; **Im Matchplan öffnen** springt
   in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
+
+**Stationen live bedienen** (Turnier → **Turnierleitung** → Reiter **Stationen**, am Handy und am PC): je Station eine
+Kachel mit Zustand (**Frei**, **Aufgerufen**, **Läuft**, **Defekt**), dem Spiel und den Namen im Klartext. Das gilt vor
+Ort und hybrid, für 1 gegen 1, Team gegen Team und Durchgänge. Bedienen dürfen Organisation, Schiedsrichter und
+Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Admin-Recht.
+
+- **Aufrufen** reserviert die Station für **Als Nächstes**, setzt „aufgerufen um“ und schickt „Du bist dran“ an die
+  Spieler – bei Teams an alle Mitglieder (mit Aufstellung an die Aufgestellten). Die Aufruf-Tafel am TV zeigt es ohne
+  Neuladen. **Als Nächstes** ist das nächste bereite Spiel ohne Station, in derselben Reihenfolge wie der Spielplaner.
+- **Starten**: die echte Startzeit, die Spielzeit-Uhr läuft, der Aufruf verschwindet von der Tafel.
+- **Freigeben**: Ein Aufruf geht zurück in die Warteschlange. Läuft das Spiel noch, fragt die Seite nach; danach ist die
+  Station frei und das Ergebnis tragt ihr unter **Ergebnisse** ein. Mit dem Ergebnis wird eine Station ohnehin von selbst
+  frei.
+- **Defekt** nimmt die Station aus der Planung. Läuft dort ein Spiel oder steht ein Aufruf, bleibt es stehen, bis ihr es
+  mit **Umlegen** auf eine freie Station legt – die Kachel und die Rückmeldung sagen es. **Bereit** meldet die Station
+  wieder bereit.
+- **Umlegen**: Ein laufendes Spiel behält Startzeit und Uhr; ein aufgerufenes wird an der neuen Station neu aufgerufen,
+  die Spieler bekommen die neue Station.
+- Tippen zwei Leute zugleich, gilt genau ein Tipp; der andere bekommt eine Meldung und sieht den neuen Stand. Jede
+  Aktion steht im Protokoll.
+
+<img src="../assets/turniere/stationen-leitung-handy.png" alt="Reiter Stationen in der Turnierleitung: Kacheln mit Aufgerufen, Frei, Läuft und Defekt, je mit Freigeben, Umlegen und Defekt" width="260">
 
 **Matchplan** (Turnier öffnen → Reiter **Matchplan**) ist das Werkzeug der Turnierleitung am Turniertag:
 
@@ -571,7 +595,7 @@ mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt 
   erschienen“ ab, Ergebnis gilt ab). **Liga:** Spielwochen mit Frist und dem geltenden Termin (vereinbart, Heimrecht,
   Standardzeit).
 
-Ein Spiel gilt auf dem Aufruf-TV als aufgerufen, sobald es einer Station zugewiesen und noch nicht gestartet ist. Mehr
+Ein Spiel gilt auf dem Aufruf-TV als aufgerufen, sobald es an einer Station aufgerufen und noch nicht gestartet ist. Mehr
 in [TV und Beamer](tv.md).
 
 Auf der öffentlichen Seite **Spielplan** sehen Zuschauer und Spieler denselben Plan: **Nach Runden** als Karten wie im

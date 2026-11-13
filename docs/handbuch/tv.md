@@ -9,7 +9,7 @@ auf einen Fernseher oder Beamer kommen, was ihr dafür einstellt und was ihr in 
   Bildschirme**, darunter der **Link für einen Bildschirm** (Baukasten), ganz unten die **Aktiven Anzeige-Schlüssel**
 - **Admin → eSports → Turniere → Turnier öffnen** – der Knopf **TV-Link** (springt in den Baukasten, Turnier ist schon
   gewählt), „Pause bis“ beim Status „Pausiert“ und, im Reiter **Turnierbaum**, „Runde präsentiert von“
-- **Admin → eSports → Stationen** – ein Spiel einer Station zuweisen („Spiel zuweisen“); das ist der Aufruf
+- **Turnier → Turnierleitung → Reiter Stationen** – **Aufrufen** an einer Station; das ist der Aufruf
 - **Admin → Verein → Sponsoren → Sponsor bearbeiten** – der Haken **TV / Anzeige**
 - **Admin → eSports → Fast Lap → Challenge öffnen** – der Knopf **TV-Ansicht**
 
@@ -279,7 +279,7 @@ QR-Code zum Mitfahren. Mehr dazu im [Fast-Lap-Kapitel](fastlap.md).
 | „Dieses Turnier hat noch keine Stationen“ | Für die Stations-Ansicht gibt es keine Station | Stationen unter **Admin → eSports → Stationen** anlegen |
 | „Das ist kein Link einer TV-Seite“ beim Übernehmen | Der eingefügte Text ist keine Adresse einer TV-Seite | Den ganzen Link einfügen, beginnend mit der Adresse eurer Website |
 | Änderung in den Grundwerten kommt nicht an | Nicht gespeichert (Knopf **Speichern**), oder der Link hat dafür eine eigene Abweichung | Speichern. Bei der Ansicht prüfen, ob unter „Abweichungen nur für diesen Bildschirm“ der Wert steht; dann gilt der Link-Wert |
-| Der Bildschirm zeigt „Keine Aufrufe“, obwohl Spiele laufen | Ein Spiel ist erst aufgerufen, wenn es einer Station zugewiesen und noch nicht gestartet ist | Unter **Admin → eSports → Stationen** mit **Spiel zuweisen** zuweisen |
+| Der Bildschirm zeigt „Keine Aufrufe“, obwohl Spiele laufen | Ein Spiel ist erst aufgerufen, wenn es an einer Station aufgerufen und noch nicht gestartet ist | In der **Turnierleitung** im Reiter **Stationen** auf **Aufrufen** tippen |
 | Hallen- oder Aufruf-Tafel zeigt ein Turnier „Nur Mitglieder“ nicht | Der Link hat keinen Anzeige-Schlüssel – der Bildschirm ist nicht angemeldet und sieht nur, was öffentlich ist | Im Baukasten bei **Event** oder **Aufrufe** **Link mit Schlüssel** erstellen und den neuen Link am TV öffnen (siehe 2.3) |
 | Der Turnierbaum-TV zeigt den Check-in statt der Anmeldung | Die Anmeldung ist zu, alle Plätze sind vergeben, oder der Check-in wurde gestartet | Gewollt. Solange man sich anmelden kann und ein Platz frei ist, zeigt er die Anmeldung mit QR-Code |
 | Aufruf-Tafel ohne Countdown | Ein Spiel ohne geplante Zeit zählt ab dem Aufruf | Bei **Zeit zum Antreten** die Minuten einstellen |
