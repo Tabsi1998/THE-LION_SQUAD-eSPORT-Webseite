@@ -34,7 +34,7 @@ async function prepare(page, { width, height }) {
 }
 
 /** Eine kleine API, die sich die Hinweise merkt - wie der Server: einmal je Kennung, nur Text und Zeit nach außen. */
-function fakeServer() {
+function fakeServer({ full = false } = {}) {
   const notices = [];
   const sent = [];
   const publicView = (row) => ({ id: row.id, text: row.text, created_at: row.created_at, expires_at: row.expires_at, target: row.target, tv: row.tv });
@@ -45,9 +45,9 @@ function fakeServer() {
     if (url === "/api/auth/me") return route.fulfill(json({ id: "s1", username: "schiri", display_name: "Schiri Sam", role: "tournament_admin", is_tournament_staff: true, mfa_enabled: true, auth_mfa_verified: true }));
     if (url === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
     if (url === `/api/tournaments/${SLUG}/lead`) {
-      return route.fulfill(json({ tournament: { ...TOURNAMENT, can_notice: true, can_pause: true }, now: NOW, matches: [], attention: [], recent: [], stations: [{ id: "st1", name: "PC 1" }], counts: { open: 0 } }));
+      return route.fulfill(json({ tournament: { ...TOURNAMENT, can_notice: true, can_pause: true, can_check_in: full }, now: NOW, matches: [], attention: [], recent: [], stations: [{ id: "st1", name: "PC 1" }], counts: { open: 0 } }));
     }
-    if (url === `/api/tournaments/${SLUG}/live-queue`) return route.fulfill(json({ applies: false }));
+    if (url === `/api/tournaments/${SLUG}/live-queue`) return route.fulfill(json(full ? { applies: true, stations: [], summary: null } : { applies: false }));
     if (url === `/api/tournaments/${SLUG}/lead/notices/preview`) return route.fulfill(json({ recipients: 14, target: "tournament" }));
     if (url === `/api/tournaments/${SLUG}/lead/notices` && method === "POST") {
       const body = request.postDataJSON();
@@ -165,5 +165,23 @@ test.describe("Hinweis der Turnierleitung", () => {
     // Am TV höchstens zwei, der neueste zuerst - ohne dass etwas quer hinausläuft.
     await expect(page.getByTestId("tv-notice-text")).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  });
+
+  test("Reiterleiste bei 390 px mit allen fünf Reitern: wischbar, „Hinweis“ erreichbar, nichts läuft aus dem Bild", async ({ page }, testInfo) => {
+    await prepare(page, { width: 390, height: 844 });
+    const server = fakeServer({ full: true });
+    await page.route("**/api/**", server.handle);
+    await page.goto(`/tournaments/${SLUG}/leitung`);
+    for (const key of ["attention", "checkin", "stations", "results", "notice"]) await expect(page.getByTestId(`lead-tab-${key}`)).toHaveCount(1);
+    await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    // Erst wenn die Seite fertig eingeblendet ist (Einblenden der Ansicht, echte Zeit - die installierte Uhr hält die
+    // Abfrage im Browser an, darum hier warten).
+    await page.waitForTimeout(600);
+    await shot(page, testInfo, "1166-reiter-390.png");
+    await page.getByTestId("lead-tab-notice").click();
+    await expect(page.getByTestId("lead-tab-notice")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("notice-form")).toBeVisible();
   });
 });
