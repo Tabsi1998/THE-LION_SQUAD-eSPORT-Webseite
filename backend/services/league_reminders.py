@@ -8,8 +8,9 @@
   (Einigung, 72-h-Regel, Verschiebung oder Leitung). Danach gilt der Standardtermin; wer ihn nie meldet, ist überfällig bei der
   Leitung (Nr. 28, ``league_schedule_sweep.overdue``).
 
-Kein Merker am Spiel: Jede Nachricht hat einen Schlüssel je Spiel, Termin und Art (``meta.dedupe_key``), der Teilindex
-``user_unique_dedupe`` lässt je Person nur eine Zeile zu - ein zweiter Lauf, auch gleichzeitig, schickt nichts mehr.
+Jede Nachricht hat einen Schlüssel je Spiel, Termin und Art (``meta.dedupe_key``), der Teilindex ``user_unique_dedupe`` lässt je
+Person nur eine Zeile zu - ein zweiter Lauf, auch gleichzeitig, schickt nichts mehr. Nach dem Versand merkt sich das Spiel den Schlüssel
+(``reminder_notes.<art>``), damit spätere Läufe die Empfänger gar nicht erst neu auflösen.
 Die Erinnerung 10 Minuten vorher (``match_reminder``) gilt für alle Spiele und bleibt, wie sie ist.
 """
 from __future__ import annotations
@@ -79,6 +80,24 @@ def unscheduled_due(tournament: dict, match: dict, rules: dict, now: datetime):
     return window
 
 
+def upcoming_key(match: dict, kind: str) -> str:
+    return f"league-upcoming:{match['id']}:{league_schedule._iso(match.get('scheduled_at'))}:{kind}"
+
+
+def unscheduled_key(match: dict, window) -> str:
+    return f"league-unscheduled:{match['id']}:{window.start.isoformat()}"
+
+
+def already_sent(match: dict, kind: str, key: str) -> bool:
+    """Ging diese Erinnerung zu diesem Spiel schon raus? Merker ``reminder_notes.<art>`` = Schlüssel (#1647, N1) - so löst ein
+    späterer Lauf Anmeldungen, Teams und Kader nicht jede Minute neu auf. Ein neuer Termin ergibt einen neuen Schlüssel."""
+    return ((match.get("reminder_notes") or {}).get(kind)) == key
+
+
+async def _note_sent(db, match: dict, kind: str, key: str) -> None:
+    await db.matches_v2.update_one({"id": match["id"]}, {"$set": {f"reminder_notes.{kind}": key}})
+
+
 def _name(registration: dict | None) -> str:
     registration = registration or {}
     return registration.get("display_name") or registration.get("team_name") or registration.get("ingame_name") or "Gegner"
@@ -108,7 +127,7 @@ async def remind_upcoming(db, tournament: dict, match: dict, rules: dict, kind: 
     teams = await teams_by_id(db, registrations)
     minutes = int(rules["upcoming_early_hours"]) * 60 if kind == EARLY else int(rules["upcoming_late_minutes"])
     start = league_schedule._iso(match.get("scheduled_at"))
-    dedupe = f"league-upcoming:{match['id']}:{start}:{kind}"
+    dedupe = upcoming_key(match, kind)
     title = f"Liga-Spiel in {reminder_rules.lead_text(minutes)}"
     sent = 0
     for reg in registrations:
@@ -134,7 +153,7 @@ async def remind_unscheduled(db, tournament: dict, match: dict, rules: dict, win
             else "ohne Einigung entscheidet die Liga-Leitung.")
     body = (f"{tournament.get('title') or 'Liga'} · {match_title(match, regs_by_id)}: Noch kein Termin vereinbart. Bitte auf der "
             f"Matchseite einen Termin vorschlagen oder annehmen – {tail}")
-    dedupe = f"league-unscheduled:{match['id']}:{window.start.isoformat()}"
+    dedupe = unscheduled_key(match, window)
     return await _send(db, await responsible_user_ids(db, registrations), "Termin noch offen", body, match, rules, UNSCHEDULED,
                        dedupe, notification_kind="match_schedule")
 
@@ -151,15 +170,20 @@ async def sweep(db, tournaments: list[dict], *, now: datetime | None = None) -> 
             {"tournament_id": tournament["id"], "status": {"$in": list(OPEN_STATUSES)}, "started_at": None,
              "is_preview": {"$ne": True}},
             {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "started_at": 1, "scheduled_at": 1, "schedule_source": 1,
-             "slots": 1, "matchday_number": 1, "round": 1, "round_index": 1, "match_key": 1, "is_preview": 1}).to_list(3000)
+             "slots": 1, "matchday_number": 1, "round": 1, "round_index": 1, "match_key": 1, "is_preview": 1,
+             "reminder_notes": 1}).to_list(3000)
         for match in matches:
             try:
                 kind = upcoming_due(tournament, match, rules, now)
-                if kind and await remind_upcoming(db, tournament, match, rules, kind):
-                    counts[kind] += 1
+                if kind and not already_sent(match, kind, upcoming_key(match, kind)):
+                    if await remind_upcoming(db, tournament, match, rules, kind):
+                        counts[kind] += 1
+                    await _note_sent(db, match, kind, upcoming_key(match, kind))
                 window = unscheduled_due(tournament, match, rules, now)
-                if window and await remind_unscheduled(db, tournament, match, rules, window):
-                    counts[UNSCHEDULED] += 1
+                if window and not already_sent(match, UNSCHEDULED, unscheduled_key(match, window)):
+                    if await remind_unscheduled(db, tournament, match, rules, window):
+                        counts[UNSCHEDULED] += 1
+                    await _note_sent(db, match, UNSCHEDULED, unscheduled_key(match, window))
             except Exception:  # noqa: BLE001 - ein Spiel hält die anderen nicht auf
                 logger.warning("[league_reminders] Erinnerung zu Spiel %s nicht verschickt", log_safe(match.get("id")), exc_info=True)
     return counts

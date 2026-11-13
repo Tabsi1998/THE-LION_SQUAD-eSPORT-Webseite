@@ -100,16 +100,20 @@ async def create_user_notification(
         return None
     meta = meta or {}
     dedupe_key = meta.get("dedupe_key")
+    unique = bool(dedupe_key and meta.get("unique_dedupe"))
     if dedupe_key:
+        # Liga-Erinnerungen (#1647): die Prüfung trifft den Teilindex ``user_unique_dedupe`` (Person + Schlüssel) - die übrigen
+        # Arten fragen wie bisher nach Art und ``meta.dedupe_key``.
         existing = await db.notifications.find_one(
-            {"user_id": user_id, "kind": kind, "meta.dedupe_key": dedupe_key},
-            {"_id": 0},
+            {"user_id": user_id, "unique_dedupe_key": dedupe_key} if unique
+            else {"user_id": user_id, "kind": kind, "meta.dedupe_key": dedupe_key},
+            {"_id": 1},
         )
         if existing:
             return None
     # Liga-Erinnerungen (#1647) mit eindeutigem Schlüssel brauchen keine Abkühlzeit: Der Schlüssel hält Doppeltes auf, und die
     # Erinnerung eine Stunde vorher darf nicht an „Spiel startet in 10 Minuten“ eines anderen Laufs hängen bleiben.
-    if kind not in NO_COOLDOWN_KINDS and not (dedupe_key and meta.get("unique_dedupe")):
+    if kind not in NO_COOLDOWN_KINDS and not unique:
         cooldown_seconds = int(meta.get("cooldown_seconds") or DEFAULT_COOLDOWN_SECONDS.get(kind, 0) or 0)
         if cooldown_seconds > 0:
             cutoff = (now_utc() - timedelta(seconds=cooldown_seconds)).isoformat()
@@ -139,7 +143,7 @@ async def create_user_notification(
         "meta": meta,
         "created_at": now_utc().isoformat(),
     }
-    if dedupe_key and meta.get("unique_dedupe"):
+    if unique:
         # Liga-Erinnerungen (#1647): der Teilindex ``user_unique_dedupe`` lässt je Person und Schlüssel nur eine Zeile zu - laufen
         # zwei Jobs gleichzeitig, verliert der zweite hier und schickt weder Push noch Discord.
         doc["unique_dedupe_key"] = dedupe_key

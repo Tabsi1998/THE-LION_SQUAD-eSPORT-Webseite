@@ -213,6 +213,63 @@ async def test_a_run_that_loses_the_race_after_its_check_writes_nothing(flow):
     assert await flow.db.notifications.count_documents({"user_id": captain}) == 1
 
 
+def count_inserts(monkeypatch, flow) -> list[str]:
+    """Wem ``notifications.insert_one`` eine Zeile schreiben wollte - auch Versuche, die am Index scheitern."""
+    calls: list[str] = []
+    cls = type(flow.db.notifications)
+    original = cls.insert_one
+
+    async def counting(self, doc, *args, **kwargs):
+        if self.name == "notifications":
+            calls.append(doc.get("user_id"))
+        return await original(self, doc, *args, **kwargs)
+
+    monkeypatch.setattr(cls, "insert_one", counting)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_the_check_before_writing_uses_the_unique_key(flow, monkeypatch):
+    """N1: Steht für Person und Schlüssel schon eine Zeile (gleich welche Art), schreibt der Lauf gar nicht erst - die Prüfung fragt
+    nach ``unique_dedupe_key`` und trifft damit den Teilindex."""
+    world = await reminder_world(flow)
+    captain = world["users"]["Kapitaen"]["id"]
+    key = f"league-upcoming:{world['match']['id']}:{league_schedule._iso(world['start'])}:upcoming_early"
+    await flow.db.notifications.insert_one({"id": new_id(), "user_id": captain, "kind": "anders", "unique_dedupe_key": key})
+    calls = count_inserts(monkeypatch, flow)
+    assert (await run(flow, world, world["start"] - timedelta(hours=24)))["upcoming_early"] == 1
+    assert captain not in calls, "kein Schreibversuch für den Captain"
+    assert len(calls) == len(SIDE_A | SIDE_H) - 1
+
+
+@pytest.mark.asyncio
+async def test_a_later_run_does_not_resolve_the_recipients_again(flow, monkeypatch):
+    """N1: Nach dem Versand merkt sich das Spiel den Schlüssel - spätere Läufe im Nachholfenster lösen Anmeldungen, Teams und Kader nicht
+    neu auf. Ein neuer Termin erinnert neu."""
+    from services import match_audience
+
+    world = await reminder_world(flow)
+    at = world["start"] - timedelta(hours=24)
+    assert (await run(flow, world, at))["upcoming_early"] == 1
+    stored = await flow.reload(world["match"])
+    assert stored["reminder_notes"]["upcoming_early"].endswith(":upcoming_early")
+    lookups: list[str] = []
+    original = match_audience.registrations_for_match
+
+    async def counting(db, match):
+        lookups.append(match.get("id"))
+        return await original(db, match)
+
+    monkeypatch.setattr(match_audience, "registrations_for_match", counting)
+    for minutes in (0, 5, 20):
+        assert (await run(flow, world, at + timedelta(minutes=minutes)))["upcoming_early"] == 0
+    assert lookups == [], "schon gesendet: keine Auflösung der Empfänger"
+    moved = world["start"] + timedelta(hours=30)
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {"scheduled_at": moved.isoformat()}})
+    assert (await run(flow, world, moved - timedelta(hours=24)))["upcoming_early"] == 1, "Gegenprobe: neuer Termin"
+    assert lookups == [world["match"]["id"]]
+
+
 @pytest.mark.asyncio
 async def test_the_partial_index_refuses_a_second_league_row_but_not_other_notifications(flow):
     user = await flow.add_user(name="Indexprobe")
