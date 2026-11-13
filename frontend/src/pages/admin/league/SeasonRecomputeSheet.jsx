@@ -21,6 +21,7 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(null);
   useEffect(() => {
     let alive = true;
     api.get(`/admin/leagues/seasons/${season.id}/successor/recompute`)
@@ -36,7 +37,13 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
     try {
       const { data: answer } = await api.post(`/admin/leagues/seasons/${season.id}/successor/recompute`, { confirm: true, stamp: data.stamp });
       toast.success(`Übernahme neu berechnet: ${answer.changed} ${answer.changed === 1 ? "Änderung" : "Änderungen"}.`);
-      onDone();
+      // Bleibt etwas von Hand zu prüfen, steht es nach dem Ausführen da - sonst ist die Arbeit getan.
+      if (answer.manual?.length) {
+        setDone(answer);
+        setSaving(false);
+      } else {
+        onDone();
+      }
     } catch (failure) {
       toast.error(formatApiError(failure.response?.data?.detail));
       setSaving(false);
@@ -44,12 +51,25 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
   };
 
   return (
-    <AdminSheet title="Übernahme neu berechnen" eyebrow={season.name} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
-      submitLabel="Jetzt neu berechnen" savingLabel="Berechne …" submitTestId="recompute-run" submitDisabled={!data?.can_run || !data?.changes?.length}
-      testId="recompute-sheet">
+    <AdminSheet title="Übernahme neu berechnen" eyebrow={season.name} size="lg" onClose={done ? onDone : onClose} onSubmit={submit} saving={saving}
+      submitLabel="Jetzt neu berechnen" savingLabel="Berechne …" submitTestId="recompute-run" submitDisabled={Boolean(done) || !data?.can_run || !data?.changes?.length}
+      cancelLabel={done ? "Schließen" : "Abbrechen"} testId="recompute-sheet">
+      {done ? (
+        <section aria-labelledby="recompute-done-manual" className="space-y-2 text-sm" data-testid="recompute-done">
+          <p className="text-ok">Neu berechnet: {done.changed} {done.changed === 1 ? "Änderung" : "Änderungen"}.</p>
+          <h3 id="recompute-done-manual" className="text-[11px] font-bold uppercase tracking-[0.2em] text-warn">Bitte von Hand prüfen ({done.manual.length})</h3>
+          <ul className="space-y-1 text-white/80" data-testid="recompute-done-manual">
+            {done.manual.map((row) => (
+              <li key={row.application_id} className="[overflow-wrap:anywhere]">
+                {row.display_name} – {row.why}{row.to_label ? ` · laut Endstand jetzt ${row.to_label}` : " · laut Endstand nicht mehr dabei"}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
       {!data && !error ? <p className="text-sm text-white/45" aria-busy="true">Lade Vorschau …</p> : null}
-      {data ? (
+      {data && !done ? (
         <div className="space-y-5 text-sm">
           <p className="text-white/75">
             Aus dem heutigen Endstand von {data.predecessor.name}. Nur Teams ohne Staffel folgen ihm; wer nicht mehr dabei ist, wird zurückgenommen

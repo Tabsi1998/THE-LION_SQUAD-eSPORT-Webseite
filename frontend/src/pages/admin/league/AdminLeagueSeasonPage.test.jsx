@@ -762,3 +762,22 @@ test("Übernahme neu berechnen: ohne Vorgänger kein Knopf; nach dem Start nur d
   expect(await within(sheet).findByTestId("recompute-problems")).toHaveTextContent("schon begonnen");
   expect(within(sheet).getByTestId("recompute-run")).toBeDisabled();
 });
+
+
+test("Übernahme neu berechnen: nach dem Ausführen steht „Bitte von Hand prüfen“ da, Schließen lädt neu", async () => {
+  body = { ...BODY, season: { ...SEASON, predecessor_id: "s0" } };
+  extra = { "/admin/leagues/seasons/s1/successor/recompute": RECOMPUTE };
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, changed: 2, manual: RECOMPUTE.manual } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-recompute"));
+  const sheet = await screen.findByTestId("recompute-sheet");
+  await within(sheet).findByTestId("recompute-change-q1");
+  fireEvent.click(within(sheet).getByTestId("recompute-run"));
+  expect(await within(sheet).findByTestId("recompute-done-manual")).toHaveTextContent("Lions · Eins – zugeteilt · laut Endstand jetzt Liga 1");
+  expect(within(sheet).queryByTestId("recompute-changes")).toBeNull();
+  expect(within(sheet).getByTestId("recompute-run")).toBeDisabled();
+  const loads = apiMock.get.mock.calls.filter(([url]) => url === "/admin/leagues/seasons/s1").length;
+  fireEvent.click(within(sheet).getAllByRole("button", { name: "Schließen" }).find((button) => button.textContent.trim() === "Schließen"));
+  await waitFor(() => expect(screen.queryByTestId("recompute-sheet")).toBeNull());
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => url === "/admin/leagues/seasons/s1").length).toBeGreaterThan(loads));
+});
