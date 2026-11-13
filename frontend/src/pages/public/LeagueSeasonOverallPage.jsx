@@ -120,7 +120,7 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
   const leader = block.teams.filter((row) => row.place === 1);
   const testId = `overall-${block.level}`;
   const rewardData = useMemo(() => ({
-    staffel: { rewards: block.rewards?.length ? { granted: block.closed, items: block.rewards } : null },
+    staffel: { rewards: block.rewards?.length ? { granted: block.rewards_granted ?? block.closed, items: block.rewards } : null },
     standings: block.teams.map((row) => ({ registration_id: row.key, display_name: row.name, rank: row.place, points: row.total })),
     teams: [],
   }), [block]);
@@ -154,7 +154,7 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
         <li>– nicht dabei · ausg. ausgeschieden (0 Punkte)</li>
         {kind === "players" ? <li>Spieler bekommen die Punkte ihres Co-Teams, wenn sie mindestens ein Spiel gespielt haben.</li> : null}
       </ul>
-      <p className="mt-2 text-[11px] text-white/55" data-testid={`${testId}-rules`}>{rulesLine(data.settings)} {tiebreakLine(data.settings)}</p>
+      <p className="mt-2 text-[11px] text-white/55" data-testid={`${testId}-rules`}>{rulesLine(block.settings || data.settings)} {tiebreakLine(block.settings || data.settings)}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <a href={`${API}/leagues/${leagueSlug}/${seasonSlug}/overall.pdf?level=${block.level}`} target="_blank" rel="noopener noreferrer"
           className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider"

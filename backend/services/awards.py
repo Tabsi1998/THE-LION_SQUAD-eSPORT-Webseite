@@ -117,6 +117,8 @@ def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
         "image_url": reward["image_url"] if reward else ((images or {}).get(str(rank)) if rank in TROPHY_RANKS else None),
         "date": (doc.get("tournament") or {}).get("start_date"),
         "updated_at": doc.get("updated_at"),
+        # Gesamtwertung (F.5): wohin das Teilen führt - die Ligaseite der Gesamtwertung über eine öffentliche Season.
+        "url": (doc.get("overall") or {}).get("url"),
     }
 
 
@@ -312,8 +314,8 @@ async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = N
             return False
     overall = doc.get("overall") or None
     if overall:
-        # Gesamtwertung (F.5): öffentlich, solange mindestens eine Season des Zeitraums für Gäste sichtbar ist.
-        if seasons is None or not any(_public_season(seasons.get(season_id)) for season_id in overall.get("season_ids") or []):
+        # Gesamtwertung (F.5): öffentlich nur, wenn Gäste jede Season der Fassung sehen - sonst verriete der Platz eine versteckte Season.
+        if seasons is None or not all(_public_season(seasons.get(season_id)) for season_id in overall.get("season_ids") or [None]):
             return False
     return await user_can_see(None, tournament.get("visibility") or "public")
 

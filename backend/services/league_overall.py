@@ -238,7 +238,7 @@ async def from_final(db, final: dict, *, viewer: dict | None, hidden, internal: 
     settings = final.get("settings") or rules.settings_of({})
     seasons = list(final.get("seasons") or [])
     if internal:
-        return {"teams": final.get("teams") or [], "players": final.get("players") or [], "seasons": seasons}
+        return {"teams": final.get("teams") or [], "players": final.get("players") or [], "seasons": seasons, "complete": True}
     from services.league_service import can_see_season
 
     live = {row["id"]: row for row in await db.league_seasons.find(
@@ -256,9 +256,11 @@ async def from_final(db, final: dict, *, viewer: dict | None, hidden, internal: 
                 allowed_tournaments.add(tournament["id"])
     order = [row["id"] for row in visible]
     decisions = list(final.get("decisions") or [])
+    # Sieht die Person die ganze Fassung? Nur dann stehen Inhaber der Belohnungen da - sonst verriete der Platz eine versteckte Season.
+    complete = len(visible) == len(seasons) and (allowed_tournaments is None or set(tournament_ids) <= allowed_tournaments)
     return {"teams": rules.rank(_filtered(final.get("teams") or [], allowed, allowed_tournaments), settings, order, decisions),
             "players": rules.rank(_filtered(final.get("players") or [], allowed, allowed_tournaments), settings, order),
-            "seasons": visible}
+            "seasons": visible, "complete": complete}
 
 
 async def active_final(db, period_id: str, level: int) -> dict | None:
@@ -342,14 +344,18 @@ async def public_view(db, league: dict, season: dict, viewer: dict | None, *, hi
             view_order = [row["id"] for row in view["seasons"]]
             team_list, player_list, label = view["teams"], view["players"], (final.get("title") or {}).get("division") or f"Liga {level}"
             used = {**settings, **(final.get("settings") or {})}
+            complete = view["complete"]
         else:
             data = live["levels"][level]
             view_order, team_list, player_list, label = order, data["teams"], data["players"], data["label"]
-            used = settings
+            used, complete = settings, False
         if not team_list and not player_list:
             continue
         people = await _people(db, {row["key"] for row in player_list})
         rewards = await reward_holders(db, period["id"], level) if final else []
+        if final and not complete:
+            # Eine Season oder Staffel der Fassung ist für die Person nicht sichtbar: die Belohnungen ohne Inhaber.
+            rewards = [{**item, "holders": []} for item in rewards]
         # Wer mit der jüngsten Season in der Wertung nach vorn kam, leuchtet auf der Ligaseite kurz auf.
         decisions = [row for row in (final or {}).get("decisions") or league.get("overall_decisions") or []
                      if row.get("period_id") == period["id"] and row.get("level") == level]
@@ -357,7 +363,7 @@ async def public_view(db, league: dict, season: dict, viewer: dict | None, *, hi
         out_levels.append({
             "level": level, "label": label, "closed": bool(final),
             "final": {"version": final.get("version"), "closed_at": final.get("closed_at")} if final else None,
-            "season_ids": view_order,
+            "season_ids": view_order, "rewards_granted": bool(final) and complete,
             # Wie diese Wertung rechnet - bei einer abgeschlossenen die Regeln der Fassung, nicht die von heute.
             "settings": rules.public_settings(used),
             "teams": team_rows(team_list, view_order, previous), "players": player_rows(player_list, view_order, people, internal=False),
@@ -403,8 +409,8 @@ async def season_block(league: dict | None, season: dict) -> dict | None:
 
 # ---------------------------------------------------------------- Profil und Teamseite
 
-async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hidden) -> dict[int, dict]:
-    """Je Liga N die Zeilen, wie die Person sie sieht - abgeschlossen aus der Fassung, sonst gerechnet."""
+async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hidden) -> tuple[dict[int, dict], list[dict]]:
+    """Je Liga N die Zeilen, wie die Person sie sieht - abgeschlossen aus der Fassung, sonst gerechnet. Dazu die Seasons, die sie sieht."""
     out: dict[int, dict] = {}
     live = await compute(db, league, period, viewer=viewer, hidden=hidden, internal=False)
     finals = {row["level"]: row for row in await db.league_overall_finals.find(
@@ -417,7 +423,7 @@ async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hi
         else:
             data = live["levels"][level]
             out[level] = {"teams": data["teams"], "players": data["players"], "closed": False, "label": data["label"]}
-    return out
+    return out, live["seasons"]
 
 
 async def _periods_with(db, query: dict) -> list[tuple[dict, dict]]:
@@ -440,21 +446,30 @@ def _entry(league: dict, period: dict, level: int, data: dict, row: dict, rows: 
             "place": row["place"], "of": len(rows), "points": row["total"], "closed": data["closed"], "url": url}
 
 
-async def _url(db, league: dict, period: dict) -> str | None:
-    ids = list(period.get("season_ids") or [])
-    if not league.get("slug") or not ids:
+def url_for(league: dict, seasons: list[dict]) -> str | None:
+    """Die Gesamtwertung auf der Ligaseite - über die jüngste Season, die die Person sieht; ohne sichtbare Season kein Link."""
+    seasons = [row for row in seasons if row.get("slug")]
+    if not league.get("slug") or not seasons:
         return None
-    seasons = await db.league_seasons.find({"id": {"$in": ids}, "status": {"$ne": "archived"}}, {"_id": 0, "slug": 1, "number": 1}).to_list(len(ids) + 1)
-    seasons.sort(key=lambda row: row.get("number") or 0)
-    return f"/liga/{league['slug']}/{seasons[-1]['slug']}/gesamtwertung" if seasons and seasons[-1].get("slug") else None
+    newest = max(seasons, key=lambda row: row.get("number") if isinstance(row.get("number"), int) else 0)
+    return f"/liga/{league['slug']}/{newest['slug']}/gesamtwertung"
+
+
+async def public_url(db, league: dict, period: dict) -> str | None:
+    """Für Nachrichten und das Teilen: nur über eine Season, die Gäste sehen (öffentlich, nicht archiviert)."""
+    ids = list(period.get("season_ids") or [])
+    seasons = await db.league_seasons.find({"id": {"$in": ids}, "status": {"$ne": "archived"}, "visibility": "public"},
+                                           {"_id": 0, "slug": 1, "number": 1}).to_list(len(ids) + 1) if ids else []
+    return url_for(league, seasons)
 
 
 async def for_team(db, team_id: str, viewer: dict | None, *, hidden=None) -> list[dict]:
     """Platz in der Gesamtwertung je Co-Team des Teams (Teamseite)."""
     out = []
     for league, period in await _periods_with(db, {"team_ids": team_id}):
-        url = await _url(db, league, period)
-        for level, data in (await _standing_rows(db, league, period, viewer, hidden)).items():
+        levels, seasons = await _standing_rows(db, league, period, viewer, hidden)
+        url = url_for(league, seasons)
+        for level, data in levels.items():
             for row in data["teams"]:
                 if row.get("team_id") == team_id:
                     out.append({**_entry(league, period, level, data, row, data["teams"], url), "name": row.get("name")})
@@ -465,8 +480,9 @@ async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None) -> l
     """Platz in der Spielerwertung (Profil)."""
     out = []
     for league, period in await _periods_with(db, {"player_ids": user_id}):
-        url = await _url(db, league, period)
-        for level, data in (await _standing_rows(db, league, period, viewer, hidden)).items():
+        levels, seasons = await _standing_rows(db, league, period, viewer, hidden)
+        url = url_for(league, seasons)
+        for level, data in levels.items():
             for row in data["players"]:
                 if row["key"] == user_id:
                     out.append(_entry(league, period, level, data, row, data["players"], url))
@@ -744,6 +760,8 @@ async def grant(db, league: dict, period: dict, final: dict) -> dict:
     frame = {"league": league, "season": {"id": period["id"], "name": f"Gesamtwertung {period.get('name') or ''}".strip(),
                                           "slug": None}, "division_label": (final.get("title") or {}).get("division")}
     season_ids = [row["id"] for row in final.get("seasons") or []]
+    # Wohin Nachricht und Teilen führen: nur über eine Season, die Gäste sehen - sonst die Liga-Übersicht.
+    url = await public_url(db, league, period)
     after, wanted_prizes = [], []
     for row in rows:
         side = {"team_id": row.get("team_id"), "squad_id": row.get("squad_id"), "user_id": row.get("user_id")}
@@ -775,7 +793,7 @@ async def grant(db, league: dict, period: dict, final: dict) -> dict:
                 "league": {"title": item.get("name"), "league_id": league["id"], "season_id": None, "division_label": frame["division_label"],
                            "staffel": None, "display_name": row.get("name"), "final_table_id": final["id"], "version": final["version"]},
                 "overall": {"league_id": league["id"], "period_id": period["id"], "level": final["level"], "final_id": final["id"],
-                            "version": final["version"], "season_ids": season_ids},
+                            "version": final["version"], "season_ids": season_ids, "url": url},
                 "reward": league_rewards._snapshot(item, frame, row["place"], basis),
                 "player_ids": player_ids, "audience_ids": sorted(set(player_ids) | (set(responsible) if to_team else set()) | ({person} if person else set())),
                 "suspended": False,
@@ -792,8 +810,7 @@ async def grant(db, league: dict, period: dict, final: dict) -> dict:
     result.update({"team_leads": {key: sorted(value) for key, value in leads.items()},
                    "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads}})
     if any(result.get(key) for key in ("gains", "losses", "team_gains", "team_losses")):
-        url = await _url(db, league, period)
-        result["sent"] = await league_rewards.notify(db, scope, final, frame, result, url=url)
+        result["sent"] = await league_rewards.notify(db, scope, final, frame, result, url=url or "/liga")
     return result
 
 

@@ -558,3 +558,32 @@ async def test_closed_standing_shows_the_counting_rule_of_its_version(flow):
     assert level_of(view)["settings"]["counting"] == "best" and level_of(view)["settings"]["best_count"] == 1
     # Gegenprobe: die Einstellung von heute steht oben für laufende Wertungen.
     assert view["settings"]["counting"] == "all"
+
+
+@pytest.mark.asyncio
+async def test_hidden_season_hides_holders_badges_and_share_image_for_guests(flow):
+    world = await two_seasons(flow)
+    await configure(flow, world, rewards=[GOLD])
+    flow.act_as(world["admin"])
+    ok(await flow.post(f"{cockpit_url(world)}/levels/1/close", json={"confirm": True}))
+    gold = await flow.db.tournament_awards.find_one({"tournament_id": f"overall:{world['period']['id']}:1"}, {"_id": 0})
+    assert gold["overall"]["url"] == f"/liga/{world['league']['slug']}/{world['seasons'][1]['slug']}/gesamtwertung"
+    flow.act_as(None)
+    assert (await flow.get(f"/api/rewards/{gold['id']}/share.png")).status_code == 200
+    # Season 2 wird versteckt: Gäste sehen weder Inhaber noch Abzeichen, das Teilen-Bild gibt es nicht.
+    flow.act_as(world["admin"])
+    ok(await flow.patch(f"{ADMIN}/seasons/{world['seasons'][1]['id']}", json={"visibility": "off"}))
+    block = level_of(await public(flow, world, season=world["seasons"][0]))
+    assert block["rewards_granted"] is False and all(not item["holders"] for item in block["rewards"])
+    profile = ok(await flow.get("/api/users/public/p-2-1"))
+    assert "Gesamtsieg" not in {row["reward"]["name"] for row in profile["awards"] if row.get("reward")}
+    # Der Link zur Gesamtwertung führt über die Season, die der Gast sieht.
+    assert profile["league_overall"][0]["url"] == f"/liga/{world['league']['slug']}/{world['seasons'][0]['slug']}/gesamtwertung"
+    assert (await flow.get(f"/api/rewards/{gold['id']}/share.png")).status_code == 404
+    # Gegenprobe: wieder öffentlich - Inhaber, Abzeichen und Bild sind zurück.
+    flow.act_as(world["admin"])
+    ok(await flow.patch(f"{ADMIN}/seasons/{world['seasons'][1]['id']}", json={"visibility": "public", "readiness_override_reason": "Testaufbau"}))
+    block = level_of(await public(flow, world))
+    assert block["rewards_granted"] is True and block["rewards"][0]["holders"][0]["display_name"] == "Probe 2"
+    assert "Gesamtsieg" in {row["reward"]["name"] for row in ok(await flow.get("/api/users/public/p-2-1"))["awards"] if row.get("reward")}
+    assert (await flow.get(f"/api/rewards/{gold['id']}/share.png")).status_code == 200
