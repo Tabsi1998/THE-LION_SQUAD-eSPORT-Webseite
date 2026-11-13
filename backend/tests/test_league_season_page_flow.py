@@ -94,6 +94,17 @@ async def test_teams_of_a_staffel_carry_the_logo_of_their_team_page(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_team_that_is_not_public_keeps_its_logo_to_itself(flow):
+    _admin, _season, staffel = await setup(flow)
+    await flow.db.teams.update_one({"id": "team-2"}, {"$set": {"is_public": False}})
+    flow.act_as(None)
+    body = (await flow.get(f"{PAGE}/staffeln/{staffel['id']}")).json()
+    logos = {row["team_id"]: row["logo_url"] for row in body["teams"]}
+    assert logos["team-2"] is None and logos["team-1"] == "/api/static/uploads/probe-1.png"
+    assert "probe-2.png" not in str(body)
+
+
+@pytest.mark.asyncio
 async def test_matchdays_and_teams_have_their_own_preview_and_sitemap_entry(flow):
     from fastapi import HTTPException
 
