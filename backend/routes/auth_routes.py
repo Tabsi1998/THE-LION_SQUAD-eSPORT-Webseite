@@ -539,6 +539,10 @@ async def _touch_auth_session(
 
 
 async def _revoke_refresh_family(db, user_id: str, family_id: str, reason: str):
+    # Abmelden (#1163): die Browser-Benachrichtigungen dieser Sitzung enden mit ihr.
+    from services.web_push import forget_session
+
+    await forget_session(db, user_id, family_id)
     await db.refresh_tokens.update_many(
         {"user_id": user_id, "$or": [{"family_id": family_id}, {"jti": family_id}]},
         {"$set": {
