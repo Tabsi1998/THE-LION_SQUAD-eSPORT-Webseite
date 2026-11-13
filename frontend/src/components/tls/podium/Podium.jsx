@@ -61,7 +61,7 @@ function usePlayOnce(ref) {
     observer.observe(node);
     return () => observer.disconnect();
     // Nur beim Erscheinen - spätere Zustände ändern nichts mehr.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Aufbau (siehe oben)
   }, []);
   return play;
 }

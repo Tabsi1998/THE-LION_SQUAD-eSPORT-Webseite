@@ -944,7 +944,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       setDrawRows(NO_MAP);
     };
     // Nur ein neuer Moment startet den Ablauf - neue Daten laufen über die Refs mit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur ein neuer Moment (siehe oben)
   }, [momentId]);
 
   const lastStage = lastStageId(matches, stages);
