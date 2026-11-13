@@ -14,21 +14,25 @@ import { SEASON_SECTIONS, sectionPath } from "@/lib/leagueSeasonPage";
 import "./league.css";
 import "./season.css";
 
-/** Die Season laden - `missing`, wenn die API sie der Person nicht zeigt. */
+/** Die Season laden - `missing`, wenn die API sie der Person nicht zeigt (404); `failed` bei Netz- oder Serverfehlern (#2268) - dann
+ *  ist die Season nicht „nicht gefunden“, sondern gerade nicht erreichbar. */
 export function useLeagueSeason(leagueSlug, seasonSlug) {
   const [data, setData] = useState(null);
   const [missing, setMissing] = useState(false);
+  const [failed, setFailed] = useState(false);
   const load = useCallback(async () => {
+    setFailed(false);
     try {
       const { data: body } = await api.get(`/leagues/${leagueSlug}/${seasonSlug}`);
       setData(body);
       setMissing(false);
-    } catch {
-      setMissing(true);
+    } catch (err) {
+      if (err?.response?.status === 404) setMissing(true);
+      else setFailed(true);
     }
   }, [leagueSlug, seasonSlug]);
   useEffect(() => { load(); }, [load]);
-  return { data, missing, reload: load };
+  return { data, missing, failed, reload: load };
 }
 
 /**
@@ -89,7 +93,7 @@ function CompactHead({ look, league, season, title }) {
  */
 export function SeasonShell({ section = "", head, children }) {
   const { league: leagueSlug, season: seasonSlug } = useParams();
-  const { data, missing } = useLeagueSeason(leagueSlug, seasonSlug);
+  const { data, missing, failed, reload } = useLeagueSeason(leagueSlug, seasonSlug);
   const league = data?.league;
   const season = data?.season;
   const current = SEASON_SECTIONS.find((row) => row.key === section) || SEASON_SECTIONS[0];
@@ -111,6 +115,20 @@ export function SeasonShell({ section = "", head, children }) {
           <h1 className="font-heading text-3xl font-black uppercase">Liga nicht gefunden</h1>
           <p className="mt-3 text-white/60">Diese Season gibt es nicht oder sie ist (noch) nicht sichtbar.</p>
           <Link to="/liga" className="tls-btn tls-btn--secondary mt-6 inline-flex rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">Zur Liga-Übersicht</Link>
+        </div>
+      </PublicLayout>
+    );
+  }
+  if (failed && !data) {
+    return (
+      <PublicLayout>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 text-center" role="alert" data-testid="league-load-failed">
+          <h1 className="font-heading text-3xl font-black uppercase">Liga gerade nicht erreichbar</h1>
+          <p className="mt-3 text-white/60">Die Seite konnte nicht geladen werden – meist hilft es, es gleich noch einmal zu versuchen.</p>
+          <button type="button" onClick={reload} data-testid="league-load-retry"
+            className="tls-btn tls-btn--secondary mt-6 inline-flex min-h-[44px] items-center rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+            Nochmal laden
+          </button>
         </div>
       </PublicLayout>
     );

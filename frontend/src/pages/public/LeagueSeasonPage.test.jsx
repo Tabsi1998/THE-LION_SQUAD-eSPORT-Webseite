@@ -178,6 +178,22 @@ test("Unsichtbare oder unbekannte Season: ein klarer Hinweis", async () => {
   expect(await screen.findByTestId("league-missing")).toHaveTextContent("Liga nicht gefunden");
 });
 
+test("Netz- oder Serverfehler (#2268): nicht „nicht gefunden“, sondern ein Hinweis mit „Nochmal laden“", async () => {
+  apiMock.get.mockRejectedValueOnce({ response: { status: 502 } });
+  renderPage();
+  const failed = await screen.findByTestId("league-load-failed");
+  expect(failed).toHaveTextContent("gerade nicht erreichbar");
+  expect(screen.queryByTestId("league-missing")).toBeNull();
+  fireEvent.click(screen.getByTestId("league-load-retry"));
+  expect(await screen.findByTestId("league-head")).toBeInTheDocument();
+});
+
+test("ohne Antwort (offline) ebenfalls „Nochmal laden“ statt „nicht gefunden“", async () => {
+  apiMock.get.mockRejectedValueOnce(new Error("Netzwerk"));
+  renderPage();
+  expect(await screen.findByTestId("league-load-failed")).toBeInTheDocument();
+});
+
 test("Staffel-Reiter: Tabpanel, Pfeiltasten wechseln und setzen den Fokus", async () => {
   renderPage();
   const tabA = await screen.findByTestId("league-staffel-tab-A");
