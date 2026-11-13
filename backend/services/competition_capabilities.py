@@ -209,7 +209,7 @@ CAPABILITIES: tuple[Capability, ...] = (
        ["GET /api/tournaments/{tid}/live-queue", "GET /api/tournaments/{tid}/live-queue/me",
         "POST /api/tournaments/{tid}/live-queue/call", "POST /api/tournaments/{tid}/live-queue/start",
         "POST /api/tournaments/{tid}/live-queue/release", "POST /api/tournaments/{tid}/live-queue/broken",
-        "POST /api/tournaments/{tid}/live-queue/move"], [GRAPH],
+        "POST /api/tournaments/{tid}/live-queue/move", "POST /api/tournaments/{tid}/live-queue/clear"], [GRAPH],
        note="#1556: je Station „läuft / als Nächstes / danach“ mit Prognose aus dem Planer; Aufrufen und Starten "
             "unter der Turnier-Sperre, nur mit Stations-Recht; lesen öffentlich wie der Turnierbaum. #1162: Freigeben, "
             "Defekt und Umlegen vom Handy für dieselben Rollen, ohne Admin-Recht."),

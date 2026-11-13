@@ -126,3 +126,14 @@ test("geteilte Station, an der ein anderes Turnier spielt (#1162): kein Aufrufen
   fireEvent.click(screen.getByTestId("live-broken-yes-sx"));
   expect(handlers.onBroken).toHaveBeenCalledWith(expect.objectContaining({ id: "sx" }), true, { confirm_other: true });
 });
+
+test("hängende Station (#1162): „Hängt“ statt „Frei“, kein Aufrufen, „Station räumen“", () => {
+  const onClear = vi.fn();
+  const stuck = { id: "sh", name: "H", station_text: "Station H", status: "busy", running: null, next: entry("QH"), after: null, hold_issue: { kind: "stuck", tournament_title: null } };
+  tile(stuck, { onClear });
+  expect(stationTone(stuck)).toBe("stuck");
+  expect(screen.getByTestId("live-chip-sh")).toHaveTextContent("Hängt");
+  expect(screen.queryByTestId("live-call-sh")).toBeNull();
+  fireEvent.click(screen.getByTestId("live-clear-sh"));
+  expect(onClear).toHaveBeenCalledWith(expect.objectContaining({ id: "sh" }));
+});

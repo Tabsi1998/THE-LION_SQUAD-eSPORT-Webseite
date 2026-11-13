@@ -7,7 +7,8 @@
 - ``POST /tournaments/{tid}/live-queue/call`` und ``.../start``: Organisation, Schiedsrichter, Stationsleitung - fürs
   ganze Turnier oder für genau diese Station.
 - ``POST .../live-queue/release``, ``.../broken`` und ``.../move`` (#1162): Freigeben, Defekt bzw. wieder bereit und
-  Umlegen vom Handy - dieselben Rollen, ohne Admin-Recht.
+  Umlegen vom Handy - dieselben Rollen, ohne Admin-Recht. ``.../clear`` räumt eine hängende Station (belegt ohne
+  offenes Spiel).
 
 Zwei Helfer zugleich: Aufruf und Start laufen unter dem Turnier-Lock wie Zuweisen und „Übernehmen“ (#1552), dazu prüft
 diese Stelle, was der Helfer gesehen hat, frisch nach: Ein Spiel, das schon an einer anderen Station aufgerufen ist,
@@ -356,6 +357,14 @@ class StationBroken(BaseModel):
     confirm_other: bool = False
 
 
+class StationClear(BaseModel):
+    """Station räumen: belegt oder reserviert gespeichert, aber ohne offenes Spiel (``_hold_issue`` „stuck“)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    station_id: str = Field(min_length=1, max_length=120)
+
+
 class StationMove(QueueAction):
     """Umlegen: das Spiel, das ``station_id`` hält, auf die freie Station ``to_station_id``."""
 
@@ -467,6 +476,41 @@ async def station_broken(tid: str, body: StationBroken, me: dict = Depends(get_c
         if body.broken:
             await _tell_other_lead(db, other, station, tournament, me["id"], now_iso)
     return {"ok": True, "idempotent_replay": False, "holds": holds}
+
+
+@router.post("/{tid}/live-queue/clear")
+async def clear_stuck_station(tid: str, body: StationClear, me: dict = Depends(get_current_user)):
+    """Station räumen (#1162): Eine Station hängt, wenn sie als belegt oder reserviert gespeichert ist, aber kein offenes
+    Spiel an genau ihr steht - etwa nach dem Löschen einer Phase oder einem fertigen Spiel ohne Freigabe. Geräumt wird nur
+    dann: Hängt ein offenes Spiel dieses Turniers daran, sind „Freigeben“ oder „Umlegen“ der Weg; hängt eines eines
+    anderen Turniers daran (geteilte Station), räumt dessen Leitung. Eine defekte Station bleibt defekt."""
+    db, tournament, _station = await _station_context(tid, body.station_id, me)
+    tournament_id = tournament["id"]
+    async with _tournament_lock(db, tournament_id):
+        station = await db.stations.find_one({"id": body.station_id}, {"_id": 0}) or {}
+        issue = await _hold_issue(db, station, tournament_id)
+        if issue is None:
+            if not station.get("current_match_id") and station.get("status") in {None, "free", "broken"}:
+                return {"ok": True, "idempotent_replay": True}
+            raise HTTPException(status_code=409, detail="An der Station steht ein offenes Spiel – bitte „Freigeben“ oder „Umlegen“.")
+        if issue["kind"] == "other":
+            raise HTTPException(status_code=409, detail=_other_text(issue))
+        held = station.get("current_match_id")
+        now_iso = now_utc().isoformat()
+        station_set = {"current_match_id": None, "current_match_type": None, "updated_at": now_iso}
+        if station.get("status") != "broken":
+            station_set["status"] = "free"
+        cleared = await db.stations.update_one(
+            {"id": station["id"], "current_match_id": held, "status": station.get("status")},
+            {"$set": station_set, "$unset": {"called_at": ""}},
+        )
+        if not cleared.matched_count:
+            raise HTTPException(status_code=409, detail="Die Station hat sich inzwischen geändert. Bitte neu laden.")
+    reset_scope_cache()  # Live-Meldungen (#1801): wie jede Stationsänderung
+    await _station_audit(db, "station.cleared", tournament_id, me["id"], {
+        "station_id": station["id"], "stale_match_id": held, "status_before": station.get("status"),
+    })
+    return {"ok": True, "idempotent_replay": False}
 
 
 async def _move_running(db, source: dict, target: dict, match: dict) -> None:

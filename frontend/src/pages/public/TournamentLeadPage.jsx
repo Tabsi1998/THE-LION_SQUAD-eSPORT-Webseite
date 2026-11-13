@@ -251,6 +251,7 @@ export default function TournamentLeadPage() {
               onRelease={(station, entry) => operateStation("release", station, { match_id: entry.match_id }, releasedText)}
               onBroken={(station, value, extra) => operateStation("broken", station, { broken: value, ...extra }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`))}
               onMove={(station, entry, target) => operateStation("move", station, { match_id: entry.match_id, to_station_id: target.id }, movedText)}
+              onClear={(station) => operateStation("clear", station, {}, (done, where) => (done.idempotent_replay ? `${where} war schon frei.` : `${where} ist geräumt und wieder frei.`))}
             />
             <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>
           </div>

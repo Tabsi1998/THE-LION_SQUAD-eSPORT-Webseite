@@ -8,7 +8,7 @@ import "./live.css";
 // „Freigeben“, „Umlegen“ und „Defekt“ (#1162). Die Reihenfolge rechnet der Server (services/live_queue.py) - die Seite
 // zeigt nur. Knöpfe nur, wer die Station bedienen darf (`queue.operate`).
 
-export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRelease, onBroken, onMove }) {
+export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRelease, onBroken, onMove, onClear }) {
   const summary = queueSummaryLine(queue?.summary);
   const stations = queue?.stations || [];
   const operate = queue?.operate;
@@ -35,6 +35,7 @@ export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRele
             onRelease={onRelease}
             onBroken={onBroken}
             onMove={onMove}
+            onClear={onClear}
           />
         ))}
       </div>

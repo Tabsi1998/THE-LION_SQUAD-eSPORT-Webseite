@@ -389,3 +389,61 @@ async def test_a_shared_station_goes_broken_only_after_asking_and_the_other_lead
     lead = (await flow.get(f"/api/tournaments/{b['id']}/lead")).json()
     case = next(item for item in lead["attention"] if item["kind"] == "station_broken")
     assert case["station_id"] == shared["id"] and case["match_ids"] == [b_match["id"]]
+
+
+# ---------------------------------------------------------------- Hängende Station räumen (#1162, Review M2)
+
+async def clear(flow, tournament, station):
+    return await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/clear", json={"station_id": station["id"]})
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_stage_frees_the_stations_of_its_matches(flow):
+    _staff, tournament, stations, _players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    assert (await call(flow, tournament, stations[0], match)).status_code == 200
+    assert (await broken(flow, tournament, stations[1])).status_code == 200
+    other = (await first_round(flow, tournament))[1]
+    await flow.db.stations.update_one({"id": stations[1]["id"]}, {"$set": {"current_match_id": other["id"]}})
+    deleted = await flow.delete(f"/api/tournaments/{tournament['id']}/stages/{match['stage_id']}?force=true")
+    assert deleted.status_code == 200, deleted.text
+    first = await station_of(flow, stations[0])
+    assert first["status"] == "free" and not first.get("current_match_id") and not first.get("called_at")
+    second = await station_of(flow, stations[1])
+    assert second["status"] == "broken" and not second.get("current_match_id"), "defekt bleibt defekt"
+
+
+@pytest.mark.asyncio
+async def test_a_stuck_station_is_shown_and_cleared_but_never_one_with_an_open_match(flow):
+    _staff, tournament, stations, _players = await on_site(flow)
+    helper = await station_lead(flow, tournament, stations[0])
+    await flow.db.stations.update_one({"id": stations[0]["id"]}, {"$set": {"status": "busy", "current_match_id": "weg"}})
+    flow.act_as(helper)
+    row = next(row for row in (await queue(flow, tournament))["stations"] if row["id"] == stations[0]["id"])
+    assert row["hold_issue"] == {"kind": "stuck", "tournament_title": None}
+    cleared = await clear(flow, tournament, stations[0])
+    assert cleared.status_code == 200 and cleared.json()["idempotent_replay"] is False, cleared.text
+    stored = await station_of(flow, stations[0])
+    assert stored["status"] == "free" and not stored.get("current_match_id")
+    assert [row["data"]["stale_match_id"] for row in await audit(flow, "station.cleared")] == ["weg"]
+    again = await clear(flow, tournament, stations[0])
+    assert again.status_code == 200 and again.json()["idempotent_replay"] is True
+    # Fremde Station: nur mit Recht.
+    assert (await clear(flow, tournament, stations[1])).status_code == 403
+
+    # Mit einem offenen Spiel dieses Turniers: nicht räumen.
+    match = (await first_round(flow, tournament))[0]
+    assert (await call(flow, tournament, stations[0], match)).status_code == 200
+    refused = await clear(flow, tournament, stations[0])
+    assert refused.status_code == 409 and "Freigeben" in refused.json()["detail"]
+    assert (await station_of(flow, stations[0]))["current_match_id"] == match["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_shared_station_of_another_tournament_is_not_cleared_from_here(flow):
+    _staff, a, b, shared, b_match, org_a = await shared_world(flow)
+    flow.act_as(org_a)
+    refused = await clear(flow, a, shared)
+    assert refused.status_code == 409 and "dessen Leitung gibt frei" in refused.json()["detail"]
+    assert (await station_of(flow, shared))["current_match_id"] == b_match["id"]
+    assert b["id"] != a["id"]

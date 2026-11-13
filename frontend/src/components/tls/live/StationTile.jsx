@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRightLeft, BellRing, Hourglass, Play, RotateCcw, Unlock, Wrench } from "lucide-react";
+import { ArrowRightLeft, BellRing, Eraser, Hourglass, Play, RotateCcw, Unlock, Wrench } from "lucide-react";
 import { delayText } from "@/lib/liveQueue";
 import { stationWho, queueWhat } from "@/lib/tvQueue";
 import { viennaTime } from "@/lib/vienna";
@@ -37,6 +37,8 @@ const TONES = {
   free: ["Frei", "border-ok/40 bg-ok/10 text-ok"],
   // Geteilte Event-Station (#1162): hier spielt gerade ein anderes Turnier - dessen Leitung bedient sie.
   other: ["Anderes Turnier", "border-white/25 bg-white/5 text-white/70"],
+  // Als belegt gespeichert, aber ohne offenes Spiel (#1162) - etwa nach dem Löschen einer Phase.
+  stuck: ["Hängt", "border-warn/50 bg-warn/10 text-warn"],
 };
 
 export function stationTone(station) {
@@ -44,6 +46,7 @@ export function stationTone(station) {
   if (station?.hold_issue?.kind === "other") return "other";
   if (station?.running) return "running";
   if (station?.next?.state === "called") return "called";
+  if (station?.hold_issue?.kind === "stuck") return "stuck";
   return "free";
 }
 
@@ -61,7 +64,7 @@ export function moveTargets(stations = [], from, canOperate = () => true) {
 
 const BTN = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider";
 
-export function StationTile({ station, index = 0, busy = false, canOperate = false, targets = [], onCall, onStart, onRelease, onBroken, onMove }) {
+export function StationTile({ station, index = 0, busy = false, canOperate = false, targets = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
   const tone = stationTone(station);
   const [chip, chipClass] = TONES[tone];
   const { running, next, after } = station;
@@ -83,6 +86,17 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
         <p className="tls-live-reveal mt-2 rounded-sm border border-white/15 bg-white/[0.03] px-2.5 py-2 text-xs text-white/70 [overflow-wrap:anywhere]" role="status" data-testid={`live-other-hint-${station.id}`}>
           Hier spielt gerade „{station.hold_issue.tournament_title}“ – dessen Leitung ruft auf, startet und gibt frei.
         </p>
+      ) : null}
+
+      {tone === "stuck" ? (
+        <div className="tls-live-reveal mt-2 rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2 text-xs text-warn" role="status" data-testid={`live-stuck-hint-${station.id}`}>
+          Als belegt gespeichert, aber ohne offenes Spiel – „Station räumen“ macht sie wieder frei.
+          {canOperate && onClear ? (
+            <button type="button" disabled={busy} onClick={() => onClear(station)} className={`tls-btn tls-btn--secondary mt-2 ${BTN}`} data-testid={`live-clear-${station.id}`}>
+              <Eraser className="h-4 w-4 shrink-0" aria-hidden="true" /> Station räumen
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {broken && holds ? (
@@ -108,7 +122,7 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
             {next.state === "called" ? <BellRing className="tls-live-bell mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
             <span className="min-w-0 [overflow-wrap:anywhere]">{next.state === "called" ? calledLine(next) : when(next)}</span>
           </div>
-          <NextAction station={station} next={next} running={running} broken={broken} blocked={tone === "other"} busy={busy} canOperate={canOperate} onCall={onCall} onStart={onStart} />
+          <NextAction station={station} next={next} running={running} broken={broken} blocked={tone === "other" || tone === "stuck"} busy={busy} canOperate={canOperate} onCall={onCall} onStart={onStart} />
         </div>
       ) : (
         !running ? <p className="mt-3 text-sm text-white/45">{broken ? "Station ist defekt – nichts wird hierher geplant." : "Nichts mehr in der Warteschlange."}</p> : null
