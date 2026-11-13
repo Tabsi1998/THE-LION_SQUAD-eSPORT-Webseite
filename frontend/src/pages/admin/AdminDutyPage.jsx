@@ -14,13 +14,15 @@ import { useAuth } from "@/context/AuthContext";
 import { hasLeagueStaff, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { capabilityWords } from "@/pages/admin/league/LeagueStaffSheet";
 import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 
 export default function AdminDutyPage() {
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
   const { user } = useAuth();
   const load = useCallback(() => {
-    api.get("/users/me/duty")
+    // Mit den Leitständen je Season (E.4) - die Startseite der Verwaltung fragt ohne, das spart dort alle Quellen der Liga.
+    api.get("/users/me/duty", { params: { desks: 1 } })
       .then(({ data: next }) => { setData(next); setFailed(false); })
       .catch(() => setFailed(true));
   }, []);
@@ -31,6 +33,7 @@ export default function AdminDutyPage() {
   const leadToday = data?.lead_today || [];
   const series = data?.series || [];
   const leagues = data?.leagues || [];
+  const desks = data?.league_desks || [];
   const leagueDuty = hasLeagueStaff(user);
   const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0 && series.length === 0 && !leagueDuty
     && !hasDutyAttention(data);
@@ -54,6 +57,31 @@ export default function AdminDutyPage() {
         <section className="mb-8" aria-labelledby="duty-attention-heading">
           <h2 id="duty-attention-heading" className="font-heading font-bold uppercase text-lg mb-3">Braucht deine Entscheidung</h2>
           <DutyAttention duty={data} />
+        </section>
+      )}
+
+      {/* Leitstand je Season (E.4, Nr. 152): Hier steht nur die eigene Liste - alles Offene der Season sammelt der Leitstand. */}
+      {desks.length > 0 && (
+        <section className="mb-8" aria-labelledby="duty-desks-heading" data-testid="duty-desks">
+          <h2 id="duty-desks-heading" className="font-heading font-bold uppercase text-lg mb-3">Leitstand der Seasons</h2>
+          <ul className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]">
+            {desks.map((row) => (
+              <li key={row.season_id}>
+                <Link to={row.url} data-testid={`duty-desk-${row.season_id}`}
+                  className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-white [overflow-wrap:anywhere]">{row.league_name} · {row.season_name}</span>
+                    <span className="block text-xs text-white/55">
+                      {row.total ? `${row.mine === 1 ? "1 Aufgabe" : `${row.mine} Aufgaben`} für dich, ${row.total} offen in der Season` : "Alles erledigt"}
+                    </span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">
+                    Leitstand <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

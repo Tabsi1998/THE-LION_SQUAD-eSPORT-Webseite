@@ -112,6 +112,9 @@ async function mockServer(page) {
       // Reiter „Proteste“ (E.2, #1619): Einstellungen und Eingang der Verfahren.
       "/admin/leagues/seasons/s1/protest-settings": PROTESTS,
       "/admin/leagues/seasons/s1/procedures": PROCEDURES,
+      // Leitstand (E.4): ohne offene Aufgabe - die Aufgaben selbst prüft league-desk.spec.js.
+      "/admin/leagues/seasons/s1/desk": { season: { id: "s1" }, groups: [], total: 0, mine: 0, can_broadcast: true },
+      "/admin/leagues/seasons/s1/desk/log": { items: [], page: 1, pages: 1, total: 0 },
     };
     if (where in bodies) return json(bodies[where])(route);
     if (["/sponsors", "/notifications/me", "/games"].some((prefix) => where.startsWith(prefix))) return json([])(route);
@@ -135,7 +138,7 @@ async function shot(page, name, width) {
 }
 
 const TABS = [
-  ["ueberblick", "season-phases"], ["spielbetrieb", "season-pool-modes"], ["termine", "season-calendar"], ["anmeldung", "season-application-settings"],
+  ["ueberblick", "season-phases"], ["leitstand", "desk-empty"], ["spielbetrieb", "season-pool-modes"], ["termine", "season-calendar"], ["anmeldung", "season-application-settings"],
   ["tabelle", "season-table-rules"], ["proteste", "season-protest-settings"], ["regelwerk", "season-rules"], ["ligen", "season-divisions"],
 ];
 

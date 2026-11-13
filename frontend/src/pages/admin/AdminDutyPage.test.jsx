@@ -41,7 +41,7 @@ test("Helfer: eigene Einsätze in der Reihenfolge des Servers, mit Rolle und Kno
   expect(screen.getByTestId("duty-admin-t-1")).toHaveAttribute("href", "/admin/tournaments/t-1");
   expect(screen.getByTestId("duty-open-f-1")).toHaveTextContent("Fast Lap öffnen");
   expect(screen.queryByTestId("duty-moderation")).toBeNull();
-  expect(apiMock.get).toHaveBeenCalledWith("/users/me/duty");
+  expect(apiMock.get).toHaveBeenCalledWith("/users/me/duty", { params: { desks: 1 } });
 });
 
 test("Moderation: die Meldungen mit Zähler, keine Turnierliste", async () => {
@@ -95,4 +95,16 @@ test("Zuständige ohne Zwei-Faktor (#2203): der Weg zur Einrichtung", async () =
   authState.user = { id: "z", role: "player", has_league_staff: true, mfa_enabled: false };
   renderWith({ assignments: [], series: [], moderation: null, lead_today: [], leagues: [] });
   expect(await screen.findByTestId("duty-leagues-mfa")).toHaveTextContent("Zwei-Faktor");
+});
+
+// Leitstand (E.4, Nr. 152): „Mein Dienst“ führt je Season mit der eigenen Zahl in den Leitstand.
+test("Leitstand der Seasons mit eigener und offener Zahl und Link auf #leitstand", async () => {
+  renderWith({ assignments: [], moderation: null, lead_today: [], league_desks: [
+    { season_id: "s1", league_name: "Probe-Liga", season_name: "Season 1", mine: 2, total: 5, url: "/admin/leagues/seasons/s1#leitstand" },
+    { season_id: "s2", league_name: "Probe-Liga", season_name: "Season 2", mine: 0, total: 0, url: "/admin/leagues/seasons/s2#leitstand" },
+  ] });
+  const first = await screen.findByTestId("duty-desk-s1");
+  expect(first).toHaveAttribute("href", "/admin/leagues/seasons/s1#leitstand");
+  expect(first).toHaveTextContent("2 Aufgaben für dich, 5 offen in der Season");
+  expect(screen.getByTestId("duty-desk-s2")).toHaveTextContent("Alles erledigt");
 });

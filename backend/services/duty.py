@@ -137,8 +137,9 @@ async def lead_today_rows(db, now: datetime | None = None, limit: int = 50) -> l
     return sorted(rows, key=_sort_key)
 
 
-async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
-    """Alles für „Mein Dienst“ in einer Antwort; leer für Spieler ohne Dienst."""
+async def duty_overview(db, user: dict, now: datetime | None = None, *, desks: bool = False) -> dict:
+    """Alles für „Mein Dienst“ in einer Antwort; leer für Spieler ohne Dienst. ``desks``: dazu die Zähler der Leitstände (E.4) - nur die
+    Seite „Mein Dienst“ fragt danach; die Startseite der Verwaltung lädt ohne, weil das je Season alle Quellen liest."""
     moderation = None
     if await can_use_area(user, "moderation", db=db):
         moderation = {"open_reports": await db.user_reports.count_documents({"status": "open"})}
@@ -168,7 +169,31 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         "checkin_proposals": await checkin_proposal_rows(db, user),
         # Vorfälle (#1619, D.5): Map in Klärung oder Serie noch festzustellen - für wer in der Liga entscheiden darf.
         "incident_reviews": await incident_review_rows(db, user),
+        # Leitstand je Season (E.4, Nr. 152): „Mein Dienst“ bleibt die eigene Liste und führt mit der Zahl der offenen Aufgaben hinein.
+        "league_desks": await league_desk_rows(db, user) if desks else [],
     }
+
+
+async def league_desk_rows(db, user: dict, limit: int = 10) -> list[dict]:
+    """Die Seasons (Entwurf oder laufend) der Ligen, in denen die Person zuständig ist, mit den Aufgaben, die im Leitstand auf sie
+    warten (``mine``) und allen offenen (``total``)."""
+    from services import league_desk
+    from services.league_permissions import has_leagues_area, staffed_league_ids
+
+    if not user or needs_mfa(user):
+        return []
+    query = {"status": "active"} if has_leagues_area(user) else {"status": "active", "id": {"$in": sorted(await staffed_league_ids(db, user))}}
+    rows: list[dict] = []
+    for league in await db.leagues.find(query, {"_id": 0, "id": 1, "name": 1}).sort("name", 1).to_list(200):
+        seasons = await db.league_seasons.find({"league_id": league["id"], "status": {"$in": ["draft", "active"]}},
+                                               {"_id": 0}).sort("number", -1).to_list(20)
+        for season in seasons:
+            desk = await league_desk.season_desk(db, season, user)
+            rows.append({"season_id": season["id"], "league_name": league.get("name"), "season_name": season.get("name"),
+                         "mine": desk["mine"], "total": desk["total"], "url": f"/admin/leagues/seasons/{season['id']}#leitstand"})
+            if len(rows) >= limit:
+                return rows
+    return rows
 
 
 async def rules_pending_rows(db, user: dict, limit: int = 50) -> list[dict]:
@@ -216,28 +241,8 @@ async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[d
     return await rows(db, user, now=now)
 
 
-async def overdue_match_rows(db, user: dict, limit: int = 50) -> list[dict]:
-    """Überfällige Liga-Spiele (#2194, Nr. 28) für die Liga-Leitung mit „Spiele betreuen“ oder „Ergebnisse korrigieren“."""
-    from services.league_permissions import can, staffel_access
-    from services.league_schedule import overdue_query
+async def overdue_match_rows(db, user: dict, limit: int = 50, *, season_id: str | None = None) -> list[dict]:
+    """Überfällige Liga-Spiele (#2194, Nr. 28) - die Regel steht in ``league_schedule.overdue_rows`` (dort liest auch der Leitstand)."""
+    from services.league_schedule import overdue_rows
 
-    query = (await staffel_access(db, user)).query()
-    if query is None:
-        return []
-    staffeln = await db.tournaments.find({**query, "status": {"$nin": ["draft", "archived", "cancelled"]}},
-                                         {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
-    allowed = {}
-    for row in staffeln:
-        if await can(user, ("matches", "results"), row["league_context"].get("league_id"), db=db):
-            allowed[row["id"]] = row
-    if not allowed:
-        return []
-    matches = await db.matches_v2.find(overdue_query(sorted(allowed)), {
-        "_id": 0, "id": 1, "tournament_id": 1, "scheduled_at": 1, "result_overdue_at": 1, "round_name": 1,
-        "matchday_label": 1, "matchday_number": 1, "round": 1}).sort("scheduled_at", 1).to_list(limit)
-    return [{
-        "match_id": row["id"], "tournament_id": row["tournament_id"], "title": allowed[row["tournament_id"]].get("title"),
-        "label": row.get("matchday_label") or row.get("round_name") or (f"Spieltag {row.get('matchday_number') or row.get('round')}"
-                                                                         if row.get("matchday_number") or row.get("round") else "Spiel"),
-        "scheduled_at": row.get("scheduled_at"), "overdue_since": row.get("result_overdue_at"), "url": f"/matches/{row['id']}",
-    } for row in matches]
+    return await overdue_rows(db, user, limit, season_id=season_id)

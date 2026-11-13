@@ -578,13 +578,16 @@ def proposal_query(tournament_ids: list[str]) -> dict:
             "is_preview": {"$ne": True}}
 
 
-async def proposal_rows(db, user: dict, limit: int = 50) -> list[dict]:
-    """Mein Dienst: die offenen Vorschläge „nicht erschienen“ aus dem Check-in für die Liga-Leitung mit ``matches`` oder ``results``."""
+async def proposal_rows(db, user: dict, limit: int = 50, *, season_id: str | None = None) -> list[dict]:
+    """Mein Dienst: die offenen Vorschläge „nicht erschienen“ aus dem Check-in für die Liga-Leitung mit ``matches`` oder ``results``.
+    ``season_id``: nur diese Season - für den Leitstand (E.4)."""
     from services.league_permissions import can, staffel_access
 
     query = (await staffel_access(db, user)).query()
     if query is None:
         return []
+    if season_id:
+        query = {**query, "league_context.season_id": season_id}
     staffeln = await db.tournaments.find({**query, "status": "live", "checkin_rules": {"$type": "object"}},
                                          {"_id": 0, "id": 1, "title": 1, "slug": 1, "league_context": 1}).to_list(500)
     allowed = {}
