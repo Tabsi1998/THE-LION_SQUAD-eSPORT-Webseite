@@ -241,30 +241,7 @@ async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[d
 
 
 async def overdue_match_rows(db, user: dict, limit: int = 50, *, season_id: str | None = None) -> list[dict]:
-    """Überfällige Liga-Spiele (#2194, Nr. 28) für die Liga-Leitung mit „Spiele betreuen“ oder „Ergebnisse korrigieren“. ``season_id``:
-    nur diese Season - für den Leitstand (E.4)."""
-    from services.league_permissions import can, staffel_access
-    from services.league_schedule import overdue_query
+    """Überfällige Liga-Spiele (#2194, Nr. 28) - die Regel steht in ``league_schedule.overdue_rows`` (dort liest auch der Leitstand)."""
+    from services.league_schedule import overdue_rows
 
-    query = (await staffel_access(db, user)).query()
-    if query is None:
-        return []
-    if season_id:
-        query = {**query, "league_context.season_id": season_id}
-    staffeln = await db.tournaments.find({**query, "status": {"$nin": ["draft", "archived", "cancelled"]}},
-                                         {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
-    allowed = {}
-    for row in staffeln:
-        if await can(user, ("matches", "results"), row["league_context"].get("league_id"), db=db):
-            allowed[row["id"]] = row
-    if not allowed:
-        return []
-    matches = await db.matches_v2.find(overdue_query(sorted(allowed)), {
-        "_id": 0, "id": 1, "tournament_id": 1, "scheduled_at": 1, "result_overdue_at": 1, "round_name": 1,
-        "matchday_label": 1, "matchday_number": 1, "round": 1}).sort("scheduled_at", 1).to_list(limit)
-    return [{
-        "match_id": row["id"], "tournament_id": row["tournament_id"], "title": allowed[row["tournament_id"]].get("title"),
-        "label": row.get("matchday_label") or row.get("round_name") or (f"Spieltag {row.get('matchday_number') or row.get('round')}"
-                                                                         if row.get("matchday_number") or row.get("round") else "Spiel"),
-        "scheduled_at": row.get("scheduled_at"), "overdue_since": row.get("result_overdue_at"), "url": f"/matches/{row['id']}",
-    } for row in matches]
+    return await overdue_rows(db, user, limit, season_id=season_id)

@@ -3271,7 +3271,7 @@ Leitstand liest dieselben Quellen wie „Mein Dienst“ und die Reiter der Seaso
 | --- | --- | --- | --- |
 | `incidents` | `league_incidents.review_rows(season_id=…, include_involved=True)` | `results`, `disputes` | `/matches/{id}#vorfaelle` |
 | `no_show` | `match_flow.proposal_rows(season_id=…)` | `matches`, `results` | Turnierleitung `?fall=ns-…` |
-| `overdue` (Nr. 28) | `duty.overdue_match_rows(season_id=…)` | `matches`, `results` | `/matches/{id}` |
+| `overdue` (Nr. 28) | `league_schedule.overdue_rows(season_id=…)` | `matches`, `results` | `/matches/{id}` |
 | `lineups` (Nr. 47) | Spiele mit `lineup_overdue_at` und `lineups_missing` | `matches`, `results` | `/matches/{id}` |
 | `procedures` (E.2) | `league_procedures.open_rows` | `disputes` | `/matches/{id}#verfahren-{pid}` |
 | `sanctions` (E.3) | `competition_sanctions` vorläufig oder mit offenem Einspruch, `league_sanctions.admin_rows` | `sanctions` | `#strafen` |

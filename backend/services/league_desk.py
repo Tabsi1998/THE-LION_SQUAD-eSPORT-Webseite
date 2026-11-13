@@ -3,7 +3,7 @@
 Ein Reiter je Season sammelt alles, was die Liga-Leitung dort noch tun muss - aus denselben Quellen wie „Mein Dienst“ und die
 Reiter der Season, ohne eigene Regeln:
 
-- überfällige, nie gemeldete Spiele (Nr. 28, ``duty.overdue_match_rows``),
+- überfällige, nie gemeldete Spiele (Nr. 28, ``league_schedule.overdue_rows``),
 - fehlende Teilnehmerlisten nach der Frist (Nr. 47, ``lineup_overdue_at`` aus ``match_deadline_sweep``),
 - abgelaufene Check-ins (D.2, ``match_flow.proposal_rows``) und Vorfälle (D.5, ``league_incidents.review_rows``),
 - offene Verfahren (E.2, ``league_procedures.open_rows``),
@@ -115,9 +115,9 @@ def _by_staffel(rows: list[dict]) -> dict[str, list[str]]:
 
 
 async def _overdue(db, me, season, staffeln) -> list[dict]:
-    from services.duty import overdue_match_rows
+    from services.league_schedule import overdue_rows
 
-    rows = await overdue_match_rows(db, me, limit=LIMIT, season_id=season["id"])
+    rows = await overdue_rows(db, me, limit=LIMIT, season_id=season["id"])
     involved = await _involved(db, me, staffeln, _by_staffel(rows))
     return [_item("overdue", row["match_id"], title=f"{row.get('title') or 'Staffel'} · {row['label']}",
                   text="Nie gemeldet, der Termin ist vorbei. Ergebnis eintragen, kampflos werten oder neuen Termin setzen. Ohne Entscheidung "
