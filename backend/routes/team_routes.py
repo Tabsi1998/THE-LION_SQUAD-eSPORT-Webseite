@@ -666,8 +666,9 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     out["awards"] = await awards_for_team(db, team_id, public_only=not insider)
     out["featured_award"] = next((award for award in out["awards"] if award["id"] == team.get("featured_award_id")), None)
     # Season-Historie (F.2, #1627): je abgeschlossener Liga-Staffel Liga N, Platz, Meister - nur Seasons, die die Person sieht.
+    from routes.tournament_common import tournament_hidden_reason
     from services.league_history import for_team
-    out["league_history"] = await for_team(db, team_id, user)
+    out["league_history"] = await for_team(db, team_id, user, hidden=tournament_hidden_reason)
     return out
 
 

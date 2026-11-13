@@ -667,3 +667,33 @@ async def test_withdraw_under_teams_only_for_carried_applications(flow):
     refused = await flow.post(f"/api/me/league-applications/{application['id']}/withdraw")
     assert refused.status_code == 404
     assert (await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0}))["status"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_season_history_visibility_for_guests_off_seasons_and_hidden_staffeln(flow):
+    world = await build(flow, levels=1, teams=4, exits={(1, 3): "withdrawn"})
+    await close_all(flow, world)
+    winner = world["regs"][1][0]
+    tid = world["tids"][0]
+    await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {"visibility": "public"}})
+    await flow.db.tournaments.update_one({"id": tid}, {"$set": {"visibility": "public", "is_public": True}})
+    flow.act_as(None)
+    guest = ok(await flow.get(f"/api/teams/{winner['team_id']}"))
+    # Von wie vielen: ohne das ausgetretene Team.
+    assert [(row["rank"], row["of"], row["champion"]) for row in guest["league_history"]] == [(1, 3, True)]
+    # Staffel intern (Turnierseite verborgen): Gäste sehen den Eintrag nicht, die Leitung schon.
+    await flow.db.tournaments.update_one({"id": tid}, {"$set": {"visibility": "internal", "is_public": False}})
+    assert ok(await flow.get(f"/api/teams/{winner['team_id']}"))["league_history"] == []
+    flow.act_as(world["lead"])
+    assert len(ok(await flow.get(f"/api/teams/{winner['team_id']}"))["league_history"]) == 1
+    # Season „Aus“: Gäste sehen nichts, auch wenn die Staffel öffentlich wäre.
+    await flow.db.tournaments.update_one({"id": tid}, {"$set": {"visibility": "public", "is_public": True}})
+    await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {"visibility": "off"}})
+    flow.act_as(None)
+    assert ok(await flow.get(f"/api/teams/{winner['team_id']}"))["league_history"] == []
+    squad = await flow.db.team_squads.find_one({"id": winner["squad_id"]}, {"_id": 0})
+    player = await flow.db.users.find_one({"id": squad["member_ids"][0]}, {"_id": 0})
+    await flow.db.users.update_one({"id": player["id"]}, {"$set": {"privacy_public_profile": True}})
+    assert ok(await flow.get(f"/api/users/public/{player['username']}"))["league_history"] == []
+    await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {"visibility": "public"}})
+    assert len(ok(await flow.get(f"/api/users/public/{player['username']}"))["league_history"]) == 1

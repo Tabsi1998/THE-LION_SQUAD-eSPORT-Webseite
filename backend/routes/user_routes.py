@@ -769,8 +769,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     if public:
         references = await personal_profile_references(u, public_only=True)
         # Season-Historie (F.2, #1627): wo die Person eingesetzt war - Liga N, Platz, Meister; nur Seasons, die der Betrachter sieht.
+        from routes.tournament_common import tournament_hidden_reason
         from services.league_history import for_player
-        league_history = await for_player(db, user_id, viewer)
+        league_history = await for_player(db, user_id, viewer, hidden=tournament_hidden_reason)
         # Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren, nur öffentliche.
         from services.awards import awards_for_user
         awards = await awards_for_user(db, user_id, public_only=True)
