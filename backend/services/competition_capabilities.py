@@ -213,6 +213,13 @@ CAPABILITIES: tuple[Capability, ...] = (
        note="#1556: je Station „läuft / als Nächstes / danach“ mit Prognose aus dem Planer; Aufrufen und Starten "
             "unter der Turnier-Sperre, nur mit Stations-Recht; lesen öffentlich wie der Turnierbaum. #1162: Freigeben, "
             "Defekt und Umlegen vom Handy für dieselben Rollen, ohne Admin-Recht."),
+    _c("lead.notices", "Hinweis der Turnierleitung an alle im Turnier",
+       ["GET /api/tournaments/{tid}/notices", "GET /api/tournaments/{tid}/lead/notices",
+        "POST /api/tournaments/{tid}/lead/notices/preview", "POST /api/tournaments/{tid}/lead/notices",
+        "POST /api/tournaments/{tid}/lead/notices/{notice_id}/resume",
+        "DELETE /api/tournaments/{tid}/lead/notices/{notice_id}"], [ENGINE_NEUTRAL],
+       note="#1166: höchstens 140 Zeichen an alle Angemeldeten (Teams: alle Mitglieder) des Turniers oder Events - "
+            "Benachrichtigung, Banner bis zum Ablauf, auf Wunsch am TV; einmal je Kennung, Versand im Hintergrund."),
     _c("lead.no_show", "„Nicht erschienen“ nach Frist entscheiden",
        ["POST /api/tournaments/{tid}/lead/no-show/{match_id}"], [GRAPH],
        note="#1551: nach der Frist schlägt der Server „kampflos verloren“ vor; die Turnierleitung bestätigt "

@@ -275,6 +275,9 @@ CLUB_CONTENT = frozenset({
     # Testentwürfe an Printful (#2062): Vereinsadresse, Druckdateien, Antwort von Printful - nur die Kennung, wer
     # gesendet bzw. gelöscht hat; nie ein Gamertag als Text (die Testdatei mit Namen hängt an shop_print_files).
     "shop_test_drafts",
+    # Hinweis der Turnierleitung (#1166): Text, Ziel, Zeitraum und Zahlen - nur die Kennung, wer geschrieben bzw. entfernt
+    # hat; Banner und TV zeigen nie eine Person.
+    "tournament_notices",
 })
 
 NO_PERSON = frozenset({

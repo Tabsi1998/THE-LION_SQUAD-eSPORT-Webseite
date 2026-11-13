@@ -73,6 +73,8 @@ nachsehen, dann **Trotzdem speichern**.
 - **Internet weg:** oben steht „Offline“. Auf Papier notieren (Station, Spiel, Plätze bzw. Zeit, Uhrzeit), später
   nachtragen.
 - **Seite hängt:** neu laden, sonst anderes Gerät.
+- **Pause oder Finale ansagen:** macht die Turnierleitung im Reiter **Hinweis** – es kommt aufs Handy, auf die
+  Turnierseite und auf Wunsch an den TV.
 
 **Notizen (Internet weg):**
 

@@ -62,6 +62,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Stationen** | Anlegen und planen; am Turniertag aufrufen, starten, freigeben, defekt, umlegen | Admin → eSports → Stationen; Turnierleitung → Stationen |
 | **Maps** | Map-Bibliothek je Spiel mit Bild und Modi; je Turnier und Phase ein eigener Map-Pool | Spielseite → Maps, im Turnier Reiter Maps |
 | **TV** | Turnierbaum, Aufrufe, Stationen auf Fernseher und Beamer | [TV und Beamer](tv.md) |
+| **Hinweis an alle** | Ein Satz wie „Pause bis 14:30“ an alle im Turnier oder Event: Benachrichtigung, Banner, auf Wunsch TV | Turnierleitung am Handy, Reiter **Hinweis** (3.17) |
 | **Abschluss** | Beendet, Ergebnisse veröffentlicht, Punkte, Erfolge, Gewinne | Statusauswahl im Turnier |
 
 ---
@@ -1054,6 +1055,38 @@ der eigene Kader und nur, wer spielberechtigt ist (**Spiel-ID**, Alter, Wartezei
 zwei Teams derselben Season.
 Die Leitung trägt Maps im Ergebnis-Fenster mit den Listen beider Seiten ein oder korrigiert sie mit Grund;
 „Rückgängig“ nimmt die Maps und Listen mit dem Ergebnis zurück.
+
+### 3.17 Hinweis der Turnierleitung an alle
+
+In der Turnierleitung am Handy (`/tournaments/<Name>/leitung`) steht der Reiter **Hinweis**. Dort schreibt ihr einen
+kurzen Satz (höchstens 140 Zeichen) an alle im Turnier:
+
+1. Eine **Vorlage** antippen – „Pause bis …“ (mit Uhrzeit in einer Viertelstunde), „Finale an PC 1“ oder „Bitte zum
+   Check-in“ – oder selbst schreiben.
+2. **An wen**: „Dieses Turnier“ oder „Ganzes Event“ (alle Turniere des Events; nur wer alle diese Turniere leitet). Darunter
+   steht, an wie viele Personen er geht.
+3. **Steht für**: 30 Minuten bis 8 Stunden, Vorgabe 2 Stunden.
+4. Haken **Auch am TV zeigen**, wenn der Hinweis am Turnierbaum-TV und an der Hallen-Tafel stehen soll.
+5. Bei „Pause bis 14:30“ gibt es den Haken **Turnier gleich pausieren bis 14:30**: Er setzt den Status „Pausiert“
+   mit **Pause bis** (3.9), der TV zeigt dann den Pause-Bildschirm. Nur wer den Turnierstatus wechseln darf, sieht ihn.
+6. **Hinweis senden**.
+
+<img src="../assets/turniere/hinweis-leitung-handy.png" alt="Turnierleitung am Handy, Reiter Hinweis: Vorlagen Pause bis, Finale an PC 1 und Bitte zum Check-in, Textfeld mit Finale an PC 1 und Zähler 14 von 140, Auswahl Dieses Turnier oder Ganzes Event mit dem Satz Geht an 14 Personen, Dauer 30 Minuten bis 8 Stunden mit 2 Stunden gewählt, Haken Auch am TV zeigen, Knopf Hinweis senden und darunter der erste gesendete Hinweis" width="300">
+
+Der Hinweis kommt als Benachrichtigung „Hinweis der Turnierleitung“ zu allen Angemeldeten – bei Teams zu allen
+Mitgliedern –, über Glocke, Push und Discord, je nach den Einstellungen der Person (Thema „Turnier-Updates“). Abgemeldete,
+Warteliste und gesperrte Konten bekommen nichts. Auch beim Ziel „Ganzes Event“ geht der Hinweis nur an die Angemeldeten
+der Turniere; wer nur für das Event selbst angemeldet ist (ohne Turnier), bekommt ihn nicht – dafür gibt es die Nachricht
+an alle Angemeldeten in „Anmeldungen & Einlass“ des Events (#1372). Oben auf der Turnierseite (beim Ziel „Ganzes Event“ auf der Event-Seite
+und allen Turnierseiten des Events) steht er als Banner mit Uhrzeit und Restzeit, bis er abläuft oder ihr ihn entfernt.
+Banner und TV zeigen nie, wer geschrieben hat.
+
+<img src="../assets/turniere/hinweis-banner-pc.png" alt="Turnierseite am PC: oben unter dem Pfad ein goldenes Banner Hinweis der Turnierleitung mit Megafon, Text Pause bis 14:25 und darunter 14:07 Uhr, noch 2 Stunden" width="600">
+
+Unter dem Formular steht, was schon hinausging: Text, Uhrzeit, wer, an wen, wie viele benachrichtigt wurden, und ob er
+noch steht. **Entfernen** nimmt ihn von Banner und TV; die Benachrichtigungen bleiben. Ein Doppeltipp auf „Senden“ oder
+ein zweiter Versuch nach einem Netzfehler schickt nichts doppelt. Steht dort „Versand unterbrochen“, tippt auf
+**Fortsetzen**: Der Versand läuft mit demselben Hinweis weiter, wer ihn schon hat, bekommt ihn nicht noch einmal.
 
 ---
 

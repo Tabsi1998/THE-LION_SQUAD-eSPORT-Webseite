@@ -1,5 +1,5 @@
 """Event routes — Vereins-CMS Phase 3."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
@@ -796,6 +796,21 @@ async def _event_for_player(event_id: str, user: dict, access: str | None) -> di
     if not has_access and not await _lead_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Event ist nicht sichtbar.")
     return event
+
+
+@router.get("/{event_id}/notices")
+async def event_notices(event_id: str, response: Response, access: str | None = None,
+                        user: dict | None = Depends(get_optional_user)):
+    """Hinweise der Turnierleitung (#1166) für Banner und Hallen-Tafel ohne Schlüssel: die an das ganze Event und die der
+    Turniere, die die Person sehen darf (mit Turniername) - nur Text und Zeit, nie die Person, die geschrieben hat."""
+    from services.tournament_notices import for_event
+
+    event = await _event_for_player(event_id, user, access)
+    db = get_db()
+    tournaments = await _filter_related(await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),
+                                        user, "tournament", access)
+    response.headers["Cache-Control"] = "no-store"
+    return {"items": await for_event(db, event["id"], tournaments)}
 
 
 @router.get("/{event_id}/play-along")

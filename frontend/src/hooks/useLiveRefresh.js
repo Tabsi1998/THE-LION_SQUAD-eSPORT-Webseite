@@ -36,7 +36,9 @@ export const LIVE_REFRESH_STUCK_MS = 30000;
  *
  * @param {() => unknown} callback  lädt die Daten der Ansicht
  * @param {string[]} resources     Ressourcen wie bei useApiInvalidation; leer = alles
- * @param {{ fallbackMs?: number, pollMs?: number, debounceMs?: number, enabled?: boolean, onlyVisible?: boolean, overlap?: boolean, tournamentId?: string|null, eventId?: string|null }} options
+ * `wholeEvent` (#1166): mit `eventId` zählen auch Änderungen der anderen Turniere desselben Events (Hinweis ans ganze Event).
+ *
+ * @param {{ fallbackMs?: number, pollMs?: number, debounceMs?: number, enabled?: boolean, onlyVisible?: boolean, overlap?: boolean, tournamentId?: string|null, eventId?: string|null, wholeEvent?: boolean }} options
  */
 export function useLiveRefresh(callback, resources = [], options = {}) {
   const fallbackMs = options.fallbackMs ?? 0;
@@ -44,7 +46,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   const debounceMs = options.debounceMs ?? 150;
   const enabled = options.enabled ?? true;
   const onlyVisible = options.onlyVisible ?? true;
-  const { tournamentId = null, eventId = null } = options;
+  const { tournamentId = null, eventId = null, wholeEvent = false } = options;
   // Fest ab dem ersten Render: ein Wechsel mittendrin ließe alte überlappende Abfragen neben der einen laufen.
   const [overlap] = useState(() => options.overlap ?? false);
   const resourceKey = useMemo(() => resources.join("|"), [resources]);
@@ -53,7 +55,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   const enabledRef = useRef(enabled);
   // Im Ref statt im Abo: Kennt die Seite ihr Turnier erst nach dem Laden, bleibt das Abo stehen - eine gerade
   // entprellte Änderung geht dabei nicht verloren.
-  const scopeRef = useRef({ tournamentId, eventId });
+  const scopeRef = useRef({ tournamentId, eventId, wholeEvent });
   const timerRef = useRef(null);
   const flightRef = useRef({ running: false, again: false, startedAt: 0, token: null, alive: true, stuckTimer: null });
   const [connected, setConnected] = useState(isStreamConnected);
@@ -63,8 +65,8 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   }, [callback]);
 
   useEffect(() => {
-    scopeRef.current = { tournamentId, eventId };
-  }, [tournamentId, eventId]);
+    scopeRef.current = { tournamentId, eventId, wholeEvent };
+  }, [tournamentId, eventId, wholeEvent]);
 
   // Läuft schon eine Abfrage, merkt sich ein weiterer Aufruf nur „danach noch einmal“.
   //
