@@ -521,6 +521,17 @@ async def test_broadcast_needs_the_right_and_a_valid_message(flow):
 # ---------------------------------------------------------------- Protokoll
 
 
+def test_log_query_uses_anchored_prefixes_without_alternation_on_indexed_fields():
+    from services.league_desk import log_query
+
+    query = log_query("s1", ["s1", "t1"])
+    assert set(query) == {"$or"}
+    for branch in query["$or"]:
+        pattern = branch["action"]["$regex"]
+        assert pattern.startswith("^") and "|" not in pattern and "(" not in pattern
+        assert set(branch) in ({"target_id", "action"}, {"data.season_id", "action"})
+
+
 @pytest.mark.asyncio
 async def test_log_shows_only_this_season_without_free_text_and_in_pages(flow):
     world = await desk_world(flow)

@@ -416,12 +416,25 @@ def _log_detail(row: dict, staffeln: dict[str, dict]) -> dict:
     return out
 
 
+LOG_PREFIXES = ("league", "match")
+
+
+def log_query(season_id: str, targets: list[str]) -> dict:
+    """Je Zweig ein Index (``target_id`` bzw. ``data.season_id``, je mit ``created_at``, ``database.AUDIT_INDEXES``) und ein Präfix mit
+    Anker ohne Alternation - so nutzt MongoDB für Zählen und Seite denselben Weg."""
+    branches = []
+    for prefix in LOG_PREFIXES:
+        action = {"$regex": f"^{prefix}\\."}
+        branches.append({"target_id": {"$in": targets}, "action": action})
+        branches.append({"data.season_id": season_id, "action": action})
+    return {"$or": branches}
+
+
 async def season_log(db, season: dict, page: int = 1) -> dict:
     """Das Protokoll der Season, neueste zuerst, seitenweise: Liga- und Spielaktionen der Season und ihrer Staffeln."""
     staffeln = await _staffeln(db, season["id"])
     targets = [season["id"], *sorted(staffeln)]
-    query = {"action": {"$regex": "^(league|match)\\."},
-             "$or": [{"target_id": {"$in": targets}}, {"data.season_id": season["id"]}]}
+    query = log_query(season["id"], targets)
     total = await db.audit_logs.count_documents(query)
     pages = max(1, -(-total // LOG_PAGE_SIZE))
     page = min(max(1, int(page or 1)), pages)
