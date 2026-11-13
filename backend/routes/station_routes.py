@@ -268,7 +268,8 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     # der Stand, der zum Spiel passt (läuft: belegt, aufgerufen: reserviert).
     held = None
     if previous_match and "status" in updates:
-        held = await db.matches_v2.find_one({"id": previous_match}, {"_id": 0, "status": 1, "called_at": 1, "started_at": 1})
+        source = await find_match_source(db, previous_match)
+        held = source.match if source else None
         if held and str(held.get("status") or "") in DONE_STATUSES:
             held = None
     keeps_hold = bool(held) and (updates["status"] == "broken" or current.get("status") == "broken")
