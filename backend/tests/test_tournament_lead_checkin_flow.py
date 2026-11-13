@@ -188,3 +188,39 @@ async def test_staffel_has_no_checkin_list(flow):
     assert body["applies"] is False and body["rows"] == []
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
     assert lead["tournament"]["can_check_in"] is False
+
+
+# Startgeld-Etikett (#1161, Review M1): nur, was wirklich offen ist. Jeder Stand ein Fall.
+PRICED = {"price_snapshot": {"total_cents": 1500, "currency": "EUR"}}
+
+
+@pytest.mark.parametrize("fields, expected", [
+    ({"billing_status": "pending"}, "open"),
+    ({"billing_status": "invoiced", "invoice_status": "validated", "payment_state": "partial"}, "open"),
+    ({"billing_status": "invoiced", "payment_state": "paid"}, "paid"),
+    ({"billing_status": "invoiced", "payment_state": "paid_reduced"}, "paid"),
+    ({"billing_status": "invoiced", "payment_state": "overpaid"}, "paid"),
+    ({"billing_status": "paid"}, "paid"),
+    ({"billing_status": "invoiced", "invoice_status": "paid"}, "paid"),
+    ({"billing_status": "invoiced", "payment_state": "credited"}, None),
+    ({"billing_status": "invoiced", "payment_state": "abandoned"}, None),
+    ({"billing_status": "cancelled"}, None),
+])
+def test_fee_state_only_marks_what_is_open(fields, expected):
+    from services.tournament_checkin_board import fee_state
+
+    assert fee_state({**PRICED, **fields}) == expected
+    assert fee_state(fields) is None, "ohne Preis nie ein Etikett"
+
+
+@pytest.mark.asyncio
+async def test_credited_and_abandoned_do_not_count_as_open(flow):
+    tournament = await flow.create_tournament(title="Kassa-Cup", event_mode="local", status="check_in", max_participants=8)
+    for name, state in [("Gerda", "credited"), ("Hugo", "abandoned"), ("Ida", "overpaid"), ("Jan", "partial")]:
+        reg = await flow.register(tournament, await flow.add_user(name=name))
+        await flow.db.tournament_registrations.update_one({"id": reg["id"]}, {"$set": {
+            **PRICED, "billing_status": "invoiced", "payment_state": state}})
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    body = (await flow.get(f"/api/tournaments/{tournament['id']}/lead/checkin")).json()
+    assert {row["name"]: row["fee"] for row in body["rows"]} == {"Gerda": None, "Hugo": None, "Ida": "paid", "Jan": "open"}
+    assert body["counts"]["fee_open"] == 1

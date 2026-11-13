@@ -12,11 +12,12 @@ from __future__ import annotations
 
 from models import REGISTRATION_LIMIT
 from services import team_lineup
+from services.billing_orders import NOT_OPEN_STATES
 from services.tournament_print import checkin_row
 
 # Wer am Turniertag kommen soll. Warteliste, Absage, Austritt und Disqualifikation stehen nicht in der Liste.
 BOARD_STATUSES = ("pending", "approved", "checked_in", "no_show")
-PAID_STATES = ("paid", "paid_reduced")
+PAID_STATES = ("paid", "paid_reduced", "overpaid")
 
 _REG_FIELDS = {
     "_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1, "team_id": 1, "squad_id": 1, "seed": 1,
@@ -27,12 +28,18 @@ _REG_FIELDS = {
 
 
 def fee_state(registration: dict) -> str | None:
-    """Startgeld der Anmeldung: ``open``, ``paid`` oder ``None`` (nichts zu zahlen)."""
+    """Startgeld der Anmeldung: ``open``, ``paid`` oder ``None`` (nichts zu zahlen).
+
+    Bezahlt ist auch „mit Abzug“ und „zu viel“ sowie ein Auftrag oder Beleg im Stand bezahlt. Gutgeschrieben oder
+    aufgegeben ist nichts mehr offen, aber auch nicht bezahlt - kein Etikett (``billing_orders.NOT_OPEN_STATES``)."""
     snapshot = registration.get("price_snapshot") or {}
     if int(snapshot.get("total_cents") or 0) <= 0 or registration.get("billing_status") == "cancelled":
         return None
-    if registration.get("invoice_status") == "paid" or registration.get("payment_state") in PAID_STATES:
+    state = registration.get("payment_state")
+    if registration.get("invoice_status") == "paid" or registration.get("billing_status") == "paid" or state in PAID_STATES:
         return "paid"
+    if state in NOT_OPEN_STATES:
+        return None
     return "open"
 
 
