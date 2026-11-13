@@ -134,6 +134,24 @@ async def test_matchdays_and_teams_have_their_own_preview_and_sitemap_entry(flow
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("hidden", [{"visibility": "members"}, {"visibility": "internal"}, {"is_public": False}])
+async def test_a_staffel_that_is_not_public_keeps_matchdays_out_of_the_sitemap(flow, hidden):
+    _admin, _season, staffel = await setup(flow)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": hidden})
+    sitemap = (await flow.get("/api/sitemap.xml")).text
+    assert "/liga/probe-shooter/season-1</loc>" in sitemap
+    assert "/season-1/spieltage</loc>" not in sitemap and "/season-1/teams</loc>" not in sitemap
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_of_an_archived_liga_n_keeps_matchdays_out_of_the_sitemap(flow):
+    _admin, season, staffel = await setup(flow)
+    await flow.db.league_divisions.update_many({"season_id": season["id"]}, {"$set": {"status": "archived"}})
+    sitemap = (await flow.get("/api/sitemap.xml")).text
+    assert "/season-1/spieltage</loc>" not in sitemap
+
+
+@pytest.mark.asyncio
 async def test_a_season_in_draft_lists_no_matchdays_in_the_sitemap(flow):
     await setup(flow, start=False)
     sitemap = (await flow.get("/api/sitemap.xml")).text

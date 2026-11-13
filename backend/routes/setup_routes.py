@@ -358,10 +358,13 @@ async def sitemap():
                     {"scope": "league", "scope_id": league_season.get("league_id")}]}, {"_id": 1}):
                 league_urls.append({"loc": f"{base}/liga/{league_slug}/{league_season['slug']}/regeln",
                                     "lastmod": league_season.get("updated_at"), "changefreq": "weekly", "priority": "0.5"})
-            # Spieltage und Teams (#2268): erst, wenn eine Staffel über den Entwurf hinaus ist - vorher stünde dort nur der Platzhalter.
-            # Die Sichtbarkeit der Staffel folgt der Season (öffentlich).
-            if await db.tournaments.find_one({"league_context.season_id": league_season.get("id"),
-                                              "status": {"$nin": ["draft", "archived"]}}, {"_id": 1}):
+            # Spieltage und Teams (#2268): erst, wenn eine Staffel öffentlich sichtbar und über den Entwurf hinaus ist und zu einer aktiven
+            # Liga N gehört - dieselben Filter wie die Turniere oben. Vorher stünde dort nur der Platzhalter.
+            divisions = [row["id"] async for row in db.league_divisions.find(
+                {"season_id": league_season.get("id"), "status": "active"}, {"_id": 0, "id": 1})]
+            if divisions and await db.tournaments.find_one({
+                    "league_context.season_id": league_season.get("id"), "league_context.division_id": {"$in": divisions},
+                    "status": {"$nin": SEO_HIDDEN_STATUSES}, "is_public": {"$ne": False}, **public_visibility}, {"_id": 1}):
                 for section in ("spieltage", "teams"):
                     league_urls.append({"loc": f"{base}/liga/{league_slug}/{league_season['slug']}/{section}",
                                         "lastmod": league_season.get("updated_at"), "changefreq": "daily", "priority": "0.6"})
