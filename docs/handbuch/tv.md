@@ -181,8 +181,8 @@ mit **Aufrufen** an einer Station aufgerufen habt, es aber noch nicht gestartet 
 Aufruf so lange, wie bei **Zeit zum Antreten** steht (Standard 2 Minuten, 1 bis 30).
 
 **Live-Warteschlange (vor Ort mit Stationen):** Hat das Turnier vor Ort Stationen, zeigt die Folie **Aufrufe** am
-Turnierbaum-TV jede Station als eigene Zeile: **Jetzt** mit Spiel, Namen und Spielzeit (gelb ab 80 % der Dauer, rot
-darüber) und **Als Nächstes** – aufgerufen mit „antreten bis …“ und Countdown, sonst mit der voraussichtlichen Zeit und
+Turnierbaum-TV jede Station als eigene Zeile: **Jetzt** mit Spiel, Namen und Spielzeit (orange ab 80 % der Dauer, rot
+darüber; dieselbe Uhr wie in der Turnierleitung, nach der Serverzeit) und **Als Nächstes** – aufgerufen mit „antreten bis …“ und Countdown, sonst mit der voraussichtlichen Zeit und
 dem Verzug. Ruft die Turnierleitung auf oder startet ein Spiel, zieht die Tafel ohne Neuladen nach. Online-Turniere
 und Turniere ohne Stationen zeigen die Aufruf-Tafel wie oben.
 
