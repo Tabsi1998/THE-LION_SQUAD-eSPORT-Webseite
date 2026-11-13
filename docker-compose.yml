@@ -55,6 +55,7 @@ services:
       APP_RELEASE_UPLOAD_TOKEN: "${APP_RELEASE_UPLOAD_TOKEN:-}"
       # Signierte Webhooks des Vereinsmoduls (#1540): Schlüssel-Kennung:Geheimnis, mehrere mit Komma.
       DOLIBARR_WEBHOOK_SECRETS: "${DOLIBARR_WEBHOOK_SECRETS:-}"
+      DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
       # Browser-Benachrichtigungen (#1163): leer = aus. Erzeugen und Setzen: docs/BETRIEB.md.
       WEB_PUSH_VAPID_PUBLIC_KEY: "${WEB_PUSH_VAPID_PUBLIC_KEY:-}"
       WEB_PUSH_VAPID_PRIVATE_KEY: "${WEB_PUSH_VAPID_PRIVATE_KEY:-}"
