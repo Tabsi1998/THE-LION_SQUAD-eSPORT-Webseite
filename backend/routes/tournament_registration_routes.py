@@ -1227,8 +1227,16 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 tid,
                 {"registration_id": reg_id, "from_status": reg.get("status"), "to_status": status},
             )
-            moved_up = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id) if status == "no_show" else []
             updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
+            # Startgeld wie im Weg über den Status (#2368): „Nicht erschienen“ schließt den Auftrag, wer danach doch eingecheckt
+            # oder zurückgesetzt wird, bekommt ihn zurück - sonst bliebe die Buchung storniert und eine Gutschrift entstünde.
+            if status == "no_show":
+                await tournament_fees.close_price(db, updated, "Anmeldung: no_show")
+            elif reg.get("status") in tournament_fees.CLOSED_STATUSES and status in tournament_fees.BILLABLE_STATUSES and updated.get("user_id"):
+                payer = await db.users.find_one({"id": updated["user_id"]}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
+                if payer:
+                    await tournament_fees.freeze_price(db, updated, tournament_doc, payer=payer, rebook_reason=billing_orders.REBOOKED_BY_LEAD)
+            moved_up = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id) if status == "no_show" else []
             # Nach dem Check-in-Ende: wer jetzt eingecheckt wird, rückt auf einen freien Platz nach (#1551).
             placement = await _place_fill_in(db, tid, updated, me.get("id")) if status == "checked_in" else None
             return {**updated, "waitlist_moved_up": moved_up, "placement": placement, "idempotent_replay": False}

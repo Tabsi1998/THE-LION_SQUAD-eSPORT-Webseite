@@ -233,6 +233,34 @@ async def test_leitung_bestaetigt_wieder_ohne_storno_kein_prueffall(flow, fake):
     assert KEPT_INVOICE not in (await last_note(flow, paula))["body"]
 
 
+async def checkin_status(flow, lead, cup, registration, status):
+    flow.act_as(lead)
+    response = await flow.post(f"/api/tournaments/{cup['id']}/registrations/{registration['id']}/checkin", json={"status": status})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("no_show_via", ["status", "checkin"])
+@pytest.mark.parametrize("back_to", ["checked_in", "approved"])
+async def test_nicht_erschienen_dann_doch_eingecheckt_gilt_wieder_als_gebucht(flow, fake, no_show_via, back_to):
+    """„Nicht erschienen“ über den Status oder den Check-in-Dienst schließt den Auftrag; checkt der Check-in-Dienst die Person
+    danach doch ein (oder setzt sie zurück), gilt die Buchung wieder - wie im Weg über den Status, ohne Gutschrift-Entwurf."""
+    kassier, cup, paula, booked, order = await booked_with_invoice(flow, fake, credit_draft=True)
+    if no_show_via == "status":
+        await set_status(flow, kassier, cup, booked, "no_show")
+    else:
+        await checkin_status(flow, kassier, cup, booked, "no_show")
+    cancelled = await stored(flow, order)
+    assert cancelled["booking_state"] == "cancelled" and cancelled.get("credit_note_due_at"), "Nicht erschienen schließt den Auftrag"
+
+    back = await checkin_status(flow, kassier, cup, booked, back_to)
+    assert back["status"] == back_to and back.get("invoice_kept") is True
+    current = await assert_review(flow, booked, order, reason=LEAD_REASON, new_cents=1000, billing_status="invoiced")
+    assert "credit_note_due_at" not in current
+    assert (await billing_orders.sync_due())["credit_drafts"] == 0, "keine Gutschrift für eine Buchung, die wieder gilt"
+
+
 # ---------------------------------------------------------------- Warteliste nach Abgleich
 
 @pytest.mark.asyncio
