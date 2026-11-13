@@ -2894,10 +2894,11 @@ class LeagueSuccessorCreate(BaseModel):
 
 
 class LeagueSuccessorRecompute(BaseModel):
-    """Übernahme neu berechnen (F.2, Nr. 162): ``stamp`` aus der Vorschau - hat sich der Endstand seitdem geändert, 409."""
+    """Übernahme neu berechnen (F.2, Nr. 162): ``stamp`` aus der Vorschau ist Pflicht - fehlt er, 422; hat sich der Endstand seitdem
+    geändert, 409."""
     model_config = ConfigDict(extra="forbid")
     confirm: bool = False
-    stamp: Optional[str] = Field(default=None, max_length=40)
+    stamp: str = Field(min_length=1, max_length=40)
 
 
 class LeagueStaffelCreate(BaseModel):

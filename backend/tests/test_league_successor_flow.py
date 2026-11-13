@@ -543,7 +543,10 @@ async def test_recompute_after_reopen_correct_and_close_again(flow):
     # Nachricht mit der Fassung im Schlüssel; ein zweiter Lauf ändert nichts und schickt nichts.
     keys = [row["meta"]["dedupe_key"] for row in await flow.db.notifications.find({"meta.reason": "league_successor"}, {"_id": 0}).to_list(None)]
     assert any(key.endswith(f":{preview['stamp']}:moved") for key in keys) and any(key.endswith(f":{preview['stamp']}:revoked") for key in keys)
-    again = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True}))
+    # Ohne Stempel aus der Vorschau: 422.
+    missing = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True})
+    assert missing.status_code == 422
+    again = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]}))
     assert again["changed"] == 0 and again["notified"] == 0
     assert await flow.db.audit_logs.count_documents({"action": "league.season.successor.recompute"}) == 2
     # Veralteter Stand der Vorschau: 409.
@@ -573,18 +576,18 @@ async def test_recompute_lists_assigned_teams_for_a_manual_check_and_stops_after
     ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
     preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
     assert [row["application_id"] for row in preview["manual"]] == [rows[winner]["id"]] and preview["manual"][0]["why"] == "zugeteilt"
-    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True}))
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]}))
     assert (await flow.db.league_applications.find_one({"id": rows[winner]["id"]}, {"_id": 0}))["carry_over"]["division_level"] == 1
     # Rechte: nur „Liga verwalten“. Nach dem Start: 409. An der alten Season gibt es nichts neu zu berechnen.
     only = await flow.add_user(name="Nur Ergebnisse")
     await flow.db.league_staff.insert_one({"id": new_id(), "league_id": world["league"]["id"], "user_id": only["id"],
                                            "capabilities": ["results", "season"], "created_at": now_utc().isoformat()})
     flow.act_as(only)
-    refused = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True})
+    refused = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]})
     assert refused.status_code == 403
     flow.act_as(world["lead"])
     await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"status": "active", "start_date": (now_utc() - timedelta(days=1)).isoformat()}})
-    late = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True})
+    late = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]})
     assert late.status_code == 409 and "begonnen" in late.json()["detail"]
     old = await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor/recompute")
     assert old.status_code == 404
@@ -700,3 +703,15 @@ async def test_season_history_visibility_for_guests_off_seasons_and_hidden_staff
     assert ok(await flow.get(f"/api/users/public/{player['username']}"))["league_history"] == []
     await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {"visibility": "public"}})
     assert len(ok(await flow.get(f"/api/users/public/{player['username']}"))["league_history"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_recompute_preview_without_predecessor_is_404(flow):
+    world = await build(flow, levels=1, teams=2)
+    await close_all(flow, world)
+    season = await new_season(flow, world)
+    # Der Vorgänger ist weg (z. B. gelöscht): 404 statt 500.
+    await flow.db.league_seasons.delete_one({"id": world["season"]["id"]})
+    flow.act_as(world["lead"])
+    missing = await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute")
+    assert missing.status_code == 404

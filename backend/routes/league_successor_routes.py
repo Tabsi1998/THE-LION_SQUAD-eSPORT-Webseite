@@ -58,7 +58,7 @@ async def admin_recompute_preview(season_id: str, _me: dict = Depends(require_ma
     db = get_db()
     try:
         return await league_successor.recompute_view(db, await _season(db, season_id))
-    except league_successor.SuccessorProblem as problem:
+    except (league_successor.SuccessorProblem, LeagueProblem) as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
 
 

@@ -542,7 +542,7 @@ async def recompute(db, season: dict, body: dict, actor: dict) -> dict:
             found = await _recompute_plan(db, fresh)
             if found["problems"]:
                 raise SuccessorProblem(found["problems"][0], 409)
-            if body.get("stamp") and body["stamp"] != found["stamp"]:
+            if body.get("stamp") != found["stamp"]:
                 raise SuccessorProblem(STAMP_CHANGED, 409)
             done = await _apply_recompute(db, fresh, found, actor)
     except MutationLockBusy:
