@@ -1044,6 +1044,8 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
             {"id": old_reg_id},
             {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}, "$unset": {"rejection_dismissed_at": ""}},
         )
+        # Die ersetzte Person ist „nicht erschienen“ - ihr Startgeld-Auftrag schließt wie im Weg über den Status (#2368).
+        await tournament_fees.close_price(db, old, "Anmeldung: no_show")
         replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"), replace_targets)
     auto_bracket_update = None
     placement = None

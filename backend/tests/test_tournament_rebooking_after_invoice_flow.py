@@ -261,6 +261,22 @@ async def test_nicht_erschienen_dann_doch_eingecheckt_gilt_wieder_als_gebucht(fl
     assert (await billing_orders.sync_due())["credit_drafts"] == 0, "keine Gutschrift für eine Buchung, die wieder gilt"
 
 
+@pytest.mark.asyncio
+async def test_ersetzte_person_ist_nicht_erschienen_und_ihr_auftrag_schliesst(flow, fake):
+    """Die Turnierleitung trägt einen Ersatz für Paula ein: Paula gilt als „nicht erschienen“, und ihr Startgeld-Auftrag schließt
+    wie im Weg über den Status - mit Beleg als Storno samt Prüffall und vorgemerktem Gutschrift-Entwurf."""
+    kassier, cup, paula, booked, order = await booked_with_invoice(flow, fake, credit_draft=True)
+    ersatz = await person(flow, "ersatz")
+    flow.act_as(kassier)
+    added = await flow.post(f"/api/tournaments/{cup['id']}/registrations",
+                            json={"user_id": ersatz["id"], "status": "approved", "replace_registration_id": booked["id"]})
+    assert added.status_code == 200, added.text
+    assert (await flow.db.tournament_registrations.find_one({"id": booked["id"]}, {"_id": 0}))["status"] == "no_show"
+    closed = await stored(flow, order)
+    assert closed["booking_state"] == "cancelled" and closed["cancel_reason"] == "Anmeldung: no_show" and closed.get("credit_note_due_at")
+    assert "cancelled_after_invoice" in await open_cases(flow, order)
+
+
 # ---------------------------------------------------------------- Warteliste nach Abgleich
 
 @pytest.mark.asyncio
