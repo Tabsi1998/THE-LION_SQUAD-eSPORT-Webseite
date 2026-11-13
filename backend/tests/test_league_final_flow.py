@@ -930,3 +930,33 @@ async def test_protest_settings_and_the_transfer_leave_a_closed_staffel_as_it_wa
     assert "abgeschlossen" in protests["reason"]
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert after.get("appeal_hours") == before.get("appeal_hours") and after.get("protest_hours") == before.get("protest_hours")
+
+
+# ---------------------------------------------------------------- Punktabzug im Wettlauf mit dem Abschluss (Runde 2, N-a)
+
+@pytest.mark.asyncio
+async def test_a_point_deduction_that_races_the_close_is_refused_under_the_lock(flow, monkeypatch):
+    from services import league_final, league_sanctions
+
+    admin, _league, season, _division, staffel = await setup(flow)
+    for index in range(1, 5):
+        await flow.db.team_squads.insert_one({"id": f"squad-{index}", "team_id": f"team-{index}", "name": f"Probe {index}", "status": "active",
+                                              "member_ids": []})
+        await flow.db.tournament_registrations.update_one({"id": f"reg-{index}"}, {"$set": {"squad_id": f"squad-{index}"}})
+    await play_all(flow, staffel)
+    real_proofs = league_sanctions.require_visible_proofs
+
+    async def close_meanwhile(*args, **kwargs):
+        # Die Prüfung vor der Sperre ist schon durch - jetzt schließt jemand anderes die Staffel ab.
+        await league_final.close(flow.db, await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}), admin)
+        return await real_proofs(*args, **kwargs)
+
+    monkeypatch.setattr(league_sanctions, "require_visible_proofs", close_meanwhile)
+    body = {"target_type": "squad", "rule_ref": "Anlage C.4", "reason": "Begründung der Leitung", "kind": "point_deduction",
+            "registration_id": "reg-1", "points": 3}
+    response = await flow.post(f"{ADMIN}/seasons/{season['id']}/sanctions", json=body)
+    assert response.status_code == 409, response.text
+    assert "wieder öffnen" in response.json()["detail"]
+    tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert tournament["final_table"]["version"] == 1 and not tournament.get("point_deductions")
+    assert await flow.db.competition_sanctions.count_documents({}) == 0

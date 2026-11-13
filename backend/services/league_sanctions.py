@@ -432,6 +432,8 @@ async def _save(db, doc: dict, fields: dict) -> dict:
 
 
 async def create(db, doc: dict, registration: dict | None, tournament: dict | None, actor: dict) -> dict:
+    # Noch einmal unter der Schreibsperre der Staffel (F.1, #1645): Wurde sie seit der Prüfung abgeschlossen, griffe die Strafe ins Leere.
+    await refuse_closed_effect(db, doc["kind"], doc.get("tournament_id"))
     await db.competition_sanctions.insert_one(dict(doc))
     try:
         doc["effect"] = await apply_effect(db, doc, registration, tournament, actor)
