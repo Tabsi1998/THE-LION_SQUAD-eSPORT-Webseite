@@ -49,7 +49,7 @@ function leadView() {
     matches: [
       row("m-late", "Viertelfinale 1", participants("NeonFalke", "PixelPanther"), { station: "PC 1", started_at: startedAgo(33), timing: { running_minutes: 33, overdue_minutes: 13, missing: true, duration_minutes: 20 } }),
       row("m-warn", "Viertelfinale 2", participants("TurboTina", "Frostbiss"), { station: "PC 2", started_at: startedAgo(16.5), timing: { running_minutes: 16, overdue_minutes: null, missing: false, duration_minutes: 20 } }),
-      row("m-run", "Viertelfinale 3", participants("Aleksandra Wiśniewska-Kowalczyk", "Mo"), { station: "PC 4", started_at: startedAgo(10), timing: { running_minutes: 10, overdue_minutes: null, missing: false, duration_minutes: 20 } }),
+      row("m-run", "Viertelfinale 3", participants("Aleksandra Długonazwiska-Testowa", "Mo"), { station: "PC 4", started_at: startedAgo(10), timing: { running_minutes: 10, overdue_minutes: null, missing: false, duration_minutes: 20 } }),
       row("m-free", "Showmatch", participants("Kranich", "Zander"), { station: "Switch 1", started_at: startedAgo(72.2), timing: { running_minutes: 72, overdue_minutes: null, missing: false, duration_minutes: null } }),
     ],
   };
