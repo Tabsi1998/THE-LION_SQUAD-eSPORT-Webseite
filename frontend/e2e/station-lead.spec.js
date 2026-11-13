@@ -34,14 +34,25 @@ function queueOf(world) {
   if (phase === "called") Object.assign(pc3, { status: "reserved", next: entry(a, { state: "called", called_at: world.calledAt, report_by: new Date(Date.parse(world.calledAt) + 2 * 60000).toISOString() }) });
   if (phase === "running") Object.assign(pc3, { status: "busy", next: null, running: entry(a, { state: "running", position: 0, started_at: world.startedAt }) });
   if (phase === "released") Object.assign(pc3, { status: "free", next: null, waiting: 0 });
+  const pc4 = { id: H.stationId("PC 4"), name: "PC 4", station_text: "PC 4 · PC", status: "free", waiting: 1, running: null, next: entry(b, { names: ["TurboTina", "Frostbiss"] }), after: null };
+  // Weitere bereite Spiele für „Anderes Spiel aufrufen“ (#1162) - wie `matches` der echten Antwort.
+  const d = T.find(bracket, "D");
+  const later = (minutes) => new Date(Date.now() + minutes * 60000).toISOString();
+  const matches = Object.fromEntries([
+    pc3.next, pc4.next,
+    entry(d, { names: ["Aurora Blitz", "Zackenbarsch"], forecast_at: later(25) }),
+  ].filter((row) => row && row.state === "queued").map((row) => [row.match_id, row]));
   return {
     applies: true, reason: null, now: new Date().toISOString(), unplaced: [], operate: { all: true, station_ids: [] },
     summary: { delay_minutes: 0, last: { label: "Finale", forecast_at: new Date(Date.now() + 90 * 60000).toISOString() } },
+    matches,
     stations: [
       pc3,
-      { id: H.stationId("PC 4"), name: "PC 4", station_text: "PC 4 · PC", status: "free", waiting: 1, running: null, next: entry(b, { names: ["TurboTina", "Frostbiss"] }), after: null },
+      pc4,
       { id: H.stationId("PC 5"), name: "PC 5", station_text: "PC 5 · PC", status: "busy", waiting: 0, running: entry(c, { state: "running", position: 0, started_at: world.otherStart, names: ["PixelPanther", "Kometa"] }), next: null, after: null },
       { id: H.stationId("PC 6"), name: "PC 6", station_text: "PC 6 · PC · Übertragungsplatz hinten links", status: "broken", waiting: 0, running: null, next: null, after: null },
+      // Geteilte Station des Events, an der gerade ein anderes Turnier spielt (#1162).
+      { id: "st-halle", name: "Halle 1", station_text: "Halle 1 · Switch 2", status: "reserved", waiting: 0, running: null, next: null, after: null, hold_issue: { kind: "other", tournament_title: "Mario Kart Abendcup" } },
     ],
   };
 }
@@ -150,6 +161,20 @@ test.describe("Stationen in der Turnierleitung", () => {
         expect(posts.map(([kind]) => kind)).toEqual(["call", "start", "release"]);
         expect(posts.every(([, body]) => body.station_id === pc3 && body.match_id === matchA)).toBe(true);
         expect(await tvPage.evaluate(() => window.__ohneNeuladen)).toBe(true);
+
+        // 4. Anderes Spiel aufrufen: alle bereiten Spiele, „Als Nächstes“ oben, dann nach Prognose.
+        const pc4 = H.stationId("PC 4");
+        await page.getByTestId(`live-pick-${pc4}`).click();
+        const picker = page.getByTestId(`live-pick-list-${pc4}`);
+        await expect(picker.locator("button").first()).toContainText("Als Nächstes");
+        await expect(picker.locator("button")).toHaveCount(2);
+        if (width === 390) {
+          await page.waitForTimeout(400);
+          await picker.scrollIntoViewIfNeeded();
+          const body = await page.screenshot();
+          await testInfo.attach("1162-anderes-spiel-390.png", { body, contentType: "image/png" });
+          if (shots) require("node:fs").writeFileSync(path.join(shots, "1162-anderes-spiel-390.png"), body);
+        }
       } finally {
         await context.close();
       }
