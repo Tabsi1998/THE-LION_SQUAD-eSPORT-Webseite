@@ -4,7 +4,7 @@
 // die Karte erklärt es statt eines toten Knopfs.
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, CircleAlert, Crown, History, Lock, LockOpen } from "lucide-react";
+import { CheckCircle2, CircleAlert, Crown, Gift, History, Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormSection } from "@/components/tls/AdminForm";
@@ -254,6 +254,13 @@ function StaffelCard({ row, data, canResults, onSheet }) {
             <p className="flex items-center gap-2 text-white"><Crown className="h-4 w-4 shrink-0 text-honor" aria-hidden="true" /> Meister: <strong className="min-w-0 break-words">{row.final.champion.display_name}</strong></p>
           ) : null}
           {(row.final.decisions || []).map((decision) => <p key={decisionLine(decision)} className="text-xs text-white/60">Entscheid: {decisionLine(decision)}</p>)}
+          {/* Belohnungen (F.4, #2214): mit dem Abschluss vergeben - Einzelheiten im Reiter „Belohnungen“. */}
+          {row.rewards ? (
+            <p className="flex items-center gap-2 text-xs text-white/70" data-testid={`close-rewards-${row.tournament_id}`}>
+              <Gift className="h-3.5 w-3.5 shrink-0 text-[#29B6E8]" aria-hidden="true" />
+              {row.rewards === 1 ? "1 Belohnung vergeben" : `${row.rewards} Belohnungen vergeben`} · <Link to="#belohnungen" className="text-[#29B6E8] hover:underline">Belohnungen</Link>
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="mt-3">
