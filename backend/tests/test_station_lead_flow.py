@@ -553,3 +553,30 @@ async def test_ready_again_at_a_shared_station_of_another_tournament_matches_its
     station = await station_of(flow, shared)
     assert station["status"] == "reserved" and station["current_match_id"] == b_match["id"] and "broken_at" not in station
     assert (await flow.reload(b_match))["called_at"], "der Aufruf von B bleibt"
+
+
+# ---------------------------------------------------------------- Spieler anderswo beschäftigt (#1162, Review N3)
+
+async def pair_and_split(flow, tournament):
+    """Zwei Spiele mit einer gemeinsamen Person - wie zwei Durchgänge einer Gruppe."""
+    one, two = await first_round(flow, tournament)
+    shared_reg = one["slots"][0]["registration_id"]
+    await flow.db.matches_v2.update_one({"id": two["id"]}, {"$set": {"slots.0.registration_id": shared_reg}})
+    return one, await flow.reload(two)
+
+
+@pytest.mark.asyncio
+async def test_a_match_whose_player_is_busy_elsewhere_is_marked_and_cannot_be_called(flow):
+    _staff, tournament, stations, _players = await on_site(flow)
+    one, two = await pair_and_split(flow, tournament)
+    assert (await call(flow, tournament, stations[0], one)).status_code == 200
+    view = await queue(flow, tournament)
+    marked = view["matches"][two["id"]]
+    assert marked["state"] == "queued" and marked["busy_at"] == {"state": "called", "station_text": "Station 1 · Switch 2"}
+    refused = await call(flow, tournament, stations[1], two)
+    assert refused.status_code == 409 and "aufgerufen" in refused.json()["detail"] and "Station 1" in refused.json()["detail"]
+    assert not (await flow.reload(two)).get("called_at")
+
+    assert (await start(flow, tournament, stations[0], one)).status_code == 200
+    refused = await call(flow, tournament, stations[1], two)
+    assert refused.status_code == 409 and "spielen gerade an" in refused.json()["detail"]

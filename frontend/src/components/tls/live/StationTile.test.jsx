@@ -150,6 +150,8 @@ test("„Anderes Spiel aufrufen“ (#1162): alle bereiten Spiele, „Als Nächst
   };
   const list = callableFor(free, matches);
   expect(list.map((row) => row.match_id)).toEqual(["QF1", "QF5"]);
+  expect(callableFor(free, { ...matches, QF7: entry("QF7", { forecast_at: "2026-10-31T16:00:00Z", busy_at: { state: "running", station_text: "Station 2" } }) })
+    .map((row) => row.match_id)).toEqual(["QF1", "QF5", "QF7"]);
   const handlers = tile(free, { callable: list });
   fireEvent.click(screen.getByTestId("live-pick-st1"));
   const picker = screen.getByTestId("live-pick-list-st1");
@@ -169,4 +171,15 @@ test("„Alle freien Stationen aufrufen“ (#1162): mit Anzahl und Rückfrage, n
   expect(screen.getByTestId("live-call-all-confirm")).toHaveTextContent("2 Stationen aufrufen?");
   fireEvent.click(screen.getByTestId("live-call-all-yes"));
   expect(onCallAll).toHaveBeenCalledWith([[expect.objectContaining({ id: "st1" }), expect.objectContaining({ match_id: "QF1" })], [expect.objectContaining({ id: "st9" }), expect.objectContaining({ match_id: "QF9" })]]);
+});
+
+test("„Anderes Spiel aufrufen“ (#1162): wer gerade anderswo spielt oder aufgerufen ist, steht ausgegraut da", () => {
+  const list = [entry("QF1"), entry("QF8", { busy_at: { state: "running", station_text: "Station 2" } }), entry("QF9", { busy_at: { state: "called", station_text: "Station 3" } })];
+  const handlers = tile(free, { callable: list });
+  fireEvent.click(screen.getByTestId("live-pick-st1"));
+  expect(screen.getByTestId("live-pick-st1-QF8")).toBeDisabled();
+  expect(screen.getByTestId("live-pick-busy-QF8")).toHaveTextContent("spielt gerade an Station 2");
+  expect(screen.getByTestId("live-pick-busy-QF9")).toHaveTextContent("Spieler gerade an Station 3 aufgerufen");
+  fireEvent.click(screen.getByTestId("live-pick-st1-QF8"));
+  expect(handlers.onCall).not.toHaveBeenCalled();
 });

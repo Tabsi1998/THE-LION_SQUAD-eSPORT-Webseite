@@ -242,6 +242,26 @@ async def _fits(db, tournament_id: str, station: dict) -> bool:
 NOT_FITTING_DETAIL = "Diese Station passt nicht zum Spiel dieses Turniers (Spiel oder Gerät)."
 
 
+async def _players_busy_elsewhere(db, tournament_id: str, match: dict) -> str | None:
+    """Spielt jemand aus diesem Spiel gerade ein anderes - oder ist dort aufgerufen (#1162)? Dann die Meldung dazu."""
+    filled = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
+    if not filled:
+        return None
+    other = await db.matches_v2.find_one({
+        "tournament_id": tournament_id, "id": {"$ne": match["id"]}, "slots.registration_id": {"$in": filled},
+        "status": {"$nin": sorted(DONE_STATUSES)},
+        "$or": [{"started_at": {"$nin": [None, ""]}}, {"status": {"$in": sorted(RUNNING_STATUSES)}},
+                {"called_at": {"$nin": [None, ""]}}],
+    }, {"_id": 0, "station_id": 1, "status": 1, "started_at": 1})
+    if not other:
+        return None
+    station = await db.stations.find_one({"id": other.get("station_id")}, {"_id": 0}) if other.get("station_id") else None
+    where = _station_name(station) if station else "einer anderen Station"
+    if _running(other):
+        return f"Spieler dieses Spiels spielen gerade an {where} – erst danach aufrufen."
+    return f"Spieler dieses Spiels sind gerade an {where} aufgerufen – erst danach aufrufen."
+
+
 @router.post("/{tid}/live-queue/call")
 async def call_next(tid: str, body: QueueAction, me: dict = Depends(get_current_user)):
     """Aufrufen: Station reservieren, „aufgerufen um“ setzen, „Du bist dran“ an die Spieler (einmal je Aufruf)."""
@@ -261,9 +281,13 @@ async def call_next(tid: str, body: QueueAction, me: dict = Depends(get_current_
             )
             raise HTTPException(status_code=409, detail=f"Das Spiel ist schon an {where} aufgerufen.")
         _check_station(station, match)
-        # Auch ein anderes als das geplante Spiel lässt sich aufrufen (#1162) - nur an einer passenden Station.
+        # Auch ein anderes als das geplante Spiel lässt sich aufrufen (#1162) - nur an einer passenden Station und nur,
+        # wenn niemand aus dem Spiel gerade anderswo spielt oder aufgerufen ist.
         if not await _fits(db, tournament_id, station):
             raise HTTPException(status_code=409, detail=NOT_FITTING_DETAIL)
+        busy = await _players_busy_elsewhere(db, tournament_id, match)
+        if busy:
+            raise HTTPException(status_code=409, detail=busy)
         await _assign_match_to_station(db, station, match, "matches_v2", start_now=False)
     stored = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "called_at": 1}) or {}
     await _audit(db, "match.called", tournament_id, match, station["id"], me["id"])

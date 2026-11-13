@@ -57,15 +57,21 @@ export function stationHolds(station) {
 }
 
 // „Anderes Spiel aufrufen“ (#1162): alle bereiten Spiele, die noch nicht aufgerufen sind oder laufen - „Als Nächstes“
-// dieser Station oben, dann nach Prognose. Die Stationen der Warteschlange passen alle zu Spiel und Gerät des Turniers
+// dieser Station oben, dann nach Prognose; Spiele, deren Spieler gerade anderswo spielen oder aufgerufen sind
+// (`busy_at` vom Server), stehen ausgegraut am Ende. Die Stationen der Warteschlange passen alle zu Spiel und Gerät des Turniers
 // (der Server prüft es beim Aufruf noch einmal).
 export function callableFor(station, matches = {}) {
   const own = station?.next?.match_id;
   return Object.values(matches || {})
     .filter((entry) => entry && entry.state === "queued" && entry.ready)
-    .sort((a, b) => (b.match_id === own) - (a.match_id === own)
+    .sort((a, b) => (b.match_id === own) - (a.match_id === own) || Boolean(a.busy_at) - Boolean(b.busy_at)
       || String(a.forecast_at || "").localeCompare(String(b.forecast_at || ""))
       || String(a.match_key || "").localeCompare(String(b.match_key || ""), "de", { numeric: true }));
+}
+
+export function busyText(busyAt) {
+  const where = busyAt?.station_text ? `an ${busyAt.station_text}` : "an einer anderen Station";
+  return busyAt?.state === "called" ? `Spieler gerade ${where} aufgerufen` : `spielt gerade ${where}`;
 }
 
 // Freie Stationen, deren „Als Nächstes“ bereit ist - für „Alle freien Stationen aufrufen“.
@@ -155,9 +161,12 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
             <ul className="tls-live-reveal mt-2 max-h-80 space-y-1.5 overflow-y-auto overscroll-contain" data-testid={`live-pick-list-${station.id}`}>
               {callable.map((entry) => (
                 <li key={entry.match_id}>
-                  <button type="button" disabled={busy} onClick={() => { setPanel(""); onCall(station, entry); }} className="tls-btn tls-btn--secondary flex min-h-[44px] w-full flex-col items-start rounded-sm px-3 py-2 text-left" data-testid={`live-pick-${station.id}-${entry.match_id}`}>
+                  <button type="button" disabled={busy || Boolean(entry.busy_at)} onClick={() => { setPanel(""); onCall(station, entry); }} className="tls-btn tls-btn--secondary flex min-h-[44px] w-full flex-col items-start rounded-sm px-3 py-2 text-left disabled:opacity-45" data-testid={`live-pick-${station.id}-${entry.match_id}`}>
                     <span className="text-[11px] uppercase tracking-wider text-white/50 [overflow-wrap:anywhere]">{entry.match_id === next?.match_id ? "Als Nächstes · " : ""}{queueWhat(entry)}{when(entry) ? ` · ${when(entry)}` : ""}</span>
                     <span className="text-sm font-bold normal-case tracking-normal text-white [overflow-wrap:anywhere]">{stationWho(entry)}</span>
+                    {entry.busy_at ? (
+                      <span className="text-xs normal-case tracking-normal text-warn" data-testid={`live-pick-busy-${entry.match_id}`}>{busyText(entry.busy_at)}</span>
+                    ) : null}
                   </button>
                 </li>
               ))}
