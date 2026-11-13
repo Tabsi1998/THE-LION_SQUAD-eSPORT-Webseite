@@ -84,6 +84,8 @@ def push_service(monkeypatch):
 
         async def post(self, url, content, headers):
             status = service["status"].get(url, 201)
+            if isinstance(status, Exception):
+                raise status
             if status < 300:
                 browser = service["browsers"][url]
                 assert headers["Content-Encoding"] == "aes128gcm"
@@ -369,3 +371,30 @@ async def test_inhalt_verbergen_je_browser(flow, keys, push_service):
     assert got[open_browser.endpoint]["title"] == "Check-in offen"
     assert got[hidden_browser.endpoint] == {"title": "THE LION SQUAD", "body": "Neue Benachrichtigung", "url": "/tournaments/cup",
                                             "tag": "n1", "kind": ""}
+
+
+async def test_kaputte_anmeldungen_fallen_weg_voruebergehende_fehler_nicht(flow, keys, push_service):
+    """Unlesbare Adresse oder Schlüssel: sofort weg. Dauerhafte Absage: nach drei Versuchen weg. Netzfehler: bleibt."""
+    import httpx
+
+    user = await flow.add_user()
+    flow.act_as(user)
+    bad_url, bad_value, refused, offline, bad_keys = (Browser(name) for name in ("url", "wert", "abgelehnt", "offline", "schluessel"))
+    for browser in (bad_url, bad_value, refused, offline, bad_keys):
+        await subscribe(flow, browser, push_service)
+    push_service["status"][bad_url.endpoint] = httpx.InvalidURL("kaputt")
+    push_service["status"][bad_value.endpoint] = ValueError("kaputt")
+    push_service["status"][refused.endpoint] = 403
+    push_service["status"][offline.endpoint] = httpx.ConnectError("offline")
+    await flow.db.web_push_subscriptions.update_one({"endpoint": bad_keys.endpoint}, {"$set": {"p256dh": "kaputt"}})
+
+    note = {"id": "n1", "user_id": user["id"], "kind": "match_call", "title": "Du bist dran", "url": "/matches/m1"}
+    assert await web_push.send_web_push_for_notification(note) == 0
+    left = {row["endpoint"]: row for row in await flow.db.web_push_subscriptions.find({}, {"_id": 0}).to_list(10)}
+    assert set(left) == {refused.endpoint, offline.endpoint}
+    assert left[refused.endpoint]["failures"] == 1 and not left[offline.endpoint].get("failures")
+
+    for _ in range(2):
+        await web_push.send_web_push_for_notification(note)
+    left = {row["endpoint"] for row in await flow.db.web_push_subscriptions.find({}, {"_id": 0}).to_list(10)}
+    assert left == {offline.endpoint}

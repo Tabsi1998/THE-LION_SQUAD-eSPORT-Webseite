@@ -407,6 +407,54 @@ def _urgency(kind: str) -> str:
     return "normal"
 
 
+# Nach so vielen dauerhaften Absagen eines Push-Dienstes (4xx außer 404/410/408/429) fällt eine Anmeldung weg.
+MAX_FAILURES = 3
+
+
+async def _deliver(client, db, row: dict, content: bytes, config: VapidConfig, kind: str, now: str, notification_id: Any) -> str:
+    """Eine Meldung an einen Browser. Ergebnis: "sent", "gone" (Anmeldung wird gelöscht) oder "failed"."""
+    endpoint = row.get("endpoint") or ""
+    if not endpoint_allowed(endpoint):
+        return "gone"
+    try:
+        encrypted = encrypt_payload(content, row.get("p256dh") or "", row.get("auth") or "")
+        headers = {
+            **vapid_headers(endpoint, config),
+            "Content-Encoding": "aes128gcm",
+            "Content-Type": "application/octet-stream",
+            "TTL": str(ttl_seconds()),
+            "Urgency": _urgency(kind),
+        }
+    except (ValueError, TypeError):
+        # Die Schlüssel des Browsers sind nicht lesbar - diese Anmeldung kann nie etwas empfangen.
+        return "gone"
+    try:
+        response = await client.post(endpoint, content=encrypted, headers=headers)
+    except (httpx.InvalidURL, httpx.UnsupportedProtocol, ValueError):
+        return "gone"
+    except Exception:
+        logger.warning("[web-push] Versand an einen Browser fehlgeschlagen (Meldung %s)", log_safe(notification_id), exc_info=True)
+        return "failed"
+    status = response.status_code
+    if status in (404, 410):
+        # Der Browser hat sich abgemeldet oder die Anmeldung ist abgelaufen - sie wird nicht mehr gebraucht.
+        return "gone"
+    if 200 <= status < 300:
+        await db.web_push_subscriptions.update_one(
+            {"id": row.get("id")}, {"$set": {"last_sent_at": now, "failures": 0}, "$unset": {"last_error": ""}},
+        )
+        return "sent"
+    logger.warning("[web-push] Push-Dienst antwortet %s (Meldung %s)", status, log_safe(notification_id))
+    update: dict[str, Any] = {"last_error": f"HTTP {status}", "last_error_at": now}
+    if 400 <= status < 500 and status not in (408, 429):
+        failures = int(row.get("failures") or 0) + 1
+        if failures >= MAX_FAILURES:
+            return "gone"
+        update["failures"] = failures
+    await db.web_push_subscriptions.update_one({"id": row.get("id")}, {"$set": update})
+    return "failed"
+
+
 async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     """Eine Meldung an alle angemeldeten Browser der Person. Gibt zurück, wie viele der Push-Dienst angenommen hat."""
     user_id = notification.get("user_id")
@@ -420,7 +468,7 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     if not config:
         return 0
     db = get_db()
-    rows = await active_subscriptions(db, user_id, {"id": 1, "endpoint": 1, "p256dh": 1, "auth": 1, "private_content": 1})
+    rows = await active_subscriptions(db, user_id, {"id": 1, "endpoint": 1, "p256dh": 1, "auth": 1, "private_content": 1, "failures": 1})
     if not rows:
         return 0
     base_url = await _site_base(db)
@@ -430,45 +478,16 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
         for flag in (False, True)
     }
     kind = str(notification.get("kind") or "")
-    sent = 0
-    gone: list[str] = []
     now = now_utc().isoformat()
+    results: list[tuple[dict, str]] = []
     async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
         for row in rows:
-            endpoint = row.get("endpoint") or ""
-            if not endpoint_allowed(endpoint):
-                gone.append(row.get("id"))
-                continue
-            try:
-                content = encrypt_payload(bodies[bool(row.get("private_content"))], row.get("p256dh") or "", row.get("auth") or "")
-                headers = {
-                    **vapid_headers(endpoint, config),
-                    "Content-Encoding": "aes128gcm",
-                    "Content-Type": "application/octet-stream",
-                    "TTL": str(ttl_seconds()),
-                    "Urgency": _urgency(kind),
-                }
-                response = await client.post(endpoint, content=content, headers=headers)
-            except Exception:
-                logger.warning("[web-push] Versand an einen Browser fehlgeschlagen (Meldung %s)", log_safe(notification.get("id")), exc_info=True)
-                continue
-            if response.status_code in (404, 410):
-                # Der Browser hat sich abgemeldet oder die Anmeldung ist abgelaufen - sie wird nicht mehr gebraucht.
-                gone.append(row.get("id"))
-                continue
-            if 200 <= response.status_code < 300:
-                sent += 1
-                await db.web_push_subscriptions.update_one(
-                    {"id": row.get("id")}, {"$set": {"last_sent_at": now}, "$unset": {"last_error": ""}},
-                )
-                continue
-            logger.warning("[web-push] Push-Dienst antwortet %s (Meldung %s)", response.status_code, log_safe(notification.get("id")))
-            await db.web_push_subscriptions.update_one(
-                {"id": row.get("id")}, {"$set": {"last_error": f"HTTP {response.status_code}", "last_error_at": now}},
-            )
+            content = bodies[bool(row.get("private_content"))]
+            results.append((row, await _deliver(client, db, row, content, config, kind, now, notification.get("id"))))
+    gone = [row.get("id") for row, outcome in results if outcome == "gone"]
     if gone:
         await db.web_push_subscriptions.delete_many({"id": {"$in": gone}})
-    return sent
+    return sum(1 for _row, outcome in results if outcome == "sent")
 
 
 def _as_utc(value) -> datetime | None:
