@@ -185,9 +185,8 @@ def mark_counted(seasons: dict[str, dict], order: list[str], settings: dict) -> 
     return sum(int(entry.get("points") or 0) for entry in seasons.values() if entry.get("counted"))
 
 
-def _criteria(row: dict, tiebreakers: list[str], order: list[str]) -> tuple:
+def _criteria(row: dict, tiebreakers: list[str], newest: str | None) -> tuple:
     seasons = row["seasons"]
-    newest = order[-1] if order else None
     values = []
     for key in tiebreakers:
         if key == "wins":
@@ -196,7 +195,7 @@ def _criteria(row: dict, tiebreakers: list[str], order: list[str]) -> tuple:
             places = [entry["place"] for entry in seasons.values() if isinstance(entry.get("place"), int)]
             values.append(min(places) if places else 999)
         elif key == "latest":
-            # Wer in der jüngsten Season des Zeitraums nicht gespielt hat, hat dort 0.
+            # Die jüngste Season mit Endstand in dieser Liga N - wer dort nicht gespielt hat, hat 0.
             values.append(-int((seasons.get(newest) or {}).get("points") or 0) if newest else 0)
     return tuple(values)
 
@@ -213,9 +212,13 @@ def rank(entries: dict[str, dict], settings: dict, order: list[str], decisions: 
                      "wins": sum(1 for value in seasons.values() if value.get("place") == 1),
                      "best_place": min((value["place"] for value in seasons.values() if isinstance(value.get("place"), int)), default=None)})
     tiebreakers = settings.get("tiebreakers") or []
+    # „Jüngste Season“: die neueste, in der in dieser Wertung jemand steht - nicht eine Season, die in dieser Liga N (noch) keinen
+    # Endstand hat.
+    played = {season_id for row in rows for season_id in row["seasons"]}
+    newest = next((season_id for season_id in reversed(order) if season_id in played), None)
 
     def sort_key(row: dict) -> tuple:
-        return (-row["total"], *_criteria(row, tiebreakers, order))
+        return (-row["total"], *_criteria(row, tiebreakers, newest))
 
     rows.sort(key=lambda row: (sort_key(row), str(row.get("name") or "").casefold(), row["key"]))
     out: list[dict] = []

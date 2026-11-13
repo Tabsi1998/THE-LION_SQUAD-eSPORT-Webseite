@@ -155,3 +155,13 @@ def test_without_period_there_is_no_overall_standing():
     assert not rules.enabled({}) and not rules.enabled({"overall": {"points_mode": "teams"}})
     league = {"overall": {"periods": [{"id": "p1", "name": "2027", "season_ids": ["s1"]}]}}
     assert rules.enabled(league) and rules.period_of(league, "s1")["id"] == "p1" and rules.period_of(league, "s2") is None
+
+
+def test_latest_means_the_newest_season_with_a_result_in_this_level():
+    # Season 3 hat in dieser Liga N (noch) keinen Endstand: Es entscheidet Season 2, nicht „alle 0 in Season 3“.
+    entries = {"a": {"name": "A", "seasons": {"s1": {"points": 5, "place": 1}, "s2": {"points": 1, "place": 4}}},
+               "b": {"name": "B", "seasons": {"s1": {"points": 2, "place": 3}, "s2": {"points": 4, "place": 2}}}}
+    settings = {**SETTINGS, "tiebreakers": ["latest"]}
+    assert [row["key"] for row in rules.rank(entries, settings, ["s1", "s2", "s3"])] == ["b", "a"]
+    # Gegenprobe: ohne das Kriterium nach Namen, A vor B.
+    assert [row["key"] for row in rules.rank(entries, {**SETTINGS, "tiebreakers": []}, ["s1", "s2", "s3"])] == ["a", "b"]
