@@ -3843,7 +3843,7 @@ ein Eintrag in `tournament_awards`:
 
 Gleiches bleibt derselbe Eintrag, Neues kommt dazu, Weggefallenes verschwindet, ein echter Gewinn (`prize_pickups`, gleicher Bereich) wird
 nie entzogen (`needs_review`); Nachrichten wie F.4 (`dedupe_key` `league-reward:<fassung>:…`). Öffentlich in Profil, Teamseite und
-Teilen-Bild nur, wenn die Liga aktiv ist und mindestens eine Season des Zeitraums für Gäste sichtbar ist (`awards._visible`).
+Teilen-Bild nur, wenn mindestens eine Season des Zeitraums für Gäste sichtbar ist (`awards._visible`).
 
 **Lesen:**
 

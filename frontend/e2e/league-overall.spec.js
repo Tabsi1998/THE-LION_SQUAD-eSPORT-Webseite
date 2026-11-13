@@ -87,10 +87,10 @@ async function noSideScroll(page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
-async function shot(target, name, style = "") {
+async function shot(target, name, style = "", extra = {}) {
   const dir = process.env.E2E_SCREENS_DIR;
   if (!dir) return;
-  await target.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", style: `.tls-bottom-nav { display: none !important; } ${style}` });
+  await target.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", style: `.tls-bottom-nav { display: none !important; } ${style}`, ...extra });
 }
 
 test.describe("Liga: Gesamtwertung über Seasons", () => {
@@ -117,9 +117,22 @@ test.describe("Liga: Gesamtwertung über Seasons", () => {
         await expect(table.locator("th", { hasText: "Season 1" })).toBeVisible();
       }
       await noSideScroll(page);
+      // Die Summen zählen beim Sichtbarwerden hoch - auch die letzte Zeile steht danach auf ihrem Wert.
+      await table.getByTestId("overall-1-teams-table-row-4").scrollIntoViewIfNeeded();
+      await expect(table.getByTestId("overall-1-teams-table-row-4").locator(".tls-overall-total")).toHaveText("5");
       // Erst wenn die Zeilen stehen und das Aufleuchten durch ist, das Bild.
       await page.waitForTimeout(2200);
-      await shot(page.getByTestId("overall"), `f5-gesamtwertung-${width}`);
+      if (width === 390) {
+        // Am Handy ein Bild des Bildschirms ab der Liga-Auswahl - ohne den klebenden Seitenkopf über der Tabelle.
+        await page.evaluate(() => {
+          document.activeElement?.blur();
+          const top = document.querySelector("[data-testid=overall]").getBoundingClientRect().top + window.scrollY;
+          window.scrollTo(0, top - 72);
+        });
+        await page.waitForTimeout(300);
+        await shot(page, "f5-gesamtwertung-390");
+      }
+      else await shot(page.getByTestId("overall"), "f5-gesamtwertung-1440");
       await page.getByTestId("overall-1-players").click();
       await expect(page.getByTestId("overall-1-players-table")).toContainText("Spieler mit privatem Profil");
       await expect(page.getByTestId("overall-1-players-table").getByRole("link", { name: "NeonFalke" })).toHaveAttribute("href", "/u/neonfalke");
