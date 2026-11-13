@@ -148,20 +148,61 @@ def public_config() -> dict[str, Any]:
     return {"enabled": bool(config), "public_key": config.public_key if config else None}
 
 
+_HOST_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-")
+_HOST_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+
+
+def valid_hostname(value: str) -> bool:
+    """Ein Hostname mit mindestens einem Punkt - kein ``localhost``, keine IP-Adresse."""
+    import ipaddress
+
+    host = str(value or "").strip().lower()
+    if not host or len(host) > 253 or "." not in host or host == "localhost" or host.endswith(".localhost"):
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
+    labels = host.split(".")
+    if labels[-1].isdigit():
+        return False
+    return all(_HOST_LABEL.fullmatch(label) for label in labels)
+
+
 def _extra_hosts(environ: dict[str, str] | None = None) -> tuple[str, ...]:
     source = environ if environ is not None else os.environ
-    return tuple(part.strip().lower() for part in str(source.get("WEB_PUSH_EXTRA_HOSTS") or "").split(",") if part.strip())
+    hosts = []
+    for part in str(source.get("WEB_PUSH_EXTRA_HOSTS") or "").split(","):
+        name = part.strip().lower()
+        if not name:
+            continue
+        if valid_hostname(name):
+            hosts.append(name)
+        else:
+            _warn_once(f"extra:{name}", f"[web-push] WEB_PUSH_EXTRA_HOSTS: Eintrag {log_safe(name, 80)} ist kein gültiger Hostname - ignoriert")
+    return tuple(hosts)
+
+
+def _printable_ascii(text: str) -> bool:
+    return all(0x21 <= ord(char) <= 0x7E for char in text)
 
 
 def endpoint_allowed(endpoint: str, environ: dict[str, str] | None = None) -> bool:
-    """Nur https zu einem bekannten Push-Dienst, ohne Zugangsdaten und fremden Port in der Adresse."""
+    """Nur https zu einem bekannten Push-Dienst: ohne Zugangsdaten, ohne fremden Port, ohne Steuer- oder Leerzeichen, der
+    Hostname nur aus Buchstaben, Ziffern, Punkt und Bindestrich."""
+    text = str(endpoint or "")
+    if not text or not _printable_ascii(text):
+        return False
     try:
-        parts = urlsplit(str(endpoint or ""))
+        parts = urlsplit(text)
         port = parts.port
     except ValueError:
         return False
     host = (parts.hostname or "").lower()
     if parts.scheme != "https" or not host or parts.username or parts.password or port not in (None, 443):
+        return False
+    if not set(host) <= _HOST_CHARS or "\\" in parts.netloc or any(label.startswith("xn--") for label in host.split(".")):
         return False
     hosts = PUSH_SERVICE_HOSTS + _extra_hosts(environ)
     return any(host == known or host.endswith("." + known) for known in hosts)

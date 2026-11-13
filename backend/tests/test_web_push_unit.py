@@ -166,3 +166,25 @@ def test_inhalt_verbergen_zeigt_nur_dass_etwas_da_ist():
                                      "url": "/tournaments/cup"}, private=True)
     assert hidden["title"] == "THE LION SQUAD" and hidden["body"] == "Neue Benachrichtigung"
     assert hidden["url"] == "/tournaments/cup" and "actions" not in hidden and hidden["kind"] == ""
+
+
+def test_adressen_mit_sonderzeichen_im_host_werden_abgelehnt():
+    for endpoint in ("https://evil.example\.fcm.googleapis.com/x", "https://evil.example%2f.fcm.googleapis.com/x",
+                     "https://evil.example;.fcm.googleapis.com/x", "https://evil.example&.fcm.googleapis.com/x",
+                     "https://evil.example .fcm.googleapis.com/x", "https://fcm.googleapis.com\t.evil.example/x",
+                     "https://fcm.googleapis.com/x\r\nX-Test: 1", "https://evil.example\u3002fcm.googleapis.com/x",
+                     "https://xn--evil.fcm.googleapis.com/x", "https://[::1].fcm.googleapis.com/x",
+                     "https://evil.example#@fcm.googleapis.com/x", "https://fcm.googleapis.com./x"):
+        assert not web_push.endpoint_allowed(endpoint), endpoint
+    assert web_push.endpoint_allowed("https://fcm.googleapis.com:443/fcm/send/abc")
+
+
+def test_zusaetzliche_push_dienste_werden_geprueft():
+    env = {"WEB_PUSH_EXTRA_HOSTS": "push.example.test, localhost, 10.0.0.1, bad_host.example, nodot, ::1"}
+    assert web_push._extra_hosts(env) == ("push.example.test",)
+    assert not web_push.endpoint_allowed("https://localhost/x", env)
+    assert not web_push.endpoint_allowed("https://10.0.0.1/x", env)
+    assert web_push.endpoint_allowed("https://push.example.test/x", env)
+    assert web_push.valid_hostname("push.example.test")
+    for bad in ("localhost", "a.localhost", "127.0.0.1", "1.2.3.4", "nodot", "under_score.example", "-x.example", ""):
+        assert not web_push.valid_hostname(bad), bad
