@@ -569,7 +569,8 @@ zum Vorbereiten da: anlegen, bearbeiten, planen, Aushang. Am Turniertag bedient 
   in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
 
 **Stationen live bedienen** (Turnier → **Turnierleitung** → Reiter **Stationen**, am Handy und am PC): je Station eine
-Kachel mit Zustand (**Frei**, **Aufgerufen**, **Läuft**, **Defekt**), dem Spiel und den Namen im Klartext. Das gilt vor
+Kachel mit Zustand (**Frei**, **Aufgerufen**, **Läuft**, **Defekt**, **Anderes Turnier**, **Hängt**), dem Spiel und den
+Namen im Klartext. Das gilt vor
 Ort und hybrid, für 1 gegen 1, Team gegen Team und Durchgänge. Bedienen dürfen Organisation, Schiedsrichter und
 Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Admin-Recht.
 
@@ -591,6 +592,12 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
 - **Umlegen**: Ein laufendes Spiel behält Startzeit und Uhr; ein aufgerufenes wird an der neuen Station neu aufgerufen,
   die Spieler bekommen die neue Station. Dabei beginnen „antreten bis“ und die Frist „nicht erschienen“ neu – gezählt
   ab dem neuen Aufruf. Umgelegt wird nur auf eine freie Station, die zu Spiel und Gerät des Turniers passt.
+- **Anderes Turnier**: An einer geteilten Station des Events spielt gerade ein anderes Turnier. Aufrufen, Freigeben und
+  Räumen macht dessen Leitung. **Defekt** geht nach einer Rückfrage – dessen Leitung bekommt sofort Bescheid, sieht den
+  Fall unter **Braucht Aufmerksamkeit** und legt das Spiel um; beide Protokolle halten es fest.
+- **Hängt**: Die Station ist als belegt gespeichert, hält aber kein offenes Spiel (etwa nach dem Löschen einer Phase).
+  **Station räumen** macht sie wieder frei – nie, solange ein offenes Spiel daran steht. Beim Löschen oder Neubauen
+  einer Phase werden die Stationen ihrer Spiele ohnehin frei.
 - Tippen zwei Leute zugleich, gilt genau ein Tipp; der andere bekommt eine Meldung und sieht den neuen Stand. Jede
   Aktion steht im Protokoll.
 
