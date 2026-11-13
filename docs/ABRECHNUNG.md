@@ -119,7 +119,8 @@ ein **anderes Mitglied** das Team neu an – auch nach einer weggenommenen Ableh
 selbst: eigener Auftrag, die alte Rechnung bleibt storniert (Gutschrift an die Person, die sie bekommen hat).
 Ist die alte Rechnung voll gutgeschrieben oder aufgegeben, gilt der aktuelle Preis mit eigenem Auftrag.
 „Nicht erschienen“ schließt den Auftrag auf jedem Weg: über den Status, über den Check-in und wenn die Leitung
-einen Ersatz für die Person einträgt.
+einen Ersatz für die Person einträgt. Kommt eine Anmeldung ohne Startgeld und ohne Kostenübernahme zurück (von
+der Leitung eingetragen), entsteht dabei keine Rechnung.
 
 **Turnier im Event.** Hängt das Turnier an einem Event, dessen Kostenbeitrag das Startgeld schon
 enthält, setzt ihr im Abschnitt „Startgeld“ den Haken „Im Eventbeitrag enthalten“ – dann zeigt
