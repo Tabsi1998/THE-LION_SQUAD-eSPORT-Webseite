@@ -216,14 +216,17 @@ async def ended_live_rows(db, user: dict, now: datetime | None = None) -> list[d
     return await rows(db, user, now=now)
 
 
-async def overdue_match_rows(db, user: dict, limit: int = 50) -> list[dict]:
-    """Überfällige Liga-Spiele (#2194, Nr. 28) für die Liga-Leitung mit „Spiele betreuen“ oder „Ergebnisse korrigieren“."""
+async def overdue_match_rows(db, user: dict, limit: int = 50, *, season_id: str | None = None) -> list[dict]:
+    """Überfällige Liga-Spiele (#2194, Nr. 28) für die Liga-Leitung mit „Spiele betreuen“ oder „Ergebnisse korrigieren“. ``season_id``:
+    nur diese Season - für den Leitstand (E.4)."""
     from services.league_permissions import can, staffel_access
     from services.league_schedule import overdue_query
 
     query = (await staffel_access(db, user)).query()
     if query is None:
         return []
+    if season_id:
+        query = {**query, "league_context.season_id": season_id}
     staffeln = await db.tournaments.find({**query, "status": {"$nin": ["draft", "archived", "cancelled"]}},
                                          {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
     allowed = {}
