@@ -473,8 +473,9 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
 async def withdraw_own(db, application_id: str, user: dict, *, refresh_previews=None) -> dict:
     """Zurückziehen bzw. abmelden von der Team-Seite (F.2): ohne Umweg über die Ligaseite - eine übernommene Season ist oft noch nicht
     veröffentlicht. Dieselben Regeln wie ``withdraw``: nur Captain und Vertreter, Frist bis zum Start."""
-    application = await db.league_applications.find_one({"id": application_id}, {"_id": 0, "season_id": 1, "squad_id": 1})
-    if not application:
+    application = await db.league_applications.find_one({"id": application_id}, {"_id": 0, "season_id": 1, "squad_id": 1, "carry_over": 1})
+    # Nur übernommene Anträge: Alles andere zieht das Team wie bisher auf der Ligaseite zurück.
+    if not application or not application.get("carry_over"):
         raise LeagueProblem(GONE, 404)
     _team, squad = await _load_side(db, application["squad_id"])
     if not squad or not await may_apply(db, user, squad):
