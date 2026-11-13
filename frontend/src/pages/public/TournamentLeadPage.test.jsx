@@ -307,3 +307,30 @@ test("Reiter „Braucht Aufmerksamkeit“: ein Textblock, kein doppelter Abstand
   // Kein loses Leerzeichen als eigenes Flex-Kind neben dem Symbol.
   expect([...tab.childNodes].filter((node) => node.nodeType === 3 && node.textContent.trim() === "")).toHaveLength(0);
 });
+
+test("Liste „läuft“ (#1167): ein laufendes Spiel trägt die Spielzeit-Uhr mit der Dauer des Servers - fehlt das Ergebnis, bleibt der Hinweis", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T16:17:00Z"));
+  const running = { ...ENTRY, id: "m9", status: "in_progress", started_at: "2026-10-31T16:00:00Z", duration_minutes: null,
+    timing: { running_minutes: 17, overdue_minutes: null, missing: false, duration_minutes: 20 } };
+  const late = { ...ENTRY, id: "m10", status: "in_progress", started_at: "2026-10-31T15:30:00Z",
+    timing: { running_minutes: 47, overdue_minutes: 27, missing: true, duration_minutes: 20 } };
+  const planned = { ...ENTRY, id: "m11", status: "scheduled", scheduled_at: "2026-10-31T17:00:00Z", timing: { running_minutes: null, missing: false } };
+  try {
+    renderLead({ tournament: { id: "t1", title: "FC 26 Herbst-Cup" }, matches: [running, late, planned], recent: [], attention: [], stations: [], counts: { open: 3, running: 2 } });
+    const clock = await screen.findByTestId("lead-clock-m9");
+    expect(clock).toHaveTextContent("17:00/ 20 Min.");
+    expect(clock).toHaveAttribute("data-tone", "warn");
+    expect(clock).toHaveAttribute("data-size", "sm");
+    expect(clock).toHaveAttribute("aria-label", "Spielzeit 17:00 von 20 Min., knapp");
+    // Die Uhr ersetzt „läuft 17 Min.“.
+    expect(screen.queryByTestId("lead-line-m9")).toBeNull();
+    expect(screen.getByTestId("lead-clock-m10")).toHaveAttribute("data-tone", "over");
+    expect(screen.getByTestId("lead-line-m10")).toHaveTextContent("Ergebnis fehlt · 27 Min. über der Zeit");
+    // Geplant, noch nicht gestartet: keine Uhr.
+    expect(screen.queryByTestId("lead-clock-m11")).toBeNull();
+    expect(screen.getByTestId("lead-line-m11")).toHaveTextContent("geplant");
+  } finally {
+    vi.useRealTimers();
+  }
+});

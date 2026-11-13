@@ -62,11 +62,14 @@ def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict |
         base = None
     else:
         base = _parse(match.get("scheduled_at"))
-    out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None}
+    out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None, "duration_minutes": None}
     if started and str(match.get("status") or "") in RUNNING_STATUSES | {"scheduled", "ready"}:
         out["running_minutes"] = max(0, int((now - started).total_seconds() // 60))
     if base:
-        planned_end = base + timedelta(minutes=duration_minutes(match, tournament, stage, game))
+        minutes = duration_minutes(match, tournament, stage, game)
+        # Die Dauer, mit der gerechnet wird (#1167): die Spielzeit-Uhr der Leitung zeigt „12:06 / 20 Min.“ damit.
+        out["duration_minutes"] = minutes
+        planned_end = base + timedelta(minutes=minutes)
         due = planned_end + timedelta(minutes=MISSING_AFTER_MINUTES)
         out["due_at"] = due.isoformat()
         if now > planned_end:
