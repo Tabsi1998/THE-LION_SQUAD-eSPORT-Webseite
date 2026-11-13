@@ -283,7 +283,7 @@ async def test_a_game_server_shows_only_its_games_and_main_shows_everything(flow
     await discord_guilds.reconcile(db, [seen(MAIN, "LION"), seen(COD, "CoD-Server"), seen(EMPTY, "Leer")], configured_main=MAIN)
     for guild_id in (COD, EMPTY):
         await discord_guilds.update_guild(db, guild_id, {"enabled": True})
-    await db.games.insert_many([{"id": "g-cod", "name": "Call of Duty", "discord_guild_id": COD}, {"id": "g-rl", "name": "Rocket League"}])
+    await db.games.insert_many([{"id": "g-cod", "slug": "g-cod", "name": "Call of Duty", "discord_guild_id": COD}, {"id": "g-rl", "slug": "g-rl", "name": "Rocket League"}])
     soon = (now_utc() + timedelta(days=3)).isoformat()
     await db.tournaments.insert_many([
         {"id": "t-cod", "slug": "cod", "title": "CoD-Cup", "game_id": "g-cod", "status": "registration_open", "visibility": "public", "start_date": soon},

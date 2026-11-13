@@ -88,7 +88,7 @@ async def test_only_opted_in_linked_members_are_asked_and_private_profiles_stay_
     await with_key(flow)
     result = await steam_presence.poll(flow.db)
     assert result == {"checked": 2, "online": 1, "error": None}
-    assert steam.calls == [["76561198000000001", "76561198000000003"]], "Leon ohne Opt-in wird nie abgefragt"
+    assert [sorted(call) for call in steam.calls] == [["76561198000000001", "76561198000000003"]], "Leon ohne Opt-in wird nie abgefragt"
 
     data = (await flow.get("/api/membership/steam-presence")).json()
     assert data["available"] is True and data["stale"] is False and data["online_count"] == 1
@@ -143,7 +143,8 @@ async def test_more_than_hundred_accounts_are_batched_and_non_members_get_403(fl
     flow.act_as(guest)
     assert (await flow.get("/api/membership/steam-presence")).status_code == 403
 
-    member = await member_with_steam(flow, "paula", "76561198000000001")
+    # Eine Steam-ID gehört nur zu einem Konto (eindeutiger Index, #2216) - nicht eine der 101 von oben.
+    member = await member_with_steam(flow, "paula", "76561198999999999")
     flow.act_as(member)
     data = (await flow.get("/api/membership/steam-presence")).json()
     assert data["online_count"] == 11 and len(data["players"]) == steam_presence.MAX_SHOWN, "Zähler ganz, Liste höchstens acht"

@@ -37,10 +37,10 @@ async def test_content_editors_save_tiers_benefits_and_numbers_counted_by_the_si
     now = now_utc()
     await flow.db.memberships.insert_many([{"id": f"m{i}", "user_id": f"u{i}", "member_status": "active"} for i in range(3)] + [{"id": "m9", "user_id": "u9", "member_status": "former"}])
     await flow.db.events.insert_many([
-        {"id": "e1", "status": "completed", "visibility": "public", "start_date": (now - timedelta(days=40)).isoformat()},
-        {"id": "e2", "status": "completed", "visibility": "public", "start_date": (now - timedelta(days=500)).isoformat()},
-        {"id": "e3", "status": "completed", "visibility": "members", "start_date": (now - timedelta(days=10)).isoformat()},
-        {"id": "e4", "status": "announced", "visibility": "public", "start_date": (now + timedelta(days=30)).isoformat()},
+        {"id": "e1", "slug": "e1", "status": "completed", "visibility": "public", "start_date": (now - timedelta(days=40)).isoformat()},
+        {"id": "e2", "slug": "e2", "status": "completed", "visibility": "public", "start_date": (now - timedelta(days=500)).isoformat()},
+        {"id": "e3", "slug": "e3", "status": "completed", "visibility": "members", "start_date": (now - timedelta(days=10)).isoformat()},
+        {"id": "e4", "slug": "e4", "status": "announced", "visibility": "public", "start_date": (now + timedelta(days=30)).isoformat()},
     ])
     await flow.db.discord_guilds.insert_one({"guild_id": "g1", "role": "main", "enabled": True, "name": "Lions", "member_count": 214})
 

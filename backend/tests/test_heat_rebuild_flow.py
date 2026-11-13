@@ -253,15 +253,26 @@ async def test_a_heat_called_between_reading_and_writing_stays_untouched(flow, m
     plan = (await stored(flow, tournament))["heat_rebuild_plan"]
     heat_c = (await heats(flow, tournament))["C"]
     real_validate = heat_rebuild.validate_competition_graph
-    sync_matches = flow.db.matches_v2._AsyncMongoMockCollection__collection
+    collection_class = type(flow.db.matches_v2)
+    real_count, real_update = collection_class.count_documents, collection_class.update_one
+    state = {"computed": False, "called": False}
 
-    def validate_while_a_station_calls(snapshot):
-        # Zwischen Lesen und Schreiben: eine Station ruft C auf.
-        sync_matches.update_one({"id": heat_c["id"]}, {"$set": {"called_at": now_utc().isoformat()}})
+    def validate_and_remember(snapshot):
+        state["computed"] = True
         return real_validate(snapshot)
 
-    monkeypatch.setattr(heat_rebuild, "validate_competition_graph", validate_while_a_station_calls)
+    async def count_while_a_station_calls(self, filter_doc, *args, **kwargs):
+        # Zwischen Lesen und Schreiben - der Umbau ist gerechnet und prüft gleich: eine Station ruft C auf. Über die
+        # Datenbank, nicht am Speicher von mongomock vorbei (#2216), damit es auch auf echtem MongoDB läuft.
+        if self.name == "matches_v2" and state["computed"] and not state["called"]:
+            state["called"] = True
+            await real_update(self, {"id": heat_c["id"]}, {"$set": {"called_at": now_utc().isoformat()}})
+        return await real_count(self, filter_doc, *args, **kwargs)
+
+    monkeypatch.setattr(heat_rebuild, "validate_competition_graph", validate_and_remember)
+    monkeypatch.setattr(collection_class, "count_documents", count_while_a_station_calls)
     response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan["id"]})
+    assert state["called"], "die Station hat zwischen Rechnen und Schreiben aufgerufen"
     assert response.status_code == 409, response.text
     by_key = await heats(flow, tournament)
     assert by_key["D"]["status"] == "ready" and by_key["D"].get("merged_into") is None
@@ -308,9 +319,7 @@ def _failing_second_write(flow, monkeypatch, *, foreign_change: dict | None = No
     """Der zweite Schreibzugriff des Umbaus trifft einen Lauf, der sich gerade geändert hat - und den ersten Lauf hat
     optional auch jemand angefasst (``foreign_change``). Jeder Zugriff auf ``db.matches_v2`` liefert einen neuen
     Wrapper, deshalb hängt der Haken an der Klasse und greift nur bei Schreibzugriffen des Umbaus."""
-    collection = flow.db.matches_v2
-    sync = collection._AsyncMongoMockCollection__collection
-    collection_class = type(collection)
+    collection_class = type(flow.db.matches_v2)
     real_update = collection_class.update_one
     state = {"writes": 0, "first": None}
 
@@ -320,9 +329,10 @@ def _failing_second_write(flow, monkeypatch, *, foreign_change: dict | None = No
             if state["writes"] == 1:
                 state["first"] = filter_doc["id"]
             if state["writes"] == 2:
-                sync.update_one({"id": filter_doc["id"]}, {"$set": {"updated_at": "2099-01-01T00:00:00+00:00"}})
+                # Die fremde Änderung über die Datenbank, nicht am Speicher von mongomock vorbei (#2216).
+                await real_update(self, {"id": filter_doc["id"]}, {"$set": {"updated_at": "2099-01-01T00:00:00+00:00"}})
                 if foreign_change:
-                    sync.update_one({"id": state["first"]}, {"$set": foreign_change})
+                    await real_update(self, {"id": state["first"]}, {"$set": foreign_change})
         return await real_update(self, filter_doc, update, *args, **kwargs)
 
     monkeypatch.setattr(collection_class, "update_one", update_one)
@@ -658,7 +668,7 @@ async def test_waiting_overfull_marks_are_checked_in_turn_so_none_starves(flow, 
     monkeypatch.setattr(heat_rebuild, "RESUME_BATCH", 2)
     for tid, checked_at in (("t-mittel", "2026-10-26T11:00:00+00:00"), ("t-neu", "2026-10-26T12:00:00+00:00"),
                             ("t-alt", "2026-10-26T10:00:00+00:00")):
-        await flow.db.tournaments.insert_one({"id": tid, "title": tid, "heat_rebuild_incomplete": {
+        await flow.db.tournaments.insert_one({"id": tid, "title": tid, "slug": tid, "heat_rebuild_incomplete": {
             "at": "2026-10-26T09:00:00+00:00", "checked_at": checked_at, "reason": "overfull",
             "match_ids": ["gibt-es-nicht"], "match_keys": ["F"]}})
     assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 2

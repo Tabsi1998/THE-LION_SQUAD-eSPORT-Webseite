@@ -78,9 +78,9 @@ async def fill(flow, user: dict, public: pathlib.Path, quarantine: pathlib.Path)
     await db.media_scans.insert_one({"id": "scan-1", "kind": "upload", "owner_id": uid, "url": UPLOADS + "gehalten.webp",
                                      "quarantine_key": "scan-1.webp", "state": "removed"})
     await db.teams.insert_one({"id": "team-1", "name": "Löwen", "logo_url": UPLOADS + "teamlogo.webp", "member_ids": [uid]})
-    await db.club_member_profiles.insert_one({"id": "selbst", "user_id": uid, "source": "member", "display_name": "Paula", "gamertag": "paula",
+    await db.club_member_profiles.insert_one({"id": "selbst", "slug": "selbst", "user_id": uid, "source": "member", "display_name": "Paula", "gamertag": "paula",
                                               "bio": "Rocket League seit 2019", "photo_url": UPLOADS + "avatar.webp", "is_active": True})
-    await db.club_member_profiles.insert_one({"id": "akte", "user_id": uid, "source": "dolibarr", "display_name": "Paula P.", "is_active": True})
+    await db.club_member_profiles.insert_one({"id": "akte", "slug": "akte", "user_id": uid, "source": "dolibarr", "display_name": "Paula P.", "is_active": True})
     await db.board_positions.insert_one({"id": "kassier", "slug": "kassier", "title_male": "Kassier", "user_id": uid, "deputy_user_id": None})
     await db.board_positions.insert_one({"id": "obmann", "slug": "obmann", "title_male": "Obmann", "user_id": "anderer", "deputy_user_id": uid})
     await db.membership_applications.insert_one({"id": "antrag-alt", "user_id": uid, "status": "approved", "motivation": "Ich will dabei sein, weil …",
@@ -98,9 +98,9 @@ async def fill(flow, user: dict, public: pathlib.Path, quarantine: pathlib.Path)
     await db.f1_lap_times.insert_one({"id": "lap", "user_id": uid, "time_ms": 83456, "proof_url": "https://clips.example.test/paula", "admin_note": "Paula vor Ort"})
     await db.prize_pickups.insert_one({"id": "preis", "user_id": uid, "tournament_id": "t-1", "place": 1, "status": "picked_up", "notes": "an Paula übergeben"})
     await db.moderation_items.insert_one({"id": "mod", "kind": "team_chat", "user_id": uid, "excerpt": "ein gehaltener Satz", "state": "pending"})
-    await db.access_links.insert_one({"id": "link-konto", "user_id": uid, "email": None, "note": "für Paula", "is_active": True})
-    await db.access_links.insert_one({"id": "link-mail", "user_id": None, "email": user["email"], "note": None, "is_active": True})
-    await db.access_links.insert_one({"id": "link-fremd", "user_id": "anderer", "email": "gast@example.test", "is_active": True,
+    await db.access_links.insert_one({"id": "link-konto", "token_hash": "hash-" + "link-konto", "user_id": uid, "email": None, "note": "für Paula", "is_active": True})
+    await db.access_links.insert_one({"id": "link-mail", "token_hash": "hash-" + "link-mail", "user_id": None, "email": user["email"], "note": None, "is_active": True})
+    await db.access_links.insert_one({"id": "link-fremd", "token_hash": "hash-" + "link-fremd", "user_id": "anderer", "email": "gast@example.test", "is_active": True,
                                       "use_count": 2, "used_by": [uid, "anderer"], "last_used_by": uid})
     # Einlass bei der Generalversammlung (#845): Paula wurde eingelassen - und hat als Vorstand selbst jemanden eingelassen.
     await db.meeting_admissions.insert_one({"meeting_id": 7, "member_id": 11, "round": 0, "name": "Paula P.", "user_id": uid, "state": "present", "voting": True,
@@ -127,7 +127,7 @@ async def fill_contract(flow, user: dict) -> None:
                                           "message": "bleibt", "status": "new"})
     await db.mail_jobs.insert_one({"id": "mail-paula", "to": user["email"], "subject": "Erinnerung", "html": "<p>Hallo Paula P.</p>", "status": "failed"})
     await db.mail_jobs.insert_one({"id": "mail-gast", "to": "gast@example.test", "subject": "Erinnerung", "html": "<p>Hallo</p>", "status": "pending"})
-    await db.news_posts.insert_one({"id": "news-1", "title": "Saisonstart", "author_id": uid, "author_name": "Paula P.", "published": True,
+    await db.news_posts.insert_one({"id": "news-1", "slug": "news-1", "title": "Saisonstart", "author_id": uid, "author_name": "Paula P.", "published": True,
                                    "updated_by": uid, "updated_by_name": "Paula P.", "withdrawn_by": uid, "withdrawn_by_name": "Paula P."})
     await db.achievement_events.insert_one({"id": "erfolg-fuer", "kind": "grant", "user_id": uid, "username": "paula", "user_name": "Paula P.",
                                             "actor_id": "vorstand", "actor_name": "Vera V.", "tier_code": "helfer-1", "note": "danke"})

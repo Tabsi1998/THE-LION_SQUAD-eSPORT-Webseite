@@ -37,6 +37,7 @@ import { SeasonPlayTab } from "./SeasonPlayTab";
 import { useSeasonReadiness } from "./SeasonReadinessPanel";
 import { SeasonProtestsTab } from "./SeasonProtestsTab";
 import { SeasonRulesTab } from "./SeasonRulesTab";
+import { SeasonSanctionsTab } from "./SeasonSanctionsTab";
 import { SeasonTablePanel } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -133,7 +134,8 @@ export default function AdminLeagueSeasonPage() {
   const rulesLink = canRules ? `/admin/leagues/rules/league_season/${seasonId}` : "";
 
   // Welche Reiter diese Person sieht: Termine nur mit „Season konfigurieren“, Anmeldung und Kader mit einer der passenden Zuständigkeiten.
-  const tabs = SEASON_TABS.filter((row) => (row.key === "termine" ? canSeason : row.key === "anmeldung" ? canSeason || can("applications") || can("roster") : true));
+  const tabs = SEASON_TABS.filter((row) => (row.key === "termine" ? canSeason : row.key === "anmeldung" ? canSeason || can("applications") || can("roster")
+    : row.key === "strafen" ? can("sanctions") : true));
   const tab = tabs.some((row) => row.key === target.tab) ? target.tab : tabs[0].key;
   useEffect(() => { setVisited((current) => (current.includes(tab) ? current : [...current, tab])); }, [tab]);
   useScrollToSection(target.section, tab, Boolean(data));
@@ -349,6 +351,8 @@ export default function AdminLeagueSeasonPage() {
     ),
     // Proteste (E.2, #1619): Eingang für „Proteste“, Einstellungen für „Season konfigurieren“ (lesen darf jede Zuständigkeit).
     proteste: () => <SeasonProtestsTab seasonId={seasonId} canSeason={canSeason} canDisputes={can("disputes")} />,
+    // Strafen (E.3): eigener Reiter - Formular oben, darunter die Strafen der Season.
+    strafen: () => <SeasonSanctionsTab seasonId={seasonId} />,
     regelwerk: () => (
       <SeasonRulesTab seasonId={seasonId} season={season} canSeason={canSeason} canRules={canRules} rulesView={rulesView} rulesNotice={notice}
         rulesLink={rulesLink} onPendingSync={setPendingSync} />

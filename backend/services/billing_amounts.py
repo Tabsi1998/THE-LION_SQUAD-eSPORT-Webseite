@@ -21,6 +21,21 @@ def paid_cents(order: dict, payments: list[dict] | None = None) -> int:
     return max(0, total - int(remaining) - max(0, credited_cents(order)))
 
 
+def invoice_fields(source: dict) -> dict:
+    """Was die Anmeldung vom Beleg trägt - aus dem gelesenen Stand (Abgleich) oder aus dem Auftrag (Rückkehr nach Storno, #2184),
+    die Felder heißen gleich."""
+    return {"billing_status": "paid" if source.get("paid") else "invoiced", "invoice_id": source.get("invoice_id"), "invoice_ref": source.get("invoice_ref"),
+            "invoice_status": source.get("invoice_status"), "payment_state": source.get("payment_state")}
+
+
+def own_registration(order: dict) -> dict:
+    """Filter auf die Anmeldung, zu der dieser Auftrag gerade gehört (#2184): derselbe eingefrorene Preis. Nach einer Rückkehr mit
+    neuem Auftrag gehört ein alter (etwa voll gutgeschriebener) Beleg nicht mehr dazu - der Abgleich spiegelt ihn dann nicht
+    zurück. Aufträge ohne Preis-Kennung (Altdaten) gehören wie bisher zur Anmeldung."""
+    digest = (order.get("snapshot") or {}).get("hash")
+    return {"id": order["registration_id"], **({"price_snapshot.hash": digest} if digest else {})}
+
+
 def waived_cents(order: dict) -> int:
     """Was bei „Bezahlt (mit Abzug)“ erlassen wurde (#2226): der Rest, den Dolibarr stehen lässt. Kein Geld und keine Gutschrift -
     zählt nie zu ``paid_cents`` und damit nie zum Erstattungslimit."""

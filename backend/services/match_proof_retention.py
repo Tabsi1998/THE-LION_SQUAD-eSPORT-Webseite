@@ -6,6 +6,8 @@
   oder eine Einspruchsfrist läuft. MOSS (Anti-Cheat) nur, bis das Verfahren beendet und die Einspruchsfrist vorbei ist -
   an einem Vorfall mindestens, bis das Ergebnis des Spiels feststeht und die Protestfrist abgelaufen ist (``moss_due``).
 - Alles, dessen Spiel es nicht mehr gibt.
+- Strafen (E.3, Nr. 31, 136): Ein Nachweis an einer Strafe bleibt, solange sie läuft, ein Einspruch offen ist oder die
+  Einspruchsfrist läuft (``keep_until``, gesetzt von ``league_sanction_bans``) - auch ein MOSS-Nachweis.
 - Kontolöschung (``delete_for_user``): alles sofort - außer MOSS in einem laufenden Vorfall oder Verfahren, der pseudonym
   für die Leitung bleibt, bis seine Frist um ist.
 
@@ -19,13 +21,13 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timedelta
 
 from models import now_utc
 from services import match_proof_refs as refs
 from services import match_proofs, media_scan
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
-from services.league_service import VIENNA, week_days
+from services.league_calendar import season_end_at
 from services.match_disputes import decided_at
 from services.matchday_schedule import response_deadline
 from storage import QUARANTINE_DIR
@@ -62,17 +64,9 @@ async def _matches_of(db, rows: list[dict], fields: dict) -> dict[str, dict]:
 
 
 def season_end(season: dict | None) -> datetime | None:
-    """Wann die Season zu Ende ist: der Abschluss durch die Leitung (``closed_at``, kommt mit F.1) - bis dahin das Ende des
+    """Wann die Season zu Ende ist (``league_calendar.season_end_at``): der Abschluss durch die Leitung, bis dahin das Ende des
     letzten Tages der letzten Spielwoche. ``None``: nicht bestimmbar."""
-    if not season:
-        return None
-    closed = refs.parse(season.get("closed_at"))
-    if closed:
-        return closed
-    weeks = week_days(season)
-    if not weeks:
-        return None
-    return datetime.combine(weeks[-1][1] + timedelta(days=1), time.min, tzinfo=VIENNA).astimezone(timezone.utc)
+    return season_end_at(season)
 
 
 def protest_window(match: dict, tournament: dict | None, season: dict | None,
@@ -252,7 +246,11 @@ async def rescan_stuck(db, *, now=None) -> int:
 async def purge(db, *, now=None) -> int:
     """Aufräumen: nie verwendete Fotos nach 24 Stunden, Turniere 30 Tage nach dem Hochladen, Liga-Staffeln nach ihrer Regel
     (``_expired_league``) und alles, dessen Spiel es nicht mehr gibt."""
+    from services import league_sanction_bans as league_sanctions
+
     current = now or now_utc()
+    # Strafen (E.3): erst die Sperrfristen der Nachweise an Strafen nachziehen, dann aufräumen.
+    await league_sanctions.refresh_proof_holds(db, current)
     stale = [row async for rows in _pages(db, {"status": "pending", "created_at": {"$lt": (current - match_proofs.PENDING_TTL).isoformat()}})
              for row in rows]
     staffeln = {row["id"]: row for row in await db.tournaments.find(ONLY_LEAGUE, STAFFEL_FIELDS).to_list(None)}
@@ -262,9 +260,11 @@ async def purge(db, *, now=None) -> int:
     known = set(await db.matches_v2.distinct("id", {"id": {"$in": attached_ids}})) if attached_ids else set()
     orphans = [row async for rows in _pages(db, {**kept, "match_id": {"$nin": sorted(known)}}) for row in rows] if attached_ids else []
     seen: set[str] = set()
+    orphan_ids = {row["id"] for row in orphans}
     rows = []
     for row in [*stale, *expired, *orphans]:
-        if row["id"] not in seen:
+        # Ein verwaister Nachweis (Spiel gelöscht) geht immer; sonst hält ihn eine laufende Strafe.
+        if row["id"] not in seen and (row["id"] in orphan_ids or not league_sanctions.held(row, current)):
             seen.add(row["id"])
             rows.append(row)
     return await match_proofs.delete_rows(db, rows)

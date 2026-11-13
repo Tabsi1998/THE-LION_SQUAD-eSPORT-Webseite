@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 import weakref
 
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, GROUP_LIMIT, new_id, now_utc
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import (
     final_match,
@@ -111,7 +111,7 @@ async def tournament_ranks(db, tournament: dict, *, surface: str = "awards") -> 
     tournament_id = tournament["id"]
     regs = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": {"$in": list(REGISTRATION_STATUSES)}}, {"_id": 0},
-    ).to_list(1000)
+    ).to_list(REGISTRATION_LIMIT)
     if not regs:
         return [], {}, {}
     read_model = await load_competition_read_model(db, tournament_id)
@@ -127,7 +127,7 @@ async def tournament_ranks(db, tournament: dict, *, surface: str = "awards") -> 
     if not placements and matches:
         groups = []
         if tournament.get("format") == "groups":
-            groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)
+            groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(GROUP_LIMIT)
         rows = standings_for_structure(tournament, snapshot, regs, groups=groups)
         if tournament.get("format") == "groups":
             rows = [row for group in rows for row in group.get("standings") or []]

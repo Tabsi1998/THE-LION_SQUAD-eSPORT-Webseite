@@ -256,8 +256,8 @@ async def test_the_migration_adds_only_missing_templates_and_never_results(flow)
 async def test_merging_duplicate_profiles_moves_series_links(flow):
     db = flow.db
     await db.club_member_profiles.insert_many([
-        {"id": "gepflegt", "display_name": "Anna Probe", "source": "editorial", "created_at": "2026-01-01"},
-        {"id": "doppel", "display_name": "Anna Probe", "source": "dolibarr", "created_by": "dolibarr-sync",
+        {"id": "gepflegt", "slug": "gepflegt", "display_name": "Anna Probe", "source": "editorial", "created_at": "2026-01-01"},
+        {"id": "doppel", "slug": "doppel", "display_name": "Anna Probe", "source": "dolibarr", "created_by": "dolibarr-sync",
          "updated_by": "dolibarr-sync", "created_at": "2026-02-01"},
     ])
     await db.reference_participants.insert_one({"id": "t1", "series_id": "s1", "name": "Anni", "link": "member", "profile_id": "doppel"})
@@ -274,8 +274,8 @@ async def test_deleting_an_account_cuts_the_series_links_of_its_own_profile(flow
     db = flow.db
     paula = await flow.add_user(role="player", name="paula")
     await db.club_member_profiles.insert_many([
-        {"id": "selbst", "user_id": paula["id"], "source": "member", "display_name": "Paula", "is_active": True},
-        {"id": "akte", "user_id": paula["id"], "source": "dolibarr", "display_name": "Paula P.", "is_active": True},
+        {"id": "selbst", "slug": "selbst", "user_id": paula["id"], "source": "member", "display_name": "Paula", "is_active": True},
+        {"id": "akte", "slug": "akte", "user_id": paula["id"], "source": "dolibarr", "display_name": "Paula P.", "is_active": True},
     ])
     await db.reference_participants.insert_many([
         {"id": "eigen", "series_id": "s1", "name": "PaulaRacing", "link": "member", "profile_id": "selbst", "name_hidden": False},

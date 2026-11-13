@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 
-from models import new_id, now_utc
+from models import REGISTRATION_LIMIT, new_id, now_utc
 
 VIENNA = ZoneInfo("Europe/Vienna")
 KINDS = ("tournament", "event")
@@ -88,7 +88,7 @@ async def tournament_participants(db, tournament: dict) -> set[str]:
     out: set[str] = set()
     regs = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"], "status": {"$in": ["approved", "checked_in"]}}, {"_id": 0},
-    ).to_list(1000)
+    ).to_list(REGISTRATION_LIMIT)
     for reg in regs:
         if reg.get("status") != "checked_in" and not await _played(db, reg["id"]):
             continue

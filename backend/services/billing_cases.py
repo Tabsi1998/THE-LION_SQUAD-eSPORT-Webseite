@@ -24,6 +24,10 @@ KINDS = {
         "label": "Buchung nach dem Beleg geändert",
         "todo": "Der Beleg passt nicht mehr zur Buchung. In Dolibarr korrigieren (Gutschrift und neuer Beleg oder Nachberechnung); der eingefrorene Preis auf der Website bleibt, bis das erledigt ist.",
     },
+    "credit_after_return": {
+        "label": "Gutschrift-Entwurf trotz Rückkehr",
+        "todo": "Die Person hat sich wieder angemeldet, während die Website den Gutschrift-Entwurf zur Abmeldung angelegt hat. Der Beleg gilt weiter: den Gutschrift-Entwurf in Dolibarr löschen. Die Website löscht in Dolibarr nichts.",
+    },
     "overpaid": {
         "label": "Überzahlung",
         "todo": "Es kam mehr Geld als der Beleg verlangt. Differenz erstatten oder mit der Person als Spende vereinbaren – in Dolibarr buchen, hier die Erstattung erfassen.",

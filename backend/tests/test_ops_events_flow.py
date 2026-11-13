@@ -250,6 +250,10 @@ async def test_the_index_start_tidies_up_two_open_episodes_and_never_crashes(flo
     import database
     from pymongo.errors import DuplicateKeyError, OperationFailure
 
+    # Der Stand vor dem Index (#2216): Die Harness hat init_indexes schon laufen lassen, auf echtem MongoDB nimmt der
+    # partielle eindeutige Index keine zwei offenen Abschnitte an.
+    if database.OPS_EPISODE_OPEN_INDEX in await flow.db.ops_check_episodes.index_information():
+        await flow.db.ops_check_episodes.drop_index(database.OPS_EPISODE_OPEN_INDEX)
     await flow.db.ops_check_episodes.insert_many([
         {"id": "alt", "open": True, "since": "2026-10-27T07:00:00+00:00", "last_at": "2026-10-27T08:00:00+00:00"},
         {"id": "neu", "open": True, "since": "2026-10-27T08:05:00+00:00", "last_at": "2026-10-27T09:00:00+00:00"},

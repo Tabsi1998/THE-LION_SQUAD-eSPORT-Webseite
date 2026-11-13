@@ -87,6 +87,12 @@ export function tiebreakOrder(keys) {
   return ["Punkte", ...(keys || []).map((key) => TIEBREAK_LABELS[key]).filter(Boolean)].join(" → ");
 }
 
+/** Punktabzug einer Zeile in Worten („−2 Punkte Abzug“, E.3) - leer ohne Abzug. Für Web, TV und Druck derselbe Satz. */
+export function deductionText(row) {
+  const deducted = Number(row?.deducted_points) || 0;
+  return deducted ? `−${String(deducted).replace(".", ",")} ${deducted === 1 ? "Punkt" : "Punkte"} Abzug` : "";
+}
+
 /** Hinweise an einer Zeile der Staffel-Tabelle: was den Platz entschied, kampflos, Abzug, Ausscheiden. Leer bei
  *  Tabellen ohne diese Felder (andere Turniere). */
 export function standingNotes(row) {
@@ -103,8 +109,8 @@ export function standingNotes(row) {
   const lost = Number(row.forfeit_lost) || 0;
   if (won) notes.push({ key: "forfeit_won", tone: "forfeit", text: `${won}× kampflos gewonnen` });
   if (lost && !row.exit) notes.push({ key: "forfeit_lost", tone: "forfeit", text: `${lost}× kampflos verloren` });
-  const deducted = Number(row.deducted_points) || 0;
-  if (deducted) notes.push({ key: "deducted", tone: "exit", text: `−${String(deducted).replace(".", ",")} ${deducted === 1 ? "Punkt" : "Punkte"} Abzug` });
+  const deducted = deductionText(row);
+  if (deducted) notes.push({ key: "deducted", tone: "exit", text: deducted, title: "Punktabzug durch eine Strafe der Liga-Leitung" });
   // Angefochtene Ergebnisse (E.2, #1619): Sie zählen vorläufig mit - die Zeile sagt, wie viele Spiele noch „in Klärung“ sind.
   const contested = Number(row.contested) || 0;
   if (contested) {

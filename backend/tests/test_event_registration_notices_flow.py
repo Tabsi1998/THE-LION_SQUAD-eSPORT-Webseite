@@ -146,13 +146,16 @@ async def test_wieder_aktiviert_mit_gestellter_rechnung_kein_zweiter_auftrag_und
     response = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "registered"})
     assert response.status_code == 200, response.text
     row = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
-    assert row["billing_status"] == "cancelled"
+    # Kein neuer Preis: Die Anmeldung trägt wieder den Stand des Belegs (#2184), wie nach dem nächsten Abgleich.
+    assert row["billing_status"] == "invoiced" and row["invoice_ref"] == "RE-1"
     assert await flow.db.billing_orders.count_documents({"registration_id": first["id"]}) == 1
     order = await flow.db.billing_orders.find_one({"registration_id": first["id"]}, {"_id": 0})
     assert order["booking_change"] == "Anmeldung wieder aktiviert", "Finanzen bekommt den Prüffall"
     back = (await notes(flow, erste))[-1]
     assert back["title"] == "Du bist wieder dabei: Herbst-LAN"
-    assert "Kostenbeitrag" not in back["body"] and "Rechnung" not in back["body"]
+    assert "Kostenbeitrag" not in back["body"] and "Meine Rechnungen" not in back["body"] and "10,00" not in back["body"]
+    # Kein Betrag, aber auch kein Schweigen (#2184): Die bestehende Rechnung gilt weiter, der Verein prüft sie.
+    assert "schon eine Rechnung" in back["body"]
 
 
 async def _storno_platz_weg_warteliste(flow, event, a, b):

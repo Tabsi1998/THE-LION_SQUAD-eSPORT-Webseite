@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user
 from database import get_db
-from models import now_utc
+from models import REGISTRATION_LIMIT, now_utc
 from routes.tournament_common import _resolve_tid
 from services import team_lineup
 from services.tournament_permissions import CHECKIN_STAFF_ROLES, has_tournament_staff_permission
@@ -240,7 +240,7 @@ async def staff_lineups(tid: str, me: dict = Depends(get_current_user)):
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     if not team_lineup.is_team_tournament(tournament):
         return {}
-    regs = await db.tournament_registrations.find({"tournament_id": tid, "team_id": {"$ne": None}}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": tid, "team_id": {"$ne": None}}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     team_ids = sorted({reg["team_id"] for reg in regs if reg.get("team_id")})
     teams = {t["id"]: t for t in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0}).to_list(len(team_ids) or 1)}
     user_ids = sorted({uid for t in teams.values() for uid in t.get("member_ids") or []})

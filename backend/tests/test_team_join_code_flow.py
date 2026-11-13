@@ -59,7 +59,7 @@ async def test_renew_join_code(flow, caplog):
     assert (await flow.post(f"/api/teams/{team['id']}/join", json={"join_code": code})).status_code == 403
     assert (await flow.post(f"/api/teams/{team['id']}/join", json={"join_code": second})).status_code == 200
 
-    rows = await flow.db.audit_logs.find({"action": "team.join_code.renew", "target_id": team["id"]}, {"_id": 0}).to_list(5)
+    rows = await flow.db.audit_logs.find({"action": "team.join_code.renew", "target_id": team["id"]}, {"_id": 0}).sort("created_at", 1).to_list(5)
     assert [row["actor_id"] for row in rows] == [leader["id"], co["id"]]
     everything = str(await flow.db.audit_logs.find({}, {"_id": 0}).to_list(50)) + caplog.text
     for value in (code, second, "Alt-Code1"):

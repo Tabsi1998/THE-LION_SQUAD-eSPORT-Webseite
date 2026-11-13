@@ -5,7 +5,7 @@ import io
 from fastapi import HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from database import get_db
-from models import now_utc
+from models import REGISTRATION_LIMIT, GROUP_LIMIT, now_utc
 from auth import get_current_user, get_optional_user
 from services import onsite_access
 from services.access_links import touch_access_link, validate_access_link
@@ -64,7 +64,7 @@ async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
             reg_ids.update(slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id"))
         else:
             reg_ids.update([match.get("participant_a_id"), match.get("participant_b_id")])
-    regs = await db.tournament_registrations.find({"id": {"$in": list(reg_ids)}}, {"_id": 0}).to_list(1000) if reg_ids else []
+    regs = await db.tournament_registrations.find({"id": {"$in": list(reg_ids)}}, {"_id": 0}).to_list(len(reg_ids)) if reg_ids else []
     reg_map = {reg["id"]: reg for reg in regs}
 
     def _participants(match: dict) -> str:
@@ -152,7 +152,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
         from services.league_procedures import for_viewer_list
 
         matches_v2 = await for_viewer_list(db, user, matches_v2, await involved_match_ids(db, user, t, matches_v2))
-    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     raw_regs = regs
     own_ids = await _own_registration_ids(db, regs, user)
     regs = [_public_registration(r, user, is_staff) for r in regs]
@@ -162,7 +162,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
             r["is_mine"] = True
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
     for r in regs:
         if r.get("user_id"):
             u = users.get(r["user_id"]) or {}
@@ -317,7 +317,7 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     if read_model is None:
         read_model = await load_competition_read_model(db, tid)
     if regs is None:
-        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
     if own_ids is None:
         own_ids = await _own_registration_ids(db, regs, user)
     # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit
@@ -331,14 +331,14 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
             r["removal_at"] = removed_at[r["id"]]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
     for r in regs:
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")
         r["user"] = {"id": u.get("id"), "username": u.get("username"), "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
     groups = []
     if t.get("format") == "groups":
-        groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
+        groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(GROUP_LIMIT)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="standings")
     rows = public_standings(

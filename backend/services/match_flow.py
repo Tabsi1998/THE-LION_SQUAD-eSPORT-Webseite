@@ -99,7 +99,7 @@ async def sides(db, match: dict, tournament: dict) -> Sides:
     teams = await teams_by_id(db, registrations)
     rosters = {reg["id"]: roster_ids(reg, teams.get(reg.get("team_id") or "")) for reg in registrations}
     everyone = set().union(*rosters.values()) if rosters else set()
-    eligibility = await league_eligibility.context_for_tournament(db, tournament, everyone)
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, everyone, match=match)
     return Sides(
         registrations=registrations,
         rosters=rosters,

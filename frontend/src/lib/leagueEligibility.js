@@ -10,6 +10,8 @@ export const ELIGIBILITY_LABELS = {
   platform_missing: "Plattform fehlt",
   waiting: "Wartezeit",
   banned: "gesperrt",
+  // Strafen (E.3): Sperre der Liga-Leitung - der Grundsatz dazu kommt vom Server, ohne Verstoß und Begründung.
+  sanctioned: "Sperre der Liga",
   late: "wartet auf Freigabe",
   missing: "Spiel-ID fehlt",
   format: "Format der ID passt nicht",

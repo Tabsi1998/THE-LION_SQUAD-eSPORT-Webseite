@@ -548,7 +548,7 @@ async def test_archiving_and_restoring_a_season_wait_for_its_lock(flow, monkeypa
 @pytest.mark.asyncio
 async def test_unknown_names_become_open_participants_and_a_confirmed_alias_assigns_at_once(flow):
     ctx = await _setup(flow)
-    await flow.db.club_member_profiles.insert_one({"id": "p-dora", "display_name": "Dora Probe", "is_active": True})
+    await flow.db.club_member_profiles.insert_one({"id": "p-dora", "slug": "p-dora", "display_name": "Dora Probe", "is_active": True})
     await flow.db.reference_aliases.insert_one({"id": "alias-dora", "name_normalized": "dorad", "target": "member",
                                                 "profile_id": "p-dora", "game_id": None,
                                                 "confirmed_at": "2026-01-02T10:00:00+00:00"})
@@ -669,7 +669,7 @@ async def test_the_board_discards_a_draft_beside_and_approves_a_captains_draft_s
 @pytest.mark.asyncio
 async def test_discarding_a_draft_removes_the_people_only_this_draft_created(flow):
     ctx = await _setup(flow)
-    await flow.db.club_member_profiles.insert_one({"id": "p-dora", "display_name": "Dora Probe", "is_active": True})
+    await flow.db.club_member_profiles.insert_one({"id": "p-dora", "slug": "p-dora", "display_name": "Dora Probe", "is_active": True})
     await flow.db.reference_aliases.insert_one({"id": "alias-dora", "name_normalized": "dorad", "target": "member",
                                                 "profile_id": "p-dora", "game_id": None,
                                                 "confirmed_at": "2026-01-02T10:00:00+00:00"})
@@ -733,8 +733,8 @@ async def test_a_captain_of_a_direct_series_publishes_and_sees_no_alias_details(
     await flow.patch(f"{ADMIN}/series/{ctx['own']['id']}", json={"publish_mode": "direct"})
     # Anna ist als Mitglied zugeordnet, „Dora D“ erkennt ein bestätigter Alias - beides sieht nur die Verwaltung.
     await flow.db.club_member_profiles.insert_many([
-        {"id": "p-anna", "display_name": "Anna Profil", "is_active": True},
-        {"id": "p-dora", "display_name": "Dora Profil", "is_active": True}])
+        {"id": "p-anna", "slug": "p-anna", "display_name": "Anna Profil", "is_active": True},
+        {"id": "p-dora", "slug": "p-dora", "display_name": "Dora Profil", "is_active": True}])
     await flow.db.reference_aliases.insert_one({"id": "alias-dora", "name_normalized": "dorad", "target": "member",
                                                 "profile_id": "p-dora", "game_id": None,
                                                 "confirmed_at": "2026-01-02T10:00:00+00:00"})
@@ -827,7 +827,7 @@ async def test_team_league_own_match_and_the_official_table_with_deviation(flow)
 @pytest.mark.asyncio
 async def test_followups_stay_until_the_recompute_succeeded(flow, monkeypatch):
     # Codex (4. Runde): scheitert das Neurechnen beim Nachziehen, darf der Nachtrag nicht verloren gehen.
-    await flow.db.reference_series.insert_one({"id": "s-folge", "alias_followups": [{"id": "f1", "alias_id": "a1"}]})
+    await flow.db.reference_series.insert_one({"id": "s-folge", "season_slug": "s-folge", "alias_followups": [{"id": "f1", "alias_id": "a1"}]})
     calls = []
 
     async def no_change(db, series_id, followup):
