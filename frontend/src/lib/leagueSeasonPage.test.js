@@ -35,6 +35,10 @@ test("Termine: ohne Terminregeln nur Standardtermin und Ergebnis; 0 Verschiebung
   const lines = scheduleLines({ schedule_rules: { home_rule: false, reschedule_max: 0, reschedule_notice_hours: 24 } });
   expect(lines.map((row) => row.key)).toEqual(["default", "reschedule"]);
   expect(lines[1].text).toBe("Verschieben legt nur die Liga-Leitung fest.");
+  // Eine andere Frist als 72 h steht so im Titel und im Satz.
+  const short = scheduleLines({ schedule_rules: { home_rule: true, home_rule_hours: 48, reschedule_max: 3, reschedule_notice_hours: 1, reschedule_same_week: false } });
+  expect(short[1]).toMatchObject({ title: "48-h-Regel", text: "Antwortet die Gastseite nicht binnen 48 Stunden auf den Vorschlag des Heimteams, gilt er." });
+  expect(short[2].text).toBe("Bis 1 Stunde vor dem Termin, höchstens 3× je Spiel. Alles darüber entscheidet die Liga-Leitung.");
 });
 
 test("Punkte und Gleichstand", () => {

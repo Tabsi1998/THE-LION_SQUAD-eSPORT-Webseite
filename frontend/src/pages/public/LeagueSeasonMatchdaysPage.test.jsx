@@ -130,3 +130,12 @@ test("vor der Einteilung: der Platzhalter statt einer leeren Seite", async () =>
   renderPage();
   expect(await screen.findByTestId("league-no-divisions")).toHaveTextContent("Die Ligen werden eingeteilt");
 });
+
+test("ungültige Adresse (?staffel=… unbekannt, ?woche=99 oder Text): erste Staffel und die laufende Woche", async () => {
+  renderPage("/liga/probe-liga/season-1/spieltage?staffel=gibt-es-nicht&woche=99");
+  expect(await screen.findByTestId("league-weekpanel-2")).toBeInTheDocument();
+  expect(screen.getByTestId("season-staffel-pick-probe-a")).toHaveAttribute("aria-pressed", "true");
+  document.body.innerHTML = "";
+  renderPage("/liga/probe-liga/season-1/spieltage?staffel=probe-a&woche=abc");
+  expect(await screen.findByTestId("league-weekpanel-2")).toBeInTheDocument();
+});

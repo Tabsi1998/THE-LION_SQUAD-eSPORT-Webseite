@@ -337,3 +337,15 @@ test("Liga N ohne sichtbare Staffel (nur Entwürfe): auch dann der Platzhalter s
   expect(await screen.findByTestId("league-no-divisions")).toBeInTheDocument();
   expect(screen.queryByTestId("league-division-1")).toBeNull();
 });
+
+test("geteilter Platz 1 in einer beendeten Staffel: kein Gold, kein Meister", async () => {
+  const finished = { ...SEASON_VIEW, divisions: [{ ...SEASON_VIEW.divisions[0], staffeln: [{ tournament_id: "t1", slug: "probe-a", staffel: "A", status: "completed" }] }] };
+  const tied = { ...STAFFEL("A"), standings: [
+    { ...STAFFEL("A").standings[0] },
+    { ...STAFFEL("A").standings[0], registration_id: "r2", display_name: "Falken · Falken A" }] };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1" ? Promise.resolve({ data: finished }) : Promise.resolve({ data: tied })));
+  renderPage();
+  const staffel = await screen.findByTestId("league-staffel-A");
+  expect(within(staffel).queryByTestId("league-champion-A")).toBeNull();
+  expect(staffel.querySelector("[data-champion]")).toBeNull();
+});
