@@ -96,3 +96,15 @@ test("Zuständige ohne Zwei-Faktor (#2203): der Weg zur Einrichtung", async () =
   renderWith({ assignments: [], series: [], moderation: null, lead_today: [], leagues: [] });
   expect(await screen.findByTestId("duty-leagues-mfa")).toHaveTextContent("Zwei-Faktor");
 });
+
+// Leitstand (E.4, Nr. 152): „Mein Dienst“ führt je Season mit der eigenen Zahl in den Leitstand.
+test("Leitstand der Seasons mit eigener und offener Zahl und Link auf #leitstand", async () => {
+  renderWith({ assignments: [], moderation: null, lead_today: [], league_desks: [
+    { season_id: "s1", league_name: "Probe-Liga", season_name: "Season 1", mine: 2, total: 5, url: "/admin/leagues/seasons/s1#leitstand" },
+    { season_id: "s2", league_name: "Probe-Liga", season_name: "Season 2", mine: 0, total: 0, url: "/admin/leagues/seasons/s2#leitstand" },
+  ] });
+  const first = await screen.findByTestId("duty-desk-s1");
+  expect(first).toHaveAttribute("href", "/admin/leagues/seasons/s1#leitstand");
+  expect(first).toHaveTextContent("2 Aufgaben für dich, 5 offen in der Season");
+  expect(screen.getByTestId("duty-desk-s2")).toHaveTextContent("Alles erledigt");
+});
