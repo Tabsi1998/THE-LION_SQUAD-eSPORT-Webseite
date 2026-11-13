@@ -107,6 +107,15 @@ def normalize(raw) -> dict:
     return out
 
 
+def home_rule_name(hours) -> str:
+    """Der Name der Regel nach der eingestellten Frist (#2406): „48-h-Regel“. Ohne gültigen Wert gilt die Vorgabe (72 h)."""
+    try:
+        count = int(hours)
+    except (TypeError, ValueError):
+        count = 0
+    return f"{count if count > 0 else DEFAULTS['home_rule_hours']}-h-Regel"
+
+
 PUBLIC_KEYS = ("home_rule", "home_rule_hours", "reschedule_notice_hours", "reschedule_max", "reschedule_same_week")
 
 
