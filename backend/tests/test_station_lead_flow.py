@@ -407,6 +407,9 @@ async def test_deleting_a_stage_frees_the_stations_of_its_matches(flow):
     await flow.db.stations.update_one({"id": stations[1]["id"]}, {"$set": {"current_match_id": other["id"]}})
     deleted = await flow.delete(f"/api/tournaments/{tournament['id']}/stages/{match['stage_id']}?force=true")
     assert deleted.status_code == 200, deleted.text
+    # Der Aufruf ist mit der Phase weg - die aufgerufenen Spieler erfahren es (#1162, Review N5).
+    withdrawn = [row for row in await calls(flow) if row["title"] == "Aufruf zurückgenommen"]
+    assert {row["meta"]["match_id"] for row in withdrawn} == {match["id"]} and len(withdrawn) == 2
     first = await station_of(flow, stations[0])
     assert first["status"] == "free" and not first.get("current_match_id") and not first.get("called_at")
     second = await station_of(flow, stations[1])

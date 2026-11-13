@@ -37,7 +37,7 @@ from services import game_modes, tournament_guard
 from services.staffel_guard import staffel_rebuild_problem
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
-from services.station_runtime import free_stations_of_deleted_matches
+from services.station_runtime import free_stations_of_deleted_matches, held_calls, tell_withdrawn_calls
 from services.league_permissions import involved_match_ids
 from services.league_scope import is_league_staffel
 from services.permissions import is_superadmin
@@ -219,12 +219,15 @@ async def delete_tournament_stage(tid: str, stage_id: str, force: bool = False, 
             impact,
         ))
     match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
+    withdrawn = await held_calls(db, match_ids)
     await db.tournament_stages.delete_one({"id": stage_id})
     await db.matches_v2.delete_many({"stage_id": stage_id})
     if match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
-        # Stationen, die ein gelöschtes Spiel hielten, hängen sonst als „belegt“ ohne Spiel (#1162).
+        # Stationen, die ein gelöschtes Spiel hielten, hängen sonst als „belegt“ ohne Spiel (#1162) - und wer
+        # aufgerufen war, erfährt, dass der Aufruf nicht mehr gilt.
         await free_stations_of_deleted_matches(db, match_ids)
+        await tell_withdrawn_calls(db, withdrawn)
     await _audit_tournament_action(
         db,
         "tournament.stage.delete",
@@ -399,10 +402,12 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
 
     if existing:
         match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
+        withdrawn = await held_calls(db, match_ids)
         if match_ids:
             await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
         await db.matches_v2.delete_many({"stage_id": stage_id})
         await free_stations_of_deleted_matches(db, match_ids)
+        await tell_withdrawn_calls(db, withdrawn)
     await db.matches_v2.insert_many(matches)
     await db.tournament_stages.update_one(
         {"id": stage_id},

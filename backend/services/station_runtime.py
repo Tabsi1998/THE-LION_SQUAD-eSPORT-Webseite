@@ -128,6 +128,35 @@ async def notify_match_started(db, match: dict, station: dict, collection_name: 
     return sent
 
 
+async def held_calls(db, match_ids) -> list[tuple[dict, dict]]:
+    """Die Aufrufe unter diesen Spielen, die eine Station gerade hält - vor dem Löschen gelesen, damit die Spieler danach
+    „Aufruf zurückgenommen“ bekommen (#1162)."""
+    ids = [match_id for match_id in match_ids or [] if match_id]
+    if not ids:
+        return []
+    stations = await db.stations.find({"current_match_id": {"$in": ids}}, {"_id": 0}).to_list(500)
+    by_match = {station["current_match_id"]: station for station in stations}
+    if not by_match:
+        return []
+    matches = await db.matches_v2.find(
+        {"id": {"$in": sorted(by_match)}, "called_at": {"$nin": [None, ""]}, "started_at": {"$in": [None, ""]}},
+        {"_id": 0}).to_list(500)
+    return [(match, by_match[match["id"]]) for match in matches]
+
+
+async def tell_withdrawn_calls(db, calls: list[tuple[dict, dict]]) -> int:
+    """„Aufruf zurückgenommen“ an die Spieler der gelöschten Aufrufe - eine Störung hält das Löschen nicht auf."""
+    from services.match_calls import notify_call_withdrawn
+
+    sent = 0
+    for match, station in calls:
+        try:
+            sent += await notify_call_withdrawn(db, match, station, match["called_at"])
+        except Exception as exc:  # noqa: BLE001 - die Nachricht ist Beiwerk, das Löschen ist geschehen
+            logger.warning("[stations] Aufruf-Rücknahme für %s nicht verschickt type=%s", log_safe(match.get("id")), type(exc).__name__)
+    return sent
+
+
 async def free_stations_of_deleted_matches(db, match_ids) -> int:
     """Spiele werden gelöscht (Phase löschen oder neu bauen, #1162): Stationen, die eines davon halten, werden frei -
     sonst hängen sie als „belegt“ ohne Spiel. Eine defekte Station bleibt defekt."""
