@@ -88,7 +88,7 @@ test("„Nicht erschienen“ im Lauf (#1823): die Rückmeldung sagt, dass der La
   await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Kampflos gewertet – beide Seiten bekommen Bescheid."));
 });
 
-test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Starten“ gehen über den Server", async () => {
+test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Starten“ gehen über den Server; Einstieg ist das Cockpit (#1653)", async () => {
   apiMock.post.mockResolvedValue({ data: { ok: true } });
   const next = { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, forecast_at: "2026-10-31T16:40:00Z" };
   const queue = {
@@ -102,10 +102,14 @@ test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ u
       <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
     </MemoryRouter>,
   );
-  const tab = await screen.findByTestId("lead-tab-stations");
-  await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+  // Vor Ort startet die Seite im Cockpit (#1653) - die Stationen stehen dort mit denselben Knöpfen.
+  await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
   fireEvent.click(await screen.findByTestId("live-call-st2"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/call", { station_id: "st2", match_id: "QF2" }));
+  // Der Reiter „Stationen“ bleibt erreichbar.
+  fireEvent.click(screen.getByTestId("lead-tab-stations"));
+  expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByTestId("lead-stations")).toBeInTheDocument();
 });
 
 // Stationen (#1162): Freigeben, Defekt und Umlegen gehen über die schmalen Wege der Warteschlange; ?reiter=stationen
@@ -349,4 +353,120 @@ test("Turnierpause (#1167): die Uhr in der Liste steht mit „Pause“ - früher
   } finally {
     vi.useRealTimers();
   }
+});
+
+// Turnier-Cockpit (#1653): vor Ort der Einstieg. Ein Tipp auf ein Problem öffnet den Fall in „Braucht Aufmerksamkeit“;
+// solange das Cockpit offen ist, fragen beide Abfragen kurz im Takt nach.
+test("Cockpit (#1653): Probleme oben, ein Tipp öffnet den Fall mit seinen Knöpfen; kurzer Abruf, solange es offen ist", async () => {
+  const { COCKPIT_POLL_MS } = await import("@/lib/tournamentCockpit");
+  liveCalls.length = 0;
+  const queue = {
+    applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {},
+    stations: [{ id: "st2", name: "2", station_text: "Station 2", status: "free", waiting: 1, running: null, next: { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, delay_minutes: 0 }, after: null }],
+  };
+  const lead = {
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+    attention: [{ id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 }],
+  };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+  expect(screen.getByTestId("lead-tab-attention")).toHaveTextContent("Aufmerksamkeit (1)");
+  expect(liveCalls.slice(-2).map((options) => options.pollMs)).toEqual([COCKPIT_POLL_MS, COCKPIT_POLL_MS]);
+  const row = await screen.findByTestId("cockpit-problem-rm-m8");
+  expect(row).toHaveAttribute("href", "/tournaments/fc-cup/leitung?fall=rm-m8");
+  fireEvent.click(row);
+  await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+  expect(screen.getByTestId("lead-case-enter-rm-m8")).toHaveTextContent("Eintragen");
+  // Außerhalb des Cockpits wieder wie bisher: die Ansicht nur bei Änderungen, die Warteschlange je Minute.
+  expect(liveCalls.slice(-2).map((options) => options.pollMs)).toEqual([0, 60000]);
+});
+
+test("Einstieg (#1653): Fall-Link → Aufmerksamkeit; vor Ort das Cockpit (im Check-in nur mit Fällen); sonst wie bisher", async () => {
+  const { defaultLeadTab } = await import("./TournamentLeadPage");
+  const queue = { applies: true, stations: [] };
+  expect(defaultLeadTab({ fall: "rm-1", queue, ready: false })).toBe("attention");
+  expect(defaultLeadTab({ queue, ready: false })).toBe("");
+  expect(defaultLeadTab({ queue, ready: true })).toBe("cockpit");
+  expect(defaultLeadTab({ queue, cases: 2, ready: true })).toBe("cockpit");
+  expect(defaultLeadTab({ queue, checkinPhase: true, ready: true })).toBe("checkin");
+  expect(defaultLeadTab({ queue, checkinPhase: true, cases: 1, ready: true })).toBe("cockpit");
+  expect(defaultLeadTab({ cases: 1, checkinPhase: true, ready: true })).toBe("attention");
+  expect(defaultLeadTab({ checkinPhase: true, ready: true })).toBe("checkin");
+  expect(defaultLeadTab({ ready: true })).toBe("results");
+});
+
+// Review M1 (#1653): Startet die Seite vor Ort im Check-in (ohne Fälle), ist das Cockpit nicht offen - kein kurzer Takt.
+test("Check-in vor Ort ohne Fälle: kein 20-Sekunden-Takt - erst im Cockpit", async () => {
+  const { COCKPIT_POLL_MS } = await import("@/lib/tournamentCockpit");
+  liveCalls.length = 0;
+  // Nur die beiden Abfragen der Seite (Ansicht, Warteschlange) - die Check-in-Liste hört selbst mit.
+  const pagePolls = () => liveCalls.filter((options) => options && "pollMs" in options).slice(-2).map((options) => options.pollMs);
+  const queue = { applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, stations: [] };
+  apiMock.get.mockImplementation((url) => {
+    if (String(url).endsWith("/lead/checkin")) return Promise.resolve({ data: { applies: true, team_mode: false, tournament: { id: "t1", slug: "fc-cup" }, rows: [] } });
+    if (String(url).endsWith("/live-queue")) return Promise.resolve({ data: queue });
+    return Promise.resolve({ data: { tournament: { id: "t1", slug: "fc-cup", title: "Cup", status: "check_in", can_check_in: true, event_mode: "local" }, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } } });
+  });
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true"));
+  expect(pagePolls()).toEqual([0, 60000]);
+  fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
+  await waitFor(() => expect(pagePolls()).toEqual([COCKPIT_POLL_MS, COCKPIT_POLL_MS]));
+});
+
+// Review M2 (#1653): Derselbe Fall ein zweites Mal aus dem Cockpit angetippt springt wieder hin - auch nach einem
+// ?fall=-Link, der schon einmal hingesprungen ist.
+test("Cockpit: zweiter Tipp auf denselben Fall springt erneut - auch nach einem ?fall=-Link", async () => {
+  const jumps = [];
+  const original = window.Element.prototype.scrollIntoView;
+  window.Element.prototype.scrollIntoView = function scrollIntoView() { jumps.push(this.id); };
+  try {
+    const queue = { applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, stations: [] };
+    const lead = {
+      tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+      attention: [{ id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 }],
+    };
+    apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung?fall=rm-m8"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByTestId("lead-case-rm-m8");
+    await waitFor(() => expect(jumps).toEqual(["fall-rm-m8"]));
+    for (const round of [2, 3]) {
+      fireEvent.click(await screen.findByTestId("lead-tab-cockpit"));
+      fireEvent.click(await screen.findByTestId("cockpit-problem-rm-m8"));
+      await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+      await waitFor(() => expect(jumps.filter((id) => id === "fall-rm-m8")).toHaveLength(round));
+    }
+  } finally {
+    window.Element.prototype.scrollIntoView = original;
+  }
+});
+
+// Review N4 (#1653): Nach dem Tipp auf ein Problem steht der Fokus auf der geöffneten Fallkarte.
+test("Cockpit: der Tipp auf ein Problem setzt den Fokus auf die Fallkarte", async () => {
+  const queue = { applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, stations: [] };
+  const lead = {
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+    attention: [{ id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 }],
+  };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByTestId("cockpit-problem-rm-m8"));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("lead-case-rm-m8")));
 });

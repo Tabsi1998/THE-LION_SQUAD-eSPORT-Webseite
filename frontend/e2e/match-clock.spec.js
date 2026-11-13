@@ -75,13 +75,17 @@ test.describe("Spielzeit-Uhr", () => {
     });
     await page.goto(`/tournaments/${SLUG}/leitung`);
 
-    // Stationen: dieselbe Sekunde wie der Server, nicht 7 Minuten weniger.
-    await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+    // Stationen (vor Ort im Cockpit, #1653): dieselbe Sekunde wie der Server, nicht 7 Minuten weniger.
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
     const tile = page.getByTestId(`live-clock-${running.running.match_id}`);
     const tileTime = page.getByTestId(`live-clock-${running.running.match_id}-time`);
     await expect.poll(() => nearServer(tileTime)).toBe(true);
     await expect(tile).toHaveAttribute("data-tone", "warn");
     await expect(tile).toHaveAttribute("aria-label", /, knapp$/);
+    // Auch hier: orange über die Deckkraft-Ebene (#1653), nicht durch Umfärben des Balkens.
+    const tileBar = page.getByTestId(`live-clock-${running.running.match_id}-bar`);
+    await expect.poll(() => tileBar.evaluate((node) => getComputedStyle(node, "::after").opacity)).toBe("1");
+    expect(await tileBar.evaluate((node) => getComputedStyle(node).transitionProperty)).not.toContain("background");
 
     // Liste „läuft“ (Reiter Ergebnisse, Filter „Läuft“): jede Uhr mit ihrer Farbe.
     await page.getByTestId("lead-tab-results").click();
@@ -135,6 +139,11 @@ test.describe("Spielzeit-Uhr", () => {
     // Orange gefüllt, nicht rot (Fabians Auswahl 07.10.).
     const fill = await over.locator(".tv-lanes__time").evaluate((node) => getComputedStyle(node).backgroundColor);
     expect(fill).toBe("rgb(255, 159, 67)");
+    // Der Balken wechselt die Farbe nur über Deckkraft (#1653): die orange Ebene ist voll da, der Balken selbst färbt nicht um.
+    const bar = over.locator(".tv-lanes__track i");
+    await expect.poll(() => bar.evaluate((node) => getComputedStyle(node, "::after").opacity)).toBe("1");
+    expect(await bar.evaluate((node) => getComputedStyle(node, "::after").backgroundColor)).toBe("rgb(255, 159, 67)");
+    expect(await bar.evaluate((node) => getComputedStyle(node).transitionProperty)).not.toContain("background");
     await page.waitForTimeout(900);
     await shot(page, testInfo, "1167-uhr-tv-1440.png");
   });

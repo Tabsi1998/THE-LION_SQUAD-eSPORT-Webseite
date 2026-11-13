@@ -88,7 +88,7 @@ export function moveTargets(stations = [], from, canOperate = () => true) {
 
 const BTN = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider";
 
-export function StationTile({ station, index = 0, busy = false, canOperate = false, targets = [], callable = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
+export function StationTile({ station, index = 0, highlighted = "", busy = false, canOperate = false, targets = [], callable = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
   const tone = stationTone(station);
   const [chip, chipClass] = TONES[tone];
   const { running, next, after } = station;
@@ -98,7 +98,7 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
   const toggle = (name) => setPanel((current) => (current === name ? "" : name));
   const tools = canOperate && (onRelease || onBroken || onMove);
   return (
-    <section className={`tls-live-station rounded-sm border bg-[#121212] p-3 ${broken ? "border-warn/40" : "border-white/10"}`} style={{ "--tls-live-i": index }} data-tone={tone} data-testid={`live-station-${station.id}`} aria-label={station.station_text || station.name}>
+    <section className={`tls-live-station rounded-sm border bg-[#121212] p-3 ${broken ? "border-warn/40" : "border-white/10"}`} style={{ "--tls-live-i": index }} data-tone={tone} data-highlighted={highlighted || undefined} data-testid={`live-station-${station.id}`} aria-label={station.station_text || station.name}>
       <header className="flex items-center justify-between gap-2">
         <h3 className="min-w-0 font-heading text-sm font-black uppercase tracking-wide text-white [overflow-wrap:anywhere]">{station.station_text || station.name}</h3>
         <span className={`tls-live-chip inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${chipClass}`} data-tone={tone} data-testid={`live-chip-${station.id}`}>

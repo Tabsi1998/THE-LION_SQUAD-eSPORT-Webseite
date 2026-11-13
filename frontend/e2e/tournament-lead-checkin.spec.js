@@ -131,7 +131,8 @@ test.describe("Check-in der Turnierleitung", () => {
     await expect(counter).toContainText("3 von 6 da");
     await page.getByTestId("lead-checkin-noshow-r6").click();
     await expect(page.getByTestId("lead-checkin-summary")).toContainText("1 nicht erschienen");
-    expect(posts.map((post) => post.body.status)).toEqual(["checked_in", "checked_in", "approved", "no_show"]);
+    // Die Seite zeigt den neuen Stand sofort (vor der Antwort) - die Anfrage kommt unter Last erst danach an (#2390).
+    await expect.poll(() => posts.map((post) => post.body.status)).toEqual(["checked_in", "checked_in", "approved", "no_show"]);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
@@ -179,7 +180,8 @@ test.describe("Check-in der Turnierleitung", () => {
     await page.getByTestId("lead-checkin-search").fill("");
     await page.getByTestId("lead-checkin-here-lsw").click();
     await expect(page.getByTestId("lead-checkin-counter")).toContainText("2 von 3 da");
-    expect(posts[0]).toEqual({ path: "/api/tournaments/t2/registrations/lsw/checkin", body: { status: "checked_in" } });
+    // Der Zähler steht vor der Antwort - auf die Anfrage warten statt sie sofort zu erwarten (#2390).
+    await expect.poll(() => posts[0]).toEqual({ path: "/api/tournaments/t2/registrations/lsw/checkin", body: { status: "checked_in" } });
     if (shotDir) await page.screenshot({ ...(await calm(page)), path: `${shotDir}/1161-checkin-1440.png` });
   });
 });
