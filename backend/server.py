@@ -49,6 +49,7 @@ from routes.league_application_routes import admin_router as league_application_
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.league_table_routes import admin_router as league_table_admin_router
 from routes.league_sanction_routes import admin_router as league_sanction_admin_router
+from routes.league_desk_routes import admin_router as league_desk_admin_router
 from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
 from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
 from routes.league_checkin_routes import admin_router as league_checkin_admin_router, router as league_checkin_router
@@ -414,6 +415,7 @@ app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)
 app.include_router(league_sanction_admin_router)  # Strafen im Wettbewerb: verhängen, bestätigen, widerrufen, Einspruch (E.3)
+app.include_router(league_desk_admin_router)  # Leitstand der Season: offene Aufgaben, Protokoll, Rundnachricht (E.4)
 app.include_router(league_result_rule_admin_router)  # Ergebnisregeln der Season (docs/LIGA.md, C.3, #1617)
 app.include_router(league_schedule_admin_router)  # Terminregeln je Season (#2194)
 app.include_router(league_loadout_router)  # Sperrliste je Season (#2218)
