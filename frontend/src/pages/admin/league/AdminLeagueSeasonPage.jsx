@@ -12,7 +12,7 @@
 // gelten für bestehende Staffeln erst nach „Vorgaben auf Staffeln übertragen“.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CopyPlus, Trash2, X } from "lucide-react";
+import { ArrowLeft, CopyPlus, RefreshCw, Trash2, X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminTabBar } from "@/components/tls/AdminTabBar";
@@ -41,6 +41,7 @@ import { SeasonRulesTab } from "./SeasonRulesTab";
 import { SeasonSanctionsTab } from "./SeasonSanctionsTab";
 import { SeasonCloseTab } from "./SeasonCloseTab";
 import { SeasonSuccessorSheet } from "./SeasonSuccessorSheet";
+import { SeasonRecomputeSheet } from "./SeasonRecomputeSheet";
 import { SeasonTablePanel } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -114,6 +115,7 @@ export default function AdminLeagueSeasonPage() {
   const [divisionSheet, setDivisionSheet] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [successorOpen, setSuccessorOpen] = useState(false);
+  const [recomputeOpen, setRecomputeOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
   const [seasonModes, setSeasonModes] = useState(null);
   const [poolDirty, setPoolDirty] = useState(false);
@@ -422,6 +424,13 @@ export default function AdminLeagueSeasonPage() {
                 Daneben „Neue Season aus …“ (F.2, #1627): Die Vorschau sagt, ob es geht - erst eine abgeschlossene Season. */}
             {can("manage") ? (
               <div className="flex flex-wrap items-center gap-2">
+                {/* Aus dem Vorgänger übernommen (F.2, Nr. 162): Wurde dessen Endstand korrigiert, rechnet der Knopf die Übernahme neu - nur vor dem Start. */}
+                {season.predecessor_id ? (
+                  <button type="button" onClick={() => setRecomputeOpen(true)} data-testid="season-recompute"
+                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Übernahme neu berechnen
+                  </button>
+                ) : null}
                 <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor"
                   className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
                   <CopyPlus className="w-3.5 h-3.5" aria-hidden="true" /> Neue Season aus {season.name}
@@ -465,6 +474,9 @@ export default function AdminLeagueSeasonPage() {
           {divisionSheet ? (
             <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} nextLevel={(data.divisions.at(-1)?.level || 0) + 1}
               onClose={() => setDivisionSheet(null)} onSaved={() => { setDivisionSheet(null); reload(); }} />
+          ) : null}
+          {recomputeOpen ? (
+            <SeasonRecomputeSheet season={season} onClose={() => setRecomputeOpen(false)} onDone={() => { setRecomputeOpen(false); reload(); }} />
           ) : null}
           {successorOpen ? (
             <SeasonSuccessorSheet season={season} onClose={() => setSuccessorOpen(false)}

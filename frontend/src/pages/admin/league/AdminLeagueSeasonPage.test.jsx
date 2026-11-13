@@ -727,3 +727,38 @@ test("Sprungmarke: rollt die Person selbst (Mausrad), rollt die Seite nicht mehr
     track.restore();
   }
 });
+
+
+// Übernahme neu berechnen (F.2, Nr. 162): nur in einer übernommenen Season; Vorschau, ausführen mit der Fassung, „von Hand prüfen“.
+const RECOMPUTE = { can_run: true, problems: [], stamp: "fassung-2", predecessor: { id: "s0", name: "Season 1" }, unchanged: 3,
+  changes: [{ kind: "moved", application_id: "a1", squad_id: "q1", display_name: "Falken · Eins", from_label: "Liga 1", to_label: "Liga 2" },
+    { kind: "revoked", application_id: "a2", squad_id: "q2", display_name: "Raben · Eins", from_label: "Liga 2" }],
+  manual: [{ application_id: "a3", display_name: "Lions · Eins", status: "accepted", why: "zugeteilt", from_label: "Liga 2", to_label: "Liga 1" }] };
+
+test("Übernahme neu berechnen: Vorschau mit Änderungen und Liste zum Prüfen, Ausführen mit der Fassung", async () => {
+  body = { ...BODY, season: { ...SEASON, predecessor_id: "s0" } };
+  extra = { "/admin/leagues/seasons/s1/successor/recompute": RECOMPUTE };
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, changed: 2 } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-recompute"));
+  const sheet = await screen.findByTestId("recompute-sheet");
+  expect(await within(sheet).findByTestId("recompute-change-q1")).toHaveTextContent("Liga 1 → Liga 2");
+  expect(within(sheet).getByTestId("recompute-change-q2")).toHaveTextContent("Übernahme zurückgenommen");
+  expect(within(sheet).getByTestId("recompute-manual")).toHaveTextContent("Lions · Eins – zugeteilt · laut Endstand jetzt Liga 1");
+  fireEvent.click(within(sheet).getByTestId("recompute-run"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/successor/recompute", { confirm: true, stamp: "fassung-2" }));
+});
+
+test("Übernahme neu berechnen: ohne Vorgänger kein Knopf; nach dem Start nur der Grund", async () => {
+  const view = renderPage();
+  await screen.findByTestId("season-successor");
+  expect(screen.queryByTestId("season-recompute")).toBeNull();
+  view.unmount();
+  body = { ...BODY, season: { ...SEASON, predecessor_id: "s0" } };
+  extra = { "/admin/leagues/seasons/s1/successor/recompute": { ...RECOMPUTE, can_run: false, changes: [], manual: [], problems: ["Die Season hat schon begonnen."] } };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-recompute"));
+  const sheet = await screen.findByTestId("recompute-sheet");
+  expect(await within(sheet).findByTestId("recompute-problems")).toHaveTextContent("schon begonnen");
+  expect(within(sheet).getByTestId("recompute-run")).toBeDisabled();
+});

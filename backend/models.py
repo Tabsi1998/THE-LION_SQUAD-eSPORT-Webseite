@@ -2893,6 +2893,13 @@ class LeagueSuccessorCreate(BaseModel):
     confirm: bool = False
 
 
+class LeagueSuccessorRecompute(BaseModel):
+    """Übernahme neu berechnen (F.2, Nr. 162): ``stamp`` aus der Vorschau - hat sich der Endstand seitdem geändert, 409."""
+    model_config = ConfigDict(extra="forbid")
+    confirm: bool = False
+    stamp: Optional[str] = Field(default=None, max_length=40)
+
+
 class LeagueStaffelCreate(BaseModel):
     """Staffel anlegen: ohne Buchstaben die nächste freie (A, B, …)."""
     staffel: Optional[str] = Field(default=None, pattern=r"^[A-Za-z]$")

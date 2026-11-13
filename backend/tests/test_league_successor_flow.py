@@ -473,3 +473,115 @@ async def test_archived_middle_division_and_several_staffeln_of_unequal_size(flo
     assert where[squad_of(world, 3, 0)] == (1, "up")
     assert where[squad_of(world, 3, 3)] == (4, "down") and where[squad_of(world, 4, 0)] == (3, "up")
     assert preview["carried"] == 4 + 4 + 3 + 4 + 4
+
+
+# ---------------------------------------------------------------- Übernahme neu berechnen (Nr. 162)
+
+async def second_lead(flow, world: dict) -> dict:
+    user = await flow.add_user(name="Zweite Leitung")
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": world["league"]["id"], "user_id": user["id"],
+                                           "capabilities": ["season", "results", "manage"], "created_at": now_utc().isoformat()})
+    return user
+
+
+async def flip_top_two(flow, tid: str, regs: list[dict]) -> None:
+    """Korrektur: Platz 2 hat das direkte Spiel gegen Platz 1 gewonnen - danach steht Platz 2 vorn."""
+    duel = next(match for match in await flow.db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(None)
+                if {slot["registration_id"] for slot in match["slots"]} == {regs[0]["id"], regs[1]["id"]})
+    await flow.db.matches_v2.update_one({"id": duel["id"]}, {"$set": {"results": [
+        {"registration_id": regs[1]["id"], "rank": 1, "score": 2}, {"registration_id": regs[0]["id"], "rank": 2, "score": 0}]}})
+
+
+@pytest.mark.asyncio
+async def test_recompute_after_reopen_correct_and_close_again(flow):
+    world = await build(flow, levels=2, teams=4)
+    await close_all(flow, world)
+    season = await new_season(flow, world)
+    rows = await carried(flow, season["id"])
+    winner, runner_up, third = (squad_of(world, 2, index) for index in range(3))
+    assert rows[winner]["carry_over"]["division_level"] == 1 and rows[runner_up]["carry_over"]["division_level"] == 2
+    # Der Absteiger aus Liga 1 ist schon zugeteilt - er bleibt, wie er ist.
+    flow.act_as(world["lead"])
+    division_2 = await flow.db.league_divisions.find_one({"season_id": season["id"], "level": 2}, {"_id": 0})
+    staffel = ok(await flow.post(f"{ADMIN}/divisions/{division_2['id']}/staffeln", json={}))
+    relegated = rows[squad_of(world, 1, 3)]
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/applications/{relegated['id']}/assign", json={"tournament_id": staffel["tournament_id"]}))
+    assigned = await flow.db.league_applications.find_one({"id": relegated["id"]}, {"_id": 0})
+    # Nichts geändert: Die Vorschau hat nichts zu tun.
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    assert preview["can_run"] and preview["changes"] == [] and preview["manual"] == []
+
+    # Wieder öffnen (zweite Person), korrigieren: Platz 2 schlägt Platz 1, Platz 3 wird disqualifiziert. Neu abschließen.
+    tid = world["tids"][1]
+    regs = world["regs"][2]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    cockpit = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/closing"))
+    assert cockpit["successor"]["id"] == season["id"]
+    await flip_top_two(flow, tid, regs)
+    await flow.db.tournament_registrations.update_one({"id": regs[2]["id"]}, {"$set": {"status": "disqualified",
+                                                                                     "removal": {"at": LONG_AGO, "mode": "forfeit"}}})
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    kinds = {change["squad_id"]: change["kind"] for change in preview["changes"]}
+    # Der Letzte rückt einen Platz vor (der Disqualifizierte steht hinten): gleiche Liga, nur der Platz ändert sich.
+    assert kinds == {winner: "moved", runner_up: "moved", third: "revoked", squad_of(world, 2, 3): "updated"}
+    assert preview["manual"] == []  # der zugeteilte Absteiger aus Liga 1 bleibt richtig in Liga 2
+    done = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]}))
+    assert done["moved"] == 2 and done["revoked"] == 1 and done["updated"] == 1
+    after = await carried(flow, season["id"])
+    assert after[runner_up]["carry_over"]["division_level"] == 1 and after[runner_up]["carry_over"]["movement"] == "up"
+    assert after[winner]["carry_over"]["division_level"] == 2 and after[winner]["carry_over"]["movement"] == "stay"
+    assert after[third]["status"] == "rejected" and after[third]["carry_over"]["revoked_at"] and "active_key" not in after[third]
+    # Zugeteilt: unverändert.
+    assert after[squad_of(world, 1, 3)] == assigned
+    # Nachricht mit der Fassung im Schlüssel; ein zweiter Lauf ändert nichts und schickt nichts.
+    keys = [row["meta"]["dedupe_key"] for row in await flow.db.notifications.find({"meta.reason": "league_successor"}, {"_id": 0}).to_list(None)]
+    assert any(key.endswith(f":{preview['stamp']}:moved") for key in keys) and any(key.endswith(f":{preview['stamp']}:revoked") for key in keys)
+    again = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True}))
+    assert again["changed"] == 0 and again["notified"] == 0
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.successor.recompute"}) == 2
+    # Veralteter Stand der Vorschau: 409.
+    stale = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": "veraltet"})
+    assert stale.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_recompute_lists_assigned_teams_for_a_manual_check_and_stops_after_the_start(flow):
+    world = await build(flow, levels=2, teams=3)
+    await close_all(flow, world)
+    season = await new_season(flow, world)
+    rows = await carried(flow, season["id"])
+    winner = squad_of(world, 2, 0)
+    flow.act_as(world["lead"])
+    division_1 = await flow.db.league_divisions.find_one({"season_id": season["id"], "level": 1}, {"_id": 0})
+    staffel = ok(await flow.post(f"{ADMIN}/divisions/{division_1['id']}/staffeln", json={}))
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/applications/{rows[winner]['id']}/assign", json={"tournament_id": staffel["tournament_id"]}))
+    tid = world["tids"][1]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    await flip_top_two(flow, tid, world["regs"][2])
+    # Solange der Vorgänger offen ist, geht nichts.
+    flow.act_as(world["lead"])
+    blocked = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    assert not blocked["can_run"] and "nicht abgeschlossen" in blocked["problems"][0]
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    assert [row["application_id"] for row in preview["manual"]] == [rows[winner]["id"]] and preview["manual"][0]["why"] == "zugeteilt"
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True}))
+    assert (await flow.db.league_applications.find_one({"id": rows[winner]["id"]}, {"_id": 0}))["carry_over"]["division_level"] == 1
+    # Rechte: nur „Liga verwalten“. Nach dem Start: 409. An der alten Season gibt es nichts neu zu berechnen.
+    only = await flow.add_user(name="Nur Ergebnisse")
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": world["league"]["id"], "user_id": only["id"],
+                                           "capabilities": ["results", "season"], "created_at": now_utc().isoformat()})
+    flow.act_as(only)
+    refused = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True})
+    assert refused.status_code == 403
+    flow.act_as(world["lead"])
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"status": "active", "start_date": (now_utc() - timedelta(days=1)).isoformat()}})
+    late = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True})
+    assert late.status_code == 409 and "begonnen" in late.json()["detail"]
+    old = await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor/recompute")
+    assert old.status_code == 404

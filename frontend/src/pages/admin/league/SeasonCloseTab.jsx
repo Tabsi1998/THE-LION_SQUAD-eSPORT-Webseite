@@ -144,7 +144,7 @@ function CloseSheet({ row, superadmin, onClose, onDone }) {
   );
 }
 
-function ReopenSheet({ row, superadmin, onClose, onDone }) {
+function ReopenSheet({ row, superadmin, successor, onClose, onDone }) {
   const [reason, setReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
@@ -172,6 +172,13 @@ function ReopenSheet({ row, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title="Staffel wieder öffnen" eyebrow={staffelLabel(row)} onClose={onClose} onSubmit={submit} saving={saving} noValidate
       submitLabel="Wieder öffnen" savingLabel="Öffne …" submitTestId="reopen-confirm" testId="reopen-sheet">
+      {/* Neue Season schon angelegt (F.2, Nr. 162): Sie folgt dem neuen Endstand nicht von selbst. */}
+      {successor ? (
+        <p className="mb-3 flex items-start gap-2 rounded-sm border border-warn/50 bg-warn/10 p-3 text-sm font-semibold text-white" role="note" data-testid="reopen-successor">
+          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+          <span>Es gibt schon die neue Season {successor.name}. Nach dem neuen Abschluss die Übernahme dort neu berechnen.</span>
+        </p>
+      ) : null}
       {row.incomplete ? (
         <p className="text-sm text-white/75">
           Der Abschluss wurde nicht fertig geschrieben – die Staffel ist gesperrt, einen Endstand gibt es nicht. Wieder öffnen gibt sie frei, danach schließt du
@@ -337,7 +344,7 @@ export function SeasonCloseTab({ seasonId, canResults = false }) {
         Auf- und Abstieg ergeben sich aus dem Endstand (Zonen je Liga im Reiter „Ligen und Staffeln“). Ist alles abgeschlossen, legt „Neue Season aus …“ oben die nächste Season an.
       </p>
       {sheet?.kind === "close" ? <CloseSheet row={sheet.row} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
-      {sheet?.kind === "reopen" ? <ReopenSheet row={sheet.row} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
+      {sheet?.kind === "reopen" ? <ReopenSheet row={sheet.row} superadmin={data.superadmin} successor={data.successor} onClose={() => setSheet(null)} onDone={done} /> : null}
       {sheet?.kind === "version" ? <VersionSheet row={sheet.row} entry={sheet.entry} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === "decide" ? (
         <OrderSheet staffel={{ tournament_id: sheet.row.tournament_id, label: staffelLabel(sheet.row) }} tie={sheet.tie} override={Boolean(sheet.tie.own_team)}

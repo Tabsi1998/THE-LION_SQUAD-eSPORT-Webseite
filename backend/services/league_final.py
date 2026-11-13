@@ -843,6 +843,8 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),
                    "closed": bool(staffeln) and all(row["closed"] for row in staffeln)},
         "can_act": can_act, "superadmin": league_permissions.is_superadmin(user), "methods": METHODS,
+        # Gibt es schon eine neue Season aus dieser (F.2, Nr. 162)? Dann sagt „Wieder öffnen“, dass die Übernahme dort neu zu berechnen ist.
+        "successor": await db.league_seasons.find_one({"predecessor_id": season["id"]}, {"_id": 0, "id": 1, "name": 1}),
         "responsible": f"„{league_permissions.CAPABILITY_LABELS[CLOSE_CAPABILITY]}“",
         "staffeln": staffeln,
     }

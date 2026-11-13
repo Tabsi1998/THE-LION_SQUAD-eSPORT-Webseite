@@ -181,3 +181,16 @@ test("Gleichstand an der Grenze zu Auf- oder Abstieg (F.2, #1627): eigener Knopf
   expect(within(screen.getByTestId("table-decision-sheet")).getAllByText(/Probe 3/).length).toBeGreaterThan(0);
   expect(screen.getByRole("list", { name: "Zonen der Tabelle" })).toHaveTextContent(/Aufstieg.*Abstieg/);
 });
+
+
+test("Wieder öffnen mit schon angelegter neuer Season (F.2, Nr. 162): deutlicher Hinweis aufs Neuberechnen", async () => {
+  const closed = staffel({ closed: true, status: "completed", final: { ...FINAL, champion: null }, history: HISTORY, can_close: false, can_reopen: true });
+  const view = renderTab(data([closed], { successor: { id: "s2", name: "Season 2" } }));
+  fireEvent.click(await screen.findByTestId("reopen-button-t1"));
+  expect(screen.getByTestId("reopen-successor")).toHaveTextContent("Es gibt schon die neue Season Season 2. Nach dem neuen Abschluss die Übernahme dort neu berechnen.");
+  view.unmount();
+  // Gegenprobe: ohne neue Season kein Hinweis.
+  renderTab(data([closed]));
+  fireEvent.click(await screen.findByTestId("reopen-button-t1"));
+  expect(screen.queryByTestId("reopen-successor")).toBeNull();
+});
