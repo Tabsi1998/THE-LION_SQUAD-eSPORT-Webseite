@@ -226,6 +226,10 @@ async def init_indexes():
     await db.event_registrations.create_index([("event_id", 1), ("status", 1)])
     # Nachricht an alle Angemeldeten (#1372): das Protokoll je Event, neueste zuerst.
     await db.event_messages.create_index([("event_id", 1), ("created_at", -1)])
+    # Hinweis der Turnierleitung (#1166): je Turnier bzw. Event die neuesten zuerst. Die Sperre gegen Doppelversand ist
+    # der feste ``_id`` aus Turnier und Kennung - dafür braucht es keinen eigenen Index.
+    await db.tournament_notices.create_index([("tournament_id", 1), ("created_at", -1)])
+    await db.tournament_notices.create_index([("event_id", 1), ("created_at", -1)])
     # F1
     await db.f1_challenges.create_index("id", unique=True)
     await db.f1_challenges.create_index("slug", unique=True)

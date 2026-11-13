@@ -38,6 +38,7 @@ from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
     RESULT_STAFF_ROLES,
+    STRUCTURE_STAFF_ROLES,
     has_match_result_permission,
     has_tournament_staff_permission,
 )
@@ -62,6 +63,14 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
         me, tournament_id, CHECKIN_STAFF_ROLES, capability="matches")
     # Checken die Spieler selbst ein (online, hybrid)? Dann öffnet die Seite im Check-in nicht von selbst den Reiter.
     view["tournament"]["self_checkin"] = self_checkin_allowed(tournament)
+    # Reiter „Hinweis“ (#1166): nur, wer Hinweise schreiben darf; „Pause bis“ gleich mitsetzen nur mit dem Recht, den
+    # Turnierstatus zu wechseln (dieselbe Prüfung wie PUT …/pause und POST …/status).
+    from services.tournament_notices import can_write as can_write_notice
+
+    view["tournament"]["can_notice"] = await can_write_notice(me, tournament_id)
+    view["tournament"]["can_pause"] = await has_tournament_staff_permission(me, tournament_id, STRUCTURE_STAFF_ROLES,
+                                                                            "tournament", capability="manage")
+    view["tournament"]["paused_until"] = tournament.get("paused_until")
     await hide_unseen_event_links(db, me, [view["tournament"]])
     return view
 

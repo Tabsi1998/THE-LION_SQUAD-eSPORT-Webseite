@@ -14,6 +14,7 @@ import { TvCallBoard } from "@/components/tv/TvCallBoard";
 import { TvQueueBoard } from "@/components/tv/TvQueueBoard";
 import { TvLiveSlide, TvSlideBar, TvSponsorMoment, TvStatsSlide } from "@/components/tv/TvSlides";
 import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/components/tv/TvScreens";
+import { TvNoticeBand } from "@/components/tv/TvNotice";
 import { TvNextUp } from "@/components/tv/TvNextUp";
 import { TvStandingsSlide } from "@/components/tv/TvStandings";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
@@ -510,6 +511,8 @@ function BracketTv() {
         />
       ) : null}
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label={words.board} onRetry={load} />
+      {/* Hinweis der Turnierleitung (#1166): nur mit „auch am TV zeigen“, solange er steht. */}
+      <TvNoticeBand items={data?.notices} />
 
       <main className="tv-main tv-main--slides" data-testid="tv-main" data-paused={paused ? "1" : "0"} data-run={playing.runId} data-moment={moment?.type || undefined}>
         {showBar && !lowMoment ? <TvSlideBar key={`${playing.runId}-${playing.tick}`} clock={playing.clock} totalMs={playing.totalMs} paused={paused} /> : null}

@@ -161,5 +161,13 @@ describe("Nachladen nur für das betroffene Turnier", () => {
     test("Seiten ohne Stationen bleiben beim eigenen Turnier, auch im selben Event", () => {
       expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e1" }), ["tournaments"], { tournamentId: "t1", eventId: "e1" })).toBe(false);
     });
+
+    test("ganzes Event (#1166): ein Hinweis aus einem anderen Turnier desselben Events lädt nach - eines anderen Events nicht", () => {
+      const scope = { tournamentId: "t1", eventId: "e1", wholeEvent: true };
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e1" }), ["tournaments"], scope)).toBe(true);
+      expect(invalidationMatches(change({ tournament_id: "t3", parent_event_id: "e2" }), ["tournaments"], scope)).toBe(false);
+      // Ohne eigenes Event bleibt es beim eigenen Turnier.
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e1" }), ["tournaments"], { tournamentId: "t1", wholeEvent: true })).toBe(false);
+    });
   });
 });

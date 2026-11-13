@@ -48,6 +48,8 @@ PUSH_CHANNELS = {
     "tournament_staff": "lion_tournaments",
     # Rundnachricht der Liga-Leitung (E.4, Nr. 153).
     "league_broadcast": "lion_tournaments",
+    # Hinweis der Turnierleitung (#1166).
+    "tournament_notice": "lion_tournaments",
     "match_result": "lion_tournaments",
     "match_report": "lion_tournaments",
     "match_dispute": "lion_tournaments",
