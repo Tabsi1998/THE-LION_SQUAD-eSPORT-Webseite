@@ -529,7 +529,7 @@ eine Season noch nichts gespeichert, steht „es gelten die Vorgaben unten“ �
 | **Termin noch offen** | bei 50 % der Spielwoche (Wochenmitte), spätestens 24 Stunden vor dem Standardtermin | Captain und Vertreter beider Seiten, solange kein Termin vereinbart ist – einmal je Spielwoche. Ohne Einigung gilt der Standardtermin; wird er nicht gemeldet, steht das Spiel bei euch als überfällig (2.7a) |
 | **Ergebnis fehlt** | Zeitpunkt aus „Termine und Verschiebungen“ (24 h nach dem Termin) | Captain und Vertreter beider Seiten. Kommt nicht, solange ein Vorfall oder ein Verfahren am Spiel offen ist |
 | **Map-Veto wartet** | nach 20 Sekunden ohne Zug, nie in den letzten 5 Sekunden | Captain und Vertreter der Seite am Zug, wenn sie die Matchseite nicht offen haben (3.1c) |
-| **Zusätzlich per Discord** | aus | Direktnachricht vom Vereins-Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben. Keine Funktion hängt an Discord |
+| **Zusätzlich per Discord** | aus | Direktnachricht vom Vereins-Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben (Entscheidung Nr. 148). Gilt für alle Arten: Ist der Schalter aus, kommen auch „Ergebnis fehlt“ und „Map-Veto wartet“ nicht mehr per Discord – früher kamen sie bei eingeschaltetem Discord immer. Keine Funktion hängt an Discord |
 
 Jede Erinnerung kommt höchstens einmal, auch wenn der Job doppelt läuft. Spieler und Captains schalten „Match-Erinnerungen“ in ihren
 Benachrichtigungs-Einstellungen ab (Web und App). Die Nachricht „Spiel startet in 10 Minuten“ kommt in allen Turnieren und ist hier nicht

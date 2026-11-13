@@ -110,10 +110,10 @@ Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und
 
 ## Erinnerungen
 
-Die Seite erinnert euch, damit nichts liegen bleibt – im Web, in der App und per Push, zusätzlich per Discord, wenn eure Season das
+Die Seite erinnert euch, damit nichts liegen bleibt – im Web, in der App und per Push, zusätzlich als Direktnachricht auf Discord, wenn eure Season das
 eingeschaltet hat und ihr Discord in den Einstellungen aktiviert habt:
 
-- **Termin noch offen:** zur Wochenmitte an beide Captains, wenn noch kein Termin vereinbart ist.
+- **Termin noch offen:** zur Wochenmitte an beide Captains, wenn noch kein Termin vereinbart ist – liegt der Standardtermin früher, spätestens 24 Stunden vor ihm.
 - **Liga-Spiel in 24 Stunden** und **in 1 Stunde:** an alle Aufgestellten (ohne Aufstellung an den ganzen Kader) und die Captains, mit
   Gegner und Uhrzeit. Nicht bei abgesagten oder schon gestarteten Spielen; nach einer Verschiebung kommt sie zum neuen Termin.
 - **Ergebnis fehlt:** 24 Stunden nach dem Termin an beide Captains – nicht, solange ein Vorfall oder Verfahren offen ist.
