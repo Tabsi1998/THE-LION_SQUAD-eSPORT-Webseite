@@ -8,6 +8,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
+from pymongo.errors import DuplicateKeyError
+
 from database import get_db
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services.competition_read import load_competition_read_model, observe_structure_read
@@ -164,6 +166,61 @@ async def _review_tournament_prizes(db, tid: str, wanted: set[tuple], groups: se
                 "updated_at": stamp,
             }})
     return to_review
+
+
+LEAGUE_REWARD = "league_reward"
+
+
+async def sync_league_reward_prizes(db, tournament: dict, wanted: list[dict]) -> dict:
+    """Echter Gewinn einer Liga-Belohnung (F.4, #2214): je Belohnung und Anmeldung ein Eintrag in ``prize_pickups`` - derselbe
+    Abholweg wie bei Turnieren, kein eigener Geldfluss. Idempotent über ``reward_key``. Nach einem neuen Abschluss wird ein Gewinn,
+    der nicht mehr passt, nie entzogen: Er bekommt „nach Korrektur prüfen“ (``needs_review``, wie TA23); passt er wieder, fällt die
+    Markierung weg."""
+    tid = tournament["id"]
+    stamp = now_utc().isoformat()
+    keys = {prize["reward_key"] for prize in wanted}
+    created = 0
+    for prize in wanted:
+        existing = await db.prize_pickups.find_one({"tournament_id": tid, "source_type": LEAGUE_REWARD, "reward_key": prize["reward_key"]},
+                                                   {"_id": 0, "id": 1})
+        if existing:
+            continue
+        doc = {
+            "id": new_id(), "tournament_id": tid, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
+            "source_type": LEAGUE_REWARD, "reward_key": prize["reward_key"],
+            "user_id": prize.get("user_id"), "team_id": prize.get("team_id"), "place": int(prize.get("place") or 0),
+            "prize_group": LEAGUE_REWARD, "place_label": prize.get("place_label") or "", "prize_label": prize.get("label") or "",
+            "prize_value": prize.get("value") or "", "status": "pending", "pickup_deadline": None, "ready_at": None,
+            "picked_up_at": None, "picked_up_by": None, "notes": "", "created_at": stamp, "updated_at": stamp,
+        }
+        try:
+            await db.prize_pickups.insert_one(dict(doc))
+        except DuplicateKeyError:
+            continue  # ein zweiter Abschluss zugleich hat ihn schon angelegt
+        created += 1
+        for recipient in await prize_recipient_ids(db, doc):
+            try:
+                from services.user_notifications import create_user_notification
+                await create_user_notification(
+                    recipient, "Gewinn vorgemerkt",
+                    f"{doc['place_label'] or place_phrase(None, doc['place'])} bei {tournament.get('title') or 'der Liga'}: "
+                    f"{doc['prize_value'] or doc['prize_label']}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
+                    url="/me/prizes", kind="prize_pending",
+                    meta={"tournament_id": tid, "pickup_id": doc["id"], "place": doc["place"], "dedupe_key": f"prize-pending:{doc['id']}"},
+                )
+            except Exception:
+                logger.warning("[prizes] notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
+    review = 0
+    async for pickup in db.prize_pickups.find({"tournament_id": tid, "source_type": LEAGUE_REWARD}, {"_id": 0}):
+        stale = pickup.get("reward_key") not in keys
+        review += int(stale)
+        if stale != bool(pickup.get("needs_review")):
+            await db.prize_pickups.update_one({"id": pickup["id"]}, {"$set": {
+                "needs_review": stale,
+                "review_note": "Nach einem neuen Abschluss der Staffel nicht mehr bei dieser Belohnung - bitte prüfen." if stale else None,
+                "updated_at": stamp,
+            }})
+    return {"created": created, "needs_review": review}
 
 
 async def prize_recipient_ids(db, pickup: dict) -> list[str]:
