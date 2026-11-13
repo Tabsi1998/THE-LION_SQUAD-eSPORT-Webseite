@@ -65,3 +65,20 @@ test("mit Remis bleibt die Spalte, ohne die neuen Felder bleibt die Zeile wie bi
   expect(within(table).getByTitle("Siege").className).toContain("hidden");
   expect(within(table).getByText("Pkt")).toHaveAttribute("title", "Punkte");
 });
+
+test("Endstand (F.1, #1645): die abgeschlossene Staffel nennt Tag und Meister - auch wenn zwei rechnerisch gleich stünden", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...DATA, staffel: { ...DATA.staffel, status: "completed",
+    final: { version: 2, closed_at: "2026-11-12T17:00:00+00:00", champion: { registration_id: "b", display_name: "Team b" }, decisions: [] } },
+  standings: [row("a", 2), row("b", 1)] } });
+  render(<MemoryRouter><StaffelPanel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
+  expect(await screen.findByTestId("league-final-A")).toHaveTextContent("Endstand · abgeschlossen am 12.11.2026");
+  expect(screen.getByTestId("league-champion-A")).toHaveTextContent("Meister Team b");
+});
+
+test("Endstand ohne Meistertitel (untere Liga N): kein Meister, auch nicht für Platz 1 allein", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...DATA, staffel: { ...DATA.staffel, status: "completed",
+    final: { version: 1, closed_at: "2026-11-12T17:00:00+00:00", champion: null, decisions: [] } }, standings: [row("a", 1), row("b", 2)] } });
+  render(<MemoryRouter><StaffelPanel topLevel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
+  expect(await screen.findByTestId("league-final-A")).toBeInTheDocument();
+  expect(screen.queryByTestId("league-champion-A")).toBeNull();
+});

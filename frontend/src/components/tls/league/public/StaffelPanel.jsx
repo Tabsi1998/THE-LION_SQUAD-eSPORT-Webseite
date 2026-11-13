@@ -7,7 +7,7 @@
 // Farben über die Marke bzw. --league-accent-rgb - auf der Ligaseite die Akzentfarbe der Liga (#2107), sonst die Vereinsfarbe.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Coffee, Crown, ExternalLink, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Coffee, Crown, ExternalLink, Lock, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
@@ -18,6 +18,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { SizedImage } from "@/components/tls/SizedImage";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { byMaps, hidesDraws, pointsNote, tiebreakOrder } from "@/lib/leagueTable";
+import { finalNote } from "@/lib/leagueFinal";
 import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
@@ -230,9 +231,18 @@ function TableBlock({ data, staffel, champion }) {
   const tableRules = data?.staffel?.table_rules || null;
   const changed = useChangedKeys(rows, standingKey, standingSignature);
   const registerRow = useFlipRows(rows, standingKey);
-  const leader = champion ? soleLeader(rows) : null;
+  // Endstand (F.1, #1645): Ist die Staffel abgeschlossen, sagt der Server, wer Meister ist - sonst gilt die Regel von bisher.
+  const final = data?.staffel?.final || null;
+  const leader = final
+    ? rows.find((row) => final.champion && row.registration_id === final.champion.registration_id) || null
+    : champion ? soleLeader(rows) : null;
   return (
     <StaggerIn className="tls-league-table" aria-label={`Tabelle Staffel ${staffel.staffel}`}>
+      {final ? (
+        <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70" data-testid={`league-final-${staffel.staffel}`}>
+          <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {finalNote(final)}
+        </p>
+      ) : null}
       {/* Gold nur für den Meister (LSW-Farbregel): erst wenn die Staffel der obersten Liga beendet ist und Platz 1 allein steht. */}
       {leader ? (
         <p className="tls-league-champion" data-testid={`league-champion-${staffel.staffel}`}>
