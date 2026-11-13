@@ -428,6 +428,31 @@ async def test_result_missing_can_be_switched_off_per_season(flow):
     assert counts["reminded"] == 0 and await notes(flow, "result_missing_reminder") == []
 
 
+@pytest.mark.asyncio
+async def test_switching_result_missing_on_again_reminds_only_matches_inside_the_window(flow):
+    """N5: Wieder eingeschaltet - keine Flut für alte Spiele. Erinnert wird nur, solange das Spiel noch nicht überfällig ist."""
+    world = await reminder_world(flow, hours=-100, rules={"result_missing": False})
+    mid = world["match"]["id"]
+    assert (await schedule_sweep(flow, world))["overdue"] == 1, "alt und nie gemeldet: überfällig bei der Leitung"
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {"reminder_rules": league_reminder_rules.defaults()}})
+    assert (await schedule_sweep(flow, world))["reminded"] == 0, "100 h nach dem Termin: keine Erinnerung mehr"
+    # Gegenprobe: ein Spiel von vor 30 Stunden (Erinnerung nach 24 h, überfällig nach 48 h) wird erinnert.
+    await flow.db.matches_v2.update_one({"id": mid}, {"$set": {"scheduled_at": (world["now"] - timedelta(hours=30)).isoformat(),
+                                                               "result_overdue_at": None}})
+    assert (await schedule_sweep(flow, world))["reminded"] == 1
+
+
+def test_the_overdue_run_only_loads_what_can_be_due():
+    """N5: Ohne Erinnerung fragt der Lauf nur nach Spielen, die noch nicht überfällig sind; künftige Termine lädt er nie."""
+    now = datetime(2026, 12, 1, 12, 0, tzinfo=timezone.utc)
+    on = league_schedule_sweep.overdue_filter("t1", SCHEDULE_DEFAULTS, league_reminder_rules.defaults(), now)
+    off = league_schedule_sweep.overdue_filter("t1", SCHEDULE_DEFAULTS, {**league_reminder_rules.defaults(), "result_missing": False}, now)
+    assert on["$or"] == [{"result_overdue_at": None}, {"result_reminded_at": None}]
+    assert off["$or"] == [{"result_overdue_at": None}]
+    assert on["scheduled_at"]["$lte"] == "2026-12-01T02:00:00+00:00", "24 h zurück, 14 h Spielraum für den Textvergleich"
+    assert off["scheduled_at"]["$lte"] == "2026-11-30T02:00:00+00:00", "ohne Erinnerung erst ab „überfällig“ (48 h)"
+
+
 # ---------------------------------------------------------------- Map-Veto wartet
 
 async def with_rules(flow, world, **rules) -> None:

@@ -181,6 +181,32 @@ def result_reminder_held(match: dict) -> bool:
     return bool(league_incident_rules.open_incidents(match)) or league_procedures.has_open(match)
 
 
+# Gespeicherte Termine sind UTC-Text; ein Termin mit anderem Versatz verschiebt den Textvergleich um höchstens 14 Stunden.
+_TEXT_SLACK = timedelta(hours=14)
+
+
+def overdue_filter(tournament_id: str, rules: dict, reminders: dict, now: datetime) -> dict:
+    """Welche Spiele der Lauf laden muss (#1647, N5): nur Termine, deren Erinnerung oder „überfällig“ schon fällig sein kann - und
+    ohne Erinnerung (aus) nur die, die noch nicht überfällig sind. So lädt nicht jede Minute jedes künftige Spiel der Staffel."""
+    hours = int(rules["result_overdue_hours"])
+    pending: list[dict] = [{"result_overdue_at": None}]
+    if reminders.get("result_missing"):
+        hours = min(hours, int(rules["result_reminder_hours"]))
+        pending.append({"result_reminded_at": None})
+    bound = (now - timedelta(hours=hours) + _TEXT_SLACK).isoformat()
+    return {"tournament_id": tournament_id, "status": {"$in": list(league_schedule.OVERDUE_OPEN_STATUSES)},
+            "scheduled_at": {"$nin": [None, ""], "$lte": bound}, "reports.0": {"$exists": False}, "is_preview": {"$ne": True},
+            "$or": pending}
+
+
+def result_reminder_window_open(moment: datetime, rules: dict, now: datetime) -> bool:
+    """„Ergebnis fehlt“ ist fällig - und nicht zu spät (#1647, N5): nur bis „überfällig“ (mindestens eine Stunde lang). Wer die
+    Erinnerung wieder einschaltet oder einen Vorfall schließt, löst keine Flut für alte Spiele aus."""
+    due = moment + timedelta(hours=int(rules["result_reminder_hours"]))
+    window = max(timedelta(hours=int(rules["result_overdue_hours"]) - int(rules["result_reminder_hours"])), timedelta(hours=1))
+    return due <= now < due + window
+
+
 async def overdue(db, tournament: dict, rules: dict, now: datetime) -> tuple[int, int]:
     """Erinnerung an beide Seiten, danach „überfällig“ bei der Leitung - je Termin einmal. Die Erinnerung lässt sich je Season
     abschalten (``reminder_rules.result_missing``, #1647) und wartet auf offene Vorfälle und Verfahren."""
@@ -190,11 +216,7 @@ async def overdue(db, tournament: dict, rules: dict, now: datetime) -> tuple[int
 
     reminders = league_reminder_rules.rules_of(tournament) or league_reminder_rules.defaults()
 
-    matches = await db.matches_v2.find(
-        {"tournament_id": tournament["id"], "status": {"$in": list(league_schedule.OVERDUE_OPEN_STATUSES)},
-         "scheduled_at": {"$nin": [None, ""]}, "reports.0": {"$exists": False}, "is_preview": {"$ne": True},
-         "$or": [{"result_reminded_at": None}, {"result_overdue_at": None}]},
-        {"_id": 0}).to_list(3000)
+    matches = await db.matches_v2.find(overdue_filter(tournament["id"], rules, reminders, now), {"_id": 0}).to_list(3000)
     reminded = marked = 0
     for match in matches:
         moment = league_schedule._moment(match.get("scheduled_at"))
@@ -203,7 +225,7 @@ async def overdue(db, tournament: dict, rules: dict, now: datetime) -> tuple[int
         base = {"id": match["id"], "scheduled_at": match["scheduled_at"], "reports.0": {"$exists": False},
                 "status": {"$in": list(league_schedule.OVERDUE_OPEN_STATUSES)}}
         if (not match.get("result_reminded_at") and reminders["result_missing"] and not result_reminder_held(match)
-                and now >= moment + timedelta(hours=int(rules["result_reminder_hours"]))):
+                and result_reminder_window_open(moment, rules, now)):
             done = await db.matches_v2.update_one({**base, "result_reminded_at": None},
                                                   {"$set": {"result_reminded_at": now.isoformat()}})
             if done.modified_count:
