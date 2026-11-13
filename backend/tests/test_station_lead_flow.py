@@ -496,3 +496,25 @@ async def test_move_only_to_a_free_station_that_fits_the_game(flow):
     fitting = await add_station(flow, tournament, "4")
     moved = await move(flow, tournament, stations[0], match, fitting)
     assert moved.status_code == 200, moved.text
+
+
+@pytest.mark.asyncio
+async def test_releasing_a_call_tells_the_called_players_once(flow):
+    _staff, tournament, stations, players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    assert (await call(flow, tournament, stations[0], match)).status_code == 200
+    assert (await release(flow, tournament, stations[0], match)).status_code == 200
+    withdrawn = [row for row in await calls(flow) if row["title"] == "Aufruf zurückgenommen"]
+    assert {row["user_id"] for row in withdrawn} == {players[slot["registration_id"]]["id"] for slot in match["slots"]}
+    assert all(row["meta"]["dedupe_key"].startswith(f"match_call_withdrawn:{match['id']}:") for row in withdrawn)
+    assert all("Station 1" in row["body"] for row in withdrawn)
+    again = await release(flow, tournament, stations[0], match)
+    assert again.json()["idempotent_replay"] is True
+    assert len([row for row in await calls(flow) if row["title"] == "Aufruf zurückgenommen"]) == len(withdrawn)
+
+    # Ein laufendes Spiel freigeben schickt keine Rücknahme.
+    other = (await first_round(flow, tournament))[1]
+    assert (await call(flow, tournament, stations[1], other)).status_code == 200
+    assert (await start(flow, tournament, stations[1], other)).status_code == 200
+    assert (await release(flow, tournament, stations[1], other)).status_code == 200
+    assert len([row for row in await calls(flow) if row["title"] == "Aufruf zurückgenommen"]) == len(withdrawn)

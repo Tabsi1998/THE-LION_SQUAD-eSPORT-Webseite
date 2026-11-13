@@ -405,7 +405,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
 // Rückmeldungen zu den Stations-Knöpfen (#1162) - nach „Defekt“ mit dem Hinweis, was mit dem Spiel an der Station passiert.
 function releasedText(done, where) {
   if (done.idempotent_replay) return `${where} war schon frei.`;
-  return done.state === "running" ? `${where} ist frei – das Ergebnis trägst du unter „Ergebnisse“ ein.` : `${where} ist frei – das Spiel ist wieder in der Warteschlange.`;
+  return done.state === "running" ? `${where} ist frei – das Ergebnis trägst du unter „Ergebnisse“ ein.` : `${where} ist frei – der Aufruf ist zurückgenommen, die Spieler bekommen Bescheid.`;
 }
 
 function brokenText(done, where) {

@@ -176,7 +176,7 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
         <div className="mt-3 border-t border-white/10 pt-3" data-testid={`live-tools-${station.id}`}>
           <div className="grid grid-cols-3 gap-2">
             {onRelease ? (
-              <button type="button" disabled={busy || !holds} onClick={() => (running ? toggle("release") : onRelease(station, holds))} aria-expanded={running ? panel === "release" : undefined} className={`tls-btn tls-btn--secondary ${BTN} disabled:opacity-40`} data-testid={`live-release-${station.id}`}>
+              <button type="button" disabled={busy || !holds} onClick={() => toggle("release")} aria-expanded={panel === "release"} className={`tls-btn tls-btn--secondary ${BTN} disabled:opacity-40`} data-testid={`live-release-${station.id}`}>
                 <Unlock className="h-4 w-4 shrink-0" aria-hidden="true" /> Freigeben
               </button>
             ) : <span />}
@@ -198,14 +198,13 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
               onNo={() => setPanel("")} onYes={() => { setPanel(""); onBroken(station, true, { confirm_other: true }); }} />
           ) : null}
 
-          {panel === "release" && running ? (
-            <div className="tls-live-reveal mt-3 rounded-sm border border-white/10 bg-white/[0.03] p-2.5" data-testid={`live-release-confirm-${station.id}`}>
-              <p className="text-xs text-white/70">Das Spiel läuft noch. Station trotzdem freigeben? Das Ergebnis trägst du danach unter „Ergebnisse“ ein.</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button type="button" className={`tls-btn tls-btn--secondary ${BTN}`} onClick={() => setPanel("")}>Abbrechen</button>
-                <button type="button" disabled={busy} className={`tls-btn tls-btn--primary ${BTN}`} onClick={() => { setPanel(""); onRelease(station, holds); }} data-testid={`live-release-yes-${station.id}`}>Freigeben</button>
-              </div>
-            </div>
+          {panel === "release" && holds ? (
+            // Beides fragt nach (#1162): ein laufendes Spiel verliert seine Station, ein Aufruf geht an die Spieler zurück.
+            <ConfirmPanel testId={`live-release-confirm-${station.id}`} yesTestId={`live-release-yes-${station.id}`} busy={busy}
+              yes={running ? "Freigeben" : "Zurücknehmen"}
+              text={running ? "Das Spiel läuft noch. Station trotzdem freigeben? Das Ergebnis trägst du danach unter „Ergebnisse“ ein."
+                : "Aufruf zurücknehmen? Die Spieler bekommen Bescheid, das Spiel geht zurück in die Warteschlange."}
+              onNo={() => setPanel("")} onYes={() => { setPanel(""); onRelease(station, holds); }} />
           ) : null}
 
           {panel === "move" && holds ? (

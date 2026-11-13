@@ -39,13 +39,16 @@ test("frei: „Aufrufen“; Freigeben und Umlegen sind aus, „Defekt“ geht", 
   expect(handlers.onBroken).toHaveBeenCalledWith(expect.objectContaining({ id: "st1" }), true);
 });
 
-test("aufgerufen: „Starten“, „Freigeben“ nimmt den Aufruf zurück, „Umlegen“ zeigt die freien Stationen", () => {
+test("aufgerufen: „Starten“, „Freigeben“ nimmt den Aufruf nach Rückfrage zurück, „Umlegen“ zeigt die freien Stationen", () => {
   const handlers = tile(called);
   expect(screen.getByTestId("live-chip-st2")).toHaveAttribute("data-tone", "called");
   expect(screen.getByTestId("live-start-st2")).toHaveTextContent("Starten");
   fireEvent.click(screen.getByTestId("live-start-st2"));
   expect(handlers.onStart).toHaveBeenCalledWith(expect.objectContaining({ id: "st2" }), expect.objectContaining({ match_id: "QF2" }));
   fireEvent.click(screen.getByTestId("live-release-st2"));
+  expect(handlers.onRelease).not.toHaveBeenCalled();
+  expect(screen.getByTestId("live-release-confirm-st2")).toHaveTextContent("Aufruf zurücknehmen? Die Spieler bekommen Bescheid");
+  fireEvent.click(screen.getByTestId("live-release-yes-st2"));
   expect(handlers.onRelease).toHaveBeenCalledWith(expect.objectContaining({ id: "st2" }), expect.objectContaining({ match_id: "QF2" }));
   fireEvent.click(screen.getByTestId("live-move-st2"));
   const picker = screen.getByTestId("live-move-picker-st2");

@@ -581,8 +581,9 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
 - **Alle freien Stationen aufrufen** (oben im Reiter): ruft an jeder freien Station ihr **Als Nächstes** auf, nach einer
   Rückfrage mit der Anzahl. Gestartet wird dabei nichts.
 - **Starten**: die echte Startzeit, die Spielzeit-Uhr läuft, der Aufruf verschwindet von der Tafel.
-- **Freigeben**: Ein Aufruf geht zurück in die Warteschlange. Läuft das Spiel noch, fragt die Seite nach; danach ist die
-  Station frei und das Ergebnis tragt ihr unter **Ergebnisse** ein. Mit dem Ergebnis wird eine Station ohnehin von selbst
+- **Freigeben** fragt immer nach. Ein Aufruf geht zurück in die Warteschlange, die aufgerufenen Spieler bekommen
+  „Aufruf zurückgenommen“ (Glocke und Push). Läuft das Spiel noch, ist danach die Station frei und das Ergebnis tragt
+  ihr unter **Ergebnisse** ein. Mit dem Ergebnis wird eine Station ohnehin von selbst
   frei.
 - **Defekt** nimmt die Station aus der Planung. Läuft dort ein Spiel oder steht ein Aufruf, bleibt es stehen, bis ihr es
   mit **Umlegen** auf eine freie Station legt – die Kachel und die Rückmeldung sagen es. **Bereit** meldet die Station

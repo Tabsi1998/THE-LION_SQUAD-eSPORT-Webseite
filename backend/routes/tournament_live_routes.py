@@ -16,6 +16,8 @@ wird nicht still umgelegt; eine belegte Station nimmt kein zweites Spiel. Dersel
 harmloses Wiederholen (``idempotent_replay``) - „aufgerufen um“ bleibt, es geht keine zweite Nachricht hinaus.
 """
 
+import logging
+
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,7 +31,8 @@ from services.access_links import touch_access_link, validate_access_link
 from services.change_events import reset_scope_cache
 from services.heat_rebuild import evaluate_after_write
 from services.live_queue import load_live_queue, my_entries
-from services.match_calls import CALL_OPEN_STATUSES
+from services.log_safe import log_safe
+from services.match_calls import CALL_OPEN_STATUSES, notify_call_withdrawn
 from services.match_duration import load_duration_game
 from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, _unresolved, _usable_stations
 from services.station_labels import station_text
@@ -42,6 +45,7 @@ from services.tournament_permissions import (
 from services.tournament_rules import match_policy
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired
 
+logger = logging.getLogger("tls.stations")
 NOT_READY_DETAIL = "Die Spieler stehen noch nicht fest – aufrufen geht erst nach den Vorspielen."
 ONLINE_DETAIL = "Online gibt es keine Stationen und keinen Aufruf – es gelten die Fristen."
 
@@ -441,6 +445,12 @@ async def release_station_live(tid: str, body: StationRelease, me: dict = Depend
         if (before or {}).get("called_at"):
             # Aufruf zurückgenommen: der Lauf ist wieder umbaubar (#2033) - unter der gehaltenen Sperre auswerten.
             await evaluate_after_write(db, tournament_id, actor_id=me.get("id"), trigger="uncall")
+    if state == "called" and (before or {}).get("called_at"):
+        # Die Spieler haben „Du bist dran“ bekommen - sie erfahren, dass der Aufruf nicht mehr gilt.
+        try:
+            await notify_call_withdrawn(db, match, station, before["called_at"])
+        except Exception as exc:  # noqa: BLE001 - eine Nachricht hält das Freigeben nicht auf
+            logger.warning("Aufruf-Rücknahme für %s nicht verschickt type=%s", log_safe(body.match_id), type(exc).__name__)
     await _station_audit(db, "station.released", tournament_id, me["id"], {
         "station_id": station["id"], "match_id": body.match_id, "match_key": (match or {}).get("match_key"), "state": state,
     })
