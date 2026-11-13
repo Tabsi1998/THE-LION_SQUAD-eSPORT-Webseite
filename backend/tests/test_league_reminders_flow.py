@@ -5,7 +5,7 @@ Season über die Route. Erfundene Namen."""
 import asyncio
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -154,6 +154,23 @@ async def test_no_reminder_in_a_blocked_period_and_none_for_a_person_who_turned_
     assert (await run(flow, world, at))["upcoming_early"] == 1, "Gegenprobe ohne Sperrzeit"
     got = names(world, await notes(flow, "upcoming_early"))
     assert "Mila" not in got and "Kapitaen" in got, "Mila hat Match-Erinnerungen abgeschaltet"
+
+
+@pytest.mark.asyncio
+async def test_first_match_after_a_break_gets_its_reminder_although_the_reminder_falls_into_the_break(flow):
+    """Nr. 151: Sperrzeit 24.–26.12., Spiel am So 27.12. um 20:00 - die 24-h-Erinnerung kommt am 26.12. um 20:00 (noch in der Pause)."""
+    world = await reminder_world(flow)
+    mid = world["match"]["id"]
+    await flow.db.tournaments.update_one({"id": world["tournament"]["id"]}, {"$set": {
+        "blocked_periods": [{"start_date": "2026-12-24", "end_date": "2026-12-26", "label": "Weihnachten"}]}})
+    await flow.db.matches_v2.update_one({"id": mid}, {"$set": {"scheduled_at": "2026-12-27T19:00:00+00:00"}})
+    at = datetime(2026, 12, 26, 19, 0, tzinfo=timezone.utc)
+    assert (await run(flow, world, at))["upcoming_early"] == 1
+    captain = next(row for row in await notes(flow, "upcoming_early") if row["user_id"] == world["users"]["Kapitaen"]["id"])
+    assert captain["body"].endswith("am So 27.12. 20:00 Uhr."), "Winterzeit: 19:00 UTC ist 20:00 in Wien"
+    # Gegenprobe: liegt das Spiel selbst in der Sperrzeit, kommt nichts.
+    await flow.db.matches_v2.update_one({"id": mid}, {"$set": {"scheduled_at": "2026-12-26T19:00:00+00:00"}})
+    assert (await run(flow, world, at - timedelta(hours=24)))["upcoming_early"] == 0
 
 
 @pytest.mark.asyncio

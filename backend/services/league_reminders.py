@@ -3,7 +3,7 @@
 
 - **Spiel steht an:** ``upcoming_early_hours`` und ``upcoming_late_minutes`` vor dem Termin an die Spieler der Aufstellung (ohne
   Aufstellung den Kader) und die Captains, mit Gegner und Zeit. Nicht bei abgesagten, schon gestarteten oder verschobenen Spielen
-  (ein neuer Termin erinnert neu, der alte nie), nicht in einer Sperrzeit.
+  (ein neuer Termin erinnert neu, der alte nie), nicht, wenn der Termin in einer Sperrzeit liegt (Nr. 151 - die Erinnerung selbst darf hineinfallen).
 - **Termin offen:** bei ``unscheduled_week_percent`` der Spielwoche an die Captains beider Seiten, solange kein Termin fest steht
   (Einigung, 72-h-Regel, Verschiebung oder Leitung). Danach gilt der Standardtermin; wer ihn nie meldet, ist überfällig bei der
   Leitung (Nr. 28, ``league_schedule_sweep.overdue``).
@@ -51,7 +51,9 @@ def upcoming_due(tournament: dict, match: dict, rules: dict, now: datetime) -> s
     start = _moment(match.get("scheduled_at"))
     if not start or start <= now:
         return None
-    if blocked_period_at(tournament, now) or blocked_period_at(tournament, start):
+    # Nr. 151: Nur der Spieltermin zählt. Liegt der Zeitpunkt der Erinnerung noch in einer Sperrzeit (das erste Spiel nach der Pause),
+    # kommt sie trotzdem - sonst ginge sie nach jeder Pause nie raus.
+    if blocked_period_at(tournament, start):
         return None
     left = (start - now).total_seconds() / 60
     catch_up = reminder_rules.CATCH_UP_MINUTES

@@ -75,7 +75,7 @@ export function SeasonReminderRulesPanel({ seasonId }) {
       ) : null}
       <div className="grid gap-3 lg:grid-cols-2">
         <Kind label="Spiel steht an" checked={form.upcoming} onChange={(value) => set("upcoming", value)} testId="reminder-rules-upcoming"
-          hint="An die Aufgestellten (ohne Aufstellung den Kader) und die Captains, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen oder gestarteten Spielen und nicht in Sperrzeiten.">
+          hint="An die Aufgestellten (ohne Aufstellung den Kader) und die Captains, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen oder gestarteten Spielen und nicht, wenn das Spiel in einer Sperrzeit liegt.">
           <FormGrid cols={2}>
             <TextField label="Erste Erinnerung (Stunden vorher)" type="number" min={2} max={72} value={form.upcoming_early_hours}
               onChange={(value) => set("upcoming_early_hours", value)} hint="Vorgabe 24" disabled={!form.upcoming} testId="reminder-rules-early" />

@@ -525,7 +525,7 @@ eine Season noch nichts gespeichert, steht „es gelten die Vorgaben unten“ �
 
 | Art | Vorgabe | Wer bekommt sie |
 | --- | --- | --- |
-| **Spiel steht an** | 24 Stunden und 60 Minuten vor dem Termin | die Aufgestellten (ohne Aufstellung der Kader) und die Captains beider Seiten, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen (zum alten Termin) oder schon gestarteten Spielen und nicht in Sperrzeiten |
+| **Spiel steht an** | 24 Stunden und 60 Minuten vor dem Termin | die Aufgestellten (ohne Aufstellung der Kader) und die Captains beider Seiten, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen (zum alten Termin) oder schon gestarteten Spielen und nicht, wenn das Spiel in einer Sperrzeit liegt. Vor dem ersten Spiel nach einer Pause kommt sie auch, wenn die Pause noch läuft |
 | **Termin noch offen** | bei 50 % der Spielwoche (Wochenmitte) | Captain und Vertreter beider Seiten, solange kein Termin vereinbart ist – einmal je Spielwoche. Ohne Einigung gilt der Standardtermin; wird er nicht gemeldet, steht das Spiel bei euch als überfällig (2.7a) |
 | **Ergebnis fehlt** | Zeitpunkt aus „Termine und Verschiebungen“ (24 h nach dem Termin) | Captain und Vertreter beider Seiten. Kommt nicht, solange ein Vorfall oder ein Verfahren am Spiel offen ist |
 | **Map-Veto wartet** | nach 20 Sekunden ohne Zug, nie in den letzten 5 Sekunden | Captain und Vertreter der Seite am Zug, wenn sie die Matchseite nicht offen haben (3.1c) |
