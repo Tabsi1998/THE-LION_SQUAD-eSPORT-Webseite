@@ -5,7 +5,9 @@ Pause lief (gestartet, noch offen), die Pausendauer auf ``paused_seconds`` addie
 dazu - und ``paused_at`` fällt weg. Die Uhr rechnet dann „jetzt - Start - paused_seconds“; solange die Pause läuft, steht
 sie bei ``paused_at``. Beide Felder sind optional: ohne sie zählt die Uhr wie bisher (keine Migration).
 
-Ein Spiel, das erst in der Pause gestartet wurde, bekommt nur die Zeit ab seinem Start - seine Uhr stand bei 0.
+Ein Spiel, das erst in der Pause gestartet wurde, bekommt nur die Zeit ab seinem Start - seine Uhr stand bei 0. Ein
+Spiel, das in der Pause ein Ergebnis bekam, wird mit abgerechnet: Nimmt die Leitung das Ergebnis zurück, läuft seine Uhr
+ohne die Pause weiter.
 """
 from __future__ import annotations
 
@@ -42,8 +44,10 @@ async def settle_pause(db, tournament: dict, now: datetime | None = None) -> int
     if not paused_at or not _parse(paused_at):
         return 0
     now = now or datetime.now(timezone.utc)
+    # Auch Spiele, die in der Pause ein Ergebnis bekamen: wird es zurückgenommen, läuft ihre Uhr ohne die Pause weiter.
     running = await db.matches_v2.find(
-        {"tournament_id": tournament["id"], "started_at": {"$nin": [None, ""]}, "status": {"$in": sorted(OPEN_STATUSES)}},
+        {"tournament_id": tournament["id"], "started_at": {"$nin": [None, ""]},
+         "$or": [{"status": {"$in": sorted(OPEN_STATUSES)}}, {"completed_at": {"$gte": paused_at}}]},
         {"_id": 0, "id": 1, "started_at": 1, "status": 1},
     ).to_list(3000)
     count = 0

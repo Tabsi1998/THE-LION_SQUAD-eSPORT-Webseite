@@ -197,3 +197,26 @@ async def test_settling_the_same_pause_twice_counts_it_once(flow):
     # Das Weiterspielen über die Route rechnet dieselbe Pause nicht noch einmal ab.
     await set_status(flow, tournament, "live")
     assert (await flow.reload(match))["paused_seconds"] == seconds, "dieselbe Pause nicht noch einmal"
+
+
+@pytest.mark.asyncio
+async def test_a_result_during_the_pause_that_is_taken_back_leaves_the_pause_out(flow):
+    """Ergebnis in der Pause, dann Rückgängig: das Spiel bekommt die Pause trotzdem abgerechnet."""
+    _staff, tournament, _stations, _players = await on_site(flow, count=8)
+    match = await running_match(flow, tournament, minutes_ago=20)
+    other = (await first_round(flow, tournament))[1]
+    await flow.db.matches_v2.update_one(
+        {"id": other["id"]},
+        {"$set": {"status": "completed", "started_at": (now_utc() - timedelta(minutes=30)).isoformat(),
+                  "completed_at": (now_utc() - timedelta(minutes=10)).isoformat()}},
+    )
+    await set_status(flow, tournament, "paused")
+    since = await backdate_pause(flow, tournament, minutes=5)
+    # In der Pause bekommt das Spiel ein Ergebnis.
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"status": "completed", "completed_at": now_utc().isoformat()}})
+    await set_status(flow, tournament, "live")
+    seconds = (await flow.reload(match)).get("paused_seconds", 0)
+    assert 299 <= seconds <= 330, seconds
+    assert (await flow.reload(match))["pause_settled_for"] == since
+    # Vor der Pause entschieden: bleibt unberührt.
+    assert "paused_seconds" not in await flow.reload(other)
