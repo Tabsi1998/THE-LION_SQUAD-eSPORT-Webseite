@@ -51,8 +51,9 @@ export function weekdayName(value) {
 /** Eine Season als Formular - Zahlen als Text, der Beginn als Wiener Kalendertag. */
 export function seasonToForm(season = {}) {
   const rules = season.scoring_rules || {};
-  // Ohne gesetzte Regeln die Vorgabe des Servers (#2406: 3/0/0, kein Remis); gesetzte Regeln bleiben, wie sie sind.
-  const fresh = !hasTableRules(season.scoring_rules);
+  // Eine NEUE Season (ohne id) zeigt die Vorgabe des Servers (#2406: 3/0/0, kein Remis). Eine bestehende ohne Regeln zeigt, was
+  // der Server dort wirklich rechnet (3/1/0), sonst änderte ein bloßes Speichern still die Wertung.
+  const fresh = !season.id && !hasTableRules(season.scoring_rules);
   const points = rules.match_points || (fresh ? LEAGUE_TABLE_DEFAULTS.match_points : { win: 3, draw: 1, loss: 0 });
   return {
     name: season.name || "",

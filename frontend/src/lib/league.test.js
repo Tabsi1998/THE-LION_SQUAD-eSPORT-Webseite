@@ -68,12 +68,18 @@ test("der Hinweis nennt eine Reihenfolge, die nicht zur längsten Serie passt (#
 });
 
 // #2406: Ohne gesetzte Regeln zeigt das Formular die Vorgabe des Servers (3/0/0, kein Remis), gesetzte Regeln bleiben unverändert.
-test("seasonToForm: ohne gesetzte Regeln die Vorgabe des Servers, mit Regeln unverändert (#2406)", () => {
+test("seasonToForm: neue Season die Vorgabe des Servers, bestehende unverändert (#2406)", () => {
   for (const season of [{ name: "Neu" }, { name: "Neu", scoring_rules: null }, { name: "Neu", scoring_rules: {} }]) {
     const form = seasonToForm(season);
     expect([form.points_win, form.points_draw, form.points_loss]).toEqual(["3", "0", "0"]);
     expect(form).toMatchObject({ allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents",
       table_tiebreakers: ["head_to_head", "score_diff", "score_for", "lead_decision"], head_to_head_criteria: ["points", "score_diff", "score_for"] });
+  }
+  // Gegenprobe: Eine bestehende Season (mit id) ohne Regeln zeigt, was der Server dort rechnet: 3/1/0 mit Remis, alter Stand.
+  for (const scoring_rules of [undefined, null, {}]) {
+    const old = seasonToForm({ id: "s1", name: "Alt", scoring_rules });
+    expect([old.points_win, old.points_draw, old.points_loss]).toEqual(["3", "1", "0"]);
+    expect(old).toMatchObject({ allow_draws: true, forfeit_score: "recorded", exit_rule: "half", table_tiebreakers: ["score_diff", "score_for"] });
   }
   // Gegenprobe: Eine Season mit Regeln behält Remis und den alten Stand, auch wenn einzelne Felder fehlen.
   const set = seasonToForm({ name: "Alt", scoring_rules: { match_points: { win: 3, draw: 1, loss: 0 }, table_tiebreakers: ["score_diff"] } });
