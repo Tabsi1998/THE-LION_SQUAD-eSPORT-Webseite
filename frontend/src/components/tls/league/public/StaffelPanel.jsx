@@ -10,7 +10,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Coffee, Crown, ExternalLink, Lock, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
+import { StandingsTable, ZoneLegend, standingKey } from "@/components/tls/tournament/StandingsTable";
 import { StaggerIn } from "@/components/tls/motion";
 import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
 import { standingSignature } from "@/lib/liveChanges";
@@ -251,6 +251,8 @@ function TableBlock({ data, staffel, champion }) {
       ) : null}
       <StandingsTable rows={rows} kind="team_league" changed={changed} registerRow={registerRow} championKey={leader ? standingKey(leader) : null}
         label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" hideDraws={hidesDraws(tableRules, rows)} mapPoints={byMaps(tableRules)} />
+      {/* Zonen für Auf- und Abstieg (F.2, #1627): Legende nur zu dem, was in der Tabelle steht. */}
+      <ZoneLegend rows={rows} testId={`league-zones-${staffel.staffel}`} />
       {/* Reihenfolge bei Punktgleichheit (E.1, #1625) - dieselbe, nach der der Server sortiert. */}
       {/* Punkte nach gewonnenen Maps (#2312): sagt, was die Spalte „Pkt“ zählt. */}
       {pointsNote(tableRules) ? (

@@ -166,3 +166,18 @@ test("ein abgebrochener Abschluss steht ehrlich da: kein Abschließen, Wieder ö
   fireEvent.click(within(sheet).getByTestId("reopen-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/reopen", { reason: "Abschluss brach ab" }));
 });
+
+test("Gleichstand an der Grenze zu Auf- oder Abstieg (F.2, #1627): eigener Knopf je Platz, Zonen und Legende an der Tabelle", async () => {
+  const zoneTie = { kind: "zone", rank: 3, registration_ids: ["r3", "r4"], names: ["Probe 3", "Probe 4"], points: 3, own_team: false };
+  const rows = [row(1, { zone: "promotion" }), row(2), row(3, { rank: 3, zone: "relegation" }), row(4, { rank: 3 })];
+  renderTab(data([staffel({ champion_place: false, champion: null, can_close: false, standings: rows, ties: [zoneTie], zones_label: "1 Aufsteiger · 1 Absteiger",
+    blockers: [{ code: "zone_tie", label: "Gleichstand an der Grenze zu Auf- oder Abstieg", text: "Teams stehen gleich.", count: 1,
+      items: [{ text: "Probe 3 – Probe 4", url: "/admin/leagues/seasons/s1#abschluss" }] }] })]), { canResults: true });
+  expect(await screen.findByTestId("close-zones-t1")).toHaveTextContent("1 Aufsteiger · 1 Absteiger");
+  // Kein Link auf die eigene Seite, sondern die Namen - wie beim Meister.
+  expect(within(screen.getByTestId("close-blocker-t1-zone_tie")).queryByRole("link")).toBeNull();
+  expect(screen.queryByTestId("close-decide-t1")).toBeNull();
+  fireEvent.click(screen.getByTestId("close-decide-zone-t1-3"));
+  expect(within(screen.getByTestId("table-decision-sheet")).getAllByText(/Probe 3/).length).toBeGreaterThan(0);
+  expect(screen.getByRole("list", { name: "Zonen der Tabelle" })).toHaveTextContent(/Aufstieg.*Abstieg/);
+});
