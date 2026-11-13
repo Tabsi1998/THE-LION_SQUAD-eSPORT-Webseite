@@ -535,7 +535,7 @@ Jede Erinnerung kommt höchstens einmal, auch wenn der Job doppelt läuft. Spiel
 Benachrichtigungs-Einstellungen ab (Web und App). Die Nachricht „Spiel startet in 10 Minuten“ kommt in allen Turnieren und ist hier nicht
 einstellbar.
 
-<img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
+<img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche und spätestens 24 Stunden vor dem Standardtermin, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
 
 ### 2.7d Veto: Maps vor dem Spiel sperren und wählen (Regelwerk § 6, Anlage B)
 
