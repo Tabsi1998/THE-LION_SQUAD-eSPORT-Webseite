@@ -48,6 +48,8 @@ PUSH_CHANNELS = {
     "tournament_staff": "lion_tournaments",
     # Rundnachricht der Liga-Leitung (E.4, Nr. 153).
     "league_broadcast": "lion_tournaments",
+    # Belohnungen der Liga (F.4, #2214): neu bekommen oder verloren - wie Erfolge.
+    "league_reward": "lion_achievements",
     # Hinweis der Turnierleitung (#1166).
     "tournament_notice": "lion_tournaments",
     "match_result": "lion_tournaments",

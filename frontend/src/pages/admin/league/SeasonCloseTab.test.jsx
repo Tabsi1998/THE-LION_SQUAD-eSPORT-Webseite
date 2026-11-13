@@ -194,3 +194,11 @@ test("Wieder öffnen mit schon angelegter neuer Season (F.2, Nr. 162): deutliche
   fireEvent.click(await screen.findByTestId("reopen-button-t1"));
   expect(screen.queryByTestId("reopen-successor")).toBeNull();
 });
+
+test("Belohnungen (F.4): Anzahl und - ohne gemeldete Aufstellung - der Hinweis auf den Kader (Nr. 167)", async () => {
+  renderTab(data([staffel({ closed: true, status: "completed", final: FINAL, history: HISTORY, can_close: false, rewards: 6, rewards_roster_fallback: ["Probe 3"] }),
+    staffel({ tournament_id: "t2", staffel: "B", closed: true, final: FINAL, history: HISTORY, can_close: false, rewards: 2, rewards_roster_fallback: [] })]));
+  expect(await screen.findByTestId("close-rewards-t1")).toHaveTextContent("6 Belohnungen vergeben");
+  expect(screen.getByTestId("close-rewards-fallback-t1")).toHaveTextContent("Kader statt Einsatz, weil keine Aufstellungen gemeldet: Probe 3.");
+  expect(screen.queryByTestId("close-rewards-fallback-t2")).toBeNull();
+});

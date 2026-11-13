@@ -98,6 +98,9 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # Gewinnbilder der Liga (#2107) je Season und Liga N.
     ("league_seasons", ["prizes.image_url"]),
     ("league_divisions", ["prizes.image_url"]),
+    # Eigene Bilder der Belohnungen (F.4, #2214) je Season und Liga N.
+    ("league_seasons", ["rewards.image_url"]),
+    ("league_divisions", ["rewards.image_url"]),
     # Bilder aus der Mitgliederverwaltung je Hintergrund (``services.sponsor_images``).
     *((collection, [f"dolibarr_images.{kind}.{variant}.url" for kind in ("logo", "banner") for variant in ("dark", "light")])
       for collection in ("sponsors", "partners")),
@@ -135,6 +138,7 @@ FIELD_LABELS = {
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
     "modes.icon_url": "Symbol eines Modus", "match_modes.icon_url": "Symbol eines Modus",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
+    "rewards.image_url": "Bild einer Belohnung",
     "body_md": "Text", "annexes.body_md": "Text einer Anlage",
     "entries.image_url": "Bild eines Eintrags", "entries.attachments.image_url": "Bild eines Aufsatzes",
     "entries.items.image_url": "Bild eines Eintrags einer gesperrten Klasse", "entries.subcategory_icon_url": "Symbol einer Unterkategorie",

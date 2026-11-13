@@ -12,6 +12,7 @@ Punkt- oder Tabellenänderung ändert ihn nicht mehr.
   bekommt die nächste Nummer.
 - **Meister** (``champion_of``): Platz 1 jeder Staffel der obersten Liga N. Ein Eintrag in ``tournament_awards`` an Team und
   eingesetzten Spielern - beim Wiederöffnen ausgesetzt, beim neuen Abschluss nachgezogen, nie doppelt.
+- **Belohnungen** (F.4, ``league_rewards``): beim Abschluss aus dem Endstand zugeteilt, beim Wiederöffnen ruhend wie der Meister.
 - **Auf- und Abstieg** (F.2, #1627, Nr. 158/159): Der Abschluss hält die Zonen der Liga N fest (``zones``) und je Team die Zone
   (``promotion``, an jeder Zeile ``zone``). Ein Gleichstand an einer Zonengrenze sperrt den Abschluss wie der um den Meistertitel.
   Dazu stehen Teams, Co-Teams und eingesetzte Spieler je Anmeldung dabei - daraus liest die Season-Historie an Team und Spieler.
@@ -26,6 +27,7 @@ from pymongo.errors import DuplicateKeyError
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_incident_rules as incident_rules
 from services import league_procedures as procedures
+from services import league_rewards
 from services import league_protest_settings as protest_settings
 from services import league_zones
 from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
@@ -432,13 +434,15 @@ async def record_champion(db, tournament: dict, final: dict, frame: dict) -> int
 
     tid = tournament["id"]
     forget_outcome(db, tid)
+    # Nur der Meister-Eintrag (ohne ``reward_key``) - die Belohnungen (F.4) teilt ``league_rewards.grant`` zu.
+    own = {"tournament_id": tid, "reward_key": None}
     champion = final.get("champion")
     if not champion:
-        await db.tournament_awards.delete_many({"tournament_id": tid})
+        await db.tournament_awards.delete_many(own)
         return 0
     registration = await db.tournament_registrations.find_one({"id": champion["registration_id"], "tournament_id": tid}, {"_id": 0})
     if not registration:
-        await db.tournament_awards.delete_many({"tournament_id": tid})
+        await db.tournament_awards.delete_many(own)
         return 0
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(2000)
     summary = registration_match_summary(matches, {registration["id"]})
@@ -465,16 +469,17 @@ async def record_champion(db, tournament: dict, final: dict, frame: dict) -> int
         "player_ids": await champion_players(db, tid, registration),
         "suspended": False, "updated_at": now,
     }
-    existing = await db.tournament_awards.find_one({"tournament_id": tid, "registration_id": registration["id"]}, {"_id": 0, "id": 1})
+    existing = await db.tournament_awards.find_one({**own, "registration_id": registration["id"]}, {"_id": 0, "id": 1})
     award_id = existing["id"] if existing else new_id()
-    await db.tournament_awards.update_one({"tournament_id": tid, "registration_id": registration["id"]},
+    await db.tournament_awards.update_one({**own, "registration_id": registration["id"]},
                                           {"$set": doc, "$setOnInsert": {"id": award_id, "created_at": now}}, upsert=True)
-    await db.tournament_awards.delete_many({"tournament_id": tid, "id": {"$ne": award_id}})
+    await db.tournament_awards.delete_many({**own, "id": {"$ne": award_id}})
     return 1
 
 
 async def suspend_champion(db, tournament_id: str) -> None:
-    """Wieder geöffnet: Der Meister-Eintrag ruht (unsichtbar), bis neu abgeschlossen ist - bleibt es dasselbe Team, bleibt der Eintrag."""
+    """Wieder geöffnet: Der Meister-Eintrag ruht (unsichtbar), bis neu abgeschlossen ist - bleibt es dasselbe Team, bleibt der Eintrag.
+    Die Belohnungen der Staffel (F.4, Nr. 166) ruhen mit."""
     from services.awards import forget_outcome
 
     forget_outcome(db, tournament_id)
@@ -630,6 +635,8 @@ async def close(db, tournament: dict, actor: dict, *, conflict_reason: str | Non
 
     await _follow_up("Protokoll der Notausnahme", tid, record_override)
     await _follow_up("Meister-Eintrag", tid, lambda: record_champion(db, {**tournament, "status": "completed"}, final, frame))
+    # Belohnungen (F.4, Nr. 165): sofort mit dem Abschluss, aus dem Endstand - mit Nachricht an alle, die etwas gewinnen oder verlieren.
+    await _follow_up("Belohnungen", tid, lambda: league_rewards.grant_and_notify(db, {**tournament, "status": "completed"}, final, frame))
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, lambda: notify_captains(db, tournament, final, frame, "closed"))
@@ -785,6 +792,13 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
         "history": [_history_row(row, names) for row in history],
         # Zonen der Liga N (F.2): was gilt bzw. beim Abschluss galt - für den Satz unter der Tabelle.
         "zones": zones, "zones_label": league_zones.summary(zones),
+        # Belohnungen (F.4): wie viele gerade gelten - beim Wiederöffnen ruhen sie und zählen nicht.
+        "rewards": await db.tournament_awards.count_documents({"tournament_id": tid, "reward_key": {"$type": "string"},
+                                                               "suspended": {"$ne": True}}),
+        # Nr. 167: Teams, deren Spieler-Belohnung mangels Aufstellung an den Kader ging (Hinweis im Cockpit).
+        "rewards_roster_fallback": sorted({(row.get("league") or {}).get("display_name") or "Team" async for row in db.tournament_awards.find(
+            {"tournament_id": tid, "reward_key": {"$type": "string"}, "suspended": {"$ne": True}, "roster_fallback": True},
+            {"_id": 0, "league.display_name": 1})}),
     }
     if is_closed(tournament) and not active:
         # Abgebrochener Abschluss (N-b): ehrlich als solcher - gesperrt, ohne Endstand, mit „Wieder öffnen“ als Ausweg.

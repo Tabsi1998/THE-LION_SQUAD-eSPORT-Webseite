@@ -14,6 +14,7 @@ import { ScrollManager } from "@/components/tls/ScrollManager";
 import { ViewTransitions } from "@/components/tls/ViewTransitions";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
+import { RewardWatcher } from "@/components/tls/rewards/RewardWatcher";
 import { BallotPopup } from "@/components/tls/BallotPopup";
 import { CalendarHintHost } from "@/components/calendar/CalendarHintHost";
 import { WebPushHost } from "@/components/notifications/WebPushHost";
@@ -276,6 +277,8 @@ function App() {
             {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
             <OptionalBoundary quiet><SignalSync /></OptionalBoundary>
             <OptionalBoundary><CeremonyHost /></OptionalBoundary>
+            {/* Belohnungen der Liga (F.4, #2214): noch nicht gefeierte reiht sie still in die Zeremonie ein. */}
+            <OptionalBoundary quiet><RewardWatcher /></OptionalBoundary>
             {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht als Popup auf jeder Seite, nie im Admin. */}
             <OptionalBoundary><BallotPopup /></OptionalBoundary>
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. Still (#986): reine

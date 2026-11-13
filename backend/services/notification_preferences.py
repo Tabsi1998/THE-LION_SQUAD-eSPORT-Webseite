@@ -184,6 +184,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "tournament_cancelled": "tournament_updates",
     # Rundnachricht der Liga-Leitung (E.4, Nr. 153): an Captains und Vertreter oder alle Spieler einer Season, Liga N oder Staffel.
     "league_broadcast": "tournament_updates",
+    # Belohnungen der Liga (F.4, Nr. 166): neu bekommen oder nach einem neuen Abschluss verloren.
+    "league_reward": "tournament_updates",
     # Hinweis der Turnierleitung (#1166): „Pause bis 14:30“ an alle im Turnier bzw. Event.
     "tournament_notice": "tournament_updates",
     # Helfer-Einsatz (#2111, TA25): „Du hilfst bei diesem Turnier als …“.
