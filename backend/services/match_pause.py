@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services.match_timing import OPEN_STATUSES, _parse, is_clock_running, whole_seconds, overlap_seconds
+from services.match_timing import OPEN_STATUSES, _parse, active_pause, is_clock_running, overlap_seconds, whole_seconds
 
 
 def clock_pause_fields(match: dict, tournament: dict | None) -> dict:
     """Was die Uhr eines Spiels über Pausen wissen muss: ``paused_at`` (nur solange die Pause läuft und das Spiel läuft)
     und ``paused_seconds`` (frühere Pausen)."""
-    paused_at = (tournament or {}).get("paused_at")
+    paused_at = active_pause(tournament)
     return {
         "paused_at": paused_at if paused_at and is_clock_running(match) else None,
         "paused_seconds": whole_seconds(match.get("paused_seconds")),

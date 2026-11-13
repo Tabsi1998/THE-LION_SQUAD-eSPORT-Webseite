@@ -72,10 +72,17 @@ def overlap_seconds(match: dict, paused_at, now: datetime) -> int:
     return max(0, int((now - max(started, since)).total_seconds()))
 
 
+def active_pause(tournament: dict | None) -> str | None:
+    """Seit wann die Turnierpause läuft - nur, solange das Turnier pausiert ist. Ein ``paused_at``, das nach einem
+    Abschluss ohne Weiterspielen stehen blieb (etwa der Staffelabschluss aus der Pause), hält keine Uhr an."""
+    tournament = tournament or {}
+    return tournament.get("paused_at") if tournament.get("status") == "paused" else None
+
+
 def pause_seconds(match: dict, tournament: dict | None, now: datetime) -> int:
     """Die ganze Pausenzeit eines laufenden Spiels: frühere Pausen plus die laufende (für „über der Zeit“)."""
     total = whole_seconds(match.get("paused_seconds"))
-    paused_at = (tournament or {}).get("paused_at")
+    paused_at = active_pause(tournament)
     if paused_at and is_clock_running(match):
         total += overlap_seconds(match, paused_at, now)
     return total
