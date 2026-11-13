@@ -708,7 +708,7 @@ describe("live: Warteschlange je Station", () => {
     expect([...marked].map((row) => row.getAttribute("data-match"))).toEqual(expect.arrayContaining([queue.stations[0].next.match_id]));
   });
 
-  it("„Gestartet“ startet über den Server; an der belegten Station gibt es kein „Aufrufen“", async () => {
+  it("„Starten“ startet über den Server; an der belegten Station gibt es kein „Aufrufen“", async () => {
     const { state } = setupLive();
     await screen.findByTestId("mp-live-queue");
     // Station 1 spielt noch - dort wird erst nach dem laufenden Spiel aufgerufen; an Station 2 ist schon aufgerufen.

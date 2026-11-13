@@ -77,9 +77,9 @@ test.describe("Abnahme: Helfer-Anleitung (Station, Einlass, Wenn etwas nicht pas
     await expect(next).toHaveAttribute("data-state", "called");
     await expect(next).toContainText("antreten bis");
 
-    // 2. Alle da: „Gestartet“ - die Uhr läuft.
+    // 2. Alle da: „Starten“ - die Uhr läuft.
     const start = page.getByTestId(`live-start-${stationId}`);
-    await expect(start).toHaveText(/Gestartet/);
+    await expect(start).toHaveText(/Starten/);
     await bilder(page, "a2-gestartet", card);
     await start.click();
     const running = page.getByTestId(`live-running-${stationId}`);

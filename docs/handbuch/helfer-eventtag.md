@@ -14,14 +14,16 @@ Jede Eingabe wird gespeichert, auch wer sie gemacht hat. Du kannst nichts kaputt
 
 ---
 
-## 1. Station betreuen: Aufrufen und Starten
+## 1. Station betreuen: Aufrufen, Starten, Freigeben
 
 **Öffnen:** Turnier → **Turnierleitung** → Reiter **Stationen**.
 
 1. Bei deiner Station steht **Als Nächstes**: Runde, Durchgang und wer antritt.
 2. Tippe **Aufrufen**. Die Spieler bekommen „Du bist dran“, der TV zeigt den Aufruf mit Countdown.
-3. Sind alle da: **Gestartet** tippen. Die Spielzeit-Uhr läuft.
+3. Sind alle da: **Starten** tippen. Die Spielzeit-Uhr läuft.
 4. Ist die Station noch belegt, steht dort „Aufrufen nach dem laufenden Spiel“. Dann warten.
+5. Unter jeder Station: **Freigeben** (Aufruf zurücknehmen bzw. Station frei machen), **Umlegen** (Spiel auf eine freie
+   Station) und **Defekt**. Das darfst du an deiner Station auch als Stationsleitung.
 
 <img src="../assets/helfer/a1-aufrufen-handy.png" alt="Station frei, darunter Als Nächstes mit Knopf Aufrufen" width="220">
 
@@ -88,7 +90,7 @@ Grundregel: **Nichts raten. Turnierleitung holen.** Wen du anrufst, steht am **A
 
 | Was passiert | Was du tust |
 | --- | --- |
-| **Station defekt** (Gerät, Controller) | Nichts mehr an der Station starten. Turnierleitung holen – sie setzt die Station auf „Defekt“ und legt die Spiele mit **Umlegen** auf eine freie Station. Der TV zeigt dort „Bitte nicht benutzen“. |
+| **Station defekt** (Gerät, Controller) | Nichts mehr an der Station starten. An der Station **Defekt** tippen (oder die Turnierleitung holen). Läuft dort ein Spiel oder steht ein Aufruf: **Umlegen** auf eine freie Station – ein laufendes Spiel behält seine Uhr. Der TV zeigt dort „Bitte nicht benutzen“. Geht das Gerät wieder: **Bereit**. |
 | **Spieler fehlt** | Aufrufen, warten. Nach der Frist kommt bei der Turnierleitung „Nicht erschienen?“. Sie tippt den Namen an oder **+5 Min. verlängern**. |
 | **Ergebnis strittig** | Nichts eintragen. Turnierleitung holen. Spieler können auf der Spielseite auch selbst **Problem melden**. |
 | **Falsch eingetragen** | Sofort **Rückgängig**, sonst **Korrigieren** mit Grund. |

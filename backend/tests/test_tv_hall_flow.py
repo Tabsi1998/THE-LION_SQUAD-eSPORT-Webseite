@@ -194,10 +194,22 @@ async def test_changing_the_station_by_hand_ends_the_call(flow):
     station = await station_for(flow, tournament)
     match = await playable_match(flow, tournament)
     assert (await flow.post(f"/api/stations/{station['id']}/assign/{match['id']}")).status_code == 200
-    response = await flow.put(f"/api/stations/{station['id']}", json={"status": "broken"})
+    # Von Hand auf „frei“: der Aufruf ist vorbei.
+    response = await flow.put(f"/api/stations/{station['id']}", json={"status": "free"})
     assert response.status_code == 200, response.text
     assert "called_at" not in response.json()
     assert "called_at" not in await flow.reload(match)
+    # „Defekt“ dagegen behält Spiel und Aufruf, bis umgelegt wird (#1162) - wie in der Turnierleitung.
+    assert (await flow.post(f"/api/stations/{station['id']}/assign/{match['id']}")).status_code == 200
+    response = await flow.put(f"/api/stations/{station['id']}", json={"status": "broken"})
+    assert response.status_code == 200, response.text
+    assert response.json()["called_at"] and (await flow.reload(match))["called_at"]
+    assert response.json()["current_match_id"] == match["id"]
+    # Zurück auf frei geht nicht still: die Station passt sich dem gehaltenen Aufruf an.
+    response = await flow.put(f"/api/stations/{station['id']}", json={"status": "free"})
+    assert response.json()["status"] == "reserved" and "broken_at" not in response.json()
+    assert (await flow.reload(match))["called_at"]
+    assert (await flow.post(f"/api/stations/{station['id']}/clear")).status_code == 200
 
     # Über die Matchplanung gestartet: auch dann ist der Aufruf vorbei.
     other = await station_for(flow, tournament, "PC 4")
