@@ -106,6 +106,10 @@ test("Admin mit Helfer-Einsatz: die Einsätze stehen oben", async () => {
   await renderAs({ id: "r", role: "player", areas: ["content"], has_staff_assignment: true, ...mfa });
   expect(await screen.findByTestId("dashboard-duty")).toHaveTextContent("Helfer-Cup");
   expect(screen.getByTestId("duty-open-t-9")).toHaveAttribute("href", "/tournaments/helfer-cup/leitung");
+  // Leitstand (E.4): Die Startseite fragt „Mein Dienst“ ohne die Leitstände ab - die rechnet nur die Seite „Mein Dienst“.
+  const duty = apiMock.get.mock.calls.filter(([url]) => url === "/users/me/duty");
+  expect(duty.length).toBeGreaterThan(0);
+  for (const call of duty) expect(call[1]?.params?.desks).toBeUndefined();
 });
 
 // Nach Codex-Prüfung (#1353): der Server schickt dem Kassier nur die Finanz-Blöcke - die Seite zeigt dann auch nur die,

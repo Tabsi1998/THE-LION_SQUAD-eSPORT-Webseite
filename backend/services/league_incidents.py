@@ -711,14 +711,17 @@ async def page_block(db, setup, *, viewer, can_lead: bool, conflict: dict | None
 
 # ---------------------------------------------------------------- Mein Dienst
 
-async def review_rows(db, user: dict, limit: int = 50) -> list[dict]:
+async def review_rows(db, user: dict, limit: int = 50, *, season_id: str | None = None, include_involved: bool = False) -> list[dict]:
     """Mein Dienst: Spiele, in denen eine Map in Klärung ist oder die Serie noch festgestellt werden muss - für die Liga-Leitung mit
-    „Ergebnisse“ oder „Proteste“, ohne die Spiele, an denen sie selbst beteiligt ist."""
+    „Ergebnisse“ oder „Proteste“, ohne die Spiele, an denen sie selbst beteiligt ist. Der Leitstand (E.4) fragt je Season
+    (``season_id``) und zeigt auch die eigenen Spiele, markiert mit ``conflict`` (``include_involved``)."""
     from services.league_permissions import can, involved_match_ids, staffel_access
 
     query = (await staffel_access(db, user)).query()
     if query is None:
         return []
+    if season_id:
+        query = {**query, "league_context.season_id": season_id}
     staffeln = await db.tournaments.find({**query, "status": {"$in": ["live", "paused"]}},
                                          {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
     allowed = {}
@@ -740,7 +743,7 @@ async def review_rows(db, user: dict, limit: int = 50) -> list[dict]:
         for match in own:
             # Was die Leitung tun kann - nicht, was das Ergebnis als Erstes aufhält (ein wartender Vorschlag verdeckt nichts).
             hold = lead_task(match)
-            if match["id"] in involved or not hold:
+            if not hold or (match["id"] in involved and not include_involved):
                 continue
             since = [row.get("at") for row in incidents_of(match) if state_of(row) in (IN_REVIEW, DECIDED) and row.get("at")]
             rows.append({
@@ -748,7 +751,7 @@ async def review_rows(db, user: dict, limit: int = 50) -> list[dict]:
                 "label": match.get("matchday_label") or match.get("round_name") or (
                     f"Spieltag {match.get('matchday_number') or match.get('round')}" if match.get("matchday_number") or match.get("round") else "Spiel"),
                 "code": hold["code"], "position": hold["position"], "since": min(since) if since else None,
-                "url": f"/matches/{match['id']}#vorfaelle",
+                "url": f"/matches/{match['id']}#vorfaelle", **({"conflict": match["id"] in involved} if include_involved else {}),
             })
     rows.sort(key=lambda row: str(row.get("since") or ""))
     return rows[:limit]

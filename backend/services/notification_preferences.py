@@ -174,6 +174,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "tournament_finished": "tournament_updates",
     # Absage (#2120): „Turnier abgesagt“ an alle, die noch mitspielen wollten.
     "tournament_cancelled": "tournament_updates",
+    # Rundnachricht der Liga-Leitung (E.4, Nr. 153): an Captains und Vertreter oder alle Spieler einer Season, Liga N oder Staffel.
+    "league_broadcast": "tournament_updates",
     # Helfer-Einsatz (#2111, TA25): „Du hilfst bei diesem Turnier als …“.
     "tournament_staff": "tournament_updates",
     "match_chat_message": "community_messages",
