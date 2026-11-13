@@ -6,6 +6,9 @@ import { resolveMediaUrl } from "@/lib/api";
 import { formatMatchStatus, stationText } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
+import { clockText, elapsedSeconds } from "@/lib/matchClock";
+import { serverNow } from "@/seasons/clock";
+import { useSeason } from "@/seasons/SeasonContext";
 import { MOTION, motionAllowed } from "@/lib/motion";
 import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
@@ -67,8 +70,12 @@ function isByeSlot(slot) {
   return ["bye", "walkover"].includes(String(slot?.status || "").toLowerCase()) || String(slot?.source?.type || "") === "bye";
 }
 
-/** Spielzeit seit dem Start, jede Sekunde neu - nur diese Zahl rendert neu, nicht der Baum. */
+/**
+ * Spielzeit seit dem Start, jede Sekunde neu - nur diese Zahl rendert neu, nicht der Baum. Dieselbe Rechnung wie an
+ * Station, Leitung und TV (#1167, lib/matchClock): nach der Serverzeit, ab einer Stunde mit Stunden („1:05:12“).
+ */
 export function LiveClock({ startedAt }) {
+  const { serverOffset } = useSeason();
   const start = startedAt ? asInstant(startedAt).getTime() : NaN;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -77,9 +84,7 @@ export function LiveClock({ startedAt }) {
     return () => clearInterval(timer);
   }, [start]);
   if (Number.isNaN(start)) return null;
-  const seconds = Math.max(0, Math.floor((now - start) / 1000));
-  const minutes = Math.floor(seconds / 60);
-  const text = `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const text = clockText(elapsedSeconds(start, serverNow(serverOffset, now)));
   return <span className="font-display tabular-nums" data-testid="bracket-live-clock">{text}</span>;
 }
 
