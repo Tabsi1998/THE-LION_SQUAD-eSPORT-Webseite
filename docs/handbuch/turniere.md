@@ -575,15 +575,17 @@ Ort. Die Turnierleitung öffnet sich dort von selbst (nur im Check-in ohne offen
 Link auf einen Fall öffnet den Fall). Die übrigen Reiter bleiben, `?reiter=cockpit` führt direkt hin.
 
 - **Probleme** (oben, am Tablet quer links): dringendstes zuerst – **Einspruch**, **Nicht erschienen**, **Defekt**
-  (eine defekte Station, auf die noch ein Spiel wartet), **Ergebnis fehlt** (auch „Meldungen weichen ab“), **Verzug**
+  (eine defekte Station, auf die noch ein Spiel wartet), **Ergebnis fehlt**, **Meldungen weichen ab**, **Verzug**
   (das nächste Spiel einer Station beginnt 5 Minuten oder mehr nach Plan, dieselbe Schwelle wie am TV) und
-  **Auslosung**. Innerhalb einer Art steht oben, was am längsten drüber ist. Ein Tipp auf die Zeile öffnet den Fall in
-  **Braucht Aufmerksamkeit** mit seinen Knöpfen; **Verzug** springt zur Station im Cockpit, die kurz aufleuchtet.
+  **Auslosung** – dieselbe Reihenfolge wie unter **Braucht Aufmerksamkeit**. Innerhalb einer Art steht oben, was am
+  längsten drüber ist. Hat ein Spiel schon einen Fall, steht es nicht zusätzlich als Verzug da. Ein Tipp auf die Zeile
+  öffnet den Fall in **Braucht Aufmerksamkeit** mit seinen Knöpfen (auch ein zweites Mal); **Verzug** springt zur
+  Station im Cockpit, die kurz aufleuchtet.
 - **Stationen** (darunter, am Tablet quer rechts): dieselben Kacheln wie im Reiter **Stationen** – was läuft, mit der
   Spielzeit-Uhr, und **Als Nächstes**. **Aufrufen**, **Starten**, **Freigeben** (mit Rückfrage) und **Defekt** gehen mit
   einem Tipp, mit denselben Rechten und Rückfragen wie dort.
-- Die Seite lädt bei jeder Änderung nach und fragt zusätzlich alle 20 Sekunden – „Ergebnis fehlt“ und Verzug entstehen
-  mit der Zeit. Neue Probleme blenden nacheinander ein, erledigte gleiten hinaus; die Liste baut sich nicht neu auf. Mit
+- Die Seite lädt bei jeder Änderung nach und fragt, solange das Cockpit offen ist, zusätzlich alle 20 Sekunden –
+  „Ergebnis fehlt“ und Verzug entstehen mit der Zeit. Neue Probleme blenden nacheinander ein, erledigte gleiten hinaus; die Liste baut sich nicht neu auf. Mit
   „Bewegung reduzieren“ im Gerät springen die Zustände.
 - Handy, Tablet hochkant und Tablet quer sind gleichwertig, jede Tippfläche ist mindestens 44 px hoch.
 
