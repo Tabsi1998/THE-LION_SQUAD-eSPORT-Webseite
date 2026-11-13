@@ -4,7 +4,7 @@ import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { divisionPlatformPayload, divisionPlatformToForm, platformPayload, platformToForm } from "@/lib/leaguePlatform";
-import { byMaps, tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
+import { LEAGUE_TABLE_DEFAULTS, byMaps, hasTableRules, tableRulesPayload, tableRulesToForm } from "@/lib/leagueTable";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
@@ -51,7 +51,9 @@ export function weekdayName(value) {
 /** Eine Season als Formular - Zahlen als Text, der Beginn als Wiener Kalendertag. */
 export function seasonToForm(season = {}) {
   const rules = season.scoring_rules || {};
-  const points = rules.match_points || { win: 3, draw: 1, loss: 0 };
+  // Ohne gesetzte Regeln die Vorgabe des Servers (#2406: 3/0/0, kein Remis); gesetzte Regeln bleiben, wie sie sind.
+  const fresh = !hasTableRules(season.scoring_rules);
+  const points = rules.match_points || (fresh ? LEAGUE_TABLE_DEFAULTS.match_points : { win: 3, draw: 1, loss: 0 });
   return {
     name: season.name || "",
     start_day: season.start_date ? viennaDay(season.start_date) : "",
@@ -82,7 +84,7 @@ export function seasonToForm(season = {}) {
     points_draw: String(points.draw ?? 1),
     points_loss: String(points.loss ?? 0),
     // Tabelle (E.1, #1625): Gleichstand, Mini-Tabelle, Remis, Default-Win, Ausscheiden.
-    ...tableRulesToForm(rules),
+    ...tableRulesToForm(fresh ? LEAGUE_TABLE_DEFAULTS : rules),
     game_mode_order: season.game_mode_order || [],
     map_repeat: season.map_repeat || "other_mode",
     result_confirm_hours: String(season.result_confirm_hours ?? 48),
