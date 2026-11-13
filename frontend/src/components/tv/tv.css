@@ -624,7 +624,10 @@
   font-variant-numeric: tabular-nums;
 }
 .tv-spot__sep { color: var(--tv-faint); }
-.tv-spot__clock { color: var(--tv-live); }
+.tv-spot__clock { color: var(--tv-live); transition: color var(--tls-motion-mid) var(--tls-ease); }
+/* Spielzeit-Uhr (#1167): mit Dauer „/ 20 Min.“ klein daneben; ab 80 % Orange (`warn`), die Farbe gleitet. */
+.tv-spot__limit { color: var(--tv-muted); font-weight: 600; }
+.tv-spot[data-tone="warn"] .tv-spot__clock { color: var(--tls-warn); }
 
 /* Goldener Weg (#1119), Fahrten (#1117): auf der Bühne über dem Baum. */
 .tv-tree-overlay { position: absolute; left: 0; top: 0; z-index: 2; overflow: visible; pointer-events: none; }
@@ -1156,10 +1159,12 @@
 .tv-lanes__time { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-weight: 800; font-variant-numeric: tabular-nums; }
 .tv-lanes__limit { color: var(--tv-muted); }
 .tv-lanes__over { font-weight: 700; color: var(--tv-live); }
+/* Spielzeit-Uhr (#1167): Farbe von Zeit und Balken gleitet beim Wechsel zu Orange (80 %) und `live` (100 %). */
+.tv-lanes__time { transition: color var(--tls-motion-mid) var(--tls-ease); }
 .tv-lanes__clock[data-tone="warn"] .tv-lanes__time { color: var(--tls-warn); }
 .tv-lanes__clock[data-tone="over"] .tv-lanes__time { color: var(--tv-live); }
 .tv-lanes__track { flex-basis: 100%; height: max(3px, calc(var(--tv-u) * 0.4)); border-radius: 999px; background: var(--tv-line); overflow: hidden; }
-.tv-lanes__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear; }
+.tv-lanes__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear, background-color var(--tls-motion-mid) var(--tls-ease); }
 .tv-lanes__clock[data-tone="warn"] .tv-lanes__track i { background: var(--tls-warn); }
 .tv-lanes__clock[data-tone="over"] .tv-lanes__track i { background: var(--tv-live); }
 

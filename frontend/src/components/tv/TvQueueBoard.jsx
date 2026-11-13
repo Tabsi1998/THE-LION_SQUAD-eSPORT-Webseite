@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { asInstant } from "@/lib/vienna";
-import { matchClock, queueSummaryLine } from "@/lib/liveQueue";
+import { queueSummaryLine } from "@/lib/liveQueue";
+import { clockLabel, matchClock } from "@/lib/matchClock";
+import { serverNow } from "@/seasons/clock";
+import { useSeason } from "@/seasons/SeasonContext";
 import { countdown } from "@/lib/tvCalls";
 import { laneSignature, queueLanes, queueNextLine, queueWhat, queueWho } from "@/lib/tvQueue";
 import { MOTION } from "@/lib/motion";
@@ -8,8 +11,8 @@ import { useTv } from "./TvScreen";
 import { useSecondTick } from "./TvTreeNode";
 
 // Live-Warteschlange je Station am Turnierbaum-TV (#1634): die Folie „Aufrufe“ zeigt, sobald das Turnier vor Ort eine
-// Warteschlange hat, jede Station als Bahn - „Jetzt“ mit Spiel, Namen und Spielzeit-Uhr (wie lib/liveQueue.matchClock,
-// gelb ab 80 %, rot ab 100 %), daneben „Als Nächstes“: aufgerufen mit Frist und Countdown oder geplant mit Prognose und
+// Warteschlange hat, jede Station als Bahn - „Jetzt“ mit Spiel, Namen und Spielzeit-Uhr (lib/matchClock, nach der
+// Serverzeit, Orange ab 80 %, `live` ab 100 %), daneben „Als Nächstes“: aufgerufen mit Frist und Countdown oder geplant mit Prognose und
 // Verzug. Die Aufrufe stecken darin (das nächste Spiel einer Station, gold). Wechselt etwas an einer Station, gleitet der
 // alte Inhalt nach oben weg und der neue von unten herein - Station für Station versetzt, nur Verschieben und Deckkraft.
 // „Bewegung reduzieren“: sofort der neue Stand, kein Gleiten. Ab drei Stationen in zwei Spalten, mehr als sechs blättern
@@ -56,14 +59,18 @@ function useSwap(key, value, motionOn) {
   return leaving;
 }
 
-/** Spielzeit: „12:34“ groß, „/ 12 Min.“ klein, darunter der Balken (nur Skalieren). Ohne Startzeit „läuft“. */
+/**
+ * Spielzeit: „12:34“ groß, „/ 12 Min.“ klein, darunter der Balken (nur Skalieren). Ohne Startzeit „läuft“. Gezählt nach
+ * der Serverzeit (#1167) - der TV zeigt dieselbe Sekunde wie Handy und Leitung, auch wenn seine Uhr danebenliegt.
+ */
 export function TvQueueClock({ entry, testId }) {
   const { motionOn } = useTv();
+  const { serverOffset } = useSeason();
   const second = useSecondTick();
-  const info = matchClock(entry?.started_at, entry?.duration_minutes, second * 1000, { stepped: !motionOn });
+  const info = matchClock(entry?.started_at, entry?.duration_minutes, serverNow(serverOffset, second * 1000), { stepped: !motionOn });
   if (!info) return <span className="tv-lanes__clock tv-t-info" data-testid={testId} data-tone="none">läuft</span>;
   return (
-    <span className="tv-lanes__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={info.limit ? `Spielzeit ${info.text} von ${info.limit}` : `Spielzeit ${info.text}`}>
+    <span className="tv-lanes__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={clockLabel(info)}>
       <span className="tv-lanes__time font-display">{info.text}</span>
       {info.limit ? <span className="tv-lanes__limit tv-t-meta">/ {info.limit}</span> : null}
       {info.tone === "over" && info.overMinutes ? <span className="tv-lanes__over tv-t-meta">+{info.overMinutes} Min.</span> : null}

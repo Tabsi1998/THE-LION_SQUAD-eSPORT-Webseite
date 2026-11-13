@@ -1,19 +1,20 @@
-// Live-Spotlight (#1116): Spielzeit aus der Startzeit (fehlende Zeit, über Mitternacht, nach dem Neuladen), was neu
+// Live-Spotlight (#1116): Spielzeit aus der Startzeit (gemeinsame Uhr lib/matchClock, #1167: „mm:ss“ wie überall) (fehlende Zeit, über Mitternacht, nach dem Neuladen), was neu
 // gestartet oder entschieden ist, und die Zoom-Entscheidung bei mehreren Starts.
-import { bracketChanges, bracketSnapshot, clockText, elapsedSeconds, liveZoomPlan, matchName, spotlightParts, stationName } from "./tvLive";
+import { clockText, elapsedSeconds } from "./matchClock";
+import { bracketChanges, bracketSnapshot, liveZoomPlan, matchName, spotlightParts, stationName } from "./tvLive";
 import { decide, find, singleElimination, start } from "../../e2e/fixtures/tvBrackets.mjs";
 
 test("Spielzeit aus der Startzeit - sekundengenau, über Mitternacht, nach dem Neuladen gleich", () => {
   const started = "2026-10-10T23:58:30+02:00";
   const now = Date.parse("2026-10-11T00:03:04+02:00");
   expect(elapsedSeconds(started, now)).toBe(274);
-  expect(clockText(elapsedSeconds(started, now))).toBe("4:34");
+  expect(clockText(elapsedSeconds(started, now))).toBe("04:34");
   // Nach dem Neuladen zählt dieselbe Startzeit - keine Uhr, die bei 0 anfängt.
-  expect(clockText(elapsedSeconds(started, now + 60_000))).toBe("5:34");
+  expect(clockText(elapsedSeconds(started, now + 60_000))).toBe("05:34");
   expect(clockText(754)).toBe("12:34");
   expect(clockText(3723)).toBe("1:02:03");
-  expect(clockText(0)).toBe("0:00");
-  // Fehlende oder kaputte Startzeit: keine Zeit. Geht die Uhr am TV nach, steht 0:00 statt einer negativen Zeit.
+  expect(clockText(0)).toBe("00:00");
+  // Fehlende oder kaputte Startzeit: keine Zeit. Geht die Uhr am TV nach, steht 00:00 statt einer negativen Zeit.
   expect(elapsedSeconds(null, now)).toBeNull();
   expect(elapsedSeconds("kein Datum", now)).toBeNull();
   expect(elapsedSeconds("2026-10-11T00:05:00+02:00", now)).toBe(0);
@@ -24,7 +25,9 @@ test("Spotlight: „PC 3 · 12:34“ - ohne Startzeit nur „Live“", () => {
   const now = Date.parse("2026-10-10T14:32:34+02:00");
   const bracket = singleElimination(8);
   start(bracket, "A", { station: "PC 3", startedAt: "2026-10-10T14:20:00+02:00" });
-  expect(spotlightParts(find(bracket, "A"), now)).toEqual({ station: "PC 3", clock: "12:34", text: "PC 3 · 12:34" });
+  expect(spotlightParts(find(bracket, "A"), now)).toMatchObject({ station: "PC 3", clock: "12:34", text: "PC 3 · 12:34", limit: "30 Min.", tone: "run", status: "" });
+  // Mit Dauer dieselbe Farbe wie an Station und Liste (#1167): 12:34 von 15 Min. ist knapp.
+  expect(spotlightParts({ ...find(bracket, "A"), duration_minutes: 15 }, now)).toMatchObject({ limit: "15 Min.", tone: "warn", status: "knapp", label: "Spielzeit 12:34 von 15 Min., knapp" });
   start(bracket, "B", { station: null, startedAt: null });
   expect(spotlightParts(find(bracket, "B"), now).text).toBe("Live");
   expect(stationName({ station_name: "3" })).toBe("Station 3");

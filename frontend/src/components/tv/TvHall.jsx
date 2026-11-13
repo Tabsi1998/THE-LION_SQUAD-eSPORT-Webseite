@@ -4,6 +4,8 @@ import { countdown } from "@/lib/tvCalls";
 import { clockText, packLane } from "@/lib/tvDayPlan";
 import { STATION_STATES, pageOf, stationCounts, stationGrid } from "@/lib/tvStationGrid";
 import { spotlightParts } from "@/lib/tvLive";
+import { serverNow } from "@/seasons/clock";
+import { useSeason } from "@/seasons/SeasonContext";
 import { useTv, useTvArea } from "./TvScreen";
 import { useSecondTick } from "./TvTreeNode";
 
@@ -86,9 +88,10 @@ function stationLine(entry) {
   return [entry.detail.kind, entry.detail.key].filter(Boolean).join(" · ");
 }
 
-function StationCell({ entry, now }) {
+// Die Spielzeit zählt nach der Serverzeit (#1167, `clockNow`) - dieselbe Sekunde wie an Station und Leitung.
+function StationCell({ entry, now, clockNow = now }) {
   const state = STATION_STATES[entry.state];
-  const live = entry.state === "busy" && entry.detail?.match ? spotlightParts(entry.detail.match, now).clock : "";
+  const live = entry.state === "busy" && entry.detail?.match ? spotlightParts(entry.detail.match, clockNow).clock : "";
   const left = entry.state === "called" && entry.call ? countdown(entry.call.dueAt, now) : null;
   const names = entry.detail?.participants || "";
   return (
@@ -127,6 +130,7 @@ const LEVELS = [
  */
 export function TvStationBoard({ entries = [] }) {
   const { motionOn } = useTv();
+  const { serverOffset } = useSeason();
   const second = useSecondTick();
   const [gridRef, area, trim] = useTvArea(`${entries.length}`);
   const layout = useMemo(() => {
@@ -162,7 +166,7 @@ export function TvStationBoard({ entries = [] }) {
         data-testid="tv-station-list"
         key={motionOn ? `page-${page}` : undefined}
       >
-        {shown.map((entry) => <StationCell key={entry.station.id} entry={entry} now={second * 1000} />)}
+        {shown.map((entry) => <StationCell key={entry.station.id} entry={entry} now={second * 1000} clockNow={serverNow(serverOffset, second * 1000)} />)}
         {!entries.length ? <div className="tv-empty tv-t-info">Keine Stationen für dieses Event</div> : null}
       </div>
     </section>
