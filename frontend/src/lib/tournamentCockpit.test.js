@@ -85,3 +85,16 @@ test("ohne Daten: leere Liste; die Zahl in Worten", () => {
   expect(problemCountText(1)).toBe("1 Problem");
   expect(problemCountText(4)).toBe("4 Probleme");
 });
+
+test("ein Spiel nur einmal: hat es einen Fall, entfällt sein Verzug (Review N5)", () => {
+  const queue = { stations: [
+    station("pc4", { match_id: "m7", label: "Halbfinale", names: ["Frostbiss", "Jo"], state: "called", delay_minutes: 12 }),
+    station("pc5", { match_id: "m8", label: "Finale", names: ["NeonFalke", "Kometa"], state: "queued", delay_minutes: 20 }),
+    station("pc7", { match_id: "m9", label: "Spiel um Platz 3", names: ["G", "H"], state: "queued", delay_minutes: 8 }),
+  ] };
+  const attention = [
+    { id: "ns-m7", kind: "no_show", title: "Nicht erschienen?", match_id: "m7", station_text: "PC4 · PC" },
+    { id: "st-x", kind: "station_broken", title: "Station defekt", station_id: "x", match_ids: ["m8"] },
+  ];
+  expect(cockpitProblems({ attention, queue }).map((row) => row.id)).toEqual(["ns-m7", "st-x", "dl-pc7"]);
+});

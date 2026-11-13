@@ -104,6 +104,7 @@ export function delayProblems(queue) {
       minutes,
       since: next.planned_at || "",
       stationId: station.id,
+      matchId: next.match_id || "",
     }];
   });
 }
@@ -119,10 +120,14 @@ export function sortProblems(rows) {
  * Jede Zeile trägt `search` - die Adresse, zu der ein Tipp führt.
  */
 export function cockpitProblems({ attention = [], draws = [], queue = null } = {}) {
+  const cases = (attention || []).filter((item) => item?.id);
+  // Ein Spiel nur einmal (Review N5): Hat es schon einen Fall (etwa „Nicht erschienen?“ oder „Station defekt“), zeigt
+  // das Cockpit dafür keinen Verzug mehr - der Fall ist das, was zu tun ist.
+  const withCase = new Set(cases.flatMap((item) => [item.match_id, ...(item.match_ids || [])]).filter(Boolean));
   const rows = [
-    ...(attention || []).filter((item) => item?.id).map(fromAttention),
+    ...cases.map(fromAttention),
     ...(draws || []).filter((card) => card?.id).map(fromDraw),
-    ...delayProblems(queue),
+    ...delayProblems(queue).filter((row) => !withCase.has(row.matchId)),
   ];
   return sortProblems(rows).map((row) => ({ ...row, search: problemSearch(row) }));
 }
