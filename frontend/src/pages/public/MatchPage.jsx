@@ -301,7 +301,7 @@ function MatchPageView() {
     const block = data?.schedule_block;
     const week = block?.window || null;
     // Die 72-h-Regel nur nennen, wenn sie in der Staffel an ist.
-    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week), homeRule: block?.rules?.home_rule !== false, offered });
+    return proposalTimeHints(values.map(fromLocalInput), { window: week, weekLabel: weekText(week), homeRule: block?.rules?.home_rule !== false, homeRuleHours: block?.rules?.home_rule_hours, offered });
   };
 
   const changeProposalTimes = (next) => {
