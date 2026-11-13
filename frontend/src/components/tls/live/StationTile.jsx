@@ -35,10 +35,13 @@ const TONES = {
   called: ["Aufgerufen", "border-brand/50 bg-brand/10 text-brand"],
   broken: ["Defekt", "border-warn/50 bg-warn/10 text-warn"],
   free: ["Frei", "border-ok/40 bg-ok/10 text-ok"],
+  // Geteilte Event-Station (#1162): hier spielt gerade ein anderes Turnier - dessen Leitung bedient sie.
+  other: ["Anderes Turnier", "border-white/25 bg-white/5 text-white/70"],
 };
 
 export function stationTone(station) {
   if (station?.status === "broken") return "broken";
+  if (station?.hold_issue?.kind === "other") return "other";
   if (station?.running) return "running";
   if (station?.next?.state === "called") return "called";
   return "free";
@@ -76,6 +79,12 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
         </span>
       </header>
 
+      {station.hold_issue?.kind === "other" ? (
+        <p className="tls-live-reveal mt-2 rounded-sm border border-white/15 bg-white/[0.03] px-2.5 py-2 text-xs text-white/70 [overflow-wrap:anywhere]" role="status" data-testid={`live-other-hint-${station.id}`}>
+          Hier spielt gerade „{station.hold_issue.tournament_title}“ – dessen Leitung ruft auf, startet und gibt frei.
+        </p>
+      ) : null}
+
       {broken && holds ? (
         <p className="tls-live-reveal mt-2 rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2 text-xs text-warn" role="status" data-testid={`live-broken-hint-${station.id}`}>
           {running ? "Das laufende Spiel steht noch hier – mit „Umlegen“ auf eine freie Station, Uhr und Startzeit bleiben." : "Der Aufruf steht noch hier – mit „Umlegen“ an einer freien Station neu aufrufen."}
@@ -99,7 +108,7 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
             {next.state === "called" ? <BellRing className="tls-live-bell mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
             <span className="min-w-0 [overflow-wrap:anywhere]">{next.state === "called" ? calledLine(next) : when(next)}</span>
           </div>
-          <NextAction station={station} next={next} running={running} broken={broken} busy={busy} canOperate={canOperate} onCall={onCall} onStart={onStart} />
+          <NextAction station={station} next={next} running={running} broken={broken} blocked={tone === "other"} busy={busy} canOperate={canOperate} onCall={onCall} onStart={onStart} />
         </div>
       ) : (
         !running ? <p className="mt-3 text-sm text-white/45">{broken ? "Station ist defekt – nichts wird hierher geplant." : "Nichts mehr in der Warteschlange."}</p> : null
@@ -125,11 +134,17 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
               </button>
             ) : <span />}
             {onBroken ? (
-              <button type="button" disabled={busy} onClick={() => onBroken(station, !broken)} aria-label={broken ? "Station wieder bereit" : "Station defekt melden"} className={`${BTN} border ${broken ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"} transition-colors disabled:opacity-40`} data-testid={`live-broken-${station.id}`}>
+              <button type="button" disabled={busy} onClick={() => (tone === "other" ? toggle("broken-other") : onBroken(station, !broken))} aria-label={broken ? "Station wieder bereit" : "Station defekt melden"} className={`${BTN} border ${broken ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"} transition-colors disabled:opacity-40`} data-testid={`live-broken-${station.id}`}>
                 {broken ? <RotateCcw className="h-4 w-4 shrink-0" aria-hidden="true" /> : <Wrench className="h-4 w-4 shrink-0" aria-hidden="true" />} {broken ? "Bereit" : "Defekt"}
               </button>
             ) : <span />}
           </div>
+
+          {panel === "broken-other" && tone === "other" ? (
+            <ConfirmPanel testId={`live-broken-confirm-${station.id}`} yesTestId={`live-broken-yes-${station.id}`} busy={busy} yes="Defekt melden"
+              text={`An dieser Station spielt gerade „${station.hold_issue.tournament_title}“. Trotzdem als defekt melden? Dessen Leitung bekommt Bescheid und legt das Spiel um.`}
+              onNo={() => setPanel("")} onYes={() => { setPanel(""); onBroken(station, true, { confirm_other: true }); }} />
+          ) : null}
 
           {panel === "release" && running ? (
             <div className="tls-live-reveal mt-3 rounded-sm border border-white/10 bg-white/[0.03] p-2.5" data-testid={`live-release-confirm-${station.id}`}>
@@ -161,7 +176,20 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
   );
 }
 
-function NextAction({ station, next, running, broken, busy, canOperate, onCall, onStart }) {
+// Rückfrage in der Kachel - kein Dialog über der Seite, die Station bleibt im Blick.
+function ConfirmPanel({ text, yes, busy, onYes, onNo, testId, yesTestId }) {
+  return (
+    <div className="tls-live-reveal mt-3 rounded-sm border border-white/10 bg-white/[0.03] p-2.5" data-testid={testId}>
+      <p className="text-xs text-white/70 [overflow-wrap:anywhere]">{text}</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button type="button" className={`tls-btn tls-btn--secondary ${BTN}`} onClick={onNo}>Abbrechen</button>
+        <button type="button" disabled={busy} className={`tls-btn tls-btn--primary ${BTN}`} onClick={onYes} data-testid={yesTestId}>{yes}</button>
+      </div>
+    </div>
+  );
+}
+
+function NextAction({ station, next, running, broken, blocked, busy, canOperate, onCall, onStart }) {
   if (!next.ready) {
     // Worauf es wartet, sagt der Server (#1858): das Los je Runde (Show-Auslosung) oder ein offenes Vorspiel.
     const waiting = next.waiting_for === "draw" ? "wartet auf die Auslosung" : "wartet auf die Vorspiele";
@@ -175,7 +203,7 @@ function NextAction({ station, next, running, broken, busy, canOperate, onCall, 
       </button>
     ) : null;
   }
-  if (running) return <p className="mt-2 text-xs text-white/45">Aufrufen nach dem laufenden Spiel.</p>;
+  if (running || blocked) return <p className="mt-2 text-xs text-white/45">{blocked ? "Aufrufen, sobald die Station frei ist." : "Aufrufen nach dem laufenden Spiel."}</p>;
   if (broken || !canOperate) return null;
   return (
     <button type="button" disabled={busy} onClick={() => onCall(station, next)} className={`tls-btn tls-btn--secondary mt-2.5 ${BTN} px-4`} data-testid={`live-call-${station.id}`}>

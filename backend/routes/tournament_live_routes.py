@@ -102,6 +102,9 @@ async def live_queue(
     view, _keys = await load_live_queue(db, tournament)
     if user and not key:
         view["operate"] = await _operate(user, tournament_id, view["stations"])
+        if view["operate"]:
+            # Nur für die Leitung (#1162): was eine Station hält, das nicht in diese Warteschlange passt.
+            await _attach_hold_issues(db, tournament_id, view["stations"])
     return view
 
 
@@ -279,6 +282,65 @@ HOLDS_OTHER_DETAIL = "Die Station hält inzwischen ein anderes Spiel. Bitte neu 
 TARGET_TAKEN_DETAIL = "Die Zielstation ist inzwischen belegt. Bitte neu laden."
 
 
+async def _hold_issue(db, station: dict, tournament_id: str) -> dict | None:
+    """Was eine Station hält, das nicht in die Warteschlange dieses Turniers passt (#1162):
+
+    - ``other``: ein offenes Spiel eines anderen Turniers - eine geteilte Station des Events. Freigeben und Räumen macht
+      dessen Leitung; „Defekt“ geht trotzdem (physisch stimmt es), mit Rückfrage und Bescheid an dessen Leitung.
+    - ``stuck``: als belegt oder reserviert gespeichert, aber ohne offenes Spiel an genau dieser Station - etwa nach dem
+      Löschen einer Phase. „Station räumen“ macht sie wieder frei.
+    """
+    held = station.get("current_match_id")
+    if not held:
+        return {"kind": "stuck", "match_id": None} if station.get("status") in {"busy", "reserved"} else None
+    match = await db.matches_v2.find_one({"id": held}, {"_id": 0})
+    open_match = bool(match) and str(match.get("status") or "") not in DONE_STATUSES
+    if open_match and match.get("tournament_id") != tournament_id:
+        other = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "id": 1, "title": 1, "slug": 1}) or {}
+        return {"kind": "other", "match": match, "tournament": {"id": match["tournament_id"], **other},
+                "tournament_title": other.get("title") or "ein anderes Turnier"}
+    if not open_match or match.get("station_id") != station.get("id"):
+        return {"kind": "stuck", "match_id": held}
+    return None
+
+
+async def _attach_hold_issues(db, tournament_id: str, rows: list[dict]) -> None:
+    ids = [row["id"] for row in rows if row.get("id")]
+    docs = {doc["id"]: doc for doc in await db.stations.find({"id": {"$in": ids}}, {"_id": 0}).to_list(len(ids) + 1)}
+    for row in rows:
+        issue = await _hold_issue(db, docs.get(row["id"]) or {}, tournament_id)
+        row["hold_issue"] = {"kind": issue["kind"], "tournament_title": issue.get("tournament_title")} if issue else None
+
+
+def _other_text(issue: dict) -> str:
+    return f"An dieser Station spielt gerade „{issue['tournament_title']}“ – dessen Leitung gibt frei."
+
+
+async def _tell_other_lead(db, issue: dict, station: dict, tournament: dict, actor_id: str, broken_at: str) -> int:
+    """Eine geteilte Station ist defekt, an der gerade ein anderes Turnier spielt: dessen Leitung (wer dort Ergebnisse
+    einträgt) bekommt sofort Bescheid - mit demselben Schlüssel wie der Fall „Station defekt“ (keine zweite Nachricht)."""
+    from services.tournament_permissions import result_staff_user_ids
+    from services.user_notifications import create_user_notification
+
+    other = issue["tournament"]
+    where = _station_name(station)
+    state = _held_state(issue["match"])
+    what = "das laufende Spiel" if state == "running" else "der Aufruf" if state == "called" else "ein Spiel"
+    body = (f"{issue['tournament_title']}: {where} wurde von der Leitung von „{tournament.get('title') or 'Turnier'}“ als "
+            f"defekt gemeldet – {what} steht noch dort. Bitte umlegen.")
+    sent = 0
+    for user_id in sorted(await result_staff_user_ids(db, issue["match"]) - {actor_id}):
+        if await create_user_notification(
+            user_id, f"Station defekt: {where}", body,
+            url=f"/tournaments/{other.get('slug') or other['id']}/leitung?reiter=stationen", kind="match_attention",
+            meta={"category": "tournament_updates", "tournament_id": other["id"], "match_id": issue["match"].get("id"),
+                  "station_id": station["id"], "reason": "station_broken",
+                  "dedupe_key": f"attention:st-{station['id']}:{broken_at}"},
+        ):
+            sent += 1
+    return sent
+
+
 class StationRelease(QueueAction):
     """Freigeben: die Station gibt das Spiel ab, das die Leitung gesehen hat (``match_id``)."""
 
@@ -290,6 +352,8 @@ class StationBroken(BaseModel):
 
     station_id: str = Field(min_length=1, max_length=120)
     broken: bool = True
+    # Geteilte Station, an der gerade ein anderes Turnier spielt (#1162): erst nach Rückfrage.
+    confirm_other: bool = False
 
 
 class StationMove(QueueAction):
@@ -321,13 +385,18 @@ async def release_station_live(tid: str, body: StationRelease, me: dict = Depend
     db, tournament, _station = await _station_context(tid, body.station_id, me)
     tournament_id = tournament["id"]
     async with _tournament_lock(db, tournament_id):
-        station, match = await _fresh(db, body.station_id, body.match_id)
+        station = await db.stations.find_one({"id": body.station_id}, {"_id": 0}) or {}
         held = station.get("current_match_id")
         if not held:
             # Doppeltipp oder eine zweite Leitung war schneller: schon frei.
             return {"ok": True, "idempotent_replay": True, "state": None}
+        issue = await _hold_issue(db, station, tournament_id)
+        if issue and issue["kind"] == "other":
+            # Geteilte Event-Station (#1162): das Spiel eines anderen Turniers gibt nur dessen Leitung frei.
+            raise HTTPException(status_code=409, detail=_other_text(issue))
         if held != body.match_id:
             raise HTTPException(status_code=409, detail=HOLDS_OTHER_DETAIL)
+        match = await db.matches_v2.find_one({"id": body.match_id, "tournament_id": tournament_id}, {"_id": 0})
         state = _held_state(match)
         now_iso = now_utc().isoformat()
         station_set = {"current_match_id": None, "current_match_type": None, "updated_at": now_iso,
@@ -341,7 +410,7 @@ async def release_station_live(tid: str, body: StationRelease, me: dict = Depend
         if not freed.matched_count:
             raise HTTPException(status_code=409, detail=HOLDS_OTHER_DETAIL)
         before = await db.matches_v2.find_one_and_update(
-            {"id": body.match_id, "station_id": station["id"]},
+            {"id": body.match_id, "tournament_id": tournament_id, "station_id": station["id"]},
             {"$set": {"station_id": None, "updated_at": now_iso}, "$unset": {"called_at": ""}},
             projection={"_id": 0, "called_at": 1},
         )
@@ -365,6 +434,12 @@ async def station_broken(tid: str, body: StationBroken, me: dict = Depends(get_c
         held_id = station.get("current_match_id")
         match = await db.matches_v2.find_one({"id": held_id}, {"_id": 0}) if held_id else None
         state = _held_state(match)
+        issue = await _hold_issue(db, station, tournament_id)
+        other = issue if issue and issue["kind"] == "other" else None
+        if body.broken and other and not body.confirm_other and station.get("status") != "broken":
+            raise HTTPException(status_code=409, detail=(
+                f"An dieser Station spielt gerade „{other['tournament_title']}“ – trotzdem als defekt melden? "
+                "Dessen Leitung bekommt Bescheid."))
         now_iso = now_utc().isoformat()
         if body.broken:
             changed = await db.stations.update_one(
@@ -378,12 +453,19 @@ async def station_broken(tid: str, body: StationBroken, me: dict = Depends(get_c
                 {"$set": {"status": status, "updated_at": now_iso}, "$unset": {"broken_at": ""}},
             )
     holds = {"match_id": held_id, "match_key": (match or {}).get("match_key"), "state": state} if state else None
+    if holds and other:
+        holds["other_tournament"] = other["tournament_title"]
     if not changed.matched_count:
         return {"ok": True, "idempotent_replay": True, "holds": holds}
     reset_scope_cache()  # Live-Meldungen (#1801): wie jede Stationsänderung
-    await _station_audit(db, "station.broken" if body.broken else "station.repaired", tournament_id, me["id"], {
-        "station_id": station["id"], "match_id": held_id if state else None, "state": state,
-    })
+    action = "station.broken" if body.broken else "station.repaired"
+    data = {"station_id": station["id"], "match_id": held_id if state else None, "state": state}
+    await _station_audit(db, action, tournament_id, me["id"], data)
+    if other:
+        # Auch im Protokoll des betroffenen Turniers - und seine Leitung erfährt es sofort.
+        await _station_audit(db, action, other["tournament"]["id"], me["id"], {**data, "by_tournament_id": tournament_id})
+        if body.broken:
+            await _tell_other_lead(db, other, station, tournament, me["id"], now_iso)
     return {"ok": True, "idempotent_replay": False, "holds": holds}
 
 

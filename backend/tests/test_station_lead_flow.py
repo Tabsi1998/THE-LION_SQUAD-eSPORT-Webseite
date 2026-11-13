@@ -317,3 +317,75 @@ async def test_calling_a_team_match_reaches_every_team_member(flow):
     assert called.status_code == 200, called.text
     assert {row["user_id"] for row in await calls(flow)} == members
     assert len(members) == 6
+
+
+# ---------------------------------------------------------------- Geteilte Event-Stationen (#1162, Review H1)
+
+async def shared_world(flow):
+    """Zwei Turniere eines Events, eine geteilte Station ohne Turnier; Turnier B ruft dort auf. Orga A ist Helferin
+    nur in Turnier A."""
+    event_id = new_id()
+    staff, a, _a_stations, _ = await on_site(flow, event_id=event_id)
+    flow.act_as(staff)
+    _staff_b, b, _b_stations, _ = await on_site(flow, event_id=event_id)
+    shared = {"id": new_id(), "name": "S", "device_type": "switch2", "tournament_id": None, "event_id": event_id,
+              "status": "free", "current_match_id": None}
+    await flow.db.stations.insert_one(dict(shared))
+    b_match = (await first_round(flow, b))[0]
+    flow.act_as(staff)
+    assert (await call(flow, b, shared, b_match)).status_code == 200
+    org_a = await flow.add_user(name="Orga A")
+    await flow.db.tournament_staff_assignments.insert_one({
+        "id": new_id(), "tournament_id": a["id"], "user_id": org_a["id"], "role": "organizer",
+        "scope": "tournament", "scope_id": None, "is_active": True,
+    })
+    return staff, a, b, shared, b_match, org_a
+
+
+@pytest.mark.asyncio
+async def test_a_shared_station_held_by_another_tournament_is_not_released_from_here(flow):
+    _staff, a, b, shared, b_match, org_a = await shared_world(flow)
+    flow.act_as(org_a)
+    view = await queue(flow, a)
+    row = next(row for row in view["stations"] if row["id"] == shared["id"])
+    assert row["hold_issue"] == {"kind": "other", "tournament_title": b["title"]}
+
+    refused = await release(flow, a, shared, b_match)
+    assert refused.status_code == 409, refused.text
+    assert "dessen Leitung gibt frei" in refused.json()["detail"] and b["title"] in refused.json()["detail"]
+    stored = await flow.reload(b_match)
+    assert stored["called_at"] and stored["station_id"] == shared["id"], "der Aufruf von B bleibt"
+    assert (await station_of(flow, shared))["current_match_id"] == b_match["id"]
+    assert not await audit(flow, "station.released")
+
+    # Über Turnier B darf Orga A gar nicht.
+    direct = await release(flow, b, shared, b_match)
+    assert direct.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_a_shared_station_goes_broken_only_after_asking_and_the_other_lead_hears_of_it(flow):
+    staff, a, b, shared, b_match, org_a = await shared_world(flow)
+    flow.act_as(org_a)
+    asked = await broken(flow, a, shared)
+    assert asked.status_code == 409 and "trotzdem als defekt melden" in asked.json()["detail"]
+    assert (await station_of(flow, shared))["status"] == "reserved"
+
+    confirmed = await flow.post(f"/api/tournaments/{a['id']}/live-queue/broken",
+                                json={"station_id": shared["id"], "broken": True, "confirm_other": True})
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["holds"] == {"match_id": b_match["id"], "match_key": b_match["match_key"], "state": "called",
+                                         "other_tournament": b["title"]}
+    stored = await station_of(flow, shared)
+    assert stored["status"] == "broken" and stored["current_match_id"] == b_match["id"], "das Spiel von B bleibt, bis B umlegt"
+    logged = await audit(flow, "station.broken")
+    assert sorted(row["target_id"] for row in logged) == sorted([a["id"], b["id"]])
+    told = await flow.db.notifications.find({"kind": "match_attention", "meta.station_id": shared["id"]}, {"_id": 0}).to_list(10)
+    assert staff["id"] in {row["user_id"] for row in told} and org_a["id"] not in {row["user_id"] for row in told}
+    assert all(row["meta"]["tournament_id"] == b["id"] and "reiter=stationen" in row["url"] for row in told)
+
+    # Bei B steht es unter „Braucht Aufmerksamkeit“ - mit Umlegen.
+    flow.act_as(staff)
+    lead = (await flow.get(f"/api/tournaments/{b['id']}/lead")).json()
+    case = next(item for item in lead["attention"] if item["kind"] == "station_broken")
+    assert case["station_id"] == shared["id"] and case["match_ids"] == [b_match["id"]]

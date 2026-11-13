@@ -110,3 +110,19 @@ test("schlimmster Fall: 20 Stationen, lange Namen, Lauf mit 8 Plätzen - alles d
   expect(screen.getByTestId("live-next-s1")).toHaveTextContent("+4");
   expect(screen.queryByTestId("live-tools-s1")).toBeNull();
 });
+
+test("geteilte Station, an der ein anderes Turnier spielt (#1162): kein Aufrufen, Defekt erst nach Rückfrage", () => {
+  const shared = { id: "sx", name: "S", station_text: "Station S", status: "reserved", running: null, next: entry("QX"), after: null,
+    hold_issue: { kind: "other", tournament_title: "Mario Kart Cup" } };
+  const handlers = tile(shared);
+  expect(stationTone(shared)).toBe("other");
+  expect(screen.getByTestId("live-chip-sx")).toHaveTextContent("Anderes Turnier");
+  expect(screen.getByTestId("live-other-hint-sx")).toHaveTextContent("Mario Kart Cup");
+  expect(screen.queryByTestId("live-call-sx")).toBeNull();
+  expect(screen.getByTestId("live-release-sx")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("live-broken-sx"));
+  expect(handlers.onBroken).not.toHaveBeenCalled();
+  expect(screen.getByTestId("live-broken-confirm-sx")).toHaveTextContent("Trotzdem als defekt melden?");
+  fireEvent.click(screen.getByTestId("live-broken-yes-sx"));
+  expect(handlers.onBroken).toHaveBeenCalledWith(expect.objectContaining({ id: "sx" }), true, { confirm_other: true });
+});

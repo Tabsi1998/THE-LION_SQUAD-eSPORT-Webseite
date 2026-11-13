@@ -249,7 +249,7 @@ export default function TournamentLeadPage() {
               onCall={(station, entry) => operateStation("call", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? `War schon an ${where} aufgerufen.` : `Aufgerufen an ${where} – die Spieler bekommen Bescheid.`))}
               onStart={(station, entry) => operateStation("start", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? "Läuft bereits." : `Gestartet an ${where} – die Uhr läuft.`))}
               onRelease={(station, entry) => operateStation("release", station, { match_id: entry.match_id }, releasedText)}
-              onBroken={(station, value) => operateStation("broken", station, { broken: value }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`))}
+              onBroken={(station, value, extra) => operateStation("broken", station, { broken: value, ...extra }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`))}
               onMove={(station, entry, target) => operateStation("move", station, { match_id: entry.match_id, to_station_id: target.id }, movedText)}
             />
             <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>
@@ -387,7 +387,9 @@ function releasedText(done, where) {
 }
 
 function brokenText(done, where) {
-  const held = done.holds?.state === "running" ? "Das laufende Spiel steht noch dort – mit „Umlegen“ auf eine freie Station."
+  // Geteilte Station (#1162): das Spiel gehört einem anderen Turnier - dessen Leitung hat Bescheid bekommen.
+  const held = done.holds?.other_tournament ? `Dort spielt gerade „${done.holds.other_tournament}“ – dessen Leitung hat Bescheid bekommen.`
+    : done.holds?.state === "running" ? "Das laufende Spiel steht noch dort – mit „Umlegen“ auf eine freie Station."
     : done.holds?.state === "called" ? "Der Aufruf steht noch dort – mit „Umlegen“ an einer freien Station neu aufrufen." : "";
   return [done.idempotent_replay ? `${where} war schon als defekt gemeldet.` : `${where} ist als defekt gemeldet.`, held].filter(Boolean).join(" ");
 }
