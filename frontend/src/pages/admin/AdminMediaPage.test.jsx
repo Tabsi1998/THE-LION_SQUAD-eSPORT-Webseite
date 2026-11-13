@@ -248,3 +248,15 @@ test("die Kachel ist ein Knopf: Enter und Leertaste öffnen das Seitenblatt", as
   await user.keyboard(" ");
   expect(screen.getByRole("dialog", { name: "frei.png" })).toBeInTheDocument();
 });
+
+// #937: vorgelesen wird kurz der Dateiname, Bereich, Hinweise, Größe und Nutzung kommen als Beschreibung; im Knopf
+// stehen nur Spans (kein div in einem button).
+test("die Kachel heißt wie die Datei, die Angaben stehen als Beschreibung daran", async () => {
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  const tile = await screen.findByTestId("media-tile-frei.png");
+  expect(tile).toHaveAccessibleName("frei.png");
+  expect(tile).toHaveAccessibleDescription(/ungenutzt/);
+  expect(tile).toHaveAccessibleDescription(/0x genutzt/);
+  expect(tile.querySelector("div")).toBeNull();
+  expect(screen.getByRole("button", { name: "loewe.png" })).toBe(screen.getByTestId("media-tile-loewe.png"));
+});

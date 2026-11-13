@@ -623,23 +623,27 @@ export default function AdminMediaPage() {
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
             data-testid="media-grid"
           >
-            {items.map((it) => {
+            {items.map((it, index) => {
               const isImg = IMG_EXT.has(it.ext);
               const isVideo = VIDEO_EXT.has(it.ext);
               const isOriginal = ORIGINAL_EXT.has(it.ext);
               const fullUrl = `${BACKEND}${it.url}`;
               const previewUrl = cacheBustedMediaUrl(fullUrl, it);
+              const infoId = `media-tile-info-${index}`;
               return (
                 // Eine Kachel ist ein Knopf (#937): per Tab erreichbar, Enter und Leertaste öffnen das Seitenblatt. Ohne
-                // eigene Optik des Knopfs - Ausrichtung links, volle Breite, Schrift und Farbe wie bisher.
+                // eigene Optik des Knopfs - Ausrichtung links, volle Breite, Schrift und Farbe wie bisher. Im Knopf
+                // stehen nur Spans (als Block); vorgelesen wird kurz der Dateiname, die Angaben als Beschreibung.
                 <button
                   type="button"
                   key={it.filename}
                   data-testid={`media-tile-${it.filename}`}
+                  aria-label={it.filename}
+                  aria-describedby={`${infoId}-tags ${infoId}-size${it.kept_for_results ? ` ${infoId}-kept` : ""}`}
                   className="block w-full text-left border border-white/10 bg-[#121212] rounded-sm overflow-hidden hover:border-[#FFD700]/60 transition group cursor-pointer"
                   onClick={() => setSelected(it)}
                 >
-                  <div className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
+                  <span className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
                     {isImg || isVideo ? (
                       <MediaPreview
                         item={it}
@@ -648,23 +652,23 @@ export default function AdminMediaPage() {
                         compact
                       />
                     ) : (
-                      <div className="flex flex-col items-center gap-2 text-white/40">
+                      <span className="flex flex-col items-center gap-2 text-white/40">
                         <FileText className="w-10 h-10" />
                         <span className="text-[10px] font-mono uppercase">{isOriginal ? it.ext || "orig" : it.ext || "file"}</span>
-                      </div>
+                      </span>
                     )}
-                  </div>
-                  <div className="p-2">
-                    <div className="text-[11px] font-mono text-white/70 truncate">{it.filename}</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
+                  </span>
+                  <span className="block p-2">
+                    <span className="block text-[11px] font-mono text-white/70 truncate">{it.filename}</span>
+                    <span id={`${infoId}-tags`} className="mt-1 flex flex-wrap gap-1">
                       <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
                       {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
                       {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
                       {it.duplicate_count > 1 && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
-                    </div>
-                    <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
-                    {it.kept_for_results && <div className="text-[10px] text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</div>}
-                  </div>
+                    </span>
+                    <span id={`${infoId}-size`} className="block text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>
+                    {it.kept_for_results && <span id={`${infoId}-kept`} className="block text-[10px] text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</span>}
+                  </span>
                 </button>
               );
             })}

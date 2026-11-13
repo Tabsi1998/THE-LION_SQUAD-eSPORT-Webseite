@@ -5,10 +5,11 @@ import { MEDIA_SCOPE_LABELS, UPLOAD_STATUS_LABELS, VIDEO_EXT, fmtBytes, fmtDateT
 
 export function BrokenImageState({ compact = false }) {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
+    // Spans (als Block bzw. Flex): die Vorschau steht auch in der Kachel, und die ist ein Knopf (#937).
+    <span className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
       <ImageIcon className={compact ? "w-6 h-6" : "w-10 h-10"} />
       <span className="text-[9px] uppercase tracking-widest font-bold">Bild nicht erreichbar</span>
-    </div>
+    </span>
   );
 }
 
@@ -23,12 +24,12 @@ export function MediaPreview({ item, src, className, compact = false }) {
   const isVideo = VIDEO_EXT.has(item.ext);
   if (isVideo) {
     return (
-      <div className="relative w-full h-full">
+      <span className="block relative w-full h-full">
         <video src={src} className={className} muted playsInline preload="metadata" />
         <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 bg-black/75 px-1.5 py-1 rounded-sm text-[9px] uppercase tracking-widest font-black text-white">
           <Video className="w-3 h-3" /> Video
         </span>
-      </div>
+      </span>
     );
   }
   return <MediaImage src={src} alt={item.filename} className={className} compact={compact} />;
