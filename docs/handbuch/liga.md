@@ -1532,7 +1532,7 @@ alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
 **1. Vorschau lesen.** Das Blatt zeigt, was übernommen wird, und je Liga die Teams der neuen Season:
 
 - **Übernommen als Entwurf:** alle Einstellungen der Season (Spielbetrieb, Tabelle, Anmeldung und Kader, Termin-, Check-in- und
-  Erinnerungsregeln, Fristen, Gestaltung und Gewinne), die Ligen mit Beinamen, Abweichungen und Zonen, der Map-Pool und die
+  Erinnerungsregeln, Fristen, Gestaltung und Gewinne, Belohnungen), die Ligen mit Beinamen, Abweichungen und Zonen, der Map-Pool und die
   Sperrliste in ihrer geltenden Version.
 - **Regelwerk:** Hatte die Season ein eigenes, liegt es in der neuen Season als **Entwurf** einer neuen Fassung bereit – im
   Regelwerk freigeben, der Haken „Captains müssen dieser Fassung neu zustimmen“ ist vorbelegt. Gilt das der Liga, gilt es weiter.
@@ -1586,8 +1586,11 @@ Zuständigen sehen den Reiter nur zum Lesen.
 | Eigenes Bild | freiwillig über **Bild hochladen** oder die Mediathek; sonst gilt die Vorlage. |
 
 **Spieler-Belohnungen gehen an** gilt für die ganze Season: **Spieler mit Einsatz** (Vorgabe – wer in der Staffel mindestens
-ein gewertetes Spiel in der Aufstellung stand) oder **Ganzer Kader zum Abschluss**. Ohne gemeldete Aufstellungen bekommt mit
-der Vorgabe kein Spieler etwas – dann den ganzen Kader wählen.
+ein gespieltes Spiel in der Aufstellung stand; kampflose Spiele zählen nicht) oder **Ganzer Kader zum Abschluss**. Hat ein Team
+in keinem gespielten Spiel eine Aufstellung gemeldet (oder nur kampflose Spiele), bekommt sein **Kader zum Abschluss** die
+Spieler-Belohnung – wie beim Meister-Eintrag. Die Reiter **Belohnungen** und **Abschluss** nennen diese Teams: „Kader statt
+Einsatz, weil keine Aufstellungen gemeldet“. In einer Einzel-Liga bekommt die Person eine Spieler-Belohnung nur, wenn sie
+gespielt hat (mit „Ganzer Kader“ immer); eine Team-Belohnung bekommt sie als Teilnehmerin auch ohne Spiel.
 
 **2. Liga N.** Jede Liga übernimmt die Belohnungen der Season. **Eigene Zusammenstellung** kopiert sie für diese Liga zum
 Anpassen (auch „keine“ ist möglich), **Wie die Season** nimmt die Abweichung zurück. Unter jeder Liga steht je Staffel, was
@@ -1599,8 +1602,10 @@ herunterladen** zum Teilen. Die Ligaseite zeigt das Podest mit den Belohnungen j
 **Belohnungen**. Eine Änderung im Reiter wirkt erst beim nächsten Abschluss.
 
 **4. Wieder öffnen.** Solange eine Staffel wieder offen ist, ruhen ihre Belohnungen (unsichtbar). Beim neuen Abschluss wird
-neu zugeteilt – nie doppelt. Wer dabei etwas verliert oder neu bekommt, erhält eine Nachricht; ein echter Gewinn wird nie
-entzogen, er bekommt unter **Gewinne** „nach Korrektur prüfen“.
+neu zugeteilt – nie doppelt. Wer dabei etwas verliert oder neu bekommt, erhält eine Nachricht; Captain und Vertreter bekommen
+für Team-Belohnungen eine eigene Nachricht („Belohnung für euer Team“). Ein echter Gewinn wird nie entzogen: Fällt er weg,
+bekommt er unter **Gewinne** „nach Korrektur prüfen“; landet dieselbe Belohnung auf einem anderen Platz, zieht der Platz mit,
+solange der Gewinn nicht abgeholt ist.
 
 **Sichtbarkeit:** Öffentlich steht eine Belohnung nur, wenn Gäste die Season und die Staffel sehen dürfen.
 

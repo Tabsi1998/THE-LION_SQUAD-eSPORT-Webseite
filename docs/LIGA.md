@@ -3662,9 +3662,13 @@ Eine Belohnung:
 **Vergabe** (Nr. 165): sofort mit dem Abschluss der Staffel (F.1, `league_final.close` → `league_rewards.grant`, als Folge-Schritt:
 ein Fehler kippt den Abschluss nicht). Quelle ist allein der Endstand (`league_final_tables.rows`): Platz aus `rank`, „alle Teilnehmer“
 sind alle Zeilen ohne `exit` - Ausgeschiedene und Disqualifizierte bekommen nichts. Ein geteilter Platz zählt für jeden, der ihn hält.
-Spieler mit Einsatz: wer in einem gewerteten Spiel der Staffel (`completed`, `forfeit`) in der Aufstellung stand (`games[].lineups`,
-`lineups`, wie `league_games.participants`); in einer Einzel-Liga die angemeldete Person, wenn sie gespielt hat. Ganzer Kader: die
-Mitglieder des Co-Teams zum Abschluss.
+Spieler mit Einsatz: wer in einem gespielten Spiel der Staffel (`completed`) in der Aufstellung stand (`games[].lineups`, `lineups`, wie
+`league_games.participants`) - **kampflose Spiele zählen nicht** (Nr. 168). Fehlen für ein Team alle Aufstellungen in gespielten Spielen
+(oder hatte es nur kampflose), bekommt sein **Kader zum Abschluss** die Spieler-Belohnung wie beim Meister-Eintrag (Nr. 167); der
+Eintrag trägt dann `roster_fallback: true`, und die Reiter „Belohnungen“ und „Abschluss“ nennen das Team („Kader statt Einsatz, weil
+keine Aufstellungen gemeldet“). Ganzer Kader (`roster`): die Mitglieder des Co-Teams zum Abschluss. **Einzel-Liga:** Die Person ist
+zugleich Teilnehmer - eine Team-Belohnung bekommt sie immer, eine Spieler-Belohnung nur, wenn sie ein Spiel gespielt hat (mit `roster`
+immer). Bekommt niemand etwas, entsteht kein Eintrag.
 
 Je Belohnung und Anmeldung ein Eintrag in `tournament_awards`:
 
@@ -3673,9 +3677,10 @@ Je Belohnung und Anmeldung ein Eintrag in `tournament_awards`:
 | `reward_key` | `<belohnung>:<anmeldung>` - eindeutig je Staffel (Teilindex `tournament_award_reward`); der Meister-Eintrag hat keinen |
 | `kind` | `reward` (zählt nirgends als Turnier-Pokal; Erfolge, XP und Jahreswertung bleiben unberührt) |
 | `team_id` | das Hauptteam, nur wenn `team` unter den Empfängern ist |
-| `user_id` | nur in einer Einzel-Liga die Person |
+| `user_id` | nur in einer Einzel-Liga die Person - und nur, wenn sie die Belohnung bekommt |
 | `player_ids` | die Spieler, nur wenn `players` unter den Empfängern ist |
-| `audience_ids` | wer Nachricht und Zeremonie bekommt: die Spieler, dazu bei Team-Belohnungen Captain und Vertreter |
+| `roster_fallback` | `true`, wenn die Spieler-Belohnung mangels Aufstellung an den Kader ging (Nr. 167) |
+| `audience_ids` | wer die Zeremonie sieht: die Spieler bzw. die Person, dazu bei Team-Belohnungen Captain und Vertreter |
 | `rank`, `participants`, `matches`, `tournament`, `game`, `season`, `team` | wie beim Meister-Eintrag |
 | `league` | `{title, league_id, season_id, division_label, staffel, display_name, final_table_id, version}` |
 | `reward` | Schnappschuss der Belohnung: `{id, kind, name, description, places, place_label, image_url, prize, recipients, art}`; `art` = Beschriftung der Vorlage `{league, season, division, place, metal}` |
@@ -3684,15 +3689,25 @@ Je Belohnung und Anmeldung ein Eintrag in `tournament_awards`:
 
 **Wieder öffnen und neu abschließen** (Nr. 166): Beim Wiederöffnen ruhen die Belohnungen wie der Meister-Eintrag (`suspended`; Profil,
 Teamseite, Ligaseite, Teilen-Bild und Zeremonie zeigen sie nicht). Der neue Abschluss teilt neu zu: Was gleich bleibt, bleibt derselbe
-Eintrag (samt `seen_by`), Neues kommt dazu, Weggefallenes verschwindet - nie doppelt. Wer eine Belohnung neu bekommt oder verliert,
-erhält eine Nachricht (Art `league_reward`, `dedupe_key` `league-reward:<fassung>:gain|loss:<person>`); wer dasselbe behält, nicht.
+Eintrag (samt `seen_by`), Neues kommt dazu, Weggefallenes verschwindet - nie doppelt. Wer eine Belohnung **persönlich** neu bekommt
+oder verliert (`player_ids`, `user_id`), erhält eine Nachricht (Art `league_reward`, `dedupe_key`
+`league-reward:<fassung>:gain|loss:<person>`); wer dasselbe behält, nicht. Team-Belohnungen werden je Team verglichen: Captain und
+Vertreter von heute bekommen eine eigene Nachricht („Belohnung für euer Team“ bzw. „Team-Belohnung entfällt“, `dedupe_key`
+`league-reward:<fassung>:team-gain|team-loss:<team>:<person>`). Ein Wechsel von Captain oder Vertreter ist weder Gewinn noch Verlust.
 Ein echter Gewinn wird nie entzogen: Passt er nach dem neuen Abschluss nicht mehr, bekommt er „nach Korrektur prüfen“ (`needs_review`,
-wie bei Turnieren). Eine geänderte Zusammenstellung wirkt erst beim nächsten Abschluss einer Staffel.
+wie bei Turnieren). Landet dieselbe Belohnung (`reward_key`) auf einem anderen Platz, ziehen `place` und `place_label` mit, solange der
+Gewinn nicht abgeholt ist - sonst ebenfalls `needs_review`. Eine geänderte Zusammenstellung wirkt erst beim nächsten Abschluss einer
+Staffel. Eine neue Season aus dem Vorgänger (F.2) übernimmt Zusammenstellung, `reward_players` und die Belohnungen je Liga N; `reward_key`
+bleibt eindeutig, weil er je Staffel (Turnier) gilt.
 
 **Sichtbarkeit:** Profil, Teamseite und Teilen-Bild zeigen eine Belohnung öffentlich nur, wenn Gäste die Season sehen
-(`can_see_season`, nicht archiviert) und die Staffel als Turnier sehen (`tournament_hidden_reason`) - das gilt seit F.4 auch für den
-Meister-Eintrag. Mitglieder eines Teams sehen am eigenen Team alles. Liga-Einträge stehen im Profil nur bei den Spielern
-(`player_ids`), nie bei jedem Mitglied des Hauptteams.
+(`can_see_season`, nicht archiviert) und die Staffel als Turnier sehen (`tournament_hidden_reason`) - geprüft nach dem **heutigen**
+Stand von Season und Staffel (`awards._visible`), nicht nach dem Schnappschuss im Eintrag. **Verhaltensänderung:** Das gilt seit F.4
+auch für den Meister-Eintrag - der Meister einer archivierten oder nicht mehr öffentlichen Season verschwindet aus öffentlichen Profilen
+und Teamseiten, passend zur Season-Historie (F.2). Mitglieder eines Teams sehen am eigenen Team alles. Liga-Einträge stehen im Profil nur
+bei den Spielern (`player_ids`), nie bei jedem Mitglied des Hauptteams. Das Teilen-Bild prüft Sichtbarkeit und Ruhen bei jedem Abruf und
+kommt erst danach aus dem Zwischenspeicher (`share_image_cache`, fünf Minuten, Fingerabdruck mit Fassung; `Cache-Control` über
+`PUBLIC_IMAGE_PATH`).
 
 **Sammlung und Auswahl:** Profil und Teamseite zeigen die Belohnungen gruppiert nach Season. Ausgewählt wird wie bisher das Banner
 (`featured_award_id`) und neu ein Titel neben dem Namen (`featured_title_award_id` an `users` und `teams`, nur Belohnungen der Art

@@ -159,7 +159,9 @@ Hat die Liga Belohnungen festgelegt (Medaille, Banner, Emblem oder Titel), stehe
 **Darum wird gespielt**. Mit dem Abschluss werden sie sofort vergeben – nach eurem Platz im Endstand:
 
 - **Team-Belohnungen** stehen an eurer Teamseite, **Spieler-Belohnungen** im Profil jedes Spielers, der mindestens ein
-  gewertetes Spiel in der Aufstellung stand (oder – wenn die Liga das so eingestellt hat – des ganzen Kaders).
+  gespieltes Spiel in der Aufstellung stand – kampflose Spiele zählen nicht. Habt ihr nie eine Aufstellung gemeldet, bekommt
+  euer ganzer Kader zum Abschluss die Spieler-Belohnung (ebenso, wenn die Liga „ganzer Kader“ eingestellt hat).
+- Als Captain oder Vertreter bekommt ihr für Team-Belohnungen eine eigene Nachricht „Belohnung für euer Team“.
 - Ihr bekommt eine Nachricht und beim nächsten Besuch eine kurze Zeremonie. Dort lädt **Bild herunterladen** ein Bild zum
   Teilen herunter (am Handy: **Teilen**).
 - Im eigenen Profil unter **Auszeichnungen** wählt ihr **Als Banner** (oben im Profil) und bei einem Titel **Als Titel** (neben
