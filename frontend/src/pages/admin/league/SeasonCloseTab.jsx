@@ -16,6 +16,7 @@ import { api, formatApiError } from "@/lib/api";
 import { closeState, decisionLine, finalMoment, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws } from "@/lib/leagueTable";
 import { OrderSheet } from "./SeasonTablePanel";
+import "./seasonClose.css";
 
 const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
 const CHIP = {
@@ -31,8 +32,10 @@ function errorOf(failure, fallback) {
 function Table({ rows, rules, championId, label }) {
   const leader = championId ? rows.find((item) => item.registration_id === championId) : null;
   return (
-    <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" championKey={leader ? standingKey(leader) : null}
-      hideDraws={hidesDraws(rules, rows)} mapPoints={byMaps(rules)} />
+    <div className="tls-close-table">
+      <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" championKey={leader ? standingKey(leader) : null}
+        hideDraws={hidesDraws(rules, rows)} mapPoints={byMaps(rules)} />
+    </div>
   );
 }
 

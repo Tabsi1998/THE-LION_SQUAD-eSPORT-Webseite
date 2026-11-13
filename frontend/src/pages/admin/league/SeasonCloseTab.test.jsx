@@ -43,7 +43,7 @@ test("die Checkliste nennt jeden Sperrgrund mit Link und hält den Knopf zu", as
       { text: "Protestfrist · Spieltag 2: Probe 1 – Probe 3", url: "/matches/m3", until: "2026-11-14T17:00:00+00:00" }] },
   ] })]));
   expect(await screen.findByTestId("season-close-summary")).toHaveTextContent("0 von 1 Staffel abgeschlossen");
-  expect(screen.getByTestId("close-state-t1")).toHaveTextContent("2 Punkte offen");
+  expect(screen.getByTestId("close-state-t1")).toHaveTextContent("2 offen");
   const open = screen.getByTestId("close-blocker-t1-open_matches");
   expect(open).toHaveTextContent("Offene Spiele (2)");
   expect(within(open).getByRole("link", { name: "Spieltag 3: Probe 3 – Probe 4" })).toHaveAttribute("href", "/matches/m1");

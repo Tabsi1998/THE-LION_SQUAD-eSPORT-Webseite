@@ -3,8 +3,8 @@ import { closeState, decisionLine, finalNote, historyLine, methodOptions, reopen
 test("Stand einer Staffel: abgeschlossen, bereit oder mit der Zahl der offenen Punkte", () => {
   expect(closeState({ closed: true, blockers: [] })).toEqual({ key: "closed", label: "Abgeschlossen" });
   expect(closeState({ closed: false, blockers: [] })).toEqual({ key: "ready", label: "Bereit zum Abschluss" });
-  expect(closeState({ blockers: [{ code: "open_matches" }] }).label).toBe("1 Punkt offen");
-  expect(closeState({ blockers: [{}, {}] })).toEqual({ key: "blocked", label: "2 Punkte offen" });
+  expect(closeState({ blockers: [{ code: "open_matches" }] }).label).toBe("1 offen");
+  expect(closeState({ blockers: [{}, {}] })).toEqual({ key: "blocked", label: "2 offen" });
 });
 
 test("die Season ist erst beendet, wenn alle Staffeln abgeschlossen sind", () => {

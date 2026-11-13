@@ -1,0 +1,10 @@
+/* Reiter „Abschluss“ (F.1, #1645): die Tabelle in der schmalen Karte der Verwaltung. Teamnamen brechen am Leerzeichen um den
+   Trenner um („Nordlicht · Nordlicht A“) statt mitten im Wort; am Handy steht der Grund eines Entscheids nur einmal - über der
+   Tabelle („Entscheid: …“), an der Zeile bleibt die kurze Notiz. */
+.tls-close-table .tls-standing-name { display: block; -webkit-line-clamp: none; overflow: visible; overflow-wrap: break-word; hyphens: none; }
+.tls-close-table .tls-standing-note { overflow-wrap: break-word; }
+@media (max-width: 639px) {
+  .tls-close-table .tls-standing-note__reason { display: none; }
+  /* Die Form braucht der Abschluss nicht - ohne sie passen Name und Punkte nebeneinander, ohne seitliches Schieben. */
+  .tls-close-table th:nth-last-child(2), .tls-close-table td:nth-last-child(2) { display: none; }
+}

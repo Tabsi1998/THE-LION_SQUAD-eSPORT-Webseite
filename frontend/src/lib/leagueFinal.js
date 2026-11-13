@@ -23,12 +23,12 @@ export function staffelLabel(row) {
   return [row?.division_label, row?.staffel ? `Staffel ${row.staffel}` : ""].filter(Boolean).join(" · ") || row?.title || "Staffel";
 }
 
-/** Stand einer Staffel: abgeschlossen, bereit (nichts hält auf) oder offen (mit Zahl der Punkte). */
+/** Stand einer Staffel: abgeschlossen, bereit (nichts hält auf) oder offen (mit der Zahl der Sperrgründe, kurz: „4 offen“). */
 export function closeState(row) {
   if (row?.closed) return { key: "closed", label: "Abgeschlossen" };
   const open = (row?.blockers || []).length;
   if (!open) return { key: "ready", label: "Bereit zum Abschluss" };
-  return { key: "blocked", label: open === 1 ? "1 Punkt offen" : `${open} Punkte offen` };
+  return { key: "blocked", label: `${open} offen` };
 }
 
 /** „2 von 3 Staffeln abgeschlossen“ - und ob die Season damit abgeschlossen ist. */
