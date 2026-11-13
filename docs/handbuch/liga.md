@@ -879,13 +879,17 @@ Spieltage · Teams · Regelwerk** (Regelwerk nur, wenn es eines gibt); dieselbe 
 | **Regelwerk** mit Version und PDF | 2.11 |
 | **Ligen und Staffeln**: je Staffel die Tabelle und der aktuelle Spieltag, Wege zu Spieltagen und Teams | Staffeln; läuft die Season, stehen die Tabellen gleich unter „Was gespielt wird“ |
 
+Im Kopf stehen nur Zeitraum, Spielwochen und Pausen – Best of, Teamgröße, Standardtermin und Punkte stehen genau einmal, in
+„Was gespielt wird“ bzw. „Ablauf“. Ist die Seite gerade nicht erreichbar, steht dort „Nochmal laden“ statt „nicht gefunden“.
+
 Vor der Einteilung (noch keine Staffel für Gäste sichtbar) steht statt der Tabellen **„Die Ligen werden eingeteilt“** mit den
 nächsten Schritten: Anmeldung, Einteilung, Start. **Gold** hat in der Tabelle nur der **Meister**: Platz 1 allein, in der
 obersten Liga, sobald die Staffel beendet ist. Auf- und Abstiegszonen kommen mit dem Saisonabschluss (#1627).
 
 **Spieltage** (`…/spieltage`): oben die Staffel (bei mehreren), darunter eine Leiste aller Wochen – Punkt in Akzentfarbe =
 gespielt bzw. läuft, schraffiert = Pause. Die gewählte Woche zeigt alle Spiele mit Ergebnis, Maps mit Bild und Modus-Symbol,
-**kampflos**, **Map wiederholt** und **in Klärung**; offene Wochen zeigen einmal den **Modus je Map**. Staffel und Woche stehen
+**kampflos**, **Map wiederholt** und **in Klärung**; offene Wochen zeigen einmal den **Modus je Map**. Den **Grund** einer
+Wiederholung sehen nur die beiden Teams und die Liga-Leitung auf der Matchseite, öffentlich steht nur „wiederholt“. Staffel und Woche stehen
 in der Adresse (`?staffel=…&woche=3`) – so lässt sich ein Spieltag in Discord verlinken.
 
 **Teams** (`…/teams`): je Liga und Staffel die Teams mit Logo (aus der Teamseite, sonst zwei Buchstaben), Platz und Punkten.
