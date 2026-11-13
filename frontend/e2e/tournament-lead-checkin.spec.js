@@ -74,9 +74,10 @@ async function serve(page, slug, board, posts, hold) {
   });
 }
 
-// Für das Bild: Meldungen abwarten, keinen Fokus-Rahmen, oben am Reiter beginnen - nur der sichtbare Ausschnitt.
+// Für das Bild: keine Meldungen, keinen Fokus-Rahmen, oben am Reiter beginnen - nur der sichtbare Ausschnitt.
 async function calm(page) {
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+  // Meldungen ausblenden statt abwarten - das Warten kostete unter Last die Zeit des ganzen Tests.
+  await page.addStyleTag({ content: "[data-sonner-toaster] { display: none !important; }" });
   await page.evaluate(() => document.activeElement?.blur());
   await page.getByTestId("lead-page").evaluate((node) => window.scrollTo(0, node.getBoundingClientRect().top + window.scrollY - 70));
   await page.waitForTimeout(700);
