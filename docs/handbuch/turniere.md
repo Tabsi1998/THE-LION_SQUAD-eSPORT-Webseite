@@ -562,9 +562,9 @@ zum Vorbereiten da: anlegen, bearbeiten, planen, Aushang. Am Turniertag bedient 
   Spiel kommt aus der einen Dauer-Regel (3.12).
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
 - An jeder Station steht ihr Zustand (frei, belegt, reserviert, defekt) und das Spiel, das sie hält; dort gibt es auch
-  **Ergebnis eintragen**. **Defekt** / **Bereit** an der Station gehört zur Planung (nur Turnierleitung) – etwa für eine
-  Station, die noch in keiner Warteschlange steht. Am Turniertag geht es samt Hinweis aufs Umlegen in der
-  Turnierleitung.
+  **Ergebnis eintragen**. **Defekt** / **Bereit** an der Station gehört zur Planung (nur Turnierleitung) und steht nur
+  an Stationen ohne Spiel. Hält eine Station ein Spiel, führt der Hinweis „Station hält ein Spiel“ in die
+  Turnierleitung – dort bleibt der Aufruf erhalten und das Spiel lässt sich umlegen.
 - **Belegung je Station** zeigt dieselbe Zeitleiste wie der Matchplan (unten), live; **Im Matchplan öffnen** springt
   in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
 
@@ -579,6 +579,8 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
   Neuladen. **Als Nächstes** ist das nächste bereite Spiel ohne Station, in derselben Reihenfolge wie der Spielplaner.
 - **Anderes Spiel aufrufen** (an einer freien Station): Auswahl aller bereiten Spiele, die noch nicht aufgerufen sind
   oder laufen – **Als Nächstes** steht oben, dann nach Prognose. Die Station muss zu Spiel und Gerät des Turniers passen.
+  Spielt jemand aus einem Spiel gerade an einer anderen Station oder ist dort aufgerufen, steht es ausgegraut mit
+  „spielt gerade an …“ da und lässt sich nicht aufrufen.
 - **Alle freien Stationen aufrufen** (oben im Reiter): ruft an jeder freien Station ihr **Als Nächstes** auf, nach einer
   Rückfrage mit der Anzahl. Gestartet wird dabei nichts.
 - **Starten**: die echte Startzeit, die Spielzeit-Uhr läuft, der Aufruf verschwindet von der Tafel.
@@ -597,7 +599,7 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
   Fall unter **Braucht Aufmerksamkeit** und legt das Spiel um; beide Protokolle halten es fest.
 - **Hängt**: Die Station ist als belegt gespeichert, hält aber kein offenes Spiel (etwa nach dem Löschen einer Phase).
   **Station räumen** macht sie wieder frei – nie, solange ein offenes Spiel daran steht. Beim Löschen oder Neubauen
-  einer Phase werden die Stationen ihrer Spiele ohnehin frei.
+  einer Phase werden die Stationen ihrer Spiele ohnehin frei; wer dort aufgerufen war, bekommt „Aufruf zurückgenommen“.
 - Tippen zwei Leute zugleich, gilt genau ein Tipp; der andere bekommt eine Meldung und sieht den neuen Stand. Jede
   Aktion steht im Protokoll.
 
