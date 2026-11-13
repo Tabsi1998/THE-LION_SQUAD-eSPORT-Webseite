@@ -24,13 +24,13 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
   }
 
   function enqueue(pkg) {
-    if (pkg?.placement) return enqueuePlacement(pkg);
+    if (pkg?.placement || pkg?.rewards?.length) return enqueuePlacement(pkg);
     if (!pkg || (!(pkg.tiers || []).length && !pkg.levelUp)) return null;
     const stamp = now();
     const last = state.pending[state.pending.length - 1];
     let entry;
     // Die Sammel-Zeremonie der Neuberechnung (#2340) bleibt für sich - sie zählt nur die nachgerechneten Stufen.
-    const alone = (item) => Boolean(item?.placement || item?.context?.recount);
+    const alone = (item) => Boolean(item?.placement || item?.rewards || item?.context?.recount);
     if (last && !alone(last) && !alone(pkg) && stamp - state.lastEnqueueAt <= bundleMs) {
       entry = mergeInto(last, pkg);
     } else if (!last && state.current && pkg.levelUp && !(pkg.tiers || []).length) {
@@ -51,9 +51,12 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
 
   // Sieger-Moment (#1180): ein Turnier-Platz ist ein eigenes Paket - nie mit Erfolgen verschmolzen, und er steht vor
   // Erfolgen, die noch warten (der Platz zuerst, dann der dabei freigeschaltete Erfolg). Ein laufender bleibt stehen.
+  // Belohnungen der Liga (F.4, #2214) gehen denselben Weg: eigenes Paket (``rewards``), vor wartenden Erfolgen.
   function enqueuePlacement(pkg) {
-    const entry = { id: pkg.id || `placement-${pkg.placement.key || now()}`, tiers: [], context: {}, levelUp: null, placement: pkg.placement, onDone: pkg.onDone || null };
-    const firstOther = state.pending.findIndex((item) => !item.placement);
+    const entry = pkg.rewards?.length
+      ? { id: pkg.id || `rewards-${pkg.rewards.map((row) => row.id).join("-")}`, tiers: [], context: {}, levelUp: null, rewards: pkg.rewards, onDone: pkg.onDone || null }
+      : { id: pkg.id || `placement-${pkg.placement.key || now()}`, tiers: [], context: {}, levelUp: null, placement: pkg.placement, onDone: pkg.onDone || null };
+    const firstOther = state.pending.findIndex((item) => !item.placement && !item.rewards);
     if (firstOther < 0) state.pending.push(entry);
     else state.pending.splice(firstOther, 0, entry);
     if (!state.current) advance();

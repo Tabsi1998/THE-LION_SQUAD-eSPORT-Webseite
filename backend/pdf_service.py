@@ -831,7 +831,10 @@ def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
     return tables
 
 
-def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
+def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None,
+                  rewards: list[list[str]] | None = None) -> bytes:
+    """Rangliste bzw. Tabelle. ``rewards`` (F.4, #2214): je Belohnung einer abgeschlossenen Liga-Staffel ``[Platz, Belohnung, Art,
+    Inhaber]`` - steht als Abschnitt „Belohnungen“ unter der Tabelle."""
     buf = io.BytesIO()
     doc = _doc(buf, f"Rangliste - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
@@ -856,6 +859,12 @@ def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None
             story.append(KeepTogether([Paragraph(escape(_normalize_pdf_text(table["title"])), styles["TLSSection"]), t]))
         else:
             story.append(t)
+    if rewards:
+        widths = [3 * cm, 5 * cm, 2.5 * cm, 7.5 * cm]
+        body = [[_normalize_pdf_text(cell) for cell in row] for row in rewards]
+        reward_table = Table([["Platz", "Belohnung", "Art", "Bekommen"], *_fit_rows_to_columns(body, widths)], colWidths=widths, repeatRows=1)
+        reward_table.setStyle(_table_style())
+        story.append(KeepTogether([Paragraph("Belohnungen", styles["TLSSection"]), reward_table]))
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
     return buf.getvalue()
 

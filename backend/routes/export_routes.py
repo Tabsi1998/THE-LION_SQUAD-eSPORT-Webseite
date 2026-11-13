@@ -377,7 +377,10 @@ async def pdf_tournament_standings(
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
-    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"rangliste_{file_id}.pdf")
+    # Belohnung je Platz (F.4, #2214): nur bei einer abgeschlossenen Liga-Staffel, aus den vergebenen Einträgen.
+    from services.league_rewards import pdf_rows
+    rewards = await pdf_rows(db, t)
+    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding, rewards=rewards), f"rangliste_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/certificates.pdf")

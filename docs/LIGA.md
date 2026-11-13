@@ -577,6 +577,7 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | Tabellen-Regeln | E.1 | Direkter Vergleich, Mini-Tabelle, Default-Win, Punktabzug | `scoring_rules`, `standings_for_structure` |
 | `competition_sanctions` | E.3 | Strafen mit Wirkung, Moderation bleibt getrennt | `penalty_routes.py` |
 | `league_final_tables` | F.1 | Dauerhafter Endstand, Meister | Muster `record_tournament_awards` |
+| Belohnungen (`league_rewards`) | F.4 | Banner, Emblem, Medaille, Titel je Platz, Vergabe aus dem Endstand | `tournament_awards`, `AwardBanner`, `prize_service` |
 
 ### F.3 Erweiterbarkeit (Prüfung, kein Bau)
 
@@ -694,6 +695,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
 | `GET /api/admin/leagues/seasons/{id}/closing`, `GET …/staffeln/{tid}/final-tables/{version}` (F.1) | jede Zuständigkeit | – | – |
 | `POST …/staffeln/{tid}/close`, `POST …/staffeln/{tid}/reopen` (F.1) | `season` | ja, eigenes Team in der Staffel | – |
+| `GET /api/admin/leagues/seasons/{id}/rewards` (F.4) | jede Zuständigkeit | – | – |
+| `PUT …/seasons/{id}/rewards` (F.4) | `season` | – | – |
 | PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
 | Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
 | Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
@@ -3509,7 +3512,7 @@ mindestens einmal aufgestellt war, ohne Aufstellungen der Kader). `awards_for_us
 nicht jedem Mitglied des Hauptteams; `rank_label` heißt „Meister“. Beim Wiederöffnen ruht der Eintrag (`suspended`; Profil,
 Teamseite und die Sieger-Karte der News zeigen ihn dann nicht), beim
 neuen Abschluss bleibt er für dasselbe Team derselbe und wechselt sonst das Team - nie zwei. Turnier-Pokalzähler, XP und
-Jahreswertung bleiben unberührt (Erfolge zählen keine Staffeln). Ausführliche Belohnungen folgen mit F.4 (#2214).
+Jahreswertung bleiben unberührt (Erfolge zählen keine Staffeln). Belohnungen je Platz kamen mit F.4 (#2214, unten).
 
 **Archiv:** Eine abgeschlossene Season (`completed`) bleibt auf Ligaseite und Übersicht sichtbar, mit Endstand. `archived`
 blendet sie wie bisher aus.
@@ -3627,3 +3630,108 @@ Entscheidungsspiel über zwei Liga N hinweg braucht eine eigene Staffel und komm
 **Nicht in F.2:** die App (`mobile/`, Folgepunkt für #2173: Zonen in der Tabelle, Abmelden, Season-Historie), Startrechte als eigener
 Zustand mit Annahme durch das Team (#1627 Abschnitt „Saisonabschluss und Folge-Season“ Punkt 5 - Nr. 160 entschied „automatisch
 dabei, wer nicht will, meldet sich ab“), Staffeln der neuen Season automatisch anlegen und Teams zuteilen.
+
+### F.4 Belohnungen (#2214)
+
+Entscheidungen Nr. 163 bis 166. Kein zweites System: Die Belohnungen sind Einträge in `tournament_awards` neben dem Meister-Eintrag
+aus F.1, die Grafik ist eine Vorlage im Stil von `TrophyCup`/`AwardBanner`, ein echter Gewinn läuft über `prize_pickups`
+(`prize_service`). Logik in `services/league_rewards.py`, Routen in `routes/league_reward_routes.py`, Teilen-Bild in
+`services/reward_share.py`. Oberfläche: Reiter **Belohnungen** der Season-Seite (`SeasonRewardsTab.jsx`, `lib/leagueRewards.js`),
+Grafik `components/tls/rewards/RewardArt.jsx`, Sammlung `RewardCollection.jsx`, Zeremonie `RewardMoment.jsx`.
+
+**Zusammenstellung** (Zuständigkeit `season`, ohne Migration - fehlt das Feld, gibt es keine Belohnungen und alles bleibt wie bisher):
+
+| Feld | Inhalt |
+| --- | --- |
+| `league_seasons.rewards` | Liste der Belohnungen der Season (höchstens 20); fehlt oder leer: keine |
+| `league_seasons.reward_players` | `fielded` (Vorgabe, Nr. 163: Spieler mit Einsatz) oder `roster` (ganzer Kader des Co-Teams zum Abschluss) |
+| `league_divisions.rewards` | `null`/fehlt: die der Season; Liste: eigene Zusammenstellung dieser Liga N (leere Liste: keine) |
+
+Eine Belohnung:
+
+| Feld | Werte |
+| --- | --- |
+| `id` | fest, vom Server vergeben (bleibt beim Bearbeiten - daran hängen Vergabe und Nachricht) |
+| `kind` | `banner`, `emblem`, `medal`, `title` (Banner, Emblem, Medaille, Titel) |
+| `name`, `description` | Name (1–60 Zeichen), Beschreibung (bis 200) |
+| `places` | `{mode: "rank", rank: n}` (Platz n), `{mode: "range", from: a, to: b}` (Platz a bis b), `{mode: "all"}` (alle Teilnehmer) |
+| `recipients` | `["team"]`, `["players"]` oder beides: das Team und/oder seine Spieler nach `reward_players` |
+| `image_url` | eigenes Bild über den Bild-Upload (Mediathek, kein SVG); leer heißt Lionsquad-Vorlage |
+| `prize` | optional ein echter Gewinn als Text (bis 160) - wird beim Abschluss ein Eintrag in `prize_pickups` |
+
+**Vergabe** (Nr. 165): sofort mit dem Abschluss der Staffel (F.1, `league_final.close` → `league_rewards.grant`, als Folge-Schritt:
+ein Fehler kippt den Abschluss nicht). Quelle ist allein der Endstand (`league_final_tables.rows`): Platz aus `rank`, „alle Teilnehmer“
+sind alle Zeilen ohne `exit` - Ausgeschiedene und Disqualifizierte bekommen nichts. Ein geteilter Platz zählt für jeden, der ihn hält.
+Spieler mit Einsatz: wer in einem gespielten Spiel der Staffel (`completed`) in der Aufstellung stand (`games[].lineups`, `lineups`, wie
+`league_games.participants`) - **kampflose Spiele zählen nicht** (Nr. 168). Fehlen für ein Team alle Aufstellungen in gespielten Spielen
+(oder hatte es nur kampflose), bekommt sein **Kader zum Abschluss** die Spieler-Belohnung wie beim Meister-Eintrag (Nr. 167); der
+Eintrag trägt dann `roster_fallback: true`, und die Reiter „Belohnungen“ und „Abschluss“ nennen das Team („Kader statt Einsatz, weil
+keine Aufstellungen gemeldet“). Ganzer Kader (`roster`): die Mitglieder des Co-Teams zum Abschluss. **Einzel-Liga:** Die Person ist
+zugleich Teilnehmer - eine Team-Belohnung bekommt sie immer, eine Spieler-Belohnung nur, wenn sie ein Spiel gespielt hat (mit `roster`
+immer). Bekommt niemand etwas, entsteht kein Eintrag.
+
+Je Belohnung und Anmeldung ein Eintrag in `tournament_awards`:
+
+| Feld | Inhalt |
+| --- | --- |
+| `reward_key` | `<belohnung>:<anmeldung>` - eindeutig je Staffel (Teilindex `tournament_award_reward`); der Meister-Eintrag hat keinen |
+| `kind` | `reward` (zählt nirgends als Turnier-Pokal; Erfolge, XP und Jahreswertung bleiben unberührt) |
+| `team_id` | das Hauptteam, nur wenn `team` unter den Empfängern ist |
+| `user_id` | nur in einer Einzel-Liga die Person - und nur, wenn sie die Belohnung bekommt |
+| `player_ids` | die Spieler, nur wenn `players` unter den Empfängern ist |
+| `roster_fallback` | `true`, wenn die Spieler-Belohnung mangels Aufstellung an den Kader ging (Nr. 167) |
+| `audience_ids` | wer die Zeremonie sieht: die Spieler bzw. die Person, dazu bei Team-Belohnungen Captain und Vertreter |
+| `rank`, `participants`, `matches`, `tournament`, `game`, `season`, `team` | wie beim Meister-Eintrag |
+| `league` | `{title, league_id, season_id, division_label, staffel, display_name, final_table_id, version}` |
+| `reward` | Schnappschuss der Belohnung: `{id, kind, name, description, places, place_label, image_url, prize, recipients, art}`; `art` = Beschriftung der Vorlage `{league, season, division, place, metal}` |
+| `seen_by` | wer die Zeremonie schon gesehen hat |
+| `suspended` | `true`, solange die Staffel wieder geöffnet ist |
+
+**Wieder öffnen und neu abschließen** (Nr. 166): Beim Wiederöffnen ruhen die Belohnungen wie der Meister-Eintrag (`suspended`; Profil,
+Teamseite, Ligaseite, Teilen-Bild und Zeremonie zeigen sie nicht). Der neue Abschluss teilt neu zu: Was gleich bleibt, bleibt derselbe
+Eintrag (samt `seen_by`), Neues kommt dazu, Weggefallenes verschwindet - nie doppelt. Wer eine Belohnung **persönlich** neu bekommt
+oder verliert (`player_ids`, `user_id`), erhält eine Nachricht (Art `league_reward`, `dedupe_key`
+`league-reward:<fassung>:gain|loss:<person>`); wer dasselbe behält, nicht. Team-Belohnungen werden je Team verglichen: Captain und
+Vertreter von heute bekommen eine eigene Nachricht („Belohnung für euer Team“ bzw. „Team-Belohnung entfällt“, `dedupe_key`
+`league-reward:<fassung>:team-gain|team-loss:<team>:<person>`). Ein Wechsel von Captain oder Vertreter ist weder Gewinn noch Verlust.
+Ein echter Gewinn wird nie entzogen: Passt er nach dem neuen Abschluss nicht mehr, bekommt er „nach Korrektur prüfen“ (`needs_review`,
+wie bei Turnieren). Landet dieselbe Belohnung (`reward_key`) auf einem anderen Platz, ziehen `place` und `place_label` mit, solange der
+Gewinn nicht abgeholt ist - sonst ebenfalls `needs_review`. Eine geänderte Zusammenstellung wirkt erst beim nächsten Abschluss einer
+Staffel. Eine neue Season aus dem Vorgänger (F.2) übernimmt Zusammenstellung, `reward_players` und die Belohnungen je Liga N; `reward_key`
+bleibt eindeutig, weil er je Staffel (Turnier) gilt.
+
+**Sichtbarkeit:** Profil, Teamseite und Teilen-Bild zeigen eine Belohnung öffentlich nur, wenn Gäste die Season sehen
+(`can_see_season`, nicht archiviert) und die Staffel als Turnier sehen (`tournament_hidden_reason`) - geprüft nach dem **heutigen**
+Stand von Season und Staffel (`awards._visible`), nicht nach dem Schnappschuss im Eintrag. **Verhaltensänderung:** Das gilt seit F.4
+auch für den Meister-Eintrag - der Meister einer archivierten oder nicht mehr öffentlichen Season verschwindet aus öffentlichen Profilen
+und Teamseiten, passend zur Season-Historie (F.2). Mitglieder eines Teams sehen am eigenen Team alles. Liga-Einträge stehen im Profil nur
+bei den Spielern (`player_ids`), nie bei jedem Mitglied des Hauptteams. Das Teilen-Bild prüft Sichtbarkeit und Ruhen bei jedem Abruf und
+kommt erst danach aus dem Zwischenspeicher (`share_image_cache`, fünf Minuten, Fingerabdruck mit Fassung; `Cache-Control` über
+`PUBLIC_IMAGE_PATH`).
+
+**Sammlung und Auswahl:** Profil und Teamseite zeigen die Belohnungen gruppiert nach Season. Ausgewählt wird wie bisher das Banner
+(`featured_award_id`) und neu ein Titel neben dem Namen (`featured_title_award_id` an `users` und `teams`, nur Belohnungen der Art
+`title`): `POST /api/me/awards/{id}/feature?slot=title`, `DELETE /api/me/awards/feature?slot=title`, für Teams dieselben Wege unter
+`/api/teams/{tid}/awards/…` (Teamleitung).
+
+**Routen:**
+
+| Route | Recht |
+| --- | --- |
+| `GET /api/admin/leagues/seasons/{id}/rewards` - Zusammenstellung, Liga N, Stand der Vergabe je Staffel | jede Zuständigkeit |
+| `PUT /api/admin/leagues/seasons/{id}/rewards` - `{reward_players, items, divisions: {division_id: items \| null}}` | `season` |
+| `GET /api/me/rewards/unseen`, `POST /api/me/rewards/seen` `{ids}` - Zeremonie | angemeldet, nur eigene |
+| `GET /api/rewards/{award_id}/share.png` - Teilen-Bild 1200×630 | öffentlich, nur was die Sichtbarkeit erlaubt |
+
+Die öffentliche Season (`GET /api/leagues/<liga>/<season>`) trägt `rewards` (Season) und je Liga N `rewards` (eigene oder `null`); die
+Staffel (`…/staffeln/<staffel>`) trägt `staffel.rewards`: `{granted, items: [{…Belohnung, holders: [{registration_id,
+display_name, rank}]}]}` - vor dem Abschluss ohne Inhaber, danach aus den Einträgen. Ergebnis-PDF einer abgeschlossenen Staffel:
+Abschnitt „Belohnungen“ je Platz.
+
+**Auskunft und Kontolöschung:** wie der Meister-Eintrag - `tournament_awards` ist Vereinsinhalt, an der Person hängen nur
+Kennungen (`player_ids`, `audience_ids`, `seen_by`); die Auswahl `featured_title_award_id` verschwindet mit dem Konto.
+
+**Gesamtpaket:** Ligaseite (Podest mit Belohnungen je Platz, „Alle Teilnehmer bekommen …“), Season-Verwaltung (Reiter
+„Belohnungen“, Stand im Reiter „Abschluss“), Profil und Teamseite (Sammlung, Auswahl), Zeremonie beim nächsten Besuch, Teilen-Bild,
+Nachricht, Ergebnis-PDF, Handbuch Liga und Captains. Nicht in F.4: TV (der Sieger-Moment zeigt den Meister wie bisher) und die App
+(`mobile/`, Liste in #2173).

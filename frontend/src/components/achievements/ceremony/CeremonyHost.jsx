@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { PlacementMoment } from "@/components/tls/podium/PlacementMoment";
+import { RewardMoment } from "@/components/tls/rewards/RewardMoment";
 import { Ceremony } from "./Ceremony";
 import { ceremonyQueue } from "./queue";
 import { planCeremony } from "./select";
@@ -27,7 +28,8 @@ export function CeremonyHost({ queue = ceremonyQueue, quietPrefixes = QUIET_PREF
   return (
     <AnimatePresence>
       {plan && !quiet && plan.sequence === "placement" ? <PlacementMoment key={plan.id} plan={plan} onClose={close} reduced={reduced} /> : null}
-      {plan && !quiet && plan.sequence !== "placement" ? <Ceremony key={plan.id} plan={plan} onClose={close} user={user} reduced={reduced} sound={sound} /> : null}
+      {plan && !quiet && plan.sequence === "reward" ? <RewardMoment key={plan.id} plan={plan} onClose={close} reduced={reduced} /> : null}
+      {plan && !quiet && !["placement", "reward"].includes(plan.sequence) ? <Ceremony key={plan.id} plan={plan} onClose={close} user={user} reduced={reduced} sound={sound} /> : null}
     </AnimatePresence>
   );
 }

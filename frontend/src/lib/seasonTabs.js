@@ -19,6 +19,8 @@ export const SEASON_TABS = [
   { key: "strafen", label: "Strafen" },
   { key: "regelwerk", label: "Regelwerk und Sperrliste" },
   { key: "ligen", label: "Ligen und Staffeln" },
+  // Belohnungen (F.4, #2214): Banner, Emblem, Medaille, Titel je Platz - Season und Liga N, eigenes Speichern; vergeben beim Abschluss.
+  { key: "belohnungen", label: "Belohnungen" },
   // Abschluss (F.1, #1645): Checkliste je Staffel, Endstand festhalten, Verlauf, wieder öffnen - lesen darf jede Zuständigkeit.
   { key: "abschluss", label: "Abschluss" },
 ];
@@ -54,6 +56,7 @@ export const SEASON_SECTIONS = {
   sperrliste: "regelwerk",
   staffeln: "ligen",
   uebertragen: "ligen",
+  "belohnungen-ligen": "belohnungen",
 };
 
 /** Reiter und Abschnitt aus der Sprungmarke: `#termine` → Reiter, `#kader` → Reiter „Anmeldung und Kader“ samt Abschnitt. */

@@ -19,6 +19,7 @@ import { SizedImage } from "@/components/tls/SizedImage";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { byMaps, hidesDraws, pointsNote, tiebreakOrder } from "@/lib/leagueTable";
 import { finalNote } from "@/lib/leagueFinal";
+import { StaffelRewards } from "@/components/tls/rewards/StaffelRewards";
 import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
@@ -293,6 +294,8 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel, topLevel = false
     <div className="tls-league-staffel" data-testid={`league-staffel-${staffel.staffel}`}>
       <div className="min-w-0">
         <TableBlock data={data} staffel={staffel} champion={topLevel && FINISHED.has(status)} />
+        {/* Belohnungen (F.4, #2214): vor dem Abschluss, worum gespielt wird - danach Podest und Belohnung je Platz. */}
+        <StaffelRewards data={data} staffel={staffel} />
       </div>
       <section className="min-w-0" aria-labelledby={`league-plan-${staffel.staffel}-${key}`}>
         <h3 id={`league-plan-${staffel.staffel}-${key}`} className="tls-league-subhead">
