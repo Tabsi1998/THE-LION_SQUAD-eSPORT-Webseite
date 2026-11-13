@@ -79,17 +79,33 @@ def _rank_from_registration(registration: dict) -> int | None:
     return None
 
 
+def reward_view(reward: dict | None) -> dict | None:
+    """Die Belohnung eines Liga-Eintrags (F.4, #2214): Art, Name, Platz und die Beschriftung der Vorlage - ohne Empfänger-Kennungen."""
+    if not reward:
+        return None
+    from services.league_reward_rules import KINDS
+
+    return {"id": reward.get("id"), "kind": reward.get("kind"), "kind_label": KINDS.get(reward.get("kind") or "", "Belohnung"),
+            "name": reward.get("name"), "description": reward.get("description") or "", "place_label": reward.get("place_label"),
+            "recipients_label": reward.get("recipients_label") or "", "image_url": reward.get("image_url") or None,
+            "prize": reward.get("prize") or None, "art": dict(reward.get("art") or {})}
+
+
 def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
     """Was Web und App bekommen - ohne Anmelde- oder Datenbank-Kennungen."""
     rank = doc.get("rank")
     league = doc.get("league") or None
+    reward = reward_view(doc.get("reward"))
     images = tournament_images if tournament_images is not None else (doc.get("tournament") or {}).get("award_images") or {}
     return {
         "id": doc["id"],
-        "kind": award_kind(rank),
+        # Belohnung (F.4): Banner, Emblem, Medaille oder Titel - sonst Pokal bzw. Banner nach dem Platz.
+        "kind": reward["kind"] if reward else award_kind(rank),
         "rank": rank,
-        # Liga-Titel (F.1, #1645): „Meister“ statt „1. Platz“, dazu Liga N und Staffel.
-        "rank_label": (league or {}).get("title") or rank_label(rank),
+        # Liga-Titel (F.1, #1645): „Meister“ statt „1. Platz“, dazu Liga N und Staffel. Belohnung: der Platz der Vorlage.
+        "rank_label": (((reward.get("art") or {}).get("place") or reward.get("place_label")) if reward
+                       else (league or {}).get("title") or rank_label(rank)),
+        "reward": reward,
         "league": ({key: league.get(key) for key in ("title", "division_label", "staffel", "display_name")} if league else None),
         "participants": int(doc.get("participants") or 0),
         "matches": {"played": int((doc.get("matches") or {}).get("played") or 0), "won": int((doc.get("matches") or {}).get("won") or 0)},
@@ -98,7 +114,7 @@ def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
         "game": doc.get("game") or None,
         "season": doc.get("season") or None,
         "team": doc.get("team") or None,
-        "image_url": (images or {}).get(str(rank)) if rank in TROPHY_RANKS else None,
+        "image_url": reward["image_url"] if reward else ((images or {}).get(str(rank)) if rank in TROPHY_RANKS else None),
         "date": (doc.get("tournament") or {}).get("start_date"),
         "updated_at": doc.get("updated_at"),
     }
@@ -281,21 +297,36 @@ async def backfill_awards(db) -> dict | None:
 
 # ---------------------------------------------------------------- Lesen
 
-async def _visible(doc: dict) -> bool:
-    tournament = doc.get("tournament") or {}
+async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = None) -> bool:
+    """Öffentlich sichtbar? Ein Liga-Eintrag (Meister, Belohnung - F.4) nur, wenn Gäste die Season sehen (``can_see_season``, nicht
+    archiviert) und die Staffel als Turnier sähen (Regel von ``tournament_hidden_reason`` für Gäste) - nach dem Stand von jetzt."""
+    current = {key: value for key, value in (live or {}).items() if key in ("status", "visibility", "is_public")}
+    tournament = {**(doc.get("tournament") or {}), **current}
     if tournament.get("status") == "draft" or tournament.get("is_public") is False:
         return False
+    league = doc.get("league") or None
+    if league and league.get("season_id") and seasons is not None:
+        # Wie ``league_service.can_see_season`` für Gäste: nur „öffentlich“ (``members`` und ``admins`` brauchen eine Person).
+        season = seasons.get(league["season_id"])
+        if not season or season.get("status") == "archived" or season.get("visibility") != "public":
+            return False
     return await user_can_see(None, tournament.get("visibility") or "public")
 
 
 async def _views(db, docs: list[dict], public_only: bool) -> list[dict]:
     tournament_ids = list({doc["tournament_id"] for doc in docs})
-    images = {row["id"]: row.get("award_images") or {} for row in await db.tournaments.find({"id": {"$in": tournament_ids}}, {"_id": 0, "id": 1, "award_images": 1}).to_list(500)} if tournament_ids else {}
+    live = {row["id"]: row for row in await db.tournaments.find(
+        {"id": {"$in": tournament_ids}}, {"_id": 0, "id": 1, "award_images": 1, "status": 1, "visibility": 1, "is_public": 1},
+    ).to_list(500)} if tournament_ids else {}
+    season_ids = sorted({(doc.get("league") or {}).get("season_id") for doc in docs if (doc.get("league") or {}).get("season_id")})
+    seasons = {row["id"]: row for row in await db.league_seasons.find(
+        {"id": {"$in": season_ids}}, {"_id": 0, "id": 1, "league_id": 1, "status": 1, "visibility": 1},
+    ).to_list(len(season_ids) + 1)} if season_ids else {}
     out = []
     for doc in docs:
-        if public_only and not await _visible(doc):
+        if public_only and not await _visible(doc, live.get(doc["tournament_id"]), seasons):
             continue
-        out.append(award_view(doc, images.get(doc["tournament_id"], {})))
+        out.append(award_view(doc, (live.get(doc["tournament_id"]) or {}).get("award_images") or {}))
     out.sort(key=lambda row: (row.get("date") or "", row["id"]), reverse=True)
     return out
 
@@ -320,27 +351,37 @@ async def featured_award(db, awards: list[dict], award_id: str | None) -> dict |
     return next((award for award in awards if award["id"] == award_id), None) if award_id else None
 
 
-async def feature_award_for_user(db, user_id: str, award_id: str | None) -> dict | None:
-    """Als Profilbanner wählen - nur eine eigene Auszeichnung; None löscht die Wahl."""
+# Was gezeigt wird (F.4): das Banner (jede eigene Auszeichnung) und ein Titel neben dem Namen (nur Belohnungen der Art „Titel“).
+SLOTS = {"banner": "featured_award_id", "title": "featured_title_award_id"}
+
+
+def fits_slot(award: dict, slot: str) -> bool:
+    return slot != "title" or award.get("kind") == "title"
+
+
+async def feature_award_for_user(db, user_id: str, award_id: str | None, slot: str = "banner") -> dict | None:
+    """Als Profilbanner (bzw. Titel) wählen - nur eine eigene Auszeichnung; None löscht die Wahl."""
+    field = SLOTS[slot]
     if award_id:
         awards = await awards_for_user(db, user_id, public_only=False)
-        chosen = next((award for award in awards if award["id"] == award_id), None)
+        chosen = next((award for award in awards if award["id"] == award_id and fits_slot(award, slot)), None)
         if not chosen:
             return None
-        await db.users.update_one({"id": user_id}, {"$set": {"featured_award_id": award_id}})
+        await db.users.update_one({"id": user_id}, {"$set": {field: award_id}})
         return chosen
-    await db.users.update_one({"id": user_id}, {"$unset": {"featured_award_id": ""}})
+    await db.users.update_one({"id": user_id}, {"$unset": {field: ""}})
     return None
 
 
-async def feature_award_for_team(db, team_id: str, award_id: str | None) -> dict | None:
-    """Teambanner wählen - nur eine Auszeichnung dieses Teams; None löscht die Wahl."""
+async def feature_award_for_team(db, team_id: str, award_id: str | None, slot: str = "banner") -> dict | None:
+    """Teambanner (bzw. Titel) wählen - nur eine Auszeichnung dieses Teams; None löscht die Wahl."""
+    field = SLOTS[slot]
     if award_id:
         awards = await awards_for_team(db, team_id, public_only=False)
-        chosen = next((award for award in awards if award["id"] == award_id), None)
+        chosen = next((award for award in awards if award["id"] == award_id and fits_slot(award, slot)), None)
         if not chosen:
             return None
-        await db.teams.update_one({"id": team_id}, {"$set": {"featured_award_id": award_id}})
+        await db.teams.update_one({"id": team_id}, {"$set": {field: award_id}})
         return chosen
-    await db.teams.update_one({"id": team_id}, {"$unset": {"featured_award_id": ""}})
+    await db.teams.update_one({"id": team_id}, {"$unset": {field: ""}})
     return None

@@ -886,6 +886,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "awards": awards,
         "league_history": league_history,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
+        # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Person gewählt hat.
+        "featured_title": next((award for award in awards if award["id"] == u.get("featured_title_award_id")), None),
     }
 
 

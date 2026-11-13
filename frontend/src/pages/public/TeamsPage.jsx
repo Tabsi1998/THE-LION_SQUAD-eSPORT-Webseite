@@ -25,6 +25,7 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
+import { RewardChip, RewardCollection } from "@/components/tls/rewards/RewardCollection";
 import { viennaDateTime } from "@/lib/vienna";
 import { departureWarning } from "@/lib/squadShortage";
 import { teamLogoUpload } from "@/lib/svgLogo";
@@ -280,11 +281,13 @@ function TeamDetail({ id }) {
   const canChangeRoles = !!user && (!!team.can_change_roles || team.leader_id === user.id);
   const teamNeedsSecondFactor = !!user && !canEditTeam && !!team.admin_needs_second_factor && needsSecondFactor(user);
   // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
-  const featureTeamAward = async (awardId) => {
+  // ``slot = "title"`` (F.4, #2214): eine Belohnung der Art „Titel“ steht im Kopf neben dem Teamnamen.
+  const featureTeamAward = async (awardId, slot = "banner") => {
+    const query = slot === "title" ? "?slot=title" : "";
     try {
-      if (awardId) await api.post(`/teams/${team.id}/awards/${awardId}/feature`);
-      else await api.delete(`/teams/${team.id}/awards/feature`);
-      toast.success(awardId ? "Als Teambanner gesetzt." : "Teambanner entfernt.");
+      if (awardId) await api.post(`/teams/${team.id}/awards/${awardId}/feature${query}`);
+      else await api.delete(`/teams/${team.id}/awards/feature${query}`);
+      toast.success(slot === "title" ? (awardId ? "Als Titel gesetzt." : "Titel entfernt.") : (awardId ? "Als Teambanner gesetzt." : "Teambanner entfernt."));
       load();
     } catch { toast.error("Das hat nicht geklappt."); }
   };
@@ -397,6 +400,7 @@ function TeamDetail({ id }) {
           </>
         )}
       >
+        {team.featured_title ? <div className="mt-3"><RewardChip award={team.featured_title} testId="team-featured-title" /></div> : null}
         {team.featured_award && (
           <div className="mt-5 w-full max-w-xl text-left" data-testid="team-featured-award">
             <AwardBanner award={team.featured_award} linkTo={team.featured_award.tournament?.slug ? `/tournaments/${team.featured_award.tournament.slug}` : null} />
@@ -424,8 +428,12 @@ function TeamDetail({ id }) {
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
               <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {team.awards.map((award) => (
+              {/* Sammlung der Liga-Belohnungen (F.4, #2214): je Season; die Teamleitung wählt Teambanner und Titel. */}
+              <RewardCollection awards={team.awards} testId="team-reward-collection" featuredId={team.featured_award?.id} titleId={team.featured_title?.id}
+                onFeature={canEdit ? (id) => featureTeamAward(id) : null} onTitle={canEdit ? (id) => featureTeamAward(id, "title") : null}
+                linkFor={(award) => (award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null)} />
+              <div className="grid sm:grid-cols-2 gap-3 mt-4">
+                {team.awards.filter((award) => !award.reward).map((award) => (
                   <AwardBanner
                     key={award.id}
                     award={award}
