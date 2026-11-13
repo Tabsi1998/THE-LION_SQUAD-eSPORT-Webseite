@@ -490,6 +490,10 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
         # Der Vorschlag entsteht von selbst (#2269): der Text der letzten Fassung mit den Daten von heute, markiert gegen die Fassung.
         "proposal": await _proposal(db, scope, league, season, latest, current) if changes and latest and not draft else None,
         "consents": consent_state,
+        # Seasons aus einem Vorgänger (F.2, #1627), die dieses Liga-Regelwerk erben: Ändert es sich, stimmen ihre übernommenen Teams neu zu -
+        # die Verwaltung belegt „neu zustimmen“ dann vor wie beim Entwurf einer eigenen Fassung.
+        "successor_seasons": ([{"id": row["id"], "name": row.get("name")} for row in await _inheriting_seasons(db, league)
+                               if row.get("predecessor_id") and row.get("status") not in ("completed", "archived")] if not season else []),
         "public_url": page_path(league, season),
         "today": _today(),
     }

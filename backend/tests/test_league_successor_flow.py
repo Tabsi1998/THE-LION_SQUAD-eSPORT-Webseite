@@ -289,6 +289,9 @@ async def test_league_rules_keep_applying_without_a_season_draft(flow):
     assert preview["rules"]["kind"] == "league"
     season = await new_season(flow, world)
     assert not await flow.db.league_rules.find_one({"scope": "league_season", "scope_id": season["id"]}, {"_id": 1})
+    # Ändert die Leitung das Liga-Regelwerk, weiß die Verwaltung von der erbenden neuen Season (Zustimmung vorbelegt).
+    view = ok(await flow.get(scope))
+    assert [row["id"] for row in view["successor_seasons"]] == [season["id"]]
 
 
 # ---------------------------------------------------------------- Abmelden
