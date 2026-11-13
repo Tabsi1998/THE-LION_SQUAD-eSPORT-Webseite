@@ -85,7 +85,7 @@ test("Reiter per Sprungmarke: ohne Marke der Überblick, #termine öffnet Termin
   const first = renderPage();
   expect(await screen.findByTestId("season-tab-ueberblick")).toHaveAttribute("aria-selected", "true");
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(
-    ["Überblick", "Spielbetrieb", "Termine", "Anmeldung und Kader", "Tabelle", "Proteste", "Strafen", "Regelwerk und Sperrliste", "Ligen und Staffeln", "Abschluss"]);
+    ["Überblick", "Leitstand", "Spielbetrieb", "Termine", "Anmeldung und Kader", "Tabelle", "Proteste", "Strafen", "Regelwerk und Sperrliste", "Ligen und Staffeln", "Abschluss"]);
   first.unmount();
   const second = renderPage("#termine");
   expect(await screen.findByTestId("season-form-weeks")).toBeInTheDocument();
@@ -94,6 +94,17 @@ test("Reiter per Sprungmarke: ohne Marke der Überblick, #termine öffnet Termin
   renderPage("#anmeldungen");
   expect(await screen.findByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications"));
+});
+
+test("Leitstand (E.4) als zweiter Reiter, per #leitstand und #protokoll erreichbar", async () => {
+  extra = { "/admin/leagues/seasons/s1/desk": { season: { id: "s1" }, groups: [], total: 0, mine: 0, can_broadcast: false },
+    "/admin/leagues/seasons/s1/desk/log": { items: [], page: 1, pages: 1, total: 0 } };
+  const first = renderPage("#leitstand");
+  expect(await screen.findByTestId("season-tab-leitstand")).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByTestId("desk-empty")).toHaveTextContent("Alles erledigt");
+  first.unmount();
+  renderPage("#protokoll");
+  expect(await screen.findByTestId("season-tab-leitstand")).toHaveAttribute("aria-selected", "true");
 });
 
 test("Überblick: Ablaufleiste, Sichtbarkeit und Stand mit einem Satz, was sie bewirken", async () => {

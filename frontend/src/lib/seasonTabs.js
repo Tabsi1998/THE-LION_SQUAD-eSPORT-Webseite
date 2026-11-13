@@ -7,6 +7,8 @@ import { dayNoon, viennaDate, viennaDateTime, viennaDay } from "@/lib/vienna";
 
 export const SEASON_TABS = [
   { key: "ueberblick", label: "Überblick" },
+  // Leitstand (E.4, Nr. 152): alle offenen Aufgaben der Season, Protokoll und Rundnachricht - gleich nach dem Überblick.
+  { key: "leitstand", label: "Leitstand" },
   { key: "spielbetrieb", label: "Spielbetrieb" },
   { key: "termine", label: "Termine" },
   { key: "anmeldung", label: "Anmeldung und Kader" },
@@ -26,6 +28,8 @@ export const SEASON_TABS = [
 export const SEASON_SECTIONS = {
   pruefung: "ueberblick",
   gestaltung: "ueberblick",
+  protokoll: "leitstand",
+  rundnachricht: "leitstand",
   modi: "spielbetrieb",
   mindestgroesse: "spielbetrieb",
   ergebnisregeln: "spielbetrieb",

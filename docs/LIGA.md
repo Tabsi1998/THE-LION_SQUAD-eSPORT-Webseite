@@ -3302,6 +3302,60 @@ sie entsperrt. „Strafe bleibt“ ändert nichts an der Staffel und geht auch i
 **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die App zeigt den Stand `sanctioned` wie jeden anderen Stand der
 Spielberechtigung und die Tabelle mit Abzug; eigene Strafen mit Einspruch fehlen dort noch.
 
+### E.4 Leitstand (#2209)
+
+Entscheidungen Nr. 28, 47, 152, 153. Logik in `services/league_desk.py`, Routen in `routes/league_desk_routes.py`, Oberfläche im Reiter
+**Leitstand** der Season (`SeasonDeskTab.jsx`, Rundnachricht `SeasonBroadcastSheet.jsx`). **Keine neue Sammlung, keine neue Regel:** Der
+Leitstand liest dieselben Quellen wie „Mein Dienst“ und die Reiter der Season und rechnet bei jedem Abruf frisch.
+
+| Gruppe (`key`) | Quelle | Zuständigkeit (eine reicht) | Weg |
+| --- | --- | --- | --- |
+| `incidents` | `league_incidents.review_rows(season_id=…, include_involved=True)` | `results`, `disputes` | `/matches/{id}#vorfaelle` |
+| `no_show` | `match_flow.proposal_rows(season_id=…)` | `matches`, `results` | Turnierleitung `?fall=ns-…` |
+| `overdue` (Nr. 28) | `league_schedule.overdue_rows(season_id=…)` | `matches`, `results` | `/matches/{id}` |
+| `lineups` (Nr. 47) | Spiele mit `lineup_overdue_at` und `lineups_missing` | `matches`, `results` | `/matches/{id}` |
+| `procedures` (E.2) | `league_procedures.open_rows` | `disputes` | `/matches/{id}#verfahren-{pid}` |
+| `sanctions` (E.3) | `competition_sanctions` vorläufig oder mit offenem Einspruch, `league_sanctions.admin_rows` | `sanctions` | `#strafen` |
+| `applications` (B.4) | `league_applications` `submitted`/`in_review`, `accepted` ohne Zuteilung | `applications` | `#anmeldungen` |
+| `roster` (B.4) | `league_transfers` `pending`, Spiel-IDs im Stand `late` (`league_roster.season_overview`) | `roster` | `#kader` |
+| `reschedule` (D.1) | `league_schedule.pending_request` | `matches` | `/matches/{id}` |
+| `rules` (B.2) | `league_rules.pending_release` | `rules` | Regelwerk der Season |
+
+- **`GET /api/admin/leagues/seasons/{id}/desk`** (`require_league(ANY)`): `groups[]` mit `key`, `label`, `responsible`, `items[]`,
+  `failed`; dazu `total`, `mine`, `can_broadcast`. Nur die Gruppen der eigenen Zuständigkeiten (Bereich Ligen: alle). Eine Aufgabe:
+  `id` (`<art>:<kennung>`), `title`, `text`, `url`, `action`, `due_at`, `since`, `assignee` (`name`, `own`), `conflict`,
+  `conflict_text`, `mine`, bei Vorfällen und Regelwerk `detail` (die Sätze baut die Oberfläche wie „Mein Dienst“).
+- **Befangenheit (B.1):** Eigene Spiele (`involved_match_ids`), das eigene Team (`belongs_to_side`) und die eigene Ausgangsentscheidung
+  bei Einsprüchen bleiben sichtbar, mit `conflict_text` („Das entscheidet eine zweite berechtigte Person“). Entschieden wird an der
+  verlinkten Stelle, die Route prüft dort selbst. `mine` ist falsch bei Befangenheit, bei einem von jemand anderem übernommenen
+  Verfahren und bei Verschiebungen (dort antwortet zuerst die Gegenseite).
+- **Protokoll** `GET …/desk/log?page=` (`require_league(ANY)`): `audit_logs` mit `league.*` oder `match.*`, deren `target_id` die Season
+  oder eine ihrer Staffeln ist oder deren `data.season_id` passt; 25 je Seite, neueste zuerst. Je Eintrag nur `label` (aus der Aktion),
+  Zeit, Name der handelnden Person (sonst „Automatik“), Staffel und Spiel als Verweis - **nie** Felder aus `data` wie Gründe oder Namen. Strafen
+  (`league.sanction.*`) sieht nur „Strafen“, Notausnahmen bei Befangenheit (`league.conflict.override`) nur „Liga verwalten“; der
+  Bereich Ligen sieht alles. Indizes `target_id`/`data.season_id` je mit `created_at`.
+- **Rundnachricht** (Nr. 153) `POST …/broadcast/preview` und `POST …/broadcast` mit `manage` oder `season` (B.1 kennt keine eigene
+  Zuständigkeit dafür): `audience` `captains` (Vorgabe, `responsible_ids`) oder `players` (`player_ids`), `scope` `season`,
+  `division` oder `staffel` mit `scope_id`; Anmeldungen `pending`/`approved`/`checked_in`, ohne gesperrte und abgeschaltete Konten und
+  ohne die sendende Person. Betreff 3 bis 80, Text 10 bis 1000 Zeichen. Zustellung über `create_user_notification` (Art
+  `league_broadcast`, Thema „Turnier-Updates“, Push-Kanal `lion_tournaments`) mit `dedupe_key` `league-broadcast:{season}:{request_id}:{user}`,
+  Mail nach Wahl über `send_league_mail` (Vorlage `league_notice`) mit demselben Thema „Turnier-Updates“ wie Glocke und Push; `mailed`
+  zählt nur wirklich eingereihte Mails. **Doppelversand:** Der
+  Protokolleintrag `league.broadcast` mit der Kennung `league-broadcast:{season}:{request_id}` ist zugleich die Sperre; ein zweiter Aufruf
+  mit derselben `request_id` antwortet mit `replay: true` und schickt nichts. Im Protokoll stehen Absender, Kreis, Zahl, Mail ja/nein und
+  die Länge - nie der Text.
+- **Versand im Hintergrund:** `POST …/broadcast` antwortet sofort mit `state: sending`, verschickt wird danach; je Person stehen
+  `processed`, `delivered`, `mailed` und `progress_at` im Protokolleintrag. Wirft der Versand, steht der Eintrag auf `interrupted`; ohne
+  Fortschritt seit 120 s gilt auch `sending` als hängend. `GET …/broadcast/{request_id}` liefert dann `stale: true`, der Dialog zeigt
+  „Versand hängt – fortsetzen“ und schickt denselben Aufruf (gleiche Kennung, Betreff, Text) - zugestellt wird nur, wer die Nachricht noch
+  nicht hat. Kennung und Eingaben merkt sich der Dialog je Season in `sessionStorage`, bis der Versand fertig ist. Das Protokoll zeigt den
+  Stand mit „zugestellt“ und „bearbeitet“.
+- **Mein Dienst:** `GET /api/users/me/duty?desks=1` liefert dazu `league_desks[]` je Season (Entwurf oder laufend) der eigenen Ligen
+  mit `mine`, `total` und `url` auf `#leitstand`. Ohne `desks` (Startseite der Verwaltung) bleibt die Liste leer und kein Leitstand wird
+  gerechnet. Die Kaderübersicht für Spiel-IDs „nach dem Stichtag“ liest der Leitstand nur, wenn es einen Eintrag `late_squad_ids` gibt.
+- **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die Rundnachricht kommt dort als Push und in der Glocke an (Art
+  `league_broadcast`); einen Leitstand gibt es in der App nicht.
+
 ### Season-Seite der Verwaltung (#2267)
 
 `/admin/leagues/seasons/{id}` in Reitern nach dem Muster der Spielseite (#2249). Nur Oberfläche: **Daten und API unverändert**, jeder
@@ -3312,6 +3366,7 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 | Reiter | Sprungmarke | Inhalt | Speichern |
 | --- | --- | --- | --- |
 | Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
+| Leitstand (E.4) | `#leitstand`, `#protokoll`, `#rundnachricht` | Offene Aufgaben je Art, Protokoll der Season, Rundnachricht | nichts - erledigt wird an der verlinkten Stelle |
 | Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie`, `#veto`, `#vorfaelle` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Veto (D.3, #1618); Vorfälle und Pausen (D.5, #1619); Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`, `map_break_after`, `map_break_minutes`, `incident_answer_minutes`, `incident_quota_per_map`, `clarification_mode`; Pool, Mindestgröße, Ergebnisregeln und Veto eigene Knöpfe |
 | Termine | `#termine`, `#kalender`, `#terminregeln`, `#checkin` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1), Check-in-Regeln (D.2, #1652) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln und Check-in eigene Knöpfe |
 | Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#plattform`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Plattform und Eingabegerät (#2270), Eingang, Kaderübersicht | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar), `platform_field`, `allowed_platforms`, `crossplay`, `input_device` |

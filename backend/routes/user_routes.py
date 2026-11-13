@@ -5,7 +5,7 @@ import secrets
 import re
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Query
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user, require_super, hash_token, require_area
@@ -982,11 +982,12 @@ async def update_me(
 
 
 @router.get("/me/duty")
-async def get_my_duty(me: dict = Depends(get_current_user)):
+async def get_my_duty(desks: bool = Query(False), me: dict = Depends(get_current_user)):
     """„Mein Dienst“ (#1352): eigene Helfer-Einsätze (heute zuerst), offene Meldungen für die Moderation und - für die
-    Turnierleitung - die Turniere von heute. Spieler ohne Dienst bekommen leere Listen."""
+    Turnierleitung - die Turniere von heute. Spieler ohne Dienst bekommen leere Listen. ``desks=1``: dazu die Leitstände je Season
+    (E.4) - nur die Seite „Mein Dienst“ fragt danach."""
     from services.duty import duty_overview
-    return await duty_overview(get_db(), me)
+    return await duty_overview(get_db(), me, desks=desks)
 
 
 @router.get("/me/level")

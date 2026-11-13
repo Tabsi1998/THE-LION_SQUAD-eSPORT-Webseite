@@ -1,5 +1,5 @@
 // Eine Season verwalten (docs/LIGA.md, #1622) unter /admin/leagues/seasons/<id> - seit #2267 in Reitern nach dem Muster der Spielseite
-// (#2249): Überblick · Spielbetrieb · Termine · Anmeldung und Kader · Tabelle · Regelwerk und Sperrliste · Ligen und Staffeln, per
+// (#2249): Überblick · Leitstand (E.4) · Spielbetrieb · Termine · Anmeldung und Kader · Tabelle · Regelwerk und Sperrliste · Ligen und Staffeln, per
 // Sprungmarke ansteuerbar (#termine, Abschnitte wie #kader oder #anmeldungen führen in ihren Reiter, lib/seasonTabs.js). Jede Angabe steht
 // an genau einer Stelle; welcher Reiter welche Felder trägt, steht in TAB_FIELDS.
 //
@@ -30,6 +30,7 @@ import {
 import { SEASON_TABS, TAB_FIELDS, dirtyTabs, rebaseForm, rulesNotice as noticeOf, seasonTarget, tabPayload } from "@/lib/seasonTabs";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { SeasonDatesTab } from "./SeasonDatesTab";
+import { SeasonDeskTab } from "./SeasonDeskTab";
 import { DivisionSheet, SeasonDivisionsTab, SyncResults } from "./SeasonDivisionsTab";
 import { SeasonEntryTab } from "./SeasonEntryTab";
 import { SeasonOverviewTab } from "./SeasonOverviewTab";
@@ -325,6 +326,8 @@ export default function AdminLeagueSeasonPage() {
         overrideReason={overrideReason} onOverrideReason={setOverrideReason} onJump={go} rulesNotice={notice} rulesLink={rulesLink}
         formProps={formProps("ueberblick")} now={new Date()} />
     ),
+    // Leitstand (E.4, Nr. 152): offene Aufgaben, Protokoll und Rundnachricht - lesen darf jede Zuständigkeit, der Server filtert.
+    leitstand: () => <SeasonDeskTab seasonId={seasonId} divisions={data.divisions} />,
     spielbetrieb: () => (
       <SeasonPlayTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} readiness={readiness} formProps={formProps("spielbetrieb")}
         modes={modes} longest={longest} orderNote={orderNote} seasonModes={seasonModes} onSeasonModes={setSeasonModes} onPoolDirty={setPoolDirty}
