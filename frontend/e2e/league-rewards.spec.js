@@ -31,7 +31,7 @@ const REWARDS = {
   items: [GOLD, SILVER, BRONZE, BANNER, TITLE],
   divisions: [
     { id: "d1", level: 1, label: "Liga 1", own: false, items: [GOLD, SILVER, BRONZE, BANNER, TITLE], staffeln: [
-      { tournament_id: "t1", staffel: "A", closed: true, version: 2, awards: 9, teams: 4, players: 14, suspended: false },
+      { tournament_id: "t1", staffel: "A", closed: true, version: 2, awards: 9, teams: 4, players: 14, suspended: false, roster_fallback: [TEAMS[2]] },
       { tournament_id: "t2", staffel: "B", closed: false, version: null, awards: 0, teams: 0, players: 0, suspended: false }] },
     { id: "d2", level: 2, label: "Liga 2", own: true, items: [item("aufstieg", "emblem", "Aufsteiger-Emblem", { mode: "rank", rank: 1 }, ["team"])], staffeln: [] },
   ],
@@ -139,6 +139,7 @@ test.describe("Liga: Belohnungen", () => {
       await expect(panel.getByTestId("season-rewards-inherit-d1")).toContainText("Goldmedaille (1. Platz)");
       await expect(panel.getByTestId("season-rewards-division-items-d2-name-0")).toHaveValue("Aufsteiger-Emblem");
       await expect(panel.getByTestId("rewards-staffel-t1")).toContainText("9 vergeben · 4 Teams · 14 Spieler · Fassung 2");
+      await expect(panel.getByTestId("rewards-fallback-t1")).toHaveText(`Kader statt Einsatz, weil keine Aufstellungen gemeldet: ${TEAMS[2]}.`);
       await noSideScroll(page);
       // Die Speicherleiste klebt unten - im Bild steht sie am Ende statt mitten über den Zeilen.
       if (width === 1440) await shot(panel, "f4-belohnungen-verwaltung-1440", "[data-testid=season-rewards-bar] { position: static !important; }");
@@ -164,6 +165,9 @@ test.describe("Liga: Belohnungen", () => {
       await expect(collection.getByTestId("reward-art-w-gold")).toHaveAttribute("data-metal", "gold");
       await expect(page.getByTestId("profile-featured-title")).toContainText("Kämpferherz");
       await expect(page.getByTestId("profile-featured-award")).toContainText("Goldmedaille");
+      // Nur Belohnungen: kein leeres Raster für Turnier-Auszeichnungen und kein „Noch keine Auszeichnungen“.
+      await expect(page.getByTestId("profile-award-banners")).toHaveCount(0);
+      await expect(page.getByTestId("public-profile-awards")).not.toContainText("Noch keine Auszeichnungen");
       await noSideScroll(page);
       if (width === 390) await shot(collection, "f4-profil-sammlung-390");
     });

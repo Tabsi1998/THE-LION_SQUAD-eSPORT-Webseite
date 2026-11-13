@@ -234,7 +234,8 @@ async def test_a_lineup_in_a_cancelled_match_is_no_appearance(flow):
 
     matches = [{"status": "cancelled", "lineups": {"reg-1": ["bank"]}}, {"status": "completed", "lineups": {"reg-1": ["star"]}},
                {"status": "forfeit", "games": [{"lineups": {"reg-1": ["kampflos"]}}]}]
-    assert league_rewards._fielded(matches, "reg-1") == {"star", "kampflos"}
+    # Nr. 168: Kampflos ist kein Einsatz - weder abgesagt noch kampflos zählen.
+    assert league_rewards._fielded(matches, "reg-1") == {"star"}
     assert league_rewards._fielded(matches, "reg-2") == set()
 
 
@@ -283,7 +284,9 @@ async def test_reopen_lets_rewards_rest_and_a_new_close_reassigns_them_without_a
     await must_close(flow, staffel)
     first = {doc["reward_key"]: doc["id"] for doc in await rewards_of(flow, staffel)}
     gains = await flow.db.notifications.find({"kind": "league_reward"}, {"_id": 0}).to_list(100)
-    assert {note["user_id"] for note in gains} >= {"p-1-1", "p-2-1", "captain-1"} and all(note["title"] == "Neue Belohnung" for note in gains)
+    assert {note["user_id"] for note in gains if note["title"] == "Neue Belohnung"} >= {"p-1-1", "p-2-1"}
+    # Team-Belohnung: eigene Nachricht an den Captain, nicht als persönlicher Gewinn.
+    assert {(note["user_id"], note["title"]) for note in gains if note["user_id"].startswith("captain")} == {("captain-1", "Belohnung für euer Team")}
     assert "captain-2" not in {note["user_id"] for note in gains}  # Team 2 hat nur Spieler-Belohnungen
 
     second = await lead(flow, league, "Zweite Leitung", "season")
@@ -314,8 +317,9 @@ async def test_reopen_lets_rewards_rest_and_a_new_close_reassigns_them_without_a
     changed = await flow.db.notifications.find({"kind": "league_reward", "meta.dedupe_key": {"$regex": f"^league-reward:{final['id']}:"}},
                                                {"_id": 0}).to_list(100)
     by_person = {(note["user_id"], note["title"]) for note in changed}
-    assert ("p-1-1", "Belohnung entfällt") in by_person and ("captain-1", "Belohnung entfällt") in by_person
-    assert ("p-2-1", "Neue Belohnung") in by_person and ("captain-2", "Neue Belohnung") in by_person
+    assert ("p-1-1", "Belohnung entfällt") in by_person and ("captain-1", "Team-Belohnung entfällt") in by_person
+    assert ("p-2-1", "Neue Belohnung") in by_person and ("captain-2", "Belohnung für euer Team") in by_person
+    assert ("captain-1", "Belohnung entfällt") not in by_person  # der Captain hielt die Team-Belohnung nie persönlich
     # Gegenprobe: wer nur „alle“ hat und behält, bekommt keine Nachricht.
     assert not any(person == "p-3-1" for person, _title in by_person)
 
@@ -521,3 +525,188 @@ async def test_the_ceremony_shows_each_new_reward_once_and_only_to_its_people(fl
     flow.act_as(await flow.add_staff(name="Zweite Leitung"))
     await must_reopen(flow, staffel)
     assert await pdf_rows(flow.db, await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})) == []
+
+
+# ---------------------------------------------------------------- Nachbesserung Runde 1 (Nr. 167, 168)
+
+async def solo_staffel(flow, division: dict) -> dict:
+    """Eine Einzel-Staffel: vier Personen ohne Team (``solo-1`` … ``solo-4``)."""
+    created = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    staffel = await flow.db.tournaments.find_one({"id": created["tournament_id"]}, {"_id": 0})
+    for index in range(1, 5):
+        await flow.db.users.insert_one({"id": f"solo-{index}", "username": f"solo-{index}", "display_name": f"Solo {index}", "role": "user",
+                                        "is_active": True, "email": f"solo-{index}@example.test"})
+        await flow.db.tournament_registrations.insert_one({
+            "id": f"sreg-{index}", "tournament_id": staffel["id"], "user_id": f"solo-{index}", "status": "approved",
+            "registration_type": "solo", "display_name": f"Solo {index}", "identity_key": f"{staffel['id']}:solo:solo-{index}"})
+    started = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert started.status_code == 200, started.text
+    return staffel
+
+
+async def play_solo(flow, staffel):
+    """Jede Partie gewertet, die kleinere Nummer gewinnt - Solo 4 tritt nie an: alle seine Spiele sind kampflos verloren."""
+    for match in await matches_of(flow, staffel):
+        sides = [slot["registration_id"] for slot in match["slots"]]
+        winner = min(sides, key=number)
+        loser = next(side for side in sides if side != winner)
+        status = "forfeit" if "sreg-4" in sides else "completed"
+        await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+            "status": status, "completed_at": LONG_AGO,
+            "results": [{"registration_id": winner, "rank": 1, "score": 2}, {"registration_id": loser, "rank": 2, "score": 0}]}})
+
+
+@pytest.mark.asyncio
+async def test_a_single_player_league_gives_player_rewards_only_with_an_appearance_and_team_rewards_always(flow):
+    for_players = {"kind": "banner", "name": "Spieler-Banner", "places": {"mode": "all"}, "recipients": ["players"]}
+    for_entrant = {"kind": "emblem", "name": "Teilnehmer-Emblem", "places": {"mode": "all"}, "recipients": ["team"]}
+    admin = await flow.add_staff()
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json={"name": "Probe Shooter", "slug": "probe-shooter"})).json()
+    league = (await flow.post(ADMIN, json={"name": "Probe-Liga", "game_id": game["id"]})).json()
+    season = (await flow.post(f"{ADMIN}/{league['id']}/seasons", json=SEASON)).json()
+    division = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={})).json()
+    assert (await flow.put(f"{ADMIN}/seasons/{season['id']}/rewards", json={"items": [for_players, for_entrant]})).status_code == 200
+    staffel = await solo_staffel(flow, division)
+    await play_solo(flow, staffel)
+    await must_close(flow, staffel)
+
+    docs = await rewards_of(flow, staffel)
+    # Einsatz-Variante: Solo 4 hat nie gespielt - kein Spieler-Banner, aber das Emblem für alle Teilnehmer.
+    assert held(docs) == {*{(f"sreg-{index}", "Spieler-Banner") for index in (1, 2, 3)}, *{(f"sreg-{index}", "Teilnehmer-Emblem") for index in (1, 2, 3, 4)}}
+    emblem = next(doc for doc in docs if doc["registration_id"] == "sreg-4")
+    assert emblem["user_id"] == "solo-4" and emblem["audience_ids"] == ["solo-4"] and emblem["player_ids"] == []
+    banner = next(doc for doc in docs if doc["registration_id"] == "sreg-1" and doc["reward"]["name"] == "Spieler-Banner")
+    assert banner["user_id"] == "solo-1" and banner["audience_ids"] == ["solo-1"]
+    flow.act_as({"id": "solo-4", "role": "user"})
+    assert [row["reward"]["name"] for row in (await flow.get("/api/me/awards")).json()["awards"] if row["reward"]] == ["Teilnehmer-Emblem"]
+    notes = await flow.db.notifications.find({"kind": "league_reward", "user_id": "solo-4"}, {"_id": 0}).to_list(10)
+    assert [note["body"] for note in notes] and all("Spieler-Banner" not in note["body"] for note in notes)
+
+    # Kader-Variante: Die angemeldete Person selbst bekommt es - auch ohne Spiel.
+    flow.act_as(admin)
+    assert (await flow.put(f"{ADMIN}/seasons/{season['id']}/rewards", json={"reward_players": "roster"})).status_code == 200
+    flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
+    await must_reopen(flow, staffel)
+    await must_close(flow, staffel)
+    assert ("sreg-4", "Spieler-Banner") in held(await rewards_of(flow, staffel))
+
+
+@pytest.mark.asyncio
+async def test_without_lineups_or_with_only_forfeits_the_roster_gets_the_player_reward(flow):
+    admin, _league, season, _division, staffel = await setup(flow, rewards=[EVERYONE])
+    await play_all(flow, staffel)
+    # Team 2 hat nie eine Aufstellung gemeldet; Team 3 hat nur kampflose Spiele (Nr. 167, 168).
+    for match in await matches_of(flow, staffel):
+        sides = {slot["registration_id"] for slot in match["slots"]}
+        lineups = {key: value for key, value in (match.get("lineups") or {}).items() if key != "reg-2"}
+        update = {"lineups": lineups}
+        if "reg-3" in sides:
+            update["status"] = "forfeit"
+        await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": update})
+    await must_close(flow, staffel)
+    docs = {doc["registration_id"]: doc for doc in await rewards_of(flow, staffel)}
+    assert docs["reg-2"]["player_ids"] == ["p-2-1", "p-2-2", "p-2-3"] and docs["reg-2"]["roster_fallback"] is True
+    assert docs["reg-3"]["player_ids"] == ["p-3-1", "p-3-2", "p-3-3"] and docs["reg-3"]["roster_fallback"] is True
+    # Gegenprobe: mit Aufstellung in gespielten Spielen nur der Einsatz, ohne Rückfall.
+    assert docs["reg-1"]["player_ids"] == ["p-1-1", "p-1-2"] and docs["reg-1"]["roster_fallback"] is False
+    assert all(doc["player_ids"] for doc in docs.values())  # kein Eintrag ohne Empfänger
+
+    view = (await flow.get(f"{ADMIN}/seasons/{season['id']}/rewards")).json()
+    row = next(item for division in view["divisions"] for item in division["staffeln"] if item["tournament_id"] == staffel["id"])
+    assert row["roster_fallback"] == ["Probe 2", "Probe 3"]
+    closing = (await flow.get(f"{ADMIN}/seasons/{season['id']}/closing")).json()
+    assert closing["staffeln"][0]["rewards_roster_fallback"] == ["Probe 2", "Probe 3"]
+
+
+@pytest.mark.asyncio
+async def test_a_new_captain_after_a_reopen_brings_no_gain_or_loss_message(flow):
+    admin, league, _season, _division, staffel = await setup(flow, rewards=[GOLD])
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
+    await must_reopen(flow, staffel)
+    # Neue Teamleitung bei Team 1 - am Ergebnis ändert sich nichts.
+    await flow.db.teams.update_one({"id": "team-1"}, {"$set": {"leader_id": "p-1-3"}})
+    flow.act_as(admin)
+    await must_close(flow, staffel)
+    final = await flow.db.league_final_tables.find_one({"tournament_id": staffel["id"], "active": True}, {"_id": 0})
+    second = await flow.db.notifications.count_documents({"kind": "league_reward", "meta.dedupe_key": {"$regex": f"^league-reward:{final['id']}:"}})
+    assert second == 0
+    # Gegenprobe: Der neue Captain hört von einer neuen Team-Belohnung schon.
+    from services import league_final, league_rewards
+
+    tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    frame = await league_final._frame(flow.db, tournament)
+    await league_rewards.notify(flow.db, tournament, final, frame, {"team_gains": {"team-1": ["Neu"]}, "team_leads": {"team-1": ["p-1-3"]},
+                                                                   "team_names": {"team-1": "Probe 1"}})
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "user_id": "p-1-3", "title": "Belohnung für euer Team"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_real_prize_moves_with_its_place_until_it_is_picked_up(flow):
+    top_two = {"kind": "medal", "name": "Finalisten-Medaille", "places": {"mode": "range", "from": 1, "to": 2}, "recipients": ["team"],
+               "prize": "Gutschein"}
+    admin, league, _season, _division, staffel = await setup(flow, rewards=[top_two])
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    pickups = {row["team_id"]: row for row in await flow.db.prize_pickups.find({"tournament_id": staffel["id"]}, {"_id": 0}).to_list(10)}
+    assert {key: (row["place"], row["place_label"]) for key, row in pickups.items()} == {"team-1": (1, "1. Platz"), "team-2": (2, "2. Platz")}
+    await flow.db.prize_pickups.update_one({"id": pickups["team-2"]["id"]}, {"$set": {"status": "picked_up"}})
+    flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
+    await must_reopen(flow, staffel)
+    flow.act_as(admin)
+    await play_all(flow, staffel, winner_of=lambda pair: "reg-2" if "reg-2" in pair else min(pair, key=number))
+    await must_close(flow, staffel)
+    after = {row["team_id"]: row for row in await flow.db.prize_pickups.find({"tournament_id": staffel["id"]}, {"_id": 0}).to_list(10)}
+    assert set(after) == {"team-1", "team-2"}
+    # Nicht abgeholt: zieht mit auf Platz 2. Abgeholt: bleibt und wird zur Prüfung markiert.
+    assert (after["team-1"]["place"], after["team-1"]["place_label"], bool(after["team-1"].get("needs_review"))) == (2, "2. Platz", False)
+    assert (after["team-2"]["place"], after["team-2"]["needs_review"]) == (2, True)
+
+
+@pytest.mark.asyncio
+async def test_the_share_image_is_drawn_once_and_a_resting_reward_is_not_served_from_memory(flow, monkeypatch):
+    from services import reward_share
+    from services.share_image_cache import is_public_share_image, share_images
+
+    _admin, league, _season, _division, staffel = await setup(flow, rewards=[GOLD])
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    award = (await rewards_of(flow, staffel))[0]
+    share_images.clear()
+    drawn = []
+    original = reward_share.render_card
+    monkeypatch.setattr(reward_share, "render_card", lambda payload: drawn.append(payload) or original(payload))
+    flow.act_as(None)
+    first = await flow.get(f"/api/rewards/{award['id']}/share.png")
+    second = await flow.get(f"/api/rewards/{award['id']}/share.png")
+    assert first.status_code == second.status_code == 200 and first.content == second.content and len(drawn) == 1
+    assert first.headers.get("cache-control") == "public, max-age=300"
+    assert is_public_share_image(f"/api/rewards/{award['id']}/share.png") and not is_public_share_image("/api/rewards/x/share.png/mehr")
+    flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
+    await must_reopen(flow, staffel)
+    flow.act_as(None)
+    resting = await flow.get(f"/api/rewards/{award['id']}/share.png")
+    assert resting.status_code == 404 and len(drawn) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_new_season_takes_over_the_rewards_and_says_so(flow):
+    from services.league_successor import COPIED_GROUPS, NOT_COPIED
+
+    _admin, _league, season, division, staffel = await setup(flow, rewards=[GOLD])
+    own = {"kind": "emblem", "name": "Liga-Emblem", "places": {"mode": "rank", "rank": 1}, "recipients": ["team"]}
+    assert (await flow.put(f"{ADMIN}/seasons/{season['id']}/rewards", json={"divisions": {division["id"]: [own]}, "reward_players": "roster"})).status_code == 200
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    preview = (await flow.get(f"{ADMIN}/seasons/{season['id']}/successor")).json()
+    assert "Belohnungen je Season und Liga N" in preview["copied"] and "Belohnungen je Season und Liga N" in COPIED_GROUPS
+    assert not {"rewards", "reward_players"} & NOT_COPIED
+    created = await flow.post(f"{ADMIN}/seasons/{season['id']}/successor", json={"confirm": True, "start_date": "2027-03-01T00:00:00"})
+    assert created.status_code == 200, created.text
+    new_id_ = created.json()["season"]["id"]
+    copied = await flow.db.league_seasons.find_one({"id": new_id_}, {"_id": 0})
+    assert [row["name"] for row in copied["rewards"]] == ["Goldmedaille"] and copied["reward_players"] == "roster"
+    new_division = await flow.db.league_divisions.find_one({"season_id": new_id_}, {"_id": 0})
+    assert [row["name"] for row in new_division["rewards"]] == ["Liga-Emblem"]
