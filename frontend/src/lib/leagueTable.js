@@ -33,6 +33,19 @@ export const MAPS_TIEBREAKERS = ["wins", "head_to_head", "score_diff", "lead_dec
 const OLD_DEFAULTS = { table_tiebreakers: ["score_diff", "score_for"], head_to_head_criteria: ["points", "score_diff", "score_for"],
   allow_draws: true, forfeit_score: "recorded", exit_rule: "half" };
 
+// Vorgabe einer Season, die noch keine Regeln trägt (#2406) - dieselbe wie der Server (scoring_rules.LEAGUE_TABLE_DEFAULTS): 3/0/0, kein Remis.
+export const LEAGUE_TABLE_DEFAULTS = {
+  match_points: { win: 3, draw: 0, loss: 0 },
+  table_tiebreakers: ["head_to_head", "score_diff", "score_for", "lead_decision"],
+  head_to_head_criteria: ["points", "score_diff", "score_for"],
+  allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents",
+};
+
+/** Trägt die Season Regeln? Ohne (neu oder sehr alt) zeigt das Formular die Vorgabe des Servers, nicht den alten Stand. */
+export function hasTableRules(rules) {
+  return Boolean(rules) && typeof rules === "object" && Object.keys(rules).length > 0;
+}
+
 /** Punkte nach gewonnenen Maps? (Season- oder Staffel-Regeln) */
 export function byMaps(rules) {
   return rules?.match_points_mode === "maps";
