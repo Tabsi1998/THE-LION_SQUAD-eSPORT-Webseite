@@ -242,3 +242,14 @@ def test_rfc_8291_testvektor():
         "mlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPT"
         "pK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN"
     )
+
+
+def test_betraege_werden_erkannt_und_die_pruefung_bleibt_bei_langen_texten_schnell():
+    import time
+    from services.web_push import _mentions_money
+    for text, expected in (("Kostenbeitrag 40,00 €", True), ("€ 20", True), ("12,00 CHF", True), ("20 Euro", True),
+                           ("Finale an PC 3", False), ("Euro-Cup", False)):
+        assert _mentions_money(text) is expected, text
+    started = time.monotonic()
+    _mentions_money("0" * 200_000 + "x")
+    assert time.monotonic() - started < 1.0

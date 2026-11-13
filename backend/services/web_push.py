@@ -324,11 +324,22 @@ NEUTRAL_TEXTS = {
 MONEY_BODY = "Die Einzelheiten findest du in deinem Konto."
 PRIVATE_TITLE = "THE LION SQUAD"
 PRIVATE_BODY = "Neue Benachrichtigung"
-_MONEY = re.compile(r"\d[\d.,]*\s?(?:€|EUR\b)")
+_CURRENCY_MARKS = ("€", "EUR", "Euro", "CHF")
 
 
 def _mentions_money(text: str) -> bool:
-    return bool(_MONEY.search(text or ""))
+    """Steht ein Betrag im Text („20 €“, „20,00€“, „€ 20“, „20 EUR“, „20 Euro“)? Ohne regulären Ausdruck: Eine Ziffer direkt
+    vor oder nach dem Währungszeichen reicht. Die Prüfung läuft linear, auch bei langen Eingaben."""
+    text = text or ""
+    for mark in _CURRENCY_MARKS:
+        start = text.find(mark)
+        while start != -1:
+            before = text[max(0, start - 2):start].rstrip()[-1:]
+            after = text[start + len(mark):start + len(mark) + 2].lstrip()[:1]
+            if before.isdigit() or after.isdigit():
+                return True
+            start = text.find(mark, start + 1)
+    return False
 
 
 def lock_screen_text(notification: dict[str, Any], *, private: bool = False) -> tuple[str, str]:
