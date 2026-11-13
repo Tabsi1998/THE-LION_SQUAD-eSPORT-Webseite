@@ -471,7 +471,7 @@ async def season_log(db, season: dict, page: int = 1, *, me: dict | None = None)
     pages = max(1, -(-total // LOG_PAGE_SIZE))
     page = min(max(1, int(page or 1)), pages)
     rows = await db.audit_logs.find(query, {"_id": 0, "id": 1, "action": 1, "actor_id": 1, "target_id": 1, "data": 1, "created_at": 1}) \
-        .sort("created_at", -1).skip((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).to_list(LOG_PAGE_SIZE)
+        .sort([("created_at", -1), ("id", -1)]).skip((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).to_list(LOG_PAGE_SIZE)
     actor_ids = sorted({row["actor_id"] for row in rows if row.get("actor_id")})
     names = {row["id"]: row.get("display_name") or row.get("username") or "Mitglied" for row in await db.users.find(
         {"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(actor_ids) + 1)} if actor_ids else {}

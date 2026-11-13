@@ -794,6 +794,19 @@ async def test_log_hides_sanctions_and_conflict_overrides_without_the_matching_c
     assert await seen(world["staff"]) == {"a-sanction", "a-override", "a-accept"}, "der Bereich Ligen sieht alles"
 
 
+@pytest.mark.asyncio
+async def test_log_order_is_stable_for_entries_of_the_same_moment(flow):
+    """N-d: Gleich alte Einträge stehen immer in derselben Reihenfolge (Kennung als zweiter Schlüssel) - keiner springt beim Blättern
+    zwischen zwei Seiten hin und her."""
+    world = await desk_world(flow)
+    moment = now_utc().isoformat()
+    await flow.db.audit_logs.insert_many([{"id": f"log-{letter}", "action": "league.season.update", "actor_id": world["staff"]["id"],
+                                           "target_id": world["season_id"], "data": {}, "created_at": moment} for letter in "acb"])
+    flow.act_as(world["staff"])
+    items = (await flow.get(f"{ADMIN}/seasons/{world['season_id']}/desk/log")).json()["items"]
+    assert [row["id"] for row in items] == ["log-c", "log-b", "log-a"]
+
+
 def test_log_query_uses_anchored_prefixes_without_alternation_on_indexed_fields():
     from services.league_desk import log_query
 
