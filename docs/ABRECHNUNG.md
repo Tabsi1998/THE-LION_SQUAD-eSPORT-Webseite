@@ -112,7 +112,8 @@ jemand nach der Abmeldung wieder an, rückt nach der Abmeldung von der Wartelist
 Turnierleitung eine abgelehnte, ausgetretene oder „nicht erschienene“ Anmeldung wieder (auch über den Check-in),
 entsteht kein zweiter Auftrag. Die Anmeldung trägt wieder den Preis und Stand der Rechnung, es öffnet sich der
 Prüffall „Buchung nach dem Beleg geändert“ mit altem und neuem Betrag (Grund „Nach Storno selbst neu angemeldet“ –
-auch wenn die Leitung eine selbst neu angemeldete Person von der Warteliste holt –, „Nach Storno von der
+auch wenn die Leitung eine selbst neu angemeldete Person von der Warteliste holt oder nach einer weggenommenen
+Ablehnung bestätigt –, „Nach Storno von der
 Warteliste nachgerückt“ oder „Anmeldung wieder aktiviert“). Die Abmeldung löscht die Turnier-Anmeldung; als
 dieselbe Anmeldung zählt eine neue, wenn Turnier, zahlende Person und Team (Solo: keins) gleich sind. Meldet
 ein **anderes Mitglied** das Team neu an – auch nach einer weggenommenen Ablehnung –, übernimmt es die Kosten
