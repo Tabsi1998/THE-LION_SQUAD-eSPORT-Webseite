@@ -122,6 +122,34 @@ async def test_with_a_lineup_only_the_lineup_and_the_captain_hear_it(flow):
     assert {"Mila", "Kapitaen"} <= got and "Tom" not in got, "aufgestellt: Mila; Captain immer"
 
 
+def ban(world, name: str, **fields) -> dict:
+    """Eine Spielsperre aus E.3 (``competition_sanctions``), seit gestern, bis in einer Woche."""
+    now = now_utc()
+    return {"id": new_id(), "league_id": "liga", "season_id": world["season_id"], "kind": "player_ban", "target_type": "player",
+            "user_id": world["users"][name]["id"], "state": "final", "revoked_at": None,
+            "starts_at": (now - timedelta(days=1)).isoformat(), "ends_at": (now + timedelta(days=7)).isoformat(), **fields}
+
+
+@pytest.mark.asyncio
+async def test_recipients_leave_out_banned_accounts_old_lineup_entries_and_players_banned_for_the_match(flow):
+    """N4: gesperrte Konten nie; aus der Aufstellung nur, wer noch im Kader ist; wer laut E.3 gesperrt ist, nicht als Spieler - als
+    Captain aber schon."""
+    world = await reminder_world(flow)
+    users = world["users"]
+    await flow.db.users.update_one({"id": users["Tom"]["id"]}, {"$set": {"is_banned": True}})
+    # Ida gehört zu Rudel B, nicht zu diesem Co-Team - ein alter Eintrag in der Aufstellung.
+    await flow.db.tournament_registrations.update_one({"id": world["reg_a"]["id"]}, {"$set": {
+        "lineup": [users["Mila"]["id"], users["Ida"]["id"], users["Tom"]["id"]]}})
+    await flow.db.competition_sanctions.insert_many([ban(world, "Falke2"), ban(world, "Falke1")])
+    assert (await run(flow, world, world["start"] - timedelta(hours=24)))["upcoming_early"] == 1
+    got = names(world, await notes(flow, "upcoming_early"))
+    assert "Tom" not in got, "gesperrtes Konto"
+    assert "Ida" not in got and "Mila" in got, "Aufstellung nur, soweit noch im Kader"
+    assert "Falke2" not in got, "für dieses Spiel gesperrt"
+    assert "Falke1" in got, "gesperrt, aber Captain: bekommt sie als Captain"
+    assert "Falke3" in got and "Kapitaen" in got, "Gegenprobe: die übrigen"
+
+
 @pytest.mark.asyncio
 async def test_no_reminder_for_cancelled_started_or_moved_matches(flow):
     world = await reminder_world(flow)

@@ -109,10 +109,13 @@ def _name(registration: dict | None) -> str:
 
 async def _send(db, user_ids, title: str, body: str, match: dict, rules: dict, kind: str, dedupe: str, *,
                 notification_kind: str) -> int:
+    from services.match_audience import users_for
     from services.user_notifications import create_user_notification
 
+    # Gesperrte Konten bekommen nichts (wie ``users_for`` überall).
+    allowed = {user["id"] for user in await users_for(db, user_ids, {"_id": 0, "id": 1})}
     sent = 0
-    for user_id in sorted(user_ids):
+    for user_id in sorted(allowed):
         if await create_user_notification(
             user_id, title, body, url=f"/matches/{match.get('id')}", kind=notification_kind,
             meta={"category": "match_reminders", "match_id": match.get("id"), "tournament_id": match.get("tournament_id"),
@@ -121,14 +124,40 @@ async def _send(db, user_ids, title: str, body: str, match: dict, rules: dict, k
     return sent
 
 
-async def remind_upcoming(db, tournament: dict, match: dict, rules: dict, kind: str) -> int:
-    """„Liga-Spiel in 24 Stunden“ an Aufstellung bzw. Kader und Captains - je Seite mit dem Namen der anderen."""
-    from services.match_audience import playing_ids, registrations_for_match, responsible_ids, teams_by_id
+async def _players(db, tournament: dict, match: dict, registrations: list[dict], teams: dict, now: datetime | None) -> dict[str, set]:
+    """Je Anmeldung, wer als Spieler erinnert wird: die Aufgestellten, soweit noch im Kader (ohne Aufstellung der Kader) - ohne
+    Personen, die laut E.3 für dieses Spiel gesperrt sind (Spielsperre, oder das ganze Co-Team gesperrt)."""
+    from services import league_sanction_bans
+    from services.match_audience import playing_ids, roster_ids
+
+    out: dict[str, set] = {}
+    for reg in registrations:
+        team = teams.get(reg.get("team_id") or "")
+        people = playing_ids(reg, team)
+        if reg.get("team_id") and reg.get("lineup"):
+            people &= roster_ids(reg, team)
+        out[reg["id"]] = people
+    context = tournament.get("league_context") or {}
+    everyone = set().union(*out.values()) if out else set()
+    found = await league_sanction_bans.bans(db, context.get("league_id"), context.get("season_id"), everyone, match=match, now=now)
+    for reg in registrations:
+        if league_sanction_bans.squad_ban(found, reg.get("squad_id")):
+            out[reg["id"]] = set()
+        else:
+            out[reg["id"]] = {user_id for user_id in out[reg["id"]] if user_id not in found.users}
+    return out
+
+
+async def remind_upcoming(db, tournament: dict, match: dict, rules: dict, kind: str, *, now: datetime | None = None) -> int:
+    """„Liga-Spiel in 24 Stunden“ an Aufstellung bzw. Kader und Captains - je Seite mit dem Namen der anderen. Gesperrte Spieler
+    (E.3) bekommen sie nicht, als Captain schon."""
+    from services.match_audience import registrations_for_match, responsible_ids, teams_by_id
 
     registrations = [reg for reg in await registrations_for_match(db, match) if reg.get("id") in _filled(match)]
     if len(registrations) != 2:
         return 0
     teams = await teams_by_id(db, registrations)
+    players = await _players(db, tournament, match, registrations, teams, now)
     minutes = int(rules["upcoming_early_hours"]) * 60 if kind == EARLY else int(rules["upcoming_late_minutes"])
     start = league_schedule._iso(match.get("scheduled_at"))
     dedupe = upcoming_key(match, kind)
@@ -137,7 +166,7 @@ async def remind_upcoming(db, tournament: dict, match: dict, rules: dict, kind: 
     for reg in registrations:
         other = next(row for row in registrations if row.get("id") != reg.get("id"))
         team = teams.get(reg.get("team_id") or "")
-        people = playing_ids(reg, team) | responsible_ids(reg, team)
+        people = players[reg["id"]] | responsible_ids(reg, team)
         body = f"{tournament.get('title') or 'Liga'}: gegen {_name(other)} am {when_text(start)} Uhr."
         sent += await _send(db, people, title, body, match, rules, kind, dedupe, notification_kind="match_reminder")
     return sent
@@ -180,7 +209,7 @@ async def sweep(db, tournaments: list[dict], *, now: datetime | None = None) -> 
             try:
                 kind = upcoming_due(tournament, match, rules, now)
                 if kind and not already_sent(match, kind, upcoming_key(match, kind)):
-                    if await remind_upcoming(db, tournament, match, rules, kind):
+                    if await remind_upcoming(db, tournament, match, rules, kind, now=now):
                         counts[kind] += 1
                     await _note_sent(db, match, kind, upcoming_key(match, kind))
                 window = unscheduled_due(tournament, match, rules, now)
