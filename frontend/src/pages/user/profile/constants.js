@@ -122,23 +122,25 @@ export const EMAIL_PREFERENCES = [
   { k: "tournament_updates", l: "Turnier-Updates", d: "Anmeldung, Status, Ergebnisse und wichtige Turnierinfos.", defaultOn: true },
   { k: "prize_updates", l: "Gewinne & Abholung", d: "Gewinn bereit, übergeben oder Frist abgelaufen.", defaultOn: true },
   // Erfolge (#568): In-App, Push und Discord - eine Mail dafür gibt es nicht, die Spalte zeigt einen Strich.
-  { k: "achievements", l: "Erfolge", d: "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.", defaultOn: true, channels: ["in_app", "push", "discord"] },
+  { k: "achievements", l: "Erfolge", d: "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.", defaultOn: true, channels: ["in_app", "push", "browser", "discord"] },
   // Wochenrückblick (#622): montags eine Mail an dich selbst - nur bei Aktivität, nur per E-Mail.
   { k: "achievement_recap", l: "Wochenrückblick", d: "Montags eine kurze Mail mit deinen XP, deinem Level und neuen Erfolgen – nur, wenn du in der Woche etwas erreicht hast.", defaultOn: true, channels: ["email"] },
   // Rechnungen (#841): „Deine Rechnung ist da“ - Beträge gehen nie über Discord, die Spalte zeigt dort einen Strich.
-  { k: "billing_updates", l: "Rechnungen", d: "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF in deinem Konto.", defaultOn: true, channels: ["in_app", "push", "email"] },
+  { k: "billing_updates", l: "Rechnungen", d: "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF in deinem Konto.", defaultOn: true, channels: ["in_app", "push", "browser", "email"] },
   { k: "membership_updates", l: "Vereinsmitgliedschaft", d: "Einladungen zum Antrag, Nummern und Vereinsvorteile. Entscheidungen über deine Mitgliedschaft bekommst du immer per Mail.", defaultOn: true },
   { k: "birthday_greetings", l: "Geburtstagsgruß", d: "Einmal im Jahr eine Geburtstagsmail vom Verein.", defaultOn: true },
   { k: "community_messages", l: "Nachrichten & Erwähnungen", d: "Direktnachrichten, Team-Chat-Erwähnungen und ähnliche Community-Hinweise.", defaultOn: true },
   { k: "news_events", l: "News & Events", d: "Neue Vereinsnews, neue Events und wichtige Ankündigungen.", requiresNewsletter: true },
   { k: "club_internal", l: "Vereinsintern", d: "Interne Events und News, die nur Mitglieder sehen.", defaultOn: true },
   // Helferdienste (#1197): Aufruf des Vorstands und Erinnerung am Vortag - nur für Mitglieder, keine Mail.
-  { k: "helper_shifts", l: "Helferdienste", d: "Nur für Vereinsmitglieder: Aufrufe für offene Helferschichten und die Erinnerung am Vortag.", defaultOn: true, channels: ["in_app", "push", "discord"] },
+  { k: "helper_shifts", l: "Helferdienste", d: "Nur für Vereinsmitglieder: Aufrufe für offene Helferschichten und die Erinnerung am Vortag.", defaultOn: true, channels: ["in_app", "push", "browser", "discord"] },
 ];
 
 export const NOTIFICATION_CHANNELS = [
   { k: "email", l: "E-Mail", d: "Nur wichtige optionale Hinweise per Mail.", defaultOn: true },
   { k: "push", l: "Push", d: "System-Benachrichtigungen auf registrierten Mobilgeräten.", defaultOn: true },
+  // Browser-Benachrichtigungen (#1163): wie Push, nur im Browser - nur da, wenn der Server sie eingerichtet hat.
+  { k: "browser", l: "Browser", d: "Meldungen im Browser – auch bei geschlossener Website, sobald du dort zugestimmt hast.", defaultOn: true },
   { k: "in_app", l: "In-App", d: "Hinweise in Web, App und Notification-Center.", defaultOn: true },
   // Discord als Kanal (#567): Direktnachricht vom Vereins-Bot, nur mit verknüpftem Konto - Standard aus.
   { k: "discord", l: "Discord", d: "Direktnachricht vom Vereins-Bot – nur mit verknüpftem Discord-Konto.", defaultOn: false },
