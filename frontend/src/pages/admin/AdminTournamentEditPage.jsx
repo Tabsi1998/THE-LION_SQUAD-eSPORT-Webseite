@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
-import { checkinStatusText, placementMessage } from "@/lib/tournamentFillIn";
+import { placementMessage } from "@/lib/tournamentFillIn";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
@@ -9,7 +9,7 @@ import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { OnsiteAccessPanel, OnsiteMark } from "./tournament/OnsiteAccessPanel";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
 import { toast } from "sonner";
-import { Zap, RefreshCw, Eye, Search, Tv } from "lucide-react";
+import { Zap, RefreshCw, Eye, Search, Tv, UserCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
@@ -227,17 +227,6 @@ export default function AdminTournamentEditPage() {
     } catch (e) {
       toast.error(formatRequestError(e, "Setzplatz konnte nicht gespeichert werden."));
       return false;
-    }
-  };
-  const setRegCheckinStatus = async (rid, status) => {
-    try {
-      const { data } = await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
-      // Mit Nachrücker von der Warteliste (#1941): die Meldung nennt ihn.
-      toast.success(checkinStatusText(status, data, regs));
-      showPlacement(data?.placement);
-      load();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
     }
   };
   // `keepStage` (Liga-Staffel, #2109): ohne Struktur im Aufruf baut der Server mit der vorhandenen Phase neu - die
@@ -512,8 +501,9 @@ export default function AdminTournamentEditPage() {
   const inFixedBracket = fixedRegistrationIds(matchesV2);
   const tournamentOver = FINISHED_STATUSES.has(t.status) || t.status === "cancelled";
   const swissUndo = t.format === "swiss" && !tournamentOver && !t.locked_at ? swissUndoInfo(matchesV2) : null;
-  // Staffel (S18): kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des
-  // Co-Teams. Austritt und Disqualifikation gehen über ParticipantRemovalActions.
+  // Check-in (#1161): ein Ort - der Reiter „Check-in“ der Turnierleitung; hier steht nur der Weg dorthin. Staffel (S18):
+  // kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des Co-Teams.
+  // Austritt und Disqualifikation gehen über ParticipantRemovalActions.
   const checkInTools = Boolean(t.can_check_in) && !staffel;
   // Setzplatz (#2111, TA15): bei „Manuell“ ordnet er die Vorschau - änderbar, bis der Baum steht (Ende des Check-ins).
   const seedEditable = Boolean(t.can_manage_participants) && !staffel && !structureFixed && ["manual", "ranking"].includes(t.seeding_mode);
@@ -674,6 +664,14 @@ export default function AdminTournamentEditPage() {
 
       {activeTab === "participants" && (
         <div className="space-y-4">
+        {checkInTools && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid="admin-tr-checkin-link">
+            <p className="min-w-0 flex-1 text-sm text-white/70">Abgehakt wird in der Turnierleitung – am Handy, mit Suche und Zähler „wer ist da“. Hier bleiben Freigeben, Ablehnen und das PDF.</p>
+            <Link to={`/tournaments/${t.slug || t.id}/leitung?reiter=checkin`} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+              <UserCheck className="h-4 w-4" aria-hidden="true" /> Zum Check-in
+            </Link>
+          </div>
+        )}
         {/* Liga (#1649): Co-Teams teilt die Turnierleitung von Hand zu - Hauptteam, dann Co-Team, mit allen Prüfungen. */}
         {(staffel ? t.can_manage_participants : isTournamentLead) && canAssignSquads(t) && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-white/10 bg-[#121212] p-4">
@@ -755,15 +753,6 @@ export default function AdminTournamentEditPage() {
                       <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-mobile-${r.id}`} />
                     </div>
                   )}
-                  {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist", "withdrawn", "disqualified"].includes(r.status) && (
-                    <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
-                  )}
-                  {checkInTools && r.status === "checked_in" && (
-                    <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
-                  )}
-                  {checkInTools && !["checked_in", "rejected", "waitlist", "no_show", "withdrawn", "disqualified"].includes(r.status) && (
-                    <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
-                  )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
                   {t.can_manage_participants && !inFixedBracket.has(r.id) && (
                     <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
@@ -803,15 +792,6 @@ export default function AdminTournamentEditPage() {
                         <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
                           <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                         </select>
-                      )}
-                      {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist", "withdrawn", "disqualified"].includes(r.status) && (
-                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-1 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
-                      )}
-                      {checkInTools && r.status === "checked_in" && (
-                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
-                      )}
-                      {checkInTools && !["checked_in", "rejected", "waitlist", "no_show", "withdrawn", "disqualified"].includes(r.status) && (
-                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
                       {t.can_manage_participants && !inFixedBracket.has(r.id) && (

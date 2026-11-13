@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.83.0 (13.11.2026)
+
+### Neu
+
+* „Map-Veto wartet“ mit Sekunden je Season (Vorgabe 20 s / 5 s), passend zur Zeit je Schritt (#1647)
+* Erinnerung „Ergebnis fehlt“ je Season abschaltbar, wartet auf offene Vorfälle und Verfahren (#1647)
+* Kasten „Erinnerungen“ im Reiter Termine der Season mit Schalter je Art und Discord ergänzend (#1647)
+* Liga-Erinnerung „Termin noch offen“ zur Wochenmitte, spätestens 24 h vor einem früheren Standardtermin (#1647)
+* Liga-Erinnerungen 24 h und 1 h vor dem Spiel an Aufstellung und Captains (#1647)
+* Turnierleitung - Reiter „Check-in“ am Handy mit Suche, Zähler „N von M da“, Team-Zeilen und Etikett „Startgeld offen“ (#1161)
+* Turnierverwaltung - Check-in nur noch in der Turnierleitung, Link „Zum Check-in“ im Reiter Teilnehmer (#1161)
+
+### Fehlerbehebungen
+
+* Check-in - „Freigabe offen“ erst freigeben statt abhaken (#1161)
+* Check-in - die Meldung beim Nachrücken nennt wieder den Namen (#1161)
+* Check-in - Rückkehr aus „Nicht erschienen“ nur auf einen freien Platz, Rückfrage vor dem Nachrücken von der Warteliste (#1161)
+* Erinnerung vor dem ersten Spiel nach einer Sperrzeit kommt auch, wenn sie noch in die Pause fällt (#1647)
+* Liga-Erinnerung unterdrückt „Match startet in 10 Minuten“ nicht (#1647)
+* Liga-Erinnerungen kommen auch bei doppeltem Joblauf nur einmal (#1647)
+* Liga-Erinnerungen nicht an gesperrte Konten und nicht an für das Spiel gesperrte Spieler (#1647)
+* Regeltext nennt „Ergebnis fehlt“ nur, wenn die Erinnerung eingeschaltet ist (#1647)
+* Turniere - anderes Teammitglied übernimmt nach weggenommener Ablehnung keine fremde Rechnung (#2368)
+* Turniere - Check-in nach „Nicht erschienen“ bucht das Startgeld zurück (#2368)
+* Turniere - Check-in-Dienst friert beim Bestätigen von der Warteliste das Startgeld ein (#2368)
+* Turniere - ersetzte Person schließt ihren Startgeld-Auftrag (#2368)
+* Turniere - Nachricht nach Rückbuchung nennt die bestehende Rechnung statt eines Betrags (#2368)
+* Turniere - Neuanmeldung nach Storno mit Rechnung wird ein Prüffall statt einer zweiten Rechnung (#2368)
+* Turniere - Prüffall nennt „selbst neu angemeldet“, wenn die Leitung eine Rückkehr bestätigt (#2368)
+* Turniere - Rückkehr aus „Nicht erschienen“ legt ohne Startgeld keine Rechnung an (#2368)
+* Turniere - Teamleitung nach Wechsel über die Co-Leitung wieder auf den eigenen Beleg gebucht (#2368)
+
 ## 1.82.0 (13.11.2026)
 
 ### Neu

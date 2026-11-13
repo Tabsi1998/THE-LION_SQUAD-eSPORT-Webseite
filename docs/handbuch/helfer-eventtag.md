@@ -70,7 +70,8 @@ Jede Eingabe wird gespeichert, auch wer sie gemacht hat. Du kannst nichts kaputt
 
 1. Wer vor Ort mitspielen will, scannt den **QR-Code am Aushang** (oder am TV).
 2. Am Handy **Mitspielen** → anmelden → **Verbindlich anmelden**.
-3. **Einchecken** macht die Turnierleitung: Verwaltung des Turniers → Reiter **Teilnehmer** → **Check-in**.
+3. **Einchecken** macht die Turnierleitung am Handy: Turnierseite → **Turnierleitung** → Reiter **Check-in** → **Da**
+   (Suche oben, Zähler „13 von 16 da“). Wer nicht kommt: **Nicht erschienen**; ein Fehltipp: **Rückgängig**.
 
 <img src="../assets/helfer/c1-qr-handy.png" alt="Turnierseite nach dem Scannen mit freien Plätzen und Knopf Mitspielen" width="220">
 

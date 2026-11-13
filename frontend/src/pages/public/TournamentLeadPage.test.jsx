@@ -179,3 +179,56 @@ test("Befangen (#2203): kein Eintragen, der Satz sagt warum - „nicht erschiene
   expect(await screen.findByTestId("lead-conflict-m8")).toHaveTextContent("Selbst beteiligt");
   expect(screen.queryByTestId("lead-enter-m8")).toBeNull();
 });
+
+// Reiter "Check-in" (#1161): nur mit Check-in-Recht; im Status "Check-in" oeffnet die Seite dort, die Verwaltung verlinkt
+// mit ?reiter=checkin. Die Liste selbst testet CheckinBoard.test.jsx.
+function renderWithCheckin(tournament, path = "/tournaments/fc-cup/leitung") {
+  apiMock.get.mockImplementation((url) => {
+    if (String(url).endsWith("/lead/checkin")) return Promise.resolve({ data: { applies: true, team_mode: false, tournament: { id: "t1", slug: "fc-cup" }, rows: [{ id: "r1", name: "Anton", status: "approved", kind: "solo", fee: null }] } });
+    if (String(url).endsWith("/live-queue")) return Promise.resolve({ data: { applies: false } });
+    return Promise.resolve({ data: { tournament, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } } });
+  });
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+}
+
+test("Check-in-Reiter: ohne Check-in-Recht fehlt er, im Status Check-in startet die Seite dort", async () => {
+  const first = renderWithCheckin({ id: "t1", slug: "fc-cup", title: "Cup", status: "check_in", can_check_in: false });
+  await screen.findByTestId("lead-row-m8");
+  expect(screen.queryByTestId("lead-tab-checkin")).toBeNull();
+  expect(apiMock.get.mock.calls.some(([url]) => String(url).endsWith("/lead/checkin"))).toBe(false);
+  first.unmount();
+
+  renderWithCheckin({ id: "t1", slug: "fc-cup", title: "Cup", status: "check_in", can_check_in: true });
+  expect(await screen.findByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByTestId("lead-checkin-row-r1")).toBeInTheDocument();
+  expect(screen.getByTestId("lead-checkin-counter")).toHaveTextContent("0 von 1 da");
+});
+
+test("Check-in-Reiter online: sichtbar, öffnet sich im Check-in aber nicht von selbst (Spieler checken selbst ein)", async () => {
+  renderWithCheckin({ id: "t1", slug: "fc-cup", title: "Cup", status: "check_in", can_check_in: true, self_checkin: true });
+  await screen.findByTestId("lead-row-m8");
+  expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "false");
+  expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
+});
+
+test("Check-in-Reiter: ?reiter=checkin aus der Verwaltung oeffnet ihn auch ausserhalb des Check-ins", async () => {
+  renderWithCheckin({ id: "t1", slug: "fc-cup", title: "Cup", status: "live", can_check_in: true }, "/tournaments/fc-cup/leitung?reiter=checkin");
+  expect(await screen.findByTestId("lead-checkin-row-r1")).toBeInTheDocument();
+  expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(screen.getByTestId("lead-tab-results"));
+  expect(await screen.findByTestId("lead-row-m8")).toBeInTheDocument();
+});
+
+test("Reiter „Braucht Aufmerksamkeit“: ein Textblock, kein doppelter Abstand (Review N8)", async () => {
+  renderLead({ tournament: { id: "t1", title: "Cup" }, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } });
+  const tab = await screen.findByTestId("lead-tab-attention");
+  const label = screen.getByTestId("lead-tab-label-attention");
+  expect(label.parentElement).toBe(tab);
+  expect(label.textContent).toBe("Braucht Aufmerksamkeit (0)");
+  // Kein loses Leerzeichen als eigenes Flex-Kind neben dem Symbol.
+  expect([...tab.childNodes].filter((node) => node.nodeType === 3 && node.textContent.trim() === "")).toHaveLength(0);
+});
