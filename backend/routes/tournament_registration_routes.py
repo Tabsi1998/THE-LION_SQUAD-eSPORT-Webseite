@@ -673,8 +673,9 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         reg["status"] = "waitlist"
     if reopen:
         # Immer „ausstehend“, auch wenn das Turnier voll ist: Die Warteliste rückte von selbst auf „bestätigt“ nach.
+        # ``reopened_at`` (#2368): wann die Person selbst neu angemeldet hat - ``created_at`` bleibt das der ersten Anmeldung.
         reg.update({"id": reopen["id"], "status": "pending", "created_at": reopen.get("created_at") or reg["created_at"],
-                    "identity_key": reopen.get("identity_key") or reg["identity_key"]})
+                    "identity_key": reopen.get("identity_key") or reg["identity_key"], "reopened_at": reg["created_at"]})
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
         claimed = await claim_access_link_use(db, register_access, me)

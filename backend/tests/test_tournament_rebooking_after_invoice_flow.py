@@ -528,6 +528,22 @@ async def team_cup(flow, fake):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("reopened", [True, False])
+async def test_grund_nach_weggenommener_ablehnung_selbst_neu_angemeldet(flow, fake, reopened):
+    """Abgelehnt, die Teamleitung nimmt die Ablehnung weg und meldet selbst neu an, die Turnierleitung bestätigt: Der Prüffall
+    nennt „Nach Storno selbst neu angemeldet“ (die Anmeldung behält ihr erstes ``created_at``, es zählt ``reopened_at``).
+    Bestätigt die Leitung ohne Neuanmeldung wieder, bleibt es „Anmeldung wieder aktiviert“."""
+    kassier, cup, leader, co_leader, booked, order = await team_invoiced(flow, fake)
+    await set_status(flow, kassier, cup, booked, "rejected")
+    if reopened:
+        await unregister(flow, cup, leader, booked)
+        again = (await register(flow, leader, cup["id"], team_id="team-1", accept_costs=True)).json()
+        assert again["id"] == booked["id"] and again["status"] == "pending"
+    await set_status(flow, kassier, cup, booked, "approved")
+    assert (await stored(flow, order))["booking_change"] == (SELF_REASON if reopened else LEAD_REASON)
+
+
+@pytest.mark.asyncio
 async def test_team_leitung_co_leitung_leitung_bucht_auf_den_eigenen_beleg_zurueck(flow, fake):
     """Teamleitung (Beleg), abgelehnt und weggenommen, die Co-Leitung meldet neu an und bekommt ihren eigenen Beleg, wieder
     abgelehnt und weggenommen, die Teamleitung meldet erneut an und wird bestätigt: Sie wird auf ihren eigenen Beleg

@@ -91,7 +91,9 @@ def rebook_reason_for(registration: dict, order: dict) -> str:
     """Der Grund im Prüffall, wenn die Leitung eine zurückgekehrte Anmeldung bestätigt (#2368): Entstand die Anmeldung erst nach
     dem Storno, hat sich die Person selbst neu angemeldet (etwa auf die Warteliste) - „Nach Storno selbst neu angemeldet“.
     Sonst hat die Leitung eine beendete Anmeldung wieder aktiviert."""
-    created, cancelled = str(registration.get("created_at") or ""), str(order.get("booking_cancelled_at") or "")
+    # Eine weggenommene Ablehnung, danach selbst neu angemeldet, behält ihr ``created_at`` - es zählt dann ``reopened_at``.
+    created = max(str(registration.get("created_at") or ""), str(registration.get("reopened_at") or ""))
+    cancelled = str(order.get("booking_cancelled_at") or "")
     return billing_orders.REBOOKED_SELF if created and cancelled and created > cancelled else billing_orders.REBOOKED_BY_LEAD
 
 
