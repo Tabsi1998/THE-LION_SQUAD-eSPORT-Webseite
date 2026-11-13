@@ -585,3 +585,49 @@ async def test_recompute_lists_assigned_teams_for_a_manual_check_and_stops_after
     assert late.status_code == 409 and "begonnen" in late.json()["detail"]
     old = await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor/recompute")
     assert old.status_code == 404
+
+
+# ---------------------------------------------------------------- Nachbesserung: Wiederholen, Nachrichten, Umzug
+
+@pytest.mark.asyncio
+async def test_replay_waits_for_a_closed_predecessor_and_sends_missing_messages(flow):
+    world = await build(flow, levels=1, teams=3)
+    await close_all(flow, world)
+    season = await new_season(flow, world)
+    # Nachricht: Die Season ist „Aus“ - nur der Weg unter Teams, kein Verweis auf die Ligaseite.
+    body = (await flow.db.notifications.find_one({"meta.reason": "league_successor"}, {"_id": 0}))["body"]
+    assert "unter Teams beim Co-Team." in body and "Ligaseite" not in body
+    # Abgebrochenes Anlegen nachstellen: nicht fertig, eine Nachricht fehlt (ohne Merker).
+    rows = await carried(flow, season["id"])
+    missing = rows[squad_of(world, 1, 0)]
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$unset": {"successor_ready": ""}})
+    await flow.db.league_applications.update_one({"id": missing["id"]}, {"$unset": {"carry_over.notified_at": ""}})
+    await flow.db.notifications.delete_many({"meta.application_id": missing["id"]})
+    assert all(row["carry_over"].get("notified_at") for key, row in rows.items() if key != missing["squad_id"])
+    # Inzwischen wieder geöffnet: 409 mit Hinweis, die Season bleibt „nicht fertig“.
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{world['tids'][0]}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    refused = await successor(flow, world)
+    assert refused.status_code == 409 and "nicht mehr abgeschlossen" in refused.json()["detail"]
+    assert not (await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})).get("successor_ready")
+    # Wieder abgeschlossen: Das Wiederholen holt genau die fehlende Nachricht nach.
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{world['tids'][0]}/close", json={"confirm": True}))
+    again = ok(await successor(flow, world))
+    assert again["replay"] and again["notified"] == 2  # Captain und Vertreter des einen Co-Teams
+    assert (await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0}))["successor_ready"]
+    assert (await flow.db.league_applications.find_one({"id": missing["id"]}, {"_id": 0}))["carry_over"]["notified_at"]
+
+
+@pytest.mark.asyncio
+async def test_co_team_that_moved_between_staffeln_appears_once_as_carried(flow):
+    world = await build(flow, levels=1, teams=3, extra={1: [2]}, exits={(1, 1): "withdrawn"})
+    moved = world["regs"][1][1]
+    other = world["more"][1][0]["regs"][0]
+    # Dasselbe Co-Team: in Staffel A ausgetreten, in Staffel B aktiv.
+    await flow.db.tournament_registrations.update_one({"id": other["id"]}, {"$set": {"squad_id": moved["squad_id"], "team_id": moved["team_id"]}})
+    await close_all(flow, world)
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
+    squads = [team["squad_id"] for row in preview["divisions"] for team in row["teams"]]
+    assert squads.count(moved["squad_id"]) == 1
+    assert moved["id"] not in [row["registration_id"] for row in preview["dropped"]]
