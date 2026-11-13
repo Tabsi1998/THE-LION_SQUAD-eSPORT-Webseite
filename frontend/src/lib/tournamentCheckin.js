@@ -2,10 +2,12 @@
 // Server (GET /tournaments/<id>/lead/checkin), abgehakt wird über POST …/registrations/<rid>/checkin - Web und App gleich.
 // Der Zähler rechnet aus dem angezeigten Stand, damit er beim Tippen sofort stimmt (optimistisch, mit Rücknahme).
 
+// Groß/klein und Akzente egal, ß wie ss (Review N9): „Strasse“ findet „Straße“ und umgekehrt.
 const fold = (value) => String(value || "")
   .normalize("NFD")
   .replace(/[̀-ͯ]/g, "")
-  .toLowerCase();
+  .toLowerCase()
+  .replace(/ß/g, "ss");
 
 /** Der angezeigte Stand einer Zeile: was gerade gespeichert wird, sonst der Stand vom Server. */
 export function shownStatus(row, pending = {}) {
