@@ -18,7 +18,8 @@ test("wiederholt, zugesprochen und nicht gespielt stehen an den Maps", () => {
   render(<MapChips match={MATCH} />);
 
   expect(screen.getByTestId("league-map-m1-1")).toHaveTextContent("für Rudel A · wiederholt");
-  expect(screen.getByTestId("league-map-m1-1")).toHaveAttribute("title", "Map 1: Hafen – Rudel A · wiederholt: Verbindung brach ab");
+  // Den Grund einer Wiederholung zeigt die öffentliche Seite nie (#2268) - auch wenn er (alter Stand) in den Daten stünde.
+  expect(screen.getByTestId("league-map-m1-1")).toHaveAttribute("title", "Map 1: Hafen – Rudel A · wiederholt");
   expect(screen.getByTestId("league-map-m1-2")).toHaveTextContent("für Rudel A · zugesprochen");
   expect(screen.getByTestId("league-map-m1-3")).toHaveTextContent("für Rudel A");
   expect(screen.getByTestId("league-map-m1-3")).not.toHaveTextContent("·");

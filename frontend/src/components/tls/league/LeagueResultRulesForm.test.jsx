@@ -105,3 +105,9 @@ test("die gespielten Maps zeigen „wiederholt“, „zugesprochen“ und die ni
   expect(screen.getByTestId("league-games-2-awarded")).toHaveTextContent("Zugesprochen");
   expect(screen.getByTestId("league-games-not-played")).toHaveTextContent("Map 4 und 5 nicht gespielt – die Serie war entschieden.");
 });
+
+test("ohne Grund (Gast, #2268) steht nur „Map wiederholt“ - kein leerer Doppelpunkt", () => {
+  const games = [{ position: 1, mode_label: "Stellung", map_name: "Hafen", winner_registration_id: "a", scores: { a: 250, b: 1 }, lineups: {}, status: "replayed" }];
+  render(<LeagueGamesView league={{ ...LEAGUE, best_of: 3, needed: 2, games }} />);
+  expect(screen.getByTestId("league-games-1-replayed")).toHaveTextContent(/^Map wiederholt$/);
+});

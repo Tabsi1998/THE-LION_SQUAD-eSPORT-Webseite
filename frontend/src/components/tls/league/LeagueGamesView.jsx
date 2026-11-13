@@ -64,9 +64,9 @@ export function LeagueGamesView({ league }) {
                   </div>
                 );
               })}
-              {/* Zusatzfelder (C.3, #1617): wiederholt mit Grund, von der Leitung zugesprochen. */}
+              {/* Zusatzfelder (C.3, #1617): wiederholt - den Grund bekommen nur die beiden Teams und die Leitung (#2268) -, zugesprochen. */}
               {game.status === "replayed" ? (
-                <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>Wiederholt: {game.replay_reason}</p>
+                <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>{game.replay_reason ? `Wiederholt: ${game.replay_reason}` : "Map wiederholt"}</p>
               ) : null}
               {game.decision === "awarded" ? (
                 <p className="text-xs text-warn" data-testid={`league-games-${game.position}-awarded`}>Zugesprochen von der Liga-Leitung</p>

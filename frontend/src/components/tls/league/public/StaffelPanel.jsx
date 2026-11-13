@@ -93,10 +93,9 @@ export function MapChips({ match }) {
             : game.winner_registration_id === match.away?.registration_id ? "away" : null;
           const winner = side === "home" ? match.home?.name : side === "away" ? match.away?.name : null;
           const note = mapNote(game);
-          const why = note === "wiederholt" && game.replay_reason ? `: ${game.replay_reason}` : "";
           return (
             <li key={game.position} className="tls-league-map" data-side={side || undefined} data-testid={`league-map-${match.id}-${game.position}`}
-              title={`Map ${game.position}: ${game.map_name || "Map"}${game.mode_label ? ` (${game.mode_label})` : ""}${winner ? ` – ${winner}` : ""}${note ? ` · ${note}${why}` : ""}`}>
+              title={`Map ${game.position}: ${game.map_name || "Map"}${game.mode_label ? ` (${game.mode_label})` : ""}${winner ? ` – ${winner}` : ""}${note ? ` · ${note}` : ""}`}>
               <span className="tls-league-map__thumb" aria-hidden="true">
                 {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
               </span>
