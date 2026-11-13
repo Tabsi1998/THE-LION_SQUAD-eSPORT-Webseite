@@ -119,8 +119,11 @@ def clean_periods(rows, current: list[dict], season_ids: set[str], season_names:
         period_id = str(raw.get("id") or "")
         period_id = period_id if period_id in known else new_id()
         wanted = []
+        saved = set((known.get(period_id) or {}).get("season_ids") or [])
         for season_id in raw.get("season_ids") or []:
             season_id = str(season_id)
+            if season_id not in season_ids and season_id in saved:
+                continue  # inzwischen gelöschte Season: still verwerfen, sonst ließe sich der Zeitraum nie mehr speichern
             if season_id not in season_ids:
                 raise OverallProblem(f"„{name}“: Diese Season gehört nicht zur Liga.")
             if season_id in owner:
@@ -129,7 +132,7 @@ def clean_periods(rows, current: list[dict], season_ids: set[str], season_names:
             if season_id not in wanted:
                 wanted.append(season_id)
                 owner[season_id] = name
-        if period_id in locked and sorted(wanted) != sorted(known[period_id].get("season_ids") or []):
+        if period_id in locked and sorted(wanted) != sorted(value for value in saved if value in season_ids):
             raise OverallProblem(f"„{name}“ ist abgeschlossen: Die Seasons ändern sich erst nach „Wieder öffnen“ im Reiter „Abschluss“.", 409)
         out.append({"id": period_id, "name": name, "season_ids": wanted})
     missing = sorted(set(locked) - {row["id"] for row in out})

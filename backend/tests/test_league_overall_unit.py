@@ -165,3 +165,14 @@ def test_latest_means_the_newest_season_with_a_result_in_this_level():
     assert [row["key"] for row in rules.rank(entries, settings, ["s1", "s2", "s3"])] == ["b", "a"]
     # Gegenprobe: ohne das Kriterium nach Namen, A vor B.
     assert [row["key"] for row in rules.rank(entries, {**SETTINGS, "tiebreakers": []}, ["s1", "s2", "s3"])] == ["a", "b"]
+
+
+def test_a_deleted_season_in_a_closed_period_does_not_block_saving():
+    current = [{"id": "p1", "name": "2027", "season_ids": ["s1", "weg"]}]
+    # Die Season „weg“ gibt es nicht mehr: Umbenennen geht, die Kennung fällt still heraus.
+    out = rules.clean_periods([{"id": "p1", "name": "Jahr 2027", "season_ids": ["s1", "weg"]}], current, {"s1"}, {}, {"p1"})
+    assert out == [{"id": "p1", "name": "Jahr 2027", "season_ids": ["s1"]}]
+    assert rules.clean_periods([{"id": "p1", "name": "2027", "season_ids": ["s1"]}], current, {"s1"}, {}, {"p1"})[0]["season_ids"] == ["s1"]
+    # Gegenprobe: eine fremde Kennung, die nie im Zeitraum stand, bleibt ein Fehler.
+    with pytest.raises(rules.OverallProblem):
+        rules.clean_periods([{"id": "p1", "name": "2027", "season_ids": ["s1", "fremd"]}], current, {"s1"}, {}, {"p1"})
