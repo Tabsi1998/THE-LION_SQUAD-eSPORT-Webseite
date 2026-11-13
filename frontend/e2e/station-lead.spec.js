@@ -99,6 +99,21 @@ async function mockLead(page, world, tv) {
   return posts;
 }
 
+/**
+ * Erst messen, wenn nichts mehr einblendet (#2390): Während Kachel, Aufruf und Seite einblenden, ändert eine Skalierung
+ * an einem Vorfahren die gemessene Höhe um Bruchteile eines Pixels (43,9999 statt 44). Wartet auf alle endlichen
+ * Animationen und die Schriften - dauerhafte (der Live-Punkt) laufen weiter. Die Prüfung selbst bleibt gleich streng.
+ */
+async function settled(page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const finite = () => document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity);
+    for (let round = 0; round < 5 && finite().some((animation) => animation.playState === "running"); round += 1) {
+      await Promise.all(finite().map((animation) => animation.finished.catch(() => null)));
+    }
+  });
+}
+
 async function shot(page, testInfo, name) {
   const body = await page.screenshot({ fullPage: true });
   await testInfo.attach(name, { body, contentType: "image/png" });
@@ -140,6 +155,7 @@ test.describe("Stationen in der Turnierleitung", () => {
         await expect(tvPage.getByTestId(`tv-call-station-${matchA}`)).toHaveText("PC 3");
         await expect(page.getByTestId(`live-broken-${H.stationId("PC 6")}`)).toHaveText(/Bereit/);
         // Nichts läuft quer aus dem Bild, jede Tippfläche ist groß genug.
+        await settled(page);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
         const small = await page.evaluate(() => [...document.querySelectorAll("[data-testid='live-board'] button")]
           .filter((button) => button.getBoundingClientRect().height < 44).map((button) => button.dataset.testid || button.textContent));
@@ -191,6 +207,7 @@ test.describe("Stationen in der Turnierleitung", () => {
       await mockLead(page, world, { push() {} });
       await page.goto("/tournaments/herbst-cup/leitung?reiter=stationen");
       await expect(page.getByTestId("live-board")).toBeVisible();
+      await settled(page);
       const overflowing = await page.evaluate(() => [...document.querySelectorAll("[data-testid='live-board'] button")]
         .filter((button) => button.scrollWidth > button.clientWidth + 1 || button.getBoundingClientRect().height < 44)
         .map((button) => `${button.dataset.testid || ""}: ${button.textContent}`));

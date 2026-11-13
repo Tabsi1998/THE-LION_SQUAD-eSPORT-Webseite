@@ -101,6 +101,21 @@ async function mockCockpit(page, world) {
 // Fürs ganze Bild: die festen Leisten (Rückmeldung, Leiste unten am Handy) lägen sonst mitten über der Seite.
 const HIDE = "[data-sonner-toaster], [data-testid='bottom-nav'], [data-testid='scroll-top-btn'] { display: none !important; }";
 
+/**
+ * Erst messen, wenn nichts mehr einblendet (#2390, wie station-lead): Während Kachel, Aufruf und Seite einblenden, ändert eine Skalierung
+ * an einem Vorfahren die gemessene Höhe um Bruchteile eines Pixels (43,9999 statt 44). Wartet auf alle endlichen
+ * Animationen und die Schriften - dauerhafte (der Live-Punkt) laufen weiter. Die Prüfung selbst bleibt gleich streng.
+ */
+async function settled(page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const finite = () => document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity);
+    for (let round = 0; round < 5 && finite().some((animation) => animation.playState === "running"); round += 1) {
+      await Promise.all(finite().map((animation) => animation.finished.catch(() => null)));
+    }
+  });
+}
+
 async function shot(page, testInfo, name) {
   const body = await page.screenshot({ fullPage: true, style: HIDE });
   await testInfo.attach(name, { body, contentType: "image/png" });
@@ -147,6 +162,7 @@ test.describe("Turnier-Cockpit", () => {
         expect(short.height).toBeLessThan(tall.height - 40);
       }
       // Nichts läuft quer hinaus, jede Tippfläche ist mindestens 44 px hoch.
+      await settled(page);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
       const small = await page.evaluate(() => [...document.querySelectorAll("[data-testid='lead-cockpit'] button, [data-testid='lead-cockpit'] a, [data-testid='lead-tabs'] button")]
         .filter((node) => node.getBoundingClientRect().height < 44).map((node) => node.dataset.testid || node.textContent));
