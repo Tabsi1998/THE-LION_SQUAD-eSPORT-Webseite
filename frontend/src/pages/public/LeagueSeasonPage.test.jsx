@@ -235,6 +235,20 @@ test("Navigation (#2268): Übersicht, Spieltage, Teams - Regelwerk nur mit Regel
   expect(within(nav).queryByTestId("season-nav-regeln")).toBeNull();
 });
 
+test("Navigation am Handy (#2268): steht rechts noch etwas über, blendet der Rand aus - am Ende nicht mehr", async () => {
+  renderPage();
+  const nav = await screen.findByTestId("season-nav");
+  const list = nav.querySelector("ul");
+  Object.defineProperty(list, "scrollWidth", { configurable: true, value: 420 });
+  Object.defineProperty(list, "clientWidth", { configurable: true, value: 358 });
+  list.scrollLeft = 0;
+  fireEvent(window, new Event("resize"));
+  expect(nav).toHaveAttribute("data-more", "true");
+  list.scrollLeft = 62;
+  fireEvent.scroll(list);
+  expect(nav).not.toHaveAttribute("data-more");
+});
+
 test("Sperrliste (#2268): zu mit Zahl, aufgeklappt mit Bildern und Hinweis aufs Regelwerk", async () => {
   const rules = { version: 1, label: "Version 1", valid_from: "2026-11-03", url: "/liga/probe-liga/season-1/regeln", pdf_url: "/api/x.pdf" };
   const bans = { entries: [

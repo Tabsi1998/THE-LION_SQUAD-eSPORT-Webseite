@@ -6,7 +6,21 @@
 .tls-season { --season-accent: var(--league-accent-rgb, var(--tls-brand-rgb)); }
 
 /* Navigation: Übersicht · Spieltage · Teams · Regelwerk - der aktive Punkt zeichnet seine Linie von links nach. */
-.tls-season-nav { border-bottom: 1px solid rgb(255 255 255 / 0.1); }
+.tls-season-nav { position: relative; border-bottom: 1px solid rgb(255 255 255 / 0.1); }
+/* Steht rechts noch ein Punkt über: der Rand blendet aus (Hinweis zum Wischen), am Ende verschwindet die Blende. */
+.tls-season-nav::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 1px;
+  width: 3rem;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgb(10 10 10 / 0), var(--tls-surface-0) 85%);
+  opacity: 0;
+  transition: opacity var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-season-nav[data-more="true"]::after { opacity: 1; }
 .tls-season-nav__list { display: flex; gap: 0.25rem; padding-bottom: 0; }
 .tls-season-nav__link {
   position: relative;

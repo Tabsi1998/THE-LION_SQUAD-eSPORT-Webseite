@@ -1,7 +1,7 @@
 // Rahmen der öffentlichen Season-Seite (#2268): lädt die Season einmal (GET /api/leagues/<liga>/<season>), zeigt Kopf und die
 // Navigation Übersicht · Spieltage · Teams · Regelwerk und gibt die Daten an die Unterseite. Unsichtbar heißt wie „gibt es
 // nicht“ - dieselbe Regel wie die Lese-API. Die Akzentfarbe der Liga gilt für die ganze Seite (#2107).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -37,9 +37,24 @@ export function useLeagueSeason(leagueSlug, seasonSlug) {
  */
 export function SeasonNav({ leagueSlug, seasonSlug, hasRules = true, className = "" }) {
   const sections = SEASON_SECTIONS.filter((row) => row.key !== "regeln" || hasRules);
+  // Steht rechts noch etwas über (Handy), blendet der Rand aus - der Hinweis, dass man wischen kann (#2268). Am Ende verschwindet er.
+  const list = useRef(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const node = list.current;
+    if (!node) return undefined;
+    const check = () => setMore(node.scrollLeft + node.clientWidth < node.scrollWidth - 2);
+    check();
+    node.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      node.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, []);
   return (
-    <nav aria-label="Season" className={`tls-season-nav ${className}`} data-testid="season-nav">
-      <ul className="tls-season-nav__list tls-swipe">
+    <nav aria-label="Season" className={`tls-season-nav ${className}`} data-more={more ? "true" : undefined} data-testid="season-nav">
+      <ul ref={list} className="tls-season-nav__list tls-swipe">
         {sections.map((row) => (
           <li key={row.key || "start"}>
             <NavLink end to={sectionPath(leagueSlug, seasonSlug, row.key)} className="tls-season-nav__link"
