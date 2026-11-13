@@ -1075,7 +1075,9 @@ kurzen Satz (höchstens 140 Zeichen) an alle im Turnier:
 
 Der Hinweis kommt als Benachrichtigung „Hinweis der Turnierleitung“ zu allen Angemeldeten – bei Teams zu allen
 Mitgliedern –, über Glocke, Push und Discord, je nach den Einstellungen der Person (Thema „Turnier-Updates“). Abgemeldete,
-Warteliste und gesperrte Konten bekommen nichts. Oben auf der Turnierseite (beim Ziel „Ganzes Event“ auf der Event-Seite
+Warteliste und gesperrte Konten bekommen nichts. Auch beim Ziel „Ganzes Event“ geht der Hinweis nur an die Angemeldeten
+der Turniere; wer nur für das Event selbst angemeldet ist (ohne Turnier), bekommt ihn nicht – dafür gibt es die Nachricht
+an alle Angemeldeten in „Anmeldungen & Einlass“ des Events (#1372). Oben auf der Turnierseite (beim Ziel „Ganzes Event“ auf der Event-Seite
 und allen Turnierseiten des Events) steht er als Banner mit Uhrzeit und Restzeit, bis er abläuft oder ihr ihn entfernt.
 Banner und TV zeigen nie, wer geschrieben hat.
 
@@ -1083,7 +1085,8 @@ Banner und TV zeigen nie, wer geschrieben hat.
 
 Unter dem Formular steht, was schon hinausging: Text, Uhrzeit, wer, an wen, wie viele benachrichtigt wurden, und ob er
 noch steht. **Entfernen** nimmt ihn von Banner und TV; die Benachrichtigungen bleiben. Ein Doppeltipp auf „Senden“ oder
-ein zweiter Versuch nach einem Netzfehler schickt nichts doppelt.
+ein zweiter Versuch nach einem Netzfehler schickt nichts doppelt. Steht dort „Versand unterbrochen“, tippt auf
+**Fortsetzen**: Der Versand läuft mit demselben Hinweis weiter, wer ihn schon hat, bekommt ihn nicht noch einmal.
 
 ---
 
