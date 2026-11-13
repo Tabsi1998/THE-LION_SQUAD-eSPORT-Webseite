@@ -293,5 +293,13 @@ test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist und nu
   expect(row).toHaveTextContent("Zustimmung zum Regelwerk folgt vor dem ersten Spiel");
   const select = screen.getByTestId("application-staffel-a2");
   const labels = Array.from(select.querySelectorAll("option")).map((option) => option.textContent);
-  expect(labels).toEqual(["Staffel wählen …", "Liga 1 · Staffel A (1 von 8)"]);
+  expect(labels).toEqual(["Staffel wählen …", "Liga 1 · Staffel A (1 von 8)", "Liga 2 · Staffel A (0 von 8) – andere Liga, nur mit Grund"]);
+  // Eigene Liga: ohne Grund. Andere Liga: erst mit Grund.
+  fireEvent.change(select, { target: { value: "t2" } });
+  expect(screen.getByTestId("application-assign-a2")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("application-deviation-a2"), { target: { value: "Liga 1 ist voll" } });
+  fireEvent.click(screen.getByTestId("application-assign-a2"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a2/assign", { tournament_id: "t2", deviation_reason: "Liga 1 ist voll" }));
+  fireEvent.change(select, { target: { value: "t1" } });
+  expect(screen.queryByTestId("application-deviation-a2")).toBeNull();
 });

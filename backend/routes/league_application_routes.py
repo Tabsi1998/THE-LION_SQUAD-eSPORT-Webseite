@@ -121,4 +121,4 @@ async def assign_application(season_id: str, application_id: str, body: LeagueAp
     league, season = await _scope(season_id)
     return _answer(await _call(applications.assign(get_db(), league, season, application_id, body.tournament_id, me,
                                                   refresh_previews=_refresh_tournament_previews_after_registration,
-                                                  conflict_reason=body.conflict_reason)))
+                                                  conflict_reason=body.conflict_reason, deviation_reason=body.deviation_reason)))

@@ -86,6 +86,8 @@ AUTO_SIBLING = ("{team} hat schon ein Co-Team in der einzigen Staffel, und zwei 
 AUTO_FAILED = "Es gab einen technischen Fehler, bitte selbst prüfen."
 # Übernommen aus der Vorgänger-Season (F.2, #1627, Nr. 160): Abmelden geht bis zum Start der Season.
 CARRY_DEADLINE = "Abmelden ging bis zum Start der Season ({day}). Jetzt trägt die Liga-Leitung einen Austritt ein."
+CARRY_OTHER_DIVISION = ("Das Co-Team ist aus der Vorgänger-Season in {label} übernommen. Eine Staffel einer anderen Liga geht nur mit Grund "
+                        "(mindestens fünf Zeichen).")
 # Zurückstufen einer angenommenen Anmeldung (#2348): wie beim Ablehnen nur mit Grund, egal ob automatisch oder von Hand angenommen.
 DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, das Team liest ihn."
 
@@ -688,8 +690,19 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
     return {**done, "ids_missing": ids_missing}
 
 
+def carry_deviation(application: dict, tournament: dict, reason: str | None) -> str | None:
+    """Ein übernommener Antrag (F.2) gehört in eine Staffel seiner neuen Liga N. Eine andere nur mit Grund (wird zurückgegeben, steht im Verlauf)."""
+    carry = application.get("carry_over") or {}
+    if not carry.get("division_id") or (tournament.get("league_context") or {}).get("division_id") == carry["division_id"]:
+        return None
+    text = " ".join(str(reason or "").split())
+    if len(text) < REASON_MIN:
+        raise LeagueProblem(CARRY_OTHER_DIVISION.format(label=carry.get("division_label") or "ihrer Liga"), 422)
+    return text[:500]
+
+
 async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
-                 conflict_reason: str | None = None) -> dict:
+                 conflict_reason: str | None = None, deviation_reason: str | None = None) -> dict:
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
     override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     if not tournament_id:
@@ -704,6 +717,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
                 raise LeagueProblem(ASSIGNED_ALREADY, 409)
+            deviation = carry_deviation(application, await _load_staffel(db, fresh, tournament_id), deviation_reason)
             # Der Kader kann sich seit dem Annehmen geändert haben: dieselbe Prüfung wie beim Einreichen, dazu die der Staffel.
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
@@ -713,8 +727,10 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             if problems:
                 raise LeagueProblem(problems[0][1], problems[0][0])
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over, override)
+            if deviation:
+                await db.league_applications.update_one({"id": done["id"]}, {"$set": {"assignment.deviation_reason": deviation}})
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
-    await _audit_decision(db, "assign", done, actor, override, tournament_id=tournament_id)
+    await _audit_decision(db, "assign", done, actor, override, tournament_id=tournament_id, **({"deviation_reason": deviation} if deviation else {}))
     await _tell_status(db, league, season, done, "assigned")
     return {**done, "ids_missing": ids_missing}
 

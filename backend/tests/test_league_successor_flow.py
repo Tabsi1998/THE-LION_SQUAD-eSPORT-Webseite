@@ -631,3 +631,39 @@ async def test_co_team_that_moved_between_staffeln_appears_once_as_carried(flow)
     squads = [team["squad_id"] for row in preview["divisions"] for team in row["teams"]]
     assert squads.count(moved["squad_id"]) == 1
     assert moved["id"] not in [row["registration_id"] for row in preview["dropped"]]
+
+
+@pytest.mark.asyncio
+async def test_carried_team_goes_into_its_own_division_other_only_with_reason(flow):
+    world = await build(flow, levels=2, teams=2)
+    await close_all(flow, world)
+    season = await new_season(flow, world)
+    rows = await carried(flow, season["id"])
+    climber = rows[squad_of(world, 2, 0)]  # Aufsteiger: Liga 1
+    flow.act_as(world["lead"])
+    division_2 = await flow.db.league_divisions.find_one({"season_id": season["id"], "level": 2}, {"_id": 0})
+    other = ok(await flow.post(f"{ADMIN}/divisions/{division_2['id']}/staffeln", json={}))
+    url = f"{ADMIN}/seasons/{season['id']}/applications/{climber['id']}/assign"
+    refused = await flow.post(url, json={"tournament_id": other["tournament_id"]})
+    assert refused.status_code == 422 and "Liga 1" in refused.json()["detail"]
+    assert "assignment" not in await flow.db.league_applications.find_one({"id": climber["id"]}, {"_id": 0})
+    done = ok(await flow.post(url, json={"tournament_id": other["tournament_id"], "deviation_reason": "Liga 1 ist voll, Absprache mit dem Team"}))
+    assert done["status"] == "accepted"
+    stored = await flow.db.league_applications.find_one({"id": climber["id"]}, {"_id": 0})
+    assert stored["assignment"]["deviation_reason"] == "Liga 1 ist voll, Absprache mit dem Team"
+
+
+@pytest.mark.asyncio
+async def test_withdraw_under_teams_only_for_carried_applications(flow):
+    world = await build(flow, levels=1, teams=2)
+    await close_all(flow, world)
+    season = await new_season(flow, world)
+    rows = await carried(flow, season["id"])
+    application = rows[squad_of(world, 1, 0)]
+    squad = await flow.db.team_squads.find_one({"id": application["squad_id"]}, {"_id": 0})
+    # Ein gewöhnlicher Antrag (ohne Übernahme): der Weg unter Teams kennt ihn nicht.
+    await flow.db.league_applications.update_one({"id": application["id"]}, {"$unset": {"carry_over": ""}})
+    flow.act_as(await flow.db.users.find_one({"id": squad["captain_id"]}, {"_id": 0}))
+    refused = await flow.post(f"/api/me/league-applications/{application['id']}/withdraw")
+    assert refused.status_code == 404
+    assert (await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0}))["status"] == "accepted"

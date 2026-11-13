@@ -2935,3 +2935,5 @@ class LeagueApplicationDecision(BaseModel):
     tournament_id: Optional[str] = Field(default=None, max_length=64)
     # Notausnahme des Superadmins beim eigenen Team (#2245): Pflicht ab fünf Zeichen, sonst nicht gebraucht.
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
+    # Übernommenes Co-Team (F.2, #1627) in eine Staffel einer anderen Liga N: Pflichtgrund.
+    deviation_reason: Optional[str] = Field(default=None, max_length=500)

@@ -27,11 +27,16 @@ function when(value) {
   return value ? viennaDateTime(value, WHEN) : "";
 }
 
+const OTHER_DIVISION = " – andere Liga, nur mit Grund";
+
 function staffelOptions(divisions = [], row = null) {
-  // Übernommen aus der Vorgänger-Season (F.2, #1627): nur die Staffeln seiner neuen Liga N, solange es dort welche gibt.
-  const own = row?.carry_over?.division_id ? divisions.filter((division) => division.id === row.carry_over.division_id && division.staffeln?.length) : [];
-  return (own.length ? own : divisions).flatMap((division) => (division.staffeln || []).map((staffel) => [
-    staffel.tournament_id, `${division.label} · Staffel ${staffel.staffel} (${staffel.participant_count} von ${staffel.max_participants})`]));
+  // Übernommen aus der Vorgänger-Season (F.2, #1627): zuerst die Staffeln seiner neuen Liga N; die anderen nur mit Grund (der Server prüft es).
+  const label = (division, staffel) => `${division.label} · Staffel ${staffel.staffel} (${staffel.participant_count} von ${staffel.max_participants})`;
+  const target = row?.carry_over?.division_id;
+  return divisions.flatMap((division) => (division.staffeln || []).map((staffel) => {
+    const other = Boolean(target) && division.id !== target;
+    return [staffel.tournament_id, `${label(division, staffel)}${other ? OTHER_DIVISION : ""}`, other];
+  })).sort((left, right) => Number(left[2]) - Number(right[2]));
 }
 
 function Notes({ row }) {
@@ -69,6 +74,7 @@ function RowActions({ row, options, busy, act, superadmin }) {
   const [mode, setMode] = useState(null);
   const [reason, setReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
+  const [deviation, setDeviation] = useState("");
   const unassigned = row.status === "accepted" && !row.assignment;
   // Eine automatische Zuteilung (#2348) nehmen Ablehnen und Warteliste wieder aus der Staffel; jede andere bleibt der Teilnehmerliste.
   const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
@@ -81,6 +87,7 @@ function RowActions({ row, options, busy, act, superadmin }) {
   const send = (action, body) => act(row, action, override ? { ...body, conflict_reason: override } : body);
   // Angenommen (automatisch oder von Hand): Zurückstufen nur mit Grund, das Team liest ihn wie beim Ablehnen (#2348).
   const waitlistWithReason = row.status === "accepted";
+  const otherDivision = Boolean(options.find(([value]) => value === staffel)?.[2]);
   const toggle = (next) => setMode((current) => (current === next ? null : next));
   return (
     <div className="mt-3 space-y-3">
@@ -95,13 +102,19 @@ function RowActions({ row, options, busy, act, superadmin }) {
         <p className="text-xs text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen das Co-Team wieder aus der Staffel, solange der Spielplan nicht steht.</p>
       ) : options.length ? (
         <SelectField label={unassigned ? "Staffel" : "Staffel (geht auch später)"} value={staffel} onChange={setStaffel} testId={`application-staffel-${row.id}`} className="max-w-md"
-          options={[["", "Staffel wählen …"], ...options]} />
+          options={[["", "Staffel wählen …"], ...options.map(([value, text]) => [value, text])]} />
       ) : <p className="text-xs text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
+      {otherDivision ? (
+        <TextField label="Grund für die andere Liga" required value={deviation} onChange={setDeviation} maxLength={500} className="max-w-md"
+          hint="Das Co-Team ist in eine andere Liga übernommen. Der Grund steht im Verlauf und im Protokoll." testId={`application-deviation-${row.id}`} />
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {deciding ? (
           <button type="button" disabled={blocked} onClick={() => send("accept", staffel ? { tournament_id: staffel } : {})} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
         ) : unassigned ? (
-          <button type="button" disabled={blocked || !staffel} onClick={() => send("assign", { tournament_id: staffel })} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
+          <button type="button" disabled={blocked || !staffel || (otherDivision && deviation.trim().length < REASON_MIN)}
+            onClick={() => send("assign", { tournament_id: staffel, ...(otherDivision ? { deviation_reason: deviation.trim() } : {}) })}
+            className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
         ) : null}
         {row.status === "submitted" ? <button type="button" disabled={blocked} onClick={() => send("review", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-review-${row.id}`}>In Prüfung nehmen</button> : null}
         {row.status !== "waitlist" && waitlistWithReason ? (
