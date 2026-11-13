@@ -168,7 +168,31 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         "checkin_proposals": await checkin_proposal_rows(db, user),
         # Vorfälle (#1619, D.5): Map in Klärung oder Serie noch festzustellen - für wer in der Liga entscheiden darf.
         "incident_reviews": await incident_review_rows(db, user),
+        # Leitstand je Season (E.4, Nr. 152): „Mein Dienst“ bleibt die eigene Liste und führt mit der Zahl der offenen Aufgaben hinein.
+        "league_desks": await league_desk_rows(db, user),
     }
+
+
+async def league_desk_rows(db, user: dict, limit: int = 10) -> list[dict]:
+    """Die Seasons (Entwurf oder laufend) der Ligen, in denen die Person zuständig ist, mit den Aufgaben, die im Leitstand auf sie
+    warten (``mine``) und allen offenen (``total``)."""
+    from services import league_desk
+    from services.league_permissions import has_leagues_area, staffed_league_ids
+
+    if not user or needs_mfa(user):
+        return []
+    query = {"status": "active"} if has_leagues_area(user) else {"status": "active", "id": {"$in": sorted(await staffed_league_ids(db, user))}}
+    rows: list[dict] = []
+    for league in await db.leagues.find(query, {"_id": 0, "id": 1, "name": 1}).sort("name", 1).to_list(200):
+        seasons = await db.league_seasons.find({"league_id": league["id"], "status": {"$in": ["draft", "active"]}},
+                                               {"_id": 0}).sort("number", -1).to_list(20)
+        for season in seasons:
+            desk = await league_desk.season_desk(db, season, user)
+            rows.append({"season_id": season["id"], "league_name": league.get("name"), "season_name": season.get("name"),
+                         "mine": desk["mine"], "total": desk["total"], "url": f"/admin/leagues/seasons/{season['id']}#leitstand"})
+            if len(rows) >= limit:
+                return rows
+    return rows
 
 
 async def rules_pending_rows(db, user: dict, limit: int = 50) -> list[dict]:
