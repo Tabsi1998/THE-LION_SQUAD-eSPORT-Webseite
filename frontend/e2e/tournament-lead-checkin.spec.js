@@ -104,6 +104,9 @@ test.describe("Check-in der Turnierleitung", () => {
     const counter = page.getByTestId("lead-checkin-counter");
     await expect(counter).toContainText("2 von 6 da");
     await expect(page.getByTestId("lead-checkin-fee-r2")).toHaveText("Startgeld offen");
+    // „Freigabe offen“: kein „Da“, sondern der Weg in die Verwaltung.
+    await expect(page.getByTestId("lead-checkin-here-r6")).toHaveCount(0);
+    await expect(page.getByTestId("lead-checkin-approve-r6")).toHaveAttribute("href", "/admin/tournaments/t1?tab=participants");
 
     // Große Tippflächen: „Da“ mindestens 48 px hoch.
     const here = page.getByTestId("lead-checkin-here-r5");
@@ -134,6 +137,29 @@ test.describe("Check-in der Turnierleitung", () => {
     await page.getByTestId("lead-checkin-here-r3").click();
     await expect(counter).toContainText("4 von 6 da");
     if (shotDir) await page.screenshot({ ...(await calm(page)), path: `${shotDir}/1161-checkin-390.png` });
+  });
+
+  test("am Handy: vor „Nicht erschienen“ die Rückfrage, wenn jemand nachrückt", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const posts = [];
+    await serve(page, "lan-cup", { ...structuredClone(SOLO), waitlist_moves_up: true }, posts, null);
+    await page.goto("/tournaments/lan-cup/leitung");
+    await page.getByTestId("lead-checkin-noshow-r5").click();
+    const question = page.getByTestId("lead-checkin-ask-r5");
+    await expect(question).toContainText("Dann rückt jemand von der Warteliste nach – das lässt sich nicht einfach rückgängig machen.");
+    await expect(page.getByTestId("lead-checkin-ask-cancel-r5")).toBeFocused();
+    expect(posts).toHaveLength(0);
+    if (shotDir) {
+      await page.evaluate(() => document.activeElement?.blur());
+      await question.scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, 160));
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${shotDir}/1161-rueckfrage-390.png` });
+    }
+    await page.getByTestId("lead-checkin-ask-confirm-r5").click();
+    await expect.poll(() => posts.length).toBe(1);
+    expect(posts[0]).toEqual({ path: "/api/tournaments/t1/registrations/r5/checkin", body: { status: "no_show" } });
+    await expect(page.getByTestId("lead-checkin-row-r5")).toHaveAttribute("data-status", "no_show");
   });
 
   test("am PC: Team-Turnier mit zehn Mitgliedern, Aufstellung und Startgeld", async ({ page }) => {
