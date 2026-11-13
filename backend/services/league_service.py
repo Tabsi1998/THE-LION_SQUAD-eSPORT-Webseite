@@ -29,6 +29,7 @@ from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
+from services.league_final_read import is_closed
 from services.league_scope import ONLY_LEAGUE
 from services import checkin_rules, league_protest_settings, league_reminder_rules, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
@@ -1208,6 +1209,7 @@ class SyncResult:
 
 
 LOCKED_REASON = "Die Staffel ist gesperrt."
+CLOSED_REASON = "Die Staffel ist abgeschlossen - der Endstand steht. Erst im Reiter „Abschluss“ wieder öffnen."
 
 
 async def sync_staffel(db, tournament: dict, league: dict, season: dict, division: dict, user: dict, *,
@@ -1222,11 +1224,13 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     updates: dict = {}
     started = tournament.get("status") not in PRE_START_STATUSES
     has_result = await _has_result(db, tournament["id"])
+    # Abgeschlossen (F.1, #1645): wie gesperrt - Fristen, Regeln und Wertung bleiben, sonst öffnet eine neue Frist Verfahren wieder.
+    closed = is_closed(tournament)
     for group, keys in SYNC_GROUPS.items():
         if not any(key in wanted for key in keys):
             continue  # eine ältere Season ohne Antwortfrist: die Staffel behält ihre
-        if group != "always" and locked:
-            skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": LOCKED_REASON})
+        if group != "always" and (locked or closed):
+            skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": LOCKED_REASON if locked else CLOSED_REASON})
             continue
         if group == "before_start" and started:
             skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group],

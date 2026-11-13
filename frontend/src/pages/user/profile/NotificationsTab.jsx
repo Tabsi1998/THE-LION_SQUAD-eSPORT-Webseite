@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Bell, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
+import { loadWebPushConfig } from "@/lib/webPush";
+import { BrowserPushCard } from "./BrowserPushCard";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, notificationPreferenceKey } from "./constants";
 import { Section } from "./fields";
 import { AutosaveStatus, ProfileSwitch, SwitchRow } from "./SwitchRow";
@@ -12,8 +14,11 @@ import { AutosaveStatus, ProfileSwitch, SwitchRow } from "./SwitchRow";
 // seitwärts, weil ein Scrollrahmen und ein klebender Kopf sich ausschließen.
 // Discord (#567) steht nur mit verknüpftem Discord-Konto als Kanal da; lehnt Discord eine
 // Direktnachricht ab, nennt der Server den Klickweg, und der steht hier beim Kanal.
-export function NotificationsTab({ form, set, setNotificationPreference, notificationEnabled, notificationTopicEnabled, autosave }) {
+// Browser (#1163) steht nur da, wenn der Server Browser-Benachrichtigungen eingerichtet hat; darunter „Dieser Browser“.
+export function NotificationsTab({ form, set, setNotificationPreference, notificationEnabled, notificationTopicEnabled, autosave, user = null }) {
   const [discord, setDiscord] = useState(null);
+  const [webPush, setWebPush] = useState(null);
+  const [webPushStamp, setWebPushStamp] = useState(0);
   useEffect(() => {
     let active = true;
     api.get("/users/me/notification-preferences")
@@ -21,11 +26,16 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
       .catch(() => { if (active) setDiscord({ linked: false }); });
     return () => { active = false; };
   }, []);
-  const channels = NOTIFICATION_CHANNELS.filter((channel) => channel.k !== "discord" || discord?.linked);
+  useEffect(() => {
+    let active = true;
+    loadWebPushConfig().then((config) => { if (active) setWebPush(config); });
+    return () => { active = false; };
+  }, [webPushStamp]);
+  const channels = NOTIFICATION_CHANNELS.filter((channel) => (channel.k !== "discord" || discord?.linked) && (channel.k !== "browser" || webPush?.enabled));
   return (
     <Section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-white/60">Steuere getrennt, ob Hinweise per E-Mail, Push, In-App oder als Discord-Direktnachricht ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
+        <p className="text-sm text-white/60">Steuere getrennt, ob Hinweise per E-Mail, Push, im Browser, In-App oder als Discord-Direktnachricht ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
         <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
       </div>
 
@@ -43,6 +53,11 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
             />
           ))}
         </div>
+        {webPush?.enabled ? (
+          <div className="mt-3">
+            <BrowserPushCard user={user} config={webPush} onChanged={() => setWebPushStamp((value) => value + 1)} />
+          </div>
+        ) : null}
         {discord && !discord.linked ? (
           <p className="text-xs text-white/45 mt-2" data-testid="profile-notification-discord-unlinked">Discord als Kanal: erst im Reiter Socials „Mit Discord verknüpfen“ – dann kommen Benachrichtigungen auf Wunsch als Direktnachricht vom Vereins-Bot.</p>
         ) : null}

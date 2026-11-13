@@ -60,6 +60,8 @@ PERSONAL: dict[str, Entry] = {
     "platform_link_flows": Entry(DELETED, note="laufende Verknüpfung, wenige Minuten gültig"),
     "platform_link_sessions": Entry(EXPIRES, note="laufende Verknüpfung ohne Kennung des Kontos, nach Minuten gelöscht"),
     "mobile_push_tokens": Entry(DELETED, ("mobile_devices",)),
+    # Browser-Benachrichtigungen (#1163): je Browser die Adresse beim Push-Dienst und seine Schlüssel.
+    "web_push_subscriptions": Entry(DELETED, ("web_push_browsers",)),
     "mobile_client_logs": Entry(DELETED, ("mobile_client_logs",)),
     "notifications": Entry(DELETED, ("notifications",)),
     "chat_reads": Entry(DELETED, ("chat_reads",)),
@@ -261,6 +263,9 @@ CLUB_CONTENT = frozenset({
     "game_equipment", "game_equipment_categories", "loadout_bans", "loadout_allowed",
     # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
     "leagues", "league_seasons", "league_divisions", "league_rules",
+    # Saisonabschluss (F.1, #1645): der eingefrorene Endstand je Staffel - Teamnamen, Plätze, Punkte; nur die Kennung, wer
+    # abgeschlossen bzw. wieder geöffnet hat.
+    "league_final_tables",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",

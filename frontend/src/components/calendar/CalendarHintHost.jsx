@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarPlus, X } from "lucide-react";
-import { CALENDAR_HINT_EVENT, markCalendarHintSeen } from "@/lib/calendarHint";
+import { CALENDAR_HINT_CLOSED_EVENT, CALENDAR_HINT_EVENT, markCalendarHintSeen } from "@/lib/calendarHint";
 import { MY_CALENDAR_PATH, SUBSCRIBE_ANCHOR } from "@/lib/myCalendar";
 
 // Der Abo-Hinweis nach einer Anmeldung (#1788): ein ruhiger Kasten unten (am Handy über der Leiste), der sich leicht
@@ -18,6 +18,13 @@ export function CalendarHintHost() {
     window.addEventListener(CALENDAR_HINT_EVENT, show);
     return () => window.removeEventListener(CALENDAR_HINT_EVENT, show);
   }, []);
+
+  // Zu (#1163): die Frage nach Browser-Benachrichtigungen wartet, bis dieser Hinweis weg ist.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) wasOpen.current = true;
+    else if (wasOpen.current) window.dispatchEvent(new CustomEvent(CALENDAR_HINT_CLOSED_EVENT));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;

@@ -1,6 +1,7 @@
 import { adminWithoutSecondFactor, areasOf, canUseArea, hasArea, isAnyAdmin } from "@/lib/permissions";
 import { clearRecentSearches } from "@/lib/recentSearches";
 import { clearOfflineCard, offlineCardOwner } from "@/lib/memberCardOffline";
+import { forgetWebPush } from "@/lib/webPush";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
@@ -153,6 +154,8 @@ export function AuthProvider({ children }) {
       // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
       clearRecentSearches();
       clearOfflineCard();
+      // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
+      void forgetWebPush();
       return true;
     } catch (e) {
       const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";

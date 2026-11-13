@@ -319,6 +319,11 @@ async def init_indexes():
     await db.mobile_push_tokens.create_index([("user_id", 1), ("enabled", 1), ("updated_at", -1)])
     await db.mobile_push_tokens.create_index([("enabled", 1), ("last_ticket_status", 1), ("last_ticket_at", -1)])
     await db.mobile_push_tokens.create_index([("last_receipt_checked_at", -1)])
+    # Browser-Benachrichtigungen (#1163): eine Anmeldung je Browser, gefunden über den Hash der Adresse beim Push-Dienst.
+    await db.web_push_subscriptions.create_index("endpoint_hash", unique=True)
+    await db.web_push_subscriptions.create_index("id", unique=True)
+    await db.web_push_subscriptions.create_index([("user_id", 1), ("updated_at", -1)])
+    await db.web_push_subscriptions.create_index([("user_id", 1), ("session_family", 1)])
     await db.mobile_client_logs.create_index("id", unique=True)
     await db.mobile_client_logs.create_index("received_at")
     await db.mobile_client_logs.create_index([("status", 1), ("level", 1), ("received_at", -1)])
@@ -612,6 +617,12 @@ async def init_indexes():
                                       partialFilterExpression={"league_context": {"$type": "object"}})
     await unique_index(db.tournaments, [("league_context.division_id", 1), ("league_context.staffel", 1)],
                        "league_staffel", partialFilterExpression={"league_context": {"$type": "object"}})
+    # Saisonabschluss (F.1, #1645): eine Zeile je Fassung des Endstands einer Staffel; höchstens eine gilt (``active``).
+    await db.league_final_tables.create_index("id", unique=True)
+    await db.league_final_tables.create_index([("tournament_id", 1), ("version", 1)], unique=True, name="league_final_version")
+    await db.league_final_tables.create_index(
+        "tournament_id", unique=True, name="league_final_active", partialFilterExpression={"active": True})
+    await db.league_final_tables.create_index("season_id")
     await init_audit_indexes(db)
 
 

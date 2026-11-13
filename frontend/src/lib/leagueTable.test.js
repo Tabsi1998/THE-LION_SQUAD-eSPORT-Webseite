@@ -8,6 +8,9 @@ describe("Tabelle der Liga-Staffel (E.1, #1625)", () => {
     expect(standingNotes({ tiebreak: "head_to_head" }).map((note) => note.text)).toEqual(["Direkter Vergleich"]);
     const decided = standingNotes({ tiebreak: "lead_decision", lead_decision: { reason: "Los vor beiden Captains" } });
     expect(decided[0]).toMatchObject({ text: "Platz durch Entscheid der Leitung", reason: "Los vor beiden Captains" });
+    // Art des Entscheids (F.1, Nr. 156): Entscheidungsspiel und Los heißen so.
+    expect(standingNotes({ tiebreak: "lead_decision", lead_decision: { reason: "2:1", method: "playoff" } })[0].text).toBe("Platz durch Entscheidungsspiel");
+    expect(standingNotes({ tiebreak: "lead_decision", lead_decision: { reason: "Münze", method: "lot" } })[0].text).toBe("Platz durch Losentscheid");
     expect(standingNotes({ tiebreak: null })).toEqual([]);
     expect(standingNotes(null)).toEqual([]);
   });

@@ -47,6 +47,7 @@ import { problemKind } from "@/lib/loadProblem";
 import { RegistrationSheet } from "@/components/tls/tournament/RegistrationSheet";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
+import { offerWebPush } from "@/lib/webPush";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -217,8 +218,9 @@ function TournamentDetailView() {
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188), nicht erst auf der Event-Seite.
       void offerFriendsHint();
-      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
-      void offerCalendarHint();
+      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet. Danach (#1163) die Frage nach
+      // Browser-Benachrichtigungen - sie wartet, bis der Abo-Hinweis zu ist.
+      void offerCalendarHint().then(() => offerWebPush());
     }, "Anmeldung konnte nicht gespeichert werden.");
   };
 

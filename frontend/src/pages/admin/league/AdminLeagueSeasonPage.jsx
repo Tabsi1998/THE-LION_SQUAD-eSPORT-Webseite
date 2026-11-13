@@ -39,6 +39,7 @@ import { useSeasonReadiness } from "./SeasonReadinessPanel";
 import { SeasonProtestsTab } from "./SeasonProtestsTab";
 import { SeasonRulesTab } from "./SeasonRulesTab";
 import { SeasonSanctionsTab } from "./SeasonSanctionsTab";
+import { SeasonCloseTab } from "./SeasonCloseTab";
 import { SeasonTablePanel } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -55,22 +56,43 @@ const SAVED_TEXT = {
 };
 const labelOf = (key) => SEASON_TABS.find((row) => row.key === key)?.label || key;
 
-/** Rollt zu einem Abschnitt, sobald er da ist - manche Bausteine laden ihre Daten erst. */
+/** Rollt zu einem Abschnitt, sobald er da ist - manche Bausteine laden ihre Daten erst. Lädt darüber noch etwas nach und schiebt
+ * den Abschnitt weg, rollt es nach, bis seine Lage drei Takte still steht (höchstens 4 s). Rollt die Person selbst, hört es auf. */
 function useScrollToSection(section, tab, ready) {
   useEffect(() => {
     if (!section || !ready) return undefined;
     let tries = 0;
+    let stable = 0;
+    let lastTop = null;
+    let userScrolled = false;
+    const stopOnUser = () => { userScrolled = true; };
+    window.addEventListener("wheel", stopOnUser, { passive: true });
+    window.addEventListener("touchmove", stopOnUser, { passive: true });
+    window.addEventListener("keydown", stopOnUser);
+    const stop = () => {
+      window.clearInterval(timer);
+      window.removeEventListener("wheel", stopOnUser);
+      window.removeEventListener("touchmove", stopOnUser);
+      window.removeEventListener("keydown", stopOnUser);
+    };
     const timer = window.setInterval(() => {
-      const node = document.getElementById(section);
       tries += 1;
-      if (node) {
+      const node = document.getElementById(section);
+      if (userScrolled || tries > 40) {
+        stop();
+        return;
+      }
+      if (!node) return;
+      const top = Math.round(node.getBoundingClientRect?.().top ?? 0);
+      if (lastTop === null || Math.abs(top - lastTop) > 2) {
         node.scrollIntoView?.({ block: "start" });
-        window.clearInterval(timer);
-      } else if (tries > 40) {
-        window.clearInterval(timer);
+        lastTop = Math.round(node.getBoundingClientRect?.().top ?? 0);
+        stable = 0;
+      } else if (++stable >= 3) {
+        stop();
       }
     }, 100);
-    return () => window.clearInterval(timer);
+    return stop;
   }, [section, tab, ready]);
 }
 
@@ -356,6 +378,8 @@ export default function AdminLeagueSeasonPage() {
     proteste: () => <SeasonProtestsTab seasonId={seasonId} canSeason={canSeason} canDisputes={can("disputes")} />,
     // Strafen (E.3): eigener Reiter - Formular oben, darunter die Strafen der Season.
     strafen: () => <SeasonSanctionsTab seasonId={seasonId} />,
+    // Abschluss (F.1, #1645): Endstand je Staffel festhalten - eigenes Laden, eigene Knöpfe.
+    abschluss: () => <SeasonCloseTab seasonId={seasonId} canResults={can("results")} />,
     regelwerk: () => (
       <SeasonRulesTab seasonId={seasonId} season={season} canSeason={canSeason} canRules={canRules} rulesView={rulesView} rulesNotice={notice}
         rulesLink={rulesLink} onPendingSync={setPendingSync} />

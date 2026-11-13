@@ -62,7 +62,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 
 | Was | Entscheidung |
 | --- | --- |
-| Name, E-Mail, Profilangaben, verknüpfte Konten, Sitzungen, Passkeys, Push-Geräte, Freundschaften, Blockierungen | gelöscht oder überschrieben. Am Konto selbst geht jedes Feld des Profilformulars (Handles, Spiele, Plattformen, Eingabegeräte, Webseite, Sichtbarkeits- und Nachrichten-Stufen …); nur Anzeigename („Gelöschter User“) und abgeschaltete Einwilligungen und Schalter bleiben. Die Liste wird aus dem Profilformular abgeleitet, `test_anonymize_profile_fields_flow.py` prüft jedes Feld; früher gelöschte Konten räumt die Migration 15 nach (#2118) |
+| Name, E-Mail, Profilangaben, verknüpfte Konten, Sitzungen, Passkeys, Push-Geräte, angemeldete Browser für Browser-Benachrichtigungen, Freundschaften, Blockierungen | gelöscht oder überschrieben. Am Konto selbst geht jedes Feld des Profilformulars (Handles, Spiele, Plattformen, Eingabegeräte, Webseite, Sichtbarkeits- und Nachrichten-Stufen …); nur Anzeigename („Gelöschter User“) und abgeschaltete Einwilligungen und Schalter bleiben. Die Liste wird aus dem Profilformular abgeleitet, `test_anonymize_profile_fields_flow.py` prüft jedes Feld; früher gelöschte Konten räumt die Migration 15 nach (#2118) |
 | Avatar, Banner und alles, was das Konto für sein Profil hochgeladen hat (samt kleinerer Fassungen und einer Kopie in der Quarantäne der Bildprüfung) | gelöscht – außer ein Bild wird vom Team oder Verein verwendet, etwa als Teamlogo. Ein Profil einer anderen Person hält es nicht fest, es verliert nur den Eintrag. Dateien eines anderen Kontos oder des Vereins bleiben, auch wenn sie im gelöschten Profil eingetragen waren (#1039). Lässt sich eine Datei nicht löschen (etwa gesperrt), steht sie als Eintrag mit Status in `pending_file_cleanups` (Datei, Kennung des gelöschten Kontos, Fehlerart ohne Pfad); der stündliche Job `erasure_file_cleanup` holt das mit wachsendem Abstand nach, nach acht Versuchen steht der Eintrag als aufgegeben unter Betrieb → Checks, bis ein Admin ihn erneut versucht. Der Eintrag geht, sobald die Datei weg ist (#1046) |
 | Bilder in veröffentlichten Regelwerk-Fassungen | bleiben ohne Bezug zur Person erhalten |
 | XP und Level, Erfolge, Zählerstände und Signale der Erfolge, Sticker, Adventkalender, Ostereier, Verlosungen, Discord-Aktivität, Verlauf der Saisonränge | gelöscht |
@@ -137,7 +137,8 @@ Sammlung aus `personal_data.py` steht ein Schlüssel drin; der Test vergleicht b
 Der Server liest seitenweise in der Reihenfolge des Anlegens und schreibt die Datei fortlaufend, ohne Obergrenze und
 ohne alles auf einmal im Speicher. Bewusst nicht enthalten:
 
-- Prüfwerte und Schlüssel: Passwort- und Token-Hashes, MFA-Geheimnisse, Push-Token, Schlüssel der Passkeys,
+- Prüfwerte und Schlüssel: Passwort- und Token-Hashes, MFA-Geheimnisse, Push-Token, Adresse und Schlüssel eines Browsers
+  beim Push-Dienst (die Auskunft nennt unter `web_push_browsers` nur Browser und Zeitpunkte), Schlüssel der Passkeys,
   Dateinamen, Adressen und Ablageorte hochgeladener Dateien (Uploads, Anhänge, Ergebnisfotos, Upload-Protokoll: nur
   Art, Größe, Datum und Prüfstand), Beitrittscodes von Teams, der Schlüssel der Mitgliederakte.
 - Daten Dritter: wer die Person blockiert oder gemeldet hat und was dabei geschrieben wurde (Meldungen über die Person

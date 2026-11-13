@@ -16,6 +16,7 @@ import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
 import { BallotPopup } from "@/components/tls/BallotPopup";
 import { CalendarHintHost } from "@/components/calendar/CalendarHintHost";
+import { WebPushHost } from "@/components/notifications/WebPushHost";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -283,6 +284,8 @@ function App() {
             <Toaster theme="dark" position="top-right" richColors />
             {/* Abo-Hinweis nach einer Anmeldung (#1788): einmal je Konto, unten - die Meldungen bleiben oben rechts. */}
             <OptionalBoundary quiet><CalendarHintHost /></OptionalBoundary>
+            {/* Frage nach Browser-Benachrichtigungen (#1163): nach einer Anmeldung, nie beim ersten Besuch, nur einmal. */}
+            <OptionalBoundary quiet><WebPushHost /></OptionalBoundary>
             <StartSplashGate />
             <AppErrorBoundary>
             <BottomNav />

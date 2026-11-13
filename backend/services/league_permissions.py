@@ -300,9 +300,14 @@ async def held_result_refusal(db, match: dict, hold: dict) -> str | None:
     wird der Stand beim Veröffentlichen: Konto, Zwei-Faktor, Liga-Recht und Befangenheit. ``None``: Ja. Andere Turniere kennen die
     Prüfung nicht. Die Bestätigung der Sitzung gehört zur Anfrage, hier zählt die eingerichtete Zwei-Faktor-Anmeldung des Kontos.
     Die Notausnahme des Superadmins bleibt, wenn sie beim Ablegen mit Grund gesetzt war und die Person noch Superadmin ist."""
-    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "league_context": 1})
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "league_context": 1, "final_table": 1})
     if not is_league_staffel(tournament):
         return None
+    # Inzwischen abgeschlossen (F.1, #1645): Ein bereitliegendes Ergebnis geht nicht mehr hinaus.
+    from services.league_final_read import CLOSED_LOCK, is_closed
+
+    if is_closed(tournament):
+        return CLOSED_LOCK
     account = await db.users.find_one({"id": hold.get("actor_id")},
                                       {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_active": 1, "is_banned": 1, "mfa_enabled": 1})
     if not account or account.get("is_active") is False or account.get("is_banned"):

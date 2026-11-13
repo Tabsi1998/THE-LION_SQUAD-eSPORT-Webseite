@@ -148,6 +148,16 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
         if rank is not None:
             return rank, participant_count
 
+    # Abgeschlossene Liga-Staffel (F.1, #1645): Der Platz kommt aus dem Endstand, nicht aus einer neuen Rechnung.
+    final = await db.league_final_tables.find_one({"tournament_id": tournament_id, "active": True},
+                                                  {"_id": 0, "rows.registration_id": 1, "rows.rank": 1})
+    if final:
+        for reg_id in reg_ids:
+            rank = _rank_from_rows(final.get("rows") or [], reg_id)
+            if rank is not None:
+                return rank, participant_count
+        return None, participant_count
+
     read_model = await load_competition_read_model(db, tournament_id)
     if not read_model.stage_matches:
         return None, participant_count

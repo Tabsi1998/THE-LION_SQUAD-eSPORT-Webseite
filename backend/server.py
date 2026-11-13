@@ -49,6 +49,7 @@ from routes.league_application_routes import admin_router as league_application_
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.league_table_routes import admin_router as league_table_admin_router
 from routes.league_sanction_routes import admin_router as league_sanction_admin_router
+from routes.league_final_routes import admin_router as league_final_admin_router
 from routes.league_desk_routes import admin_router as league_desk_admin_router
 from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
 from routes.league_schedule_routes import admin_router as league_schedule_admin_router, router as league_schedule_router
@@ -89,6 +90,7 @@ from routes.reference_round_page_routes import router as reference_round_page_ro
 from routes.reference_partner_routes import router as reference_partner_router
 from routes.reference_season_table_routes import router as reference_season_table_router
 from routes.mobile_routes import router as mobile_router
+from routes.web_push_routes import router as web_push_router
 from routes.admin_routes import router as admin_router
 from routes.ops_routes import router as ops_router
 from routes.dolibarr_routes import admin_router as dolibarr_admin_router, member_router as dolibarr_member_router, public_router as dolibarr_public_router
@@ -416,6 +418,7 @@ app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)
 app.include_router(league_sanction_admin_router)  # Strafen im Wettbewerb: verhängen, bestätigen, widerrufen, Einspruch (E.3)
+app.include_router(league_final_admin_router)  # Saisonabschluss: Cockpit, abschließen, wieder öffnen (F.1, #1645)
 app.include_router(league_desk_admin_router)  # Leitstand der Season: offene Aufgaben, Protokoll, Rundnachricht (E.4)
 app.include_router(league_result_rule_admin_router)  # Ergebnisregeln der Season (docs/LIGA.md, C.3, #1617)
 app.include_router(league_schedule_admin_router)  # Terminregeln je Season (#2194)
@@ -461,6 +464,8 @@ app.include_router(reference_round_page_router)  # Ergebnistabelle je Runde, Sta
 app.include_router(reference_partner_router)  # Partner-Plattform anbinden: Turniertage als Entwurf holen (#1964)
 app.include_router(reference_season_table_router)  # Saisontabelle einlesen: Runden als Entwurf nachtragen (#1928)
 app.include_router(mobile_router)
+# Browser-Benachrichtigungen (#1163): Anmelden und Abmelden eines Browsers.
+app.include_router(web_push_router)
 app.include_router(admin_router)
 app.include_router(ops_router)
 app.include_router(dolibarr_admin_router)

@@ -101,6 +101,7 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
                       games: list[dict] | None = None, lineups_missing: list[str] | None = None,
                       conflict_reason: str | None = None, lineups: dict | None = None) -> dict:
     """Ein Ergebnis für 10 Sekunden bereitlegen. Prüft alles wie beim Speichern - Fehler kommen sofort zurück."""
+    await _refuse_closed(db, match)
     actor_id = actor["id"]
     normalized = await checked_results(db, match, raw_results)
     existing = match.get("pending_result")
@@ -372,7 +373,17 @@ async def undo_result(db, match: dict, *, actor_id: str, hold_id: str | None = N
     return await _revert_published(db, match, actor_id=actor_id, hold_id=hold_id)
 
 
+async def _refuse_closed(db, match: dict) -> None:
+    """Abgeschlossene Liga-Staffel (F.1, #1645): nichts bereitlegen, nichts zurücknehmen - erst wieder öffnen."""
+    from services.league_final_read import closed_refusal
+
+    closed = await closed_refusal(db, match.get("tournament_id"))
+    if closed:
+        raise MatchV2ResultError(closed, 409)
+
+
 async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | None) -> dict:
+    await _refuse_closed(db, match)
     meta = match.get("result_meta") or {}
     status = str(match.get("status") or "")
     if status not in DECIDED_STATUSES or not match.get("results"):

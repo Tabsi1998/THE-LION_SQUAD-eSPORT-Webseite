@@ -129,3 +129,16 @@ test("die Tabellenregeln der Season: Reihenfolge, Mini-Tabelle, Remis, Default-W
   fireEvent.change(screen.getByTestId("season-form-exit-rule"), { target: { value: "all_for_opponents" } });
   expect(state()).toMatchObject({ allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents" });
 });
+
+test("Art der Entscheidung (F.1): im Reiter Tabelle freiwillig - gewählt geht sie mit", async () => {
+  render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  fireEvent.click(await screen.findByTestId("season-tie-decide-1"));
+  const sheet = await screen.findByTestId("table-decision-sheet");
+  expect(within(sheet).getByTestId("table-decision-method")).toHaveValue("");
+  expect(sheet).toHaveTextContent("Keine Angabe");
+  fireEvent.change(within(sheet).getByTestId("table-decision-method"), { target: { value: "lot" } });
+  fireEvent.change(within(sheet).getByTestId("table-decision-reason"), { target: { value: "Losentscheid vor beiden Captains" } });
+  fireEvent.click(within(sheet).getByTestId("table-decision-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/table-decision",
+    { registration_ids: ["r1", "r2"], reason: "Losentscheid vor beiden Captains", method: "lot" }));
+});

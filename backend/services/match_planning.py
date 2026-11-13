@@ -154,6 +154,10 @@ async def ensure_station_slot_available(db, current_match: dict, updates: dict, 
 
 
 async def ensure_tournament_accepts_results(db, tournament_id: str) -> None:
+    # Abgeschlossene Liga-Staffel (F.1, #1645): der Endstand steht - mit dem Satz, wie es weitergeht.
+    from services.league_final_read import ensure_not_closed
+
+    await ensure_not_closed(db, tournament_id)
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "status": 1})
     if not tournament or tournament.get("status") not in RESULT_OPEN_TOURNAMENT_STATUSES:
         raise HTTPException(

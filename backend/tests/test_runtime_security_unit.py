@@ -206,3 +206,17 @@ def test_admin_bootstrap_creates_once_without_logging_password(monkeypatch):
     assert user["password_contract"] == 2
     assert user["role"] == "superadmin"
     memberships.insert_one.assert_awaited_once()
+
+
+def test_backend_compose_passes_scheduler_and_web_push_settings():
+    """Die Scheduler-Schalter bleiben, und jede Web-Push-Einstellung aus .env.example erreicht das Backend (#1163)."""
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    backend = compose.split("\n  backend:", 1)[1].split("\n  frontend:", 1)[0]
+    for name in ("DISABLE_SCHEDULER", "SCHEDULER_JOBS", "OUTBOUND_DISABLED"):
+        assert f"      {name}: " in backend, name
+    example = (root / ".env.example").read_text(encoding="utf-8")
+    web_push = [line.split("=", 1)[0] for line in example.splitlines() if line.startswith("WEB_PUSH_")]
+    assert web_push
+    for name in web_push:
+        assert f'      {name}: "${{{name}:-' in backend, name

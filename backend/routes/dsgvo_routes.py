@@ -253,6 +253,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
                                      _report(user_id))),
         ("email_logs", _rows(db.email_logs, {"to": email})),
         ("mobile_devices", _rows(db.mobile_push_tokens, me, lambda row: _clean(row, "token"))),
+        # Browser-Benachrichtigungen (#1163): welcher Browser, seit wann - ohne Adresse und Schlüssel beim Push-Dienst.
+        ("web_push_browsers", _rows(db.web_push_subscriptions, me,
+                                    _pick("browser", "private_content", "created_at", "updated_at", "last_sent_at"))),
         ("mobile_client_logs", _rows(db.mobile_client_logs, me)),
         ("audit_trail", _rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}, _audit_entry(user_id))),
         # Nachrichten an alle Angemeldeten eines Events (#1372), die die Person als Turnierleitung geschickt hat.
@@ -388,6 +391,7 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     await db.users.update_one({"id": user_id}, update)
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,
                        db.password_reset_tokens, db.mfa_login_challenges, db.mobile_push_tokens,
+                       db.web_push_subscriptions,
                        db.mobile_client_logs, db.notifications, db.user_socials,
                        db.passkeys, db.passkey_challenges, db.platform_links, db.platform_link_flows,
                        # Verhalten, das nur für die Erfolge gezählt wurde (#616, #678) - ohne Konto ohne Zweck.

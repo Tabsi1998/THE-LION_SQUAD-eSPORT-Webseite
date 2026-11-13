@@ -85,6 +85,7 @@ class FakeDb:
             "tournament_stages",
             "tournament_groups",
             "f1_lap_times",
+            "league_final_tables",
         ]
         for name in names:
             setattr(self, name, FakeCollection(collections.get(name, [])))
