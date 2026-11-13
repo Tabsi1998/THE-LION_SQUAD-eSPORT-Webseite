@@ -174,8 +174,8 @@ Uhrzeit** zeigt er „Kurze Pause“. Beim Weiterspielen fällt die Uhrzeit von 
 Die Tafel zeigt groß, wer an welche Station soll, mit Countdown. Ohne Aufrufe steht dort „Gerade keine Aufrufe“, dazu
 die nächsten geplanten Spiele.
 
-**Was ist ein Aufruf?** Ein Spiel gilt als aufgerufen, sobald ihr es unter **Admin → eSports → Stationen** mit **Spiel
-zuweisen** einer Station zugewiesen habt, es aber noch nicht gestartet ist.
+**Was ist ein Aufruf?** Ein Spiel gilt als aufgerufen, sobald ihr es in der **Turnierleitung** im Reiter **Stationen**
+mit **Aufrufen** an einer Station aufgerufen habt, es aber noch nicht gestartet ist.
 
 **Countdown:** Hat das Spiel eine geplante Uhrzeit, läuft der Countdown bis dahin. Hat es keine, läuft er ab dem
 Aufruf so lange, wie bei **Zeit zum Antreten** steht (Standard 2 Minuten, 1 bis 30).

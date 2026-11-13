@@ -612,7 +612,7 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
   Baum fix ist. Kann der Planer nicht antworten oder fehlt das Recht, steht das als Hinweis da.
 - **Live:** Oben steht der Verzug aus der Warteschlange („+11 Min. – Finale jetzt ca. 20:51“), die Zeitleiste
   zeigt, wie der Rest nachrückt. Vor Ort steht darunter die **Warteschlange je Station** (läuft, als Nächstes mit
-  **Aufrufen**/**Gestartet**, Aufruf und Frist „nicht erschienen“, danach). Im laufenden Turnier vor Ort schreibt der
+  **Aufrufen**/**Starten**, Aufruf und Frist „nicht erschienen“, danach). Im laufenden Turnier vor Ort schreibt der
   Matchplan keine Zeiten mehr: **Prognose ansehen** zeigt die Vorschau ohne **Übernehmen** – die Warteschlange rückt
   von selbst nach, die geplanten Zeiten bleiben als Vergleich für den Verzug. Von Hand ändern und ziehen geht weiter.
 - **Am Handy** steht statt der breiten Zeitleiste je Station eine Liste: was läuft, was als Nächstes kommt.
@@ -647,7 +647,7 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
   Aufgestellten). Danach steht dort „Aufgerufen · antreten bis … · nicht erschienen ab …“; die Frist „nicht erschienen“
   (3.7) zählt ab dem Aufruf. Wer vor der geplanten Zeit aufgerufen wird, hat bis zur geplanten Zeit – dann nennen
   „antreten bis“ und „nicht erschienen ab“ dieselbe Uhrzeit.
-- **Gestartet** setzt die echte Startzeit. Ab da läuft die Uhr, und **Ergebnis fehlt** zählt erst ab diesem Start
+- **Starten** setzt die echte Startzeit. Ab da läuft die Uhr, und **Ergebnis fehlt** zählt erst ab diesem Start
   (Dauer plus 5 Minuten) – ein Spiel, das an seiner Station noch wartet, hat Verzug, aber kein fehlendes Ergebnis.
 - Rufen zwei Helfer gleichzeitig auf, gilt genau ein Aufruf; der andere bekommt „Die Station hält inzwischen ein anderes
   Spiel“ und sieht den neuen Stand. Ein schon aufgerufenes Spiel lässt sich nicht still an eine andere Station rufen.

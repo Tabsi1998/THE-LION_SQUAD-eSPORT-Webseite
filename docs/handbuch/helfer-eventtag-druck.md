@@ -21,7 +21,8 @@ Turnier → **Turnierleitung** → Reiter **Stationen**.
 
 1. Bei deiner Station steht **Als Nächstes** mit Runde, Durchgang und Namen.
 2. **Aufrufen** tippen. Die Spieler bekommen „Du bist dran“.
-3. Alle da? **Gestartet** tippen. Die Uhr läuft.
+3. Alle da? **Starten** tippen. Die Uhr läuft.
+4. Gerät kaputt? **Defekt** tippen, dann **Umlegen** auf eine freie Station.
 
 **Wenn** niemand kommt: **dann** nicht selbst entscheiden. Nach 10 Minuten bekommt die Turnierleitung „Nicht erschienen?“.
 
