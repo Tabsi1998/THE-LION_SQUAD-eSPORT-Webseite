@@ -807,7 +807,10 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
                                                        {"_id": 0, "match_collection": 0}).to_list(2000)
     table = await tournament_standings(tournament["id"], None, user)
     from services.league_final import public_final_of
+    from services.league_rewards import staffel_view as reward_view
     from services.league_table import public_rules
+
+    final = await public_final_of(db, tournament)
 
     # Teams der Season mit Bild (#2268): das Logo nur von Teams mit öffentlicher Teamseite (``is_public`` nicht aus) - sonst ``None``,
     # die Seite zeigt dann die Initialen.
@@ -819,7 +822,9 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
                     # Regeln der Tabelle (E.1, #1625): Remis, Reihenfolge bei Gleichstand - für Spalten und Legende.
                     "table_rules": public_rules(tournament),
                     # Endstand (F.1, #1645): abgeschlossen seit, Meister und Entscheide - ``None``, solange gespielt wird.
-                    "final": await public_final_of(db, tournament)},
+                    "final": final,
+                    # Belohnungen (F.4, #2214): vor dem Abschluss die Zusammenstellung, danach mit Inhabern - ``None`` ohne Belohnungen.
+                    "rewards": await reward_view(db, tournament, season, division, granted=bool(final))},
         "standings": table,
         "teams": sorted(({**row, "logo_url": logos.get(row.get("team_id"))} for key, row in names.items() if key in active_ids),
                         key=lambda row: str(row["display_name"]).casefold()),
