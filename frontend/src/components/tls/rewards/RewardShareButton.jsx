@@ -18,6 +18,8 @@ export function rewardFileName(award) {
 }
 
 export function rewardShareLink(award, origin = typeof window === "undefined" ? "" : window.location.origin) {
+  // Gesamtwertung (F.5, #2215): keine Staffel dahinter - der Server nennt die Ligaseite der Gesamtwertung.
+  if (award?.url) return `${origin}${award.url}`;
   const slug = award?.tournament?.slug || award?.tournament?.id;
   return slug ? `${origin}/tournaments/${encodeURIComponent(slug)}` : origin;
 }
