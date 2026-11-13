@@ -14,6 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 from league_match_world import OLD_RULES, world as league_world  # noqa: E402
+from squad_world import make_squad, make_team, squad_registration  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import league_rules  # noqa: E402
 
@@ -408,6 +409,95 @@ async def test_broadcast_reaches_captains_by_default_and_all_players_on_request(
     assert staffel.json()["recipients"] == 8 and division.json()["recipients"] == 8 and division.json()["scope_label"] == "Liga 1"
     unknown = await flow.post(f"{world['broadcast']}/preview", json={"scope": "staffel", "scope_id": "gibt-es-nicht"})
     assert unknown.status_code == 404
+
+
+async def wide_world(flow) -> dict:
+    """N10: dazu Liga 2 mit Staffel B (Co-Team der Nordlichter) und eine zweite Season mit Staffel C (Co-Team der Südwinde)."""
+    world = await desk_world(flow)
+    await flow.db.league_divisions.insert_one({"id": "liga-2", "league_id": "liga", "season_id": world["season_id"], "level": 2})
+
+    async def side(season_id, division_id, letter, team_name, people):
+        users = [await flow.add_user(name=name) for name in people]
+        team = await make_team(flow, team_name, leader=users[0], members=users[1:])
+        squad = await make_squad(flow, team, f"{team_name} A", users[1:], captain=users[1])
+        staffel = await flow.create_tournament(team_mode="team", team_size=2, format="league", status="live", title=f"Staffel {letter}",
+                                               league_context={"league_id": "liga", "season_id": season_id, "division_id": division_id,
+                                                               "staffel": letter})
+        await squad_registration(flow, staffel, team, squad)
+        world["users"].update({user["display_name"]: user for user in users})
+        return staffel
+
+    world["staffel_b"] = await side(world["season_id"], "liga-2", "B", "Nordlichter", ["NordLeitung", "Nord1", "Nord2"])
+    other_season = new_id()
+    await flow.db.league_seasons.insert_one({"id": other_season, "league_id": "liga", "name": "Season 2", "slug": "season-2", "status": "draft"})
+    await flow.db.league_divisions.insert_one({"id": "liga-1-s2", "league_id": "liga", "season_id": other_season, "level": 1})
+    world["staffel_c"] = await side(other_season, "liga-1-s2", "C", "Suedwinde", ["SuedLeitung", "Sued1"])
+    return world
+
+
+async def preview_count(flow, world, **body) -> int:
+    response = await flow.post(f"{world['broadcast']}/preview", json=body)
+    assert response.status_code == 200, response.text
+    return response.json()["recipients"]
+
+
+@pytest.mark.asyncio
+async def test_each_circle_reaches_only_its_own_teams(flow):
+    world = await wide_world(flow)
+    flow.act_as(world["staff"])
+    # Captains: Kapitaen (Rudel A), Falke1 (Horst), Nord1 (Nordlichter) - nie die Südwinde der anderen Season.
+    assert await preview_count(flow, world) == 3
+    assert await preview_count(flow, world, scope="division", scope_id="liga-1") == 2
+    assert await preview_count(flow, world, scope="division", scope_id="liga-2") == 1
+    assert await preview_count(flow, world, scope="staffel", scope_id=world["staffel_b"]["id"]) == 1
+    assert await preview_count(flow, world, audience="players", scope="staffel", scope_id=world["staffel_b"]["id"]) == 3
+
+    sent = await send(flow, world, scope="division", scope_id="liga-2")
+    assert sent.status_code == 200 and sent.json()["recipients"] == 1
+    assert len(await inbox(flow, world, "Nord1")) == 1
+    for name in ("Kapitaen", "Falke1", "Sued1", "Nord2"):
+        assert await inbox(flow, world, name) == [], name
+
+    players = await send(flow, world, audience="players", scope="staffel", scope_id=world["tournament"]["id"])
+    assert players.json()["recipients"] == 8
+    assert await inbox(flow, world, "Nord2") == [] and await inbox(flow, world, "Sued1") == [], "andere Staffel und andere Season nicht"
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_or_league_of_another_season_is_refused(flow):
+    world = await wide_world(flow)
+    flow.act_as(world["staff"])
+    for body in ({"scope": "staffel", "scope_id": world["staffel_c"]["id"]}, {"scope": "division", "scope_id": "liga-1-s2"},
+                 {"scope": "division"}, {"scope": "staffel", "scope_id": "gibt-es-nicht"}):
+        preview = await flow.post(f"{world['broadcast']}/preview", json=body)
+        assert preview.status_code == 404, (body, preview.text)
+        sent = await send(flow, world, **body)
+        assert sent.status_code == 404, (body, sent.text)
+    assert await inbox(flow, world, "Sued1") == []
+
+
+@pytest.mark.asyncio
+async def test_banned_and_switched_off_accounts_and_the_sender_get_nothing(flow):
+    world = await wide_world(flow)
+    await flow.db.users.update_one({"id": world["users"]["Falke1"]["id"]}, {"$set": {"is_banned": True}})
+    await flow.db.users.update_one({"id": world["users"]["Nord1"]["id"]}, {"$set": {"is_active": False}})
+    # Der Captain der Löwen gehört zugleich zur Liga-Leitung und schickt selbst.
+    sender = world["users"]["Kapitaen"]
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "liga", "user_id": sender["id"], "capabilities": ["season"],
+                                           "created_at": now_utc().isoformat()})
+    flow.act_as(sender)
+    # Gesperrt zählt als fehlende Rolle: Für den Horst bekommt es dann die Leitung der Falken (wie überall, ``responsible_ids``).
+    assert await preview_count(flow, world) == 1
+    captains = await send(flow, world, sender)
+    assert captains.json()["recipients"] == 1
+    assert len(await inbox(flow, world, "FalLeitung")) == 1
+    flow.act_as(sender)
+    assert await preview_count(flow, world, audience="players", scope="division", scope_id="liga-1") == 6
+    sent = await send(flow, world, sender, audience="players", scope="division", scope_id="liga-1")
+    assert sent.json()["recipients"] == 6
+    for name in ("Kapitaen", "Falke1", "Nord1"):
+        assert await inbox(flow, world, name) == [], name
+    assert len(await inbox(flow, world, "Mila")) == 1 and len(await inbox(flow, world, "FalLeitung")) == 2
 
 
 @pytest.mark.asyncio
