@@ -3431,28 +3431,51 @@ nie, wer abgeschlossen hat.
 | `not_started` | Staffel läuft nicht (Stand außerhalb `live`, `paused`, `completed`, `results_published`) | `tournaments.status` |
 | `no_matches` | kein gewertetes Spiel | `matches_v2` |
 | `open_matches` | ein Spiel mit zwei Seiten ist weder gespielt noch kampflos noch abgesagt | `matches_v2.status` |
+| `pending_results` | ein eingetragenes Ergebnis liegt noch für „Rückgängig“ bereit und ginge gleich hinaus | `matches_v2.pending_result` |
 | `incidents` | offener Vorfall oder „Serie feststellen“ | `league_incident_rules.open_incidents`, `lead_task` |
 | `procedures` | offene Beanstandung, offener Protest oder Einspruch | `league_procedures.open_rows` |
 | `sanctions` | vorläufige Sperre oder offener Einspruch gegen eine Strafe der Staffel | `competition_sanctions` |
 | `deadlines` | laufende Protestfrist, Einspruchsfrist gegen Kampflos-Wertung, Korrektur, Protestentscheid oder Strafe | `match_disputes.league_window_of`, `appeal_until`, `league_sanctions.appeal_refusal` |
-| `champion_tie` | Gleichstand auf Platz 1 in der obersten Liga N ohne Entscheid (Nr. 156) | Tabelle |
+| `champion_tie` | Gleichstand um den Meistertitel in der obersten Liga N ohne Entscheid (Nr. 156) | Tabelle |
+| `no_champion` | in der obersten Liga N steht kein Team mehr in der Wertung | Tabelle |
 
 Hier steht keine zweite Regel: Fristen und Zustände kommen aus den Bausteinen von D.5, E.2 und E.3. Sobald der Leitstand
 (E.4, `league_desk`) auf `main` ist, lesen beide dieselben Bausteine.
 
-**Gleichstand auf Platz 1 (Nr. 156):** Meister ist Platz 1 jeder Staffel der obersten Liga N (kleinste Stufe). Stehen dort
-Teams nach allen Kriterien gleich, verlangt der Abschluss einen Entscheid über `PUT …/staffeln/{tid}/table-decision` (E.1).
-Neu ist das optionale Feld `method` (`playoff` Entscheidungsspiel, `lot` Los, `lead` Entscheid der Leitung); es steht im
-Entscheid, in `lead_decision.method` der Tabellenzeile und im Endstand. Führt die Season `lead_decision` nicht in
+**Gleichstand auf Platz 1 (Nr. 156):** Meister ist in jeder Staffel der obersten Liga N (kleinste Stufe) das beste Team, das
+noch in der Wertung steht (`league_final.leaders`). Ausgeschiedene zählen nicht mit - auch wenn sie mit der Regel `half`
+rechnerisch vorn stehen. Stehen die besten Aktiven nach allen Kriterien gleich, verlangt der Abschluss einen Entscheid über
+`PUT …/staffeln/{tid}/table-decision` (E.1). Neu ist das Feld `method` (`playoff` Entscheidungsspiel, `lot` Los, `lead`
+Entscheid der Leitung); es steht im Entscheid, in `lead_decision.method` der Tabellenzeile und im Endstand. Für den Entscheid
+um den Meistertitel ist es Pflicht (422 ohne Angabe, `league_final.decides_champion`), sonst freiwillig. Führt die Season `lead_decision` nicht in
 `table_tiebreakers`, sagt das Cockpit, dass das Kriterium zuerst aufgenommen und übertragen werden muss. In unteren Ligen
 bleibt ein geteilter Platz 1 geteilt und sperrt nichts.
 
 **Abschließen** (`POST …/staffeln/{tid}/close`, `{confirm: true, conflict_reason?}`): Zuständigkeit `season`; wer zu einem
 Team der Staffel gehört, schließt nicht ab (403, Superadmin als Notausnahme mit Grund). Unter der Schreibsperre des Turniers;
-den Abschluss gewinnt, wer `tournaments.final_table` zuerst setzt - jeder zweite bekommt 409. Folgen: Staffel `completed`
-(Ergebnisse, Tabellen-Entscheide und „beide nicht erschienen“ sind gesperrt, der Stand geht nur über „Wieder öffnen“ zurück),
+den Abschluss gewinnt, wer `tournaments.final_table` zuerst setzt - jeder zweite bekommt 409. Scheitert danach das Schreiben
+der Fassung, fällt die Marke wieder weg: Die Staffel bleibt offen und abschließbar. Folgen: Staffel `completed`,
 Meister-Eintrag, Season `completed`, wenn alle Staffeln abgeschlossen sind, Protokoll `league.final.close`, Nachricht an
-Captains und Vertreter (`dedupe_key` `league-final:<fassung>:closed:<person>`).
+Captains und Vertreter (`dedupe_key` `league-final:<fassung>:closed:<person>`). Ein Fehler in einer dieser Folgen kippt den
+Abschluss nicht, er steht im Log (`league_final._follow_up`); dasselbe gilt beim Wiederöffnen.
+
+**Schreibsperre nach dem Abschluss:** Eine Stelle entscheidet (`league_final_read.closed_refusal` bzw. `ensure_not_closed`),
+jeder Schreibweg fragt sie - in der Route vor und unter der Schreibsperre des Turniers und noch einmal in der Schreibfunktion.
+Antwort ist immer 409 mit „Die Staffel ist abgeschlossen. Erst im Reiter ‚Abschluss‘ wieder öffnen, dann korrigieren.“
+
+| Weg | Stelle |
+| --- | --- |
+| Ergebnis eintragen, korrigieren, bereitlegen | `match_planning.ensure_tournament_accepts_results`, `v2_result_submission.submit_v2_result`, `result_hold.hold_result` |
+| „Rückgängig“ eines veröffentlichten Ergebnisses | `match_routes.undo_match_result`, `result_hold._revert_published` |
+| Veröffentlichen eines bereitliegenden Ergebnisses | `league_permissions.held_result_refusal` (das Ergebnis wird verworfen, die Person bekommt eine Nachricht) |
+| Kampflos, Meldung der Teams, Teilnehmerliste, Einspruch und Entscheidung am Spiel, `PATCH` des Spiels | `match_routes._ensure_staffel_open` |
+| Vorfall melden, beantworten, entscheiden, Serie feststellen | `league_incident_routes._context` |
+| Tabellen-Entscheid, „beide nicht erschienen“ | `league_table_routes._staffel` |
+| Austritt und Disqualifikation in der Teilnehmerliste | `tournament_removal_routes.remove_participant` |
+| Strafe „Punktabzug“ oder „Disqualifikation“ verhängen oder widerrufen | `league_sanctions.refuse_closed_effect` (andere Strafen bleiben möglich) |
+| Stand der Staffel ändern (jeder Stand, auch „Archiviert“) | `staffel_guard.staffel_status_problem` (400) |
+
+Chat, Terminvorschläge und das Lesen bleiben offen.
 
 **Wieder öffnen** (Nr. 155, `POST …/staffeln/{tid}/reopen`, `{reason, emergency_reason?, conflict_reason?}`): Pflichtgrund
 (mindestens fünf Zeichen), Zuständigkeit `season`, und eine **zweite Person** - wer abgeschlossen hat, bekommt 403; der
@@ -3464,7 +3487,8 @@ Fassung. Protokoll `league.final.reopen`, Nachricht an die Captains ohne den Gru
 **Meister-Eintrag:** ein Eintrag in `tournament_awards` je Staffel der obersten Liga N (`rank: 1`, `league: {title: "Meister",
 division_label, staffel, final_table_id, version}`), am Team (`team_id`) und an den Spielern (`player_ids`: wer in der Staffel
 mindestens einmal aufgestellt war, ohne Aufstellungen der Kader). `awards_for_user` zeigt Liga-Titel nur über `player_ids`,
-nicht jedem Mitglied des Hauptteams; `rank_label` heißt „Meister“. Beim Wiederöffnen ruht der Eintrag (`suspended`), beim
+nicht jedem Mitglied des Hauptteams; `rank_label` heißt „Meister“. Beim Wiederöffnen ruht der Eintrag (`suspended`; Profil,
+Teamseite und die Sieger-Karte der News zeigen ihn dann nicht), beim
 neuen Abschluss bleibt er für dasselbe Team derselbe und wechselt sonst das Team - nie zwei. Turnier-Pokalzähler, XP und
 Jahreswertung bleiben unberührt (Erfolge zählen keine Staffeln). Ausführliche Belohnungen folgen mit F.4 (#2214).
 

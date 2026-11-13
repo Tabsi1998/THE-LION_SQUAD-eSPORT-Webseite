@@ -1473,24 +1473,32 @@ jede Zuständigkeit der Liga.
 | Punkt | Was tun |
 | --- | --- |
 | Offene Spiele | Ergebnis eintragen, kampflos werten oder absagen. Ohne Entscheidung gibt es keinen Abschluss. |
+| Ergebnis wartet auf Veröffentlichung | ein paar Sekunden warten (das Ergebnis liegt noch für „Rückgängig“ bereit) oder „Rückgängig“ wählen |
 | Offene Vorfälle | auf der Matchseite entscheiden und die Serie feststellen |
 | Offene Verfahren | Beanstandung, Protest oder Einspruch entscheiden (Reiter **Proteste**) |
 | Strafen und Einsprüche | vorläufige Sperren bestätigen oder widerrufen, Einsprüche entscheiden (Reiter **Strafen**) |
 | Laufende Fristen | abwarten – daneben steht, bis wann die Protest- oder Einspruchsfrist läuft |
 | Gleichstand auf Platz 1 | **Meister entscheiden** (nur in der obersten Liga) |
+| Kein Meister | in der obersten Liga steht kein Team mehr in der Wertung – Anmeldungen prüfen |
+
+Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf.
 
 **2. Gleichstand auf Platz 1.** Stehen in der obersten Liga zwei Teams nach allen Kriterien gleich, gibt es keinen Meister
 ohne Entscheid. **Meister entscheiden** → Reihenfolge mit den Pfeilen → **Wie wurde entschieden?** (Entscheidungsspiel, Los
 oder Entscheid der Leitung) → **Grund** → **Festlegen**. Art und Grund stehen im Endstand und öffentlich an der Tabelle.
 Recht: **Ergebnisse korrigieren**, nie über das eigene Team. In unteren Ligen bleibt ein geteilter Platz geteilt.
+Meister wird das beste Team, das noch in der Wertung steht: Ein ausgetretenes oder disqualifiziertes Team wird es nie, auch
+wenn es nach Punkten vorn steht. Wer den Meisterplatz im Reiter **Tabelle** entscheidet, muss die Art dort ebenfalls angeben.
 
 **3. Staffel abschließen.** Der Knopf geht auf, sobald die Checkliste leer ist. Das Fenster nennt den Meister und fragt
 nach: **Jetzt abschließen**. Danach gilt:
 
 - Der **Endstand** steht fest: Plätze, Punkte, Maps, Entscheide und der Regelstand von jetzt. Website, TV und PDF zeigen ihn,
   auf der Ligaseite steht „Endstand · abgeschlossen am …“.
-- Ergebnisse, Tabellen-Entscheide und der Stand der Staffel lassen sich nicht mehr ändern. Ändert ihr später Punkte oder
-  Regeln der Season, bleibt der Endstand, wie er war.
+- Ergebnisse, „Rückgängig“, Kampflos-Wertungen, Vorfälle, Tabellen-Entscheide, Austritt und Disqualifikation, Punktabzüge und
+  der Stand der Staffel sind gesperrt. Jeder Versuch antwortet „Die Staffel ist abgeschlossen. Erst im Reiter ‚Abschluss‘
+  wieder öffnen, dann korrigieren.“ Verwarnungen und Sperren bleiben möglich. Ändert ihr später Punkte oder Regeln der Season,
+  bleibt der Endstand, wie er war.
 - Der Meister bekommt einen Eintrag „Meister“ an Team und eingesetzten Spielern (Profil → Auszeichnungen).
 - Captains und Vertreter bekommen eine Nachricht.
 - Wer selbst in einem Team der Staffel spielt, schließt nicht ab – das macht eine andere Person.
