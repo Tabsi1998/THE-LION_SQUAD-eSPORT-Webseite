@@ -329,7 +329,8 @@ async def test_protokoll_der_leitung_ohne_preis_und_belegfelder(flow, fake):
     for status in ("cancelled", "registered"):
         response = await flow.patch(url, json={"status": status})
         assert response.status_code == 200, response.text
-    rows = await flow.db.audit_logs.find({"action": "event.registration.update", "target_id": event["id"]}, {"_id": 0}).to_list(10)
+    # Nach Zeit sortiert: Ohne Sortierung ist die Reihenfolge auf echtem MongoDB nicht festgelegt.
+    rows = await flow.db.audit_logs.find({"action": "event.registration.update", "target_id": event["id"]}, {"_id": 0}).sort("created_at", 1).to_list(10)
     assert [row["data"]["updates"] for row in rows] == [{"status": "cancelled"}, {"status": "registered"}]
 
 
