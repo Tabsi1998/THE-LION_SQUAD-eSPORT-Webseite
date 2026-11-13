@@ -158,6 +158,19 @@ export function hasReplay(match) {
   return (match?.games || []).some((game) => game.status === "replayed");
 }
 
+/**
+ * Name eines Co-Teams in Hauptteam und Co-Team: „Löwen · Löwen Nachwuchs B“ → club „Löwen“, squad „Löwen Nachwuchs B“. `redundant`:
+ * das Co-Team nennt das Hauptteam schon - am Handy fällt das Hauptteam dann weg, der volle Name bleibt lesbar (#2268).
+ */
+export function splitTeamName(name) {
+  const text = String(name || "");
+  const at = text.indexOf(" · ");
+  if (at < 0) return { club: "", squad: text, redundant: false };
+  const club = text.slice(0, at).trim();
+  const squad = text.slice(at + 3).trim();
+  return { club, squad, redundant: Boolean(club) && squad.toLocaleLowerCase("de").startsWith(club.toLocaleLowerCase("de")) };
+}
+
 /** Initialen eines Teams für das Ersatzbild: „Löwen · Löwen B“ → „LB“, „Nebelwölfe“ → „NE“. */
 export function teamInitials(name) {
   const part = String(name || "").split("·").pop().trim();

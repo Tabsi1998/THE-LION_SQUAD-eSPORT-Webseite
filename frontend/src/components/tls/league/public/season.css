@@ -277,17 +277,19 @@
   background: rgb(var(--season-accent, var(--tls-brand-rgb)) / 0.12);
 }
 .tls-team-mark img { width: 100%; height: 100%; }
-.tls-league-match__team { display: flex; align-items: center; gap: 0.5rem; white-space: normal; text-overflow: clip; }
+.tls-league-match__team { display: flex; gap: 0.5rem; white-space: normal; text-overflow: clip; }
 .tls-league-match__team[data-align="right"] { justify-content: flex-end; text-align: right; }
 .tls-league-match__name {
-  display: -webkit-box;
   min-width: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   line-height: 1.25;
   overflow-wrap: anywhere;
   hyphens: auto;
+}
+.tls-league-match__team { align-items: flex-start; }
+.tls-league-match__team .tls-team-mark { margin-top: 0.0625rem; }
+/* Am Handy: nennt das Co-Team das Hauptteam schon („Löwen · Löwen B“), fällt das Hauptteam weg - der Rest steht ganz da. */
+@media (max-width: 639px) {
+  .tls-league-match__club[data-redundant="true"] { display: none; }
 }
 .tls-league-badge {
   display: inline-flex;

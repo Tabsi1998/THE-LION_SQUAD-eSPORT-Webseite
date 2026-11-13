@@ -136,6 +136,14 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(panel.getByTestId("league-match-m1-2")).toContainText("kampflos");
     await expect(panel.getByTestId("league-match-m1-1-contested")).toBeVisible();
     // Die Namen bleiben im Spiel: abgeschnitten mit vollem Namen als Titel, der Stand dazwischen bleibt ganz.
+    // Namen ganz lesbar (#2268): kein Abschneiden, kein Kürzen auf zwei Zeilen; am Handy fällt nur ein doppelt genanntes Hauptteam weg.
+    const names = await panel.locator(".tls-league-match__name").evaluateAll((nodes) => nodes.map((node) => ({
+      clipped: node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1,
+      clamp: getComputedStyle(node).webkitLineClamp, text: node.innerText })));
+    expect(names.filter((row) => row.clipped || (row.clamp && row.clamp !== "none"))).toEqual([]);
+    expect(names.some((row) => row.text.includes("Abendrunde"))).toBe(true);
+    const winners = await panel.locator("[data-testid$='-winner']").evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).length);
+    expect(winners).toBe(0);
     const score = await panel.getByTestId("league-match-m1-0").locator(".tls-league-match__score").boundingBox();
     expect(score.width).toBeGreaterThan(40);
     await noSideScroll(page);

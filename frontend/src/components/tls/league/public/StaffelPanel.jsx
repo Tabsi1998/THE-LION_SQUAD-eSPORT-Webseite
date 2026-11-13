@@ -28,7 +28,7 @@ import {
   weekHeading,
   winnerSide,
 } from "@/lib/leaguePage";
-import { hasReplay, sectionPath, teamInitials, weekDays, weekShort, weekState } from "@/lib/leagueSeasonPage";
+import { hasReplay, sectionPath, splitTeamName, teamInitials, weekDays, weekShort, weekState } from "@/lib/leagueSeasonPage";
 import "./league.css";
 import "./season.css";
 
@@ -63,10 +63,15 @@ export function TeamMark({ name, logo, size = 20, className = "" }) {
 function TeamName({ side, won, logo, align = "left" }) {
   if (!side) return <span className="text-white/40">–</span>;
   const tone = won ? "text-white font-bold" : "text-white/75";
+  // Ganz lesbar statt abgeschnitten: der Name bricht um; nennt das Co-Team das Hauptteam schon, fällt es am Handy weg.
+  const { club, squad, redundant } = splitTeamName(side.name);
   const inner = (
     <>
       {align === "left" ? <TeamMark name={side.name} logo={logo} /> : null}
-      <span className="tls-league-match__name">{side.name}</span>
+      <span className="tls-league-match__name">
+        {club ? <span className="tls-league-match__club" data-redundant={redundant ? "true" : undefined}>{club} · </span> : null}
+        {squad}
+      </span>
       {align === "right" ? <TeamMark name={side.name} logo={logo} /> : null}
     </>
   );
@@ -106,7 +111,10 @@ export function MapChips({ match }) {
                   {game.mode ? <ModeIcon src={game.mode_icon_url} label={game.mode_label || ""} size="xs" testId={`league-map-${match.id}-${game.position}-mode`} /> : null}
                   <span className="truncate">{game.map_name || `Map ${game.position}`}</span>
                 </span>
-                <span className="block truncate text-[10px] text-white/45">{winner ? `für ${winner}` : "offen"}{note ? ` · ${note}` : ""}</span>
+                {/* Ganz lesbar (#2268): das Co-Team ohne Hauptteam, Umbruch statt Abschneiden. */}
+                <span className="block text-[10px] leading-snug text-white/45 [overflow-wrap:anywhere]" data-testid={`league-map-${match.id}-${game.position}-winner`}>
+                  {winner ? `für ${splitTeamName(winner).squad}` : "offen"}{note ? ` · ${note}` : ""}
+                </span>
               </span>
             </li>
           );

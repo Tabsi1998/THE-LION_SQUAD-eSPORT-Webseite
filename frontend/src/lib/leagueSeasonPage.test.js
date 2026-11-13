@@ -1,5 +1,5 @@
 import {
-  formatFacts, listWords, mapOrder, nextSteps, playModes, pointsLines, scheduleLines, sectionPath, staffelList, teamInitials, weekState,
+  formatFacts, listWords, splitTeamName, mapOrder, nextSteps, playModes, pointsLines, scheduleLines, sectionPath, staffelList, teamInitials, weekState,
 } from "./leagueSeasonPage";
 
 // Season-Seite (#2268): was gespielt wird, Ablauf und Spieltage als reine Helfer. Erfundene Werte.
@@ -49,6 +49,13 @@ test("Platzhalter: offene Anmeldung zuerst, sonst Einteilung als Nächstes", () 
   const closed = nextSteps({ registration_deadline: "2026-11-06" }, null);
   expect(closed.map((row) => `${row.key}:${row.state}`)).toEqual(["apply:done", "split:now", "start:next"]);
   expect(closed[2].text).toBe("Der Spielplan folgt.");
+});
+
+test("Teamname: Hauptteam und Co-Team, doppelt genannt nur einmal nötig (#2268)", () => {
+  expect(splitTeamName("Löwen · Löwen Nachwuchs B")).toEqual({ club: "Löwen", squad: "Löwen Nachwuchs B", redundant: true });
+  expect(splitTeamName("Donaustädter Verein · Zweite Mannschaft")).toEqual({ club: "Donaustädter Verein", squad: "Zweite Mannschaft", redundant: false });
+  expect(splitTeamName("Jo")).toEqual({ club: "", squad: "Jo", redundant: false });
+  expect(splitTeamName(null).squad).toBe("");
 });
 
 test("Staffeln flach mit Liga N, Wochenstand, Initialen, Wörter, Adressen", () => {

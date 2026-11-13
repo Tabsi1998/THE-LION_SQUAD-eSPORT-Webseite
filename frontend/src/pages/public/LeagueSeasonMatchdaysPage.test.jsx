@@ -91,6 +91,12 @@ test("Woche wählen: Ergebnis mit Map-Chips, Modus-Symbol, wiederholter Map, kam
   expect(within(result).getByTestId("league-map-m1-1")).toHaveTextContent("Hafenkante");
   expect(within(result).getByTestId("league-map-m1-1-mode")).toHaveAttribute("data-icon", "image");
   expect(within(result).getByTestId("league-map-m1-2")).toHaveTextContent("wiederholt");
+  // Ganz lesbar am Handy (#2268): „für“ nennt das Co-Team ohne Hauptteam und wird nicht abgeschnitten; das doppelt genannte Hauptteam
+  // ist markiert (am Handy ausgeblendet), der volle Name steht im Titel.
+  expect(within(result).getByTestId("league-map-m1-1-winner")).toHaveTextContent("für Probe B");
+  expect(within(result).getByTestId("league-map-m1-1-winner").className).not.toContain("truncate");
+  expect(result.querySelector(".tls-league-match__club")).toHaveAttribute("data-redundant", "true");
+  expect(result.querySelector(".tls-league-match__name")).toHaveTextContent("Probe · Probe B");
   expect(within(result).getByTestId("league-match-m1-replayed")).toHaveTextContent("Map wiederholt");
   expect(result.querySelector(".tls-team-mark img")).toHaveAttribute("src", expect.stringContaining("probe.png"));
   expect(within(panel).getByTestId("league-match-m3")).toHaveTextContent("kampflos");
