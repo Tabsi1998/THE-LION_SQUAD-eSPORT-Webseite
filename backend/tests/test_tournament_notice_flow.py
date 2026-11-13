@@ -437,3 +437,66 @@ async def test_closed_tournament_takes_no_new_notices(flow):
     flow.act_as(await flow.add_staff())
     res = await send(flow, tournament)
     assert res.status_code == 409
+
+
+# ---------------------------------------------------------------- Liga-Staffel (Review N3, N5)
+
+
+async def staffel_of(flow, **fields) -> dict:
+    return await flow.create_tournament(status="live", title="Staffel A",
+                                        league_context={"league_id": "liga", "season_id": "s1", "division_id": "liga-1", "staffel": "A"},
+                                        **fields)
+
+
+async def league_lead(flow, name: str, *capabilities: str) -> dict:
+    user = await flow.add_user(name=name)
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "liga", "user_id": user["id"],
+                                           "capabilities": list(capabilities), "created_at": now_utc().isoformat()})
+    return user
+
+
+@pytest.mark.asyncio
+async def test_staffel_needs_the_league_right_matches(flow):
+    staffel = await staffel_of(flow)
+    player = await flow.add_user(name="Captain")
+    await flow.register(staffel, player)
+    flow.act_as(await league_lead(flow, "Nur Tabelle", "table"))
+    res = await send(flow, staffel)
+    assert res.status_code == 403
+    # Ein Helfer-Einsatz als Schiedsrichter zählt in einer Staffel nicht - dort gilt das Liga-Recht.
+    flow.act_as(await referee_of(flow, staffel, "Schiri ohne Liga-Recht"))
+    res = await send(flow, staffel)
+    assert res.status_code == 403
+    flow.act_as(await league_lead(flow, "Spielbetreuung", "matches"))
+    res = await send(flow, staffel, "Bitte zum Check-in")
+    assert res.status_code == 200, res.text
+    assert len(await notified(flow, player)) == 1
+
+
+@pytest.mark.asyncio
+async def test_event_target_with_a_staffel_needs_the_league_right_even_for_the_tournament_lead(flow):
+    await flow.db.events.insert_one({"id": "ev5", "slug": "liga-abend", "name": "Liga-Abend", "status": "published", "visibility": "public"})
+    cup = await flow.create_tournament(status="live", event_id="ev5", title="Cup")
+    await staffel_of(flow, event_id="ev5")
+    # Turnierleitung als Rolle (mit Zwei-Faktor), aber ohne Liga-Recht.
+    lead = await flow.add_user(role="tournament_admin", name="Turnierleitung")
+    flow.act_as(lead)
+    assert (await flow.get(lead_url(cup))).json()["can_target_event"] is False
+    res = await send(flow, cup, target="event")
+    assert res.status_code == 403
+    res = await send(flow, cup, target="tournament")
+    assert res.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_person_in_two_tournaments_of_the_event_gets_one_notice(flow):
+    await flow.db.events.insert_one({"id": "ev6", "slug": "doppel-lan", "name": "Doppel-LAN", "status": "published", "visibility": "public"})
+    first = await flow.create_tournament(status="live", event_id="ev6")
+    second = await flow.create_tournament(status="live", event_id="ev6")
+    both = await flow.add_user(name="Doppelstarter")
+    await flow.register(first, both)
+    await flow.register(second, both)
+    flow.act_as(await flow.add_staff())
+    res = await send(flow, first, "Finale an PC 1", target="event")
+    assert res.json()["recipients"] == 1
+    assert len(await notified(flow, both)) == 1

@@ -86,14 +86,11 @@ async def event_tournaments(db, event_id: str | None) -> list[dict]:
 
 
 async def can_write_event(db, user: dict | None, event_id: str | None) -> bool:
-    """Ziel „ganzes Event“: wer in jedem Turnier des Events Hinweise schreiben darf (die Turnierleitung als Rolle immer).
-    Später entscheidet das die Event-Leitung (#1372)."""
-    from services.tournament_permissions import is_global_tournament_staff
-
+    """Ziel „ganzes Event“: wer in jedem Turnier des Events Hinweise schreiben darf. Ohne Abkürzung für die Turnierleitung als
+    Rolle: Ist eine Liga-Staffel im Event, braucht es dort das Liga-Recht (Review N3). Später entscheidet das die
+    Event-Leitung (#1372)."""
     if not user or not event_id:
         return False
-    if is_global_tournament_staff(user):
-        return True
     rows = await event_tournaments(db, event_id)
     if not rows:
         return False
