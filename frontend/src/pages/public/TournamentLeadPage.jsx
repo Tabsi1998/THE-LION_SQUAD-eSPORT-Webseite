@@ -100,11 +100,6 @@ export default function TournamentLeadPage() {
   // das Turnier geladen ist, jede; ohne sichtbares Event jede eines Turniers mit Event.
   const tournamentId = data?.tournament?.id;
   const eventId = data?.tournament?.event_id;
-  // Das Cockpit (#1653) fragt kurz im Takt nach - sonst wie bisher nur bei Änderungen.
-  const cockpitOpen = tab === "cockpit" || (!tab && !fall && Boolean(queue));
-  useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0, tournamentId, eventId });
-  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter.
-  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 60000, tournamentId, eventId });
   const undo = useResultUndo({ onDone: load });
   useDocumentTitle(data?.tournament?.title ? `Turnierleitung · ${data.tournament.title}` : "Turnierleitung", "Turnierleitung: Ergebnisse eintragen und offene Spiele im Blick.", { robots: "noindex, nofollow" });
 
@@ -129,6 +124,12 @@ export default function TournamentLeadPage() {
     : (tab === "stations" || tab === "cockpit") && !queue ? (queueLoaded ? null : "")
       : tab === "notice" && !canNotice ? (data ? null : "") : tab;
   const activeTab = chosenTab === "" ? "" : chosenTab || defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded });
+  // Das Cockpit (#1653) fragt kurz im Takt nach, solange es wirklich zu sehen ist (nicht im Check-in oder einem anderen
+  // Reiter) - sonst wie bisher nur bei Änderungen.
+  const cockpitOpen = activeTab === "cockpit";
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0, tournamentId, eventId });
+  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter.
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 60000, tournamentId, eventId });
   // Die Probleme des Cockpits (#1653) - aus denselben Daten wie „Braucht Aufmerksamkeit“ und die Stationen.
   const problems = useMemo(() => cockpitProblems({ attention, draws, queue }), [attention, draws, queue]);
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.

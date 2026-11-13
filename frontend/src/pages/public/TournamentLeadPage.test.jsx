@@ -399,3 +399,26 @@ test("Einstieg (#1653): Fall-Link → Aufmerksamkeit; vor Ort das Cockpit (im Ch
   expect(defaultLeadTab({ checkinPhase: true, ready: true })).toBe("checkin");
   expect(defaultLeadTab({ ready: true })).toBe("results");
 });
+
+// Review M1 (#1653): Startet die Seite vor Ort im Check-in (ohne Fälle), ist das Cockpit nicht offen - kein kurzer Takt.
+test("Check-in vor Ort ohne Fälle: kein 20-Sekunden-Takt - erst im Cockpit", async () => {
+  const { COCKPIT_POLL_MS } = await import("@/lib/tournamentCockpit");
+  liveCalls.length = 0;
+  // Nur die beiden Abfragen der Seite (Ansicht, Warteschlange) - die Check-in-Liste hört selbst mit.
+  const pagePolls = () => liveCalls.filter((options) => options && "pollMs" in options).slice(-2).map((options) => options.pollMs);
+  const queue = { applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, stations: [] };
+  apiMock.get.mockImplementation((url) => {
+    if (String(url).endsWith("/lead/checkin")) return Promise.resolve({ data: { applies: true, team_mode: false, tournament: { id: "t1", slug: "fc-cup" }, rows: [] } });
+    if (String(url).endsWith("/live-queue")) return Promise.resolve({ data: queue });
+    return Promise.resolve({ data: { tournament: { id: "t1", slug: "fc-cup", title: "Cup", status: "check_in", can_check_in: true, event_mode: "local" }, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } } });
+  });
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true"));
+  expect(pagePolls()).toEqual([0, 60000]);
+  fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
+  await waitFor(() => expect(pagePolls()).toEqual([COCKPIT_POLL_MS, COCKPIT_POLL_MS]));
+});
