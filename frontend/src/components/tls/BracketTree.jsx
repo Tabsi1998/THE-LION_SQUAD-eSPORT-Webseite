@@ -164,7 +164,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   ) : (
     <div data-bracket-root="" data-season-quiet="bracket" className="space-y-8">
       {mine && !finished ? <NextMatchBanner matches={matches_v2} regMap={regMap} mineId={mine} /> : null}
-      {steps && !finished ? <LiveStrip matches={matches_v2} regMap={regMap} /> : null}
+      {steps && !finished ? <LiveStrip matches={matches_v2} regMap={regMap} duration={duration} /> : null}
       <WebStages stages={stages} matches={matches_v2} regMap={regMap} podiumMap={podiumMap} steps={steps} finalMatch={finalMatch} tournamentPath={tournamentPath} />
     </div>
   );
@@ -246,7 +246,7 @@ function NextMatchBanner({ matches, regMap, mineId }) {
 }
 
 /** Am Handy (#1561): laufende Spiele oben angepinnt - mit Station und Spielzeit. */
-function LiveStrip({ matches, regMap }) {
+function LiveStrip({ matches, regMap, duration }) {
   const live = matches.filter((match) => isLive(match));
   if (!live.length) return null;
   return (
@@ -262,7 +262,7 @@ function LiveStrip({ matches, regMap }) {
               <span className="font-bold text-white/85">{roundNameOf(match, match.round)} · {match.match_key}</span>
               <span className="min-w-0 break-words text-white/75">{(match.slots || []).map((slot) => slotLabel(slot, regMap)).filter(Boolean).join(" – ")}</span>
               <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-live">
-                {getStationLabel(match) || "läuft"}{match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} /></> : null}
+                {getStationLabel(match) || "läuft"}{match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} durationMinutes={duration(match)} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></> : null}
               </span>
             </motion.li>
           ))}

@@ -64,7 +64,7 @@ test("aufgerufen: dieselbe Partie wechselt zu „Aufgerufen“ mit Frist - die S
   expect(screen.getByTestId("tv-queue-when-s1")).toHaveTextContent(/Aufgerufen · antreten bis \d{2}:\d{2}/);
 });
 
-test("die Spielzeit: gelb ab 80 %, rot mit Überzug in Worten", () => {
+test("die Spielzeit: orange ab 80 %, darüber orange gefüllt mit Überzug in Worten", () => {
   render(board(view([station("s1", run("m1", 10, 12), null), station("s2", run("m2", 15.5, 12), null)])));
   expect(screen.getByTestId("tv-queue-clock-s1")).toHaveAttribute("data-tone", "warn");
   const over = screen.getByTestId("tv-queue-clock-s2");

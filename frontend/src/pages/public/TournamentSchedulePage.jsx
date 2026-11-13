@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { StationNowNext } from "@/components/tls/live/StationNowNext";
 import { queueSummaryLine } from "@/lib/liveQueue";
@@ -13,6 +13,8 @@ import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { LiveClock } from "@/components/tls/bracket/BracketCards";
+import { DurationContext } from "@/components/tls/bracket/context";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { api } from "@/lib/api";
 import { describeResult, freshResults, matchResultSignature } from "@/lib/liveChanges";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -149,6 +151,14 @@ export default function TournamentSchedulePage() {
 
   const tournament = data?.tournament || {};
   const trail = useLeagueTrail(data?.tournament);
+  // Die Dauer-Kette (#1554) wie im Baum - für die Farbe der Spielzeit-Uhr (#1167) bei „Läuft“.
+  const durationGame = data?.duration_game;
+  const durationStages = data?.stages;
+  const durationTournament = data?.tournament;
+  const duration = useMemo(() => {
+    const stageById = new Map((durationStages || []).map((stage) => [stage?.id, stage]));
+    return (match) => effectiveMatchDuration(match, { stage: stageById.get(match?.stage_id), tournament: durationTournament, game: durationGame });
+  }, [durationStages, durationTournament, durationGame]);
   const tournamentUrl = `/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   const seoDescription = seoTextPreview(tournament.description, "Spielplan des eSports Turniers mit Runden, Heats, Zeiten und Matchseiten.");
   useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, seoDescription, {
@@ -171,6 +181,7 @@ export default function TournamentSchedulePage() {
   const showViews = stationsAvailable && !currentWeek;
 
   return (
+    <DurationContext.Provider value={duration}>
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Eine Brotkrumen-Kette (#2124): kein zusätzliches „← Zurück“ - die Reiter darunter führen weiter. */}
@@ -273,18 +284,20 @@ export default function TournamentSchedulePage() {
         )}
       </section>
     </PublicLayout>
+    </DurationContext.Provider>
   );
 }
 
 /** Wie es steht - nur ein laufendes Spiel trägt die Live-Farbe, mit Spielzeit seit dem Start. */
 function StatusLabel({ entry, compact = false }) {
   const { match, tone } = entry;
+  const duration = useContext(DurationContext)(match);
   const label = tone === "live" ? "Läuft" : matchScheduleStatusText(match);
   return (
     <span className="tls-sched-status" data-tone={tone} data-testid={`schedule-status-${match.id}`}>
       {tone === "live" && <span className="tls-sched-status__dot" aria-hidden="true" />}
       <span>{label}</span>
-      {tone === "live" && entry.startedAt && !compact && <span className="tabular-nums opacity-80"><LiveClock startedAt={entry.startedAt} /></span>}
+      {tone === "live" && entry.startedAt && !compact && <span className="tabular-nums opacity-80"><LiveClock startedAt={entry.startedAt} durationMinutes={duration} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></span>}
     </span>
   );
 }

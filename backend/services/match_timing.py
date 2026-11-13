@@ -45,6 +45,49 @@ def registration_name(registration: dict | None) -> str:
     return (registration or {}).get("display_name") or (registration or {}).get("ingame_name") or (registration or {}).get("team_name") or "Teilnehmer"
 
 
+# ---------------------------------------------------------------- Turnierpause (#1167, services/match_pause.py)
+
+# Was ein (neuer) Start und ein Zurücksetzen des Starts mitschreiben: Pausen gehören zum alten Start - die Uhr zählt
+# danach ab 0 ohne Abzug, und eine frühere Abrechnung zählt nicht mehr.
+FRESH_CLOCK = {"paused_seconds": 0, "pause_settled_for": None}
+
+def whole_seconds(value) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def is_clock_running(match: dict) -> bool:
+    """Läuft die Uhr dieses Spiels? Gestartet und noch offen (ohne Ergebnis)."""
+    return bool(match.get("started_at")) and str(match.get("status") or "pending") in OPEN_STATUSES
+
+
+def overlap_seconds(match: dict, paused_at, now: datetime) -> int:
+    """Wie lange die laufende Pause dieses Spiel angehalten hat - ab Pausenbeginn bzw. ab seinem Start, wenn das später war."""
+    started = _parse(match.get("started_at"))
+    since = _parse(paused_at)
+    if not started or not since:
+        return 0
+    return max(0, int((now - max(started, since)).total_seconds()))
+
+
+def active_pause(tournament: dict | None) -> str | None:
+    """Seit wann die Turnierpause läuft - nur, solange das Turnier pausiert ist. Ein ``paused_at``, das nach einem
+    Abschluss ohne Weiterspielen stehen blieb (etwa der Staffelabschluss aus der Pause), hält keine Uhr an."""
+    tournament = tournament or {}
+    return tournament.get("paused_at") if tournament.get("status") == "paused" else None
+
+
+def pause_seconds(match: dict, tournament: dict | None, now: datetime) -> int:
+    """Die ganze Pausenzeit eines laufenden Spiels: frühere Pausen plus die laufende (für „über der Zeit“)."""
+    total = whole_seconds(match.get("paused_seconds"))
+    paused_at = active_pause(tournament)
+    if paused_at and is_clock_running(match):
+        total += overlap_seconds(match, paused_at, now)
+    return total
+
+
 def duration_minutes(match: dict, tournament: dict | None, stage: dict | None = None, game: dict | None = None) -> int:
     return effective_match_duration(match, stage=stage, tournament=tournament, game=game)
 
@@ -54,19 +97,26 @@ def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict |
     Station) gibt es kein „Ergebnis fehlt“ (#1160).
 
     Live vor Ort (#1556): Gezählt wird ab dem echten Start. Ein Spiel, das an seiner Station noch wartet, hat Verzug
-    (den zeigt die Warteschlange), aber kein fehlendes Ergebnis."""
+    (den zeigt die Warteschlange), aber kein fehlendes Ergebnis.
+
+    Turnierpause (#1167): Pausen zählen nicht als Spielzeit - weder bei „läuft N Min.“ noch bei „über der Zeit“; solange
+    die Pause läuft, wird kein Ergebnis fällig."""
     started = _parse(match.get("started_at"))
+    paused = timedelta(seconds=pause_seconds(match, tournament, now)) if started else timedelta(0)
     if started:
         base = started
     elif match.get("station_id"):
         base = None
     else:
         base = _parse(match.get("scheduled_at"))
-    out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None}
+    out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None, "duration_minutes": None}
     if started and str(match.get("status") or "") in RUNNING_STATUSES | {"scheduled", "ready"}:
-        out["running_minutes"] = max(0, int((now - started).total_seconds() // 60))
+        out["running_minutes"] = max(0, int((now - started - paused).total_seconds() // 60))
     if base:
-        planned_end = base + timedelta(minutes=duration_minutes(match, tournament, stage, game))
+        minutes = duration_minutes(match, tournament, stage, game)
+        # Die Dauer, mit der gerechnet wird (#1167): die Spielzeit-Uhr der Leitung zeigt „12:06 / 20 Min.“ damit.
+        out["duration_minutes"] = minutes
+        planned_end = base + timedelta(minutes=minutes) + paused
         due = planned_end + timedelta(minutes=MISSING_AFTER_MINUTES)
         out["due_at"] = due.isoformat()
         if now > planned_end:

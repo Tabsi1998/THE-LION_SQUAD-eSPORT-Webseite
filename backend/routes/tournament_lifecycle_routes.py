@@ -23,6 +23,7 @@ from services.competition_versions import persist_competition_versions
 from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
 from models import REGISTRATION_LIMIT, now_utc
 from services.log_safe import log_safe
+from services.match_pause import settle_pause
 from services.league_scope import is_league_staffel
 from services.league_service import season_follows_first_staffel
 from services.staffel_guard import staffel_status_problem
@@ -258,18 +259,29 @@ async def unlock_tournament(tid: str, me: dict = Depends(require_lead_of("manage
 
 def _pause_change(tournament: dict, previous: str | None, status: str, body: dict) -> tuple[dict, dict]:
     """„Pause bis“ (#1123) beim Statuswechsel: nur zum Status „Pausiert“; ohne Uhrzeit „Kurze Pause“. Jeder andere
-    Status (Weiterspielen) löscht die Uhrzeit. Gibt zurück, was gesetzt und was gelöscht wird."""
+    Status (Weiterspielen) löscht die Uhrzeit. Gibt zurück, was gesetzt und was gelöscht wird.
+
+    Spielzeit-Uhr (#1167): Seit wann pausiert ist (``paused_at``) steht ab dem Pausieren am Turnier - auch, wenn nur „Pause
+    bis“ geändert wird und es noch fehlt (Pause von vor #1167). Beim Weiterspielen fällt es weg; die Pausendauer der
+    laufenden Spiele summiert ``services.match_pause.settle_pause``."""
+    pause_set: dict = {}
+    pause_unset: dict = {}
+    if status == "paused" and (previous != "paused" or not tournament.get("paused_at")):
+        pause_set["paused_at"] = now_utc().isoformat()
+    if status != "paused" and tournament.get("paused_at"):
+        pause_unset["paused_at"] = ""
     if status == "paused" and ("paused_until" in body or previous != "paused"):
         try:
             until = pause_until_value(body.get("paused_until"), now_utc())
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         if until:
-            return {"paused_until": until}, {}
-        return {}, ({"paused_until": ""} if tournament.get("paused_until") else {})
-    if status != "paused" and tournament.get("paused_until"):
-        return {}, {"paused_until": ""}
-    return {}, {}
+            pause_set["paused_until"] = until
+        elif tournament.get("paused_until"):
+            pause_unset["paused_until"] = ""
+    elif status != "paused" and tournament.get("paused_until"):
+        pause_unset["paused_until"] = ""
+    return pause_set, pause_unset
 
 
 async def _save_pause(db, me: dict, tid: str, pause_set: dict, pause_unset: dict) -> None:
@@ -296,7 +308,7 @@ async def set_pause_until(tid: str, body: PauseUntilUpdate, me: dict = Depends(g
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="manage")
-    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "status": 1, "paused_until": 1})
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "status": 1, "paused_until": 1, "paused_at": 1})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if tournament.get("status") != "paused":
@@ -413,6 +425,9 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         if blocker:
             raise HTTPException(status_code=409, detail=blocker)
 
+    if prev != status and prev == "paused" and t.get("paused_at"):
+        # Weiterspielen (#1167): die Pause zählt nicht als Spielzeit - auf jedes Spiel, das in der Pause lief.
+        await settle_pause(db, t)
     if prev != status:
         changed_at = now_utc().isoformat()
         change: dict = {"$set": {"status": status, "updated_at": changed_at, **pause_set}}
@@ -438,7 +453,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 "forced": force,
                 "planning_errors": (planning or {}).get("error_count", 0),
                 "planning_warnings": (planning or {}).get("warning_count", 0),
-                **({"paused_until": pause_set["paused_until"]} if pause_set else {}),
+                **({"paused_until": pause_set["paused_until"]} if "paused_until" in pause_set else {}),
             },
         )
     elif pause_set or pause_unset:

@@ -11,6 +11,7 @@ from services import game_usage
 from services.access_links import validate_access_link
 from services.change_events import reset_scope_cache
 from services.heat_rebuild import evaluate_after_write, reevaluate_after_release
+from services.match_timing import FRESH_CLOCK
 from services.league_permissions import READ
 from services.tournament_permissions import (
     READ_STAFF_ROLES,
@@ -345,6 +346,8 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
     station_change: dict = {"$set": station_updates}
     if start_now:
         match_updates["started_at"] = now_iso
+        # Spielzeit-Uhr (#1167): ein neuer Start zählt ab 0 - Pausen eines früheren Starts zählen nicht.
+        match_updates.update(FRESH_CLOCK)
         match_updates["scheduled_at"] = match.get("scheduled_at") or now_iso
         # Gestartet: der Aufruf ist vorbei.
         match_change["$unset"] = {"called_at": ""}

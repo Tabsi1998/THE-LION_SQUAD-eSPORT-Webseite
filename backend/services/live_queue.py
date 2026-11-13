@@ -26,6 +26,7 @@ from models import REGISTRATION_LIMIT
 from services.match_calls import report_by, report_minutes
 from services.match_deadlines import no_show_deadline
 from services.match_duration import effective_match_duration
+from services.match_pause import clock_pause_fields
 from services.match_scheduler import (
     KEPT_SOURCES,
     RUNNING_STATUSES,
@@ -238,6 +239,8 @@ def build_live_queue(
             "no_show_names": [names.get(registration_id) or "Teilnehmer"
                               for registration_id in match.get("no_show_registration_ids") or [] if registration_id in filled],
             "started_at": match.get("started_at") if row["state"] == "running" else None,
+            # Spielzeit-Uhr (#1167): in der Turnierpause steht sie (``paused_at``), frühere Pausen zählen nicht mit.
+            **(clock_pause_fields(match, tournament) if row["state"] == "running" else {"paused_at": None, "paused_seconds": 0}),
         }
 
     # Wer gerade spielt oder aufgerufen ist (#1162): ein wartendes Spiel mit einer dieser Personen trägt, wo sie sind -

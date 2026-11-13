@@ -3,29 +3,12 @@
 // auch nach dem Neuladen und über Mitternacht. Ohne Startzeit steht nur „Live“.
 import { matchName as treeMatchName } from "@/lib/bracketNames";
 import { isMatchDone } from "@/lib/slotSource";
+import { clockLabel, matchClock } from "@/lib/matchClock";
 
 export const LIVE_STATUSES = new Set(["running", "in_progress", "live"]);
 
 export function isLiveMatch(match) {
   return LIVE_STATUSES.has(String(match?.status || "").toLowerCase());
-}
-
-/** Sekunden seit dem Start - `null` ohne (gültige) Startzeit. Eine Startzeit in der Zukunft (Uhr am TV geht nach) ist 0. */
-export function elapsedSeconds(startedAt, nowMs = Date.now()) {
-  if (!startedAt) return null;
-  const start = new Date(startedAt).getTime();
-  if (Number.isNaN(start)) return null;
-  return Math.max(0, Math.floor((nowMs - start) / 1000));
-}
-
-/** „7:05“, „12:34“, ab einer Stunde „1:02:03“. */
-export function clockText(seconds) {
-  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return "";
-  const total = Math.max(0, Math.floor(Number(seconds)));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const rest = String(total % 60).padStart(2, "0");
-  return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
 
 /** Der kurze Name der Station („PC 3“) - eine nackte Nummer wird zu „Station 3“. */
@@ -35,12 +18,25 @@ export function stationName(match) {
   return /^\d+$/.test(raw) ? `Station ${raw}` : raw;
 }
 
-/** Was groß unter einem laufenden Spiel steht: „PC 3 · 12:34“, ohne Startzeit „PC 3 · Live“ oder nur „Live“. */
-export function spotlightParts(match, nowMs = Date.now()) {
+/** Die Dauer für die Uhr: am TV rechnet sie der Server (`effective_duration_minutes`, Dauer-Kette #1554). */
+function clockMinutes(match) {
+  const server = Number(match?.effective_duration_minutes);
+  return server > 0 ? server : match?.duration_minutes;
+}
+
+/**
+ * Was groß unter einem laufenden Spiel steht: „PC 3 · 12:34“, ohne Startzeit „PC 3 · Live“ oder nur „Live“. Die Uhr ist
+ * dieselbe wie überall (#1167): mit Dauer `limit` („20 Min.“), Farbe `tone` und Zustand `status`; `now` ist Serverzeit.
+ */
+export function spotlightParts(match, nowMs = Date.now(), { stepped = false } = {}) {
   const station = stationName(match);
-  const seconds = elapsedSeconds(match?.started_at, nowMs);
-  const clock = seconds === null ? "" : clockText(seconds);
-  return { station, clock, text: [station, clock || "Live"].filter(Boolean).join(" · ") };
+  // Turnierpause (#1167): die Uhr steht ab `paused_at`, frühere Pausen (`paused_seconds`) zählen nicht mit.
+  const info = matchClock(match?.started_at, clockMinutes(match), nowMs, { stepped, pausedAt: match?.paused_at, pausedSeconds: match?.paused_seconds });
+  const clock = info ? info.text : "";
+  return {
+    station, clock, text: [station, clock || "Live"].filter(Boolean).join(" · "),
+    limit: info?.limit || "", tone: info?.tone || "none", status: info?.status || "", label: clockLabel(info),
+  };
 }
 
 function resultSignature(match) {

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from models import new_id, now_utc
+from services.match_timing import FRESH_CLOCK
 # Die Regeln ohne Datenbank stehen im Blatt-Modul (kein Import-Kreis über league_service, match_deadlines, league_rules) - hier
 # bleiben sie unter denselben Namen erreichbar.
 from services.checkin_rules import (  # noqa: F401 - weiterhin über match_flow erreichbar
@@ -322,7 +323,7 @@ async def start(db, match: dict, tournament: dict | None, setup: Sides, *, user:
     entry = {"at": now_iso, "by": user.get("id"), "registration_id": registration_id, "via": via}
     written = await db.matches_v2.update_one(
         {"id": match["id"], "started_at": None, "status": {"$in": sorted(OPEN_MATCH_STATUSES)}},
-        {"$set": {"started_at": now_iso, "status": "in_progress", "flow.start": entry, "updated_at": now_iso},
+        {"$set": {"started_at": now_iso, "status": "in_progress", "flow.start": entry, "updated_at": now_iso, **FRESH_CLOCK},
          "$addToSet": {"flow.user_ids": user.get("id")}})
     if not written.matched_count:
         fresh = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "started_at": 1}) or {}
@@ -380,7 +381,7 @@ async def start_by_report(db, match: dict, tournament: dict | None, *, user: dic
     entry = {"at": now_iso, "by": user.get("id"), "registration_id": registration_id, "via": REPORT}
     written = await db.matches_v2.update_one(
         {"id": match["id"], "started_at": None, "status": {"$in": sorted(OPEN_MATCH_STATUSES)}},
-        {"$set": {"started_at": now_iso, "status": "in_progress", "flow.start": entry, "updated_at": now_iso},
+        {"$set": {"started_at": now_iso, "status": "in_progress", "flow.start": entry, "updated_at": now_iso, **FRESH_CLOCK},
          "$addToSet": {"flow.user_ids": user.get("id")}})
     if not written.matched_count:
         return False

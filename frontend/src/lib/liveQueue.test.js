@@ -1,38 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DELAY_SHOWN_FROM, delayText, matchClock, myQueueLine, queueSummaryLine } from "./liveQueue";
+import { DELAY_SHOWN_FROM, delayText, myQueueLine, queueSummaryLine } from "./liveQueue";
 
-// Live vor Ort (#1556): Spielzeit-Uhr (#1167), Verzug und die Zeile für Spieler - reine Rechnung, die Uhr gibt der Aufrufer.
-
-const START = Date.parse("2026-10-31T16:00:00Z"); // 17:00 in Wien
-const at = (minutes, seconds = 0) => START + minutes * 60000 + seconds * 1000;
-
-describe("matchClock", () => {
-  it("zählt mm:ss gegen die Dauer und färbt bei 80 % und 100 %", () => {
-    const iso = new Date(START).toISOString();
-    expect(matchClock(iso, 30, at(15))).toMatchObject({ text: "15:00", limit: "30 Min.", ratio: 0.5, tone: "run" });
-    expect(matchClock(iso, 30, at(24))).toMatchObject({ text: "24:00", tone: "warn" });
-    expect(matchClock(iso, 30, at(30))).toMatchObject({ text: "30:00", tone: "over", ratio: 1 });
-    expect(matchClock(iso, 30, at(47, 5))).toMatchObject({ text: "47:05", tone: "over", ratio: 1, overMinutes: 17 });
-  });
-
-  it("ohne Dauer nur die laufende Zeit, ohne Farbe; ohne Start nichts", () => {
-    expect(matchClock(new Date(START).toISOString(), null, at(3, 9))).toMatchObject({ text: "03:09", limit: "", ratio: null, tone: "none" });
-    expect(matchClock(null, 30, at(3))).toBeNull();
-    expect(matchClock("kein Datum", 30, at(3))).toBeNull();
-  });
-
-  it("über eine Stunde mit Stunden; eine Uhr vor dem Start steht auf 00:00", () => {
-    expect(matchClock(new Date(START).toISOString(), 90, at(75, 2)).text).toBe("1:15:02");
-    expect(matchClock(new Date(START).toISOString(), 30, at(-1)).text).toBe("00:00");
-  });
-
-  it("mit „Bewegung reduzieren“ springt der Balken minutenweise", () => {
-    const smooth = matchClock(new Date(START).toISOString(), 30, at(10, 30));
-    const stepped = matchClock(new Date(START).toISOString(), 30, at(10, 30), { stepped: true });
-    expect(smooth.ratio).toBeCloseTo(10.5 / 30);
-    expect(stepped.ratio).toBeCloseTo(10 / 30);
-  });
-});
+// Live vor Ort (#1556): Verzug und die Zeile für Spieler - reine Rechnung. Die Spielzeit-Uhr prüft matchClock.test.js.
 
 describe("delayText", () => {
   it("nennt Verzug ab 5 Minuten, darunter nichts", () => {

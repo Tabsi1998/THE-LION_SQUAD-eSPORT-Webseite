@@ -20,6 +20,7 @@ from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_notifications import results_summary
 from services.match_proofs import visible_proofs
+from services.match_pause import clock_pause_fields
 from services.match_timing import MISSING_AFTER_MINUTES, OPEN_STATUSES, RUNNING_STATUSES, filled_slots, registration_name, timing
 from services.match_v2_results import _advancement_result_rank, _ranking_mode, has_result, resolve_best_of
 from services.result_hold import hold_view
@@ -246,6 +247,8 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
                           stage_matches=by_stage.get(match.get("stage_id") or "", []), regs_by_id=regs_by_id,
                           viewer_id=user.get("id"))
         info["timing"] = timing(match, tournament, now, stage=stages.get(match.get("stage_id") or ""), game=game)
+        # Spielzeit-Uhr (#1167): in der Turnierpause steht sie, frühere Pausen zählen nicht mit.
+        info.update(clock_pause_fields(match, tournament))
         # Befangen (#2203): Der Superadmin darf als Notausnahme mit Grund, alle anderen gar nicht.
         involved = match.get("id") in conflicted
         info["can_enter"] = may_enter(match) and (not involved or override)

@@ -23,6 +23,7 @@ from services.matchday_schedule import build_matchday_plan, current_matchday_num
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import public_standings
 from services.private_fields import private_projection
+from services.match_pause import with_clock_pause
 from services.match_duration import load_duration_game, with_effective_durations
 from services.bracket_tree import has_bracket_tree
 from routes.tournament_common import (
@@ -171,6 +172,8 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
     # Dauer je Spiel für App und TV (#1554); die Website rechnet selbst mit duration_game.
     duration_game = await load_duration_game(db, t)
     with_effective_durations(matches_v2, stages=read_model.stages, tournament=t, game=duration_game)
+    # Spielzeit-Uhr (#1167): in der Turnierpause steht sie, frühere Pausen zählen nicht mit.
+    with_clock_pause(matches_v2, t)
     t["can_view_display"] = bool(is_staff)
     # Turnierbaum je Format (#2124): auch eine K.-o.-Phase nach Liga oder Gruppen zählt.
     t["has_bracket_tree"] = has_bracket_tree(t, read_model.stages)
