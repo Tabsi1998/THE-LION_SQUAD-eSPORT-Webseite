@@ -21,7 +21,8 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle anlegen und planen; live bedient
   werden sie in der Turnierleitung
 - **Admin → eSports → Gewinne**, **Strafen**, **Jahreswertung** – was nach dem Turnier daraus wird
-- **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung
+- **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung;
+  vor Ort startet sie im **Cockpit** (Probleme und Stationen auf einer Seite, 3.8)
 - **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
   **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Alle Turnierseiten tragen dieselben
   Brotkrumen „Start · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
@@ -121,7 +122,7 @@ noch die Zeile „Gehört zu … – ändern im Event“, und der Ort kommt vom 
 1. **Check-in starten** (Knopf oben im Turnier).
 2. Teilnehmer einchecken (3.3). Mit dem Ende des Check-ins steht der Baum (3.4).
 3. **Turnier starten**.
-4. Ergebnisse eintragen oder melden lassen (3.6).
+4. Ergebnisse eintragen oder melden lassen (3.6). Vor Ort ist das **Cockpit** der Turnierleitung der Einstieg (3.8).
 5. Im Status **Beendet**, danach **Ergebnisse veröffentlicht** (3.10).
 
 ---
@@ -569,7 +570,29 @@ zum Vorbereiten da: anlegen, bearbeiten, planen, Aushang. Am Turniertag bedient 
 - **Belegung je Station** zeigt dieselbe Zeitleiste wie der Matchplan (unten), live; **Im Matchplan öffnen** springt
   in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
 
-**Stationen live bedienen** (Turnier → **Turnierleitung** → Reiter **Stationen**, am Handy und am PC): je Station eine
+**Turnier-Cockpit** (Turnier → **Turnierleitung**, erster Reiter **Cockpit**, #1653): die Hauptseite am Turniertag vor
+Ort. Die Turnierleitung öffnet sich dort von selbst (nur im Check-in ohne offene Fälle startet sie beim Check-in, ein
+Link auf einen Fall öffnet den Fall). Die übrigen Reiter bleiben, `?reiter=cockpit` führt direkt hin.
+
+- **Probleme** (oben, am Tablet quer links): dringendstes zuerst – **Einspruch**, **Nicht erschienen**, **Defekt**
+  (eine defekte Station, auf die noch ein Spiel wartet), **Ergebnis fehlt** (auch „Meldungen weichen ab“), **Verzug**
+  (das nächste Spiel einer Station beginnt 5 Minuten oder mehr nach Plan, dieselbe Schwelle wie am TV) und
+  **Auslosung**. Innerhalb einer Art steht oben, was am längsten drüber ist. Ein Tipp auf die Zeile öffnet den Fall in
+  **Braucht Aufmerksamkeit** mit seinen Knöpfen; **Verzug** springt zur Station im Cockpit, die kurz aufleuchtet.
+- **Stationen** (darunter, am Tablet quer rechts): dieselben Kacheln wie im Reiter **Stationen** – was läuft, mit der
+  Spielzeit-Uhr, und **Als Nächstes**. **Aufrufen**, **Starten**, **Freigeben** (mit Rückfrage) und **Defekt** gehen mit
+  einem Tipp, mit denselben Rechten und Rückfragen wie dort.
+- Die Seite lädt bei jeder Änderung nach und fragt zusätzlich alle 20 Sekunden – „Ergebnis fehlt“ und Verzug entstehen
+  mit der Zeit. Neue Probleme blenden nacheinander ein, erledigte gleiten hinaus; die Liste baut sich nicht neu auf. Mit
+  „Bewegung reduzieren“ im Gerät springen die Zustände.
+- Handy, Tablet hochkant und Tablet quer sind gleichwertig, jede Tippfläche ist mindestens 44 px hoch.
+
+<table><tr><th>Tablet quer</th><th>Handy</th></tr><tr>
+<td><img src="../assets/turniere/cockpit-leitung-tablet.png" alt="Cockpit der Turnierleitung am Tablet quer: links Probleme mit Einspruch, Nicht erschienen, Station defekt und Ergebnis fehlt, je mit farbiger Leiste und Pfeil; rechts die Stationen PC 1 bis PC 4 mit Läuft und Spielzeit-Uhr, Als Nächstes und den Knöpfen Freigeben, Umlegen und Defekt" width="420"></td>
+<td><img src="../assets/turniere/cockpit-leitung-handy.png" alt="Dasselbe Cockpit am Handy: oben die Probleme, darunter die Stationen" width="200"></td>
+</tr></table>
+
+**Stationen live bedienen** (Turnier → **Turnierleitung** → Reiter **Stationen** oder **Cockpit**, am Handy und am PC): je Station eine
 Kachel mit Zustand (**Frei**, **Aufgerufen**, **Läuft**, **Defekt**, **Anderes Turnier**, **Hängt**), dem Spiel und den
 Namen im Klartext. Das gilt vor
 Ort und hybrid, für 1 gegen 1, Team gegen Team und Durchgänge. Bedienen dürfen Organisation, Schiedsrichter und
@@ -781,7 +804,7 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
   Turnier. Zwei Helfer reichen oft: einer am Check-in, einer mit dem Handy bei den Spielen („Ergebnisdienst“).
 - **Werkzeuge → Planen** statt jedes Spiel einzeln zuzuweisen; Vorschau prüfen, dann **Übernehmen**.
 - **Das Handy der Turnierleitung** (`/tournaments/<Name>/leitung`) trägt Ergebnisse ein, zeigt „Ergebnis fehlt“ und
-  gibt Benachrichtigungen bei Problemen.
+  gibt Benachrichtigungen bei Problemen. Vor Ort steht im **Cockpit** alles auf einer Seite: Probleme und Stationen (3.8).
 - **TV** aufstellen und aufrufen lassen, damit Spieler selbst sehen, wo sie hinmüssen.
 - **Check-in**: Online-Spieler checken selbst ein, vor Ort hakt ihr am Handy ab (Turnierleitung → Reiter **Check-in**).
   **PDF Check-in** ist die Liste auf Papier, falls Netz oder Server ausfallen.
