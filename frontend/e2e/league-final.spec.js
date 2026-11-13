@@ -12,13 +12,22 @@ const consent = () => {
 };
 
 const TEAMS = ["Nordlicht · Nordlicht A", "Sturmfalken · Falken Rot", "Eisbären · Eisbären B", "Wüstenfüchse · Füchse A"];
-const row = (index, extra = {}) => ({ registration_id: `r${index}`, display_name: TEAMS[index - 1], team_id: `team-${index}`, rank: index, played: 3, won: 4 - index, drawn: 0,
-  lost: index - 1, score_for: 8 - index, score_against: index + 1, score_diff: 7 - 2 * index, points: 12 - 3 * index, form: ["W", "L", "W"], previous_rank: null,
-  forfeit_won: 0, forfeit_lost: 0, deducted_points: 0, exit: null, tiebreak: null, lead_decision: null, contested: 0, ...extra });
-const ROWS = [row(1), row(2), row(3), row(4)];
-const DECISION = { id: "d1", reason: "Entscheidungsspiel am 10.01. mit 2:1 gewonnen", method: "playoff", decided_at: "2027-01-10T20:00:00+00:00" };
-const TIED = [row(1, { points: 6, won: 2, lost: 1 }), row(2, { rank: 1, points: 6, won: 2, lost: 1, score_for: 7, score_against: 2, score_diff: 5 }), row(3), row(4)];
-const DECIDED = [row(1, { tiebreak: "lead_decision", lead_decision: DECISION }), row(2, { tiebreak: "lead_decision", lead_decision: DECISION, points: 9, won: 3 }), row(3), row(4)];
+// Jede Zeile aus ihren Spielen gerechnet (Best of 3, Sieg 3 Punkte, kein Remis): SP = S + N, Punkte = 3 × S, Maps und Form passen dazu.
+const row = (index, rank, won, lost, mapsFor, mapsAgainst, form, extra = {}) => ({ registration_id: `r${index}`, display_name: TEAMS[index - 1], team_id: `team-${index}`,
+  rank, played: won + lost, won, drawn: 0, lost, score_for: mapsFor, score_against: mapsAgainst, score_diff: mapsFor - mapsAgainst, points: won * 3, form,
+  previous_rank: null, forfeit_won: 0, forfeit_lost: 0, deducted_points: 0, exit: null, tiebreak: null, lead_decision: null, contested: 0, ...extra });
+// Staffel B, alles gespielt: 1 schlägt 2 (2:1), 3 (2:0), 4 (2:0); 2 schlägt 3 (2:1), 4 (2:0); 3 schlägt 4 (2:1).
+const ROWS = [row(1, 1, 3, 0, 6, 1, ["W", "W", "W"]), row(2, 2, 2, 1, 5, 3, ["L", "W", "W"]), row(3, 3, 1, 2, 3, 5, ["L", "L", "W"]), row(4, 4, 0, 3, 1, 6, ["L", "L", "L"])];
+const DECISION = { id: "d1", reason: "Am 10.01. mit 2:1 gewonnen", method: "playoff", decided_at: "2027-01-10T20:00:00+00:00" };
+// Staffel A: Das Spiel 1 gegen 2 fiel aus. 1 schlägt 3 (2:0) und 4 (2:1), 2 schlägt 3 (2:1) und 4 (2:0) - beide stehen in allem gleich.
+// 3 gegen 4 ist noch offen.
+const TIED = [row(1, 1, 2, 0, 4, 1, ["W", "W"]), row(2, 1, 2, 0, 4, 1, ["W", "W"]), row(3, 3, 0, 2, 1, 4, ["L", "L"]), row(4, 3, 0, 2, 1, 4, ["L", "L"])];
+// Staffel C: wie A, dazu 3 schlägt 4 (2:0) - das Entscheidungsspiel 2:1 machte 1 zum Meister.
+const DECIDED = [row(1, 1, 2, 0, 4, 1, ["W", "W"], { tiebreak: "lead_decision", lead_decision: DECISION }),
+  row(2, 2, 2, 0, 4, 1, ["W", "W"], { tiebreak: "lead_decision", lead_decision: DECISION }),
+  row(3, 3, 1, 2, 3, 4, ["L", "L", "W"]), row(4, 4, 0, 3, 1, 6, ["L", "L", "L"])];
+// Fassung 1 von Staffel C: Spieltag 2 war vertauscht eingetragen (4 schlägt 1 mit 2:1 statt umgekehrt) - damals stand 2 allein vorn.
+const FIRST_VERSION = [row(2, 1, 2, 0, 4, 1, ["W", "W"]), row(1, 2, 1, 1, 3, 2, ["W", "L"]), row(3, 3, 1, 2, 3, 4, ["L", "L", "W"]), row(4, 4, 1, 2, 2, 5, ["L", "W", "L"])];
 const RULES = { allow_draws: false, tiebreakers: ["head_to_head", "score_diff", "score_for", "lead_decision"], match_points: { win: 3, draw: 0, loss: 0 }, match_points_mode: "result" };
 
 const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
@@ -44,7 +53,7 @@ const FINAL = { id: "f2", version: 2, closed_at: "2027-01-12T19:30:00+00:00", cl
 const HISTORY = [
   { id: "f2", version: 2, active: true, closed_at: "2027-01-12T19:30:00+00:00", closed_by_name: "Zweite Leitung", reopened_at: null, champion: TEAMS[0], teams: 4, rules_label: "Fassung 1.2" },
   { id: "f1", version: 1, active: false, closed_at: "2027-01-09T18:00:00+00:00", closed_by_name: "Erste Leitung", reopened_at: "2027-01-10T09:15:00+00:00",
-    reopened_by_name: "Zweite Leitung", reopen_reason: "Ergebnis von Spieltag 5 war vertauscht eingetragen", champion: TEAMS[1], teams: 4, rules_label: "Fassung 1.2" },
+    reopened_by_name: "Zweite Leitung", reopen_reason: "Ergebnis von Spieltag 2 war vertauscht eingetragen", champion: TEAMS[1], teams: 4, rules_label: "Fassung 1.2" },
 ];
 const base = (letter, extra) => ({ tournament_id: `t${letter}`, title: `Probe-Liga · Season 1 · Liga 1 · Staffel ${letter}`, slug: `probe-${letter.toLowerCase()}`, staffel: letter,
   division_label: "Liga 1", status: "live", champion_place: true, own_team: false, history: [], closed: false, final: null, standings: ROWS, table_rules: RULES,
@@ -57,7 +66,7 @@ const BLOCKED = base("A", { can_close: false, champion: null, standings: TIED,
     { code: "procedures", label: "Offene Verfahren", count: 1, text: "Beanstandung, Protest oder Einspruch sind noch nicht entschieden.",
       items: [{ text: `Protest · Spieltag 2: ${TEAMS[0]} – ${TEAMS[2]}`, url: "/matches/m4#verfahren-p1" }] },
     { code: "deadlines", label: "Laufende Fristen", count: 1, text: "Solange eine Protest- oder Einspruchsfrist läuft, kann sich das Ergebnis noch ändern.",
-      items: [{ text: `Protestfrist · Spieltag 3: ${TEAMS[0]} – ${TEAMS[1]}`, url: "/matches/m8", until: "2027-01-14T19:00:00+00:00" }] },
+      items: [{ text: `Protestfrist · Spieltag 2: ${TEAMS[1]} – ${TEAMS[3]}`, url: "/matches/m8", until: "2027-01-14T19:00:00+00:00" }] },
     { code: "champion_tie", label: "Gleichstand auf Platz 1", count: 1,
       text: "Der Meister steht nicht fest: Vor dem Abschluss braucht es einen begründeten Entscheid (Entscheidungsspiel, Los oder Leitung).",
       items: [{ text: `${TEAMS[0]} – ${TEAMS[1]}`, url: "/admin/leagues/seasons/s1#abschluss" }] },
@@ -95,7 +104,7 @@ async function mockServer(page, { admin = false, closing = CLOSING } = {}) {
   await page.route("**/api/leagues/probe-liga/season-1/staffeln/**", json(PUBLIC_STAFFEL));
   await page.route("**/api/admin/leagues/seasons/s1", json(SEASON_PAGE));
   await page.route("**/api/admin/leagues/seasons/s1/closing", json(closing));
-  await page.route("**/api/admin/leagues/staffeln/*/final-tables/*", json({ ...HISTORY[1], standings: ROWS, decisions: [], table_rules: RULES }));
+  await page.route("**/api/admin/leagues/staffeln/*/final-tables/*", json({ ...HISTORY[1], standings: FIRST_VERSION, decisions: [], table_rules: RULES }));
 }
 
 async function noSideScroll(page) {
@@ -122,7 +131,7 @@ test.describe("Liga: Saisonabschluss", () => {
       await expect(panel.getByTestId("season-close-summary")).toHaveText("1 von 3 Staffeln abgeschlossen. Die Season ist beendet, wenn alle abgeschlossen sind.");
 
       const blocked = panel.getByTestId("close-staffel-tA");
-      await expect(blocked.getByTestId("close-state-tA")).toHaveText("4 Punkte offen");
+      await expect(blocked.getByTestId("close-state-tA")).toHaveText("4 offen");
       await expect(blocked.getByRole("link", { name: `Spieltag 3: ${TEAMS[2]} – ${TEAMS[3]}` })).toHaveAttribute("href", "/matches/m9");
       await expect(blocked.getByTestId("close-blocker-tA-deadlines")).toContainText("bis 14.01.2027, 20:00");
       await expect(blocked.getByTestId("close-decide-tA")).toBeVisible();
@@ -135,14 +144,16 @@ test.describe("Liga: Saisonabschluss", () => {
       const closed = panel.getByTestId("close-staffel-tC");
       await expect(closed.getByTestId("close-final-tC")).toContainText("Abgeschlossen am 12.01.2027, 20:30 von Zweite Leitung · Fassung 2");
       await expect(closed.getByTestId("close-final-tC")).toContainText(`Meister: ${TEAMS[0]}`);
-      await expect(closed.getByTestId("close-final-tC")).toContainText("Entscheidungsspiel: Entscheidungsspiel am 10.01. mit 2:1 gewonnen");
+      await expect(closed.getByTestId("close-final-tC")).toContainText("Entscheidungsspiel: Am 10.01. mit 2:1 gewonnen");
       await expect(closed.getByTestId("standing-notes-r1")).toContainText("Platz durch Entscheidungsspiel");
-      await expect(closed.getByTestId("close-history-tC")).toContainText("Ergebnis von Spieltag 5 war vertauscht eingetragen");
+      await expect(closed.getByTestId("close-history-tC")).toContainText("Ergebnis von Spieltag 2 war vertauscht eingetragen");
       await noSideScroll(page);
       await shot(panel, `f1-cockpit-${width}`);
 
       await closed.getByTestId("close-version-tC-1").click();
-      await expect(page.getByTestId("version-sheet").getByRole("table", { name: "Endstand Fassung 1" })).toBeVisible();
+      const version = page.getByTestId("version-sheet").getByRole("table", { name: "Endstand Fassung 1" });
+      await expect(version).toBeVisible();
+      await expect(version.getByRole("row").nth(1)).toContainText(TEAMS[1]);
       await noSideScroll(page);
     });
 
@@ -167,10 +178,10 @@ test.describe("Liga: Saisonabschluss", () => {
       await page.getByTestId("close-decide-tA").click();
       const decide = page.getByTestId("table-decision-sheet");
       await decide.getByTestId("table-decision-method").selectOption("playoff");
-      await decide.getByTestId("table-decision-reason").fill("Entscheidungsspiel am 10.01. mit 2:1 gewonnen");
+      await decide.getByTestId("table-decision-reason").fill("Am 10.01. mit 2:1 gewonnen");
       await noSideScroll(page);
       await decide.getByTestId("table-decision-save").click();
-      await expect.poll(() => sent.decision).toEqual({ registration_ids: ["r1", "r2"], reason: "Entscheidungsspiel am 10.01. mit 2:1 gewonnen", method: "playoff" });
+      await expect.poll(() => sent.decision).toEqual({ registration_ids: ["r1", "r2"], reason: "Am 10.01. mit 2:1 gewonnen", method: "playoff" });
 
       await page.getByTestId("close-button-tB").click();
       const sheet = page.getByTestId("close-sheet");
@@ -184,9 +195,9 @@ test.describe("Liga: Saisonabschluss", () => {
       const reopen = page.getByTestId("reopen-sheet");
       await reopen.getByTestId("reopen-confirm").click();
       expect(sent.reopen).toBeUndefined();
-      await reopen.getByTestId("reopen-reason").fill("Ergebnis von Spieltag 5 war vertauscht");
+      await reopen.getByTestId("reopen-reason").fill("Ergebnis von Spieltag 2 war vertauscht");
       await reopen.getByTestId("reopen-confirm").click();
-      await expect.poll(() => sent.reopen).toEqual({ reason: "Ergebnis von Spieltag 5 war vertauscht" });
+      await expect.poll(() => sent.reopen).toEqual({ reason: "Ergebnis von Spieltag 2 war vertauscht" });
     });
 
     test(`Ligaseite bei ${width} px: abgeschlossene Staffel zeigt Endstand und Meister`, async ({ page }) => {
@@ -196,7 +207,7 @@ test.describe("Liga: Saisonabschluss", () => {
       const staffel = page.getByTestId("league-staffel-A");
       await expect(staffel.getByTestId("league-final-A")).toHaveText("Endstand · abgeschlossen am 12.01.2027");
       await expect(staffel.getByTestId("league-champion-A")).toContainText(`Meister ${TEAMS[0]}`);
-      await expect(staffel.getByTestId("standing-notes-r1")).toContainText("Platz durch Entscheidungsspiel: Entscheidungsspiel am 10.01. mit 2:1 gewonnen");
+      await expect(staffel.getByTestId("standing-notes-r1")).toContainText("Platz durch Entscheidungsspiel: Am 10.01. mit 2:1 gewonnen");
       await noSideScroll(page);
       await shot(staffel.locator(".tls-league-table"), `f1-endstand-oeffentlich-${width}`);
     });
