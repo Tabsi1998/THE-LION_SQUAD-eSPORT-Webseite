@@ -12,8 +12,8 @@ const TICK_MS = 30000;
 const LEAVE_MS = 180;
 
 /** Lädt die stehenden Hinweise (`path`: `/tournaments/<id>/notices` bzw. `/events/<slug>/notices`) und lädt nach, sobald
- * sich das Turnier ändert. Ohne Pfad lädt er nichts. */
-export function useNotices(path, { tournamentId = null } = {}) {
+ * sich das Turnier oder ein anderes Turnier desselben Events (`eventId`) ändert. Ohne Pfad lädt er nichts. */
+export function useNotices(path, { tournamentId = null, eventId = null } = {}) {
   const [items, setItems] = useState([]);
   const load = useCallback(async () => {
     if (!path) return;
@@ -26,7 +26,9 @@ export function useNotices(path, { tournamentId = null } = {}) {
     }
   }, [path]);
   useEffect(() => { load(); }, [load]);
-  useLiveRefresh(load, ["tournaments", "events"], { fallbackMs: 30000, enabled: Boolean(path), tournamentId });
+  // Ein Hinweis ans ganze Event kann aus einem anderen Turnier des Events kommen (#1166, Review M2): dann zählt jede Änderung
+  // eines Turniers desselben Events - nicht nur die des eigenen.
+  useLiveRefresh(load, ["tournaments", "events"], { fallbackMs: 30000, enabled: Boolean(path), tournamentId, eventId, wholeEvent: true });
   return items;
 }
 

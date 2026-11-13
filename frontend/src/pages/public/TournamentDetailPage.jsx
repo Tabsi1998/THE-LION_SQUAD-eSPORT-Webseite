@@ -178,7 +178,7 @@ function TournamentDetailView() {
   // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
   useLiveRefresh(refresh, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
   // Hinweis der Turnierleitung (#1166): oben auf der Seite, bis er abläuft oder entfernt wird.
-  const notices = useNotices(t?.id ? `/tournaments/${encodeURIComponent(t.id)}/notices` : null, { tournamentId: t?.id });
+  const notices = useNotices(t?.id ? `/tournaments/${encodeURIComponent(t.id)}/notices` : null, { tournamentId: t?.id, eventId: t?.event_id });
   const countdownDays = useCountdownDays();
 
   // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die

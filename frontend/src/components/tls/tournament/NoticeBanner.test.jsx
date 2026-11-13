@@ -5,7 +5,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "", formatApiError: (value) => value }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+const live = { options: null };
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (_load, _resources, options) => { live.options = options; } }));
 const { NoticeBanner, useNotices } = await import("./NoticeBanner");
 
 const NOW = Date.parse("2026-11-14T13:07:00Z");
@@ -61,4 +62,13 @@ it("lädt die Hinweise über den Pfad und hält still, wenn das nicht klappt", a
   apiMock.get.mockRejectedValueOnce(new Error("offline"));
   rerender(<Probe path="/tournaments/t2/notices" />);
   await waitFor(() => expect(screen.queryByText("Pause bis 14:30")).toBeNull());
+});
+
+it("lädt auch nach, wenn ein anderes Turnier desselben Events einen Hinweis ans ganze Event schreibt (Review M2)", () => {
+  apiMock.get.mockResolvedValue({ data: { items: [] } });
+  function Probe() {
+    return <NoticeBanner items={useNotices("/tournaments/t1/notices", { tournamentId: "t1", eventId: "e1" })} />;
+  }
+  render(<Probe />);
+  expect(live.options).toEqual(expect.objectContaining({ tournamentId: "t1", eventId: "e1", wholeEvent: true }));
 });
