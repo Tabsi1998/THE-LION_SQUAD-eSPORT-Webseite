@@ -263,9 +263,18 @@ def encrypt_payload(plaintext: bytes, p256dh: str, auth: str, *, salt: bytes | N
     return header + ciphertext
 
 
-def vapid_headers(endpoint: str, config: VapidConfig, now: float | None = None) -> dict[str, str]:
+def vapid_audience(endpoint: str) -> str:
+    """Für wen die VAPID-Anmeldung gilt: Schema und Host in Kleinbuchstaben, ohne Zugangsdaten und ohne Standard-Port."""
     parts = urlsplit(endpoint)
-    claims = {"aud": f"{parts.scheme}://{parts.netloc}", "exp": int((now or time.time()) + 12 * 60 * 60), "sub": config.contact}
+    scheme = (parts.scheme or "https").lower()
+    host = (parts.hostname or "").lower()
+    port = parts.port
+    default = 443 if scheme == "https" else 80
+    return f"{scheme}://{host}" + (f":{port}" if port and port != default else "")
+
+
+def vapid_headers(endpoint: str, config: VapidConfig, now: float | None = None) -> dict[str, str]:
+    claims = {"aud": vapid_audience(endpoint), "exp": int((now or time.time()) + 12 * 60 * 60), "sub": config.contact}
     token = jwt.encode(claims, config.private_key, algorithm="ES256")
     return {"Authorization": f"vapid t={token}, k={config.public_key}"}
 

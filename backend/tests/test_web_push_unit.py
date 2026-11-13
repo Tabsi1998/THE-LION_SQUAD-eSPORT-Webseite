@@ -215,3 +215,12 @@ def test_groessengrenze_des_inhalts():
     assert len(data) <= web_push.MAX_PLAINTEXT
     assert json.loads(data)["url"] == "/x"
     assert decrypt(web_push.encrypt_payload(data, p256dh, auth), key, auth) == data
+
+
+def test_vapid_audience_ist_normalisiert():
+    assert web_push.vapid_audience("https://FCM.GoogleAPIs.com:443/fcm/send/abc") == "https://fcm.googleapis.com"
+    assert web_push.vapid_audience("https://push.example.test:8443/x") == "https://push.example.test:8443"
+    config = web_push.vapid_config(env_with_keys())
+    header = web_push.vapid_headers("https://Updates.Push.Services.Mozilla.com:443/wpush/v2/x", config)["Authorization"]
+    token = header.split("t=", 1)[1].split(",", 1)[0]
+    assert jwt.decode(token, options={"verify_signature": False})["aud"] == "https://updates.push.services.mozilla.com"
