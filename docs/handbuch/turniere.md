@@ -656,7 +656,7 @@ Pausiert ihr das Turnier, steht jede laufende Uhr mit „Pause“; nach **Weiter
 (auch über mehrere Pausen). Auch „Ergebnis fehlt“ rechnet die Pause nicht mit.
 Mit „Bewegung reduzieren“ springt der Balken minutenweise.
 
-<img src="../assets/turniere/spielzeit-uhr-leitung-handy.png" alt="Turnierleitung am Handy, Reiter Ergebnisse mit Filter Läuft: Viertelfinale 1 rot mit 33:02 von 20 Minuten, plus 13 Minuten und Ergebnis fehlt, Viertelfinale 2 orange mit 16:32 von 20 Minuten, Viertelfinale 3 ruhig mit 10:02 von 20 Minuten" width="300">
+<img src="../assets/turniere/spielzeit-uhr-leitung-handy.png" alt="Turnierleitung am Handy, Reiter Ergebnisse mit Filter Läuft: Viertelfinale 1 mit Warn-Symbol orange hinterlegt 33:03 von 20 Minuten, plus 13 Minuten und Ergebnis fehlt, Viertelfinale 2 orange mit 16:33 von 20 Minuten" width="300">
 
 **Live vor Ort: die Warteschlange je Station.** Vor Ort ist der Plan eine Prognose – während des Turniers zählt die
 Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) steht dafür der Reiter **Stationen**

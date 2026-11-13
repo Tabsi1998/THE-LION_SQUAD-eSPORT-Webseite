@@ -44,11 +44,12 @@ export function MatchClock({ startedAt, durationMinutes, pausedAt = null, paused
   const small = size === "sm";
   return (
     <div className={`tls-live-clock ${className}`} data-tone={info.tone} data-size={size} data-paused={info.paused ? "1" : undefined} data-testid={testId} role="timer" aria-label={clockLabel(info)}>
-      <div className="flex items-baseline gap-2">
+      {/* Eng (Listenzeile am Handy): die Teile brechen als Ganzes um, nie „/ 20“ und „Min.“ getrennt. */}
+      <div className="flex flex-wrap items-baseline gap-x-2">
         <ClockTime info={info} testId={testId} className={`font-bold text-white ${small ? "text-sm" : "text-2xl"}`} />
-        {info.limit ? <span className={`${small ? "text-[11px]" : "text-xs"} text-white/55`}>/ {info.limit}</span> : null}
-        {info.paused ? <span className={`tls-live-clock-paused ${small ? "text-[11px]" : "text-xs"} font-bold uppercase tracking-wider text-white/60`} data-testid={`${testId}-paused`}>Pause</span> : null}
-        {info.tone === "over" && info.overMinutes ? <span className={`ml-auto ${small ? "text-[11px]" : "text-xs"} font-bold text-warn`}>+{info.overMinutes} Min.</span> : null}
+        {info.limit ? <span className={`${small ? "text-[11px]" : "text-xs"} whitespace-nowrap text-white/55`}>/ {info.limit}</span> : null}
+        {info.paused ? <span className={`tls-live-clock-paused whitespace-nowrap ${small ? "text-[11px]" : "text-xs"} font-bold uppercase tracking-wider text-white/60`} data-testid={`${testId}-paused`}>Pause</span> : null}
+        {info.tone === "over" && info.overMinutes ? <span className={`ml-auto ${small ? "text-[11px]" : "text-xs"} whitespace-nowrap font-bold text-warn`}>+{info.overMinutes} Min.</span> : null}
       </div>
       {info.ratio !== null ? (
         <div className={`tls-live-clock-track ${small ? "mt-1" : "mt-1.5"}`} aria-hidden="true">
