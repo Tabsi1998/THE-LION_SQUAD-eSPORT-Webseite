@@ -170,13 +170,22 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
     return items
 
 
+def station_query(tournament: dict) -> dict:
+    """Die Stationen eines Turniers - dazu die geteilten Stationen seines Events ohne eigenes Turnier (#1801, #1162):
+    Wird eine davon defekt, während dieses Turnier dort spielt, ist das auch hier ein Fall."""
+    own = {"tournament_id": tournament["id"]}
+    if not tournament.get("event_id"):
+        return own
+    return {"$or": [own, {"tournament_id": None, "event_id": tournament["event_id"]}]}
+
+
 async def tournament_attention(db, tournament: dict, *, now: datetime | None = None) -> tuple[list[dict], dict[str, dict]]:
     """Die Fälle eines Turniers aus der Datenbank - und die Spiele dazu (für die Empfänger)."""
     now = now or now_utc()
     # Alle Spiele, nicht nur offene: die Runden je Baumteil zählen wie im Baum (#1860).
     matches = await db.matches_v2.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(3000)
     await attach_station_info(db, matches)
-    stations = await db.stations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(500)
+    stations = await db.stations.find(station_query(tournament), {"_id": 0}).to_list(500)
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(REGISTRATION_LIMIT)
     regs_by_id = {row["id"]: row for row in registrations if row.get("id")}
