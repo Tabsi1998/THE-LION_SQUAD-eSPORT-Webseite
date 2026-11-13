@@ -163,7 +163,8 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   Website. Am iPhone geht das nur mit der Website auf dem Home-Bildschirm (Safari → Teilen → „Zum Home-Bildschirm“). Gefragt
   wird nie beim ersten Besuch, sondern nach der ersten Turnier- oder Event-Anmeldung, einmal je Browser; „Nicht jetzt“ merkt
   sich die Seite. Ein Tipp auf die Meldung öffnet die passende Seite (ein offener Tab mit dieser Seite wird nach vorn geholt),
-  beim Check-in gibt es den Knopf **Jetzt einchecken**. Abmelden vom Konto meldet den Browser ab. Einrichten muss es der
+  beim Check-in gibt es den Knopf **Jetzt einchecken**. Abmelden vom Konto, Passwort ändern und „Überall abmelden“ melden den
+  Browser ab; Meldungen kommen, solange die Anmeldung auf der Website in diesem Browser gilt. Einrichten muss es der
   Betreiber einmal mit zwei Schlüsseln in der Server-Konfiguration ([Betrieb](../BETRIEB.md)); ohne sie gibt es den Kanal nicht.
 - **Discord-Direktnachricht:** Nur mit verknüpftem Discord-Konto und nur auf Wunsch (Standard **aus**). Es kommt dieselbe Meldung als
   Nachricht vom Vereins-Bot (Titel, Text, Link). Nie darin: Chat-Texte anderer, Moderation, Zahlungsdaten. Discord stellt Direktnachrichten
