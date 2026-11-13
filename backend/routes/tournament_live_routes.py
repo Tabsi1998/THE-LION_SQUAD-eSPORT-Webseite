@@ -571,6 +571,11 @@ async def move_match(tid: str, body: StationMove, me: dict = Depends(get_current
             raise HTTPException(status_code=409, detail="Die Zielstation ist als defekt markiert.")
         if target.get("current_match_id"):
             raise HTTPException(status_code=409, detail=TARGET_TAKEN_DETAIL)
+        # Nur auf eine freie, passende Station (#1162) - dieselbe Regel wie der Planer und der Aufruf.
+        if (target.get("status") or "free") != "free":
+            raise HTTPException(status_code=409, detail="Die Zielstation ist nicht frei. Bitte neu laden.")
+        if not await _fits(db, tournament_id, target):
+            raise HTTPException(status_code=409, detail=NOT_FITTING_DETAIL)
         if state == "running":
             await _move_running(db, source, target, match)
         else:

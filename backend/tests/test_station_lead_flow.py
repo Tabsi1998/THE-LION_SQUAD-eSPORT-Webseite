@@ -475,3 +475,24 @@ async def test_another_ready_match_can_be_called_at_a_free_station_but_only_wher
                               json={"station_id": stations[1]["id"], "match_id": rest["match_id"]})
     assert refused.status_code == 409 and "passt nicht" in refused.json()["detail"]
     assert not (await flow.db.matches_v2.find_one({"id": rest["match_id"]}, {"_id": 0})).get("called_at")
+
+
+@pytest.mark.asyncio
+async def test_move_only_to_a_free_station_that_fits_the_game(flow):
+    _staff, tournament, stations, _players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    assert (await call(flow, tournament, stations[0], match)).status_code == 200
+    # Hängt (belegt ohne Spiel): nicht frei.
+    await flow.db.stations.update_one({"id": stations[1]["id"]}, {"$set": {"status": "busy"}})
+    stuck = await move(flow, tournament, stations[0], match, stations[1])
+    assert stuck.status_code == 409 and "nicht frei" in stuck.json()["detail"]
+    # Station für ein anderes Spiel: passt nicht.
+    other_game = await add_station(flow, tournament, "3")
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"game_id": new_id()}})
+    await flow.db.stations.update_one({"id": other_game["id"]}, {"$set": {"game_id": new_id()}})
+    wrong = await move(flow, tournament, stations[0], match, other_game)
+    assert wrong.status_code == 409 and "passt nicht" in wrong.json()["detail"]
+    assert (await flow.reload(match))["station_id"] == stations[0]["id"]
+    fitting = await add_station(flow, tournament, "4")
+    moved = await move(flow, tournament, stations[0], match, fitting)
+    assert moved.status_code == 200, moved.text
