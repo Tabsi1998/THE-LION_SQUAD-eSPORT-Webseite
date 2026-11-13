@@ -687,11 +687,13 @@ export function AdminLayout({ children }) {
         <style>{`.admin-scroll::-webkit-scrollbar{width:4px}.admin-scroll::-webkit-scrollbar-track{background:transparent}.admin-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}.admin-scroll::-webkit-scrollbar-thumb:hover{background:rgba(41,182,232,0.4)}`}</style>
       </aside>
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay: der Klick daneben ist nur eine Maus-Abkürzung - Escape und „Admin-Menü schließen“ sind der Weg für
+          Tastatur und Vorleseprogramm, deshalb steht die Fläche nicht im Barrierefreiheitsbaum (#937). */}
       {openMobile && (
         <div
           data-testid="admin-menu-overlay"
           className="lg:hidden fixed inset-0 bg-black/60 z-30"
+          aria-hidden="true"
           onClick={() => setOpenMobile(false)}
         />
       )}
