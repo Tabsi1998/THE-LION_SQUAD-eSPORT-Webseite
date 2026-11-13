@@ -82,9 +82,8 @@ STAFFEL_STATUSES = frozenset({"draft", "live", "paused", "completed", "results_p
 STAFFEL_STATUS_REFUSED = ("Eine Liga-Staffel hat keine Anmeldung und keinen Check-in – die Co-Teams werden zugeteilt, "
                           "dann „Liga starten“.")
 
-STAFFEL_REOPENING_STATUSES = frozenset({"draft", "live", "paused"})
-STAFFEL_CLOSED_REFUSED = ("Diese Staffel ist abgeschlossen – der Endstand steht. Zurück in den Spielbetrieb geht es nur in der "
-                          "Season im Reiter „Abschluss“ über „Wieder öffnen“.")
+STAFFEL_CLOSED_REFUSED = ("Diese Staffel ist abgeschlossen – der Endstand steht. Der Stand ändert sich nur in der Season im "
+                          "Reiter „Abschluss“ über „Wieder öffnen“.")
 
 # Status nur über den Ablauf (S2, alle Turniere): ``POST /status`` prüft und protokolliert, das Formular nicht.
 STATUS_ONLY_THROUGH_FLOW = ("Den Status änderst du oben in der Turnierverwaltung – dort laufen die Prüfungen des "
@@ -148,8 +147,9 @@ def staffel_status_problem(tournament: dict, status: str | None) -> str | None:
     """Status, die es für eine Staffel nicht gibt (Anmeldung, Check-in, Angekündigt)."""
     if not is_league_staffel(tournament):
         return None
-    # Abgeschlossen (F.1, #1645): Der Endstand steht - zurück in den Spielbetrieb geht es nur über „Wieder öffnen“.
-    if isinstance(tournament.get("final_table"), dict) and status in STAFFEL_REOPENING_STATUSES:
+    # Abgeschlossen (F.1, #1645): Der Endstand steht - jeder andere Stand (auch „Archiviert“, „Abgesagt“, „Ergebnisse
+    # veröffentlicht“) geht nur über „Wieder öffnen“. Der Aufrufer fragt nur bei einem Wechsel.
+    if isinstance(tournament.get("final_table"), dict):
         return STAFFEL_CLOSED_REFUSED
     if status in STAFFEL_STATUSES:
         return None
