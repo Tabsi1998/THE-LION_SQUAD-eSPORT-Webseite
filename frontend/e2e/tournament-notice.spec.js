@@ -167,16 +167,17 @@ test.describe("Hinweis der Turnierleitung", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   });
 
-  test("Reiterleiste bei 390 px mit allen fünf Reitern: alle auf einen Blick (Umbruch statt Wischen), nichts läuft aus dem Bild", async ({ page }, testInfo) => {
+  test("Reiterleiste bei 390 px mit allen sechs Reitern: alle auf einen Blick (Umbruch statt Wischen), nichts läuft aus dem Bild", async ({ page }, testInfo) => {
     await prepare(page, { width: 390, height: 844 });
     const server = fakeServer({ full: true });
     await page.route("**/api/**", server.handle);
     await page.goto(`/tournaments/${SLUG}/leitung`);
-    for (const key of ["attention", "checkin", "stations", "results", "notice"]) {
+    for (const key of ["cockpit", "attention", "checkin", "stations", "results", "notice"]) {
       await expect(page.getByTestId(`lead-tab-${key}`)).toHaveCount(1);
       await expect(page.getByTestId(`lead-tab-${key}`)).toBeInViewport({ ratio: 1 });
     }
-    await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+    // Vor Ort ist das Cockpit der Einstieg (#1653).
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     // Erst wenn die Seite fertig eingeblendet ist (Einblenden der Ansicht, echte Zeit - die installierte Uhr hält die

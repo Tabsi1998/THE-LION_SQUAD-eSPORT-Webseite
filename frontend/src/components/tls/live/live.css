@@ -53,11 +53,22 @@
 }
 .tls-live-clock[data-size="sm"] .tls-live-clock-track { height: 3px; }
 .tls-live-clock-bar {
+  position: relative;
   height: 100%;
   border-radius: inherit;
   transform-origin: left center;
   background: var(--tls-brand);
-  transition: background-color var(--tls-motion-mid) var(--tls-ease);
+}
+/* Farbwechsel nur über Deckkraft (#1653): die orange Füllung liegt über dem Balken und blendet weich ein - kein Sprung,
+   kein Umfärben. Sie wächst mit dem Balken (transform des Balkens). */
+.tls-live-clock-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--tls-warn);
+  opacity: 0;
+  transition: opacity var(--tls-motion-slow) var(--tls-ease);
 }
 .tls-live-clock-track::after {
   content: "";
@@ -67,8 +78,8 @@
   opacity: 0;
   pointer-events: none;
 }
-.tls-live-clock[data-tone="warn"] .tls-live-clock-bar,
-.tls-live-clock[data-tone="over"] .tls-live-clock-bar { background: var(--tls-warn); }
+.tls-live-clock[data-tone="warn"] .tls-live-clock-bar::after,
+.tls-live-clock[data-tone="over"] .tls-live-clock-bar::after { opacity: 1; }
 .tls-live-clock[data-tone="warn"] .tls-live-clock-track::after { background: rgb(var(--tls-warn-rgb) / 0.55); animation: tls-clock-flare-warn var(--tls-motion-glow) var(--tls-ease) both; }
 .tls-live-clock[data-tone="over"] .tls-live-clock-track::after { background: rgb(255 255 255 / 0.5); animation: tls-clock-flare-over var(--tls-motion-glow) var(--tls-ease) both; }
 /* Zwei Namen: der Wechsel von „knapp“ zu „überschritten“ startet das Aufleuchten neu. */

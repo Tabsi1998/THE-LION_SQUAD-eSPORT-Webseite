@@ -16,7 +16,8 @@ Jede Eingabe wird gespeichert, auch wer sie gemacht hat. Du kannst nichts kaputt
 
 ## 1. Station betreuen: Aufrufen, Starten, Freigeben
 
-**Öffnen:** Turnier → **Turnierleitung** → Reiter **Stationen**.
+**Öffnen:** Turnier → **Turnierleitung**. Vor Ort startet sie im **Cockpit**: oben die Probleme, darunter die
+Stationen mit denselben Knöpfen. Nur die Stationen gibt es im Reiter **Stationen**.
 
 1. Bei deiner Station steht **Als Nächstes**: Runde, Durchgang und wer antritt.
 2. Tippe **Aufrufen**. Die Spieler bekommen „Du bist dran“, der TV zeigt den Aufruf mit Countdown.
@@ -98,7 +99,12 @@ Grundregel: **Nichts raten. Turnierleitung holen.** Wen du anrufst, steht am **A
 | **Seite hängt** | Neu laden. Hilft das nicht: anderes Gerät nehmen. |
 | **Pause, Finale, Check-in ansagen** | Die Turnierleitung schreibt im Reiter **Hinweis** einen Satz an alle im Turnier (z. B. „Pause bis 14:30“) – er kommt aufs Handy, oben auf die Turnierseite und auf Wunsch an den TV. Siehe [Turniere, 3.17](turniere.md#317-hinweis-der-turnierleitung-an-alle). |
 
-So sieht es die Turnierleitung im Reiter **Braucht Aufmerksamkeit**:
+Die Turnierleitung sieht alle Probleme oben im **Cockpit**, das dringendste zuerst: Einspruch, nicht erschienen,
+Station defekt, Ergebnis fehlt, Verzug. Ein Tipp auf die Zeile öffnet den Fall mit seinen Knöpfen, bei Verzug die Station.
+
+<img src="../assets/turniere/cockpit-leitung-handy.png" alt="Cockpit der Turnierleitung am Handy: oben Probleme mit Einspruch, Nicht erschienen, Station defekt und Ergebnis fehlt, darunter die Stationen mit Spielzeit-Uhr und den Knöpfen" width="220">
+
+So sieht ein Fall im Reiter **Braucht Aufmerksamkeit** aus:
 
 <table><tr><th>Station defekt</th><th>Nicht erschienen?</th><th>Streitfall</th></tr><tr>
 <td><img src="../assets/helfer/x-aufmerksamkeit-handy.png" alt="Fall Station defekt mit Knopf Umlegen und Auswahl der freien Stationen" width="200"></td>
@@ -133,5 +139,5 @@ Echte Namen und Nummern stehen **nur am Aushang** vor Ort, nicht hier.
 Mehr für die Turnierleitung: [Turniere](turniere.md) · [Fast Lap](fastlap.md) · [TV und Beamer](tv.md) ·
 [ausführliche Helfer-Anleitung](helfer.md)
 
-<sub>Die Bilder der Problemfälle stammen aus `frontend/e2e/helfer-eventtag-bilder.spec.js` (nachgestellte Daten,
-erfundene Namen); die übrigen aus der Abnahme der [Helfer-Anleitung](helfer.md).</sub>
+<sub>Die Bilder der Problemfälle stammen aus `frontend/e2e/helfer-eventtag-bilder.spec.js`, das Cockpit aus
+`frontend/e2e/tournament-cockpit.spec.js` (nachgestellte Daten, erfundene Namen); die übrigen aus der Abnahme der [Helfer-Anleitung](helfer.md).</sub>

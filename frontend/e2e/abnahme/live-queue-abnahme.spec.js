@@ -45,7 +45,8 @@ test.describe("Abnahme: Live-Warteschlange vor Ort", () => {
     await signIn(page, "lead");
     const problems = watch(page, { allow });
     await page.goto(`/tournaments/${slug}/leitung`);
-    await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+    // Vor Ort ist das Cockpit der Einstieg (#1653) - mit denselben Stationskacheln wie der Reiter „Stationen“.
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
     const board = page.getByTestId("live-board");
 
     // Die Uhr am laufenden Spiel tickt ohne Neuladen.
@@ -159,7 +160,8 @@ test.describe("Abnahme: Live-Warteschlange vor Ort", () => {
     await signIn(page, "lead");
     const problems = watch(page, { allow });
     await page.goto(`/tournaments/${slug}/leitung`);
-    await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+    // Vor Ort ist das Cockpit der Einstieg (#1653) - mit denselben Stationskacheln wie der Reiter „Stationen“.
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("lead-tab-results")).toBeInViewport();
     // Nach dem Test mit zwei Helfern ist Runde 1 vorbei - hier zählt, dass jede Station mit Aufruf oder Knopf dasteht.
     await expect(page.getByTestId("live-board").locator("[data-testid^='live-station-']").first()).toBeVisible();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ClipboardCheck, Clock, Megaphone, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, Gauge, Megaphone, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -11,7 +11,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatWhen } from "@/lib/datetime";
+import { motionAllowed } from "@/lib/motion";
 import { leadFilter, leadLine, leadNames } from "@/lib/tournamentLead";
+import { COCKPIT_POLL_MS, cockpitProblems } from "@/lib/tournamentCockpit";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
@@ -19,6 +21,7 @@ import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 import { MatchClock } from "@/components/tls/live/MatchClock";
 import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
 import { NoticeComposer } from "@/components/tls/tournament/NoticeComposer";
+import { TournamentCockpit } from "@/components/tls/tournament/TournamentCockpit";
 
 // Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Erster
 // Reiter „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf - Erledigtes verschwindet von selbst; jeder
@@ -34,6 +37,11 @@ import { NoticeComposer } from "@/components/tls/tournament/NoticeComposer";
 // verlinkt hierher (?reiter=checkin). Im Status „Check-in“ öffnet die Seite gleich dort.
 // Reiter „Hinweis“ (#1166, nur wer Hinweise schreiben darf): ein Satz an alle im Turnier oder Event - Benachrichtigung,
 // Banner, auf Wunsch TV; darunter das Protokoll (?reiter=hinweis).
+// Reiter „Cockpit“ (#1653, nur vor Ort mit Warteschlange): der Einstieg am Turniertag - oben bzw. am Tablet quer links
+// die „Probleme“ (Fälle, Auslosungen, Verzug je Station; ein Tipp führt zum Fall), daneben die Stationen mit denselben
+// Knöpfen wie im Reiter „Stationen“. Die übrigen Reiter bleiben. ?reiter=cockpit öffnet ihn, ?station=<id> springt zur
+// Station (aus „Verzug“). Solange er offen ist, fragen beide Abfragen zusätzlich kurz im Takt nach (COCKPIT_POLL_MS):
+// „Ergebnis fehlt“ und Verzug entstehen mit der Zeit, ohne eigenes Ereignis.
 
 const FILTERS = [
   ["all", "Alle offenen", "open"],
@@ -51,7 +59,7 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  const [tab, setTab] = useState(() => ({ checkin: "checkin", stationen: "stations", hinweis: "notice" })[searchParams.get("reiter")] || null);
+  const [tab, setTab] = useState(() => ({ cockpit: "cockpit", checkin: "checkin", stationen: "stations", hinweis: "notice" })[searchParams.get("reiter")] || null);
   const [movingId, setMovingId] = useState("");
   const [queue, setQueue] = useState(null);
   const [queueLoaded, setQueueLoaded] = useState(false);
@@ -59,6 +67,12 @@ export default function TournamentLeadPage() {
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
   const scrolledTo = useRef("");
+  // Jeder Tipp auf einen Fall im Cockpit springt hin - auch ein zweites Mal auf denselben (Review M2).
+  const [caseJump, setCaseJump] = useState(0);
+  // Aus „Verzug“ im Cockpit (#1653): ?station=<id> - die Station leuchtet auf und rückt ins Bild.
+  const stationParam = searchParams.get("station") || "";
+  const stationScrolled = useRef("");
+  const [stationJump, setStationJump] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -88,9 +102,6 @@ export default function TournamentLeadPage() {
   // das Turnier geladen ist, jede; ohne sichtbares Event jede eines Turniers mit Event.
   const tournamentId = data?.tournament?.id;
   const eventId = data?.tournament?.event_id;
-  useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, tournamentId, eventId });
-  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen.
-  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: 60000, tournamentId, eventId });
   const undo = useResultUndo({ onDone: load });
   useDocumentTitle(data?.tournament?.title ? `Turnierleitung · ${data.tournament.title}` : "Turnierleitung", "Turnierleitung: Ergebnisse eintragen und offene Spiele im Blick.", { robots: "noindex, nofollow" });
 
@@ -112,9 +123,17 @@ export default function TournamentLeadPage() {
   // wenn es vor Ort eine Warteschlange gibt - bis die geladen ist, „Wird geladen …“, sonst die Vorgabe. „Hinweis“ (#1166)
   // nur mit Recht zum Schreiben - bis die Ansicht geladen ist, „Wird geladen …“.
   const chosenTab = tab === "checkin" && !canCheckIn ? null
-    : tab === "stations" && !queue ? (queueLoaded ? null : "")
+    : (tab === "stations" || tab === "cockpit") && !queue ? (queueLoaded ? null : "")
       : tab === "notice" && !canNotice ? (data ? null : "") : tab;
-  const activeTab = chosenTab === "" ? "" : chosenTab || (fall || cases ? "attention" : checkinPhase ? "checkin" : queue ? "stations" : queueLoaded && data ? "results" : "");
+  const activeTab = chosenTab === "" ? "" : chosenTab || defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded });
+  // Das Cockpit (#1653) fragt kurz im Takt nach, solange es wirklich zu sehen ist (nicht im Check-in oder einem anderen
+  // Reiter) - sonst wie bisher nur bei Änderungen.
+  const cockpitOpen = activeTab === "cockpit";
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0, tournamentId, eventId });
+  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter.
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 60000, tournamentId, eventId });
+  // Die Probleme des Cockpits (#1653) - aus denselben Daten wie „Braucht Aufmerksamkeit“ und die Stationen.
+  const problems = useMemo(() => cockpitProblems({ attention, draws, queue }), [attention, draws, queue]);
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.
   const compactTabs = Boolean(queue) || canCheckIn || canNotice;
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
@@ -148,13 +167,37 @@ export default function TournamentLeadPage() {
   };
 
   useEffect(() => {
-    if (!fall || !data || scrolledTo.current === fall) return;
+    if (!stationParam || activeTab !== "cockpit" || !queue || stationScrolled.current === stationParam) return;
+    const target = [...document.querySelectorAll("[data-testid^='live-station-']")].find((node) => node.dataset.testid === `live-station-${stationParam}`);
+    if (target) {
+      stationScrolled.current = stationParam;
+      target.scrollIntoView?.({ block: "center", behavior: motionAllowed() ? "smooth" : "auto" });
+    }
+  }, [stationParam, activeTab, queue, stationJump]);
+
+  // Ein Tipp auf ein Problem (#1653): ein Fall öffnet „Braucht Aufmerksamkeit“ an genau dieser Karte, Verzug bleibt im
+  // Cockpit und springt zur Station. Derselbe Fall ein zweites Mal springt wieder hin.
+  const openProblem = (problem) => {
+    if (problem.target === "station") {
+      stationScrolled.current = "";
+      setStationJump((value) => value + 1);
+      return;
+    }
+    scrolledTo.current = "";
+    setCaseJump((value) => value + 1);
+    setTab("attention");
+  };
+
+  useEffect(() => {
+    if (!fall || !data || activeTab !== "attention" || scrolledTo.current === fall) return;
     const target = document.getElementById(`fall-${fall}`);
     if (target) {
       scrolledTo.current = fall;
       target.scrollIntoView?.({ block: "center" });
+      // Review N4: der Fokus geht mit auf die Karte - Tastatur und Screenreader stehen dort, wo der Tipp hinführte.
+      target.focus?.({ preventScroll: true });
     }
-  }, [fall, data]);
+  }, [fall, data, activeTab, caseJump]);
 
   // Aufrufen, Starten, Freigeben, Defekt und Umlegen (#1556, #1162): zwei Helfer zugleich - der Server nimmt genau einen,
   // der andere bekommt die Meldung (409) und sieht danach den neuen Stand.
@@ -222,6 +265,18 @@ export default function TournamentLeadPage() {
     }
   };
 
+  // Die Knöpfe der Stationen (#1556, #1162) - im Reiter „Stationen“ und im Cockpit (#1653) dieselben Wege.
+  const stationHandlers = {
+    busyKey: busyStation,
+    onCall: (station, entry) => operateStation("call", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? `War schon an ${where} aufgerufen.` : `Aufgerufen an ${where} – die Spieler bekommen Bescheid.`)),
+    onStart: (station, entry) => operateStation("start", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? "Läuft bereits." : `Gestartet an ${where} – die Uhr läuft.`)),
+    onRelease: (station, entry) => operateStation("release", station, { match_id: entry.match_id }, releasedText),
+    onBroken: (station, value, extra) => operateStation("broken", station, { broken: value, ...extra }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`)),
+    onMove: (station, entry, target) => operateStation("move", station, { match_id: entry.match_id, to_station_id: target.id }, movedText),
+    onCallAll: callAll,
+    onClear: (station) => operateStation("clear", station, {}, (done, where) => (done.idempotent_replay ? `${where} war schon frei.` : `${where} ist geräumt und wieder frei.`)),
+  };
+
   const openEntry = (id) => {
     setOpenId(id);
     const next = new URLSearchParams(searchParams);
@@ -250,13 +305,14 @@ export default function TournamentLeadPage() {
 
   return (
     <PublicLayout>
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-28" data-testid="lead-page">
+      {/* Das Cockpit nutzt am Tablet quer die Breite für zwei Spalten (#1653); die übrigen Reiter bleiben schmal. */}
+      <section className={`${activeTab === "cockpit" ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl"} mx-auto px-4 sm:px-6 py-8 pb-28`} data-testid="lead-page">
         <Breadcrumbs items={tournamentCrumbs(data?.tournament, trail, { tournamentUrl, current: { label: "Turnierleitung" } })} className="mb-4" />
         <div className="text-[11px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Turnierleitung</div>
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-1 border-b border-white/10" role="tablist" aria-label="Turnierleitung" data-testid="lead-tabs">
-          {[["attention", <><span className={compactTabs ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(canCheckIn ? [["checkin", "Check-in", UserCheck]] : []), ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck], ...(canNotice ? [["notice", "Hinweis", Megaphone]] : [])].map(([key, label, Icon]) => (
+          {[...(queue ? [["cockpit", "Cockpit", Gauge]] : []), ["attention", <><span className={compactTabs ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(canCheckIn ? [["checkin", "Check-in", UserCheck]] : []), ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck], ...(canNotice ? [["notice", "Hinweis", Megaphone]] : [])].map(([key, label, Icon]) => (
             <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
               <Icon className={`${compactTabs ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} />
               {/* Ein Textblock (Review N8): sonst setzt der Flex-Abstand zwischen „Braucht “ und „Aufmerksamkeit“ eine zweite Lücke. */}
@@ -264,6 +320,18 @@ export default function TournamentLeadPage() {
             </button>
           ))}
         </div>
+
+        {activeTab === "cockpit" && queue ? (
+          <TournamentCockpit
+            problems={problems}
+            loaded={Boolean(data)}
+            queue={queue}
+            highlightStation={stationParam}
+            highlightPulse={stationJump}
+            onOpen={openProblem}
+            board={stationHandlers}
+          />
+        ) : null}
 
         {activeTab === "checkin" && canCheckIn ? (
           <CheckinBoard slug={slug} tournamentId={tournamentId} eventId={eventId} />
@@ -275,17 +343,7 @@ export default function TournamentLeadPage() {
 
         {activeTab === "stations" && queue ? (
           <div className="mt-5" data-testid="lead-stations">
-            <StationQueueBoard
-              queue={queue}
-              busyKey={busyStation}
-              onCall={(station, entry) => operateStation("call", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? `War schon an ${where} aufgerufen.` : `Aufgerufen an ${where} – die Spieler bekommen Bescheid.`))}
-              onStart={(station, entry) => operateStation("start", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? "Läuft bereits." : `Gestartet an ${where} – die Uhr läuft.`))}
-              onRelease={(station, entry) => operateStation("release", station, { match_id: entry.match_id }, releasedText)}
-              onBroken={(station, value, extra) => operateStation("broken", station, { broken: value, ...extra }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`))}
-              onMove={(station, entry, target) => operateStation("move", station, { match_id: entry.match_id, to_station_id: target.id }, movedText)}
-              onCallAll={callAll}
-              onClear={(station) => operateStation("clear", station, {}, (done, where) => (done.idempotent_replay ? `${where} war schon frei.` : `${where} ist geräumt und wieder frei.`))}
-            />
+            <StationQueueBoard queue={queue} {...stationHandlers} />
             <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>
           </div>
         ) : null}
@@ -362,6 +420,21 @@ export default function TournamentLeadPage() {
   );
 }
 
+/**
+ * Womit die Turnierleitung startet, wenn kein Reiter gewählt ist: ein Fall aus einem Link (?fall=) öffnet „Braucht
+ * Aufmerksamkeit“. Vor Ort mit Warteschlange ist das Cockpit der Einstieg (#1653) - es zeigt die Fälle mit; nur im
+ * Check-in ohne offene Fälle beginnt die Seite beim Check-in. Ohne Warteschlange wie bisher: Fälle, Check-in,
+ * Ergebnisse. `ready`: Ansicht und Warteschlange sind geladen - bis dahin „Wird geladen …“ (sonst springt der Reiter).
+ */
+export function defaultLeadTab({ fall = "", cases = 0, checkinPhase = false, queue = null, ready = false } = {}) {
+  if (fall) return "attention";
+  if (!ready) return "";
+  if (queue && (cases || !checkinPhase)) return "cockpit";
+  if (cases) return "attention";
+  if (checkinPhase) return "checkin";
+  return "results";
+}
+
 /** Restzeit bis zum automatischen Los: ganze Minuten, aus der Server-Uhr (`now`) weitergezählt. */
 export function drawCountdown(card, serverNow, clientNow = Date.now()) {
   const due = card?.due_at ? new Date(card.due_at).getTime() : NaN;
@@ -389,7 +462,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
   }, []);
   const names = card.pot || [];
   return (
-    <div id={`fall-${card.id}`} className={`rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
+    <div id={`fall-${card.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border border-brand/40 text-brand" aria-hidden="true">
           <Shuffle className="h-5 w-5" />
@@ -436,7 +509,7 @@ function movedText(done, where) {
 function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
   const bad = item.kind === "station_broken";
   return (
-    <div id={`fall-${item.id}`} className={`rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
+    <div id={`fall-${item.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
       <div className="flex items-center gap-3">
         <div className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border text-center text-[10px] font-bold uppercase leading-tight ${bad ? "border-[#FF3B30]/50 text-[#FF6B60]" : "border-[#29B6E8]/40 text-[#29B6E8]"}`}>
           {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}
