@@ -12,6 +12,7 @@ const { SeasonReminderRulesPanel, reminderRulesPayload } = await import("./Seaso
 
 const DEFAULTS = {
   upcoming: true, upcoming_early_hours: 24, upcoming_late_minutes: 60, unscheduled: true, unscheduled_week_percent: 50,
+  unscheduled_hours_before_default: 24,
   result_missing: true, veto_turn: true, veto_idle_seconds: 20, veto_min_left_seconds: 5, discord: false,
 };
 

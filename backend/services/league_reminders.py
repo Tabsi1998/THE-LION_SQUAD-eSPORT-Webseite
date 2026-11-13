@@ -4,7 +4,8 @@
 - **Spiel steht an:** ``upcoming_early_hours`` und ``upcoming_late_minutes`` vor dem Termin an die Spieler der Aufstellung (ohne
   Aufstellung den Kader) und die Captains, mit Gegner und Zeit. Nicht bei abgesagten, schon gestarteten oder verschobenen Spielen
   (ein neuer Termin erinnert neu, der alte nie), nicht, wenn der Termin in einer Sperrzeit liegt (Nr. 151 - die Erinnerung selbst darf hineinfallen).
-- **Termin offen:** bei ``unscheduled_week_percent`` der Spielwoche an die Captains beider Seiten, solange kein Termin fest steht
+- **Termin offen:** bei ``unscheduled_week_percent`` der Spielwoche (spätestens ``unscheduled_hours_before_default`` Stunden vor dem
+  Standardtermin) an die Captains beider Seiten, solange kein Termin fest steht
   (Einigung, 72-h-Regel, Verschiebung oder Leitung). Danach gilt der Standardtermin; wer ihn nie meldet, ist überfällig bei der
   Leitung (Nr. 28, ``league_schedule_sweep.overdue``).
 
@@ -16,7 +17,7 @@ Die Erinnerung 10 Minuten vorher (``match_reminder``) gilt für alle Spiele und 
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from models import now_utc
 from services import league_reminder_rules as reminder_rules
@@ -72,9 +73,12 @@ def unscheduled_due(tournament: dict, match: dict, rules: dict, now: datetime):
     if not window or not window.start <= now < window.end:
         return None
     point = window.start + (window.end - window.start) * (int(rules["unscheduled_week_percent"]) / 100)
+    default = _moment(match.get("scheduled_at"))
+    if default:
+        # Liegt der Standardtermin vor der Wochenmitte, käme die Erinnerung sonst nie - dann spätestens so viele Stunden vor ihm.
+        point = min(point, default - timedelta(hours=int(rules["unscheduled_hours_before_default"])))
     if now < point or blocked_period_at(tournament, now):
         return None
-    default = _moment(match.get("scheduled_at"))
     if default and default <= now:
         return None  # Der Standardtermin ist schon vorbei - das ist ein Fall für „Ergebnis fehlt“ und „überfällig“.
     return window

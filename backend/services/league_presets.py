@@ -40,6 +40,8 @@ PRESETS.update({
 PRESETS["reminder_rules"] = {
     "upcoming": True, "upcoming_early_hours": 24, "upcoming_late_minutes": 60,
     "unscheduled": True, "unscheduled_week_percent": 50,
+    # Liegt der Standardtermin vor diesem Zeitpunkt, kommt „Termin offen“ spätestens so viele Stunden vor ihm (N2 Review).
+    "unscheduled_hours_before_default": 24,
     "result_missing": True,
     # Nr. 140: bisher fest 20 s ohne Zug und nie in den letzten 5 s - das bleibt die Vorgabe.
     "veto_turn": True, "veto_idle_seconds": 20, "veto_min_left_seconds": 5,

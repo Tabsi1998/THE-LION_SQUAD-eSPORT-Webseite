@@ -58,7 +58,7 @@ const SCHEDULE = { active: true, defaults: { home_rule: true, home_rule_hours: 7
 SCHEDULE.schedule_rules = SCHEDULE.defaults;
 // Erinnerungen (E.5, #1647): eine Season ohne gespeicherte Werte - der Server liefert die Vorgaben.
 const REMINDERS = { active: false, reminder_rules: null, result_reminder_hours: 24, staffeln: 2, defaults: { upcoming: true, upcoming_early_hours: 24,
-  upcoming_late_minutes: 60, unscheduled: true, unscheduled_week_percent: 50, result_missing: true, veto_turn: true, veto_idle_seconds: 20,
+  upcoming_late_minutes: 60, unscheduled: true, unscheduled_week_percent: 50, unscheduled_hours_before_default: 24, result_missing: true, veto_turn: true, veto_idle_seconds: 20,
   veto_min_left_seconds: 5, discord: false } };
 const RULES_VIEW = { current: null, inherited: null, versions: [], draft: { revision: 1, title: "Regelwerk Season 1" }, data_changes: null };
 
@@ -255,6 +255,7 @@ test.describe("Liga: Season-Seite mit Reitern", () => {
       // Eine Art aus: ihre Zeiten sind gesperrt; Speichern schickt alle Schalter und Zahlen.
       await page.getByTestId("reminder-rules-unscheduled").uncheck();
       await expect(page.getByTestId("reminder-rules-week-percent")).toBeDisabled();
+      await expect(page.getByTestId("reminder-rules-before-default")).toBeDisabled();
       await page.getByTestId("reminder-rules-early").fill("12");
       await page.getByTestId("reminder-rules-save").click();
       await expect.poll(() => calls.reminders.length).toBe(1);

@@ -307,6 +307,26 @@ async def test_open_date_reminds_both_captains_at_mid_week_once(flow):
 
 
 @pytest.mark.asyncio
+async def test_open_date_comes_before_an_early_default_time(flow):
+    """N2: Liegt der Standardtermin vor der Wochenmitte, kommt „Termin offen“ spätestens 24 Stunden (einstellbar) vor ihm."""
+    world = await reminder_world(flow, hours=100, source="default")
+    window = await week_of(flow, world)
+    default = window.start + timedelta(days=2, hours=20)
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {"scheduled_at": default.isoformat()}})
+    assert default < window.start + (window.end - window.start) / 2, "Standardtermin vor der Wochenmitte"
+    assert (await run(flow, world, default - timedelta(hours=24, minutes=1)))["unscheduled"] == 0, "noch zu früh"
+    assert (await run(flow, world, default - timedelta(hours=24)))["unscheduled"] == 1
+    assert names(world, await notes(flow, "unscheduled")) == {"Kapitaen", "Falke1"}
+    # Einstellbar: 6 Stunden vorher.
+    other = await reminder_world(flow, hours=100, source="default", rules={"unscheduled_hours_before_default": 6}, letter="B")
+    other_window = await week_of(flow, other)
+    other_default = other_window.start + timedelta(days=2, hours=20)
+    await flow.db.matches_v2.update_one({"id": other["match"]["id"]}, {"$set": {"scheduled_at": other_default.isoformat()}})
+    assert (await run(flow, other, other_default - timedelta(hours=24)))["unscheduled"] == 0
+    assert (await run(flow, other, other_default - timedelta(hours=6)))["unscheduled"] == 1
+
+
+@pytest.mark.asyncio
 async def test_open_date_stays_quiet_with_a_fixed_time_a_past_default_a_block_or_switched_off(flow):
     world = await reminder_world(flow, hours=100, source="accepted")
     window = await week_of(flow, world)

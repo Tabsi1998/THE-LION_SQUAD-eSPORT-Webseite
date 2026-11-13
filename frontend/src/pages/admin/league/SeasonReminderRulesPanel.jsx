@@ -8,7 +8,8 @@ import { CheckField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
 
 const FLAGS = ["upcoming", "unscheduled", "result_missing", "veto_turn", "discord"];
-const NUMBERS = ["upcoming_early_hours", "upcoming_late_minutes", "unscheduled_week_percent", "veto_idle_seconds", "veto_min_left_seconds"];
+const NUMBERS = ["upcoming_early_hours", "upcoming_late_minutes", "unscheduled_week_percent", "unscheduled_hours_before_default",
+  "veto_idle_seconds", "veto_min_left_seconds"];
 
 /** Die Eingabe als Werte für den Server: Schalter als an/aus, Zahlen als ganze Zahlen, leer heißt Vorgabe. */
 export function reminderRulesPayload(form) {
@@ -85,9 +86,14 @@ export function SeasonReminderRulesPanel({ seasonId }) {
         </Kind>
         <Kind label="Termin noch offen" checked={form.unscheduled} onChange={(value) => set("unscheduled", value)} testId="reminder-rules-unscheduled"
           hint="An beide Captains, solange kein Termin vereinbart ist. Ohne Einigung gilt der Standardtermin.">
-          <TextField label="Zeitpunkt in der Spielwoche (%)" type="number" min={10} max={90} value={form.unscheduled_week_percent}
-            onChange={(value) => set("unscheduled_week_percent", value)} hint="50 = Wochenmitte (Vorgabe)" disabled={!form.unscheduled}
-            testId="reminder-rules-week-percent" className="max-w-xs" />
+          <FormGrid cols={2}>
+            <TextField label="Zeitpunkt in der Spielwoche (%)" type="number" min={10} max={90} value={form.unscheduled_week_percent}
+              onChange={(value) => set("unscheduled_week_percent", value)} hint="50 = Wochenmitte (Vorgabe)" disabled={!form.unscheduled}
+              testId="reminder-rules-week-percent" />
+            <TextField label="Spätestens vor dem Standardtermin (Stunden)" type="number" min={1} max={168}
+              value={form.unscheduled_hours_before_default} onChange={(value) => set("unscheduled_hours_before_default", value)}
+              hint="liegt er früher in der Woche; Vorgabe 24" disabled={!form.unscheduled} testId="reminder-rules-before-default" />
+          </FormGrid>
         </Kind>
         <Kind label="Ergebnis fehlt" checked={form.result_missing} onChange={(value) => set("result_missing", value)} testId="reminder-rules-result"
           hint={`An beide Captains${resultHours ? `, ${resultHours} h nach dem Termin (einstellbar oben unter „Termine und Verschiebungen“)` : ""}. Wartet, solange ein Vorfall oder Verfahren offen ist.`} />

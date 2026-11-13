@@ -6,7 +6,8 @@ fehlt“, „Map-Veto wartet“ mit 20 s / 5 s). Übertragen wird in der Gruppe 
 über ``…/seasons/{id}/reminder-rules`` (gilt sofort für alle nicht gesperrten Staffeln).
 
 - ``upcoming``: Spiel steht an - ``upcoming_early_hours`` und ``upcoming_late_minutes`` vor dem Termin.
-- ``unscheduled``: Termin noch offen - bei ``unscheduled_week_percent`` der Spielwoche (50 = Wochenmitte) an die Captains.
+- ``unscheduled``: Termin noch offen - bei ``unscheduled_week_percent`` der Spielwoche (50 = Wochenmitte) an die Captains, spätestens
+  ``unscheduled_hours_before_default`` Stunden vor dem Standardtermin (liegt er früher in der Woche).
 - ``result_missing``: Ergebnis fehlt - der Zeitpunkt steht in den Terminregeln (``result_reminder_hours``).
 - ``veto_turn``: Map-Veto wartet - nach ``veto_idle_seconds`` ohne Zug, nie in den letzten ``veto_min_left_seconds``.
 - ``discord``: zusätzlich als Direktnachricht vom Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben.
@@ -25,6 +26,7 @@ NUMBERS: dict[str, tuple[int, int, str]] = {
     "upcoming_early_hours": (2, 72, "Die erste Erinnerung vor dem Spiel (Stunden)"),
     "upcoming_late_minutes": (30, 720, "Die zweite Erinnerung vor dem Spiel (Minuten)"),
     "unscheduled_week_percent": (10, 90, "Der Zeitpunkt „Termin offen“ in der Spielwoche"),
+    "unscheduled_hours_before_default": (1, 168, "„Termin offen“ spätestens vor dem Standardtermin (Stunden)"),
     "veto_idle_seconds": (5, 300, "„Map-Veto wartet“ nach Sekunden ohne Zug"),
     "veto_min_left_seconds": (0, 120, "„Map-Veto wartet“ nicht mehr in den letzten Sekunden"),
 }

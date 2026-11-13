@@ -32,6 +32,7 @@ class ReminderRulesBody(BaseModel):
     upcoming_late_minutes: Optional[int] = None
     unscheduled: Optional[bool] = None
     unscheduled_week_percent: Optional[int] = None
+    unscheduled_hours_before_default: Optional[int] = None
     result_missing: Optional[bool] = None
     veto_turn: Optional[bool] = None
     veto_idle_seconds: Optional[int] = None
