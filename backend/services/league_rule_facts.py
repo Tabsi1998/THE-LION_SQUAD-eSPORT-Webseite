@@ -12,7 +12,7 @@ from datetime import date
 
 from models import normalize_rule, rule_time_limit_seconds
 from services import game_maps, game_modes, league_platform, league_veto_rules, map_pools, mode_icons
-from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS, ScheduleProblem, normalize as normalize_schedule
+from services.league_schedule import DEFAULTS as SCHEDULE_DEFAULTS, ScheduleProblem, home_rule_name, normalize as normalize_schedule
 from services.markdown_text import text_cell
 from services.scoring_rules import division_rules, normalize_rules
 
@@ -426,9 +426,10 @@ def render_schedule(data: dict, variant: str = MARKDOWN) -> str:
     rules = data.get("rules")
     if rules:
         if rules.get("home_rule"):
-            lines.append(f"- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach {hours(rules.get('home_rule_hours'))}.")
+            lines.append(f"- {home_rule_name(rules.get('home_rule_hours'))}: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach "
+                         f"{hours(rules.get('home_rule_hours') or SCHEDULE_DEFAULTS['home_rule_hours'])}.")
         else:
-            lines.append("- 72-h-Regel: aus - ohne Einigung gilt der Standardtermin.")
+            lines.append(f"- {home_rule_name(rules.get('home_rule_hours'))}: aus - ohne Einigung gilt der Standardtermin.")
         if int(rules.get("reschedule_max") or 0) > 0:
             where = "in derselben Spielwoche" if rules.get("reschedule_same_week") else "auch in einer anderen Spielwoche"
             lines.append(f"- Verschiebung: höchstens {rules['reschedule_max']} je Spiel durch die Teams, Antrag spätestens "
