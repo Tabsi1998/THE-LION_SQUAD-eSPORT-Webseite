@@ -471,11 +471,11 @@ function useRouteFade(pathname) {
   // Blendet der Browser selbst über (#1073, lib/viewTransition), blendet der Inhalt nicht noch einmal ein.
   const [name, setName] = useState(() => (pageShown && !transitionPending() ? "a" : ""));
   const previous = useRef(pathname);
+  // Nur beim ersten Aufbau (mit dem Pfad, mit dem die Seite kam) - danach zählt der Wechsel unten.
+  const firstPath = useRef(pathname);
   useEffect(() => {
     pageShown = true;
-    takeTransitionShown(pathname);
-    // Nur beim ersten Aufbau - danach zählt der Wechsel unten.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    takeTransitionShown(firstPath.current);
   }, []);
   useEffect(() => {
     if (previous.current === pathname) return;

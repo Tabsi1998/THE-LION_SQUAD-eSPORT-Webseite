@@ -22,7 +22,13 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
   const [draft, setDraft] = useState(() => valuesOf(terms));
   const savedLang = terms?.pdf_lang ?? DEFAULT_LANG;
   const [lang, setLang] = useState(savedLang);
-  useEffect(() => { setDraft(valuesOf(terms)); }, [terms?.payment_term_id, terms?.payment_mode_id, terms?.bank_account_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Nur geänderte Werte setzen den Entwurf zurück - `terms` kommt bei jedem Laden als neues Objekt (#937).
+  const termId = terms?.payment_term_id;
+  const modeId = terms?.payment_mode_id;
+  const accountId = terms?.bank_account_id;
+  useEffect(() => {
+    setDraft(valuesOf({ payment_term_id: termId, payment_mode_id: modeId, bank_account_id: accountId }));
+  }, [termId, modeId, accountId]);
   useEffect(() => { setLang(savedLang); }, [savedLang]);
   useEffect(() => {
     if (!connected) { setOptions(null); return; }

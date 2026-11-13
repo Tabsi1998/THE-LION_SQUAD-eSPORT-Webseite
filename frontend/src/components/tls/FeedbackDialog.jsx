@@ -22,9 +22,12 @@ export function FeedbackDialog({ target, onClose, onDone }) {
   const { submitting, submitOnce } = useSubmissionGuard();
   const dialogRef = useModalBehavior(Boolean(target), onClose);
   const parsed = parseFeedbackTarget(target);
+  // Nur Art und Kennung zählen - `parsed` ist bei jeder Darstellung ein neues Objekt (#937).
+  const kind = parsed?.kind;
+  const targetId = parsed?.id;
 
   useEffect(() => {
-    if (!parsed) return undefined;
+    if (!kind) return undefined;
     let alive = true;
     setPrompt(null);
     setMissing(false);
@@ -34,14 +37,14 @@ export function FeedbackDialog({ target, onClose, onDone }) {
     setError("");
     api.get("/feedback/open").then(({ data }) => {
       if (!alive) return;
-      const item = (data?.items || []).find((row) => row.kind === parsed.kind && row.target_id === parsed.id);
+      const item = (data?.items || []).find((row) => row.kind === kind && row.target_id === targetId);
       setTags(Array.isArray(data?.tags) ? data.tags : []);
       setTextMax(Number(data?.text_max) || 280);
       if (item) setPrompt(item);
       else setMissing(true);
     }).catch(() => { if (alive) setMissing(true); });
     return () => { alive = false; };
-  }, [parsed?.kind, parsed?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [kind, targetId]);
 
   if (!parsed) return null;
 
