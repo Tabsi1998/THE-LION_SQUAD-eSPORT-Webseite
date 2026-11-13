@@ -179,11 +179,22 @@ async def sync_league_reward_prizes(db, tournament: dict, wanted: list[dict]) ->
     tid = tournament["id"]
     stamp = now_utc().isoformat()
     keys = {prize["reward_key"] for prize in wanted}
-    created = 0
+    created = moved = 0
     for prize in wanted:
         existing = await db.prize_pickups.find_one({"tournament_id": tid, "source_type": LEAGUE_REWARD, "reward_key": prize["reward_key"]},
-                                                   {"_id": 0, "id": 1})
+                                                   {"_id": 0})
         if existing:
+            place = int(prize.get("place") or 0)
+            if int(existing.get("place") or 0) != place:
+                # Derselbe Gewinn auf einem anderen Platz (neuer Abschluss): nachziehen, solange er nicht abgeholt ist - sonst prüfen lassen.
+                if existing.get("status") == "picked_up":
+                    await db.prize_pickups.update_one({"id": existing["id"]}, {"$set": {
+                        "needs_review": True, "updated_at": stamp,
+                        "review_note": f"Nach einem neuen Abschluss jetzt {prize.get('place_label') or place_phrase(None, place)} - schon abgeholt, bitte prüfen."}})
+                else:
+                    await db.prize_pickups.update_one({"id": existing["id"]}, {"$set": {
+                        "place": place, "place_label": prize.get("place_label") or "", "updated_at": stamp}})
+                    moved += 1
             continue
         doc = {
             "id": new_id(), "tournament_id": tid, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
@@ -212,6 +223,9 @@ async def sync_league_reward_prizes(db, tournament: dict, wanted: list[dict]) ->
                 logger.warning("[prizes] notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
     review = 0
     async for pickup in db.prize_pickups.find({"tournament_id": tid, "source_type": LEAGUE_REWARD}, {"_id": 0}):
+        if pickup.get("reward_key") in keys and pickup.get("needs_review") and pickup.get("status") == "picked_up":
+            review += 1
+            continue  # abgeholt und verrutscht - bleibt zur Prüfung markiert
         stale = pickup.get("reward_key") not in keys
         review += int(stale)
         if stale != bool(pickup.get("needs_review")):
@@ -220,7 +234,7 @@ async def sync_league_reward_prizes(db, tournament: dict, wanted: list[dict]) ->
                 "review_note": "Nach einem neuen Abschluss der Staffel nicht mehr bei dieser Belohnung - bitte prüfen." if stale else None,
                 "updated_at": stamp,
             }})
-    return {"created": created, "needs_review": review}
+    return {"created": created, "moved": moved, "needs_review": review}
 
 
 async def prize_recipient_ids(db, pickup: dict) -> list[str]:
