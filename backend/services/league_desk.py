@@ -670,8 +670,10 @@ async def _deliver(db, *, season_id: str, claim: str, sender_id: str | None, tit
         key = f"{claim}:{user_id}"
         try:
             done = await create_user_notification(user_id, f"{heading}: {title}", text, url=path, kind="league_broadcast",
+                                                  # ``unique_dedupe``: Teilindex je Person und Schlüssel - läuft ein Fortsetzen
+                                                  # parallel, verliert es beim Eintragen und schickt weder Push noch Direktnachricht.
                                                   meta={"category": "tournament_updates", "season_id": season_id, "dedupe_key": key,
-                                                        "reason": "league_broadcast"})
+                                                        "unique_dedupe": True, "reason": "league_broadcast"})
             await progress(delivered=1 if done else 0)
         except Exception:  # noqa: BLE001 - eine Person, bei der es klemmt, hält die anderen nicht auf
             logger.warning("[league_desk] Rundnachricht %s nicht zugestellt", log_safe(claim), exc_info=True)

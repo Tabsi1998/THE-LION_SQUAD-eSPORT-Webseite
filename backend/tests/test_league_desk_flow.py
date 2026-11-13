@@ -571,6 +571,49 @@ async def test_broadcast_mail_follows_the_tournament_updates_setting_and_counts_
 
 
 @pytest.mark.asyncio
+async def test_a_parallel_delivery_loses_on_the_unique_key_and_sends_no_push(flow, monkeypatch):
+    """N-a: Die Rundnachricht trägt ``unique_dedupe``. Hat ein paralleler Lauf die Zeile schon geschrieben (nachgestellt: die Prüfung
+    sieht sie nicht), verliert dieser Lauf am Teilindex und schickt weder Push noch Direktnachricht."""
+    import database
+    from services import discord_dm, push_notifications
+
+    if not flow.real_mongo:
+        await database.init_audit_indexes(flow.db)
+    world = await desk_world(flow)
+    request_id = new_id()
+    captain = world["users"]["Kapitaen"]["id"]
+    key = f"league-broadcast:{world['season_id']}:{request_id}:{captain}"
+    await flow.db.notifications.insert_one({"id": new_id(), "user_id": captain, "kind": "league_broadcast", "unique_dedupe_key": key,
+                                            "meta": {"dedupe_key": key}})
+    cls = type(flow.db.notifications)
+    original_find = cls.find_one
+
+    async def blind(self, query=None, *args, **kwargs):
+        # Der andere Lauf hat noch nicht geschrieben, als dieser prüfte - gleich, ob nach Schlüssel oder ``meta.dedupe_key`` gefragt wird.
+        if self.name == "notifications" and isinstance(query, dict) and ({"unique_dedupe_key", "meta.dedupe_key"} & set(query)):
+            return None
+        return await original_find(self, query, *args, **kwargs)
+
+    pushed, dms = [], []
+
+    async def fake_push(notification):
+        pushed.append(notification["user_id"])
+        return 1
+
+    async def fake_dm(notification, category=None):
+        dms.append(notification["user_id"])
+        return 1
+
+    monkeypatch.setattr(cls, "find_one", blind)
+    monkeypatch.setattr(push_notifications, "send_mobile_push_for_notification", fake_push)
+    monkeypatch.setattr(discord_dm, "send_discord_dm_for_notification", fake_dm)
+    assert (await send(flow, world, request_id=request_id)).status_code == 200
+    assert await flow.db.notifications.count_documents({"user_id": captain, "kind": "league_broadcast"}) == 1
+    assert captain not in pushed and captain not in dms
+    assert pushed == [world["users"]["Falke1"]["id"]], "Gegenprobe: der andere Captain bekommt seinen Push"
+
+
+@pytest.mark.asyncio
 async def test_a_failing_delivery_is_marked_stale_and_can_be_continued_without_doubles(flow, monkeypatch):
     """M-1: Wirft der Versand im Hintergrund, steht der Eintrag nicht still auf „sending“: Der Stand sagt ``stale``, das Protokoll
     „hängt“, und derselbe Aufruf setzt fort - am Ende ``sent``, niemand bekommt die Nachricht zweimal."""
