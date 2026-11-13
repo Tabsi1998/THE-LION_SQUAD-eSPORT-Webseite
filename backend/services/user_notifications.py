@@ -8,7 +8,9 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from models import new_id, now_utc
-from services.notification_preferences import NOTIFICATION_KIND_CATEGORY, discord_allowed, notification_allowed, push_allowed
+from services.notification_preferences import (
+    NOTIFICATION_KIND_CATEGORY, browser_allowed, discord_allowed, notification_allowed, push_allowed,
+)
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.notifications")
@@ -55,7 +57,9 @@ async def achievement_push_capped(db, user_id: str, kind: str, now=None) -> bool
         return False
     sent = await db.notifications.count_documents({
         "user_id": user_id, "kind": {"$in": list(ACHIEVEMENT_PUSH_KINDS)},
-        "created_at": {"$gte": vienna_day_start(now)}, "push_sent_count": {"$gt": 0},
+        "created_at": {"$gte": vienna_day_start(now)},
+        # App oder Browser (#1163): beides zählt als Push.
+        "$or": [{"push_sent_count": {"$gt": 0}}, {"browser_sent_count": {"$gt": 0}}],
     })
     return sent >= ACHIEVEMENT_PUSH_DAILY_CAP
 
@@ -94,9 +98,11 @@ async def create_user_notification(
     # `in_app_only`: nur ins Postfach - etwa eine Rücknahme (#622), die niemand per Push erfahren soll.
     in_app_only = bool((meta or {}).get("in_app_only"))
     push_channel_allowed = push_allowed(user, kind, category) and not in_app_only
+    # Browser-Benachrichtigungen (#1163): wie der App-Push, mit eigenem Kanal „Browser“.
+    browser_channel_allowed = browser_allowed(user, kind, category) and not in_app_only
     # `no_discord`: Postfach und Push, aber keine Direktnachricht - etwa die Sammel-Nachricht der Neuberechnung (#2340).
     discord_channel_allowed = discord_allowed(user, kind, category) and not in_app_only and not (meta or {}).get("no_discord")
-    if not in_app_allowed and not push_channel_allowed and not discord_channel_allowed:
+    if not in_app_allowed and not push_channel_allowed and not browser_channel_allowed and not discord_channel_allowed:
         return None
     meta = meta or {}
     dedupe_key = meta.get("dedupe_key")
@@ -159,10 +165,18 @@ async def create_user_notification(
         # Only the recipient hears about it, and only that something is new.
         from services.change_events import publish_user_change
         await publish_user_change([user_id], "notifications")
+    # Die Tagesgrenze der Erfolgs-Pushes (#622) gilt für App und Browser zusammen.
+    capped = False
+    if push_channel_allowed or browser_channel_allowed:
+        try:
+            capped = await achievement_push_capped(db, user_id, kind)
+        except Exception:
+            capped = False
+    if capped:
+        push_channel_allowed = False
+        browser_channel_allowed = False
     try:
         push_sent_count = 0
-        if push_channel_allowed and await achievement_push_capped(db, user_id, kind):
-            push_channel_allowed = False
         if push_channel_allowed:
             from services.push_notifications import send_mobile_push_for_notification
             push_sent_count = await send_mobile_push_for_notification(doc)
@@ -174,6 +188,17 @@ async def create_user_notification(
         )
     except Exception:
         logger.warning("[push] Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
+    try:
+        browser_sent = 0
+        if browser_channel_allowed:
+            from services.web_push import send_web_push_for_notification
+            browser_sent = await send_web_push_for_notification(doc)
+        doc["browser_sent_count"] = browser_sent
+        if browser_sent:
+            await db.notifications.update_one({"id": doc["id"]}, {"$set": {"browser_sent_count": browser_sent}})
+    except Exception:
+        logger.warning("[web-push] Browser-Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
+        doc.setdefault("browser_sent_count", 0)
     # Discord als persönlicher Kanal (#567): Direktnachricht vom Bot - nur mit Opt-in und verknüpftem Konto.
     try:
         discord_sent = 0
