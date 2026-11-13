@@ -2,14 +2,14 @@
 // Liga N mit ihren Staffeln. Reine Anzeige aus GET /api/leagues/<liga>/<season> - Helfer in lib/leagueSeasonPage.js.
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Ban, CalendarClock, ChevronDown, Coffee, FileText, Gamepad2, ListOrdered, ScrollText, Swords, Timer } from "lucide-react";
+import { Ban, CalendarClock, ChevronDown, Coffee, FileText, Gamepad2, ScrollText, Swords, Timer } from "lucide-react";
 import { API } from "@/lib/api";
 import { ModeIcon } from "@/components/tls/ModeIcon";
 import { StaggerIn } from "@/components/tls/motion";
 import { LoadoutBansView, EquipmentThumb } from "@/components/tls/league/LoadoutBansView";
 import { LeaguePrizes } from "@/components/tls/league/public/LeagueLook";
 import { StaffelPanel } from "@/components/tls/league/public/StaffelPanel";
-import { blockedLines, defaultSlot, seasonPeriod, weekSpan } from "@/lib/leaguePage";
+import { blockedLines, seasonPeriod, weekSpan } from "@/lib/leaguePage";
 import { platformLines } from "@/lib/leaguePlatform";
 import { formatFacts, mapOrder, nextSteps, playModes, pointsLines, scheduleLines, weeksText } from "@/lib/leagueSeasonPage";
 import { publicGroups } from "@/lib/loadoutBans";
@@ -94,17 +94,15 @@ function Fact({ icon: Icon, label, children, testId }) {
   );
 }
 
-/** Kopf-Fakten unter dem Titel: Zeitraum, Spielwoche, Punkte, Pausen - wie bisher, mit Spielwochen. */
+/** Kopf-Fakten unter dem Titel: nur, was sonst nirgends steht (#2268, jede Angabe an einer Stelle) - Zeitraum, Spielwochen, Pausen.
+ *  Best of und Teamgröße stehen in „Was gespielt wird“, Standardtermin und Punkte im „Ablauf“. */
 export function SeasonHeadFacts({ season }) {
   const blocked = blockedLines(season);
   return (
-    <dl className="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4" data-testid="league-facts">
-      <Fact icon={CalendarClock} label="Zeitraum" testId="league-fact-period">
-        {seasonPeriod(season)}{weeksText(season) ? <span className="block text-white/55">{weeksText(season)}</span> : null}
-      </Fact>
-      <Fact icon={Timer} label={weekSpan(season)} testId="league-fact-week">Ohne Einigung: {defaultSlot(season)}</Fact>
-      <Fact icon={ListOrdered} label="Punkte" testId="league-fact-points">
-        {pointsLines(season)[0]} · Best of {season.best_of} · {season.team_size} gegen {season.team_size}
+    <dl className="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-3" data-testid="league-facts">
+      <Fact icon={CalendarClock} label="Zeitraum" testId="league-fact-period">{seasonPeriod(season)}</Fact>
+      <Fact icon={Timer} label="Spielwochen" testId="league-fact-week">
+        {weeksText(season) || "–"}<span className="block text-white/55">{weekSpan(season)}</span>
       </Fact>
       <Fact icon={Coffee} label="Pausen" testId="league-fact-breaks">
         {blocked.length ? blocked.map((row) => <span key={row.key} className="block">{row.label} {row.range}</span>) : "keine"}

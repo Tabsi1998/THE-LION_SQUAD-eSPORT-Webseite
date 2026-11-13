@@ -66,13 +66,18 @@ function renderPage(path = "/liga/probe-liga/season-1") {
   );
 }
 
-test("Kopf mit Zeitraum, Spielwoche, Punkten und Pausen", async () => {
+test("Kopf mit Zeitraum, Spielwochen und Pausen - Best of, Standardtermin und Punkte nur an ihrer einen Stelle (#2268)", async () => {
   renderPage();
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Probe-Liga Season 1");
   expect(screen.getByTestId("league-fact-period")).toHaveTextContent("10.11.2026 – 18.1.2027");
+  expect(screen.getByTestId("league-fact-week")).toHaveTextContent("10 Spielwochen");
   expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Spielwoche Di–Mo");
-  expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Sonntag, 20:00 Uhr");
-  expect(screen.getByTestId("league-fact-points")).toHaveTextContent("3 / 1 / 0");
+  // Jede Angabe an einer Stelle: nicht im Kopf, sondern in „Was gespielt wird“ bzw. „Ablauf“.
+  expect(screen.queryByTestId("league-fact-points")).toBeNull();
+  expect(screen.getByTestId("league-facts")).not.toHaveTextContent("Best of");
+  expect(screen.getByTestId("league-facts")).not.toHaveTextContent("20:00");
+  expect(screen.getByTestId("season-points")).toHaveTextContent("3 / 1 / 0");
+  expect(screen.getByTestId("season-flow-default")).toHaveTextContent("Sonntag, 20:00 Uhr");
   expect(screen.getByTestId("league-fact-breaks")).toHaveTextContent("Weihnachtspause 21.12.–3.1.");
   expect(screen.getByTestId("league-rules")).toHaveTextContent("Kein Cheaten");
   expect(screen.getByTestId("league-map-pool")).toHaveTextContent("Hafenkante");
