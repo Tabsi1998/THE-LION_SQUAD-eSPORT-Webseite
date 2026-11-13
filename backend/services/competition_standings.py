@@ -626,7 +626,9 @@ def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: 
             if not decision:
                 return resolve(group, index + 1)
             order = {registration_id: position for position, registration_id in enumerate(decision["registration_ids"])}
-            info = {"id": decision.get("id"), "reason": decision.get("reason"), "decided_at": decision.get("decided_at")}
+            info = {"id": decision.get("id"), "reason": decision.get("reason"), "decided_at": decision.get("decided_at"),
+                    # Wie entschieden wurde (F.1, Nr. 156) - nur wenn die Leitung es angegeben hat.
+                    **({"method": decision["method"]} if decision.get("method") else {})}
             for row in group:
                 row["tiebreak"] = "lead_decision"
                 row["lead_decision"] = info

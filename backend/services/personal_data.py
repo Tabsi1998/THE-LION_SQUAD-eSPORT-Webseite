@@ -261,6 +261,9 @@ CLUB_CONTENT = frozenset({
     "game_equipment", "game_equipment_categories", "loadout_bans", "loadout_allowed",
     # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
     "leagues", "league_seasons", "league_divisions", "league_rules",
+    # Saisonabschluss (F.1, #1645): der eingefrorene Endstand je Staffel - Teamnamen, Plätze, Punkte; nur die Kennung, wer
+    # abgeschlossen bzw. wieder geöffnet hat.
+    "league_final_tables",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",

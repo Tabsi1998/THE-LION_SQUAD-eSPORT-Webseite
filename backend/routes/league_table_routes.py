@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from models import new_id, now_utc
 from services import checkin_rules, league_permissions, league_procedures
-from services import league_table
+from services import league_final, league_table
 from services.change_events import publish_api_change
 from services.league_scope import ONLY_LEAGUE
 from services.league_permissions import ANY, require_league
@@ -32,6 +32,8 @@ class TableDecisionBody(BaseModel):
     registration_ids: list[str] = Field(max_length=32)
     reason: str = Field(max_length=500)
     conflict_reason: str | None = Field(default=None, max_length=500)
+    # Wie entschieden wurde (F.1, Nr. 156): ``playoff``, ``lot`` oder ``lead``.
+    method: str | None = Field(default=None, max_length=20)
 
 
 class TableReasonBody(BaseModel):
@@ -59,7 +61,11 @@ async def _staffel(db, tournament_id: str) -> dict:
 
     if not await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 1}):
         raise HTTPException(status_code=404, detail="Staffel nicht gefunden.")
-    return await _ensure_tournament_unlocked(db, tournament_id)
+    tournament = await _ensure_tournament_unlocked(db, tournament_id)
+    # Abgeschlossen (F.1, #1645): Der Endstand steht - korrigiert wird erst nach dem Wiederöffnen.
+    if league_final.is_closed(tournament):
+        raise HTTPException(status_code=409, detail=league_final.CLOSED_LOCK)
+    return tournament
 
 
 @admin_router.get("/{tournament_id}/table")
@@ -86,7 +92,8 @@ async def admin_set_table_decision(tournament_id: str, body: TableDecisionBody,
             overrides = [await league_permissions.require_no_side_conflict(db, me, registration,
                                                                            conflict_reason=body.conflict_reason)
                          for registration in registrations]
-            decision = await league_table.set_decision(db, tournament, body.registration_ids, reason, me["id"])
+            decision = await league_table.set_decision(db, tournament, body.registration_ids, reason, me["id"],
+                                                       method=body.method)
     except league_table.TableProblem as problem:
         raise _refuse(problem) from None
     except MutationLockBusy:
@@ -96,7 +103,8 @@ async def admin_set_table_decision(tournament_id: str, body: TableDecisionBody,
         await league_permissions.record_override(db, me, action="table_decision", target_id=tournament_id,
                                                  reason=override_reason, decision_id=decision["id"])
     await _audit(db, "league.table.decision", me, tournament_id, {
-        "decision_id": decision["id"], "registration_ids": decision["registration_ids"], "reason": reason})
+        "decision_id": decision["id"], "registration_ids": decision["registration_ids"], "reason": reason,
+        **({"method": decision["method"]} if decision.get("method") else {})})
     await publish_api_change("PUT", f"/api/tournaments/{tournament_id}/standings", 200)
     return decision
 
