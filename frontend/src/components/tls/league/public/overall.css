@@ -37,7 +37,7 @@
 .tls-overall-cell[data-counted="false"] { color: rgb(255 255 255 / 0.38); text-decoration: line-through; text-decoration-thickness: 1px; }
 .tls-overall-cell[data-played="false"] { color: rgb(255 255 255 / 0.25); }
 .tls-overall-cell__crown { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.2rem; vertical-align: -1px; color: var(--tls-honor); }
-.tls-overall-name { min-width: 0; color: #fff; font-weight: 600; overflow-wrap: anywhere; }
+.tls-overall-name { min-width: 0; color: #fff; font-weight: 600; overflow-wrap: anywhere; hyphens: auto; }
 .tls-overall-name a { color: inherit; }
 .tls-overall-name a:hover { color: var(--tls-cyan); }
 .tls-overall-more {
@@ -49,7 +49,7 @@
 .tls-overall-more:focus-visible { outline: 2px solid var(--tls-cyan); outline-offset: 1px; }
 .tls-overall-detail td { padding-top: 0; }
 .tls-overall-detail dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 1rem; font-size: 0.8125rem; }
-.tls-overall-detail dt { color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; }
+.tls-overall-detail dt { color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; hyphens: auto; }
 .tls-overall-detail dd { text-align: right; color: #fff; }
 .tls-overall-detail dd[data-counted="false"] { color: rgb(255 255 255 / 0.4); text-decoration: line-through; }
 

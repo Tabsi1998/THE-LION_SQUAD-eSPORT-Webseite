@@ -128,7 +128,7 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
     <section className="mt-8" aria-labelledby={`${testId}-head`} data-testid={testId}>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-3">
         <div className="min-w-0">
-          <h2 id={`${testId}-head`} className="font-heading text-2xl font-black uppercase [overflow-wrap:anywhere] md:text-3xl">{block.label}</h2>
+          <h2 id={`${testId}-head`} className="font-heading text-2xl font-black uppercase [overflow-wrap:anywhere] hyphens-auto md:text-3xl">{block.label}</h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-white/60" data-testid={`${testId}-state`}>
             {block.closed ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
             {stateLine(block, (value) => viennaDate(value, LONG_DAY))}
@@ -144,7 +144,7 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
       </div>
       {block.closed && leader.length === 1 ? (
         <p className="tls-league-champion mt-4" data-testid={`${testId}-winner`}>
-          <Crown className="h-4 w-4 shrink-0" aria-hidden="true" /> Gesamtsieger <span className="min-w-0 text-white [overflow-wrap:anywhere]">{leader[0].name}</span>
+          <Crown className="h-4 w-4 shrink-0" aria-hidden="true" /> Gesamtsieger <span className="min-w-0 text-white [overflow-wrap:anywhere] hyphens-auto">{leader[0].name}</span>
         </p>
       ) : null}
       <StandingTable block={block} kind={kind} columns={columns} testId={`${testId}-${kind}-table`} />

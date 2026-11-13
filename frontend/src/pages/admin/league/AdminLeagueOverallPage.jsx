@@ -273,7 +273,7 @@ function Preview({ block, seasons, kind, testId }) {
           {rows.map((row, index) => (
             <tr key={row.key || index} className="border-t border-white/5">
               <td className="py-2 pl-3 pr-1 font-bold text-white">{row.place}.</td>
-              <td className="px-2 py-2 text-white [overflow-wrap:anywhere]">
+              <td className="px-2 py-2 text-white [overflow-wrap:anywhere] hyphens-auto">
                 {row.name}{row.tie ? <span className="ml-2 text-[10px] font-bold uppercase text-warn">gleich</span> : null}
                 {row.lead_decision ? <span className="block text-[11px] text-white/50">{row.lead_decision.method_label}: {row.lead_decision.reason}</span> : null}
               </td>

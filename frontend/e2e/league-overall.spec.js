@@ -108,6 +108,8 @@ test.describe("Liga: Gesamtwertung über Seasons", () => {
       await expect(table.locator('[data-counted="false"]').first()).toHaveAttribute("title", /Streichergebnis/);
       await expect(page.getByTestId("overall-1-rules")).toContainText("Es zählen die besten 2 Seasons.");
       await expect(page.getByTestId("league-rewards-gesamt-1")).toContainText("Gesamtsieger 2027");
+      // Lange Namen trennen mit Silbentrennung - „anywhere“ bricht nur noch, wenn ein Wort sonst nicht passt.
+      expect(await table.locator(".tls-overall-name").nth(2).evaluate((node) => getComputedStyle(node).hyphens)).toBe("auto");
       if (width === 390) {
         // Am Handy stehen die Seasons im Aufklappen.
         await expect(table.locator("th", { hasText: "Season 1" })).toBeHidden();

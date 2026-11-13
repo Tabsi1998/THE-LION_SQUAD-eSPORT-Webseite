@@ -17,10 +17,10 @@ export function LeagueOverallStanding({ rows, showTeam = false, testId = "league
           return (
             <li key={`${title}-${row.level}-${row.name || ""}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3" data-testid={`${testId}-${row.level}`}>
               <div className="min-w-0 flex-1 basis-56">
-                <p className="font-semibold text-white [overflow-wrap:anywhere]">
+                <p className="font-semibold text-white [overflow-wrap:anywhere] hyphens-auto">
                   {row.url ? <Link to={row.url} className="hover:text-[#29B6E8]">{title}</Link> : title}
                 </p>
-                <p className="text-xs text-white/60 [overflow-wrap:anywhere]">
+                <p className="text-xs text-white/60 [overflow-wrap:anywhere] hyphens-auto">
                   {[row.division_label, showTeam ? row.name : "", row.closed ? "Endstand" : "laufend"].filter(Boolean).join(" · ")}
                 </p>
               </div>
