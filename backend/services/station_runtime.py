@@ -128,6 +128,50 @@ async def notify_match_started(db, match: dict, station: dict, collection_name: 
     return sent
 
 
+async def held_calls(db, match_ids) -> list[tuple[dict, dict]]:
+    """Die Aufrufe unter diesen Spielen, die eine Station gerade hält - vor dem Löschen gelesen, damit die Spieler danach
+    „Aufruf zurückgenommen“ bekommen (#1162)."""
+    ids = [match_id for match_id in match_ids or [] if match_id]
+    if not ids:
+        return []
+    stations = await db.stations.find({"current_match_id": {"$in": ids}}, {"_id": 0}).to_list(500)
+    by_match = {station["current_match_id"]: station for station in stations}
+    if not by_match:
+        return []
+    matches = await db.matches_v2.find(
+        {"id": {"$in": sorted(by_match)}, "called_at": {"$nin": [None, ""]}, "started_at": {"$in": [None, ""]}},
+        {"_id": 0}).to_list(500)
+    return [(match, by_match[match["id"]]) for match in matches]
+
+
+async def tell_withdrawn_calls(db, calls: list[tuple[dict, dict]]) -> int:
+    """„Aufruf zurückgenommen“ an die Spieler der gelöschten Aufrufe - eine Störung hält das Löschen nicht auf."""
+    from services.match_calls import notify_call_withdrawn
+
+    sent = 0
+    for match, station in calls:
+        try:
+            sent += await notify_call_withdrawn(db, match, station, match["called_at"])
+        except Exception as exc:  # noqa: BLE001 - die Nachricht ist Beiwerk, das Löschen ist geschehen
+            logger.warning("[stations] Aufruf-Rücknahme für %s nicht verschickt type=%s", log_safe(match.get("id")), type(exc).__name__)
+    return sent
+
+
+async def free_stations_of_deleted_matches(db, match_ids) -> int:
+    """Spiele werden gelöscht (Phase löschen oder neu bauen, #1162): Stationen, die eines davon halten, werden frei -
+    sonst hängen sie als „belegt“ ohne Spiel. Eine defekte Station bleibt defekt."""
+    ids = [match_id for match_id in match_ids or [] if match_id]
+    if not ids:
+        return 0
+    now = now_utc().isoformat()
+    held = {"current_match_id": {"$in": ids}}
+    cleared = {"current_match_id": None, "current_match_type": None, "updated_at": now}
+    freed = await db.stations.update_many({**held, "status": {"$ne": "broken"}},
+                                          {"$set": {**cleared, "status": "free"}, "$unset": {"called_at": ""}})
+    kept = await db.stations.update_many({**held, "status": "broken"}, {"$set": cleared, "$unset": {"called_at": ""}})
+    return int(freed.modified_count or 0) + int(kept.modified_count or 0)
+
+
 async def release_station_for_match(db, match: dict, collection_name: str) -> bool:
     # Mit dem Ergebnis ist auch ein Aufruf vorbei (#1122) - auch wenn das Spiel nie gestartet wurde.
     if match.get("id") and match.get("called_at"):

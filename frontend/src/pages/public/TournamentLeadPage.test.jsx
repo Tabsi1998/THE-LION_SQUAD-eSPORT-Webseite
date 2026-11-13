@@ -88,7 +88,7 @@ test("„Nicht erschienen“ im Lauf (#1823): die Rückmeldung sagt, dass der La
   await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Kampflos gewertet – beide Seiten bekommen Bescheid."));
 });
 
-test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Gestartet“ gehen über den Server", async () => {
+test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Starten“ gehen über den Server", async () => {
   apiMock.post.mockResolvedValue({ data: { ok: true } });
   const next = { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, forecast_at: "2026-10-31T16:40:00Z" };
   const queue = {
@@ -106,6 +106,81 @@ test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ u
   await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
   fireEvent.click(await screen.findByTestId("live-call-st2"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/call", { station_id: "st2", match_id: "QF2" }));
+});
+
+// Stationen (#1162): Freigeben, Defekt und Umlegen gehen über die schmalen Wege der Warteschlange; ?reiter=stationen
+// öffnet den Reiter direkt (Link aus /admin/stations). Nach „Defekt“ sagt die Rückmeldung, was mit dem Spiel passiert.
+test("Stationen (#1162): Freigeben, Defekt und Umlegen - mit Hinweis auf „Umlegen“ nach „Defekt“", async () => {
+  const { toast } = await import("sonner");
+  const running = { match_id: "QF1", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "running", position: 0, started_at: "2026-10-31T16:00:00Z", duration_minutes: 30 };
+  const queue = {
+    applies: true, summary: null, operate: { all: true, station_ids: [] },
+    stations: [
+      { id: "st1", name: "1", station_text: "Station 1", status: "busy", waiting: 0, running, next: null, after: null },
+      { id: "st2", name: "2", station_text: "Station 2", status: "free", waiting: 0, running: null, next: null, after: null },
+    ],
+  };
+  const lead = { tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: [ENTRY], recent: [], attention: [{ id: "x", kind: "result_missing", match_id: "m8", title: "Ergebnis fehlt" }], stations: [], counts: { open: 1 } };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  apiMock.post.mockReset();
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung?reiter=stationen"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  // Trotz offener Fälle: der Link öffnet die Stationen.
+  await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
+
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, idempotent_replay: false, holds: { match_id: "QF1", state: "running" } } });
+  fireEvent.click(await screen.findByTestId("live-broken-st1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/broken", { station_id: "st1", broken: true }));
+  await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Station 1 ist als defekt gemeldet. Das laufende Spiel steht noch dort – mit „Umlegen“ auf eine freie Station."));
+
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, idempotent_replay: false, state: "running", to: "Station 2" } });
+  fireEvent.click(screen.getByTestId("live-move-st1"));
+  fireEvent.click(await screen.findByTestId("live-move-to-st1-st2"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/move", { station_id: "st1", match_id: "QF1", to_station_id: "st2" }));
+  await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Von Station 1 an Station 2 umgelegt – die Uhr läuft weiter."));
+
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, idempotent_replay: false, state: "running" } });
+  fireEvent.click(await screen.findByTestId("live-release-st1"));
+  fireEvent.click(await screen.findByTestId("live-release-yes-st1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/release", { station_id: "st1", match_id: "QF1" }));
+  await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Station 1 ist frei – das Ergebnis trägst du unter „Ergebnisse“ ein."));
+
+  // Zwei Leitungen zugleich: die zweite bekommt die Meldung des Servers.
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Die Zielstation ist inzwischen belegt. Bitte neu laden." } } });
+  fireEvent.click(screen.getByTestId("live-move-st1"));
+  fireEvent.click(await screen.findByTestId("live-move-to-st1-st2"));
+  await waitFor(() => expect(toast.error).toHaveBeenLastCalledWith("Die Zielstation ist inzwischen belegt. Bitte neu laden."));
+});
+
+test("„Alle freien Stationen aufrufen“ (#1162): nacheinander über den Aufruf-Weg, Absagen in der Rückmeldung", async () => {
+  const { toast } = await import("sonner");
+  const next = (id) => ({ match_id: id, label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, forecast_at: "2026-10-31T16:40:00Z" });
+  const queue = {
+    applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {},
+    stations: [
+      { id: "st1", name: "1", station_text: "Station 1", status: "free", waiting: 1, running: null, next: next("QF1"), after: null },
+      { id: "st2", name: "2", station_text: "Station 2", status: "free", waiting: 1, running: null, next: next("QF2"), after: null },
+    ],
+  };
+  const lead = { tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true } }).mockRejectedValueOnce({ response: { status: 409, data: { detail: "Das Spiel ist schon an Station 3 aufgerufen." } } });
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung?reiter=stationen"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByTestId("live-call-all"));
+  fireEvent.click(await screen.findByTestId("live-call-all-yes"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
+  expect(apiMock.post).toHaveBeenNthCalledWith(1, "/tournaments/fc-cup/live-queue/call", { station_id: "st1", match_id: "QF1" });
+  expect(apiMock.post).toHaveBeenNthCalledWith(2, "/tournaments/fc-cup/live-queue/call", { station_id: "st2", match_id: "QF2" });
+  await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("1 Station aufgerufen – die Spieler bekommen Bescheid."));
+  expect(toast.error).toHaveBeenLastCalledWith("Station 2: Das Spiel ist schon an Station 3 aufgerufen.");
 });
 
 // Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit Topf, Restzeit bis zum automatischen Los und „Jetzt auslosen“.

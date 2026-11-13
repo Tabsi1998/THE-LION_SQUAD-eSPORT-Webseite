@@ -5,6 +5,8 @@
 import { api } from "@/lib/api";
 
 export const CALENDAR_HINT_EVENT = "tls:calendar-hint";
+// Der Hinweis ist zu (#1163): eine wartende Frage nach Browser-Benachrichtigungen darf jetzt erscheinen.
+export const CALENDAR_HINT_CLOSED_EVENT = "tls:calendar-hint-closed";
 
 /** Fragt nach einer Anmeldung, ob der Hinweis fällig ist, und lässt ihn dann erscheinen. Gibt zurück, ob er kam. */
 export async function offerCalendarHint(win = typeof window === "undefined" ? null : window) {

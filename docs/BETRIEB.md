@@ -390,6 +390,35 @@ docker compose exec backend python scripts/unique_index_duplicates.py
 
 Alle drei lesen nur (das Dubletten-Skript ohne `--anwenden`).
 
+## Browser-Benachrichtigungen einrichten (Web-Push, #1163)
+
+Die Website schickt Meldungen auf Wunsch auch an Browser (PC und Handy, am iPhone nur mit der Website auf dem
+Home-Bildschirm) – neben dem Push an die LionsAPP, mit denselben Themen und dem Kanal „Browser“ in den Einstellungen.
+Dafür braucht der Server ein Schlüsselpaar (VAPID). Ohne Schlüssel ist Web-Push still aus: kein Fehler, kein Knopf.
+
+1. Schlüssel einmal erzeugen (gibt zwei Zeilen aus, nichts wird gespeichert):
+
+   ```bash
+   docker compose exec backend python -m services.web_push --generate
+   ```
+
+2. Beide Zeilen in die `.env` auf dem Server eintragen (`WEB_PUSH_VAPID_PUBLIC_KEY=…`, `WEB_PUSH_VAPID_PRIVATE_KEY=…`).
+   Der private Schlüssel ist ein Geheimnis wie `JWT_SECRET`: nicht ins Repository, nicht in Issues oder Chats.
+3. Optional `WEB_PUSH_CONTACT` (`mailto:…` oder eine https-Adresse; leer = `SENDER_EMAIL`) und `WEB_PUSH_TTL_SECONDS`
+   (wie lange ein Push-Dienst eine Meldung aufhebt, Vorgabe 21600 = 6 Stunden).
+4. `docker compose up -d backend` – danach erscheinen der Kanal „Browser“ und die Frage nach der ersten Anmeldung.
+
+Die Schlüssel danach nicht mehr wechseln: Mit einem neuen Paar gelten alle bisherigen Browser-Anmeldungen nicht mehr;
+die Website meldet einen Browser beim nächsten Besuch selbst neu an. Passen öffentlicher und privater Schlüssel nicht
+zusammen, bleibt Web-Push aus und das Protokoll sagt es einmal (`[web-push] …`). Verschickt wird nur an die Push-Dienste
+der Browser (Google, Mozilla, Apple, Microsoft); einen weiteren Dienst nimmt `WEB_PUSH_EXTRA_HOSTS` (Komma-Liste) auf.
+Abgelaufene Anmeldungen (Antwort 404 oder 410 des Dienstes) löscht der Versand selbst, ebenso nicht lesbare und solche,
+die der Dienst dreimal dauerhaft ablehnt. Eine Browser-Anmeldung hängt an der Sitzung, in der sie entstand: Abmelden,
+„Überall abmelden“, Passwort ändern oder zurücksetzen und Zwei-Faktor abschalten löschen sie; eine abgelaufene Sitzung
+(ohne „Angemeldet bleiben“ nach 24 Stunden, sonst nach 90 Tagen) bekommt nichts mehr, bis die Person die Website in diesem
+Browser wieder öffnet. Ein Konto meldet höchstens zehn Browser je Minute und 20 insgesamt an. Chat-Texte und Beträge stehen
+nie in einer Browser-Meldung. Im Abnahme-Stand (`OUTBOUND_DISABLED=true`) geht nichts hinaus.
+
 ## Was tun bei gelben Checks (#2080)
 
 Die Checks **Freier Speicher** und **Bildvarianten** schreiben im gelben bzw. roten Zustand selbst hin, was hilft:

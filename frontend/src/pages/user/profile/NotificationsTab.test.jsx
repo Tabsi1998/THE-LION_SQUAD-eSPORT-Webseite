@@ -78,3 +78,29 @@ test("Zeremonien: Ton, Lautstärke und „dezent“ stehen in der Karte und schr
   fireEvent.click(screen.getByTestId("profile-ceremony-sound"));
   expect(set).toHaveBeenCalledWith("ceremony_sound", false);
 });
+
+// Browser-Benachrichtigungen (#1163): Kanal und Spalte „Browser“ und der Kasten „Dieser Browser“ nur, wenn der Server
+// Web-Push eingerichtet hat - sonst kein Knopf.
+test("ohne Web-Push am Server gibt es keinen Kanal Browser", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/web-push/config" ? { enabled: false, public_key: null } : { discord: { linked: false } } }));
+  renderTab();
+  await waitFor(() => expect(screen.getByTestId("profile-notification-discord-unlinked")).toBeInTheDocument());
+  expect(screen.queryByTestId("profile-notification-channel-browser")).toBeNull();
+  expect(screen.queryByTestId("profile-notification-column-browser")).toBeNull();
+  expect(screen.queryByTestId("profile-browser-push")).toBeNull();
+});
+
+test("mit Web-Push: Kanal, Spalte je Thema und „Dieser Browser“", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/web-push/config" ? { enabled: true, public_key: "BQQ", subscriptions: 2 } : { discord: { linked: false } } }));
+  renderTab();
+  await waitFor(() => expect(screen.getByTestId("profile-notification-channel-browser")).toBeInTheDocument());
+  expect(screen.getByTestId("profile-notification-column-browser")).toHaveTextContent("Browser");
+  expect(screen.getByTestId("profile-notification-browser-tournament_updates")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-notification-browser-achievements")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-notification-browser-achievement_recap-none")).toHaveTextContent("–");
+  const card = screen.getByTestId("profile-browser-push");
+  expect(card).toHaveTextContent("Dieser Browser");
+  expect(screen.getByTestId("profile-browser-push-count")).toHaveTextContent("2 Browser");
+  // jsdom kann kein Web-Push - der Kasten sagt das ehrlich.
+  await waitFor(() => expect(card).toHaveAttribute("data-status", "unsupported"));
+});

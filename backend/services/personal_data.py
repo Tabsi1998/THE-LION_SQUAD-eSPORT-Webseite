@@ -60,6 +60,8 @@ PERSONAL: dict[str, Entry] = {
     "platform_link_flows": Entry(DELETED, note="laufende Verknüpfung, wenige Minuten gültig"),
     "platform_link_sessions": Entry(EXPIRES, note="laufende Verknüpfung ohne Kennung des Kontos, nach Minuten gelöscht"),
     "mobile_push_tokens": Entry(DELETED, ("mobile_devices",)),
+    # Browser-Benachrichtigungen (#1163): je Browser die Adresse beim Push-Dienst und seine Schlüssel.
+    "web_push_subscriptions": Entry(DELETED, ("web_push_browsers",)),
     "mobile_client_logs": Entry(DELETED, ("mobile_client_logs",)),
     "notifications": Entry(DELETED, ("notifications",)),
     "chat_reads": Entry(DELETED, ("chat_reads",)),

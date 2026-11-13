@@ -40,7 +40,7 @@ Kasten **Verteilen** am Beitrag ([Inhalte](inhalte.md)).
 | **Mail-Vorlagen** | Betreff und Text jeder Mail, mit Vorschau und Testmail | E-Mail → E-Mail-Vorlagen |
 | **Mail-Queue** | Jede Mail wartet erst, wird dann gesendet; Fehler lassen sich wiederholen | E-Mail → Mail-Queue |
 | **Newsletter** | Beim Veröffentlichen von News und Events an alle mit Zustimmung | Kasten „Verteilen“, Verlauf unter E-Mail → Newsletter |
-| **Benachrichtigungen** | Eine Meldung, vier mögliche Kanäle: E-Mail, Push, In-App, Discord | Einstellungen → Benachrichtigungen (Mitglied) |
+| **Benachrichtigungen** | Eine Meldung, fünf mögliche Kanäle: E-Mail, Push, Browser, In-App, Discord | Einstellungen → Benachrichtigungen (Mitglied) |
 | **Push in der App** | Mitteilungen aufs Handy, in fünf Kanälen mit eigener Lautstärke | App-Einstellungen am Handy; Test unter Push-Tests |
 | **Discord-Direktnachricht** | Dieselbe Meldung als Nachricht vom Vereins-Bot | Mitglied schaltet den Kanal ein |
 
@@ -159,6 +159,13 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   schalten kann: **Aufrufe & Spielstart** (wichtig, mit Gong: Du bist dran, Match startet jetzt, Erinnerung vor dem Spiel; für die Turnierleitung
   „Braucht Aufmerksamkeit“), **Turniere & Events**, **Chats**, **Verein** (Vereinsintern, News, Mitgliedschaft, Rechnungen) und **Erfolge**.
   Wer die Chats leise stellt, verpasst den Spielaufruf nicht.
+- **Browser** (#1163): dieselben Meldungen wie Push, aber im Browser – am PC und im Handy-Browser, auch bei geschlossener
+  Website. Am iPhone geht das nur mit der Website auf dem Home-Bildschirm (Safari → Teilen → „Zum Home-Bildschirm“). Gefragt
+  wird nie beim ersten Besuch, sondern nach der ersten Turnier- oder Event-Anmeldung, einmal je Browser; „Nicht jetzt“ merkt
+  sich die Seite. Ein Tipp auf die Meldung öffnet die passende Seite (ein offener Tab mit dieser Seite wird nach vorn geholt),
+  beim Check-in gibt es den Knopf **Jetzt einchecken**. Abmelden vom Konto, Passwort ändern und „Überall abmelden“ melden den
+  Browser ab; Meldungen kommen, solange die Anmeldung auf der Website in diesem Browser gilt. Einrichten muss es der
+  Betreiber einmal mit zwei Schlüsseln in der Server-Konfiguration ([Betrieb](../BETRIEB.md)); ohne sie gibt es den Kanal nicht.
 - **Discord-Direktnachricht:** Nur mit verknüpftem Discord-Konto und nur auf Wunsch (Standard **aus**). Es kommt dieselbe Meldung als
   Nachricht vom Vereins-Bot (Titel, Text, Link). Nie darin: Chat-Texte anderer, Moderation, Zahlungsdaten. Discord stellt Direktnachrichten
   nur zu, wenn die Person mit dem Bot einen Server teilt und „Direktnachrichten von Servermitgliedern“ erlaubt. Lehnt Discord ab, bleibt es
@@ -173,8 +180,12 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 
 **Benutzermenü → Einstellungen → Benachrichtigungen** (Seite „Benachrichtigungen einstellen“):
 
-- Oben die **Kanäle**: **E-Mail**, **Push**, **In-App**, **Discord** (nur mit verknüpftem Konto). Ein ausgeschalteter Kanal blendet seine Spalte aus,
-  die Einstellungen darin bleiben erhalten.
+- Oben die **Kanäle**: **E-Mail**, **Push**, **Browser** (nur, wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat), **In-App**,
+  **Discord** (nur mit verknüpftem Konto). Ein ausgeschalteter Kanal blendet seine Spalte aus, die Einstellungen darin bleiben erhalten.
+- Darunter **Dieser Browser**: ob der Browser, in dem die Seite gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw.
+  **Browser abmelden**. Blockiert der Browser die Benachrichtigungen, steht dort, wo man sie wieder erlaubt. Mit **Inhalt verbergen**
+  zeigt dieser Browser nur „Neue Benachrichtigung“. Chat-Texte und Beträge (Rechnungen, Kostenbeiträge) stehen nie in einer
+  Browser-Meldung – dort steht nur „Neue Nachricht von …“ bzw. „Deine Rechnung liegt in deinem Konto“.
 - Darunter die Tabelle **Jede Benachrichtigung pro Kanal**: je Thema ein Schalter je Kanal. Ein Strich heißt: Dieses Thema gibt es auf dem Kanal nicht.
 - **News & Events** per E-Mail geht nur mit der Einwilligung unten: „Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu
   erhalten. Jederzeit widerrufbar.“
@@ -195,6 +206,8 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 | Newsletter ging nicht hinaus | Entwurf, „Nur intern“ oder keine Zustimmungen | Kasten **Verteilen** ansehen ([Inhalte](inhalte.md)) |
 | Ein Mitglied bekommt keine Turnier-Mails | Thema oder Kanal E-Mail ist bei ihm aus | In Einstellungen → Benachrichtigungen prüfen |
 | Mitglied bekommt keine Push-Meldung | Keine App, keine Erlaubnis, Kanal am Handy stumm, oder Push in den Einstellungen aus | Push-Tests ausführen; Handy-Einstellungen prüfen |
+| Keine Meldung im Browser | Browser nicht angemeldet, im Browser blockiert, Kanal „Browser“ oder Thema aus, iPhone ohne Home-Bildschirm | Einstellungen → Benachrichtigungen → **Dieser Browser** ansehen |
+| Kanal „Browser“ fehlt in den Einstellungen | Der Server hat keine Web-Push-Schlüssel | Schlüssel erzeugen und setzen ([Betrieb](../BETRIEB.md)) |
 | „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ | Das Konto hat kein registriertes Gerät | App öffnen, Push erlauben |
 | Discord-Kanal lässt sich nicht einschalten | Kein Discord-Konto verknüpft | Profil → Socials → Mit Discord verknüpfen |
 | Discord-Direktnachricht kommt nicht | Discord lehnt ab (kein gemeinsamer Server oder Nachrichten gesperrt), oder Bot aus | Hinweis in den Einstellungen folgen; Verbindungen → Discord prüfen |

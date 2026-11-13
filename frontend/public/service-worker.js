@@ -123,3 +123,80 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(staticCache(request));
   }
 });
+
+// Browser-Benachrichtigungen (#1163): der Server schickt Titel, Text, Ziel und höchstens Knöpfe mit eigenem Ziel - nur
+// Text, angezeigt über showNotification, nie als HTML. Geöffnet wird nur, was auf dieser Website liegt; sonst das Postfach.
+const PUSH_ICON = "/assets/brand/tls-favicon.png";
+const PUSH_FALLBACK_PATH = "/notifications";
+
+function pushText(value, limit) {
+  return typeof value === "string" ? value.slice(0, limit) : "";
+}
+
+function samePath(value) {
+  if (typeof value !== "string" || !value) return PUSH_FALLBACK_PATH;
+  try {
+    const target = new URL(value, self.location.origin);
+    if (target.origin !== self.location.origin) return PUSH_FALLBACK_PATH;
+    return target.pathname + target.search + target.hash;
+  } catch {
+    return PUSH_FALLBACK_PATH;
+  }
+}
+
+function readPush(event) {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  if (!data || typeof data !== "object") data = {};
+  const url = samePath(data.url);
+  const actions = (Array.isArray(data.actions) ? data.actions : [])
+    .filter((item) => item && typeof item.action === "string" && typeof item.title === "string" && typeof item.url === "string")
+    .slice(0, 2)
+    .map((item) => ({ action: item.action.slice(0, 40), title: item.title.slice(0, 40), url: samePath(item.url) }));
+  return {
+    title: pushText(data.title, 120) || "THE LION SQUAD",
+    options: {
+      body: pushText(data.body, 180),
+      icon: PUSH_ICON,
+      badge: PUSH_ICON,
+      tag: pushText(data.tag, 80) || undefined,
+      lang: "de",
+      data: { url, actions: Object.fromEntries(actions.map((item) => [item.action, item.url])) },
+      actions: actions.map(({ action, title }) => ({ action, title })),
+    },
+  };
+}
+
+self.addEventListener("push", (event) => {
+  const { title, options } = readPush(event);
+  // Ein Browser ohne Knöpfe zeigt die Meldung trotzdem - die Knöpfe fallen dann still weg.
+  const max = (self.Notification && self.Notification.maxActions) || 0;
+  if (!max) delete options.actions;
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+async function openPath(path) {
+  const target = new URL(path, self.location.origin).href;
+  const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
+  const open = windows.find((client) => {
+    try {
+      const url = new URL(client.url);
+      return url.origin === self.location.origin && url.href === target;
+    } catch {
+      return false;
+    }
+  });
+  if (open && "focus" in open) return open.focus();
+  return clients.openWindow ? clients.openWindow(target) : undefined;
+}
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const fromAction = event.action && data.actions ? data.actions[event.action] : "";
+  event.waitUntil(openPath(samePath(fromAction || data.url)));
+});

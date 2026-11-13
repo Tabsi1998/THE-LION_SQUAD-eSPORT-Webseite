@@ -2,18 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { AdminSheet } from "@/components/tls/AdminSheet";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { AdminSheet } from "@/components/tls/AdminSheet";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
-import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
+import { formatBracketSection, formatDeviceType, formatMatchKind, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { formatDateTime } from "@/lib/datetime";
 import { isArchivedGame, selectableGames } from "@/lib/gameLabels";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
-import { Pencil, Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
@@ -29,7 +29,6 @@ const DEVICES = [
   ["racing_rig", "Renn-Setup"], ["beamer", "Beamer"],
   ["stream_setup", "Übertragungsplatz"], ["admin_desk", "Orga-Tisch"],
 ];
-const STATUSES = ["free", "busy", "broken", "reserved"];
 
 // Welches Turnier die Stationen-Seite zeigt (#2111, TA26): Stationen gibt es vor Ort und hybrid. Diese Turniere stehen
 // oben (solange sie nicht vorbei sind), vorgewählt ist ein laufendes; alle übrigen folgen unter „Weitere Turniere“.
@@ -55,6 +54,13 @@ function stationExportUrl(tournamentId, orientation) {
   return `${API}/exports/tournaments/${encodeURIComponent(tournamentId)}/stations.pdf?${params.toString()}`;
 }
 
+// Die Live-Knöpfe (Aufrufen, Starten, Freigeben, Defekt, Umlegen) stehen seit #1162 nur noch in der Turnierleitung
+// (/tournaments/<slug>/leitung, Reiter „Stationen“) - hier bleiben Anlegen, Bearbeiten, Planen, Aushang und die Belegung.
+export function leadStationsUrl(tournament) {
+  const ref = tournament?.slug || tournament?.id;
+  return ref ? `/tournaments/${encodeURIComponent(ref)}/leitung?reiter=stationen` : "";
+}
+
 export default function AdminStationsPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
   const { isTournamentLead } = useAuth();
@@ -70,7 +76,6 @@ export default function AdminStationsPage() {
   const [pageError, setPageError] = useState("");
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [bulk, setBulk] = useState({ prefix: "Station", count: 4, device_type: "switch", notes: "" });
-  const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
   const [editing, setEditing] = useState(null);
   // Das eine Ergebnis-Fenster (#1370) statt eigener Formulare je Station.
   const [resultFor, setResultFor] = useState("");
@@ -154,7 +159,6 @@ export default function AdminStationsPage() {
   useLiveRefresh(refreshLive, ["stations", "matches", "tournaments"], { fallbackMs: 15000 });
   const resultUndo = useResultUndo({ onDone: () => { loadStations(); loadMatches(); } });
   useEffect(() => {
-    setAssignFor(null);
     setList([]);
     setMatches([]);
     setRegs([]);
@@ -185,9 +189,13 @@ export default function AdminStationsPage() {
       toast.error(formatRequestError(e, "Stationen konnten nicht angelegt werden."));
     }
   };
-  const updateStatus = async (id, status) => {
+  // Defekt / Bereit (#1162) bleibt hier als Teil der Planung - nur für Stationen ohne gehaltenes Spiel, etwa eine, die
+  // (noch) in keiner Warteschlange steht. Hält sie ein Spiel, geht es in der Turnierleitung (mit Hinweis aufs Umlegen).
+  const toggleBroken = async (station) => {
+    const status = station.status === "broken" ? "free" : "broken";
     try {
-      await api.patch(`/stations/${id}`, { status });
+      await api.patch(`/stations/${station.id}`, { status });
+      toast.success(status === "broken" ? `${station.name} ist als defekt gemeldet.` : `${station.name} ist wieder bereit.`);
       loadStations();
     } catch (e) {
       toast.error(formatRequestError(e, "Stationsstatus konnte nicht gespeichert werden."));
@@ -207,39 +215,10 @@ export default function AdminStationsPage() {
       toast.error(formatRequestError(e, "Station konnte nicht gelöscht werden."));
     }
   };
-  const assign = async (sid, mid, startNow = false) => {
-    try {
-      await api.post(`/stations/${sid}/assign/${mid}${startNow ? "?start_now=true" : ""}`);
-      toast.success(startNow ? "Spiel gestartet." : "Spiel zugewiesen.");
-      setAssignFor(null);
-      loadStations(); loadMatches();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Spiel konnte nicht zugewiesen werden."));
-    }
-  };
   // Spielplaner (#1552): Vorschau im Dialog, geschrieben wird erst nach „Übernehmen“ - wie auf der Turnierseite.
   const autoAssign = async () => {
     if (!activeTid) return;
     if (await planAndApplySchedule({ tournamentId: activeTid, confirm })) { loadStations(); loadMatches(); }
-  };
-  const startFreeStations = async () => {
-    if (!activeTid) return;
-    try {
-      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(activeTid)}&start_now=true&plan=false`);
-      toast.success(`${data.assigned} Spiel${Number(data.assigned) === 1 ? "" : "e"} gestartet.`);
-      loadStations(); loadMatches();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Freie Stationen konnten nicht gestartet werden."));
-    }
-  };
-  const clearStation = async (sid) => {
-    try {
-      await api.post(`/stations/${sid}/clear`);
-      toast.success("Station freigegeben.");
-      loadStations(); loadMatches();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Station konnte nicht freigegeben werden."));
-    }
   };
 
   // Belegung je Station (#1557): dieselbe Zeitleiste wie im Matchplan, aus denselben Daten.
@@ -257,8 +236,7 @@ export default function AdminStationsPage() {
     .filter((m) => m.station_id && ["ready", "scheduled"].includes(m.status))
     .sort((a, b) => (Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER) - (Date.parse(b.scheduled_at || "") || Number.MAX_SAFE_INTEGER));
   const plannedQueue = queuedMatches.filter((m) => !occupiedMatchIds.has(m.id));
-  const freeStations = safeArray(list).filter((station) => ["free", "reserved"].includes(station.status) && !station.current_match_id);
-  const startableCount = safeArray(matches).filter((m) => ["ready", "scheduled"].includes(m.status)).length;
+  const leadUrl = leadStationsUrl(tournaments.find((row) => row.id === activeTid));
 
   // Leere Plätze im Klartext (#1113): „Sieger aus A“ statt „W:A:1“.
   const findIn = finderFor(safeArray(matches));
@@ -341,10 +319,16 @@ export default function AdminStationsPage() {
         <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} data-testid="stations-plan-schedule" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Wand2 className="w-4 h-4" /> Zeitplan füllen
         </button>
-        <button type="button" onClick={startFreeStations} disabled={!freeStations.length || !startableCount} className="px-4 py-2 bg-[#00FF88] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
-          <Play className="w-4 h-4" /> Freie Stationen starten
-        </button>
       </div>
+
+      {leadUrl ? (
+        <div className="mb-6 flex flex-col gap-3 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="stations-lead-link">
+          <p className="text-sm text-white/70">Aufrufen, Starten, Freigeben, Defekt und Umlegen stehen am Turniertag in der <span className="font-bold text-white">Turnierleitung</span> – am Handy und am PC.</p>
+          <Link to={leadUrl} className="tls-btn tls-btn--primary inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+            <ExternalLink className="h-4 w-4" aria-hidden="true" /> Stationen live bedienen
+          </Link>
+        </div>
+      ) : null}
 
       {activeTid && timeline.items.length > 0 && (
         <section className="mp-card mb-6" aria-label="Belegung je Station" data-testid="stations-timeline">
@@ -441,29 +425,30 @@ export default function AdminStationsPage() {
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
-                  {isTournamentLead && <select value={s.status} onChange={(e) => updateStatus(s.id, e.target.value)} data-testid={`station-status-${s.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
-                    {STATUSES.map((st) => <option key={st} value={st}>{formatMatchStatus(st)}</option>)}
-                  </select>}
+                  {isTournamentLead && !s.current_match_id ? (
+                    <button type="button" onClick={() => toggleBroken(s)} data-testid={`station-broken-${s.id}`} className={`ml-auto min-h-[36px] rounded-sm border px-3 text-[11px] font-bold uppercase tracking-wider ${s.status === "broken" ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"}`}>
+                      {s.status === "broken" ? "Bereit" : "Defekt"}
+                    </button>
+                  ) : null}
                 </div>
+                {/* Hält die Station ein Spiel (#1162), gehört „Defekt“ in die Turnierleitung - dort bleibt der Aufruf und das
+                    Spiel lässt sich umlegen. */}
+                {isTournamentLead && s.current_match_id ? (
+                  <p className="mt-2 text-xs text-white/55" data-testid={`station-broken-hint-${s.id}`}>
+                    Station hält ein Spiel – {leadUrl ? <Link to={leadUrl} className="text-[#29B6E8] underline-offset-2 hover:underline">in der Turnierleitung als defekt melden</Link> : "in der Turnierleitung als defekt melden"}.
+                  </p>
+                ) : null}
                 {/* Current match */}
                 {s.current_match_id ? (
                   <div className="mt-3 p-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm">
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{s.status === "reserved" ? "Reserviert" : "Aktuell"}</div>
                     <div className="text-sm text-white truncate">{currentMatch ? nameOfMatch(currentMatch) : "Spiel wird geladen oder ist nicht mehr vorhanden"}</div>
                     {currentMatch?.scheduled_at && <div className="mt-1 text-[11px] text-white/45">{formatDateTime(currentMatch.scheduled_at)}</div>}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {s.status === "reserved" && currentMatch && <button onClick={() => assign(s.id, s.current_match_id, true)} className="text-[10px] text-[#00FF88] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><Play className="w-3 h-3" /> Starten</button>}
-                      <button onClick={() => clearStation(s.id)} data-testid={`station-clear-${s.id}`} className="text-[10px] text-[#FF3B30] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Freigeben</button>
-                    </div>
                     {currentMatch ? (
                       <button type="button" onClick={() => setResultFor(currentMatch.id)} className="mt-3 w-full px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-[10px] font-bold uppercase tracking-widest" data-testid={`station-result-${s.id}`}>Ergebnis eintragen</button>
                     ) : null}
                   </div>
-                ) : (
-                  <button onClick={() => setAssignFor(s)} data-testid={`station-assign-${s.id}`} className="mt-3 w-full py-2 border border-dashed border-white/20 rounded-sm text-xs text-white/60 hover:text-[#29B6E8] hover:border-[#29B6E8] inline-flex items-center justify-center gap-2">
-                    <LinkIcon className="w-3.5 h-3.5" /> Spiel zuweisen
-                  </button>
-                )}
+                ) : null}
                 {s.notes && <div className="mt-2 text-white/50 text-xs">{s.notes}</div>}
               </div>
               );
@@ -477,24 +462,6 @@ export default function AdminStationsPage() {
       {editing && <StationEditSheet station={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadStations(); }} />}
       {resultFor ? <ResultWindowLoader matchId={resultFor} onClose={() => setResultFor("")} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
-      {/* Zuweisen als Seitenblatt (#435): die Stationen bleiben daneben sichtbar. */}
-      {assignFor && (
-        <AdminSheet title={assignFor.name} eyebrow="Zuweisen zu" onClose={() => setAssignFor(null)} testId="station-assign-sheet">
-          <div className="space-y-1.5">
-            {unassignedMatches.map((m) => (
-              <div key={m.id} className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:bg-[#29B6E8]/5 text-xs">
-                <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
-                <div className="text-white font-semibold mt-0.5">{nameOfMatch(m)}</div>
-                <div className="mt-2 flex gap-2">
-                  <button type="button" onClick={() => assign(assignFor.id, m.id)} data-testid={`assign-match-${m.id}`} className="px-2 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Zuweisen</button>
-                  <button type="button" onClick={() => assign(assignFor.id, m.id, true)} className="px-2 py-1 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Direkt starten</button>
-                </div>
-              </div>
-            ))}
-            {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
-          </div>
-        </AdminSheet>
-      )}
     </AdminLayout>
   );
 }

@@ -15,7 +15,7 @@ from datetime import datetime
 
 from match_rules import match_allows_draw
 from models import REGISTRATION_LIMIT, now_utc
-from services.match_attention import attention_items
+from services.match_attention import attention_items, station_query
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_notifications import results_summary
@@ -264,7 +264,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
     open_items.sort(key=lead_sort_key)
     # „Braucht Aufmerksamkeit“ (#1160): dieselben Spiele, als Fälle mit Knopf; dazu die Stationen zum Umlegen.
 
-    stations = await db.stations.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(500)
+    stations = await db.stations.find(station_query(tournament), {"_id": 0}).to_list(500)
     attention = attention_items(tournament, matches, stations, regs_by_id, now, stages=stages, game=game)
     # Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit „Jetzt auslosen“ für die Leitung mit Aufbau-Recht.
     can_draw = await has_tournament_staff_permission(user, tournament_id, STRUCTURE_STAFF_ROLES, capability="season")

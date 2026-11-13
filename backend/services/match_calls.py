@@ -63,6 +63,28 @@ def _clock(moment: datetime | None) -> str:
     return moment.astimezone(ZoneInfo("Europe/Vienna")).strftime("%H:%M") if moment else ""
 
 
+async def notify_call_withdrawn(db, match: dict, station: dict, called_at: str) -> int:
+    """Die Leitung hat einen Aufruf zurückgenommen („Freigeben“, #1162): wer „Du bist dran“ bekommen hat, erfährt es -
+    im Postfach und per Push, einmal je Aufruf (``dedupe_key`` mit „aufgerufen um“)."""
+    users = await match_player_users(db, match)
+    if not users:
+        return 0
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "title": 1}) or {}
+    where = station_text(station.get("name") or station.get("label"), station.get("device_type")) or "der Station"
+    body = (f"{tournament.get('title') or 'Turnier'}: Der Aufruf an {where} gilt nicht mehr – bitte noch nicht antreten. "
+            "Du bekommst Bescheid, wenn es weitergeht.")
+    dedupe = f"match_call_withdrawn:{match.get('id')}:{station.get('id')}:{called_at}"
+    sent = 0
+    for user in users:
+        if await create_user_notification(
+            user["id"], "Aufruf zurückgenommen", body, url=f"/matches/{match.get('id')}", kind="match_call",
+            meta={"category": "match_reminders", "dedupe_key": dedupe, "match_id": match.get("id"),
+                  "tournament_id": match.get("tournament_id"), "station_id": station.get("id"), "withdrawn": True},
+        ):
+            sent += 1
+    return sent
+
+
 async def notify_match_called(db, match: dict, station: dict, called_at: str) -> int:
     """„Du bist dran“ - einmal je Aufruf an alle Spieler des Spiels, im Postfach und per Push."""
     users = await match_player_users(db, match)

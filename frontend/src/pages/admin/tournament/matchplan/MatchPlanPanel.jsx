@@ -151,7 +151,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const delay = live && !preview ? (queue ? queueDelay : scheduleDelay(background)) : null;
   const nextIds = useMemo(() => (queue ? new Set((queue.stations || []).map((row) => row.next?.match_id).filter(Boolean)) : null), [queue]);
 
-  // Aufrufen und Gestartet aus der Warteschlange - derselbe Weg wie in der Turnierleitung am Handy.
+  // Aufrufen und Starten aus der Warteschlange - derselbe Weg wie in der Turnierleitung am Handy.
   const operateStation = async (kind, station, entry) => {
     setBusyStation(station.id);
     try {

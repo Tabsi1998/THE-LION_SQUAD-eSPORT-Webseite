@@ -93,6 +93,17 @@ class _Documents:
         return SimpleNamespace(modified_count=matched)
 
 
+class _Browsers:
+    """Browser-Benachrichtigungen (#1163): eine beendete Sitzung nimmt ihre Browser-Anmeldung mit."""
+
+    def __init__(self):
+        self.deleted = []
+
+    async def delete_many(self, query):
+        self.deleted.append(query)
+        return SimpleNamespace(deleted_count=0)
+
+
 class _Users:
     def __init__(self, user):
         self.user = deepcopy(user)
@@ -209,7 +220,7 @@ def test_parallel_refresh_replays_return_one_deterministic_successor():
             "revoked": False,
             "expires_at": expiry,
         }])
-        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user))
+        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user), web_push_subscriptions=_Browsers())
         request = _request(refresh=old_token)
 
         first, second = await asyncio.gather(
@@ -252,7 +263,7 @@ def test_legacy_refresh_token_is_migrated_into_a_session_family():
             "revoked": False,
             "expires_at": expiry,
         }])
-        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user))
+        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user), web_push_subscriptions=_Browsers())
 
         _user, access, refresh = await _rotate_session(db, legacy_token, _request(refresh=legacy_token))
 
@@ -294,7 +305,7 @@ def test_refresh_reuse_outside_the_same_client_grace_revokes_only_that_family():
                 "expires_at": expiry,
             },
         ])
-        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user))
+        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user), web_push_subscriptions=_Browsers())
         await _rotate_session(db, token, _request(refresh=token, user_agent="browser-a"))
 
         with pytest.raises(HTTPException) as exc:

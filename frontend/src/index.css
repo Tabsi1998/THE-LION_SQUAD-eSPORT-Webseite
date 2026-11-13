@@ -3562,8 +3562,18 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   to { opacity: 1; transform: none; }
 }
 .tls-copy-check { animation: tls-copy-check var(--tls-motion-fast) var(--tls-ease) both; }
+/* Frage nach Browser-Benachrichtigungen (#1163): steigt wie der Abo-Hinweis auf, die Glocke schwingt danach einmal kurz an.
+   Mit „Bewegung reduzieren“ steht beides sofort still. */
+.tls-push-hint { animation: tls-cal-rise var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tls-push-ring {
+  0%, 100% { transform: none; }
+  25% { transform: rotate(calc(14deg * var(--tls-motion-on))); }
+  55% { transform: rotate(calc(-10deg * var(--tls-motion-on))); }
+  80% { transform: rotate(calc(4deg * var(--tls-motion-on))); }
+}
+.tls-push-hint__icon { display: inline-flex; transform-origin: 50% 10%; animation: tls-push-ring var(--tls-motion-slow) var(--tls-ease) var(--tls-motion-mid) 1 both; }
 @media (prefers-reduced-motion: reduce) {
-  .tls-cal-enter, .tls-cal-hint, .tls-copy-check { animation: none; }
+  .tls-cal-enter, .tls-cal-hint, .tls-copy-check, .tls-push-hint, .tls-push-hint__icon { animation: none; }
 }
 
 /* Referenzen: „Läuft gerade“ / „Heute im Einsatz“ (#1748). Karten steigen leise auf (gestaffelt), der Balken füllt sich

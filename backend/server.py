@@ -91,6 +91,7 @@ from routes.reference_round_page_routes import router as reference_round_page_ro
 from routes.reference_partner_routes import router as reference_partner_router
 from routes.reference_season_table_routes import router as reference_season_table_router
 from routes.mobile_routes import router as mobile_router
+from routes.web_push_routes import router as web_push_router
 from routes.admin_routes import router as admin_router
 from routes.ops_routes import router as ops_router
 from routes.dolibarr_routes import admin_router as dolibarr_admin_router, member_router as dolibarr_member_router, public_router as dolibarr_public_router
@@ -465,6 +466,8 @@ app.include_router(reference_round_page_router)  # Ergebnistabelle je Runde, Sta
 app.include_router(reference_partner_router)  # Partner-Plattform anbinden: Turniertage als Entwurf holen (#1964)
 app.include_router(reference_season_table_router)  # Saisontabelle einlesen: Runden als Entwurf nachtragen (#1928)
 app.include_router(mobile_router)
+# Browser-Benachrichtigungen (#1163): Anmelden und Abmelden eines Browsers.
+app.include_router(web_push_router)
 app.include_router(admin_router)
 app.include_router(ops_router)
 app.include_router(dolibarr_admin_router)
