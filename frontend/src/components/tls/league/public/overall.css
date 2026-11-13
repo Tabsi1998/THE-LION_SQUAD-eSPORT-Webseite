@@ -1,0 +1,86 @@
+/* Gesamtwertung über Seasons (F.5, #2215): Tabelle mit Punkten je Season, Streichergebnis, Staffelsieg und Aufsteigern. */
+
+.tls-overall-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tls-overall-tab {
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 2px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.7);
+  background: transparent;
+  transition: color var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease),
+    background-color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-overall-tab[aria-selected="true"], .tls-overall-tab[aria-pressed="true"] {
+  color: #fff;
+  border-color: rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 0.7);
+  background: rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 0.12);
+}
+.tls-overall-tab:focus-visible { outline: 2px solid var(--tls-cyan); outline-offset: 2px; }
+@media (hover: hover) {
+  .tls-overall-tab:hover { color: #fff; border-color: rgb(255 255 255 / 0.3); }
+}
+
+.tls-overall-table { width: 100%; font-size: 0.875rem; font-variant-numeric: tabular-nums; border-collapse: collapse; }
+.tls-overall-table th { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.5); }
+.tls-overall-table td, .tls-overall-table th { padding: 0.6rem 0.5rem; vertical-align: middle; }
+.tls-overall-table tbody tr { border-top: 1px solid rgb(255 255 255 / 0.06); }
+.tls-overall-row[data-leader="true"] .tls-overall-rank { color: var(--tls-honor); }
+.tls-overall-row[data-leader="true"] { background: linear-gradient(90deg, rgb(255 215 0 / 0.08), transparent 60%); }
+.tls-overall-rank { font-family: var(--font-display, inherit); font-weight: 700; font-size: 1rem; color: #fff; }
+.tls-overall-total { font-family: var(--font-display, inherit); font-weight: 700; font-size: 1rem; color: #fff; text-align: right; }
+.tls-overall-cell { text-align: right; color: rgb(255 255 255 / 0.78); white-space: nowrap; }
+.tls-overall-cell[data-counted="false"] { color: rgb(255 255 255 / 0.38); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tls-overall-cell[data-played="false"] { color: rgb(255 255 255 / 0.25); }
+.tls-overall-cell__crown { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.2rem; vertical-align: -1px; color: var(--tls-honor); }
+.tls-overall-name { min-width: 0; color: #fff; font-weight: 600; overflow-wrap: anywhere; }
+.tls-overall-name a { color: inherit; }
+.tls-overall-name a:hover { color: var(--tls-cyan); }
+.tls-overall-more {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 2px;
+  color: rgb(255 255 255 / 0.6);
+}
+.tls-overall-more svg { transition: transform var(--tls-motion-mid) var(--tls-ease); }
+.tls-overall-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.tls-overall-more:focus-visible { outline: 2px solid var(--tls-cyan); outline-offset: 1px; }
+.tls-overall-detail td { padding-top: 0; }
+.tls-overall-detail dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 1rem; font-size: 0.8125rem; }
+.tls-overall-detail dt { color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; }
+.tls-overall-detail dd { text-align: right; color: #fff; }
+.tls-overall-detail dd[data-counted="false"] { color: rgb(255 255 255 / 0.4); text-decoration: line-through; }
+
+/* Zeilen steigen beim ersten Sichtbarwerden gestaffelt auf (nur die ersten zwölf), Aufsteiger leuchten danach einmal auf. */
+.tls-overall-body[data-stagger="wait"] .tls-overall-row { opacity: 0; }
+.tls-overall-body[data-stagger="run"] .tls-overall-row {
+  animation: tls-stagger-in var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(min(var(--tls-stagger-i, 0), 11) * var(--tls-stagger-step));
+}
+/* Gilt in „run“ und „done“ gleich - so läuft das Aufleuchten zu Ende, auch wenn die Staffelung schon fertig ist. */
+.tls-overall-body:not([data-stagger="wait"]) .tls-overall-row[data-climbed="true"] {
+  animation: tls-stagger-in var(--tls-motion-slow) var(--tls-ease) both, tls-overall-climb 1.6s var(--tls-ease) both;
+  animation-delay: calc(min(var(--tls-stagger-i, 0), 11) * var(--tls-stagger-step)),
+    calc(min(var(--tls-stagger-i, 0), 11) * var(--tls-stagger-step) + var(--tls-motion-slow));
+}
+@keyframes tls-overall-climb {
+  0% { box-shadow: inset 3px 0 0 rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 0); background-color: transparent; }
+  30% { box-shadow: inset 3px 0 0 rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 1);
+    background-color: rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 0.16); }
+  100% { box-shadow: inset 3px 0 0 rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 0.6); background-color: transparent; }
+}
+.tls-overall-row[data-climbed="true"] .tls-overall-up { color: #1FD08E; }
+
+.tls-overall-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 11px; color: rgb(255 255 255 / 0.55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-overall-body .tls-overall-row,
+  .tls-overall-body[data-stagger] .tls-overall-row[data-climbed="true"] { animation: none !important; opacity: 1 !important; }
+  .tls-overall-row[data-climbed="true"] { box-shadow: inset 3px 0 0 rgb(var(--league-accent-rgb, var(--tls-brand-rgb)) / 0.6); }
+  .tls-overall-more svg, .tls-overall-tab { transition: none; }
+}
+@media print {
+  .tls-overall-body .tls-overall-row { animation: none !important; opacity: 1 !important; }
+}

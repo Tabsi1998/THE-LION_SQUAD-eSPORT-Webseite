@@ -12,6 +12,8 @@ export const SEASON_SECTIONS = [
   { key: "spieltage", label: "Spieltage" },
   { key: "teams", label: "Teams" },
   { key: "regeln", label: "Regelwerk" },
+  // Gesamtwertung über Seasons (F.5, #2215): nur, wenn die Season zu einem Zeitraum der Liga gehört.
+  { key: "gesamtwertung", label: "Gesamtwertung" },
 ];
 
 /** Adresse einer Unterseite: `/liga/<liga>/<season>[/<key>]`. */
