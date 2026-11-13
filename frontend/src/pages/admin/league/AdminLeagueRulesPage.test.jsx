@@ -322,3 +322,13 @@ test("der Weg zurück führt in den Reiter Regelwerk der Season", async () => {
   renderPage();
   expect(await screen.findByTestId("rules-back")).toHaveAttribute("href", "/admin/leagues/seasons/s1#regelwerk");
 });
+
+test("Entwurf aus der Vorgänger-Season (F.2, #1627): Herkunft, Zustimmung und Grund vorbelegt", async () => {
+  serve({ ...VIEW, draft: { ...DRAFT, carried_from: { season_id: "s0", season_name: "Season 1", label: "Version 2" } } });
+  apiMock.post.mockResolvedValue({ data: { ...HEAD, version: 1 } });
+  renderPage();
+  expect(await screen.findByTestId("rules-carried-from")).toHaveTextContent("Übernommen aus Season 1 (Version 2)");
+  fireEvent.click(screen.getByTestId("rules-publish"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/league-rules/league_season/s1/publish", expect.objectContaining({
+    change_reason: "Neue Season, übernommen aus Season 1", requires_consent: true })));
+});

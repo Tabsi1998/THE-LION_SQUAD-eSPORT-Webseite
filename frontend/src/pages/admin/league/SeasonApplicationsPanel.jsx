@@ -9,6 +9,7 @@ import { FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
+import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -26,8 +27,10 @@ function when(value) {
   return value ? viennaDateTime(value, WHEN) : "";
 }
 
-function staffelOptions(divisions = []) {
-  return divisions.flatMap((division) => (division.staffeln || []).map((staffel) => [
+function staffelOptions(divisions = [], row = null) {
+  // Übernommen aus der Vorgänger-Season (F.2, #1627): nur die Staffeln seiner neuen Liga N, solange es dort welche gibt.
+  const own = row?.carry_over?.division_id ? divisions.filter((division) => division.id === row.carry_over.division_id && division.staffeln?.length) : [];
+  return (own.length ? own : divisions).flatMap((division) => (division.staffeln || []).map((staffel) => [
     staffel.tournament_id, `${division.label} · Staffel ${staffel.staffel} (${staffel.participant_count} von ${staffel.max_participants})`]));
 }
 
@@ -132,11 +135,16 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
         <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
         <ApplicationStateBadge state={row.status} />
       </div>
+      {row.carry_over ? (
+        <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
+      ) : null}
       <p className="mt-1 text-xs text-white/60 [overflow-wrap:anywhere]">
-        Eingereicht {when(row.submitted_at)} von {row.applied_by_name} · {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}
+        {row.carry_over ? "Übernommen" : "Eingereicht"} {when(row.submitted_at)} {row.carry_over ? "" : `von ${row.applied_by_name} `}· {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}
       </p>
       <p className="text-xs text-white/60">
-        {row.rules_version ? `Regeln Version ${row.rules_version} zugestimmt ${when(row.rules_at)}` : "Keine Zustimmung zu den Regeln"} · {row.privacy_at ? "Datenschutz zugestimmt" : "Keine Zustimmung zum Datenschutz"}
+        {row.carry_over && !row.rules_version ? "Zustimmung zum Regelwerk folgt vor dem ersten Spiel (Captain im Regelwerk)"
+          : row.rules_version ? `Regeln Version ${row.rules_version} zugestimmt ${when(row.rules_at)}` : "Keine Zustimmung zu den Regeln"}
+        {row.carry_over ? "" : ` · ${row.privacy_at ? "Datenschutz zugestimmt" : "Keine Zustimmung zum Datenschutz"}`}
       </p>
       {row.assignment ? (
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/85">
@@ -209,7 +217,7 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
   };
 
   if (!visible) return null;
-  const options = staffelOptions(data.divisions);
+  const options = (row) => staffelOptions(data.divisions, row);
   const items = data.items || [];
   const closed = items.filter((row) => ["rejected", "withdrawn"].includes(row.status));
   return (
@@ -223,14 +231,14 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
           return (
             <div key={group.key} className="space-y-2">
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">{group.title} ({rows.length})</h3>
-              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
+              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
             </div>
           );
         })}
         {closed.length ? (
           <details data-testid="season-applications-closed">
             <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-white/60">Abgeschlossen ({closed.length})</summary>
-            <ul className="mt-2 space-y-2">{closed.map((row) => <ApplicationRow key={row.id} row={row} options={options} busy={busy} act={act} />)}</ul>
+            <ul className="mt-2 space-y-2">{closed.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} />)}</ul>
           </details>
         ) : null}
       </FormSection>

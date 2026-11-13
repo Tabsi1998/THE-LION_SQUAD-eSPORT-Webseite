@@ -628,3 +628,56 @@ test("Zuständigkeit „Kader prüfen“: kein Formular, Liga N und Staffeln nur
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/roster"));
   expect(screen.queryByTestId("season-form-anmeldung")).toBeNull();
 });
+
+// Neue Season aus dem Vorgänger (F.2, #1627): Vorschau mit Teams je Liga, Anlegen mit Beginn, danach in die neue Season.
+const SUCCESSOR = {
+  season: { id: "s1", name: "Season 1" }, can_create: true, problems: [], successor: null, suggested: { number: 2, name: "Season 2" },
+  copied: ["Spielbetrieb: Best of, Teamgröße"], dates_to_set: ["Beginn der ersten Spielwoche", "Sperrzeiten"], map_pool: { version: 3 }, loadout_bans: null,
+  rules: { kind: "draft", label: "Version 2" }, carried: 2, relegation_note: "Relegationsplätze sind vorbereitet.",
+  divisions: [{ level: 1, label: "Liga 1", zones_label: "oberste Liga: kein Aufstieg · 1 Absteiger", teams: [
+    { squad_id: "q1", display_name: "Lions · Eins", movement: "stay", from_label: "Liga 1", from_staffel: "A", rank: 1 },
+    { squad_id: "q2", display_name: "Falken · Eins", movement: "up", from_label: "Liga 2", from_staffel: "A", rank: 1 }] }],
+  dropped: [{ registration_id: "r9", display_name: "Raben · Eins", reason: "Disqualifiziert", from_label: "Liga 1", from_staffel: "A", rank: 4 }],
+};
+
+test("Neue Season aus …: Vorschau mit Teams, Anlegen mit Beginn, danach die neue Season", async () => {
+  extra = { "/admin/leagues/seasons/s1/successor": SUCCESSOR, "/admin/leagues/seasons/s2": { ...BODY, season: { ...SEASON, id: "s2", name: "Season 2" } } };
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, replay: false, carried: 2, season: { id: "s2", name: "Season 2" } } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  expect(await within(sheet).findByTestId("successor-team-q2")).toHaveTextContent("Aufstieg · Liga 2 · Staffel A, Platz 1");
+  expect(within(sheet).getByTestId("successor-dropped")).toHaveTextContent("Raben · Eins – Disqualifiziert");
+  expect(within(sheet).getByTestId("successor-rules")).toHaveTextContent("Version 2 als Entwurf");
+  expect(within(sheet).getByTestId("successor-create")).toBeDisabled();
+  fireEvent.change(within(sheet).getByTestId("successor-start"), { target: { value: "2027-01-05" } });
+  fireEvent.click(within(sheet).getByTestId("successor-create"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/successor", expect.objectContaining({ confirm: true })));
+  expect(apiMock.post.mock.calls[0][1].start_date).toMatch(/^2027-01-0[45]T/);
+  await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/seasons/s2"));
+  expect(await screen.findByRole("heading", { name: /Season 2/ })).toBeInTheDocument();
+});
+
+test("Neue Season aus …: nicht abgeschlossen - der Grund statt des Knopfs", async () => {
+  extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, can_create: false, problems: ["Die Season ist noch nicht abgeschlossen."] } };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  expect(await within(sheet).findByTestId("successor-problems")).toHaveTextContent("noch nicht abgeschlossen");
+  expect(within(sheet).queryByTestId("successor-start")).toBeNull();
+  expect(within(sheet).getByTestId("successor-create")).toBeDisabled();
+});
+
+test("Zonen je Liga N (F.2): Satz an der Liga, Ändern schickt nur geänderte Zonen", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0 },
+    zones_effective: { promote: 0, relegate: 0, playoff_promote: 0, playoff_relegate: 0, top: true, bottom: true } }] };
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-zones-1")).toHaveTextContent("oberste Liga: kein Aufstieg · unterste Liga: kein Abstieg");
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  fireEvent.change(within(sheet).getByTestId("zones-relegate"), { target: { value: "2" } });
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", expect.objectContaining({
+    zones: { promote: 1, relegate: 2, playoff_promote: 0, playoff_relegate: 0 } })));
+});

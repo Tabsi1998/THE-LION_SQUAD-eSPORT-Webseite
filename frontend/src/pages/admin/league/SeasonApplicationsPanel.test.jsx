@@ -280,3 +280,18 @@ test("eine Absage des Servers steht als Meldung da, und die Liste lädt neu", as
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Alle Startplätze sind vergeben."));
   expect(apiMock.get).toHaveBeenCalledTimes(2);
 });
+
+test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist und nur die Staffeln der neuen Liga", async () => {
+  const carried = { ...ROW, id: "a2", status: "accepted", applied_by_name: "Übernommen aus Season 1", rules_version: null, privacy_at: null,
+    carry_over: { from_season_name: "Season 1", from_label: "Liga 2", division_id: "d1", division_label: "Liga 1", movement: "up", rank: 1,
+      withdraw_until: "2027-01-04T23:00:00+00:00" } };
+  apiMock.get.mockResolvedValue({ data: { ...BODY, configured: false, window: null, items: [carried], divisions: [
+    ...BODY.divisions, { id: "d2", label: "Liga 2", staffeln: [{ tournament_id: "t2", staffel: "A", participant_count: 0, max_participants: 8 }] }] } });
+  renderPanel();
+  const row = await screen.findByTestId("application-a2");
+  expect(screen.getByTestId("application-carry-a2")).toHaveTextContent("Übernommen aus Season 1: Liga 1 (Aufstieg aus Liga 2). Abmelden bis zum Start am 05.01.2027, 00:00 Uhr.");
+  expect(row).toHaveTextContent("Zustimmung zum Regelwerk folgt vor dem ersten Spiel");
+  const select = screen.getByTestId("application-staffel-a2");
+  const labels = Array.from(select.querySelectorAll("option")).map((option) => option.textContent);
+  expect(labels).toEqual(["Staffel wählen …", "Liga 1 · Staffel A (1 von 8)"]);
+});

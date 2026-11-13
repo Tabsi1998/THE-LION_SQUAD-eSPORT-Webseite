@@ -288,7 +288,10 @@ export default function AdminLeagueRulesPage() {
       setView(data);
       setError(null);
       applyDraft(data.draft);
-      setPublish((value) => ({ ...value, valid_from: value.valid_from || data.today || "" }));
+      // Entwurf aus der Vorgänger-Season (F.2, #1627, Nr. 160): Die Teams stimmen der neuen Fassung neu zu - vorbelegt, abwählbar.
+      const carried = data.draft?.carried_from;
+      setPublish((value) => ({ ...value, valid_from: value.valid_from || data.today || "",
+        ...(carried && !value.change_reason ? { requires_consent: true, change_reason: `Neue Season, übernommen aus ${carried.season_name || "der Vorgänger-Season"}` } : {}) }));
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail));
     }
@@ -480,6 +483,11 @@ export default function AdminLeagueRulesPage() {
                 ) : null}
 
                 <FormSection title="Veröffentlichen" hint="Danach lässt sich die Fassung nicht mehr ändern, sie gilt ab dem gewählten Tag." testId="rules-publish-section">
+                  {view.draft?.carried_from ? (
+                    <p className="text-sm text-white/75" data-testid="rules-carried-from">
+                      Übernommen aus {view.draft.carried_from.season_name} ({view.draft.carried_from.label}). Die übernommenen Teams stimmen dieser Fassung zu, bevor sie einchecken.
+                    </p>
+                  ) : null}
                   <TextField label="Gültig ab" type="date" value={publish.valid_from} min={view.today} onChange={(value) => setPublish((row) => ({ ...row, valid_from: value }))} testId="rules-valid-from" />
                   <TextAreaField label="Änderungsgrund" value={publish.change_reason} onChange={(value) => setPublish((row) => ({ ...row, change_reason: value }))} rows={2}
                     placeholder="Was sich ändert und warum" hint="Steht öffentlich bei der Fassung, mindestens fünf Zeichen." testId="rules-reason" />
