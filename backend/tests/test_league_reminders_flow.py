@@ -240,20 +240,62 @@ async def test_two_runs_at_the_same_time_send_one_message_each(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_run_that_loses_the_race_after_its_check_writes_nothing(flow):
+async def test_a_run_that_loses_the_race_after_its_check_writes_nothing_and_sends_no_push_or_discord(flow, monkeypatch):
     """Zwei Läufe gleichzeitig: Beide prüfen, keiner findet eine Zeile - der zweite verliert dann beim Schreiben am Teilindex. Hier
-    nachgestellt mit einer Zeile, die die Prüfung nicht sieht (andere Art), aber denselben eindeutigen Schlüssel trägt."""
-    world = await reminder_world(flow)
+    nachgestellt: Die Prüfung sieht die Zeile des „schnelleren“ Laufs nicht (gemockt). Der verlorene Insert schickt weder Push noch
+    Discord (N8)."""
+    from services import discord_dm, push_notifications
+
+    world = await reminder_world(flow, rules={"discord": True})
     at = world["start"] - timedelta(hours=24)
     captain = world["users"]["Kapitaen"]["id"]
+    await flow.db.users.update_one({"id": captain}, {"$set": {"notification_preferences": {"discord": True}}})
     key = f"league-upcoming:{world['match']['id']}:{league_schedule._iso(world['start'])}:upcoming_early"
-    await flow.db.notifications.insert_one({"id": new_id(), "user_id": captain, "kind": "race", "unique_dedupe_key": key,
+    await flow.db.notifications.insert_one({"id": new_id(), "user_id": captain, "kind": "match_reminder", "unique_dedupe_key": key,
                                             "meta": {"dedupe_key": key}})
+    cls = type(flow.db.notifications)
+    original_find = cls.find_one
+
+    async def blind(self, query=None, *args, **kwargs):
+        if self.name == "notifications" and isinstance(query, dict) and "unique_dedupe_key" in query:
+            return None  # der andere Lauf hat noch nicht geschrieben, als dieser prüfte
+        return await original_find(self, query, *args, **kwargs)
+
+    pushed: list[str] = []
+    dms: list[str] = []
+
+    async def fake_push(notification):
+        pushed.append(notification["user_id"])
+        return 1
+
+    async def fake_dm(notification, category=None):
+        dms.append(notification["user_id"])
+        return 1
+
+    monkeypatch.setattr(cls, "find_one", blind)
+    monkeypatch.setattr(push_notifications, "send_mobile_push_for_notification", fake_push)
+    monkeypatch.setattr(discord_dm, "send_discord_dm_for_notification", fake_dm)
     assert (await run(flow, world, at))["upcoming_early"] == 1
     rows = await notes(flow, "upcoming_early")
     assert captain not in {row["user_id"] for row in rows}, "der Captain hatte seine schon"
     assert names(world, rows) == (SIDE_A | SIDE_H) - {"Kapitaen"}
     assert await flow.db.notifications.count_documents({"user_id": captain}) == 1
+    assert captain not in pushed and captain not in dms, "verlorener Insert: kein Push, keine Direktnachricht"
+    assert len(pushed) == len(SIDE_A | SIDE_H) - 1, "Gegenprobe: die übrigen bekommen ihren Push"
+
+
+@pytest.mark.asyncio
+async def test_vienna_time_around_the_switch_to_summer_time(flow):
+    """N8: feste Erwartung im Text - Sa 28.03.2026 20:00 (Winterzeit, 19:00 UTC) und So 29.03.2026 20:00 (Sommerzeit, 18:00 UTC)."""
+    world = await reminder_world(flow)
+    mid = world["match"]["id"]
+    captain = world["users"]["Kapitaen"]["id"]
+    for stored, text in (("2026-03-28T19:00:00+00:00", "am Sa 28.03. 20:00 Uhr."), ("2026-03-29T18:00:00+00:00", "am So 29.03. 20:00 Uhr.")):
+        await flow.db.matches_v2.update_one({"id": mid}, {"$set": {"scheduled_at": stored}})
+        start = datetime.fromisoformat(stored)
+        assert (await run(flow, world, start - timedelta(hours=24)))["upcoming_early"] == 1
+        rows = [row for row in await notes(flow, "upcoming_early") if row["user_id"] == captain and stored in row["meta"]["dedupe_key"]]
+        assert len(rows) == 1 and rows[0]["body"].endswith(text), rows[0]["body"]
 
 
 def count_inserts(monkeypatch, flow) -> list[str]:
