@@ -21,6 +21,7 @@ import os
 import struct
 import sys
 import time
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -301,9 +302,7 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     if not config:
         return 0
     db = get_db()
-    rows = await db.web_push_subscriptions.find(
-        {"user_id": user_id}, {"_id": 0, "id": 1, "endpoint": 1, "p256dh": 1, "auth": 1},
-    ).to_list(MAX_SUBSCRIPTIONS_PER_USER)
+    rows = await active_subscriptions(db, user_id, {"id": 1, "endpoint": 1, "p256dh": 1, "auth": 1})
     if not rows:
         return 0
     base_url = await _site_base(db)
@@ -350,12 +349,46 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     return sent
 
 
+def _as_utc(value) -> datetime | None:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str) and value:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    return None
+
+
+async def active_subscriptions(db, user_id: str | None, projection: dict | None = None) -> list[dict]:
+    """Die Browser-Anmeldungen der Person, deren Sitzung noch gilt - eine beendete oder abgelaufene Sitzung bekommt nichts."""
+    if not user_id:
+        return []
+    fields = {"_id": 0, "session_family": 1, **(projection or {})}
+    rows = await db.web_push_subscriptions.find({"user_id": user_id}, fields).to_list(MAX_SUBSCRIPTIONS_PER_USER)
+    families = sorted({row.get("session_family") for row in rows if row.get("session_family")})
+    if not families:
+        return []
+    sessions = await db.auth_sessions.find(
+        {"user_id": user_id, "family_id": {"$in": families}},
+        {"_id": 0, "family_id": 1, "revoked": 1, "expires_at": 1},
+    ).to_list(len(families) * 2)
+    now = datetime.now(timezone.utc)
+    valid = set()
+    for session in sessions:
+        expires = _as_utc(session.get("expires_at"))
+        if not session.get("revoked") and (expires is None or expires > now):
+            valid.add(session.get("family_id"))
+    return [row for row in rows if row.get("session_family") in valid]
+
+
 async def has_browser_subscription(db, user_id: str | None) -> bool:
-    """Hat die Person einen angemeldeten Browser - und ist Web-Push überhaupt eingerichtet?"""
+    """Hat die Person einen angemeldeten Browser mit gültiger Sitzung - und ist Web-Push überhaupt eingerichtet?"""
     if not user_id or not vapid_config():
         return False
     try:
-        return bool(await db.web_push_subscriptions.find_one({"user_id": user_id}, {"_id": 1}))
+        return bool(await active_subscriptions(db, user_id))
     except Exception:
         return False
 
@@ -365,6 +398,18 @@ async def forget_session(db, user_id: str | None, family_id: str | None) -> int:
     if not user_id or not family_id:
         return 0
     result = await db.web_push_subscriptions.delete_many({"user_id": user_id, "session_family": family_id})
+    return int(getattr(result, "deleted_count", 0) or 0)
+
+
+async def forget_other_sessions(db, user_id: str | None, keep_family: str | None = None) -> int:
+    """Alle Sitzungen enden (Passwort geändert oder zurückgesetzt, Zwei-Faktor aus, überall abmelden): die Browser-
+    Anmeldungen gehen mit - außer der der Sitzung, die bleibt."""
+    if not user_id:
+        return 0
+    query: dict[str, Any] = {"user_id": user_id}
+    if keep_family:
+        query["session_family"] = {"$ne": keep_family}
+    result = await db.web_push_subscriptions.delete_many(query)
     return int(getattr(result, "deleted_count", 0) or 0)
 
 

@@ -9,6 +9,7 @@ import json
 import os
 import pathlib
 import sys
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -24,6 +25,8 @@ from test_web_push_unit import decrypt  # noqa: E402
 pytestmark = pytest.mark.anyio
 
 FCM = "https://fcm.googleapis.com/fcm/send/"
+JWT_SECRET = "flow-tests-secret-with-at-least-32-characters"
+UA = "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0 Safari/537.36"
 
 
 @pytest.fixture
@@ -45,6 +48,7 @@ def keys(monkeypatch):
     for name, value in web_push.generate_keys().items():
         monkeypatch.setenv(name, value)
     monkeypatch.setenv("SENDER_EMAIL", "noreply@example.test")
+    monkeypatch.setenv("JWT_SECRET", JWT_SECRET)
     monkeypatch.delenv("OUTBOUND_DISABLED", raising=False)
 
 
@@ -91,15 +95,30 @@ def push_service(monkeypatch):
     return service
 
 
-async def subscribe(flow, browser: Browser, service=None, **kwargs):
+async def login(flow, user: dict, family: str | None = None, *, expires_in: timedelta = timedelta(days=1)) -> dict:
+    """Eine Sitzung wie nach dem Anmelden: Eintrag in auth_sessions und ein Zugangs-Token mit ihrer Familie."""
+    import auth
+
+    family = family or f"familie-{os.urandom(4).hex()}"
+    await flow.db.auth_sessions.insert_one({
+        "id": f"s-{family}", "family_id": family, "user_id": user["id"], "revoked": False,
+        "expires_at": datetime.now(timezone.utc) + expires_in, "created_at": datetime.now(timezone.utc),
+    })
+    token = auth.create_access_token(user["id"], user["email"], user.get("role") or "user", f"jti-{family}", family)
+    return {"Authorization": f"Bearer {token}", "User-Agent": UA}
+
+
+async def subscribe(flow, browser: Browser, service=None, *, headers: dict | None = None, family: str | None = None):
     if service is not None:
         service["browsers"][browser.endpoint] = browser
-    return await flow.post("/api/web-push/subscriptions", json=browser.subscription(),
-                           headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0 Safari/537.36"}, **kwargs)
+    if headers is None:
+        headers = await login(flow, flow.user, family)
+    return await flow.post("/api/web-push/subscriptions", json=browser.subscription(), headers=headers)
 
 
 async def test_ohne_schluessel_ist_alles_aus(flow, monkeypatch):
     monkeypatch.delenv("WEB_PUSH_VAPID_PRIVATE_KEY", raising=False)
+    monkeypatch.setenv("JWT_SECRET", JWT_SECRET)
     user = await flow.add_user()
     flow.act_as(user)
     config = await flow.get("/api/web-push/config")
@@ -208,26 +227,89 @@ async def test_abgelaufene_anmeldungen_verschwinden(flow, keys, push_service):
     assert left[broken.endpoint]["last_error"] == "HTTP 500"
 
 
-async def test_abmelden_vom_konto_nimmt_die_browser_anmeldung_mit(flow, keys, monkeypatch):
+async def test_abmelden_vom_konto_nimmt_die_browser_anmeldung_mit(flow, keys):
+    """Logout über die Route: die Anmeldung dieses Browsers ist weg, die eines anderen Browsers bleibt."""
     import auth
-    from routes import auth_routes
 
-    monkeypatch.setenv("JWT_SECRET", "flow-tests-secret-with-at-least-32-characters")
     user = await flow.add_user()
     flow.act_as(user)
-    access = auth.create_access_token(user["id"], user["email"], "user", "jti-1", "familie-1")
-    await flow.post("/api/web-push/subscriptions", json=Browser("hier").subscription(), headers={"Authorization": f"Bearer {access}"})
-    other_access = auth.create_access_token(user["id"], user["email"], "user", "jti-2", "familie-2")
-    await flow.post("/api/web-push/subscriptions", json=Browser("dort").subscription(), headers={"Authorization": f"Bearer {other_access}"})
+    await subscribe(flow, Browser("hier"), family="familie-1")
+    await subscribe(flow, Browser("dort"), family="familie-2")
     rows = await flow.db.web_push_subscriptions.find({}, {"_id": 0, "session_family": 1}).to_list(10)
     assert sorted(row["session_family"] for row in rows) == ["familie-1", "familie-2"]
 
     refresh = auth.create_refresh_token(user["id"], "jti-1", "familie-1")
-    await flow.db.refresh_tokens.insert_one({"jti": "jti-1", "user_id": user["id"], "family_id": "familie-1", "token_hash": auth.hash_token(refresh)})
-    await auth_routes._revoke_refresh(flow.db, refresh)
+    await flow.db.refresh_tokens.insert_one({"jti": "jti-1", "user_id": user["id"], "family_id": "familie-1",
+                                             "token_hash": auth.hash_token(refresh)})
+    flow.client.cookies.set("refresh_token", refresh)
+    flow.client.cookies.set("csrf_token", "csrf-1")
+    try:
+        res = await flow.post("/api/auth/logout", headers={"X-CSRF-Token": "csrf-1"})
+    finally:
+        flow.client.cookies.clear()
+    assert res.status_code == 200
 
     left = await flow.db.web_push_subscriptions.find({}, {"_id": 0, "session_family": 1}).to_list(10)
     assert [row["session_family"] for row in left] == ["familie-2"]
+
+
+async def _two_browsers(flow):
+    import auth
+
+    user = await flow.add_user()
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": auth.password_fields("altes-testpasswort-42")})
+    flow.act_as(user)
+    here = await login(flow, user, "familie-hier")
+    await subscribe(flow, Browser("hier"), headers=here)
+    await subscribe(flow, Browser("dort"), family="familie-dort")
+    return user, here
+
+
+async def test_passwort_aendern_beendet_alle_browser_anmeldungen(flow, keys):
+    user, here = await _two_browsers(flow)
+    res = await flow.post("/api/auth/change-password", headers=here,
+                          json={"current_password": "altes-testpasswort-42", "new_password": "neues-testpasswort-42"})
+    assert res.status_code == 200
+    assert await flow.db.web_push_subscriptions.count_documents({"user_id": user["id"]}) == 0
+
+
+async def test_passwort_zuruecksetzen_beendet_alle_browser_anmeldungen(flow, keys):
+    import auth
+
+    user, _here = await _two_browsers(flow)
+    flow.act_as(None)
+    await flow.db.password_reset_tokens.insert_one({
+        "id": "reset-1", "user_id": user["id"], "token_hash": auth.hash_token("reset-link-1"), "used": False,
+        "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+    })
+    res = await flow.post("/api/auth/reset-password", json={"token": "reset-link-1", "new_password": "neues-testpasswort-42"})
+    assert res.status_code == 200
+    assert await flow.db.web_push_subscriptions.count_documents({"user_id": user["id"]}) == 0
+
+
+async def test_ueberall_abmelden_laesst_nur_diesen_browser(flow, keys):
+    user, here = await _two_browsers(flow)
+    # Eine Anmeldung ohne Sitzungs-Eintrag geht auch.
+    await flow.db.web_push_subscriptions.insert_one({"id": "alt", "user_id": user["id"], "endpoint_hash": "x", "endpoint": FCM + "alt"})
+    res = await flow.post("/api/auth/sessions/logout-all", headers=here)
+    assert res.status_code == 200
+    left = await flow.db.web_push_subscriptions.find({"user_id": user["id"]}, {"_id": 0, "session_family": 1}).to_list(10)
+    assert [row.get("session_family") for row in left] == ["familie-hier"]
+
+
+async def test_versand_nur_an_browser_mit_gueltiger_sitzung(flow, keys, push_service):
+    user = await flow.add_user()
+    flow.act_as(user)
+    alive, revoked, expired = Browser("gilt"), Browser("widerrufen"), Browser("abgelaufen")
+    await subscribe(flow, alive, push_service, family="f-gilt")
+    await subscribe(flow, revoked, push_service, family="f-widerrufen")
+    await subscribe(flow, expired, push_service, headers=await login(flow, user, "f-abgelaufen", expires_in=timedelta(days=-1)))
+    await flow.db.auth_sessions.update_one({"family_id": "f-widerrufen"}, {"$set": {"revoked": True}})
+
+    sent = await web_push.send_web_push_for_notification(
+        {"id": "n1", "user_id": user["id"], "kind": "match_call", "title": "Du bist dran", "url": "/matches/m1"})
+    assert sent == 1
+    assert [url for url, _payload, _headers in push_service["received"]] == [alive.endpoint]
 
 
 async def test_auskunft_und_loeschung(flow, keys):

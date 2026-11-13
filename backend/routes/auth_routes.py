@@ -562,6 +562,10 @@ async def _revoke_refresh_family(db, user_id: str, family_id: str, reason: str):
 
 
 async def _revoke_all_auth_sessions(db, user_id: str, reason: str, *, exclude_family: str | None = None):
+    # Browser-Benachrichtigungen (#1163): enden die Sitzungen, enden auch ihre Browser-Anmeldungen.
+    from services.web_push import forget_other_sessions
+
+    await forget_other_sessions(db, user_id, exclude_family)
     query = {"user_id": user_id, "revoked": {"$ne": True}}
     if exclude_family:
         query["family_id"] = {"$ne": exclude_family}
@@ -1269,6 +1273,10 @@ async def logout_all_sessions(request: Request, user: dict = Depends(get_current
             continue
         await _revoke_refresh_family(db, user["id"], family_id, "user_revoked")
         revoked += 1
+    # Browser-Anmeldungen anderer Sitzungen (#1163), auch solche ohne Sitzungs-Eintrag.
+    from services.web_push import forget_other_sessions
+
+    await forget_other_sessions(db, user["id"], current_family)
     # Sweep legacy refresh tokens that never got a session document.
     await db.refresh_tokens.update_many(
         {"user_id": user["id"], "revoked": {"$ne": True}, "family_id": {"$ne": current_family}},
