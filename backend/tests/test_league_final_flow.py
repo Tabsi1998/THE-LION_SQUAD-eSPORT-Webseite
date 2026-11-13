@@ -307,7 +307,9 @@ async def test_the_final_table_stays_when_rules_points_or_results_change_later(f
     assert [(row["registration_id"], row["points"]) for row in live] != [(row["registration_id"], row["points"]) for row in before]
 
     stored = await flow.db.league_final_tables.find_one({"tournament_id": staffel["id"]}, {"_id": 0})
-    assert stored["active"] is True and stored["champion"]["registration_id"] == "reg-1" and stored["zones"] == []
+    assert stored["active"] is True and stored["champion"]["registration_id"] == "reg-1"
+    # Zonen (F.2, #1627): Eine einzige Liga N ist oberste und unterste zugleich - niemand steigt auf oder ab.
+    assert stored["zones"]["top"] and stored["zones"]["bottom"] and stored["promotion"] == {}
     assert stored["rules"]["table"]["match_points"] == {"win": 3, "draw": 0, "loss": 0}
     assert [row["rank"] for row in stored["rows"]] == [1, 2, 3, 4]
 
@@ -362,11 +364,17 @@ async def test_a_tie_on_first_place_needs_a_reasoned_decision_that_stands_in_the
 @pytest.mark.asyncio
 async def test_below_the_top_league_a_shared_first_place_is_no_champion_and_no_blocker(flow):
     _admin, _league, season, _division, _staffel = await setup(flow)
-    second = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={})).json()
+    # Zwei Aufsteiger (F.2): Der geteilte Platz 1 liegt ganz in der Aufstiegszone - kein Meister, kein Entscheid nötig.
+    second = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={"zones": {"promote": 2}})).json()
     lower = await add_staffel(flow, second, "b")
     await tie_on_top(flow, lower)
     row = await cockpit(flow, season, lower)
     assert row["champion_place"] is False and row["blockers"] == [] and row["ties"] == []
+    # Gegenprobe (F.2): Mit nur einem Aufsteiger trennt die Grenze die beiden - dann braucht es einen Entscheid.
+    await flow.db.league_divisions.update_one({"id": second["id"]}, {"$set": {"zones": {"promote": 1}}})
+    row = await cockpit(flow, season, lower)
+    assert [blocker["code"] for blocker in row["blockers"]] == ["zone_tie"] and [tie["kind"] for tie in row["ties"]] == ["zone"]
+    await flow.db.league_divisions.update_one({"id": second["id"]}, {"$set": {"zones": {"promote": 2}}})
     await must_close(flow, lower)
     stored = await flow.db.league_final_tables.find_one({"tournament_id": lower["id"]}, {"_id": 0})
     assert stored["champion"] is None and [item["rank"] for item in stored["rows"][:2]] == [1, 1]

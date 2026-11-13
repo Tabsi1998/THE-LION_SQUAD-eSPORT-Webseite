@@ -84,6 +84,10 @@ AUTO_STAFFEL_PLAN = "Der Spielplan der einzigen Staffel steht schon."
 AUTO_SIBLING = ("{team} hat schon ein Co-Team in der einzigen Staffel, und zwei Co-Teams eines Hauptteams spielen in dieser Season nicht in derselben "
                 "Staffel.")
 AUTO_FAILED = "Es gab einen technischen Fehler, bitte selbst prüfen."
+# Übernommen aus der Vorgänger-Season (F.2, #1627, Nr. 160): Abmelden geht bis zum Start der Season.
+CARRY_DEADLINE = "Abmelden ging bis zum Start der Season ({day}). Jetzt trägt die Liga-Leitung einen Austritt ein."
+CARRY_OTHER_DIVISION = ("Das Co-Team ist aus der Vorgänger-Season in {label} übernommen. Eine Staffel einer anderen Liga geht nur mit Grund "
+                        "(mindestens fünf Zeichen).")
 # Zurückstufen einer angenommenen Anmeldung (#2348): wie beim Ablehnen nur mit Grund, egal ob automatisch oder von Hand angenommen.
 DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, das Team liest ihn."
 
@@ -92,6 +96,25 @@ DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). D
 
 def _moment(value) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
+
+
+def self_seat(assignment: dict | None) -> bool:
+    """Eine Zuteilung, die das Team selbst wieder zurückgeben darf (solange kein fester Spielplan steht): automatisch (#2348) oder aus der
+    Vorgänger-Season übernommen (F.2)."""
+    return bool((assignment or {}).get("auto") or (assignment or {}).get("carried"))
+
+
+def carry_deadline(application: dict | None, season: dict | None) -> datetime | None:
+    """Bis wann sich ein übernommenes Co-Team abmelden kann: der Start der Season (Nr. 160). ``None``: kein übernommener Antrag."""
+    if not (application or {}).get("carry_over") or not season:
+        return None
+    return league_service._aware(season.get("start_date"))
+
+
+def carry_open(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
+    """Darf ein übernommenes Co-Team sich noch abmelden? Andere Anträge kennen keine Frist."""
+    until = carry_deadline(application, season)
+    return until is None or (now or now_utc()) < until
 
 
 def window_state(season: dict, now: datetime | None = None) -> str | None:
@@ -155,6 +178,13 @@ async def public_block(db, season: dict) -> dict | None:
 
 
 # ---------------------------------------------------------------- Prüfung
+
+def _day(value: str | None) -> str:
+    from services.matchday_schedule import LOCAL_TZ
+
+    moment = league_service._aware(value)
+    return moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr") if moment else ""
+
 
 def _when(value: str | None) -> str:
     from services.matchday_schedule import LOCAL_TZ
@@ -424,6 +454,9 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
             application = await _load(db, season["id"], application_id)
             if application["status"] not in OPEN_STATUSES:
                 raise LeagueProblem(DECIDED, 409)
+            fresh = await league_service.get_season(db, season["id"])
+            if not carry_open(application, fresh):
+                raise LeagueProblem(CARRY_DEADLINE.format(day=_day(fresh.get("start_date"))), 409)
             seat = await _auto_seat(db, season, application, locked_id, fixed_detail=WITHDRAW_ASSIGNED)
             if not seat and (application.get("assignment") or await _left_over(db, application)):
                 raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
@@ -437,6 +470,21 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
     await _audit(db, "withdraw", done, user["id"], **_unseat_data(seat))
     await _tell_status(db, league, season, done, WITHDRAWN, squad=squad)
     return done
+
+
+async def withdraw_own(db, application_id: str, user: dict, *, refresh_previews=None) -> dict:
+    """Zurückziehen bzw. abmelden von der Team-Seite (F.2): ohne Umweg über die Ligaseite - eine übernommene Season ist oft noch nicht
+    veröffentlicht. Dieselben Regeln wie ``withdraw``: nur Captain und Vertreter, Frist bis zum Start."""
+    application = await db.league_applications.find_one({"id": application_id}, {"_id": 0, "season_id": 1, "squad_id": 1, "carry_over": 1})
+    # Nur übernommene Anträge: Alles andere zieht das Team wie bisher auf der Ligaseite zurück.
+    if not application or not application.get("carry_over"):
+        raise LeagueProblem(GONE, 404)
+    _team, squad = await _load_side(db, application["squad_id"])
+    if not squad or not await may_apply(db, user, squad):
+        raise LeagueProblem(NOT_RESPONSIBLE, 403)
+    season = await league_service.get_season(db, application["season_id"])
+    league = await league_service.get_league(db, season["league_id"])
+    return await withdraw(db, league, season, application_id, user, refresh_previews=refresh_previews)
 
 
 async def review(db, league: dict, season: dict, application_id: str, actor: dict, *, conflict_reason: str | None = None) -> dict:
@@ -601,6 +649,8 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
     try:
         if registration:
             assignment = await _assignment(db, tournament, registration, actor["id"])
+            if application.get("carry_over"):
+                assignment = {**assignment, "carried": True}  # übernommen (F.2): Abmelden bis zum Start nimmt sie mit heraus
             fields = {**fields, "assignment": {**assignment, "auto": True} if auto else assignment}
         done = await _move(db, application, ACCEPTED, actor["id"], fields=fields, override=override, auto=auto)
     except Exception:
@@ -640,8 +690,19 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
     return {**done, "ids_missing": ids_missing}
 
 
+def carry_deviation(application: dict, tournament: dict, reason: str | None) -> str | None:
+    """Ein übernommener Antrag (F.2) gehört in eine Staffel seiner neuen Liga N. Eine andere nur mit Grund (wird zurückgegeben, steht im Verlauf)."""
+    carry = application.get("carry_over") or {}
+    if not carry.get("division_id") or (tournament.get("league_context") or {}).get("division_id") == carry["division_id"]:
+        return None
+    text = " ".join(str(reason or "").split())
+    if len(text) < REASON_MIN:
+        raise LeagueProblem(CARRY_OTHER_DIVISION.format(label=carry.get("division_label") or "ihrer Liga"), 422)
+    return text[:500]
+
+
 async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
-                 conflict_reason: str | None = None) -> dict:
+                 conflict_reason: str | None = None, deviation_reason: str | None = None) -> dict:
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
     override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     if not tournament_id:
@@ -656,6 +717,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
                 raise LeagueProblem(ASSIGNED_ALREADY, 409)
+            deviation = carry_deviation(application, await _load_staffel(db, fresh, tournament_id), deviation_reason)
             # Der Kader kann sich seit dem Annehmen geändert haben: dieselbe Prüfung wie beim Einreichen, dazu die der Staffel.
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
@@ -665,8 +727,10 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             if problems:
                 raise LeagueProblem(problems[0][1], problems[0][0])
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over, override)
+            if deviation:
+                await db.league_applications.update_one({"id": done["id"]}, {"$set": {"assignment.deviation_reason": deviation}})
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
-    await _audit_decision(db, "assign", done, actor, override, tournament_id=tournament_id)
+    await _audit_decision(db, "assign", done, actor, override, tournament_id=tournament_id, **({"deviation_reason": deviation} if deviation else {}))
     await _tell_status(db, league, season, done, "assigned")
     return {**done, "ids_missing": ids_missing}
 
@@ -780,7 +844,7 @@ async def _auto_seat_to_lock(db, season_id: str, application_id: str) -> str | N
     """Die Staffel einer automatischen Zuteilung: Ablehnen und Warteliste sperren sie vor der Season."""
     application = await db.league_applications.find_one({"id": application_id, "season_id": season_id}, {"_id": 0, "assignment": 1})
     assignment = (application or {}).get("assignment") or {}
-    return assignment.get("tournament_id") if assignment.get("auto") else None
+    return assignment.get("tournament_id") if self_seat(assignment) else None
 
 
 async def _auto_seat(db, season: dict, application: dict, locked_id: str | None, *, fixed_detail: str = AUTO_PLAN_FIXED) -> tuple[dict, dict] | None:
@@ -788,7 +852,7 @@ async def _auto_seat(db, season: dict, application: dict, locked_id: str | None,
     die Staffel nicht gesperrt ist und sie in keinem festen Spiel steht. ``None``: keine solche Zuteilung, dann gilt wie bisher ``ASSIGNED_ALREADY``.
     ``fixed_detail``: der Satz bei festem Spielplan - das Team liest einen anderen als die Leitung."""
     assignment = application.get("assignment") or {}
-    if not assignment.get("auto"):
+    if not self_seat(assignment):
         return None
     if assignment.get("tournament_id") != locked_id:
         raise LeagueProblem(BUSY, 409)
@@ -814,7 +878,7 @@ async def _auto_withdrawable(db, application: dict | None) -> bool:
     """Darf das Team eine automatische Zuteilung noch selbst zurückziehen? Ja, solange sie einen Platz hält, nicht eingecheckt ist, die Staffel vor Check-in
     und Start steht und kein fester Spielplan steht - für den Knopf. Geprüft wird beim Zurückziehen unter der Sperre noch einmal."""
     assignment = (application or {}).get("assignment") or {}
-    if not assignment.get("auto") or application.get("status") != ACCEPTED:
+    if not self_seat(assignment) or application.get("status") != ACCEPTED:
         return False
     registration_id = assignment.get("registration_id")
     registration = await db.tournament_registrations.find_one({"id": registration_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0, "status": 1})
@@ -919,6 +983,8 @@ def _texts(application: dict, title: str, status: str) -> tuple[str, str]:
         # Der Grund steht dabei, wenn die Leitung einen angibt - beim Zurückstufen einer automatisch angenommenen Anmeldung ist er Pflicht (#2348).
         reason = f" Grund: {application.get('decision_reason')}" if application.get("decision_reason") else ""
         return "Auf der Warteliste", f"{name} steht für {title} auf der Warteliste. Wird ein Platz frei, entscheidet die Liga-Leitung.{reason}"
+    if application.get("carry_over"):
+        return "Abgemeldet", f"{name} ist von {title} abgemeldet. Der Startplatz ist frei."
     return "Anmeldung zurückgezogen", f"Die Anmeldung von {name} für {title} ist zurückgezogen."
 
 
@@ -937,6 +1003,9 @@ def _lead_texts(application: dict, title: str, status: str, auto: bool) -> tuple
     if status == SUBMITTED:
         why = f" Automatisch annehmen ging nicht: {problem}" if problem else ""
         return "Neue Anmeldung", f"{name} möchte in {title} mitspielen.{why} Bitte prüfen."
+    if status == WITHDRAWN and application.get("carry_over"):
+        return "Abmeldung aus der neuen Season", (f"{name} hat sich von {title} abgemeldet ({(application.get('carry_over') or {}).get('division_label')}). "
+                                                  "Der Platz ist frei - wer nachrückt, entscheidest du.")
     if status == WITHDRAWN:
         return "Anmeldung zurückgezogen", f"{name} hat die Anmeldung für {title} zurückgezogen. Rückt jemand nach, entscheidest du das."
     return None
@@ -986,20 +1055,36 @@ async def team_answer(db, application: dict) -> dict:
     """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung. Ob eine eben gemachte automatische
     Zuteilung noch zurückgeht, sagt dieselbe Regel wie auf der Ligaseite (``_auto_withdrawable``) - etwa nicht, wenn der Check-in der Staffel läuft."""
     withdrawable = await _auto_withdrawable(db, application)
-    return {**own_view(application, responsible=True, can_act=True, withdrawable=withdrawable), "rule_consent": application.get("rule_consent")}
+    season = await db.league_seasons.find_one({"id": application.get("season_id")}, {"_id": 0}) if application.get("carry_over") else None
+    return {**own_view(application, responsible=True, can_act=True, withdrawable=withdrawable, season=season), "rule_consent": application.get("rule_consent")}
 
 
-def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False, withdrawable: bool = False) -> dict | None:
+def carry_view(application: dict | None, season: dict | None) -> dict | None:
+    """Woher ein übernommenes Co-Team kommt und bis wann es sich abmelden kann (F.2) - ohne Kennungen."""
+    carry = (application or {}).get("carry_over")
+    if not carry:
+        return None
+    until = carry_deadline(application, season)
+    return {"from_season_name": carry.get("from_season_name"), "from_label": carry.get("from_label"), "rank": carry.get("rank"),
+            "movement": carry.get("movement"), "division_label": carry.get("division_label"),
+            "withdraw_until": until.isoformat() if until else None}
+
+
+def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False, withdrawable: bool = False,
+             season: dict | None = None) -> dict | None:
     """Ein Antrag für das eigene Team. Der Kader sieht den Stand, ``responsible`` (Captain, Vertreter, Hauptteam-Leitung) auch den Grund, zurückziehen darf nur ``can_act`` (``may_apply``).
-    Zugeteilt nur bei ``withdrawable``: eine automatische Zuteilung ohne festen Spielplan (#2348, ``_auto_withdrawable``)."""
+    Zugeteilt nur bei ``withdrawable``: eine automatische oder übernommene Zuteilung ohne festen Spielplan (#2348, F.2, ``_auto_withdrawable``).
+    Übernommen aus der Vorgänger-Season (F.2): ``carry_over`` mit der Frist zum Abmelden - danach kein Zurückziehen mehr (``season``)."""
     if not application:
         return None
     out = {"id": application["id"], "status": application["status"], "submitted_at": application.get("submitted_at"),
-           "staffel": (application.get("assignment") or {}).get("label"), "staffel_left": left}
+           "staffel": (application.get("assignment") or {}).get("label"), "staffel_left": left,
+           "carry_over": carry_view(application, season)}
     if responsible:
         out.update(decided_at=application.get("decided_at"), decision_reason=application.get("decision_reason"),
                    rules_label=f"Version {(application.get('rule_consent') or {}).get('version')}" if application.get("rule_consent") else None,
-                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and (not application.get("assignment") or withdrawable))
+                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and (not application.get("assignment") or withdrawable)
+                   and carry_open(application, season))
     return out
 
 
@@ -1054,7 +1139,7 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
                "display_name": squad_registration.display_name(team, squad), "member_count": len([uid for uid in squad.get("member_ids") or [] if uid]),
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
                "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone),
-                                       withdrawable=can_apply and await _auto_withdrawable(db, application))}
+                                       withdrawable=can_apply and await _auto_withdrawable(db, application), season=season)}
         if can_apply:
             check = {"problems": [], "warnings": [], "shortfall": None}
             if state == OPEN and not active:
@@ -1092,16 +1177,22 @@ async def my_applications(db, user: dict) -> list[dict]:
         if season_id not in seasons:
             seasons[season_id] = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) or {}
         season = seasons[season_id]
-        if not season or season.get("status") in ("completed", "archived") or not await league_service.can_see_season(user, season):
+        if not season or season.get("status") in ("completed", "archived"):
+            continue
+        visible = await league_service.can_see_season(user, season)
+        # Übernommen aus der Vorgänger-Season (F.2): Das eigene Co-Team erfährt es per Nachricht und meldet sich hier ab - auch solange die
+        # neue Season noch nicht veröffentlicht ist. Ein Link zur Ligaseite erst, wenn sie sichtbar ist.
+        if not visible and not application.get("carry_over"):
             continue
         league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1, "slug": 1}) or {}
         squad = by_id[squad_id]
         can_act = await may_apply(db, user, squad)
         responsible = can_act or user["id"] in _leads(teams[squad["team_id"]])
         withdrawable = can_act and await _auto_withdrawable(db, application)
-        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone, withdrawable=withdrawable),
+        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone, withdrawable=withdrawable,
+                                 season=season),
                       "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
-                      "url": f"/liga/{league.get('slug')}/{season.get('slug')}"})
+                      "url": f"/liga/{league.get('slug')}/{season.get('slug')}" if visible else None})
     return items
 
 
@@ -1152,7 +1243,10 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
         items.append({
             "id": row["id"], "status": row["status"], "squad_id": row["squad_id"], "team_id": row["team_id"], "display_name": row.get("display_name"),
             "squad_name": row.get("squad_name"), "team_name": row.get("team_name"), "submitted_at": row.get("submitted_at"),
-            "applied_by_name": names.get(row.get("applied_by")) or "Gelöschter User",
+            "applied_by_name": (f"Übernommen aus {(row.get('carry_over') or {}).get('from_season_name') or 'der Vorgänger-Season'}"
+                                if row.get("carry_over") and not row.get("applied_by") else names.get(row.get("applied_by")) or "Gelöschter User"),
+            # Aus der Vorgänger-Season (F.2): woher, welche Liga N jetzt, bis wann Abmelden geht.
+            "carry_over": ({**(row.get("carry_over") or {}), **(carry_view(row, season) or {})} if row.get("carry_over") else None),
             "rules_version": (row.get("rule_consent") or {}).get("version"), "rules_at": (row.get("rule_consent") or {}).get("at"),
             "privacy_at": (row.get("privacy_consent") or {}).get("at"),
             "decided_at": row.get("decided_at"), "decided_by_name": names.get(row.get("decided_by")), "decision_reason": row.get("decision_reason"),

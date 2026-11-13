@@ -149,6 +149,24 @@ Staffel ab**. Ihr bekommt eine Nachricht. Ab dann steht über der Tabelle „End
   stehen an der Tabelle.
 - **Fehler entdeckt?** Meldet euch bei der Liga-Leitung. Sie kann die Staffel mit Grund wieder öffnen, korrigieren und neu
   abschließen – darüber bekommt ihr ebenfalls eine Nachricht.
+- **Auf- und Abstieg:** In der Tabelle zeigt ein Strich links, wer aufsteigt (grün) oder absteigt (orange). Es zählt der
+  Endstand, ohne weitere Bestätigung. Ein ausgetretenes oder disqualifiziertes Team steigt nie auf und ist in der nächsten
+  Season nicht dabei.
+
+## Neue Season: ihr seid automatisch dabei
+
+Legt die Liga-Leitung die nächste Season an, steht euer Co-Team **automatisch** in seiner neuen Liga – nach Auf- und Abstieg.
+Captain und Vertreter bekommen eine Nachricht. Unter **Teams** steht beim Co-Team „Übernommen aus Season 1: Liga 1 (Aufstieg aus
+Liga 2). Abmelden bis zum Start …“.
+
+<img src="../assets/liga/f2-abmelden-390.png" alt="Teams am Handy: beim Co-Team die neue Season mit dem Stand Angemeldet – Zuteilung folgt, der Satz Übernommen aus Season 1 mit Liga und Frist und der Knopf Abmelden" width="300">
+
+- **Nicht dabei sein?** **Abmelden** – unter Teams oder auf der Ligaseite, bis zum Start der Season. Danach geht es nur noch über
+  die Liga-Leitung. Euer Platz geht an die Warteliste oder neue Anmeldungen.
+- **Regelwerk:** Gibt es eine neue Fassung, stimmt Captain oder Vertreter ihr vor dem ersten Spiel zu (Startseite oder
+  Regelwerk). Ohne Zustimmung geht kein Check-in.
+- **Kader:** Die Kaderregeln der Season gelten weiter – prüft vor dem Start, ob alle Angaben stimmen.
+- **Profil:** Team- und Spielerprofil zeigen unter **Seasons** eure Liga, euren Platz und den Meistertitel.
 
 ## Strafen und Einspruch
 

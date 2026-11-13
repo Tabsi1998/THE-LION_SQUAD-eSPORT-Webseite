@@ -395,6 +395,14 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-standing-note[data-tone="exit"] { color: rgb(var(--tls-warn-rgb)); font-weight: 600; }
 .tls-standing-note__reason { color: var(--tls-muted); }
 .tls-standing-row:has(.tls-standing-note[data-tone="exit"]) .tls-standing-name { color: rgb(255 255 255 / 0.6); }
+/* Zonen für Auf- und Abstieg (F.2, #1627): ein Strich links am Platz - Grün hinauf, Orange hinunter, Relegation heller.
+   Gleiche Farben in Legende, TV (tv-standings__row) und PDF (pdf_service._ZONE_COLORS). */
+.tls-standing-row[data-zone] .tls-standing-rank, .tls-zone-swatch { box-shadow: inset 3px 0 0 var(--tls-zone-color); }
+.tls-standing-row[data-zone="promotion"], .tls-zone-swatch[data-zone="promotion"], .tv-standings__row[data-zone="promotion"] { --tls-zone-color: rgb(var(--tls-ok-rgb)); }
+.tls-standing-row[data-zone="playoff_promotion"], .tls-zone-swatch[data-zone="playoff_promotion"], .tv-standings__row[data-zone="playoff_promotion"] { --tls-zone-color: rgb(var(--tls-ok-rgb) / 0.5); }
+.tls-standing-row[data-zone="playoff_relegation"], .tls-zone-swatch[data-zone="playoff_relegation"], .tv-standings__row[data-zone="playoff_relegation"] { --tls-zone-color: rgb(var(--tls-warn-rgb) / 0.5); }
+.tls-standing-row[data-zone="relegation"], .tls-zone-swatch[data-zone="relegation"], .tv-standings__row[data-zone="relegation"] { --tls-zone-color: rgb(var(--tls-warn-rgb)); }
+.tls-zone-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: rgb(255 255 255 / 0.04); box-shadow: inset 3px 0 0 var(--tls-zone-color); }
 .tls-standing-move {
   display: inline-flex; align-items: center; gap: 1px; font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif;
   font-size: 12px; font-weight: 700; line-height: 1;

@@ -275,7 +275,9 @@ STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "
                    # Liga-Staffel (E.1, #1625): was den Gleichstand entschied, kampflos, Abzug, Ausscheiden.
                    "tiebreak", "forfeit_won", "forfeit_lost", "deducted_points", "exit",
                    # Angefochtene Ergebnisse (E.2, #1619): wie viele Spiele der Zeile „in Klärung“ sind - nur die Zahl.
-                   "contested")
+                   "contested",
+                   # Zone für Auf- und Abstieg (F.2, #1627): Strich am Platz wie auf der Website.
+                   "zone")
 STANDING_GROUP_FIELDS = ("id", "group_key", "name")
 
 

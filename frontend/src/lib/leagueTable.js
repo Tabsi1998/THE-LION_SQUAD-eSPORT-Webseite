@@ -128,3 +128,47 @@ export function standingNotes(row) {
 export function hidesDraws(rules, rows) {
   return rules?.allow_draws === false && !(rows || []).some((row) => Number(row?.drawn) > 0);
 }
+
+// Zonen für Auf- und Abstieg (F.2, #1627, Nr. 158): der Server schreibt ``zone`` an jede Zeile einer Liga-Staffel. Grün hinauf, Orange
+// hinunter, Relegation heller - Rot bleibt Live, Gold dem Podest (LSW-Farbregel). Dieselben Wörter im PDF (pdf_service._ZONE_TEXT).
+export const ZONE_LABELS = {
+  promotion: "Aufstieg",
+  playoff_promotion: "Relegation um den Aufstieg",
+  playoff_relegation: "Relegation gegen den Abstieg",
+  relegation: "Abstieg",
+};
+const ZONE_ORDER = ["promotion", "playoff_promotion", "playoff_relegation", "relegation"];
+
+/** Die Zonen, die in dieser Tabelle vorkommen - in fester Reihenfolge, für die Legende unter der Tabelle. */
+export function zoneLegend(rows) {
+  const used = new Set((rows || []).map((row) => row?.zone).filter(Boolean));
+  return ZONE_ORDER.filter((zone) => used.has(zone)).map((zone) => ({ zone, label: ZONE_LABELS[zone] }));
+}
+
+/** Kurzer Satz zu den Zonen einer Liga N für die Verwaltung: „1 Aufsteiger · 1 Absteiger“, mit den Randfällen. */
+export function zonesLine(zones) {
+  if (!zones) return "";
+  const parts = [];
+  if (zones.top) parts.push("oberste Liga: kein Aufstieg");
+  else parts.push(zones.promote ? `${zones.promote} Aufsteiger` : "kein Aufstieg");
+  if (zones.playoff_promote) parts.push(`${zones.playoff_promote} Relegation oben`);
+  if (zones.playoff_relegate) parts.push(`${zones.playoff_relegate} Relegation unten`);
+  if (zones.bottom) parts.push("unterste Liga: kein Abstieg");
+  else parts.push(zones.relegate ? `${zones.relegate} Absteiger` : "kein Abstieg");
+  return parts.join(" · ");
+}
+
+/** Die Zonen einer Liga N als Formularwerte (Texte für Zahlenfelder) - fehlt ein Wert, gilt 1/1 ohne Relegation. */
+export function zonesToForm(zones) {
+  const value = (key, fallback) => String(zones?.[key] ?? fallback);
+  return { promote: value("promote", 1), relegate: value("relegate", 1), playoff_promote: value("playoff_promote", 0), playoff_relegate: value("playoff_relegate", 0) };
+}
+
+/** Formular → ``zones`` für den Server: ganze Zahlen 0–10, leer heißt Vorgabe. */
+export function zonesPayload(form) {
+  const number = (text, fallback) => {
+    const parsed = Number.parseInt(String(text ?? "").trim(), 10);
+    return Number.isFinite(parsed) ? Math.min(10, Math.max(0, parsed)) : fallback;
+  };
+  return { promote: number(form.promote, 1), relegate: number(form.relegate, 1), playoff_promote: number(form.playoff_promote, 0), playoff_relegate: number(form.playoff_relegate, 0) };
+}

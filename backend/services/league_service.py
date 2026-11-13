@@ -871,6 +871,17 @@ async def _platform_overrides(db, season: dict, overrides: dict, before: dict | 
         raise LeagueProblem(problem.message, problem.status) from None
 
 
+def _zones(raw: dict | None, season: dict, overrides: dict | None) -> dict:
+    """Zonen für Auf- und Abstieg einer Liga N (F.2, #1627) geprüft: nicht mehr Plätze als Teams in einer Staffel."""
+    from services import league_zones
+
+    size = effective_settings(season, {"overrides": overrides or {}}).get("max_staffel_size")
+    try:
+        return league_zones.clean(raw, size)
+    except league_zones.ZoneProblem as problem:
+        raise LeagueProblem(problem.message, problem.status) from None
+
+
 async def create_division(db, season: dict, body: dict, user: dict, *, warnings: list | None = None) -> dict:
     level = body.get("level")
     if level is None:
@@ -887,6 +898,8 @@ async def create_division(db, season: dict, body: dict, user: dict, *, warnings:
         **await _look(db, {key: value for key, value in body.items() if value is not None}, (league_look.PRIZES,)),
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
     }
+    if body.get("zones") is not None:
+        doc["zones"] = _zones(body["zones"], season, doc["overrides"])
     if (doc["overrides"] or {}).get("best_of"):
         await _division_order_check(db, season, doc, None, warnings)
     try:
@@ -906,6 +919,10 @@ async def update_division(db, division: dict, body: dict, *, warnings: list | No
                                                          division.get("overrides"))
     if body.get("status"):
         updates["status"] = body["status"]
+    if body.get("zones") is not None or ("overrides" in updates and division.get("zones")):
+        # Auf- und Abstieg (F.2): auch eine kleinere Staffelgröße darf die gespeicherten Zonen nicht überschneiden lassen.
+        updates["zones"] = _zones(body.get("zones") if body.get("zones") is not None else division.get("zones"), season,
+                                  updates.get("overrides", division.get("overrides")))
     updates.update(await _look(db, body, (league_look.PRIZES,)))
     if "overrides" in updates or "status" in updates:
         await _division_order_check(db, season, {**division, **updates}, division, warnings)
@@ -1480,6 +1497,8 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
     return {
         "league": {**public_league(league), "game": map_pools.game_summary(game)},
         "season": public_season(season),
+        # Aus der Vorgänger-Season übernommen (F.2, #1627): Die Ligaseite zeigt den eigenen Co-Teams Stand und „Abmelden“ auch ohne Anmeldefenster.
+        "carried_over": bool(season.get("predecessor_id")),
         # Gestaltung (#2107): Emblem und Banner Season → Liga → nichts; Farbe der Liga (leer = Vereinsfarbe).
         "look": league_look.effective(league, season),
         # „Um was gespielt wird“ - die Gewinne der Season; eine Liga N mit eigenen trägt sie unter ``prizes``.

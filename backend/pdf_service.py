@@ -782,6 +782,10 @@ def _pdf_group_title(group: dict, index: int) -> str:
 
 
 _EXIT_SUFFIX = {"withdrawn": "ausgetreten", "disqualified": "disqualifiziert"}
+# Zonen für Auf- und Abstieg (F.2, #1627): dieselben Wörter und Farben wie in der Webtabelle (lib/leagueTable.js ZONE_LABELS).
+_ZONE_TEXT = {"promotion": "Aufstieg", "playoff_promotion": "Relegation", "playoff_relegation": "Relegation", "relegation": "Abstieg"}
+_ZONE_COLORS = {"promotion": colors.HexColor("#1FD08E"), "playoff_promotion": colors.HexColor("#8FE8C7"),
+                "playoff_relegation": colors.HexColor("#FFCFA1"), "relegation": colors.HexColor("#FF9F43")}
 
 
 def _standing_name(row: dict) -> str:
@@ -793,6 +797,8 @@ def _standing_name(row: dict) -> str:
     contested = row.get("contested") if isinstance(row.get("contested"), int) and not isinstance(row.get("contested"), bool) else 0
     if contested > 0:
         notes.append("1 Spiel in Klärung" if contested == 1 else f"{contested} Spiele in Klärung")
+    if _ZONE_TEXT.get(row.get("zone") or ""):
+        notes.append(_ZONE_TEXT[row["zone"]])
     return f"{name} ({', '.join(notes)})" if notes else name
 
 
@@ -814,6 +820,8 @@ def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
             # Der Rundenname braucht Platz, die Zahlen nicht.
             "wide": [index for index, (label, _keys, _fmt) in enumerate(columns) if label == "Erreicht"],
             "headers": ["Platz", name_head, *[label for label, _keys, _fmt in columns]],
+            # Zone je Zeile (Liga-Staffel, F.2): ein farbiger Strich links - nur bei Zeilen mit Zone.
+            "zones": [row.get("zone") if row.get("zone") in _ZONE_COLORS else None for row in section_rows],
             "rows": [
                 [str(row.get("rank", "")), _standing_name(row),
                  *[fmt(_first(row, *keys)) for _label, keys, fmt in columns]]
@@ -839,6 +847,10 @@ def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None
         body = table["rows"] or [["", "Noch keine Ergebnisse", *[""] * numbers]]
         t = Table([table["headers"], *_fit_rows_to_columns(body, widths)], colWidths=widths, repeatRows=1)
         t.setStyle(_table_style())
+        marks = [("LINEBEFORE", (0, index), (0, index), 4, _ZONE_COLORS[zone])
+                 for index, zone in enumerate(table.get("zones") or [], start=1) if zone]
+        if marks:
+            t.setStyle(TableStyle(marks))
         if table["title"]:
             # Die Gruppenüberschrift bleibt bei ihrer Tabelle - nie allein unten auf einer Seite.
             story.append(KeepTogether([Paragraph(escape(_normalize_pdf_text(table["title"])), styles["TLSSection"]), t]))

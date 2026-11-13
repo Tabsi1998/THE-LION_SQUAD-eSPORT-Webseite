@@ -342,7 +342,7 @@ export function TeamsPanel() {
                           );
                         })}
                       </div>
-                      <SquadApplicationStatus items={applications.filter((row) => row.squad_id === squad.id)} />
+                      <SquadApplicationStatus items={applications.filter((row) => row.squad_id === squad.id)} onChanged={loadApplications} />
                       {squad.league_requirement ? <SquadEligibilityPanel teamId={activeId} squad={squad} /> : null}
                     </div>
                   ))}

@@ -10,7 +10,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormSection } from "@/components/tls/AdminForm";
 import { TextAreaField } from "@/components/tls/FormFields";
 import { ConflictReasonField, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
-import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
+import { StandingsTable, ZoneLegend, standingKey } from "@/components/tls/tournament/StandingsTable";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatApiError } from "@/lib/api";
 import { closeState, decisionLine, finalMoment, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "@/lib/leagueFinal";
@@ -35,9 +35,13 @@ function Table({ rows, rules, championId, label }) {
     <div className="tls-close-table">
       <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" championKey={leader ? standingKey(leader) : null}
         hideDraws={hidesDraws(rules, rows)} mapPoints={byMaps(rules)} />
+      <ZoneLegend rows={rows} />
     </div>
   );
 }
+
+// Gleichstände, die einen Entscheid brauchen (Nr. 156): um den Meistertitel und - seit F.2 (#1627) - an einer Grenze zu Auf- oder Abstieg.
+const TIE_BLOCKERS = { champion_tie: { kind: "champion", label: "Meister entscheiden" }, zone_tie: { kind: "zone", label: "Platz entscheiden" } };
 
 /** Die Checkliste: jeder Sperrgrund mit seinen Fällen und dem Weg dorthin. */
 function Checklist({ row, canResults, superadmin, onDecide }) {
@@ -62,7 +66,7 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
             <ul className="mt-2 space-y-1">
               {blocker.items.map((item, index) => (
                 <li key={`${item.url}-${index}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                  {blocker.code === "champion_tie"
+                  {TIE_BLOCKERS[blocker.code]
                     ? <span className="min-w-0 break-words text-white/85">{item.text}</span>
                     : <Link to={item.url} className="inline-flex min-h-11 min-w-0 items-center break-words text-[#29B6E8] hover:underline">{item.text}</Link>}
                   {untilText(item) ? <span className="text-xs tabular-nums text-white/55">{untilText(item)}</span> : null}
@@ -71,7 +75,7 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
             </ul>
           ) : null}
           {blocker.count > blocker.items.length ? <p className="mt-1 text-xs text-white/50">und {blocker.count - blocker.items.length} weitere</p> : null}
-          {blocker.code === "champion_tie" ? (
+          {TIE_BLOCKERS[blocker.code] ? (
             <div className="mt-2 space-y-2">
               {!row.can_decide ? (
                 <p className="text-xs text-white/65">
@@ -80,11 +84,12 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
                 </p>
               ) : !canResults ? (
                 <p className="text-xs text-white/65">Den Entscheid trifft, wer in dieser Liga „Ergebnisse korrigieren“ darf.</p>
-              ) : row.ties.map((tie) => (tie.own_team && !superadmin
+              ) : row.ties.filter((tie) => (tie.kind || "champion") === TIE_BLOCKERS[blocker.code].kind).map((tie) => (tie.own_team && !superadmin
                 ? <OwnTeamNote key={tie.rank} testId={`close-tie-own-${row.tournament_id}`} />
                 : (
-                  <button key={tie.rank} type="button" onClick={() => onDecide(tie)} className={`${BUTTON} tls-btn--secondary`} data-testid={`close-decide-${row.tournament_id}`}>
-                    Meister entscheiden
+                  <button key={tie.rank} type="button" onClick={() => onDecide(tie)} className={`${BUTTON} tls-btn--secondary`}
+                    data-testid={tie.kind === "zone" ? `close-decide-zone-${row.tournament_id}-${tie.rank}` : `close-decide-${row.tournament_id}`}>
+                    {TIE_BLOCKERS[blocker.code].label}
                   </button>
                 )))}
             </div>
@@ -131,14 +136,15 @@ function CloseSheet({ row, superadmin, onClose, onDone }) {
           <p className="flex items-center gap-2 rounded-sm border border-honor/40 bg-honor/5 px-3 py-2 text-white" data-testid="close-sheet-champion">
             <Crown className="h-4 w-4 shrink-0 text-honor" aria-hidden="true" /> Meister: <strong className="min-w-0 break-words">{row.champion?.display_name || "–"}</strong>
           </p>
-        ) : <p className="text-white/55">In dieser Liga N gibt es keinen Meistertitel – Auf- und Abstieg folgen mit der nächsten Season.</p>}
+        ) : <p className="text-white/55">In dieser Liga N gibt es keinen Meistertitel.</p>}
+        {row.zones_label ? <p className="text-white/65" data-testid="close-sheet-zones">Auf- und Abstieg: {row.zones_label}. Er ergibt sich aus diesem Endstand und gilt für die nächste Season.</p> : null}
       </div>
       {override ? <div className="mt-4"><ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="close-conflict-reason" /></div> : null}
     </AdminSheet>
   );
 }
 
-function ReopenSheet({ row, superadmin, onClose, onDone }) {
+function ReopenSheet({ row, superadmin, successor, onClose, onDone }) {
   const [reason, setReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
@@ -166,6 +172,13 @@ function ReopenSheet({ row, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title="Staffel wieder öffnen" eyebrow={staffelLabel(row)} onClose={onClose} onSubmit={submit} saving={saving} noValidate
       submitLabel="Wieder öffnen" savingLabel="Öffne …" submitTestId="reopen-confirm" testId="reopen-sheet">
+      {/* Neue Season schon angelegt (F.2, Nr. 162): Sie folgt dem neuen Endstand nicht von selbst. */}
+      {successor ? (
+        <p className="mb-3 flex items-start gap-2 rounded-sm border border-warn/50 bg-warn/10 p-3 text-sm font-semibold text-white" role="note" data-testid="reopen-successor">
+          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+          <span>Es gibt schon die neue Season {successor.name}. Nach dem neuen Abschluss die Übernahme dort neu berechnen.</span>
+        </p>
+      ) : null}
       {row.incomplete ? (
         <p className="text-sm text-white/75">
           Der Abschluss wurde nicht fertig geschrieben – die Staffel ist gesperrt, einen Endstand gibt es nicht. Wieder öffnen gibt sie frei, danach schließt du
@@ -250,6 +263,7 @@ function StaffelCard({ row, data, canResults, onSheet }) {
 
       <div className="mt-4">
         <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">{row.closed ? "Endstand" : "Vorschau des Endstands"}</h4>
+        {row.zones_label ? <p className="mb-2 text-xs text-white/55" data-testid={`close-zones-${row.tournament_id}`}>Auf- und Abstieg: {row.zones_label}</p> : null}
         <Table rows={row.standings || []} rules={row.table_rules} championId={championId} label={`${row.closed ? "Endstand" : "Vorschau"} ${label}`} />
       </div>
 
@@ -326,9 +340,11 @@ export function SeasonCloseTab({ seasonId, canResults = false }) {
       <div className="mt-4 space-y-4">
         {data.staffeln.map((row) => <StaffelCard key={row.tournament_id} row={row} data={data} canResults={canResults} onSheet={setSheet} />)}
       </div>
-      <p className="mt-4 text-[11px] text-white/45">Auf- und Abstieg sind vorgemerkt: Zonen und Vorschlag kommen mit „Season aus Vorgänger übernehmen“.</p>
+      <p className="mt-4 text-[11px] text-white/45">
+        Auf- und Abstieg ergeben sich aus dem Endstand (Zonen je Liga im Reiter „Ligen und Staffeln“). Ist alles abgeschlossen, legt „Neue Season aus …“ oben die nächste Season an.
+      </p>
       {sheet?.kind === "close" ? <CloseSheet row={sheet.row} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
-      {sheet?.kind === "reopen" ? <ReopenSheet row={sheet.row} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
+      {sheet?.kind === "reopen" ? <ReopenSheet row={sheet.row} superadmin={data.superadmin} successor={data.successor} onClose={() => setSheet(null)} onDone={done} /> : null}
       {sheet?.kind === "version" ? <VersionSheet row={sheet.row} entry={sheet.entry} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === "decide" ? (
         <OrderSheet staffel={{ tournament_id: sheet.row.tournament_id, label: staffelLabel(sheet.row) }} tie={sheet.tie} override={Boolean(sheet.tie.own_team)}
