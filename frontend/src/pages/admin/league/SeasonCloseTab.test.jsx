@@ -151,3 +151,18 @@ test("ein abgelehnter Abschluss lädt die Karte neu und sagt, warum", async () =
   await waitFor(() => expect(screen.queryByTestId("close-sheet")).toBeNull());
   expect(apiMock.get).toHaveBeenCalledTimes(2);
 });
+
+test("ein abgebrochener Abschluss steht ehrlich da: kein Abschließen, Wieder öffnen gibt die Staffel frei", async () => {
+  renderTab(data([staffel({ status: "completed", incomplete: true, can_close: false, can_reopen: true, champion: null, blockers: [
+    { code: "incomplete_close", label: "Abschluss unvollständig", text: "Der Abschluss wurde nicht fertig geschrieben.", count: 0, items: [] },
+  ] })]));
+  expect(await screen.findByTestId("close-state-t1")).toHaveTextContent("Unvollständig");
+  expect(screen.getByTestId("close-blocker-t1-incomplete_close")).toHaveTextContent("Abschluss unvollständig");
+  expect(screen.queryByTestId("close-button-t1")).toBeNull();
+  fireEvent.click(screen.getByTestId("reopen-button-t1"));
+  const sheet = screen.getByTestId("reopen-sheet");
+  expect(sheet).toHaveTextContent("einen Endstand gibt es nicht");
+  fireEvent.change(within(sheet).getByTestId("reopen-reason"), { target: { value: "Abschluss brach ab" } });
+  fireEvent.click(within(sheet).getByTestId("reopen-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/reopen", { reason: "Abschluss brach ab" }));
+});

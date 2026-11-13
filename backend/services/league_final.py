@@ -53,6 +53,8 @@ SECOND_PERSON = "Wieder öffnen muss eine zweite Person: nicht die, die abgeschl
 SECOND_PERSON_SUPERADMIN = ("Du hast diese Staffel selbst abgeschlossen. Als Superadmin geht das Wiederöffnen nur als "
                             "Notausnahme, mit einem Grund von mindestens fünf Zeichen.")
 BUSY = "Der Abschluss wird gerade bearbeitet. Bitte gleich noch einmal."
+INCOMPLETE = ("Der Abschluss wurde nicht fertig geschrieben: Die Staffel ist gesperrt, einen Endstand gibt es nicht. „Wieder öffnen“ "
+              "gibt sie frei, danach neu abschließen.")
 
 
 class FinalProblem(Exception):
@@ -617,8 +619,11 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
         raise FinalProblem("Das gibt es nur in einer Liga-Staffel.", 404)
     tid = tournament["id"]
     final = await active_final(db, tid)
-    if not is_closed(tournament) or not final:
+    if not is_closed(tournament):
         raise FinalProblem(NOT_CLOSED, 409)
+    if not final:
+        # Abgebrochener Abschluss (N-b): Marke ohne Fassung - freigeben statt festhängen.
+        return await _free_incomplete(db, tournament, actor, reason, conflict_reason=conflict_reason, now=now)
     text = reason_text(reason, "einen Grund für das Wiederöffnen")
     emergency = second_person_override(final, actor, emergency_reason)
     override = await _conflict_override(db, actor, tid, conflict_reason)
@@ -662,6 +667,40 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
             "season_status": season_status}
 
 
+async def _free_incomplete(db, tournament: dict, actor: dict, reason, *, conflict_reason: str | None, now: datetime | None) -> dict:
+    """Ein Abschluss, der nach der Marke am Turnier und vor der Fassung abbrach (Prozessende, Absturz): Die Staffel ist gesperrt, einen
+    Endstand gibt es nicht. Wieder öffnen nimmt die Marke zurück - mit Grund und Protokoll, ohne zweite Person (es gibt keine Fassung
+    und niemanden, der sie abgeschlossen hat) und ohne Nachricht (die Captains haben vom Abschluss nie erfahren)."""
+    from services import league_permissions
+
+    tid = tournament["id"]
+    mark = tournament.get("final_table") or {}
+    text = reason_text(reason, "einen Grund für das Wiederöffnen")
+    override = await _conflict_override(db, actor, tid, conflict_reason)
+    now = now or now_utc()
+    status = tournament.get("status_before_final") or "live"
+    freed = await db.tournaments.update_one({"id": tid, "final_table.id": mark.get("id")},
+                                            {"$set": {"final_table": None, "status": status, "updated_at": now.isoformat()},
+                                             "$unset": {"status_before_final": ""}})
+    if not freed.modified_count:
+        raise FinalProblem(NOT_CLOSED, 409)
+
+    async def record_override() -> None:
+        if override:
+            await league_permissions.record_override(db, actor, action="final_reopen", target_id=tid, reason=override, final_table_id=mark.get("id"))
+
+    async def audit() -> None:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "league.final.repair", "actor_id": actor.get("id"), "target_id": tid,
+            "data": {"final_table_id": mark.get("id"), "version": mark.get("version"),
+                     "season_id": (tournament.get("league_context") or {}).get("season_id"), "reason": text},
+            "created_at": now.isoformat()})
+
+    await _follow_up("Protokoll der Notausnahme", tid, record_override)
+    await _follow_up("Protokoll", tid, audit)
+    return {"final": {"id": mark.get("id"), "version": mark.get("version"), "active": False, "incomplete": True}, "season_status": None}
+
+
 # ---------------------------------------------------------------- Cockpit
 
 def _history_row(final: dict, names: dict[str, str]) -> dict:
@@ -701,6 +740,12 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
         "status": tournament.get("status"), "champion_place": decisive, "own_team": own_team,
         "history": [_history_row(row, names) for row in history],
     }
+    if is_closed(tournament) and not active:
+        # Abgebrochener Abschluss (N-b): ehrlich als solcher - gesperrt, ohne Endstand, mit „Wieder öffnen“ als Ausweg.
+        return {**base, "closed": False, "incomplete": True, "final": None, "standings": await live_rows(db, tournament),
+                "table_rules": public_rules(tournament), "blockers": [_blocker("incomplete_close", "Abschluss unvollständig", INCOMPLETE, [])],
+                "ties": [], "can_decide": False, "champion": None, "can_close": False, "closed_by_me": False,
+                "can_reopen": can_act and (not own_team or superadmin)}
     if active:
         rows = (await frozen_rows(db, tournament)) or []
         closed_by_me = active.get("closed_by") == user.get("id")

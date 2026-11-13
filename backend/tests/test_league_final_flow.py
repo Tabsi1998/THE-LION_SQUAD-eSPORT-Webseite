@@ -960,3 +960,28 @@ async def test_a_point_deduction_that_races_the_close_is_refused_under_the_lock(
     tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert tournament["final_table"]["version"] == 1 and not tournament.get("point_deductions")
     assert await flow.db.competition_sanctions.count_documents({}) == 0
+
+
+# ---------------------------------------------------------------- Abbruch mitten im Abschluss (Runde 2, N-b)
+
+@pytest.mark.asyncio
+async def test_a_close_cut_off_before_its_version_shows_honestly_and_can_be_freed_and_closed_again(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    # Der Prozess endete nach der Marke am Turnier und vor der Fassung - nichts hat aufgeräumt.
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {
+        "final_table": {"id": new_id(), "version": 1, "closed_at": now_utc().isoformat()}, "status": "completed", "status_before_final": "live"}})
+    row = await cockpit(flow, season, staffel)
+    assert row["closed"] is False and row["incomplete"] is True
+    assert [blocker["code"] for blocker in row["blockers"]] == ["incomplete_close"]
+    assert row["can_close"] is False and row["can_reopen"] is True
+    assert (await cockpit(flow, season))["season"]["closed"] is False
+    freed = await must_reopen(flow, staffel, reason="Abschluss brach mittendrin ab")
+    assert freed.json()["version"] == 1
+    tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert tournament["final_table"] is None and tournament["status"] == "live" and "status_before_final" not in tournament
+    assert await flow.db.audit_logs.count_documents({"action": "league.final.repair"}) == 1
+    assert await flow.db.notifications.count_documents({}) == 0
+    again = await must_close(flow, staffel)
+    assert again.json()["version"] == 1
+    assert (await cockpit(flow, season, staffel))["closed"] is True

@@ -5,6 +5,7 @@ test("Stand einer Staffel: abgeschlossen, bereit oder mit der Zahl der offenen P
   expect(closeState({ closed: false, blockers: [] })).toEqual({ key: "ready", label: "Bereit zum Abschluss" });
   expect(closeState({ blockers: [{ code: "open_matches" }] }).label).toBe("1 offen");
   expect(closeState({ blockers: [{}, {}] })).toEqual({ key: "blocked", label: "2 offen" });
+  expect(closeState({ closed: false, incomplete: true, blockers: [{ code: "incomplete_close" }] })).toEqual({ key: "blocked", label: "Unvollständig" });
 });
 
 test("die Season ist erst beendet, wenn alle Staffeln abgeschlossen sind", () => {

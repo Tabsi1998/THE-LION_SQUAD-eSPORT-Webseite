@@ -166,10 +166,17 @@ function ReopenSheet({ row, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title="Staffel wieder öffnen" eyebrow={staffelLabel(row)} onClose={onClose} onSubmit={submit} saving={saving} noValidate
       submitLabel="Wieder öffnen" savingLabel="Öffne …" submitTestId="reopen-confirm" testId="reopen-sheet">
-      <p className="text-sm text-white/75">
-        Die Tabelle wird wieder gerechnet, Ergebnisse lassen sich korrigieren. Fassung {row.final?.version} bleibt im Verlauf sichtbar, der Meister-Eintrag ruht,
-        bis neu abgeschlossen ist. Die Captains bekommen eine Nachricht – ohne deinen Grund.
-      </p>
+      {row.incomplete ? (
+        <p className="text-sm text-white/75">
+          Der Abschluss wurde nicht fertig geschrieben – die Staffel ist gesperrt, einen Endstand gibt es nicht. Wieder öffnen gibt sie frei, danach schließt du
+          neu ab. Die Captains haben vom Abschluss nichts erfahren und bekommen keine Nachricht.
+        </p>
+      ) : (
+        <p className="text-sm text-white/75">
+          Die Tabelle wird wieder gerechnet, Ergebnisse lassen sich korrigieren. Fassung {row.final?.version} bleibt im Verlauf sichtbar, der Meister-Eintrag ruht,
+          bis neu abgeschlossen ist. Die Captains bekommen eine Nachricht – ohne deinen Grund.
+        </p>
+      )}
       <div className="mt-4">
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required placeholder="z. B. Ergebnis von Spieltag 5 war vertauscht eingetragen"
           hint="Pflicht. Steht im Verlauf und im Protokoll." testId="reopen-reason" />
@@ -248,13 +255,13 @@ function StaffelCard({ row, data, canResults, onSheet }) {
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {!row.closed && data.can_act && row.own_team && !data.superadmin ? <OwnTeamNote testId={`close-own-${row.tournament_id}`} /> : null}
-        {!row.closed && data.can_act && !(row.own_team && !data.superadmin) ? (
+        {!row.closed && !row.incomplete && data.can_act && !(row.own_team && !data.superadmin) ? (
           <button type="button" disabled={!row.can_close} onClick={() => onSheet({ kind: "close", row })} className={`${BUTTON} tls-btn--primary`} data-testid={`close-button-${row.tournament_id}`}>
             <Lock className="h-4 w-4" aria-hidden="true" /> Staffel abschließen
           </button>
         ) : null}
-        {!row.closed && data.can_act && !row.can_close && row.blockers.length ? <span className="text-xs text-white/55">Geht, sobald die Punkte oben erledigt sind.</span> : null}
-        {row.closed && row.can_reopen ? (
+        {!row.closed && !row.incomplete && data.can_act && !row.can_close && row.blockers.length ? <span className="text-xs text-white/55">Geht, sobald die Punkte oben erledigt sind.</span> : null}
+        {(row.closed || row.incomplete) && row.can_reopen ? (
           <button type="button" onClick={() => onSheet({ kind: "reopen", row })} className={`${BUTTON} tls-btn--secondary`} data-testid={`reopen-button-${row.tournament_id}`}>
             <LockOpen className="h-4 w-4" aria-hidden="true" /> Wieder öffnen
           </button>

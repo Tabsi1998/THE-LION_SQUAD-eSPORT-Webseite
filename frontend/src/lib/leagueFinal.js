@@ -23,9 +23,11 @@ export function staffelLabel(row) {
   return [row?.division_label, row?.staffel ? `Staffel ${row.staffel}` : ""].filter(Boolean).join(" · ") || row?.title || "Staffel";
 }
 
-/** Stand einer Staffel: abgeschlossen, bereit (nichts hält auf) oder offen (mit der Zahl der Sperrgründe, kurz: „4 offen“). */
+/** Stand einer Staffel: abgeschlossen, bereit (nichts hält auf) oder offen (mit der Zahl der Sperrgründe, kurz: „4 offen“).
+ * Ein abgebrochener Abschluss (gesperrt, ohne Endstand) heißt „Unvollständig“. */
 export function closeState(row) {
   if (row?.closed) return { key: "closed", label: "Abgeschlossen" };
+  if (row?.incomplete) return { key: "blocked", label: "Unvollständig" };
   const open = (row?.blockers || []).length;
   if (!open) return { key: "ready", label: "Bereit zum Abschluss" };
   return { key: "blocked", label: `${open} offen` };
