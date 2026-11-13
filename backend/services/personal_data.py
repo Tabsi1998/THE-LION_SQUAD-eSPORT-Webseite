@@ -262,7 +262,8 @@ CLUB_CONTENT = frozenset({
     # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
     "leagues", "league_seasons", "league_divisions", "league_rules",
     # Saisonabschluss (F.1, #1645): der eingefrorene Endstand je Staffel - Teamnamen, Plätze, Punkte; nur die Kennung, wer
-    # abgeschlossen bzw. wieder geöffnet hat.
+    # abgeschlossen bzw. wieder geöffnet hat. Seit F.2 (#1627) dazu je Anmeldung die eingesetzten Spieler (``sides``,
+    # ``player_ids``) für die Season-Historie - wie ``player_ids`` am Meister-Eintrag in ``tournament_awards``.
     "league_final_tables",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
