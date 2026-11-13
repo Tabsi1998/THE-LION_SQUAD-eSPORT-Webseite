@@ -153,6 +153,22 @@ Staffel ab**. Ihr bekommt eine Nachricht. Ab dann steht über der Tabelle „End
   Endstand, ohne weitere Bestätigung. Ein ausgetretenes oder disqualifiziertes Team steigt nie auf und ist in der nächsten
   Season nicht dabei.
 
+### Belohnungen
+
+Hat die Liga Belohnungen festgelegt (Medaille, Banner, Emblem oder Titel), stehen sie vor dem Abschluss auf der Ligaseite unter
+**Darum wird gespielt**. Mit dem Abschluss werden sie sofort vergeben – nach eurem Platz im Endstand:
+
+- **Team-Belohnungen** stehen an eurer Teamseite, **Spieler-Belohnungen** im Profil jedes Spielers, der mindestens ein
+  gewertetes Spiel in der Aufstellung stand (oder – wenn die Liga das so eingestellt hat – des ganzen Kaders).
+- Ihr bekommt eine Nachricht und beim nächsten Besuch eine kurze Zeremonie. Dort lädt **Bild herunterladen** ein Bild zum
+  Teilen herunter (am Handy: **Teilen**).
+- Im eigenen Profil unter **Auszeichnungen** wählt ihr **Als Banner** (oben im Profil) und bei einem Titel **Als Titel** (neben
+  dem Namen). Für das Team wählt das die Teamleitung.
+- Öffnet die Liga eine Staffel wieder, ruhen die Belohnungen. Nach dem neuen Abschluss gelten sie wieder; wer dabei etwas
+  verliert oder neu bekommt, erhält eine Nachricht.
+
+<img src="../assets/liga/f4-profil-sammlung-390.png" alt="Sammlung im Profil am Handy: Season 1 mit Goldmedaille und Season-Banner, Season 0 mit dem Titel Kämpferherz" width="320">
+
 ## Neue Season: ihr seid automatisch dabei
 
 Legt die Liga-Leitung die nächste Season an, steht euer Co-Team **automatisch** in seiner neuen Liga – nach Auf- und Abstieg.
