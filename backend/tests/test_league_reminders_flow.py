@@ -187,6 +187,21 @@ async def test_switch_and_times_per_season(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_late_league_reminder_does_not_swallow_the_ten_minute_call(flow):
+    """N3: Mit ``upcoming_late_minutes=30`` holt der Job die zweite Erinnerung auch 12 Minuten vor dem Start nach - die Nachricht
+    „Match startet in 10 Minuten“ kommt trotzdem (die Abkühlzeit zählt nur Zeilen ohne eindeutigen Schlüssel)."""
+    from services.match_reminder import schedule_match_reminders
+
+    world = await reminder_world(flow, rules={"upcoming_late_minutes": 30})
+    start = now_utc().replace(microsecond=0) + timedelta(minutes=10)
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {"scheduled_at": start.isoformat()}})
+    assert (await run(flow, world, start - timedelta(minutes=12)))["upcoming_late"] == 1
+    await schedule_match_reminders()
+    calls = await flow.db.notifications.find({"title": "Match startet in 10 Minuten"}, {"_id": 0}).to_list(50)
+    assert world["users"]["Kapitaen"]["id"] in {row["user_id"] for row in calls}
+
+
+@pytest.mark.asyncio
 async def test_two_runs_at_the_same_time_send_one_message_each(flow):
     world = await reminder_world(flow)
     at = world["start"] - timedelta(hours=24)

@@ -121,6 +121,9 @@ async def create_user_notification(
                 "user_id": user_id,
                 "kind": kind,
                 "created_at": {"$gte": cutoff},
+                # Nur Zeilen ohne eindeutigen Schlüssel zählen (#1647, N3): „Liga-Spiel in 30 Minuten“ darf „Match startet in
+                # 10 Minuten“ nicht unterdrücken.
+                "unique_dedupe_key": {"$exists": False},
             }
             if category:
                 cooldown_query["meta.category"] = category
