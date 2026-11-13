@@ -731,6 +731,9 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
      {"partialFilterExpression": {"unique_dedupe_key": {"$type": "string"}}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
+    # Protokoll der Season im Leitstand (E.4, #2209): je Season bzw. Staffel, neueste zuerst (``league_desk.log_query``).
+    ("audit_logs", [("target_id", 1), ("created_at", -1)]),
+    ("audit_logs", [("data.season_id", 1), ("created_at", -1)]),
     ("platform_links", "user_id"),
     # Jahreswertung (#2123): je Turnier alle Einträge beim (erneuten) Veröffentlichen und in Migration 18.
     ("season_points", [("source_id", 1), ("source_type", 1)]),

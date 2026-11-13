@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.84.0 (13.11.2026)
+
+### Neu
+
+* „Mein Dienst“ zeigt je Season die eigenen Aufgaben im Leitstand (#2209)
+* Filter „Nur meine“ im Leitstand mit Hinweis bei Befangenheit (#2209)
+* Protokoll der Season im Leitstand, seitenweise, ohne Begründungen; Strafen und Notausnahmen nur mit passender Zuständigkeit (#2209)
+* Reiter „Leitstand“ je Season mit allen offenen Aufgaben, Frist, Zuständigkeit und direktem Weg (#2209)
+* Rundnachricht an Captains und Vertreter oder alle Spieler einer Season, Liga N oder Staffel, Mail wählbar, mit Fortschritt beim Versand und „Fortsetzen“, wenn er hängt (#2209)
+
 ## 1.83.0 (13.11.2026)
 
 ### Neu

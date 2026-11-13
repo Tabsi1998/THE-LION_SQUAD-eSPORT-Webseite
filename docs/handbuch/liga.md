@@ -926,6 +926,49 @@ der Season sagt, was gespielt wird; Spieltage und Teams haben eine eigene Vorsch
 
 ## 3. Während der Season
 
+### 3.0 Leitstand: alles Offene der Season an einem Ort
+
+Der Reiter **Leitstand** (gleich nach dem Überblick, Admin → Liga → Season, `#leitstand`) sammelt alles, was in dieser Season noch
+auf die Liga-Leitung wartet – gruppiert nach Art, jede Gruppe mit Zähler:
+
+| Gruppe | Wer sie sieht | Wo ihr es erledigt |
+| --- | --- | --- |
+| Vorfälle (Map in Klärung, Serie feststellen) | „Ergebnisse korrigieren“ oder „Proteste“ | Matchseite, Abschnitt Vorfälle |
+| Check-in abgelaufen | „Spiele betreuen“ oder „Ergebnisse korrigieren“ | Turnierleitung des Spiels |
+| Überfällige Spiele (nie gemeldet) | „Spiele betreuen“ oder „Ergebnisse korrigieren“ | Matchseite |
+| Fehlende Teilnehmerlisten (Frist zum Nachtragen vorbei) | „Spiele betreuen“ oder „Ergebnisse korrigieren“ | Matchseite |
+| Verfahren (Beanstandung, Protest, Einspruch) | „Proteste“ | Matchseite, Karte des Verfahrens |
+| Strafen und Einsprüche (vorläufige Sperren, offene Einsprüche) | „Strafen“ | Reiter Strafen |
+| Anmeldungen (offen oder angenommen, aber nicht zugeteilt) | „Teams freigeben“ | Reiter Anmeldung und Kader |
+| Kaderanträge (Transfers, Spiel-IDs nach dem Stichtag) | „Kader prüfen“ | Reiter Anmeldung und Kader, Kader |
+| Verschiebungen (die Gegenseite muss antworten) | „Spiele betreuen“ | Matchseite |
+| Regelwerk-Freigabe | „Regeln veröffentlichen“ | Regelwerk der Season |
+
+Jede Aufgabe nennt ihre **Frist** (oder seit wann sie offen ist), **wer zuständig ist** (bei einem übernommenen Verfahren die Person)
+und hat einen Knopf direkt an die Stelle, an der ihr sie erledigt. Erledigt ist sie, sobald dort entschieden ist – dann verschwindet
+sie von selbst. **Alle** zeigt alles, **Nur meine** nur, was du selbst erledigen kannst. Bei einem Spiel deines eigenen Co-Teams steht
+der Fall trotzdem da, mit dem Hinweis „Das entscheidet eine zweite berechtigte Person“ (bei Strafen: wer verhängt hat, entscheidet
+nie über den Einspruch). Ist nichts offen, steht **Alles erledigt**.
+
+<table><tr>
+<td><img src="../assets/liga/liga-leitstand-pc.png" alt="Leitstand am PC: 6 offene Aufgaben, Filter Alle und Nur meine, Knopf Rundnachricht, darunter Gruppen Vorfälle, Überfällige Spiele mit Hinweis auf Befangenheit, Verfahren mit Frist und Zuständigem, Strafen, Anmeldungen, dann das Protokoll der Season" width="560"></td>
+<td><img src="../assets/liga/liga-leitstand-handy.png" alt="Derselbe Leitstand am Handy mit 390 px" width="220"></td>
+</tr></table>
+
+**Protokoll der Season:** unter den Aufgaben, neueste zuerst, 25 Einträge je Seite (**Neuer** / **Älter**). Es nennt, was wer wann
+getan hat – nie Begründungen, Nachrichtentexte oder Namen aus den Fällen. Lesen darf jede Zuständigkeit der Liga.
+
+**Rundnachricht** (Knopf oben, mit „Liga verwalten“ oder „Season konfigurieren“): Empfänger sind **Captains und Vertreter** (Vorgabe;
+ohne beide die Leitung des Hauptteams) oder **alle Spieler**, wahlweise der ganzen Season, einer Liga N oder einer Staffel. Bevor du
+schickst, steht da, wie viele Personen sie bekommen; beim Schicken fragt die Seite noch einmal nach. Sie kommt in die Glocke und als
+Push, **Auch per Mail** schickt sie zusätzlich per Mail – alles nach der Einstellung **Turnier-Updates** der jeweiligen Person. Betreff bis 80, Text bis 1000 Zeichen.
+Ein Doppelklick schickt nichts zweimal. Im Protokoll steht sie mit Absender, Kreis und Zahl der Empfänger.
+
+<img src="../assets/liga/liga-rundnachricht-handy.png" alt="Rundnachricht am Handy: Empfänger Captains und Vertreter gewählt, Kreis Ganze Season, Geht an 14 Personen, Betreff und Nachricht, unten der Knopf An 14 Personen schicken" width="260">
+
+**Mein Dienst** bleibt deine persönliche Liste. Unter **Leitstand der Seasons** steht je laufender Season, wie viele Aufgaben auf dich
+warten, mit dem Weg in den Leitstand.
+
 ### 3.1 Termine
 
 Captain oder Vertreter schlagen auf der Matchseite unter **Terminabstimmung** einen Termin vor, die Gegenseite nimmt

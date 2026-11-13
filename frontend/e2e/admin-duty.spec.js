@@ -30,7 +30,7 @@ async function mockServer(page, user) {
   }
   await page.route("**/api/friends", json({ incoming: [], friends: [], outgoing: [] }));
   await page.route("**/api/auth/me", json(user));
-  await page.route("**/api/users/me/duty", json(DUTY));
+  await page.route("**/api/users/me/duty*", json(DUTY));
 }
 
 // PC (ab 1024 px): Benutzermenü oben rechts; schmaler: das ausklappende Handy-Menü.
