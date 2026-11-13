@@ -3799,7 +3799,9 @@ Season für zwei, die höheren. Zählen und Reihenfolge wie bei den Co-Teams, oh
 nur Seasons, die sie sieht (`can_see_season`, nicht archiviert), und nur Staffeln, die sie als Turnier sähe (`tournament_hidden_reason`) -
 Gäste sehen damit den öffentlichen Stand. Seasons mit Sichtbarkeit „Aus“ und versteckte Staffeln zählen dort nicht mit, die Reihenfolge
 wird ohne sie gerechnet. Bei einer abgeschlossenen Wertung rechnet die Ligaseite aus der Fassung (je Co-Team die Season-Einträge) ohne die
-unsichtbaren Seasons; sind alle sichtbar, steht die Fassung unverändert da. Die Season-Seite trägt `overall: {period_id, name} | null`
+unsichtbaren Seasons; sind alle sichtbar, steht die Fassung unverändert da. Die Inhaber der Belohnungen stehen nur, wenn die Person
+jede Season und Staffel der Fassung sieht (`rewards_granted`), sonst die Belohnungen ohne Inhaber. Jede Liga N trägt `settings`: bei einer
+abgeschlossenen die Rechnung ihrer Fassung (Ansicht und PDF), sonst die von heute. Die Season-Seite trägt `overall: {period_id, name} | null`
 - nur dann zeigt die Navigation „Gesamtwertung“.
 
 **Abschluss** (Nr. 173, wie F.1) je Zeitraum und Liga N - Sammlung `league_overall_finals` (neu, ohne Migration):
@@ -3844,7 +3846,9 @@ ein Eintrag in `tournament_awards`:
 
 Gleiches bleibt derselbe Eintrag, Neues kommt dazu, Weggefallenes verschwindet, ein echter Gewinn (`prize_pickups`, gleicher Bereich) wird
 nie entzogen (`needs_review`); Nachrichten wie F.4 (`dedupe_key` `league-reward:<fassung>:…`). Öffentlich in Profil, Teamseite und
-Teilen-Bild nur, wenn mindestens eine Season des Zeitraums für Gäste sichtbar ist (`awards._visible`).
+Teilen-Bild nur, wenn Gäste jede Season der Fassung sehen (`awards._visible`). Nachricht und Teilen-Link (`overall.url`, `award_view.url`)
+führen über die jüngste öffentliche Season zur Gesamtwertung, ohne öffentliche Season zu `/liga`. Echte Gewinne (Bereich `overall:…`) verwaltet
+unter **Gewinne**, wer in der Liga „Liga verwalten“ hat.
 
 **Lesen:**
 
@@ -3857,7 +3861,8 @@ Teilen-Bild nur, wenn mindestens eine Season des Zeitraums für Gäste sichtbar 
 
 Profil (`/api/users/public/{name}`) und Teamseite (`GET /api/teams/{id}`) tragen `league_overall`: `[{league_name, period_name,
 division_label, place, of, points, closed, url}]` - je Zeitraum und Liga N, in denen die Person bzw. ein Co-Team des Teams steht, nach
-derselben Sichtbarkeit wie die Ligaseite.
+derselben Sichtbarkeit wie die Ligaseite; der Link führt über die jüngste Season, die die Person sieht. Höchstens die sechs jüngsten
+Zeiträume (`PROFILE_PERIODS`), weil jeder eine Rechnung über seine Endstände kostet.
 
 **Altdaten:** Ligen ohne `overall` oder ohne Zeitraum zeigen keine Gesamtwertung; ein Zeitraum ohne Abschluss zeigt die laufende Wertung.
 Endstände von vor F.2 ohne `sides` lesen das Co-Team aus der Anmeldung. Keine Migration.
