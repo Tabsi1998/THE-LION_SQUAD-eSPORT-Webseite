@@ -61,9 +61,20 @@ def _result_reminder_hours(season: dict) -> int:
     return int(rules["result_reminder_hours"])
 
 
+def _veto_step_seconds(season: dict) -> int | None:
+    """Die Zeit je Veto-Schritt der Season - ``None`` ohne Veto (dann gibt es nichts zu prüfen)."""
+    veto = season.get("veto_rules")
+    if not isinstance(veto, dict) or not veto.get("enabled"):
+        return None
+    try:
+        return int(veto.get("step_seconds") or 60)
+    except (TypeError, ValueError):
+        return 60
+
+
 async def _answer(db, season: dict, rules: dict | None, **extra) -> dict:
     return {"reminder_rules": rules, "active": rules is not None, "defaults": reminder_rules.defaults(),
-            "result_reminder_hours": _result_reminder_hours(season),
+            "result_reminder_hours": _result_reminder_hours(season), "veto_step_seconds": _veto_step_seconds(season),
             "staffeln": await db.tournaments.count_documents({"league_context.season_id": season["id"]}), **extra}
 
 
@@ -79,7 +90,8 @@ async def put_reminder_rules(season_id: str, body: ReminderRulesBody, me: dict =
     db = get_db()
     season = await _season(db, season_id)
     try:
-        rules = reminder_rules.normalize({**(reminder_rules.stored(season) or {}), **body.model_dump(exclude_none=True)})
+        rules = reminder_rules.normalize({**(reminder_rules.stored(season) or {}), **body.model_dump(exclude_none=True)},
+                                         step_seconds=_veto_step_seconds(season))
     except reminder_rules.ReminderProblem as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
     field = reminder_rules.FIELD

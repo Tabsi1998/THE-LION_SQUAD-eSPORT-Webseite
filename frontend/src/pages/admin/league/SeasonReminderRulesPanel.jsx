@@ -21,6 +21,15 @@ export function reminderRulesPayload(form) {
   return out;
 }
 
+/** Passt „Map-Veto wartet“ in die Zeit je Schritt der Season? Sonst der Satz für den Kasten (der Server lehnt dann mit 422 ab). */
+export function vetoMisfit(form, stepSeconds) {
+  if (!form?.veto_turn || !stepSeconds) return "";
+  const idle = Number.parseInt(String(form.veto_idle_seconds), 10);
+  const left = Number.parseInt(String(form.veto_min_left_seconds), 10);
+  if (Number.isNaN(idle) || Number.isNaN(left) || idle < stepSeconds - left) return "";
+  return `Je Schritt sind ${stepSeconds} Sekunden Zeit – so käme die Erinnerung nie. Höchstens ${Math.max(stepSeconds - left - 1, 0)} Sekunden ohne Zug.`;
+}
+
 function Kind({ label, hint, checked, onChange, testId, children }) {
   return (
     <div className="rounded-sm border border-white/10 bg-white/[0.02] p-3" data-testid={`${testId}-box`}>
@@ -65,6 +74,8 @@ export function SeasonReminderRulesPanel({ seasonId }) {
     }
   };
   const resultHours = state?.result_reminder_hours;
+  const stepSeconds = state?.veto_step_seconds;
+  const misfit = vetoMisfit(form, stepSeconds);
 
   return (
     <FormSection title="Erinnerungen" testId="season-reminder-rules"
@@ -98,13 +109,14 @@ export function SeasonReminderRulesPanel({ seasonId }) {
         <Kind label="Ergebnis fehlt" checked={form.result_missing} onChange={(value) => set("result_missing", value)} testId="reminder-rules-result"
           hint={`An beide Captains${resultHours ? `, ${resultHours} h nach dem Termin (einstellbar oben unter „Termine und Verschiebungen“)` : ""}. Wartet, solange ein Vorfall oder Verfahren offen ist.`} />
         <Kind label="Map-Veto wartet" checked={form.veto_turn} onChange={(value) => set("veto_turn", value)} testId="reminder-rules-veto"
-          hint="An die Seite am Zug, wenn sie das Veto gerade nicht offen hat – einmal je Schritt.">
+          hint={`An die Seite am Zug, wenn sie das Veto gerade nicht offen hat – einmal je Schritt.${stepSeconds ? ` Zeit je Schritt in dieser Season: ${stepSeconds} Sekunden.` : ""}`}>
           <FormGrid cols={2}>
             <TextField label="Nach Sekunden ohne Zug" type="number" min={5} max={300} value={form.veto_idle_seconds}
               onChange={(value) => set("veto_idle_seconds", value)} hint="Vorgabe 20" disabled={!form.veto_turn} testId="reminder-rules-veto-idle" />
             <TextField label="Nicht in den letzten Sekunden" type="number" min={0} max={120} value={form.veto_min_left_seconds}
               onChange={(value) => set("veto_min_left_seconds", value)} hint="Vorgabe 5" disabled={!form.veto_turn} testId="reminder-rules-veto-left" />
           </FormGrid>
+          {misfit ? <p className="mt-2 text-sm text-warn" data-testid="reminder-rules-veto-misfit">{misfit}</p> : null}
         </Kind>
       </div>
       <Kind label="Zusätzlich per Discord" checked={form.discord} onChange={(value) => set("discord", value)} testId="reminder-rules-discord"

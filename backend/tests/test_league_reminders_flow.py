@@ -510,9 +510,43 @@ async def test_season_rules_write_season_and_staffeln(flow):
     assert await flow.db.audit_logs.find_one({"action": "league.season.reminder_rules"})
 
 
+@pytest.mark.asyncio
+async def test_the_route_refuses_veto_seconds_that_never_fit_the_step_of_the_season(flow):
+    world = await reminder_world(flow)
+    season = {"id": world["season_id"], "league_id": "liga", "number": 1, "name": "Season 1", "slug": "season-1",
+              "veto_rules": {"enabled": True, "step_seconds": 30, "steps": []}}
+    await flow.db.league_seasons.insert_one(dict(season))
+    url = f"/api/admin/leagues/seasons/{season['id']}/reminder-rules"
+    flow.act_as(world["staff"])
+    assert (await flow.get(url)).json()["veto_step_seconds"] == 30
+    refused = await flow.put(url, json={"veto_idle_seconds": 26})
+    assert refused.status_code == 422 and "Je Schritt sind 30 Sekunden" in refused.json()["detail"]
+    assert (await flow.put(url, json={"veto_idle_seconds": 24})).status_code == 200, "Gegenprobe: passt"
+
+
 def test_rules_of_old_staffeln_and_other_tournaments():
     assert league_reminder_rules.rules_of({"id": "t"}) is None, "kein Liga-Turnier"
     assert league_reminder_rules.rules_of({"league_context": {}}) == league_reminder_rules.defaults(), "ältere Staffel: Vorgabe"
     bent = {"league_context": {}, "reminder_rules": {"veto_idle_seconds": "viel"}}
     assert league_reminder_rules.rules_of(bent) == league_reminder_rules.defaults()
     assert league_reminder_rules.lead_text(24 * 60) == "24 Stunden" and league_reminder_rules.lead_text(45) == "45 Minuten"
+
+
+def test_a_bent_value_falls_back_alone():
+    """N6: Ein von Hand verbogener Wert setzt nur sein eigenes Feld auf die Vorgabe zurück - die übrigen Einstellungen bleiben."""
+    bent = {"league_context": {}, "reminder_rules": {"veto_idle_seconds": "viel", "upcoming": False, "upcoming_early_hours": 12,
+                                                      "discord": "ja"}}
+    rules = league_reminder_rules.rules_of(bent)
+    assert rules["veto_idle_seconds"] == 20 and rules["discord"] is False, "verbogen: Vorgabe"
+    assert rules["upcoming"] is False and rules["upcoming_early_hours"] == 12, "die übrigen bleiben"
+
+
+def test_veto_seconds_must_fit_into_the_step():
+    """N6: Bei 30 Sekunden je Schritt kommt die Erinnerung nach 25 Sekunden ohne Zug und nie in den letzten 5 nie - Klartext."""
+    rules = {**league_reminder_rules.defaults(), "veto_idle_seconds": 25}
+    with pytest.raises(league_reminder_rules.ReminderProblem) as caught:
+        league_reminder_rules.normalize(rules, step_seconds=30)
+    assert "höchstens 24" in caught.value.detail
+    assert league_reminder_rules.normalize({**rules, "veto_idle_seconds": 24}, step_seconds=30)["veto_idle_seconds"] == 24
+    assert league_reminder_rules.normalize({**rules, "veto_turn": False}, step_seconds=30), "aus: keine Prüfung"
+    assert league_reminder_rules.normalize(rules), "ohne Veto in der Season: keine Prüfung"

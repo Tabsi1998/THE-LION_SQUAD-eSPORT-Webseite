@@ -45,8 +45,9 @@ def defaults() -> dict:
     return copy.deepcopy(DEFAULTS)
 
 
-def normalize(raw) -> dict:
-    """Die Regeln aus einer Eingabe der Verwaltung - fehlende Felder mit Vorgabe, Falsches mit deutscher Meldung (422)."""
+def normalize(raw, *, step_seconds: int | None = None) -> dict:
+    """Die Regeln aus einer Eingabe der Verwaltung - fehlende Felder mit Vorgabe, Falsches mit deutscher Meldung (422).
+    ``step_seconds``: die Zeit je Veto-Schritt der Season, wenn bekannt - „Map-Veto wartet“ muss dort hineinpassen."""
     if not isinstance(raw, dict):
         raise ReminderProblem("Die Erinnerungen fehlen.")
     if set(raw) - set(DEFAULTS):
@@ -69,7 +70,23 @@ def normalize(raw) -> dict:
     # Die zwei Erinnerungen vor dem Spiel dürfen sich nicht überholen - mit dem Nachholfenster dazwischen.
     if out["upcoming_early_hours"] * 60 < out["upcoming_late_minutes"] + 2 * CATCH_UP_MINUTES:
         raise ReminderProblem("Die erste Erinnerung vor dem Spiel muss mindestens eine Stunde vor der zweiten liegen.")
+    problem = veto_problem(out, step_seconds)
+    if problem:
+        raise ReminderProblem(problem)
     return out
+
+
+def veto_problem(rules: dict, step_seconds: int | None) -> str | None:
+    """Passt „Map-Veto wartet“ in die Zeit je Schritt? Sie kommt nach ``veto_idle_seconds`` ohne Zug und nie in den letzten
+    ``veto_min_left_seconds`` - bei zu wenig Zeit je Schritt käme sie nie (#1647, N6)."""
+    if not rules.get("veto_turn") or not step_seconds:
+        return None
+    idle, left = int(rules["veto_idle_seconds"]), int(rules["veto_min_left_seconds"])
+    if idle < int(step_seconds) - left:
+        return None
+    return (f"„Map-Veto wartet“ käme nie: Je Schritt sind {int(step_seconds)} Sekunden Zeit, die Erinnerung kommt nach {idle} Sekunden "
+            f"und nie in den letzten {left}. Bitte weniger Sekunden ohne Zug (höchstens {max(int(step_seconds) - left - 1, 0)}) "
+            "oder weniger Sekunden am Ende eintragen.")
 
 
 def stored(source: dict | None) -> dict | None:
@@ -77,11 +94,18 @@ def stored(source: dict | None) -> dict | None:
     raw = (source or {}).get(FIELD)
     if not isinstance(raw, dict):
         return None
-    try:
-        return normalize({key: value for key, value in raw.items() if key in DEFAULTS})
-    except ReminderProblem:
-        # Ein von Hand verbogener Wert sperrt nichts - es gelten die Vorgaben.
-        return defaults()
+    # Ein von Hand verbogener Wert sperrt nichts - nur dieses Feld fällt auf die Vorgabe zurück (#1647, N6).
+    out = defaults()
+    for key in FLAGS:
+        if isinstance(raw.get(key), bool):
+            out[key] = raw[key]
+    for key, (low, high, _label) in NUMBERS.items():
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and low <= value <= high:
+            out[key] = value
+    if out["upcoming_early_hours"] * 60 < out["upcoming_late_minutes"] + 2 * CATCH_UP_MINUTES:
+        out["upcoming_early_hours"], out["upcoming_late_minutes"] = DEFAULTS["upcoming_early_hours"], DEFAULTS["upcoming_late_minutes"]
+    return out
 
 
 def rules_of(tournament: dict | None) -> dict | None:

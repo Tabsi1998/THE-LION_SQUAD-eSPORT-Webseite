@@ -8,7 +8,7 @@ const apiMock = { get: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { SeasonReminderRulesPanel, reminderRulesPayload } = await import("./SeasonReminderRulesPanel");
+const { SeasonReminderRulesPanel, reminderRulesPayload, vetoMisfit } = await import("./SeasonReminderRulesPanel");
 
 const DEFAULTS = {
   upcoming: true, upcoming_early_hours: 24, upcoming_late_minutes: 60, unscheduled: true, unscheduled_week_percent: 50,
@@ -65,4 +65,15 @@ test("leere Zahlen bleiben weg, Schalter gehen immer mit", () => {
 
 test("die Sprungmarke #erinnerungen führt in den Reiter Termine", () => {
   expect(seasonTarget("#erinnerungen")).toEqual({ tab: "termine", section: "erinnerungen" });
+});
+
+test("Map-Veto wartet: der Kasten nennt die Zeit je Schritt und warnt, wenn die Sekunden nie passen (N6)", async () => {
+  apiMock.get.mockResolvedValue({ data: { reminder_rules: DEFAULTS, active: true, defaults: DEFAULTS, veto_step_seconds: 30 } });
+  render(<SeasonReminderRulesPanel seasonId="s1" />);
+  expect(await screen.findByTestId("reminder-rules-veto-box")).toHaveTextContent("Zeit je Schritt in dieser Season: 30 Sekunden");
+  expect(screen.queryByTestId("reminder-rules-veto-misfit")).toBeNull();
+  fireEvent.change(screen.getByTestId("reminder-rules-veto-idle"), { target: { value: "26" } });
+  expect(screen.getByTestId("reminder-rules-veto-misfit")).toHaveTextContent("Höchstens 24 Sekunden ohne Zug");
+  expect(vetoMisfit({ ...DEFAULTS, veto_turn: false, veto_idle_seconds: 90 }, 30)).toBe("");
+  expect(vetoMisfit({ ...DEFAULTS, veto_idle_seconds: 90 }, null)).toBe("");
 });
