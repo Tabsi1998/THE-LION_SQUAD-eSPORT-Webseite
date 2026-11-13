@@ -146,6 +146,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     expect(winners).toBe(0);
     const score = await panel.getByTestId("league-match-m1-0").locator(".tls-league-match__score").boundingBox();
     expect(score.width).toBeGreaterThan(40);
+    // Wochenleiste (#2268): der Stand-Punkt steht neben dem Namen, auch bei der langen Pause.
+    const pause = page.getByTestId("league-week-7");
+    const label = await pause.locator(".tls-league-strip__label").boundingBox();
+    const dot = await pause.locator(".tls-league-strip__dot").boundingBox();
+    expect(dot.x).toBeGreaterThanOrEqual(label.x + label.width);
     await noSideScroll(page);
     await shot(page, `worst-spieltage-${width}.png`);
 

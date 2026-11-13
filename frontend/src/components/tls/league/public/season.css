@@ -355,7 +355,8 @@
 .tls-league-strip__week:focus-visible { outline: 2px solid rgb(var(--season-accent)); outline-offset: 2px; }
 .tls-league-strip__label { max-width: 11rem; overflow: hidden; text-overflow: ellipsis; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; white-space: nowrap; }
 .tls-league-strip__days { font-size: 11px; color: rgb(255 255 255 / 0.5); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tls-league-strip__dot { position: absolute; top: 0.625rem; right: 0.625rem; width: 6px; height: 6px; border-radius: 999px; background: rgb(255 255 255 / 0.2); }
+.tls-league-strip__top { display: flex; max-width: 100%; min-width: 0; align-items: center; gap: 0.5rem; }
+.tls-league-strip__dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 999px; background: rgb(255 255 255 / 0.2); }
 .tls-league-strip__week[data-state="done"] .tls-league-strip__dot { background: rgb(var(--season-accent)); }
 .tls-league-strip__week[data-state="live"] .tls-league-strip__dot { background: rgb(var(--season-accent)); box-shadow: 0 0 0 3px rgb(var(--season-accent) / 0.25); }
 .tls-league-strip__week[data-state="pause"] {

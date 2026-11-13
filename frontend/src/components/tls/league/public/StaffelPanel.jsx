@@ -372,9 +372,12 @@ export function StaffelPlan({ leagueSlug, seasonSlug, staffel, order, week: chos
             <li key={row.week} data-testid={`league-week-${row.week}`}>
               <button type="button" className="tls-league-strip__week" data-state={weekState(row)} aria-current={current ? "true" : undefined}
                 title={`${label} · ${weekDays(row)}`} onClick={() => onWeek(row.week)}>
-                <span className="tls-league-strip__label">{label}</span>
+                {/* Der Stand-Punkt steht neben dem Namen, nie darauf - auch bei langen Pausen-Namen (#2268). */}
+                <span className="tls-league-strip__top">
+                  <span className="tls-league-strip__label">{label}</span>
+                  <span className="tls-league-strip__dot" aria-hidden="true" />
+                </span>
                 <span className="tls-league-strip__days">{weekDays(row)}</span>
-                <span className="tls-league-strip__dot" aria-hidden="true" />
               </button>
             </li>
           );
