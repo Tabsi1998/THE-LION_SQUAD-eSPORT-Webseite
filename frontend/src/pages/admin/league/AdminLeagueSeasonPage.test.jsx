@@ -681,3 +681,49 @@ test("Zonen je Liga N (F.2): Satz an der Liga, Ändern schickt nur geänderte Zo
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", expect.objectContaining({
     zones: { promote: 1, relegate: 2, playoff_promote: 0, playoff_relegate: 0 } })));
 });
+
+// Sprungmarke (F.1, aus main): Schiebt Nachgeladenes den Abschnitt weg, rollt die Seite nach - bis die Lage still steht; rollt die Person selbst, hört es auf.
+function trackScroll(tops) {
+  const calls = [];
+  let index = 0;
+  const into = vi.fn(function into() { calls.push(this.id); });
+  const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function rectOf() {
+    if (this.id !== "punkte") return { top: 0, left: 0, width: 0, height: 0, right: 0, bottom: 0 };
+    const top = tops[Math.min(index, tops.length - 1)];
+    index += 1;
+    return { top, left: 0, width: 100, height: 50, right: 100, bottom: top + 50 };
+  });
+  HTMLElement.prototype.scrollIntoView = into;
+  return { into, calls, restore: () => { rect.mockRestore(); delete HTMLElement.prototype.scrollIntoView; } };
+}
+
+test("Sprungmarke rollt nach, solange Nachgeladenes den Abschnitt verschiebt", async () => {
+  // Erster Sprung, dann rutscht der Abschnitt (Nachgeladenes darüber) und steht danach still.
+  const track = trackScroll([0, 0, 240, 240, 0, 0, 0, 0, 0, 0, 0, 0]);
+  try {
+    renderPage("#punkte");
+    // Erster Sprung, zweimal nachgerollt (240, dann wieder 0) - danach still.
+    await waitFor(() => expect(track.into.mock.calls.length).toBeGreaterThanOrEqual(3), { timeout: 3000 });
+    await new Promise((resolve) => { setTimeout(resolve, 1200); });
+    const settled = track.into.mock.calls.length;
+    await new Promise((resolve) => { setTimeout(resolve, 600); });
+    // Steht die Lage still, hört das Nachrollen auf.
+    expect(track.into.mock.calls.length).toBe(settled);
+  } finally {
+    track.restore();
+  }
+});
+
+test("Sprungmarke: rollt die Person selbst (Mausrad), rollt die Seite nicht mehr nach", async () => {
+  const track = trackScroll([0, 0, 240, 480, 720, 960, 1200, 1440, 1680, 1920, 2160, 2400]);
+  try {
+    renderPage("#punkte");
+    await waitFor(() => expect(track.into).toHaveBeenCalled(), { timeout: 3000 });
+    window.dispatchEvent(new Event("wheel"));
+    const after = track.into.mock.calls.length;
+    await new Promise((resolve) => { setTimeout(resolve, 600); });
+    expect(track.into.mock.calls.length).toBe(after);
+  } finally {
+    track.restore();
+  }
+});
