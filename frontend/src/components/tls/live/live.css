@@ -38,10 +38,12 @@
 }
 
 /* Spielzeit-Uhr (#1167): ein Balken, der über transform wächst. Er tickt sekündlich um Bruchteile eines Pixels -
-   ohne Übergang; Farbe von Zeit und Balken gleiten, wenn sie bei 80 % (Orange, `warn`) und 100 % (`live`) wechseln.
-   Detail-Runde: beim Wechsel leuchtet die Spur einmal in der neuen Farbe auf (nur Deckkraft) - so fällt „knapp“ auf,
-   ohne zu blinken. Mit „Bewegung reduzieren“ bleibt nur der Farbwechsel. Die kleine Uhr (`data-size="sm"`) steht in
-   Listenzeilen. */
+   ohne Übergang. Farben nach Fabians Auswahl (07.10.): Rot gehört allein „läuft“; ab 80 % wird die Uhr orange
+   (`warn`, „knapp“), ab 100 % steht die Zeit orange gefüllt mit Warn-Symbol („Zeit überschritten“), der Balken bleibt
+   voll orange. Farbe und Füllung gleiten weich. Detail-Runde: beim Wechsel leuchtet die Spur einmal auf (nur Deckkraft),
+   das Warn-Symbol wächst klein herein (nur transform/opacity) - so fällt es auf, ohne zu blinken. Mit „Bewegung
+   reduzieren“ bleibt nur der Farbwechsel. Die kleine Uhr (`data-size="sm"`) steht in Listenzeilen, die Text-Uhr
+   (`--inline`) im Baum und im Spielplan - ruhig in der Farbe ihrer Zeile. */
 .tls-live-clock-track {
   position: relative;
   height: 4px;
@@ -65,16 +67,34 @@
   opacity: 0;
   pointer-events: none;
 }
-.tls-live-clock[data-tone="warn"] .tls-live-clock-bar { background: var(--tls-warn); }
-.tls-live-clock[data-tone="over"] .tls-live-clock-bar { background: var(--tls-live); }
+.tls-live-clock[data-tone="warn"] .tls-live-clock-bar,
+.tls-live-clock[data-tone="over"] .tls-live-clock-bar { background: var(--tls-warn); }
 .tls-live-clock[data-tone="warn"] .tls-live-clock-track::after { background: rgb(var(--tls-warn-rgb) / 0.55); animation: tls-clock-flare-warn var(--tls-motion-glow) var(--tls-ease) both; }
-.tls-live-clock[data-tone="over"] .tls-live-clock-track::after { background: rgb(var(--tls-live-rgb) / 0.55); animation: tls-clock-flare-over var(--tls-motion-glow) var(--tls-ease) both; }
+.tls-live-clock[data-tone="over"] .tls-live-clock-track::after { background: rgb(255 255 255 / 0.5); animation: tls-clock-flare-over var(--tls-motion-glow) var(--tls-ease) both; }
 /* Zwei Namen: der Wechsel von „knapp“ zu „überschritten“ startet das Aufleuchten neu. */
 @keyframes tls-clock-flare-warn { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes tls-clock-flare-over { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
-.tls-live-clock-time { transition: color var(--tls-motion-mid) var(--tls-ease); }
+/* Die Zeit: immer mit derselben Innenkante (negativer Rand gleicht sie aus) - die Füllung kommt ohne Sprung dazu. */
+.tls-live-clock-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0 0.3em;
+  margin-left: -0.3em;
+  border-radius: 3px;
+  transition: color var(--tls-motion-mid) var(--tls-ease), background-color var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-live-clock--inline .tls-live-clock-time { padding: 0 0.25em; margin-left: 0; }
 .tls-live-clock[data-tone="warn"] .tls-live-clock-time { color: var(--tls-warn); }
-.tls-live-clock[data-tone="over"] .tls-live-clock-time { color: var(--tls-live); }
+.tls-live-clock[data-tone="over"] .tls-live-clock-time { color: rgb(12 12 12); background: var(--tls-warn); }
+.tls-live-clock-icon {
+  width: 0.8em;
+  height: 0.8em;
+  flex: none;
+  stroke-width: 2.5;
+  animation: tls-clock-icon-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+@keyframes tls-clock-icon-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 
 /* Stationen in der Turnierleitung (#1162). Zustandswechsel gleiten: Rahmen und Kennzeichen wechseln die Farbe weich,
    statt zu springen. Der Aufruf pulsiert kurz - zwei ruhige Ringe um das Kennzeichen, dann steht es still. Neue Felder
@@ -117,7 +137,8 @@
   animation: tls-live-arrive var(--tls-motion-fast) var(--tls-ease) both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tls-live-clock-track::after { animation: none; }
+  .tls-live-clock-track::after,
+  .tls-live-clock-icon { animation: none; }
   .tls-live-chip[data-tone="called"]::after,
   .tls-live-next[data-state="called"] .tls-live-bell { animation: none; }
 }

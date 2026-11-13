@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { charsPerLine, wrapLines, TV_LINE } from "@/lib/tvType";
 import { countdown } from "@/lib/tvCalls";
 import { clockText, packLane } from "@/lib/tvDayPlan";
@@ -88,10 +89,11 @@ function stationLine(entry) {
   return [entry.detail.kind, entry.detail.key].filter(Boolean).join(" · ");
 }
 
-// Die Spielzeit zählt nach der Serverzeit (#1167, `clockNow`) - dieselbe Sekunde wie an Station und Leitung.
+// Die Spielzeit zählt nach der Serverzeit (#1167, `clockNow`) - dieselbe Sekunde und Farbe wie an Station und Leitung.
 function StationCell({ entry, now, clockNow = now }) {
   const state = STATION_STATES[entry.state];
-  const live = entry.state === "busy" && entry.detail?.match ? spotlightParts(entry.detail.match, clockNow).clock : "";
+  const spot = entry.state === "busy" && entry.detail?.match ? spotlightParts(entry.detail.match, clockNow) : null;
+  const live = spot?.clock || "";
   const left = entry.state === "called" && entry.call ? countdown(entry.call.dueAt, now) : null;
   const names = entry.detail?.participants || "";
   return (
@@ -104,7 +106,12 @@ function StationCell({ entry, now, clockNow = now }) {
         <>
           <div className="tv-hall-station__what tv-t-meta">
             <span>{stationLine(entry)}</span>
-            {live ? <span className="tv-hall-station__clock">{live}</span> : null}
+            {live ? (
+              <span className="tv-hall-station__clock tv-clock-time" data-tone={spot.tone} role="timer" aria-label={spot.label}>
+                {spot.tone === "over" ? <AlertTriangle className="tv-clock-icon" aria-hidden="true" /> : null}
+                {live}
+              </span>
+            ) : null}
             {left && left.text ? <span className="tv-hall-station__clock tv-gold">{left.done ? "jetzt" : `noch ${left.text}`}</span> : null}
           </div>
           <div className="tv-t-name tv-hall-station__who" data-tv-name="1">{names}</div>

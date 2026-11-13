@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen } from "@testing-library/react";
 
 // Spielzeit-Uhr (#1167) in der Stationskachel: nach der Serverzeit (Abstand aus dem Saison-Kontext), Farbe und Zustand
@@ -44,6 +46,30 @@ test("Zeit überschritten: Farbe, „+N Min.“ und der Satz für Screenreader; 
   expect(screen.getByTestId("clock")).toHaveAttribute("data-tone", "over");
   expect(screen.getByTestId("clock")).toHaveTextContent("+20 Min.");
   expect(screen.getByTestId("clock")).toHaveAttribute("aria-label", "Spielzeit 1:05:12 von 45 Min., Zeit überschritten");
+  // Fabians Auswahl (07.10.): überschritten = orange gefüllt mit Warn-Symbol, Rot bleibt „läuft“.
+  expect(screen.getByTestId("clock-warn")).toBeInTheDocument();
+  expect(screen.getByTestId("clock")).toHaveTextContent("+20 Min.");
+  expect(screen.getByTestId("clock").querySelector(".text-live")).toBeNull();
+});
+
+test("knapp: orange ohne Warn-Symbol; ruhig ohne beides", () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-31T16:17:00Z"));
+  const { rerender } = render(<MatchClock startedAt="2026-10-31T16:00:00Z" durationMinutes={20} testId="clock" />);
+  expect(screen.getByTestId("clock")).toHaveAttribute("data-tone", "warn");
+  expect(screen.queryByTestId("clock-warn")).toBeNull();
+  rerender(<MatchClock startedAt="2026-10-31T16:10:00Z" durationMinutes={20} testId="clock" />);
+  expect(screen.getByTestId("clock")).toHaveAttribute("data-tone", "run");
+  expect(screen.queryByTestId("clock-warn")).toBeNull();
+});
+
+test("Farben (Fabians Auswahl 07.10.): „knapp“ und „überschritten“ sind Orange - Rot (`live`) nur für „läuft“", () => {
+  const css = ["src/components/tls/live/live.css", "src/components/tv/tv.css"]
+    .map((file) => readFileSync(path.join(process.cwd(), file), "utf8")).join(" ");
+  const toneRules = css.split("}").filter((rule) => /data-tone="(warn|over)"/.test(rule));
+  expect(toneRules.length).toBeGreaterThan(6);
+  expect(toneRules.filter((rule) => /tls-live\b|tv-live\b|live-rgb/.test(rule.split("{")[1] || ""))).toEqual([]);
+  expect(toneRules.filter((rule) => /data-tone="over"/.test(rule) && /tls-warn/.test(rule)).length).toBeGreaterThan(3);
 });
 
 test("ohne Dauer: nur die laufende Zeit, ohne Farbe und ohne Balken", () => {
@@ -86,4 +112,20 @@ test("Web-Baum und Spielplan (LiveClock): dieselbe Rechnung - Serverzeit, über 
   season.serverOffset = 5 * MINUTE;
   render(<LiveClock startedAt="2026-10-31T16:00:00Z" />);
   expect(screen.getByTestId("bracket-live-clock")).toHaveTextContent("1:05:12");
+  expect(screen.getByTestId("bracket-live-clock")).toHaveAttribute("data-tone", "none");
+});
+
+test("Web-Baum mit Dauer: dieselben Farben - knapp orange, überschritten orange gefüllt mit Warn-Symbol", async () => {
+  const { LiveClock } = await import("@/components/tls/bracket/BracketCards");
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-31T16:17:00Z"));
+  const { rerender } = render(<LiveClock startedAt="2026-10-31T16:00:00Z" durationMinutes={20} />);
+  const clock = screen.getByTestId("bracket-live-clock");
+  expect(clock).toHaveAttribute("data-tone", "warn");
+  expect(clock).toHaveAttribute("aria-label", "Spielzeit 17:00 von 20 Min., knapp");
+  expect(clock.querySelector(".tls-live-clock-icon")).toBeNull();
+  rerender(<LiveClock startedAt="2026-10-31T15:50:00Z" durationMinutes={20} />);
+  expect(screen.getByTestId("bracket-live-clock")).toHaveAttribute("data-tone", "over");
+  expect(screen.getByTestId("bracket-live-clock").querySelector(".tls-live-clock-icon")).not.toBeNull();
+  expect(screen.getByTestId("bracket-live-clock")).toHaveTextContent("27:00");
 });

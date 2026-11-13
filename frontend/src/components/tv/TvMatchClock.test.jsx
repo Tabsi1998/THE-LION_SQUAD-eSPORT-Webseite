@@ -45,6 +45,22 @@ test("Live-Spotlight: „PC 3 · 21:00 / 20 Min.“ - überschritten, nach der S
   expect(screen.getByTestId("tv-spot-clock-m1")).toHaveTextContent("21:00");
   expect(screen.getByTestId("tv-spot-clock-m1")).toHaveAttribute("aria-label", "Spielzeit 21:00 von 20 Min., Zeit überschritten");
   expect(screen.getByTestId("tv-spot-m1")).toHaveTextContent("/ 20 Min.");
+  // Überschritten: orange gefüllt mit Warn-Symbol (Fabians Auswahl 07.10.).
+  expect(screen.getByTestId("tv-spot-warn-m1")).toBeInTheDocument();
+});
+
+test("Warteschlange überschritten: Warn-Symbol und „+N Min.“ - knapp ohne Symbol", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T16:23:00Z"));
+  onTv(<>
+    <TvQueueClock entry={{ started_at: "2026-10-31T16:00:00Z", duration_minutes: 20 }} testId="tv-over" />
+    <TvQueueClock entry={{ started_at: "2026-10-31T16:06:00Z", duration_minutes: 20 }} testId="tv-warn" />
+  </>);
+  expect(screen.getByTestId("tv-over")).toHaveAttribute("data-tone", "over");
+  expect(screen.getByTestId("tv-over-warn")).toBeInTheDocument();
+  expect(screen.getByTestId("tv-over")).toHaveTextContent("+3 Min.");
+  expect(screen.getByTestId("tv-warn")).toHaveAttribute("data-tone", "warn");
+  expect(screen.queryByTestId("tv-warn-warn")).toBeNull();
 });
 
 test("Live-Spotlight ohne Dauer: nur die Zeit, ohne Farbe; ohne Start „Live“", () => {

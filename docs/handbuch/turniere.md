@@ -647,8 +647,9 @@ steht in Rot mit Spielzeit, spätere Runden mit „voraussichtlich“. Angemelde
 Seite rechnet nichts selbst – Zeit und Station kommen aus dem Spielplaner.
 
 **Spielzeit-Uhr.** Jedes laufende Spiel zeigt, wie lange es schon läuft und wie lange es geplant ist: „16:32 / 20 Min.“
-mit Balken – an der Station, im Reiter **Ergebnisse** der Turnierleitung (Filter **Läuft**), im Spielplan und am TV.
-Ab 80 % der Dauer wird die Uhr orange („knapp“), ab der vollen Dauer rot mit „+13 Min.“. Ohne Dauer steht nur die
+mit Balken – an der Station, im Reiter **Ergebnisse** der Turnierleitung (Filter **Läuft**), im Baum, im Spielplan und am TV.
+Ab 80 % der Dauer wird die Uhr orange („knapp“), ab der vollen Dauer steht die Zeit orange hinterlegt mit Warn-Symbol
+und „+13 Min.“ (Rot heißt nur „läuft“). Ohne Dauer steht nur die
 laufende Zeit, ab einer Stunde mit Stunden („1:12:14“). Fehlt das Ergebnis schon, steht der Hinweis unter der Uhr.
 Alle Geräte zählen nach der Uhr des Servers: Geht ein Handy falsch, zeigt es trotzdem dieselbe Sekunde wie der TV.
 Mit „Bewegung reduzieren“ springt der Balken minutenweise.
@@ -659,7 +660,7 @@ Mit „Bewegung reduzieren“ springt der Balken minutenweise.
 Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) steht dafür der Reiter **Stationen**
 (nur bei Turnieren vor Ort mit Stationen):
 
-- Je Station: was **läuft** (mit Spielzeit-Uhr „12:34 / 30 Min.“, Orange ab 80 %, Rot ab der vollen Dauer), was **als
+- Je Station: was **läuft** (mit Spielzeit-Uhr „12:34 / 30 Min.“, orange ab 80 %, ab der vollen Dauer orange hinterlegt mit Warn-Symbol), was **als
   Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“.
 - Wird eine Station frei, rückt das nächste bereite Spiel nach – an die Station, die zuerst frei ist. Ein Spiel wartet
   nur auf seine eigenen Vorspiele (die Linien im Baum), nicht auf die ganze Runde. Steht ein Platz noch nicht fest,
