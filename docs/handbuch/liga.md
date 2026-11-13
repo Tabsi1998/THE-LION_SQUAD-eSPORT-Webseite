@@ -1481,7 +1481,10 @@ jede Zuständigkeit der Liga.
 | Gleichstand auf Platz 1 | **Meister entscheiden** (nur in der obersten Liga) |
 | Kein Meister | in der obersten Liga steht kein Team mehr in der Wertung – Anmeldungen prüfen |
 
-Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf.
+Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf. Steht
+**Unvollständig** am Chip, ist ein Abschluss mittendrin abgebrochen: Die Staffel ist gesperrt, einen Endstand gibt es
+nicht. **Wieder öffnen** mit Grund gibt sie frei (ohne zweite Person, die Captains bekommen keine Nachricht), danach neu
+abschließen.
 
 **2. Gleichstand auf Platz 1.** Stehen in der obersten Liga zwei Teams nach allen Kriterien gleich, gibt es keinen Meister
 ohne Entscheid. **Meister entscheiden** → Reihenfolge mit den Pfeilen → **Wie wurde entschieden?** (Entscheidungsspiel, Los
@@ -1495,10 +1498,11 @@ nach: **Jetzt abschließen**. Danach gilt:
 
 - Der **Endstand** steht fest: Plätze, Punkte, Maps, Entscheide und der Regelstand von jetzt. Website, TV und PDF zeigen ihn,
   auf der Ligaseite steht „Endstand · abgeschlossen am …“.
-- Ergebnisse, „Rückgängig“, Kampflos-Wertungen, Vorfälle, Tabellen-Entscheide, Austritt und Disqualifikation, Punktabzüge und
-  der Stand der Staffel sind gesperrt. Jeder Versuch antwortet „Die Staffel ist abgeschlossen. Erst im Reiter ‚Abschluss‘
+- Ergebnisse, „Rückgängig“, Kampflos-Wertungen, Vorfälle, Einsprüche und Verfahren, Tabellen-Entscheide, Austritt und
+  Disqualifikation, Punktabzüge und der Stand der Staffel sind gesperrt. Jeder Versuch antwortet „Die Staffel ist abgeschlossen. Erst im Reiter ‚Abschluss‘
   wieder öffnen, dann korrigieren.“ Verwarnungen und Sperren bleiben möglich. Ändert ihr später Punkte oder Regeln der Season,
-  bleibt der Endstand, wie er war.
+  bleibt der Endstand, wie er war. Auch neue Protest-Einstellungen und **Vorgaben auf Staffeln übertragen** lassen eine
+  abgeschlossene Staffel unverändert.
 - Der Meister bekommt einen Eintrag „Meister“ an Team und eingesetzten Spielern (Profil → Auszeichnungen).
 - Captains und Vertreter bekommen eine Nachricht.
 - Wer selbst in einem Team der Staffel spielt, schließt nicht ab – das macht eine andere Person.

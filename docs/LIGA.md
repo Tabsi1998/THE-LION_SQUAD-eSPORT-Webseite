@@ -3438,6 +3438,7 @@ nie, wer abgeschlossen hat.
 | `deadlines` | laufende Protestfrist, Einspruchsfrist gegen Kampflos-Wertung, Korrektur, Protestentscheid oder Strafe | `match_disputes.league_window_of`, `appeal_until`, `league_sanctions.appeal_refusal` |
 | `champion_tie` | Gleichstand um den Meistertitel in der obersten Liga N ohne Entscheid (Nr. 156) | Tabelle |
 | `no_champion` | in der obersten Liga N steht kein Team mehr in der Wertung | Tabelle |
+| `incomplete_close` | Abschluss abgebrochen: Marke `final_table` am Turnier, aber keine aktive Fassung (nur Cockpit, Ausweg „Wieder öffnen“) | `league_final_tables` |
 
 Hier steht keine zweite Regel: Fristen und Zustände kommen aus den Bausteinen von D.5, E.2 und E.3. Sobald der Leitstand
 (E.4, `league_desk`) auf `main` ist, lesen beide dieselben Bausteine.
@@ -3454,7 +3455,10 @@ bleibt ein geteilter Platz 1 geteilt und sperrt nichts.
 **Abschließen** (`POST …/staffeln/{tid}/close`, `{confirm: true, conflict_reason?}`): Zuständigkeit `season`; wer zu einem
 Team der Staffel gehört, schließt nicht ab (403, Superadmin als Notausnahme mit Grund). Unter der Schreibsperre des Turniers;
 den Abschluss gewinnt, wer `tournaments.final_table` zuerst setzt - jeder zweite bekommt 409. Scheitert danach das Schreiben
-der Fassung, fällt die Marke wieder weg: Die Staffel bleibt offen und abschließbar. Folgen: Staffel `completed`,
+der Fassung, fällt die Marke wieder weg: Die Staffel bleibt offen und abschließbar. Bricht der Prozess genau dazwischen ab
+(Marke ohne aktive Fassung), zeigt das Cockpit „Unvollständig“ mit dem Sperrgrund `incomplete_close`; „Wieder öffnen“ nimmt
+die Marke dann mit Grund zurück (`league_final._free_incomplete`, Protokoll `league.final.repair`, ohne zweite Person und
+ohne Nachricht). Folgen: Staffel `completed`,
 Meister-Eintrag, Season `completed`, wenn alle Staffeln abgeschlossen sind, Protokoll `league.final.close`, Nachricht an
 Captains und Vertreter (`dedupe_key` `league-final:<fassung>:closed:<person>`). Ein Fehler in einer dieser Folgen kippt den
 Abschluss nicht, er steht im Log (`league_final._follow_up`); dasselbe gilt beim Wiederöffnen.
@@ -3470,12 +3474,15 @@ Antwort ist immer 409 mit „Die Staffel ist abgeschlossen. Erst im Reiter ‚Ab
 | Veröffentlichen eines bereitliegenden Ergebnisses | `league_permissions.held_result_refusal` (das Ergebnis wird verworfen, die Person bekommt eine Nachricht) |
 | Kampflos, Meldung der Teams, Teilnehmerliste, Einspruch und Entscheidung am Spiel, `PATCH` des Spiels | `match_routes._ensure_staffel_open` |
 | Vorfall melden, beantworten, entscheiden, Serie feststellen | `league_incident_routes._context` |
+| Einspruch einlegen und jeder Schritt in einem Verfahren (Ergänzen, Zurückziehen, Stellungnahme, Zuweisen, Entscheid, MOSS) | `league_protest_routes._context` |
 | Tabellen-Entscheid, „beide nicht erschienen“ | `league_table_routes._staffel` |
 | Austritt und Disqualifikation in der Teilnehmerliste | `tournament_removal_routes.remove_participant` |
-| Strafe „Punktabzug“ oder „Disqualifikation“ verhängen oder widerrufen | `league_sanctions.refuse_closed_effect` (andere Strafen bleiben möglich) |
+| Strafe „Punktabzug“ oder „Disqualifikation“ verhängen oder widerrufen | `league_sanctions.refuse_closed_effect`, beim Verhängen noch einmal unter der Schreibsperre in `create` (andere Strafen bleiben möglich) |
 | Stand der Staffel ändern (jeder Stand, auch „Archiviert“) | `staffel_guard.staffel_status_problem` (400) |
 
-Chat, Terminvorschläge und das Lesen bleiben offen.
+Chat, Terminvorschläge und das Lesen bleiben offen. Neue Vorgaben der Season (Protest-Einstellungen, „Vorgaben auf Staffeln
+übertragen“) gehen an einer abgeschlossenen Staffel vorbei wie an einer gesperrten - eine längere Einspruchsfrist öffnet
+dort nichts wieder.
 
 **Wieder öffnen** (Nr. 155, `POST …/staffeln/{tid}/reopen`, `{reason, emergency_reason?, conflict_reason?}`): Pflichtgrund
 (mindestens fünf Zeichen), Zuständigkeit `season`, und eine **zweite Person** - wer abgeschlossen hat, bekommt 403; der
