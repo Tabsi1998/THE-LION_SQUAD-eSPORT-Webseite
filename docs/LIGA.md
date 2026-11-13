@@ -3339,7 +3339,9 @@ Leitstand liest dieselben Quellen wie „Mein Dienst“ und die Reiter der Seaso
   Protokolleintrag `league.broadcast` mit der Kennung `league-broadcast:{season}:{request_id}` ist zugleich die Sperre; ein zweiter Aufruf
   mit derselben `request_id` antwortet mit `replay: true` und schickt nichts. Im Protokoll stehen Absender, Kreis, Zahl, Mail ja/nein und
   die Länge - nie der Text.
-- **Mein Dienst:** `league_desks[]` je Season (Entwurf oder laufend) der eigenen Ligen mit `mine`, `total` und `url` auf `#leitstand`.
+- **Mein Dienst:** `GET /api/users/me/duty?desks=1` liefert dazu `league_desks[]` je Season (Entwurf oder laufend) der eigenen Ligen
+  mit `mine`, `total` und `url` auf `#leitstand`. Ohne `desks` (Startseite der Verwaltung) bleibt die Liste leer und kein Leitstand wird
+  gerechnet. Die Kaderübersicht für Spiel-IDs „nach dem Stichtag“ liest der Leitstand nur, wenn es einen Eintrag `late_squad_ids` gibt.
 - **App (#2173, Folgepunkt):** `mobile/` ist unverändert. Die Rundnachricht kommt dort als Push und in der Glocke an (Art
   `league_broadcast`); einen Leitstand gibt es in der App nicht.
 

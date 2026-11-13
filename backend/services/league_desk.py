@@ -275,6 +275,9 @@ async def _roster(db, me, season, staffeln) -> list[dict]:
                          text="Ein Wechsel im Transferfenster wartet auf die Genehmigung der Liga-Leitung.",
                          url=f"/admin/leagues/seasons/{season['id']}#kader", action="Entscheiden", since=row.get("requested_at"),
                          me_id=me.get("id")))
+    # Spiel-IDs „nach dem Stichtag“ gibt es nur mit einem Eintrag ``late_squad_ids`` - ohne ihn bleibt die teure Kaderübersicht zu.
+    if not await db.league_rosters.find_one({"season_id": season["id"], "late_squad_ids.0": {"$exists": True}}, {"_id": 1}):
+        return out
     overview = await league_roster.season_overview(db, season)
     for squad in overview.get("squads") or []:
         late = [player for player in squad.get("players") or [] if player.get("state") == league_roster.LATE]

@@ -21,7 +21,8 @@ export default function AdminDutyPage() {
   const [failed, setFailed] = useState(false);
   const { user } = useAuth();
   const load = useCallback(() => {
-    api.get("/users/me/duty")
+    // Mit den Leitständen je Season (E.4) - die Startseite der Verwaltung fragt ohne, das spart dort alle Quellen der Liga.
+    api.get("/users/me/duty", { params: { desks: 1 } })
       .then(({ data: next }) => { setData(next); setFailed(false); })
       .catch(() => setFailed(true));
   }, []);

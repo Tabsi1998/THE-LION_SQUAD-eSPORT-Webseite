@@ -295,11 +295,56 @@ async def test_my_duty_links_into_the_desk_with_the_own_count(flow):
     await set_match(flow, world, result_overdue_at=at(hours=-2))
     lead = await lead_of(flow, "Spielleitung", "matches")
     flow.act_as(lead)
-    rows = (await flow.get("/api/users/me/duty")).json()["league_desks"]
+    rows = (await flow.get("/api/users/me/duty?desks=1")).json()["league_desks"]
     assert rows == [{"season_id": world["season_id"], "league_name": "Probe-Liga", "season_name": "Season 1", "mine": 1, "total": 1,
                      "url": f"/admin/leagues/seasons/{world['season_id']}#leitstand"}]
     flow.act_as(world["users"]["Tom"])
-    assert (await flow.get("/api/users/me/duty")).json()["league_desks"] == [], "Spieler ohne Dienst"
+    assert (await flow.get("/api/users/me/duty?desks=1")).json()["league_desks"] == [], "Spieler ohne Dienst"
+
+
+@pytest.mark.asyncio
+async def test_duty_without_the_flag_does_not_compute_any_desk(flow, monkeypatch):
+    """Die Startseite der Verwaltung lädt „Mein Dienst“ ohne ``desks`` - dann rechnet der Server keinen Leitstand."""
+    from services import league_desk
+
+    world = await desk_world(flow)
+    await set_match(flow, world, result_overdue_at=at(hours=-2))
+    lead = await lead_of(flow, "Spielleitung", "matches")
+    calls = []
+    real = league_desk.season_desk
+
+    async def counted(db, season, me):
+        calls.append(season["id"])
+        return await real(db, season, me)
+
+    monkeypatch.setattr(league_desk, "season_desk", counted)
+    flow.act_as(lead)
+    plain = (await flow.get("/api/users/me/duty")).json()
+    assert plain["league_desks"] == [] and calls == [], "ohne ?desks=1 kein Leitstand"
+    assert len(plain["overdue_matches"]) == 1, "die eigene Liste bleibt"
+    asked = (await flow.get("/api/users/me/duty?desks=1")).json()
+    assert asked["league_desks"][0]["mine"] == 1 and calls == [world["season_id"]]
+
+
+@pytest.mark.asyncio
+async def test_roster_overview_is_read_only_when_late_ids_can_exist(flow, monkeypatch):
+    from services import league_roster
+
+    world = await desk_world(flow)
+    calls = []
+    real = league_roster.season_overview
+
+    async def counted(db, season):
+        calls.append(season["id"])
+        return await real(db, season)
+
+    monkeypatch.setattr(league_roster, "season_overview", counted)
+    await desk(flow, world)
+    assert calls == [], "ohne Spiel-ID nach dem Stichtag keine Kaderübersicht"
+    await flow.db.league_rosters.insert_one({"id": new_id(), "season_id": world["season_id"], "user_id": world["users"]["Ida"]["id"],
+                                             "late_squad_ids": [world["squad_a"]["id"]]})
+    await desk(flow, world)
+    assert calls == [world["season_id"]]
 
 
 # ---------------------------------------------------------------- Rundnachricht

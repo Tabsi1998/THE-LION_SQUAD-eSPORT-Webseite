@@ -137,8 +137,9 @@ async def lead_today_rows(db, now: datetime | None = None, limit: int = 50) -> l
     return sorted(rows, key=_sort_key)
 
 
-async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
-    """Alles für „Mein Dienst“ in einer Antwort; leer für Spieler ohne Dienst."""
+async def duty_overview(db, user: dict, now: datetime | None = None, *, desks: bool = False) -> dict:
+    """Alles für „Mein Dienst“ in einer Antwort; leer für Spieler ohne Dienst. ``desks``: dazu die Zähler der Leitstände (E.4) - nur die
+    Seite „Mein Dienst“ fragt danach; die Startseite der Verwaltung lädt ohne, weil das je Season alle Quellen liest."""
     moderation = None
     if await can_use_area(user, "moderation", db=db):
         moderation = {"open_reports": await db.user_reports.count_documents({"status": "open"})}
@@ -169,7 +170,7 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         # Vorfälle (#1619, D.5): Map in Klärung oder Serie noch festzustellen - für wer in der Liga entscheiden darf.
         "incident_reviews": await incident_review_rows(db, user),
         # Leitstand je Season (E.4, Nr. 152): „Mein Dienst“ bleibt die eigene Liste und führt mit der Zahl der offenen Aufgaben hinein.
-        "league_desks": await league_desk_rows(db, user),
+        "league_desks": await league_desk_rows(db, user) if desks else [],
     }
 
 

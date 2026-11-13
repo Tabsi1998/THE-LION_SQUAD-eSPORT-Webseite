@@ -41,7 +41,7 @@ test("Helfer: eigene Einsätze in der Reihenfolge des Servers, mit Rolle und Kno
   expect(screen.getByTestId("duty-admin-t-1")).toHaveAttribute("href", "/admin/tournaments/t-1");
   expect(screen.getByTestId("duty-open-f-1")).toHaveTextContent("Fast Lap öffnen");
   expect(screen.queryByTestId("duty-moderation")).toBeNull();
-  expect(apiMock.get).toHaveBeenCalledWith("/users/me/duty");
+  expect(apiMock.get).toHaveBeenCalledWith("/users/me/duty", { params: { desks: 1 } });
 });
 
 test("Moderation: die Meldungen mit Zähler, keine Turnierliste", async () => {
