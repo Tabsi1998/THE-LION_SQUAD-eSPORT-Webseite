@@ -82,3 +82,39 @@ def test_the_signature_knows_earlier_rounds_too():
     corrected[0] = match("m1", 1, 1, "r1", "r2", status="completed", score=(2, 1))
     assert bracket_image.signature(bracket_image.bracket_sections(corrected, STAGES)) != before
     assert bracket_image.signature(bracket_image.bracket_sections(four_player_bracket((3, 1)), STAGES)) == before
+
+
+def _warn_pixels(data: bytes) -> int:
+    red, green, blue = bracket_image.COLORS["warn"]
+    return sum(1 for pixel in Image.open(io.BytesIO(data)).convert("RGB").getdata()
+               if abs(pixel[0] - red) < 20 and abs(pixel[1] - green) < 20 and abs(pixel[2] - blue) < 20)
+
+
+def test_a_contested_result_and_a_map_in_clarification_read_in_clarification():
+    """#2363: wie die Ligaseite - ein fertiges Spiel mit angefochtenem Ergebnis (E.2) und ein offenes mit einer Map in
+    Klärung (D.5) tragen „in Klärung“ in Warnfarbe; ohne Verfahren bleibt alles wie bisher."""
+    plain = four_player_bracket((3, 1))
+    contested = four_player_bracket((3, 1))
+    contested[0] = {**contested[0], "contested": True}
+    assert bracket_image._note(contested[0]) == "in Klärung" and bracket_image._note(plain[0]) == ""
+    assert _warn_pixels(bracket_image.render({"title": "Sommer-Cup"}, contested, STAGES, REGS)) > 50
+    assert _warn_pixels(bracket_image.render({"title": "Sommer-Cup"}, plain, STAGES, REGS)) == 0
+
+    clarifying = four_player_bracket()
+    clarifying[2] = {**clarifying[2], "in_clarification": True}
+    assert bracket_image._note(clarifying[2]) == "in Klärung" and bracket_image._note(four_player_bracket()[2]) == "live"
+    # Die Markierung einer Map zählt nur im offenen Spiel, ``contested`` nur im fertigen - wie auf der Ligaseite.
+    assert bracket_image._note({**plain[2], "in_clarification": True}) == ""
+    assert bracket_image._note({**four_player_bracket()[2], "contested": True}) == "live"
+
+
+def test_the_signature_knows_in_clarification_and_stays_the_same_without():
+    plain = bracket_image.signature(bracket_image.bracket_sections(four_player_bracket((3, 1)), STAGES))
+    # Ohne Verfahren dieselbe Prüfsumme wie vor #2363 - sonst käme bei jedem Turnier ein neues Bild.
+    assert plain == "8432d26972c773c182310f1a0ab701115e8968c6"
+    contested = four_player_bracket((3, 1))
+    contested[0] = {**contested[0], "contested": True}
+    marked = bracket_image.signature(bracket_image.bracket_sections(contested, STAGES))
+    assert marked != plain, "Protest eingelegt: neues Bild"
+    contested[0] = {**contested[0], "contested": False}
+    assert bracket_image.signature(bracket_image.bracket_sections(contested, STAGES)) == plain, "entschieden: wieder das Bild ohne Hinweis"

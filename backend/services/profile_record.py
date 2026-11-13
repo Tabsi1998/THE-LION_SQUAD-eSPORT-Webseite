@@ -78,7 +78,9 @@ async def path_for(db, owner: dict, tournament_ref: str, *, public: bool) -> dic
     return {
         "tournament": {"id": tournament["id"], "slug": tournament.get("slug") or tournament["id"], "title": tournament.get("title") or "Turnier"},
         "kind": path_kind(steps),
-        "steps": [{"kind": s["kind"], "label": s["label"], "result": s["result"], "outcome": s["outcome"], "opponent": s.get("opponent")} for s in steps],
+        # ``contested`` nur als Hinweis „in Klärung“ (#2363) - ohne Grund, Seite oder Person.
+        "steps": [{"kind": s["kind"], "label": s["label"], "result": s["result"], "outcome": s["outcome"], "opponent": s.get("opponent"),
+                   **({"contested": s["contested"]} if s.get("contested") else {})} for s in steps],
         "final": {"rank": rank, "participant_count": participant_count},
         "team_name": team_name,
         "date": tournament.get("start_date"),
