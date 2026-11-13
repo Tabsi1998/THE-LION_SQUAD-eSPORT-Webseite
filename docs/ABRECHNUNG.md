@@ -109,14 +109,17 @@ Beleg schließen den Auftrag. Die Aufträge stehen in derselben Finanzübersicht
 
 **Zurück nach Storno, die Rechnung gibt es schon (#2368).** Wie bei Events (siehe Prüffälle): Meldet sich
 jemand nach der Abmeldung wieder an, rückt nach der Abmeldung von der Warteliste nach oder bestätigt die
-Turnierleitung eine abgelehnte (oder ausgetretene) Anmeldung wieder, entsteht kein zweiter Auftrag. Die
-Anmeldung trägt wieder den Preis und Stand der Rechnung, es öffnet sich der Prüffall „Buchung nach dem Beleg
-geändert“ mit altem und neuem Betrag (Grund „Nach Storno selbst neu angemeldet“, „Nach Storno von der
+Turnierleitung eine abgelehnte, ausgetretene oder „nicht erschienene“ Anmeldung wieder (auch über den Check-in),
+entsteht kein zweiter Auftrag. Die Anmeldung trägt wieder den Preis und Stand der Rechnung, es öffnet sich der
+Prüffall „Buchung nach dem Beleg geändert“ mit altem und neuem Betrag (Grund „Nach Storno selbst neu angemeldet“ –
+auch wenn die Leitung eine selbst neu angemeldete Person von der Warteliste holt –, „Nach Storno von der
 Warteliste nachgerückt“ oder „Anmeldung wieder aktiviert“). Die Abmeldung löscht die Turnier-Anmeldung; als
 dieselbe Anmeldung zählt eine neue, wenn Turnier, zahlende Person und Team (Solo: keins) gleich sind. Meldet
-ein **anderes Mitglied** das Team neu an, übernimmt es die Kosten selbst: eigener Auftrag, die alte Rechnung
-bleibt storniert (Gutschrift an die Person, die sie bekommen hat). Ist die alte Rechnung voll gutgeschrieben
-oder aufgegeben, gilt der aktuelle Preis mit eigenem Auftrag.
+ein **anderes Mitglied** das Team neu an – auch nach einer weggenommenen Ablehnung –, übernimmt es die Kosten
+selbst: eigener Auftrag, die alte Rechnung bleibt storniert (Gutschrift an die Person, die sie bekommen hat).
+Ist die alte Rechnung voll gutgeschrieben oder aufgegeben, gilt der aktuelle Preis mit eigenem Auftrag.
+„Nicht erschienen“ schließt den Auftrag auf jedem Weg: über den Status, über den Check-in und wenn die Leitung
+einen Ersatz für die Person einträgt.
 
 **Turnier im Event.** Hängt das Turnier an einem Event, dessen Kostenbeitrag das Startgeld schon
 enthält, setzt ihr im Abschnitt „Startgeld“ den Haken „Im Eventbeitrag enthalten“ – dann zeigt
