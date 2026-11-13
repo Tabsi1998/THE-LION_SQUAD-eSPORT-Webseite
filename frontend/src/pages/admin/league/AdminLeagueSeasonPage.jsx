@@ -38,6 +38,7 @@ import { useSeasonReadiness } from "./SeasonReadinessPanel";
 import { SeasonProtestsTab } from "./SeasonProtestsTab";
 import { SeasonRulesTab } from "./SeasonRulesTab";
 import { SeasonSanctionsTab } from "./SeasonSanctionsTab";
+import { SeasonCloseTab } from "./SeasonCloseTab";
 import { SeasonTablePanel } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -353,6 +354,8 @@ export default function AdminLeagueSeasonPage() {
     proteste: () => <SeasonProtestsTab seasonId={seasonId} canSeason={canSeason} canDisputes={can("disputes")} />,
     // Strafen (E.3): eigener Reiter - Formular oben, darunter die Strafen der Season.
     strafen: () => <SeasonSanctionsTab seasonId={seasonId} />,
+    // Abschluss (F.1, #1645): Endstand je Staffel festhalten - eigenes Laden, eigene Knöpfe.
+    abschluss: () => <SeasonCloseTab seasonId={seasonId} canResults={can("results")} />,
     regelwerk: () => (
       <SeasonRulesTab seasonId={seasonId} season={season} canSeason={canSeason} canRules={canRules} rulesView={rulesView} rulesNotice={notice}
         rulesLink={rulesLink} onPendingSync={setPendingSync} />

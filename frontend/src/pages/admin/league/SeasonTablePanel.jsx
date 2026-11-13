@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormSection } from "@/components/tls/AdminForm";
-import { TextAreaField } from "@/components/tls/FormFields";
+import { SelectField, TextAreaField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { byMaps, tiebreakOrder } from "@/lib/leagueTable";
 import { viennaDateTime } from "@/lib/vienna";
@@ -24,7 +24,10 @@ function when(value) {
   }
 }
 
-function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
+/** Reihenfolge bei echtem Gleichstand festlegen. `methods` (F.1, Nr. 156): die Auswahl „Wie wurde entschieden?“ - im Reiter
+ *  „Abschluss“ Pflicht, weil der Entscheid über den Meister im Endstand steht. */
+export function OrderSheet({ staffel, tie, override, onClose, onSaved, methods = null }) {
+  const [method, setMethod] = useState("");
   const [order, setOrder] = useState(tie.registration_ids.map((id, index) => ({ id, name: tie.names[index] || "Team" })));
   const [reason, setReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
@@ -41,6 +44,10 @@ function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
       toast.error(`Bitte einen Grund mit mindestens ${MIN_REASON} Zeichen angeben.`);
       return;
     }
+    if (methods && !method) {
+      toast.error("Bitte wählen, wie entschieden wurde.");
+      return;
+    }
     if (overrideMissing(override, conflictReason)) {
       toast.error(`Bitte den Grund für die Notausnahme mit mindestens ${CONFLICT_REASON_MIN} Zeichen angeben.`);
       return;
@@ -48,7 +55,7 @@ function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
     setSaving(true);
     try {
       await api.put(`/admin/leagues/staffeln/${staffel.tournament_id}/table-decision`, { registration_ids: order.map((item) => item.id), reason: reason.trim(),
-        ...overridePayload(override, conflictReason) });
+        ...(methods && method ? { method } : {}), ...overridePayload(override, conflictReason) });
       toast.success("Reihenfolge festgelegt.");
       onSaved();
     } catch (err) {
@@ -76,6 +83,12 @@ function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
           </li>
         ))}
       </ol>
+      {methods ? (
+        <div className="mt-4">
+          <SelectField label="Wie wurde entschieden?" required value={method} onChange={setMethod} testId="table-decision-method"
+            options={[["", "Bitte wählen"], ...methods]} hint="Steht mit dem Grund im Endstand." />
+        </div>
+      ) : null}
       <div className="mt-4">
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required placeholder="z. B. Losentscheid vor beiden Captains am 20.11."
           hint="Steht öffentlich an der Tabelle und im Protokoll." testId="table-decision-reason" />

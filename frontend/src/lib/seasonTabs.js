@@ -17,6 +17,8 @@ export const SEASON_TABS = [
   { key: "strafen", label: "Strafen" },
   { key: "regelwerk", label: "Regelwerk und Sperrliste" },
   { key: "ligen", label: "Ligen und Staffeln" },
+  // Abschluss (F.1, #1645): Checkliste je Staffel, Endstand festhalten, Verlauf, wieder öffnen - lesen darf jede Zuständigkeit.
+  { key: "abschluss", label: "Abschluss" },
 ];
 
 // Abschnitte innerhalb der Reiter, per Sprungmarke erreichbar (Prüfung, Nachrichten des Servers, Handbuch). „anmeldungen“ ist die
@@ -198,7 +200,7 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
     { key: "spielbetrieb", label: "Spielbetrieb", when: startText ? `${startText}${lastDay ? ` – ${viennaDate(dayNoon(lastDay), SHORT)}` : ""}` : "",
       note: weekNote || "Termine, Check-in je Spiel, Ergebnisse" },
     { key: "abschluss", label: "Abschluss", when: season.status === "archived" ? "archiviert" : season.status === "completed" ? "beendet" : "",
-      note: "Tabelle steht, Stand auf „Beendet“" },
+      note: "Endstand je Staffel im Reiter „Abschluss“ festhalten" },
   ];
   return steps.map((step, index) => {
     if (step.key === "anmeldung" && !hasWindow) return { ...step, state: index < current ? "skipped" : current === index ? "current" : "skipped" };
