@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Megaphone } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -48,50 +48,50 @@ function useNow(items) {
   return now;
 }
 
-/** Hält Hinweise, die gerade verschwinden, noch einen Augenblick stehen - sie blenden aus statt zu springen. */
-function useLeaving(shown) {
-  const [leaving, setLeaving] = useState([]);
-  const previous = useRef(shown);
-  const latest = useRef(shown);
-  latest.current = shown;
-  const timers = useRef(new Set());
-  // Nur wenn sich die Menge ändert - nicht bei jedem Neuzeichnen (die Liste ist jedes Mal eine neue).
+/**
+ * Was das Banner zeigt: die stehenden Hinweise und dazu, am selben Platz und mit demselben Schlüssel, die gerade
+ * verschwundenen - so blendet dieselbe Karte aus, statt neu einzufahren und am Ende zu stehen (Review N2). Die Liste der
+ * verschwindenden wird beim Zeichnen nachgeführt (Zustand „während des Renderns“ angepasst): Schon das erste Bild ohne
+ * den Hinweis hält seine Karte noch, sonst würde sie einmal abgebaut und neu angelegt.
+ */
+function useDisplayed(shown) {
   const key = shown.map((item) => item.id).join("|");
+  const [state, setState] = useState({ key, shown, leaving: [] });
+  if (state.key !== key) {
+    const ids = new Set(shown.map((item) => item.id));
+    const gone = state.shown.map((item, index) => ({ item, index })).filter(({ item }) => !ids.has(item.id));
+    const kept = state.leaving.filter(({ item }) => !ids.has(item.id) && !gone.some((entry) => entry.item.id === item.id));
+    setState({ key, shown, leaving: [...kept, ...gone] });
+  }
+  const leavingKey = state.leaving.map((entry) => entry.item.id).join("|");
   useEffect(() => {
-    const now = latest.current;
-    const ids = new Set(now.map((item) => item.id));
-    const gone = previous.current.filter((item) => !ids.has(item.id));
-    previous.current = now;
-    if (!gone.length) return undefined;
-    setLeaving((current) => [...current.filter((item) => !ids.has(item.id)), ...gone]);
-    const timer = setTimeout(() => {
-      timers.current.delete(timer);
-      setLeaving((current) => current.filter((item) => !gone.some((old) => old.id === item.id)));
-    }, LEAVE_MS);
-    timers.current.add(timer);
-    return undefined;
-  }, [key]);
-  // Ausblenden läuft auch weiter, wenn gleich danach der nächste Hinweis kommt - erst beim Verlassen der Seite aufräumen.
-  useEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach((timer) => clearTimeout(timer));
-  }, []);
-  return leaving;
+    if (!leavingKey) return undefined;
+    const timer = setTimeout(() => setState((current) => ({ ...current, leaving: [] })), LEAVE_MS);
+    return () => clearTimeout(timer);
+  }, [leavingKey]);
+  const ids = new Set(shown.map((item) => item.id));
+  const list = shown.map((item) => ({ item, leaving: false }));
+  [...state.leaving]
+    .filter(({ item }) => !ids.has(item.id))
+    .sort((a, b) => a.index - b.index)
+    .forEach(({ item, index }) => list.splice(Math.min(index, list.length), 0, { item, leaving: true }));
+  return list;
 }
 
 /**
- * Das Banner. `items`: die Antwort des Servers; `label`: „Turnier“ oder „Event“ für Hinweise eines Turniers auf der
- * Event-Seite (`tournament_title`). `limit`: wie viele höchstens stehen (der neueste zuerst).
+ * Das Banner. `items`: die Antwort des Servers; `showTournament`: auf der Event-Seite der Turniername vor Hinweisen eines
+ * Turniers (`tournament_title`). `limit`: wie viele höchstens stehen (der neueste zuerst).
  */
 export function NoticeBanner({ items, limit = 3, className = "", showTournament = false }) {
   const now = useNow(items);
   const shown = activeNotices(items, now).slice(0, limit);
-  const leaving = useLeaving(shown);
-  if (!shown.length && !leaving.length) return null;
+  const displayed = useDisplayed(shown);
+  if (!displayed.length) return null;
   return (
     <div className={`space-y-2 ${className}`} role="status" aria-live="polite" data-testid="notice-banner">
-      {shown.map((item, index) => <NoticeCard key={item.id} item={item} index={index} now={now} showTournament={showTournament} />)}
-      {leaving.map((item) => <NoticeCard key={`leaving-${item.id}`} item={item} index={0} now={now} showTournament={showTournament} leaving />)}
+      {displayed.map(({ item, leaving }, index) => (
+        <NoticeCard key={item.id} item={item} index={index} now={now} showTournament={showTournament} leaving={leaving} />
+      ))}
     </div>
   );
 }

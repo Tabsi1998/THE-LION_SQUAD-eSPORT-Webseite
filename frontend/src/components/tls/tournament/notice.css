@@ -35,11 +35,15 @@
   100% { opacity: 0; }
 }
 
-/* Abgelaufen oder entfernt: schneller hinaus als herein. */
+/* Abgelaufen oder entfernt: dieselbe Karte am selben Platz blendet aus - schneller hinaus als herein, ohne noch einmal
+   einzufahren, aufzuleuchten oder zu wippen. */
 .tls-notice[data-leaving="1"] {
+  animation: none;
   opacity: 0;
   transform: translateY(calc(-4px * var(--tls-motion-on)));
 }
+.tls-notice[data-leaving="1"]::after,
+.tls-notice[data-leaving="1"] .tls-notice__icon { animation: none; }
 
 /* Der Ablauf als Leiste: sie läuft gleichmäßig leer, bis der Hinweis verschwindet. */
 .tls-notice__left {

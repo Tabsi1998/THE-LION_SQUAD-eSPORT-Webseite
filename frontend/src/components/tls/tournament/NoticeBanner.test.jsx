@@ -72,3 +72,21 @@ it("lädt auch nach, wenn ein anderes Turnier desselben Events einen Hinweis ans
   render(<Probe />);
   expect(live.options).toEqual(expect.objectContaining({ tournamentId: "t1", eventId: "e1", wholeEvent: true }));
 });
+
+it("blendet einen entfernten Hinweis am selben Platz mit derselben Karte aus (Review N2)", () => {
+  vi.useFakeTimers({ now: NOW, toFake: ["Date", "setTimeout", "setInterval", "clearTimeout", "clearInterval"] });
+  const newer = notice("a", "Pause bis 14:30", "2026-11-14T13:05:00Z", "2026-11-14T15:00:00Z");
+  const older = notice("b", "Bitte zum Check-in", "2026-11-14T13:00:00Z", "2026-11-14T15:00:00Z");
+  const { container, rerender } = render(<NoticeBanner items={[newer, older]} />);
+  const card = screen.getByTestId("notice-a");
+  rerender(<NoticeBanner items={[older]} />);
+  const cards = container.querySelectorAll(".tls-notice");
+  // Oben bleibt die Karte des entfernten Hinweises - dasselbe Element, jetzt beim Ausblenden.
+  expect(cards).toHaveLength(2);
+  expect(cards[0]).toBe(card);
+  expect(cards[0]).toHaveAttribute("data-leaving", "1");
+  expect(cards[1]).not.toHaveAttribute("data-leaving");
+  act(() => { vi.advanceTimersByTime(400); });
+  expect(container.querySelectorAll(".tls-notice")).toHaveLength(1);
+  expect(screen.getByTestId("notice-b")).toBeInTheDocument();
+});
