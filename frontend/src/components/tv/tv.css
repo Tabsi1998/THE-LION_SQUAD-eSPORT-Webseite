@@ -1253,9 +1253,12 @@
 .tv-lanes__clock[data-tone="warn"] .tv-lanes__time { color: var(--tls-warn); }
 .tv-lanes__clock[data-tone="over"] .tv-lanes__time { color: rgb(12 12 12); background: var(--tls-warn); }
 .tv-lanes__track { flex-basis: 100%; height: max(3px, calc(var(--tv-u) * 0.4)); border-radius: 999px; background: var(--tv-line); overflow: hidden; }
-.tv-lanes__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear, background-color var(--tls-motion-mid) var(--tls-ease); }
-.tv-lanes__clock[data-tone="warn"] .tv-lanes__track i { background: var(--tls-warn); }
-.tv-lanes__clock[data-tone="over"] .tv-lanes__track i { background: var(--tls-warn); }
+.tv-lanes__track i { position: relative; display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear; }
+/* Farbwechsel nur über Deckkraft (#1653, wie die Uhr im Web): die orange Füllung liegt über dem Balken und blendet weich
+   ein, sie wächst mit dem Balken (transform). */
+.tv-lanes__track i::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--tls-warn); opacity: 0; transition: opacity var(--tls-motion-slow) var(--tls-ease); }
+.tv-lanes__clock[data-tone="warn"] .tv-lanes__track i::after,
+.tv-lanes__clock[data-tone="over"] .tv-lanes__track i::after { opacity: 1; }
 
 /* ------------------------------------------ Live-Spiele (#1121) */
 .tv-slide-live { height: 100%; min-height: 0; display: grid; gap: calc(var(--tv-u) * 2); padding-top: calc(var(--tv-u) * 1.2); }
