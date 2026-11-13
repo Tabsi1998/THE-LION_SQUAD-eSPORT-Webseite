@@ -6,6 +6,8 @@
 - ``GET /tournaments/{tid}/live-queue/me``: die eigenen Spiele - „Du bist als Nächstes an Station 2“.
 - ``POST /tournaments/{tid}/live-queue/call`` und ``.../start``: Organisation, Schiedsrichter, Stationsleitung - fürs
   ganze Turnier oder für genau diese Station.
+- ``POST .../live-queue/release``, ``.../broken`` und ``.../move`` (#1162): Freigeben, Defekt bzw. wieder bereit und
+  Umlegen vom Handy - dieselben Rollen, ohne Admin-Recht.
 
 Zwei Helfer zugleich: Aufruf und Start laufen unter dem Turnier-Lock wie Zuweisen und „Übernehmen“ (#1552), dazu prüft
 diese Stelle, was der Helfer gesehen hat, frisch nach: Ein Spiel, das schon an einer anderen Station aufgerufen ist,
@@ -23,9 +25,11 @@ from routes.station_routes import _assign_match_to_station, _match_has_minimum_p
 from routes.tournament_common import _ensure_tournament_unlocked, _get_visible_tournament, _resolve_tid
 from routes.tournament_router import router
 from services.access_links import touch_access_link, validate_access_link
+from services.change_events import reset_scope_cache
+from services.heat_rebuild import evaluate_after_write
 from services.live_queue import load_live_queue, my_entries
 from services.match_calls import CALL_OPEN_STATUSES
-from services.match_scheduler import RUNNING_STATUSES, _unresolved
+from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, _unresolved
 from services.station_labels import station_text
 from services.tournament_permissions import (
     STATION_ASSIGN_ROLES,
@@ -125,30 +129,44 @@ class QueueAction(BaseModel):
     match_id: str = Field(min_length=1, max_length=120)
 
 
-async def _context(tid: str, body: QueueAction, me: dict) -> tuple:
-    """Recht, Turnier, Station und Spiel - erst das Recht, dann was es gibt."""
+async def _may_operate(me: dict, tournament_id: str, station_id: str) -> bool:
+    return await has_tournament_staff_permission(
+        me, tournament_id, STATION_ASSIGN_ROLES, "tournament", capability="matches"
+    ) or await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "station", station_id, capability="matches")
+
+
+def _own_station(station: dict | None, tournament: dict) -> bool:
+    """Eine Station dieses Turniers - oder eine des Events ohne eigenes Turnier (geteilte Stationen, #1801)."""
+    return bool(station) and (
+        station.get("tournament_id") == tournament["id"]
+        or (
+            not station.get("tournament_id")
+            and bool(tournament.get("event_id"))
+            and station.get("event_id") == tournament.get("event_id")
+        )
+    )
+
+
+async def _station_context(tid: str, station_id: str, me: dict) -> tuple:
+    """Recht, Turnier und Station - erst das Recht, dann was es gibt."""
     db = get_db()
     tournament_id = await _resolve_tid(tid)
-    allowed = await has_tournament_staff_permission(
-        me, tournament_id, STATION_ASSIGN_ROLES, "tournament", capability="matches"
-    ) or await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "station", body.station_id, capability="matches")
-    if not allowed:
+    if not await _may_operate(me, tournament_id, station_id):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _ensure_tournament_unlocked(db, tournament_id)
-    station = await db.stations.find_one({"id": body.station_id}, {"_id": 0})
-    own_station = station and (
-        station.get("tournament_id") == tournament_id
-        or (
-            not station.get("tournament_id")
-            and tournament.get("event_id")
-            and station.get("event_id") == tournament.get("event_id")
-        )
-    )
-    if not own_station:
+    station = await db.stations.find_one({"id": station_id}, {"_id": 0})
+    if not _own_station(station, tournament):
         raise HTTPException(status_code=404, detail="Station nicht gefunden")
+    return db, tournament, station
+
+
+async def _context(tid: str, body: QueueAction, me: dict) -> tuple:
+    """Recht, Turnier, Station und Spiel - erst das Recht, dann was es gibt."""
+    db, tournament, station = await _station_context(tid, body.station_id, me)
+    tournament_id = tournament["id"]
     match = await db.matches_v2.find_one({"id": body.match_id, "tournament_id": tournament_id}, {"_id": 0})
     if not match or match.get("is_preview"):
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
@@ -249,3 +267,180 @@ async def start_match(tid: str, body: QueueAction, me: dict = Depends(get_curren
     stored = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "started_at": 1}) or {}
     await _audit(db, "match.started", tournament_id, match, station["id"], me["id"])
     return {"ok": True, "idempotent_replay": False, "started_at": stored.get("started_at")}
+
+
+# ---------------------------------------------------------------- Freigeben, Defekt, Umlegen (#1162)
+# Dieselben Rollen wie Aufrufen und Starten (Organisation, Schiedsrichter, Stationsleitung - fürs ganze Turnier oder für
+# genau diese Station), ohne Admin-Recht. Alles unter dem Turnier-Lock und mit Compare-and-Set an der Station: zwei
+# Leitungen zugleich ergeben genau einen Wechsel, die andere bekommt 409 mit einer Meldung - oder, wenn sie dasselbe
+# wollte, ``idempotent_replay``.
+
+HOLDS_OTHER_DETAIL = "Die Station hält inzwischen ein anderes Spiel. Bitte neu laden."
+TARGET_TAKEN_DETAIL = "Die Zielstation ist inzwischen belegt. Bitte neu laden."
+
+
+class StationRelease(QueueAction):
+    """Freigeben: die Station gibt das Spiel ab, das die Leitung gesehen hat (``match_id``)."""
+
+
+class StationBroken(BaseModel):
+    """Defekt melden (``broken``) oder wieder bereit (``broken: false``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    station_id: str = Field(min_length=1, max_length=120)
+    broken: bool = True
+
+
+class StationMove(QueueAction):
+    """Umlegen: das Spiel, das ``station_id`` hält, auf die freie Station ``to_station_id``."""
+
+    to_station_id: str = Field(min_length=1, max_length=120)
+
+
+async def _station_audit(db, action: str, tournament_id: str, actor_id: str, data: dict) -> None:
+    await db.audit_logs.insert_one(
+        {"id": new_id(), "action": action, "target_id": tournament_id, "actor_id": actor_id,
+         "data": data, "created_at": now_utc().isoformat()}
+    )
+
+
+def _held_state(match: dict | None) -> str | None:
+    """Was die Station mit diesem Spiel hält: ``running``, ``called`` oder nichts Offenes."""
+    if not match or str(match.get("status") or "") in DONE_STATUSES:
+        return None
+    if _running(match):
+        return "running"
+    return "called" if match.get("called_at") else None
+
+
+@router.post("/{tid}/live-queue/release")
+async def release_station_live(tid: str, body: StationRelease, me: dict = Depends(get_current_user)):
+    """Freigeben: Ein Aufruf wird zurückgenommen (das Spiel rückt zurück in die Warteschlange); ein laufendes Spiel
+    gibt die Station ab, das Ergebnis kommt danach unter „Ergebnisse“. Eine defekte Station bleibt defekt."""
+    db, tournament, _station = await _station_context(tid, body.station_id, me)
+    tournament_id = tournament["id"]
+    async with _tournament_lock(db, tournament_id):
+        station, match = await _fresh(db, body.station_id, body.match_id)
+        held = station.get("current_match_id")
+        if not held:
+            # Doppeltipp oder eine zweite Leitung war schneller: schon frei.
+            return {"ok": True, "idempotent_replay": True, "state": None}
+        if held != body.match_id:
+            raise HTTPException(status_code=409, detail=HOLDS_OTHER_DETAIL)
+        state = _held_state(match)
+        now_iso = now_utc().isoformat()
+        station_set = {"current_match_id": None, "current_match_type": None, "updated_at": now_iso,
+                       "last_match_id": body.match_id, "last_match_type": "matches_v2", "freed_at": now_iso}
+        if station.get("status") != "broken":
+            station_set["status"] = "free"
+        freed = await db.stations.update_one(
+            {"id": station["id"], "current_match_id": body.match_id},
+            {"$set": station_set, "$unset": {"called_at": ""}},
+        )
+        if not freed.matched_count:
+            raise HTTPException(status_code=409, detail=HOLDS_OTHER_DETAIL)
+        before = await db.matches_v2.find_one_and_update(
+            {"id": body.match_id, "station_id": station["id"]},
+            {"$set": {"station_id": None, "updated_at": now_iso}, "$unset": {"called_at": ""}},
+            projection={"_id": 0, "called_at": 1},
+        )
+        if (before or {}).get("called_at"):
+            # Aufruf zurückgenommen: der Lauf ist wieder umbaubar (#2033) - unter der gehaltenen Sperre auswerten.
+            await evaluate_after_write(db, tournament_id, actor_id=me.get("id"), trigger="uncall")
+    await _station_audit(db, "station.released", tournament_id, me["id"], {
+        "station_id": station["id"], "match_id": body.match_id, "match_key": (match or {}).get("match_key"), "state": state,
+    })
+    return {"ok": True, "idempotent_replay": False, "state": state}
+
+
+@router.post("/{tid}/live-queue/broken")
+async def station_broken(tid: str, body: StationBroken, me: dict = Depends(get_current_user)):
+    """Defekt: Die Station bekommt nichts mehr. Hält sie ein laufendes oder aufgerufenes Spiel, bleibt es dort, bis die
+    Leitung es umlegt (Antwort ``holds``). „Wieder bereit“ stellt den Stand her, der zum gehaltenen Spiel passt."""
+    db, tournament, _station = await _station_context(tid, body.station_id, me)
+    tournament_id = tournament["id"]
+    async with _tournament_lock(db, tournament_id):
+        station = await db.stations.find_one({"id": body.station_id}, {"_id": 0}) or {}
+        held_id = station.get("current_match_id")
+        match = await db.matches_v2.find_one({"id": held_id}, {"_id": 0}) if held_id else None
+        state = _held_state(match)
+        now_iso = now_utc().isoformat()
+        if body.broken:
+            changed = await db.stations.update_one(
+                {"id": station["id"], "status": {"$ne": "broken"}},
+                {"$set": {"status": "broken", "broken_at": now_iso, "updated_at": now_iso}},
+            )
+        else:
+            status = "busy" if state == "running" else "reserved" if state == "called" else "free"
+            changed = await db.stations.update_one(
+                {"id": station["id"], "status": "broken"},
+                {"$set": {"status": status, "updated_at": now_iso}, "$unset": {"broken_at": ""}},
+            )
+    holds = {"match_id": held_id, "match_key": (match or {}).get("match_key"), "state": state} if state else None
+    if not changed.matched_count:
+        return {"ok": True, "idempotent_replay": True, "holds": holds}
+    reset_scope_cache()  # Live-Meldungen (#1801): wie jede Stationsänderung
+    await _station_audit(db, "station.broken" if body.broken else "station.repaired", tournament_id, me["id"], {
+        "station_id": station["id"], "match_id": held_id if state else None, "state": state,
+    })
+    return {"ok": True, "idempotent_replay": False, "holds": holds}
+
+
+async def _move_running(db, source: dict, target: dict, match: dict) -> None:
+    """Ein laufendes Spiel wechselt die Station - Startzeit und Uhr bleiben, es geht keine Startnachricht hinaus."""
+    now_iso = now_utc().isoformat()
+    claimed = await db.stations.update_one(
+        {"id": target["id"], "status": {"$ne": "broken"}, "deleting": {"$ne": True},
+         "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}]},
+        {"$set": {"current_match_id": match["id"], "current_match_type": "matches_v2", "status": "busy",
+                  "updated_at": now_iso}, "$unset": {"called_at": ""}},
+    )
+    if not claimed.matched_count:
+        raise HTTPException(status_code=409, detail=TARGET_TAKEN_DETAIL)
+    await db.matches_v2.update_one({"id": match["id"]}, {"$set": {"station_id": target["id"], "updated_at": now_iso}})
+    source_set = {"current_match_id": None, "current_match_type": None, "updated_at": now_iso}
+    if source.get("status") != "broken":
+        source_set["status"] = "free"
+    await db.stations.update_one({"id": source["id"], "current_match_id": match["id"]},
+                                 {"$set": source_set, "$unset": {"called_at": ""}})
+
+
+@router.post("/{tid}/live-queue/move")
+async def move_match(tid: str, body: StationMove, me: dict = Depends(get_current_user)):
+    """Umlegen: ein laufendes oder aufgerufenes Spiel auf eine freie Station. Ein laufendes behält Startzeit und Uhr;
+    ein aufgerufenes wird an der neuen Station aufgerufen - die Spieler bekommen „Du bist dran“ mit der neuen Station.
+    Die alte Station wird frei, eine defekte bleibt defekt."""
+    if body.to_station_id == body.station_id:
+        raise HTTPException(status_code=422, detail="Bitte eine andere Station wählen.")
+    db, tournament_id, _station = await _context(tid, body, me)
+    await _station_context(tid, body.to_station_id, me)
+    async with _tournament_lock(db, tournament_id):
+        source, match = await _fresh(db, body.station_id, body.match_id)
+        target = await db.stations.find_one({"id": body.to_station_id}, {"_id": 0}) or {}
+        state = _held_state(match)
+        if match.get("station_id") == target.get("id") and target.get("current_match_id") == match["id"]:
+            # Doppeltipp: schon dort.
+            return {"ok": True, "idempotent_replay": True, "state": state, "to": _station_name(target)}
+        if source.get("current_match_id") != match["id"]:
+            raise HTTPException(status_code=409, detail=HOLDS_OTHER_DETAIL)
+        if state is None:
+            raise HTTPException(status_code=409, detail="Umlegen geht nur für ein laufendes oder aufgerufenes Spiel.")
+        if target.get("status") == "broken" or target.get("deleting"):
+            raise HTTPException(status_code=409, detail="Die Zielstation ist als defekt markiert.")
+        if target.get("current_match_id"):
+            raise HTTPException(status_code=409, detail=TARGET_TAKEN_DETAIL)
+        if state == "running":
+            await _move_running(db, source, target, match)
+        else:
+            # Aufgerufen: an der neuen Station neu aufrufen - mit „Du bist dran“ und der neuen Station im Klartext.
+            await _assign_match_to_station(db, target, match, "matches_v2", start_now=False)
+    await _station_audit(db, "match.moved", tournament_id, me["id"], {
+        "match_id": match["id"], "match_key": match.get("match_key"), "from_station_id": source["id"],
+        "to_station_id": target["id"], "state": state,
+    })
+    return {"ok": True, "idempotent_replay": False, "state": state, "to": _station_name(target)}
+
+
+def _station_name(station: dict) -> str:
+    return station_text(station.get("name") or station.get("label"), station.get("device_type")) or "die Station"
