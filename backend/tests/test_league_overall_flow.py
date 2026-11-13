@@ -587,3 +587,21 @@ async def test_hidden_season_hides_holders_badges_and_share_image_for_guests(flo
     assert block["rewards_granted"] is True and block["rewards"][0]["holders"][0]["display_name"] == "Probe 2"
     assert "Gesamtsieg" in {row["reward"]["name"] for row in ok(await flow.get("/api/users/public/p-2-1"))["awards"] if row.get("reward")}
     assert (await flow.get(f"/api/rewards/{gold['id']}/share.png")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_prizes_of_the_overall_standing_belong_to_the_league_lead(flow):
+    world = await two_seasons(flow)
+    await configure(flow, world, rewards=[{**GOLD, "prize": "Gutschein für das Team"}])
+    flow.act_as(world["admin"])
+    ok(await flow.post(f"{cockpit_url(world)}/levels/1/close", json={"confirm": True}))
+    scope = f"overall:{world['period']['id']}:1"
+    manager = await lead(flow, world, "Liga-Verwaltung", "manage")
+    flow.act_as(manager)
+    rows = ok(await flow.get("/api/prizes", params={"tournament_id": scope}))
+    assert [row["prize_value"] for row in (rows.get("prizes") if isinstance(rows, dict) else rows)] == ["Gutschein für das Team"]
+    # Gegenprobe: ohne „Liga verwalten“ bzw. in einer anderen Liga kein Zugriff.
+    flow.act_as(await lead(flow, world, "Nur Ergebnisse", "results"))
+    assert (await flow.get("/api/prizes", params={"tournament_id": scope})).status_code == 403
+    flow.act_as(manager)
+    assert (await flow.get("/api/prizes", params={"tournament_id": "overall:fremd:1"})).status_code == 403
