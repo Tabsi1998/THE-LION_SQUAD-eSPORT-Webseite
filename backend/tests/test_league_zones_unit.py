@@ -93,3 +93,18 @@ def test_tie_across_a_zone_boundary_is_found_but_not_inside_a_zone():
     rows = table(6)
     rows[1]["rank"] = 1
     assert zones.boundary_ties(rows, zones.effective({"level": 2, "zones": {"promote": 2}}, [1, 2, 3])) == []
+
+
+def test_pdf_shows_the_zone_next_to_the_name_and_as_a_mark():
+    from pdf_service import _pdf_standings_tables, pdf_standings
+
+    rows = zones.mark(table(4), zones.effective({"level": 2}, [1, 2, 3]))
+    for row in rows:
+        row.update(score_diff=0, won=1, drawn=0, lost=1)
+    built = _pdf_standings_tables({"format": "league"}, rows)[0]
+    assert built["zones"] == ["promotion", None, None, "relegation"]
+    assert built["rows"][0][1] == "Team 1 (Aufstieg)" and built["rows"][3][1] == "Team 4 (Abstieg)" and built["rows"][1][1] == "Team 2"
+    assert pdf_standings({"title": "Probe", "format": "league"}, rows).startswith(b"%PDF")
+    # Gegenprobe: ein Turnier ohne Zonen bleibt, wie es war.
+    plain = _pdf_standings_tables({"format": "league"}, table(2))[0]
+    assert plain["zones"] == [None, None] and plain["rows"][0][1] == "Team 1"
