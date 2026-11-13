@@ -53,7 +53,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Formate** | K.-o. und Doppel-K.-o., Jeder gegen jeden (einfach oder mit Hin- und Rückrunde), Schweizer System, Gruppenphase, Mehrspieler, freie Bäume. Die Vereinsliga mit Seasons und Staffeln läuft über **Admin → eSports → Liga** (3.15) | Neues Turnier / Reiter Bearbeiten, Abschnitt „Struktur“ |
 | **Spielweise** | **Online**, **Vor Ort** oder **Hybrid**: wer Ergebnisse meldet, wer Termine macht, wer eincheckt | „Wie gespielt wird“ |
 | **Anmeldung** | Selbstanmeldung, Warteliste, Einladung, Speziallinks, Startgeld | Reiter Bearbeiten, Reiter Teilnehmer |
-| **Check-in** | Online selbst, vor Ort durch die Turnierleitung | Reiter Teilnehmer |
+| **Check-in** | Online selbst, vor Ort durch die Turnierleitung | Turnierleitung am Handy, Reiter **Check-in** |
 | **Aufstellung** | Bei Team-Turnieren wählt die Teamleitung, wer spielt | Dein-Stand-Karte der Spieler, Anzeige im Reiter Teilnehmer |
 | **Turnierbaum, Gruppen** | Vorschau wächst mit den Anmeldungen, fix wird sie mit dem Ende des Check-ins | Reiter Turnierbaum, Matchplan, Gruppen |
 | **Ergebnisse** | Spieler melden, oder die Turnierleitung trägt im **Ergebnis-Fenster** ein, danach 10 Sekunden **Rückgängig** | Matchplan, Stationen, Turnierleitung am Handy |
@@ -285,8 +285,9 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   Eingecheckt, Nicht erschienen. Beim Ablehnen fragt die Seite nach einem freiwilligen Grund; die Person bekommt eine
   Nachricht. Wird bis zum Ende des Check-ins ein Platz frei (Absage, **Nicht erschienen**, Entfernen), rückt die
   älteste Anmeldung der Warteliste von selbst nach und bekommt eine Nachricht. Danach entscheidet ihr (3.4).
-- Die Knöpfe **Check-in**, **Auschecken**, **Nicht erschienen**, **Entfernen**. Rückt nach **Nicht erschienen**
-  jemand von der Warteliste nach, nennt die Meldung den Namen („Nicht erschienen gesetzt – Nachrücker: …“).
+- Der Knopf **Entfernen**. Abgehakt wird hier nicht mehr: Check-in, Rückgängig und **Nicht erschienen** stehen an
+  einem Ort, im Reiter **Check-in** der Turnierleitung (3.4). Der Kasten **Zum Check-in** oben im Reiter führt dorthin;
+  Freigeben, Ablehnen (Status-Auswahl) und **PDF Check-in** bleiben hier.
 - Wer in einem festen Spiel steht, hat kein **Entfernen**, und **Ausstehend**, **Abgelehnt** und **Warteliste** sind in
   der Status-Auswahl gesperrt – in jedem Status, auch pausiert oder nach dem Ende. Sonst stünden im Baum Spiele mit
   einer Anmeldung, die es nicht mehr gibt. Vor dem Start: **Nicht erschienen** und ersetzen; im laufenden Turnier:
@@ -341,8 +342,27 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
 
 - **Online/Hybrid:** Spieler checken auf der Turnierseite selbst ein (Knopf **Check-in**) – nur wenn ihre Anmeldung
   **Bestätigt** ist.
-- **Vor Ort:** Der Knopf heißt für Spieler „Check-in vor Ort“ und ist gesperrt. Die Turnierleitung setzt den Haken:
-  im Reiter **Teilnehmer** **Check-in** (das Gegenstück ist **Auschecken**). Wer nicht kommt: **Nicht erschienen**.
+- **Vor Ort:** Der Knopf heißt für Spieler „Check-in vor Ort“ und ist gesperrt. Die Turnierleitung setzt den Haken –
+  am Handy in der **Turnierleitung** (`/tournaments/<Name>/leitung`), Reiter **Check-in** (siehe unten).
+
+**Reiter „Check-in“ der Turnierleitung (#1161).** Der eine Ort zum Abhaken – vor Ort, hybrid und online, Einzel und
+Team, jedes Format. Ihn sehen nur Turnierleitung und Helfer mit **Organisation**, **Schiedsrichter**, **Ergebnisdienst**
+oder **Stationsleitung** in diesem Turnier; im Status **Check-in offen** öffnet die Seite gleich dort.
+
+- Oben steht **„13 von 16 da“** mit Balken, darunter, wer noch fehlt, wer nicht erschienen ist und wie viele
+  Startgelder offen sind. Der Zähler stimmt sofort nach dem Tipp; klappt das Speichern nicht, springt die Zeile zurück
+  und eine Meldung sagt warum.
+- **Suche** nach Name, Spielname, Team-Kürzel oder – bei Teams – einem Mitglied. Filter **Fehlen noch**, **Da**, **Alle**.
+- Je Zeile ein Tipp: **Da**, danach **Rückgängig**; darunter **Nicht erschienen**. Rückt dabei jemand von der
+  Warteliste nach, sagt es die Meldung. Etiketten: **Startgeld offen** (den Betrag sehen nur Finanzen), **Freigabe
+  offen**, **Vor Ort angemeldet**.
+- **Teams** stehen als eine Zeile: mit Aufstellung („Spielt“, „Ersatz“) oder allen Mitgliedern, grün, wer schon
+  **Ich bin da** getippt hat (3.5). Abgehakt wird das ganze Team.
+- Zwei Helfer am Einlass sehen gegenseitig, was der andere abhakt. Jeder Tipp steht im Protokoll (wer, wann, von welchem
+  Stand zu welchem). Die App nutzt denselben Weg.
+
+  <img src="../assets/turniere/checkin-leitung-handy.png" alt="Turnierleitung am Handy, Reiter Check-in: oben 3 von 6 da mit grünem Balken, darunter Suche, Filter Fehlen noch, Da, Alle und die Zeilen mit grünem Häkchen, Knopf Da, Rückgängig, Nicht erschienen und dem Etikett Startgeld offen" width="300">
+
 - **Check-in starten** (Hauptknopf oben im Turnier, solange noch kein Check-in läuft) setzt den Status **Check-in
   offen**. Der Baum bleibt bis zum Ende des Check-ins eine Vorschau; bis dahin rücken Wartende nach. Vor der
   eingestellten Zeit gestartet, steht **Check-in öffnet** danach auf dem wirklichen Beginn.
@@ -399,8 +419,9 @@ Bei Team-Turnieren (Teilnahme „Team“) wählen Teamleitung oder Co-Leitung in
 spielt: genau so viele wie **Spieler pro Team**, die übrigen sind Ersatz, wenn **Ersatzspieler erlauben** (Spieloptionen)
 an ist. Das geht bis zum Ende des Check-ins. Am Turniertag tippt jedes Teammitglied **Ich bin da**.
 
-Die Turnierleitung sieht es im Reiter **Teilnehmer** unter dem Teamnamen: „Spielt: …, Ersatz: …“ und „4 von 5 da“.
-Ohne gewählte Aufstellung steht dort „Keine Aufstellung – ganzes Team“.
+Die Turnierleitung sieht es im Reiter **Teilnehmer** unter dem Teamnamen („Spielt: …, Ersatz: …“, „4 von 5 da“) und
+beim Abhaken im Reiter **Check-in** der Turnierleitung als Namen je Mitglied. Ohne gewählte Aufstellung steht dort
+„Keine Aufstellung – ganzes Team“.
 
 ### 3.6 Ergebnisse: melden, eintragen, korrigieren
 
@@ -695,7 +716,8 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
 - **Das Handy der Turnierleitung** (`/tournaments/<Name>/leitung`) trägt Ergebnisse ein, zeigt „Ergebnis fehlt“ und
   gibt Benachrichtigungen bei Problemen.
 - **TV** aufstellen und aufrufen lassen, damit Spieler selbst sehen, wo sie hinmüssen.
-- **Check-in** vorher: Online-Spieler checken selbst ein, vor Ort druckt **PDF Check-in** die Liste zum Abhaken.
+- **Check-in**: Online-Spieler checken selbst ein, vor Ort hakt ihr am Handy ab (Turnierleitung → Reiter **Check-in**).
+  **PDF Check-in** ist die Liste auf Papier, falls Netz oder Server ausfallen.
 - **Plan B auf Papier** am Vorabend drucken: Baum bzw. Tabelle, Spielplan und Check-in-Liste ([3.13](#313-plan-b-auf-papier)).
 - **Nicht erschienen** früh setzen, Ersatz einsetzen, und die Frist vorher in den Regeln nennen.
 
