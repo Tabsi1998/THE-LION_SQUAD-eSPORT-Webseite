@@ -122,6 +122,10 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
   // „Alles im Plan“ erst, wenn die letzte Zeile hinausgeglitten ist (Review N6) - sonst stünde beides kurz übereinander.
   // Mit „Bewegung reduzieren“ gleitet nichts, dann sofort.
   const [drained, setDrained] = useState(true);
+  // framer-motion meldet `onExitComplete` nach jedem fertigen Hinausgleiten, auch wenn noch Zeilen stehen - darum zählt
+  // nur die aktuelle Zahl (Ref: der Rückruf kann aus einem früheren Render stammen).
+  const countRef = useRef(count);
+  countRef.current = count;
   useEffect(() => {
     if (count) setDrained(false);
   }, [count]);
@@ -149,7 +153,7 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
               </div>
             </div>
           ) : null}
-          <ProblemList problems={problems} onOpen={onOpen} onExitComplete={() => setDrained(true)} />
+          <ProblemList problems={problems} onOpen={onOpen} onExitComplete={() => { if (!countRef.current) setDrained(true); }} />
         </div>
       </section>
 

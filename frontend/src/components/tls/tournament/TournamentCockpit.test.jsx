@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { cockpitProblems } from "@/lib/tournamentCockpit";
 import { TournamentCockpit } from "./TournamentCockpit";
@@ -132,6 +132,22 @@ test("„Bewegung reduzieren“: die Liste springt - Erledigtes ist sofort weg, 
   rerender(<MemoryRouter><TournamentCockpit loaded queue={QUEUE} board={board()} problems={cockpitProblems({ attention: [ATTENTION[0]] })} /></MemoryRouter>);
   expect(screen.queryByTestId("cockpit-problem-ds-m5")).toBeNull();
   expect(screen.getByTestId("cockpit-problem-rm-m1")).toBeInTheDocument();
+});
+
+test("„Alles im Plan“ auch bei 2 → 1 → 0 erst nach der letzten Zeile (Review N6, Runde 2)", async () => {
+  reduceMotion(false);
+  const both = cockpitProblems({ attention: ATTENTION });
+  const view = (problems) => <MemoryRouter><TournamentCockpit loaded queue={QUEUE} board={board()} problems={problems} /></MemoryRouter>;
+  const { rerender } = render(view(both));
+  // 2 → 1: eine Zeile gleitet hinaus, die andere bleibt.
+  rerender(view(cockpitProblems({ attention: [ATTENTION[0]] })));
+  await waitFor(() => expect(screen.queryByTestId("cockpit-problem-ds-m5")).toBeNull(), { timeout: 3000 });
+  expect(screen.queryByTestId("cockpit-problems-empty")).toBeNull();
+  // 1 → 0: solange die letzte Zeile noch hinausgleitet, wartet die Meldung.
+  rerender(view([]));
+  expect(screen.getByTestId("cockpit-problem-rm-m1")).toBeInTheDocument();
+  expect(screen.queryByTestId("cockpit-problems-empty")).toBeNull();
+  expect(await screen.findByTestId("cockpit-problems-empty", {}, { timeout: 3000 })).toHaveTextContent("Alles im Plan");
 });
 
 test("„Alles im Plan“ erst, wenn die letzte Zeile hinausgeglitten ist (Review N6)", async () => {
