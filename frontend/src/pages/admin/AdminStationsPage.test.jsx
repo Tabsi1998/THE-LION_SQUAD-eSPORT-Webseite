@@ -182,3 +182,24 @@ test("Station bearbeiten: ein unbekanntes Gerät bleibt beim Speichern erhalten"
   await user.click(await screen.findByTestId("station-edit-st-1"));
   expect(screen.getByTestId("station-edit-device")).toHaveValue("vr_brille");
 });
+
+// #1162: Die Live-Knöpfe stehen nur noch in der Turnierleitung - hier ein Link dorthin, kein Zuweisen, Starten, Freigeben
+// und kein Status-Umschalter mehr.
+test("Live-Knöpfe nur in der Turnierleitung: Link mit Reiter Stationen, hier nur noch Anlegen und Planen", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const text = String(url);
+    if (text.startsWith("/tournaments?")) return Promise.resolve({ data: [{ id: "t-1", slug: "winter-cup", title: "Winter Cup", status: "live", event_mode: "local" }] });
+    if (text.includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "1", device_type: "switch2", status: "reserved", current_match_id: "m1" }, { id: "st-2", name: "2", status: "free", current_match_id: null }] });
+    return Promise.resolve(routeFor(text));
+  });
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+  const link = await screen.findByRole("link", { name: /Stationen live bedienen/ });
+  expect(link).toHaveAttribute("href", "/tournaments/winter-cup/leitung?reiter=stationen");
+  await screen.findByText("Reserviert");
+  expect(screen.queryByText("Freie Stationen starten")).toBeNull();
+  expect(screen.queryByText("Spiel zuweisen")).toBeNull();
+  expect(screen.queryByText("Freigeben")).toBeNull();
+  expect(screen.queryByTestId("station-status-st-1")).toBeNull();
+  expect(screen.getByTestId("stations-plan-schedule")).toBeInTheDocument();
+  expect(screen.getByTestId("station-submit")).toBeInTheDocument();
+});
