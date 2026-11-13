@@ -470,7 +470,7 @@ async def _scope(db, season: dict, scope: str, scope_id: str | None) -> tuple[li
     staffeln = await db.tournaments.find({"league_context.season_id": season["id"], "status": {"$nin": ["archived", "cancelled"]}},
                                          {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
     if scope == "season":
-        return staffeln, f"Season {season.get('name') or ''}".strip()
+        return staffeln, "Ganze Season"
     if scope == "division":
         division = await db.league_divisions.find_one({"id": scope_id, "season_id": season["id"]}, {"_id": 0}) if scope_id else None
         if not division:

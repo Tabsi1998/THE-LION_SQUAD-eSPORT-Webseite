@@ -371,7 +371,7 @@ async def test_broadcast_is_sent_once_per_request_and_logged_with_sender(flow):
     log = (await flow.get(f"{ADMIN}/seasons/{world['season_id']}/desk/log")).json()
     entry = next(row for row in log["items"] if row["action"] == "league.broadcast")
     assert entry["label"] == "Rundnachricht" and entry["actor"] == world["staff"]["display_name"]
-    assert entry["broadcast"] == {"audience": "Captains und Vertreter", "scope": "Season Season 1", "recipients": 2, "mail": False}
+    assert entry["broadcast"] == {"audience": "Captains und Vertreter", "scope": "Ganze Season", "recipients": 2, "mail": False}
     assert "Check-in am Sonntag" not in str(log), "der Text der Nachricht steht nicht im Protokoll"
 
 
