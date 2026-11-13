@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Link2, Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ChallengeSettingsForm } from "./f1/ChallengeSettingsForm";
@@ -54,6 +55,8 @@ export default function AdminF1EditPage() {
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
+  // „Zeit bearbeiten“ (#937): Escape schließt, Tab bleibt im Fenster, der Fokus kehrt zum Stift zurück.
+  const editTimeRef = useModalBehavior(Boolean(editTime), () => setEditTime(null));
   // Gast mit Konto verknüpfen (#1585) - nur die Turnierleitung.
   const [linkGuest, setLinkGuest] = useState(null);
   // Vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
@@ -531,6 +534,7 @@ export default function AdminF1EditPage() {
                           score_scope: challenge.block_club_member_results && t.user?.is_club_member ? "club_reference" : (t.score_scope || "official"),
                         })}
                         data-testid={`f1-edit-time-${t.id}`}
+                        aria-label={`Zeit von ${t.user?.display_name || t.user?.username || "Fahrer"} bearbeiten`}
                         className="p-1 text-white/40 hover:text-[#29B6E8]"
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -554,11 +558,11 @@ export default function AdminF1EditPage() {
 
       {/* Edit Time Modal */}
       {editTime && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setEditTime(null)}>
-          <div className="bg-[#121212] border border-white/10 rounded-sm max-w-md w-full p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" role="presentation" data-testid="f1-edit-time-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setEditTime(null); }}>
+          <div ref={editTimeRef} role="dialog" aria-modal="true" aria-labelledby="f1-edit-time-title" className="bg-[#121212] border border-white/10 rounded-sm max-w-md w-full p-6 space-y-3" data-testid="f1-edit-time-dialog">
             <div className="flex items-center justify-between">
-              <h3 className="font-heading text-lg font-bold uppercase">Zeit bearbeiten</h3>
-              <button onClick={() => setEditTime(null)} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
+              <h3 id="f1-edit-time-title" className="font-heading text-lg font-bold uppercase">Zeit bearbeiten</h3>
+              <button type="button" onClick={() => setEditTime(null)} className="text-white/40 hover:text-white" aria-label="Schließen"><XIcon className="w-4 h-4" /></button>
             </div>
             <div className="text-xs text-white/60">Spieler: <span className="text-white">{editTime.user?.display_name || editTime.user?.username}</span></div>
             <label className="block">
