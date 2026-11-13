@@ -320,6 +320,11 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
 
         frozen = await frozen_rows(db, t)
         if frozen is not None:
+            if frozen and any("zone" not in row for row in frozen):
+                # Endstand von vor F.2 (#1627): Zonen nach der heutigen Einstellung der Liga N - die Plätze selbst bleiben eingefroren.
+                from services.league_zones import mark_rows
+
+                await mark_rows(db, t, frozen)
             if own_ids is None and user:
                 if regs is None:
                     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
@@ -360,6 +365,11 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
         groups=groups,
         stages=read_model.stages,
     )
+    if t.get("league_context"):
+        # Zonen für Auf- und Abstieg (F.2, #1627): je Zeile ``zone`` - Website, TV, PDF und App lesen dieselbe Rechnung.
+        from services.league_zones import mark_rows
+
+        await mark_rows(db, t, rows)
     # Die eigene Zeile ist markiert (#1179) - nur für den, der schaut.
     _mark_own_rows(rows, own_ids)
     return rows

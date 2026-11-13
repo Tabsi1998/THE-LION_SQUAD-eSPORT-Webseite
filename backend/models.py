@@ -2857,6 +2857,16 @@ class LeagueDivisionOverrides(BaseModel):
     input_device: Optional[Literal["controller", "mouse_keyboard", "both"]] = None
 
 
+class LeagueDivisionZones(BaseModel):
+    """Zonen für Auf- und Abstieg einer Liga N (F.2, #1627, Nr. 158): Anzahl je Staffel. Fehlt ein Wert, gilt 1/1 ohne Relegation;
+    die oberste Liga N steigt nie auf, die unterste nie ab (``league_zones``)."""
+    model_config = ConfigDict(extra="forbid")
+    promote: Optional[int] = Field(default=None, ge=0, le=10)
+    relegate: Optional[int] = Field(default=None, ge=0, le=10)
+    playoff_promote: Optional[int] = Field(default=None, ge=0, le=10)
+    playoff_relegate: Optional[int] = Field(default=None, ge=0, le=10)
+
+
 class LeagueDivisionCreate(BaseModel):
     level: Optional[int] = Field(default=None, ge=1, le=20)
     nickname: Optional[str] = Field(default=None, max_length=40)
@@ -2864,6 +2874,7 @@ class LeagueDivisionCreate(BaseModel):
     status: Literal["active", "archived"] = "active"
     # Eigene Gewinne der Liga N (#2107) - leer heißt: wie die Season.
     prizes: Optional[List[LeaguePrize]] = Field(default=None, max_length=20)
+    zones: Optional[LeagueDivisionZones] = None
 
 
 class LeagueDivisionUpdate(BaseModel):
@@ -2871,6 +2882,15 @@ class LeagueDivisionUpdate(BaseModel):
     overrides: Optional[LeagueDivisionOverrides] = None
     status: Optional[Literal["active", "archived"]] = None
     prizes: Optional[List[LeaguePrize]] = Field(default=None, max_length=20)
+    zones: Optional[LeagueDivisionZones] = None
+
+
+class LeagueSuccessorCreate(BaseModel):
+    """Neue Season aus der Vorgänger-Season (F.2, #1627): Zeitraum neu, alles andere als Entwurf übernommen."""
+    model_config = ConfigDict(extra="forbid")
+    start_date: datetime
+    name: Optional[str] = Field(default=None, max_length=80)
+    confirm: bool = False
 
 
 class LeagueStaffelCreate(BaseModel):

@@ -42,6 +42,7 @@ from services import league_readiness
 from services import league_service as leagues
 from services import league_veto
 from services import league_veto_sweep
+from services import league_zones
 from services.league_permissions import (
     ANY,
     CAPABILITIES,
@@ -133,10 +134,14 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
     staffeln = await leagues.staffeln_of(db, season_id)
     pool = await map_pools.current(db, "league_season", season_id)
     rows = []
+    levels = sorted({row["level"] for row in divisions if row.get("status") != "archived" and isinstance(row.get("level"), int)})
     for division in divisions:
         settings = leagues.effective_settings(season, division)
+        zones = league_zones.effective(division, levels)
         rows.append({
             **division, "label": leagues.division_label(division),
+            # Auf- und Abstieg (F.2, #1627): eingestellt (``zones``) und was gilt (oberste ohne Aufstieg, unterste ohne Abstieg).
+            "zones": league_zones.settings_of(division), "zones_effective": zones, "zones_label": league_zones.summary(zones),
             "settings": {key: settings[key] for key in leagues.OVERRIDE_FIELDS},
             "calendar": leagues.calendar_summary(season, settings),
             "staffeln": [leagues.staffel_summary(row) for row in staffeln

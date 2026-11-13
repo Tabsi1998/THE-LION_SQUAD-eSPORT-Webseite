@@ -12,7 +12,9 @@ Punkt- oder Tabellenänderung ändert ihn nicht mehr.
   bekommt die nächste Nummer.
 - **Meister** (``champion_of``): Platz 1 jeder Staffel der obersten Liga N. Ein Eintrag in ``tournament_awards`` an Team und
   eingesetzten Spielern - beim Wiederöffnen ausgesetzt, beim neuen Abschluss nachgezogen, nie doppelt.
-- **Auf- und Abstieg** (Nr. 157): nur vorgemerkt - ``zones`` bleibt leer, bis F.2 sie füllt.
+- **Auf- und Abstieg** (F.2, #1627, Nr. 158/159): Der Abschluss hält die Zonen der Liga N fest (``zones``) und je Team die Zone
+  (``promotion``, an jeder Zeile ``zone``). Ein Gleichstand an einer Zonengrenze sperrt den Abschluss wie der um den Meistertitel.
+  Dazu stehen Teams, Co-Teams und eingesetzte Spieler je Anmeldung dabei - daraus liest die Season-Historie an Team und Spieler.
 """
 from __future__ import annotations
 
@@ -25,6 +27,7 @@ from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_incident_rules as incident_rules
 from services import league_procedures as procedures
 from services import league_protest_settings as protest_settings
+from services import league_zones
 from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.log_safe import log_safe
@@ -178,9 +181,9 @@ def _blocker(code: str, label: str, text: str, items: list[dict]) -> dict:
 
 
 async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict] | None = None, decisive: bool = False,
-                   now: datetime | None = None) -> list[dict]:
+                   zones: dict | None = None, now: datetime | None = None) -> list[dict]:
     """Was dem Abschluss dieser Staffel entgegensteht - leer heißt: Es kann abgeschlossen werden. ``rows``: die Tabelle wie
-    öffentlich; ``decisive``: Platz 1 ist ein entscheidender Platz (oberste Liga N)."""
+    öffentlich; ``decisive``: Platz 1 ist ein entscheidender Platz (oberste Liga N); ``zones``: die Zonen der Liga N (F.2)."""
     from services import league_sanctions as sanctions
 
     now = now or now_utc()
@@ -263,6 +266,16 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
                 "champion_tie", "Gleichstand auf Platz 1" if ties[0]["rank"] == 1 else "Gleichstand um den Meistertitel",
                 "Der Meister steht nicht fest: Vor dem Abschluss braucht es einen begründeten Entscheid (Entscheidungsspiel, Los oder Leitung).",
                 [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in ties]))
+    if rows is not None and zones and not any(row["code"] == "no_matches" for row in out):
+        # Gleichstand an einer Zonengrenze (Nr. 156 „später Auf-/Abstieg“, F.2): Wer auf- oder absteigt, steht vor dem Abschluss fest.
+        champion_ranks = {tie["rank"] for tie in champion_ties(rows)} if decisive else set()
+        zone_ties = [tie for tie in league_zones.boundary_ties(rows, zones) if tie["rank"] not in champion_ranks]
+        if zone_ties:
+            out.append(_blocker(
+                "zone_tie", "Gleichstand an der Grenze zu Auf- oder Abstieg",
+                "Teams stehen gleich, aber nur ein Teil kommt in die Zone. Vor dem Abschluss braucht es einen begründeten Entscheid "
+                "(Entscheidungsspiel, Los oder Leitung).",
+                [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in zone_ties]))
     return out
 
 
@@ -311,7 +324,9 @@ async def _frame(db, tournament: dict) -> dict:
 
     return {"league": league, "season": season, "division": division,
             "division_label": division_label(division) if division.get("level") is not None else None,
-            "decisive": bool(division.get("id")) and division.get("id") == await top_division_id(db, season.get("id"))}
+            "decisive": bool(division.get("id")) and division.get("id") == await top_division_id(db, season.get("id")),
+            "zones": (league_zones.effective(division, await league_zones.season_levels(db, season.get("id")))
+                      if division.get("id") else None)}
 
 
 async def _rules_snapshot(db, tournament: dict, frame: dict) -> dict:
@@ -381,6 +396,32 @@ async def champion_players(db, tournament_id: str, registration: dict) -> list[s
         squad = (team.get("squads") or {}).get(registration["squad_id"]) or {}
         return sorted({person for person in squad.get("member_ids") or [] if person})
     return sorted({person for person in [registration.get("user_id"), *(team.get("member_ids") or [])] if person})
+
+
+async def _people(db, tournament: dict, rows: list[dict]) -> dict:
+    """Wer zu welcher Zeile des Endstands gehört (F.2, Season-Historie): Hauptteam und Co-Team je Anmeldung und die Spieler - wer in der
+    Staffel mindestens einmal aufgestellt war, ohne Einsatz das Co-Team (wie beim Meister-Eintrag). Flach dazu ``team_ids`` und
+    ``player_ids`` für die Suche im Profil."""
+    from services.match_audience import teams_by_id
+
+    tid = tournament["id"]
+    ids = [row["registration_id"] for row in rows if row.get("registration_id")]
+    registrations = await db.tournament_registrations.find({"tournament_id": tid, "id": {"$in": ids}}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
+    matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}},
+                                       {"_id": 0, "games.lineups": 1, "lineups": 1}).to_list(2000)
+    teams = await teams_by_id(db, registrations)
+    sides: dict[str, dict] = {}
+    for registration in registrations:
+        people = _fielded(matches, registration["id"])
+        if not people:
+            team = teams.get(registration.get("team_id") or "") or {}
+            squad = (team.get("squads") or {}).get(registration.get("squad_id") or "") or {}
+            people = set(squad.get("member_ids") or []) if registration.get("squad_id") else {registration.get("user_id")}
+        sides[registration["id"]] = {"team_id": registration.get("team_id"), "squad_id": registration.get("squad_id"),
+                                     "player_ids": sorted(person for person in people if person)}
+    return {"sides": sides,
+            "team_ids": sorted({side["team_id"] for side in sides.values() if side.get("team_id")}),
+            "player_ids": sorted({person for side in sides.values() for person in side["player_ids"]})}
 
 
 async def record_champion(db, tournament: dict, final: dict, frame: dict) -> int:
@@ -533,7 +574,7 @@ async def close(db, tournament: dict, actor: dict, *, conflict_reason: str | Non
     override = await _conflict_override(db, actor, tid, conflict_reason)
     frame = await _frame(db, tournament)
     rows = await live_rows(db, tournament)
-    found = await blockers(db, tournament, frame["season"], rows=rows, decisive=frame["decisive"], now=now)
+    found = await blockers(db, tournament, frame["season"], rows=rows, decisive=frame["decisive"], zones=frame["zones"], now=now)
     if found:
         raise FinalProblem("Abschließen geht noch nicht: " + ", ".join(row["label"] for row in found) + ".", 409, blockers=found)
     last = await db.league_final_tables.find({"tournament_id": tid}, {"_id": 0, "version": 1}).sort("version", -1).to_list(1)
@@ -548,8 +589,11 @@ async def close(db, tournament: dict, actor: dict, *, conflict_reason: str | Non
         "rows": rows, "participants": len([row for row in rows if not row.get("exit")]),
         "champion_place": frame["decisive"], "champion": champion_of(rows) if frame["decisive"] else None,
         "decisions": applied_decisions(tournament, rows), "rules": await _rules_snapshot(db, tournament, frame),
-        # Auf- und Abstieg (Nr. 157): vorgemerkt - F.2 füllt Zonen und Vorschlag.
-        "zones": [], "promotion": None,
+        # Auf- und Abstieg (F.2, Nr. 158/159): die Zonen der Liga N von jetzt und je Team die Zone - daraus entsteht die neue Season.
+        "zones": frame["zones"] or {},
+        "promotion": {row["registration_id"]: row.get("zone") for row in rows if row.get("registration_id") and row.get("zone")},
+        # Season-Historie (F.2): Teams, Co-Teams und eingesetzte Spieler je Anmeldung.
+        **await _people(db, tournament, rows),
         "status_before": tournament.get("status"),
         "reopened_at": None, "reopened_by": None, "reopen_reason": None, "created_at": now.isoformat(),
     }
@@ -722,7 +766,7 @@ async def _names(db, user_ids: set[str]) -> dict[str, str]:
 
 
 async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, decisive: bool, division_label: str | None,
-                           can_act: bool, now: datetime | None = None) -> dict:
+                           can_act: bool, zones: dict | None = None, now: datetime | None = None) -> dict:
     """Eine Staffel im Cockpit: Stand, Sperrgründe mit Link, Vorschau bzw. Endstand, Gleichstand auf Platz 1, Verlauf."""
     from services import league_permissions
     from services.league_table import can_decide, public_rules
@@ -739,6 +783,8 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
         "staffel": (tournament.get("league_context") or {}).get("staffel"), "division_label": division_label,
         "status": tournament.get("status"), "champion_place": decisive, "own_team": own_team,
         "history": [_history_row(row, names) for row in history],
+        # Zonen der Liga N (F.2): was gilt bzw. beim Abschluss galt - für den Satz unter der Tabelle.
+        "zones": zones, "zones_label": league_zones.summary(zones),
     }
     if is_closed(tournament) and not active:
         # Abgebrochener Abschluss (N-b): ehrlich als solcher - gesperrt, ohne Endstand, mit „Wieder öffnen“ als Ausweg.
@@ -752,14 +798,19 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
         return {**base, "closed": True, "final": {**public_final(active), "id": active["id"],
                                                   "closed_by_name": names.get(active.get("closed_by") or "") or "Liga-Leitung"},
                 "standings": rows, "table_rules": (active.get("rules") or {}).get("table"),
+                "zones": active.get("zones") or zones, "zones_label": league_zones.summary(active.get("zones") or zones),
                 "blockers": [], "ties": [], "can_decide": False, "can_close": False,
                 "closed_by_me": closed_by_me,
                 # Wieder öffnen: zweite Person; wer selbst abgeschlossen hat, nur als Superadmin mit Notausnahme.
                 "can_reopen": can_act and (not closed_by_me or superadmin) and (not own_team or superadmin)}
     rows = await live_rows(db, tournament)
-    found = await blockers(db, tournament, season, rows=rows, decisive=decisive, now=now)
-    # Je Gleichstand: Gehört die Person zu einer der Seiten? Dann entscheidet eine andere (wie im Reiter „Tabelle“).
-    ties = [{**tie, "own_team": bool(own_ids & set(tie["registration_ids"]))} for tie in champion_ties(rows)] if decisive else []
+    found = await blockers(db, tournament, season, rows=rows, decisive=decisive, zones=zones, now=now)
+    # Je Gleichstand: Gehört die Person zu einer der Seiten? Dann entscheidet eine andere (wie im Reiter „Tabelle“). Dazu die
+    # Gleichstände an einer Zonengrenze (F.2) - nur die, die noch nicht im Meister-Gleichstand stehen.
+    champion = [{**tie, "kind": "champion"} for tie in champion_ties(rows)] if decisive else []
+    taken = {tie["rank"] for tie in champion}
+    zone_ties = [tie for tie in league_zones.boundary_ties(rows, zones) if tie["rank"] not in taken] if zones else []
+    ties = [{**tie, "own_team": bool(own_ids & set(tie["registration_ids"]))} for tie in [*champion, *zone_ties]]
     return {**base, "closed": False, "final": None, "standings": rows, "table_rules": public_rules(tournament), "blockers": found,
             "ties": ties, "can_decide": can_decide(tournament),
             "champion": champion_of(rows) if decisive else None,
@@ -775,6 +826,7 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
     can_act = CLOSE_CAPABILITY in capabilities
     divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0}).to_list(50)}
     top = await top_division_id(db, season["id"])
+    levels = sorted({row["level"] for row in divisions.values() if isinstance(row.get("level"), int) and row.get("status") != "archived"})
     tournaments = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE},
                                             {"_id": 0, "creation_key": 0, "billing": 0}).to_list(500)
     tournaments = [row for row in tournaments if is_closed(row) or row.get("status") not in IGNORED_STAFFEL_STATUSES]
@@ -785,7 +837,8 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
         division = divisions.get(tournament["league_context"].get("division_id")) or {}
         staffeln.append(await staffel_overview(
             db, tournament, season, user, decisive=bool(division) and division.get("id") == top,
-            division_label=division_label(division) if division.get("level") is not None else None, can_act=can_act, now=now))
+            division_label=division_label(division) if division.get("level") is not None else None, can_act=can_act,
+            zones=league_zones.effective(division, levels) if division else None, now=now))
     return {
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),
                    "closed": bool(staffeln) and all(row["closed"] for row in staffeln)},
