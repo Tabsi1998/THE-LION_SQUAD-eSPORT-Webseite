@@ -308,9 +308,18 @@ async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = N
     if league and league.get("season_id") and seasons is not None:
         # Wie ``league_service.can_see_season`` für Gäste: nur „öffentlich“ (``members`` und ``admins`` brauchen eine Person).
         season = seasons.get(league["season_id"])
-        if not season or season.get("status") == "archived" or season.get("visibility") != "public":
+        if not _public_season(season):
+            return False
+    overall = doc.get("overall") or None
+    if overall:
+        # Gesamtwertung (F.5): öffentlich, solange mindestens eine Season des Zeitraums für Gäste sichtbar ist.
+        if seasons is None or not any(_public_season(seasons.get(season_id)) for season_id in overall.get("season_ids") or []):
             return False
     return await user_can_see(None, tournament.get("visibility") or "public")
+
+
+def _public_season(season: dict | None) -> bool:
+    return bool(season) and season.get("status") != "archived" and season.get("visibility") == "public"
 
 
 async def _views(db, docs: list[dict], public_only: bool) -> list[dict]:
@@ -318,7 +327,8 @@ async def _views(db, docs: list[dict], public_only: bool) -> list[dict]:
     live = {row["id"]: row for row in await db.tournaments.find(
         {"id": {"$in": tournament_ids}}, {"_id": 0, "id": 1, "award_images": 1, "status": 1, "visibility": 1, "is_public": 1},
     ).to_list(500)} if tournament_ids else {}
-    season_ids = sorted({(doc.get("league") or {}).get("season_id") for doc in docs if (doc.get("league") or {}).get("season_id")})
+    season_ids = sorted({(doc.get("league") or {}).get("season_id") for doc in docs if (doc.get("league") or {}).get("season_id")}
+                        | {season_id for doc in docs for season_id in (doc.get("overall") or {}).get("season_ids") or []})
     seasons = {row["id"]: row for row in await db.league_seasons.find(
         {"id": {"$in": season_ids}}, {"_id": 0, "id": 1, "league_id": 1, "status": 1, "visibility": 1},
     ).to_list(len(season_ids) + 1)} if season_ids else {}

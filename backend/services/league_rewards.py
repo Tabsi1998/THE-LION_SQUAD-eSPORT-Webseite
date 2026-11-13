@@ -324,8 +324,6 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
         if tournament.get("game_id") else None
     league = frame["league"]
     title = " · ".join(part for part in (league.get("name"), season.get("name")) if part) or tournament.get("title")
-    now = now_utc().isoformat()
-    kept: list[str] = []
     after: list[dict] = []
     wanted_prizes: list[dict] = []
     for row in rows:
@@ -371,46 +369,60 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
                            "division_label": frame.get("division_label"), "staffel": (tournament.get("league_context") or {}).get("staffel"),
                            "display_name": row.get("display_name"), "final_table_id": final["id"], "version": final["version"]},
                 "reward": _snapshot(item, frame, rank, basis),
-                "player_ids": player_ids, "audience_ids": audience, "suspended": False, "updated_at": now,
+                "player_ids": player_ids, "audience_ids": audience, "suspended": False,
             }
-            try:
-                await db.tournament_awards.update_one({"tournament_id": tid, "reward_key": reward_key},
-                                                      {"$set": doc, "$setOnInsert": {"id": new_id(), "created_at": now, "seen_by": []}},
-                                                      upsert=True)
-            except DuplicateKeyError:
-                # Zwei Schreiber zugleich (eindeutiger Teilindex): der zweite schreibt in den Eintrag des ersten.
-                await db.tournament_awards.update_one({"tournament_id": tid, "reward_key": reward_key}, {"$set": doc})
-            kept.append(reward_key)
             after.append(doc)
             if item.get("prize"):
                 wanted_prizes.append({"reward_key": reward_key, "place": rank or 0, "team_id": registration.get("team_id"),
                                       "user_id": person,
                                       "label": item.get("name"), "value": item.get("prize"), "place_label": _art(frame, item, rank)["place"]})
+    result = await store(db, tournament, before, after, wanted_prizes)
+    # Wer eine Team-Belohnung erfährt: Captain und Vertreter von heute (bzw. die Teamleitung) - für das Team, nicht für sich.
+    leads = {}
+    for registration in registrations.values():
+        if registration.get("team_id") in {*result["team_gains"], *result["team_losses"]}:
+            leads.setdefault(registration["team_id"], set()).update(responsible_ids(registration, teams.get(registration["team_id"]) or None))
+    return {**result, "team_leads": {key: sorted(value) for key, value in leads.items()},
+            "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads}}
+
+
+async def store(db, scope: dict, before: list[dict], after: list[dict], wanted_prizes: list[dict]) -> dict:
+    """Schreibt die Einträge eines Bereichs (``scope["id"]``: die Staffel, in F.5 die Gesamtwertung ``overall:<zeitraum>:<n>``):
+    Gleiches bleibt derselbe Eintrag (samt ``seen_by``), Neues kommt dazu, Weggefallenes verschwindet, echte Gewinne über
+    ``prize_service``. Gibt zurück, wer persönlich bzw. als Team etwas gewonnen oder verloren hat."""
+    tid = scope["id"]
+    now = now_utc().isoformat()
+    kept: list[str] = []
+    for doc in after:
+        doc.update({"tournament_id": tid, "updated_at": now})
+        reward_key = doc["reward_key"]
+        try:
+            await db.tournament_awards.update_one({"tournament_id": tid, "reward_key": reward_key},
+                                                  {"$set": doc, "$setOnInsert": {"id": new_id(), "created_at": now, "seen_by": []}},
+                                                  upsert=True)
+        except DuplicateKeyError:
+            # Zwei Schreiber zugleich (eindeutiger Teilindex): der zweite schreibt in den Eintrag des ersten.
+            await db.tournament_awards.update_one({"tournament_id": tid, "reward_key": reward_key}, {"$set": doc})
+        kept.append(reward_key)
     await db.tournament_awards.delete_many({"tournament_id": tid, "reward_key": {"$type": "string", "$nin": kept}})
     if wanted_prizes or before:
         from services.prize_service import sync_league_reward_prizes
 
-        await sync_league_reward_prizes(db, tournament, wanted_prizes)
+        await sync_league_reward_prizes(db, scope, wanted_prizes)
     names = {doc["reward"]["id"]: doc["reward"]["name"] for doc in [*before, *after] if doc.get("reward")}
     gains, losses = _changes(_holdings(before), _holdings(after), names)
     team_gains, team_losses = _changes(_team_holdings(before), _team_holdings(after), names)
-    # Wer eine Team-Belohnung erfährt: Captain und Vertreter von heute (bzw. die Teamleitung) - für das Team, nicht für sich.
-    leads = {}
-    for registration in registrations.values():
-        if registration.get("team_id") in {*team_gains, *team_losses}:
-            leads.setdefault(registration["team_id"], set()).update(responsible_ids(registration, teams.get(registration["team_id"]) or None))
-    return {"granted": len(kept), "gains": gains, "losses": losses, "team_gains": team_gains, "team_losses": team_losses,
-            "team_leads": {key: sorted(value) for key, value in leads.items()},
-            "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads}}
+    return {"granted": len(kept), "gains": gains, "losses": losses, "team_gains": team_gains, "team_losses": team_losses}
 
 
-async def notify(db, tournament: dict, final: dict, frame: dict, result: dict) -> int:
-    """Nachricht an jede Person, die eine Belohnung neu bekommt oder verliert (Nr. 166) - je Fassung, Richtung und Person einmal."""
+async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *, url: str | None = None) -> int:
+    """Nachricht an jede Person, die eine Belohnung neu bekommt oder verliert (Nr. 166) - je Fassung, Richtung und Person einmal.
+    ``tournament``: die Staffel bzw. der Bereich der Gesamtwertung (F.5, ``id`` und ``title``); ``url``: wohin die Nachricht führt."""
     from services.user_notifications import create_user_notification
 
     league, season = frame["league"], frame["season"]
-    url = (f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug")
-           else f"/tournaments/{tournament.get('slug') or tournament['id']}")
+    url = url or (f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug")
+                  else f"/tournaments/{tournament.get('slug') or tournament['id']}")
     name = tournament.get("title") or "Die Staffel"
     sent = 0
     for event, people in (("gain", result.get("gains") or {}), ("loss", result.get("losses") or {})):
