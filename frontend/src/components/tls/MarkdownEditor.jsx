@@ -286,7 +286,9 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
           top: Math.max(8, coords.bottom - wrap.top + 4),
         });
       }
-    } catch {}
+    } catch {
+      // Lässt sich die Stelle nicht messen, bleiben die Vorschläge an ihrem letzten Platz - sie funktionieren trotzdem (#937).
+    }
     setVisualMention({ query: trigger.query, from: from.pos - trigger.query.length - 1, to: from.pos });
     setVisualMentionIndex(0);
   }

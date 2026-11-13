@@ -22,7 +22,11 @@ function handleCrownNotifications(rows, userId) {
   const crownRows = rows.filter((item) => !item.read && CROWN_KINDS.has(item.kind));
   if (!crownRows.length) return;
   let seen = [];
-  try { seen = JSON.parse(localStorage.getItem("tls-crowns-celebrated") || "[]"); } catch {}
+  try {
+    seen = JSON.parse(localStorage.getItem("tls-crowns-celebrated") || "[]");
+  } catch {
+    // Kein oder kaputter Speicher: dann gilt keine Krone als schon gefeiert (#937).
+  }
   const fresh = crownRows.filter((item) => item.kind === "crown_gained" && item.id && !seen.includes(item.id));
   refreshCrowns().then((crowns) => {
     if (!fresh.length) return;
@@ -36,7 +40,11 @@ function handleCrownNotifications(rows, userId) {
         detail: { id: item.id, variant, title: item.title, body: item.body },
       }));
     });
-    try { localStorage.setItem("tls-crowns-celebrated", JSON.stringify(seen.slice(-50))); } catch {}
+    try {
+      localStorage.setItem("tls-crowns-celebrated", JSON.stringify(seen.slice(-50)));
+    } catch {
+      // Speicher voll oder gesperrt: schlimmstenfalls wird eine Krone noch einmal gefeiert (#937).
+    }
   });
 }
 

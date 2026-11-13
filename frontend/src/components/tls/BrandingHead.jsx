@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { devWarn } from "@/lib/devWarn";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { rasterLogoUrl } from "@/lib/svgLogo";
@@ -166,7 +167,10 @@ export function BrandingHead() {
       const { data } = await api.get("/settings/public");
       setCachedBranding(data || {});
       applyBranding(data);
-    } catch {}
+    } catch (error) {
+      // Das Branding aus dem Zwischenspeicher bleibt stehen - ein Fehlschlag soll keine Seite stören (#937).
+      devWarn("Branding nicht nachgeladen", error);
+    }
   }, []);
 
   useEffect(() => {

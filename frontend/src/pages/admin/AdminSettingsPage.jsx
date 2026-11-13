@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
+import { devWarn } from "@/lib/devWarn";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { isGoogleMeasurementId } from "@/lib/analyticsConfig";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -220,7 +221,10 @@ export default function AdminSettingsPage() {
     try {
       const { data } = await api.get("/settings/public", { params: { _: Date.now() } });
       setCachedBranding(data || {});
-    } catch {}
+    } catch (error) {
+      // Gespeichert ist schon - nur die Vorschau der öffentlichen Seite zieht erst beim nächsten Laden nach (#937).
+      devWarn("Öffentliches Branding nach dem Speichern nicht nachgeladen", error);
+    }
   };
 
   const saveAuth = async (next) => {
