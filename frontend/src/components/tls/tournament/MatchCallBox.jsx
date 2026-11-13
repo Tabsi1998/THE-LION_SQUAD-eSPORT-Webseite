@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { countdown } from "@/lib/tvCalls";
 import { asInstant, viennaTime } from "@/lib/vienna";
+import { serverNow } from "@/seasons/clock";
+import { useSeason } from "@/seasons/SeasonContext";
 
 // Aufruf (#1137): Hat die Turnierleitung das Spiel einer Station zugewiesen, steht hier groß, wohin es geht und wie
 // lange noch - derselbe Countdown wie auf der Aufruf-Tafel am TV (#1122). Das Ende („antreten bis“) rechnet der Server.
 // Bei 0 steht „Jetzt geht es los“; mit „Bewegung reduzieren“ zählt nur die Zahl, nichts blinkt.
 
 export function MatchCallBox({ call }) {
+  // Nach der Serverzeit (#1167): derselbe Countdown wie auf der Aufruf-Tafel am TV, auch wenn das Handy falsch geht.
+  const { serverOffset } = useSeason();
   const dueAt = call?.report_by ? asInstant(call.report_by).getTime() : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -16,7 +20,7 @@ export function MatchCallBox({ call }) {
     return () => window.clearInterval(timer);
   }, [dueAt]);
   if (!call) return null;
-  const left = countdown(Number.isNaN(dueAt) ? null : dueAt, now);
+  const left = countdown(Number.isNaN(dueAt) ? null : dueAt, serverNow(serverOffset, now));
   const station = call.station_text || "deine Station";
   return (
     <div className="mt-6 rounded-sm border border-[#FFD700]/50 bg-[#FFD700]/10 px-4 py-4 sm:px-5" role="status" data-testid="match-call">

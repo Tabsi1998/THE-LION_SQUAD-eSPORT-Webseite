@@ -6,7 +6,7 @@ import { forecastText } from "@/lib/tvForecast";
 import { viennaTime } from "@/lib/vienna";
 import { TvFace } from "./TvParts";
 import { useTv } from "./TvScreen";
-import { useSecondTick } from "./TvTreeNode";
+import { useServerTick } from "./TvTreeNode";
 
 // Aufruf-Tafel (#1122), gestaltet wie in der TV-Vorschau: „Als Nächstes an PC 3“ groß, Turnier und Durchgang, die Namen
 // mit Bild oder Kürzel, „Bitte jetzt zur Station“ und ein Countdown-Ring. Bis zu drei Aufrufe groß nebeneinander, mehr
@@ -33,8 +33,8 @@ function whatOf(call, tournamentOf) {
 /** Der Countdown: Ring und Zahl. Ohne geplante Zeit nur der Ring; bei 0 „Jetzt geht es los“. */
 export function TvCallCountdown({ call, small = false }) {
   const { motionOn } = useTv();
-  const second = useSecondTick();
-  const now = second * 1000;
+  // Nach der Serverzeit (#1167): derselbe Countdown wie auf dem Handy des Spielers, auch wenn die TV-Uhr danebenliegt.
+  const now = useServerTick();
   const left = countdown(call.dueAt, now);
   const share = motionOn ? ringShare(call, now) : 1;
   const radius = 44;
@@ -54,8 +54,7 @@ export function TvCallCountdown({ call, small = false }) {
 }
 
 function CallCard({ call, matches, nameOf, avatarOf, tournamentOf, layout }) {
-  const second = useSecondTick();
-  const done = countdown(call.dueAt, second * 1000).done;
+  const done = countdown(call.dueAt, useServerTick()).done;
   const players = playersOf(call.match, matches, nameOf);
   // Nie mitten im Wort trennen: die Schrift passt sich dem längsten Wort an (#1822).
   const station = stationFit(call.station);

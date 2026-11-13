@@ -3,13 +3,11 @@ import { AlertTriangle } from "lucide-react";
 import { asInstant } from "@/lib/vienna";
 import { queueSummaryLine } from "@/lib/liveQueue";
 import { clockLabel, matchClock } from "@/lib/matchClock";
-import { serverNow } from "@/seasons/clock";
-import { useSeason } from "@/seasons/SeasonContext";
 import { countdown } from "@/lib/tvCalls";
 import { laneSignature, queueLanes, queueNextLine, queueWhat, queueWho } from "@/lib/tvQueue";
 import { MOTION } from "@/lib/motion";
 import { useTv } from "./TvScreen";
-import { useSecondTick } from "./TvTreeNode";
+import { useServerTick } from "./TvTreeNode";
 
 // Live-Warteschlange je Station am Turnierbaum-TV (#1634): die Folie „Aufrufe“ zeigt, sobald das Turnier vor Ort eine
 // Warteschlange hat, jede Station als Bahn - „Jetzt“ mit Spiel, Namen und Spielzeit-Uhr (lib/matchClock, nach der
@@ -67,9 +65,8 @@ function useSwap(key, value, motionOn) {
  */
 export function TvQueueClock({ entry, testId }) {
   const { motionOn } = useTv();
-  const { serverOffset } = useSeason();
-  const second = useSecondTick();
-  const info = matchClock(entry?.started_at, entry?.duration_minutes, serverNow(serverOffset, second * 1000), {
+  const now = useServerTick();
+  const info = matchClock(entry?.started_at, entry?.duration_minutes, now, {
     stepped: !motionOn, pausedAt: entry?.paused_at, pausedSeconds: entry?.paused_seconds,
   });
   if (!info) return <span className="tv-lanes__clock tv-t-info" data-testid={testId} data-tone="none">läuft</span>;
@@ -88,11 +85,11 @@ export function TvQueueClock({ entry, testId }) {
   );
 }
 
-/** „noch 1:23“ bis zur Frist eines Aufrufs - bei 0 „jetzt“. */
+/** „noch 1:23“ bis zur Frist eines Aufrufs - bei 0 „jetzt“. Nach der Serverzeit (#1167), wie die Frist selbst. */
 function CallLeft({ entry, ghost }) {
-  const second = useSecondTick();
+  const now = useServerTick();
   if (!entry?.report_by) return null;
-  const left = countdown(asInstant(entry.report_by).getTime(), second * 1000);
+  const left = countdown(asInstant(entry.report_by).getTime(), now);
   return <span className="tv-lanes__left font-display" data-testid={ghost ? undefined : `tv-queue-left-${entry.match_id}`}>{left.done ? "jetzt" : `noch ${left.text}`}</span>;
 }
 

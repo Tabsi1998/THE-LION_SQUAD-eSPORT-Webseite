@@ -88,3 +88,29 @@ test("Pause am TV: Warteschlange und Spotlight stehen bei derselben Zeit wie Lei
   expect(screen.getByTestId("tv-pause")).toHaveAttribute("aria-label", "Spielzeit 10:00 von 20 Min., angehalten");
   expect(screen.getByTestId("tv-spot-clock-m4")).toHaveTextContent("10:00");
 });
+
+test("Aufruf-Countdowns am TV zählen nach der Serverzeit: Aufruf-Tafel und Hallen-Tafel", async () => {
+  const { TvCallCountdown } = await import("./TvCallBoard");
+  const { TvStationBoard } = await import("./TvHall");
+  vi.useFakeTimers({ toFake: ["Date"] });
+  // Der TV geht 3 Minuten vor - die Frist (16:01:30) ist laut Server noch 90 Sekunden weg, nicht schon vorbei.
+  vi.setSystemTime(new Date("2026-10-31T16:03:00Z"));
+  season.serverOffset = -3 * MINUTE;
+  const dueAt = Date.parse("2026-10-31T16:01:30Z");
+  onTv(<>
+    <TvCallCountdown call={{ matchId: "c1", dueAt, totalMs: 120000 }} />
+    <TvStationBoard entries={[{ station: { id: "pc1", name: "PC 1" }, state: "called", detail: { kind: "Viertelfinale", key: "A" }, call: { dueAt } }]} />
+  </>);
+  expect(screen.getByTestId("tv-call-clock-c1")).toHaveTextContent("1:30");
+  expect(screen.getByTestId("tv-station")).toHaveTextContent("noch 1:30");
+});
+
+test("Warteschlange: „noch 1:30“ bis zur Frist nach der Serverzeit", async () => {
+  const { TvQueueBoard } = await import("./TvQueueBoard");
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T16:03:00Z"));
+  season.serverOffset = -3 * MINUTE;
+  const called = { match_id: "q1", state: "called", names: ["Gamma", "Delta"], open_slots: 0, label: "Runde 1", report_by: "2026-10-31T16:01:30Z", forecast_at: "2026-10-31T16:01:30Z" };
+  onTv(<TvQueueBoard queue={{ applies: true, matches: {}, summary: null, stations: [{ id: "s1", name: "S1", status: "reserved", waiting: 1, running: null, next: called }] }} />);
+  expect(await screen.findByTestId("tv-queue-left-q1")).toHaveTextContent("noch 1:30");
+});

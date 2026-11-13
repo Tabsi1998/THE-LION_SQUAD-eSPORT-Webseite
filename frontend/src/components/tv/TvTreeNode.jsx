@@ -64,15 +64,24 @@ export function useSecondTick() {
 }
 
 /**
+ * Jetzt nach der Serverzeit (ms), jede Sekunde neu (#1167): Spielzeit-Uhren und Aufruf-Countdowns zählen so wie Handy und
+ * Leitung, auch wenn die Uhr des TV danebenliegt (Abstand aus dem Saison-Kontext).
+ */
+export function useServerTick() {
+  const { serverOffset } = useSeason();
+  const second = useSecondTick();
+  return serverNow(serverOffset, second * 1000);
+}
+
+/**
  * Station und Spielzeit eines laufenden Spiels, sekundengenau („PC 3 · 12:34“, ohne Startzeit „Live“). Dieselbe Uhr wie
  * an Station und Leitung (#1167, lib/matchClock): nach der Serverzeit, mit Dauer „/ 20 Min.“, ab 80 % orange, ab 100 %
  * orange gefüllt mit Warn-Symbol. Ruhig bleibt die Zeit rot - das heißt hier „läuft“.
  */
 export function TvSpotlight({ match, className = "", testPrefix = "tv-spot" }) {
   const { motionOn } = useTv();
-  const { serverOffset } = useSeason();
-  const second = useSecondTick();
-  const parts = spotlightParts(match, serverNow(serverOffset, second * 1000), { stepped: !motionOn });
+  const now = useServerTick();
+  const parts = spotlightParts(match, now, { stepped: !motionOn });
   return (
     <div className={`tv-spot ${className}`} data-testid={`${testPrefix}-${match.id}`} data-tone={parts.tone}>
       <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" />

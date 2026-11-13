@@ -5,10 +5,8 @@ import { countdown } from "@/lib/tvCalls";
 import { clockText, packLane } from "@/lib/tvDayPlan";
 import { STATION_STATES, pageOf, stationCounts, stationGrid } from "@/lib/tvStationGrid";
 import { spotlightParts } from "@/lib/tvLive";
-import { serverNow } from "@/seasons/clock";
-import { useSeason } from "@/seasons/SeasonContext";
 import { useTv, useTvArea } from "./TvScreen";
-import { useSecondTick } from "./TvTreeNode";
+import { useServerTick } from "./TvTreeNode";
 
 // Die Hallen-Tafel (#1126), gestaltet wie in der TV-Vorschau: links der Tagesplan als Zeitleiste mit „jetzt“-Linie,
 // rechts alle Stationen als Raster (frei, belegt, aufgerufen, defekt - mit Spiel und Namen im Klartext), unten was jetzt
@@ -89,10 +87,10 @@ function stationLine(entry) {
   return [entry.detail.kind, entry.detail.key].filter(Boolean).join(" · ");
 }
 
-// Die Spielzeit zählt nach der Serverzeit (#1167, `clockNow`) - dieselbe Sekunde und Farbe wie an Station und Leitung.
-function StationCell({ entry, now, clockNow = now }) {
+// Spielzeit und Aufruf-Countdown zählen nach der Serverzeit (#1167) - dieselbe Sekunde und Farbe wie an Station und Leitung.
+function StationCell({ entry, now }) {
   const state = STATION_STATES[entry.state];
-  const spot = entry.state === "busy" && entry.detail?.match ? spotlightParts(entry.detail.match, clockNow) : null;
+  const spot = entry.state === "busy" && entry.detail?.match ? spotlightParts(entry.detail.match, now) : null;
   const live = spot?.clock || "";
   const left = entry.state === "called" && entry.call ? countdown(entry.call.dueAt, now) : null;
   const names = entry.detail?.participants || "";
@@ -137,8 +135,7 @@ const LEVELS = [
  */
 export function TvStationBoard({ entries = [] }) {
   const { motionOn } = useTv();
-  const { serverOffset } = useSeason();
-  const second = useSecondTick();
+  const now = useServerTick();
   const [gridRef, area, trim] = useTvArea(`${entries.length}`);
   const layout = useMemo(() => {
     const base = stationGrid(entries.length, area || { w: 70, h: 50 }, LEVELS, 1);
@@ -173,7 +170,7 @@ export function TvStationBoard({ entries = [] }) {
         data-testid="tv-station-list"
         key={motionOn ? `page-${page}` : undefined}
       >
-        {shown.map((entry) => <StationCell key={entry.station.id} entry={entry} now={second * 1000} clockNow={serverNow(serverOffset, second * 1000)} />)}
+        {shown.map((entry) => <StationCell key={entry.station.id} entry={entry} now={now} />)}
         {!entries.length ? <div className="tv-empty tv-t-info">Keine Stationen für dieses Event</div> : null}
       </div>
     </section>
