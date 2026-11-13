@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from auth import get_current_user
@@ -31,7 +31,11 @@ from services.match_planning import ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError
 from services.result_hold import ensure_no_hold
 from services.v2_match_flows import no_show_keeps_heat_open
+from services.permissions import area_refusal
+from services.tournament_checkin_board import checkin_board
+from services.tournament_rules import self_checkin_allowed, tournament_event_mode
 from services.tournament_permissions import (
+    CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
     RESULT_STAFF_ROLES,
     has_match_result_permission,
@@ -53,8 +57,41 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     # Das Event (#1801): Die Ansicht zeigt Stationen, die sich die Turniere eines Events teilen, und lädt bei dessen
     # Änderungen nach. Die Kennung nur, wenn die Person das Event sehen darf (#1473).
     view["tournament"]["event_id"] = tournament.get("event_id")
+    # Reiter „Check-in“ (#1161): nur mit Check-in-Recht - dieselbe Prüfung wie der Check-in-Weg; in einer Staffel nie.
+    view["tournament"]["can_check_in"] = not is_league_staffel(tournament) and await has_tournament_staff_permission(
+        me, tournament_id, CHECKIN_STAFF_ROLES, capability="matches")
+    # Checken die Spieler selbst ein (online, hybrid)? Dann öffnet die Seite im Check-in nicht von selbst den Reiter.
+    view["tournament"]["self_checkin"] = self_checkin_allowed(tournament)
     await hide_unseen_event_links(db, me, [view["tournament"]])
     return view
+
+
+@router.get("/{tid}/lead/checkin")
+async def tournament_lead_checkin(tid: str, response: Response, me: dict = Depends(get_current_user)):
+    """Reiter „Check-in“ (#1161): wer da ist, je Anmeldung bzw. Team, mit dem Stand des Startgelds. Dieselben Rollen wie
+    der Check-in-Weg (Organisation, Schiedsrichter, Ergebnisdienst, Stationsleitung); abgehakt wird dort."""
+    # Namen der Angemeldeten: nie in einem gemeinsamen Zwischenspeicher.
+    response.headers["Cache-Control"] = "private, no-store"
+    db = get_db()
+    tournament_id = await _resolve_tid(tid)
+    if not await has_tournament_staff_permission(me, tournament_id, CHECKIN_STAFF_ROLES, capability="matches"):
+        raise HTTPException(status_code=403, detail="Den Check-in macht die Turnierleitung dieses Turniers.")
+    tournament = await db.tournaments.find_one(
+        {"id": tournament_id},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "team_mode": 1, "team_size": 1, "event_mode": 1, "is_online": 1,
+         "is_hybrid": 1, "status": 1, "league_context": 1, "check_in_from": 1, "check_in_until": 1, "check_in_closed_at": 1})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    head = {"id": tournament["id"], "slug": tournament.get("slug"), "title": tournament.get("title"),
+            "event_mode": tournament_event_mode(tournament), "team_mode": tournament.get("team_mode") or "solo",
+            "check_in_from": tournament.get("check_in_from"), "check_in_until": tournament.get("check_in_until"),
+            "self_checkin": self_checkin_allowed(tournament)}
+    # Liga-Staffel (S18): kein Check-in der Anmeldungen - die Liga hat ihren eigenen je Spiel.
+    if is_league_staffel(tournament):
+        return {"applies": False, "tournament": head, "rows": [], "counts": {}}
+    show_amounts = await area_refusal(me, ("finance",), db) is None
+    board = await checkin_board(db, tournament, show_amounts=show_amounts)
+    return {**board, "tournament": head}
 
 
 STALE_PROPOSAL_DETAIL = ("Der Vorschlag gilt nicht mehr: Das Spiel hat begonnen, eine Seite hat gemeldet, "

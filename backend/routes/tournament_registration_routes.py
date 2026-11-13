@@ -141,6 +141,8 @@ REMOVAL_NO_PLACE = ("Im Turnierbaum ist kein Platz frei, darum lässt sich der A
                     "zurücknehmen. Ein Platz wird frei, wenn jemand austritt oder als „Nicht erschienen“ gilt.")
 DISQUALIFIED_STAYS = ("Eine Disqualifikation lässt sich nicht durch Abmelden aufheben. Das kann nur die Turnierleitung "
                       "zurücknehmen.")
+PENDING_NOT_AT_CHECKIN = ("Erst freigeben: Die Anmeldung wartet noch auf die Freigabe in der Turnierverwaltung – "
+                          "danach lässt sie sich einchecken.")
 REMOVAL_NOT_AT_CHECKIN = ("Austritt und Disqualifikation lassen sich beim Check-in nicht zurücknehmen. Das macht die "
                           "Turnierleitung über den Status in der Teilnehmerliste.")
 
@@ -425,6 +427,47 @@ async def _require_seed_on_return(db, tournament: dict, reg: dict, new_status: s
     if (reg.get("status") in SEED_FREE_STATUSES and new_status not in SEED_FREE_STATUSES
             and not await tournament_guard.structure_fixed(db, tournament)):
         await _require_free_seed(db, tournament["id"], reg.get("seed"), reg["id"])
+
+
+# Zurück aus „Nicht erschienen“ (#1161) auf bestätigt bzw. eingecheckt. „Abgelehnt“ und „Warteliste“ → bestätigt ist eine
+# Freigabe: die entscheidet die Leitung bewusst, auch über die Höchstzahl hinaus (wie bisher, #2368).
+RETURNS_FROM_ENDED = {"no_show"}
+
+
+async def registration_names(db, registration_ids: list[str]) -> list[str]:
+    """Anzeigenamen in der Reihenfolge der Kennungen - für Meldungen an die Turnierleitung (#1941, #1161)."""
+    if not registration_ids:
+        return []
+    rows = {row["id"]: row for row in await db.tournament_registrations.find(
+        {"id": {"$in": list(registration_ids)}}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
+    ).to_list(len(registration_ids))}
+    return [str((rows.get(rid) or {}).get("display_name") or (rows.get(rid) or {}).get("ingame_name")
+                or (rows.get(rid) or {}).get("team_name") or "Teilnehmer") for rid in registration_ids]
+
+
+async def _require_free_place_on_return(db, tournament: dict, reg: dict, new_status: str | None) -> None:
+    """Wer aus „Nicht erschienen“ zurückkommt, braucht einen freien Platz (#1161). Ist inzwischen jemand
+    von der Warteliste nachgerückt und das Turnier voll, lehnt der Server ab - sonst wäre es überbucht. Die Leitung
+    entscheidet dann in der Verwaltung (etwa den Platz tauschen). Ohne Höchstzahl gibt es keine Grenze."""
+    if reg.get("status") not in RETURNS_FROM_ENDED or new_status not in ("approved", "checked_in"):
+        return
+    try:
+        limit = int(tournament.get("max_participants") or 0)
+    except (TypeError, ValueError):
+        limit = 0
+    if limit <= 0:
+        return
+    taken = await db.tournament_registrations.count_documents(
+        {"tournament_id": tournament["id"], "status": {"$in": ACTIVE_REGISTRATION_STATUSES}, "id": {"$ne": reg["id"]}})
+    if taken < limit:
+        return
+    moved = await db.audit_logs.find_one(
+        {"action": "tournament.registration.waitlist_moved_up", "target_id": tournament["id"]},
+        {"_id": 0, "data": 1}, sort=[("created_at", -1)])
+    moved_id = ((moved or {}).get("data") or {}).get("registration_id")
+    names = await registration_names(db, [moved_id]) if moved_id else []
+    lead = f"Inzwischen ist {names[0]} nachgerückt" if names else "Inzwischen sind alle Plätze vergeben"
+    raise HTTPException(status_code=409, detail=f"{lead} – kein freier Platz mehr. In der Verwaltung entscheiden.")
 
 
 async def _open_place(db, tid: str, matches: list[dict]) -> dict | None:
@@ -1140,6 +1183,9 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         if any(not match.get("is_preview") for match in matches) and not await _open_place(db, tid, matches):
             raise HTTPException(status_code=409, detail=REMOVAL_NO_PLACE)
     if updates.get("status") and updates["status"] != previous_status:
+        # Zurück aus „Nicht erschienen“ nur auf einen freien Platz (#1161) - wie im Check-in-Weg.
+        await _require_free_place_on_return(db, tournament_doc, reg, updates["status"])
+    if updates.get("status") and updates["status"] != previous_status:
         # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
         await _sync_squad_key(db, reg, updates["status"], tournament_doc)
@@ -1212,6 +1258,10 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
             if reg.get("status") in REMOVAL_KINDS:
                 raise HTTPException(status_code=409, detail=REMOVAL_NOT_AT_CHECKIN)
+            if reg.get("status") == "pending" and status == "checked_in":
+                # Erst freigeben (#1161): die Freigabe prüft Platz und Startgeld und schickt die Bestätigung.
+                raise HTTPException(status_code=409, detail=PENDING_NOT_AT_CHECKIN)
+            await _require_free_place_on_return(db, tournament_doc, reg, status)
             await _require_seed_on_return(db, tournament_doc, reg, status)
             await _sync_squad_key(db, reg, status, tournament_doc)
 
@@ -1248,7 +1298,9 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
             moved_up = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id) if status == "no_show" else []
             # Nach dem Check-in-Ende: wer jetzt eingecheckt wird, rückt auf einen freien Platz nach (#1551).
             placement = await _place_fill_in(db, tid, updated, me.get("id")) if status == "checked_in" else None
-            return {**updated, "waitlist_moved_up": moved_up, "placement": placement, "idempotent_replay": False}
+            # Wer nachgerückt ist, mit Namen (#1941, #1161) - die Route ist nur für die Turnierleitung.
+            return {**updated, "waitlist_moved_up": moved_up, "waitlist_moved_up_names": await registration_names(db, moved_up),
+                    "placement": placement, "idempotent_replay": False}
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
