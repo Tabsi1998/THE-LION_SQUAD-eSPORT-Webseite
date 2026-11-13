@@ -652,6 +652,8 @@ Ab 80 % der Dauer wird die Uhr orange („knapp“), ab der vollen Dauer steht d
 und „+13 Min.“ (Rot heißt nur „läuft“). Ohne Dauer steht nur die
 laufende Zeit, ab einer Stunde mit Stunden („1:12:14“). Fehlt das Ergebnis schon, steht der Hinweis unter der Uhr.
 Alle Geräte zählen nach der Uhr des Servers: Geht ein Handy falsch, zeigt es trotzdem dieselbe Sekunde wie der TV.
+Pausiert ihr das Turnier, steht jede laufende Uhr mit „Pause“; nach **Weiterspielen** zählt sie ohne die Pause weiter
+(auch über mehrere Pausen). Auch „Ergebnis fehlt“ rechnet die Pause nicht mit.
 Mit „Bewegung reduzieren“ springt der Balken minutenweise.
 
 <img src="../assets/turniere/spielzeit-uhr-leitung-handy.png" alt="Turnierleitung am Handy, Reiter Ergebnisse mit Filter Läuft: Viertelfinale 1 rot mit 33:02 von 20 Minuten, plus 13 Minuten und Ergebnis fehlt, Viertelfinale 2 orange mit 16:32 von 20 Minuten, Viertelfinale 3 ruhig mit 10:02 von 20 Minuten" width="300">

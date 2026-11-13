@@ -71,6 +71,8 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     view["tournament"]["can_pause"] = await has_tournament_staff_permission(me, tournament_id, STRUCTURE_STAFF_ROLES,
                                                                             "tournament", capability="manage")
     view["tournament"]["paused_until"] = tournament.get("paused_until")
+    # Spielzeit-Uhr (#1167): seit wann die Pause läuft - die Uhren stehen so lange.
+    view["tournament"]["paused_at"] = tournament.get("paused_at")
     await hide_unseen_event_links(db, me, [view["tournament"]])
     return view
 

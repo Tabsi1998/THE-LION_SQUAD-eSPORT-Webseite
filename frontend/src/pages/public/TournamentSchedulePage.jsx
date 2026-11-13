@@ -297,7 +297,7 @@ function StatusLabel({ entry, compact = false }) {
     <span className="tls-sched-status" data-tone={tone} data-testid={`schedule-status-${match.id}`}>
       {tone === "live" && <span className="tls-sched-status__dot" aria-hidden="true" />}
       <span>{label}</span>
-      {tone === "live" && entry.startedAt && !compact && <span className="tabular-nums opacity-80"><LiveClock startedAt={entry.startedAt} durationMinutes={duration} /></span>}
+      {tone === "live" && entry.startedAt && !compact && <span className="tabular-nums opacity-80"><LiveClock startedAt={entry.startedAt} durationMinutes={duration} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></span>}
     </span>
   );
 }

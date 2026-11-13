@@ -129,3 +129,36 @@ test("Web-Baum mit Dauer: dieselben Farben - knapp orange, überschritten orange
   expect(screen.getByTestId("bracket-live-clock").querySelector(".tls-live-clock-icon")).not.toBeNull();
   expect(screen.getByTestId("bracket-live-clock")).toHaveTextContent("27:00");
 });
+
+test("Pause vom Server: in der Pause steht die Uhr mit „Pause“, danach läuft sie ohne die 5 Minuten weiter", async () => {
+  const { act } = await import("@testing-library/react");
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-31T16:17:00Z"));
+  // Gestartet 16:00, Pause seit 16:12 (5 Minuten): die Uhr steht bei 12:00, auch wenn Zeit vergeht.
+  const { rerender } = render(<MatchClock startedAt="2026-10-31T16:00:00Z" durationMinutes={20} pausedAt="2026-10-31T16:12:00Z" testId="clock" />);
+  expect(screen.getByTestId("clock-time")).toHaveTextContent("12:00");
+  expect(screen.getByTestId("clock-paused")).toHaveTextContent("Pause");
+  expect(screen.getByTestId("clock")).toHaveAttribute("data-paused", "1");
+  act(() => { vi.advanceTimersByTime(5000); });
+  expect(screen.getByTestId("clock-time")).toHaveTextContent("12:00");
+  // Weiter um 16:17: der Server hat 300 Sekunden Pause auf das Spiel gebucht - die Uhr zählt ab 12:00 weiter.
+  rerender(<MatchClock startedAt="2026-10-31T16:00:00Z" durationMinutes={20} pausedSeconds={300} testId="clock" />);
+  act(() => { vi.advanceTimersByTime(1000); });
+  expect(screen.getByTestId("clock-time")).toHaveTextContent(/^12:0\d$/);
+  expect(screen.queryByTestId("clock-paused")).toBeNull();
+  expect(screen.getByTestId("clock")).toHaveAttribute("data-tone", "run");
+  // Eine zweite Pause (3 Minuten, gebucht) summiert sich: 16:30 - 16:00 - 8 Min. = 22:00, überschritten.
+  vi.setSystemTime(new Date("2026-10-31T16:30:00Z"));
+  rerender(<MatchClock startedAt="2026-10-31T16:00:00Z" durationMinutes={20} pausedSeconds={480} testId="clock" />);
+  act(() => { vi.advanceTimersByTime(1000); });
+  expect(screen.getByTestId("clock-time")).toHaveTextContent(/^22:0\d$/);
+});
+
+test("Pause im Web-Baum (LiveClock): die Zeit steht", async () => {
+  const { LiveClock } = await import("@/components/tls/bracket/BracketCards");
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-31T16:40:00Z"));
+  render(<LiveClock startedAt="2026-10-31T16:00:00Z" durationMinutes={20} pausedAt="2026-10-31T16:10:00Z" pausedSeconds={60} />);
+  expect(screen.getByTestId("bracket-live-clock")).toHaveTextContent("09:00");
+  expect(screen.getByTestId("bracket-live-clock")).toHaveAttribute("aria-label", "Spielzeit 09:00 von 20 Min., angehalten");
+});

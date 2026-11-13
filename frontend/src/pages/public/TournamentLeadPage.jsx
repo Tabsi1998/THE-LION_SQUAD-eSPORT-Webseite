@@ -499,7 +499,7 @@ function LeadRow({ item, onEnter }) {
         <div className="text-sm font-bold text-white truncate">{item.stage_name ? `${item.stage_name} · ` : ""}{item.label}</div>
         <div className="text-xs text-white/55 truncate">{leadNames(item)}</div>
         {clocked ? (
-          <MatchClock size="sm" startedAt={item.started_at} durationMinutes={item.timing?.duration_minutes} testId={`lead-clock-${item.id}`} className="mt-1" />
+          <MatchClock size="sm" startedAt={item.started_at} durationMinutes={item.timing?.duration_minutes} pausedAt={item.paused_at} pausedSeconds={item.paused_seconds} testId={`lead-clock-${item.id}`} className="mt-1" />
         ) : null}
         {!clocked || missing ? (
           <div className={`mt-0.5 flex items-center gap-1 text-[11px] ${missing ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`lead-line-${item.id}`}>

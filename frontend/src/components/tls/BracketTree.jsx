@@ -262,7 +262,7 @@ function LiveStrip({ matches, regMap, duration }) {
               <span className="font-bold text-white/85">{roundNameOf(match, match.round)} · {match.match_key}</span>
               <span className="min-w-0 break-words text-white/75">{(match.slots || []).map((slot) => slotLabel(slot, regMap)).filter(Boolean).join(" – ")}</span>
               <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-live">
-                {getStationLabel(match) || "läuft"}{match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} durationMinutes={duration(match)} /></> : null}
+                {getStationLabel(match) || "läuft"}{match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} durationMinutes={duration(match)} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></> : null}
               </span>
             </motion.li>
           ))}

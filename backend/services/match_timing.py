@@ -54,8 +54,14 @@ def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict |
     Station) gibt es kein „Ergebnis fehlt“ (#1160).
 
     Live vor Ort (#1556): Gezählt wird ab dem echten Start. Ein Spiel, das an seiner Station noch wartet, hat Verzug
-    (den zeigt die Warteschlange), aber kein fehlendes Ergebnis."""
+    (den zeigt die Warteschlange), aber kein fehlendes Ergebnis.
+
+    Turnierpause (#1167): Pausen zählen nicht als Spielzeit - weder bei „läuft N Min.“ noch bei „über der Zeit“; solange
+    die Pause läuft, wird kein Ergebnis fällig."""
+    from services.match_pause import pause_seconds
+
     started = _parse(match.get("started_at"))
+    paused = timedelta(seconds=pause_seconds(match, tournament, now)) if started else timedelta(0)
     if started:
         base = started
     elif match.get("station_id"):
@@ -64,12 +70,12 @@ def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict |
         base = _parse(match.get("scheduled_at"))
     out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None, "duration_minutes": None}
     if started and str(match.get("status") or "") in RUNNING_STATUSES | {"scheduled", "ready"}:
-        out["running_minutes"] = max(0, int((now - started).total_seconds() // 60))
+        out["running_minutes"] = max(0, int((now - started - paused).total_seconds() // 60))
     if base:
         minutes = duration_minutes(match, tournament, stage, game)
         # Die Dauer, mit der gerechnet wird (#1167): die Spielzeit-Uhr der Leitung zeigt „12:06 / 20 Min.“ damit.
         out["duration_minutes"] = minutes
-        planned_end = base + timedelta(minutes=minutes)
+        planned_end = base + timedelta(minutes=minutes) + paused
         due = planned_end + timedelta(minutes=MISSING_AFTER_MINUTES)
         out["due_at"] = due.isoformat()
         if now > planned_end:

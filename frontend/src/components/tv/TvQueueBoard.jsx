@@ -69,7 +69,9 @@ export function TvQueueClock({ entry, testId }) {
   const { motionOn } = useTv();
   const { serverOffset } = useSeason();
   const second = useSecondTick();
-  const info = matchClock(entry?.started_at, entry?.duration_minutes, serverNow(serverOffset, second * 1000), { stepped: !motionOn });
+  const info = matchClock(entry?.started_at, entry?.duration_minutes, serverNow(serverOffset, second * 1000), {
+    stepped: !motionOn, pausedAt: entry?.paused_at, pausedSeconds: entry?.paused_seconds,
+  });
   if (!info) return <span className="tv-lanes__clock tv-t-info" data-testid={testId} data-tone="none">läuft</span>;
   return (
     <span className="tv-lanes__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={clockLabel(info)}>

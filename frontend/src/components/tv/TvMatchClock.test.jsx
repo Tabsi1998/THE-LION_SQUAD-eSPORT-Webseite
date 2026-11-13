@@ -75,3 +75,16 @@ test("Live-Spotlight ohne Dauer: nur die Zeit, ohne Farbe; ohne Start „Live“
   expect(screen.getByTestId("tv-spot-m2")).not.toHaveTextContent("Min.");
   expect(screen.getByTestId("tv-spot-clock-m3")).toHaveTextContent("Live");
 });
+
+test("Pause am TV: Warteschlange und Spotlight stehen bei derselben Zeit wie Leitung und Station", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T16:30:00Z"));
+  const pause = { paused_at: "2026-10-31T16:12:00Z", paused_seconds: 120 };
+  onTv(<>
+    <TvQueueClock entry={{ started_at: "2026-10-31T16:00:00Z", duration_minutes: 20, ...pause }} testId="tv-pause" />
+    <TvSpotlight match={{ id: "m4", station_name: "PC 6", started_at: "2026-10-31T16:00:00Z", duration_minutes: 20, ...pause }} />
+  </>);
+  expect(screen.getByTestId("tv-pause")).toHaveTextContent("10:00");
+  expect(screen.getByTestId("tv-pause")).toHaveAttribute("aria-label", "Spielzeit 10:00 von 20 Min., angehalten");
+  expect(screen.getByTestId("tv-spot-clock-m4")).toHaveTextContent("10:00");
+});

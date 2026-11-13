@@ -334,3 +334,19 @@ test("Liste „läuft“ (#1167): ein laufendes Spiel trägt die Spielzeit-Uhr m
     vi.useRealTimers();
   }
 });
+
+test("Turnierpause (#1167): die Uhr in der Liste steht mit „Pause“ - frühere Pausen zählen nicht mit", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T16:30:00Z"));
+  const paused = { ...ENTRY, id: "m12", status: "in_progress", started_at: "2026-10-31T16:00:00Z", paused_at: "2026-10-31T16:20:00Z", paused_seconds: 240,
+    timing: { running_minutes: 16, overdue_minutes: null, missing: false, duration_minutes: 20 } };
+  try {
+    renderLead({ tournament: { id: "t1", title: "FC 26 Herbst-Cup", status: "paused", paused_at: "2026-10-31T16:20:00Z" }, matches: [paused], recent: [], attention: [], stations: [], counts: { open: 1, running: 1 } });
+    const clock = await screen.findByTestId("lead-clock-m12");
+    expect(screen.getByTestId("lead-clock-m12-time")).toHaveTextContent("16:00");
+    expect(screen.getByTestId("lead-clock-m12-paused")).toHaveTextContent("Pause");
+    expect(clock).toHaveAttribute("aria-label", "Spielzeit 16:00 von 20 Min., knapp, angehalten");
+  } finally {
+    vi.useRealTimers();
+  }
+});

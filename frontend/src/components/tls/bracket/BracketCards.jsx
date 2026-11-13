@@ -73,8 +73,8 @@ function isByeSlot(slot) {
  * Leitung und TV (#1167, lib/matchClock): nach der Serverzeit, ab einer Stunde mit Stunden („1:05:12“), mit Dauer ab
  * 80 % orange und ab 100 % orange gefüllt mit Warn-Symbol.
  */
-export function LiveClock({ startedAt, durationMinutes = null }) {
-  return <InlineMatchClock startedAt={startedAt} durationMinutes={durationMinutes} />;
+export function LiveClock({ startedAt, durationMinutes = null, pausedAt = null, pausedSeconds = 0 }) {
+  return <InlineMatchClock startedAt={startedAt} durationMinutes={durationMinutes} pausedAt={pausedAt} pausedSeconds={pausedSeconds} />;
 }
 
 function LiveStatus({ match }) {
@@ -91,7 +91,7 @@ function LiveStatus({ match }) {
       <span className="flex min-w-0 items-center gap-1.5 text-live" data-live="1">
         <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-live tv-live-dot" aria-hidden="true" />
         <span className="min-w-0 truncate" title={label}>{label}</span>
-        {match.started_at ? <span className="shrink-0 tabular-nums">{"· "}<LiveClock startedAt={match.started_at} durationMinutes={duration} /></span> : null}
+        {match.started_at ? <span className="shrink-0 tabular-nums">{"· "}<LiveClock startedAt={match.started_at} durationMinutes={duration} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></span> : null}
       </span>
     );
   }

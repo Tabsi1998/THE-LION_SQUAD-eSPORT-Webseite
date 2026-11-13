@@ -168,7 +168,7 @@ def key_label(value: str | None) -> str:
 # kommen alle bestätigten Anmeldungen mit Namen und Stand („da“ oder nicht) - nie mit Konto, Bild oder Notiz.
 
 TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "format", "format_label", "format_display_name",
-                     "public_phase", "start_date", "end_date", "team_mode", "paused_until", "registration_enabled",
+                     "public_phase", "start_date", "end_date", "team_mode", "paused_until", "paused_at", "registration_enabled",
                      "is_invite_only", "registration_open_from", "registration_open_until", "check_in_from",
                      "check_in_until", "check_in_closed_at", "max_participants", "round_sponsors",
                      # Für die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gilt Phase, Turnier, Game.
@@ -180,6 +180,8 @@ MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type",
                 "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
                 "station_label", "winner_id", "is_preview", "called_at", "best_of", "effective_duration_minutes",
                 "merged_into_key",
+                # Spielzeit-Uhr in der Turnierpause (#1167): steht ab ``paused_at``, frühere Pausen zählen nicht mit.
+                "paused_at", "paused_seconds",
                 # „Als Nächstes“ mit Prognose (#1564): ist die Zeit nur eine Prognose des Planers, und woher stammt sie.
                 "schedule_forecast", "schedule_source",
                 # „Nicht erschienen“ im offenen Lauf (#1823): nur wer, nie die Begründung (``no_show_notes``).

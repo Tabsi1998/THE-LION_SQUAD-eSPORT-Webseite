@@ -25,7 +25,7 @@ export function StationNowNext({ station, stationKey }) {
           <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-live"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Jetzt</div>
           <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
           <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
-          <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} testId={`schedule-clock-${running.match_id}`} className="mt-1" />
+          <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} pausedAt={running.paused_at} pausedSeconds={running.paused_seconds} testId={`schedule-clock-${running.match_id}`} className="mt-1" />
         </div>
       ) : null}
       {next ? (

@@ -18,13 +18,20 @@ export function stationName(match) {
   return /^\d+$/.test(raw) ? `Station ${raw}` : raw;
 }
 
+/** Die Dauer für die Uhr: am TV rechnet sie der Server (`effective_duration_minutes`, Dauer-Kette #1554). */
+function clockMinutes(match) {
+  const server = Number(match?.effective_duration_minutes);
+  return server > 0 ? server : match?.duration_minutes;
+}
+
 /**
  * Was groß unter einem laufenden Spiel steht: „PC 3 · 12:34“, ohne Startzeit „PC 3 · Live“ oder nur „Live“. Die Uhr ist
  * dieselbe wie überall (#1167): mit Dauer `limit` („20 Min.“), Farbe `tone` und Zustand `status`; `now` ist Serverzeit.
  */
 export function spotlightParts(match, nowMs = Date.now(), { stepped = false } = {}) {
   const station = stationName(match);
-  const info = matchClock(match?.started_at, match?.duration_minutes, nowMs, { stepped });
+  // Turnierpause (#1167): die Uhr steht ab `paused_at`, frühere Pausen (`paused_seconds`) zählen nicht mit.
+  const info = matchClock(match?.started_at, clockMinutes(match), nowMs, { stepped, pausedAt: match?.paused_at, pausedSeconds: match?.paused_seconds });
   const clock = info ? info.text : "";
   return {
     station, clock, text: [station, clock || "Live"].filter(Boolean).join(" · "),
