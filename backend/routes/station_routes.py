@@ -429,6 +429,9 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
 async def auto_assign_stations(tournament_id: str, start_now: bool = False,
                                plan: bool = True,
                                me: dict = Depends(get_current_user)):
+    """Nur API (#1162): ``plan`` ist die Vorschau des Spielplaners; ``start_now`` (alle freien Stationen sofort starten)
+    hat im Web keinen Knopf mehr - am Turniertag ersetzt durch „Alle freien Stationen aufrufen“ in der Turnierleitung
+    (``POST /tournaments/{tid}/live-queue/call`` je Station)."""
     db = get_db()
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if not tournament:
@@ -498,6 +501,8 @@ async def _start_on_free_stations(db, stations, candidates, start_now: bool) -> 
 @router.post("/{sid}/assign/{match_id}")
 async def assign_match(sid: str, match_id: str, start_now: bool = False,
                        me: dict = Depends(get_current_user)):
+    """Nur API (#1162): im Web ersetzt durch Aufrufen und Starten in der Turnierleitung
+    (``POST /tournaments/{tid}/live-queue/call`` bzw. ``…/start``)."""
     db = get_db()
     station = await db.stations.find_one({"id": sid}, {"_id": 0})
     if not station:
@@ -517,6 +522,8 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
 
 @router.post("/{sid}/clear")
 async def clear_station(sid: str, me: dict = Depends(get_current_user)):
+    """Nur API (#1162): im Web ersetzt durch „Freigeben“ bzw. „Station räumen“ in der Turnierleitung
+    (``POST /tournaments/{tid}/live-queue/release`` bzw. ``…/clear``)."""
     db = get_db()
     s = await db.stations.find_one({"id": sid})
     if not s:

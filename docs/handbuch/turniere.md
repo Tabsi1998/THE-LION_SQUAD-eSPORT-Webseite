@@ -562,7 +562,9 @@ zum Vorbereiten da: anlegen, bearbeiten, planen, Aushang. Am Turniertag bedient 
   Spiel kommt aus der einen Dauer-Regel (3.12).
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
 - An jeder Station steht ihr Zustand (frei, belegt, reserviert, defekt) und das Spiel, das sie hält; dort gibt es auch
-  **Ergebnis eintragen**.
+  **Ergebnis eintragen**. **Defekt** / **Bereit** an der Station gehört zur Planung (nur Turnierleitung) – etwa für eine
+  Station, die noch in keiner Warteschlange steht. Am Turniertag geht es samt Hinweis aufs Umlegen in der
+  Turnierleitung.
 - **Belegung je Station** zeigt dieselbe Zeitleiste wie der Matchplan (unten), live; **Im Matchplan öffnen** springt
   in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
 
@@ -574,6 +576,10 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
 - **Aufrufen** reserviert die Station für **Als Nächstes**, setzt „aufgerufen um“ und schickt „Du bist dran“ an die
   Spieler – bei Teams an alle Mitglieder (mit Aufstellung an die Aufgestellten). Die Aufruf-Tafel am TV zeigt es ohne
   Neuladen. **Als Nächstes** ist das nächste bereite Spiel ohne Station, in derselben Reihenfolge wie der Spielplaner.
+- **Anderes Spiel aufrufen** (an einer freien Station): Auswahl aller bereiten Spiele, die noch nicht aufgerufen sind
+  oder laufen – **Als Nächstes** steht oben, dann nach Prognose. Die Station muss zu Spiel und Gerät des Turniers passen.
+- **Alle freien Stationen aufrufen** (oben im Reiter): ruft an jeder freien Station ihr **Als Nächstes** auf, nach einer
+  Rückfrage mit der Anzahl. Gestartet wird dabei nichts.
 - **Starten**: die echte Startzeit, die Spielzeit-Uhr läuft, der Aufruf verschwindet von der Tafel.
 - **Freigeben**: Ein Aufruf geht zurück in die Warteschlange. Läuft das Spiel noch, fragt die Seite nach; danach ist die
   Station frei und das Ergebnis tragt ihr unter **Ergebnisse** ein. Mit dem Ergebnis wird eine Station ohnehin von selbst

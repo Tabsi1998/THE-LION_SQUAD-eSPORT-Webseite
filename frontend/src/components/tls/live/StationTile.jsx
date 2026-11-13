@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRightLeft, BellRing, Eraser, Hourglass, Play, RotateCcw, Unlock, Wrench } from "lucide-react";
+import { ArrowRightLeft, BellRing, Eraser, Hourglass, ListPlus, Play, RotateCcw, Unlock, Wrench } from "lucide-react";
 import { delayText } from "@/lib/liveQueue";
 import { stationWho, queueWhat } from "@/lib/tvQueue";
 import { viennaTime } from "@/lib/vienna";
@@ -56,6 +56,24 @@ export function stationHolds(station) {
   return station?.next?.state === "called" ? station.next : null;
 }
 
+// „Anderes Spiel aufrufen“ (#1162): alle bereiten Spiele, die noch nicht aufgerufen sind oder laufen - „Als Nächstes“
+// dieser Station oben, dann nach Prognose. Die Stationen der Warteschlange passen alle zu Spiel und Gerät des Turniers
+// (der Server prüft es beim Aufruf noch einmal).
+export function callableFor(station, matches = {}) {
+  const own = station?.next?.match_id;
+  return Object.values(matches || {})
+    .filter((entry) => entry && entry.state === "queued" && entry.ready)
+    .sort((a, b) => (b.match_id === own) - (a.match_id === own)
+      || String(a.forecast_at || "").localeCompare(String(b.forecast_at || ""))
+      || String(a.match_key || "").localeCompare(String(b.match_key || ""), "de", { numeric: true }));
+}
+
+// Freie Stationen, deren „Als Nächstes“ bereit ist - für „Alle freien Stationen aufrufen“.
+export function callAllTargets(stations = [], canOperate = () => true) {
+  return stations.filter((station) => stationTone(station) === "free" && canOperate(station)
+    && station.next?.state === "queued" && station.next.ready);
+}
+
 // Wohin sich ein Spiel umlegen lässt: frei, nicht defekt, kein Aufruf, und die Person darf dort bedienen.
 export function moveTargets(stations = [], from, canOperate = () => true) {
   return stations.filter((station) => station.id !== from?.id && station.status === "free" && !station.running
@@ -64,7 +82,7 @@ export function moveTargets(stations = [], from, canOperate = () => true) {
 
 const BTN = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider";
 
-export function StationTile({ station, index = 0, busy = false, canOperate = false, targets = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
+export function StationTile({ station, index = 0, busy = false, canOperate = false, targets = [], callable = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
   const tone = stationTone(station);
   const [chip, chipClass] = TONES[tone];
   const { running, next, after } = station;
@@ -127,6 +145,26 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
       ) : (
         !running ? <p className="mt-3 text-sm text-white/45">{broken ? "Station ist defekt – nichts wird hierher geplant." : "Nichts mehr in der Warteschlange."}</p> : null
       )}
+
+      {tone === "free" && canOperate && onCall && callable.length ? (
+        <div className="mt-2">
+          <button type="button" disabled={busy} onClick={() => toggle("pick")} aria-expanded={panel === "pick"} className={`${BTN} border border-dashed border-white/20 text-white/70 hover:border-brand/60 hover:text-brand transition-colors`} data-testid={`live-pick-${station.id}`}>
+            <ListPlus className="h-4 w-4 shrink-0" aria-hidden="true" /> Anderes Spiel aufrufen
+          </button>
+          {panel === "pick" ? (
+            <ul className="tls-live-reveal mt-2 max-h-80 space-y-1.5 overflow-y-auto overscroll-contain" data-testid={`live-pick-list-${station.id}`}>
+              {callable.map((entry) => (
+                <li key={entry.match_id}>
+                  <button type="button" disabled={busy} onClick={() => { setPanel(""); onCall(station, entry); }} className="tls-btn tls-btn--secondary flex min-h-[44px] w-full flex-col items-start rounded-sm px-3 py-2 text-left" data-testid={`live-pick-${station.id}-${entry.match_id}`}>
+                    <span className="text-[11px] uppercase tracking-wider text-white/50 [overflow-wrap:anywhere]">{entry.match_id === next?.match_id ? "Als Nächstes · " : ""}{queueWhat(entry)}{when(entry) ? ` · ${when(entry)}` : ""}</span>
+                    <span className="text-sm font-bold normal-case tracking-normal text-white [overflow-wrap:anywhere]">{stationWho(entry)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {after ? (
         <div className="mt-2 text-xs text-white/50 [overflow-wrap:anywhere]" data-testid={`live-after-${station.id}`}>

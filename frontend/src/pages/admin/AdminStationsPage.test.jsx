@@ -200,6 +200,10 @@ test("Live-Knöpfe nur in der Turnierleitung: Link mit Reiter Stationen, hier nu
   expect(screen.queryByText("Spiel zuweisen")).toBeNull();
   expect(screen.queryByText("Freigeben")).toBeNull();
   expect(screen.queryByTestId("station-status-st-1")).toBeNull();
+  // Defekt / Bereit bleibt als Teil der Planung (Admin).
+  apiMock.patch.mockResolvedValue({ data: {} });
+  await userEvent.setup().click(screen.getByTestId("station-broken-st-2"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/stations/st-2", { status: "broken" }));
   expect(screen.getByTestId("stations-plan-schedule")).toBeInTheDocument();
   expect(screen.getByTestId("station-submit")).toBeInTheDocument();
 });

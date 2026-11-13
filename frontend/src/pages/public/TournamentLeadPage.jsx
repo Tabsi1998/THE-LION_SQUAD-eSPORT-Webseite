@@ -163,6 +163,26 @@ export default function TournamentLeadPage() {
     }
   };
 
+  // „Alle freien Stationen aufrufen“ (#1162): nacheinander über denselben Weg wie ein einzelner Aufruf - was schon ein
+  // anderer aufgerufen hat, zählt der Server als Wiederholung; eine Absage nennt die Rückmeldung.
+  const callAll = async (pairs) => {
+    setBusyStation("all");
+    let called = 0;
+    const refused = [];
+    for (const [station, entry] of pairs) {
+      try {
+        await api.post(`/tournaments/${encodeURIComponent(slug)}/live-queue/call`, { station_id: station.id, match_id: entry.match_id });
+        called += 1;
+      } catch (err) {
+        refused.push(`${station.station_text || station.name}: ${formatApiError(err.response?.data?.detail) || "nicht aufgerufen"}`);
+      }
+    }
+    setBusyStation("");
+    if (called) toast.success(`${called === 1 ? "1 Station" : `${called} Stationen`} aufgerufen – die Spieler bekommen Bescheid.`);
+    if (refused.length) toast.error(refused.join(" · "));
+    await Promise.all([loadQueue(), load()]);
+  };
+
   // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen die Entscheidung.
   const keepResult = async (item, note, conflictReason) => {
     setDeciding(true);
@@ -251,6 +271,7 @@ export default function TournamentLeadPage() {
               onRelease={(station, entry) => operateStation("release", station, { match_id: entry.match_id }, releasedText)}
               onBroken={(station, value, extra) => operateStation("broken", station, { broken: value, ...extra }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`))}
               onMove={(station, entry, target) => operateStation("move", station, { match_id: entry.match_id, to_station_id: target.id }, movedText)}
+              onCallAll={callAll}
               onClear={(station) => operateStation("clear", station, {}, (done, where) => (done.idempotent_replay ? `${where} war schon frei.` : `${where} ist geräumt und wieder frei.`))}
             />
             <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>

@@ -30,7 +30,8 @@ from services.change_events import reset_scope_cache
 from services.heat_rebuild import evaluate_after_write
 from services.live_queue import load_live_queue, my_entries
 from services.match_calls import CALL_OPEN_STATUSES
-from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, _unresolved
+from services.match_duration import load_duration_game
+from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, _unresolved, _usable_stations
 from services.station_labels import station_text
 from services.tournament_permissions import (
     STATION_ASSIGN_ROLES,
@@ -226,6 +227,17 @@ async def _audit(db, action: str, tournament_id: str, match: dict, station_id: s
     )
 
 
+async def _fits(db, tournament_id: str, station: dict) -> bool:
+    """Passt die Station zu diesem Turnier - dieselbe Regel wie der Planer (``_usable_stations``): nicht defekt, Spiel
+    der Station gleich dem Spiel des Turniers (oder offen) und ein Gerät, das das Spiel kennt."""
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "id": 1, "game_id": 1}) or {}
+    game = await load_duration_game(db, tournament, extra=("station_devices",))
+    return bool(_usable_stations(tournament, [station], game))
+
+
+NOT_FITTING_DETAIL = "Diese Station passt nicht zum Spiel dieses Turniers (Spiel oder Gerät)."
+
+
 @router.post("/{tid}/live-queue/call")
 async def call_next(tid: str, body: QueueAction, me: dict = Depends(get_current_user)):
     """Aufrufen: Station reservieren, „aufgerufen um“ setzen, „Du bist dran“ an die Spieler (einmal je Aufruf)."""
@@ -245,6 +257,9 @@ async def call_next(tid: str, body: QueueAction, me: dict = Depends(get_current_
             )
             raise HTTPException(status_code=409, detail=f"Das Spiel ist schon an {where} aufgerufen.")
         _check_station(station, match)
+        # Auch ein anderes als das geplante Spiel lässt sich aufrufen (#1162) - nur an einer passenden Station.
+        if not await _fits(db, tournament_id, station):
+            raise HTTPException(status_code=409, detail=NOT_FITTING_DETAIL)
         await _assign_match_to_station(db, station, match, "matches_v2", start_now=False)
     stored = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "called_at": 1}) or {}
     await _audit(db, "match.called", tournament_id, match, station["id"], me["id"])

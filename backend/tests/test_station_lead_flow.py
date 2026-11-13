@@ -447,3 +447,31 @@ async def test_a_shared_station_of_another_tournament_is_not_cleared_from_here(f
     assert refused.status_code == 409 and "dessen Leitung gibt frei" in refused.json()["detail"]
     assert (await station_of(flow, shared))["current_match_id"] == b_match["id"]
     assert b["id"] != a["id"]
+
+
+# ---------------------------------------------------------------- Anderes Spiel aufrufen (#1162, Review M3)
+
+@pytest.mark.asyncio
+async def test_another_ready_match_can_be_called_at_a_free_station_but_only_where_it_fits(flow):
+    _staff, tournament, stations, _players = await on_site(flow, count=8)
+    view = await queue(flow, tournament)
+    nexts = {row["id"]: row["next"]["match_id"] for row in view["stations"]}
+    # Ein bereites Spiel, das nicht „Als Nächstes“ an Station 1 steht.
+    other = next(entry for entry in view["matches"].values()
+                 if entry["ready"] and entry["state"] == "queued" and entry["match_id"] != nexts[stations[0]["id"]])
+    called = await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/call",
+                             json={"station_id": stations[0]["id"], "match_id": other["match_id"]})
+    assert called.status_code == 200, called.text
+    assert (await flow.db.matches_v2.find_one({"id": other["match_id"]}, {"_id": 0}))["station_id"] == stations[0]["id"]
+
+    # Eine Station für ein anderes Spiel (game_id) passt nicht.
+    game = {"id": new_id(), "name": "Anderes Spiel"}
+    await flow.db.games.insert_one(dict(game))
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"game_id": new_id()}})
+    await flow.db.stations.update_one({"id": stations[1]["id"]}, {"$set": {"game_id": game["id"]}})
+    rest = next(entry for entry in view["matches"].values()
+                if entry["ready"] and entry["state"] == "queued" and entry["match_id"] != other["match_id"])
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/call",
+                              json={"station_id": stations[1]["id"], "match_id": rest["match_id"]})
+    assert refused.status_code == 409 and "passt nicht" in refused.json()["detail"]
+    assert not (await flow.db.matches_v2.find_one({"id": rest["match_id"]}, {"_id": 0})).get("called_at")

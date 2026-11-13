@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { StationTile, moveTargets, stationHolds, stationTone } from "./StationTile";
+import { StationTile, callableFor, moveTargets, stationHolds, stationTone } from "./StationTile";
 import { StationQueueBoard } from "./StationQueueBoard";
 
 // Stations-Kachel (#1162): je Zustand Kennzeichen und Knöpfe - frei, aufgerufen, läuft, defekt. Namen sind erfunden.
@@ -136,4 +136,34 @@ test("hängende Station (#1162): „Hängt“ statt „Frei“, kein Aufrufen, �
   expect(screen.queryByTestId("live-call-sh")).toBeNull();
   fireEvent.click(screen.getByTestId("live-clear-sh"));
   expect(onClear).toHaveBeenCalledWith(expect.objectContaining({ id: "sh" }));
+});
+
+test("„Anderes Spiel aufrufen“ (#1162): alle bereiten Spiele, „Als Nächstes“ oben, dann nach Prognose", () => {
+  const matches = {
+    QF1: entry("QF1", { forecast_at: "2026-10-31T17:00:00Z" }),
+    QF5: entry("QF5", { forecast_at: "2026-10-31T16:30:00Z", names: ["Kometa", "Tiramisu"] }),
+    QF6: entry("QF6", { state: "called" }),
+    SF1: entry("SF1", { ready: false }),
+  };
+  const list = callableFor(free, matches);
+  expect(list.map((row) => row.match_id)).toEqual(["QF1", "QF5"]);
+  const handlers = tile(free, { callable: list });
+  fireEvent.click(screen.getByTestId("live-pick-st1"));
+  const picker = screen.getByTestId("live-pick-list-st1");
+  expect(picker).toHaveTextContent("Als Nächstes");
+  fireEvent.click(within(picker).getByTestId("live-pick-st1-QF5"));
+  expect(handlers.onCall).toHaveBeenCalledWith(expect.objectContaining({ id: "st1" }), expect.objectContaining({ match_id: "QF5" }));
+});
+
+test("„Alle freien Stationen aufrufen“ (#1162): mit Anzahl und Rückfrage, nur freie Stationen mit bereitem Spiel", () => {
+  const onCallAll = vi.fn();
+  const second = { ...free, id: "st9", station_text: "Station 9", next: entry("QF9") };
+  render(<StationQueueBoard queue={{ applies: true, stations: [free, second, called, running, brokenEmpty], matches: {}, operate: { all: true, station_ids: [] } }}
+    onCall={vi.fn()} onStart={vi.fn()} onCallAll={onCallAll} />);
+  expect(screen.getByTestId("live-call-all")).toHaveTextContent("Alle freien Stationen aufrufen (2)");
+  fireEvent.click(screen.getByTestId("live-call-all"));
+  expect(onCallAll).not.toHaveBeenCalled();
+  expect(screen.getByTestId("live-call-all-confirm")).toHaveTextContent("2 Stationen aufrufen?");
+  fireEvent.click(screen.getByTestId("live-call-all-yes"));
+  expect(onCallAll).toHaveBeenCalledWith([[expect.objectContaining({ id: "st1" }), expect.objectContaining({ match_id: "QF1" })], [expect.objectContaining({ id: "st9" }), expect.objectContaining({ match_id: "QF9" })]]);
 });
