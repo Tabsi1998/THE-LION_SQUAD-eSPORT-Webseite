@@ -134,10 +134,37 @@ def test_discord_channel_is_opt_in_and_follows_the_topics():
 
 
 def test_achievements_are_a_topic_without_an_email_way():
-    """Erfolge (#568): Thema für In-App, Push und Discord; eine Mail dafür gibt es nicht."""
+    """Erfolge (#568): Thema für In-App, Push, Browser (#1163) und Discord; eine Mail dafür gibt es nicht."""
     categories = {category["key"]: category for category in public_preferences_payload({})["categories"]}
-    assert categories["achievements"]["channels"] == ["in_app", "push", "discord"] and categories["achievements"]["default"] is True
+    assert categories["achievements"]["channels"] == ["in_app", "push", "browser", "discord"] and categories["achievements"]["default"] is True
     assert notification_allowed({"notification_preferences": {}}, "achievement") is True
     assert push_allowed({"notification_preferences": {"push:achievements": False}}, "achievement") is False
     assert discord_allowed({"notification_preferences": {"discord": True}}, "achievement") is True
     assert discord_allowed({"notification_preferences": {"discord": True, "discord:achievements": False}}, "achievement") is False
+
+
+def test_browser_is_its_own_channel_with_the_push_topics():
+    """Browser-Benachrichtigungen (#1163): eigener Kanal „Browser“, an bis zum Abschalten, mit denselben Themen wie Push."""
+    from services.notification_preferences import browser_allowed
+
+    channels = {channel["key"]: channel for channel in public_preferences_payload({})["channels"]}
+    assert channels["browser"]["default"] is True and channels["browser"]["requires_link"] == "web_push"
+    assert browser_allowed({}, "tournament_checkin") is True
+    assert browser_allowed({"notification_preferences": {"browser": False}}, "tournament_checkin") is False
+    assert browser_allowed({"notification_preferences": {"browser:tournament_updates": False}}, "tournament_checkin") is False
+    # Push aus heißt nicht Browser aus - zwei Kanäle.
+    assert browser_allowed({"notification_preferences": {"push": False}}, "tournament_checkin") is True
+    # Pflicht-Meldungen kommen wie bei Push trotzdem.
+    assert browser_allowed({"notification_preferences": {"browser": False}}, "rights_change") is True
+    categories = {category["key"]: category for category in public_preferences_payload({})["categories"]}
+    for topic in ("achievements", "billing_updates", "helper_shifts"):
+        assert "browser" in categories[topic]["channels"]
+    assert "browser" not in categories["achievement_recap"]["channels"]
+
+
+def test_browser_topic_follows_push_until_set_on_its_own():
+    """Browser (#1163): ein Thema, das beim Push aus ist, bleibt im Browser aus - bis die Person es dort selbst setzt."""
+    from services.notification_preferences import browser_allowed
+
+    assert browser_allowed({"notification_preferences": {"push:tournament_updates": False}}, "tournament_checkin") is False
+    assert browser_allowed({"notification_preferences": {"push:tournament_updates": False, "browser:tournament_updates": True}}, "tournament_checkin") is True

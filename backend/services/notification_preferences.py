@@ -31,7 +31,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "label": "Erfolge",
         "description": "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.",
         "default": True,
-        "channels": ["in_app", "push", "discord"],
+        "channels": ["in_app", "push", "browser", "discord"],
     },
     # Rechnungen (#841): „Deine Rechnung ist da“ mit Betrag, Zahlungsziel und Link zum PDF - nur an die Person
     # selbst; Beträge gehen nie über Discord, deshalb gibt es dort keinen Schalter.
@@ -39,7 +39,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "label": "Rechnungen",
         "description": "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF in deinem Konto.",
         "default": True,
-        "channels": ["in_app", "push", "email"],
+        "channels": ["in_app", "push", "browser", "email"],
     },
     "membership_updates": {
         "label": "Vereinsmitgliedschaft",
@@ -83,7 +83,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "label": "Helferdienste",
         "description": "Nur für Vereinsmitglieder: Aufrufe für offene Helferschichten und die Erinnerung am Vortag.",
         "default": True,
-        "channels": ["in_app", "push", "discord"],
+        "channels": ["in_app", "push", "browser", "discord"],
     },
 }
 
@@ -97,6 +97,14 @@ DELIVERY_CHANNEL_PREFERENCES = {
         "label": "Push",
         "description": "Benachrichtigungen auf registrierten Mobilgeräten erhalten.",
         "default": True,
+    },
+    # Browser-Benachrichtigungen (#1163): wie Push, nur im Browser - an, sobald die Person im Browser zugestimmt hat. Ohne
+    # angemeldeten Browser geht dort nichts hinaus, deshalb darf der Kanal von Anfang an an sein.
+    "browser": {
+        "label": "Browser",
+        "description": "Benachrichtigungen im Browser – auch bei geschlossener Website, sobald du dort zugestimmt hast.",
+        "default": True,
+        "requires_link": "web_push",
     },
     "in_app": {
         "label": "In-App",
@@ -287,6 +295,10 @@ def normalized_preferences(user: dict | None) -> dict[str, bool]:
             key = preference_key(channel, topic)
             if key in raw:
                 value = bool(raw[key])
+            elif channel == "browser" and preference_key("push", topic) in raw:
+                # Browser (#1163): solange nichts eigenes gespeichert ist, gilt das Thema wie beim Push - wer es dort
+                # abgeschaltet hat, bekommt es im Browser auch nicht.
+                value = bool(raw[preference_key("push", topic)])
             else:
                 value = bool(prefs.get(topic, meta.get("default", True)))
             if channel == "email" and meta.get("requires_newsletter_consent") and not newsletter:
@@ -321,6 +333,12 @@ def notification_allowed(user: dict | None, kind: str, category: str | None = No
 def push_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
     category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
     return channel_topic_allowed(user, "push", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
+
+
+def browser_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
+    """Browser-Benachrichtigungen (#1163): dieselben Themen wie Push, eigener Kanal „Browser“."""
+    category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
+    return channel_topic_allowed(user, "browser", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
 
 
 def discord_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:

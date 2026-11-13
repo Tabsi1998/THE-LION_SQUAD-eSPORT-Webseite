@@ -339,6 +339,7 @@ export default function ProfilePage() {
                 notificationEnabled={notificationEnabled}
                 notificationTopicEnabled={notificationTopicEnabled}
                 autosave={autosave}
+                user={user}
               />
             )}
 

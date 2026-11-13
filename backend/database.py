@@ -315,6 +315,11 @@ async def init_indexes():
     await db.mobile_push_tokens.create_index([("user_id", 1), ("enabled", 1), ("updated_at", -1)])
     await db.mobile_push_tokens.create_index([("enabled", 1), ("last_ticket_status", 1), ("last_ticket_at", -1)])
     await db.mobile_push_tokens.create_index([("last_receipt_checked_at", -1)])
+    # Browser-Benachrichtigungen (#1163): eine Anmeldung je Browser, gefunden über den Hash der Adresse beim Push-Dienst.
+    await db.web_push_subscriptions.create_index("endpoint_hash", unique=True)
+    await db.web_push_subscriptions.create_index("id", unique=True)
+    await db.web_push_subscriptions.create_index([("user_id", 1), ("updated_at", -1)])
+    await db.web_push_subscriptions.create_index([("user_id", 1), ("session_family", 1)])
     await db.mobile_client_logs.create_index("id", unique=True)
     await db.mobile_client_logs.create_index("received_at")
     await db.mobile_client_logs.create_index([("status", 1), ("level", 1), ("received_at", -1)])

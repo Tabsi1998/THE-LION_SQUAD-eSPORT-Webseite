@@ -8,6 +8,7 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
+import { offerWebPush } from "@/lib/webPush";
 
 // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt. Am Handy ein Blatt
 // von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass die Teamleitung anmeldet (Teamleitungen
@@ -119,7 +120,8 @@ export function PlayAlongSheet({ event, from = "", onClose }) {
       // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
       if ((data?.results || []).some((entry) => entry.state === "registered")) {
         void offerFriendsHint();
-        void offerCalendarHint();
+        // Danach die Frage nach Browser-Benachrichtigungen (#1163).
+        void offerCalendarHint().then(() => offerWebPush());
       }
     });
     if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Die Anmeldung hat nicht geklappt."));
