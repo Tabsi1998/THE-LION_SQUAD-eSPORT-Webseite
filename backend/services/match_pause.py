@@ -11,37 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services.match_timing import OPEN_STATUSES, _parse
-
-
-def _seconds(value) -> int:
-    try:
-        return max(0, int(value or 0))
-    except (TypeError, ValueError):
-        return 0
-
-
-def is_clock_running(match: dict) -> bool:
-    """Läuft die Uhr dieses Spiels? Gestartet und noch offen (ohne Ergebnis)."""
-    return bool(match.get("started_at")) and str(match.get("status") or "pending") in OPEN_STATUSES
-
-
-def overlap_seconds(match: dict, paused_at, now: datetime) -> int:
-    """Wie lange die laufende Pause dieses Spiel angehalten hat - ab Pausenbeginn bzw. ab seinem Start, wenn das später war."""
-    started = _parse(match.get("started_at"))
-    since = _parse(paused_at)
-    if not started or not since:
-        return 0
-    return max(0, int((now - max(started, since)).total_seconds()))
-
-
-def pause_seconds(match: dict, tournament: dict | None, now: datetime) -> int:
-    """Die ganze Pausenzeit eines laufenden Spiels: frühere Pausen plus die laufende (für „über der Zeit“)."""
-    total = _seconds(match.get("paused_seconds"))
-    paused_at = (tournament or {}).get("paused_at")
-    if paused_at and is_clock_running(match):
-        total += overlap_seconds(match, paused_at, now)
-    return total
+from services.match_timing import OPEN_STATUSES, _parse, is_clock_running, whole_seconds, overlap_seconds
 
 
 def clock_pause_fields(match: dict, tournament: dict | None) -> dict:
@@ -50,7 +20,7 @@ def clock_pause_fields(match: dict, tournament: dict | None) -> dict:
     paused_at = (tournament or {}).get("paused_at")
     return {
         "paused_at": paused_at if paused_at and is_clock_running(match) else None,
-        "paused_seconds": _seconds(match.get("paused_seconds")),
+        "paused_seconds": whole_seconds(match.get("paused_seconds")),
     }
 
 

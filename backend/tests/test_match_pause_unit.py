@@ -1,8 +1,8 @@
 """Turnierpause und Spielzeit-Uhr (#1167): reine Rechnung - Pausendauer je Spiel und „über der Zeit“ ohne Pause."""
 from datetime import datetime, timedelta, timezone
 
-from services.match_pause import clock_pause_fields, overlap_seconds, pause_seconds, with_clock_pause
-from services.match_timing import timing
+from services.match_pause import clock_pause_fields, with_clock_pause
+from services.match_timing import overlap_seconds, pause_seconds, timing
 
 START = datetime(2026, 10, 31, 16, 0, tzinfo=timezone.utc)
 

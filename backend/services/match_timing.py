@@ -45,6 +45,38 @@ def registration_name(registration: dict | None) -> str:
     return (registration or {}).get("display_name") or (registration or {}).get("ingame_name") or (registration or {}).get("team_name") or "Teilnehmer"
 
 
+# ---------------------------------------------------------------- Turnierpause (#1167, services/match_pause.py)
+
+def whole_seconds(value) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def is_clock_running(match: dict) -> bool:
+    """Läuft die Uhr dieses Spiels? Gestartet und noch offen (ohne Ergebnis)."""
+    return bool(match.get("started_at")) and str(match.get("status") or "pending") in OPEN_STATUSES
+
+
+def overlap_seconds(match: dict, paused_at, now: datetime) -> int:
+    """Wie lange die laufende Pause dieses Spiel angehalten hat - ab Pausenbeginn bzw. ab seinem Start, wenn das später war."""
+    started = _parse(match.get("started_at"))
+    since = _parse(paused_at)
+    if not started or not since:
+        return 0
+    return max(0, int((now - max(started, since)).total_seconds()))
+
+
+def pause_seconds(match: dict, tournament: dict | None, now: datetime) -> int:
+    """Die ganze Pausenzeit eines laufenden Spiels: frühere Pausen plus die laufende (für „über der Zeit“)."""
+    total = whole_seconds(match.get("paused_seconds"))
+    paused_at = (tournament or {}).get("paused_at")
+    if paused_at and is_clock_running(match):
+        total += overlap_seconds(match, paused_at, now)
+    return total
+
+
 def duration_minutes(match: dict, tournament: dict | None, stage: dict | None = None, game: dict | None = None) -> int:
     return effective_match_duration(match, stage=stage, tournament=tournament, game=game)
 
@@ -58,8 +90,6 @@ def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict |
 
     Turnierpause (#1167): Pausen zählen nicht als Spielzeit - weder bei „läuft N Min.“ noch bei „über der Zeit“; solange
     die Pause läuft, wird kein Ergebnis fällig."""
-    from services.match_pause import pause_seconds
-
     started = _parse(match.get("started_at"))
     paused = timedelta(seconds=pause_seconds(match, tournament, now)) if started else timedelta(0)
     if started:
