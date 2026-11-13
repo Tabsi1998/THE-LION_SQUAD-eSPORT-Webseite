@@ -706,7 +706,17 @@
   font-variant-numeric: tabular-nums;
 }
 .tv-spot__sep { color: var(--tv-faint); }
-.tv-spot__clock { color: var(--tv-live); }
+.tv-spot__clock { color: var(--tv-live); transition: color var(--tls-motion-mid) var(--tls-ease); }
+/* Spielzeit-Uhr (#1167): mit Dauer „/ 20 Min.“ klein daneben; ab 80 % Orange (`warn`), die Farbe gleitet. */
+.tv-spot__limit { color: var(--tv-muted); font-weight: 600; }
+.tv-spot[data-tone="warn"] .tv-spot__clock { color: var(--tls-warn); }
+.tv-spot[data-tone="over"] .tv-spot__clock { color: rgb(12 12 12); background: var(--tls-warn); }
+/* Zeit überschritten (#1167, Fabians Auswahl 07.10.): orange gefüllt mit Warn-Symbol - Rot bleibt „läuft“. Die Füllung
+   hat immer dieselbe Innenkante (negativer Rand), die Farbe gleitet, das Symbol wächst klein herein. */
+.tv-clock-time { display: inline-flex; align-items: center; gap: 0.2em; padding: 0 0.25em; margin-left: -0.25em; border-radius: calc(var(--tv-u) * 0.3);
+  transition: color var(--tls-motion-mid) var(--tls-ease), background-color var(--tls-motion-mid) var(--tls-ease); }
+.tv-clock-icon { width: 0.75em; height: 0.75em; flex: none; stroke-width: 2.5; animation: tv-clock-icon-in var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tv-clock-icon-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 
 /* Goldener Weg (#1119), Fahrten (#1117): auf der Bühne über dem Baum. */
 .tv-tree-overlay { position: absolute; left: 0; top: 0; z-index: 2; overflow: visible; pointer-events: none; }
@@ -1237,13 +1247,15 @@
 .tv-lanes__clock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.5em; color: var(--tv-text); }
 .tv-lanes__time { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-weight: 800; font-variant-numeric: tabular-nums; }
 .tv-lanes__limit { color: var(--tv-muted); }
-.tv-lanes__over { font-weight: 700; color: var(--tv-live); }
+.tv-lanes__over { font-weight: 700; color: var(--tls-warn); }
+/* Spielzeit-Uhr (#1167): Farbe von Zeit und Balken gleitet beim Wechsel zu Orange (80 %) und orange gefüllt (100 %). */
+.tv-lanes__time { transition: color var(--tls-motion-mid) var(--tls-ease); }
 .tv-lanes__clock[data-tone="warn"] .tv-lanes__time { color: var(--tls-warn); }
-.tv-lanes__clock[data-tone="over"] .tv-lanes__time { color: var(--tv-live); }
+.tv-lanes__clock[data-tone="over"] .tv-lanes__time { color: rgb(12 12 12); background: var(--tls-warn); }
 .tv-lanes__track { flex-basis: 100%; height: max(3px, calc(var(--tv-u) * 0.4)); border-radius: 999px; background: var(--tv-line); overflow: hidden; }
-.tv-lanes__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear; }
+.tv-lanes__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear, background-color var(--tls-motion-mid) var(--tls-ease); }
 .tv-lanes__clock[data-tone="warn"] .tv-lanes__track i { background: var(--tls-warn); }
-.tv-lanes__clock[data-tone="over"] .tv-lanes__track i { background: var(--tv-live); }
+.tv-lanes__clock[data-tone="over"] .tv-lanes__track i { background: var(--tls-warn); }
 
 /* ------------------------------------------ Live-Spiele (#1121) */
 .tv-slide-live { height: 100%; min-height: 0; display: grid; gap: calc(var(--tv-u) * 2); padding-top: calc(var(--tv-u) * 1.2); }
@@ -1563,6 +1575,8 @@ td.tv-standings__num--strong { color: #ffffff; font-weight: 800; }
 .tv-hall-stations__grid--small .tv-t-name { font-size: var(--tv-fs-name-min); }
 .tv-hall-station__what { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 calc(var(--tv-u) * 0.8); color: var(--tv-muted); }
 .tv-hall-station__clock { font-weight: 800; color: var(--tv-live); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tv-hall-station__clock[data-tone="warn"] { color: var(--tls-warn); }
+.tv-hall-station__clock[data-tone="over"] { color: rgb(12 12 12); background: var(--tls-warn); }
 .tv-hall-station__clock.tv-gold { color: var(--tv-gold); }
 .tv-hall-station__who { font-weight: 600; }
 .tv-hall-station--free { border-color: color-mix(in srgb, var(--tv-green) 45%, transparent); }

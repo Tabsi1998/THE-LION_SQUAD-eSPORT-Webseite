@@ -168,6 +168,21 @@ def test_schedule_block_with_and_without_d1_rules():
     assert "Verschiebungen entscheidet die Liga-Leitung" in plain_out and "72-h-Regel" not in plain_out
 
 
+def test_home_rule_line_is_named_after_the_set_deadline():
+    """#2406: Die Zeile heißt nach der eingestellten Frist - nicht fest „72-h-Regel“ -, an wie aus; ohne Wert gilt die Vorgabe."""
+    def line(**changes):
+        rules = {**SEASON["schedule_rules"], **changes}
+        return [row for row in facts.render_schedule(facts.schedule_data({**SEASON, "schedule_rules": rules})).split("\n") if "-h-Regel" in row][0]
+    assert line(home_rule_hours=48) == "- 48-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 48 Stunden."
+    assert line(home_rule_hours=72) == "- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden."
+    assert line(home_rule=False, home_rule_hours=48) == "- 48-h-Regel: aus - ohne Einigung gilt der Standardtermin."
+    without = {key: value for key, value in SEASON["schedule_rules"].items() if key != "home_rule_hours"}
+    assert "- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden." in facts.render_schedule(
+        facts.schedule_data({**SEASON, "schedule_rules": without}))
+    assert facts.home_rule_name(48) == "48-h-Regel" and facts.home_rule_name(None) == "72-h-Regel" and facts.home_rule_name(0) == "72-h-Regel"
+    assert facts.home_rule_name("x") == "72-h-Regel" and facts.home_rule_name(1) == "1-h-Regel"
+
+
 def test_schedule_block_names_the_result_reminder_only_when_it_is_on():
     """E.5 (#1647, N9): Ist „Ergebnis fehlt“ für die Season aus, nennt der Regeltext keine Erinnerung - nur „überfällig“."""
     on = facts.render_schedule(facts.schedule_data(SEASON))

@@ -1,7 +1,7 @@
 import { treeSlotLabel } from "@/lib/bracketNames";
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
-import { Trophy } from "lucide-react";
+import { AlertTriangle, Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { describeSlot, initials, isMatchDone, plannedText } from "@/lib/slotSource";
 import { isLiveMatch, matchName, spotlightParts } from "@/lib/tvLive";
@@ -10,6 +10,8 @@ import { isDuelMatch } from "@/lib/tvGrid";
 import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { DELAY_SHOWN_FROM, forecastText } from "@/lib/tvForecast";
 import { nameFit, treeScale } from "@/lib/tvType";
+import { serverNow } from "@/seasons/clock";
+import { useSeason } from "@/seasons/SeasonContext";
 import { useTv } from "./TvScreen";
 
 // Eine Karte im Turnierbaum am TV (#1115-#1119): Duell oder Durchgang, Namen in TV-Größe (nie „…“), laufende Spiele atmen
@@ -61,16 +63,35 @@ export function useSecondTick() {
   return useSyncExternalStore(subscribeClock, currentSecond, currentSecond);
 }
 
-/** Station und Spielzeit eines laufenden Spiels, sekundengenau („PC 3 · 12:34“, ohne Startzeit „Live“). */
-export function TvSpotlight({ match, className = "", testPrefix = "tv-spot" }) {
+/**
+ * Jetzt nach der Serverzeit (ms), jede Sekunde neu (#1167): Spielzeit-Uhren und Aufruf-Countdowns zählen so wie Handy und
+ * Leitung, auch wenn die Uhr des TV danebenliegt (Abstand aus dem Saison-Kontext).
+ */
+export function useServerTick() {
+  const { serverOffset } = useSeason();
   const second = useSecondTick();
-  const parts = spotlightParts(match, second * 1000);
+  return serverNow(serverOffset, second * 1000);
+}
+
+/**
+ * Station und Spielzeit eines laufenden Spiels, sekundengenau („PC 3 · 12:34“, ohne Startzeit „Live“). Dieselbe Uhr wie
+ * an Station und Leitung (#1167, lib/matchClock): nach der Serverzeit, mit Dauer „/ 20 Min.“, ab 80 % orange, ab 100 %
+ * orange gefüllt mit Warn-Symbol. Ruhig bleibt die Zeit rot - das heißt hier „läuft“.
+ */
+export function TvSpotlight({ match, className = "", testPrefix = "tv-spot" }) {
+  const { motionOn } = useTv();
+  const now = useServerTick();
+  const parts = spotlightParts(match, now, { stepped: !motionOn });
   return (
-    <div className={`tv-spot ${className}`} data-testid={`${testPrefix}-${match.id}`}>
+    <div className={`tv-spot ${className}`} data-testid={`${testPrefix}-${match.id}`} data-tone={parts.tone}>
       <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" />
       {parts.station ? <span className="tv-spot__station">{parts.station}</span> : null}
       {parts.station ? <span className="tv-spot__sep" aria-hidden="true">·</span> : null}
-      <span className="tv-spot__clock" data-testid={`${testPrefix}-clock-${match.id}`}>{parts.clock || "Live"}</span>
+      <span className="tv-spot__clock tv-clock-time" data-testid={`${testPrefix}-clock-${match.id}`} role={parts.clock ? "timer" : undefined} aria-label={parts.label || undefined}>
+        {parts.tone === "over" ? <AlertTriangle className="tv-clock-icon" aria-hidden="true" data-testid={`${testPrefix}-warn-${match.id}`} /> : null}
+        {parts.clock || "Live"}
+      </span>
+      {parts.limit ? <span className="tv-spot__limit tv-t-meta">/ {parts.limit}</span> : null}
     </div>
   );
 }

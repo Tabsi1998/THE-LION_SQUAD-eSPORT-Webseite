@@ -6,6 +6,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import { formatMatchStatus, stationText } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
+import { InlineMatchClock } from "@/components/tls/live/MatchClock";
 import { MOTION, motionAllowed } from "@/lib/motion";
 import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
@@ -67,24 +68,18 @@ function isByeSlot(slot) {
   return ["bye", "walkover"].includes(String(slot?.status || "").toLowerCase()) || String(slot?.source?.type || "") === "bye";
 }
 
-/** Spielzeit seit dem Start, jede Sekunde neu - nur diese Zahl rendert neu, nicht der Baum. */
-export function LiveClock({ startedAt }) {
-  const start = startedAt ? asInstant(startedAt).getTime() : NaN;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (Number.isNaN(start)) return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [start]);
-  if (Number.isNaN(start)) return null;
-  const seconds = Math.max(0, Math.floor((now - start) / 1000));
-  const minutes = Math.floor(seconds / 60);
-  const text = `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  return <span className="font-display tabular-nums" data-testid="bracket-live-clock">{text}</span>;
+/**
+ * Spielzeit seit dem Start, jede Sekunde neu - nur diese Zahl rendert neu, nicht der Baum. Dieselbe Uhr wie an Station,
+ * Leitung und TV (#1167, lib/matchClock): nach der Serverzeit, ab einer Stunde mit Stunden („1:05:12“), mit Dauer ab
+ * 80 % orange und ab 100 % orange gefüllt mit Warn-Symbol.
+ */
+export function LiveClock({ startedAt, durationMinutes = null, pausedAt = null, pausedSeconds = 0 }) {
+  return <InlineMatchClock startedAt={startedAt} durationMinutes={durationMinutes} pausedAt={pausedAt} pausedSeconds={pausedSeconds} />;
 }
 
 function LiveStatus({ match }) {
   const finished = useContext(FinishedContext);
+  const duration = useContext(DurationContext)(match);
   const status = String(match?.status || "").toLowerCase();
   if (finished && !isDone(match)) return <span className="text-quiet" data-testid="bracket-not-played">nicht gespielt</span>;
   if (!finished && isLive(match)) {
@@ -96,7 +91,7 @@ function LiveStatus({ match }) {
       <span className="flex min-w-0 items-center gap-1.5 text-live" data-live="1">
         <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-live tv-live-dot" aria-hidden="true" />
         <span className="min-w-0 truncate" title={label}>{label}</span>
-        {match.started_at ? <span className="shrink-0 tabular-nums">{"· "}<LiveClock startedAt={match.started_at} /></span> : null}
+        {match.started_at ? <span className="shrink-0 tabular-nums">{"· "}<LiveClock startedAt={match.started_at} durationMinutes={duration} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></span> : null}
       </span>
     );
   }

@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { asInstant } from "@/lib/vienna";
-import { matchClock, queueSummaryLine } from "@/lib/liveQueue";
+import { queueSummaryLine } from "@/lib/liveQueue";
+import { clockLabel, matchClock } from "@/lib/matchClock";
 import { countdown } from "@/lib/tvCalls";
 import { laneSignature, queueLanes, queueNextLine, queueWhat, queueWho } from "@/lib/tvQueue";
 import { MOTION } from "@/lib/motion";
 import { useTv } from "./TvScreen";
-import { useSecondTick } from "./TvTreeNode";
+import { useServerTick } from "./TvTreeNode";
 
 // Live-Warteschlange je Station am Turnierbaum-TV (#1634): die Folie „Aufrufe“ zeigt, sobald das Turnier vor Ort eine
-// Warteschlange hat, jede Station als Bahn - „Jetzt“ mit Spiel, Namen und Spielzeit-Uhr (wie lib/liveQueue.matchClock,
-// gelb ab 80 %, rot ab 100 %), daneben „Als Nächstes“: aufgerufen mit Frist und Countdown oder geplant mit Prognose und
+// Warteschlange hat, jede Station als Bahn - „Jetzt“ mit Spiel, Namen und Spielzeit-Uhr (lib/matchClock, nach der
+// Serverzeit, orange ab 80 %, ab 100 % orange gefüllt mit Warn-Symbol), daneben „Als Nächstes“: aufgerufen mit Frist und Countdown oder geplant mit Prognose und
 // Verzug. Die Aufrufe stecken darin (das nächste Spiel einer Station, gold). Wechselt etwas an einer Station, gleitet der
 // alte Inhalt nach oben weg und der neue von unten herein - Station für Station versetzt, nur Verschieben und Deckkraft.
 // „Bewegung reduzieren“: sofort der neue Stand, kein Gleiten. Ab drei Stationen in zwei Spalten, mehr als sechs blättern
@@ -56,15 +58,24 @@ function useSwap(key, value, motionOn) {
   return leaving;
 }
 
-/** Spielzeit: „12:34“ groß, „/ 12 Min.“ klein, darunter der Balken (nur Skalieren). Ohne Startzeit „läuft“. */
+/**
+ * Spielzeit: „12:34“ groß, „/ 12 Min.“ klein, darunter der Balken (nur Skalieren). Ohne Startzeit „läuft“. Gezählt nach
+ * der Serverzeit (#1167) - der TV zeigt dieselbe Sekunde wie Handy und Leitung, auch wenn seine Uhr danebenliegt. Ab 80 %
+ * orange, ab 100 % orange gefüllt mit Warn-Symbol (Rot bleibt „läuft“).
+ */
 export function TvQueueClock({ entry, testId }) {
   const { motionOn } = useTv();
-  const second = useSecondTick();
-  const info = matchClock(entry?.started_at, entry?.duration_minutes, second * 1000, { stepped: !motionOn });
+  const now = useServerTick();
+  const info = matchClock(entry?.started_at, entry?.duration_minutes, now, {
+    stepped: !motionOn, pausedAt: entry?.paused_at, pausedSeconds: entry?.paused_seconds,
+  });
   if (!info) return <span className="tv-lanes__clock tv-t-info" data-testid={testId} data-tone="none">läuft</span>;
   return (
-    <span className="tv-lanes__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={info.limit ? `Spielzeit ${info.text} von ${info.limit}` : `Spielzeit ${info.text}`}>
-      <span className="tv-lanes__time font-display">{info.text}</span>
+    <span className="tv-lanes__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={clockLabel(info)}>
+      <span className="tv-lanes__time tv-clock-time font-display">
+        {info.tone === "over" ? <AlertTriangle className="tv-clock-icon" aria-hidden="true" data-testid={testId ? `${testId}-warn` : undefined} /> : null}
+        {info.text}
+      </span>
       {info.limit ? <span className="tv-lanes__limit tv-t-meta">/ {info.limit}</span> : null}
       {info.tone === "over" && info.overMinutes ? <span className="tv-lanes__over tv-t-meta">+{info.overMinutes} Min.</span> : null}
       {info.ratio !== null ? (
@@ -74,11 +85,11 @@ export function TvQueueClock({ entry, testId }) {
   );
 }
 
-/** „noch 1:23“ bis zur Frist eines Aufrufs - bei 0 „jetzt“. */
+/** „noch 1:23“ bis zur Frist eines Aufrufs - bei 0 „jetzt“. Nach der Serverzeit (#1167), wie die Frist selbst. */
 function CallLeft({ entry, ghost }) {
-  const second = useSecondTick();
+  const now = useServerTick();
   if (!entry?.report_by) return null;
-  const left = countdown(asInstant(entry.report_by).getTime(), second * 1000);
+  const left = countdown(asInstant(entry.report_by).getTime(), now);
   return <span className="tv-lanes__left font-display" data-testid={ghost ? undefined : `tv-queue-left-${entry.match_id}`}>{left.done ? "jetzt" : `noch ${left.text}`}</span>;
 }
 

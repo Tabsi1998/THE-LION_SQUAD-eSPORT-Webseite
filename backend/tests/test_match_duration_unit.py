@@ -190,6 +190,21 @@ def test_the_result_timer_knows_stage_and_game():
     assert timing(match, {}, now, stage={"settings": {"duration_minutes": 10}})["overdue_minutes"] == 4
 
 
+def test_the_lead_clock_gets_the_duration_it_is_measured_against():
+    """Spielzeit-Uhr der Leitung (#1167): „12:06 / 20 Min.“ zeigt dieselbe Dauer, mit der „über der Zeit“ rechnet -
+    samt Phase, Game und Puffer. Ohne Startzeit (wartet an der Station) gibt es keine."""
+    from datetime import datetime, timedelta, timezone
+
+    from services.match_timing import timing
+
+    start = datetime(2026, 10, 31, 10, 0, tzinfo=timezone.utc)
+    match = {"started_at": start.isoformat(), "status": "in_progress", "station_id": "s1"}
+    now = start + timedelta(minutes=5)
+    assert timing(match, {}, now, game=MK8)["duration_minutes"] == 12
+    assert timing(match, {"match_buffer_minutes": 5}, now, stage={"settings": {"duration_minutes": 10}})["duration_minutes"] == 15
+    assert timing({"status": "ready", "station_id": "s1"}, {}, now)["duration_minutes"] is None
+
+
 # Puffer je Spiel (#1557): die Turnierleitung legt etwas Luft auf jede Dauer - aus Spiel, Phase, Turnier oder Vorgabe.
 # Eine Dauer am Spiel selbst ist die ganze Dauer (wie bisher) und bekommt keinen Puffer.
 def test_the_buffer_comes_on_top_of_game_stage_tournament_and_default():

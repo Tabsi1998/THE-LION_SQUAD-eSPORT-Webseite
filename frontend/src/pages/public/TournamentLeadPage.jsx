@@ -16,6 +16,7 @@ import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
+import { MatchClock } from "@/components/tls/live/MatchClock";
 import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
 import { NoticeComposer } from "@/components/tls/tournament/NoticeComposer";
 
@@ -483,8 +484,11 @@ function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, mov
   );
 }
 
+// Ein laufendes Spiel trägt die Spielzeit-Uhr (#1167) - dieselbe wie an der Station, mit der Dauer, mit der der Server
+// „über der Zeit“ rechnet. Sie ersetzt „läuft 12 Min.“; fehlt das Ergebnis schon, bleibt der Hinweis darunter stehen.
 function LeadRow({ item, onEnter }) {
   const missing = Boolean(item.timing?.missing);
+  const clocked = Boolean(item.started_at) && item.timing?.running_minutes != null && item.status !== "disputed";
   const held = item.hold;
   return (
     <div className={`flex items-center gap-3 rounded-sm border p-3 ${missing ? "border-[#FFD700]/45 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`} data-testid={`lead-row-${item.id}`} data-missing={missing ? "true" : "false"}>
@@ -494,10 +498,15 @@ function LeadRow({ item, onEnter }) {
       <div className="min-w-0 flex-1">
         <div className="text-sm font-bold text-white truncate">{item.stage_name ? `${item.stage_name} · ` : ""}{item.label}</div>
         <div className="text-xs text-white/55 truncate">{leadNames(item)}</div>
-        <div className={`mt-0.5 flex items-center gap-1 text-[11px] ${missing ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`lead-line-${item.id}`}>
-          {item.timing?.running_minutes != null ? <Radio className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-          {leadLine(item, (value) => formatWhen(value))}
-        </div>
+        {clocked ? (
+          <MatchClock size="sm" startedAt={item.started_at} durationMinutes={item.timing?.duration_minutes} pausedAt={item.paused_at} pausedSeconds={item.paused_seconds} testId={`lead-clock-${item.id}`} className="mt-1" />
+        ) : null}
+        {!clocked || missing ? (
+          <div className={`mt-0.5 flex items-center gap-1 text-[11px] ${missing ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`lead-line-${item.id}`}>
+            {item.timing?.running_minutes != null ? <Radio className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+            {leadLine(item, (value) => formatWhen(value))}
+          </div>
+        ) : null}
       </div>
       {held ? (
         <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid={`lead-held-${item.id}`}>{held.mine ? "gespeichert" : `${held.actor_name} trägt ein`}</span>

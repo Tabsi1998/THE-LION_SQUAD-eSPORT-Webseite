@@ -34,6 +34,7 @@ from services.advancement_draw import (
     match_mode,
 )
 from services.match_result_errors import MatchResultError
+from services.match_timing import FRESH_CLOCK
 from services.round_labels import section_kind
 
 # Derselbe Fehler, unter dem Namen, unter dem ihn der Graph-Zweig eingeführt hat.
@@ -1347,6 +1348,8 @@ def _pairing_reset_fields(match: dict, now_iso: str) -> dict:
     return {
         "reports": [],
         "started_at": None,
+        # Spielzeit-Uhr (#1167): Pausen gehörten zum alten Start - ein Neustart zählt ab 0 ohne Abzug.
+        **FRESH_CLOCK,
         "called_at": None,
         # Frist „nicht erschienen“ (#1551): Vorschlag und Verlängerung gehörten zur alten Paarung.
         "no_show_proposal": None,

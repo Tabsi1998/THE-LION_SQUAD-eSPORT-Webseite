@@ -575,7 +575,7 @@ def _proposal_time_hints(tournament: dict | None, match: dict, moments: list[dat
         return []
     last = window.end - timedelta(minutes=1)
     text = (f"Liegt außerhalb der Spielwoche ({league_schedule.when_text(window.start)} bis {league_schedule.when_text(last)}) – "
-            "gilt nur, wenn die Gegenseite annimmt" + ("; die 72-h-Regel greift hier nicht." if rules.get("home_rule") else "."))
+            "gilt nur, wenn die Gegenseite annimmt" + (f"; die {league_schedule.home_rule_name(rules.get('home_rule_hours'))} greift hier nicht." if rules.get("home_rule") else "."))
     return [{"index": index, "detail": text} for index, raw in enumerate(moments)
             if not window.contains(raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc))]
 

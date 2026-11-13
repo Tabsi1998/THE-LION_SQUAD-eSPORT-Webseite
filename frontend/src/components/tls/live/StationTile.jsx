@@ -133,7 +133,7 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
         <div className="mt-3" data-testid={`live-running-${station.id}`}>
           <div className="text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
           <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
-          <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} testId={`live-clock-${running.match_id}`} className="mt-2" />
+          <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} pausedAt={running.paused_at} pausedSeconds={running.paused_seconds} testId={`live-clock-${running.match_id}`} className="mt-2" />
         </div>
       ) : null}
 

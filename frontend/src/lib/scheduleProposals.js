@@ -97,13 +97,19 @@ function offeredMoments(offered) {
   return new Set((offered || []).map((value) => new Date(value).getTime()).filter((moment) => !Number.isNaN(moment)));
 }
 
+/** Der Name der Regel nach der eingestellten Frist (#2406): „48-h-Regel“; ohne gültigen Wert die Vorgabe 72 (wie am Server). */
+export function homeRuleName(hours) {
+  const count = Math.trunc(Number(hours));
+  return `${count > 0 ? count : 72}-h-Regel`;
+}
+
 /**
  * Hinweise schon beim Eingeben (#2325): In einer Staffel mit Terminregeln (`window` aus `schedule_block`) zählt ein Termin
  * außerhalb der Spielwoche nicht für die 72-h-Regel - er gilt nur, wenn die Gegenseite annimmt; die 72-h-Regel nennt der Satz nur,
  * wenn sie an ist (`homeRule` aus `schedule_block.rules.home_rule`). Im Gegenvorschlag steht bei einem angebotenen Termin
  * (`offered`) schon vor dem Absenden, dass er zur Auswahl steht. Dieselben Sätze wie am Server.
  */
-export function proposalTimeHints(values, { window = null, weekLabel = "", homeRule = true, offered = [] } = {}) {
+export function proposalTimeHints(values, { window = null, weekLabel = "", homeRule = true, homeRuleHours = null, offered = [] } = {}) {
   const start = window?.start ? new Date(window.start).getTime() : null;
   const end = window?.end ? new Date(window.end).getTime() : null;
   const already = offeredMoments(offered);
@@ -112,7 +118,7 @@ export function proposalTimeHints(values, { window = null, weekLabel = "", homeR
     if (!Number.isNaN(moment) && already.has(moment)) return OFFERED_TIME_TEXT;
     if (Number.isNaN(moment) || start === null || end === null || (moment >= start && moment < end)) return null;
     const week = weekLabel ? ` (${weekLabel})` : "";
-    return `Liegt außerhalb der Spielwoche${week} – gilt nur, wenn die Gegenseite annimmt${homeRule ? "; die 72-h-Regel greift hier nicht." : "."}`;
+    return `Liegt außerhalb der Spielwoche${week} – gilt nur, wenn die Gegenseite annimmt${homeRule ? `; die ${homeRuleName(homeRuleHours)} greift hier nicht.` : "."}`;
   });
 }
 
