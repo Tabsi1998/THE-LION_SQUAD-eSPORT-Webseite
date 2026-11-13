@@ -20,6 +20,7 @@ Captains und Vertreter (Vorgabe) oder alle Spieler der Season, einer Liga N oder
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime
 
@@ -550,6 +551,14 @@ async def preview(db, season: dict, *, audience: str, scope: str, scope_id: str 
     return {"recipients": len(ids), "scope_label": label, "audience_label": AUDIENCE_LABELS[audience]}
 
 
+OTHER_TEXT = "Betreff oder Text weichen von der begonnenen Nachricht ab. Bitte eine neue Rundnachricht starten."
+
+
+def text_digest(title: str, text: str) -> str:
+    """Fingerabdruck von Betreff und Text (sha256) - im Protokolleintrag steht nie der Text selbst."""
+    return hashlib.sha256(f"{title}\n{text}".encode("utf-8")).hexdigest()
+
+
 def _claim_id(season_id: str, request_id: str) -> str:
     return f"league-broadcast:{season_id}:{request_id}"
 
@@ -572,15 +581,19 @@ async def send(db, season: dict, me: dict, *, request_id: str, title, text, audi
     text = clean_text(text, TEXT_MIN, TEXT_MAX, "Nachricht")
     claim = _claim_id(season["id"], request_id)
     moment = now or now_utc()
-    earlier = await db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1})
+    earlier = await db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1, "actor_id": 1})
     if earlier:
-        return await _replay(db, season, me, claim, earlier.get("data") or {}, title, text, moment)
+        data = earlier.get("data") or {}
+        if data.get("text_sha256") and data["text_sha256"] != text_digest(title, text):
+            raise BroadcastProblem(OTHER_TEXT, 409)
+        # Fortgesetzt wird im Namen der Person, die begonnen hat: Sie bleibt aus dem Kreis heraus, wer auch fortsetzt.
+        return await _replay(db, season, {"id": earlier.get("actor_id")}, claim, data, title, text, moment)
     ids, label = await recipients(db, season, audience=audience, scope=scope, scope_id=scope_id, sender_id=me.get("id"))
     if not ids:
         raise BroadcastProblem("In diesem Kreis gibt es niemanden, der die Nachricht bekommen kann.", 409)
     # Ohne Namen und ohne den Text: Kreis, Zahl, Mail ja/nein, Länge, Fortschritt - der Absender steht als ``actor_id`` dabei.
     data = {"season_id": season["id"], "request_id": request_id, "audience": audience, "scope": scope, "scope_id": scope_id,
-            "scope_label": label, "recipients": len(ids), "mail": bool(mail), "length": len(text), "state": "sending",
+            "scope_label": label, "recipients": len(ids), "mail": bool(mail), "length": len(text), "text_sha256": text_digest(title, text), "state": "sending",
             "processed": 0, "delivered": 0, "mailed": 0, "progress_at": moment.isoformat()}
     try:
         await db.audit_logs.insert_one({"id": claim, "action": "league.broadcast", "actor_id": me.get("id"), "target_id": season["id"],

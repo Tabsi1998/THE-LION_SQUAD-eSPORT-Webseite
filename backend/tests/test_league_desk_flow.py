@@ -571,6 +571,34 @@ async def test_broadcast_mail_follows_the_tournament_updates_setting_and_counts_
 
 
 @pytest.mark.asyncio
+async def test_continuing_needs_the_same_text_and_keeps_the_original_sender_out(flow):
+    """N-b: Im Eintrag steht ein sha256 über Betreff und Text, nie der Text. Ein Fortsetzen mit anderem Text gibt 409; fortgesetzt wird im
+    Namen der Person, die begonnen hat - sie bleibt aus dem Kreis heraus, auch wenn jemand anderes fortsetzt."""
+    world = await desk_world(flow)
+    sender = world["users"]["Kapitaen"]
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "liga", "user_id": sender["id"], "capabilities": ["season"],
+                                           "created_at": now_utc().isoformat()})
+    request_id = new_id()
+    first = await send(flow, world, sender, request_id=request_id, audience="players", scope="staffel", scope_id=world["tournament"]["id"])
+    assert first.status_code == 200 and first.json()["recipients"] == 7
+    claim = f"league-broadcast:{world['season_id']}:{request_id}"
+    entry = await flow.db.audit_logs.find_one({"id": claim}, {"_id": 0})
+    assert len(entry["data"]["text_sha256"]) == 64 and "Check-in" not in str(entry), "nur der Fingerabdruck, nie der Text"
+    # Nachgestellt: abgebrochen, bevor Mila an der Reihe war.
+    await flow.db.notifications.delete_many({"user_id": world["users"]["Mila"]["id"], "kind": "league_broadcast"})
+    await flow.db.audit_logs.update_one({"id": claim}, {"$set": {"data.state": "interrupted"}})
+
+    other = await send(flow, world, request_id=request_id, text="Ganz anderer Text für alle Spieler.")
+    assert other.status_code == 409 and "neue Rundnachricht" in other.json()["detail"]
+    assert await inbox(flow, world, "Mila") == []
+
+    resumed = await send(flow, world, request_id=request_id)
+    assert resumed.status_code == 200 and resumed.json()["resumed"] is True
+    assert len(await inbox(flow, world, "Mila")) == 1
+    assert await inbox(flow, world, "Kapitaen") == [], "wer begonnen hat, bekommt sie auch beim Fortsetzen durch andere nicht"
+
+
+@pytest.mark.asyncio
 async def test_a_parallel_delivery_loses_on_the_unique_key_and_sends_no_push(flow, monkeypatch):
     """N-a: Die Rundnachricht trägt ``unique_dedupe``. Hat ein paralleler Lauf die Zeile schon geschrieben (nachgestellt: die Prüfung
     sieht sie nicht), verliert dieser Lauf am Teilindex und schickt weder Push noch Direktnachricht."""
