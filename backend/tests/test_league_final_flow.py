@@ -651,3 +651,43 @@ async def test_the_write_functions_refuse_a_closed_staffel_even_without_a_route(
         await result_hold.hold_result(flow.db, match, rows, actor=admin, note=None, proof_url=None, force=True, reason="Korrektur")
     assert {submit.value.status_code, undo.value.status_code, hold.value.status_code} == {409}
     assert all(CLOSED_DETAIL in str(error.value) for error in (submit, undo, hold))
+
+
+# ---------------------------------------------------------------- Meister nur unter den Aktiven (M1)
+
+@pytest.mark.asyncio
+async def test_a_leader_who_left_is_not_champion_the_best_active_team_is(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"scoring_rules.exit_rule": "half"}})
+    await play_all(flow, staffel)
+    await flow.db.tournament_registrations.update_one({"id": "reg-1"}, {"$set": {"status": "withdrawn", "withdrawn_at": LONG_AGO}})
+    row = await cockpit(flow, season, staffel)
+    assert [(item["registration_id"], item["rank"], bool(item.get("exit"))) for item in row["standings"]][:2] == [("reg-1", 1, True), ("reg-2", 2, False)]
+    assert row["blockers"] == [] and row["champion"]["registration_id"] == "reg-2"
+    await must_close(flow, staffel)
+    stored = await flow.db.league_final_tables.find_one({"tournament_id": staffel["id"]}, {"_id": 0})
+    assert stored["champion"]["registration_id"] == "reg-2"
+    award = await flow.db.tournament_awards.find_one({"tournament_id": staffel["id"]}, {"_id": 0})
+    assert award["registration_id"] == "reg-2"
+
+
+@pytest.mark.asyncio
+async def test_two_active_teams_level_behind_a_leader_who_left_need_a_decision_and_no_active_team_blocks(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"scoring_rules.exit_rule": "half"}})
+    winners = await tie_on_top(flow, staffel)
+    # Ein dritter Sieger gibt es nicht: Einer der beiden Sieger steigt aus - dann stehen die Verlierer als beste Aktive nicht vorn.
+    await flow.db.tournament_registrations.update_one({"id": winners[0]}, {"$set": {"status": "withdrawn", "withdrawn_at": LONG_AGO}})
+    row = await cockpit(flow, season, staffel)
+    assert row["blockers"] == [] and row["champion"]["registration_id"] == winners[1]
+    # Steigt auch der zweite aus, stehen die beiden Verlierer gleich - ohne Entscheid kein Meister.
+    await flow.db.tournament_registrations.update_one({"id": winners[1]}, {"$set": {"status": "withdrawn", "withdrawn_at": LONG_AGO}})
+    row = await cockpit(flow, season, staffel)
+    assert [(blocker["code"], blocker["label"]) for blocker in row["blockers"]] == [("champion_tie", "Gleichstand um den Meistertitel")]
+    assert row["ties"][0]["rank"] == 3 and row["champion"] is None
+    await must_close(flow, staffel, 409)
+    # Niemand mehr in der Wertung: eigener Sperrgrund statt eines stillen Abschlusses ohne Meister.
+    await flow.db.tournament_registrations.update_many({"tournament_id": staffel["id"]}, {"$set": {"status": "withdrawn", "withdrawn_at": LONG_AGO}})
+    row = await cockpit(flow, season, staffel)
+    assert [blocker["code"] for blocker in row["blockers"]] == ["no_champion"]
+    await must_close(flow, staffel, 409)

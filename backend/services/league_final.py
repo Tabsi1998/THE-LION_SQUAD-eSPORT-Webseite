@@ -136,12 +136,22 @@ def running_deadlines(match: dict, tournament: dict, settings: dict, now: dateti
     return out
 
 
+def leaders(rows: list[dict]) -> list[dict]:
+    """Die Teams auf dem besten Platz unter denen, die noch in der Wertung stehen. Ausgeschiedene zählen nicht mit - auch wenn sie
+    rechnerisch vorn stehen (Regel ``half``: Das ausgetretene Team behält seine Punkte, Meister wird es nicht)."""
+    active = [row for row in rows if not row.get("exit") and int(row.get("rank") or 0) > 0]
+    if not active:
+        return []
+    best = min(int(row["rank"]) for row in active)
+    return [row for row in active if int(row["rank"]) == best]
+
+
 def champion_ties(rows: list[dict]) -> list[dict]:
-    """Echter Gleichstand auf Platz 1 (Nr. 156) - unter den Teams, die noch in der Wertung stehen."""
-    first = [row for row in rows if int(row.get("rank") or 0) == 1 and not row.get("exit")]
+    """Echter Gleichstand um den Meistertitel (Nr. 156) - unter den Teams, die noch in der Wertung stehen."""
+    first = leaders(rows)
     if len(first) < 2:
         return []
-    return [{"rank": 1, "registration_ids": [row["registration_id"] for row in first],
+    return [{"rank": int(first[0]["rank"]), "registration_ids": [row["registration_id"] for row in first],
              "names": [row.get("display_name") or "Team" for row in first], "points": first[0].get("points")}]
 
 
@@ -220,9 +230,12 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
     # Ohne gewertetes Spiel stehen alle gleich - das ist kein Gleichstand, den jemand entscheiden soll.
     if decisive and rows is not None and not any(row["code"] == "no_matches" for row in out):
         ties = champion_ties(rows)
+        if not ties and not champion_of(rows):
+            out.append(_blocker("no_champion", "Kein Meister", "In der obersten Liga steht kein Team mehr in der Wertung - ohne Meister "
+                                "gibt es keinen Abschluss. Bitte die Anmeldungen prüfen.", []))
         if ties:
             out.append(_blocker(
-                "champion_tie", "Gleichstand auf Platz 1",
+                "champion_tie", "Gleichstand auf Platz 1" if ties[0]["rank"] == 1 else "Gleichstand um den Meistertitel",
                 "Der Meister steht nicht fest: Vor dem Abschluss braucht es einen begründeten Entscheid (Entscheidungsspiel, Los oder Leitung).",
                 [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in ties]))
     return out
@@ -245,8 +258,8 @@ async def top_division_id(db, season_id: str | None) -> str | None:
 
 
 def champion_of(rows: list[dict]) -> dict | None:
-    """Der Meister aus der Tabelle: das eine Team auf Platz 1, das noch in der Wertung steht."""
-    first = [row for row in rows if int(row.get("rank") or 0) == 1 and not row.get("exit")]
+    """Der Meister aus der Tabelle: das beste Team, das noch in der Wertung steht - nur wenn es dort allein steht."""
+    first = leaders(rows)
     if len(first) != 1:
         return None
     row = first[0]
