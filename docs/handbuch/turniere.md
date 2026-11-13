@@ -589,7 +589,8 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
   mit **Umlegen** auf eine freie Station legt – die Kachel und die Rückmeldung sagen es. **Bereit** meldet die Station
   wieder bereit.
 - **Umlegen**: Ein laufendes Spiel behält Startzeit und Uhr; ein aufgerufenes wird an der neuen Station neu aufgerufen,
-  die Spieler bekommen die neue Station.
+  die Spieler bekommen die neue Station. Dabei beginnen „antreten bis“ und die Frist „nicht erschienen“ neu – gezählt
+  ab dem neuen Aufruf. Umgelegt wird nur auf eine freie Station, die zu Spiel und Gerät des Turniers passt.
 - Tippen zwei Leute zugleich, gilt genau ein Tipp; der andere bekommt eine Meldung und sieht den neuen Stand. Jede
   Aktion steht im Protokoll.
 
