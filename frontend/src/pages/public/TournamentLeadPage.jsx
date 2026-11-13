@@ -194,6 +194,8 @@ export default function TournamentLeadPage() {
     if (target) {
       scrolledTo.current = fall;
       target.scrollIntoView?.({ block: "center" });
+      // Review N4: der Fokus geht mit auf die Karte - Tastatur und Screenreader stehen dort, wo der Tipp hinführte.
+      target.focus?.({ preventScroll: true });
     }
   }, [fall, data, activeTab, caseJump]);
 
@@ -459,7 +461,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
   }, []);
   const names = card.pot || [];
   return (
-    <div id={`fall-${card.id}`} className={`rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
+    <div id={`fall-${card.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border border-brand/40 text-brand" aria-hidden="true">
           <Shuffle className="h-5 w-5" />
@@ -506,7 +508,7 @@ function movedText(done, where) {
 function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
   const bad = item.kind === "station_broken";
   return (
-    <div id={`fall-${item.id}`} className={`rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
+    <div id={`fall-${item.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
       <div className="flex items-center gap-3">
         <div className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border text-center text-[10px] font-bold uppercase leading-tight ${bad ? "border-[#FF3B30]/50 text-[#FF6B60]" : "border-[#29B6E8]/40 text-[#29B6E8]"}`}>
           {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}

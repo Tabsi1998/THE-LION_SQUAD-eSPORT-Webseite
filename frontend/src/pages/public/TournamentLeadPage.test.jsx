@@ -453,3 +453,20 @@ test("Cockpit: zweiter Tipp auf denselben Fall springt erneut - auch nach einem 
     window.Element.prototype.scrollIntoView = original;
   }
 });
+
+// Review N4 (#1653): Nach dem Tipp auf ein Problem steht der Fokus auf der geöffneten Fallkarte.
+test("Cockpit: der Tipp auf ein Problem setzt den Fokus auf die Fallkarte", async () => {
+  const queue = { applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, stations: [] };
+  const lead = {
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+    attention: [{ id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 }],
+  };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByTestId("cockpit-problem-rm-m8"));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("lead-case-rm-m8")));
+});
