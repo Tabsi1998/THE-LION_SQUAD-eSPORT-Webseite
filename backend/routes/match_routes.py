@@ -126,6 +126,14 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
 
 
+async def _ensure_staffel_open(db, match: dict) -> None:
+    """Abgeschlossene Liga-Staffel (F.1, #1645): Ergebnis, Stand und Wertung eines Spiels ändert niemand mehr - 409 mit dem Satz,
+    dass erst wieder geöffnet wird. Dieselbe Sperre wie in den Schreibfunktionen (``league_final_read``)."""
+    from services.league_final_read import ensure_not_closed
+
+    await ensure_not_closed(db, match.get("tournament_id"))
+
+
 async def _sees_internal(match: dict, user: dict | None) -> bool:
     """Notizen, Entscheidungs-Begründungen, Einsprüche und Meldungen im Detail sieht nur, wer das Turnier leitet."""
     if not user:
@@ -1505,11 +1513,13 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
     await _require_undisputed_or_both(me, match)
     await league_permissions.require_no_conflict(db, me, match, action="result", conflict_reason=body.conflict_reason, record=False)
     await _ensure_match_tournament_unlocked(db, match)
+    await _ensure_staffel_open(db, match)
     await ensure_tournament_accepts_results(db, match["tournament_id"])
     try:
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
             match, _collection = await _find_match_any(match_id)
             await _ensure_match_tournament_unlocked(db, match)
+            await _ensure_staffel_open(db, match)
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
             await _require_undisputed_or_both(me, match)
@@ -1628,9 +1638,11 @@ async def undo_match_result(match_id: str, body: MatchResultUndo | None = None, 
     conflict_reason = body.conflict_reason if body else None
     await league_permissions.require_no_conflict(db, me, match, action="result_undo", conflict_reason=conflict_reason, record=False)
     await _ensure_match_tournament_unlocked(db, match)
+    await _ensure_staffel_open(db, match)
     try:
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
             match, _collection = await _find_match_any(match_id)
+            await _ensure_staffel_open(db, match)
             await league_permissions.require_no_conflict(db, me, match, action="result_undo", conflict_reason=conflict_reason)
             return await league_procedures.guard(db, await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None)), me)
     except MutationLockBusy:
@@ -1684,6 +1696,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     v2_match = await v2_collection.find_one({"id": match_id}, {"_id": 0}) if v2_collection is not None else None
     if v2_match:
         await _ensure_match_tournament_unlocked(db, v2_match)
+        await _ensure_staffel_open(db, v2_match)
         await require_tournament_staff_permission(
             me, v2_match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id, capability="matches"
         )
@@ -1941,6 +1954,7 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     db = get_db()
     m, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, m)
+    await _ensure_staffel_open(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
     tournament = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"_id": 0})
     stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0}) if m.get("stage_id") else None
@@ -1966,6 +1980,7 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
     db = get_db()
     match, _collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
+    await _ensure_staffel_open(db, match)
     league = await league_games.setup(db, match)
     if not league:
         raise HTTPException(status_code=404, detail="Aufstellungen gibt es nur bei Liga-Spielen.")
@@ -2003,6 +2018,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     # sonst kann ein Turnier im Graph-System nicht vollstaendig gespielt werden.
     m, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, m)
+    await _ensure_staffel_open(db, m)
     acting_reg = await _acting_registration_for_match(m, me)
     if not acting_reg and not await leads_tournament(me, m.get("tournament_id"), "disputes"):
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
@@ -2086,6 +2102,7 @@ async def decide_dispute(match_id: str, body: MatchDisputeDecision, me: dict = D
     await _require_result_permission(me, m, capability="disputes")
     await league_permissions.require_no_conflict(db, me, m, action="dispute_decision", conflict_reason=body.conflict_reason)
     await _ensure_match_tournament_unlocked(db, m)
+    await _ensure_staffel_open(db, m)
     pending = league_procedures.open_rows(m)
     if pending:
         # Liga (#1619, E.2): je Verfahren eine Entscheidung mit Pflichtbegründung - derselbe Weg wie ``/procedures/{id}/decision``.
@@ -2179,5 +2196,6 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     if blocked:
         raise HTTPException(status_code=409, detail=blocked)
     await _ensure_match_tournament_unlocked(db, m)
+    await _ensure_staffel_open(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
     return await league_procedures.guard(db, await _forfeit_v2(db, m, body, me, force), me)

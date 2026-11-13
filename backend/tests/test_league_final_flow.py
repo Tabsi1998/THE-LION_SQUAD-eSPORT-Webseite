@@ -593,3 +593,61 @@ async def test_a_season_set_to_completed_by_hand_is_not_reactivated_by_reopening
     assert opened.json()["season_status"] is None
     assert (await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0}))["status"] == "completed"
     assert admin["id"] != second["id"]
+
+
+# ---------------------------------------------------------------- Nach dem Abschluss schreibt niemand mehr (H1)
+
+CLOSED_DETAIL = "Die Staffel ist abgeschlossen."
+
+
+@pytest.mark.asyncio
+async def test_after_the_close_no_route_changes_a_result_or_status_anymore(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    before = await standings(flow, staffel)
+    await must_close(flow, staffel)
+    match = next(row for row in await matches_of(flow, staffel) if stronger(row) == "reg-1")
+    stored = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    winner, loser = "reg-1", next(slot["registration_id"] for slot in match["slots"] if slot["registration_id"] != "reg-1")
+    turned = {"results": [{"registration_id": loser, "rank": 1, "score": 2}, {"registration_id": winner, "rank": 2, "score": 0}]}
+    calls = {
+        "undo": ("POST", f"/api/matches/{match['id']}/result/undo", {}),
+        "correction": ("POST", f"/api/matches/{match['id']}/result", {**turned, "reason": "Korrektur laut Protokoll"}),
+        "forfeit": ("POST", f"/api/matches/{match['id']}/forfeit", {"forfeit_registration_id": winner, "note": "Nicht angetreten"}),
+        "report": ("POST", f"/api/matches/{match['id']}/report", turned),
+        "incident": ("POST", f"/api/matches/{match['id']}/incidents", {"kind": "disconnect", "position": 1}),
+        "removal": ("POST", f"/api/tournaments/{staffel['id']}/registrations/reg-1/removal", {"kind": "disqualified", "reason": "Verstoß gegen die Regeln"}),
+        "double_no_show": ("POST", f"{STAFFELN}/{staffel['id']}/matches/{match['id']}/double-no-show", {"note": "Beide nicht da"}),
+    }
+    for name, (method, url, body) in calls.items():
+        response = await flow.client.request(method, url, json=body)
+        assert response.status_code == 409, (name, response.status_code, response.text)
+        assert CLOSED_DETAIL in response.json()["detail"] and "wieder öffnen" in response.json()["detail"], (name, response.text)
+    assert await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) == stored
+    assert (await flow.db.tournament_registrations.find_one({"id": "reg-1"}, {"_id": 0}))["status"] == "approved"
+    flow.act_as(None)
+    assert await standings(flow, staffel) == before
+    assert season["id"]
+
+
+@pytest.mark.asyncio
+async def test_the_write_functions_refuse_a_closed_staffel_even_without_a_route(flow):
+    """Die Schreibfunktionen selbst lehnen ab - auch der Job, der ein bereitliegendes Ergebnis veröffentlicht."""
+    from services import result_hold
+    from services.match_v2_results import MatchV2ResultError
+    from services.v2_result_submission import submit_v2_result
+
+    admin, _league, _season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    match = (await matches_of(flow, staffel))[0]
+    rows = [{"registration_id": slot["registration_id"], "rank": index + 1, "score": 2 - 2 * index} for index, slot in enumerate(match["slots"])]
+    with pytest.raises(MatchV2ResultError) as submit:
+        await submit_v2_result(flow.db, match, rows, actor_id=admin["id"], proof_url=None, note=None, force=True, audit_action="match.result.admin",
+                               reason="Korrektur")
+    with pytest.raises(MatchV2ResultError) as undo:
+        await result_hold.undo_result(flow.db, match, actor_id=admin["id"])
+    with pytest.raises(MatchV2ResultError) as hold:
+        await result_hold.hold_result(flow.db, match, rows, actor=admin, note=None, proof_url=None, force=True, reason="Korrektur")
+    assert {submit.value.status_code, undo.value.status_code, hold.value.status_code} == {409}
+    assert all(CLOSED_DETAIL in str(error.value) for error in (submit, undo, hold))

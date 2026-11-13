@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import copy
 
+from fastapi import HTTPException
+
 from services.league_scope import is_league_staffel
+
+CLOSED_LOCK = "Die Staffel ist abgeschlossen. Erst im Reiter „Abschluss“ wieder öffnen, dann korrigieren."
 
 
 def is_closed(tournament: dict | None) -> bool:
@@ -25,3 +29,19 @@ async def frozen_rows(db, tournament: dict | None) -> list[dict] | None:
         return None
     final = await active_final(db, tournament["id"])
     return copy.deepcopy(final.get("rows") or []) if final else None
+
+
+async def closed_refusal(db, tournament_id: str | None) -> str | None:
+    """Die eine Schreibsperre nach dem Abschluss (H1): Ist die Staffel abgeschlossen, der Satz dazu - sonst ``None``. Jeder Weg, der
+    Ergebnis, Stand oder Wertung eines Spiels schreibt, fragt hier, vor und unter der Schreibsperre des Turniers."""
+    if not tournament_id:
+        return None
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "final_table": 1})
+    return CLOSED_LOCK if is_closed(tournament) else None
+
+
+async def ensure_not_closed(db, tournament_id: str | None) -> None:
+    """409 mit ``CLOSED_LOCK``, wenn die Staffel abgeschlossen ist - für Routen."""
+    refusal = await closed_refusal(db, tournament_id)
+    if refusal:
+        raise HTTPException(status_code=409, detail=refusal)

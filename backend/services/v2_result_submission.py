@@ -253,6 +253,13 @@ async def submit_v2_result(
 
     Jeder Weg schreibt hier und prüft hier denselben Vertrag (services/match_v2_results): die Werte samt Best-of und,
     hat das Spiel schon ein Ergebnis, Korrektur nur mit ``force`` und Grund."""
+    # Abgeschlossene Liga-Staffel (F.1, #1645): kein Weg schreibt mehr ein Ergebnis - auch kein zurückgehaltenes.
+    from services.league_final_read import closed_refusal
+    from services.match_v2_results import MatchV2ResultError
+
+    closed = await closed_refusal(db, match.get("tournament_id"))
+    if closed:
+        raise MatchV2ResultError(closed, 409)
     same_games = games is None or (games == (match.get("games") or []) and
                                    sorted(lineups_missing or []) == sorted(match.get("lineups_missing") or []))
     same_games = same_games and (match_lineups is None or match_lineups == (match.get("lineups") or {}))

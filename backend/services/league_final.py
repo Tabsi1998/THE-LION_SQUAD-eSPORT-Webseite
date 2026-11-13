@@ -25,7 +25,7 @@ from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_incident_rules as incident_rules
 from services import league_procedures as procedures
 from services import league_protest_settings as protest_settings
-from services.league_final_read import active_final, frozen_rows, is_closed
+from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.log_safe import log_safe
 from services.match_disputes import decided_at, league_window_of
@@ -49,7 +49,6 @@ KIND = "tournament_registration"
 
 ALREADY_CLOSED = "Diese Staffel ist schon abgeschlossen."
 NOT_CLOSED = "Diese Staffel ist nicht abgeschlossen."
-CLOSED_LOCK = "Die Staffel ist abgeschlossen. Erst im Reiter „Abschluss“ wieder öffnen, dann korrigieren."
 SECOND_PERSON = "Wieder öffnen muss eine zweite Person: nicht die, die abgeschlossen hat."
 SECOND_PERSON_SUPERADMIN = ("Du hast diese Staffel selbst abgeschlossen. Als Superadmin geht das Wiederöffnen nur als "
                             "Notausnahme, mit einem Grund von mindestens fünf Zeichen.")
