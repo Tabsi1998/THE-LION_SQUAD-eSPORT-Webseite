@@ -875,3 +875,58 @@ async def test_the_news_card_names_no_champion_whose_entry_rests(flow):
     shown = [{"id": "post-1", "linked_tournament_ids": ["t-news"]}]
     await attach_result_winners(flow.db, shown, None)
     assert shown[0]["result"] == {"winner": "Probe News", "tournament": "Probe-Liga · Staffel A"}
+
+
+# ---------------------------------------------------------------- Kein neues Verfahren nach dem Abschluss (Runde 2, M-1)
+
+async def _forfeit_five_days_ago(flow, admin, staffel) -> tuple[dict, str]:
+    match = (await matches_of(flow, staffel))[0]
+    loser = next(slot["registration_id"] for slot in match["slots"] if slot["registration_id"] != stronger(match))
+    five_days = (now_utc() - timedelta(days=5)).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+        "status": "forfeit", "forfeit_registration_id": loser, "completed_at": five_days,
+        "admin_decision_at": five_days, "admin_decision_by": admin["id"]}})
+    return match, loser
+
+
+@pytest.mark.asyncio
+async def test_a_longer_appeal_window_after_the_close_opens_no_appeal_and_no_procedure_route(flow):
+    admin, _league, season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    match, loser = await _forfeit_five_days_ago(flow, admin, staffel)
+    await must_close(flow, staffel)
+    widened = await flow.put(f"{ADMIN}/seasons/{season['id']}/protest-settings", json={"appeal_hours": 336})
+    assert widened.status_code == 200, widened.text
+    stored = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    registration = await flow.db.tournament_registrations.find_one({"id": loser}, {"_id": 0})
+    team = await flow.db.teams.find_one({"id": registration["team_id"]}, {"_id": 0})
+    flow.act_as(await flow.db.users.find_one({"id": team["leader_id"]}, {"_id": 0}))
+    appeal = await flow.post(f"/api/matches/{match['id']}/appeals",
+                             json={"against_type": "forfeit", "ref_id": match["id"], "reason": "Wir waren da, Beweis folgt sofort."})
+    assert appeal.status_code == 409, appeal.text
+    assert CLOSED_DETAIL in appeal.json()["detail"] and "wieder öffnen" in appeal.json()["detail"]
+    flow.act_as(admin)
+    decision = await flow.post(f"/api/matches/{match['id']}/procedures/p-1/decision", json={"decision": "keep", "decision_note": "Keine Grundlage"})
+    assert decision.status_code == 409, decision.text
+    assert await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) == stored
+    row = await cockpit(flow, season, staffel)
+    assert row["closed"] is True
+
+
+@pytest.mark.asyncio
+async def test_protest_settings_and_the_transfer_leave_a_closed_staffel_as_it_was(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    before = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    widened = await flow.put(f"{ADMIN}/seasons/{season['id']}/protest-settings", json={"appeal_hours": 336, "protest_hours": 96})
+    assert widened.status_code == 200, widened.text
+    assert widened.json()["staffeln_updated"] == 0
+    assert (await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0}))["appeal_hours"] == 336
+    synced = await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
+    assert synced.status_code == 200, synced.text
+    result = next(row for row in synced.json()["staffeln"] if row["tournament_id"] == staffel["id"])
+    protests = next(item for item in result["skipped"] if item["group"] == "protests")
+    assert "abgeschlossen" in protests["reason"]
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert after.get("appeal_hours") == before.get("appeal_hours") and after.get("protest_hours") == before.get("protest_hours")
