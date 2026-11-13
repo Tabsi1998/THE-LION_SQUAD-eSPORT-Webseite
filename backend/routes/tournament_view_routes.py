@@ -316,7 +316,7 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     Liga-Staffel (F.1, #1645) liefert ihren Endstand statt einer Rechnung; ``live`` rechnet trotzdem (Verwaltung)."""
     tid = t["id"]
     if not live:
-        from services.league_final import frozen_rows
+        from services.league_final_read import frozen_rows
 
         frozen = await frozen_rows(db, t)
         if frozen is not None:

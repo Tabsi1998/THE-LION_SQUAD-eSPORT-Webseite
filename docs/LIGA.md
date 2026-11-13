@@ -3362,7 +3362,7 @@ Am Turnier steht dazu `final_table: {id, version, closed_at}` (sonst `null`) und
 `final_closed_at`, wenn der Abschluss sie beendet hat.
 
 **Lesen:** `tournament_view_routes._standing_rows` liefert für eine abgeschlossene Staffel `rows` der geltenden Fassung statt
-einer Rechnung (`league_final.frozen_rows`) - damit lesen Ligaseite, Turnierseite, TV, Ergebnis-PDF und App denselben Endstand.
+einer Rechnung (`league_final_read.frozen_rows`, Blatt-Modul ohne Import-Kreis) - damit lesen Ligaseite, Turnierseite, TV, Ergebnis-PDF und App denselben Endstand.
 Eine spätere Änderung an `scoring_rules`, `point_deductions`, `table_decisions` oder an einem Spiel ändert ihn nicht. Die
 Verwaltung rechnet weiter (`live=True`: Reiter „Tabelle“, Vorschau im Cockpit). Der Platz im Profil
 (`profile_references`) kommt ebenfalls aus dem Endstand. `GET /api/leagues/<liga>/<season>/staffeln/<staffel>` trägt

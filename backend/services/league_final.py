@@ -2,7 +2,7 @@
 
 Abgeschlossen wird je Staffel; die Season ist abgeschlossen, wenn alle ihre Staffeln abgeschlossen sind. Der Abschluss friert die
 Tabelle in ``league_final_tables`` ein - Plätze, Punkte, Maps, Kennzeichen, Entscheide, Meister, Regelstand und Zeitpunkt. Ab dann
-lesen Website, TV, PDF und App diesen Endstand (``frozen_rows`` in ``tournament_view_routes._standing_rows``): Eine spätere Regel-,
+lesen Website, TV, PDF und App diesen Endstand (``league_final_read.frozen_rows`` in ``tournament_view_routes._standing_rows``): Eine spätere Regel-,
 Punkt- oder Tabellenänderung ändert ihn nicht mehr.
 
 - **Sperrgründe** (Nr. 154, ``blockers``): offenes Spiel, offener Vorfall, offenes Verfahren, vorläufige Strafe oder offener Einspruch,
@@ -16,7 +16,6 @@ Punkt- oder Tabellenänderung ändert ihn nicht mehr.
 """
 from __future__ import annotations
 
-import copy
 import logging
 from datetime import datetime
 
@@ -26,6 +25,7 @@ from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_incident_rules as incident_rules
 from services import league_procedures as procedures
 from services import league_protest_settings as protest_settings
+from services.league_final_read import active_final, frozen_rows, is_closed
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.log_safe import log_safe
 from services.match_disputes import decided_at, league_window_of
@@ -71,24 +71,6 @@ def reason_text(value, what: str = "einen Grund") -> str:
     if len(text) < REASON_MIN:
         raise FinalProblem(f"Bitte {what} mit mindestens {REASON_MIN} Zeichen angeben.")
     return text[:REASON_MAX]
-
-
-def is_closed(tournament: dict | None) -> bool:
-    return isinstance((tournament or {}).get("final_table"), dict)
-
-
-# ---------------------------------------------------------------- Lesen: der eingefrorene Endstand
-
-async def active_final(db, tournament_id: str) -> dict | None:
-    return await db.league_final_tables.find_one({"tournament_id": tournament_id, "active": True}, {"_id": 0})
-
-
-async def frozen_rows(db, tournament: dict | None) -> list[dict] | None:
-    """Die Tabelle des Endstands - ``None``, solange die Staffel nicht abgeschlossen ist (dann wird gerechnet)."""
-    if not is_league_staffel(tournament):
-        return None
-    final = await active_final(db, tournament["id"])
-    return copy.deepcopy(final.get("rows") or []) if final else None
 
 
 def public_final(final: dict | None) -> dict | None:
