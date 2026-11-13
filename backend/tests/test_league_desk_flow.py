@@ -571,6 +571,31 @@ async def test_broadcast_mail_follows_the_tournament_updates_setting_and_counts_
 
 
 @pytest.mark.asyncio
+async def test_continuing_never_moves_processed_backwards(flow, monkeypatch):
+    """N-c: Fortsetzen geht die Liste von vorn durch (wer sie schon hat, bekommt nichts) - ``processed`` bleibt dabei mindestens beim
+    gespeicherten Stand."""
+    from services import user_notifications
+
+    world = await desk_world(flow)
+    request_id = new_id()
+    assert (await send(flow, world, request_id=request_id)).status_code == 200
+    claim = f"league-broadcast:{world['season_id']}:{request_id}"
+    await flow.db.audit_logs.update_one({"id": claim}, {"$set": {"data.state": "interrupted", "data.processed": 2}})
+    seen = []
+    real = user_notifications.create_user_notification
+
+    async def watching(*args, **kwargs):
+        seen.append((await flow.db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1}))["data"]["processed"])
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(user_notifications, "create_user_notification", watching)
+    assert (await send(flow, world, request_id=request_id)).json()["resumed"] is True
+    assert seen == [2, 2], "nie zurück auf 1"
+    final = await flow.db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1})
+    assert final["data"]["processed"] == 2 and final["data"]["state"] == "sent"
+
+
+@pytest.mark.asyncio
 async def test_continuing_needs_the_same_text_and_keeps_the_original_sender_out(flow):
     """N-b: Im Eintrag steht ein sha256 über Betreff und Text, nie der Text. Ein Fortsetzen mit anderem Text gibt 409; fortgesetzt wird im
     Namen der Person, die begonnen hat - sie bleibt aus dem Kreis heraus, auch wenn jemand anderes fortsetzt."""

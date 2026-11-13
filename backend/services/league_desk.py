@@ -674,7 +674,8 @@ async def _deliver(db, *, season_id: str, claim: str, sender_id: str | None, tit
         """Je Person geschrieben: Zähler sofort, damit ein Abbruch nichts verliert, und ``progress_at`` als Lebenszeichen."""
         change: dict = {"$set": {"data.progress_at": now_utc().isoformat(), **extra}}
         if processed is not None:
-            change["$set"]["data.processed"] = processed
+            # Beim Fortsetzen beginnt die Schleife vorn - der gespeicherte Stand geht dabei nie zurück.
+            change["$max"] = {"data.processed": processed}
         if delivered or mailed:
             change["$inc"] = {"data.delivered": delivered, "data.mailed": mailed}
         await db.audit_logs.update_one({"id": claim}, change)
