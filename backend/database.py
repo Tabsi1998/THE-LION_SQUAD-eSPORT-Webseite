@@ -614,6 +614,12 @@ async def init_indexes():
     await db.league_final_tables.create_index(
         "tournament_id", unique=True, name="league_final_active", partialFilterExpression={"active": True})
     await db.league_final_tables.create_index("season_id")
+    # Season-Historie an Team und Spieler (F.2, #1627): nur geltende Fassungen.
+    await db.league_final_tables.create_index("team_ids", name="league_final_teams", partialFilterExpression={"active": True})
+    await db.league_final_tables.create_index("player_ids", name="league_final_players", partialFilterExpression={"active": True})
+    # Neue Season aus dem Vorgänger (F.2): höchstens eine je Vorgänger - auch bei einem Doppelklick.
+    await unique_index(db.league_seasons, "predecessor_id", "league_season_predecessor",
+                       partialFilterExpression={"predecessor_id": {"$type": "string"}})
     await init_audit_indexes(db)
 
 
