@@ -168,6 +168,14 @@ def test_schedule_block_with_and_without_d1_rules():
     assert "Verschiebungen entscheidet die Liga-Leitung" in plain_out and "72-h-Regel" not in plain_out
 
 
+def test_schedule_block_names_the_result_reminder_only_when_it_is_on():
+    """E.5 (#1647, N9): Ist „Ergebnis fehlt“ für die Season aus, nennt der Regeltext keine Erinnerung - nur „überfällig“."""
+    on = facts.render_schedule(facts.schedule_data(SEASON))
+    assert "- Ergebnis: Erinnerung 24 Stunden nach dem Termin ohne Meldung, überfällig nach 48 Stunden." in on
+    off = facts.render_schedule(facts.schedule_data({**SEASON, "reminder_rules": {"result_missing": False}}))
+    assert "Erinnerung" not in off and "- Ergebnis: ohne Meldung überfällig nach 48 Stunden." in off
+
+
 PLATFORM = {"field": "Platt|form", "platforms": "PC und PlayStation", "crossplay": "aus", "input_device": "Controller",
             "divisions": [{"label": "Liga 2", "platforms": "PC", "crossplay": None, "input_device": None}]}
 

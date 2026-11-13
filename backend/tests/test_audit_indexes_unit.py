@@ -78,6 +78,8 @@ EXPECTED = {
     "event_registrations": {"user_id_1"},
     # Kapitän im Altbestand (#2338): letzte Übergabe je Team, neueste zuerst.
     "audit_logs": {"action_1_target_id_1_created_at_-1"},
+    # Liga-Erinnerungen (#1647): je Person und Schlüssel eine Nachricht, nur Zeilen mit Schlüssel.
+    "notifications": {"user_unique_dedupe_unique"},
 }
 
 

@@ -273,7 +273,16 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
 **Startgeld:** Kostet die Teilnahme etwas, steht es im Abschnitt **Startgeld** unter **Turnier öffnen → Bearbeiten**.
 Den sieht und ändert nur der Bereich **Finanzen**. Wer anmeldet, übernimmt das Startgeld ausdrücklich (bei Teams der
 Teamleitung für das ganze Team); ohne diese Bestätigung nimmt die Seite die Anmeldung nicht an. Bezahlt wird mit der
-verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrechnung](../ABRECHNUNG.md).
+verbindlichen Teilnahme: Warteliste kostet nichts. Meldet sich jemand nach dem Abmelden wieder an (auch über die
+Warteliste) oder bestätigt die Turnierleitung eine abgelehnte oder „nicht erschienene“ Anmeldung wieder (auch beim Check-in),
+und es gibt schon eine Rechnung (auch als
+Entwurf, auch bezahlt), bleibt diese Rechnung: kein zweiter Rechnungsauftrag, die Anmeldung zeigt wieder diese Rechnung,
+und die Finanzübersicht bekommt den Prüffall **Buchung nach dem Beleg geändert** mit altem und neuem Betrag. Die Nachricht
+(Glocke, Mail, Discord) nennt dann keinen Betrag, sondern sagt, dass es schon eine Rechnung gibt und der Verein sie prüft.
+Das gilt für dieselbe Person mit demselben Team; meldet ein anderes Mitglied das Team neu an (auch nach einer
+weggenommenen Ablehnung), bekommt es eine eigene Rechnung. Trägt die Turnierleitung einen **Ersatz** ein, gilt die
+ersetzte Person als „nicht erschienen“, und ihr Startgeld-Auftrag schließt wie bei einer Absage. Eine voll gutgeschriebene oder aufgegebene Rechnung zählt nicht mehr: Dann gilt das aktuelle Startgeld mit
+neuer Rechnung. Alles Weitere steht in [Abrechnung](../ABRECHNUNG.md).
 
 **Reiter Teilnehmer** (Standard beim Öffnen):
 

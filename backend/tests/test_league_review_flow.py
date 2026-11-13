@@ -150,6 +150,8 @@ async def test_a_locked_staffel_still_takes_rules_text_but_keeps_its_calendar(fl
         "checkin": "Die Staffel ist gesperrt.",
         # Seit D.3 (#1618) die Veto-Vorlage, eigene Gruppe wie der Check-in.
         "veto": "Die Staffel ist gesperrt.",
+        # Seit E.5 (#1647) die Erinnerungen, eigene Gruppe wie der Check-in.
+        "reminders": "Die Staffel ist gesperrt.",
         "before_result": "Die Staffel ist gesperrt.",
         # Seit C.3 (#1617) auch die Ergebnisregeln - eine gesperrte Staffel behält ihre.
         "result_rules": "Die Staffel ist gesperrt."}

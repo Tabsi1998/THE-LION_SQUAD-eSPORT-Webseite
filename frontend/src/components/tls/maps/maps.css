@@ -191,3 +191,23 @@
 .tls-map-figures dt { color: rgb(255 255 255 / 0.5); }
 .tls-map-figures dd { font-weight: 700; color: #fff; }
 .tls-map-figures [data-figure="won"] dd { color: var(--tls-cyan); }
+
+/* Wischbarer Pool (#2268, Ligaseite): am Handy je Modus eine Reihe großer Karten zum Wischen (78 % breit, rasten ein), ab sm
+   das Raster mit drei, ab lg mit vier Spalten - dort ohne Wischleiste und Verlauf, damit Anheben und Leuchten nicht abgeschnitten werden. */
+.tls-map-pool-swipe { display: flex; gap: 0.75rem; scroll-snap-type: x mandatory; }
+.tls-map-pool-swipe > li { flex: 0 0 78%; min-width: 0; scroll-snap-align: start; }
+.tls-map-pool-swipe .tls-map-card__name { font-size: 1rem; left: 0.875rem; bottom: 0.75rem; }
+@media (min-width: 640px) {
+  .tls-map-pool-swipe {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+/* Ab lg vier Spalten - bei vier Maps steht keine Karte allein in einer Zeile (#2268). */
+@media (min-width: 1024px) {
+  .tls-map-pool-swipe { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

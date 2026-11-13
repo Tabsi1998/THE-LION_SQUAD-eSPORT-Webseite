@@ -54,6 +54,16 @@ describe("Turnierweg", () => {
     expect(screen.queryByTestId("tournament-path-tournament:t-old")).toBeNull();
   });
 
+  it("ein angefochtenes Ergebnis steht im Weg „in Klärung“ (#2363)", async () => {
+    const steps = [PATH.steps[0], PATH.steps[1], { ...PATH.steps[2], contested: true }];
+    apiMock.get.mockResolvedValue({ data: { ...PATH, steps } });
+    renderPath({ own: true });
+    fireEvent.click(screen.getByTestId("reference-path-toggle-tournament:t-old"));
+    const rows = await screen.findAllByTestId("tournament-path-step");
+    expect(rows[2]).toHaveTextContent("Finale1:2 gegen TurboTina (Niederlage) · in Klärung");
+    expect(screen.getAllByTestId("tournament-path-clarification")).toHaveLength(1);
+  });
+
   it("für andere: öffentliche Sicht, ohne Teilen-Knopf; Fehler ergeben einen Satz", async () => {
     apiMock.get.mockResolvedValue({ data: { ...PATH, share: null } });
     renderPath({ publicView: true });

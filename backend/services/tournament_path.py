@@ -2,13 +2,16 @@
 
 Je Spiel ein Schritt in Alltagsworten (``round_labels``): im K.-o. Ergebnis und Gegner, bei Durchgängen der Platz in
 der Runde, bei Gruppen und Liga die Bilanz je Gruppe (Siege, Unentschieden, Niederlagen) als ein Schritt. Gezählt wird
-nur, was gewertet ist (fertig oder kampflos) - laufende Spiele stehen nicht im Weg.
+nur, was gewertet ist (fertig oder kampflos) - laufende Spiele stehen nicht im Weg. Ist ein Ergebnis angefochten (Liga,
+E.2: ``contested``), trägt der Schritt ``contested`` - beim Duell ``True``, bei der Tabelle die Zahl der Spiele - und
+liest sich „in Klärung“ wie auf der Ligaseite (#2363). Ohne Verfahren fehlt der Schlüssel, alles bleibt wie bisher.
 
 Sichtbarkeit: Im eigenen Profil steht jeder Gegner da. Im öffentlichen Profil und auf dem Teilen-Bild nur Gegner mit
 öffentlichem Profil bzw. öffentliche Teams - sonst bleibt der Name weg, das Ergebnis bleibt.
 """
 from __future__ import annotations
 
+from services.bracket_common import CLARIFICATION, clarification_count
 from services.competition_read import load_competition_read_model
 from services.round_labels import round_label, rounds_by_section, section_kind, stage_kind
 from services.team_history import dissolved_views
@@ -61,12 +64,24 @@ def table_result(step: dict) -> str:
 
 
 def chip_text(step: dict) -> str:
-    """Kurz für Schildchen und Teilen-Bild: „Viertelfinale 2:0“, „Finale: Platz 1“, „Gruppe A: 3 Siege, 1 Niederlage“."""
+    """Kurz für Schildchen und Teilen-Bild: „Viertelfinale 2:0“, „Finale: Platz 1“, „Gruppe A: 3 Siege, 1 Niederlage“ -
+    angefochten mit „· in Klärung“ bzw. „· 1 Spiel in Klärung“ (#2363)."""
     if step.get("kind") == "heat":
-        return f"{step['label']}: Platz {step['rank']}" if step.get("rank") else str(step.get("label"))
-    if step.get("kind") == "table":
-        return f"{step['label']}: {step['result']}"
-    return f"{step['label']} {step['result']}".strip()
+        text = f"{step['label']}: Platz {step['rank']}" if step.get("rank") else str(step.get("label"))
+    elif step.get("kind") == "table":
+        text = f"{step['label']}: {step['result']}"
+    else:
+        text = f"{step['label']} {step['result']}".strip()
+    note = clarification_note(step)
+    return f"{text} · {note}" if note else text
+
+
+def clarification_note(step: dict) -> str:
+    """„in Klärung“ für ein angefochtenes Duell, „1 Spiel in Klärung“ für eine Tabelle - leer ohne Verfahren (#2363)."""
+    contested = step.get("contested")
+    if not contested:
+        return ""
+    return clarification_count(contested) if step.get("kind") == "table" else CLARIFICATION
 
 
 async def visible_names(db, registration_ids: list[str], *, public: bool) -> dict[str, str | None]:
@@ -127,6 +142,8 @@ async def tournament_path(db, tournament: dict, registration_ids: set[str] | lis
             outcome = _outcome(mine_result, results.get(others[0]) if others else None)
             tables[key]["games"] += 1
             tables[key][{"win": "wins", "draw": "draws", "loss": "losses"}[outcome]] += 1
+            if match.get("contested"):
+                tables[key]["contested"] = tables[key].get("contested", 0) + 1
             continue
         if kind == "heats" or len(participants) > 2 or match.get("match_type") == "ffa":
             rank = mine_result.get("rank")
@@ -144,7 +161,7 @@ async def tournament_path(db, tournament: dict, registration_ids: set[str] | lis
         steps.append({
             "kind": "duel", "label": round_label(match, rounds=rounds, kind=kind), "result": score,
             "outcome": _outcome(mine_result, theirs), "opponent": names.get(opponent) if opponent else "Freilos",
-            "forfeit": forfeit,
+            "forfeit": forfeit, **({"contested": True} if match.get("contested") else {}),
         })
     for step in steps:
         if step["kind"] == "table":

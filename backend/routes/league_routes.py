@@ -803,12 +803,17 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
     table = await tournament_standings(tournament["id"], None, user)
     from services.league_table import public_rules
 
+    # Teams der Season mit Bild (#2268): das Logo nur von Teams mit öffentlicher Teamseite (``is_public`` nicht aus) - sonst ``None``,
+    # die Seite zeigt dann die Initialen.
+    team_ids = sorted({row["team_id"] for key, row in names.items() if key in active_ids and row.get("team_id")})
+    logos = {row["id"]: row.get("logo_url") or None for row in await db.teams.find(
+        {"id": {"$in": team_ids}, "is_public": {"$ne": False}}, {"_id": 0, "id": 1, "logo_url": 1}).to_list(len(team_ids) or 1)} if team_ids else {}
     return {
         "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"],
                     # Regeln der Tabelle (E.1, #1625): Remis, Reihenfolge bei Gleichstand - für Spalten und Legende.
                     "table_rules": public_rules(tournament)},
         "standings": table,
-        "teams": sorted((row for key, row in names.items() if key in active_ids),
+        "teams": sorted(({**row, "logo_url": logos.get(row.get("team_id"))} for key, row in names.items() if key in active_ids),
                         key=lambda row: str(row["display_name"]).casefold()),
         **league_page.staffel_weeks(tournament, matches, names, proposals),
     }

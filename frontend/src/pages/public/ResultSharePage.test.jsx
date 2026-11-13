@@ -54,6 +54,15 @@ describe("ResultSharePage", () => {
     expect(screen.getByTestId("breadcrumbs")).toHaveTextContent("Ergebnis von Neonfalke");
   });
 
+  it("ein angefochtenes Ergebnis steht im Weg „in Klärung“ wie auf dem Bild (#2363)", async () => {
+    const steps = [DATA.steps[0], { ...DATA.steps[1], contested: true }];
+    apiMock.get.mockResolvedValue({ data: { ...DATA, steps } });
+    renderPage();
+    const rows = await screen.findAllByTestId("result-path-step");
+    expect(rows.map((step) => step.textContent)).toEqual(["HalbfinaleSieg2:1", "Finalein KlärungNiederlage1:2"]);
+    expect(screen.getAllByTestId("result-path-clarification")).toHaveLength(1);
+  });
+
   it("beim Team steht der Teamname und wer geteilt hat", async () => {
     apiMock.get.mockResolvedValue({ data: { ...DATA, team_name: "Lions Rocket", rank: 1, participant_word: "Teams", headline: "Platz 1 im FC 26 Herbst-Cup" } });
     renderPage();

@@ -20,9 +20,10 @@ from services.mutation_lock import MutationLockBusy, mutation_lock
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 ACTIVE_STATUSES = {"registered", "checked_in"}
 ENDED_STATUSES = {"cancelled", "no_show"}
-# Der Grund im Prüffall der Finanzverwaltung, wenn eine beendete Anmeldung trotz Beleg zurückkommt (#2127, #2184).
-REBOOKED_SELF = "Nach Storno selbst neu angemeldet"
-REBOOKED_BY_LEAD = "Anmeldung wieder aktiviert"
+# Der Grund im Prüffall der Finanzverwaltung, wenn eine beendete Anmeldung trotz Beleg zurückkommt (#2127, #2184) - derselbe
+# wie bei Turnieren (#2368).
+REBOOKED_SELF = billing_orders.REBOOKED_SELF
+REBOOKED_BY_LEAD = billing_orders.REBOOKED_BY_LEAD
 
 
 class RegistrationError(Exception):

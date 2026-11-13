@@ -12,7 +12,8 @@ steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es e
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga 1, 2 …, Staffel A, B …
 - **Turnierverwaltung der Staffel** (`/admin/tournaments/<Staffel>`, aus der Season über **Turnierverwaltung · Co-Teams
   zuteilen**) – Co-Teams zuteilen, starten, Spiele, Ergebnisse
-- **Ligaseite** (`/liga/<liga>/<season>`, etwa `/liga/call-of-duty/season-1`) – was Mitglieder und Gäste sehen
+- **Ligaseite** (`/liga/<liga>/<season>`, etwa `/liga/call-of-duty/season-1`) – was Mitglieder und Gäste sehen, mit den Unterseiten
+  **Spieltage** und **Teams** (siehe [2.12](#212-die-ligaseite-übersicht-spieltage-teams))
 
 Wer was darf: Liga, Season, Liga N, Staffel, Zuteilen, Start und Korrekturen macht nur die **Liga-Leitung mit
 bestätigter Zwei-Faktor-Anmeldung**: wer den Bereich **Ligen** hat oder in dieser Liga **zuständig** ist, siehe
@@ -495,7 +496,7 @@ Verschiebung, bis ihr einmal speichert.
 | **Verschieben bis (Stunden vor dem Termin)** | 24 | später beantragen geht nicht mehr |
 | **Verschiebungen je Spiel** | 2 | 0 heißt: nur die Leitung verschiebt |
 | **Verschieben nur innerhalb der Spielwoche** | an | wochenübergreifend entscheidet die Leitung |
-| **Erinnerung ohne Ergebnis** | 24 h nach dem Termin | Nachricht an Captain und Vertreter beider Seiten |
+| **Erinnerung ohne Ergebnis** | 24 h nach dem Termin | Nachricht an Captain und Vertreter beider Seiten; abschalten unter **Erinnerungen** (2.7f) |
 | **Überfällig nach** | 48 h nach dem Termin | das Spiel steht bei euch unter **Mein Dienst → Braucht deine Entscheidung** |
 
 Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), legt die Liga-Leitung fest – siehe 3.1.
@@ -516,6 +517,26 @@ speichert.
 | **Erinnerung an fehlende Angaben (Stunden vor dem ersten Spiel)** | 48 | einmal je Team vor dem ersten Spiel: an jeden, dem Geburtsdatum, Spiel-ID oder Plattform fehlt, und an Captain und Vertreter (3.9); 0 = keine. Steht nicht im Regelwerk |
 
 Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
+
+### 2.7f Erinnerungen
+
+Im Reiter **Termine** steht unter dem Check-in der Kasten **Erinnerungen** (Zuständigkeit „Season konfigurieren“) mit eigenem
+**Erinnerungen speichern**; er gilt sofort für alle Staffeln der Season. Je Art gibt es einen Schalter, die Zeiten haben Vorgaben. Ist für
+eine Season noch nichts gespeichert, steht „es gelten die Vorgaben unten“ – sie erinnert trotzdem schon.
+
+| Art | Vorgabe | Wer bekommt sie |
+| --- | --- | --- |
+| **Spiel steht an** | 24 Stunden und 60 Minuten vor dem Termin | die Aufgestellten (ohne Aufstellung der Kader) und die Captains beider Seiten, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen (zum alten Termin) oder schon gestarteten Spielen und nicht, wenn das Spiel in einer Sperrzeit liegt. Vor dem ersten Spiel nach einer Pause kommt sie auch, wenn die Pause noch läuft |
+| **Termin noch offen** | bei 50 % der Spielwoche (Wochenmitte), spätestens 24 Stunden vor dem Standardtermin | Captain und Vertreter beider Seiten, solange kein Termin vereinbart ist – einmal je Spielwoche. Ohne Einigung gilt der Standardtermin; wird er nicht gemeldet, steht das Spiel bei euch als überfällig (2.7a) |
+| **Ergebnis fehlt** | Zeitpunkt aus „Termine und Verschiebungen“ (24 h nach dem Termin) | Captain und Vertreter beider Seiten. Kommt nicht, solange ein Vorfall oder ein Verfahren am Spiel offen ist |
+| **Map-Veto wartet** | nach 20 Sekunden ohne Zug, nie in den letzten 5 Sekunden | Captain und Vertreter der Seite am Zug, wenn sie die Matchseite nicht offen haben (3.1c) |
+| **Zusätzlich per Discord** | aus | Direktnachricht vom Vereins-Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben (Entscheidung Nr. 148). Gilt für alle Arten: Ist der Schalter aus, kommen auch „Ergebnis fehlt“ und „Map-Veto wartet“ nicht mehr per Discord – früher kamen sie bei eingeschaltetem Discord immer. Keine Funktion hängt an Discord |
+
+Jede Erinnerung kommt höchstens einmal, auch wenn der Job doppelt läuft. Spieler und Captains schalten „Match-Erinnerungen“ in ihren
+Benachrichtigungs-Einstellungen ab (Web und App). Die Nachricht „Spiel startet in 10 Minuten“ kommt in allen Turnieren und ist hier nicht
+einstellbar.
+
+<img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche und spätestens 24 Stunden vor dem Standardtermin, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
 
 ### 2.7d Veto: Maps vor dem Spiel sperren und wählen (Regelwerk § 6, Anlage B)
 
@@ -862,6 +883,47 @@ der Matchseite, je mit Version, Stand und PDF.
 - Eine Season oder Liga mit veröffentlichtem Regelwerk oder mit Zustimmungen lässt sich nicht mehr löschen, nur archivieren. Entwürfe gehen mit.
 - Ein Regelwerk darf mit allen Anlagen höchstens 400 000 Zeichen und 400 Überschriften haben.
 
+### 2.12 Die Ligaseite: Übersicht, Spieltage, Teams
+
+Die Ligaseite zeigt nur, was die Season veröffentlicht – du pflegst nichts extra. Oben steht eine Leiste **Übersicht ·
+Spieltage · Teams · Regelwerk** (Regelwerk nur, wenn es eines gibt); dieselbe Leiste steht auf der Regelseite.
+
+**Übersicht** (`/liga/<liga>/<season>`):
+
+| Block | Woher es kommt |
+| --- | --- |
+| **Was gespielt wird**: Spiel, Teamgröße, Best of, Runden, Map-Wiederholung, je Modus Symbol und Regel („bis 250 Punkte · 10 Min.“), Reihenfolge Map 1 bis N, Plattform | Reiter **Spielbetrieb** und **Ergebnisregeln** der Season, Modus-Symbole am Spiel (2.1), Plattform (2.7c) |
+| **Map-Pool** mit großen Bildern, am Handy je Modus zum Wischen | Map-Pool der Season |
+| **Sperrliste** mit Bildern, aufklappbar, darunter die **erlaubte Ausrüstung** | Sperrliste der Season (2.1a) |
+| **Ablauf**: Standardtermin, 72-h-Regel, Verschieben, Frist zum Bestätigen, Punkte und Gleichstand | Reiter **Termine** und **Tabelle** der Season |
+| **Regelwerk** mit Version und PDF | 2.11 |
+| **Ligen und Staffeln**: je Staffel die Tabelle und der aktuelle Spieltag, Wege zu Spieltagen und Teams | Staffeln; läuft die Season, stehen die Tabellen gleich unter „Was gespielt wird“ |
+
+Im Kopf stehen nur Zeitraum, Spielwochen und Pausen – Best of, Teamgröße, Standardtermin und Punkte stehen genau einmal, in
+„Was gespielt wird“ bzw. „Ablauf“. Ist die Seite gerade nicht erreichbar, steht dort „Nochmal laden“ statt „nicht gefunden“.
+
+Vor der Einteilung (noch keine Staffel für Gäste sichtbar) steht statt der Tabellen **„Die Ligen werden eingeteilt“** mit den
+nächsten Schritten: Anmeldung, Einteilung, Start. **Gold** hat in der Tabelle nur der **Meister**: Platz 1 allein, in der
+obersten Liga, sobald die Staffel beendet ist. Auf- und Abstiegszonen kommen mit dem Saisonabschluss (#1627).
+
+**Spieltage** (`…/spieltage`): oben die Staffel (bei mehreren), darunter eine Leiste aller Wochen – Punkt in Akzentfarbe =
+gespielt bzw. läuft, schraffiert = Pause. Die gewählte Woche zeigt alle Spiele mit Ergebnis, Maps mit Bild und Modus-Symbol,
+**kampflos**, **Map wiederholt** und **in Klärung**; offene Wochen zeigen einmal den **Modus je Map**. Den **Grund** einer
+Wiederholung sehen nur die beiden Teams und die Liga-Leitung auf der Matchseite, öffentlich steht nur „wiederholt“. Staffel und Woche stehen
+in der Adresse (`?staffel=…&woche=3`) – so lässt sich ein Spieltag in Discord verlinken.
+
+**Teams** (`…/teams`): je Liga und Staffel die Teams mit Logo (aus der Teamseite, sonst zwei Buchstaben), Platz und Punkten.
+
+Interne Dinge der Leitung – Grund eines Punktabzugs, Verfahren, Vorfälle – stehen nirgends auf diesen Seiten. Die Teilen-Vorschau
+der Season sagt, was gespielt wird; Spieltage und Teams haben eine eigene Vorschau.
+
+<table>
+<tr>
+<td><img src="../assets/liga/season-seite-handy.png" alt="Ligaseite am Handy: Kopf mit Banner und Emblem, Leiste Übersicht, Spieltage, Teams, Regelwerk, darunter Was gespielt wird mit Format, drei Modi mit Symbol und Regel und der Reihenfolge Map 1 bis 3, dann die Tabelle der Liga 1" width="260"></td>
+<td><img src="../assets/liga/season-spieltage-1440.png" alt="Spieltage am PC: Auswahl Liga 1 oder Liga 2, Leiste der Wochen mit Reserve und Weihnachtspause, Spieltag 1 mit einem Ergebnis 2:1 samt drei Maps mit Bild und dem Hinweis Map wiederholt sowie einem kampflosen Spiel" width="520"></td>
+</tr>
+</table>
+
 ## 3. Während der Season
 
 ### 3.1 Termine
@@ -878,8 +940,9 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
 
 - **Nachrichten:** Jeder Vorschlag, Gegenvorschlag, jedes Annehmen, Ablehnen und Zurückziehen geht sofort an Captain
   und Vertreter der anderen Seite (ohne beide an deren Teamleitung) – ins Postfach und per Push, Thema
-  „Match-Erinnerungen“. Trägt die Turnierleitung selbst einen Termin vor, erfahren es beide Seiten. Erinnerungen vor
-  Fristen kommen später (#1647).
+  „Match-Erinnerungen“. Trägt die Turnierleitung selbst einen Termin vor, erfahren es beide Seiten. Steht zur Wochenmitte
+  noch kein Termin, erinnert die Seite beide Captains; 24 Stunden und 1 Stunde vor dem Spiel erinnert sie die Aufgestellten
+  und die Captains (einstellbar, 2.7f).
 - **Termin oder Best of direkt am Spiel ändern:** steht mit altem und neuem Wert im Protokoll, und Captain und Vertreter
   beider Seiten bekommen eine Nachricht – je Änderung eine.
 - **Eigener Vorschlag:** steht bei der eigenen Seite als „wartet auf die Gegenseite“ mit **Zurückziehen**; annehmen
@@ -966,7 +1029,8 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   Servers, nicht nach der des Handys; die letzten 10 Sekunden sind rot und mit Sanduhr und „gleich vorbei“ markiert. Mit „Bewegung
   reduzieren“ im Gerät steht alles sofort da.
 - **Erinnerung:** Ist eine Seite am Zug, hat 20 Sekunden lang nicht gezogen und die Matchseite nicht offen, bekommen Captain und Vertreter
-  einmal die Nachricht **„Map-Veto wartet – ihr seid am Zug“** (je Schritt höchstens einmal).
+  einmal die Nachricht **„Map-Veto wartet – ihr seid am Zug“** (je Schritt höchstens einmal). Schalter und Sekunden stellt ihr je Season
+  unter **Erinnerungen** ein (2.7f).
 - **Zuschauer und TV:** Wer nicht beteiligt ist, sieht das laufende Veto auf der Matchseite nur lesend (wenn die Staffel sichtbar ist).
   Über **TV-Ansicht** im Veto-Block öffnet sich die Ansicht für den Bildschirm (`/display/veto/<Spiel>`): großer Countdown, wer am Zug
   ist, Karten und Ablauf, danach die Spielreihenfolge. Für Staffeln „Nur Mitglieder“ hängt ihr den Anzeige-Schlüssel des Turniers an
@@ -1136,7 +1200,9 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
   ersten Entscheidung – auch der Superadmin nicht über die eigene. Bis dahin gilt die erste Entscheidung weiter.
 - **Tabelle und TV**: Mit **Zählt vorläufig** (Vorgabe) bleibt ein Ergebnis mit laufendem Protest in der Tabelle; Spiel
-  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV und in der Tabelle als PDF. Unter **Braucht
+  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV, in der Tabelle als PDF, auf dem Teilen-Bild eines
+  Ergebnisses und im Turnierweg im Profil. Nach der Entscheidung zeigen alle wieder das gültige
+  Ergebnis ohne Hinweis. Unter **Braucht
   Aufmerksamkeit** steht der Fall mit **Zum Spiel**. Mit **Zählt bis zur Entscheidung nicht** fällt das Spiel so lange heraus.
 - **Einstellen**: Season → **Proteste** → **Fristen, Gründe und Tabelle**. Speichern gilt sofort in allen nicht
   gesperrten Staffeln; laufende Verfahren behalten ihre Fristen. Die vier Grundgründe bleiben in der Liste, damit auch

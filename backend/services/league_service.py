@@ -30,8 +30,9 @@ from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
 from services.league_scope import ONLY_LEAGUE
-from services import checkin_rules, league_protest_settings, league_veto_rules
+from services import checkin_rules, league_protest_settings, league_reminder_rules, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
+from services.league_schedule import public_rules as schedule_public_rules
 from services.log_safe import log_safe
 from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
                                     mutation_lock, tournament_write_resource)
@@ -462,6 +463,9 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     fields.update({key: copy.deepcopy(season[key]) for key in league_protest_settings.FIELDS if key in season})
     # Vorfälle (#1619, D.5): nur, was die Season trägt - ohne Feld gilt in der Staffel die Vorgabe.
     fields.update({key: season[key] for key in INCIDENT_FIELDS if season.get(key) is not None})
+    # Erinnerungen (#1647, E.5): ebenso - ohne Feld erinnert die Staffel mit der Vorgabe (league_presets).
+    if isinstance(season.get(league_reminder_rules.FIELD), dict):
+        fields[league_reminder_rules.FIELD] = dict(season[league_reminder_rules.FIELD])
     return fields
 
 
@@ -483,6 +487,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "protests": league_protest_settings.FIELDS,
     # Vorfälle (#1619, D.5): ebenso - jeder Vorfall hält seine Frist fest, neue Werte gelten nur für neue Fälle.
     "incidents": INCIDENT_FIELDS,
+    # Erinnerungen (#1647, E.5): ebenso - gelten für die nächsten Erinnerungen, schon verschickte bleiben.
+    "reminders": (league_reminder_rules.FIELD,),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -499,6 +505,7 @@ SYNC_GROUP_LABELS = {
     "veto": "Veto",
     "protests": "Proteste, Einspruch und MOSS",
     "incidents": "Vorfälle und Pausen",
+    "reminders": "Erinnerungen",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
@@ -785,6 +792,8 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     doc.setdefault("schedule_rules", dict(SCHEDULE_RULE_DEFAULTS))
     # Check-in (#1652, docs/LIGA.md D.2): ebenso, die Mindestzahl aus Teilnehmerliste oder Teamgröße; gepflegt über …/checkin-rules.
     doc.setdefault("checkin_rules", checkin_rules.defaults_for_season(doc))
+    # Erinnerungen (#1647, docs/LIGA.md E.5): ebenso mit Vorgabe, gepflegt über …/reminder-rules.
+    doc.setdefault(league_reminder_rules.FIELD, league_reminder_rules.defaults())
     # Veto (#1618, docs/LIGA.md D.3; Fabian Nr. 105): neue Seasons mit Veto an, die Vorlage aus Modusfolge und Best of vorbelegt - der
     # Pool kommt erst später; bis zum ersten Speichern von Hand (Merker ``auto``, Nr. 108) zieht sie mit dem Pool nach. Je Season
     # abschaltbar, gepflegt über …/veto-rules.
@@ -1403,6 +1412,10 @@ def public_season(season: dict) -> dict:
     out["table_tiebreakers"] = rules.get("table_tiebreakers")
     out["blocked_weeks"] = blocked_weeks(season)
     out["end_date"] = season_end(season)
+    # Was gespielt wird und wie Termine laufen (#2268): die Regel je Modus und die Terminregeln aus dem Regelwerk - ohne
+    # Arbeitswerte der Leitung (Erinnerung, „überfällig“).
+    out["result_rules"] = league_result_rules.public_rules(season)
+    out["schedule_rules"] = schedule_public_rules(season)
     return out
 
 

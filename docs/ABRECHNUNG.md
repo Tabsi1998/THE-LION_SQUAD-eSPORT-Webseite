@@ -107,6 +107,22 @@ Positionen, und wird dann eingefroren. Ablehnung, „nicht erschienen“ oder Ab
 Beleg schließen den Auftrag. Die Aufträge stehen in derselben Finanzübersicht wie die der Events
 (Quelle „Startgeld <Turnier>“), der Rechnungsweg nach Dolibarr ist derselbe.
 
+**Zurück nach Storno, die Rechnung gibt es schon (#2368).** Wie bei Events (siehe Prüffälle): Meldet sich
+jemand nach der Abmeldung wieder an, rückt nach der Abmeldung von der Warteliste nach oder bestätigt die
+Turnierleitung eine abgelehnte, ausgetretene oder „nicht erschienene“ Anmeldung wieder (auch über den Check-in),
+entsteht kein zweiter Auftrag. Die Anmeldung trägt wieder den Preis und Stand der Rechnung, es öffnet sich der
+Prüffall „Buchung nach dem Beleg geändert“ mit altem und neuem Betrag (Grund „Nach Storno selbst neu angemeldet“ –
+auch wenn die Leitung eine selbst neu angemeldete Person von der Warteliste holt oder nach einer weggenommenen
+Ablehnung bestätigt –, „Nach Storno von der
+Warteliste nachgerückt“ oder „Anmeldung wieder aktiviert“). Die Abmeldung löscht die Turnier-Anmeldung; als
+dieselbe Anmeldung zählt eine neue, wenn Turnier, zahlende Person und Team (Solo: keins) gleich sind. Meldet
+ein **anderes Mitglied** das Team neu an – auch nach einer weggenommenen Ablehnung –, übernimmt es die Kosten
+selbst: eigener Auftrag, die alte Rechnung bleibt storniert (Gutschrift an die Person, die sie bekommen hat).
+Ist die alte Rechnung voll gutgeschrieben oder aufgegeben, gilt der aktuelle Preis mit eigenem Auftrag.
+„Nicht erschienen“ schließt den Auftrag auf jedem Weg: über den Status, über den Check-in und wenn die Leitung
+einen Ersatz für die Person einträgt. Kommt eine Anmeldung ohne Startgeld und ohne Kostenübernahme zurück (von
+der Leitung eingetragen), entsteht dabei keine Rechnung.
+
 **Turnier im Event.** Hängt das Turnier an einem Event, dessen Kostenbeitrag das Startgeld schon
 enthält, setzt ihr im Abschnitt „Startgeld“ den Haken „Im Eventbeitrag enthalten“ – dann zeigt
 das Turnier kein Startgeld und es entsteht keine zweite Rechnung.
@@ -214,7 +230,7 @@ Dolibarr noch am eingefrorenen Preis. Sie legt einen Prüffall an und sagt, was 
 | Prüffall | Wann | Was ihr tut |
 | --- | --- | --- |
 | Storniert, Beleg existiert | jemand sagt ab, die Rechnung ist schon da | Entwurf in Dolibarr löschen oder Gutschrift mit Bezug anlegen; bezahltes Geld erstatten |
-| Buchung nach dem Beleg geändert | Begleitpersonen ändern sich nach der Rechnung; eine stornierte Anmeldung kommt zurück („Anmeldung wieder aktiviert“ durch die Leitung, „Nach Storno selbst neu angemeldet“) | in Dolibarr korrigieren (Gutschrift + neuer Beleg oder Nachberechnung) oder den Beleg stehen lassen; der Fall nennt alt und neu. Ein zweiter Auftrag entsteht nicht; der Fall „Storniert, Beleg existiert“ dazu bleibt offen – gilt der Beleg weiter, mit Grund erledigen („wieder angemeldet“). Ist der Beleg schon voll gutgeschrieben oder aufgegeben, gilt er nicht mehr: kein Prüffall, die Rückkehr bekommt einen neuen Auftrag zum aktuellen Preis |
+| Buchung nach dem Beleg geändert | Begleitpersonen ändern sich nach der Rechnung; eine stornierte Anmeldung kommt zurück („Anmeldung wieder aktiviert“ durch die Leitung, „Nach Storno selbst neu angemeldet“, beim Turnier auch „Nach Storno von der Warteliste nachgerückt“, #2368) | in Dolibarr korrigieren (Gutschrift + neuer Beleg oder Nachberechnung) oder den Beleg stehen lassen; der Fall nennt alt und neu. Ein zweiter Auftrag entsteht nicht; der Fall „Storniert, Beleg existiert“ dazu bleibt offen – gilt der Beleg weiter, mit Grund erledigen („wieder angemeldet“). Ist der Beleg schon voll gutgeschrieben oder aufgegeben, gilt er nicht mehr: kein Prüffall, die Rückkehr bekommt einen neuen Auftrag zum aktuellen Preis |
 | Gutschrift-Entwurf trotz Rückkehr | die Person meldet sich wieder an, während oder nachdem die Website den vorgemerkten Gutschrift-Entwurf angelegt hat | der Beleg gilt weiter: den Gutschrift-Entwurf in Dolibarr löschen, dann Fall mit Grund erledigen. Ein offener Fall „Storniert, Beleg existiert“ zum selben Auftrag erledigt sich dabei von selbst |
 | Überzahlung | mehr bezahlt als verlangt | Differenz erstatten oder als Spende vereinbaren |
 | Zahlung auf stornierte Buchung | Geld kommt für eine abgesagte Anmeldung | nicht reaktivieren – erstatten oder klären |
