@@ -500,3 +500,39 @@ async def test_person_in_two_tournaments_of_the_event_gets_one_notice(flow):
     res = await send(flow, first, "Finale an PC 1", target="event")
     assert res.json()["recipients"] == 1
     assert len(await notified(flow, both)) == 1
+
+
+# ---------------------------------------------------------------- Fehler bei einer Person (Review N4)
+
+
+@pytest.mark.asyncio
+async def test_a_person_that_failed_is_not_counted_and_is_caught_up_when_resuming(flow, monkeypatch):
+    from services import user_notifications
+
+    world = await solo_world(flow)
+    bodo = world["people"]["Bodo"]["id"]
+    real = user_notifications.create_user_notification
+    broken = {"on": True}
+
+    async def flaky(user_id, *args, **kwargs):
+        if broken["on"] and user_id == bodo:
+            raise RuntimeError("Push-Dienst weg")
+        return await real(user_id, *args, **kwargs)
+
+    monkeypatch.setattr(user_notifications, "create_user_notification", flaky)
+    flow.act_as(world["lead"])
+    rid = request_id()
+    await send(flow, world["tournament"], request_id=rid)
+    notice = await flow.db.tournament_notices.find_one({}, {"_id": 0})
+    assert (notice["state"], notice["processed"], notice["delivered"], notice["failed"]) == ("interrupted", 2, 2, 1)
+    row = (await flow.get(lead_url(world["tournament"]))).json()["items"][0]
+    assert (row["state"], row["stale"], row["failed"]) == ("interrupted", True, 1)
+    assert await notified(flow, world["people"]["Bodo"]) == []
+
+    broken["on"] = False
+    again = await send(flow, world["tournament"], request_id=rid)
+    assert again.json()["resumed"] is True
+    notice = await flow.db.tournament_notices.find_one({}, {"_id": 0})
+    assert (notice["state"], notice["processed"], notice["delivered"], notice["failed"]) == ("sent", 3, 3, 0)
+    for name in ("Aria", "Bodo", "Cleo"):
+        assert len(await notified(flow, world["people"][name])) == 1, name

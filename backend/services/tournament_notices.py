@@ -266,7 +266,10 @@ async def deliver(db, *, notice_id: str) -> dict:
 
 
 async def _deliver(db, nid: str) -> dict:
-    """Glocke, Push und Discord je Person nach ihren Einstellungen; nach jeder Person steht der Fortschritt am Hinweis."""
+    """Glocke, Push und Discord je Person nach ihren Einstellungen; nach jeder Person steht der Fortschritt am Hinweis.
+
+    Klemmt es bei einer Person, zählt sie nicht als verarbeitet (Review N4): Der Versand endet dann auf ``interrupted`` mit
+    der Zahl der Fehlschläge, „Fortsetzen“ holt genau sie nach - wer schon benachrichtigt ist, bekommt nichts doppelt."""
     from services.user_notifications import create_user_notification
 
     doc = await db.tournament_notices.find_one({"_id": nid}, {"_id": 0})
@@ -276,8 +279,8 @@ async def _deliver(db, nid: str) -> dict:
     rows = await scope_tournaments(db, tournament, doc["target"])
     ids = await recipients(db, [row["id"] for row in rows], sender_id=doc.get("created_by"))
     name, path = await _place(db, tournament, doc)
-    for index, user_id in enumerate(ids, start=1):
-        delivered = 0
+    handled = failed = 0
+    for user_id in ids:
         try:
             done = await create_user_notification(
                 user_id, f"{HEADING} · {name}", doc["text"], url=path, kind=KIND,
@@ -285,16 +288,19 @@ async def _deliver(db, nid: str) -> dict:
                 # Eintragen und schickt weder Push noch Direktnachricht.
                 meta={"category": CATEGORY, "tournament_id": doc["tournament_id"], "event_id": doc.get("event_id"),
                       "notice_id": nid, "dedupe_key": f"tournament-notice:{nid}:{user_id}", "unique_dedupe": True})
-            delivered = 1 if done else 0
         except Exception:  # noqa: BLE001 - eine Person, bei der es klemmt, hält die anderen nicht auf
             logger.warning("[tournament_notices] Hinweis %s nicht zugestellt", log_safe(nid), exc_info=True)
-        change: dict = {"$set": {"progress_at": now_utc().isoformat()}, "$max": {"processed": index}}
-        if delivered:
+            failed += 1
+            await db.tournament_notices.update_one({"_id": nid}, {"$set": {"progress_at": now_utc().isoformat()}})
+            continue
+        handled += 1
+        # Beim Fortsetzen beginnt die Schleife vorn - der gespeicherte Stand geht dabei nie zurück.
+        change: dict = {"$set": {"progress_at": now_utc().isoformat()}, "$max": {"processed": handled}}
+        if done:
             change["$inc"] = {"delivered": 1}
         await db.tournament_notices.update_one({"_id": nid}, change)
-    await db.tournament_notices.update_one({"_id": nid}, {"$set": {"state": "sent", "recipients": len(ids),
-                                                                   "progress_at": now_utc().isoformat()},
-                                                          "$max": {"processed": len(ids)}})
+    await db.tournament_notices.update_one({"_id": nid}, {"$set": {
+        "state": "interrupted" if failed else "sent", "failed": failed, "recipients": len(ids), "progress_at": now_utc().isoformat()}})
     return answer(await db.tournament_notices.find_one({"_id": nid}, {"_id": 0}) or {})
 
 
@@ -310,7 +316,7 @@ def answer(doc: dict, now: datetime | None = None) -> dict:
     """Stand eines Hinweises für die Turnierleitung (ohne Text der Empfänger, ohne Namen)."""
     return {"id": doc.get("id"), "target": doc.get("target"), "target_label": TARGET_LABELS.get(doc.get("target"), ""),
             "recipients": int(doc.get("recipients") or 0), "processed": int(doc.get("processed") or 0),
-            "delivered": int(doc.get("delivered") or 0), "state": doc.get("state") or "sent",
+            "delivered": int(doc.get("delivered") or 0), "failed": int(doc.get("failed") or 0), "state": doc.get("state") or "sent",
             "stale": is_stale(doc, now), "expires_at": doc.get("expires_at")}
 
 
