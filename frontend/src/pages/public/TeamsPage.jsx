@@ -45,6 +45,7 @@ import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useLoad } from "@/hooks/useLoad";
 import { ShareButton } from "@/components/tls/ShareButton";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
+import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
 
@@ -425,6 +426,8 @@ function TeamDetail({ id }) {
           <TeamSchedule overview={overview} />
           {/* Season-Historie (F.2, #1627): Liga N, Platz, Meister je abgeschlossener Season. */}
           <LeagueSeasonHistory rows={team.league_history} showTeam testId="team-league-history" />
+          {/* Gesamtwertung über Seasons (F.5, #2215): Platz je Co-Team und Zeitraum. */}
+          <LeagueOverallStanding rows={team.league_overall} showTeam testId="team-league-overall" />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
               <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
