@@ -222,3 +222,13 @@ test("Check-in-Reiter: ?reiter=checkin aus der Verwaltung oeffnet ihn auch ausse
   fireEvent.click(screen.getByTestId("lead-tab-results"));
   expect(await screen.findByTestId("lead-row-m8")).toBeInTheDocument();
 });
+
+test("Reiter „Braucht Aufmerksamkeit“: ein Textblock, kein doppelter Abstand (Review N8)", async () => {
+  renderLead({ tournament: { id: "t1", title: "Cup" }, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } });
+  const tab = await screen.findByTestId("lead-tab-attention");
+  const label = screen.getByTestId("lead-tab-label-attention");
+  expect(label.parentElement).toBe(tab);
+  expect(label.textContent).toBe("Braucht Aufmerksamkeit (0)");
+  // Kein loses Leerzeichen als eigenes Flex-Kind neben dem Symbol.
+  expect([...tab.childNodes].filter((node) => node.nodeType === 3 && node.textContent.trim() === "")).toHaveLength(0);
+});
