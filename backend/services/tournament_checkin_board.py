@@ -18,6 +18,9 @@ from services.tournament_print import checkin_row
 # Wer am Turniertag kommen soll. Warteliste, Absage, Austritt und Disqualifikation stehen nicht in der Liste.
 BOARD_STATUSES = ("pending", "approved", "checked_in", "no_show")
 PAID_STATES = ("paid", "paid_reduced", "overpaid")
+# Solange der Baum Vorschau ist, rückt bei „Nicht erschienen“ die Warteliste von selbst nach (#1551) - dieselben Status wie
+# ``routes.tournament_registration_routes.WAITLIST_MOVE_UP_STATUSES`` (ein Test hält beide gleich).
+WAITLIST_MOVE_UP_STATUSES = frozenset({"scheduled", "registration_open", "registration_closed", "check_in"})
 
 _REG_FIELDS = {
     "_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1, "team_id": 1, "squad_id": 1, "seed": 1,
@@ -59,6 +62,16 @@ def _members(registration: dict, team: dict | None, squad: dict | None, names: d
     return [{
         "id": uid, "name": names.get(uid, "Spieler"), "role": role, "leader": uid == leader, "present": uid in present,
     } for uid, role in ordered], lineup_set
+
+
+async def waitlist_moves_up(db, tournament: dict) -> bool:
+    """Rückt bei „Nicht erschienen“ jetzt jemand von der Warteliste nach? Dann fragt der Reiter vorher (#1161, Review M2):
+    das Nachrücken lässt sich nicht einfach zurücknehmen."""
+    if tournament.get("status") not in WAITLIST_MOVE_UP_STATUSES or tournament.get("check_in_closed_at"):
+        return False
+    if not await db.tournament_registrations.count_documents({"tournament_id": tournament["id"], "status": "waitlist"}, limit=1):
+        return False
+    return not await db.matches_v2.count_documents({"tournament_id": tournament["id"], "is_preview": {"$ne": True}}, limit=1)
 
 
 def _sort_key(row: dict) -> tuple:
@@ -119,6 +132,7 @@ async def checkin_board(db, tournament: dict, *, show_amounts: bool = False) -> 
         "applies": True,
         "team_mode": team_mode,
         "rows": rows,
+        "waitlist_moves_up": await waitlist_moves_up(db, tournament),
         "counts": {
             "total": len(rows),
             "present": present,

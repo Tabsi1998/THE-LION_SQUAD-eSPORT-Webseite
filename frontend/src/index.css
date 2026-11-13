@@ -3607,6 +3607,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-lead-tap { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .tls-lead-checkin-row { transition: background-color var(--tls-motion-mid) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease); }
 .tls-lead-checkin-bar { transition: transform var(--tls-motion-slow) var(--tls-ease); }
+.tls-lead-ask { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; }
 .tls-lead-check-draw { stroke-dasharray: 1; animation: tls-lead-check-draw var(--tls-motion-mid) var(--tls-ease) backwards; }
 @keyframes tls-lead-check-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) {

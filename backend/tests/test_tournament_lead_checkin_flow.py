@@ -224,3 +224,73 @@ async def test_credited_and_abandoned_do_not_count_as_open(flow):
     body = (await flow.get(f"/api/tournaments/{tournament['id']}/lead/checkin")).json()
     assert {row["name"]: row["fee"] for row in body["rows"]} == {"Gerda": None, "Hugo": None, "Ida": "paid", "Jan": "open"}
     assert body["counts"]["fee_open"] == 1
+
+
+async def full_with_waitlist(flow, *, limit=4):
+    """Voll (limit/limit) plus eine Person auf der Warteliste - im Check-in, der Baum ist noch Vorschau."""
+    tournament = await flow.create_tournament(title="Voll-Cup", event_mode="local", status="check_in", max_participants=limit)
+    regs = [await flow.register(tournament, await flow.add_user(name=f"Spieler {index}")) for index in range(limit)]
+    waiting = await flow.register(tournament, await flow.add_user(name="Wartende Wilma"), status="waitlist")
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    return tournament, regs, waiting
+
+
+@pytest.mark.asyncio
+async def test_back_from_no_show_needs_a_free_place(flow):
+    """Review M2: „Nicht erschienen“, jemand rückt nach, dann „Rückgängig“ - das wäre überbucht."""
+    tournament, regs, waiting = await full_with_waitlist(flow)
+    base = f"/api/tournaments/{tournament['id']}/registrations"
+    marked = await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": "no_show"})
+    assert marked.status_code == 200, marked.text
+    assert marked.json()["waitlist_moved_up"] == [waiting["id"]]
+
+    for status in ("approved", "checked_in"):
+        back = await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": status})
+        assert back.status_code == 409, (status, back.text)
+        assert back.json()["detail"] == "Inzwischen ist Wartende Wilma nachgerückt – kein freier Platz mehr. In der Verwaltung entscheiden."
+    # Derselbe Weg über die Verwaltung (Status-Auswahl) hat dieselbe Grenze.
+    patched = await flow.patch(f"{base}/{regs[0]['id']}", json={"status": "approved"})
+    assert patched.status_code == 409, patched.text
+    stored = await flow.db.tournament_registrations.find_one({"id": regs[0]["id"]}, {"_id": 0, "status": 1})
+    assert stored["status"] == "no_show"
+    active = await flow.db.tournament_registrations.count_documents(
+        {"tournament_id": tournament["id"], "status": {"$in": ["pending", "approved", "checked_in"]}})
+    assert active == 4
+
+    # Wird wieder ein Platz frei, geht die Rückkehr.
+    await flow.post(f"{base}/{regs[1]['id']}/checkin", json={"status": "no_show"})
+    back = await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": "checked_in"})
+    assert back.status_code == 200, back.text
+
+
+@pytest.mark.asyncio
+async def test_back_from_rejected_when_full_is_refused(flow):
+    tournament, regs, _waiting = await full_with_waitlist(flow)
+    rejected = await flow.register(tournament, await flow.add_user(name="Rita"), status="rejected")
+    response = await flow.patch(f"/api/tournaments/{tournament['id']}/registrations/{rejected['id']}", json={"status": "approved"})
+    assert response.status_code == 409, response.text
+    assert "kein freier Platz mehr" in response.json()["detail"]
+    # Ohne Höchstzahl keine Grenze - und mit freiem Platz geht es wie bisher.
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"max_participants": 6}})
+    response = await flow.patch(f"/api/tournaments/{tournament['id']}/registrations/{rejected['id']}", json={"status": "approved"})
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_board_says_when_no_show_moves_someone_up(flow):
+    """Review M2: der Reiter fragt vor „Nicht erschienen“, wenn dann jemand von der Warteliste nachrückt."""
+    from routes.tournament_registration_routes import WAITLIST_MOVE_UP_STATUSES as ROUTE_STATUSES
+    from services.tournament_checkin_board import WAITLIST_MOVE_UP_STATUSES
+
+    assert set(WAITLIST_MOVE_UP_STATUSES) == set(ROUTE_STATUSES)
+    tournament, _regs, waiting = await full_with_waitlist(flow)
+    url = f"/api/tournaments/{tournament['id']}/lead/checkin"
+    body = (await flow.get(url)).json()
+    assert body["waitlist_moves_up"] is True
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"check_in_closed_at": "2026-11-14T18:00:00+00:00"}})
+    body = (await flow.get(url)).json()
+    assert body["waitlist_moves_up"] is False, "nach dem Check-in-Ende rückt niemand von selbst nach"
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$unset": {"check_in_closed_at": ""}})
+    await flow.db.tournament_registrations.update_one({"id": waiting["id"]}, {"$set": {"status": "rejected"}})
+    body = (await flow.get(url)).json()
+    assert body["waitlist_moves_up"] is False, "ohne Warteliste keine Rückfrage"

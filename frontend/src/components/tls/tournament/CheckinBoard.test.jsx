@@ -138,3 +138,35 @@ test("Team-Zeile: ein Team, zehn Mitglieder ohne Aufstellung - oder Spielt/Ersat
   expect(screen.getAllByRole("listitem").map((item) => item.dataset.testid)).toEqual(["lead-checkin-row-lsw"]);
   expect(screen.getByTestId("lead-checkin-search")).toHaveAttribute("placeholder", "Team, Kürzel oder Mitglied suchen");
 });
+
+test("„Nicht erschienen“ fragt vorher, wenn dann jemand von der Warteliste nachrückt", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "r3", status: "no_show", waitlist_moved_up: [], placement: null } });
+  renderBoard({ ...SOLO_BOARD, waitlist_moves_up: true });
+  fireEvent.click(await screen.findByTestId("lead-checkin-noshow-r3"));
+  const question = screen.getByTestId("lead-checkin-ask-r3");
+  expect(question).toHaveAttribute("role", "alertdialog");
+  expect(question).toHaveTextContent("Dann rückt jemand von der Warteliste nach – das lässt sich nicht einfach rückgängig machen.");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId("lead-checkin-ask-cancel-r3")).toHaveFocus();
+
+  fireEvent.click(screen.getByTestId("lead-checkin-ask-cancel-r3"));
+  expect(screen.queryByTestId("lead-checkin-ask-r3")).toBeNull();
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("lead-checkin-noshow-r3"));
+  fireEvent.keyDown(screen.getByTestId("lead-checkin-ask-r3"), { key: "Escape" });
+  expect(screen.queryByTestId("lead-checkin-ask-r3")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("lead-checkin-noshow-r3"));
+  fireEvent.click(screen.getByTestId("lead-checkin-ask-confirm-r3"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/registrations/r3/checkin", { status: "no_show" }));
+  expect(screen.queryByTestId("lead-checkin-ask-r3")).toBeNull();
+});
+
+test("ohne Nachrücker kein Zwischenschritt", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "r3", status: "no_show", waitlist_moved_up: [], placement: null } });
+  renderBoard({ ...SOLO_BOARD, waitlist_moves_up: false });
+  fireEvent.click(await screen.findByTestId("lead-checkin-noshow-r3"));
+  expect(screen.queryByTestId("lead-checkin-ask-r3")).toBeNull();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/registrations/r3/checkin", { status: "no_show" }));
+});

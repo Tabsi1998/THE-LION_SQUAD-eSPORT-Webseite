@@ -77,7 +77,7 @@ async def tournament_lead_checkin(tid: str, response: Response, me: dict = Depen
     tournament = await db.tournaments.find_one(
         {"id": tournament_id},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "team_mode": 1, "team_size": 1, "event_mode": 1, "is_online": 1,
-         "is_hybrid": 1, "status": 1, "league_context": 1, "check_in_from": 1, "check_in_until": 1})
+         "is_hybrid": 1, "status": 1, "league_context": 1, "check_in_from": 1, "check_in_until": 1, "check_in_closed_at": 1})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     head = {"id": tournament["id"], "slug": tournament.get("slug"), "title": tournament.get("title"),

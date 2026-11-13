@@ -31,6 +31,8 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
   const [pending, setPending] = useState({});
   // Frisch abgehakt (diese Sitzung): nur dort zeichnet sich das Häkchen nach - nicht bei allem, was schon da war.
   const [fresh, setFresh] = useState({});
+  // Rückfrage vor „Nicht erschienen“ (Review M2): rückt dann jemand von der Warteliste nach, erst bestätigen lassen.
+  const [asking, setAsking] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -53,7 +55,16 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
     [rows, query, filter, pending],
   );
 
+  const ask = (row, status) => {
+    if (status === "no_show" && board?.waitlist_moves_up) {
+      setAsking(row.id);
+      return;
+    }
+    setStatus(row, status);
+  };
+
   const setStatus = async (row, status) => {
+    setAsking("");
     if (pending[row.id]) return;
     setPending((now) => ({ ...now, [row.id]: status }));
     if (status === "checked_in") setFresh((now) => ({ ...now, [row.id]: true }));
@@ -114,7 +125,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
 
       <ul className="mt-3 space-y-2" data-testid="lead-checkin-list">
         {shown.map((row) => (
-          <CheckinRow key={row.id} row={row} status={shownStatus(row, pending)} saving={Boolean(pending[row.id])} fresh={Boolean(fresh[row.id])} onStatus={(status) => setStatus(row, status)} />
+          <CheckinRow key={row.id} row={row} status={shownStatus(row, pending)} saving={Boolean(pending[row.id])} fresh={Boolean(fresh[row.id])} asking={asking === row.id} onStatus={(status) => ask(row, status)} onConfirm={() => setStatus(row, "no_show")} onCancel={() => setAsking("")} />
         ))}
       </ul>
       {rows.length === 0 ? (
@@ -206,7 +217,36 @@ function TeamMembers({ row }) {
   );
 }
 
-export function CheckinRow({ row, status, saving, fresh, onStatus }) {
+/** Die Rückfrage in der Zeile - kein Browser-Dialog. Fokus auf „Abbrechen“, Escape bricht ab. */
+function NoShowQuestion({ row, onConfirm, onCancel }) {
+  const cancel = useRef(null);
+  const close = useRef(onCancel);
+  close.current = onCancel;
+  useEffect(() => {
+    cancel.current?.focus();
+    const onKey = (event) => { if (event.key === "Escape") close.current(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  return (
+    <div
+      role="alertdialog"
+      aria-labelledby={`lead-checkin-ask-text-${row.id}`}
+      className="tls-lead-ask mt-3 rounded-sm border border-warn/40 bg-warn/[0.07] p-3"
+      data-testid={`lead-checkin-ask-${row.id}`}
+    >
+      <p id={`lead-checkin-ask-text-${row.id}`} className="text-sm text-white/85">
+        <span className="font-bold text-white">{row.name} nicht erschienen?</span> Dann rückt jemand von der Warteliste nach – das lässt sich nicht einfach rückgängig machen.
+      </p>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <button ref={cancel} type="button" onClick={onCancel} className="tls-btn tls-btn--quiet tls-lead-tap min-h-[44px] rounded-sm px-4 text-xs font-bold uppercase tracking-wider" data-testid={`lead-checkin-ask-cancel-${row.id}`}>Abbrechen</button>
+        <button type="button" onClick={onConfirm} className="tls-btn tls-btn--danger tls-lead-tap min-h-[44px] rounded-sm px-4 text-xs font-bold uppercase tracking-wider" data-testid={`lead-checkin-ask-confirm-${row.id}`}>Ja, nicht erschienen</button>
+      </div>
+    </div>
+  );
+}
+
+export function CheckinRow({ row, status, saving, fresh, asking = false, onStatus, onConfirm, onCancel }) {
   const here = status === "checked_in";
   const gone = status === "no_show";
   const at = here && row.checked_in_at ? viennaTime(row.checked_in_at, { hour: "2-digit", minute: "2-digit" }) : "";
@@ -239,7 +279,8 @@ export function CheckinRow({ row, status, saving, fresh, onStatus }) {
           </button>
         )}
       </div>
-      {!here && !gone ? (
+      {asking ? <NoShowQuestion row={row} onConfirm={onConfirm} onCancel={onCancel} /> : null}
+      {!here && !gone && !asking ? (
         <div className="mt-2 flex justify-end">
           <button type="button" disabled={saving} onClick={() => onStatus("no_show")} className="tls-lead-tap inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2 text-[11px] font-bold uppercase tracking-wider text-white/50 hover:text-warn" data-testid={`lead-checkin-noshow-${row.id}`} aria-label={`${row.name} nicht erschienen`}>
             <UserX className="h-4 w-4" aria-hidden="true" /> Nicht erschienen

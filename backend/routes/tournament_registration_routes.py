@@ -423,6 +423,46 @@ async def _require_seed_on_return(db, tournament: dict, reg: dict, new_status: s
         await _require_free_seed(db, tournament["id"], reg.get("seed"), reg["id"])
 
 
+# Zurück aus einem beendeten Stand (#1161): „Nicht erschienen“ oder „Abgelehnt“ wieder auf bestätigt bzw. eingecheckt.
+RETURNS_FROM_ENDED = {"no_show", "rejected"}
+
+
+async def registration_names(db, registration_ids: list[str]) -> list[str]:
+    """Anzeigenamen in der Reihenfolge der Kennungen - für Meldungen an die Turnierleitung (#1941, #1161)."""
+    if not registration_ids:
+        return []
+    rows = {row["id"]: row for row in await db.tournament_registrations.find(
+        {"id": {"$in": list(registration_ids)}}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
+    ).to_list(len(registration_ids))}
+    return [str((rows.get(rid) or {}).get("display_name") or (rows.get(rid) or {}).get("ingame_name")
+                or (rows.get(rid) or {}).get("team_name") or "Teilnehmer") for rid in registration_ids]
+
+
+async def _require_free_place_on_return(db, tournament: dict, reg: dict, new_status: str | None) -> None:
+    """Wer aus „Nicht erschienen“ oder „Abgelehnt“ zurückkommt, braucht einen freien Platz (#1161). Ist inzwischen jemand
+    von der Warteliste nachgerückt und das Turnier voll, lehnt der Server ab - sonst wäre es überbucht. Die Leitung
+    entscheidet dann in der Verwaltung (etwa den Platz tauschen). Ohne Höchstzahl gibt es keine Grenze."""
+    if reg.get("status") not in RETURNS_FROM_ENDED or new_status not in ("approved", "checked_in"):
+        return
+    try:
+        limit = int(tournament.get("max_participants") or 0)
+    except (TypeError, ValueError):
+        limit = 0
+    if limit <= 0:
+        return
+    taken = await db.tournament_registrations.count_documents(
+        {"tournament_id": tournament["id"], "status": {"$in": ACTIVE_REGISTRATION_STATUSES}, "id": {"$ne": reg["id"]}})
+    if taken < limit:
+        return
+    moved = await db.audit_logs.find_one(
+        {"action": "tournament.registration.waitlist_moved_up", "target_id": tournament["id"]},
+        {"_id": 0, "data": 1}, sort=[("created_at", -1)])
+    moved_id = ((moved or {}).get("data") or {}).get("registration_id")
+    names = await registration_names(db, [moved_id]) if moved_id else []
+    lead = f"Inzwischen ist {names[0]} nachgerückt" if names else "Inzwischen sind alle Plätze vergeben"
+    raise HTTPException(status_code=409, detail=f"{lead} – kein freier Platz mehr. In der Verwaltung entscheiden.")
+
+
 async def _open_place(db, tid: str, matches: list[dict]) -> dict | None:
     """Der Platz, den ein Nachrücker im festen Baum bekäme (#1551) - nur nachsehen, nichts schreiben. Zuerst der einer
     Person „Nicht erschienen“ (mit dem niedrigsten Setzplatz), sonst ein leerer Platz neben einem Freilos."""
@@ -1129,6 +1169,9 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         if any(not match.get("is_preview") for match in matches) and not await _open_place(db, tid, matches):
             raise HTTPException(status_code=409, detail=REMOVAL_NO_PLACE)
     if updates.get("status") and updates["status"] != previous_status:
+        # Zurück aus „Nicht erschienen“ oder „Abgelehnt“ nur auf einen freien Platz (#1161) - wie im Check-in-Weg.
+        await _require_free_place_on_return(db, tournament_doc, reg, updates["status"])
+    if updates.get("status") and updates["status"] != previous_status:
         # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
         await _sync_squad_key(db, reg, updates["status"], tournament_doc)
@@ -1200,6 +1243,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
             if reg.get("status") in REMOVAL_KINDS:
                 raise HTTPException(status_code=409, detail=REMOVAL_NOT_AT_CHECKIN)
+            await _require_free_place_on_return(db, tournament_doc, reg, status)
             await _require_seed_on_return(db, tournament_doc, reg, status)
             await _sync_squad_key(db, reg, status, tournament_doc)
 
