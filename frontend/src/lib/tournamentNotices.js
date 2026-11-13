@@ -98,7 +98,10 @@ export function deliveryText(item) {
   if (!item) return "";
   const people = item.recipients === 1 ? "1 Person" : `${item.recipients || 0} Personen`;
   if (item.state === "sending" && !item.stale) return `wird verschickt · ${item.processed || 0} von ${people}`;
-  if (item.state === "interrupted" || item.stale) return `Versand unterbrochen · ${item.processed || 0} von ${people}`;
+  if (item.state === "interrupted" || item.stale) {
+    const failed = item.failed ? ` · bei ${item.failed === 1 ? "1 Person" : `${item.failed} Personen`} hat es geklemmt` : "";
+    return `Versand unterbrochen · ${item.processed || 0} von ${people}${failed} – bitte fortsetzen`;
+  }
   if (item.state === "failed") return "Versand fehlgeschlagen";
   return `an ${people} · ${item.delivered || 0} benachrichtigt`;
 }

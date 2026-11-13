@@ -125,3 +125,17 @@ it("schickt nichts unter drei Zeichen", async () => {
   fireEvent.change(screen.getByTestId("notice-text-input"), { target: { value: "ok" } });
   expect(screen.getByTestId("notice-send")).toBeDisabled();
 });
+
+it("bietet bei einem unterbrochenen Versand „Fortsetzen“ an - mit dem gespeicherten Hinweis (Review M1)", async () => {
+  const interrupted = { ...LIST.items[0], id: "tn-9", request_id: "notice-abc", state: "interrupted", stale: true, processed: 2, delivered: 2, failed: 1, recipients: 3 };
+  apiMock.get.mockResolvedValue({ data: { ...LIST, items: [interrupted, LIST.items[0], LIST.items[1]] } });
+  apiMock.post.mockImplementation(async (url) => (url.endsWith("/preview") ? { data: { recipients: 3 } } : { data: { resumed: true, replay: true } }));
+  render(<NoticeComposer slug="lan-cup" tournament={{ id: "t1", event_id: "ev1", status: "live" }} stations={[]} />);
+  const row = await screen.findByTestId("notice-log-tn-9");
+  expect(within(row).getByTestId("notice-delivery-tn-9").textContent).toMatch(/Versand unterbrochen · 2 von 3 Personen/);
+  // Wer schon fertig ist, bekommt keinen Knopf.
+  expect(screen.queryByTestId("notice-resume-tn-1")).toBeNull();
+  fireEvent.click(within(row).getByTestId("notice-resume-tn-9"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/lan-cup/lead/notices/tn-9/resume"));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Versand läuft weiter – niemand bekommt den Hinweis doppelt."));
+});

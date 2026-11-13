@@ -6,6 +6,7 @@
 - ``POST   /api/tournaments/{tid}/lead/notices/preview``: wie viele Personen den Hinweis bekämen.
 - ``POST   /api/tournaments/{tid}/lead/notices``: schreiben, einmal je ``request_id``. Die Antwort kommt sofort, verschickt
   wird im Hintergrund (wie die Rundnachricht aus E.4).
+- ``POST   /api/tournaments/{tid}/lead/notices/{notice_id}/resume``: einen unterbrochenen Versand fortsetzen.
 - ``DELETE /api/tournaments/{tid}/lead/notices/{notice_id}``: entfernen - Banner und TV zeigen ihn nicht mehr.
 
 Schreiben und entfernen: Organisation und Schiedsrichter mit Einsatz für das ganze Turnier, die Turnierleitung als Rolle
@@ -104,6 +105,20 @@ async def lead_notice_send(tid: str, body: NoticeBody, background: BackgroundTas
     try:
         answer, job = await notices.send(db, tournament, me, request_id=body.request_id, text=body.text, target=body.target,
                                          show_on_tv=body.show_on_tv, duration_minutes=body.duration_minutes)
+    except notices.NoticeProblem as problem:
+        _raise(problem)
+    if job:
+        background.add_task(notices.deliver, db, **job)
+    return answer
+
+
+@router.post("/{tid}/lead/notices/{notice_id}/resume")
+async def lead_notice_resume(tid: str, notice_id: str, background: BackgroundTasks, me: dict = Depends(get_current_user)):
+    """„Fortsetzen“: ein unterbrochener Versand läuft mit Text, Ziel und Kennung des Hinweises weiter - ohne Doppelte."""
+    db = get_db()
+    tournament = await _lead_tournament(db, tid, me)
+    try:
+        answer, job = await notices.resume(db, tournament, me, notice_id)
     except notices.NoticeProblem as problem:
         _raise(problem)
     if job:

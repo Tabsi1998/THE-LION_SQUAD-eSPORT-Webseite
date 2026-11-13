@@ -536,3 +536,56 @@ async def test_a_person_that_failed_is_not_counted_and_is_caught_up_when_resumin
     assert (notice["state"], notice["processed"], notice["delivered"], notice["failed"]) == ("sent", 3, 3, 0)
     for name in ("Aria", "Bodo", "Cleo"):
         assert len(await notified(flow, world["people"][name])) == 1, name
+
+
+# ---------------------------------------------------------------- Fortsetzen im Protokoll (Review M1)
+
+
+@pytest.mark.asyncio
+async def test_crashed_delivery_shows_as_interrupted_and_resume_finishes_it_without_doubles(flow, monkeypatch):
+    from services import tournament_notices
+
+    world = await solo_world(flow)
+    real_place = tournament_notices._place
+
+    async def crash(*args, **kwargs):
+        raise RuntimeError("Datenbank kurz weg")
+
+    monkeypatch.setattr(tournament_notices, "_place", crash)
+    flow.act_as(world["lead"])
+    first = await send(flow, world["tournament"], "Finale an PC 1")
+    assert first.status_code == 200
+    rows = (await flow.get(lead_url(world["tournament"]))).json()["items"]
+    assert (rows[0]["state"], rows[0]["stale"], rows[0]["processed"]) == ("interrupted", True, 0)
+    assert rows[0]["request_id"]
+    notice_id = rows[0]["id"]
+
+    # Wer nicht leitet, setzt nichts fort.
+    flow.act_as(world["people"]["Aria"])
+    res = await flow.post(lead_url(world["tournament"], f"/{notice_id}/resume"))
+    assert res.status_code == 403
+
+    monkeypatch.setattr(tournament_notices, "_place", real_place)
+    flow.act_as(world["lead"])
+    res = await flow.post(lead_url(world["tournament"], f"/{notice_id}/resume"))
+    assert res.status_code == 200, res.text
+    assert res.json()["resumed"] is True
+    rows = (await flow.get(lead_url(world["tournament"]))).json()["items"]
+    assert (rows[0]["state"], rows[0]["stale"], rows[0]["delivered"]) == ("sent", False, 3)
+    # Ein zweites „Fortsetzen“ ändert nichts mehr.
+    again = await flow.post(lead_url(world["tournament"], f"/{notice_id}/resume"))
+    assert again.json()["replay"] is True and "resumed" not in again.json()
+    for name in ("Aria", "Bodo", "Cleo"):
+        assert len(await notified(flow, world["people"][name])) == 1, name
+
+
+@pytest.mark.asyncio
+async def test_removed_notice_is_not_resumed(flow):
+    world = await solo_world(flow)
+    flow.act_as(world["lead"])
+    await send(flow, world["tournament"])
+    notice = await flow.db.tournament_notices.find_one({}, {"_id": 0})
+    await flow.db.tournament_notices.update_one({"id": notice["id"]}, {"$set": {"state": "interrupted"}})
+    await flow.delete(lead_url(world["tournament"], f"/{notice['id']}"))
+    res = await flow.post(lead_url(world["tournament"], f"/{notice['id']}/resume"))
+    assert res.status_code == 409

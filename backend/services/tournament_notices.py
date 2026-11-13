@@ -314,10 +314,29 @@ async def _place(db, tournament: dict, doc: dict) -> tuple[str, str]:
 
 def answer(doc: dict, now: datetime | None = None) -> dict:
     """Stand eines Hinweises für die Turnierleitung (ohne Text der Empfänger, ohne Namen)."""
-    return {"id": doc.get("id"), "target": doc.get("target"), "target_label": TARGET_LABELS.get(doc.get("target"), ""),
+    return {"id": doc.get("id"), "request_id": doc.get("request_id"), "target": doc.get("target"),
+            "target_label": TARGET_LABELS.get(doc.get("target"), ""),
             "recipients": int(doc.get("recipients") or 0), "processed": int(doc.get("processed") or 0),
             "delivered": int(doc.get("delivered") or 0), "failed": int(doc.get("failed") or 0), "state": doc.get("state") or "sent",
             "stale": is_stale(doc, now), "expires_at": doc.get("expires_at")}
+
+
+# ---------------------------------------------------------------- Fortsetzen (Review M1)
+
+GONE = "Dieser Hinweis steht nicht mehr - entfernt oder abgelaufen. Bitte einen neuen schreiben."
+
+
+async def resume(db, tournament: dict, me: dict, nid: str, now: datetime | None = None) -> tuple[dict, dict | None]:
+    """„Fortsetzen“ im Protokoll: ein unterbrochener oder hängender Versand läuft mit den gespeicherten Werten weiter (Text,
+    Ziel, Kennung). Wer schon benachrichtigt ist, bekommt nichts doppelt. Läuft er noch oder ist er durch, passiert nichts.
+    Rechte für das Turnier prüft die Route; beim Ziel „Event“ hier die für das Event."""
+    doc = await _notice_of(db, tournament, nid)
+    if doc.get("target") == "event" and not await can_write_event(db, me, doc.get("event_id")):
+        raise NoticeProblem("Einen Hinweis an das ganze Event setzt fort, wer für alle Turniere des Events schreiben darf.", 403)
+    moment = now or now_utc()
+    if not is_active(doc, moment):
+        raise NoticeProblem(GONE, 409)
+    return await _replay(db, doc, moment)
 
 
 # ---------------------------------------------------------------- Entfernen

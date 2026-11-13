@@ -71,7 +71,8 @@ describe("Formular und Protokoll", () => {
     expect(deliveryText({ state: "sent", recipients: 12, delivered: 11 })).toBe("an 12 Personen · 11 benachrichtigt");
     expect(deliveryText({ state: "sent", recipients: 1, delivered: 1 })).toBe("an 1 Person · 1 benachrichtigt");
     expect(deliveryText({ state: "sending", recipients: 40, processed: 7 })).toBe("wird verschickt · 7 von 40 Personen");
-    expect(deliveryText({ state: "sending", stale: true, recipients: 40, processed: 7 })).toBe("Versand unterbrochen · 7 von 40 Personen");
+    expect(deliveryText({ state: "sending", stale: true, recipients: 40, processed: 7 })).toBe("Versand unterbrochen · 7 von 40 Personen – bitte fortsetzen");
+    expect(deliveryText({ state: "interrupted", recipients: 3, processed: 2, failed: 1 })).toBe("Versand unterbrochen · 2 von 3 Personen · bei 1 Person hat es geklemmt – bitte fortsetzen");
   });
 
   it("gibt jedem Hinweis eine eigene Kennung", () => {

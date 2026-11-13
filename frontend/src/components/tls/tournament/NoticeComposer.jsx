@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MonitorPlay, Send, Trash2 } from "lucide-react";
+import { MonitorPlay, RotateCw, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -138,6 +138,21 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
     }
   };
 
+  // „Fortsetzen“ (Review M1): ein unterbrochener Versand läuft mit Text, Ziel und Kennung des Hinweises weiter - wer schon
+  // benachrichtigt ist, bekommt nichts doppelt.
+  const resume = async (item) => {
+    setRemoving(item.id);
+    try {
+      const { data } = await api.post(`${base}/${encodeURIComponent(item.id)}/resume`);
+      toast.success(data?.resumed ? "Versand läuft weiter – niemand bekommt den Hinweis doppelt." : "Der Versand läuft schon oder ist fertig.");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Fortsetzen hat nicht geklappt.");
+    } finally {
+      setRemoving("");
+    }
+  };
+
   const items = list?.items || [];
   return (
     <div className="mt-5 space-y-6" data-testid="lead-notice">
@@ -228,9 +243,16 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
                   </div>
                 </div>
                 {item.active && item.can_remove ? (
-                  <button type="button" disabled={removing === item.id} onClick={() => remove(item)} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider" data-testid={`notice-remove-${item.id}`}>
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Entfernen
-                  </button>
+                  <div className="flex shrink-0 flex-col items-stretch gap-2">
+                    {item.stale || item.state === "interrupted" ? (
+                      <button type="button" disabled={removing === item.id} onClick={() => resume(item)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider" data-testid={`notice-resume-${item.id}`}>
+                        <RotateCw className="h-3.5 w-3.5" aria-hidden="true" /> Fortsetzen
+                      </button>
+                    ) : null}
+                    <button type="button" disabled={removing === item.id} onClick={() => remove(item)} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider" data-testid={`notice-remove-${item.id}`}>
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Entfernen
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </li>
