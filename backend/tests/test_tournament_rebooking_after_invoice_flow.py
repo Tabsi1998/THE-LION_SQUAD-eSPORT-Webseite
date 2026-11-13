@@ -292,6 +292,21 @@ async def test_warteliste_nach_abgleich_dann_nachgerueckt_ein_prueffall(flow, fa
     assert note["title"].startswith("Nachgerückt") and KEPT_INVOICE in note["body"]
 
 
+@pytest.mark.asyncio
+async def test_leitung_holt_selbst_zurueckgekehrte_von_der_warteliste_grund_selbst_neu_angemeldet(flow, fake):
+    """Abgemeldet, selbst neu auf die Warteliste, die Turnierleitung bestätigt: Der Prüffall nennt den eigentlichen Grund - die
+    Person hat sich nach dem Storno selbst neu angemeldet, die Leitung hat nichts reaktiviert."""
+    kassier, cup, paula, booked, order = await booked_with_invoice(flow, fake, max_participants=1)
+    await unregister(flow, cup, paula, booked)
+    otto = await person(flow, "otto")
+    assert (await register(flow, otto, cup["id"], accept_costs=True)).json()["status"] == "approved"
+    assert (await billing_orders.classify_due())["invoiced"] == 1, "Ottos eigener Beleg"
+    waiting = await come_back(flow, cup, kassier, paula, booked, by_lead=False)
+    assert waiting["id"] == booked["id"] and waiting["status"] == "waitlist"
+    await set_status(flow, kassier, cup, waiting, "approved")
+    await assert_review(flow, booked, order, reason=SELF_REASON, new_cents=1000, billing_status="invoiced")
+
+
 # ---------------------------------------------------------------- Beleg gilt nicht mehr
 
 @pytest.mark.asyncio

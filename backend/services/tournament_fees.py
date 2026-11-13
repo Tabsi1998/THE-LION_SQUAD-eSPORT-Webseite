@@ -80,13 +80,22 @@ def same_payer(order: dict, payer: dict, registration: dict) -> bool:
     return order.get("user_id") == payer.get("id") and same_team
 
 
+def rebook_reason_for(registration: dict, order: dict) -> str:
+    """Der Grund im Prüffall, wenn die Leitung eine zurückgekehrte Anmeldung bestätigt (#2368): Entstand die Anmeldung erst nach
+    dem Storno, hat sich die Person selbst neu angemeldet (etwa auf die Warteliste) - „Nach Storno selbst neu angemeldet“.
+    Sonst hat die Leitung eine beendete Anmeldung wieder aktiviert."""
+    created, cancelled = str(registration.get("created_at") or ""), str(order.get("booking_cancelled_at") or "")
+    return billing_orders.REBOOKED_SELF if created and cancelled and created > cancelled else billing_orders.REBOOKED_BY_LEAD
+
+
 async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict, selected: list[str] | None = None,
-                       rebook_reason: str = billing_orders.REBOOKED_BY_LEAD) -> dict | None:
+                       rebook_reason: str | None = None) -> dict | None:
     """Preis einfrieren und Auftrag anlegen - nur bei verbindlicher Teilnahme und nur einmal.
 
     Zurück nach einem Storno, obwohl es zur Anmeldung schon einen Beleg gibt (#2368, wie bei Events #2184): kein neuer Preis
     und kein zweiter Auftrag. Die Buchung gilt am Auftrag wieder (``billing_orders.rebook_after_invoice``), die Anmeldung trägt
-    wieder Preis und Stand des Belegs, die Finanzverwaltung bekommt den Prüffall mit alt und neu (Grund ``rebook_reason``). Gilt der Beleg nicht mehr (voll gutgeschrieben, aufgegeben, Entwurf gelöscht) oder gehört er
+    wieder Preis und Stand des Belegs, die Finanzverwaltung bekommt den Prüffall mit alt und neu (Grund ``rebook_reason``, ohne
+    ihn ``rebook_reason_for``). Gilt der Beleg nicht mehr (voll gutgeschrieben, aufgegeben, Entwurf gelöscht) oder gehört er
     einer anderen zahlenden Person (``same_payer``), gilt der aktuelle Preis mit eigenem Auftrag.
 
     Was hier an die Anmeldung geht, steht danach auch in ``registration`` - nach einer Rückbuchung dazu ``invoice_kept`` (nur
@@ -111,7 +120,8 @@ async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict,
         # Ein anderes Teammitglied hat die Anmeldung übernommen (#2368, etwa nach weggenommener Ablehnung): Die Rechnung gehört
         # der bisherigen Person - die neue zahlt mit eigenem Auftrag, die alte Rechnung bleibt storniert.
         invoiced = None
-    if invoiced and await billing_orders.rebook_after_invoice(db, invoiced, reason=rebook_reason, new_total_cents=int(price.get("total_cents") or 0)):
+    if invoiced and await billing_orders.rebook_after_invoice(db, invoiced, reason=rebook_reason or rebook_reason_for(registration, invoiced),
+                                                              new_total_cents=int(price.get("total_cents") or 0)):
         fields = billing_orders.rebooked_fields(invoiced)
         await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {**fields, "updated_at": now}})
         registration.update(fields, invoice_kept=True)
