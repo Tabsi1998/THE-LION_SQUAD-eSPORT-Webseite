@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ChevronRight, CircleCheck, ClipboardX, Scale, Shuffle, Timer, UserX, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronRight, CircleCheck, ClipboardX, MessagesSquare, Scale, Shuffle, Timer, UserX, Wrench } from "lucide-react";
 import { EASE_MOVE, MICRO, MOTION, motionAllowed } from "@/lib/motion";
 import { problemCountText } from "@/lib/tournamentCockpit";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
@@ -21,7 +21,7 @@ const ICONS = {
   no_show: UserX,
   station_broken: Wrench,
   result_missing: ClipboardX,
-  report_conflict: ClipboardX,
+  report_conflict: MessagesSquare,
   delay: Timer,
   draw: Shuffle,
 };

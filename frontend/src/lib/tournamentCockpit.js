@@ -5,20 +5,23 @@
 // und wohin ein Tipp führt. Die App (mobile/) übernimmt dieselben Regeln mit #2393.
 import { DELAY_SHOWN_FROM, delayText } from "@/lib/liveQueue";
 
-// Dringlichkeit: kleiner ist dringender. Einspruch zuerst (ein Ergebnis hängt und beide Seiten warten), dann wer nicht
-// erschienen ist (die Station steht), dann eine defekte Station mit wartenden Spielen, dann was fehlt, zuletzt Verzug
-// und Auslosung (laufen von selbst weiter). Dieselbe Reihenfolge wie der Server für „Braucht Aufmerksamkeit“.
+// Dringlichkeit: kleiner ist dringender. Für die Fälle aus „Braucht Aufmerksamkeit“ dieselbe Reihenfolge wie der
+// Server (services/match_attention.py, Sortierung am Ende von attention_items): Streitfall, nicht erschienen, Station
+// defekt, Ergebnis fehlt, Meldungen weichen ab - innerhalb einer Art das am längsten Überfällige zuerst. Das Cockpit
+// weicht an zwei Stellen bewusst ab: Ein Liga-Verfahren (`procedure`, Protest oder Einspruch) steht beim Server ganz
+// hinten, hier ist es ein Einspruch wie der Streitfall und steht vorn. Und das Cockpit kennt zwei Arten mehr, die der
+// Server nicht als Fall führt - Verzug und Auslosung -, beide hinten, weil sie von selbst weiterlaufen.
 export const PROBLEM_KINDS = Object.freeze({
   dispute: { rank: 0, chip: "Einspruch", tone: "warn" },
   procedure: { rank: 0, chip: "Einspruch", tone: "warn" },
   no_show: { rank: 1, chip: "Nicht erschienen", tone: "warn" },
   station_broken: { rank: 2, chip: "Defekt", tone: "warn" },
   result_missing: { rank: 3, chip: "Ergebnis fehlt", tone: "honor" },
-  report_conflict: { rank: 3, chip: "Ergebnis fehlt", tone: "honor" },
-  delay: { rank: 4, chip: "Verzug", tone: "honor" },
-  draw: { rank: 5, chip: "Auslosung", tone: "brand" },
+  report_conflict: { rank: 4, chip: "Meldungen weichen ab", tone: "honor" },
+  delay: { rank: 5, chip: "Verzug", tone: "honor" },
+  draw: { rank: 6, chip: "Auslosung", tone: "brand" },
 });
-const OTHER = { rank: 6, chip: "", tone: "honor" };
+const OTHER = { rank: 7, chip: "", tone: "honor" };
 
 // Solange das Cockpit offen ist, fragt es zusätzlich im Takt nach (zum Änderungsstrom dazu): „Ergebnis fehlt“ und Verzug
 // entstehen mit der Zeit, ohne dass sich etwas ändert, das der Strom meldet. Kurz genug für den Turniertag, und die

@@ -29,14 +29,15 @@ const QUEUE = {
   ],
 };
 
-test("sortiert nach Dringlichkeit: Einspruch, nicht erschienen, defekt, Ergebnis fehlt (am längsten drüber zuerst), Verzug, Auslosung", () => {
+test("sortiert nach Dringlichkeit wie der Server: Einspruch, nicht erschienen, defekt, Ergebnis fehlt (am längsten drüber zuerst), Meldungen weichen ab - dann Verzug, Auslosung", () => {
   const draws = [{ id: "dr-s1-a", label: "Runde 1", stage_name: "Gruppen", pot_size: 6 }];
   const rows = cockpitProblems({ attention: ATTENTION, draws, queue: QUEUE });
   expect(rows.map((row) => row.id)).toEqual([
     "vf-m6", "ds-m5", // Einspruch: der ältere zuerst
     "ns-m3",
     "st-pc6",
-    "rm-m2", "rm-m1", "rc-m4", // 17 Min. vor 4 Min., dann die abweichenden Meldungen
+    "rm-m2", "rm-m1", // 17 Min. vor 4 Min.
+    "rc-m4", // eigene Art nach „Ergebnis fehlt“ (wie match_attention.py)
     "dl-pc5", "dl-pc4", // 25 Min. vor 12 Min.
     "dr-s1-a",
   ]);
@@ -49,7 +50,7 @@ test("Arten: jede Zeile trägt das Wort der Art, ihre Farbe und kurz die Station
   expect(rows["ns-m3"]).toMatchObject({ chip: "Nicht erschienen", tone: "warn" });
   expect(rows["st-pc6"]).toMatchObject({ chip: "Defekt", tone: "warn", where: "PC 6" });
   expect(rows["rm-m2"]).toMatchObject({ chip: "Ergebnis fehlt", tone: "honor", detail: "17 Min. über der Zeit" });
-  expect(rows["rc-m4"]).toMatchObject({ chip: "Ergebnis fehlt", title: "Meldungen weichen ab" });
+  expect(rows["rc-m4"]).toMatchObject({ chip: "Meldungen weichen ab", tone: "honor", title: "Meldungen weichen ab" });
   expect(rows["dl-pc4"]).toMatchObject({ chip: "Verzug", tone: "honor", where: "PC4", title: "+12 Min. hinter dem Plan", what: "Halbfinale · Frostbiss gegen Jo" });
   expect(rows["dl-pc5"].detail).toContain("Aufgerufen");
   expect(rows["dr-1"]).toMatchObject({ chip: "Auslosung", tone: "brand", title: "Auslosung bereit · 1 Name" });
