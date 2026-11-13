@@ -374,8 +374,8 @@ async def test_a_shared_station_goes_broken_only_after_asking_and_the_other_lead
     confirmed = await flow.post(f"/api/tournaments/{a['id']}/live-queue/broken",
                                 json={"station_id": shared["id"], "broken": True, "confirm_other": True})
     assert confirmed.status_code == 200, confirmed.text
-    assert confirmed.json()["holds"] == {"match_id": b_match["id"], "match_key": b_match["match_key"], "state": "called",
-                                         "other_tournament": b["title"]}
+    assert confirmed.json()["holds"] == {"state": "called", "other_tournament": b["title"]}, "nichts vom Spiel des anderen Turniers"
+    assert b_match["id"] not in confirmed.text
     stored = await station_of(flow, shared)
     assert stored["status"] == "broken" and stored["current_match_id"] == b_match["id"], "das Spiel von B bleibt, bis B umlegt"
     logged = await audit(flow, "station.broken")

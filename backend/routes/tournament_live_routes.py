@@ -512,7 +512,8 @@ async def station_broken(tid: str, body: StationBroken, me: dict = Depends(get_c
             )
     holds = {"match_id": held_id, "match_key": (match or {}).get("match_key"), "state": state} if state else None
     if holds and other:
-        holds["other_tournament"] = other["tournament_title"]
+        # Fremdes Turnier (#1162): nur Titel und Zustand - keine Kennung und kein Schlüssel seines Spiels.
+        holds = {"state": state, "other_tournament": other["tournament_title"]}
     if not changed.matched_count:
         return {"ok": True, "idempotent_replay": True, "holds": holds}
     reset_scope_cache()  # Live-Meldungen (#1801): wie jede Stationsänderung
