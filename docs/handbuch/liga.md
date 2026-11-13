@@ -1541,7 +1541,8 @@ alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
   oben die Aufsteiger, unten die Absteiger je Staffel. Ausgetretene und Disqualifizierte stehen hinten, belegen zuerst die
   Abstiegsplätze und sind **nicht dabei** (Liste unten). Ein Co-Team, das es nicht mehr gibt, fällt ebenfalls heraus.
 - **Relegation** ist vorbereitet: Die Plätze stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.
-- **Abweichen** geht nur über **Wieder öffnen** (3.10): Endstand korrigieren, neu abschließen – erst dann die neue Season anlegen.
+- **Abweichen** geht nur über **Wieder öffnen** (3.10): Endstand korrigieren, neu abschließen. Gibt es die neue Season schon,
+  sagt das Blatt „Wieder öffnen“ es deutlich – danach in der neuen Season oben **Übernahme neu berechnen** (siehe unten).
 
 **2. Anlegen.** **Beginn der ersten Spielwoche** wählen, Name freiwillig (leer: „Season 2“) → **Season anlegen**. Die neue
 Season ist ein **Entwurf** mit Sichtbarkeit **Aus**, bis ihr sie veröffentlicht. Ein zweiter Klick legt nichts doppelt an.
@@ -1550,6 +1551,12 @@ Season ist ein **Entwurf** mit Sichtbarkeit **Aus**, bis ihr sie veröffentlicht
 Liga 1 (Aufstieg aus Liga 2)“. Staffeln anlegen und zuteilen wie immer (2.3, 2.5) – die Auswahl zeigt nur die Staffeln der
 neuen Liga des Teams. Captains und Vertreter bekommen eine Nachricht: „Ihr seid in Liga N der neuen Season, abmelden bis …“.
 Wer sich bis zum Start abmeldet, gibt seinen Platz frei; über Warteliste und neue Anmeldungen entscheidet ihr wie in 2.5a.
+Eine Staffel einer anderen Liga geht nur mit Grund – die Auswahl sagt „andere Liga, nur mit Grund“ und fragt danach.
+
+**4. Korrektur nach dem Anlegen: Übernahme neu berechnen.** In der neuen Season oben (Recht **Liga verwalten**, nur vor dem Start):
+Die Vorschau zeigt, welche Teams eine neue Liga bekommen, dazukommen oder zurückgenommen werden. Teams ohne Staffel folgen dem
+korrigierten Endstand; schon zugeteilte oder abgemeldete bleiben und stehen unter **Bitte von Hand prüfen**. Gelöscht wird nichts,
+Captains mit neuer Liga bekommen eine Nachricht. Ein zweiter Lauf ändert nichts mehr.
 Der Vorgänger bleibt unverändert: Endstand, Spiele und Regeln der alten Season ändert nichts davon.
 
 <img src="../assets/liga/f2-zonen-tabelle-390.png" alt="Staffel-Tabelle am Handy: Platz 1 mit grünem Strich, der Letzte mit orangem Strich, darunter die Legende Aufstieg und Abstieg" width="300">
