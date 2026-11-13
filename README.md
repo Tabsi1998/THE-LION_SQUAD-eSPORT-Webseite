@@ -150,15 +150,16 @@ corepack yarn build
 ```
 
 Benötigte Python-Pakete stehen in `backend/requirements.txt` und
-`backend/requirements-dev.txt`. Schreibende Live-Tests laufen ausschließlich auf
-einem dafür vorbereiteten Teststack.
+`backend/requirements-dev.txt`.
 
-Seit dem Spamschutz (#2067) brauchen Registrierung und Kontaktformular der Website ein
-Formular-Token (`GET /api/spam-guard/token?form=…`, frühestens nach der Mindestzeit
-absenden). Die älteren Live-Tests (`test_phase_*`, `test_iter*`, `test_tls_arena_api`)
-schicken keines mit: gegen einen echten Server antwortet `/api/auth/register` dann mit
-400, und Kontaktnachrichten landen als „Spam“ in der Inbox. Die Flow-Tests holen das
-Token über `backend/tests/spam_forms.py`.
+**Welche Backend-Tests wo laufen** ([Einzelheiten](docs/entwicklung/altetests-932.md#was-wo-läuft)):
+Unit- und Flow-Tests (die echte App gegen mongomock, `backend/tests/flow_harness.py`)
+laufen mit `-m "not live"` lokal und in der CI. Ein Teil der Flow-Tests läuft in der CI
+zusätzlich gegen echtes MongoDB (`scripts/flow_mongo_tests.py`, Indizes und
+Transaktionen). Die wenigen älteren Live-Tests (`LIVE_TEST_FILES` in
+`backend/tests/conftest.py`) brauchen einen laufenden Server und laufen nie in der CI,
+schreibend nur auf einem dafür vorbereiteten Teststack. Sie schicken kein Formular-Token
+des Spamschutzes (#2067) mit; die Flow-Tests holen es über `backend/tests/spam_forms.py`.
 
 **Lokal zuerst, GitHub bestätigt.** Die [CI-Workflows](.github/workflows/ci.yml)
 enthalten die verbindlichen automatischen Prüfungen. Sie laufen vor dem Push auf dem

@@ -16,27 +16,24 @@ _XDIST_WORKER = os.environ.get("PYTEST_XDIST_WORKER")
 if _XDIST_WORKER and os.environ.get("UPLOAD_DIR"):
     os.environ["UPLOAD_DIR"] = os.path.join(os.environ["UPLOAD_DIR"], _XDIST_WORKER)
 
+# Ältere Tests gegen einen laufenden Server (requests auf REACT_APP_BACKEND_URL). Die CI wählt sie mit -m "not live" ab;
+# ohne Server und Zugang überspringen sie sich ohnehin. 20 solche Dateien sind mit #932 entfallen: ihre noch gültigen
+# Fälle laufen jetzt als Flow-Tests (Inventar: docs/entwicklung/altetests-932.md). Neue Tests kommen hier nicht dazu.
 LIVE_TEST_FILES = {
-    "test_iter20_bug_hunt.py",
-    "test_iter20_bugfixes.py",
-    "test_iter20_edge_cases.py",
-    "test_phase2_3.py",
-    "test_phase3.py",
-    "test_phase3_news_events_gallery.py",
-    "test_phase4_documents.py",
-    "test_phase4_features.py",
-    "test_phase5_badges.py",
-    "test_phase567.py",
-    "test_phase_8_9_10.py",
-    "test_phase_a_quickwins.py",
-    "test_phase_b_v4_achievements.py",
-    "test_phase_c_iter16.py",
-    "test_phase_d_v3.py",
-    "test_phase_ef_iter17.py",
-    "test_phase_fg_iter18.py",
-    "test_phase_membership.py",
-    "test_phase_penalty_iter19.py",
-    "test_tls_arena_api.py",
+    "test_iter3_achievements_bracket.py",
+    "test_iter4_achievement_taxonomy_nav.py",
+    "test_iter5_taxonomy_premium.py",
+    "test_iter6_google_gallery.py",
+    "test_iter7_fixes.py",
+    "test_iter10_auth_settings.py",
+    "test_iter11_refresh_race.py",
+    "test_iter12_sessions_growth.py",
+    "test_iter13_crowns.py",
+    "test_iter14_logout_regression.py",
+    "test_iter14_team_levels_crowns.py",
+    "test_live_preview_validation.py",
+    "test_phase1_unified_match.py",
+    "test_phase1_v2_unified_seeded.py",
 }
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
