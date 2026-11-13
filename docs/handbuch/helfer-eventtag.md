@@ -96,6 +96,7 @@ Grundregel: **Nichts raten. Turnierleitung holen.** Wen du anrufst, steht am **A
 | **Falsch eingetragen** | Sofort **Rückgängig**, sonst **Korrigieren** mit Grund. |
 | **Internet weg** | Oben steht „Offline · Stand …“. Auf Papier notieren: Station, Spiel, Plätze bzw. Zeit, Uhrzeit. Ist das Netz zurück: neu laden und nachtragen. |
 | **Seite hängt** | Neu laden. Hilft das nicht: anderes Gerät nehmen. |
+| **Pause, Finale, Check-in ansagen** | Die Turnierleitung schreibt im Reiter **Hinweis** einen Satz an alle im Turnier (z. B. „Pause bis 14:30“) – er kommt aufs Handy, oben auf die Turnierseite und auf Wunsch an den TV. Siehe [Turniere, 3.17](turniere.md#317-hinweis-der-turnierleitung-an-alle). |
 
 So sieht es die Turnierleitung im Reiter **Braucht Aufmerksamkeit**:
 

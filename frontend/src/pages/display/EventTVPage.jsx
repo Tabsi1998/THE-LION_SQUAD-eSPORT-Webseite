@@ -6,6 +6,7 @@ import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { TvScreen, useTv } from "@/components/tv/TvScreen";
 import { TvFooter, TvHeader, TvKeyRefused, TvPill } from "@/components/tv/TvParts";
 import { TvDayPlan, TvNowNext, TvStationBoard } from "@/components/tv/TvHall";
+import { TvNoticeBand } from "@/components/tv/TvNotice";
 import { TvSponsorMoment } from "@/components/tv/TvSlides";
 import { useEventHall } from "@/components/tv/useEventHall";
 import { useLowMomentTimer, useMinuteTick, useSponsorMoments, useTvSponsors } from "@/components/tv/tvHooks";
@@ -61,7 +62,7 @@ function EventTv() {
   const [params] = useSearchParams();
   const { settings } = useTv();
   // Mit Anzeige-Schlüssel (#1822) auch die Turniere „Nur Mitglieder“ - am Hallen-TV ohne Anmeldung.
-  const { event, stations, matches, lookup, tournamentOfMatch, loadError, keyRefused, lastUpdated, load } = useEventHall(id, { displayKey: params.get("key") || "" });
+  const { event, stations, matches, lookup, tournamentOfMatch, notices, loadError, keyRefused, lastUpdated, load } = useEventHall(id, { displayKey: params.get("key") || "" });
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
   const now = minute * 60000 + 30000;
@@ -143,6 +144,8 @@ function EventTv() {
       />
 
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Event-Daten" onRetry={load} />
+      {/* Hinweise der Turnierleitung mit TV-Haken (#1166): an das ganze Event und die einzelner Turniere (mit Name). */}
+      <TvNoticeBand items={notices} showTournament />
 
       <main className="tv-main tv-hall" data-testid="tv-hall">
         <section className="tv-panel tv-hall__plan">

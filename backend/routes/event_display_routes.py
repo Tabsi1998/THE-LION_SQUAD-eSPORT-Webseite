@@ -95,7 +95,12 @@ async def _build(db, event: dict) -> dict:
         row["id"]: row for row in await db.stations.find(station_query, {"_id": 0}).to_list(500)
         if row.get("id") and (row["tournament_id"] in shown_ids if row.get("tournament_id") else True)
     }
-    return display_event_payload(event, tournaments, challenges, event_days.schedule_view(event), brackets, list(stations.values()))
+    payload = display_event_payload(event, tournaments, challenges, event_days.schedule_view(event), brackets, list(stations.values()))
+    # Hinweise der Turnierleitung mit „auch am TV zeigen“ (#1166): an das ganze Event und die der gezeigten Turniere.
+    from services.tournament_notices import for_event
+
+    payload["notices"] = await for_event(db, event["id"], tournaments, tv_only=True)
+    return payload
 
 
 async def _payload(db, event: dict) -> dict:

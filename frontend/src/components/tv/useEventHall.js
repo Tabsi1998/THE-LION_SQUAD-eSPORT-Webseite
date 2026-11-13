@@ -84,6 +84,8 @@ export function useEventHall(id, { displayKey = "" } = {}) {
   const [event, setEvent] = useState(null);
   const [stations, setStations] = useState([]);
   const [payloads, setPayloads] = useState([]);
+  // Hinweise der Turnierleitung mit „auch am TV zeigen“ (#1166).
+  const [notices, setNotices] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [keyRefused, setKeyRefused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -98,6 +100,7 @@ export function useEventHall(id, { displayKey = "" } = {}) {
         setEvent({ ...data?.event, tournaments: sortByNearestDate(data?.event?.tournaments || []) });
         setStations(Array.isArray(data?.stations) ? data.stations : []);
         setPayloads((data?.brackets || []).filter(Boolean));
+        setNotices(Array.isArray(data?.notices) ? data.notices : []);
         setKeyRefused(false);
         setLoadError(null);
         setLastUpdated(Date.now());
@@ -126,6 +129,8 @@ export function useEventHall(id, { displayKey = "" } = {}) {
       ]);
       const stationRows = stationResponses.filter((result) => result.status === "fulfilled").flatMap((result) => result.value.data || []);
       const bracketResponses = await Promise.allSettled(tournaments.map((tournament) => loadTournamentBracketForDisplay(tournament.id, display)));
+      const noticeResponse = await api.get(`/events/${encodeURIComponent(data.id)}/notices`).catch(() => null);
+      setNotices((noticeResponse?.data?.items || []).filter((item) => item.tv));
       setEvent({ ...data, tournaments });
       setStations(Array.from(new Map(stationRows.map((station) => [station.id, station])).values()));
       setPayloads(bracketResponses.filter((result) => result.status === "fulfilled").map((result) => result.value.data).filter(Boolean));
@@ -150,5 +155,5 @@ export function useEventHall(id, { displayKey = "" } = {}) {
     for (const payload of payloads) for (const match of payload?.matches_v2 || []) titles.set(match.id, payload?.tournament?.title || "");
     return (match) => titles.get(match?.id) || "";
   }, [payloads]);
-  return { event, stations, payloads, matches, registrations, lookup, tournamentOfMatch, loadError, keyRefused, lastUpdated, load };
+  return { event, stations, payloads, matches, registrations, lookup, tournamentOfMatch, notices, loadError, keyRefused, lastUpdated, load };
 }
