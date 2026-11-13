@@ -6,7 +6,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", resolveMediaUrl: (url) => url || "", formatApiError: (d) => String(d || "Fehler") }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+const liveRefresh = vi.fn();
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (...args) => liveRefresh(...args) }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 
 const { default: LeagueSeasonTeamsPage } = await import("./LeagueSeasonTeamsPage");
@@ -48,4 +49,7 @@ test("Teams je Staffel mit Logo, Platz und Link - ohne Logo die Initialen, vor d
   expect(second).toHaveTextContent("noch ohne Spiel");
   expect(second).toHaveTextContent("ZA");
   expect(screen.getByTestId("season-nav-teams")).toHaveAttribute("aria-current", "page");
+  // Kein Takt je Staffel (#2268): die Teams-Seite lädt einmal.
+  expect(liveRefresh).toHaveBeenCalled();
+  expect(liveRefresh.mock.calls.every(([, , options]) => options?.enabled === false)).toBe(true);
 });

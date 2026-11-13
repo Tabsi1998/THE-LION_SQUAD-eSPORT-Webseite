@@ -27,7 +27,8 @@ function TeamCard({ team, standing }) {
 }
 
 function StaffelTeams({ leagueSlug, seasonSlug, staffel }) {
-  const { data, error } = useStaffel(leagueSlug, seasonSlug, staffel.tournament_id);
+  // Ohne Live-Nachladen: N Staffeln im Takt wären N Abfragen alle 15 s - Platz und Punkte stehen beim nächsten Aufruf frisch da.
+  const { data, error } = useStaffel(leagueSlug, seasonSlug, staffel.tournament_id, { live: false });
   const standings = Object.fromEntries((data?.standings || []).map((row) => [row.registration_id, row]));
   const teams = data?.teams || [];
   return (

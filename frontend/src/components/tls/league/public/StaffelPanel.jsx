@@ -32,8 +32,9 @@ import { hasReplay, sectionPath, teamInitials, weekDays, weekShort, weekState } 
 import "./league.css";
 import "./season.css";
 
-/** Die Daten einer Staffel laden und live halten. */
-export function useStaffel(leagueSlug, seasonSlug, tournamentId) {
+/** Die Daten einer Staffel laden und live halten. `live: false`: nur einmal laden (Teams der Season - dort stünden sonst N Staffeln
+ *  im Takt, #2268). */
+export function useStaffel(leagueSlug, seasonSlug, tournamentId, { live = true } = {}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
   const load = useCallback(async () => {
@@ -46,7 +47,7 @@ export function useStaffel(leagueSlug, seasonSlug, tournamentId) {
     }
   }, [leagueSlug, seasonSlug, tournamentId]);
   useEffect(() => { load(); }, [load]);
-  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 15000, tournamentId });
+  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 15000, tournamentId, enabled: live });
   return { data, error };
 }
 
