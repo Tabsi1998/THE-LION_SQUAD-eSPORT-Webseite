@@ -102,7 +102,7 @@ export function SeasonDatesTab({ seasonId, data, form, set, canSeason, formProps
         <SeasonCheckinRulesPanel seasonId={seasonId} />
       </div>
       <div id="erinnerungen" className="scroll-mt-24">
-        <SeasonReminderRulesPanel seasonId={seasonId} />
+        <SeasonReminderRulesPanel seasonId={seasonId} canEdit={canSeason !== false} />
       </div>
     </div>
   );

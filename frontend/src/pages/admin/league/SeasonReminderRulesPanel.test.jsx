@@ -77,3 +77,13 @@ test("Map-Veto wartet: der Kasten nennt die Zeit je Schritt und warnt, wenn die 
   expect(vetoMisfit({ ...DEFAULTS, veto_turn: false, veto_idle_seconds: 90 }, 30)).toBe("");
   expect(vetoMisfit({ ...DEFAULTS, veto_idle_seconds: 90 }, null)).toBe("");
 });
+
+test("ohne „Season konfigurieren“ nur lesen: alles gesperrt, kein Speichern, mit Hinweis (N7)", async () => {
+  apiMock.get.mockResolvedValue({ data: { reminder_rules: DEFAULTS, active: true, defaults: DEFAULTS } });
+  render(<SeasonReminderRulesPanel seasonId="s1" canEdit={false} />);
+  expect(await screen.findByTestId("reminder-rules-readonly")).toHaveTextContent("Nur lesen");
+  for (const id of ["reminder-rules-upcoming", "reminder-rules-early", "reminder-rules-week-percent", "reminder-rules-result", "reminder-rules-veto-idle", "reminder-rules-discord"]) {
+    expect(screen.getByTestId(id)).toBeDisabled();
+  }
+  expect(screen.queryByTestId("reminder-rules-save")).toBeNull();
+});
