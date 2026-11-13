@@ -630,10 +630,13 @@ export default function AdminMediaPage() {
               const fullUrl = `${BACKEND}${it.url}`;
               const previewUrl = cacheBustedMediaUrl(fullUrl, it);
               return (
-                <div
+                // Eine Kachel ist ein Knopf (#937): per Tab erreichbar, Enter und Leertaste öffnen das Seitenblatt. Ohne
+                // eigene Optik des Knopfs - Ausrichtung links, volle Breite, Schrift und Farbe wie bisher.
+                <button
+                  type="button"
                   key={it.filename}
                   data-testid={`media-tile-${it.filename}`}
-                  className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden hover:border-[#FFD700]/60 transition group cursor-pointer"
+                  className="block w-full text-left border border-white/10 bg-[#121212] rounded-sm overflow-hidden hover:border-[#FFD700]/60 transition group cursor-pointer"
                   onClick={() => setSelected(it)}
                 >
                   <div className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
@@ -662,7 +665,7 @@ export default function AdminMediaPage() {
                     <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
                     {it.kept_for_results && <div className="text-[10px] text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</div>}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
