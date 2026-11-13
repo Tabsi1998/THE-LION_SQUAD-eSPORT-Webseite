@@ -30,6 +30,8 @@ HISTORY_LIMIT = 50
 IGNORED_STAFFEL_STATUSES = frozenset({"cancelled", "archived", "draft"})
 PLAYED_STATUSES = ("completed",)
 PRIVATE_NAME = "Spieler mit privatem Profil"
+# Höchstens so viele Zeiträume an Profil und Teamseite (jeder kostet eine Rechnung über seine Endstände).
+PROFILE_PERIODS = 6
 
 ALREADY_CLOSED = "Diese Gesamtwertung ist schon abgeschlossen."
 NOT_CLOSED = "Diese Gesamtwertung ist nicht abgeschlossen."
@@ -438,7 +440,9 @@ async def _periods_with(db, query: dict) -> list[tuple[dict, dict]]:
         for period in rules.settings_of(league)["periods"]:
             if season_ids & set(period.get("season_ids") or []):
                 out.append((league, period))
-    return out
+    # Jeder Zeitraum heißt eine Rechnung über seine Endstände - Profil und Teamseite zeigen nur die jüngsten (je Liga die zuletzt
+    # angelegten), damit eine lange Vereinsgeschichte die Seite nicht bremst.
+    return out[-PROFILE_PERIODS:]
 
 
 def _entry(league: dict, period: dict, level: int, data: dict, row: dict, rows: list[dict], url: str | None) -> dict:
