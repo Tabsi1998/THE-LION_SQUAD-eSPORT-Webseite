@@ -387,7 +387,15 @@ def schedule_data(season: dict) -> dict:
                             for row in season.get("blocked_periods") or [] if isinstance(row, dict)],
         "response_hours": season.get("match_schedule_response_hours") or None,
         "rules": schedule_rules_of(season),
+        # Erinnerung „Ergebnis fehlt“ je Season abschaltbar (E.5, #1647) - ohne Feld an (Vorgabe).
+        "result_reminder": result_reminder_on(season),
     }
+
+
+def result_reminder_on(season: dict) -> bool:
+    from services import league_reminder_rules
+
+    return bool((league_reminder_rules.stored(season) or league_reminder_rules.defaults())["result_missing"])
 
 
 def default_slot(data: dict) -> str:
@@ -427,8 +435,11 @@ def render_schedule(data: dict, variant: str = MARKDOWN) -> str:
                          f"{hours(rules.get('reschedule_notice_hours'))} vor dem Termin, der neue Termin {where}. Alles darüber entscheidet die Liga-Leitung.")
         else:
             lines.append("- Verschiebung: nur durch die Liga-Leitung.")
-        lines.append(f"- Ergebnis: Erinnerung {hours(rules.get('result_reminder_hours'))} nach dem Termin ohne Meldung, überfällig nach "
-                     f"{hours(rules.get('result_overdue_hours'))}.")
+        if data.get("result_reminder", True):
+            lines.append(f"- Ergebnis: Erinnerung {hours(rules.get('result_reminder_hours'))} nach dem Termin ohne Meldung, überfällig nach "
+                         f"{hours(rules.get('result_overdue_hours'))}.")
+        else:
+            lines.append(f"- Ergebnis: ohne Meldung überfällig nach {hours(rules.get('result_overdue_hours'))}.")
     else:
         lines.append("- Verschiebung: Termine laufen über Terminvorschläge, Verschiebungen entscheidet die Liga-Leitung.")
     return "\n".join(lines)

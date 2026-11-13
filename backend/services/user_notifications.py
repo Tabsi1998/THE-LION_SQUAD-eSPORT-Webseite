@@ -4,6 +4,8 @@ import os
 from typing import Any
 from datetime import timedelta
 
+from pymongo.errors import DuplicateKeyError
+
 from database import get_db
 from models import new_id, now_utc
 from services.notification_preferences import NOTIFICATION_KIND_CATEGORY, discord_allowed, notification_allowed, push_allowed
@@ -98,14 +100,20 @@ async def create_user_notification(
         return None
     meta = meta or {}
     dedupe_key = meta.get("dedupe_key")
+    unique = bool(dedupe_key and meta.get("unique_dedupe"))
     if dedupe_key:
+        # Liga-Erinnerungen (#1647): die Prüfung trifft den Teilindex ``user_unique_dedupe`` (Person + Schlüssel) - die übrigen
+        # Arten fragen wie bisher nach Art und ``meta.dedupe_key``.
         existing = await db.notifications.find_one(
-            {"user_id": user_id, "kind": kind, "meta.dedupe_key": dedupe_key},
-            {"_id": 0},
+            {"user_id": user_id, "unique_dedupe_key": dedupe_key} if unique
+            else {"user_id": user_id, "kind": kind, "meta.dedupe_key": dedupe_key},
+            {"_id": 1},
         )
         if existing:
             return None
-    if kind not in NO_COOLDOWN_KINDS:
+    # Liga-Erinnerungen (#1647) mit eindeutigem Schlüssel brauchen keine Abkühlzeit: Der Schlüssel hält Doppeltes auf, und die
+    # Erinnerung eine Stunde vorher darf nicht an „Spiel startet in 10 Minuten“ eines anderen Laufs hängen bleiben.
+    if kind not in NO_COOLDOWN_KINDS and not unique:
         cooldown_seconds = int(meta.get("cooldown_seconds") or DEFAULT_COOLDOWN_SECONDS.get(kind, 0) or 0)
         if cooldown_seconds > 0:
             cutoff = (now_utc() - timedelta(seconds=cooldown_seconds)).isoformat()
@@ -113,6 +121,9 @@ async def create_user_notification(
                 "user_id": user_id,
                 "kind": kind,
                 "created_at": {"$gte": cutoff},
+                # Nur Zeilen ohne eindeutigen Schlüssel zählen (#1647, N3): „Liga-Spiel in 30 Minuten“ darf „Match startet in
+                # 10 Minuten“ nicht unterdrücken.
+                "unique_dedupe_key": {"$exists": False},
             }
             if category:
                 cooldown_query["meta.category"] = category
@@ -135,7 +146,14 @@ async def create_user_notification(
         "meta": meta,
         "created_at": now_utc().isoformat(),
     }
-    await db.notifications.insert_one(doc)
+    if unique:
+        # Liga-Erinnerungen (#1647): der Teilindex ``user_unique_dedupe`` lässt je Person und Schlüssel nur eine Zeile zu - laufen
+        # zwei Jobs gleichzeitig, verliert der zweite hier und schickt weder Push noch Discord.
+        doc["unique_dedupe_key"] = dedupe_key
+    try:
+        await db.notifications.insert_one(doc)
+    except DuplicateKeyError:
+        return None
     doc.pop("_id", None)
     if in_app_allowed:
         # Only the recipient hears about it, and only that something is new.

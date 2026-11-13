@@ -496,7 +496,7 @@ Verschiebung, bis ihr einmal speichert.
 | **Verschieben bis (Stunden vor dem Termin)** | 24 | später beantragen geht nicht mehr |
 | **Verschiebungen je Spiel** | 2 | 0 heißt: nur die Leitung verschiebt |
 | **Verschieben nur innerhalb der Spielwoche** | an | wochenübergreifend entscheidet die Leitung |
-| **Erinnerung ohne Ergebnis** | 24 h nach dem Termin | Nachricht an Captain und Vertreter beider Seiten |
+| **Erinnerung ohne Ergebnis** | 24 h nach dem Termin | Nachricht an Captain und Vertreter beider Seiten; abschalten unter **Erinnerungen** (2.7f) |
 | **Überfällig nach** | 48 h nach dem Termin | das Spiel steht bei euch unter **Mein Dienst → Braucht deine Entscheidung** |
 
 Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), legt die Liga-Leitung fest – siehe 3.1.
@@ -517,6 +517,26 @@ speichert.
 | **Erinnerung an fehlende Angaben (Stunden vor dem ersten Spiel)** | 48 | einmal je Team vor dem ersten Spiel: an jeden, dem Geburtsdatum, Spiel-ID oder Plattform fehlt, und an Captain und Vertreter (3.9); 0 = keine. Steht nicht im Regelwerk |
 
 Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
+
+### 2.7f Erinnerungen
+
+Im Reiter **Termine** steht unter dem Check-in der Kasten **Erinnerungen** (Zuständigkeit „Season konfigurieren“) mit eigenem
+**Erinnerungen speichern**; er gilt sofort für alle Staffeln der Season. Je Art gibt es einen Schalter, die Zeiten haben Vorgaben. Ist für
+eine Season noch nichts gespeichert, steht „es gelten die Vorgaben unten“ – sie erinnert trotzdem schon.
+
+| Art | Vorgabe | Wer bekommt sie |
+| --- | --- | --- |
+| **Spiel steht an** | 24 Stunden und 60 Minuten vor dem Termin | die Aufgestellten (ohne Aufstellung der Kader) und die Captains beider Seiten, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen (zum alten Termin) oder schon gestarteten Spielen und nicht, wenn das Spiel in einer Sperrzeit liegt. Vor dem ersten Spiel nach einer Pause kommt sie auch, wenn die Pause noch läuft |
+| **Termin noch offen** | bei 50 % der Spielwoche (Wochenmitte), spätestens 24 Stunden vor dem Standardtermin | Captain und Vertreter beider Seiten, solange kein Termin vereinbart ist – einmal je Spielwoche. Ohne Einigung gilt der Standardtermin; wird er nicht gemeldet, steht das Spiel bei euch als überfällig (2.7a) |
+| **Ergebnis fehlt** | Zeitpunkt aus „Termine und Verschiebungen“ (24 h nach dem Termin) | Captain und Vertreter beider Seiten. Kommt nicht, solange ein Vorfall oder ein Verfahren am Spiel offen ist |
+| **Map-Veto wartet** | nach 20 Sekunden ohne Zug, nie in den letzten 5 Sekunden | Captain und Vertreter der Seite am Zug, wenn sie die Matchseite nicht offen haben (3.1c) |
+| **Zusätzlich per Discord** | aus | Direktnachricht vom Vereins-Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben (Entscheidung Nr. 148). Gilt für alle Arten: Ist der Schalter aus, kommen auch „Ergebnis fehlt“ und „Map-Veto wartet“ nicht mehr per Discord – früher kamen sie bei eingeschaltetem Discord immer. Keine Funktion hängt an Discord |
+
+Jede Erinnerung kommt höchstens einmal, auch wenn der Job doppelt läuft. Spieler und Captains schalten „Match-Erinnerungen“ in ihren
+Benachrichtigungs-Einstellungen ab (Web und App). Die Nachricht „Spiel startet in 10 Minuten“ kommt in allen Turnieren und ist hier nicht
+einstellbar.
+
+<img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche und spätestens 24 Stunden vor dem Standardtermin, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
 
 ### 2.7d Veto: Maps vor dem Spiel sperren und wählen (Regelwerk § 6, Anlage B)
 
@@ -920,8 +940,9 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
 
 - **Nachrichten:** Jeder Vorschlag, Gegenvorschlag, jedes Annehmen, Ablehnen und Zurückziehen geht sofort an Captain
   und Vertreter der anderen Seite (ohne beide an deren Teamleitung) – ins Postfach und per Push, Thema
-  „Match-Erinnerungen“. Trägt die Turnierleitung selbst einen Termin vor, erfahren es beide Seiten. Erinnerungen vor
-  Fristen kommen später (#1647).
+  „Match-Erinnerungen“. Trägt die Turnierleitung selbst einen Termin vor, erfahren es beide Seiten. Steht zur Wochenmitte
+  noch kein Termin, erinnert die Seite beide Captains; 24 Stunden und 1 Stunde vor dem Spiel erinnert sie die Aufgestellten
+  und die Captains (einstellbar, 2.7f).
 - **Termin oder Best of direkt am Spiel ändern:** steht mit altem und neuem Wert im Protokoll, und Captain und Vertreter
   beider Seiten bekommen eine Nachricht – je Änderung eine.
 - **Eigener Vorschlag:** steht bei der eigenen Seite als „wartet auf die Gegenseite“ mit **Zurückziehen**; annehmen
@@ -1008,7 +1029,8 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
   Servers, nicht nach der des Handys; die letzten 10 Sekunden sind rot und mit Sanduhr und „gleich vorbei“ markiert. Mit „Bewegung
   reduzieren“ im Gerät steht alles sofort da.
 - **Erinnerung:** Ist eine Seite am Zug, hat 20 Sekunden lang nicht gezogen und die Matchseite nicht offen, bekommen Captain und Vertreter
-  einmal die Nachricht **„Map-Veto wartet – ihr seid am Zug“** (je Schritt höchstens einmal).
+  einmal die Nachricht **„Map-Veto wartet – ihr seid am Zug“** (je Schritt höchstens einmal). Schalter und Sekunden stellt ihr je Season
+  unter **Erinnerungen** ein (2.7f).
 - **Zuschauer und TV:** Wer nicht beteiligt ist, sieht das laufende Veto auf der Matchseite nur lesend (wenn die Staffel sichtbar ist).
   Über **TV-Ansicht** im Veto-Block öffnet sich die Ansicht für den Bildschirm (`/display/veto/<Spiel>`): großer Countdown, wer am Zug
   ist, Karten und Ablauf, danach die Spielreihenfolge. Für Staffeln „Nur Mitglieder“ hängt ihr den Anzeige-Schlüssel des Turniers an
