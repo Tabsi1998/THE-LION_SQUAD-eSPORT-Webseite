@@ -32,6 +32,7 @@ from routes.match_routes import (
 )
 from services import league_games, league_incidents
 from services.league_permissions import require_no_conflict
+from services import league_final_read
 from services.match_planning import ensure_tournament_accepts_results
 from services.rate_limit import enforce_rate_limit
 from services.tournament_permissions import has_match_result_permission
@@ -110,6 +111,9 @@ async def _context(match_id: str, user: dict):
         raise HTTPException(status_code=404, detail=NOT_LEAGUE_DETAIL)
     if tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail="Turnier ist gesperrt und kann nur noch angesehen werden.")
+    # Abgeschlossene Staffel (F.1, #1645): kein Vorfall, keine Entscheidung mehr - erst wieder öffnen.
+    if league_final_read.is_closed(tournament):
+        raise HTTPException(status_code=409, detail=league_final_read.CLOSED_LOCK)
     return db, match, tournament, setup
 
 

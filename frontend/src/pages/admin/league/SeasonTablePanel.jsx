@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormSection } from "@/components/tls/AdminForm";
-import { TextAreaField } from "@/components/tls/FormFields";
+import { SelectField, TextAreaField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { byMaps, tiebreakOrder } from "@/lib/leagueTable";
 import { viennaDateTime } from "@/lib/vienna";
@@ -24,7 +24,12 @@ function when(value) {
   }
 }
 
-function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
+const DECISION_METHODS = [["playoff", "Entscheidungsspiel"], ["lot", "Los"], ["lead", "Entscheid der Leitung"]];
+
+/** Reihenfolge bei echtem Gleichstand festlegen. „Wie wurde entschieden?“ (F.1, Nr. 156) ist freiwillig - nur für den Meisterplatz
+ *  Pflicht (`methodRequired` im Reiter „Abschluss“; der Server verlangt es dort auch, wenn der Entscheid im Reiter „Tabelle“ fällt). */
+export function OrderSheet({ staffel, tie, override, onClose, onSaved, methods = DECISION_METHODS, methodRequired = false }) {
+  const [method, setMethod] = useState("");
   const [order, setOrder] = useState(tie.registration_ids.map((id, index) => ({ id, name: tie.names[index] || "Team" })));
   const [reason, setReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
@@ -41,6 +46,10 @@ function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
       toast.error(`Bitte einen Grund mit mindestens ${MIN_REASON} Zeichen angeben.`);
       return;
     }
+    if (methodRequired && !method) {
+      toast.error("Bitte wählen, wie entschieden wurde.");
+      return;
+    }
     if (overrideMissing(override, conflictReason)) {
       toast.error(`Bitte den Grund für die Notausnahme mit mindestens ${CONFLICT_REASON_MIN} Zeichen angeben.`);
       return;
@@ -48,7 +57,7 @@ function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
     setSaving(true);
     try {
       await api.put(`/admin/leagues/staffeln/${staffel.tournament_id}/table-decision`, { registration_ids: order.map((item) => item.id), reason: reason.trim(),
-        ...overridePayload(override, conflictReason) });
+        ...(method ? { method } : {}), ...overridePayload(override, conflictReason) });
       toast.success("Reihenfolge festgelegt.");
       onSaved();
     } catch (err) {
@@ -76,6 +85,11 @@ function OrderSheet({ staffel, tie, override, onClose, onSaved }) {
           </li>
         ))}
       </ol>
+      <div className="mt-4">
+        <SelectField label="Wie wurde entschieden?" required={methodRequired} value={method} onChange={setMethod} testId="table-decision-method"
+          options={[["", methodRequired ? "Bitte wählen" : "Keine Angabe"], ...methods]}
+          hint={methodRequired ? "Steht mit dem Grund im Endstand." : "Freiwillig – für den Meisterplatz der obersten Liga Pflicht. Steht mit dem Grund an der Tabelle."} />
+      </div>
       <div className="mt-4">
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required placeholder="z. B. Losentscheid vor beiden Captains am 20.11."
           hint="Steht öffentlich an der Tabelle und im Protokoll." testId="table-decision-reason" />

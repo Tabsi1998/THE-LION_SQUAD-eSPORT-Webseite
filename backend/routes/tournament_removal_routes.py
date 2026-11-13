@@ -50,6 +50,10 @@ async def remove_participant(tid: str, reg_id: str, body: RemovalRequest, me: di
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament, registration = await _structure_staff(db, tid, reg_id, me)
+    # Abgeschlossene Liga-Staffel (F.1, #1645): Austritt und Disqualifikation würden Spiele umwerten - erst wieder öffnen.
+    from services.league_final_read import ensure_not_closed
+
+    await ensure_not_closed(db, tid)
     try:
         if body.plan_id:
             return await confirm_removal(db, tournament, registration, body.plan_id, kind=body.kind, actor_id=me.get("id"),

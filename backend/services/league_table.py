@@ -80,7 +80,8 @@ async def table_rows(db, tournament: dict) -> list[dict]:
     """Die Tabelle wie öffentlich (dieselbe Rechnung für Web, App, TV, PDF), mit allen Feldern für die Leitung."""
     from routes.tournament_view_routes import _standing_rows
 
-    return await _standing_rows(db, tournament, None, True)
+    # Immer gerechnet: Die Verwaltung arbeitet am Stand von jetzt, den Endstand zeigt der Reiter „Abschluss“ (F.1).
+    return await _standing_rows(db, tournament, None, True, live=True)
 
 
 def decisions_view(tournament: dict, rows: list[dict]) -> list[dict]:
@@ -88,7 +89,7 @@ def decisions_view(tournament: dict, rows: list[dict]) -> list[dict]:
     names = {row["registration_id"]: row.get("display_name") for row in rows}
     return [{"id": decision.get("id"), "registration_ids": list(decision.get("registration_ids") or []),
              "names": [names.get(item) or "Team" for item in decision.get("registration_ids") or []],
-             "reason": decision.get("reason"), "decided_at": decision.get("decided_at"),
+             "reason": decision.get("reason"), "method": decision.get("method"), "decided_at": decision.get("decided_at"),
              "decided_by": decision.get("decided_by"), "applies": decision.get("id") in applied}
             for decision in tournament.get("table_decisions") or [] if isinstance(decision, dict)]
 
@@ -116,11 +117,18 @@ async def overview(db, tournament: dict, user: dict | None = None) -> dict:
             "rules": public_rules(tournament), "superadmin": league_permissions.is_superadmin(user)}
 
 
-async def set_decision(db, tournament: dict, registration_ids: list[str], reason: str, actor_id: str) -> dict:
+DECISION_METHODS = ("playoff", "lot", "lead")
+
+
+async def set_decision(db, tournament: dict, registration_ids: list[str], reason: str, actor_id: str, *,
+                       method: str | None = None) -> dict:
     """Die Reihenfolge der Leitung für genau eine Gruppe mit geteiltem Platz. Ein früherer Entscheid für dieselbe Menge
-    zählt beim Prüfen nicht und wird ersetzt."""
+    zählt beim Prüfen nicht und wird ersetzt. ``method`` (F.1, Nr. 156): wie entschieden wurde - Entscheidungsspiel, Los oder
+    Leitung; ohne Angabe bleibt das Feld weg."""
     if not is_league_staffel(tournament):
         raise TableProblem("Das gibt es nur in einer Liga-Staffel.", 404)
+    if method is not None and method not in DECISION_METHODS:
+        raise TableProblem("Diese Art der Entscheidung gibt es nicht.")
     if not can_decide(tournament):
         raise TableProblem("In dieser Season entscheidet die Leitung keinen Gleichstand - die Teams teilen sich den Platz.", 409)
     order = [str(item) for item in registration_ids or [] if str(item or "").strip()]
@@ -137,7 +145,7 @@ async def set_decision(db, tournament: dict, registration_ids: list[str], reason
     if len(others) >= DECISION_LIMIT:
         raise TableProblem("Zu viele Entscheide an dieser Staffel.", 409)
     decision = {"id": new_id(), "registration_ids": order, "reason": reason, "decided_by": actor_id,
-                "decided_at": now_utc().isoformat()}
+                "decided_at": now_utc().isoformat(), **({"method": method} if method else {})}
     # Die Route hält die Schreibsperre des Turniers - gelesen und geschrieben wird unter ihr.
     await db.tournaments.update_one({"id": tournament["id"]},
                                     {"$set": {"table_decisions": [*others, decision], "updated_at": decision["decided_at"]}})

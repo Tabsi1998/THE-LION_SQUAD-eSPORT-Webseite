@@ -85,7 +85,7 @@ test("Reiter per Sprungmarke: ohne Marke der Überblick, #termine öffnet Termin
   const first = renderPage();
   expect(await screen.findByTestId("season-tab-ueberblick")).toHaveAttribute("aria-selected", "true");
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(
-    ["Überblick", "Leitstand", "Spielbetrieb", "Termine", "Anmeldung und Kader", "Tabelle", "Proteste", "Strafen", "Regelwerk und Sperrliste", "Ligen und Staffeln"]);
+    ["Überblick", "Leitstand", "Spielbetrieb", "Termine", "Anmeldung und Kader", "Tabelle", "Proteste", "Strafen", "Regelwerk und Sperrliste", "Ligen und Staffeln", "Abschluss"]);
   first.unmount();
   const second = renderPage("#termine");
   expect(await screen.findByTestId("season-form-weeks")).toBeInTheDocument();

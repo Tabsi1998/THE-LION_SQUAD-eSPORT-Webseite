@@ -108,6 +108,8 @@ async function mockServer(page) {
       "/admin/leagues/seasons/s1/applications": { configured: true, items: [], stats: { taken: 3, slots: 16, open: 2, waiting: 0, unassigned: 0 }, divisions: [] },
       "/admin/leagues/seasons/s1/loadout-bans": { game: { id: "g1", name: "Probe Shooter", modes: GAME.modes }, categories: [], library: [], list: null, versions: [] },
       "/admin/leagues/seasons/s1/map-pool/versions": { versions: [] },
+      // Reiter „Abschluss“ (F.1, #1645): ohne gestartete Staffel - Checkliste und Endstand prüft league-final.spec.js.
+      "/admin/leagues/seasons/s1/closing": { season: { id: "s1", closed: false }, can_act: true, superadmin: true, methods: {}, responsible: "„Season konfigurieren“", staffeln: [] },
       "/admin/league-rules/league_season/s1": RULES_VIEW,
       // Reiter „Proteste“ (E.2, #1619): Einstellungen und Eingang der Verfahren.
       "/admin/leagues/seasons/s1/protest-settings": PROTESTS,
@@ -141,6 +143,8 @@ const TABS = [
   ["ueberblick", "season-phases"], ["leitstand", "desk-empty"], ["spielbetrieb", "season-pool-modes"], ["termine", "season-calendar"], ["anmeldung", "season-application-settings"],
   ["tabelle", "season-table-rules"], ["proteste", "season-protest-settings"], ["regelwerk", "season-rules"], ["ligen", "season-divisions"],
 ];
+// Abschluss (F.1, #1645): eigene Zeile, der Reiter steht am Ende.
+TABS.push(["abschluss", "season-close-summary"]);
 
 test.describe("Liga: Season-Seite mit Reitern", () => {
   test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");

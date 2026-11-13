@@ -310,10 +310,22 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
 
 
 async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read_model=None,
-                        regs: list[dict] | None = None, own_ids: set[str] | None = None) -> list[dict]:
+                        regs: list[dict] | None = None, own_ids: set[str] | None = None, live: bool = False) -> list[dict]:
     """Die Rangliste eines Turniers (#2121: nur wer dazugehört, Plätze erst mit dem ersten Ergebnis) - für die Seite,
-    das Ergebnis-PDF und den TV. Der TV reicht Lesestand und Anmeldungen der Baum-Antwort weiter."""
+    das Ergebnis-PDF und den TV. Der TV reicht Lesestand und Anmeldungen der Baum-Antwort weiter. Eine abgeschlossene
+    Liga-Staffel (F.1, #1645) liefert ihren Endstand statt einer Rechnung; ``live`` rechnet trotzdem (Verwaltung)."""
     tid = t["id"]
+    if not live:
+        from services.league_final_read import frozen_rows
+
+        frozen = await frozen_rows(db, t)
+        if frozen is not None:
+            if own_ids is None and user:
+                if regs is None:
+                    regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
+                own_ids = await _own_registration_ids(db, regs, user)
+            _mark_own_rows(frozen, own_ids or set())
+            return frozen
     if read_model is None:
         read_model = await load_competition_read_model(db, tid)
     if regs is None:

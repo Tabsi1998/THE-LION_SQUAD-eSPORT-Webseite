@@ -24,6 +24,7 @@ from auth import get_current_user
 from database import get_db
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from routes.match_routes import _find_match_any, _serialized_match_write
+from services import league_final_read
 from services import league_procedures as procedures
 from services import league_protest_settings as protest_settings
 from services import match_proofs
@@ -141,10 +142,13 @@ async def put_protest_settings(season_id: str, body: ProtestSettingsBody, me: di
     if before != settings:
         await db.league_seasons.update_one({"id": season_id}, {"$set": {**settings, "updated_at": now}})
     # Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt sie das Übertragen nach dem Entsperren mit). Laufende
-    # Verfahren behalten ihre gespeicherten Fristen.
+    # Verfahren behalten ihre gespeicherten Fristen. Abgeschlossene Staffeln (F.1, #1645) behalten ihre Fristen ebenso: eine längere
+    # Einspruchsfrist öffnet dort nichts wieder.
     updated = 0
     staffeln = await db.tournaments.find({"league_context.season_id": season_id, "locked_at": None}, {"_id": 0}).to_list(500)
     for staffel in staffeln:
+        if league_final_read.is_closed(staffel):
+            continue
         if protest_settings.stored(staffel) != settings:
             await db.tournaments.update_one({"id": staffel["id"]}, {"$set": {**settings, "updated_at": now}})
             updated += 1
@@ -207,6 +211,9 @@ async def _context(match_id: str, user: dict):
         raise HTTPException(status_code=404, detail=procedures.NOT_FOUND_DETAIL)
     if league.tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail="Turnier ist gesperrt und kann nur noch angesehen werden.")
+    # Abgeschlossene Staffel (F.1, #1645): kein neuer Einspruch und kein Schritt in einem Verfahren mehr - erst wieder öffnen.
+    if league_final_read.is_closed(league.tournament):
+        raise HTTPException(status_code=409, detail=league_final_read.CLOSED_LOCK)
     return db, match, league, viewer
 
 

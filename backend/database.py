@@ -613,6 +613,12 @@ async def init_indexes():
                                       partialFilterExpression={"league_context": {"$type": "object"}})
     await unique_index(db.tournaments, [("league_context.division_id", 1), ("league_context.staffel", 1)],
                        "league_staffel", partialFilterExpression={"league_context": {"$type": "object"}})
+    # Saisonabschluss (F.1, #1645): eine Zeile je Fassung des Endstands einer Staffel; höchstens eine gilt (``active``).
+    await db.league_final_tables.create_index("id", unique=True)
+    await db.league_final_tables.create_index([("tournament_id", 1), ("version", 1)], unique=True, name="league_final_version")
+    await db.league_final_tables.create_index(
+        "tournament_id", unique=True, name="league_final_active", partialFilterExpression={"active": True})
+    await db.league_final_tables.create_index("season_id")
     await init_audit_indexes(db)
 
 

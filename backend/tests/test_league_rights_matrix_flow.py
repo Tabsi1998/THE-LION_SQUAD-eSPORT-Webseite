@@ -189,6 +189,11 @@ ROUTES = [
     route("DELETE", "/api/admin/leagues/staffeln/{tid}/table-decision/nix", "results", DELETE_BODY),
     route("POST", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", {"note": "Beide nicht da"}),
     route("DELETE", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", DELETE_BODY),
+    # Saisonabschluss (F.1, #1645): Cockpit, Abschluss, Wiedereröffnung, Fassung aus dem Verlauf
+    route("GET", "/api/admin/leagues/seasons/{season}/closing", ANY),
+    route("POST", "/api/admin/leagues/staffeln/{tid}/close", "season", {"confirm": True}),
+    route("POST", "/api/admin/leagues/staffeln/{tid}/reopen", "season", {"reason": "Ergebnis war falsch"}),
+    route("GET", "/api/admin/leagues/staffeln/{tid}/final-tables/1", ANY),
     # PDF
     route("GET", "/api/exports/tournaments/{tid}/participants.pdf", ANY),
     route("GET", "/api/exports/tournaments/{tid}/checkin.pdf", ANY),

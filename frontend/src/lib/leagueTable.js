@@ -93,6 +93,8 @@ export function deductionText(row) {
   return deducted ? `−${String(deducted).replace(".", ",")} ${deducted === 1 ? "Punkt" : "Punkte"} Abzug` : "";
 }
 
+const DECISION_METHOD_NOTES = { playoff: "Platz durch Entscheidungsspiel", lot: "Platz durch Losentscheid", lead: "Platz durch Entscheid der Leitung" };
+
 /** Hinweise an einer Zeile der Staffel-Tabelle: was den Platz entschied, kampflos, Abzug, Ausscheiden. Leer bei
  *  Tabellen ohne diese Felder (andere Turniere). */
 export function standingNotes(row) {
@@ -101,7 +103,9 @@ export function standingNotes(row) {
   if (row.exit?.kind) notes.push({ key: "exit", tone: "exit", text: EXIT_LABELS[row.exit.kind] || "Ausgeschieden" });
   if (row.tiebreak === "lead_decision") {
     const reason = row.lead_decision?.reason;
-    notes.push({ key: "tiebreak", tone: "decision", text: "Platz durch Entscheid der Leitung", title: reason ? `Grund: ${reason}` : undefined, reason });
+    // Wie entschieden wurde (F.1, Nr. 156) - ohne Angabe wie bisher „Entscheid der Leitung“.
+    const text = DECISION_METHOD_NOTES[row.lead_decision?.method] || DECISION_METHOD_NOTES.lead;
+    notes.push({ key: "tiebreak", tone: "decision", text, title: reason ? `Grund: ${reason}` : undefined, reason });
   } else if (row.tiebreak && TIEBREAK_LABELS[row.tiebreak]) {
     notes.push({ key: "tiebreak", tone: "tiebreak", text: TIEBREAK_LABELS[row.tiebreak], title: `Bei Punktgleichheit entschied: ${TIEBREAK_LABELS[row.tiebreak]}` });
   }

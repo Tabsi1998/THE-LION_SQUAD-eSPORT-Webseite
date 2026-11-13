@@ -82,12 +82,15 @@ def _rank_from_registration(registration: dict) -> int | None:
 def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
     """Was Web und App bekommen - ohne Anmelde- oder Datenbank-Kennungen."""
     rank = doc.get("rank")
+    league = doc.get("league") or None
     images = tournament_images if tournament_images is not None else (doc.get("tournament") or {}).get("award_images") or {}
     return {
         "id": doc["id"],
         "kind": award_kind(rank),
         "rank": rank,
-        "rank_label": rank_label(rank),
+        # Liga-Titel (F.1, #1645): „Meister“ statt „1. Platz“, dazu Liga N und Staffel.
+        "rank_label": (league or {}).get("title") or rank_label(rank),
+        "league": ({key: league.get(key) for key in ("title", "division_label", "staffel", "display_name")} if league else None),
         "participants": int(doc.get("participants") or 0),
         "matches": {"played": int((doc.get("matches") or {}).get("played") or 0), "won": int((doc.get("matches") or {}).get("won") or 0)},
         "record": record_line(doc.get("matches")),
@@ -300,14 +303,17 @@ async def _views(db, docs: list[dict], public_only: bool) -> list[dict]:
 async def awards_for_user(db, user_id: str, public_only: bool = True) -> list[dict]:
     """Eigene Einzelturniere und die Turniere der eigenen Teams."""
     team_ids = [row["team_id"] for row in await db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1}).to_list(200) if row.get("team_id")]
-    query = {"$or": [{"user_id": user_id}] + ([{"team_id": {"$in": team_ids}}] if team_ids else [])}
+    # Liga-Titel (F.1, #1645) gehören den eingesetzten Spielern (``player_ids``), nicht jedem Mitglied des Hauptteams.
+    query = {"$or": [{"user_id": user_id}, {"player_ids": user_id}]
+             + ([{"team_id": {"$in": team_ids}, "league": None}] if team_ids else [])}
     docs = await db.tournament_awards.find(query, {"_id": 0}).to_list(500)
-    return await _views(db, docs, public_only)
+    return await _views(db, [doc for doc in docs if not doc.get("suspended")], public_only)
 
 
 async def awards_for_team(db, team_id: str, public_only: bool = True) -> list[dict]:
     docs = await db.tournament_awards.find({"team_id": team_id}, {"_id": 0}).to_list(500)
-    return await _views(db, docs, public_only)
+    # Ein ruhender Liga-Titel (Staffel wieder geöffnet, F.1) wird nicht gezeigt.
+    return await _views(db, [doc for doc in docs if not doc.get("suspended")], public_only)
 
 
 async def featured_award(db, awards: list[dict], award_id: str | None) -> dict | None:

@@ -98,7 +98,7 @@ async def test_a_real_tie_is_shared_until_the_lead_decides_it_with_a_reason(flow
     assert short.status_code == 422
     ordered = [winners[1], winners[0]]
     response = await flow.put(f"{TABLE}/{staffel['id']}/table-decision",
-                              json={"registration_ids": ordered, "reason": "Losentscheid vor beiden Captains"})
+                              json={"registration_ids": ordered, "reason": "Losentscheid vor beiden Captains", "method": "lot"})
     assert response.status_code == 200, response.text
     decision = response.json()
 
@@ -303,7 +303,7 @@ async def test_removing_a_decision_respects_the_conflict(flow):
     admin, league, staffel = await setup(flow)
     winners, _losers = await two_ties(flow, staffel)
     decision = (await flow.put(f"{TABLE}/{staffel['id']}/table-decision",
-                               json={"registration_ids": winners[::-1], "reason": "Losentscheid vor Zeugen"})).json()
+                               json={"registration_ids": winners[::-1], "reason": "Losentscheid vor Zeugen", "method": "lot"})).json()
     own = await flow.db.tournament_registrations.find_one({"id": winners[0]}, {"_id": 0})
     judge = await flow.add_user(name="Leitung im Team")
     await flow.db.league_staff.insert_one({"id": new_id(), "league_id": league["id"], "user_id": judge["id"],
