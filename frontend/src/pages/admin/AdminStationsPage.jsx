@@ -189,13 +189,10 @@ export default function AdminStationsPage() {
       toast.error(formatRequestError(e, "Stationen konnten nicht angelegt werden."));
     }
   };
-  // Defekt / Bereit (#1162) bleibt hier als Teil der Planung - etwa für eine Station, die (noch) in keiner
-  // Warteschlange steht. Live (mit Hinweis aufs Umlegen) geht es in der Turnierleitung. „Bereit“ stellt den Stand her,
-  // der zum gehaltenen Spiel passt.
+  // Defekt / Bereit (#1162) bleibt hier als Teil der Planung - nur für Stationen ohne gehaltenes Spiel, etwa eine, die
+  // (noch) in keiner Warteschlange steht. Hält sie ein Spiel, geht es in der Turnierleitung (mit Hinweis aufs Umlegen).
   const toggleBroken = async (station) => {
-    const held = station.current_match_id ? matchById[station.current_match_id] : null;
-    const ready = held ? (held.started_at || ["running", "in_progress", "waiting_result"].includes(held.status) ? "busy" : "reserved") : "free";
-    const status = station.status === "broken" ? ready : "broken";
+    const status = station.status === "broken" ? "free" : "broken";
     try {
       await api.patch(`/stations/${station.id}`, { status });
       toast.success(status === "broken" ? `${station.name} ist als defekt gemeldet.` : `${station.name} ist wieder bereit.`);
@@ -428,12 +425,19 @@ export default function AdminStationsPage() {
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
-                  {isTournamentLead ? (
+                  {isTournamentLead && !s.current_match_id ? (
                     <button type="button" onClick={() => toggleBroken(s)} data-testid={`station-broken-${s.id}`} className={`ml-auto min-h-[36px] rounded-sm border px-3 text-[11px] font-bold uppercase tracking-wider ${s.status === "broken" ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"}`}>
                       {s.status === "broken" ? "Bereit" : "Defekt"}
                     </button>
                   ) : null}
                 </div>
+                {/* Hält die Station ein Spiel (#1162), gehört „Defekt“ in die Turnierleitung - dort bleibt der Aufruf und das
+                    Spiel lässt sich umlegen. */}
+                {isTournamentLead && s.current_match_id ? (
+                  <p className="mt-2 text-xs text-white/55" data-testid={`station-broken-hint-${s.id}`}>
+                    Station hält ein Spiel – {leadUrl ? <Link to={leadUrl} className="text-[#29B6E8] underline-offset-2 hover:underline">in der Turnierleitung als defekt melden</Link> : "in der Turnierleitung als defekt melden"}.
+                  </p>
+                ) : null}
                 {/* Current match */}
                 {s.current_match_id ? (
                   <div className="mt-3 p-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm">

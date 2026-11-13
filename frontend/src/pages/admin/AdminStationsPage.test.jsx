@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -200,7 +200,10 @@ test("Live-Knöpfe nur in der Turnierleitung: Link mit Reiter Stationen, hier nu
   expect(screen.queryByText("Spiel zuweisen")).toBeNull();
   expect(screen.queryByText("Freigeben")).toBeNull();
   expect(screen.queryByTestId("station-status-st-1")).toBeNull();
-  // Defekt / Bereit bleibt als Teil der Planung (Admin).
+  // Defekt / Bereit bleibt als Teil der Planung (Admin) - nur ohne gehaltenes Spiel; sonst der Weg in die Turnierleitung.
+  expect(screen.queryByTestId("station-broken-st-1")).toBeNull();
+  expect(screen.getByTestId("station-broken-hint-st-1")).toHaveTextContent("Station hält ein Spiel – in der Turnierleitung als defekt melden");
+  expect(within(screen.getByTestId("station-broken-hint-st-1")).getByRole("link")).toHaveAttribute("href", "/tournaments/winter-cup/leitung?reiter=stationen");
   apiMock.patch.mockResolvedValue({ data: {} });
   await userEvent.setup().click(screen.getByTestId("station-broken-st-2"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/stations/st-2", { status: "broken" }));

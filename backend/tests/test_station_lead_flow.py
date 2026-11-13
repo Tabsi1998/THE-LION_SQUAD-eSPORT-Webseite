@@ -518,3 +518,38 @@ async def test_releasing_a_call_tells_the_called_players_once(flow):
     assert (await start(flow, tournament, stations[1], other)).status_code == 200
     assert (await release(flow, tournament, stations[1], other)).status_code == 200
     assert len([row for row in await calls(flow) if row["title"] == "Aufruf zurückgenommen"]) == len(withdrawn)
+
+
+# ---------------------------------------------------------------- Verwaltung: Defekt behält den Aufruf (#1162, Review M1/N2)
+
+@pytest.mark.asyncio
+async def test_the_admin_broken_switch_keeps_a_called_match_at_the_station(flow):
+    staff, tournament, stations, _players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    assert (await call(flow, tournament, stations[0], match)).status_code == 200
+    called_at = (await flow.reload(match))["called_at"]
+    flow.act_as(staff)
+    patched = await flow.patch(f"/api/stations/{stations[0]['id']}", json={"status": "broken"})
+    assert patched.status_code == 200, patched.text
+    stored = await flow.reload(match)
+    assert stored["called_at"] == called_at and stored["station_id"] == stations[0]["id"], "kein stilles Ende des Aufrufs"
+    station = await station_of(flow, stations[0])
+    assert station["status"] == "broken" and station["current_match_id"] == match["id"] and station["called_at"] == called_at
+    # In der Turnierleitung: defekt mit dem Aufruf - und „Umlegen“ ruft an einer freien Station neu auf.
+    row = next(row for row in (await queue(flow, tournament))["stations"] if row["id"] == stations[0]["id"])
+    assert row["status"] == "broken" and row["next"]["match_id"] == match["id"] and row["next"]["state"] == "called"
+    moved = await move(flow, tournament, stations[0], match, stations[1])
+    assert moved.status_code == 200, moved.text
+
+
+@pytest.mark.asyncio
+async def test_ready_again_at_a_shared_station_of_another_tournament_matches_its_call(flow):
+    _staff, a, _b, shared, b_match, org_a = await shared_world(flow)
+    flow.act_as(org_a)
+    assert (await flow.post(f"/api/tournaments/{a['id']}/live-queue/broken",
+                            json={"station_id": shared["id"], "broken": True, "confirm_other": True})).status_code == 200
+    ready = await broken(flow, a, shared, value=False)
+    assert ready.status_code == 200, ready.text
+    station = await station_of(flow, shared)
+    assert station["status"] == "reserved" and station["current_match_id"] == b_match["id"] and "broken_at" not in station
+    assert (await flow.reload(b_match))["called_at"], "der Aufruf von B bleibt"
