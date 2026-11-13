@@ -61,9 +61,9 @@ async def season_desk(season_id: str, me: dict = Depends(require_any)):
 
 
 @admin_router.get("/seasons/{season_id}/desk/log")
-async def season_log(season_id: str, page: int = Query(1, ge=1, le=10000), _me: dict = Depends(require_any)):
+async def season_log(season_id: str, page: int = Query(1, ge=1, le=10000), me: dict = Depends(require_any)):
     db = get_db()
-    return await desk.season_log(db, await _season(db, season_id), page)
+    return await desk.season_log(db, await _season(db, season_id), page, me=me)
 
 
 @admin_router.post("/seasons/{season_id}/broadcast/preview")

@@ -521,6 +521,31 @@ async def test_broadcast_needs_the_right_and_a_valid_message(flow):
 # ---------------------------------------------------------------- Protokoll
 
 
+@pytest.mark.asyncio
+async def test_log_hides_sanctions_and_conflict_overrides_without_the_matching_capability(flow):
+    """N7: Strafen sieht nur „Strafen“, Notausnahmen bei Befangenheit nur „Liga verwalten“ - alle anderen den Rest."""
+    world = await desk_world(flow)
+    base = now_utc()
+    rows = [
+        {"id": "a-sanction", "action": "league.sanction.create", "actor_id": world["staff"]["id"], "target_id": "x",
+         "data": {"season_id": world["season_id"]}},
+        {"id": "a-override", "action": "league.conflict.override", "actor_id": world["staff"]["id"], "target_id": world["season_id"], "data": {}},
+        {"id": "a-accept", "action": "league.application.accept", "actor_id": world["staff"]["id"], "target_id": world["season_id"], "data": {}},
+    ]
+    await flow.db.audit_logs.insert_many([{**row, "created_at": (base - timedelta(minutes=index)).isoformat()} for index, row in enumerate(rows)])
+
+    async def seen(user) -> set[str]:
+        flow.act_as(user)
+        response = await flow.get(f"{ADMIN}/seasons/{world['season_id']}/desk/log")
+        assert response.status_code == 200, response.text
+        return {row["id"] for row in response.json()["items"]}
+
+    assert await seen(await lead_of(flow, "Spielleitung", "matches")) == {"a-accept"}
+    assert await seen(await lead_of(flow, "Strafleitung", "sanctions")) == {"a-sanction", "a-accept"}
+    assert await seen(await lead_of(flow, "Ligaleitung", "manage")) == {"a-override", "a-accept"}
+    assert await seen(world["staff"]) == {"a-sanction", "a-override", "a-accept"}, "der Bereich Ligen sieht alles"
+
+
 def test_log_query_uses_anchored_prefixes_without_alternation_on_indexed_fields():
     from services.league_desk import log_query
 

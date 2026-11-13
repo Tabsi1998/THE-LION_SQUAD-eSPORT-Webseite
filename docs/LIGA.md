@@ -3329,7 +3329,9 @@ Leitstand liest dieselben Quellen wie „Mein Dienst“ und die Reiter der Seaso
   Verfahren und bei Verschiebungen (dort antwortet zuerst die Gegenseite).
 - **Protokoll** `GET …/desk/log?page=` (`require_league(ANY)`): `audit_logs` mit `league.*` oder `match.*`, deren `target_id` die Season
   oder eine ihrer Staffeln ist oder deren `data.season_id` passt; 25 je Seite, neueste zuerst. Je Eintrag nur `label` (aus der Aktion),
-  Zeit, Name der handelnden Person (sonst „Automatik“), Staffel und Spiel als Verweis - **nie** Felder aus `data` wie Gründe oder Namen.
+  Zeit, Name der handelnden Person (sonst „Automatik“), Staffel und Spiel als Verweis - **nie** Felder aus `data` wie Gründe oder Namen. Strafen
+  (`league.sanction.*`) sieht nur „Strafen“, Notausnahmen bei Befangenheit (`league.conflict.override`) nur „Liga verwalten“; der
+  Bereich Ligen sieht alles. Indizes `target_id`/`data.season_id` je mit `created_at`.
 - **Rundnachricht** (Nr. 153) `POST …/broadcast/preview` und `POST …/broadcast` mit `manage` oder `season` (B.1 kennt keine eigene
   Zuständigkeit dafür): `audience` `captains` (Vorgabe, `responsible_ids`) oder `players` (`player_ids`), `scope` `season`,
   `division` oder `staffel` mit `scope_id`; Anmeldungen `pending`/`approved`/`checked_in`, ohne gesperrte und abgeschaltete Konten und

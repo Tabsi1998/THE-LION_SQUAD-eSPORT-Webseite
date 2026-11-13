@@ -417,9 +417,14 @@ def _log_detail(row: dict, staffeln: dict[str, dict]) -> dict:
 
 
 LOG_PREFIXES = ("league", "match")
+# Was nicht jede Zuständigkeit im Protokoll sieht: Strafen nur „Strafen“, Notausnahmen bei Befangenheit nur „Liga verwalten“.
+LOG_RESTRICTED = (
+    ("sanctions", {"action": {"$regex": "^league\\.sanction\\."}}),
+    ("manage", {"action": "league.conflict.override"}),
+)
 
 
-def log_query(season_id: str, targets: list[str]) -> dict:
+def log_query(season_id: str, targets: list[str], capabilities=None) -> dict:
     """Je Zweig ein Index (``target_id`` bzw. ``data.season_id``, je mit ``created_at``, ``database.AUDIT_INDEXES``) und ein Präfix mit
     Anker ohne Alternation - so nutzt MongoDB für Zählen und Seite denselben Weg."""
     branches = []
@@ -427,14 +432,20 @@ def log_query(season_id: str, targets: list[str]) -> dict:
         action = {"$regex": f"^{prefix}\\."}
         branches.append({"target_id": {"$in": targets}, "action": action})
         branches.append({"data.season_id": season_id, "action": action})
-    return {"$or": branches}
+    query: dict = {"$or": branches}
+    if capabilities is not None:
+        hidden = [condition for capability, condition in LOG_RESTRICTED if capability not in capabilities]
+        if hidden:
+            query["$nor"] = hidden
+    return query
 
 
-async def season_log(db, season: dict, page: int = 1) -> dict:
-    """Das Protokoll der Season, neueste zuerst, seitenweise: Liga- und Spielaktionen der Season und ihrer Staffeln."""
+async def season_log(db, season: dict, page: int = 1, *, me: dict | None = None) -> dict:
+    """Das Protokoll der Season, neueste zuerst, seitenweise: Liga- und Spielaktionen der Season und ihrer Staffeln. Strafen und
+    Notausnahmen nur mit der passenden Zuständigkeit (``LOG_RESTRICTED``)."""
     staffeln = await _staffeln(db, season["id"])
     targets = [season["id"], *sorted(staffeln)]
-    query = log_query(season["id"], targets)
+    query = log_query(season["id"], targets, await capabilities_of(db, me, season.get("league_id")))
     total = await db.audit_logs.count_documents(query)
     pages = max(1, -(-total // LOG_PAGE_SIZE))
     page = min(max(1, int(page or 1)), pages)
