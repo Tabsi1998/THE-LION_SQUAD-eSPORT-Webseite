@@ -12,7 +12,8 @@ steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es e
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga 1, 2 …, Staffel A, B …
 - **Turnierverwaltung der Staffel** (`/admin/tournaments/<Staffel>`, aus der Season über **Turnierverwaltung · Co-Teams
   zuteilen**) – Co-Teams zuteilen, starten, Spiele, Ergebnisse
-- **Ligaseite** (`/liga/<liga>/<season>`, etwa `/liga/call-of-duty/season-1`) – was Mitglieder und Gäste sehen
+- **Ligaseite** (`/liga/<liga>/<season>`, etwa `/liga/call-of-duty/season-1`) – was Mitglieder und Gäste sehen, mit den Unterseiten
+  **Spieltage** und **Teams** (siehe [2.12](#212-die-ligaseite-übersicht-spieltage-teams))
 
 Wer was darf: Liga, Season, Liga N, Staffel, Zuteilen, Start und Korrekturen macht nur die **Liga-Leitung mit
 bestätigter Zwei-Faktor-Anmeldung**: wer den Bereich **Ligen** hat oder in dieser Liga **zuständig** ist, siehe
@@ -882,6 +883,47 @@ der Matchseite, je mit Version, Stand und PDF.
 - Eine Season oder Liga mit veröffentlichtem Regelwerk oder mit Zustimmungen lässt sich nicht mehr löschen, nur archivieren. Entwürfe gehen mit.
 - Ein Regelwerk darf mit allen Anlagen höchstens 400 000 Zeichen und 400 Überschriften haben.
 
+### 2.12 Die Ligaseite: Übersicht, Spieltage, Teams
+
+Die Ligaseite zeigt nur, was die Season veröffentlicht – du pflegst nichts extra. Oben steht eine Leiste **Übersicht ·
+Spieltage · Teams · Regelwerk** (Regelwerk nur, wenn es eines gibt); dieselbe Leiste steht auf der Regelseite.
+
+**Übersicht** (`/liga/<liga>/<season>`):
+
+| Block | Woher es kommt |
+| --- | --- |
+| **Was gespielt wird**: Spiel, Teamgröße, Best of, Runden, Map-Wiederholung, je Modus Symbol und Regel („bis 250 Punkte · 10 Min.“), Reihenfolge Map 1 bis N, Plattform | Reiter **Spielbetrieb** und **Ergebnisregeln** der Season, Modus-Symbole am Spiel (2.1), Plattform (2.7c) |
+| **Map-Pool** mit großen Bildern, am Handy je Modus zum Wischen | Map-Pool der Season |
+| **Sperrliste** mit Bildern, aufklappbar, darunter die **erlaubte Ausrüstung** | Sperrliste der Season (2.1a) |
+| **Ablauf**: Standardtermin, 72-h-Regel, Verschieben, Frist zum Bestätigen, Punkte und Gleichstand | Reiter **Termine** und **Tabelle** der Season |
+| **Regelwerk** mit Version und PDF | 2.11 |
+| **Ligen und Staffeln**: je Staffel die Tabelle und der aktuelle Spieltag, Wege zu Spieltagen und Teams | Staffeln; läuft die Season, stehen die Tabellen gleich unter „Was gespielt wird“ |
+
+Im Kopf stehen nur Zeitraum, Spielwochen und Pausen – Best of, Teamgröße, Standardtermin und Punkte stehen genau einmal, in
+„Was gespielt wird“ bzw. „Ablauf“. Ist die Seite gerade nicht erreichbar, steht dort „Nochmal laden“ statt „nicht gefunden“.
+
+Vor der Einteilung (noch keine Staffel für Gäste sichtbar) steht statt der Tabellen **„Die Ligen werden eingeteilt“** mit den
+nächsten Schritten: Anmeldung, Einteilung, Start. **Gold** hat in der Tabelle nur der **Meister**: Platz 1 allein, in der
+obersten Liga, sobald die Staffel beendet ist. Auf- und Abstiegszonen kommen mit dem Saisonabschluss (#1627).
+
+**Spieltage** (`…/spieltage`): oben die Staffel (bei mehreren), darunter eine Leiste aller Wochen – Punkt in Akzentfarbe =
+gespielt bzw. läuft, schraffiert = Pause. Die gewählte Woche zeigt alle Spiele mit Ergebnis, Maps mit Bild und Modus-Symbol,
+**kampflos**, **Map wiederholt** und **in Klärung**; offene Wochen zeigen einmal den **Modus je Map**. Den **Grund** einer
+Wiederholung sehen nur die beiden Teams und die Liga-Leitung auf der Matchseite, öffentlich steht nur „wiederholt“. Staffel und Woche stehen
+in der Adresse (`?staffel=…&woche=3`) – so lässt sich ein Spieltag in Discord verlinken.
+
+**Teams** (`…/teams`): je Liga und Staffel die Teams mit Logo (aus der Teamseite, sonst zwei Buchstaben), Platz und Punkten.
+
+Interne Dinge der Leitung – Grund eines Punktabzugs, Verfahren, Vorfälle – stehen nirgends auf diesen Seiten. Die Teilen-Vorschau
+der Season sagt, was gespielt wird; Spieltage und Teams haben eine eigene Vorschau.
+
+<table>
+<tr>
+<td><img src="../assets/liga/season-seite-handy.png" alt="Ligaseite am Handy: Kopf mit Banner und Emblem, Leiste Übersicht, Spieltage, Teams, Regelwerk, darunter Was gespielt wird mit Format, drei Modi mit Symbol und Regel und der Reihenfolge Map 1 bis 3, dann die Tabelle der Liga 1" width="260"></td>
+<td><img src="../assets/liga/season-spieltage-1440.png" alt="Spieltage am PC: Auswahl Liga 1 oder Liga 2, Leiste der Wochen mit Reserve und Weihnachtspause, Spieltag 1 mit einem Ergebnis 2:1 samt drei Maps mit Bild und dem Hinweis Map wiederholt sowie einem kampflosen Spiel" width="520"></td>
+</tr>
+</table>
+
 ## 3. Während der Season
 
 ### 3.1 Termine
@@ -1158,7 +1200,9 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   Einspruchsfrist (Vorgabe 48 Stunden) einmal Einspruch einlegen. Darüber entscheidet **eine andere Person** als bei der
   ersten Entscheidung – auch der Superadmin nicht über die eigene. Bis dahin gilt die erste Entscheidung weiter.
 - **Tabelle und TV**: Mit **Zählt vorläufig** (Vorgabe) bleibt ein Ergebnis mit laufendem Protest in der Tabelle; Spiel
-  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV und in der Tabelle als PDF. Unter **Braucht
+  und Tabellenzeile tragen „in Klärung“ – auf der Ligaseite, im TV, in der Tabelle als PDF, auf dem Teilen-Bild eines
+  Ergebnisses und im Turnierweg im Profil. Nach der Entscheidung zeigen alle wieder das gültige
+  Ergebnis ohne Hinweis. Unter **Braucht
   Aufmerksamkeit** steht der Fall mit **Zum Spiel**. Mit **Zählt bis zur Entscheidung nicht** fällt das Spiel so lange heraus.
 - **Einstellen**: Season → **Proteste** → **Fristen, Gründe und Tabelle**. Speichern gilt sofort in allen nicht
   gesperrten Staffeln; laufende Verfahren behalten ihre Fristen. Die vier Grundgründe bleiben in der Liste, damit auch

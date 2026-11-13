@@ -8,20 +8,26 @@ vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", resolveMediaUrl: (url) 
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
+vi.mock("@/components/tls/league/application/LeagueApplicationPanel", () => ({ LeagueApplicationPanel: () => <div data-testid="league-application" /> }));
 
 const { default: LeagueSeasonPage } = await import("./LeagueSeasonPage");
 
 const SEASON_VIEW = {
-  league: { id: "l1", slug: "probe-liga", name: "Probe-Liga", game: { name: "Probe Shooter" } },
+  league: { id: "l1", slug: "probe-liga", name: "Probe-Liga", game: { name: "Probe Shooter", modes: [
+    { mode: "stellung", label: "Stellung", icon_url: "/api/static/uploads/stellung.png" }, { mode: "snd", label: "Suchen & Zerstören" }] } },
   season: {
     name: "Season 1", slug: "season-1", start_date: "2026-11-09T23:00:00+00:00", end_date: "2027-01-18T22:59:59+00:00",
     matchday_days: 7, default_match_weekday: 6, default_match_time: "20:00", best_of: 3, team_size: 4,
     match_points: { win: 3, draw: 1, loss: 0 }, rules_text: "## Fairplay\nKein Cheaten.", registration_deadline: "2026-11-06",
     blocked_periods: [{ start_date: "2026-12-21", end_date: "2027-01-03", label: "Weihnachtspause" }],
+    weeks_total: 10, round_robin_legs: 1, map_repeat: "other_mode", result_confirm_hours: 48, game_mode_order: ["stellung", "snd", "stellung"],
+    table_tiebreakers: ["head_to_head", "score_diff"],
+    result_rules: { stellung: { kind: "score", target: 250, time_limit_seconds: 600 }, snd: { kind: "rounds", target: 6, round_limit: 11 } },
+    schedule_rules: { home_rule: true, home_rule_hours: 72, reschedule_notice_hours: 24, reschedule_max: 2, reschedule_same_week: true },
   },
   map_pool: { id: "p1", modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "m1", name: "Hafenkante", image_url: null }] }] },
   divisions: [{ id: "d1", level: 1, label: "Liga 1", staffeln: [
-    { tournament_id: "t1", slug: "probe-a", staffel: "A" }, { tournament_id: "t2", slug: "probe-b", staffel: "B" }] }],
+    { tournament_id: "t1", slug: "probe-a", staffel: "A", status: "live" }, { tournament_id: "t2", slug: "probe-b", staffel: "B", status: "live" }] }],
 };
 const done = {
   id: "m1", matchday: 1, done: true, status: "completed", home: { registration_id: "r1", name: "Probe · Probe B", team_id: "team-1", score: 2 },
@@ -60,13 +66,18 @@ function renderPage(path = "/liga/probe-liga/season-1") {
   );
 }
 
-test("Kopf mit Zeitraum, Spielwoche, Punkten und Pausen", async () => {
+test("Kopf mit Zeitraum, Spielwochen und Pausen - Best of, Standardtermin und Punkte nur an ihrer einen Stelle (#2268)", async () => {
   renderPage();
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Probe-Liga Season 1");
   expect(screen.getByTestId("league-fact-period")).toHaveTextContent("10.11.2026 – 18.1.2027");
+  expect(screen.getByTestId("league-fact-week")).toHaveTextContent("10 Spielwochen");
   expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Spielwoche Di–Mo");
-  expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Sonntag, 20:00 Uhr");
-  expect(screen.getByTestId("league-fact-points")).toHaveTextContent("3 / 1 / 0");
+  // Jede Angabe an einer Stelle: nicht im Kopf, sondern in „Was gespielt wird“ bzw. „Ablauf“.
+  expect(screen.queryByTestId("league-fact-points")).toBeNull();
+  expect(screen.getByTestId("league-facts")).not.toHaveTextContent("Best of");
+  expect(screen.getByTestId("league-facts")).not.toHaveTextContent("20:00");
+  expect(screen.getByTestId("season-points")).toHaveTextContent("3 / 1 / 0");
+  expect(screen.getByTestId("season-flow-default")).toHaveTextContent("Sonntag, 20:00 Uhr");
   expect(screen.getByTestId("league-fact-breaks")).toHaveTextContent("Weihnachtspause 21.12.–3.1.");
   expect(screen.getByTestId("league-rules")).toHaveTextContent("Kein Cheaten");
   expect(screen.getByTestId("league-map-pool")).toHaveTextContent("Hafenkante");
@@ -79,29 +90,26 @@ test("Regelwerk (#1646): Link mit Version und Stand plus PDF statt des Aufklappb
     ? Promise.resolve({ data: { ...SEASON_VIEW, rules } }) : Promise.resolve({ data: STAFFEL("A") })));
   renderPage();
   const link = await screen.findByTestId("league-rules-link");
-  expect(within(link).getByRole("link", { name: /Regeln/ })).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
+  expect(within(link).getByRole("link", { name: "Regelwerk" })).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
   expect(screen.getByTestId("league-rules-version")).toHaveTextContent("Version 2 · gültig ab 03.11.2026");
   expect(screen.getByTestId("league-rules-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe-liga/season-1/versions/v2/pdf");
   expect(screen.getByTestId("league-rules-consent")).toHaveTextContent("noch nicht zugestimmt");
   expect(screen.queryByTestId("league-rules")).toBeNull();
 });
 
-test("Staffel: Tabelle, laufende Woche offen, Pause sichtbar, Ergebnis mit Maps und Teamseiten", async () => {
+test("Staffel (#2268): Tabelle und nur der aktuelle Spieltag, offene Spiele mit Modus je Map, Wege zu Spieltagen und Teams", async () => {
   renderPage();
   const staffel = await screen.findByTestId("league-staffel-A");
   expect(within(staffel).getByTestId("standing-row-r1")).toHaveTextContent("Probe · Probe B");
-  expect(within(staffel).getByTestId("league-week-7")).toHaveTextContent("Weihnachtspause");
-  // Die laufende Woche (2) ist offen, die erste zu.
+  // Die laufende Woche (2) steht offen da, die übrigen Wochen stehen auf der Unterseite Spieltage.
   expect(within(staffel).getByTestId("league-match-m2")).toHaveTextContent("Standardtermin");
-  expect(within(staffel).queryByTestId("league-match-m1")).toBeNull();
-  fireEvent.click(within(within(staffel).getByTestId("league-week-1")).getByRole("button"));
-  const result = within(staffel).getByTestId("league-match-m1");
-  expect(result).toHaveTextContent("2 : 1");
-  expect(result).toHaveTextContent("Hafenkante");
-  expect(result).toHaveTextContent("Nebelwerk");
-  expect(within(result).getAllByRole("link", { name: /Probe · Probe B/ })[0]).toHaveAttribute("href", "/teams/team-1");
-  expect(within(result).getByRole("link", { name: /Zum Spiel/ })).toHaveAttribute("href", "/matches/m1");
-  expect(within(staffel).getByTestId("league-team-r2")).toHaveAttribute("href", "/teams/team-2");
+  expect(within(staffel).queryByTestId("league-week-1")).toBeNull();
+  expect(within(staffel).queryByTestId("league-week-7")).toBeNull();
+  expect(within(staffel).getByTestId("league-planned-2")).toHaveTextContent("Suchen & Zerstören");
+  expect(within(staffel).getByTestId("league-plan-link-A")).toHaveAttribute("href", "/liga/probe-liga/season-1/spieltage?staffel=probe-a");
+  expect(within(staffel).getByTestId("league-teams-link-A")).toHaveTextContent("2 Teams");
+  expect(within(staffel).getByTestId("league-teams-link-A")).toHaveAttribute("href", "/liga/probe-liga/season-1/teams#staffel-probe-a");
+  expect(within(within(staffel).getByTestId("league-match-m2")).getAllByRole("link", { name: /Falken/ })[0]).toHaveAttribute("href", "/teams/team-2");
 });
 
 test("Staffel-Reiter und Sprung aus der Teamseite (#staffel-…)", async () => {
@@ -170,6 +178,22 @@ test("Unsichtbare oder unbekannte Season: ein klarer Hinweis", async () => {
   expect(await screen.findByTestId("league-missing")).toHaveTextContent("Liga nicht gefunden");
 });
 
+test("Netz- oder Serverfehler (#2268): nicht „nicht gefunden“, sondern ein Hinweis mit „Nochmal laden“", async () => {
+  apiMock.get.mockRejectedValueOnce({ response: { status: 502 } });
+  renderPage();
+  const failed = await screen.findByTestId("league-load-failed");
+  expect(failed).toHaveTextContent("gerade nicht erreichbar");
+  expect(screen.queryByTestId("league-missing")).toBeNull();
+  fireEvent.click(screen.getByTestId("league-load-retry"));
+  expect(await screen.findByTestId("league-head")).toBeInTheDocument();
+});
+
+test("ohne Antwort (offline) ebenfalls „Nochmal laden“ statt „nicht gefunden“", async () => {
+  apiMock.get.mockRejectedValueOnce(new Error("Netzwerk"));
+  renderPage();
+  expect(await screen.findByTestId("league-load-failed")).toBeInTheDocument();
+});
+
 test("Staffel-Reiter: Tabpanel, Pfeiltasten wechseln und setzen den Fokus", async () => {
   renderPage();
   const tabA = await screen.findByTestId("league-staffel-tab-A");
@@ -190,4 +214,138 @@ test("Staffel-Reiter: Tabpanel, Pfeiltasten wechseln und setzen den Fokus", asyn
   fireEvent.keyDown(tabA, { key: "End" });
   expect(tabB).toHaveAttribute("aria-selected", "true");
   expect(document.getElementById("staffel-probe-a")).not.toBeNull();
+});
+
+test("Was gespielt wird (#2268): Format, Modi mit Symbol und Regel in Klartext, Map-Reihenfolge als Leiste", async () => {
+  renderPage();
+  const play = await screen.findByTestId("season-play");
+  expect(within(play).getByTestId("season-format")).toHaveTextContent("Probe Shooter");
+  expect(within(play).getByTestId("season-format-size")).toHaveTextContent("4 gegen 4");
+  expect(within(play).getByTestId("season-format-best_of")).toHaveTextContent("Best of 3");
+  expect(within(play).getByTestId("season-format-legs")).toHaveTextContent("eine Runde");
+  expect(within(play).getByTestId("season-mode-stellung-rule")).toHaveTextContent("bis 250 Punkte · 10 Min.");
+  expect(within(play).getByTestId("season-mode-snd-rule")).toHaveTextContent("6 Runden, höchstens 11");
+  expect(within(play).getByTestId("season-mode-stellung").querySelector("[data-icon='image']")).not.toBeNull();
+  expect(within(play).getByTestId("season-mode-snd").querySelector("[data-icon='placeholder']")).not.toBeNull();
+  expect(within(play).getByTestId("season-mode-snd")).toHaveTextContent("1 Map im Pool");
+  const order = within(play).getByTestId("season-map-order");
+  expect(within(order).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Map 1Stellung", "Map 2Suchen & Zerstören", "Map 3Stellung"]);
+});
+
+test("Ablauf (#2268): Standardtermin, 72-h-Regel, Verschieben, Ergebnis, Punkte und Gleichstand in Klartext", async () => {
+  renderPage();
+  const flow = await screen.findByTestId("season-flow");
+  expect(within(flow).getByTestId("season-flow-default")).toHaveTextContent("Sonntag, 20:00 Uhr");
+  expect(within(flow).getByTestId("season-flow-home")).toHaveTextContent("binnen 72 Stunden");
+  expect(within(flow).getByTestId("season-flow-reschedule")).toHaveTextContent("Bis 24 Stunden vor dem Termin, höchstens 2× je Spiel, innerhalb der Spielwoche");
+  expect(within(flow).getByTestId("season-flow-confirm")).toHaveTextContent("48 Stunden");
+  expect(within(flow).getByTestId("season-points")).toHaveTextContent("Punkte → Direkter Vergleich → Map-Differenz");
+});
+
+test("Navigation (#2268): Übersicht, Spieltage, Teams - Regelwerk nur mit Regelwerk", async () => {
+  renderPage();
+  const nav = await screen.findByTestId("season-nav");
+  expect(within(nav).getByTestId("season-nav-start")).toHaveAttribute("aria-current", "page");
+  expect(within(nav).getByTestId("season-nav-spieltage")).toHaveAttribute("href", "/liga/probe-liga/season-1/spieltage");
+  expect(within(nav).getByTestId("season-nav-teams")).toHaveAttribute("href", "/liga/probe-liga/season-1/teams");
+  expect(within(nav).queryByTestId("season-nav-regeln")).toBeNull();
+});
+
+test("Navigation am Handy (#2268): steht rechts noch etwas über, blendet der Rand aus - am Ende nicht mehr", async () => {
+  renderPage();
+  const nav = await screen.findByTestId("season-nav");
+  const list = nav.querySelector("ul");
+  Object.defineProperty(list, "scrollWidth", { configurable: true, value: 420 });
+  Object.defineProperty(list, "clientWidth", { configurable: true, value: 358 });
+  list.scrollLeft = 0;
+  fireEvent(window, new Event("resize"));
+  expect(nav).toHaveAttribute("data-more", "true");
+  list.scrollLeft = 62;
+  fireEvent.scroll(list);
+  expect(nav).not.toHaveAttribute("data-more");
+});
+
+test("Sperrliste (#2268): zu mit Zahl, aufgeklappt mit Bildern und Hinweis aufs Regelwerk", async () => {
+  const rules = { version: 1, label: "Version 1", valid_from: "2026-11-03", url: "/liga/probe-liga/season-1/regeln", pdf_url: "/api/x.pdf" };
+  const bans = { entries: [
+    { kind: "item", item_id: "w1", name: "Blitz 9", category_label: "Waffen", image_url: "/api/static/uploads/blitz.webp", mode_labels: [] },
+    { kind: "item", item_id: "p1", name: "Leise Sohlen", category_label: "Perks", image_url: null, mode_labels: ["Suchen"] },
+  ] };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1"
+    ? Promise.resolve({ data: { ...SEASON_VIEW, rules, loadout_bans: bans } }) : Promise.resolve({ data: STAFFEL("A") })));
+  renderPage();
+  const block = await screen.findByTestId("season-bans");
+  expect(within(block).getByTestId("season-bans-toggle")).toHaveTextContent("2 Sperren");
+  expect(within(block).queryByTestId("league-loadout-bans")).toBeNull();
+  const details = block.querySelector("details");
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  const list = await within(block).findByTestId("league-loadout-bans");
+  expect(list).toHaveTextContent("Blitz 9");
+  expect(list.querySelector("img")).not.toBeNull();
+  expect(within(block).getByRole("link", { name: "Regelwerk" })).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
+  expect(screen.getByTestId("season-nav-regeln")).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
+});
+
+test("Vor der Einteilung (#2268): freundlicher Platzhalter mit dem, was als Nächstes passiert", async () => {
+  const application = { state: "open", closes_at: "2026-11-06T22:59:00+00:00", slots: 8, slots_free: 3 };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1"
+    ? Promise.resolve({ data: { ...SEASON_VIEW, divisions: [], application } }) : Promise.reject(new Error(url))));
+  renderPage();
+  const placeholder = await screen.findByTestId("league-no-divisions");
+  expect(placeholder).toHaveTextContent("Die Ligen werden eingeteilt");
+  expect(within(placeholder).getByTestId("season-step-apply")).toHaveAttribute("data-state", "now");
+  expect(within(placeholder).getByTestId("season-step-apply")).toHaveTextContent("Offen bis 6.11.2026");
+  expect(within(placeholder).getByTestId("season-step-split")).toHaveAttribute("data-state", "next");
+  expect(within(placeholder).getByTestId("season-step-start")).toHaveTextContent("Erster Spieltag ab 10.11.2026");
+});
+
+test("Gold nur für den Meister (#2268): beendete Staffel der obersten Liga, Platz 1 allein", async () => {
+  const finished = { ...SEASON_VIEW, divisions: [
+    { ...SEASON_VIEW.divisions[0], staffeln: [{ tournament_id: "t1", slug: "probe-a", staffel: "A", status: "completed" }] },
+    { id: "d2", level: 2, label: "Liga 2", staffeln: [{ tournament_id: "t3", slug: "probe-c", staffel: "C", status: "completed" }] }] };
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/leagues/probe-liga/season-1") return Promise.resolve({ data: finished });
+    return Promise.resolve({ data: STAFFEL(url.endsWith("/t3") ? "C" : "A") });
+  });
+  renderPage();
+  const champion = await screen.findByTestId("league-champion-A");
+  expect(champion).toHaveTextContent("Meister Probe · Probe B");
+  expect(within(screen.getByTestId("league-staffel-A")).getByTestId("standing-row-r1")).toHaveAttribute("data-champion", "true");
+  // Liga 2 hat keinen Meister.
+  const lower = await screen.findByTestId("league-staffel-C");
+  expect(within(lower).queryByTestId("league-champion-C")).toBeNull();
+  expect(within(lower).getByTestId("standing-row-r1")).not.toHaveAttribute("data-champion");
+});
+
+test("Läuft die Season, stehen die Tabellen vor dem Map-Pool; im Entwurf erst am Ende", async () => {
+  const { unmount } = renderPage();
+  const division = await screen.findByTestId("league-division-1");
+  expect(division.compareDocumentPosition(screen.getByTestId("league-map-pool")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  unmount();
+  const draft = { ...SEASON_VIEW, divisions: [{ ...SEASON_VIEW.divisions[0], staffeln: [{ tournament_id: "t1", slug: "probe-a", staffel: "A", status: "draft" }] }] };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1" ? Promise.resolve({ data: draft }) : Promise.resolve({ data: STAFFEL("A") })));
+  renderPage();
+  const later = await screen.findByTestId("league-division-1");
+  expect(later.compareDocumentPosition(screen.getByTestId("league-map-pool")) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+});
+
+test("Liga N ohne sichtbare Staffel (nur Entwürfe): auch dann der Platzhalter statt leerer Ligen", async () => {
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1"
+    ? Promise.resolve({ data: { ...SEASON_VIEW, divisions: [{ id: "d1", level: 1, label: "Liga 1", staffeln: [] }] } }) : Promise.reject(new Error(url))));
+  renderPage();
+  expect(await screen.findByTestId("league-no-divisions")).toBeInTheDocument();
+  expect(screen.queryByTestId("league-division-1")).toBeNull();
+});
+
+test("geteilter Platz 1 in einer beendeten Staffel: kein Gold, kein Meister", async () => {
+  const finished = { ...SEASON_VIEW, divisions: [{ ...SEASON_VIEW.divisions[0], staffeln: [{ tournament_id: "t1", slug: "probe-a", staffel: "A", status: "completed" }] }] };
+  const tied = { ...STAFFEL("A"), standings: [
+    { ...STAFFEL("A").standings[0] },
+    { ...STAFFEL("A").standings[0], registration_id: "r2", display_name: "Falken · Falken A" }] };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1" ? Promise.resolve({ data: finished }) : Promise.resolve({ data: tied })));
+  renderPage();
+  const staffel = await screen.findByTestId("league-staffel-A");
+  expect(within(staffel).queryByTestId("league-champion-A")).toBeNull();
+  expect(staffel.querySelector("[data-champion]")).toBeNull();
 });

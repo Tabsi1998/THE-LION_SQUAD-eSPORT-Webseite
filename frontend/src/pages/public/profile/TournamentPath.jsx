@@ -4,6 +4,7 @@ import { ChevronDown, Swords } from "lucide-react";
 import { api } from "@/lib/api";
 import { viennaDate } from "@/lib/vienna";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
+import { clarificationNote } from "@/lib/resultShare";
 
 // Profil (#1193): „Dein Weg“ je Turnier in den Referenzen (aufklappen) und die Bilanz gegen Gegner als Karte in der
 // Übersicht. Farben wie im Turnierbaum (#1340, Fabians Auswahl): Siege hell mit Zahl in Cyan, Niederlagen grau -
@@ -33,6 +34,7 @@ export function PathSteps({ path, testId }) {
     <ol className="relative" data-testid={testId}>
       {steps.map((step, index) => {
         const tone = STEP_TONE[step.outcome] || STEP_TONE.placed;
+        const note = clarificationNote(step);
         return (
           <li key={`${step.label}-${index}`} className="relative pl-6 pb-3" data-testid="tournament-path-step">
             <span className="absolute left-[5px] top-4 bottom-0 w-0.5 bg-white/10" aria-hidden="true" />
@@ -42,6 +44,7 @@ export function PathSteps({ path, testId }) {
               <span className={`font-bold tabular-nums ${tone.result}`}>{step.kind === "duel" && step.opponent === "Freilos" ? `${step.result || "weiter"} · Freilos` : step.result}</span>
               {step.kind === "duel" && step.opponent && step.opponent !== "Freilos" ? <span> gegen {step.opponent}</span> : null}
               {tone.word ? <span className="sr-only"> ({tone.word})</span> : null}
+              {note ? <span className="font-semibold text-warn" data-testid="tournament-path-clarification"> · {note}</span> : null}
             </div>
           </li>
         );

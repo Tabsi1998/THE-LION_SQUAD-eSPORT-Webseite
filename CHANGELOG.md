@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.82.0 (13.11.2026)
+
+### Neu
+
+* Liga – Ablauf der Season mit Standardtermin, Terminregel, Verschieben, Punkten und Gleichstand; Kopf ohne Doppelangaben (#2268)
+* Liga – eigene Teilen-Vorschau für Spieltage und Teams, Season-Vorschau sagt, was gespielt wird (#2268)
+* Liga – freundlicher Platzhalter vor der Einteilung mit den nächsten Schritten (#2268)
+* Liga – je Staffel Tabelle und aktueller Spieltag, Gold nur für den Meister (#2268)
+* Liga – Map-Pool der Season mit großen Bildern, am Handy wischbar, am PC vier Karten je Zeile (#2268)
+* Liga – Navigation Übersicht, Spieltage, Teams, Regelwerk, auch auf der Regelseite; am Handy mit Hinweis zum Wischen (#2268)
+* Liga – Season-Seite zeigt, was gespielt wird: Format, Modi mit Symbol und Regel im Klartext, Map-Reihenfolge, Plattform (#2268)
+* Liga – Sperrliste mit Bildern auf der Season-Seite aufklappbar (#2268)
+* Liga – Spieltage der Season als eigene Unterseite, Woche für Woche mit Map-Chips und Modus-Symbolen (#2268)
+* Liga – Teams der Season als eigene Unterseite mit Logos (#2268)
+
+### Fehlerbehebungen
+
+* Discord-Bracket zeigt angefochtene Ergebnisse und Maps „in Klärung“ wie die Ligaseite (#2363)
+* Liga – Grund einer Map-Wiederholung nur für die beiden Teams und die Leitung, öffentlich nur „wiederholt“ (#2268)
+* Liga – Season-Seite zeigt „gerade nicht erreichbar“ mit „Nochmal laden“ statt „nicht gefunden“ bei Netzfehlern (#2268)
+* Teilen-Bild und Link-Vorschau eines Ergebnisses zeigen angefochtene Ergebnisse als „in Klärung“ (#2363)
+* Teilen-Seite und Turnierweg im Profil zeigen angefochtene Ergebnisse als „in Klärung“ (#2363)
+
 ## 1.81.0 (12.11.2026)
 
 ### Neu
