@@ -398,3 +398,48 @@ async def test_kaputte_anmeldungen_fallen_weg_voruebergehende_fehler_nicht(flow,
         await web_push.send_web_push_for_notification(note)
     left = {row["endpoint"] for row in await flow.db.web_push_subscriptions.find({}, {"_id": 0}).to_list(10)}
     assert left == {offline.endpoint}
+
+
+async def test_mehrere_browser_gleichzeitig_aber_begrenzt(flow, keys, monkeypatch):
+    import asyncio
+
+    user = await flow.add_user()
+    flow.act_as(user)
+    browsers = [Browser(f"b{index}") for index in range(8)]
+    for browser in browsers:
+        await subscribe(flow, browser)
+    state = {"now": 0, "max": 0, "clients": 0}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            state["clients"] += 1
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, content, headers):
+            state["now"] += 1
+            state["max"] = max(state["max"], state["now"])
+            await asyncio.sleep(0.02)
+            state["now"] -= 1
+            return type("R", (), {"status_code": 201})()
+
+    monkeypatch.setattr(web_push.httpx, "AsyncClient", _Client)
+    sent = await web_push.send_web_push_for_notification({"id": "n1", "user_id": user["id"], "kind": "match_call", "title": "x", "url": "/"})
+    assert sent == 8
+    assert state["max"] == web_push.SEND_CONCURRENCY and state["clients"] == 1
+
+
+def test_schluessel_wird_nur_einmal_geladen(keys, monkeypatch):
+    calls = []
+    original = web_push._load_private_key
+    monkeypatch.setattr(web_push, "_load_private_key", lambda raw: calls.append(1) or original(raw))
+    web_push._config_cache.clear()
+    first = web_push.vapid_config()
+    second = web_push.vapid_config()
+    assert first is second and len(calls) == 1
+    monkeypatch.setenv("WEB_PUSH_CONTACT", "mailto:neu@example.test")
+    assert web_push.vapid_config().contact == "mailto:neu@example.test" and len(calls) == 2

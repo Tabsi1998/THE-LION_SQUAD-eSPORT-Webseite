@@ -13,6 +13,7 @@ Schlüssel erzeugen: ``python -m services.web_push --generate`` im Backend-Conta
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -120,9 +121,22 @@ def _warn_once(key: str, message: str) -> None:
         logger.warning(message)
 
 
+_CONFIG_NAMES = ("WEB_PUSH_VAPID_PRIVATE_KEY", "WEB_PUSH_VAPID_PUBLIC_KEY", "WEB_PUSH_CONTACT", "SENDER_EMAIL", "ADMIN_EMAIL")
+_config_cache: dict[str, Any] = {}
+
+
 def vapid_config(environ: dict[str, str] | None = None) -> VapidConfig | None:
-    """Die Schlüssel aus der Konfiguration - oder ``None``: dann ist Web-Push aus."""
-    source = environ if environ is not None else os.environ
+    """Die Schlüssel aus der Konfiguration - oder ``None``: dann ist Web-Push aus. Aus der Umgebung des Servers wird der
+    Schlüssel nur einmal geladen; ändern sich die Werte (Tests), wird neu gelesen."""
+    if environ is not None:
+        return _read_vapid_config(environ)
+    marker = tuple(os.environ.get(name, "") for name in _CONFIG_NAMES)
+    if _config_cache.get("marker") != marker:
+        _config_cache.update(marker=marker, config=_read_vapid_config(os.environ))
+    return _config_cache["config"]
+
+
+def _read_vapid_config(source) -> VapidConfig | None:
     private_key = _load_private_key(source.get("WEB_PUSH_VAPID_PRIVATE_KEY", ""))
     if private_key is None:
         if str(source.get("WEB_PUSH_VAPID_PRIVATE_KEY", "")).strip():
@@ -409,6 +423,7 @@ def _urgency(kind: str) -> str:
 
 # Nach so vielen dauerhaften Absagen eines Push-Dienstes (4xx außer 404/410/408/429) fällt eine Anmeldung weg.
 MAX_FAILURES = 3
+SEND_CONCURRENCY = 5
 
 
 async def _deliver(client, db, row: dict, content: bytes, config: VapidConfig, kind: str, now: str, notification_id: Any) -> str:
@@ -479,11 +494,17 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     }
     kind = str(notification.get("kind") or "")
     now = now_utc().isoformat()
-    results: list[tuple[dict, str]] = []
-    async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
-        for row in rows:
+    # Mehrere Browser einer Person gleichzeitig, aber höchstens SEND_CONCURRENCY auf einmal - ein langsamer Dienst hält
+    # die anderen nicht auf.
+    gate = asyncio.Semaphore(SEND_CONCURRENCY)
+
+    async def one(client, row: dict) -> tuple[dict, str]:
+        async with gate:
             content = bodies[bool(row.get("private_content"))]
-            results.append((row, await _deliver(client, db, row, content, config, kind, now, notification.get("id"))))
+            return row, await _deliver(client, db, row, content, config, kind, now, notification.get("id"))
+
+    async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
+        results = await asyncio.gather(*(one(client, row) for row in rows))
     gone = [row.get("id") for row, outcome in results if outcome == "gone"]
     if gone:
         await db.web_push_subscriptions.delete_many({"id": {"$in": gone}})
