@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.81.0 (12.11.2026)
+
+### Neu
+
+* „Braucht Aufmerksamkeit“ zeigt offene Verfahren mit dem Grund der Season (#1619)
+* Events: Nachricht nach Rückkehr mit bestehender Rechnung nennt sie statt eines Betrags (#2184)
+* Finanzen: Verlauf des Auftrags zeigt jeden Storno und jede Rückkehr der Buchung (#2184)
+* Liga – angefochtene Ergebnisse stehen in Tabelle, Spielplan, TV und PDF als „in Klärung“ (#1619)
+* Liga – Beanstandung, Protest und Einspruch als Verfahren mit Stellungnahme, Zuständiger und Pflichtbegründung (#1619)
+* Liga – Disqualifikation als Strafe, der Widerruf gibt Team und Spiele so zurück, wie sie davor standen (#2369)
+* Liga – eine Sperre verhindert Check-in, Aufstellung und Anmeldung, auch vorläufig; eine Sperre nach Spielen endet spätestens mit der Season (#2369)
+* Liga – Eskalation offener Verfahren je Season einstellbar (#1619)
+* Liga – MOSS-Datei anfordern, als ZIP bis 200 MB hochladen und geschützt herunterladen (#2297)
+* Liga – Nachweise bleiben aufbewahrt, solange eine Strafe läuft oder ein Einspruch offen ist (#2369)
+* Liga – Protestfrist je Season ab der Bestätigung, ruht in Sperrzeiten (#1619)
+* Liga – Punktabzug wirkt in der Tabelle und steht auf Website, TV und im Druck an der Zeile, ohne Grund (#2369)
+* Liga – Strafen im Wettbewerb: Verwarnung, Karten, Punktabzug, Map- und Spielverlust, Spielsperre, Teamsperre, Disqualifikation, Ligaausschluss und externe Sperre (#2369)
+* Liga – über den Einspruch gegen eine Strafe entscheidet eine andere Person, die Strafe gilt bis dahin weiter (#2369)
+* Liga-Verwaltung – Reiter „Strafen“ in der Season mit Strafkatalog, Nachweisen, Bestätigen und Widerruf (#2369)
+* Matchseite – „Problem melden“ führt durch Art, Grund und Nachweise (#1619)
+* Matchseite – Einspruch gegen Protestentscheid, Kampflos-Wertung und Korrektur per Knopf (#1619)
+* Matchseite – Karte des Verfahrens mit Fristen, Stellungnahme und Entscheidung (#1619)
+* Meine Strafen – Strafen der Liga mit Zeitraum, Frist und Einspruch, auch für das eigene Co-Team (#2369)
+* Season-Seite – Reiter „Proteste“ mit Eingang und Einstellungen (#1619)
+* Strafen-Eingang der Verwaltung zeigt Strafen der Liga mit der Zuständigkeit „Strafen“ (#2369)
+
+### Fehlerbehebungen
+
+* Abrechnung: „Storniert, Beleg existiert“ erledigt sich, wenn „Gutschrift-Entwurf trotz Rückkehr“ offen ist (#2184)
+* Abrechnung: Abgleich liest den Stand der Buchung frisch, wenn die Person gerade zurückkommt (#2184)
+* Abrechnung: Abgleich spiegelt einen alten Beleg nicht mehr an die Anmeldung nach einer Rückkehr mit neuem Auftrag (#2184)
+* Abrechnung: Gelöschter Entwurf setzt nur die Anmeldung zurück, die genau diesen Beleg trägt (#2184)
+* Abrechnung: Gutschrift-Entwurf trotz Rückkehr wird ein eigener Prüffall, in jeder Reihenfolge und nicht doppelt (#2184)
+* Abrechnung: Kein Gutschrift-Entwurf, wenn die Person während des Gutschrift-Laufs zurückkommt (#2184)
+* Abrechnung: Prüffall „Buchung nach dem Beleg geändert“ und Rückkehr über die Warteliste treffen den eigenen Auftrag, nicht einen alten gutgeschriebenen (#2184)
+* Abrechnung: Zurück nach Storno gilt der Auftrag wieder als gebucht, kein vorgemerkter Gutschrift-Entwurf (#2184)
+* Events: Abmelden bei belegter Platzsperre sagt „Gerade ist viel los“ statt „viele melden sich an“ (#2184)
+* Events: Eigenes Storno unter der Platzsperre, keine Rückbuchung mitten im Storno (#2184)
+* Events: Nachrücken nach Storno über die Warteliste wird auch nach dem Abgleich ein Prüffall (#2184)
+* Events: Neuanmeldung nach Storno mit gestellter Rechnung wird ein Prüffall statt eines zweiten Auftrags (#2184)
+* Events: Protokoll der Leitung ohne eingefrorenen Preis und Belegfelder (#2184)
+* Events: Rückbuchung nach Storno prüft den Beleg im selben Zug, sonst neuer Auftrag zum aktuellen Preis (#2184)
+* Events: Voll gutgeschriebene oder aufgegebene Rechnung zählt bei der Rückkehr nach Storno nicht mehr (#2184)
+* Events: Wiederaktivieren durch die Leitung auch nach dem Abgleich als Prüffall (#2184)
+* Finanzen: Altaufträge behalten den ersten Storno im Verlauf, wenn die Person zurückkommt (#2184)
+* Große Lobbys: „Nicht erschienen?“ nennt die richtige Zahl der Teilnehmer (#2216)
+* Große Lobbys: jeder Platz kann melden und erfährt das Ergebnis (#2216)
+* Gruppenphase: Gruppenliste und Tabelle zeigen jede Gruppe (#2216)
+* Turniere mit über 500 Anmeldungen: Liste, Baum und Tabelle zeigen jedes Profil, der Spielplan-Export jeden Namen (#2216)
+* Turniere mit über 500 Anmeldungen: Liste, Baum, Tabelle und Auslosung sehen alle (#2216)
+* Verfahren verlassen den Server nur für die nicht befangene Leitung ungekürzt (#1619)
+* Wertung kampflos und jedes Ergebnis entscheiden ein offenes Verfahren nur mit Recht und Begründung (#1619)
+* Zurückgezogenes Verfahren hält die Frist-Automatik nicht mehr an (#1619)
+
 ## 1.80.0 (12.11.2026)
 
 ### Neu
