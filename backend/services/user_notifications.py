@@ -100,6 +100,11 @@ async def create_user_notification(
     push_channel_allowed = push_allowed(user, kind, category) and not in_app_only
     # Browser-Benachrichtigungen (#1163): wie der App-Push, mit eigenem Kanal „Browser“.
     browser_channel_allowed = browser_allowed(user, kind, category) and not in_app_only
+    if browser_channel_allowed:
+        # Ohne angemeldeten Browser zählt der Kanal nicht - sonst entstünde für Personen ohne Browser-Anmeldung eine
+        # unsichtbare Meldung, obwohl Postfach und Push aus sind.
+        from services.web_push import has_browser_subscription
+        browser_channel_allowed = await has_browser_subscription(db, user_id)
     # `no_discord`: Postfach und Push, aber keine Direktnachricht - etwa die Sammel-Nachricht der Neuberechnung (#2340).
     discord_channel_allowed = discord_allowed(user, kind, category) and not in_app_only and not (meta or {}).get("no_discord")
     if not in_app_allowed and not push_channel_allowed and not browser_channel_allowed and not discord_channel_allowed:

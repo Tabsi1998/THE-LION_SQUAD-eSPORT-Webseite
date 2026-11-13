@@ -248,3 +248,21 @@ async def test_auskunft_und_loeschung(flow, keys):
 
     await dsgvo_routes._anonymize_user_data(flow.db, user["id"], user["id"], "self_delete")
     assert await flow.db.web_push_subscriptions.count_documents({"user_id": user["id"]}) == 0
+
+
+async def test_ohne_browser_anmeldung_entsteht_keine_unsichtbare_meldung(flow, keys, push_service):
+    """Postfach und Push aus, kein Browser angemeldet: wie bisher keine Meldung - der Kanal „Browser“ allein legt nichts an."""
+    from services.user_notifications import create_user_notification
+
+    user = await flow.add_user()
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"notification_preferences": {"in_app": False, "push": False}}})
+    created = await create_user_notification(user["id"], "Check-in offen", url="/tournaments/cup", kind="tournament_checkin")
+    assert created is None
+    assert await flow.db.notifications.count_documents({"user_id": user["id"]}) == 0
+
+    # Mit angemeldetem Browser kommt sie dort an - im Postfach bleibt sie unsichtbar.
+    flow.act_as(user)
+    await subscribe(flow, Browser("spaeter"), push_service)
+    created = await create_user_notification(user["id"], "Check-in offen", url="/tournaments/cup", kind="tournament_checkin",
+                                             meta={"tournament_id": "t2"})
+    assert created["browser_sent_count"] == 1 and created["in_app_visible"] is False

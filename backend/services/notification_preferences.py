@@ -293,6 +293,10 @@ def normalized_preferences(user: dict | None) -> dict[str, bool]:
             key = preference_key(channel, topic)
             if key in raw:
                 value = bool(raw[key])
+            elif channel == "browser" and preference_key("push", topic) in raw:
+                # Browser (#1163): solange nichts eigenes gespeichert ist, gilt das Thema wie beim Push - wer es dort
+                # abgeschaltet hat, bekommt es im Browser auch nicht.
+                value = bool(raw[preference_key("push", topic)])
             else:
                 value = bool(prefs.get(topic, meta.get("default", True)))
             if channel == "email" and meta.get("requires_newsletter_consent") and not newsletter:

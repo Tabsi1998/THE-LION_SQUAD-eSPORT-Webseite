@@ -342,6 +342,16 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     return sent
 
 
+async def has_browser_subscription(db, user_id: str | None) -> bool:
+    """Hat die Person einen angemeldeten Browser - und ist Web-Push überhaupt eingerichtet?"""
+    if not user_id or not vapid_config():
+        return False
+    try:
+        return bool(await db.web_push_subscriptions.find_one({"user_id": user_id}, {"_id": 1}))
+    except Exception:
+        return False
+
+
 async def forget_session(db, user_id: str | None, family_id: str | None) -> int:
     """Abmelden (#1163): die Browser-Anmeldung, die in dieser Sitzung entstand, geht mit."""
     if not user_id or not family_id:

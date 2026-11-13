@@ -160,3 +160,11 @@ def test_browser_is_its_own_channel_with_the_push_topics():
     for topic in ("achievements", "billing_updates", "helper_shifts"):
         assert "browser" in categories[topic]["channels"]
     assert "browser" not in categories["achievement_recap"]["channels"]
+
+
+def test_browser_topic_follows_push_until_set_on_its_own():
+    """Browser (#1163): ein Thema, das beim Push aus ist, bleibt im Browser aus - bis die Person es dort selbst setzt."""
+    from services.notification_preferences import browser_allowed
+
+    assert browser_allowed({"notification_preferences": {"push:tournament_updates": False}}, "tournament_checkin") is False
+    assert browser_allowed({"notification_preferences": {"push:tournament_updates": False, "browser:tournament_updates": True}}, "tournament_checkin") is True
