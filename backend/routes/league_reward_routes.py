@@ -118,10 +118,13 @@ async def my_rewards_seen(body: SeenBody, user: dict = Depends(get_current_user)
 
 @router.get("/rewards/{award_id}/share.png")
 async def reward_share_image(award_id: str):
+    """Das Teilen-Bild einer Belohnung. Sichtbarkeit und Ruhen werden bei jedem Abruf geprüft, erst dann kommt das gemerkte Bild
+    (services/share_image_cache, fünf Minuten; der Fingerabdruck trägt die Fassung des Endstands). ``Cache-Control`` setzt server.py."""
     from services import reward_share
+    from services.share_image_cache import share_images
 
     payload = await reward_share.share_payload(get_db(), award_id)
     if not payload:
         raise HTTPException(status_code=404, detail="Belohnung nicht gefunden.")
-    return Response(content=reward_share.render_card(payload), media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=300"})
+    png = share_images.get_or_draw(("reward", award_id), payload, lambda: reward_share.render_card(payload))
+    return Response(content=png, media_type="image/png", headers={"Content-Disposition": f'inline; filename="belohnung-{award_id}.png"'})

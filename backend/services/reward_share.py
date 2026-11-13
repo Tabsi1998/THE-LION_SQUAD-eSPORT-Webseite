@@ -35,6 +35,8 @@ async def share_payload(db, award_id: str) -> dict | None:
         "place": art.get("place") or reward.get("place_label"), "metal": art.get("metal") or "lion",
         "league": art.get("league"), "season": art.get("season"), "division": art.get("division") or league.get("division_label"),
         "holder": (doc.get("team") or {}).get("name") or league.get("display_name") or "",
+        # Fassung des Endstands: Nach einem neuen Abschluss ist es ein neues Bild, auch wenn sonst alles gleich aussieht.
+        "version": league.get("version"), "final_table_id": league.get("final_table_id"),
         "club_name": branding.get("club_name") or "THE LION SQUAD",
     }
 
