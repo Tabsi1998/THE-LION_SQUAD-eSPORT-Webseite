@@ -850,8 +850,8 @@ export default function PublicProfilePage() {
             <RewardCollection awards={awards} testId="profile-reward-collection" featuredId={profile.featured_award?.id} titleId={profile.featured_title?.id}
               onFeature={isOwnProfile ? (id) => featureAward(id) : null} onTitle={isOwnProfile ? (id) => featureAward(id, "title") : null}
               linkFor={(award) => (award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null)} />
-            {awards.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2">
+            {awards.some((award) => !award.reward) ? (
+              <div className="grid gap-3 md:grid-cols-2" data-testid="profile-award-banners">
                 {awards.filter((award) => !award.reward).map((award) => (
                   <AwardBanner
                     key={award.id}
@@ -870,7 +870,7 @@ export default function PublicProfilePage() {
                   />
                 ))}
               </div>
-            ) : (
+            ) : awards.length ? null : (
               <EmptyState text={isOwnProfile ? "Noch keine Auszeichnungen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." : "Noch keine Auszeichnungen aus öffentlichen Turnieren."} />
             )}
           </div>

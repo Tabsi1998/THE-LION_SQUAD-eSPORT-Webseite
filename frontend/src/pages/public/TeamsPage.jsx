@@ -432,7 +432,7 @@ function TeamDetail({ id }) {
               <RewardCollection awards={team.awards} testId="team-reward-collection" featuredId={team.featured_award?.id} titleId={team.featured_title?.id}
                 onFeature={canEdit ? (id) => featureTeamAward(id) : null} onTitle={canEdit ? (id) => featureTeamAward(id, "title") : null}
                 linkFor={(award) => (award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null)} />
-              <div className="grid sm:grid-cols-2 gap-3 mt-4">
+              {team.awards.some((award) => !award.reward) ? <div className="grid sm:grid-cols-2 gap-3 mt-4" data-testid="team-award-banners">
                 {team.awards.filter((award) => !award.reward).map((award) => (
                   <AwardBanner
                     key={award.id}
@@ -450,7 +450,7 @@ function TeamDetail({ id }) {
                     ) : null}
                   />
                 ))}
-              </div>
+              </div> : null}
             </section>
           )}
           {canEdit && <section data-testid="team-manage-members">
