@@ -3,7 +3,7 @@ const { test, expect } = require("@playwright/test");
 const fixture = require("./fixtures/liveQueueGenerated.json");
 
 // Live vor Ort (#1556): Warteschlange je Station in der Turnierleitung (Uhr tickt ohne Neuladen, „Aufrufen“,
-// „Gestartet“) und die Spieler-Sicht auf Matchseite und Turnierseite. Die Daten kommen aus den echten Routen
+// „Starten“) und die Spieler-Sicht auf Matchseite und Turnierseite. Die Daten kommen aus den echten Routen
 // (scripts/make_live_queue_fixture.py), die API ist hier nur nachgestellt. Namen sind erfunden.
 // LSW_SCREENS=<Ordner> legt die Bildschirmfotos zusätzlich dort ab.
 
@@ -32,7 +32,7 @@ function leadView() {
   return { tournament: { ...fixture.tournament, status: "live" }, now: fixture.now, matches: [], attention: [], recent: [], stations: [], counts: { open: 0 } };
 }
 
-/** Nach „Gestartet“: das aufgerufene Spiel läuft, das danach rückt nach - wie der Server es neu rechnen würde. */
+/** Nach „Starten“: das aufgerufene Spiel läuft, das danach rückt nach - wie der Server es neu rechnen würde. */
 function afterStart(queue, stationId, now) {
   return {
     ...queue,
@@ -46,7 +46,7 @@ test.describe("Warteschlange vor Ort", () => {
   test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
 
   for (const [width, height, name] of [[390, 844, "leitung-390.png"], [1280, 900, "leitung-1280.png"]]) {
-    test(`Turnierleitung ${width} px: läuft mit Uhr, aufgerufen mit „Gestartet“, Verzug oben`, async ({ page }, testInfo) => {
+    test(`Turnierleitung ${width} px: läuft mit Uhr, aufgerufen mit „Starten“, Verzug oben`, async ({ page }, testInfo) => {
       await prepare(page, { width, height, now: fixture.now });
       let queue = fixture.states.live;
       const posts = [];
