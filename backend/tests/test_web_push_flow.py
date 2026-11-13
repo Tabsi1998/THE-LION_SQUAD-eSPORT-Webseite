@@ -462,3 +462,37 @@ async def test_anmelden_ist_je_konto_begrenzt(flow, keys):
     flow.act_as(other)
     res = await subscribe(flow, Browser("anders"))
     assert res.status_code == 200
+
+
+async def test_hoechstens_zwanzig_browser_die_aeltesten_fallen_weg(flow, keys, monkeypatch):
+    from routes import web_push_routes
+
+    monkeypatch.setattr(web_push_routes, "SUBSCRIBE_LIMIT", 100)
+    user = await flow.add_user()
+    flow.act_as(user)
+    headers = await login(flow, user)
+    browsers = [Browser(f"nr{index:02d}") for index in range(web_push.MAX_SUBSCRIPTIONS_PER_USER + 1)]
+    for index, browser in enumerate(browsers):
+        await flow.post("/api/web-push/subscriptions", json=browser.subscription(), headers=headers)
+        await flow.db.web_push_subscriptions.update_one({"endpoint": browser.endpoint}, {"$set": {"updated_at": f"2026-01-01T10:{index:02d}:00+00:00"}})
+    left = {row["endpoint"] for row in await flow.db.web_push_subscriptions.find({"user_id": user["id"]}, {"_id": 0}).to_list(50)}
+    assert len(left) == web_push.MAX_SUBSCRIPTIONS_PER_USER
+    # Die ältesten (nr00 beim 21., nr01 beim 22. Browser) fallen heraus, der neueste bleibt.
+    extra = Browser("neu")
+    await flow.post("/api/web-push/subscriptions", json=extra.subscription(), headers=headers)
+    left = {row["endpoint"] for row in await flow.db.web_push_subscriptions.find({"user_id": user["id"]}, {"_id": 0}).to_list(50)}
+    assert len(left) == web_push.MAX_SUBSCRIPTIONS_PER_USER
+    assert extra.endpoint in left and browsers[-1].endpoint in left
+    assert browsers[0].endpoint not in left and browsers[1].endpoint not in left
+
+
+async def test_fremdes_konto_kann_nicht_abmelden(flow, keys):
+    owner = await flow.add_user()
+    flow.act_as(owner)
+    browser = Browser("meins")
+    await subscribe(flow, browser)
+    stranger = await flow.add_user()
+    flow.act_as(stranger)
+    res = await flow.client.request("DELETE", "/api/web-push/subscriptions", json={"endpoint": browser.endpoint})
+    assert res.status_code == 200 and res.json()["removed"] == 0
+    assert await flow.db.web_push_subscriptions.count_documents({"user_id": owner["id"]}) == 1

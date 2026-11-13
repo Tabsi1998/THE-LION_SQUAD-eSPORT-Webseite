@@ -224,3 +224,21 @@ def test_vapid_audience_ist_normalisiert():
     header = web_push.vapid_headers("https://Updates.Push.Services.Mozilla.com:443/wpush/v2/x", config)["Authorization"]
     token = header.split("t=", 1)[1].split(",", 1)[0]
     assert jwt.decode(token, options={"verify_signature": False})["aud"] == "https://updates.push.services.mozilla.com"
+
+
+def test_rfc_8291_testvektor():
+    """RFC 8291, Abschnitt 5 / Anhang A: mit festem Salz und Server-Schlüssel kommt genau die Nachricht des Standards heraus."""
+    d64 = web_push._b64url_decode
+    server = ec.derive_private_key(int.from_bytes(d64("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw"), "big"), ec.SECP256R1())
+    body = web_push.encrypt_payload(
+        b"When I grow up, I want to be a watermelon",
+        "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+        "BTBZMqHH6r4Tts7J_aSIgg",
+        salt=d64("DGv6ra1nlYgDCS1FRnbzlw"),
+        server_key=server,
+    )
+    assert web_push._b64url(body) == (
+        "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27ml"
+        "mlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPT"
+        "pK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN"
+    )
