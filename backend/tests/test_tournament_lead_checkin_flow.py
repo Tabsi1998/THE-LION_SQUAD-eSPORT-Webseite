@@ -266,15 +266,17 @@ async def test_back_from_no_show_needs_a_free_place(flow):
 
 
 @pytest.mark.asyncio
-async def test_back_from_rejected_when_full_is_refused(flow):
+async def test_back_from_no_show_without_limit_or_with_room(flow):
+    """Ohne Höchstzahl keine Grenze. „Abgelehnt“ → bestätigt ist eine Freigabe wie von der Warteliste - die entscheidet die
+    Leitung bewusst, auch wenn alles voll ist (#2368)."""
     tournament, regs, _waiting = await full_with_waitlist(flow)
+    base = f"/api/tournaments/{tournament['id']}/registrations"
     rejected = await flow.register(tournament, await flow.add_user(name="Rita"), status="rejected")
-    response = await flow.patch(f"/api/tournaments/{tournament['id']}/registrations/{rejected['id']}", json={"status": "approved"})
-    assert response.status_code == 409, response.text
-    assert "kein freier Platz mehr" in response.json()["detail"]
-    # Ohne Höchstzahl keine Grenze - und mit freiem Platz geht es wie bisher.
-    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"max_participants": 6}})
-    response = await flow.patch(f"/api/tournaments/{tournament['id']}/registrations/{rejected['id']}", json={"status": "approved"})
+    response = await flow.patch(f"{base}/{rejected['id']}", json={"status": "approved"})
+    assert response.status_code == 200, response.text
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$unset": {"max_participants": ""}})
+    await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": "no_show"})
+    response = await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": "checked_in"})
     assert response.status_code == 200, response.text
 
 

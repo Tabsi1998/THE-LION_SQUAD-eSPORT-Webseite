@@ -429,8 +429,9 @@ async def _require_seed_on_return(db, tournament: dict, reg: dict, new_status: s
         await _require_free_seed(db, tournament["id"], reg.get("seed"), reg["id"])
 
 
-# Zurück aus einem beendeten Stand (#1161): „Nicht erschienen“ oder „Abgelehnt“ wieder auf bestätigt bzw. eingecheckt.
-RETURNS_FROM_ENDED = {"no_show", "rejected"}
+# Zurück aus „Nicht erschienen“ (#1161) auf bestätigt bzw. eingecheckt. „Abgelehnt“ und „Warteliste“ → bestätigt ist eine
+# Freigabe: die entscheidet die Leitung bewusst, auch über die Höchstzahl hinaus (wie bisher, #2368).
+RETURNS_FROM_ENDED = {"no_show"}
 
 
 async def registration_names(db, registration_ids: list[str]) -> list[str]:
@@ -445,7 +446,7 @@ async def registration_names(db, registration_ids: list[str]) -> list[str]:
 
 
 async def _require_free_place_on_return(db, tournament: dict, reg: dict, new_status: str | None) -> None:
-    """Wer aus „Nicht erschienen“ oder „Abgelehnt“ zurückkommt, braucht einen freien Platz (#1161). Ist inzwischen jemand
+    """Wer aus „Nicht erschienen“ zurückkommt, braucht einen freien Platz (#1161). Ist inzwischen jemand
     von der Warteliste nachgerückt und das Turnier voll, lehnt der Server ab - sonst wäre es überbucht. Die Leitung
     entscheidet dann in der Verwaltung (etwa den Platz tauschen). Ohne Höchstzahl gibt es keine Grenze."""
     if reg.get("status") not in RETURNS_FROM_ENDED or new_status not in ("approved", "checked_in"):
@@ -1182,7 +1183,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         if any(not match.get("is_preview") for match in matches) and not await _open_place(db, tid, matches):
             raise HTTPException(status_code=409, detail=REMOVAL_NO_PLACE)
     if updates.get("status") and updates["status"] != previous_status:
-        # Zurück aus „Nicht erschienen“ oder „Abgelehnt“ nur auf einen freien Platz (#1161) - wie im Check-in-Weg.
+        # Zurück aus „Nicht erschienen“ nur auf einen freien Platz (#1161) - wie im Check-in-Weg.
         await _require_free_place_on_return(db, tournament_doc, reg, updates["status"])
     if updates.get("status") and updates["status"] != previous_status:
         # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
