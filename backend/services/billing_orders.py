@@ -118,8 +118,10 @@ async def create_order(db, *, kind: str, source_id: str, registration_id: str, u
         same = await db.billing_orders.find_one({"booking_key": key}, {"_id": 0})
         if same:
             return same
+    # Ein stornierter Auftrag einer anderen zahlenden Person hält keine neue Buchung auf (#2368: ein anderes Teammitglied übernimmt
+    # die Turnier-Anmeldung und zahlt selbst) - bei Events zahlt immer die angemeldete Person, dort ändert sich nichts.
     existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]},
-                                                 "$nor": [SETTLED_AFTER_CANCEL]}, {"_id": 0})
+                                                 "$nor": [SETTLED_AFTER_CANCEL, {"booking_state": "cancelled", "user_id": {"$ne": user_id}}]}, {"_id": 0})
     if existing:
         return existing
     order = {

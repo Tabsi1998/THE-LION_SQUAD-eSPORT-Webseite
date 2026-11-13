@@ -72,14 +72,22 @@ def quote_for(registration: dict, tournament: dict, offer: dict, selected: list[
     return pricing.quote(offer, seats=seats, teams=1, selected=selected)
 
 
+def same_payer(order: dict, payer: dict, registration: dict) -> bool:
+    """Gehört der Auftrag zu dieser zahlenden Person und diesem Team (#2368)? Nur dann bucht eine Rückkehr auf seinen Beleg
+    zurück. Altaufträge ohne Preis-Kennung vergleichen nur die Person."""
+    source = (order.get("snapshot") or {}).get("source") or {}
+    same_team = "team_id" not in source or (source.get("team_id") or None) == (registration.get("team_id") or None)
+    return order.get("user_id") == payer.get("id") and same_team
+
+
 async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict, selected: list[str] | None = None,
                        rebook_reason: str = billing_orders.REBOOKED_BY_LEAD) -> dict | None:
     """Preis einfrieren und Auftrag anlegen - nur bei verbindlicher Teilnahme und nur einmal.
 
     Zurück nach einem Storno, obwohl es zur Anmeldung schon einen Beleg gibt (#2368, wie bei Events #2184): kein neuer Preis
     und kein zweiter Auftrag. Die Buchung gilt am Auftrag wieder (``billing_orders.rebook_after_invoice``), die Anmeldung trägt
-    wieder Preis und Stand des Belegs, die Finanzverwaltung bekommt den Prüffall mit alt und neu (Grund ``rebook_reason``). Gilt
-    der Beleg nicht mehr (voll gutgeschrieben, aufgegeben, Entwurf gelöscht), gilt der aktuelle Preis mit eigenem Auftrag.
+    wieder Preis und Stand des Belegs, die Finanzverwaltung bekommt den Prüffall mit alt und neu (Grund ``rebook_reason``). Gilt der Beleg nicht mehr (voll gutgeschrieben, aufgegeben, Entwurf gelöscht) oder gehört er
+    einer anderen zahlenden Person (``same_payer``), gilt der aktuelle Preis mit eigenem Auftrag.
 
     Was hier an die Anmeldung geht, steht danach auch in ``registration`` - nach einer Rückbuchung dazu ``invoice_kept`` (nur
     für Nachricht und Antwort, nie gespeichert, ``event_notifications.kept_invoice_line``)."""
@@ -99,6 +107,10 @@ async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict,
         return None
     now = now_utc().isoformat()
     invoiced = await billing_orders.invoiced_order(db, kind="tournament", registration_id=registration["id"]) if returning else None
+    if invoiced and not same_payer(invoiced, payer, registration):
+        # Ein anderes Teammitglied hat die Anmeldung übernommen (#2368, etwa nach weggenommener Ablehnung): Die Rechnung gehört
+        # der bisherigen Person - die neue zahlt mit eigenem Auftrag, die alte Rechnung bleibt storniert.
+        invoiced = None
     if invoiced and await billing_orders.rebook_after_invoice(db, invoiced, reason=rebook_reason, new_total_cents=int(price.get("total_cents") or 0)):
         fields = billing_orders.rebooked_fields(invoiced)
         await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {**fields, "updated_at": now}})

@@ -380,7 +380,8 @@ async def test_zweiter_zyklus_rueckkehr_trifft_den_neuen_auftrag(flow, fake, by_
 
 # ---------------------------------------------------------------- Teams
 
-async def team_cup(flow, fake):
+async def team_invoiced(flow, fake):
+    """Die Teamleitung meldet das Team an (5 x 10 €), der Beleg ist freigegeben; die Co-Leitung darf das Team ebenfalls anmelden."""
     await connect(flow, **TERMS)
     kassier = await person(flow, "kassier", role="club_admin")
     cup = await tournament(flow, kassier, team_mode="team", team_size=5, billing=FEE)
@@ -392,8 +393,47 @@ async def team_cup(flow, fake):
     assert booked["price_snapshot"]["total_cents"] == 5000
     assert (await billing_orders.classify_due())["invoiced"] == 1
     order = await settle(flow, fake, await order_of(flow, booked), "validated")
+    return kassier, cup, leader, co_leader, booked, order
+
+
+async def team_cup(flow, fake):
+    kassier, cup, leader, co_leader, booked, order = await team_invoiced(flow, fake)
     await unregister(flow, cup, leader, booked)
     return cup, leader, co_leader, booked, order
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("who", ["co_leader", "leader"])
+async def test_team_nach_weggenommener_ablehnung_bucht_nur_dieselbe_zahlende_person_zurueck(flow, fake, who):
+    """Abgelehnt, die Teamleitung nimmt die Ablehnung weg, das Team wird neu angemeldet (dieselbe Anmeldung kommt zur Prüfung) und
+    die Turnierleitung bestätigt. Meldet die Co-Leitung neu an, zahlt sie selbst: eigener Auftrag, an ihrer Anmeldung kein fremder
+    Preis, Empfänger oder Beleg - die Rechnung der Teamleitung bleibt storniert. Meldet die Teamleitung selbst neu an, gilt ihr Beleg."""
+    kassier, cup, leader, co_leader, booked, order = await team_invoiced(flow, fake)
+    await set_status(flow, kassier, cup, booked, "rejected")
+    await unregister(flow, cup, leader, booked)   # nimmt die Ablehnung nur weg (#2113)
+    payer = co_leader if who == "co_leader" else leader
+    again = (await register(flow, payer, cup["id"], team_id="team-1", accept_costs=True)).json()
+    assert again["id"] == booked["id"] and again["status"] == "pending"
+    back = await set_status(flow, kassier, cup, again, "approved")
+
+    if who == "leader":
+        assert back.get("invoice_kept") is True and [row["id"] for row in await orders_of(flow, leader)] == [order["id"]]
+        assert "booking_state" not in await stored(flow, order)
+        return
+    assert "invoice_kept" not in back
+    assert back["price_snapshot"]["recipient"]["user_id"] == co_leader["id"]
+    [own] = await orders_of(flow, co_leader)
+    assert own["status"] == "pending" and own["registration_id"] == booked["id"] and own["total_cents"] == 5000
+    old = await stored(flow, order)
+    assert old["booking_state"] == "cancelled" and "changed_after_invoice" not in await open_cases(flow, old)
+    reg = await flow.db.tournament_registrations.find_one({"id": booked["id"]}, {"_id": 0})
+    assert reg["billing_status"] == "pending" and reg["price_snapshot"]["hash"] == own["snapshot"]["hash"]
+    assert not reg.get("invoice_ref") and not reg.get("invoice_id"), "kein fremder Beleg an der Anmeldung"
+    await flow.db.billing_orders.update_one({"id": order["id"]}, {"$set": {"synced_at": "2000-01-01T00:00:00+00:00"}})
+    await billing_orders.sync_due()
+    reg = await flow.db.tournament_registrations.find_one({"id": booked["id"]}, {"_id": 0})
+    assert reg["billing_status"] == "pending" and not reg.get("invoice_ref"), "der Abgleich spiegelt die Rechnung der Teamleitung nicht"
+    assert (await billing_orders.classify_due())["invoiced"] == 1, "die Co-Leitung bekommt ihre eigene Rechnung"
 
 
 @pytest.mark.asyncio
