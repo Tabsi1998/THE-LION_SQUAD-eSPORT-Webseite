@@ -155,4 +155,22 @@ test.describe("Stationen in der Turnierleitung", () => {
       }
     });
   }
+
+  // Schmales Handy und zwischen Handy und PC (Review N7, #1162): kein Knopftext läuft über seinen Knopf.
+  for (const width of [320, 768, 820, 900, 1000]) {
+    test(`${width} px: Knopftexte passen in ihre Knöpfe`, async ({ page }) => {
+      const bracket = T.singleElimination(8, { title: "Lions Herbst-Cup" });
+      T.start(bracket, "C", { station: "PC 5", startedAt: new Date(Date.now() - 12 * 60000).toISOString() });
+      const world = { bracket, phase: "called", calledAt: new Date().toISOString(), otherStart: T.find(bracket, "C").started_at };
+      await page.setViewportSize({ width, height: 1000 });
+      await mockLead(page, world, { push() {} });
+      await page.goto("/tournaments/herbst-cup/leitung?reiter=stationen");
+      await expect(page.getByTestId("live-board")).toBeVisible();
+      const overflowing = await page.evaluate(() => [...document.querySelectorAll("[data-testid='live-board'] button")]
+        .filter((button) => button.scrollWidth > button.clientWidth + 1 || button.getBoundingClientRect().height < 44)
+        .map((button) => `${button.dataset.testid || ""}: ${button.textContent}`));
+      expect(overflowing).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    });
+  }
 });

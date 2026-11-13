@@ -102,3 +102,14 @@
   .tls-live-chip[data-tone="called"]::after,
   .tls-live-next[data-state="called"] .tls-live-bell { animation: none; }
 }
+
+/* Knöpfe unter der Kachel (#1162, Review N7): Die Kachel misst sich selbst - ob am schmalen Handy oder zwei nebeneinander
+   am Tablet. Wird es eng, rücken Buchstaben und Abstände zusammen; ganz eng fällt das Symbol weg. Der Text bleibt ganz. */
+.tls-live-tools { container-type: inline-size; }
+.tls-live-tool { min-width: 0; }
+@container (max-width: 330px) {
+  .tls-live-tool { gap: 0.25rem; padding-inline: 0.375rem; letter-spacing: 0.02em; }
+}
+@container (max-width: 290px) {
+  .tls-live-tool > svg { display: none; }
+}

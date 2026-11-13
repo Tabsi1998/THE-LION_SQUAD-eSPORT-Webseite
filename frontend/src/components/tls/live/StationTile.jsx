@@ -173,20 +173,20 @@ export function StationTile({ station, index = 0, busy = false, canOperate = fal
       ) : null}
 
       {tools ? (
-        <div className="mt-3 border-t border-white/10 pt-3" data-testid={`live-tools-${station.id}`}>
+        <div className="tls-live-tools mt-3 border-t border-white/10 pt-3" data-testid={`live-tools-${station.id}`}>
           <div className="grid grid-cols-3 gap-2">
             {onRelease ? (
-              <button type="button" disabled={busy || !holds} onClick={() => toggle("release")} aria-expanded={panel === "release"} className={`tls-btn tls-btn--secondary ${BTN} disabled:opacity-40`} data-testid={`live-release-${station.id}`}>
+              <button type="button" disabled={busy || !holds} onClick={() => toggle("release")} aria-expanded={panel === "release"} className={`tls-live-tool tls-btn tls-btn--secondary ${BTN} disabled:opacity-40`} data-testid={`live-release-${station.id}`}>
                 <Unlock className="h-4 w-4 shrink-0" aria-hidden="true" /> Freigeben
               </button>
             ) : <span />}
             {onMove ? (
-              <button type="button" disabled={busy || !holds} onClick={() => toggle("move")} aria-expanded={panel === "move"} className={`tls-btn tls-btn--secondary ${BTN} disabled:opacity-40`} data-testid={`live-move-${station.id}`}>
+              <button type="button" disabled={busy || !holds} onClick={() => toggle("move")} aria-expanded={panel === "move"} className={`tls-live-tool tls-btn tls-btn--secondary ${BTN} disabled:opacity-40`} data-testid={`live-move-${station.id}`}>
                 <ArrowRightLeft className="h-4 w-4 shrink-0" aria-hidden="true" /> Umlegen
               </button>
             ) : <span />}
             {onBroken ? (
-              <button type="button" disabled={busy} onClick={() => (tone === "other" ? toggle("broken-other") : onBroken(station, !broken))} aria-label={broken ? "Station wieder bereit" : "Station defekt melden"} className={`${BTN} border ${broken ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"} transition-colors disabled:opacity-40`} data-testid={`live-broken-${station.id}`}>
+              <button type="button" disabled={busy} onClick={() => (tone === "other" ? toggle("broken-other") : onBroken(station, !broken))} aria-label={broken ? "Station wieder bereit" : "Station defekt melden"} className={`tls-live-tool ${BTN} border ${broken ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"} transition-colors disabled:opacity-40`} data-testid={`live-broken-${station.id}`}>
                 {broken ? <RotateCcw className="h-4 w-4 shrink-0" aria-hidden="true" /> : <Wrench className="h-4 w-4 shrink-0" aria-hidden="true" />} {broken ? "Bereit" : "Defekt"}
               </button>
             ) : <span />}
