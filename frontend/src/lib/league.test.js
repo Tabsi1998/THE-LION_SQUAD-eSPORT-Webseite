@@ -67,6 +67,25 @@ test("der Hinweis nennt eine Reihenfolge, die nicht zur längsten Serie passt (#
   expect(orderLengthNote(["a", "b", "c"], 3)).toBe("");
 });
 
+// #2406: Ohne gesetzte Regeln zeigt das Formular die Vorgabe des Servers (3/0/0, kein Remis), gesetzte Regeln bleiben unverändert.
+test("seasonToForm: ohne gesetzte Regeln die Vorgabe des Servers, mit Regeln unverändert (#2406)", () => {
+  for (const season of [{ name: "Neu" }, { name: "Neu", scoring_rules: null }, { name: "Neu", scoring_rules: {} }]) {
+    const form = seasonToForm(season);
+    expect([form.points_win, form.points_draw, form.points_loss]).toEqual(["3", "0", "0"]);
+    expect(form).toMatchObject({ allow_draws: false, forfeit_score: "best_of", exit_rule: "all_for_opponents",
+      table_tiebreakers: ["head_to_head", "score_diff", "score_for", "lead_decision"], head_to_head_criteria: ["points", "score_diff", "score_for"] });
+  }
+  // Gegenprobe: Eine Season mit Regeln behält Remis und den alten Stand, auch wenn einzelne Felder fehlen.
+  const set = seasonToForm({ name: "Alt", scoring_rules: { match_points: { win: 3, draw: 1, loss: 0 }, table_tiebreakers: ["score_diff"] } });
+  expect([set.points_win, set.points_draw, set.points_loss]).toEqual(["3", "1", "0"]);
+  expect(set).toMatchObject({ allow_draws: true, forfeit_score: "recorded", exit_rule: "half", table_tiebreakers: ["score_diff"] });
+  const explicit = seasonToForm({ name: "Neu", scoring_rules: { match_points: { win: 2, draw: 0, loss: 0 }, allow_draws: false } });
+  expect([explicit.points_win, explicit.points_draw]).toEqual(["2", "0"]);
+  // Ein Formular ohne Regeln speichert nicht mehr ungewollt 3/1/0.
+  expect(seasonPayload(seasonToForm({ name: "Neu", start_date: SEASON.start_date })).scoring_rules)
+    .toMatchObject({ match_points: { win: 3, draw: 0, loss: 0 }, allow_draws: false });
+});
+
 test("Liga N: nur abweichende Werte, leer heißt wie die Season", () => {
   expect(overridesPayload(overridesToForm({}))).toEqual({});
   const form = { ...overridesToForm({}), best_of: "5", points_win: "2" };

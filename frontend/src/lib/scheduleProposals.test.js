@@ -4,6 +4,7 @@ import {
   OFFERED_TIME_TEXT,
   PAST_PROPOSAL_TEXT,
   bundleProposals,
+  homeRuleName,
   isOwnProposal,
   proposalStatusLabel,
   proposalTimeErrors,
@@ -57,6 +58,17 @@ test("proposalTimeHints: außerhalb der Spielwoche nur ein Hinweis, ohne Woche k
   expect(proposalTimeHints(["2027-03-09T19:00:00Z"], { window, homeRule: false })).toEqual([
     "Liegt außerhalb der Spielwoche – gilt nur, wenn die Gegenseite annimmt.",
   ]);
+});
+
+test("proposalTimeHints: die Regel heißt nach der eingestellten Frist (#2406)", () => {
+  const window = { start: "2027-03-01T00:00:00Z", end: "2027-03-08T00:00:00Z" };
+  const out = (homeRuleHours) => proposalTimeHints(["2027-03-09T19:00:00Z"], { window, homeRuleHours })[0];
+  expect(out(48)).toBe("Liegt außerhalb der Spielwoche – gilt nur, wenn die Gegenseite annimmt; die 48-h-Regel greift hier nicht.");
+  expect(out(72)).toContain("die 72-h-Regel greift");
+  expect(out(null)).toContain("die 72-h-Regel greift");
+  expect(out(48)).not.toContain("72-h-Regel");
+  expect(homeRuleName(24)).toBe("24-h-Regel");
+  expect(homeRuleName("x")).toBe("72-h-Regel");
 });
 
 test("serverTimeErrors legt die Sätze des Servers an ihre Stelle", () => {
