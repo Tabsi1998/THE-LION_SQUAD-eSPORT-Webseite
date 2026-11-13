@@ -508,6 +508,43 @@ async def team_cup(flow, fake):
 
 
 @pytest.mark.asyncio
+async def test_team_leitung_co_leitung_leitung_bucht_auf_den_eigenen_beleg_zurueck(flow, fake):
+    """Teamleitung (Beleg), abgelehnt und weggenommen, die Co-Leitung meldet neu an und bekommt ihren eigenen Beleg, wieder
+    abgelehnt und weggenommen, die Teamleitung meldet erneut an und wird bestätigt: Sie wird auf ihren eigenen Beleg
+    zurückgebucht, nicht auf den jüngeren der Co-Leitung. Dessen Buchung bleibt storniert und bekommt die Gutschrift."""
+    kassier, cup, leader, co_leader, booked, order_l = await team_invoiced(flow, fake)
+    await set_status(flow, kassier, cup, booked, "rejected")
+    await unregister(flow, cup, leader, booked)
+    again = (await register(flow, co_leader, cup["id"], team_id="team-1", accept_costs=True)).json()
+    await set_status(flow, kassier, cup, again, "approved")
+    assert (await billing_orders.classify_due())["invoiced"] == 1
+    [order_c] = await orders_of(flow, co_leader)
+    order_c = await settle(flow, fake, order_c, "validated")
+    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"credit_note_draft_on_cancel": True}})
+    await set_status(flow, kassier, cup, again, "rejected")
+    await unregister(flow, cup, co_leader, again)
+
+    third = (await register(flow, leader, cup["id"], team_id="team-1", accept_costs=True)).json()
+    assert third["id"] == booked["id"] and third["status"] == "pending"
+    back = await set_status(flow, kassier, cup, third, "approved")
+    assert back.get("invoice_kept") is True
+    assert [row["id"] for row in await orders_of(flow, leader)] == [order_l["id"]], "kein weiterer Auftrag für die Teamleitung"
+    mine = await stored(flow, order_l)
+    assert "booking_state" not in mine and "changed_after_invoice" in await open_cases(flow, mine)
+    reg = await flow.db.tournament_registrations.find_one({"id": booked["id"]}, {"_id": 0})
+    assert reg["price_snapshot"]["hash"] == mine["snapshot"]["hash"] and reg["invoice_ref"] == mine["invoice_ref"]
+    assert reg["price_snapshot"]["recipient"]["user_id"] == leader["id"]
+
+    theirs = await stored(flow, order_c)
+    assert theirs["booking_state"] == "cancelled" and theirs.get("credit_note_due_at")
+    assert "changed_after_invoice" not in await open_cases(flow, theirs)
+    assert (await billing_orders.sync_due())["credit_drafts"] == 1
+    assert (await stored(flow, order_c)).get("credit_note_id") and not (await stored(flow, order_l)).get("credit_note_id")
+    reg = await flow.db.tournament_registrations.find_one({"id": booked["id"]}, {"_id": 0})
+    assert reg["invoice_ref"] == mine["invoice_ref"], "der Abgleich spiegelt den Beleg der Co-Leitung nicht an die Anmeldung"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("who", ["co_leader", "leader"])
 async def test_team_nach_weggenommener_ablehnung_bucht_nur_dieselbe_zahlende_person_zurueck(flow, fake, who):
     """Abgelehnt, die Teamleitung nimmt die Ablehnung weg, das Team wird neu angemeldet (dieselbe Anmeldung kommt zur Prüfung) und

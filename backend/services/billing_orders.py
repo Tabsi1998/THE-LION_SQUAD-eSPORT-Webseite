@@ -118,10 +118,11 @@ async def create_order(db, *, kind: str, source_id: str, registration_id: str, u
         same = await db.billing_orders.find_one({"booking_key": key}, {"_id": 0})
         if same:
             return same
-    # Ein stornierter Auftrag einer anderen zahlenden Person hält keine neue Buchung auf (#2368: ein anderes Teammitglied übernimmt
-    # die Turnier-Anmeldung und zahlt selbst) - bei Events zahlt immer die angemeldete Person, dort ändert sich nichts.
+    # Ein Auftrag mit stornierter Buchung ist kein offener Auftrag und hält keine neue Buchung auf (#2368) - wer mit gültigem Beleg
+    # zurückkommt, wird vorher zurückgebucht (``rebook_after_invoice``); hierher kommt nur, wessen Beleg nicht mehr gilt oder wem
+    # er nicht gehört (ein anderes Teammitglied übernimmt die Turnier-Anmeldung und zahlt selbst).
     existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]},
-                                                 "$nor": [SETTLED_AFTER_CANCEL, {"booking_state": "cancelled", "user_id": {"$ne": user_id}}]}, {"_id": 0})
+                                                 "booking_state": {"$ne": "cancelled"}}, {"_id": 0})
     if existing:
         return existing
     order = {
@@ -196,12 +197,19 @@ async def note_change_after_invoice(db, order: dict | None, *, reason: str, new_
     })
 
 
-async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
+async def invoiced_order(db, *, kind: str, registration_id: str, payer: dict | None = None) -> dict | None:
     """Der Auftrag, zu dem es in Dolibarr einen gültigen Beleg gibt - Entwurf, freigegeben, bezahlt, auch mit Abzug. Ein in Dolibarr
     gelöschter Entwurf (#2226) zählt nicht mehr: Sein Auftrag wartet oder ist zu. Ein voll gutgeschriebener oder aufgegebener
-    Beleg auch nicht (#2184): Wer danach zurückkommt, bekommt einen neuen Auftrag zum aktuellen Preis."""
-    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced", **INVOICE_STILL_VALID}, {"_id": 0},
-                                            sort=[("created_at", -1)])
+    Beleg auch nicht (#2184): Wer danach zurückkommt, bekommt einen neuen Auftrag zum aktuellen Preis.
+
+    ``payer`` (Turniere, #2368): nur ein Auftrag dieser zahlenden Person und dieses Teams (``{"user_id", "team_id"}``) - eine
+    Turnier-Anmeldung kann nacheinander von verschiedenen Teammitgliedern bezahlt worden sein. Altaufträge ohne Team im Preis
+    zählen für die Person. Events fragen ohne: Dort zahlt immer die angemeldete Person."""
+    query = {"kind": kind, "registration_id": registration_id, "status": "invoiced", **INVOICE_STILL_VALID}
+    if payer is not None:
+        query.update({"user_id": payer["user_id"], "$or": [{"snapshot.source.team_id": payer.get("team_id")},
+                                                           {"snapshot.source.team_id": {"$exists": False}}]})
+    return await db.billing_orders.find_one(query, {"_id": 0}, sort=[("created_at", -1)])
 
 
 def _own_order_filter(kind: str, registration: dict) -> dict:

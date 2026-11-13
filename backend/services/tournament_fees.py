@@ -122,10 +122,12 @@ async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict,
     if price.get("free"):
         return None
     now = now_utc().isoformat()
-    invoiced = await billing_orders.invoiced_order(db, kind="tournament", registration_id=registration["id"]) if returning else None
+    # Der gültige Beleg genau dieser zahlenden Person und dieses Teams (#2368): Hat ein anderes Teammitglied die Anmeldung
+    # zwischendurch übernommen (etwa nach weggenommener Ablehnung), gehört dessen Rechnung ihm - die Person hier bucht auf ihre
+    # eigene zurück oder zahlt mit eigenem Auftrag; die andere Rechnung bleibt storniert.
+    invoiced = await billing_orders.invoiced_order(db, kind="tournament", registration_id=registration["id"], payer={
+        "user_id": payer["id"], "team_id": registration.get("team_id") or None}) if returning else None
     if invoiced and not same_payer(invoiced, payer, registration):
-        # Ein anderes Teammitglied hat die Anmeldung übernommen (#2368, etwa nach weggenommener Ablehnung): Die Rechnung gehört
-        # der bisherigen Person - die neue zahlt mit eigenem Auftrag, die alte Rechnung bleibt storniert.
         invoiced = None
     if invoiced and await billing_orders.rebook_after_invoice(db, invoiced, reason=rebook_reason or rebook_reason_for(registration, invoiced),
                                                               new_total_cents=int(price.get("total_cents") or 0)):
