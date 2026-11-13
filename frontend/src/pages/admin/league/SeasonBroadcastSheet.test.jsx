@@ -1,0 +1,109 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+// Rundnachricht (E.4, Nr. 153): Vorgabe Captains und Vertreter, Kreis wählbar, Vorschau mit Empfängerzahl, Bestätigung vor dem Senden,
+// Mail nach Wahl, eine Kennung je Dialog und kein zweiter Versand beim Doppelklick. Erfundene Namen.
+const apiMock = { get: vi.fn(), post: vi.fn() };
+vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "") }));
+const toastMock = { success: vi.fn(), error: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
+const confirmMock = vi.fn();
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
+
+const { SeasonBroadcastSheet } = await import("./SeasonBroadcastSheet");
+
+const DIVISIONS = [{ id: "d1", level: 1, label: "Liga 1", status: "active", staffeln: [{ tournament_id: "t1", staffel: "A" }] }];
+const PREVIEW = "/admin/leagues/seasons/s1/broadcast/preview";
+const SEND = "/admin/leagues/seasons/s1/broadcast";
+
+function renderSheet(props = {}) {
+  const onSent = vi.fn();
+  render(<SeasonBroadcastSheet seasonId="s1" divisions={DIVISIONS} onClose={vi.fn()} onSent={onSent} {...props} />);
+  return { onSent };
+}
+
+function fill() {
+  fireEvent.change(screen.getByTestId("broadcast-title"), { target: { value: "Spieltag 3" } });
+  fireEvent.change(screen.getByTestId("broadcast-text"), { target: { value: "Bitte denkt an den Check-in." } });
+}
+
+let release;
+beforeEach(() => {
+  for (const fn of [...Object.values(apiMock), ...Object.values(toastMock), confirmMock]) fn.mockReset();
+  confirmMock.mockResolvedValue(true);
+  apiMock.post.mockImplementation(async (url, body) => {
+    if (url === PREVIEW) return { data: { recipients: body.audience === "players" ? 9 : body.scope === "staffel" ? 2 : 4, scope_label: "x" } };
+    await new Promise((resolve) => { release = resolve; });
+    return { data: { recipients: 4, replay: false } };
+  });
+});
+
+test("Vorgabe Captains und Vertreter mit Vorschau, Kreis und Empfänger ändern die Zahl", async () => {
+  renderSheet();
+  expect(await screen.findByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen");
+  expect(apiMock.post).toHaveBeenCalledWith(PREVIEW, { audience: "captains", scope: "season", scope_id: null });
+  fireEvent.change(screen.getByTestId("broadcast-scope"), { target: { value: "staffel:t1" } });
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 2 Personen"));
+  expect(apiMock.post).toHaveBeenLastCalledWith(PREVIEW, { audience: "captains", scope: "staffel", scope_id: "t1" });
+  fireEvent.click(screen.getByLabelText(/Alle Spieler/));
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 9 Personen"));
+  expect(screen.getByTestId("broadcast-send")).toHaveTextContent("An 9 Personen schicken");
+});
+
+test("fragt vor dem Senden nach und schickt nichts ohne Zustimmung", async () => {
+  confirmMock.mockResolvedValue(false);
+  renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen"));
+  fill();
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(confirmMock.mock.calls[0][0].title).toBe("An 4 Personen schicken?");
+  expect(apiMock.post.mock.calls.filter(([url]) => url === SEND)).toHaveLength(0);
+});
+
+test("prüft Betreff und Nachricht vor dem Senden", async () => {
+  renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen"));
+  fireEvent.change(screen.getByTestId("broadcast-title"), { target: { value: "ab" } });
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  expect(await screen.findByTestId("broadcast-error")).toHaveTextContent("Betreff: mindestens 3 Zeichen");
+  expect(confirmMock).not.toHaveBeenCalled();
+});
+
+test("schickt einmal mit Mail nach Wahl - ein Doppelklick schickt nicht zweimal", async () => {
+  const { onSent } = renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen"));
+  fill();
+  fireEvent.click(screen.getByTestId("broadcast-mail").querySelector("input"));
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  await waitFor(() => expect(apiMock.post.mock.calls.filter(([url]) => url === SEND)).toHaveLength(1));
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  expect(screen.getByTestId("broadcast-send")).toBeDisabled();
+  release();
+  await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+  const sends = apiMock.post.mock.calls.filter(([url]) => url === SEND);
+  expect(sends).toHaveLength(1);
+  expect(sends[0][1]).toMatchObject({ title: "Spieltag 3", text: "Bitte denkt an den Check-in.", audience: "captains", mail: true, scope: "season" });
+  expect(sends[0][1].request_id.length).toBeGreaterThanOrEqual(8);
+  expect(toastMock.success).toHaveBeenCalledWith("Rundnachricht an 4 Personen verschickt.");
+});
+
+test("niemand im Kreis: Senden gesperrt", async () => {
+  apiMock.post.mockResolvedValue({ data: { recipients: 0, scope_label: "x" } });
+  renderSheet();
+  expect(await screen.findByTestId("broadcast-preview")).toHaveTextContent("noch niemanden");
+  expect(screen.getByTestId("broadcast-send")).toBeDisabled();
+});
+
+test("ein Doppelklick vor der Antwort auf die Rückfrage fragt nur einmal", async () => {
+  let answer;
+  confirmMock.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+  renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen"));
+  fill();
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  answer(false);
+  await waitFor(() => expect(screen.getByTestId("broadcast-send")).not.toBeDisabled());
+  expect(confirmMock).toHaveBeenCalledTimes(1);
+});
