@@ -495,6 +495,14 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
 
 # ---------------------------------------------------------------- Abschließen
 
+async def _follow_up(what: str, tournament_id: str, step):
+    """Ein Schritt nach dem Abschluss bzw. dem Wiederöffnen: Sein Fehler wird geloggt und hält nichts auf."""
+    try:
+        return await step()
+    except Exception:  # noqa: BLE001 - der Endstand steht schon
+        logger.exception("[league_final] %s für Staffel %s fehlgeschlagen", what, log_safe(tournament_id))
+        return None
+
 async def close(db, tournament: dict, actor: dict, *, conflict_reason: str | None = None, now: datetime | None = None) -> dict:
     """Schließt die Staffel ab. Der Aufrufer hält die Schreibsperre des Turniers und hat das Recht geprüft. Atomar: Den Abschluss
     gewinnt, wer das Turnier zuerst markiert - jeder zweite bekommt 409."""
@@ -533,24 +541,36 @@ async def close(db, tournament: dict, actor: dict, *, conflict_reason: str | Non
         {"$set": {"final_table": mark, "status": "completed", "status_before_final": tournament.get("status"), "updated_at": final["closed_at"]}})
     if not claimed.modified_count:
         raise FinalProblem(ALREADY_CLOSED, 409)
+    # Scheitert das Schreiben der Fassung - aus welchem Grund auch immer -, fällt die Marke wieder weg: Die Staffel bleibt offen und
+    # lässt sich erneut abschließen, statt ohne Endstand gesperrt festzuhängen (N3).
     try:
         await db.league_final_tables.insert_one(dict(final))
-    except DuplicateKeyError:
+    except BaseException as failure:
         await db.tournaments.update_one({"id": tid, "final_table.id": final["id"]},
                                         {"$set": {"final_table": None, "status": tournament.get("status")}, "$unset": {"status_before_final": ""}})
-        raise FinalProblem(ALREADY_CLOSED, 409) from None
-    if override:
-        from services import league_permissions
+        if isinstance(failure, DuplicateKeyError):
+            raise FinalProblem(ALREADY_CLOSED, 409) from None
+        raise
 
-        await league_permissions.record_override(db, actor, action="final_close", target_id=tid, reason=override, final_table_id=final["id"])
-    await record_champion(db, {**tournament, "status": "completed"}, final, frame)
-    season_status = await _season_follows(db, context.get("season_id"), actor.get("id"), tid)
-    await db.audit_logs.insert_one({
-        "id": new_id(), "action": "league.final.close", "actor_id": actor.get("id"), "target_id": tid,
-        "data": {"final_table_id": final["id"], "version": final["version"], "season_id": context.get("season_id"),
-                 "champion_registration_id": (final["champion"] or {}).get("registration_id"), "teams": final["participants"]},
-        "created_at": final["closed_at"]})
-    await notify_captains(db, tournament, final, frame, "closed")
+    # Ab hier steht der Abschluss. Was folgt, darf ihn nicht mehr kippen - ein Fehler steht im Log, der Endstand bleibt.
+    async def record_override() -> None:
+        if override:
+            from services import league_permissions
+
+            await league_permissions.record_override(db, actor, action="final_close", target_id=tid, reason=override, final_table_id=final["id"])
+
+    async def audit() -> None:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "league.final.close", "actor_id": actor.get("id"), "target_id": tid,
+            "data": {"final_table_id": final["id"], "version": final["version"], "season_id": context.get("season_id"),
+                     "champion_registration_id": (final["champion"] or {}).get("registration_id"), "teams": final["participants"]},
+            "created_at": final["closed_at"]})
+
+    await _follow_up("Protokoll der Notausnahme", tid, record_override)
+    await _follow_up("Meister-Eintrag", tid, lambda: record_champion(db, {**tournament, "status": "completed"}, final, frame))
+    season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
+    await _follow_up("Protokoll", tid, audit)
+    await _follow_up("Nachricht an die Captains", tid, lambda: notify_captains(db, tournament, final, frame, "closed"))
     return {"final": final, "season_status": season_status}
 
 
@@ -593,20 +613,35 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
     if not claimed.modified_count:
         raise FinalProblem(NOT_CLOSED, 409)
     status = tournament.get("status_before_final") or final.get("status_before") or "live"
-    await db.tournaments.update_one({"id": tid}, {"$set": {"final_table": None, "status": status, "updated_at": now.isoformat()},
-                                                  "$unset": {"status_before_final": ""}})
-    for kind, why in (("final_reopen_own", emergency), ("final_reopen", override)):
-        if why:
-            await league_permissions.record_override(db, actor, action=kind, target_id=tid, reason=why, final_table_id=final["id"])
-    await suspend_champion(db, tid)
+    # Scheitert das Entsperren der Staffel, gilt die Fassung wieder - sonst wäre die Staffel gesperrt, ohne Endstand (N3).
+    try:
+        await db.tournaments.update_one({"id": tid}, {"$set": {"final_table": None, "status": status, "updated_at": now.isoformat()},
+                                                      "$unset": {"status_before_final": ""}})
+    except BaseException:
+        await db.league_final_tables.update_one(
+            {"id": final["id"]}, {"$set": {"active": True, "reopened_at": None, "reopened_by": None, "reopen_reason": None}})
+        raise
     context = tournament.get("league_context") or {}
-    season_status = await _season_follows(db, context.get("season_id"), actor.get("id"), tid)
-    await db.audit_logs.insert_one({
-        "id": new_id(), "action": "league.final.reopen", "actor_id": actor.get("id"), "target_id": tid,
-        "data": {"final_table_id": final["id"], "version": final["version"], "season_id": context.get("season_id"), "reason": text},
-        "created_at": now.isoformat()})
-    frame = await _frame(db, tournament)
-    await notify_captains(db, tournament, final, frame, "reopened")
+
+    async def record_overrides() -> None:
+        for kind, why in (("final_reopen_own", emergency), ("final_reopen", override)):
+            if why:
+                await league_permissions.record_override(db, actor, action=kind, target_id=tid, reason=why, final_table_id=final["id"])
+
+    async def audit() -> None:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "league.final.reopen", "actor_id": actor.get("id"), "target_id": tid,
+            "data": {"final_table_id": final["id"], "version": final["version"], "season_id": context.get("season_id"), "reason": text},
+            "created_at": now.isoformat()})
+
+    async def tell() -> None:
+        await notify_captains(db, tournament, final, await _frame(db, tournament), "reopened")
+
+    await _follow_up("Protokoll der Notausnahme", tid, record_overrides)
+    await _follow_up("Ruhen des Meister-Eintrags", tid, lambda: suspend_champion(db, tid))
+    season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
+    await _follow_up("Protokoll", tid, audit)
+    await _follow_up("Nachricht an die Captains", tid, tell)
     return {"final": {**final, "active": False, "reopened_at": now.isoformat(), "reopened_by": actor.get("id"), "reopen_reason": text},
             "season_status": season_status}
 

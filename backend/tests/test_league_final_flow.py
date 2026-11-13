@@ -767,3 +767,50 @@ async def test_a_point_deduction_or_disqualification_on_a_closed_staffel_is_refu
     # Eine Verwarnung greift nicht in die Tabelle ein - sie bleibt möglich.
     warning = await flow.post(url, json={**body, "kind": "warning", "registration_id": "reg-1"})
     assert warning.status_code == 200, warning.text
+
+
+# ---------------------------------------------------------------- Kein Teilzustand bei einem Fehler (N3)
+
+@pytest.mark.asyncio
+async def test_a_failure_while_writing_the_final_table_leaves_the_staffel_open_and_closable(flow, monkeypatch):
+    from services import league_final
+
+    admin, _league, season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Speicher voll")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(flow.db.league_final_tables), "insert_one", broken)
+        with pytest.raises(RuntimeError):
+            await league_final.close(flow.db, await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}), admin)
+    tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert tournament["final_table"] is None and tournament["status"] == "live" and "status_before_final" not in tournament
+    assert await flow.db.league_final_tables.count_documents({}) == 0
+    row = await cockpit(flow, season, staffel)
+    assert row["can_close"] is True
+    await must_close(flow, staffel)
+
+
+@pytest.mark.asyncio
+async def test_a_failing_award_or_message_does_not_undo_the_close_or_the_reopen(flow, monkeypatch):
+    from services import league_final
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Dienst nicht erreichbar")
+
+    _admin, league, _season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    second = await lead(flow, league, "Zweite Leitung", "season")
+    for name in ("record_champion", "notify_captains", "suspend_champion"):
+        monkeypatch.setattr(league_final, name, broken)
+    closed = await must_close(flow, staffel)
+    assert closed.json()["version"] == 1
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}))["final_table"]["version"] == 1
+    assert await flow.db.league_final_tables.count_documents({"active": True}) == 1
+    assert await flow.db.audit_logs.count_documents({"action": "league.final.close"}) == 1
+    flow.act_as(second)
+    await must_reopen(flow, staffel)
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}))["final_table"] is None
+    assert await flow.db.audit_logs.count_documents({"action": "league.final.reopen"}) == 1
