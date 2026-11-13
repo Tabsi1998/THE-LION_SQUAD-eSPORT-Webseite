@@ -84,21 +84,27 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await noSideScroll(page);
   });
 
-  test(`Ligaseite (${width} px): Kopf, Tabelle, Spielwochen mit Pause, Ergebnis mit Maps`, async ({ page }) => {
+  test(`Ligaseite (${width} px): Kopf, Tabelle, aktueller Spieltag; Spieltage mit Pause, Ergebnis mit Maps (#2268)`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await mockServer(page);
     await page.goto("/liga/probe-liga/season-1");
     await expect(page.getByTestId("league-fact-breaks")).toContainText("Weihnachtspause 21.12.–3.1.");
     const staffel = page.getByTestId("league-staffel-A");
     await expect(staffel.getByTestId("standing-row-r1")).toContainText("Löwen · Löwen Nachwuchs B");
-    await expect(staffel.getByTestId("league-week-7")).toContainText("Weihnachtspause");
     await expect(staffel.getByTestId("league-match-m2-1")).toBeVisible();
-    await staffel.getByTestId("league-week-1").getByRole("button").click();
-    await expect(staffel.getByTestId("league-match-m1-1")).toContainText("2 : 1");
-    await expect(staffel.getByTestId("league-match-m1-1")).toContainText("Nebelwerk");
-    await expect(staffel.getByTestId("league-map-m1-1-2")).toContainText("wiederholt");
-    await expect(staffel.getByTestId("league-map-m1-1-3")).toContainText("zugesprochen");
-    await expect(staffel.getByTestId("league-maps-m1-4-not-played")).toHaveText("Map 3 nicht gespielt – die Serie war entschieden.");
+    await noSideScroll(page);
+    // Alle Wochen stehen auf der Unterseite Spieltage (#2268).
+    await staffel.getByTestId("league-plan-link-A").click();
+    await expect(page).toHaveURL(/\/liga\/probe-liga\/season-1\/spieltage\?staffel=/);
+    const plan = page.getByTestId("league-plan-A");
+    await expect(plan.getByTestId("league-week-7")).toContainText("Weihnachtspause");
+    await expect(plan.getByTestId("league-match-m2-1")).toBeVisible();
+    await plan.getByTestId("league-week-1").getByRole("button").click();
+    await expect(plan.getByTestId("league-match-m1-1")).toContainText("2 : 1");
+    await expect(plan.getByTestId("league-match-m1-1")).toContainText("Nebelwerk");
+    await expect(plan.getByTestId("league-map-m1-1-2")).toContainText("wiederholt");
+    await expect(plan.getByTestId("league-map-m1-1-3")).toContainText("zugesprochen");
+    await expect(plan.getByTestId("league-maps-m1-4-not-played")).toHaveText("Map 3 nicht gespielt – die Serie war entschieden.");
     await noSideScroll(page);
   });
 }

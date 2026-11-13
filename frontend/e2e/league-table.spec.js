@@ -159,7 +159,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(staffel.getByTestId("league-tiebreak-order-A")).toHaveText("Reihenfolge: Punkte → Mehr Siege → Direkter Vergleich → Map-Differenz → Entscheid der Leitung");
     await expect(table.getByRole("columnheader", { name: "S", exact: true })).toBeVisible();
     await expect(table.getByRole("columnheader", { name: "Pkt", exact: true })).toHaveAttribute("title", "Punkte = gewonnene Maps");
-    await expect(page.getByTestId("league-fact-points")).toContainText("Punkte je gewonnene Map · Best of 5");
+    await expect(page.getByTestId("season-points")).toContainText("Punkte je gewonnene Map");
+    await expect(page.getByTestId("season-format-best_of")).toContainText("Best of 5");
     await noSideScroll(page);
     await screenshot(staffel.locator(".tls-league-table"), "liga-tabelle-mappunkte", width, width);
   });

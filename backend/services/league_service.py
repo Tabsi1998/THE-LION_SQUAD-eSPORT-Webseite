@@ -32,6 +32,7 @@ from services.league_presets import INCIDENT_FIELDS
 from services.league_scope import ONLY_LEAGUE
 from services import checkin_rules, league_protest_settings, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
+from services.league_schedule import public_rules as schedule_public_rules
 from services.log_safe import log_safe
 from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
                                     mutation_lock, tournament_write_resource)
@@ -1403,6 +1404,10 @@ def public_season(season: dict) -> dict:
     out["table_tiebreakers"] = rules.get("table_tiebreakers")
     out["blocked_weeks"] = blocked_weeks(season)
     out["end_date"] = season_end(season)
+    # Was gespielt wird und wie Termine laufen (#2268): die Regel je Modus und die Terminregeln aus dem Regelwerk - ohne
+    # Arbeitswerte der Leitung (Erinnerung, „überfällig“).
+    out["result_rules"] = league_result_rules.public_rules(season)
+    out["schedule_rules"] = schedule_public_rules(season)
     return out
 
 

@@ -201,3 +201,71 @@ async def test_the_whole_tree_hangs_on_the_message_as_an_image(flow, bot):
     # Nur Tabellen: kein Bild, die Einbettung bleibt Text.
     raw, image = await discord_bracket.build_with_image(flow.db, {"id": "leer", "title": "Leer"})
     assert image is None and "image_signature" not in raw
+
+
+NAMES = {"r1": "Paula", "r2": "Leon", "r3": "Mira", "r4": "Kai"}
+
+
+def test_in_clarification_reads_like_the_league_page():
+    """#2363: Ein angefochtenes Ergebnis (E.2, ``contested``) und eine Map in Klärung (D.5, offener Vorfall ``in_review``)
+    stehen in der Einbettung „in Klärung“ - aus derselben Quelle wie die Ligaseite. Ohne Verfahren wie bisher."""
+    from services.competition_snapshot import adapt_stage_matches
+
+    done = match("a", 1, 1, "r1", "r2", status="completed", score=(2, 1))
+    assert discord_bracket.match_line(adapt_stage_matches([done])[0], NAMES) == "**Paula** 2 : 1 Leon"
+    assert discord_bracket.match_line(adapt_stage_matches([{**done, "contested": True}])[0], NAMES) == "**Paula** 2 : 1 Leon · in Klärung"
+
+    live = match("c", 2, 1, "r1", "r4", status="live")
+    review = {**live, "incidents": [{"id": "v1", "position": 2, "state": "in_review"}]}
+    decided = {**live, "incidents": [{"id": "v1", "position": 2, "state": "decided"}]}
+    for raw, line in ((live, "Paula – Kai · live"), (review, "Paula – Kai · in Klärung"), (decided, "Paula – Kai · live")):
+        marked = discord_bracket.mark_clarification(adapt_stage_matches([raw]), [raw])
+        assert discord_bracket.match_line(marked[0], NAMES) == line, raw.get("incidents")
+
+    # Liga-Tabelle: wie die Zeile auf der Website und im PDF „1 Spiel in Klärung“.
+    league = {"id": "t1", "title": "Liga", "scoring_rules": {"match_points": {"win": 3, "draw": 1, "loss": 0}}}
+    stage = [{"id": "s2", "tournament_id": "t1", "number": 1, "name": "Staffel A", "stage_type": "league"}]
+    games = [match("l1", 1, 1, "r1", "r2", status="completed", score=(2, 0), stage="s2", section="main"),
+             match("l2", 1, 2, "r3", "r4", status="completed", score=(1, 2), stage="s2", section="main")]
+    plain = discord_bracket.bracket_fields(adapt_stage_matches(games), stage, REGS, {}, tournament=league)[0]["value"]
+    assert "Klärung" not in plain
+    games[0] = {**games[0], "contested": True}
+    contested = discord_bracket.bracket_fields(adapt_stage_matches(games), stage, REGS, {}, tournament=league)[0]["value"]
+    lines = dict(line.split(" · ", 1) for line in contested.split("\n"))
+    assert lines["1. Paula"].endswith(" · 1 Spiel in Klärung") and lines[next(key for key in lines if key.endswith("Leon"))].endswith(" · 1 Spiel in Klärung")
+    assert not lines[next(key for key in lines if key.endswith("Kai"))].endswith("Klärung"), "nur die beiden Seiten des Spiels"
+    assert discord_bracket.content_hash({"fields": [{"value": plain}]}) != discord_bracket.content_hash({"fields": [{"value": contested}]})
+
+
+@pytest.mark.asyncio
+async def test_a_contested_result_brings_a_new_image_and_the_decision_another(flow, bot):
+    """#2363: Protest eingelegt - die nächste Bearbeitung zeigt „in Klärung“ mit neuem Bild; nach dem Entscheid wieder
+    ohne Hinweis, ebenfalls mit neuem Bild (der Stand steht in Prüfsumme und Bild-Signatur). Eine Map in Klärung kommt aus
+    den Vorfällen am Spiel."""
+    await configure(flow)
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": match("a", 1, 1, "r1", "r2", status="completed", score=(2, 1))})
+    await flow.db.matches_v2.update_one({"id": "b"}, {"$set": match("b", 1, 2, "r3", "r4", status="completed", score=(0, 2))})
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": {"slots": match("c", 2, 1, "r1", "r4")["slots"], "status": "live"}})
+    t0 = now_utc()
+    assert (await discord_bracket.refresh(flow.db, "t1", now=t0))["reason"] == "posted"
+    assert "Klärung" not in str(bot.sent[-1]["embed"]["fields"])
+
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": {"incidents": [{"id": "v1", "position": 1, "state": "in_review"}]}})
+    clarifying = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=2))
+    assert clarifying["reason"] == "edited" and "Paula – Kai · in Klärung" in bot.edited[-1]["embed"]["fields"][-1]["value"]
+    assert len(bot.files) == 2, "neues Bild mit der Map in Klärung"
+
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": {"incidents": [], "status": "completed", "results": match("c", 2, 1, "r1", "r4", score=(2, 1))["results"]}})
+    assert (await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=4)))["reason"] == "edited" and len(bot.files) == 3
+    assert "Klärung" not in str(bot.edited[-1]["embed"]["fields"])
+
+    # Protest gegen Runde 1: Die Felder zeigen sie nur zusammengefasst, das Bild aber den ganzen Baum - also ein neues.
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": {"contested": True}})
+    contested = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=6))
+    assert contested["reason"] == "edited" and len(bot.files) == 4
+    assert (await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=8)))["reason"] == "unchanged" and len(bot.files) == 4
+
+    # Entscheid: das Ergebnis bleibt, „in Klärung“ fällt weg - wieder ein neues Bild, jetzt ohne Hinweis.
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": {"contested": False}})
+    decided = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=10))
+    assert decided["reason"] == "edited" and len(bot.files) == 5

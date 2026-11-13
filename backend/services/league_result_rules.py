@@ -225,6 +225,20 @@ def _same_settings(entry: dict | None) -> dict | None:
 # ---------------------------------------------------------------- Prüfen je Map
 
 
+PUBLIC_RULE_KEYS = ("kind", "target", "round_limit", "time_limit_seconds", "round_time_seconds", "overtime", "draw_allowed")
+
+
+def public_rules(season: dict | None) -> dict[str, dict]:
+    """Die Ergebnisregeln der Season für die Ligaseite (#2268): je Modus nur die Regel selbst („bis 250 Punkte, 10 Min.“) - keine
+    Einstellungen der Verwaltung. Leer ohne Regeln (ältere Seasons)."""
+    out: dict[str, dict] = {}
+    for key, raw in ((season or {}).get("result_rules") or {}).items():
+        rule = rule_for({key: raw}, key)
+        if rule:
+            out[str(key)] = {name: rule[name] for name in PUBLIC_RULE_KEYS if rule.get(name) is not None}
+    return out
+
+
 def rule_for(rules: dict | None, mode: str | None) -> dict | None:
     """Die geltende Regel einer Map aus einem Regelstand ``{mode: rule}`` - ohne Stand oder Modus keine."""
     if not mode or not isinstance(rules, dict):

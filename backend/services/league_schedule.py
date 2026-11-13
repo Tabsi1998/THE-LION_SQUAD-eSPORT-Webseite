@@ -107,6 +107,22 @@ def normalize(raw) -> dict:
     return out
 
 
+PUBLIC_KEYS = ("home_rule", "home_rule_hours", "reschedule_notice_hours", "reschedule_max", "reschedule_same_week")
+
+
+def public_rules(season: dict | None) -> dict | None:
+    """Die Terminregeln der Season für die Ligaseite (#2268): 72-h-Regel und Verschiebung, wie sie im Regelwerk stehen. Erinnerung
+    und „überfällig“ sind Arbeitswerte der Leitung und bleiben weg. ``None`` für Seasons ohne Terminregeln."""
+    raw = (season or {}).get("schedule_rules")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        rules = normalize({key: value for key, value in raw.items() if key in DEFAULTS})
+    except ScheduleProblem:
+        rules = dict(DEFAULTS)
+    return {key: rules[key] for key in PUBLIC_KEYS}
+
+
 def rules_of(tournament: dict | None) -> dict | None:
     """Die geltenden Regeln einer Staffel - ``None`` für Staffeln ohne ``schedule_rules`` und alle anderen Turniere."""
     if not is_league_staffel(tournament):

@@ -31,6 +31,19 @@ export function prefersShareSheet(nav = typeof navigator !== "undefined" ? navig
   }
 }
 
+/**
+ * Angefochtenes Ergebnis im Weg (#2363): „in Klärung“ beim Duell, „1 Spiel in Klärung“ bei der Tabelle - wie
+ * Ligaseite, Teilen-Bild und PDF. Leer ohne Verfahren (``contested`` fehlt dann).
+ */
+export function clarificationNote(step) {
+  const contested = step?.contested;
+  if (!contested) return "";
+  if (step.kind !== "table") return "in Klärung";
+  const count = Number(contested) || 0;
+  if (count <= 0) return "";
+  return count === 1 ? "1 Spiel in Klärung" : `${count} Spiele in Klärung`;
+}
+
 /** „ergebnis-fc26-cup-neonfalke-story.png“ aus dem Pfad der Teilen-Seite. */
 export function resultFileName(path, format = "story") {
   const parts = String(path || "").split("/").filter(Boolean);
