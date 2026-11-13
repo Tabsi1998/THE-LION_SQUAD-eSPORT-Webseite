@@ -148,6 +148,7 @@ ROUTES = [
     # Staffel: Spiele betreuen
     route("POST", "/api/tournaments/{tid}/registrations/{reg}/checkin", "matches", {"status": "checked_in"}),
     route("GET", "/api/tournaments/{tid}/print/checkin", "matches"),
+    route("GET", "/api/tournaments/{tid}/lead/checkin", "matches"),
     route("POST", "/api/tournaments/{tid}/schedule/plan", "matches"),
     route("POST", "/api/tournaments/{tid}/schedule/release", "matches", {}),
     route("POST", "/api/tournaments/{tid}/live-queue/call", "matches", {"station_id": "s", "match_id": "m"}),

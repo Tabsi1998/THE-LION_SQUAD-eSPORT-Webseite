@@ -521,12 +521,12 @@ test("Disqualifizieren und Austritt (#1553): nur mit Struktur-Recht und nur im l
   expect(screen.getAllByTestId("admin-reg-withdraw-r-1").length).toBeGreaterThan(0);
 });
 
-test("Ergebnisdienst: Check-in und Teilnehmer ja, Turnierbaum zurücksetzen nein", async () => {
+test("Ergebnisdienst: Weg zum Check-in und Teilnehmer ja, Turnierbaum zurücksetzen nein", async () => {
   authState.lead = false;
   serveTournament({ can_use_staff_tools: true, can_check_in: true, can_manage_participants: true, can_manage_results: true });
   renderPage();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
-  expect((await screen.findAllByRole("button", { name: "Check-in" })).length).toBeGreaterThan(0);
+  expect(await screen.findByRole("link", { name: /Zum Check-in/ })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Entfernen" }).length).toBeGreaterThan(0);
   expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
 });
@@ -844,25 +844,25 @@ test("Betrieb: Neu auslosen für eine ausgeloste Runde", async () => {
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/redraw", { group: "WB:2" }));
 });
 
-// #1941 (F9): Nach „Nicht erschienen“ mit Nachrücken nennt die Meldung, wer von der Warteliste nachgerückt ist.
-test("Nicht erschienen mit Nachrücker: die Meldung nennt den Namen", async () => {
-  const { toast } = await import("sonner");
+// Check-in an einem Ort (#1161): die Verwaltung hat keine Check-in-Knöpfe mehr, nur den Weg zum Reiter der
+// Turnierleitung. Freigeben bzw. Ablehnen und das PDF bleiben hier. („Nicht erschienen“ mit Nachrücker: CheckinBoard.test.)
+test("Check-in nur in der Turnierleitung: kein Abhaken hier, ein Link zum Reiter", async () => {
   apiMock.get.mockImplementation((url) => {
     const path = String(url);
     if (path.includes("/registrations")) return Promise.resolve({ data: [
       { id: "r-paul", status: "approved", display_name: "PistenPaul" },
-      { id: "r-bea", status: "waitlist", display_name: "Begleitung Bea" },
+      { id: "r-anna", status: "checked_in", display_name: "Anna" },
     ] });
-    if (path.includes("/tournaments/t-1") && !path.includes("/t-1/")) return Promise.resolve({ data: { ...TOURNAMENT, status: "check_in" } });
+    if (path.includes("/tournaments/t-1") && !path.includes("/t-1/")) return Promise.resolve({ data: { ...TOURNAMENT, status: "check_in", can_check_in: true } });
     return Promise.resolve(routeFor(path));
   });
-  apiMock.post.mockResolvedValue({ data: { id: "r-paul", status: "no_show", waitlist_moved_up: ["r-bea"], placement: null } });
-  const user = userEvent.setup();
   renderPage();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
-  await user.click((await screen.findAllByRole("button", { name: "Nicht erschienen" }))[0]);
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/registrations/r-paul/checkin", { status: "no_show" }));
-  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Nicht erschienen gesetzt – Nachrücker: Begleitung Bea."));
+  await screen.findAllByText("PistenPaul");
+  for (const name of ["Check-in", "Auschecken", "Nicht erschienen"]) expect(screen.queryByRole("button", { name })).toBeNull();
+  const link = screen.getByRole("link", { name: /Zum Check-in/ });
+  expect(link.getAttribute("href")).toBe(`/tournaments/${TOURNAMENT.slug || TOURNAMENT.id}/leitung?reiter=checkin`);
+  expect(screen.getByTestId("admin-tr-download-checkin")).toBeInTheDocument();
 });
 
 // Liga-Staffel (#2096): keine Vor-Ort-Anmeldung über QR, der Startknopf heißt „Liga starten“.

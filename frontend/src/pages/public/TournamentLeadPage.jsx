@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ClipboardCheck, Clock, MonitorPlay, Radio, Shuffle } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -16,6 +16,7 @@ import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
+import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
 
 // Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Erster
 // Reiter „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf - Erledigtes verschwindet von selbst; jeder
@@ -27,6 +28,8 @@ import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 // „Aufrufen“ und „Starten“, danach. Die Reihenfolge und den Verzug rechnet der Server (GET …/live-queue). Dazu je Kachel
 // „Freigeben“, „Umlegen“ und „Defekt“ (#1162) - die Live-Knöpfe stehen nur hier, /admin/stations behält Anlegen und Planen.
 // ?reiter=stationen öffnet direkt die Stationen (Link aus der Verwaltung).
+// Reiter „Check-in“ (#1161, nur mit Check-in-Recht): wer da ist, mit einem Tipp - der eine Ort dafür; die Verwaltung
+// verlinkt hierher (?reiter=checkin). Im Status „Check-in“ öffnet die Seite gleich dort.
 
 const FILTERS = [
   ["all", "Alle offenen", "open"],
@@ -44,7 +47,7 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  const [tab, setTab] = useState(searchParams.get("reiter") === "stationen" ? "stations" : null);
+  const [tab, setTab] = useState(() => ({ checkin: "checkin", stationen: "stations" })[searchParams.get("reiter")] || null);
   const [movingId, setMovingId] = useState("");
   const [queue, setQueue] = useState(null);
   const [queueLoaded, setQueueLoaded] = useState(false);
@@ -97,9 +100,15 @@ export default function TournamentLeadPage() {
   const byId = useMemo(() => Object.fromEntries(matches.map((item) => [item.id, item])), [matches]);
   const cases = attention.length + draws.length;
   // Erst entscheiden, wenn klar ist, ob es vor Ort eine Warteschlange gibt - sonst springt der Reiter nach dem Laden.
-  // Der Reiter „Stationen“ (auch über ?reiter=stationen) erst, wenn es vor Ort eine Warteschlange gibt - sonst die Vorgabe.
-  const wanted = tab === "stations" && !queue ? (queueLoaded ? null : "") : tab;
-  const activeTab = wanted === "" ? "" : wanted || (fall || cases ? "attention" : queue ? "stations" : queueLoaded ? "results" : "");
+  const canCheckIn = Boolean(data?.tournament?.can_check_in);
+  // Von selbst nur, wo allein die Leitung eincheckt (vor Ort) - online checken die Spieler selbst (Review N7).
+  const checkinPhase = canCheckIn && data?.tournament?.status === "check_in" && !data?.tournament?.self_checkin;
+  // Ein gewählter Reiter gilt nur, wenn es ihn gibt: „Check-in“ mit Recht, „Stationen“ (auch über ?reiter=stationen) erst,
+  // wenn es vor Ort eine Warteschlange gibt - bis die geladen ist, „Wird geladen …“, sonst die Vorgabe.
+  const chosenTab = tab === "checkin" && !canCheckIn ? null : tab === "stations" && !queue ? (queueLoaded ? null : "") : tab;
+  const activeTab = chosenTab === "" ? "" : chosenTab || (fall || cases ? "attention" : checkinPhase ? "checkin" : queue ? "stations" : queueLoaded && data ? "results" : "");
+  // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.
+  const compactTabs = Boolean(queue) || canCheckIn;
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
 
   const drawNow = async (card) => {
@@ -219,12 +228,18 @@ export default function TournamentLeadPage() {
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
         <div className="mt-6 flex items-center gap-1 tls-swipe pb-0 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
-          {[["attention", <><span className={queue ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
+          {[["attention", <><span className={compactTabs ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(canCheckIn ? [["checkin", "Check-in", UserCheck]] : []), ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
             <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
-              <Icon className={`${queue ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
+              <Icon className={`${compactTabs ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} />
+              {/* Ein Textblock (Review N8): sonst setzt der Flex-Abstand zwischen „Braucht “ und „Aufmerksamkeit“ eine zweite Lücke. */}
+              <span data-testid={`lead-tab-label-${key}`}>{label}</span>
             </button>
           ))}
         </div>
+
+        {activeTab === "checkin" && canCheckIn ? (
+          <CheckinBoard slug={slug} tournamentId={tournamentId} eventId={eventId} />
+        ) : null}
 
         {activeTab === "stations" && queue ? (
           <div className="mt-5" data-testid="lead-stations">
@@ -304,7 +319,7 @@ export default function TournamentLeadPage() {
           </div>
         ) : null}
         </>) : null}
-        <p className="mt-6 text-xs text-white/40">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p>
+        {activeTab !== "checkin" ? <p className="mt-6 text-xs text-white/40">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p> : null}
       </section>
 
       {opened && opened.can_enter ? <ResultWindow key={opened.id} entry={opened} onClose={closeEntry} onSaved={undo.start} /> : null}

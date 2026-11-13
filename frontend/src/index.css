@@ -3599,6 +3599,21 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
    Restzeit, rückt aber nur mit der Zahl einmal je Sekunde nach - ohne Übergang, ohne Gleiten. */
 @keyframes tls-incident-open { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes tls-incident-pulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+/* Check-in der Turnierleitung (#1161): der Tipp auf „Da“ zeichnet das Häkchen in einem Zug nach, der Balken unter
+   „13 von 16 da“ wächst mit (nur transform), die Zeile wechselt ihre Farbe weich. Zwei Tipps hintereinander setzen den
+   Übergang fort, statt neu zu starten. Am Handy: kein grauer Tipp-Schein, kein Doppeltipp-Zoom, kein Markieren.
+   „Bewegung reduzieren“: Häkchen und Balken stehen sofort da, nur die Farbe wechselt. */
+.tls-lead-tap { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.tls-lead-checkin-row { transition: background-color var(--tls-motion-mid) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease); }
+.tls-lead-checkin-bar { transition: transform var(--tls-motion-slow) var(--tls-ease); }
+.tls-lead-ask { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; }
+.tls-lead-check-draw { stroke-dasharray: 1; animation: tls-lead-check-draw var(--tls-motion-mid) var(--tls-ease) backwards; }
+@keyframes tls-lead-check-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .tls-lead-checkin-bar { transition: none; }
+  .tls-lead-check-draw { animation: none; }
+}
 .tls-incident-open { animation: tls-incident-open var(--tls-motion-mid) var(--tls-ease) both; }
 .tls-incident-pulse { position: relative; }
 .tls-incident-pulse::after {
