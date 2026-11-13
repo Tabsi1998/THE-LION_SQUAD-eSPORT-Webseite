@@ -99,7 +99,8 @@ export default function TournamentLeadPage() {
   const cases = attention.length + draws.length;
   // Erst entscheiden, wenn klar ist, ob es vor Ort eine Warteschlange gibt - sonst springt der Reiter nach dem Laden.
   const canCheckIn = Boolean(data?.tournament?.can_check_in);
-  const checkinPhase = canCheckIn && data?.tournament?.status === "check_in";
+  // Von selbst nur, wo allein die Leitung eincheckt (vor Ort) - online checken die Spieler selbst (Review N7).
+  const checkinPhase = canCheckIn && data?.tournament?.status === "check_in" && !data?.tournament?.self_checkin;
   const chosenTab = tab === "checkin" && !canCheckIn ? null : tab;
   const activeTab = chosenTab || (fall || cases ? "attention" : checkinPhase ? "checkin" : queue ? "stations" : queueLoaded && data ? "results" : "");
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.

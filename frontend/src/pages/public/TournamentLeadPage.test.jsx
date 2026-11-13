@@ -208,6 +208,13 @@ test("Check-in-Reiter: ohne Check-in-Recht fehlt er, im Status Check-in startet 
   expect(screen.getByTestId("lead-checkin-counter")).toHaveTextContent("0 von 1 da");
 });
 
+test("Check-in-Reiter online: sichtbar, öffnet sich im Check-in aber nicht von selbst (Spieler checken selbst ein)", async () => {
+  renderWithCheckin({ id: "t1", slug: "fc-cup", title: "Cup", status: "check_in", can_check_in: true, self_checkin: true });
+  await screen.findByTestId("lead-row-m8");
+  expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "false");
+  expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
+});
+
 test("Check-in-Reiter: ?reiter=checkin aus der Verwaltung oeffnet ihn auch ausserhalb des Check-ins", async () => {
   renderWithCheckin({ id: "t1", slug: "fc-cup", title: "Cup", status: "live", can_check_in: true }, "/tournaments/fc-cup/leitung?reiter=checkin");
   expect(await screen.findByTestId("lead-checkin-row-r1")).toBeInTheDocument();

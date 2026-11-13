@@ -86,6 +86,7 @@ async def test_rights_like_the_checkin_route(flow):
         assert response.headers["cache-control"] == "private, no-store"
         lead = await flow.get(lead_url)
         assert lead.json()["tournament"]["can_check_in"] is True, role
+        assert lead.json()["tournament"]["self_checkin"] is False, "vor Ort checkt nur die Leitung ein"
     flow.act_as(await flow.add_staff())
     response = await flow.get(url)
     assert response.status_code == 200

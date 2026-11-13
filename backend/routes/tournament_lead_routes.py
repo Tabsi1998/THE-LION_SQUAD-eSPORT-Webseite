@@ -60,6 +60,8 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     # Reiter „Check-in“ (#1161): nur mit Check-in-Recht - dieselbe Prüfung wie der Check-in-Weg; in einer Staffel nie.
     view["tournament"]["can_check_in"] = not is_league_staffel(tournament) and await has_tournament_staff_permission(
         me, tournament_id, CHECKIN_STAFF_ROLES, capability="matches")
+    # Checken die Spieler selbst ein (online, hybrid)? Dann öffnet die Seite im Check-in nicht von selbst den Reiter.
+    view["tournament"]["self_checkin"] = self_checkin_allowed(tournament)
     await hide_unseen_event_links(db, me, [view["tournament"]])
     return view
 

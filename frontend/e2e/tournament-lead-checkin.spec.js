@@ -140,7 +140,7 @@ test.describe("Check-in der Turnierleitung", () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     const posts = [];
     await serve(page, "team-cup", structuredClone(TEAM), posts, null);
-    await page.goto("/tournaments/team-cup/leitung");
+    await page.goto("/tournaments/team-cup/leitung?reiter=checkin");
     await expect(page.getByTestId("lead-checkin-counter")).toContainText("1 von 3 da");
     const lions = page.getByTestId("lead-checkin-members-lsw");
     await expect(lions).toContainText("Keine Aufstellung – ganzes Team · 3 von 10 sagen „Ich bin da“");
