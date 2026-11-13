@@ -383,8 +383,12 @@ async def confirm(db, discord_user_id, kind: str, item_id: str, then: str | None
             text = f"Deine Anmeldung für „{title}“ wartet auf die Freigabe der Turnierleitung."
         else:
             text = f"✅ Du bist angemeldet: „{title}“" + (f" mit „{team.get('name')}“" if team else "") + "."
-        if reg.get("price_snapshot"):
-            text += f"\nStartgeld: {pricing.describe(reg['price_snapshot'])} – die Rechnung kommt über die Website."
+        # Wie bei Events (#2184): nach einem Storno mit schon gestellter Rechnung kein Betrag, sondern der Hinweis darauf (#2368).
+        billed, kept = price_to_bill(reg), kept_invoice_line(reg, tournament_fees.BILLABLE_STATUSES)
+        if billed:
+            text += f"\nStartgeld: {pricing.describe(billed)} – die Rechnung kommt über die Website."
+        elif kept:
+            text += f"\n{kept}"
         return answer(text, buttons=link)
     return answer("Diesen Knopf kenne ich nicht mehr.")
 

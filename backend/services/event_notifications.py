@@ -40,10 +40,11 @@ def price_to_bill(registration: dict) -> dict | None:
 KEPT_INVOICE = "Für deine Anmeldung gibt es schon eine Rechnung – der Verein prüft sie und meldet sich bei dir, falls sich etwas ändert."
 
 
-def kept_invoice_line(registration: dict) -> str:
+def kept_invoice_line(registration: dict, active: set | tuple = ACTIVE) -> str:
     """Zurück nach einem Storno, der Beleg gilt weiter (#2184): kein Betrag, aber auch kein Schweigen - sonst wirkt die Anmeldung kostenlos.
-    Nur nach der Rückbuchung selbst (``invoice_kept``, nur in der Antwort, nie gespeichert): Ohne sie gibt es nichts zu prüfen."""
-    if registration.get("invoice_kept") and registration.get("status") in ACTIVE and registration.get("billing_status") in ("invoiced", "paid"):
+    Nur nach der Rückbuchung selbst (``invoice_kept``, nur in der Antwort, nie gespeichert): Ohne sie gibt es nichts zu prüfen.
+    ``active``: die Stände, mit denen jemand dabei ist - bei Turnieren (#2368) ``tournament_fees.BILLABLE_STATUSES``."""
+    if registration.get("invoice_kept") and registration.get("status") in active and registration.get("billing_status") in ("invoiced", "paid"):
         return KEPT_INVOICE
     return ""
 

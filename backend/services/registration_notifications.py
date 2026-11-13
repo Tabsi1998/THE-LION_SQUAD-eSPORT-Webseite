@@ -15,8 +15,10 @@ import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from services.event_notifications import kept_invoice_line
 from services.match_audience import player_user_ids, responsible_user_ids, users_for
 from services.notification_preferences import send_user_template
+from services.tournament_fees import BILLABLE_STATUSES
 from services.tournament_rules import self_checkin_allowed
 from services.user_notifications import build_public_url, create_user_notification
 
@@ -51,16 +53,21 @@ def _checkin_line(tournament: dict) -> str:
     return f"Check-in vor Ort bei der Turnierleitung ab {start}."
 
 
-def registration_message(tournament: dict, status: str, previous: str | None = None, reason: str | None = None) -> dict | None:
-    """Titel, Text und Mail-Vorlage für einen Stand der Anmeldung - oder nichts, wenn es dazu keine Nachricht gibt."""
+def registration_message(tournament: dict, status: str, previous: str | None = None, reason: str | None = None,
+                         registration: dict | None = None) -> dict | None:
+    """Titel, Text und Mail-Vorlage für einen Stand der Anmeldung - oder nichts, wenn es dazu keine Nachricht gibt.
+
+    Nach einem Storno mit schon gestellter Rechnung zurück (#2368, wie bei Events #2184): kein Betrag, aber der Hinweis, dass
+    es die Rechnung schon gibt und der Verein sie prüft (``kept_invoice_line``)."""
     title = tournament.get("title") or "Turnier"
     if status in {"approved", "checked_in"}:
         promoted = previous == "waitlist"
         detail = "Ein Platz ist frei geworden – du bist von der Warteliste nachgerückt." if promoted else ""
+        kept = kept_invoice_line(registration or {}, BILLABLE_STATUSES)
         checkin = _checkin_line(tournament) if status == "approved" else ""
-        body = " ".join(part for part in (detail or "Deine Anmeldung ist bestätigt.", checkin) if part)
+        body = " ".join(part for part in (detail or "Deine Anmeldung ist bestätigt.", kept, checkin) if part)
         return {"title": f"{'Nachgerückt' if promoted else 'Du bist dabei'}: {title}", "body": body,
-                "template": "registration_approved", "detail": " ".join(part for part in (detail, checkin) if part)}
+                "template": "registration_approved", "detail": " ".join(part for part in (detail, kept, checkin) if part)}
     if status == "waitlist":
         detail = ("Das Turnier ist voll – du stehst auf der Warteliste. Wird ein Platz frei, holt dich die "
                   "Turnierleitung nach; dann bekommst du Bescheid.")
@@ -83,7 +90,7 @@ async def notify_registration_status(db, tournament: dict, registration: dict, s
         return 0
     if status in {"approved", "checked_in"} and previous in {"approved", "checked_in"}:
         return 0  # Einchecken oder Auschecken ändert nichts daran, dass die Person dabei ist
-    message = registration_message(tournament, status, previous, reason)
+    message = registration_message(tournament, status, previous, reason, registration=registration)
     if not message:
         return 0
     recipients = await users_for(db, await responsible_user_ids(db, [registration]))

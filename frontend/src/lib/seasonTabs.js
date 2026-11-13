@@ -38,6 +38,8 @@ export const SEASON_SECTIONS = {
   kalender: "termine",
   terminregeln: "termine",
   checkin: "termine",
+  // Erinnerungen (E.5, #1647): 24 h / 1 h vorher, Termin offen, Ergebnis fehlt, Map-Veto wartet - eigenes Speichern.
+  erinnerungen: "termine",
   selbstanmeldung: "anmeldung",
   spielberechtigung: "anmeldung",
   plattform: "anmeldung",

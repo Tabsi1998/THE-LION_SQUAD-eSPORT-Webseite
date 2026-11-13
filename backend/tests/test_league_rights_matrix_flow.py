@@ -69,6 +69,9 @@ ROUTES = [
     # Check-in (D.2, #1652): Regeln je Season
     route("GET", "/api/admin/leagues/seasons/{season}/checkin-rules", ANY),
     route("PUT", "/api/admin/leagues/seasons/{season}/checkin-rules", "season", {"min_present": 2}),
+    # Erinnerungen (E.5, #1647): je Season
+    route("GET", "/api/admin/leagues/seasons/{season}/reminder-rules", ANY),
+    route("PUT", "/api/admin/leagues/seasons/{season}/reminder-rules", "season", {"discord": True}),
     # Veto (D.3, #1618): Vorlage je Season
     route("GET", "/api/admin/leagues/seasons/{season}/veto-rules", ANY),
     route("GET", "/api/admin/leagues/seasons/{season}/veto-rules/proposal", ANY),
