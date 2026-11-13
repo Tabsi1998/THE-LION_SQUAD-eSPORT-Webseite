@@ -691,3 +691,44 @@ async def test_two_active_teams_level_behind_a_leader_who_left_need_a_decision_a
     row = await cockpit(flow, season, staffel)
     assert [blocker["code"] for blocker in row["blockers"]] == ["no_champion"]
     await must_close(flow, staffel, 409)
+
+
+# ---------------------------------------------------------------- Bereitliegendes Ergebnis (M2)
+
+def _held(match, actor_id: str, *, publish_at: str) -> dict:
+    home, away = [slot["registration_id"] for slot in match["slots"]]
+    return {"id": "halt-1", "kind": "result", "actor_id": actor_id, "publish_at": publish_at, "force": True, "reason": "Korrektur laut Protokoll",
+            "results": [{"registration_id": away, "rank": 1, "score": 2}, {"registration_id": home, "rank": 2, "score": 0}]}
+
+
+@pytest.mark.asyncio
+async def test_a_result_waiting_for_publication_holds_the_close(flow):
+    admin, _league, season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    match = await bottom_match(flow, staffel)
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"pending_result": _held(match, admin["id"], publish_at=LONG_AGO)}})
+    row = await cockpit(flow, season, staffel)
+    assert [blocker["code"] for blocker in row["blockers"]] == ["pending_results"]
+    assert row["blockers"][0]["items"][0]["url"] == f"/matches/{match['id']}"
+    await must_close(flow, staffel, 409)
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$unset": {"pending_result": ""}})
+    await must_close(flow, staffel)
+
+
+@pytest.mark.asyncio
+async def test_a_held_result_is_not_published_into_a_closed_staffel(flow):
+    from services import result_hold
+
+    admin, _league, _season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    match = await bottom_match(flow, staffel)
+    before = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    await must_close(flow, staffel)
+    # Gleichzeitig mit dem Abschluss abgelegt: Die Veröffentlichung kommt erst danach an die Reihe.
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"pending_result": _held(match, admin["id"], publish_at=LONG_AGO)}})
+    published = await result_hold.publish_due_holds(flow.db, match_id=match["id"])
+    assert published == 0
+    after = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    assert after["results"] == before["results"] and "pending_result" not in after
+    failed = await flow.db.audit_logs.find_one({"action": "match.result.hold_failed"}, {"_id": 0})
+    assert "abgeschlossen" in failed["data"]["detail"]

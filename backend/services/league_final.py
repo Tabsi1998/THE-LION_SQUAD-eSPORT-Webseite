@@ -188,6 +188,13 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
             [{"text": _label(match, names), "url": f"/matches/{match['id']}"}
              for match in sorted(open_matches, key=lambda match: (match.get("round") or 0, match.get("order") or 0))]))
 
+    # Ein Ergebnis liegt für „Rückgängig“ bereit (services/result_hold) und geht gleich hinaus - es würde den Endstand ändern (M2).
+    held = [match for match in matches if isinstance(match.get("pending_result"), dict)]
+    if held:
+        out.append(_blocker("pending_results", "Ergebnis wartet auf Veröffentlichung",
+                            "Ein eingetragenes Ergebnis liegt noch bereit. Kurz warten, bis es veröffentlicht ist, oder „Rückgängig“ wählen.",
+                            [{"text": _label(match, names), "url": f"/matches/{match['id']}"} for match in held]))
+
     incident_items = []
     for match in matches:
         if incident_rules.open_incidents(match) or incident_rules.lead_task(match):
