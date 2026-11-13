@@ -186,7 +186,7 @@ export function SeasonRulesCard({ rules }) {
           <ScrollText className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Regelwerk
         </Link>
         <p className="mt-1 text-sm text-white/70" data-testid="league-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
-        {rules.consent_open ? <p className="mt-1 text-sm font-semibold text-warn" data-testid="league-rules-consent">Dein Co-Team hat noch nicht zugestimmt. Spiele laufen trotzdem weiter.</p> : null}
+        {rules.consent_open ? <p className="mt-1 text-sm font-semibold text-warn" data-testid="league-rules-consent">Dein Co-Team hat noch nicht zugestimmt. Ohne Zustimmung geht vor dem Spiel kein Check-in.</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
         <Link to={rules.url} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">

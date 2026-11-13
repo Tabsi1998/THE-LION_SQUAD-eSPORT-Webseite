@@ -492,7 +492,7 @@ export default function AdminLeagueRulesPage() {
                   <TextAreaField label="Änderungsgrund" value={publish.change_reason} onChange={(value) => setPublish((row) => ({ ...row, change_reason: value }))} rows={2}
                     placeholder="Was sich ändert und warum" hint="Steht öffentlich bei der Fassung, mindestens fünf Zeichen." testId="rules-reason" />
                   <CheckField label="Captains müssen dieser Fassung neu zustimmen" checked={publish.requires_consent} onChange={(value) => setPublish((row) => ({ ...row, requires_consent: value }))}
-                    hint="Fehlt die Zustimmung, gibt es eine Aufgabe auf der Startseite. Spiele laufen trotzdem weiter." testId="rules-requires-consent" />
+                    hint="Fehlt die Zustimmung, gibt es eine Aufgabe auf der Startseite, und das Team kann vor dem Spiel nicht einchecken, bis Captain oder Vertreter zugestimmt hat." testId="rules-requires-consent" />
                   {emptyVars.length ? (
                     <CheckField label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={publish.confirm_empty}
                       onChange={(value) => setPublish((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
