@@ -589,3 +589,20 @@ async def test_removed_notice_is_not_resumed(flow):
     await flow.delete(lead_url(world["tournament"], f"/{notice['id']}"))
     res = await flow.post(lead_url(world["tournament"], f"/{notice['id']}/resume"))
     assert res.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_same_request_with_other_duration_or_tv_is_another_notice(flow):
+    """Review N1: Dauer und TV-Haken gehören zum Hinweis - dieselbe Kennung mit anderen Werten wiederholt nicht still den ersten."""
+    world = await solo_world(flow)
+    flow.act_as(world["lead"])
+    rid = request_id()
+    first = await send(flow, world["tournament"], "Pause bis 14:30", request_id=rid, duration_minutes=60, show_on_tv=False)
+    assert first.status_code == 200
+    longer = await send(flow, world["tournament"], "Pause bis 14:30", request_id=rid, duration_minutes=120, show_on_tv=False)
+    assert longer.status_code == 409
+    with_tv = await send(flow, world["tournament"], "Pause bis 14:30", request_id=rid, duration_minutes=60, show_on_tv=True)
+    assert with_tv.status_code == 409
+    same = await send(flow, world["tournament"], "Pause bis 14:30", request_id=rid, duration_minutes=60, show_on_tv=False)
+    assert same.json()["replay"] is True
+    assert await flow.db.tournament_notices.count_documents({}) == 1

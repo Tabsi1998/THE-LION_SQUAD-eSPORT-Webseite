@@ -37,8 +37,11 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState("");
   const [now, setNow] = useState(() => Date.now());
-  // Eine Kennung je Hinweis: bleibt bei einem Fehler stehen (neuer Versuch = derselbe Hinweis), neu erst nach dem Senden.
-  const requestId = useRef(newRequestId());
+  // Eine Kennung je Hinweis: bleibt bei einem Fehler stehen (neuer Versuch = derselbe Hinweis). Neu nach dem Senden, nach
+  // einer 409 und sobald sich Text, Ziel, Dauer oder TV-Haken seit dem letzten Versuch geändert haben (Review N1) - sonst
+  // hielte der Server den geänderten Hinweis für den alten. Die Kennung hängt am Stand des Versuchs, nicht am Tippen:
+  // Während eine Anfrage läuft, ändert sich nichts.
+  const requestId = useRef({ id: newRequestId(), key: "" });
   const base = `/tournaments/${encodeURIComponent(slug)}/lead/notices`;
 
   const load = useCallback(async () => {
@@ -99,18 +102,23 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
     event.preventDefault();
     if (busy || tooShort || length > NOTICE_MAX) return;
     setBusy(true);
+    const key = JSON.stringify([text, target, duration, tv]);
+    if (requestId.current.key && requestId.current.key !== key) requestId.current = { id: newRequestId(), key: "" };
+    requestId.current.key = key;
     try {
       const { data } = await api.post(base, {
-        request_id: requestId.current, text, target, show_on_tv: tv, duration_minutes: duration,
+        request_id: requestId.current.id, text, target, show_on_tv: tv, duration_minutes: duration,
       });
       const people = data.recipients === 1 ? "1 Person" : `${data.recipients} Personen`;
       toast.success(data.replay ? "Dieser Hinweis ist schon unterwegs." : `Hinweis gesendet – geht an ${people}.`);
       if (setPause && canPause && !data.replay) await applyPause();
-      requestId.current = newRequestId();
+      requestId.current = { id: newRequestId(), key: "" };
       setText("");
       setSetPause(false);
       await load();
     } catch (err) {
+      // 409: Der Server kennt die Kennung mit anderen Werten - der nächste Versuch ist ein neuer Hinweis.
+      if (err.response?.status === 409) requestId.current = { id: newRequestId(), key: "" };
       toast.error(formatApiError(err.response?.data?.detail) || "Der Hinweis konnte nicht gesendet werden. Bitte noch einmal tippen – er geht nicht doppelt hinaus.");
     } finally {
       setBusy(false);

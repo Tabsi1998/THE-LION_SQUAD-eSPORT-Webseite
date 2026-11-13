@@ -139,3 +139,25 @@ it("bietet bei einem unterbrochenen Versand „Fortsetzen“ an - mit dem gespei
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/lan-cup/lead/notices/tn-9/resume"));
   await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Versand läuft weiter – niemand bekommt den Hinweis doppelt."));
 });
+
+it("nimmt eine neue Kennung, sobald sich der Hinweis nach einem Fehler ändert - und nach einer 409 (Review N1)", async () => {
+  setup();
+  await screen.findByTestId("notice-log-tn-1");
+  const sends = () => apiMock.post.mock.calls.filter(([url]) => url === "/tournaments/lan-cup/lead/notices").map(([, body]) => body);
+  fireEvent.change(screen.getByTestId("notice-text-input"), { target: { value: "Finale an PC 1" } });
+  apiMock.post.mockImplementationOnce(async () => { throw { response: { status: 502, data: { detail: "Netz weg" } } }; });
+  fireEvent.click(screen.getByTestId("notice-send"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Netz weg"));
+  // Geändert (Dauer): eine neue Kennung - sonst hielte der Server ihn für den alten.
+  fireEvent.click(screen.getByTestId("notice-duration-30"));
+  apiMock.post.mockImplementationOnce(async () => { throw { response: { status: 409, data: { detail: "weicht ab" } } }; });
+  fireEvent.click(screen.getByTestId("notice-send"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("weicht ab"));
+  // Nach der 409, unverändert: wieder eine neue.
+  fireEvent.click(screen.getByTestId("notice-send"));
+  await waitFor(() => expect(sends()).toHaveLength(3));
+  const [first, second, third] = sends();
+  expect(second.request_id).not.toBe(first.request_id);
+  expect(third.request_id).not.toBe(second.request_id);
+  expect(second.duration_minutes).toBe(30);
+});

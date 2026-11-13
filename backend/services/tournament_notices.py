@@ -52,7 +52,7 @@ STALE_SECONDS = 120
 SKIPPED_TOURNAMENT_STATUSES = ("draft", "cancelled", "archived")
 LIST_LIMIT = 20
 
-OTHER_TEXT = "Text oder Ziel weichen vom begonnenen Hinweis ab. Bitte einen neuen Hinweis schreiben."
+OTHER_TEXT = "Text, Ziel, Dauer oder TV-Haken weichen vom begonnenen Hinweis ab. Bitte einen neuen Hinweis schreiben."
 NO_EVENT = "Dieses Turnier gehört zu keinem Event."
 NOT_FOUND = "Diesen Hinweis gibt es nicht."
 
@@ -128,8 +128,10 @@ def notice_id(tournament_id: str, request_id: str) -> str:
     return "tn-" + hashlib.sha256(f"{tournament_id}:{request_id}".encode("utf-8")).hexdigest()[:24]
 
 
-def text_digest(text: str, target: str) -> str:
-    return hashlib.sha256(f"{target}\n{text}".encode("utf-8")).hexdigest()
+def text_digest(text: str, target: str, minutes: int = DURATION_DEFAULT, show_on_tv: bool = False) -> str:
+    """Fingerabdruck von allem, was ein Hinweis festlegt (Review N1): Text, Ziel, Dauer, TV-Haken. Eine Kennung mit anderen
+    Werten ist ein anderer Hinweis - 409 statt still den ersten zu wiederholen."""
+    return hashlib.sha256(f"{target}\n{int(minutes)}\n{int(bool(show_on_tv))}\n{text}".encode("utf-8")).hexdigest()
 
 
 def _parse(value) -> datetime | None:
@@ -198,14 +200,14 @@ async def send(db, tournament: dict, me: dict, *, request_id, text, target: str,
     nid = notice_id(tournament["id"], request_id)
     earlier = await db.tournament_notices.find_one({"_id": nid}, {"_id": 0})
     if earlier:
-        if earlier.get("text_sha256") != text_digest(text, target):
+        if earlier.get("text_sha256") != text_digest(text, target, minutes, show_on_tv):
             raise NoticeProblem(OTHER_TEXT, 409)
         return await _replay(db, earlier, moment)
     rows = await scope_tournaments(db, tournament, target)
     ids = await recipients(db, [row["id"] for row in rows], sender_id=me.get("id"))
     doc = {
         "id": nid, "request_id": request_id, "tournament_id": tournament["id"], "event_id": tournament.get("event_id"),
-        "target": target, "text": text, "text_sha256": text_digest(text, target), "show_on_tv": bool(show_on_tv),
+        "target": target, "text": text, "text_sha256": text_digest(text, target, minutes, show_on_tv), "show_on_tv": bool(show_on_tv),
         "duration_minutes": minutes, "created_by": me.get("id"), "created_at": moment.isoformat(),
         "expires_at": (moment + timedelta(minutes=minutes)).isoformat(),
         "recipients": len(ids), "processed": 0, "delivered": 0, "state": "sending" if ids else "sent",
