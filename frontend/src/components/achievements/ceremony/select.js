@@ -124,6 +124,10 @@ export function planCeremony(pkg) {
   if (pkg?.placement) {
     return { id: pkg.id || `placement-${pkg.placement.key}`, sequence: "placement", placement: pkg.placement, particles: 0, tiers: [], levelUp: null };
   }
+  // Belohnungen der Liga (F.4, #2214): ruhig wie der Sieger-Moment - eigener Ablauf ohne Partikel (components/tls/rewards/RewardMoment).
+  if (pkg?.rewards?.length) {
+    return { id: pkg.id || `rewards-${pkg.rewards[0].id}`, sequence: "reward", rewards: pkg.rewards, particles: 0, tiers: [], levelUp: null };
+  }
   const levelUp = pkg?.levelUp || null;
   const tiers = sortByRank((pkg?.tiers || []).filter((t) => !isNegative(t)));
   if (!tiers.length && !levelUp) return null;
