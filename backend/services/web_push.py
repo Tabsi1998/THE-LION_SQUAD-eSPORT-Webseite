@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import struct
 import sys
 import time
@@ -243,18 +244,58 @@ def safe_path(url: Any, base_url: str = "") -> str:
     return "/notifications"
 
 
-def build_payload(notification: dict[str, Any], base_url: str = "") -> dict[str, Any]:
-    """Was der Browser zeigt: Titel, Text, Ziel und Knöpfe - nur Text, nie HTML."""
+# Sperrbildschirm (#1163): Nachrichtentexte und Geldbeträge stehen nicht in der Browser-Meldung - nur, dass etwas da ist.
+MESSAGE_KINDS = {
+    "direct_message", "team_chat_message", "team_chat_mention", "tournament_chat_message", "tournament_chat_mention",
+    "match_chat_message", "match_chat_mention", "news_mention",
+}
+MESSAGE_BODY = "Tippe, um die Nachricht zu lesen."
+NEUTRAL_TEXTS = {
+    "invoice_ready": ("Deine Rechnung ist da", "Deine Rechnung liegt in deinem Konto."),
+}
+MONEY_BODY = "Die Einzelheiten findest du in deinem Konto."
+PRIVATE_TITLE = "THE LION SQUAD"
+PRIVATE_BODY = "Neue Benachrichtigung"
+_MONEY = re.compile(r"\d[\d.,]*\s?(?:€|EUR\b)")
+
+
+def _mentions_money(text: str) -> bool:
+    return bool(_MONEY.search(text or ""))
+
+
+def lock_screen_text(notification: dict[str, Any], *, private: bool = False) -> tuple[str, str]:
+    """Titel und Text, wie sie im Browser erscheinen: ohne Nachrichtentext, ohne Betrag, mit „Inhalt verbergen“ ganz ohne."""
+    if private:
+        return PRIVATE_TITLE, PRIVATE_BODY
     kind = str(notification.get("kind") or "")
     meta = notification.get("meta") or {}
+    title = str(notification.get("title") or PRIVATE_TITLE)
+    body = str(meta.get("push_body") or notification.get("body") or "")
+    if kind in NEUTRAL_TEXTS:
+        return NEUTRAL_TEXTS[kind]
+    if kind in MESSAGE_KINDS:
+        body = MESSAGE_BODY
+    if _mentions_money(title):
+        title = PRIVATE_TITLE
+    if _mentions_money(body):
+        body = MONEY_BODY
+    return title, body
+
+
+def build_payload(notification: dict[str, Any], base_url: str = "", *, private: bool = False) -> dict[str, Any]:
+    """Was der Browser zeigt: Titel, Text, Ziel und Knöpfe - nur Text, nie HTML."""
+    kind = str(notification.get("kind") or "")
     path = safe_path(notification.get("url"), base_url)
+    title, body = lock_screen_text(notification, private=private)
     payload: dict[str, Any] = {
-        "title": str(notification.get("title") or "THE LION SQUAD")[:TITLE_LIMIT],
-        "body": str(meta.get("push_body") or notification.get("body") or "")[:BODY_LIMIT],
+        "title": title[:TITLE_LIMIT],
+        "body": body[:BODY_LIMIT],
         "url": path,
         "tag": str(notification.get("id") or ""),
-        "kind": kind,
+        "kind": "" if private else kind,
     }
+    if private:
+        return payload
     action = ACTION_LABELS.get(kind)
     # Ein Knopf nur mit eigenem Ziel auf dieser Website - ohne Ziel bleibt es beim Tipp auf die Meldung.
     if action and notification.get("url") and path != "/notifications":
@@ -302,11 +343,15 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     if not config:
         return 0
     db = get_db()
-    rows = await active_subscriptions(db, user_id, {"id": 1, "endpoint": 1, "p256dh": 1, "auth": 1})
+    rows = await active_subscriptions(db, user_id, {"id": 1, "endpoint": 1, "p256dh": 1, "auth": 1, "private_content": 1})
     if not rows:
         return 0
     base_url = await _site_base(db)
-    body = json.dumps(build_payload(notification, base_url), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    # „Inhalt verbergen“ je Browser (#1163): dort nur „Neue Benachrichtigung“.
+    bodies = {
+        flag: json.dumps(build_payload(notification, base_url, private=flag), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        for flag in (False, True)
+    }
     kind = str(notification.get("kind") or "")
     sent = 0
     gone: list[str] = []
@@ -318,7 +363,7 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
                 gone.append(row.get("id"))
                 continue
             try:
-                content = encrypt_payload(body, row.get("p256dh") or "", row.get("auth") or "")
+                content = encrypt_payload(bodies[bool(row.get("private_content"))], row.get("p256dh") or "", row.get("auth") or "")
                 headers = {
                     **vapid_headers(endpoint, config),
                     "Content-Encoding": "aes128gcm",

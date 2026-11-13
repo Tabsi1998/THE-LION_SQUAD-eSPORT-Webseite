@@ -138,3 +138,31 @@ def test_ttl_ist_einstellbar_und_begrenzt():
     assert web_push.ttl_seconds({"WEB_PUSH_TTL_SECONDS": "600"}) == 600
     assert web_push.ttl_seconds({"WEB_PUSH_TTL_SECONDS": "5"}) == 60
     assert web_push.ttl_seconds({"WEB_PUSH_TTL_SECONDS": "x"}) == web_push.DEFAULT_TTL_SECONDS
+
+
+def test_sperrbildschirm_ohne_nachrichtentext_und_betrag():
+    """Im Browser stehen weder Chat-Texte noch Beträge - nur, dass etwas da ist (#1163)."""
+    invoice = web_push.build_payload({"id": "n1", "kind": "invoice_ready", "title": "Deine Rechnung ist da",
+                                      "body": "Weihnachtsfeier: 40,00 €, zahlbar bis 17.10.2026.", "url": "/profile?tab=invoices"})
+    assert invoice["title"] == "Deine Rechnung ist da" and invoice["body"] == "Deine Rechnung liegt in deinem Konto."
+    assert "40" not in json.dumps(invoice)
+    message = web_push.build_payload({"id": "n2", "kind": "direct_message", "title": "Neue Nachricht von Max",
+                                      "body": "Treffen um acht?", "url": "/profile?tab=inbox&to=max"})
+    assert message["title"] == "Neue Nachricht von Max" and "Treffen" not in json.dumps(message)
+    for kind in ("team_chat_message", "match_chat_mention", "tournament_chat_message"):
+        assert web_push.build_payload({"kind": kind, "title": "Chat", "body": "geheim"})["body"] == web_push.MESSAGE_BODY
+    # Kostenbeitrag in einer Anmeldung: kein Betrag, aber der Hinweis aufs Konto.
+    fee = web_push.build_payload({"kind": "event_registration", "title": "Angemeldet: Sommerfest",
+                                  "body": "Dein Kostenbeitrag: 12,50 €. Die Rechnung findest du unter „Meine Rechnungen“."})
+    assert fee["title"] == "Angemeldet: Sommerfest" and fee["body"] == web_push.MONEY_BODY
+    assert web_push.build_payload({"kind": "x", "title": "Gewinn 100 EUR", "body": "ok"})["title"] == "THE LION SQUAD"
+    # Andere Meldungen bleiben, wie sie sind.
+    checkin = web_push.build_payload({"kind": "tournament_checkin", "title": "Check-in offen", "body": "Bis 18:00 Uhr"})
+    assert checkin["body"] == "Bis 18:00 Uhr"
+
+
+def test_inhalt_verbergen_zeigt_nur_dass_etwas_da_ist():
+    hidden = web_push.build_payload({"id": "n1", "kind": "tournament_checkin", "title": "Check-in offen", "body": "Bis 18:00",
+                                     "url": "/tournaments/cup"}, private=True)
+    assert hidden["title"] == "THE LION SQUAD" and hidden["body"] == "Neue Benachrichtigung"
+    assert hidden["url"] == "/tournaments/cup" and "actions" not in hidden and hidden["kind"] == ""

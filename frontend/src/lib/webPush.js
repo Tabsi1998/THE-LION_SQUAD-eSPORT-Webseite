@@ -15,6 +15,7 @@ const ASK_KEY = "tls-web-push-ask";
 const FIRST_VISIT_KEY = "tls-web-push-first-visit";
 const VISIT_KEY = "tls-web-push-visit";
 const OWNER_KEY = "tls-web-push-owner";
+const PRIVATE_KEY = "tls-web-push-private";
 const READY_TIMEOUT_MS = 5000;
 
 function local(win) {
@@ -161,9 +162,23 @@ async function register(registration, subscription, config, userId, win) {
   if (!current) {
     current = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(config.public_key) });
   }
-  await api.post("/web-push/subscriptions", current.toJSON());
+  const { data } = await api.post("/web-push/subscriptions", current.toJSON());
   write(local(win), OWNER_KEY, String(userId || ""));
+  write(local(win), PRIVATE_KEY, data?.private ? "1" : "");
   return current;
+}
+
+/** „Inhalt verbergen“ für diesen Browser: so, wie der Server es zuletzt bestätigt hat. */
+export const webPushPrivate = (win = currentWindow()) => read(local(win), PRIVATE_KEY) === "1";
+
+/** „Inhalt verbergen“ umschalten - der Server schickt diesem Browser dann nur „Neue Benachrichtigung“. */
+export async function setWebPushPrivate(value, win = currentWindow()) {
+  const { subscription } = await currentSubscription(win);
+  if (!subscription) return false;
+  const { data } = await api.post("/web-push/subscriptions", { ...subscription.toJSON(), private: Boolean(value) });
+  const stored = Boolean(data?.private);
+  write(local(win), PRIVATE_KEY, stored ? "1" : "");
+  return stored;
 }
 
 /**
@@ -206,6 +221,7 @@ export async function disableWebPush(win = currentWindow()) {
     }
   } finally {
     write(local(win), OWNER_KEY, "");
+    write(local(win), PRIVATE_KEY, "");
   }
   return true;
 }
@@ -245,6 +261,7 @@ export async function forgetWebPush(win = currentWindow()) {
     // still - der Server löscht seine Seite beim Abmelden ohnehin
   } finally {
     write(local(win), OWNER_KEY, "");
+    write(local(win), PRIVATE_KEY, "");
   }
 }
 

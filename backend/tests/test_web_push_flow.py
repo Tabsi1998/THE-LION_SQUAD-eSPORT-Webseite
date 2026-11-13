@@ -348,3 +348,24 @@ async def test_ohne_browser_anmeldung_entsteht_keine_unsichtbare_meldung(flow, k
     created = await create_user_notification(user["id"], "Check-in offen", url="/tournaments/cup", kind="tournament_checkin",
                                              meta={"tournament_id": "t2"})
     assert created["browser_sent_count"] == 1 and created["in_app_visible"] is False
+
+
+async def test_inhalt_verbergen_je_browser(flow, keys, push_service):
+    user = await flow.add_user()
+    flow.act_as(user)
+    open_browser, hidden_browser = Browser("offen"), Browser("verborgen")
+    await subscribe(flow, open_browser, push_service)
+    headers = await login(flow, user)
+    push_service["browsers"][hidden_browser.endpoint] = hidden_browser
+    res = await flow.post("/api/web-push/subscriptions", json={**hidden_browser.subscription(), "private": True}, headers=headers)
+    assert res.json() == {"ok": True, "private": True}
+    # Ein Auffrischen ohne Angabe lässt die Einstellung stehen.
+    res = await flow.post("/api/web-push/subscriptions", json=hidden_browser.subscription(), headers=headers)
+    assert res.json()["private"] is True
+
+    await web_push.send_web_push_for_notification({"id": "n1", "user_id": user["id"], "kind": "tournament_checkin",
+                                                   "title": "Check-in offen", "body": "Bis 18:00", "url": "/tournaments/cup"})
+    got = {url: payload for url, payload, _headers in push_service["received"]}
+    assert got[open_browser.endpoint]["title"] == "Check-in offen"
+    assert got[hidden_browser.endpoint] == {"title": "THE LION SQUAD", "body": "Neue Benachrichtigung", "url": "/tournaments/cup",
+                                            "tag": "n1", "kind": ""}

@@ -184,3 +184,22 @@ describe("anmelden, auffrischen, abmelden", () => {
     expect(await browserPushStatus({ id: "u1" }, win)).toBe("subscribed");
   });
 });
+
+describe("Inhalt verbergen (#1163)", () => {
+  test("schaltet je Browser um und merkt sich, was der Server bestätigt", async () => {
+    const existing = subscription();
+    const { win } = fakeWindow({ permission: "granted", existing });
+    apiMock.post.mockResolvedValue({ data: { ok: true, private: true } });
+    expect(await webPush.setWebPushPrivate(true, win)).toBe(true);
+    expect(apiMock.post).toHaveBeenCalledWith("/web-push/subscriptions", { ...existing.toJSON(), private: true });
+    expect(webPush.webPushPrivate(win)).toBe(true);
+    await forgetWebPush(win);
+    expect(webPush.webPushPrivate(win)).toBe(false);
+  });
+
+  test("ohne Anmeldung im Browser gibt es nichts umzuschalten", async () => {
+    const { win } = fakeWindow({ permission: "granted" });
+    expect(await webPush.setWebPushPrivate(true, win)).toBe(false);
+    expect(apiMock.post).not.toHaveBeenCalled();
+  });
+});

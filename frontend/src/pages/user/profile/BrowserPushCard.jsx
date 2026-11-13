@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { toast } from "sonner";
-import { browserPushStatus, disableWebPush, enableWebPush } from "@/lib/webPush";
+import { browserPushStatus, disableWebPush, enableWebPush, setWebPushPrivate, webPushPrivate } from "@/lib/webPush";
+import { SwitchRow } from "./SwitchRow";
 
 // „Dieser Browser“ (#1163): ob dieser Browser Meldungen bekommt, und der eine Knopf, der es ändert. Der Kanal „Browser“
 // oben gilt für alle Browser des Kontos; hier geht es nur um den, in dem die Seite gerade offen ist.
@@ -16,6 +17,7 @@ const TEXT = {
 export function BrowserPushCard({ user, config, onChanged }) {
   const [status, setStatus] = useState("loading");
   const [busy, setBusy] = useState(false);
+  const [hidden, setHidden] = useState(() => webPushPrivate());
 
   useEffect(() => {
     let active = true;
@@ -48,6 +50,16 @@ export function BrowserPushCard({ user, config, onChanged }) {
     onChanged?.();
   };
 
+  const toggleHidden = async (value) => {
+    setHidden(value);
+    try {
+      setHidden(await setWebPushPrivate(value));
+    } catch {
+      setHidden(!value);
+      toast.error("Das hat nicht geklappt. Versuch es noch einmal.");
+    }
+  };
+
   const count = Number(config?.subscriptions || 0);
   return (
     <div className="border border-white/10 rounded-sm p-4 bg-[#0A0A0A]" data-testid="profile-browser-push" data-status={status}>
@@ -73,6 +85,17 @@ export function BrowserPushCard({ user, config, onChanged }) {
           </button>
         ) : null}
       </div>
+      {status === "subscribed" ? (
+        <div className="mt-3">
+          <SwitchRow
+            label="Inhalt verbergen"
+            description="Dieser Browser zeigt nur „Neue Benachrichtigung“ – nichts vom Inhalt, etwa auf einem geteilten Rechner. Nachrichten und Beträge stehen ohnehin nie in der Meldung."
+            checked={hidden}
+            onCheckedChange={toggleHidden}
+            testId="profile-browser-push-private"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

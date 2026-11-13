@@ -182,7 +182,9 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 - Oben die **Kanäle**: **E-Mail**, **Push**, **Browser** (nur, wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat), **In-App**,
   **Discord** (nur mit verknüpftem Konto). Ein ausgeschalteter Kanal blendet seine Spalte aus, die Einstellungen darin bleiben erhalten.
 - Darunter **Dieser Browser**: ob der Browser, in dem die Seite gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw.
-  **Browser abmelden**. Blockiert der Browser die Benachrichtigungen, steht dort, wo man sie wieder erlaubt.
+  **Browser abmelden**. Blockiert der Browser die Benachrichtigungen, steht dort, wo man sie wieder erlaubt. Mit **Inhalt verbergen**
+  zeigt dieser Browser nur „Neue Benachrichtigung“. Chat-Texte und Beträge (Rechnungen, Kostenbeiträge) stehen nie in einer
+  Browser-Meldung – dort steht nur „Neue Nachricht von …“ bzw. „Deine Rechnung liegt in deinem Konto“.
 - Darunter die Tabelle **Jede Benachrichtigung pro Kanal**: je Thema ein Schalter je Kanal. Ein Strich heißt: Dieses Thema gibt es auf dem Kanal nicht.
 - **News & Events** per E-Mail geht nur mit der Einwilligung unten: „Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu
   erhalten. Jederzeit widerrufbar.“

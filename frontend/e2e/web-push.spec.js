@@ -50,8 +50,10 @@ async function mockServer(page, { storage = {} } = {}) {
     if (path === "/auth/me") return json(ME);
     if (path === "/web-push/config") return json({ ...CONFIG, subscriptions: seen.subscribed.length });
     if (path === "/web-push/subscriptions" && request.method() === "POST") {
-      seen.subscribed.push(request.postDataJSON());
-      return json({ ok: true });
+      const body = request.postDataJSON();
+      seen.subscribed.push(body);
+      if (typeof body.private === "boolean") seen.private = body.private;
+      return json({ ok: true, private: Boolean(seen.private) });
     }
     if (path === "/settings/public") return json({ club_name: "THE LION SQUAD" });
     if (path === "/users/me" && request.method() === "GET") return json(ME);
@@ -117,6 +119,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await page.getByTestId("profile-browser-push-enable").click();
       await expect(card).toHaveAttribute("data-status", "subscribed");
       await expect.poll(() => seen.subscribed.length).toBe(1);
+      // Inhalt verbergen: der Server bekommt es mit, der Schalter steht danach an.
+      const hide = page.getByTestId("profile-browser-push-private");
+      await expect(hide).toHaveAttribute("aria-checked", "false");
+      await hide.click();
+      await expect(hide).toHaveAttribute("aria-checked", "true");
+      await expect.poll(() => seen.private).toBe(true);
       expect(await noSidewaysScroll(page)).toBe(true);
       if (SHOTS && width === 1440) {
         await card.scrollIntoViewIfNeeded();

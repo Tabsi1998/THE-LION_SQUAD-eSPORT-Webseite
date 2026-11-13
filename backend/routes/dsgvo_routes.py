@@ -255,7 +255,7 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("mobile_devices", _rows(db.mobile_push_tokens, me, lambda row: _clean(row, "token"))),
         # Browser-Benachrichtigungen (#1163): welcher Browser, seit wann - ohne Adresse und Schlüssel beim Push-Dienst.
         ("web_push_browsers", _rows(db.web_push_subscriptions, me,
-                                    _pick("browser", "created_at", "updated_at", "last_sent_at"))),
+                                    _pick("browser", "private_content", "created_at", "updated_at", "last_sent_at"))),
         ("mobile_client_logs", _rows(db.mobile_client_logs, me)),
         ("audit_trail", _rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}, _audit_entry(user_id))),
         # Nachrichten an alle Angemeldeten eines Events (#1372), die die Person als Turnierleitung geschickt hat.

@@ -25,6 +25,8 @@ class SubscriptionKeys(BaseModel):
 class SubscriptionCreate(BaseModel):
     endpoint: str = Field(min_length=20, max_length=1024)
     keys: SubscriptionKeys
+    # „Inhalt verbergen“ für diesen Browser: nur „Neue Benachrichtigung“. Ohne Angabe bleibt, was gespeichert ist.
+    private: bool | None = None
 
 
 class SubscriptionDelete(BaseModel):
@@ -69,6 +71,7 @@ async def subscribe_browser(body: SubscriptionCreate, request: Request, user: di
                 "browser": web_push.browser_label(request.headers.get("user-agent")),
                 "session_family": family,
                 "updated_at": now,
+                **({"private_content": body.private} if body.private is not None else {}),
             },
             "$setOnInsert": {"id": new_id(), "endpoint_hash": digest, "created_at": now},
         },
@@ -81,7 +84,8 @@ async def subscribe_browser(body: SubscriptionCreate, request: Request, user: di
     stale = [row["id"] for row in rows[web_push.MAX_SUBSCRIPTIONS_PER_USER:] if row.get("id")]
     if stale:
         await db.web_push_subscriptions.delete_many({"id": {"$in": stale}})
-    return {"ok": True}
+    stored = await db.web_push_subscriptions.find_one({"endpoint_hash": digest}, {"_id": 0, "private_content": 1})
+    return {"ok": True, "private": bool((stored or {}).get("private_content"))}
 
 
 @router.delete("/subscriptions")
