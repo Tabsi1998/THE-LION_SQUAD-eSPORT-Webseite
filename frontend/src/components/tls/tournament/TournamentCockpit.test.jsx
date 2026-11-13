@@ -58,6 +58,9 @@ test("Probleme: dringendstes zuerst, jede Zeile ein Link zum Fall - Verzug zur S
 test("ohne Probleme: „Alles im Plan“ - erst wenn geladen", () => {
   const { rerender } = show({ problems: [], loaded: false });
   expect(screen.queryByTestId("cockpit-problems-empty")).toBeNull();
+  // Vor dem ersten Laden wird nichts angesagt (Review N3).
+  expect(screen.getByTestId("cockpit-problems-count")).not.toHaveTextContent("Keine Probleme");
+  expect(screen.getByTestId("cockpit-problems-count")).toHaveTextContent("Wird geladen");
   rerender(<MemoryRouter><TournamentCockpit loaded queue={QUEUE} board={board()} problems={[]} /></MemoryRouter>);
   expect(screen.getByTestId("cockpit-problems-empty")).toHaveTextContent("Alles im Plan");
   expect(screen.getByTestId("cockpit-problems-count")).toHaveTextContent("Keine Probleme");

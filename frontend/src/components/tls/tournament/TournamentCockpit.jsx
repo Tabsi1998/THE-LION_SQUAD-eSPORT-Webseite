@@ -127,8 +127,9 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
             <h2 id="cockpit-problems-title" className="font-heading text-lg font-black uppercase tracking-wide text-white">Probleme</h2>
             <p className="text-xs text-white/45">Dringendes zuerst – ein Tipp führt zum Fall.</p>
           </div>
-          <span className={`tls-cockpit-count shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${count ? "border-honor/40 text-honor" : "border-ok/40 text-ok"}`} role="status" aria-live="polite" data-testid="cockpit-problems-count">
-            {problemCountText(count)}
+          {/* Vor dem ersten Laden der Fälle nichts ansagen (Review N3) - „Keine Probleme“ wäre geraten. */}
+          <span className={`tls-cockpit-count shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${!loaded ? "border-white/10 text-white/40" : count ? "border-honor/40 text-honor" : "border-ok/40 text-ok"}`} role="status" aria-live="polite" aria-busy={loaded ? undefined : "true"} data-testid="cockpit-problems-count">
+            {loaded ? problemCountText(count) : "Wird geladen …"}
           </span>
         </header>
         <div className="mt-3">
