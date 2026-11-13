@@ -3386,7 +3386,7 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 - **Beiname der Liga N:** Hinweis, wenn er die Stufe wiederholt („Liga 1“ → Titel „Liga 1 · Liga 1“).
 - **Links:** Nachrichten zu neuen Anmeldungen zeigen weiter auf `#anmeldungen`, „Transfer beantragt“ auf `#kader`, „Zurück“ im
   Regelwerk auf `#regelwerk`. Unbekannte Marken öffnen den Überblick.
-- Vorbereitet für F.2 „Season aus Vorgänger übernehmen“: der Knopf kommt neben „Season löschen“.
+- „Neue Season aus …“ (F.2, #1627) steht als Knopf neben „Season löschen“, siehe „F.2 Neue Season aus dem Vorgänger“.
 
 ### F.1 Saisonabschluss (#1645)
 
@@ -3409,7 +3409,8 @@ Entscheidungen Nr. 154 bis 157.
 | `decisions` | die geltenden Entscheide der Leitung: `{id, registration_ids, names, reason, method, decided_at}` |
 | `rules` | `{table: …}` (Punkte, Reihenfolge, Remis, Default-Win, Ausscheiden von jetzt) und `version: {id, version, label}` des Regelwerks |
 | `title` | Namen von Liga, Season, Liga N und Staffel zum Zeitpunkt des Abschlusses |
-| `zones`, `promotion` | leer bzw. `null`: Auf- und Abstieg sind nur vorgemerkt (Nr. 157), F.2 füllt sie |
+| `zones`, `promotion` | seit F.2: die Zonen der Liga N beim Abschluss (`league_zones.effective`) und je Anmeldung die Zone (nur Zeilen mit Zone); jede Zeile in `rows` trägt `zone` |
+| `sides`, `team_ids`, `player_ids` | seit F.2: je Anmeldung Hauptteam, Co-Team und Spieler (eingesetzt, sonst Kader des Co-Teams) - Quelle der Season-Historie |
 | `status_before` | Stand der Staffel vor dem Abschluss |
 | `reopened_at`, `reopened_by`, `reopen_reason` | gesetzt, sobald die Fassung wieder geöffnet wurde |
 
@@ -3507,5 +3508,86 @@ blendet sie wie bisher aus.
 `ties` (mit `own_team`), `can_decide`, `champion`, `champion_place`, `own_team`, `can_close`, `closed_by_me`, `can_reopen`,
 `history`. `GET …/staffeln/{tid}/final-tables/{version}` liefert eine Fassung mit ihrer Tabelle.
 
-**Nicht in F.1:** Zonen für Auf- und Abstieg (F.2, #1627), Belohnungen und Banner (F.4, #2214), die App (#2173 - sie liest
-den Endstand schon über die Tabellen-Route, zeigt aber kein „Endstand“).
+**Nicht in F.1:** Belohnungen und Banner (F.4, #2214), die App (#2173 - sie liest den Endstand schon über die Tabellen-Route, zeigt
+aber kein „Endstand“). Zonen und Folge-Season kamen mit F.2 (unten).
+
+### F.2 Neue Season aus dem Vorgänger (#1627)
+
+Entscheidungen Nr. 158 bis 161, dazu 11c, 34b, 43, 75. Zonen in `services/league_zones.py` (Blatt-Modul), die neue Season in
+`services/league_successor.py` mit `routes/league_successor_routes.py`, Abmelden in `services/league_applications.py`, Historie in
+`services/league_history.py`. Oberfläche: Blatt „Neue Season aus …“ (`SeasonSuccessorSheet.jsx`, `lib/leagueSuccessor.js`), Zonen
+im Liga-N-Blatt (`SeasonDivisionsTab.jsx`) und an jeder Tabelle (`StandingsTable.jsx`, `lib/leagueTable.js`).
+
+**Zonen** (`league_divisions.zones`, Nr. 158): `{promote, relegate, playoff_promote, playoff_relegate}`, ganze Zahlen 0–10, fehlt
+das Feld: 1/1 ohne Relegation. Je **Staffel** gezählt. Die oberste aktive Liga N hat nie Aufstieg, die unterste nie Abstieg
+(`effective`, auch wenn etwas anderes eingestellt ist). Zusammen mehr Plätze als `max_staffel_size` der Liga N: 422 „Die Zonen
+überschneiden sich“ - auch, wenn eine kleinere Staffelgröße gespeicherte Zonen überschneiden ließe. Gepflegt über `POST/PATCH
+…/divisions` (`zones`), die Verwaltung bekommt je Liga N `zones`, `zones_effective` und `zones_label`.
+
+| Zone (`row.zone`) | Wer | Wirkung in der neuen Season |
+| --- | --- | --- |
+| `promotion` | die ersten `promote` der Staffel | eine Liga N höher |
+| `playoff_promotion`, `playoff_relegation` | die Plätze danach bzw. davor | vorbereitet: farbig, die Teams bleiben (keine Wirkung) |
+| `relegation` | die letzten `relegate` | eine Liga N tiefer |
+| `out` | ausgetreten oder disqualifiziert (`exit`) | fällt heraus |
+| `null` | alle anderen | bleibt |
+
+- **Reihenfolge** (Nr. 43, 159): erst die Teams in der Wertung nach Platz, dahinter die Ausgeschiedenen - auch unter der Regel
+  `half`, die sie rechnerisch vorn lässt. Ausgeschiedene steigen nie auf und belegen zuerst die Abstiegsplätze. Wer mit
+  annullierten Spielen ausschied, steht in keiner Tabelle und kommt ebenfalls nicht mit.
+- **Erst mit dem ersten gewerteten Spiel** gibt es Zonen (`started`).
+- **Tabelle:** `_standing_rows` schreibt `zone` an jede Zeile einer Staffel (live gerechnet). Der Abschluss friert die Zeilen samt
+  `zone` ein; ein Endstand von vor F.2 bekommt beim Lesen die Zonen nach der heutigen Einstellung. Web (`data-zone`, Strich links,
+  Legende `ZoneLegend`, Wort für Screenreader), TV (`tv-standings__row[data-zone]`) und Ergebnis-PDF (Wort hinter dem Namen,
+  farbiger Strich, `pdf_service._ZONE_COLORS`) lesen dasselbe Feld. Farben: Grün hinauf, Orange hinunter, Relegation heller.
+- **Gleichstand an einer Zonengrenze** (Nr. 156 „später Auf-/Abstieg“): Sperrgrund `zone_tie` im Abschluss, solange Teams auf
+  demselben Platz auf beiden Seiten einer Grenze stehen. Entschieden wird wie beim Meister über `PUT …/table-decision` (Art
+  freiwillig, das Cockpit fragt sie ab); im Cockpit stehen sie in `ties` mit `kind: "zone"` (Meister: `kind: "champion"`).
+
+**Neue Season** (`GET`/`POST /api/admin/leagues/seasons/{id}/successor`, Zuständigkeit **`manage`** wie beim Anlegen einer Season):
+
+| Schritt | Verhalten |
+| --- | --- |
+| Voraussetzung | Jede Staffel, die zählt (wie F.1: Entwurf, abgesagt, archiviert nicht), ist abgeschlossen; mindestens eine aktive Liga N. Sonst `problems` in der Vorschau und 409 beim Anlegen |
+| Vorschau | `copied`, `dates_to_set`, `map_pool`, `loadout_bans`, `rules` (`kind`: `draft` eigenes Regelwerk wird Entwurf, `league` das der Liga gilt weiter, `none`), je Liga N `teams` mit `movement` (`up`, `down`, `stay`), `dropped` mit Grund, `successor` (schon angelegt), `relegation_note` |
+| Anlegen | `{start_date, name?, confirm: true}` (ohne `confirm` 422). Über `league_service.create_season` mit Nummer + 1, `status: "draft"`, `visibility: "off"`, `predecessor_id`, `predecessor` |
+| Übernommen | jedes Feld der Season außer `NOT_COPIED` (Kennung, Nummer, Name, Slug, Stand, Sichtbarkeit, Zeiten) und Feldern auf `_at`: also auch Ergebnis-, Termin-, Check-in-, Erinnerungs-, Veto- und Protest-Regeln, Vorgaben der Woche, Plätze und Warteliste |
+| Neu zu setzen | `start_date` (Pflicht), `blocked_periods`, `registration_deadline`, Anmeldefenster, `transfer_windows`, `roster_deadline` |
+| Liga N | die aktiven mit `level`, Beiname, `overrides`, `zones`, Gewinnen |
+| Map-Pool, Sperrliste | die geltende Version als Version 1 der neuen Season (`copy_version`, Notiz „Übernommen aus …“) |
+| Regelwerk | eine eigene Fassung der Season wird Entwurf (`save_draft`) mit `carried_from: {season_id, season_name, version_id, label}`; die Verwaltung belegt beim Veröffentlichen „neu zustimmen“ vor |
+| Teams | je Co-Team ein `league_applications`-Eintrag `status: "accepted"` ohne Zuteilung mit `carry_over: {from_season_id, from_season_name, from_level, from_label, from_staffel, rank, zone, movement, division_id, division_level, division_label}`, `applied_by: null`, `history[0].carry_over: true` |
+| Nachricht | an Captain und Vertreter je Co-Team (`meta.reason` `league_successor`, `dedupe_key` `league-successor:<season>:<co-team>:<person>`, dazu Mail), Link `/teams` - die neue Season ist noch „Aus“ |
+| Protokoll | `league.season.successor` (Season, Vorgänger, Nummer) und `league.season.successor.teams` (Zahlen) |
+
+- **Einmalig:** Teilindex `league_season_predecessor` (eindeutig auf `predecessor_id`) und die Sperre der Vorgänger-Season. Ein
+  zweites Anlegen - auch gleichzeitig - antwortet mit der vorhandenen Season (`replay: true`) bzw. 409, nie mit einer zweiten.
+  Brach das erste Anlegen nach der Season ab, ergänzt der nächste Aufruf die fehlenden Schritte (jeder sieht nach, was schon da
+  ist); erst dann steht `successor_ready` an der neuen Season.
+- **Der Vorgänger bleibt unverändert:** Hier wird nur gelesen - Season, Liga N, Endstände, Spiele, Anmeldungen, Pools und Regelwerk
+  der alten Season. Ein Wiederöffnen nach dem Anlegen ändert die neue Season nicht.
+
+**Abmelden** (Nr. 160): Ein übernommener Antrag lässt sich von Captain oder Vertreter bis zum `start_date` der neuen Season
+zurückziehen - auf der Ligaseite (`…/applications/{id}/withdraw`) oder unter Teams (`POST /api/me/league-applications/{id}/withdraw`,
+geht auch, solange die Season „Aus“ ist). Danach 409 „Abmelden ging bis zum Start der Season …“. Teilt die Leitung das Co-Team zu,
+trägt die Zuteilung `carried: true` und verhält sich wie eine automatische (#2348): Abmelden nimmt sie mit heraus, solange kein
+fester Spielplan steht und die Staffel vor Check-in und Start ist. Der Platz wird frei (`seat_stats`), nachrücken entscheidet die
+Leitung (B.4). Antworten an das Team tragen `carry_over` mit `withdraw_until`; `GET /api/me/league-applications` zeigt übernommene
+Anträge auch für eine noch nicht sichtbare Season (dann `url: null`). Der Eingang zeigt die Herkunft und bietet beim Zuteilen nur
+die Staffeln der neuen Liga N an.
+
+**Zustimmung** (Nr. 160, 75): Übernommene Teams haben keine Zustimmung zur neuen Season - Zustimmungen gelten je Season. Wird die
+Fassung mit `requires_consent` freigegeben, sperrt der Check-in (D.2, `league_rules.sides_consent`), bis Captain oder Vertreter
+zugestimmt hat. Die Kaderregeln (B.3) gelten wie für jede Anmeldung.
+
+**Season-Historie** (`league_history`): `GET /api/teams/{id}` trägt `league_history`, das öffentliche Profil
+(`/api/users/public/{name}`) ebenso - je geltender Fassung eines Endstands mit dem Team bzw. der Person (`team_ids`, `player_ids`,
+Teilindizes nur auf `active`): Liga, Season, Liga N, Staffel, Platz von wie vielen, Punkte, `champion`, `zone`, `exit`. Nur Seasons,
+die die betrachtende Person sehen darf, ohne archivierte.
+
+**Relegation (Entscheidung im Paket):** nur vorbereitet - einstellbar und farbig, ohne Wirkung auf die neue Season. Ein
+Entscheidungsspiel über zwei Liga N hinweg braucht eine eigene Staffel und kommt als eigenes Paket.
+
+**Nicht in F.2:** die App (`mobile/`, Folgepunkt für #2173: Zonen in der Tabelle, Abmelden, Season-Historie), Startrechte als eigener
+Zustand mit Annahme durch das Team (#1627 Abschnitt „Saisonabschluss und Folge-Season“ Punkt 5 - Nr. 160 entschied „automatisch
+dabei, wer nicht will, meldet sich ab“), Staffeln der neuen Season automatisch anlegen und Teams zuteilen.

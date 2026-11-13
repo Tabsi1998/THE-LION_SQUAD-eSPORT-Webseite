@@ -356,6 +356,10 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    Der **Beiname** ist freiwillig: „Liga 1“ zählt die Seite von selbst, trag dort nur einen Zusatz wie „Elite“ ein (Anzeige
    „Liga 1 · Elite“). Wiederholt der Beiname die Stufe – etwa „Liga 1“, dann hieße es „Liga 1 · Liga 1“ –, sagt das ein Hinweis
    im Blatt und in der Liste. Liga 2, 3 … entstehen genauso und dürfen eigene Werte haben.
+   **Auf- und Abstieg je Staffel** stellt ihr im selben Blatt ein: Aufsteiger und Absteiger (Vorgabe je 1), dazu freiwillig
+   Relegationsplätze. Die oberste Liga hat nie einen Aufstieg, die unterste nie einen Abstieg – das sagt der Satz unter der
+   Liga („Auf- und Abstieg: oberste Liga: kein Aufstieg · 1 Absteiger“). Mehr Plätze als Teams in einer Staffel lehnt die Seite
+   ab. Die Zonen stehen farbig in der Tabelle (siehe 3.11).
 2. In der Zeile von Liga 1 → **Staffel anlegen** → bestätigen. Es entsteht das Turnier „CoD-Liga Season 1 · Liga 1 ·
    Staffel A“ als **Entwurf** – ohne offene Anmeldung, ohne Discord, ohne Jahreswertung. Mehr als acht Teams? Eine
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
@@ -1479,6 +1483,7 @@ jede Zuständigkeit der Liga.
 | Strafen und Einsprüche | vorläufige Sperren bestätigen oder widerrufen, Einsprüche entscheiden (Reiter **Strafen**) |
 | Laufende Fristen | abwarten – daneben steht, bis wann die Protest- oder Einspruchsfrist läuft |
 | Gleichstand auf Platz 1 | **Meister entscheiden** (nur in der obersten Liga) |
+| Gleichstand an der Grenze zu Auf- oder Abstieg | **Platz entscheiden** – zwei Teams stehen gleich, aber nur eines käme in die Zone (3.11) |
 | Kein Meister | in der obersten Liga steht kein Team mehr in der Wertung – Anmeldungen prüfen |
 
 Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf. Steht
@@ -1514,8 +1519,47 @@ die Captains). Danach korrigiert ihr das Ergebnis und schließt neu ab. Die alte
 wechselt beim neuen Abschluss mit, falls ein anderes Team Meister wird. Als Superadmin geht das Wiederöffnen der eigenen
 Fassung nur als Notausnahme mit eigenem Grund.
 
-**Auf- und Abstieg** sind vorgemerkt und kommen mit „Season aus Vorgänger übernehmen“. Die abgeschlossene Season bleibt auf
+**Auf- und Abstieg** ergeben sich aus dem Endstand nach den Zonen der Liga (3.11). Die abgeschlossene Season bleibt auf
 der Ligaseite sichtbar; erst der Stand **Archiviert** blendet sie aus.
+
+### 3.11 Neue Season aus der Vorgänger-Season
+
+**Wo:** Season-Seite oben → **Neue Season aus Season 1** (neben „Season löschen“). Recht: **Liga verwalten**. Geht erst, wenn
+alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
+
+<img src="../assets/liga/f2-neue-season-1440.png" alt="Blatt Neue Season aus Season 1 am PC: Beginn und Name, Liste Übernommen als Entwurf mit Map-Pool, Sperrliste und Regelwerk, darunter je Liga die Teams mit Pfeil für Aufstieg, Abstieg oder bleibt und unten wer nicht dabei ist" width="720">
+
+**1. Vorschau lesen.** Das Blatt zeigt, was übernommen wird, und je Liga die Teams der neuen Season:
+
+- **Übernommen als Entwurf:** alle Einstellungen der Season (Spielbetrieb, Tabelle, Anmeldung und Kader, Termin-, Check-in- und
+  Erinnerungsregeln, Fristen, Gestaltung und Gewinne), die Ligen mit Beinamen, Abweichungen und Zonen, der Map-Pool und die
+  Sperrliste in ihrer geltenden Version.
+- **Regelwerk:** Hatte die Season ein eigenes, liegt es in der neuen Season als **Entwurf** einer neuen Fassung bereit – im
+  Regelwerk freigeben, der Haken „Captains müssen dieser Fassung neu zustimmen“ ist vorbelegt. Gilt das der Liga, gilt es weiter.
+- **Neu setzen:** Beginn, Sperrzeiten, Anmeldefenster und Meldeschluss, Transferfenster, Stichtag des Kaders.
+- **Teams:** Pfeil hinauf = Aufstieg, hinunter = Abstieg, Strich = bleibt. Das ergibt sich ohne Bestätigung aus dem Endstand:
+  oben die Aufsteiger, unten die Absteiger je Staffel. Ausgetretene und Disqualifizierte stehen hinten, belegen zuerst die
+  Abstiegsplätze und sind **nicht dabei** (Liste unten). Ein Co-Team, das es nicht mehr gibt, fällt ebenfalls heraus.
+- **Relegation** ist vorbereitet: Die Plätze stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.
+- **Abweichen** geht nur über **Wieder öffnen** (3.10): Endstand korrigieren, neu abschließen – erst dann die neue Season anlegen.
+
+**2. Anlegen.** **Beginn der ersten Spielwoche** wählen, Name freiwillig (leer: „Season 2“) → **Season anlegen**. Die neue
+Season ist ein **Entwurf** mit Sichtbarkeit **Aus**, bis ihr sie veröffentlicht. Ein zweiter Klick legt nichts doppelt an.
+
+**3. Danach.** Die Teams stehen im Reiter **Anmeldung und Kader** im Eingang als **angenommen**, mit „Übernommen aus Season 1:
+Liga 1 (Aufstieg aus Liga 2)“. Staffeln anlegen und zuteilen wie immer (2.3, 2.5) – die Auswahl zeigt nur die Staffeln der
+neuen Liga des Teams. Captains und Vertreter bekommen eine Nachricht: „Ihr seid in Liga N der neuen Season, abmelden bis …“.
+Wer sich bis zum Start abmeldet, gibt seinen Platz frei; über Warteliste und neue Anmeldungen entscheidet ihr wie in 2.5a.
+Der Vorgänger bleibt unverändert: Endstand, Spiele und Regeln der alten Season ändert nichts davon.
+
+<img src="../assets/liga/f2-zonen-tabelle-390.png" alt="Staffel-Tabelle am Handy: Platz 1 mit grünem Strich, der Letzte mit orangem Strich, darunter die Legende Aufstieg und Abstieg" width="300">
+
+**Zonen in der Tabelle:** Ein Strich links am Platz – grün für Aufstieg, orange für Abstieg, heller für Relegation – darunter
+die Legende. Dieselben Farben am TV und im Ergebnis-PDF (dort zusätzlich als Wort hinter dem Namen). Vor dem ersten Ergebnis
+gibt es keine Zonen. Stehen zwei Teams an einer Zonengrenze in allem gleich, verlangt der Abschluss **Platz entscheiden** (3.10).
+
+**Season-Historie:** Team- und Spielerprofil zeigen unter **Seasons** je abgeschlossene Staffel Liga, Platz, Meister und Auf-
+oder Abstieg – aus dem Endstand, nur für Seasons, die die Person sehen darf.
 
 ---
 
