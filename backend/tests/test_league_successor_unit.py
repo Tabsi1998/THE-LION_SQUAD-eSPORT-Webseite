@@ -27,3 +27,15 @@ def test_archived_on_top_and_at_the_bottom():
     assert target_level([2, 3], 2, -1) == 2
     assert [target_level([1, 2], 3, move) for move in (-1, 0, 1)] == [2, 2, 2]
     assert target_level([1, 2], 2, 1) == 2
+
+
+def test_two_archived_in_a_row_keep_the_movement():
+    # Aktiv [1, 4]: Liga 2 und 3 archiviert - der Absteiger aus 1 geht nach 4, der Aufsteiger aus 4 nach 1.
+    assert target_level([1, 4], 1, 1) == 4
+    assert target_level([1, 4], 4, -1) == 1
+    assert target_level([1, 4], 1, 0) == 1 and target_level([1, 4], 4, 0) == 4
+    # Aktiv [1, 2, 5]: Der Absteiger aus 2 geht nach 5, der Aufsteiger aus 5 nach 2.
+    assert target_level([1, 2, 5], 2, 1) == 5
+    assert target_level([1, 2, 5], 5, -1) == 2
+    # Am Rand bleibt es bei der Zielstufe: ganz oben kein Aufstieg, ganz unten kein Abstieg.
+    assert target_level([1, 2, 5], 1, -1) == 1 and target_level([1, 2, 5], 5, 1) == 5

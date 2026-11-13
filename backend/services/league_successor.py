@@ -76,6 +76,11 @@ def target_level(levels: list[int], level, move: int) -> int:
     Liga N niemanden um zwei Stufen."""
     if not isinstance(level, int):
         return levels[-1]
+    # Mit Bewegung: die nächste aktive Liga N echt in Bewegungsrichtung - auch über mehrere archivierte hinweg (aktiv [1, 4]: aus 1 nach 4).
+    ahead = [item for item in levels if (item > level if move > 0 else item < level)] if move else []
+    if ahead:
+        return min(ahead) if move > 0 else max(ahead)
+    # Am Rand (keine aktive Liga N mehr in dieser Richtung) und ohne Bewegung: die nächste zur Zielstufe.
     wanted = level + move
     if wanted in levels:
         return wanted
