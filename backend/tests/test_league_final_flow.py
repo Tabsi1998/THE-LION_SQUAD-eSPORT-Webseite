@@ -732,3 +732,38 @@ async def test_a_held_result_is_not_published_into_a_closed_staffel(flow):
     assert after["results"] == before["results"] and "pending_result" not in after
     failed = await flow.db.audit_logs.find_one({"action": "match.result.hold_failed"}, {"_id": 0})
     assert "abgeschlossen" in failed["data"]["detail"]
+
+
+# ---------------------------------------------------------------- Strafen mit Wirkung auf die Tabelle (N2)
+
+@pytest.mark.asyncio
+async def test_a_point_deduction_or_disqualification_on_a_closed_staffel_is_refused_not_silently_ignored(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    for index in range(1, 5):
+        await flow.db.team_squads.insert_one({"id": f"squad-{index}", "team_id": f"team-{index}", "name": f"Probe {index}", "status": "active",
+                                              "member_ids": []})
+        await flow.db.tournament_registrations.update_one({"id": f"reg-{index}"}, {"$set": {"squad_id": f"squad-{index}"}})
+    await play_all(flow, staffel)
+    url = f"{ADMIN}/seasons/{season['id']}/sanctions"
+    body = {"target_type": "squad", "rule_ref": "Anlage C.4", "reason": "Begründung der Leitung"}
+    early = await flow.post(url, json={**body, "kind": "point_deduction", "registration_id": "reg-2", "points": 1})
+    assert early.status_code == 200, early.text
+    await flow.db.competition_sanctions.update_many({}, {"$set": {"appeal_until": LONG_AGO}})
+    await must_close(flow, staffel)
+    before = await standings(flow, staffel)
+    deductions = (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}))["point_deductions"]
+
+    attempts = {
+        "deduction": await flow.post(url, json={**body, "kind": "point_deduction", "registration_id": "reg-1", "points": 3}),
+        "disqualification": await flow.post(url, json={**body, "kind": "disqualification", "registration_id": "reg-1"}),
+        "revoke": await flow.post(f"{url}/{early.json()['id']}/revoke", json={"reason": "Abzug war ein Irrtum."}),
+    }
+    for name, response in attempts.items():
+        assert response.status_code == 409 and "wieder öffnen" in response.json()["detail"], (name, response.text)
+    assert await flow.db.competition_sanctions.count_documents({}) == 1
+    assert (await flow.db.competition_sanctions.find_one({}, {"_id": 0}))["revoked_at"] is None
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}))["point_deductions"] == deductions
+    assert await standings(flow, staffel) == before
+    # Eine Verwarnung greift nicht in die Tabelle ein - sie bleibt möglich.
+    warning = await flow.post(url, json={**body, "kind": "warning", "registration_id": "reg-1"})
+    assert warning.status_code == 200, warning.text

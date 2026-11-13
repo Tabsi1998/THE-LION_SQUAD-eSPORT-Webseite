@@ -212,6 +212,22 @@ def _period(kind: str, state: str, season: dict, registration: dict | None, body
     return {"starts_at": start.isoformat(), "ends_at": end.isoformat() if end else None, "matches": matches}
 
 
+# Strafen, die in die Tabelle eingreifen: Punktabzug zieht Punkte ab, die Disqualifikation wertet Spiele um.
+TABLE_KINDS = frozenset({"point_deduction", "disqualification"})
+
+
+async def refuse_closed_effect(db, kind: str, tournament_id: str | None) -> None:
+    """Abgeschlossene Staffel (F.1, #1645): Eine Strafe mit Wirkung auf die Tabelle griffe ins Leere - der Endstand steht. Statt sie
+    still ohne Wirkung zu verhängen (oder beim Widerruf Spiele wieder zu öffnen): 409, erst wieder öffnen."""
+    from services.league_final_read import closed_refusal
+
+    if kind not in TABLE_KINDS:
+        return
+    closed = await closed_refusal(db, tournament_id)
+    if closed:
+        raise SanctionProblem(closed, 409)
+
+
 async def build(db, season: dict, body: dict, actor: dict, *, now: datetime | None = None) -> tuple[dict, dict | None, dict | None, dict | None]:
     """Prüft die Eingabe und baut die Zeile - schreibt nichts. Liefert ``(Strafe, Anmeldung, Staffel, Spiel)``."""
     now = now or now_utc()
@@ -244,6 +260,7 @@ async def build(db, season: dict, body: dict, actor: dict, *, now: datetime | No
             registration, tournament = await _player_registration(db, season, user_id)
     if kind == "disqualification" and registration.get("status") not in ACTIVE_REGISTRATION:
         raise SanctionProblem("Dieses Co-Team ist nicht mehr im Wettbewerb.", 409)
+    await refuse_closed_effect(db, kind, (registration or {}).get("tournament_id"))
     match = await check_match(db, season, body.get("match_id"), registration, required=bool(KINDS[kind].get("match")))
     points = _int(body.get("points"), 1, POINTS_MAX, f"Der Punktabzug liegt zwischen 1 und {POINTS_MAX}.") if kind == "point_deduction" else None
     doc = {
@@ -468,6 +485,7 @@ async def revoke(db, doc: dict, reason, actor_id: str | None, *, via: str = "rev
     """Erst der Anspruch (nur eine Person widerruft), dann die Wirkung zurück. Scheitert das Zurücknehmen, gilt die Strafe weiter."""
     if doc.get("revoked_at"):
         raise SanctionProblem(ALREADY_REVOKED, 409)
+    await refuse_closed_effect(db, doc.get("kind"), doc.get("tournament_id"))
     reason = _text(reason, REASON_MIN, REASON_MAX, f"Bitte den Widerruf begründen (mindestens {REASON_MIN} Zeichen).")
     await _claim(db, doc, {"revoked_at": None},
                  {"revoked_at": now_utc().isoformat(), "revoked_by": actor_id, "revoke_reason": reason, "revoked_via": via}, ALREADY_REVOKED)
