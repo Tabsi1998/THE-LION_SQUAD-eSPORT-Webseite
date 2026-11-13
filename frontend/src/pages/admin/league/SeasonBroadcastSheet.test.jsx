@@ -28,6 +28,7 @@ function fill() {
 
 let release;
 beforeEach(() => {
+  window.sessionStorage.clear();
   for (const fn of [...Object.values(apiMock), ...Object.values(toastMock), confirmMock]) fn.mockReset();
   confirmMock.mockResolvedValue(true);
   apiMock.post.mockImplementation(async (url, body) => {
@@ -123,4 +124,59 @@ test("der Server verschickt im Hintergrund: der Dialog zeigt den Fortschritt und
   await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1), { timeout: 4000 });
   expect(apiMock.get).toHaveBeenCalledWith(expect.stringMatching(/^\/admin\/leagues\/seasons\/s1\/broadcast\/.{8,}$/));
   expect(toastMock.success).toHaveBeenCalledWith("Rundnachricht an 4 Personen verschickt.");
+});
+
+// M-1: Ein hängender Versand bleibt nicht unsichtbar auf „wird verschickt“.
+test("hängt der Versand, endet das Nachfragen, und „Fortsetzen“ schickt denselben Aufruf mit Kennung, Betreff und Text", async () => {
+  const sends = [];
+  apiMock.post.mockImplementation(async (url, body) => {
+    if (url === PREVIEW) return { data: { recipients: 4 } };
+    sends.push(body);
+    return { data: sends.length === 1 ? { recipients: 4, processed: 0, state: "sending" } : { recipients: 4, processed: 1, state: "sending", resumed: true } };
+  });
+  let stale = true;
+  apiMock.get.mockImplementation(async () => ({ data: stale ? { recipients: 4, processed: 1, state: "interrupted", stale: true }
+    : { recipients: 4, processed: 4, delivered: 4, state: "sent", stale: false } }));
+  const { onSent } = renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen"));
+  fill();
+  fireEvent.click(screen.getByTestId("broadcast-send"));
+  await waitFor(() => expect(screen.getByTestId("broadcast-progress")).toHaveAttribute("data-stale", "true"), { timeout: 4000 });
+  expect(screen.getByTestId("broadcast-progress")).toHaveTextContent("Versand hängt");
+  expect(screen.getByTestId("broadcast-progress")).toHaveTextContent("1 von 4");
+  expect(screen.queryByTestId("broadcast-progress-slow")).not.toBeInTheDocument();
+  const asked = apiMock.get.mock.calls.length;
+  await new Promise((resolve) => { setTimeout(resolve, 1700); });
+  expect(apiMock.get.mock.calls.length).toBe(asked);
+
+  stale = false;
+  fireEvent.click(screen.getByTestId("broadcast-resume"));
+  await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1), { timeout: 4000 });
+  expect(sends).toHaveLength(2);
+  expect(sends[1]).toEqual(sends[0]);
+  expect(sends[1]).toMatchObject({ title: "Spieltag 3", text: "Bitte denkt an den Check-in." });
+  expect(window.sessionStorage.getItem("tls-broadcast:s1")).toBeNull();
+}, 15000);
+
+test("geschlossen während des Versands: wieder geöffnet zeigt der Dialog den Stand und setzt mit derselben Kennung fort", async () => {
+  window.sessionStorage.setItem("tls-broadcast:s1", JSON.stringify({ request_id: "kennung-123456", title: "Spieltag 3", text: "Bitte denkt an den Check-in.",
+    audience: "players", scope: "season:", mail: true }));
+  apiMock.get.mockResolvedValue({ data: { recipients: 9, processed: 3, state: "sending", stale: true } });
+  renderSheet();
+  await waitFor(() => expect(screen.getByTestId("broadcast-progress")).toHaveTextContent("Versand hängt"));
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/broadcast/kennung-123456");
+  expect(screen.getByTestId("broadcast-title")).toHaveValue("Spieltag 3");
+  expect(screen.getByTestId("broadcast-send")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("broadcast-resume"));
+  await waitFor(() => expect(apiMock.post.mock.calls.filter(([url]) => url === SEND)).toHaveLength(1));
+  expect(apiMock.post.mock.calls.find(([url]) => url === SEND)[1]).toMatchObject({ request_id: "kennung-123456", audience: "players", mail: true });
+});
+
+test("wieder geöffnet nach fertigem Versand: neu beginnen, nichts fortsetzen", async () => {
+  window.sessionStorage.setItem("tls-broadcast:s1", JSON.stringify({ request_id: "kennung-123456", title: "Alt", text: "Alter Text hier.", audience: "captains", scope: "season:" }));
+  apiMock.get.mockResolvedValue({ data: { recipients: 4, processed: 4, state: "sent" } });
+  renderSheet();
+  await waitFor(() => expect(window.sessionStorage.getItem("tls-broadcast:s1")).toBeNull());
+  expect(screen.getByTestId("broadcast-title")).toHaveValue("");
+  expect(screen.queryByTestId("broadcast-progress")).not.toBeInTheDocument();
 });

@@ -429,7 +429,10 @@ def _log_detail(row: dict, staffeln: dict[str, dict]) -> dict:
     out = {"staffel": (staffel or {}).get("title"), "match_id": data.get("match_id") if isinstance(data.get("match_id"), str) else None}
     if row.get("action") == "league.broadcast":
         out["broadcast"] = {"audience": AUDIENCE_LABELS.get(data.get("audience"), ""), "scope": data.get("scope_label") or "",
-                            "recipients": int(data.get("recipients") or 0), "mail": bool(data.get("mail"))}
+                            "recipients": int(data.get("recipients") or 0), "mail": bool(data.get("mail")),
+                            # Stand des Versands: sent, sending, interrupted (hängt) oder failed - mit zugestellt und bearbeitet.
+                            "state": "interrupted" if is_stale(data) else data.get("state") or "sent",
+                            "delivered": int(data.get("delivered") or 0), "processed": int(data.get("processed") or 0)}
     return out
 
 
@@ -552,7 +555,6 @@ def _claim_id(season_id: str, request_id: str) -> str:
 
 
 STALE_SECONDS = 120
-BATCH = 20
 
 
 async def send(db, season: dict, me: dict, *, request_id: str, title, text, audience: str, scope: str, scope_id: str | None,
@@ -594,22 +596,30 @@ def _job(season: dict, me: dict, claim: str, data: dict, title: str, text: str) 
             "audience": data["audience"], "scope": data["scope"], "scope_id": data.get("scope_id"), "mail": bool(data.get("mail"))}
 
 
-async def _replay(db, season, me, claim, data, title, text, moment) -> tuple[dict, dict | None]:
+def is_stale(data: dict, now: datetime | None = None) -> bool:
+    """Hängt der Versand? Abgebrochen (``interrupted``) oder seit ``STALE_SECONDS`` ohne Fortschritt auf „sending“."""
+    if data.get("state") == "interrupted":
+        return True
     if data.get("state") != "sending":
-        return {**_answer(data), "replay": True}, None
+        return False
     last = data.get("progress_at")
     try:
-        quiet = (moment - datetime.fromisoformat(str(last))).total_seconds() if last else STALE_SECONDS + 1
+        quiet = ((now or now_utc()) - datetime.fromisoformat(str(last))).total_seconds() if last else STALE_SECONDS + 1
     except ValueError:
         quiet = STALE_SECONDS + 1
-    if quiet < STALE_SECONDS:
-        return {**_answer(data), "replay": True}, None
+    return quiet >= STALE_SECONDS
+
+
+async def _replay(db, season, me, claim, data, title, text, moment) -> tuple[dict, dict | None]:
+    if not is_stale(data, moment):
+        return {**_answer(data, moment), "replay": True}, None
     # Nur ein Aufruf übernimmt den Rest: die Bedingung auf den gelesenen Stand des Fortschritts.
-    taken = await db.audit_logs.update_one({"id": claim, "data.state": "sending", "data.progress_at": last},
-                                           {"$set": {"data.progress_at": moment.isoformat()}})
+    taken = await db.audit_logs.update_one({"id": claim, "data.state": data.get("state"), "data.progress_at": data.get("progress_at")},
+                                           {"$set": {"data.state": "sending", "data.progress_at": moment.isoformat()}})
     if not taken.modified_count:
         return {**_answer(data), "replay": True}, None
-    return {**_answer(data), "replay": True, "resumed": True}, _job(season, me, claim, data, title, text)
+    resumed = {**data, "state": "sending", "progress_at": moment.isoformat()}
+    return {**_answer(resumed, moment), "replay": True, "resumed": True}, _job(season, me, claim, data, title, text)
 
 
 async def _state(db, claim: str) -> dict:
@@ -618,7 +628,23 @@ async def _state(db, claim: str) -> dict:
 
 async def deliver(db, *, season_id: str, claim: str, sender_id: str | None, title: str, text: str, audience: str, scope: str,
                   scope_id: str | None, mail: bool) -> dict:
-    """Der Versand: Glocke und Push je Person, Mail nach Wahl; je ``BATCH`` Personen steht der Fortschritt im Protokolleintrag."""
+    """Der Versand im Hintergrund. Geht dabei etwas schief, steht der Eintrag auf ``interrupted`` - der nächste Aufruf mit derselben
+    Kennung setzt fort (``_replay``), der Dialog bietet „Fortsetzen“ an. Nie bleibt er still auf „sending“ stehen."""
+    try:
+        return await _deliver(db, season_id=season_id, claim=claim, sender_id=sender_id, title=title, text=text, audience=audience,
+                              scope=scope, scope_id=scope_id, mail=mail)
+    except Exception:  # noqa: BLE001 - eine Hintergrundaufgabe hat niemanden, der den Fehler sieht: Stand speichern, protokollieren
+        logger.warning("[league_desk] Versand der Rundnachricht %s abgebrochen", log_safe(claim), exc_info=True)
+        try:
+            await db.audit_logs.update_one({"id": claim, "data.state": "sending"}, {"$set": {"data.state": "interrupted"}})
+        except Exception:  # noqa: BLE001 - dann gilt „sending“ ohne Fortschritt nach STALE_SECONDS als hängend
+            logger.warning("[league_desk] Stand der Rundnachricht %s nicht gespeichert", log_safe(claim), exc_info=True)
+        return await _state(db, claim)
+
+
+async def _deliver(db, *, season_id: str, claim: str, sender_id: str | None, title: str, text: str, audience: str, scope: str,
+                   scope_id: str | None, mail: bool) -> dict:
+    """Glocke und Push je Person, Mail nach Wahl; nach jeder Person steht der Fortschritt im Protokolleintrag."""
     from services.league_mail import send_league_mail
     from services.user_notifications import create_user_notification
 
@@ -631,13 +657,14 @@ async def deliver(db, *, season_id: str, claim: str, sender_id: str | None, titl
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1, "slug": 1}) or {}
     heading = f"{league.get('name') or 'Liga'} {season.get('name') or ''}".strip()
     path = f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug") else "/benachrichtigungen"
-    counts = {"delivered": 0, "mailed": 0}
-
-    async def progress(processed: int, **extra) -> None:
-        await db.audit_logs.update_one({"id": claim}, {
-            "$inc": {"data.delivered": counts["delivered"], "data.mailed": counts["mailed"]},
-            "$set": {"data.processed": processed, "data.progress_at": now_utc().isoformat(), **extra}})
-        counts.update(delivered=0, mailed=0)
+    async def progress(processed: int | None = None, *, delivered: int = 0, mailed: int = 0, **extra) -> None:
+        """Je Person geschrieben: Zähler sofort, damit ein Abbruch nichts verliert, und ``progress_at`` als Lebenszeichen."""
+        change: dict = {"$set": {"data.progress_at": now_utc().isoformat(), **extra}}
+        if processed is not None:
+            change["$set"]["data.processed"] = processed
+        if delivered or mailed:
+            change["$inc"] = {"data.delivered": delivered, "data.mailed": mailed}
+        await db.audit_logs.update_one({"id": claim}, change)
 
     for index, user_id in enumerate(ids, start=1):
         key = f"{claim}:{user_id}"
@@ -645,28 +672,29 @@ async def deliver(db, *, season_id: str, claim: str, sender_id: str | None, titl
             done = await create_user_notification(user_id, f"{heading}: {title}", text, url=path, kind="league_broadcast",
                                                   meta={"category": "tournament_updates", "season_id": season_id, "dedupe_key": key,
                                                         "reason": "league_broadcast"})
-            counts["delivered"] += 1 if done else 0
+            await progress(delivered=1 if done else 0)
         except Exception:  # noqa: BLE001 - eine Person, bei der es klemmt, hält die anderen nicht auf
             logger.warning("[league_desk] Rundnachricht %s nicht zugestellt", log_safe(claim), exc_info=True)
         # Die Mail folgt derselben Einstellung wie Glocke und Push („Turnier-Updates“); gezählt wird nur, was wirklich eingereiht ist.
-        if mail and await send_league_mail(db, user_id, f"{heading}: {title}", text, path, f"{key}:mail", category="tournament_updates"):
-            counts["mailed"] += 1
-        if index % BATCH == 0:
-            await progress(index)
+        mailed = bool(mail and await send_league_mail(db, user_id, f"{heading}: {title}", text, path, f"{key}:mail",
+                                                     category="tournament_updates"))
+        await progress(index, mailed=1 if mailed else 0)
     await progress(len(ids), **{"data.state": "sent", "data.recipients": len(ids)})
     return await _state(db, claim)
 
 
 async def status(db, season: dict, request_id: str) -> dict:
-    """Der Stand einer Rundnachricht für den Dialog: ``sending`` mit Fortschritt, ``sent`` oder ``failed``."""
+    """Der Stand einer Rundnachricht für den Dialog: ``sending`` mit Fortschritt, ``sent``, ``failed`` oder ``interrupted``; ``stale``:
+    Der Versand hängt und lässt sich mit derselben Kennung fortsetzen."""
     row = await db.audit_logs.find_one({"id": _claim_id(season["id"], str(request_id or "").strip())}, {"_id": 0, "data": 1})
     if not row:
         raise BroadcastProblem("Diese Rundnachricht gibt es nicht.", 404)
     return _answer(row.get("data") or {})
 
 
-def _answer(data: dict) -> dict:
+def _answer(data: dict, now: datetime | None = None) -> dict:
     return {"recipients": int(data.get("recipients") or 0), "processed": int(data.get("processed") or 0),
             "delivered": int(data.get("delivered") or 0), "mailed": int(data.get("mailed") or 0),
             "mail": bool(data.get("mail")), "scope_label": data.get("scope_label") or "",
-            "audience_label": AUDIENCE_LABELS.get(data.get("audience"), ""), "state": data.get("state") or "sent"}
+            "audience_label": AUDIENCE_LABELS.get(data.get("audience"), ""), "state": data.get("state") or "sent",
+            "stale": is_stale(data, now)}

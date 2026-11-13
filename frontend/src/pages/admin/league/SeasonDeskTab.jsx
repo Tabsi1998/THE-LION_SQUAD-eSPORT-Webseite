@@ -17,6 +17,8 @@ import { viennaDateTime } from "@/lib/vienna";
 import { incidentReviewText, rulesPendingText } from "@/pages/admin/duty/DutyAttention";
 import { SeasonBroadcastSheet } from "./SeasonBroadcastSheet";
 
+// Stand einer Rundnachricht im Protokoll (M-1): „hängt“ heißt, im Dialog der Rundnachricht lässt sie sich fortsetzen.
+const BROADCAST_STATE = { sent: "verschickt", sending: "wird verschickt", interrupted: "Versand hängt", failed: "abgebrochen" };
 const WHEN = { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" };
 const ACTION = "tls-btn tls-btn--secondary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider sm:w-auto";
 
@@ -110,7 +112,16 @@ function DeskLog({ seasonId, version }) {
               <span className="shrink-0 text-xs tabular-nums text-white/45 sm:w-32">{row.at ? viennaDateTime(row.at, WHEN) : ""}</span>
               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                 <span className="font-semibold text-white">{row.label}</span>
-                {row.broadcast ? <span className="text-white/65"> · {row.broadcast.audience}, {row.broadcast.scope}, {row.broadcast.recipients} Empfänger{row.broadcast.mail ? ", mit Mail" : ""}</span> : null}
+                {row.broadcast ? (
+                  <span className="text-white/65"> · {row.broadcast.audience}, {row.broadcast.scope}, {row.broadcast.recipients} Empfänger{row.broadcast.mail ? ", mit Mail" : ""}
+                    {row.broadcast.state ? (
+                      <span className={row.broadcast.state === "interrupted" || row.broadcast.state === "failed" ? "text-warn" : ""} data-testid={`desk-log-state-${row.id}`}>
+                        {" · "}{BROADCAST_STATE[row.broadcast.state] || row.broadcast.state}, {row.broadcast.delivered} zugestellt
+                        {row.broadcast.state !== "sent" ? `, ${row.broadcast.processed} von ${row.broadcast.recipients} bearbeitet` : ""}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
                 {row.staffel ? <span className="text-white/55"> · {row.staffel}</span> : null}
                 {row.match_id ? <> · <Link to={`/matches/${row.match_id}`} className="text-[#29B6E8] hover:underline">Spiel</Link></> : null}
               </span>

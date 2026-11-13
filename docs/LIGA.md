@@ -3342,6 +3342,12 @@ Leitstand liest dieselben Quellen wie „Mein Dienst“ und die Reiter der Seaso
   Protokolleintrag `league.broadcast` mit der Kennung `league-broadcast:{season}:{request_id}` ist zugleich die Sperre; ein zweiter Aufruf
   mit derselben `request_id` antwortet mit `replay: true` und schickt nichts. Im Protokoll stehen Absender, Kreis, Zahl, Mail ja/nein und
   die Länge - nie der Text.
+- **Versand im Hintergrund:** `POST …/broadcast` antwortet sofort mit `state: sending`, verschickt wird danach; je Person stehen
+  `processed`, `delivered`, `mailed` und `progress_at` im Protokolleintrag. Wirft der Versand, steht der Eintrag auf `interrupted`; ohne
+  Fortschritt seit 120 s gilt auch `sending` als hängend. `GET …/broadcast/{request_id}` liefert dann `stale: true`, der Dialog zeigt
+  „Versand hängt – fortsetzen“ und schickt denselben Aufruf (gleiche Kennung, Betreff, Text) - zugestellt wird nur, wer die Nachricht noch
+  nicht hat. Kennung und Eingaben merkt sich der Dialog je Season in `sessionStorage`, bis der Versand fertig ist. Das Protokoll zeigt den
+  Stand mit „zugestellt“ und „bearbeitet“.
 - **Mein Dienst:** `GET /api/users/me/duty?desks=1` liefert dazu `league_desks[]` je Season (Entwurf oder laufend) der eigenen Ligen
   mit `mine`, `total` und `url` auf `#leitstand`. Ohne `desks` (Startseite der Verwaltung) bleibt die Liste leer und kein Leitstand wird
   gerechnet. Die Kaderübersicht für Spiel-IDs „nach dem Stichtag“ liest der Leitstand nur, wenn es einen Eintrag `late_squad_ids` gibt.

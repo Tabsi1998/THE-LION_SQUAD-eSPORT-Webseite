@@ -32,6 +32,8 @@ const DESK = {
 const LOG = { items: [{ id: "a1", action: "league.broadcast", label: "Rundnachricht", at: "2026-11-12T18:00:00+00:00", actor: "Leitung",
   broadcast: { audience: "Captains und Vertreter", scope: "Ganze Season", recipients: 12, mail: true }, staffel: null, match_id: null }],
 page: 1, pages: 2, total: 26, page_size: 25 };
+LOG.items.push({ id: "a2", action: "league.broadcast", label: "Rundnachricht", at: "2026-11-12T17:00:00+00:00", actor: "Leitung", staffel: null, match_id: null,
+  broadcast: { audience: "Alle Spieler", scope: "Liga 1", recipients: 12, mail: false, state: "interrupted", delivered: 5, processed: 5 } });
 
 function renderTab(desk = DESK) {
   apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/desk") ? desk : LOG }));
@@ -95,6 +97,7 @@ test("Protokoll mit Absender, Kreis und Seiten", async () => {
   const row = await screen.findByTestId("desk-log-a1");
   expect(row).toHaveTextContent("Rundnachricht");
   expect(row).toHaveTextContent("Captains und Vertreter, Ganze Season, 12 Empfänger, mit Mail");
+  expect(screen.getByTestId("desk-log-state-a2")).toHaveTextContent("Versand hängt, 5 zugestellt, 5 von 12 bearbeitet");
   expect(row).toHaveTextContent("Leitung");
   expect(screen.getByTestId("desk-log-page")).toHaveTextContent("Seite 1 von 2");
   fireEvent.click(screen.getByTestId("desk-log-older"));

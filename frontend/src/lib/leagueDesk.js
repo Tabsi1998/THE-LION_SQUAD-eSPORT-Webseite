@@ -83,3 +83,33 @@ export function broadcastResultText(data = {}) {
 export function peopleText(count) {
   return count === 1 ? "1 Person" : `${count} Personen`;
 }
+
+// Laufende Rundnachricht je Season (M-1): Kennung und Eingaben, bis der Versand fertig ist - ein wieder geöffneter Dialog setzt fort,
+// statt mit neuer Kennung neu zu senden. Ohne Speicher (privates Fenster, gesperrt) läuft alles wie bisher.
+const draftKey = (seasonId) => `tls-broadcast:${seasonId}`;
+
+export function rememberBroadcast(seasonId, draft) {
+  try {
+    window.sessionStorage.setItem(draftKey(seasonId), JSON.stringify(draft));
+  } catch {
+    // ohne Speicher kein Fortsetzen nach dem Schließen - der Versand selbst läuft trotzdem
+  }
+}
+
+export function recallBroadcast(seasonId) {
+  try {
+    const raw = window.sessionStorage.getItem(draftKey(seasonId));
+    const draft = raw ? JSON.parse(raw) : null;
+    return draft && typeof draft.request_id === "string" && draft.request_id.length >= 8 ? draft : null;
+  } catch {
+    return null;
+  }
+}
+
+export function forgetBroadcast(seasonId) {
+  try {
+    window.sessionStorage.removeItem(draftKey(seasonId));
+  } catch {
+    // nichts zu tun
+  }
+}

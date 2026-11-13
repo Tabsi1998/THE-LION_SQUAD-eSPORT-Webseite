@@ -571,6 +571,44 @@ async def test_broadcast_mail_follows_the_tournament_updates_setting_and_counts_
 
 
 @pytest.mark.asyncio
+async def test_a_failing_delivery_is_marked_stale_and_can_be_continued_without_doubles(flow, monkeypatch):
+    """M-1: Wirft der Versand im Hintergrund, steht der Eintrag nicht still auf „sending“: Der Stand sagt ``stale``, das Protokoll
+    „hängt“, und derselbe Aufruf setzt fort - am Ende ``sent``, niemand bekommt die Nachricht zweimal."""
+    from services import league_mail
+
+    world = await desk_world(flow)
+    mails = []
+    broken = {"on": True}
+
+    async def flaky_mail(_db, user_id, title, text, path, dedupe_key, *, category=None):
+        if broken["on"] and mails:
+            raise RuntimeError("Mailserver weg")
+        if dedupe_key not in mails:
+            mails.append(dedupe_key)
+        return True
+
+    monkeypatch.setattr(league_mail, "send_league_mail", flaky_mail)
+    request_id = new_id()
+    first = await send(flow, world, request_id=request_id, mail=True)
+    assert first.status_code == 200 and first.json()["state"] == "sending"
+    flow.act_as(world["staff"])
+    state = (await flow.get(f"{world['broadcast']}/{request_id}")).json()
+    assert state["state"] == "interrupted" and state["stale"] is True and state["processed"] == 1 and state["delivered"] == 2
+    log = (await flow.get(f"{ADMIN}/seasons/{world['season_id']}/desk/log")).json()
+    entry = next(row for row in log["items"] if row["action"] == "league.broadcast")
+    assert entry["broadcast"]["state"] == "interrupted"
+
+    broken["on"] = False
+    resumed = await send(flow, world, request_id=request_id, mail=True)
+    assert resumed.status_code == 200 and resumed.json()["resumed"] is True
+    final = (await flow.get(f"{world['broadcast']}/{request_id}")).json()
+    assert final["state"] == "sent" and final["stale"] is False and final["processed"] == 2 and final["delivered"] == 2
+    for name in ("Kapitaen", "Falke1"):
+        assert len(await inbox(flow, world, name)) == 1, name
+    assert len(mails) == 2
+
+
+@pytest.mark.asyncio
 async def test_broadcast_answers_at_once_and_sends_in_the_background(flow, monkeypatch):
     """N3: Die Anfrage wartet nicht auf den Versand - sie antwortet mit „sending“, der Dialog liest den Fortschritt nach."""
     from services import league_desk
@@ -612,7 +650,8 @@ async def test_broadcast_is_sent_once_per_request_and_logged_with_sender(flow):
     log = (await flow.get(f"{ADMIN}/seasons/{world['season_id']}/desk/log")).json()
     entry = next(row for row in log["items"] if row["action"] == "league.broadcast")
     assert entry["label"] == "Rundnachricht" and entry["actor"] == world["staff"]["display_name"]
-    assert entry["broadcast"] == {"audience": "Captains und Vertreter", "scope": "Ganze Season", "recipients": 2, "mail": False}
+    assert entry["broadcast"] == {"audience": "Captains und Vertreter", "scope": "Ganze Season", "recipients": 2, "mail": False,
+                                  "state": "sent", "delivered": 2, "processed": 2}
     assert "Check-in am Sonntag" not in str(log), "der Text der Nachricht steht nicht im Protokoll"
 
 
