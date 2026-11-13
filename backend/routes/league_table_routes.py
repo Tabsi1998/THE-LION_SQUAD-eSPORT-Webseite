@@ -92,6 +92,10 @@ async def admin_set_table_decision(tournament_id: str, body: TableDecisionBody,
             overrides = [await league_permissions.require_no_side_conflict(db, me, registration,
                                                                            conflict_reason=body.conflict_reason)
                          for registration in registrations]
+            # Meisterplatz (F.1, Nr. 156): Dort gehört die Art der Entscheidung zum Entscheid - sie steht im Endstand.
+            if not body.method and league_table.can_decide(tournament) and await league_final.decides_champion(
+                    db, tournament, body.registration_ids):
+                raise league_table.TableProblem(league_final.METHOD_REQUIRED, 422)
             decision = await league_table.set_decision(db, tournament, body.registration_ids, reason, me["id"],
                                                        method=body.method)
     except league_table.TableProblem as problem:

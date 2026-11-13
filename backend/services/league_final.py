@@ -155,6 +155,22 @@ def champion_ties(rows: list[dict]) -> list[dict]:
              "names": [row.get("display_name") or "Team" for row in first], "points": first[0].get("points")}]
 
 
+METHOD_REQUIRED = "Für den Meisterplatz bitte angeben, wie entschieden wurde: Entscheidungsspiel, Los oder Entscheid der Leitung."
+
+
+async def decides_champion(db, tournament: dict, registration_ids: list[str]) -> bool:
+    """Geht dieser Entscheid um den Meistertitel - die Teams, die in der obersten Liga N als beste Aktive gleich stehen (Nr. 156)?
+    Dann ist die Art der Entscheidung Pflicht (N4). Ein früherer Entscheid für dieselben Teams zählt beim Prüfen nicht."""
+    context = tournament.get("league_context") or {}
+    if not context.get("division_id") or context.get("division_id") != await top_division_id(db, context.get("season_id")):
+        return False
+    wanted = {str(item) for item in registration_ids or []}
+    others = [decision for decision in tournament.get("table_decisions") or []
+              if isinstance(decision, dict) and set(decision.get("registration_ids") or []) != wanted]
+    ties = champion_ties(await live_rows(db, {**tournament, "table_decisions": others}))
+    return bool(ties) and set(ties[0]["registration_ids"]) == wanted
+
+
 def _blocker(code: str, label: str, text: str, items: list[dict]) -> dict:
     return {"code": code, "label": label, "text": text, "count": len(items), "items": items[:ITEM_LIMIT]}
 

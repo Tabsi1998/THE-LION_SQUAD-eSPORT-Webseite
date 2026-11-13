@@ -814,3 +814,64 @@ async def test_a_failing_award_or_message_does_not_undo_the_close_or_the_reopen(
     await must_reopen(flow, staffel)
     assert (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0}))["final_table"] is None
     assert await flow.db.audit_logs.count_documents({"action": "league.final.reopen"}) == 1
+
+
+# ---------------------------------------------------------------- Art der Entscheidung für den Meisterplatz (N4)
+
+@pytest.mark.asyncio
+async def test_the_decision_about_the_champion_needs_its_method_on_the_server_other_ties_do_not(flow):
+    _admin, _league, season, _division, staffel = await setup(flow)
+    winners = await tie_on_top(flow, staffel)
+    losers = sorted({f"reg-{index}" for index in range(1, 5)} - set(winners))
+    bare = await flow.put(f"{STAFFELN}/{staffel['id']}/table-decision", json={"registration_ids": winners, "reason": "Losentscheid vor Zeugen"})
+    assert bare.status_code == 422 and "Meisterplatz" in bare.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})).get("table_decisions") in (None, [])
+    # Der geteilte Platz 3 ist kein Meisterplatz: dort bleibt die Art freiwillig.
+    lower = await flow.put(f"{STAFFELN}/{staffel['id']}/table-decision", json={"registration_ids": losers, "reason": "Losentscheid vor Zeugen"})
+    assert lower.status_code == 200, lower.text
+    named = await flow.put(f"{STAFFELN}/{staffel['id']}/table-decision",
+                           json={"registration_ids": winners, "reason": "Losentscheid vor Zeugen", "method": "lot"})
+    assert named.status_code == 200, named.text
+    # Ersetzen desselben Entscheids: wieder nur mit Art.
+    again = await flow.put(f"{STAFFELN}/{staffel['id']}/table-decision", json={"registration_ids": winners[::-1], "reason": "Neu gelost vor Zeugen"})
+    assert again.status_code == 422
+    # In einer unteren Liga N ist Platz 1 kein Meisterplatz.
+    second = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={})).json()
+    below = await add_staffel(flow, second, "b")
+    top = await tie_on_top(flow, below)
+    free = await flow.put(f"{STAFFELN}/{below['id']}/table-decision", json={"registration_ids": top, "reason": "Losentscheid vor Zeugen"})
+    assert free.status_code == 200, free.text
+
+
+# ---------------------------------------------------------------- Stand einer abgeschlossenen Staffel (N5)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["live", "paused", "results_published", "archived", "cancelled", "draft"])
+async def test_a_closed_staffel_changes_its_status_only_by_reopening(flow, status):
+    _admin, _league, _season, _division, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    await must_close(flow, staffel)
+    response = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": status})
+    assert response.status_code == 400 and "Wieder öffnen" in response.json()["detail"], response.text
+    tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert tournament["status"] == "completed" and tournament["final_table"]["version"] == 1
+
+
+# ---------------------------------------------------------------- News-Karte ohne ruhenden Meister (N6)
+
+@pytest.mark.asyncio
+async def test_the_news_card_names_no_champion_whose_entry_rests(flow):
+    from services.news_cards import attach_result_winners
+
+    await flow.db.tournaments.insert_one({"id": "t-news", "title": "Probe-Liga · Staffel A", "status": "results_published", "visibility": "public",
+                                          "is_public": True})
+    await flow.db.teams.insert_one({"id": "team-news", "name": "Probe News", "is_public": True})
+    await flow.db.tournament_registrations.insert_one({"id": "reg-news", "tournament_id": "t-news", "team_id": "team-news", "display_name": "Probe News"})
+    await flow.db.tournament_awards.insert_one({"id": "award-news", "tournament_id": "t-news", "registration_id": "reg-news", "rank": 1, "suspended": True})
+    resting = [{"id": "post-1", "linked_tournament_ids": ["t-news"]}]
+    await attach_result_winners(flow.db, resting, None)
+    assert "result" not in resting[0]
+    await flow.db.tournament_awards.update_one({"id": "award-news"}, {"$set": {"suspended": False}})
+    shown = [{"id": "post-1", "linked_tournament_ids": ["t-news"]}]
+    await attach_result_winners(flow.db, shown, None)
+    assert shown[0]["result"] == {"winner": "Probe News", "tournament": "Probe-Liga · Staffel A"}

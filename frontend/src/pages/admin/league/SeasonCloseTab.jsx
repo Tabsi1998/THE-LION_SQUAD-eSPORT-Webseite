@@ -322,7 +322,7 @@ export function SeasonCloseTab({ seasonId, canResults = false }) {
       {sheet?.kind === "version" ? <VersionSheet row={sheet.row} entry={sheet.entry} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === "decide" ? (
         <OrderSheet staffel={{ tournament_id: sheet.row.tournament_id, label: staffelLabel(sheet.row) }} tie={sheet.tie} override={Boolean(sheet.tie.own_team)}
-          methods={methodOptions(data.methods)} onClose={() => setSheet(null)} onSaved={() => done()} />
+          methods={methodOptions(data.methods)} methodRequired onClose={() => setSheet(null)} onSaved={() => done()} />
       ) : null}
     </FormSection>
   );
