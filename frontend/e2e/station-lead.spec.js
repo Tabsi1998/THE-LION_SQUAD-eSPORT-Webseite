@@ -102,15 +102,22 @@ async function mockLead(page, world, tv) {
 /**
  * Erst messen, wenn nichts mehr einblendet (#2390): Während Kachel, Aufruf und Seite einblenden, ändert eine Skalierung
  * an einem Vorfahren die gemessene Höhe um Bruchteile eines Pixels (43,9999 statt 44). Wartet auf alle endlichen
- * Animationen und die Schriften - dauerhafte (der Live-Punkt) laufen weiter. Die Prüfung selbst bleibt gleich streng.
+ * laufenden Animationen und die Schriften (höchstens 3 s) - dauerhafte (der Live-Punkt) laufen weiter. Die Prüfung selbst
+ * bleibt gleich streng.
  */
 async function settled(page) {
   await page.evaluate(async () => {
-    await document.fonts.ready;
-    const finite = () => document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity);
-    for (let round = 0; round < 5 && finite().some((animation) => animation.playState === "running"); round += 1) {
-      await Promise.all(finite().map((animation) => animation.finished.catch(() => null)));
-    }
+    // Höchstens 3 Sekunden - eine hängende Animation darf den Test nicht bis zur Zeitgrenze aufhalten; dann misst er eben.
+    const limit = new Promise((resolve) => { window.setTimeout(resolve, 3000); });
+    const done = (async () => {
+      await document.fonts.ready;
+      const running = () => document.getAnimations().filter((animation) => animation.playState === "running"
+        && animation.effect?.getComputedTiming().endTime !== Infinity);
+      for (let round = 0; round < 5 && running().length; round += 1) {
+        await Promise.all(running().map((animation) => animation.finished.catch(() => null)));
+      }
+    })();
+    await Promise.race([done, limit]);
   });
 }
 
