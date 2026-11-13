@@ -37,10 +37,14 @@ export default function AdminDolibarrPage() {
     setTabState(key);
     setSearchParams(key === "overview" ? {} : { tab: key }, { replace: true });
   };
+  // Ein neuer ?tab= stellt den Reiter um, sobald er erlaubt ist - verglichen mit dem aktuellen Reiter (Ref), damit ein
+  // Klick, der Reiter und Adresse zugleich setzt, nicht kurz auf den alten zurückspringt (#937).
+  const requestedAllowed = Boolean(requestedTab) && tabs.some((entry) => entry.key === requestedTab);
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   useEffect(() => {
-    if (requestedTab && requestedTab !== tab && tabs.some((entry) => entry.key === requestedTab)) setTabState(requestedTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedTab]);
+    if (requestedAllowed && requestedTab !== tabRef.current) setTabState(requestedTab);
+  }, [requestedTab, requestedAllowed]);
   const [status, setStatus] = useState(null);
   // Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): die Einwilligungstexte des Vereins zur Auswahl.
   const [consentTexts, setConsentTexts] = useState([]);
