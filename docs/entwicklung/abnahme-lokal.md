@@ -72,6 +72,11 @@ Kader, Captain und Vertreter), zugeteilt. Den Spielplan erzeugt erst **Liga star
 Staffel – so lässt sich die [Checkliste für den Obmann](../handbuch/liga.md#6-checkliste-für-den-obmann-bis-911) am
 Stand durchspielen. Die Tage rechnet der Seed vom heutigen Tag aus, der Stand läuft also nicht aus (#2200).
 
+Mit `--schaufenster` kommt die öffentliche Season-Seite mit allem dazu (#2268): „Alpenliga“, Season 1 mit Modus-Symbolen und
+Ergebnisregeln, Map-Pool und Sperrliste mit Bildern, Regelwerk, Liga 1 und Liga 2 mit gestarteten Staffeln, Ergebnissen (Maps,
+kampflos, wiederholte Map, „in Klärung“), Banner, Emblem und Team-Logos – für `liga-season-seite-abnahme.spec.js`. Es setzt dafür
+Symbol und Regel an den Modi des Spiels und läuft darum nicht in der nächtlichen Abnahme.
+
 Für den schreibenden Ablauf kommt die eigene Liga „Liga-Probelauf“ dazu: eine öffentliche Season, Staffel A im Entwurf,
 fünf Co-Teams zugeteilt, das sechste teilt die Spec im Browser zu. Ist die Staffel schon gestartet, legt der nächste
 Aufruf die nächste Season an.

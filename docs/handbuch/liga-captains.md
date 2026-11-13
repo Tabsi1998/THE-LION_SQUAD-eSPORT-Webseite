@@ -1,7 +1,7 @@
 # Liga: Spickzettel für Captains
 
 Eine Seite für **Captain und Vertreter** eines Co-Teams in der CoD-Liga (Season 1 ab Di 10.11.2026). Alles läuft
-auf der **Matchseite** eures Spiels: Ligaseite → euer Spiel, oder über die Benachrichtigung. Ohne Captain und
+auf der **Matchseite** eures Spiels: Ligaseite → **Spieltage** → euer Spiel, oder über die Benachrichtigung. Ohne Captain und
 Vertreter macht das die Teamleitung. Melden, Bestätigen und Nachtragen ausführlich:
 [Turniere, 3.16 Ergebnis je Map melden](turniere.md#316-liga-ergebnis-je-map-melden-für-captains); für die
 Turnierleitung: [Liga leiten](liga.md). Zum Verschicken an Captains gibt es dieselben Schritte kürzer und mit Bildern
@@ -141,7 +141,7 @@ Vertreter und die Leitung des Hauptteams, Strafen gegen eine Person nur sie selb
 
 ## Regeln
 
-Die Regeln stehen auf der Ligaseite unter **Regeln**, mit Inhaltsverzeichnis, Suche und PDF. Oben steht, was **neu in dieser Version** ist, geänderte
+Die Regeln stehen auf der Ligaseite unter **Regelwerk** (Leiste oben), mit Inhaltsverzeichnis, Suche und PDF. Oben steht, was **neu in dieser Version** ist, geänderte
 Paragrafen haben einen Strich am Rand und das Wort „Geändert“. Ältere Versionen und ein Vergleich Wort für Wort stehen auf derselben Seite.
 
 Verlangt die Leitung eine **Zustimmung**, siehst du als Captain oder Vertreter auf der Startseite unter **Offene Aktionen** „Regeln zustimmen“ und auf der

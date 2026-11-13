@@ -82,11 +82,15 @@ test.describe("Abnahme: Liga gegen den echten Server", () => {
       await expect(page.getByTestId("league-facts")).toBeVisible();
       const staffel = page.getByTestId("league-staffel-A");
       await expect(staffel).toBeVisible();
-      await expect(staffel.locator('[data-testid^="league-team-"]')).toHaveCount(8);
-      await expect(staffel.getByTestId("league-week-7")).toContainText("Weihnachtspause");
-      await expect(staffel.getByTestId("league-week-8")).toContainText("Weihnachtspause");
+      await expect(staffel.getByTestId("league-teams-link-A")).toContainText("8 Teams");
       await noSideScroll(page);
       await shot(page, `liga-seite-${width}.png`);
+      // Alle Spielwochen mit der Pause stehen auf der Unterseite Spieltage (#2268).
+      await staffel.getByTestId("league-plan-link-A").click();
+      const plan = page.getByTestId("league-plan-A");
+      await expect(plan.getByTestId("league-week-7")).toContainText("Weihnachtspause");
+      await expect(plan.getByTestId("league-week-8")).toContainText("Weihnachtspause");
+      await noSideScroll(page);
       expect(problems).toEqual([]);
     });
   }

@@ -25,6 +25,7 @@ Aufruf (Stack läuft; Projektname und Compose-Ordner wie bei seed_abnahme_fastla
 ABNAHME_COMPOSE_DIR):
 
     python scripts/seed_abnahme_liga.py
+    python scripts/seed_abnahme_liga.py --schaufenster   # dazu die Season-Seite mit allem (#2268): „Alpenliga“, Season 1
 
 Passwort und Zwei-Faktor-Geheimnis entstehen bei jedem Lauf neu und stehen nur in der Stand-Datei
 ``.local-testing/abnahme/state-liga.json`` (nicht im Repo; anderer Ort über ABNAHME_STATE).
@@ -160,7 +161,9 @@ def host_main() -> int:
     os.environ["ABNAHME_SEED_TOTP"] = base64.b32encode(secrets.token_bytes(20)).decode("ascii")
     compose, compose_dir = compose_command(root)
     source = pathlib.Path(__file__).read_text(encoding="utf-8")
-    completed = subprocess.run([*compose, "exec", "-T", "-e", "ABNAHME_SEED_PASSWORD", "-e", "ABNAHME_SEED_TOTP",
+    # Schaufenster der Season-Seite (#2268) nur auf Wunsch - es ändert die Modi des Spiels.
+    os.environ["ABNAHME_SCHAUFENSTER"] = "1" if "--schaufenster" in sys.argv else "0"
+    completed = subprocess.run([*compose, "exec", "-T", "-e", "ABNAHME_SEED_PASSWORD", "-e", "ABNAHME_SEED_TOTP", "-e", "ABNAHME_SCHAUFENSTER",
                                 "backend", "python", "-", "--inside"], input=source, text=True, encoding="utf-8",
                                capture_output=True, cwd=compose_dir)
     sys.stderr.write(completed.stderr[-4000:])
@@ -498,6 +501,163 @@ async def ensure_anmeldung(admin: Session, db, game: dict, maps: dict) -> dict:
     return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]}, "tournament_id": staffel["tournament_id"]}
 
 
+# Schaufenster der Season-Seite (#2268), nur mit --schaufenster: eine öffentliche Season, die alles hat, was die Seite zeigt - Modi
+# mit Symbol und Ergebnisregel, Map-Pool mit Bildern, Sperrliste mit Bildern, Regelwerk, zwei Ligen mit je einer Staffel, gestartete
+# Spieltage mit Ergebnissen (Maps, kampflos, wiederholte Map, „in Klärung“), Banner, Emblem und Logos. Ändert dafür die Modi des Spiels
+# (Symbol, Regel) - darum nicht im nächtlichen Lauf. Alles erfunden, Bilder sind Farbflächen mit Namen.
+SCHAUFENSTER_LEAGUE = "Alpenliga"
+MODE_LOOK = {"stellung": ((41, 182, 232), "ST", {"kind": "score", "target": 250, "time_limit_seconds": 600}),
+             "suchen": ((255, 159, 67), "SZ", {"kind": "rounds", "target": 6, "round_limit": 11}),
+             "kontrolle": ((159, 122, 234), "KO", {"kind": "rounds", "target": 3, "round_limit": 5})}
+EQUIPMENT = [("weapon", "Habicht 7", (70, 90, 120)), ("weapon", "Donnerbüchse", (120, 70, 60)),
+             ("item", "Leise Sohlen", (60, 110, 80)), ("item", "Rauchwolke", (90, 90, 100))]
+SCHAUFENSTER_RULES = ("# Fairplay\n\nFair spielen, immer. Platzhalter der lokalen Abnahme, erfunden.\n\n"
+                      "# Termine\n\nDas Heimteam schlägt vor, die Gastseite antwortet binnen 72 Stunden.\n")
+
+
+def flat_png(size: tuple[int, int], color: tuple[int, int, int], label: str, small: str = "") -> bytes:
+    """Ein erfundenes Bild: Farbverlauf mit Name - kein Markenbild."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    width, height = size
+    # Die eingebaute Schrift kann keine Umlaute - auf dem Bild umschreiben, der Name in den Daten bleibt.
+    label = label.translate(str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss"}))
+    image = Image.new("RGB", size, color)
+    draw = ImageDraw.Draw(image)
+    for row in range(height):
+        shade = row / max(1, height - 1)
+        draw.line([(0, row), (width, row)], fill=tuple(int(part * (1 - 0.55 * shade)) for part in color))
+    try:
+        title, note = ImageFont.load_default(size=max(18, height // 4)), ImageFont.load_default(size=max(12, height // 12))
+    except (TypeError, OSError, ImportError):
+        title = note = ImageFont.load_default()
+    draw.text((width // 12, height // 3), label, fill=(245, 245, 245), font=title)
+    if small:
+        draw.text((width // 12, int(height * 0.72)), small, fill=(220, 220, 220), font=note)
+    out = io.BytesIO()
+    image.save(out, format="PNG")
+    return out.getvalue()
+
+
+async def upload(admin: Session, name: str, data: bytes) -> str:
+    body = await admin.call("POST", "/api/uploads/image", params={"media_scope": "admin"}, files={"file": (name, data, "image/png")})
+    return body["url"]
+
+
+async def ensure_mode_look(admin: Session, db, game: dict) -> dict:
+    """Symbol und Ergebnisregel je Modus am Spiel - neue Seasons übernehmen die Regel."""
+    game = await db.games.find_one({"id": game["id"]}, {"_id": 0})
+    modes = []
+    for mode in game.get("match_modes") or []:
+        look = MODE_LOOK.get(mode.get("mode"))
+        if look and not mode.get("icon_url"):
+            color, letters, rule = look
+            mode = {**mode, "icon_url": await upload(admin, f"modus-{mode['mode']}.png", flat_png((160, 160), color, letters)), "result_rule": rule}
+        modes.append(mode)
+    return await admin.call("PATCH", f"/api/games/{game['id']}", json={"match_modes": modes})
+
+
+async def ensure_bans(admin: Session, game: dict, season_id: str) -> None:
+    base = f"/api/games/{game['id']}/equipment"
+    library = await admin.call("GET", base)
+    if not library["categories"]:
+        await admin.call("PUT", f"{base}/categories", json={"categories": library["suggested_categories"]})
+        library = await admin.call("GET", base)
+    role = {row["role"]: row["key"] for row in library["categories"]}
+    known = {row["name"]: row for row in library.get("items") or []}
+    items = {}
+    for kind, name, color in EQUIPMENT:
+        items[name] = known.get(name) or await admin.call("POST", base, json={
+            "category": role[kind], "name": name, "image_url": await upload(admin, f"ausruestung-{len(items)}.png", flat_png((640, 360), color, name, "Testbild"))})
+    await admin.call("PUT", f"/api/admin/leagues/seasons/{season_id}/loadout-bans", json={"expected_version": 0, "entries": [
+        {"item_id": items["Donnerbüchse"]["id"], "kind": "item"},
+        {"item_id": items["Rauchwolke"]["id"], "kind": "item", "modes": ["suchen"]}]})
+
+
+def game_body(position: int, mode: str, map_id: str, winner: str, loser: str) -> dict:
+    rule = MODE_LOOK[mode][2]
+    won = rule["target"]
+    lost = {"score": 180, "rounds": max(0, rule["target"] - 3)}[rule["kind"]]
+    return {"position": position, "mode": mode, "map_id": map_id, "winner_registration_id": winner, "scores": {winner: won, loser: lost}}
+
+
+async def play(admin: Session, db, match: dict, maps: dict, sweep: bool) -> None:
+    """Ergebnis als Leitung mit Maps: 2:0 oder 2:1 für die Heimseite."""
+    home, away = [slot["registration_id"] for slot in match["slots"][:2]]
+    order = ["stellung", "suchen", "kontrolle"]
+    pools = {mode: [maps[name]["id"] for name in POOL[mode]] for mode in order}
+    winners = [home, home] if sweep else [home, away, home]
+    games = [game_body(index + 1, order[index], pools[order[index]][index % len(pools[order[index]])], winner, away if winner == home else home)
+             for index, winner in enumerate(winners)]
+    await admin.call("POST", f"/api/matches/{match['id']}/result", json={
+        "results": [{"registration_id": home, "rank": 1, "score": 2}, {"registration_id": away, "rank": 2, "score": len(winners) - 2}],
+        "lineup": [], "games": games})
+
+
+async def ensure_schaufenster(admin: Session, db, game: dict, maps: dict, squads: list[dict]) -> dict:
+    listing = await admin.call("GET", "/api/admin/leagues")
+    league = next((row for row in listing["leagues"] if row.get("name") == SCHAUFENSTER_LEAGUE), None)
+    if league and league.get("seasons"):
+        season = league["seasons"][0]
+        return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]}}
+    game = await ensure_mode_look(admin, db, game)
+    banner = await upload(admin, "alpenliga-banner.png", flat_png((1800, 600), (24, 74, 104), "ALPENLIGA", "Season 1 · Abnahme"))
+    emblem = await upload(admin, "alpenliga-emblem.png", flat_png((512, 512), (41, 182, 232), "AL"))
+    league = await admin.call("POST", "/api/admin/leagues", json={
+        "name": SCHAUFENSTER_LEAGUE, "game_id": game["id"], "emblem_url": emblem, "banner_url": banner,
+        "banner_focus": {"x": 30, "y": 50, "mobile_x": 20, "mobile_y": 50}})
+    season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={
+        **hidden(ABLAUF_SEASON), **season_dates(), "number": 1, "name": "Season 1", "slug": "season-1", "max_staffel_size": 4})
+    await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
+        {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
+    await ensure_bans(admin, game, season["id"])
+    scope = f"/api/admin/league-rules/league_season/{season['id']}"
+    draft = await admin.call("PUT", f"{scope}/draft", json={"title": "Regelwerk Alpenliga", "body_md": SCHAUFENSTER_RULES, "annexes": []})
+    today = datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
+    await admin.call("POST", f"{scope}/publish", json={"revision": draft["revision"], "valid_from": today,
+                                                       "change_reason": "Fassung für die Abnahme", "requires_consent": False})
+    staffeln = []
+    for level, rows in ((1, squads[:4]), (2, squads[4:8])):
+        division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
+        staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
+        for row in rows:
+            await admin.call("POST", f"/api/tournaments/{staffel['tournament_id']}/squad-registrations",
+                             json={"team_id": row["team"]["id"], "squad_id": row["squad"]["id"]})
+        staffeln.append(staffel["tournament_id"])
+    await publish_season(admin, season["id"], "public")
+    # Logos der Hauptteams (Teamseite) - die Hälfte bekommt eines, die andere zeigt die Initialen.
+    for index, row in enumerate(squads[:8]):
+        if index % 2 == 0:
+            logo = await upload(admin, f"logo-{index}.png", flat_png((256, 256), TEAM_COLORS[index % len(TEAM_COLORS)], row["team"]["name"][:2].upper()))
+            await db.teams.update_one({"id": row["team"]["id"]}, {"$set": {"logo_url": logo}})
+    for tid in staffeln:
+        await admin.call("POST", f"/api/tournaments/{tid}/status", json={"status": "live"})
+    for tid in staffeln:
+        matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(None)
+        rounds = sorted({int(row.get("round") or 0) for row in matches})
+        first = [row for row in matches if int(row.get("round") or 0) == rounds[0] and len(row.get("slots") or []) >= 2]
+        second = [row for row in matches if int(row.get("round") or 0) == rounds[1] and len(row.get("slots") or []) >= 2]
+        await play(admin, db, first[0], maps, sweep=False)
+        if len(first) > 1:
+            survivor = first[1]["slots"][0]["registration_id"]
+            await admin.call("POST", f"/api/matches/{first[1]['id']}/forfeit", json={"winner_id": survivor, "note": "Gegner nicht erschienen (Abnahme)"})
+        await play(admin, db, second[0], maps, sweep=True)
+    # Die Haltezeit des Ergebnisses (10 s) abwarten, dann eine wiederholte Map und ein angefochtenes Ergebnis - öffentlich nur als
+    # Hinweis, ohne Verfahren.
+    await asyncio.sleep(15)
+    first_staffel = await db.matches_v2.find({"tournament_id": staffeln[0], "status": "completed", "games.2": {"$exists": True}}, {"_id": 0, "id": 1}).to_list(1)
+    if first_staffel:
+        await db.matches_v2.update_one({"id": first_staffel[0]["id"]}, {"$set": {"games.1.status": "replayed",
+                                                                               "games.1.replay_reason": "Map nach Verbindungsabbruch wiederholt"}})
+    contested = await db.matches_v2.find({"tournament_id": staffeln[1], "status": "completed"}, {"_id": 0, "id": 1}).to_list(1)
+    if contested:
+        await db.matches_v2.update_one({"id": contested[0]["id"]}, {"$set": {"contested": True}})
+    return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]},
+            "staffeln": staffeln}
+
+
+TEAM_COLORS = [(41, 182, 232), (255, 159, 67), (31, 208, 142), (159, 122, 234)]
+
 async def inside_main() -> None:
     guard_environment(os.environ)
     from database import get_db
@@ -516,6 +676,7 @@ async def inside_main() -> None:
         squads = await ensure_squads(admin, db, game, tid, teams)
         ablauf = await ensure_ablauf(admin, db, game, maps, squads)
         anmeldung = await ensure_anmeldung(admin, db, game, maps)
+        schaufenster = await ensure_schaufenster(admin, db, game, maps, squads) if os.environ.get("ABNAHME_SCHAUFENSTER") == "1" else None
     finally:
         await admin.close()
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "slug": 1, "status": 1, "title": 1})
@@ -534,6 +695,7 @@ async def inside_main() -> None:
         "maps": {name: row["id"] for name, row in maps.items()},
         "ablauf": ablauf,
         "anmeldung": anmeldung,
+        "schaufenster": schaufenster,
         "teams": [{"name": row["team"]["name"], "team_id": row["team"]["id"], "squad_id": row["squad"]["id"],
                    "squad_name": row["squad"]["name"], "registration_id": row["registration"]["id"],
                    "leader": row["people"][0]["email"], "captain": by_id[row["squad"]["captain_id"]]["email"],

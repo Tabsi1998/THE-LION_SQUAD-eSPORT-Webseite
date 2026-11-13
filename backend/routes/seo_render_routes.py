@@ -248,7 +248,9 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
             return await league_rules_meta(db, slug, None, meta, origin)
         if len(parts) > 3 and parts[3].lower() == "regeln":
             return await league_rules_meta(db, slug, unquote(parts[2]), meta, origin)
-        return await league_season_meta(db, slug, unquote(parts[2]), meta, origin)
+        # Unterseiten der Season (#2268): Spieltage und Teams mit eigener Adresse und eigenem Titel.
+        section = parts[3].lower() if len(parts) > 3 and parts[3].lower() in LEAGUE_SEASON_SECTIONS else None
+        return await league_season_meta(db, slug, unquote(parts[2]), meta, origin, section)
     if first in {"gallery", "galerie"} and slug:
         return await gallery_meta(db, slug, meta, origin)
     if first == "teams" and slug:
@@ -566,9 +568,30 @@ async def league_signup_details(db, season: dict) -> list[str]:
     return details
 
 
-async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:
+# Unterseiten der Season (#2268): Adresse → Name in Titel und Brotkrumen, Satz für die Vorschau. „regeln“ hat eigene Metadaten.
+LEAGUE_SEASON_SECTIONS = {
+    "spieltage": ("Spieltage", "Spielplan Woche für Woche mit Ergebnissen, Maps und Modi"),
+    "teams": ("Teams", "Alle Teams der Season nach Liga und Staffel"),
+}
+
+
+async def league_play_text(db, league: dict, season: dict) -> str:
+    """Was gespielt wird (#2268), ein Satz für die Teilen-Karte: „Best of 3 · 4 gegen 4 · Stellung, Suchen & Zerstören und Kontrolle“.
+    Leer ohne Angaben."""
+    game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0, "name": 1, "match_modes": 1}) or {}
+    labels = {row.get("mode"): row.get("label") or row.get("mode") for row in game.get("match_modes") or [] if isinstance(row, dict)}
+    modes = [labels.get(key) or key for key in dict.fromkeys(season.get("game_mode_order") or []) if key]
+    size = season.get("team_size")
+    parts = [game.get("name"), f"Best of {season['best_of']}" if season.get("best_of") else None,
+             f"{size} gegen {size}" if size else None,
+             (", ".join(modes[:-1]) + f" und {modes[-1]}" if len(modes) > 1 else modes[0]) if modes else None]
+    return " · ".join(str(part) for part in parts if part)
+
+
+async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str, section: str | None = None) -> dict:
     """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ als neutrale Karte ohne Index;
-    „aus“, „Nur Turnierleitung“ und Unbekanntes 404."""
+    „aus“, „Nur Turnierleitung“ und Unbekanntes 404. ``section``: eine Unterseite (#2268, ``LEAGUE_SEASON_SECTIONS``) mit eigener
+    Adresse und eigenem Titel - gleiche Sichtbarkeit, gleiches Bild."""
     from services.league_look import effective as effective_look
     from services.league_look import effective_banner_url
     from services.league_service import season_end
@@ -579,19 +602,23 @@ async def league_season_meta(db, league_slug: str, season_slug: str, base: dict,
     # „aus“ und „Nur Turnierleitung“ wie „gibt es nicht“ - von außen lässt sich nicht erraten, ob es die Season gibt.
     if not season or season.get("status") == "archived" or (season.get("visibility") or "off") in ("off", "admins"):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
-    canonical = f"{origin}/liga/{league['slug']}/{season['slug']}"
+    page = LEAGUE_SEASON_SECTIONS.get(section or "")
+    canonical = f"{origin}/liga/{league['slug']}/{season['slug']}" + (f"/{section}" if page else "")
     title = f"{league.get('name')} {season.get('name')}"
     if season.get("visibility") != "public":
         return restricted_meta("league", season, base, origin, canonical)
     # Teilen-Karte bei offener Anmeldung (#2324): Anmeldeschluss und freie Plätze stehen vorn - so wirbt der Link in Discord
     # und WhatsApp für die Anmeldung.
     signup = await league_signup_details(db, season)
+    play = await league_play_text(db, league, season)
     description = seo_description(
-        season.get("rules_text") or title,
+        f"{page[1]}. {play}" if page else (play or season.get("rules_text") or title),
         prefix="Liga",
         details=[*signup, format_date_label(season.get("start_date")), format_date_label(season_end(season))],
     )
     shown_title = f"{title} · Anmeldung offen" if signup else title
+    if page:
+        shown_title = f"{page[0]} · {title}"
     meta = {**base, "title": f"{shown_title} · {base['site_name']}", "description": description, "url": canonical,
             "canonical": canonical, "type": "website"}
     # Gestaltung (#2107): die Vorschaukarte zeigt das Banner der Season bzw. Liga, sonst das Emblem (#2324), sonst das Bild
@@ -601,6 +628,8 @@ async def league_season_meta(db, league_slug: str, season_slug: str, base: dict,
     if picture:
         meta["image"] = absolute_url(picture, origin)
     meta["json_ld"] = webpage_json_ld(meta)
+    if page:
+        return add_breadcrumbs(meta, origin, [("Liga", "/liga"), (title, f"/liga/{league['slug']}/{season['slug']}")], page[0])
     return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 
 

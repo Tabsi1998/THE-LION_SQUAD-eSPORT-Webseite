@@ -997,7 +997,9 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
                     )
                 },
                 # Zusatzfelder (C.3) nur, wenn gesetzt; den Nachweis sehen nur Beteiligte und Leitung - wie Aufstellungen.
-                **{key: game[key] for key in ("mode_icon_url", "status", "replay_reason", "decision", "host_registration_id") if game.get(key)},
+                **{key: game[key] for key in ("mode_icon_url", "status", "decision", "host_registration_id") if game.get(key)},
+                # Grund einer Wiederholung (#2268): wie die Vorfälle nur für die beiden Teams und die Leitung.
+                **({"replay_reason": game["replay_reason"]} if with_lineups and game.get("replay_reason") else {}),
                 **({"proof_id": game["proof_id"]} if with_lineups and game.get("proof_id") else {}),
                 # Vorfall zur Map (D.5, #1619): nur Beteiligte und Leitung - öffentlich bleibt „wiederholt“ bzw. „zugesprochen“.
                 **({"incident_id": game["incident_id"]} if with_lineups and game.get("incident_id") else {}),
