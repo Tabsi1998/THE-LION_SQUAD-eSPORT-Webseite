@@ -34,7 +34,10 @@ def with_clock_pause(matches, tournament: dict | None) -> list:
 
 async def settle_pause(db, tournament: dict, now: datetime | None = None) -> int:
     """Beim Weiterspielen: die Pausendauer auf jedes Spiel addieren, das in der Pause lief. Gibt die Zahl der Spiele
-    zurück. Ohne ``paused_at`` (eine Pause von vor #1167) passiert nichts."""
+    zurück. Ohne ``paused_at`` (eine Pause von vor #1167) passiert nichts.
+
+    Je Spiel genau einmal je Pause: ``pause_settled_for`` merkt sich, welche Pause schon abgerechnet ist. Bricht das
+    Weiterspielen danach ab (``paused_at`` bleibt) und wird wiederholt, zählt nichts doppelt."""
     paused_at = tournament.get("paused_at")
     if not paused_at or not _parse(paused_at):
         return 0
@@ -47,6 +50,9 @@ async def settle_pause(db, tournament: dict, now: datetime | None = None) -> int
     for match in running:
         seconds = overlap_seconds(match, paused_at, now)
         if seconds:
-            await db.matches_v2.update_one({"id": match["id"]}, {"$inc": {"paused_seconds": seconds}})
-            count += 1
+            written = await db.matches_v2.update_one(
+                {"id": match["id"], "pause_settled_for": {"$ne": paused_at}},
+                {"$inc": {"paused_seconds": seconds}, "$set": {"pause_settled_for": paused_at}},
+            )
+            count += written.modified_count
     return count

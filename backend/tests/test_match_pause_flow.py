@@ -178,3 +178,22 @@ async def test_a_pairing_reset_and_a_new_start_count_from_zero_without_the_old_p
     assert stored["started_at"] and stored["paused_seconds"] == 0
     _lead, item = await lead_item(flow, tournament, match["id"])
     assert item["paused_seconds"] == 0 and item["timing"]["running_minutes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_settling_the_same_pause_twice_counts_it_once(flow):
+    """Bricht „Weiterspielen“ nach der Abrechnung ab und wird wiederholt, zählt die Pause nicht doppelt."""
+    from services.match_pause import settle_pause
+
+    _staff, tournament, _stations, _players = await on_site(flow)
+    match = await running_match(flow, tournament, minutes_ago=20)
+    await set_status(flow, tournament, "paused")
+    await backdate_pause(flow, tournament, minutes=5)
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    assert await settle_pause(flow.db, stored) == 1
+    assert await settle_pause(flow.db, stored) == 0
+    seconds = (await flow.reload(match))["paused_seconds"]
+    assert 299 <= seconds <= 330, seconds
+    # Das Weiterspielen über die Route rechnet dieselbe Pause nicht noch einmal ab.
+    await set_status(flow, tournament, "live")
+    assert (await flow.reload(match))["paused_seconds"] == seconds, "dieselbe Pause nicht noch einmal"
