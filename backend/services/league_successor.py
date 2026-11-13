@@ -63,12 +63,17 @@ class SuccessorProblem(ValueError):
 
 # ---------------------------------------------------------------- Plan: wer wohin geht
 
-def _target_index(levels: list[int], level) -> int:
-    """Die Stelle einer Liga N unter den aktiven - eine archivierte zählt wie die nächste aktive darunter (oder die unterste)."""
-    if level in levels:
-        return levels.index(level)
-    below = [index for index, item in enumerate(levels) if isinstance(level, int) and item >= level]
-    return below[0] if below else len(levels) - 1
+def target_level(levels: list[int], level, move: int) -> int:
+    """Die Liga N der neuen Season: erst das Ziel rechnen (eine Stufe höher, tiefer oder gleich), dann auf die nächste aktive Liga N
+    abbilden. Liegen zwei gleich nah, entscheidet die Richtung der Bewegung (ohne Bewegung die tiefere) - so verschiebt eine archivierte
+    Liga N niemanden um zwei Stufen."""
+    if not isinstance(level, int):
+        return levels[-1]
+    wanted = level + move
+    if wanted in levels:
+        return wanted
+    toward_top = move < 0
+    return min(levels, key=lambda item: (abs(item - wanted), (item > wanted) if toward_top else (item < wanted)))
 
 
 def _zone_map(final: dict, division: dict | None, levels: list[int]) -> dict[str, str | None]:
@@ -138,13 +143,13 @@ async def plan(db, season: dict) -> dict:
                 continue
             else:
                 seen.add(squad["id"])
-                here = _target_index(levels, division.get("level"))
-                there = min(len(levels) - 1, max(0, here + league_zones.MOVES.get(zone, 0)))
+                level = division.get("level")
+                there = target_level(levels, level, league_zones.MOVES.get(zone, 0))
                 team = teams[squad["team_id"]]
                 carried.append({**entry, "squad_id": squad["id"], "team_id": team["id"], "team_name": team.get("name"),
                                 "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad),
-                                "target_level": levels[there],
-                                "movement": "up" if there < here else "down" if there > here else "stay"})
+                                "target_level": there,
+                                "movement": "up" if isinstance(level, int) and there < level else "down" if isinstance(level, int) and there > level else "stay"})
     out_divisions = []
     for division in active:
         zones = league_zones.effective(division, levels)

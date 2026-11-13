@@ -55,8 +55,10 @@ async def play(flow, tid: str) -> list[dict]:
     return regs
 
 
-async def build(flow, *, levels: int = 3, teams: int = 4, zones: dict | None = None, exits: dict | None = None) -> dict:
-    """Liga mit ``levels`` Liga N (je eine Staffel mit ``teams`` Co-Teams), gespielt. ``exits``: {(level, index): status} vor dem Abschluss."""
+async def build(flow, *, levels: int = 3, teams: int = 4, zones: dict | None = None, exits: dict | None = None,
+                extra: dict | None = None) -> dict:
+    """Liga mit ``levels`` Liga N (je eine Staffel mit ``teams`` Co-Teams), gespielt. ``exits``: {(level, index): status} vor dem Abschluss.
+    ``extra``: {level: [Größe, …]} weitere Staffeln dieser Liga N (``world["more"][level]`` mit Turnier und Anmeldungen)."""
     lead = await flow.add_staff()
     flow.act_as(lead)
     game = ok(await flow.post("/api/games", json=GAME))
@@ -79,6 +81,12 @@ async def build(flow, *, levels: int = 3, teams: int = 4, zones: dict | None = N
         world["divisions"].append(division)
         world["tids"].append(tid)
         world["regs"][level] = regs
+        for index, size in enumerate((extra or {}).get(level, [])):
+            more = await add_staffel(flow, lead, division["id"], size, game=game, prefix=f"L{level}X{index}")
+            flow.act_as(lead)
+            ok(await flow.post(f"/api/tournaments/{more}/status", json={"status": "live"}))
+            world["tids"].append(more)
+            world.setdefault("more", {}).setdefault(level, []).append({"tid": more, "regs": await play(flow, more)})
     return world
 
 
@@ -441,3 +449,27 @@ async def test_tv_shows_the_zones_with_key_and_for_staff(flow):
     assert [row.get("zone") for row in tv["standings"]] == ["promotion", None, None, None]
     # Nur Platz, Name und Zahlen - nie Konto oder Team-Kennung.
     assert not any("team_id" in row or "user_id" in row for row in tv["standings"])
+
+
+@pytest.mark.asyncio
+async def test_archived_middle_division_and_several_staffeln_of_unequal_size(flow):
+    """Liga 2 hat zwei Staffeln (4 und 3 Teams) und wird nach dem Abschluss archiviert: Ihre Aufsteiger gehen in Liga 1, die anderen in
+    die nächste aktive darunter (Liga 3), die Absteiger aus Liga 1 ebenso - niemand rutscht um zwei Stufen (Liga 4)."""
+    world = await build(flow, levels=4, extra={2: [3]})
+    await close_all(flow, world)
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"status": "archived"}))
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
+    where = {team["squad_id"]: (row["level"], team["movement"]) for row in preview["divisions"] for team in row["teams"]}
+    assert [row["level"] for row in preview["divisions"]] == [1, 3, 4]
+    small = world["more"][2][0]["regs"]
+    # Je Staffel ein Aufsteiger: zwei aus Liga 2 nach oben.
+    assert where[squad_of(world, 2, 0)] == (1, "up") and where[small[0]["squad_id"]] == (1, "up")
+    # Liga 2 gibt es nicht mehr: die Mitte und die Absteiger beider Staffeln in Liga 3, nicht in Liga 4.
+    for squad in (squad_of(world, 2, 1), squad_of(world, 2, 3), small[1]["squad_id"], small[2]["squad_id"]):
+        assert where[squad] == (3, "down"), squad
+    # Absteiger aus Liga 1 in die nächste aktive darunter, Aufsteiger aus Liga 3 nach Liga 1 (Ziel Liga 2 ist archiviert).
+    assert where[squad_of(world, 1, 3)] == (3, "down")
+    assert where[squad_of(world, 3, 0)] == (1, "up")
+    assert where[squad_of(world, 3, 3)] == (4, "down") and where[squad_of(world, 4, 0)] == (3, "up")
+    assert preview["carried"] == 4 + 4 + 3 + 4 + 4
