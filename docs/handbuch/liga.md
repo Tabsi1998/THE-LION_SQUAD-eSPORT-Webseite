@@ -1417,6 +1417,51 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 
 **Eingriff von außen:** Ändert ihr den Kader oder die Rollen eines Co-Teams, bekommen Leitung und Co-Leitung des Hauptteams eine Nachricht: wer, was, wann. Jede Kaderänderung in einer laufenden Staffel steht im Protokoll, auch wenn die Teamleitung sie macht oder jemand das Team verlässt.
 
+### 3.10 Saisonabschluss
+
+**Wo:** **Admin → Ligen → Season → Reiter Abschluss**. Abgeschlossen wird **je Staffel**. Die Season ist beendet, wenn alle
+Staffeln abgeschlossen sind – der Stand springt dann von selbst auf „Beendet“. Recht: **Season konfigurieren**; lesen darf
+jede Zuständigkeit der Liga.
+
+<img src="../assets/liga/abschluss-cockpit-pc.png" alt="Reiter Abschluss am PC: Staffel A mit vier offenen Punkten samt Links und dem Knopf Meister entscheiden, Staffel B bereit zum Abschluss mit Vorschau des Endstands, Staffel C abgeschlossen mit Meister, Endstand, Wieder öffnen und Verlauf der Fassungen" width="720">
+
+**1. Checkliste abarbeiten.** Jede Staffel zeigt, was dem Abschluss noch entgegensteht – mit Link zur Stelle:
+
+| Punkt | Was tun |
+| --- | --- |
+| Offene Spiele | Ergebnis eintragen, kampflos werten oder absagen. Ohne Entscheidung gibt es keinen Abschluss. |
+| Offene Vorfälle | auf der Matchseite entscheiden und die Serie feststellen |
+| Offene Verfahren | Beanstandung, Protest oder Einspruch entscheiden (Reiter **Proteste**) |
+| Strafen und Einsprüche | vorläufige Sperren bestätigen oder widerrufen, Einsprüche entscheiden (Reiter **Strafen**) |
+| Laufende Fristen | abwarten – daneben steht, bis wann die Protest- oder Einspruchsfrist läuft |
+| Gleichstand auf Platz 1 | **Meister entscheiden** (nur in der obersten Liga) |
+
+**2. Gleichstand auf Platz 1.** Stehen in der obersten Liga zwei Teams nach allen Kriterien gleich, gibt es keinen Meister
+ohne Entscheid. **Meister entscheiden** → Reihenfolge mit den Pfeilen → **Wie wurde entschieden?** (Entscheidungsspiel, Los
+oder Entscheid der Leitung) → **Grund** → **Festlegen**. Art und Grund stehen im Endstand und öffentlich an der Tabelle.
+Recht: **Ergebnisse korrigieren**, nie über das eigene Team. In unteren Ligen bleibt ein geteilter Platz geteilt.
+
+**3. Staffel abschließen.** Der Knopf geht auf, sobald die Checkliste leer ist. Das Fenster nennt den Meister und fragt
+nach: **Jetzt abschließen**. Danach gilt:
+
+- Der **Endstand** steht fest: Plätze, Punkte, Maps, Entscheide und der Regelstand von jetzt. Website, TV und PDF zeigen ihn,
+  auf der Ligaseite steht „Endstand · abgeschlossen am …“.
+- Ergebnisse, Tabellen-Entscheide und der Stand der Staffel lassen sich nicht mehr ändern. Ändert ihr später Punkte oder
+  Regeln der Season, bleibt der Endstand, wie er war.
+- Der Meister bekommt einen Eintrag „Meister“ an Team und eingesetzten Spielern (Profil → Auszeichnungen).
+- Captains und Vertreter bekommen eine Nachricht.
+- Wer selbst in einem Team der Staffel spielt, schließt nicht ab – das macht eine andere Person.
+
+**4. Korrigieren: Wieder öffnen.** Stimmt nach dem Abschluss etwas nicht, öffnet eine **zweite Person** die Staffel wieder –
+nicht die, die abgeschlossen hat – mit einem **Grund** (Pflicht, steht im Verlauf und im Protokoll, nicht in der Nachricht an
+die Captains). Danach korrigiert ihr das Ergebnis und schließt neu ab. Die alte Fassung bleibt im **Verlauf** sichtbar
+(**Tabelle ansehen**), die neue bekommt die nächste Nummer. Der Meister-Eintrag ruht, solange die Staffel offen ist, und
+wechselt beim neuen Abschluss mit, falls ein anderes Team Meister wird. Als Superadmin geht das Wiederöffnen der eigenen
+Fassung nur als Notausnahme mit eigenem Grund.
+
+**Auf- und Abstieg** sind vorgemerkt und kommen mit „Season aus Vorgänger übernehmen“. Die abgeschlossene Season bleibt auf
+der Ligaseite sichtbar; erst der Stand **Archiviert** blendet sie aus.
+
 ---
 
 ## 4. Wenn etwas nicht klappt

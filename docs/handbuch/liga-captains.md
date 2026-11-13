@@ -136,6 +136,20 @@ das Thema **Match-Erinnerungen** ab: auf der Website **Benutzermenü → Einstel
 
 Die genaue Reihenfolge stellt jede Season ein – sie steht unter der Tabelle.
 
+## Saisonende
+
+Sind alle Spiele eurer Staffel entschieden und läuft keine Protest- oder Einspruchsfrist mehr, **schließt die Liga-Leitung die
+Staffel ab**. Ihr bekommt eine Nachricht. Ab dann steht über der Tabelle „Endstand · abgeschlossen am …“ – Plätze und Punkte
+ändern sich nicht mehr, auch nicht, wenn die Liga später Regeln ändert. Der Meister der obersten Liga bekommt den Eintrag
+„Meister“ im Profil (Team und eingesetzte Spieler).
+
+- **Protest oder Einspruch gehören vor den Abschluss.** Solange eure Frist läuft oder ein Verfahren offen ist, kann die
+  Leitung nicht abschließen.
+- **Gleichstand auf Platz 1:** Die Leitung entscheidet mit Grund (Entscheidungsspiel, Los oder Entscheid). Art und Grund
+  stehen an der Tabelle.
+- **Fehler entdeckt?** Meldet euch bei der Liga-Leitung. Sie kann die Staffel mit Grund wieder öffnen, korrigieren und neu
+  abschließen – darüber bekommt ihr ebenfalls eine Nachricht.
+
 ## Strafen und Einspruch
 
 Verhängt die Liga-Leitung eine Strafe gegen euer Co-Team oder gegen dich, kommt eine Nachricht. Unter **Meine Strafen**

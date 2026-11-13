@@ -681,6 +681,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
 | `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
 | `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
+| `GET /api/admin/leagues/seasons/{id}/closing`, `GET …/staffeln/{tid}/final-tables/{version}` (F.1) | jede Zuständigkeit | – | – |
+| `POST …/staffeln/{tid}/close`, `POST …/staffeln/{tid}/reopen` (F.1) | `season` | ja, eigenes Team in der Staffel | – |
 | PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
 | Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
 | Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
@@ -3330,3 +3332,94 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 - **Links:** Nachrichten zu neuen Anmeldungen zeigen weiter auf `#anmeldungen`, „Transfer beantragt“ auf `#kader`, „Zurück“ im
   Regelwerk auf `#regelwerk`. Unbekannte Marken öffnen den Überblick.
 - Vorbereitet für F.2 „Season aus Vorgänger übernehmen“: der Knopf kommt neben „Season löschen“.
+
+### F.1 Saisonabschluss (#1645)
+
+Abgeschlossen wird **je Staffel**; die Season ist abgeschlossen, wenn alle ihre Staffeln abgeschlossen sind (Entwurf, abgesagt und
+archiviert zählen nicht). Der Abschluss friert die Tabelle ein. Logik in `services/league_final.py`, Routen in
+`routes/league_final_routes.py`, Oberfläche im Reiter **Abschluss** der Season-Seite (`SeasonCloseTab.jsx`, `lib/leagueFinal.js`).
+Entscheidungen Nr. 154 bis 157.
+
+**Sammlung `league_final_tables`** (neu, ohne Migration): eine Zeile je Fassung des Endstands einer Staffel.
+
+| Feld | Inhalt |
+| --- | --- |
+| `id`, `tournament_id`, `league_id`, `season_id`, `division_id`, `staffel` | Zuordnung |
+| `version` | 1, 2, … je Staffel; eindeutig mit `tournament_id` |
+| `active` | `true` für die geltende Fassung (höchstens eine je Staffel, Teilindex `league_final_active`) |
+| `closed_at`, `closed_by` | wann und wer abgeschlossen hat |
+| `rows` | die Tabelle wie öffentlich: Platz, Punkte, Maps, `forfeit_won`/`forfeit_lost`, `deducted_points`, `exit`, `tiebreak`, `lead_decision` |
+| `participants` | Teams in der Wertung |
+| `champion_place`, `champion` | ob Platz 1 hier der Meister ist (oberste Liga N), und wer: `{registration_id, display_name, team_id}` oder `null` |
+| `decisions` | die geltenden Entscheide der Leitung: `{id, registration_ids, names, reason, method, decided_at}` |
+| `rules` | `{table: …}` (Punkte, Reihenfolge, Remis, Default-Win, Ausscheiden von jetzt) und `version: {id, version, label}` des Regelwerks |
+| `title` | Namen von Liga, Season, Liga N und Staffel zum Zeitpunkt des Abschlusses |
+| `zones`, `promotion` | leer bzw. `null`: Auf- und Abstieg sind nur vorgemerkt (Nr. 157), F.2 füllt sie |
+| `status_before` | Stand der Staffel vor dem Abschluss |
+| `reopened_at`, `reopened_by`, `reopen_reason` | gesetzt, sobald die Fassung wieder geöffnet wurde |
+
+Am Turnier steht dazu `final_table: {id, version, closed_at}` (sonst `null`) und `status_before_final`; an der Season
+`final_closed_at`, wenn der Abschluss sie beendet hat.
+
+**Lesen:** `tournament_view_routes._standing_rows` liefert für eine abgeschlossene Staffel `rows` der geltenden Fassung statt
+einer Rechnung (`league_final.frozen_rows`) - damit lesen Ligaseite, Turnierseite, TV, Ergebnis-PDF und App denselben Endstand.
+Eine spätere Änderung an `scoring_rules`, `point_deductions`, `table_decisions` oder an einem Spiel ändert ihn nicht. Die
+Verwaltung rechnet weiter (`live=True`: Reiter „Tabelle“, Vorschau im Cockpit). Der Platz im Profil
+(`profile_references`) kommt ebenfalls aus dem Endstand. `GET /api/leagues/<liga>/<season>/staffeln/<staffel>` trägt
+`staffel.final`: `{version, closed_at, champion, decisions: [{names, reason, method, method_label}], rules_label}` oder `null` -
+nie, wer abgeschlossen hat.
+
+**Sperrgründe (Nr. 154, `blockers`)** - jeder mit `code`, `label`, `text`, `count` und `items: [{text, url, until?}]`:
+
+| `code` | Bedeutung | Quelle |
+| --- | --- | --- |
+| `not_started` | Staffel läuft nicht (Stand außerhalb `live`, `paused`, `completed`, `results_published`) | `tournaments.status` |
+| `no_matches` | kein gewertetes Spiel | `matches_v2` |
+| `open_matches` | ein Spiel mit zwei Seiten ist weder gespielt noch kampflos noch abgesagt | `matches_v2.status` |
+| `incidents` | offener Vorfall oder „Serie feststellen“ | `league_incident_rules.open_incidents`, `lead_task` |
+| `procedures` | offene Beanstandung, offener Protest oder Einspruch | `league_procedures.open_rows` |
+| `sanctions` | vorläufige Sperre oder offener Einspruch gegen eine Strafe der Staffel | `competition_sanctions` |
+| `deadlines` | laufende Protestfrist, Einspruchsfrist gegen Kampflos-Wertung, Korrektur, Protestentscheid oder Strafe | `match_disputes.league_window_of`, `appeal_until`, `league_sanctions.appeal_refusal` |
+| `champion_tie` | Gleichstand auf Platz 1 in der obersten Liga N ohne Entscheid (Nr. 156) | Tabelle |
+
+Hier steht keine zweite Regel: Fristen und Zustände kommen aus den Bausteinen von D.5, E.2 und E.3. Sobald der Leitstand
+(E.4, `league_desk`) auf `main` ist, lesen beide dieselben Bausteine.
+
+**Gleichstand auf Platz 1 (Nr. 156):** Meister ist Platz 1 jeder Staffel der obersten Liga N (kleinste Stufe). Stehen dort
+Teams nach allen Kriterien gleich, verlangt der Abschluss einen Entscheid über `PUT …/staffeln/{tid}/table-decision` (E.1).
+Neu ist das optionale Feld `method` (`playoff` Entscheidungsspiel, `lot` Los, `lead` Entscheid der Leitung); es steht im
+Entscheid, in `lead_decision.method` der Tabellenzeile und im Endstand. Führt die Season `lead_decision` nicht in
+`table_tiebreakers`, sagt das Cockpit, dass das Kriterium zuerst aufgenommen und übertragen werden muss. In unteren Ligen
+bleibt ein geteilter Platz 1 geteilt und sperrt nichts.
+
+**Abschließen** (`POST …/staffeln/{tid}/close`, `{confirm: true, conflict_reason?}`): Zuständigkeit `season`; wer zu einem
+Team der Staffel gehört, schließt nicht ab (403, Superadmin als Notausnahme mit Grund). Unter der Schreibsperre des Turniers;
+den Abschluss gewinnt, wer `tournaments.final_table` zuerst setzt - jeder zweite bekommt 409. Folgen: Staffel `completed`
+(Ergebnisse, Tabellen-Entscheide und „beide nicht erschienen“ sind gesperrt, der Stand geht nur über „Wieder öffnen“ zurück),
+Meister-Eintrag, Season `completed`, wenn alle Staffeln abgeschlossen sind, Protokoll `league.final.close`, Nachricht an
+Captains und Vertreter (`dedupe_key` `league-final:<fassung>:closed:<person>`).
+
+**Wieder öffnen** (Nr. 155, `POST …/staffeln/{tid}/reopen`, `{reason, emergency_reason?, conflict_reason?}`): Pflichtgrund
+(mindestens fünf Zeichen), Zuständigkeit `season`, und eine **zweite Person** - wer abgeschlossen hat, bekommt 403; der
+Superadmin nur mit `emergency_reason` (Protokoll `league.conflict.override`, `final_reopen_own`). Die Fassung bleibt mit
+`active: false` und Grund im Verlauf, die Staffel bekommt ihren Stand von vorher, die Tabelle wird wieder gerechnet. Eine
+Season, die der Abschluss beendet hat, läuft wieder; eine von Hand beendete bleibt. Der nächste Abschluss schreibt die nächste
+Fassung. Protokoll `league.final.reopen`, Nachricht an die Captains ohne den Grund.
+
+**Meister-Eintrag:** ein Eintrag in `tournament_awards` je Staffel der obersten Liga N (`rank: 1`, `league: {title: "Meister",
+division_label, staffel, final_table_id, version}`), am Team (`team_id`) und an den Spielern (`player_ids`: wer in der Staffel
+mindestens einmal aufgestellt war, ohne Aufstellungen der Kader). `awards_for_user` zeigt Liga-Titel nur über `player_ids`,
+nicht jedem Mitglied des Hauptteams; `rank_label` heißt „Meister“. Beim Wiederöffnen ruht der Eintrag (`suspended`), beim
+neuen Abschluss bleibt er für dasselbe Team derselbe und wechselt sonst das Team - nie zwei. Turnier-Pokalzähler, XP und
+Jahreswertung bleiben unberührt (Erfolge zählen keine Staffeln). Ausführliche Belohnungen folgen mit F.4 (#2214).
+
+**Archiv:** Eine abgeschlossene Season (`completed`) bleibt auf Ligaseite und Übersicht sichtbar, mit Endstand. `archived`
+blendet sie wie bisher aus.
+
+**Cockpit** (`GET /api/admin/leagues/seasons/{id}/closing`, jede Zuständigkeit): `season`, `can_act`, `superadmin`,
+`methods`, `responsible` und je Staffel `closed`, `final`, `blockers`, `standings` (Vorschau bzw. Endstand), `table_rules`,
+`ties` (mit `own_team`), `can_decide`, `champion`, `champion_place`, `own_team`, `can_close`, `closed_by_me`, `can_reopen`,
+`history`. `GET …/staffeln/{tid}/final-tables/{version}` liefert eine Fassung mit ihrer Tabelle.
+
+**Nicht in F.1:** Zonen für Auf- und Abstieg (F.2, #1627), Belohnungen und Banner (F.4, #2214), die App (#2173 - sie liest
+den Endstand schon über die Tabellen-Route, zeigt aber kein „Endstand“).
