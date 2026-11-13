@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ClipboardCheck, Clock, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, Megaphone, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -17,6 +17,7 @@ import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUnd
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
+import { NoticeComposer } from "@/components/tls/tournament/NoticeComposer";
 
 // Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Erster
 // Reiter „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf - Erledigtes verschwindet von selbst; jeder
@@ -28,6 +29,8 @@ import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
 // „Aufrufen“ und „Gestartet“, danach. Die Reihenfolge und den Verzug rechnet der Server (GET …/live-queue).
 // Reiter „Check-in“ (#1161, nur mit Check-in-Recht): wer da ist, mit einem Tipp - der eine Ort dafür; die Verwaltung
 // verlinkt hierher (?reiter=checkin). Im Status „Check-in“ öffnet die Seite gleich dort.
+// Reiter „Hinweis“ (#1166, nur wer Hinweise schreiben darf): ein Satz an alle im Turnier oder Event - Benachrichtigung,
+// Banner, auf Wunsch TV; darunter das Protokoll (?reiter=hinweis).
 
 const FILTERS = [
   ["all", "Alle offenen", "open"],
@@ -45,7 +48,7 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  const [tab, setTab] = useState(searchParams.get("reiter") === "checkin" ? "checkin" : null);
+  const [tab, setTab] = useState({ checkin: "checkin", hinweis: "notice" }[searchParams.get("reiter")] || null);
   const [movingId, setMovingId] = useState("");
   const [queue, setQueue] = useState(null);
   const [queueLoaded, setQueueLoaded] = useState(false);
@@ -101,10 +104,11 @@ export default function TournamentLeadPage() {
   const canCheckIn = Boolean(data?.tournament?.can_check_in);
   // Von selbst nur, wo allein die Leitung eincheckt (vor Ort) - online checken die Spieler selbst (Review N7).
   const checkinPhase = canCheckIn && data?.tournament?.status === "check_in" && !data?.tournament?.self_checkin;
-  const chosenTab = tab === "checkin" && !canCheckIn ? null : tab;
+  const canNotice = Boolean(data?.tournament?.can_notice);
+  const chosenTab = (tab === "checkin" && !canCheckIn) || (tab === "notice" && data && !canNotice) ? null : tab;
   const activeTab = chosenTab || (fall || cases ? "attention" : checkinPhase ? "checkin" : queue ? "stations" : queueLoaded && data ? "results" : "");
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.
-  const compactTabs = Boolean(queue) || canCheckIn;
+  const compactTabs = Boolean(queue) || canCheckIn || canNotice;
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
 
   const drawNow = async (card) => {
@@ -225,7 +229,7 @@ export default function TournamentLeadPage() {
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
         <div className="mt-6 flex items-center gap-1 tls-swipe pb-0 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
-          {[["attention", <><span className={compactTabs ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(canCheckIn ? [["checkin", "Check-in", UserCheck]] : []), ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
+          {[["attention", <><span className={compactTabs ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(canCheckIn ? [["checkin", "Check-in", UserCheck]] : []), ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck], ...(canNotice ? [["notice", "Hinweis", Megaphone]] : [])].map(([key, label, Icon]) => (
             <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
               <Icon className={`${compactTabs ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} />
               {/* Ein Textblock (Review N8): sonst setzt der Flex-Abstand zwischen „Braucht “ und „Aufmerksamkeit“ eine zweite Lücke. */}
@@ -236,6 +240,10 @@ export default function TournamentLeadPage() {
 
         {activeTab === "checkin" && canCheckIn ? (
           <CheckinBoard slug={slug} tournamentId={tournamentId} eventId={eventId} />
+        ) : null}
+
+        {activeTab === "notice" && canNotice ? (
+          <NoticeComposer slug={slug} tournament={data.tournament} stations={data.stations || []} />
         ) : null}
 
         {activeTab === "stations" && queue ? (
@@ -308,7 +316,7 @@ export default function TournamentLeadPage() {
           </div>
         ) : null}
         </>) : null}
-        {activeTab !== "checkin" ? <p className="mt-6 text-xs text-white/40">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p> : null}
+        {activeTab !== "checkin" && activeTab !== "notice" ? <p className="mt-6 text-xs text-white/40">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p> : null}
       </section>
 
       {opened && opened.can_enter ? <ResultWindow key={opened.id} entry={opened} onClose={closeEntry} onSaved={undo.start} /> : null}
