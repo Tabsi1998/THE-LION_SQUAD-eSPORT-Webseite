@@ -31,7 +31,7 @@ from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
 from services.league_final_read import is_closed
 from services.league_scope import ONLY_LEAGUE
-from services import checkin_rules, league_protest_settings, league_reminder_rules, league_veto_rules
+from services import checkin_rules, league_protest_settings, league_reminder_rules, league_reward_rules, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.league_schedule import public_rules as schedule_public_rules
 from services.log_safe import log_safe
@@ -1503,6 +1503,8 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
         "look": league_look.effective(league, season),
         # „Um was gespielt wird“ - die Gewinne der Season; eine Liga N mit eigenen trägt sie unter ``prizes``.
         "prizes": list(season.get(league_look.PRIZES) or []),
+        # Belohnungen (F.4, #2214): was je Platz vergeben wird - eine Liga N mit eigener Zusammenstellung trägt sie unter ``rewards``.
+        "rewards": league_reward_rules.public_view(season),
         "map_pool": pool,
         # Sperrliste (#2218): nur der Schnappschuss der Season, ohne Notiz und Autor; eine ganze Klasse mit ihren Einträgen von
         # heute (#2287).
@@ -1513,6 +1515,7 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
             "id": division["id"], "level": division["level"], "nickname": division.get("nickname"),
             "label": division_label(division),
             "prizes": league_look.division_prizes(division),
+            "rewards": league_reward_rules.public_view(season, division, own_only=True),
             "settings": {key: effective_settings(season, division)[key]
                          for key in ("best_of", "team_size", "min_squad_size", "max_staffel_size")},
             "staffeln": [staffel_summary(row) for row in staffeln

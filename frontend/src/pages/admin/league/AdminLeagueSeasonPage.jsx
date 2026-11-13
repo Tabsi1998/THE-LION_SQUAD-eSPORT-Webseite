@@ -40,6 +40,7 @@ import { SeasonProtestsTab } from "./SeasonProtestsTab";
 import { SeasonRulesTab } from "./SeasonRulesTab";
 import { SeasonSanctionsTab } from "./SeasonSanctionsTab";
 import { SeasonCloseTab } from "./SeasonCloseTab";
+import { SeasonRewardsTab } from "./SeasonRewardsTab";
 import { SeasonSuccessorSheet } from "./SeasonSuccessorSheet";
 import { SeasonRecomputeSheet } from "./SeasonRecomputeSheet";
 import { SeasonTablePanel } from "./SeasonTablePanel";
@@ -391,6 +392,8 @@ export default function AdminLeagueSeasonPage() {
     strafen: () => <SeasonSanctionsTab seasonId={seasonId} />,
     // Abschluss (F.1, #1645): Endstand je Staffel festhalten - eigenes Laden, eigene Knöpfe.
     abschluss: () => <SeasonCloseTab seasonId={seasonId} canResults={can("results")} />,
+    // Belohnungen (F.4, #2214): eigenes Laden und Speichern - lesen jede Zuständigkeit, ändern „Season konfigurieren“ (der Server prüft).
+    belohnungen: () => <SeasonRewardsTab seasonId={seasonId} />,
     regelwerk: () => (
       <SeasonRulesTab seasonId={seasonId} season={season} canSeason={canSeason} canRules={canRules} rulesView={rulesView} rulesNotice={notice}
         rulesLink={rulesLink} onPendingSync={setPendingSync} />

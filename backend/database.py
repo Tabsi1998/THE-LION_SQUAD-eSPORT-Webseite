@@ -699,6 +699,12 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # Fast Lap (#1584): je Platz, Quelle und Person ein Gewinn, je Saison, Strecke und Person eine Punktezeile - der
     # Abgleich nach einer Korrektur schreibt per Upsert darauf.
     ("prize_pickups", FASTLAP_PRIZE_KEY, "fastlap_place_user", {"partialFilterExpression": {"source_type": "fastlap"}}),
+    # Belohnungen der Liga (F.4, #2214): je Belohnung und Anmeldung einer Staffel ein Eintrag bzw. ein echter Gewinn - auch wenn zwei
+    # Abschlüsse zugleich schreiben. Der Meister-Eintrag und Turnier-Auszeichnungen haben keinen ``reward_key`` und zählen nicht.
+    ("tournament_awards", [("tournament_id", 1), ("reward_key", 1)], "tournament_award_reward",
+     {"partialFilterExpression": {"reward_key": {"$type": "string"}}}),
+    ("prize_pickups", [("tournament_id", 1), ("reward_key", 1)], "league_reward",
+     {"partialFilterExpression": {"source_type": "league_reward"}}),
     ("season_points", [("season_id", 1), ("source_type", 1), ("source_id", 1), ("user_id", 1)], "fastlap_source_user",
      {"partialFilterExpression": {"source_type": "fastlap"}}),
     # Shop (#1703, docs/SHOP.md): je Idempotenzschlüssel eine Bestellung, je Bestellung ein Printful-Auftrag, jedes
@@ -774,6 +780,8 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("billing_cases", "status"),
     ("tournament_awards", [("tournament_id", 1), ("registration_id", 1)]),
     ("tournament_awards", "registration_id"),
+    # Zeremonie der Belohnungen (F.4): „was habe ich noch nicht gesehen“ je Person.
+    ("tournament_awards", "audience_ids"),
     ("team_squads", "team_id"),
     ("chat_attachments", "owner_id"),
     ("chat_attachments", [("status", 1), ("created_at", 1)]),

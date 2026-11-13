@@ -1532,7 +1532,7 @@ alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
 **1. Vorschau lesen.** Das Blatt zeigt, was übernommen wird, und je Liga die Teams der neuen Season:
 
 - **Übernommen als Entwurf:** alle Einstellungen der Season (Spielbetrieb, Tabelle, Anmeldung und Kader, Termin-, Check-in- und
-  Erinnerungsregeln, Fristen, Gestaltung und Gewinne), die Ligen mit Beinamen, Abweichungen und Zonen, der Map-Pool und die
+  Erinnerungsregeln, Fristen, Gestaltung und Gewinne, Belohnungen), die Ligen mit Beinamen, Abweichungen und Zonen, der Map-Pool und die
   Sperrliste in ihrer geltenden Version.
 - **Regelwerk:** Hatte die Season ein eigenes, liegt es in der neuen Season als **Entwurf** einer neuen Fassung bereit – im
   Regelwerk freigeben, der Haken „Captains müssen dieser Fassung neu zustimmen“ ist vorbelegt. Gilt das der Liga, gilt es weiter.
@@ -1567,6 +1567,47 @@ gibt es keine Zonen. Stehen zwei Teams an einer Zonengrenze in allem gleich, ver
 
 **Season-Historie:** Team- und Spielerprofil zeigen unter **Seasons** je abgeschlossene Staffel Liga, Platz, Meister und Auf-
 oder Abstieg – aus dem Endstand, nur für Seasons, die die Person sehen darf.
+
+### 3.12 Belohnungen
+
+**Wo:** **Admin → Ligen → Season → Reiter Belohnungen**. Ändern darf, wer **Season konfigurieren** hat; alle anderen
+Zuständigen sehen den Reiter nur zum Lesen.
+
+<img src="../assets/liga/f4-belohnungen-verwaltung-1440.png" alt="Reiter Belohnungen am PC: Spieler-Belohnungen an Spieler mit Einsatz, fünf Belohnungen mit Vorschau der Grafik (Gold-, Silber-, Bronzemedaille, Season-Banner für alle, Titel für Platz 4 bis 6), darunter Liga 1 wie die Season mit dem Stand der Vergabe je Staffel und Liga 2 mit eigenem Emblem" width="720">
+
+**1. Zusammenstellen.** **Belohnung hinzufügen** legt eine Zeile an:
+
+| Feld | Bedeutung |
+| --- | --- |
+| Art | **Medaille**, **Banner**, **Emblem** oder **Titel**. Links steht die Vorschau der Lionsquad-Vorlage – Gold, Silber und Bronze für Platz 1 bis 3, sonst Lionsquad-Blau. Beschriftet wird sie beim Vergeben mit Season, Liga und Platz. |
+| Für wen | ein **Platz**, ein **Platzbereich** (etwa 4–6) oder **Alle Teilnehmer**. Ausgetretene und disqualifizierte Teams bekommen nichts. |
+| Bekommt | **Team** (steht an der Teamseite) und/oder **Spieler** (steht in deren Profil). |
+| Echter Gewinn | freiwillig, etwa „Gutschein“. Er landet beim Abschluss unter **Gewinne** zur Abholung, wie bei Turnieren. |
+| Eigenes Bild | freiwillig über **Bild hochladen** oder die Mediathek; sonst gilt die Vorlage. |
+
+**Spieler-Belohnungen gehen an** gilt für die ganze Season: **Spieler mit Einsatz** (Vorgabe – wer in der Staffel mindestens
+ein gespieltes Spiel in der Aufstellung stand; kampflose Spiele zählen nicht) oder **Ganzer Kader zum Abschluss**. Hat ein Team
+in keinem gespielten Spiel eine Aufstellung gemeldet (oder nur kampflose Spiele), bekommt sein **Kader zum Abschluss** die
+Spieler-Belohnung – wie beim Meister-Eintrag. Die Reiter **Belohnungen** und **Abschluss** nennen diese Teams: „Kader statt
+Einsatz, weil keine Aufstellungen gemeldet“. In einer Einzel-Liga bekommt die Person eine Spieler-Belohnung nur, wenn sie
+gespielt hat (mit „Ganzer Kader“ immer); eine Team-Belohnung bekommt sie als Teilnehmerin auch ohne Spiel.
+
+**2. Liga N.** Jede Liga übernimmt die Belohnungen der Season. **Eigene Zusammenstellung** kopiert sie für diese Liga zum
+Anpassen (auch „keine“ ist möglich), **Wie die Season** nimmt die Abweichung zurück. Unter jeder Liga steht je Staffel, was
+vergeben ist.
+
+**3. Vergabe.** Vergeben wird beim **Abschluss** einer Staffel (3.10) aus dem Endstand – sofort. Wer etwas bekommt, sieht es
+im Profil bzw. an der Teamseite, bekommt eine Nachricht und beim nächsten Besuch eine kurze Zeremonie mit **Bild
+herunterladen** zum Teilen. Die Ligaseite zeigt das Podest mit den Belohnungen je Platz, das Ergebnis-PDF einen Abschnitt
+**Belohnungen**. Eine Änderung im Reiter wirkt erst beim nächsten Abschluss.
+
+**4. Wieder öffnen.** Solange eine Staffel wieder offen ist, ruhen ihre Belohnungen (unsichtbar). Beim neuen Abschluss wird
+neu zugeteilt – nie doppelt. Wer dabei etwas verliert oder neu bekommt, erhält eine Nachricht; Captain und Vertreter bekommen
+für Team-Belohnungen eine eigene Nachricht („Belohnung für euer Team“). Ein echter Gewinn wird nie entzogen: Fällt er weg,
+bekommt er unter **Gewinne** „nach Korrektur prüfen“; landet dieselbe Belohnung auf einem anderen Platz, zieht der Platz mit,
+solange der Gewinn nicht abgeholt ist.
+
+**Sichtbarkeit:** Öffentlich steht eine Belohnung nur, wenn Gäste die Season und die Staffel sehen dürfen.
 
 ---
 

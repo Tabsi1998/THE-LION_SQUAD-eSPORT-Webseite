@@ -45,6 +45,8 @@ COPIED_GROUPS = (
     "Anmeldung und Kader: Spielberechtigung, Plattform, Plätze, Warteliste, Zulassung",
     "Termin-, Check-in- und Erinnerungsregeln, Fristen für Proteste und Einsprüche",
     "Gestaltung und Gewinne",
+    # F.4 (#2214): Zusammenstellung der Season, „Spieler mit Einsatz“ bzw. Kader und die eigenen Belohnungen je Liga N.
+    "Belohnungen je Season und Liga N",
 )
 REASONS = {"withdrawn": "Ausgetreten", "disqualified": "Disqualifiziert", "dissolved": "Aufgelöst"}
 MOVEMENT_TEXT = {"up": "Aufstieg", "down": "Abstieg", "stay": "bleibt"}

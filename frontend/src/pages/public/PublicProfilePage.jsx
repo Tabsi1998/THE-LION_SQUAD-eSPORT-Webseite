@@ -40,6 +40,7 @@ import { showLapTime } from "@/lib/laptime";
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
+import { RewardChip, RewardCollection } from "@/components/tls/rewards/RewardCollection";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
@@ -445,12 +446,14 @@ export default function PublicProfilePage() {
   const showTwitchChannel = Boolean(profile.show_twitch_embed && twitchChannel && !liveStream);
   const hasOverviewContent = highlights.length > 0 || awards.length > 0 || badges.length > 0 || pinned.length > 0 || referenceItems.length > 0 || leagueHistory.length > 0 || showTwitchLive;
 
-  // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu.
-  const featureAward = async (awardId) => {
+  // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu. ``slot = "title"``: eine Belohnung der
+  // Art „Titel“ steht neben dem Namen (F.4, #2214).
+  const featureAward = async (awardId, slot = "banner") => {
+    const query = slot === "title" ? "?slot=title" : "";
     try {
-      if (awardId) await api.post(`/me/awards/${awardId}/feature`);
-      else await api.delete("/me/awards/feature");
-      toast.success(awardId ? "Als Profilbanner gesetzt." : "Profilbanner entfernt.");
+      if (awardId) await api.post(`/me/awards/${awardId}/feature${query}`);
+      else await api.delete(`/me/awards/feature${query}`);
+      toast.success(slot === "title" ? (awardId ? "Als Titel gesetzt." : "Titel entfernt.") : (awardId ? "Als Profilbanner gesetzt." : "Profilbanner entfernt."));
       load();
     } catch (err) {
       toast.error(formatRequestError(err, "Das hat nicht geklappt."));
@@ -590,6 +593,8 @@ export default function PublicProfilePage() {
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/55" data-testid="profile-identity">
                 <span>@{profile.username}</span>
+                {/* Titel neben dem Namen (F.4, #2214): eine gewählte Belohnung der Art „Titel“. */}
+                <RewardChip award={profile.featured_title} testId="profile-featured-title" />
                 <AccountLevelPill level={level.level} />
                 {liveStream && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
@@ -841,9 +846,13 @@ export default function PublicProfilePage() {
         {activeTab === "awards" && (
           <div className="space-y-3" data-testid="public-profile-awards">
             <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
-            {awards.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {awards.map((award) => (
+            {/* Sammlung der Liga-Belohnungen (F.4, #2214): je Season gruppiert; das eigene Profil wählt Banner und Titel. */}
+            <RewardCollection awards={awards} testId="profile-reward-collection" featuredId={profile.featured_award?.id} titleId={profile.featured_title?.id}
+              onFeature={isOwnProfile ? (id) => featureAward(id) : null} onTitle={isOwnProfile ? (id) => featureAward(id, "title") : null}
+              linkFor={(award) => (award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null)} />
+            {awards.some((award) => !award.reward) ? (
+              <div className="grid gap-3 md:grid-cols-2" data-testid="profile-award-banners">
+                {awards.filter((award) => !award.reward).map((award) => (
                   <AwardBanner
                     key={award.id}
                     award={award}
@@ -861,8 +870,8 @@ export default function PublicProfilePage() {
                   />
                 ))}
               </div>
-            ) : (
-              <EmptyState text={isOwnProfile ? "Noch keine Auszeichnungen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht." : "Noch keine Auszeichnungen aus öffentlichen Turnieren."} />
+            ) : awards.length ? null : (
+              <EmptyState text={isOwnProfile ? "Noch keine Auszeichnungen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." : "Noch keine Auszeichnungen aus öffentlichen Turnieren."} />
             )}
           </div>
         )}

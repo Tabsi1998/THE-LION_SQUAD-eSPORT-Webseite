@@ -100,6 +100,8 @@ EXTRA_PERSONAL_USER_FIELDS = (
     "discord_servers_greeted_for", "discord_dm_blocked_at", "discord_last_message_at",
     # Mitgliederakte (#2118): welche Netzwerke geteilt wurden; Erfolge und Auszeichnung, die oben stehen sollten.
     "dolibarr_accounts_shared", "pinned_achievements", "featured_award_id", "last_twitch_live_at",
+    # Titel neben dem Namen (F.4, #2214).
+    "featured_title_award_id",
     # Datenbewusst (#2338): wann die Person ihre Privatsphäre eingestellt bzw. ihre Daten geholt hat.
     "privacy_reviewed_at", "data_exported_at",
 )

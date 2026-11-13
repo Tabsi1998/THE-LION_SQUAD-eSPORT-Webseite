@@ -37,7 +37,9 @@ async def attach_result_winners(db, posts: list[dict], user: dict | None) -> Non
         return
     awards = await db.tournament_awards.find(
         # Ein ruhender Liga-Titel (Staffel wieder geöffnet, F.1 #1645) ist kein Sieger.
-        {"tournament_id": {"$in": list(visible)}, "rank": 1, "suspended": {"$ne": True}}, {"_id": 0, "tournament_id": 1, "registration_id": 1},
+        # Belohnungen (F.4, ``reward_key``) sind keine Sieger-Einträge.
+        {"tournament_id": {"$in": list(visible)}, "rank": 1, "suspended": {"$ne": True}, "reward_key": None},
+        {"_id": 0, "tournament_id": 1, "registration_id": 1},
     ).to_list(len(visible) * 4)
     first_award = {}
     for award in awards:
