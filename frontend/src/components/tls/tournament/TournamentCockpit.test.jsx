@@ -126,3 +126,15 @@ test("„Bewegung reduzieren“: die Liste springt - Erledigtes ist sofort weg, 
   expect(screen.queryByTestId("cockpit-problem-ds-m5")).toBeNull();
   expect(screen.getByTestId("cockpit-problem-rm-m1")).toBeInTheDocument();
 });
+
+test("„Alles im Plan“ erst, wenn die letzte Zeile hinausgeglitten ist (Review N6)", async () => {
+  reduceMotion(false);
+  const { rerender } = show({ problems: cockpitProblems({ attention: [ATTENTION[0]] }) });
+  expect(screen.queryByTestId("cockpit-problems-empty")).toBeNull();
+  rerender(<MemoryRouter><TournamentCockpit loaded queue={QUEUE} board={board()} problems={[]} /></MemoryRouter>);
+  // Die Zeile gleitet noch hinaus - die Meldung wartet.
+  expect(screen.getByTestId("cockpit-problem-rm-m1")).toBeInTheDocument();
+  expect(screen.queryByTestId("cockpit-problems-empty")).toBeNull();
+  expect(await screen.findByTestId("cockpit-problems-empty", {}, { timeout: 3000 })).toHaveTextContent("Alles im Plan");
+  expect(screen.queryByTestId("cockpit-problem-rm-m1")).toBeNull();
+});

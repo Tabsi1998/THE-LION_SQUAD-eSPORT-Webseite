@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, ChevronRight, CircleCheck, ClipboardX, MessagesSquare, Scale, Shuffle, Timer, UserX, Wrench } from "lucide-react";
@@ -78,7 +78,7 @@ function ProblemRow({ problem, onOpen }) {
 }
 
 /** Die Liste „Probleme“ - mit Bewegung über framer-motion, ohne als schlichte Liste. */
-export function ProblemList({ problems, onOpen }) {
+export function ProblemList({ problems, onOpen, onExitComplete }) {
   const moving = motionAllowed();
   const orderOf = useStaggerOrder(problems.map((problem) => problem.id));
   if (!moving) {
@@ -90,7 +90,7 @@ export function ProblemList({ problems, onOpen }) {
   }
   return (
     <ul className="relative space-y-2" data-testid="cockpit-problems-list" data-motion="on">
-      <AnimatePresence initial mode="popLayout">
+      <AnimatePresence initial mode="popLayout" onExitComplete={onExitComplete}>
         {problems.map((problem) => {
           const delay = seconds(orderOf(problem.id) * MICRO.stagger);
           return (
@@ -119,6 +119,13 @@ export function ProblemList({ problems, onOpen }) {
 
 export function TournamentCockpit({ problems = [], loaded = false, queue, board = {}, highlightStation = "", onOpen }) {
   const count = problems.length;
+  // „Alles im Plan“ erst, wenn die letzte Zeile hinausgeglitten ist (Review N6) - sonst stünde beides kurz übereinander.
+  // Mit „Bewegung reduzieren“ gleitet nichts, dann sofort.
+  const [drained, setDrained] = useState(true);
+  useEffect(() => {
+    if (count) setDrained(false);
+  }, [count]);
+  const settled = drained || !motionAllowed();
   return (
     <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start" data-testid="lead-cockpit">
       <section aria-labelledby="cockpit-problems-title" data-testid="cockpit-problems">
@@ -133,7 +140,7 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
           </span>
         </header>
         <div className="mt-3">
-          {loaded && !count ? (
+          {loaded && !count && settled ? (
             <div className="tls-live-reveal flex items-center gap-3 rounded-sm border border-ok/25 bg-ok/5 p-4" data-testid="cockpit-problems-empty">
               <CircleCheck className="h-6 w-6 shrink-0 text-ok" aria-hidden="true" />
               <div className="min-w-0">
@@ -142,7 +149,7 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
               </div>
             </div>
           ) : null}
-          <ProblemList problems={problems} onOpen={onOpen} />
+          <ProblemList problems={problems} onOpen={onOpen} onExitComplete={() => setDrained(true)} />
         </div>
       </section>
 
