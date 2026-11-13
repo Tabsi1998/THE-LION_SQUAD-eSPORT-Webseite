@@ -108,3 +108,15 @@ def test_pdf_shows_the_zone_next_to_the_name_and_as_a_mark():
     # Gegenprobe: ein Turnier ohne Zonen bleibt, wie es war.
     plain = _pdf_standings_tables({"format": "league"}, table(2))[0]
     assert plain["zones"] == [None, None] and plain["rows"][0][1] == "Team 1"
+
+
+def test_no_tie_block_when_all_tied_teams_land_in_the_same_zone():
+    # Vier Teams, Zonen 3/3 (überlappen): Platz 1 geteilt - beide steigen auf, nichts zu entscheiden.
+    rows = table(4)
+    rows[1]["rank"] = 1
+    rules = zones.effective({"level": 2, "zones": {"promote": 3, "relegate": 3}}, [1, 2, 3])
+    assert zones.boundary_ties(rows, rules) == []
+    # Gegenprobe: Platz 3 und 4 geteilt - einer stiege auf, einer ab.
+    rows = table(4)
+    rows[3]["rank"] = 3
+    assert [tie["registration_ids"] for tie in zones.boundary_ties(rows, rules)] == [["r3", "r4"]]

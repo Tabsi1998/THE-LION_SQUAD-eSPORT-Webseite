@@ -136,25 +136,22 @@ def mark(rows: list[dict], zones: dict | None) -> list[dict]:
 
 
 def boundary_ties(rows: list[dict], zones: dict | None) -> list[dict]:
-    """Echte Gleichstände an einer Zonengrenze (Nr. 156 „später Auf-/Abstieg“): Teams auf demselben Platz liegen auf beiden Seiten einer
-    Grenze. Unentschiedene Startrechte bleiben nicht dem Zufall überlassen - vor dem Abschluss entscheidet die Leitung."""
+    """Echte Gleichstände an einer Zonengrenze (Nr. 156 „später Auf-/Abstieg“): Teams auf demselben Platz bekämen nach ``assign`` verschiedene
+    Zonen. Liegen alle gleich Platzierten in derselben Zone (auch bei Zonen, die sich überlappen), ist nichts zu entscheiden."""
     if not zones or not started(rows):
         return []
-    order = [row for row in ordered(rows) if not row.get("exit")]
-    size = len(ordered(rows))
-    up, up_playoff = zones.get("promote") or 0, zones.get("playoff_promote") or 0
-    down, down_playoff = zones.get("relegate") or 0, zones.get("playoff_relegate") or 0
-    cuts = sorted({cut for cut, used in ((up, up), (up + up_playoff, up_playoff), (size - down - down_playoff, down_playoff),
-                                          (size - down, down)) if used and 0 < cut < len(order)})
-    found: dict[int, dict] = {}
-    for cut in cuts:
-        before, after = order[cut - 1], order[cut]
-        rank = _rank(before)
-        if rank and rank == _rank(after) and rank not in found:
-            group = [row for row in order if _rank(row) == rank]
-            found[rank] = {"kind": "zone", "rank": rank, "registration_ids": [row["registration_id"] for row in group],
-                           "names": [row.get("display_name") or "Team" for row in group], "points": before.get("points")}
-    return [found[rank] for rank in sorted(found)]
+    found = assign(rows, zones)
+    groups: dict[int, list[dict]] = {}
+    for row in ordered(rows):
+        if not row.get("exit") and _rank(row) and row.get("registration_id"):
+            groups.setdefault(_rank(row), []).append(row)
+    out = []
+    for rank in sorted(groups):
+        group = groups[rank]
+        if len(group) > 1 and len({found.get(row["registration_id"]) for row in group}) > 1:
+            out.append({"kind": "zone", "rank": rank, "registration_ids": [row["registration_id"] for row in group],
+                        "names": [row.get("display_name") or "Team" for row in group], "points": group[0].get("points")})
+    return out
 
 
 def summary(zones: dict | None) -> str:
