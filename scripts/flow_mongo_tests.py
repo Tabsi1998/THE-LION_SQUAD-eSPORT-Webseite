@@ -31,7 +31,9 @@ AREA = re.compile(r"league|squad|match|map|flow_harness|result_confirm|result_au
                   # Ausrüstung und Sperrliste (#2218): eindeutige Indizes und Versionen wie bei Maps und Pools.
                   r"|game_equipment|loadout"
                   # Unterkategorien (#2287): positionsgenaues Schreiben in den Kategorien des Spiels.
-                  r"|equipment_subcategories")
+                  r"|equipment_subcategories"
+                  # Einladung durch die Verwaltung (#932): zwei Protokollzeilen unter dem eindeutigen Index audit_logs.id.
+                  r"|admin_user_invite")
 USES_HARNESS = re.compile(r"\bmake_flow\b")
 
 

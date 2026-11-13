@@ -27,6 +27,10 @@ REMOVED = {
     "POST /api/notifications/read-all",
     "DELETE /api/notifications/read",
     "DELETE /api/notifications/{nid}",
+    # Alte Abzeichen (#932, früher test_phase5_badges/test_phase_d_v3): abgelöst durch /api/achievements.
+    "GET /api/badges",
+    "GET /api/badges/{code}",
+    "GET /api/badges/progress/me",
 }
 
 STILL_THERE = {
@@ -39,6 +43,7 @@ STILL_THERE = {
     "GET /api/documents/{doc_id}/download",
     "GET /api/mobile/dashboard",
     "GET /api/seasons/{slug_or_id}/standings",
+    "GET /api/achievements/groups",
     # Bewusst behalten (siehe Docstring).
     "GET /api/matches/upcoming",
 }
