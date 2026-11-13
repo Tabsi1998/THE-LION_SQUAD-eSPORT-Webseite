@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // Galerie (#2112): Beschriftung und Reihenfolge eines Mediums lassen sich nach dem Hochladen ändern.
 
@@ -107,4 +108,40 @@ test("eine Reihenfolge, die keine ganze Zahl ist, wird gemeldet", async () => {
   fireEvent.click(screen.getByTestId("gallery-photo-save"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Reihenfolge bitte als ganze Zahl."));
   expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+// Tastatur (#937): die Medienauswahl ist ein echter Dialog - Fokus hinein, Tab bleibt drin, Leertaste wählt (und sagt
+// „ausgewählt“), Escape schließt und gibt den Fokus an den Knopf zurück; der Klick daneben schließt weiter.
+test("Medienauswahl per Tastatur: Fokus im Dialog, Leertaste wählt, Escape schließt mit Fokus zurück", async () => {
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/admin/media")
+    ? { data: { items: [{ filename: "neu.webp", url: "/api/static/uploads/neu.webp", media_type: "image" }], total: 1 } }
+    : albumWith([PHOTO])));
+  const user = userEvent.setup();
+  render(<AlbumPhotos album={ALBUM} onBack={() => {}} />);
+  const opener = await screen.findByTestId("photo-media-picker");
+  opener.focus();
+  await user.keyboard("{Enter}");
+  const dialog = screen.getByRole("dialog", { name: "Medienbibliothek" });
+  expect(dialog).toContainElement(document.activeElement);
+  const tile = await screen.findByTitle("neu.webp");
+  tile.focus();
+  await user.keyboard(" ");
+  expect(tile).toHaveAttribute("aria-pressed", "true");
+  for (let i = 0; i < 8; i += 1) {
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "Medienbibliothek" })).toBeNull();
+  expect(opener).toHaveFocus();
+});
+
+test("Medienauswahl: Klick daneben schließt, ein Klick im Fenster nicht", async () => {
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/admin/media") ? { data: { items: [], total: 0 } } : albumWith([PHOTO])));
+  render(<AlbumPhotos album={ALBUM} onBack={() => {}} />);
+  fireEvent.click(await screen.findByTestId("photo-media-picker"));
+  fireEvent.click(screen.getByRole("heading", { name: "Medienbibliothek" }));
+  expect(screen.getByRole("dialog", { name: "Medienbibliothek" })).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("photo-media-backdrop"));
+  expect(screen.queryByRole("dialog", { name: "Medienbibliothek" })).toBeNull();
 });

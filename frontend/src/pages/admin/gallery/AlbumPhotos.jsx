@@ -1,5 +1,5 @@
 // Galerie (#223): die Bilder und Videos eines Albums – Abschnitte, Reihenfolge, Auswahl aus den Medien, Video-Link.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { api, formatApiError, formatRequestError, formatUploadError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { MediaLibraryMore, MediaLibrarySearch } from "@/components/tls/MediaLibraryControls";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { buildExternalGalleryPayload, galleryMediaUrl, galleryPosterUrl, isVideoLike, MEDIA_ACCEPT, mediaTypeFromItem, mediaTypeFromFile, providerLabel } from "@/lib/galleryMedia";
@@ -29,6 +30,9 @@ export function AlbumPhotos({ album, onBack }) {
   const [mediaOpen, setMediaOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const media = useMediaLibrary("/admin/media?type=media", mediaOpen);
+  // Medienauswahl (#937): Escape schließt, Tab bleibt im Fenster, der Fokus kehrt zum Knopf zurück.
+  const mediaTitleId = useId();
+  const mediaDialogRef = useModalBehavior(mediaOpen, () => setMediaOpen(false));
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [editingPhoto, setEditingPhoto] = useState(null);
   // Häkchen-Auswahl (#2122): mehrere Einträge auf einmal aus dem Album nehmen oder verschieben.
@@ -420,14 +424,14 @@ export function AlbumPhotos({ album, onBack }) {
         </div>
       )}
       {mediaOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setMediaOpen(false)}>
-          <div className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid="photo-media-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMediaOpen(false); }}>
+          <div ref={mediaDialogRef} role="dialog" aria-modal="true" aria-labelledby={mediaTitleId} className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <h3 className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
+                <h3 id={mediaTitleId} className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
                 <div className="text-xs text-white/45">{selectedMedia.length} ausgewählt</div>
               </div>
-              <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white">×</button>
+              <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white" aria-label="Schließen">×</button>
             </div>
             <MediaLibrarySearch library={media} testId="gallery-media" />
             {media.loading ? (
@@ -443,6 +447,7 @@ export function AlbumPhotos({ album, onBack }) {
                       key={item.filename}
                       type="button"
                       onClick={() => toggleMedia(item)}
+                      aria-pressed={active}
                       className={`aspect-square border bg-[#0A0A0A] rounded-sm overflow-hidden relative ${active ? "border-[#29B6E8] ring-2 ring-[#29B6E8]/30" : "border-white/10 hover:border-[#29B6E8]/60"}`}
                       title={item.filename}
                     >
