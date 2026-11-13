@@ -109,11 +109,12 @@ test("geht das Speichern schief, springt die Zeile zurück und eine Meldung sagt
   expect(screen.getByTestId("lead-checkin-row-r2")).toHaveAttribute("data-status", "approved");
 });
 
-test("„Nicht erschienen“ mit Nachrücker meldet es", async () => {
-  apiMock.post.mockResolvedValueOnce({ data: { id: "r3", status: "no_show", waitlist_moved_up: ["r9"], placement: null } });
+// #1941 (F9): Nach „Nicht erschienen“ mit Nachrücken nennt die Meldung, wer von der Warteliste nachgerückt ist.
+test("Nicht erschienen mit Nachrücker: die Meldung nennt den Namen", async () => {
+  apiMock.post.mockResolvedValueOnce({ data: { id: "r3", status: "no_show", waitlist_moved_up: ["r9"], waitlist_moved_up_names: ["Begleitung Bea"], placement: null } });
   renderBoard(SOLO_BOARD);
   fireEvent.click(await screen.findByTestId("lead-checkin-noshow-r3"));
-  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Nicht erschienen gesetzt – 1 Person rückt von der Warteliste nach."));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Nicht erschienen gesetzt – Nachrücker: Begleitung Bea."));
   expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/registrations/r3/checkin", { status: "no_show" });
   expect(screen.getByTestId("lead-checkin-summary")).toHaveTextContent("2 nicht erschienen");
 });

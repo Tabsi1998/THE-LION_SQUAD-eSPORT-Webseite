@@ -82,7 +82,9 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
     if (status === "checked_in") setFresh((now) => ({ ...now, [row.id]: true }));
     try {
       const { data } = await api.post(`/tournaments/${encodeURIComponent(tournamentId || slug)}/registrations/${row.id}/checkin`, { status });
-      if (status === "no_show") toast.success(checkinStatusText(status, data));
+      // Wer nachgerückt ist, nennt der Server mit Namen (#1941) - die Meldung sagt es.
+      const movedUp = (data?.waitlist_moved_up || []).map((id, index) => ({ id, display_name: data?.waitlist_moved_up_names?.[index] }));
+      if (status === "no_show") toast.success(checkinStatusText(status, data, movedUp));
       const placed = placementMessage(data?.placement);
       if (placed) toast[placed.tone](placed.text);
       // Der Stand des Servers übernimmt; erst dann fällt die vorläufige Anzeige weg (kein Zurückspringen dazwischen).

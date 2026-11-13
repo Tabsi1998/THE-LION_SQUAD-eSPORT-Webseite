@@ -243,6 +243,7 @@ async def test_back_from_no_show_needs_a_free_place(flow):
     marked = await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": "no_show"})
     assert marked.status_code == 200, marked.text
     assert marked.json()["waitlist_moved_up"] == [waiting["id"]]
+    assert marked.json()["waitlist_moved_up_names"] == ["Wartende Wilma"], "die Meldung nennt den Namen (#1941)"
 
     for status in ("approved", "checked_in"):
         back = await flow.post(f"{base}/{regs[0]['id']}/checkin", json={"status": status})

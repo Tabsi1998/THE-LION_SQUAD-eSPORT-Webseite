@@ -1273,7 +1273,9 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
             updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
             # Nach dem Check-in-Ende: wer jetzt eingecheckt wird, rückt auf einen freien Platz nach (#1551).
             placement = await _place_fill_in(db, tid, updated, me.get("id")) if status == "checked_in" else None
-            return {**updated, "waitlist_moved_up": moved_up, "placement": placement, "idempotent_replay": False}
+            # Wer nachgerückt ist, mit Namen (#1941, #1161) - die Route ist nur für die Turnierleitung.
+            return {**updated, "waitlist_moved_up": moved_up, "waitlist_moved_up_names": await registration_names(db, moved_up),
+                    "placement": placement, "idempotent_replay": False}
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
