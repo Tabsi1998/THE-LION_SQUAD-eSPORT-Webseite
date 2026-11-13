@@ -149,6 +149,28 @@ async def test_open_procedure_appears_with_assignee_and_vanishes_when_decided(fl
 
 
 @pytest.mark.asyncio
+async def test_procedure_query_loads_only_matches_with_an_open_procedure(flow):
+    """N9: Spiele mit nur entschiedenen oder zurückgezogenen Verfahren lädt der Leitstand gar nicht erst - offen ist auch ein alter
+    Eintrag ohne ``state``, solange er nicht entschieden ist."""
+    from services.league_desk import PROCEDURE_FIELDS, procedure_query
+
+    def match(match_id, *rows):
+        return {"id": match_id, "tournament_id": "t1", "disputes": list(rows), "reports": [{"big": "x"}]}
+
+    await flow.db.matches_v2.insert_many([
+        match("open", {"id": "p1", "kind": "protest", "state": "open"}),
+        match("legacy", {"id": "p2", "kind": "objection"}),
+        match("decided", {"id": "p3", "kind": "protest", "state": "decided", "resolved_at": "2026-11-01"}),
+        match("withdrawn", {"id": "p4", "kind": "appeal", "state": "withdrawn", "withdrawn_at": "2026-11-01"}),
+        match("old-dispute", {"id": "p5", "reason": "Problem melden ohne Art"}),
+        match("mixed", {"id": "p6", "kind": "protest", "state": "decided"}, {"id": "p7", "kind": "appeal", "state": "open"}),
+    ])
+    rows = await flow.db.matches_v2.find(procedure_query(["t1"]), PROCEDURE_FIELDS).to_list(None)
+    assert sorted(row["id"] for row in rows) == ["legacy", "mixed", "open"]
+    assert all("reports" not in row for row in rows), "nur die nötigen Felder"
+
+
+@pytest.mark.asyncio
 async def test_provisional_sanction_and_open_appeal_appear_until_handled(flow):
     world = await desk_world(flow)
     doc = {"id": new_id(), "season_id": world["season_id"], "league_id": "liga", "tournament_id": world["tournament"]["id"],

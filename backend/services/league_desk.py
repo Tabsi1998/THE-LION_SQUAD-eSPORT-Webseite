@@ -99,9 +99,25 @@ async def _involved(db, user: dict, staffeln: dict[str, dict], match_ids_by_staf
         if not match_ids or tournament_id not in staffeln:
             continue
         matches = await db.matches_v2.find({"id": {"$in": sorted(set(match_ids))}},
-                                           {"_id": 0, "id": 1, "slots": 1, "games": 1, "lineups": 1, "participants": 1}).to_list(len(match_ids) + 1)
+                                           SIDE_FIELDS).to_list(len(match_ids) + 1)
         out |= await involved_match_ids(db, user, staffeln[tournament_id], matches)
     return out
+
+
+# Was ``involved_match_ids`` an einem Spiel liest: Seiten (auch die alten Feldnamen aus ``participant_source_ids``) und Aufstellungen.
+SIDE_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "slots": 1, "games": 1, "lineups": 1, "participant_a_id": 1, "participant_b_id": 1,
+               "player1_id": 1, "player2_id": 1, "p1_registration_id": 1, "p2_registration_id": 1}
+PROCEDURE_FIELDS = {**SIDE_FIELDS, "disputes": 1, "round_name": 1, "matchday_label": 1, "matchday_number": 1, "round": 1}
+
+
+def procedure_query(tournament_ids: list[str]) -> dict:
+    """Nur Spiele mit einem offenen Verfahren: offen ist, was weder entschieden noch zurückgezogen ist (wie ``league_procedures.state_of``,
+    auch für Einträge ohne ``state``). Die genaue Prüfung macht danach ``open_rows``."""
+    from services.league_procedures import DECIDED, KINDS, WITHDRAWN
+
+    return {"tournament_id": {"$in": tournament_ids}, "is_preview": {"$ne": True},
+            "disputes": {"$elemMatch": {"kind": {"$in": list(KINDS)}, "state": {"$nin": [DECIDED, WITHDRAWN]},
+                                        "resolved_at": None, "withdrawn_at": None}}}
 
 
 def _by_staffel(rows: list[dict]) -> dict[str, list[str]]:
@@ -174,8 +190,7 @@ async def _procedures(db, me, season, staffeln) -> list[dict]:
     ids = sorted(staffeln)
     if not ids:
         return []
-    matches = await db.matches_v2.find({"tournament_id": {"$in": ids}, "disputes.kind": {"$in": list(procedures.KINDS)}},
-                                       {"_id": 0}).to_list(LIMIT * 5)
+    matches = await db.matches_v2.find(procedure_query(ids), PROCEDURE_FIELDS).to_list(LIMIT)
     open_matches = [match for match in matches if procedures.open_rows(match)]
     involved: set[str] = set()
     for tournament_id in sorted({match["tournament_id"] for match in open_matches}):
