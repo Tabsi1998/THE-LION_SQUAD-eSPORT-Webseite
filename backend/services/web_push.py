@@ -43,6 +43,9 @@ logger = logging.getLogger("tls.web_push")
 # gestern hilft niemandem.
 DEFAULT_TTL_SECONDS = 6 * 60 * 60
 RECORD_SIZE = 4096
+# Größter Klartext je Meldung: 4096 Byte Nachricht minus Kopf (86), Prüfsumme (16) und Trennzeichen (1).
+MAX_PLAINTEXT = 3993
+URL_LIMIT = 1000
 MAX_SUBSCRIPTIONS_PER_USER = 20
 TITLE_LIMIT = 120
 BODY_LIMIT = 180
@@ -253,7 +256,7 @@ def encrypt_payload(plaintext: bytes, p256dh: str, auth: str, *, salt: bytes | N
     salt = salt or os.urandom(16)
     cek = _hkdf(salt, ikm, b"Content-Encoding: aes128gcm\x00", 16)
     nonce = _hkdf(salt, ikm, b"Content-Encoding: nonce\x00", 12)
-    if len(plaintext) + 17 > RECORD_SIZE:
+    if len(plaintext) > MAX_PLAINTEXT:
         raise ValueError("Inhalt zu groß für einen Web-Push")
     ciphertext = AESGCM(cek).encrypt(nonce, plaintext + b"\x02", None)
     header = salt + struct.pack("!L", RECORD_SIZE) + struct.pack("!B", len(as_public_bytes)) + as_public_bytes
@@ -328,6 +331,8 @@ def build_payload(notification: dict[str, Any], base_url: str = "", *, private: 
     """Was der Browser zeigt: Titel, Text, Ziel und Knöpfe - nur Text, nie HTML."""
     kind = str(notification.get("kind") or "")
     path = safe_path(notification.get("url"), base_url)
+    if len(path) > URL_LIMIT:
+        path = "/notifications"
     title, body = lock_screen_text(notification, private=private)
     payload: dict[str, Any] = {
         "title": title[:TITLE_LIMIT],
@@ -343,6 +348,27 @@ def build_payload(notification: dict[str, Any], base_url: str = "", *, private: 
     if action and notification.get("url") and path != "/notifications":
         payload["actions"] = [{"action": action[0], "title": action[1], "url": path}]
     return payload
+
+
+def encode_payload(payload: dict[str, Any]) -> bytes:
+    """Die Meldung als JSON - passt sie nicht in einen Web-Push, fallen erst die Knöpfe weg, dann wird der Text kürzer."""
+    current = dict(payload)
+
+    def dump(value: dict[str, Any]) -> bytes:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+    data = dump(current)
+    if len(data) <= MAX_PLAINTEXT:
+        return data
+    current.pop("actions", None)
+    for key in ("body", "title"):
+        while len(data := dump(current)) > MAX_PLAINTEXT and current.get(key):
+            current[key] = current[key][: max(0, len(current[key]) // 2)]
+    if len(data) > MAX_PLAINTEXT:
+        current["url"] = "/notifications"
+        current["tag"] = str(current.get("tag") or "")[:80]
+        data = dump(current)
+    return data
 
 
 async def _site_base(db) -> str:
@@ -391,7 +417,7 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     base_url = await _site_base(db)
     # „Inhalt verbergen“ je Browser (#1163): dort nur „Neue Benachrichtigung“.
     bodies = {
-        flag: json.dumps(build_payload(notification, base_url, private=flag), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        flag: encode_payload(build_payload(notification, base_url, private=flag))
         for flag in (False, True)
     }
     kind = str(notification.get("kind") or "")

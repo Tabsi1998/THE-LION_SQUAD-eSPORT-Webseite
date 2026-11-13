@@ -195,3 +195,23 @@ def test_ziel_ohne_steuerzeichen():
     for raw in ("/\t/evil.example", "/x\n/y", "/x\r/y", "https://club.example/a\tb", "/a\x00b", "/a\x7fb"):
         assert web_push.safe_path(raw, base) == "/notifications", repr(raw)
     assert web_push.safe_path("/a b", base) == "/a b"
+
+
+def test_groessengrenze_des_inhalts():
+    key, p256dh, auth = browser_keys()
+    assert len(web_push.encrypt_payload(b"y" * 3993, p256dh, auth)) == 4096
+    try:
+        web_push.encrypt_payload(b"y" * 3994, p256dh, auth)
+        raise AssertionError("3994 Byte hätten abgelehnt werden müssen")
+    except ValueError:
+        pass
+    # Ein überlanges Ziel wird zum Postfach, ein überlanger Inhalt kürzer - die Meldung passt immer.
+    huge = web_push.build_payload({"id": "n1", "kind": "tournament_checkin", "title": "Ä" * 120, "body": "Ö" * 180,
+                                   "url": "/t/" + "x" * 2000}, "")
+    assert huge["url"] == "/notifications" and "actions" not in huge
+    crowded = {"title": "T" * 3000, "body": "B" * 3000, "url": "/x", "tag": "n1", "kind": "x",
+               "actions": [{"action": "a", "title": "A", "url": "/x"}]}
+    data = web_push.encode_payload(crowded)
+    assert len(data) <= web_push.MAX_PLAINTEXT
+    assert json.loads(data)["url"] == "/x"
+    assert decrypt(web_push.encrypt_payload(data, p256dh, auth), key, auth) == data
