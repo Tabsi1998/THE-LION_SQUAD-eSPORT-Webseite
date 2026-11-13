@@ -40,6 +40,9 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         {isImg ? (
           <MediaImage src={previewUrl} alt={item.filename} className="max-h-[50vh] object-contain" />
         ) : isVideo ? (
+          // Vorschau einer hochgeladenen Datei für die Verwaltung - zu Medien der Bibliothek gibt es keine Untertiteldatei,
+          // eine leere Spur täuschte welche vor (#937).
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- keine Untertiteldatei vorhanden (siehe oben)
           <video src={previewUrl} controls playsInline className="max-h-[50vh] max-w-full bg-black" />
         ) : (
           <div className="flex flex-col items-center gap-3 text-white/50 py-12">

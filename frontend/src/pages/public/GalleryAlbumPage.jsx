@@ -431,6 +431,9 @@ function LightboxVideo({ item }) {
     const src = resolveMediaUrl(url);
     return (
       <div className="flex max-h-[85vh] flex-col items-center gap-3">
+        {/* Hochgeladene Galerie-Videos haben keine Untertiteldatei; eine leere Spur täuschte Vorleseprogrammen Untertitel
+            vor, die es nicht gibt. Die Bildunterschrift steht darunter und benennt die Ansicht (#937). */}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- siehe oben: keine Untertiteldatei vorhanden */}
         <video
           src={src}
           poster={galleryPosterUrl(item) ? resolveMediaUrl(galleryPosterUrl(item)) : undefined}
