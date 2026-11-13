@@ -258,10 +258,15 @@ def _with_table(payload: dict, full: dict) -> dict:
 
 
 async def _with_onsite_path(db, t: dict, payload: dict) -> dict:
-    """Der Anmelde-Bildschirm zeigt im QR-Code den Vor-Ort-Zugang (#1592) - nur solange er gilt."""
+    """Der Anmelde-Bildschirm zeigt im QR-Code den Vor-Ort-Zugang (#1592) - nur solange er gilt. Dazu die Hinweise der
+    Turnierleitung für den TV (#1166)."""
     payload["onsite_path"] = (
         onsite_access.onsite_path(await onsite_access.ensure_token(db, t["id"])) if onsite_access.is_open(t) else None
     )
+    # Hinweis der Turnierleitung (#1166): nur die mit „auch am TV zeigen“ - Text und Zeit, nie die Person.
+    from services.tournament_notices import for_tournament
+
+    payload["notices"] = await for_tournament(db, t, tv_only=True)
     return payload
 
 
