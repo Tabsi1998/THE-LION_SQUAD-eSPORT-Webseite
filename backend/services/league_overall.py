@@ -106,6 +106,11 @@ async def _extract(db, final: dict) -> dict:
             continue
         players, fallback = (players_for(registration, teams.get(registration.get("team_id") or "") or None, matches, "fielded")
                              if registration else ([], False))
+        if fallback and isinstance(side.get("player_ids"), list):
+            # Kader-Rückfall (Nr. 167) mit dem Kader zum Abschluss, wie ihn der Endstand festhielt (seit F.2) - ein späterer Kaderwechsel
+            # ändert die Wertung nicht, und die Vorauswahl für Profil und Teamseite (``player_ids``) passt dazu. Nur ältere Endstände
+            # ohne ``sides`` lesen den Kader von heute.
+            players = sorted(person for person in side["player_ids"] if person)
         entries.append({"registration_id": row["registration_id"], "key": key, "name": row.get("display_name") or "Team",
                         **identity, "players": players, "fallback": bool(fallback)})
     extract = {"entries": entries}

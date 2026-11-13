@@ -510,3 +510,20 @@ async def test_without_settings_there_is_no_overall_standing_and_periods_are_che
     assert team_view["league_overall"][0]["place"] == 1 and team_view["league_overall"][0]["closed"] is True
     pdf = await flow.get(f"{page(world)}.pdf?level=1")
     assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
+
+
+# ---------------------------------------------------------------- Nachbesserung Runde 1
+
+@pytest.mark.asyncio
+async def test_roster_fallback_uses_the_roster_at_close(flow):
+    world = await setup(flow)
+    season = await add_season(flow, world)
+    await played_staffel(flow, world, season, 1, [1, 2, 3, 4], lineups={4: []})
+    # Nach dem Abschluss wechselt der Kader von Team 4: p-4-3 geht, eine neue Person kommt.
+    await flow.db.team_squads.update_one({"id": "squad-4"}, {"$set": {"member_ids": ["p-4-1", "p-4-2", "p-neu"]}})
+    await configure(flow, world)
+    names = {row["key"] for row in level_of(await public(flow, world, user=world["admin"]))["players"]}
+    assert {"p-4-1", "p-4-2", "p-4-3"} <= names and "p-neu" not in names
+    # Profil und Wertung stimmen überein: p-4-3 sieht seinen Platz, p-neu keinen.
+    flow.act_as(None)
+    assert ok(await flow.get("/api/users/public/p-4-3"))["league_overall"][0]["points"] == 1
