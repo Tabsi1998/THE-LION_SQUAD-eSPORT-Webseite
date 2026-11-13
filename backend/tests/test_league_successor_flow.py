@@ -426,3 +426,18 @@ async def test_season_history_on_team_and_player(flow):
     outsider = await flow.add_user(name="Zaungast")
     await flow.db.users.update_one({"id": outsider["id"]}, {"$set": {"privacy_public_profile": True}})
     assert ok(await flow.get(f"/api/users/public/{outsider['username']}"))["league_history"] == []
+
+
+@pytest.mark.asyncio
+async def test_tv_shows_the_zones_with_key_and_for_staff(flow):
+    world = await build(flow, levels=2, teams=4)
+    tid = world["tids"][1]
+    flow.act_as(world["lead"])
+    staff = ok(await flow.get(f"/api/tournaments/{tid}/bracket/display", params={"table": "1"}))
+    assert [row.get("zone") for row in staff["standings"]] == ["promotion", None, None, None]
+    key = ok(await flow.post("/api/tv/keys", json={"tournament_id": tid, "label": "Beamer Liga 2"}))["token"]
+    flow.act_as(None)
+    tv = ok(await flow.get(f"/api/tournaments/{tid}/bracket/display", params={"key": key, "table": "1"}))
+    assert [row.get("zone") for row in tv["standings"]] == ["promotion", None, None, None]
+    # Nur Platz, Name und Zahlen - nie Konto oder Team-Kennung.
+    assert not any("team_id" in row or "user_id" in row for row in tv["standings"])
