@@ -66,7 +66,9 @@ test.describe("Warteschlange vor Ort", () => {
       });
       await page.goto(`/tournaments/${SLUG}/leitung`);
 
-      await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+      // Vor Ort ist das Cockpit der Einstieg (#1653) - es zeigt dieselben Stationskacheln wie der Reiter „Stationen“.
+      await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByTestId("lead-tab-stations")).toBeVisible();
       await expect(page.getByTestId("live-summary")).toContainText("+15 Min. · Finale jetzt ca.");
       const running = queue.stations.find((station) => station.running).running;
       const clock = page.getByTestId(`live-clock-${running.match_id}`);

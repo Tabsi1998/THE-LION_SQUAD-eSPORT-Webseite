@@ -127,7 +127,10 @@ test.describe("Abnahme: Helfer-Anleitung (Station, Einlass, Wenn etwas nicht pas
     const broken = await send(page, "PATCH", `/api/stations/${station.id}`, { status: "broken" });
     expect(broken.status(), await broken.text()).toBe(200);
 
+    // Vor Ort startet die Leitung im Cockpit (#1653): der Fall steht oben unter „Probleme“, ein Tipp öffnet ihn.
     await page.goto(`/tournaments/${liveSlug}/leitung`);
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    await page.getByTestId(`cockpit-problem-st-${station.id}`).click();
     await expect(page.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true");
     const item = page.getByTestId(`lead-case-st-${station.id}`);
     await expect(item).toContainText("Station defekt");
