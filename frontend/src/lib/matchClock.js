@@ -4,7 +4,8 @@
 // damit ein Handy mit falsch gehender Uhr dasselbe zeigt wie der TV. Die App (mobile/) rechnet dieselben Fälle (#2393).
 import { asInstant } from "@/lib/vienna";
 
-// Die Uhr wird knapp (Orange, Token `warn`) ab 80 % der Dauer und überschritten (Token `live`) ab 100 %.
+// Die Uhr wird knapp ab 80 % der Dauer (Orange, Token `warn`) und überschritten ab 100 % (orange gefüllt mit Warn-Symbol,
+// ebenfalls `warn` - Rot bleibt „läuft“).
 export const CLOCK_WARN_AT = 0.8;
 
 const pad = (value) => String(value).padStart(2, "0");
