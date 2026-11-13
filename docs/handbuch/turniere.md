@@ -353,9 +353,13 @@ oder **Stationsleitung** in diesem Turnier; im Status **Check-in offen** öffnet
   Startgelder offen sind. Der Zähler stimmt sofort nach dem Tipp; klappt das Speichern nicht, springt die Zeile zurück
   und eine Meldung sagt warum.
 - **Suche** nach Name, Spielname, Team-Kürzel oder – bei Teams – einem Mitglied. Filter **Fehlen noch**, **Da**, **Alle**.
-- Je Zeile ein Tipp: **Da**, danach **Rückgängig**; darunter **Nicht erschienen**. Rückt dabei jemand von der
-  Warteliste nach, sagt es die Meldung. Etiketten: **Startgeld offen** (den Betrag sehen nur Finanzen), **Freigabe
-  offen**, **Vor Ort angemeldet**.
+- Je Zeile ein Tipp: **Da**, danach **Rückgängig**; darunter **Nicht erschienen**. Würde dabei jemand von der
+  Warteliste nachrücken, fragt die Seite vorher („Dann rückt jemand von der Warteliste nach – das lässt sich nicht
+  einfach rückgängig machen“); die Meldung danach nennt, wer nachgerückt ist. Ist danach alles voll, geht
+  **Rückgängig** nicht mehr: „Inzwischen ist … nachgerückt – kein freier Platz mehr“. Das klärt ihr in der Verwaltung.
+- Etiketten: **Startgeld offen** (nur, wenn wirklich etwas offen ist – bezahlt, gutgeschrieben oder aufgegeben trägt
+  keines; den Betrag sehen nur Finanzen), **Freigabe offen**, **Vor Ort angemeldet**. Bei **Freigabe offen** steht statt
+  **Da** der Weg **Erst freigeben** in die Verwaltung: Die Freigabe prüft Platz und Startgeld, danach wird abgehakt.
 - **Teams** stehen als eine Zeile: mit Aufstellung („Spielt“, „Ersatz“) oder allen Mitgliedern, grün, wer schon
   **Ich bin da** getippt hat (3.5). Abgehakt wird das ganze Team.
 - Zwei Helfer am Einlass sehen gegenseitig, was der andere abhakt. Jeder Tipp steht im Protokoll (wer, wann, von welchem
@@ -1017,6 +1021,8 @@ Die Leitung trägt Maps im Ergebnis-Fenster mit den Listen beider Seiten ein ode
 | Spieler kommt nicht ins Turnier, steht auf Warteliste | Das Turnier ist voll | **Max Spieler** erhöhen oder die Person auf Bestätigt setzen |
 | Check-in-Knopf der Spieler ist grau („Check-in vor Ort“) | Das Turnier ist **Vor Ort** | Die Turnierleitung checkt ein |
 | „Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.“ | Dasselbe | wie oben |
+| „Inzwischen ist … nachgerückt – kein freier Platz mehr“ | Nach **Nicht erschienen** ist jemand von der Warteliste nachgerückt, das Turnier ist voll | In der Verwaltung entscheiden: einen Platz frei machen (etwa die nachgerückte Person zurück auf die Warteliste), dann zurücksetzen |
+| „Erst freigeben …“ beim Check-in | Die Anmeldung ist noch **Ausstehend** | In der Verwaltung freigeben, dann im Reiter **Check-in** abhaken |
 | Teilnehmer lässt sich nach Check-in-Start nicht entfernen | Der Baum ist fix | **Nicht erschienen** setzen und mit „Ersetzt Nicht-Erschienen“ einen Ersatz hinzufügen |
 | „Die Anmeldung steht im festen Turnierbaum …“ | Entfernen, Ablehnen oder Warteliste für jemanden mit festen Spielen | Vor dem Start **Nicht erschienen** und ersetzen, im laufenden Turnier **Austritt eintragen** oder **Disqualifizieren** |
 | „Turnierstruktur: Der Turnierbaum steht seit dem Ende des Check-ins fest …“ (auch Teilnahme, Spieler pro Team, Spiel) | Der Check-in ist zu Ende oder es gibt feste Spiele | So weiterspielen; neu aufbauen nur über **Zurücksetzen** |
