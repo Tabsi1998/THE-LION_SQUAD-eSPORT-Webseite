@@ -138,7 +138,7 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
         ) : null}
       </p>
       <TextField label="Betreff" value={title} onChange={setTitle} maxLength={BROADCAST_LIMITS.titleMax} testId="broadcast-title"
-        hint={`${title.trim().length} / ${BROADCAST_LIMITS.titleMax} Zeichen · steht in der Glocke vor dem Namen der Season`} />
+        hint={`${title.trim().length} / ${BROADCAST_LIMITS.titleMax} Zeichen · steht in der Glocke nach dem Namen der Season („Liga Season: Betreff“)`} />
       <TextAreaField label="Nachricht" value={text} onChange={(value) => setText(value.slice(0, BROADCAST_LIMITS.textMax))} rows={6} testId="broadcast-text"
         hint={`${text.trim().length} / ${BROADCAST_LIMITS.textMax} Zeichen`} />
       <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-white/80" data-testid="broadcast-mail">
