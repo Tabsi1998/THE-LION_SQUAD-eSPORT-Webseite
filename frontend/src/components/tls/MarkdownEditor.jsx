@@ -307,10 +307,23 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
     setVisualMention(null);
   }
 
+  // Eine Taste, die die @-Vorschläge bedient hat, sucht beim Loslassen nicht neu - sonst sprang die Wahl auf den ersten
+  // Vorschlag zurück und Escape öffnete die Liste gleich wieder (#937).
+  const handledMentionKey = useRef(null);
+
+  function handleVisualKeyUp(event) {
+    if (handledMentionKey.current === event.key) {
+      handledMentionKey.current = null;
+      return;
+    }
+    refreshVisualMention();
+  }
+
   function handleVisualKeyDown(event) {
     const open = !!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0);
     if (!open || !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) return;
     event.preventDefault();
+    handledMentionKey.current = event.key;
     if (event.key === "Escape") {
       setVisualMention(null);
       return;
@@ -527,7 +540,7 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
       {mode === "visual" && (
         // Die Hülle sammelt nur, was aus dem Editor darin hochsteigt (Tasten für die @-Vorschläge) - bedient wird das
         // Textfeld des Editors selbst, die Hülle ist ohne eigene Bedeutung (#937).
-        <div ref={visualEditorWrapRef} className="relative" role="presentation" onKeyDown={handleVisualKeyDown} onKeyUp={() => refreshVisualMention()} onMouseUp={() => refreshVisualMention()}>
+        <div ref={visualEditorWrapRef} className="relative" role="presentation" onKeyDown={handleVisualKeyDown} onKeyUp={handleVisualKeyUp} onMouseUp={() => refreshVisualMention()}>
           <EditorContent editor={editor} />
           {!!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0) && (
             <MentionSuggestionList
