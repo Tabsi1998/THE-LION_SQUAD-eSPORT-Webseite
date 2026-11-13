@@ -10,7 +10,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
 import { nicknameRepeatsLevel } from "@/lib/seasonTabs";
-import { byMaps } from "@/lib/leagueTable";
+import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable";
 import { PrizeEditor } from "./LeagueLookFields";
 import { DivisionPlatformFields } from "./DivisionPlatformFields";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -29,6 +29,7 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
   const [status, setStatus] = useState(division?.status || "active");
   const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
   const [prizes, setPrizes] = useState(() => prizesToForm(division?.prizes));
+  const [zones, setZones] = useState(() => zonesToForm(division?.zones));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const level = division?.level || nextLevel || 1;
@@ -39,6 +40,9 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
     try {
       // Der Stand (#2106): die API kannte ihn, das Formular schickt ihn jetzt mit - archiviert fällt aus der Ligaseite.
       const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form, { mapPoints: byMaps(season.scoring_rules) }), ...(division ? { status } : {}) };
+      // Auf- und Abstieg (F.2, #1627): die Zonen je Staffel dieser Liga N - nur, wenn sie sich ändern (leer heißt 1/1 ohne Relegation).
+      const ownZones = zonesPayload(zones);
+      if (JSON.stringify(ownZones) !== JSON.stringify(zonesPayload(zonesToForm(division?.zones)))) body.zones = ownZones;
       // Eigene Gewinne (#2107) nur, wenn sie sich ändern - leer heißt wieder „wie die Season“.
       const ownPrizes = prizesPayload(prizes);
       if (JSON.stringify(ownPrizes) !== JSON.stringify(prizesPayload(prizesToForm(division?.prizes)))) body.prizes = ownPrizes;
@@ -97,9 +101,34 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
         <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} placeholder={String(points.loss ?? 0)} testId="override-points-loss" />
       </FormGrid>
       )}
+      <ZoneFields zones={zones} onChange={setZones} effective={division?.zones_effective} level={level} />
       <PrizeEditor rows={prizes} onChange={setPrizes} testId="division-prizes"
         emptyHint={season.prizes?.length ? `Wie die Season: ${season.prizes.map((row) => `${row.place}. ${row.text}`).join(" · ")}` : "Wie die Season – dort sind noch keine Gewinne eingetragen."} />
     </AdminSheet>
+  );
+}
+
+/** Auf- und Abstieg dieser Liga N (F.2, #1627, Nr. 158): je Staffel, die Randfälle sagt der Hinweis. */
+function ZoneFields({ zones, onChange, effective, level }) {
+  const set = (key) => (value) => onChange((current) => ({ ...current, [key]: value }));
+  const edge = [effective?.top ? "Als oberste Liga gibt es hier keinen Aufstieg." : "", effective?.bottom ? "Als unterste Liga gibt es hier keinen Abstieg." : ""]
+    .filter(Boolean).join(" ");
+  return (
+    <fieldset className="space-y-2" data-testid="division-zones">
+      <legend className="text-xs font-bold uppercase tracking-wider text-white/70">Auf- und Abstieg je Staffel</legend>
+      <p className="text-xs text-white/55">
+        Ergibt sich beim Abschluss aus dem Endstand und gilt für die nächste Season. Ausgeschiedene stehen hinten und belegen zuerst die Abstiegsplätze.
+        {edge ? ` ${edge}` : level === 1 ? " Liga 1 ist die oberste: Ein Aufstieg zählt hier nicht." : ""}
+      </p>
+      <FormGrid cols={2}>
+        <TextField label="Aufsteiger" type="number" min={0} max={10} value={zones.promote} onChange={set("promote")} testId="zones-promote" />
+        <TextField label="Absteiger" type="number" min={0} max={10} value={zones.relegate} onChange={set("relegate")} testId="zones-relegate" />
+        <TextField label="Relegation oben (freiwillig)" type="number" min={0} max={10} value={zones.playoff_promote} onChange={set("playoff_promote")}
+          hint="Vorbereitet: farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga." testId="zones-playoff-promote" />
+        <TextField label="Relegation unten (freiwillig)" type="number" min={0} max={10} value={zones.playoff_relegate} onChange={set("playoff_relegate")}
+          testId="zones-playoff-relegate" />
+      </FormGrid>
+    </fieldset>
   );
 }
 
@@ -153,6 +182,9 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                 ) : null}
                 <p className="text-xs text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
                 <p className="text-xs text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
+                {division.zones_effective ? (
+                  <p className="text-xs text-white/55" data-testid={`division-zones-${division.level}`}>Auf- und Abstieg: {zonesLine(division.zones_effective)}</p>
+                ) : null}
               </div>
               {canSeason ? (
                 <div className="flex items-center gap-1">

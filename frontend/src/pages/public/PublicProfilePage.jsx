@@ -39,6 +39,7 @@ import { asInstant, viennaDate } from "@/lib/vienna";
 import { showLapTime } from "@/lib/laptime";
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
+import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
@@ -417,6 +418,7 @@ export default function PublicProfilePage() {
   const highlights = podiumHighlights(referenceItems);
   const referenceTargets = new Set(referenceItems.map((item) => item.target_id).filter(Boolean));
   const awards = Array.isArray(profile.awards) ? profile.awards : [];
+  const leagueHistory = Array.isArray(profile.league_history) ? profile.league_history : [];
   // Ehrungen (#848): nur, was der Verein freigibt und die Person selbst zeigt - sonst gibt es den Reiter nicht.
   const honours = Array.isArray(profile.honours) ? profile.honours : [];
   const badges = Array.isArray(achievementsData?.awards) ? achievementsData.awards : [];
@@ -441,7 +443,7 @@ export default function PublicProfilePage() {
   const filteredReferences = referenceFilter === "all" ? referenceItems : referenceItems.filter((item) => (item.kind || "tournament") === referenceFilter);
   const showTwitchLive = Boolean(profile.show_twitch_embed && twitchChannel && liveStream);
   const showTwitchChannel = Boolean(profile.show_twitch_embed && twitchChannel && !liveStream);
-  const hasOverviewContent = highlights.length > 0 || awards.length > 0 || badges.length > 0 || pinned.length > 0 || referenceItems.length > 0 || showTwitchLive;
+  const hasOverviewContent = highlights.length > 0 || awards.length > 0 || badges.length > 0 || pinned.length > 0 || referenceItems.length > 0 || leagueHistory.length > 0 || showTwitchLive;
 
   // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu.
   const featureAward = async (awardId) => {
@@ -760,6 +762,9 @@ export default function PublicProfilePage() {
                   </div>
                 </section>
               )}
+
+              {/* Season-Historie (F.2, #1627): Liga N, Platz, Meister - wo die Person eingesetzt war. */}
+              <LeagueSeasonHistory rows={leagueHistory} showTeam testId="profile-league-history" />
 
               {referenceItems.length > 0 && (
                 <section data-testid="profile-references-preview">

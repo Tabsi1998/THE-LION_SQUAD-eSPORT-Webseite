@@ -9,6 +9,7 @@ import { FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
+import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -26,9 +27,16 @@ function when(value) {
   return value ? viennaDateTime(value, WHEN) : "";
 }
 
-function staffelOptions(divisions = []) {
-  return divisions.flatMap((division) => (division.staffeln || []).map((staffel) => [
-    staffel.tournament_id, `${division.label} · Staffel ${staffel.staffel} (${staffel.participant_count} von ${staffel.max_participants})`]));
+const OTHER_DIVISION = " – andere Liga, nur mit Grund";
+
+function staffelOptions(divisions = [], row = null) {
+  // Übernommen aus der Vorgänger-Season (F.2, #1627): zuerst die Staffeln seiner neuen Liga N; die anderen nur mit Grund (der Server prüft es).
+  const label = (division, staffel) => `${division.label} · Staffel ${staffel.staffel} (${staffel.participant_count} von ${staffel.max_participants})`;
+  const target = row?.carry_over?.division_id;
+  return divisions.flatMap((division) => (division.staffeln || []).map((staffel) => {
+    const other = Boolean(target) && division.id !== target;
+    return [staffel.tournament_id, `${label(division, staffel)}${other ? OTHER_DIVISION : ""}`, other];
+  })).sort((left, right) => Number(left[2]) - Number(right[2]));
 }
 
 function Notes({ row }) {
@@ -66,6 +74,7 @@ function RowActions({ row, options, busy, act, superadmin }) {
   const [mode, setMode] = useState(null);
   const [reason, setReason] = useState("");
   const [conflictReason, setConflictReason] = useState("");
+  const [deviation, setDeviation] = useState("");
   const unassigned = row.status === "accepted" && !row.assignment;
   // Eine automatische Zuteilung (#2348) nehmen Ablehnen und Warteliste wieder aus der Staffel; jede andere bleibt der Teilnehmerliste.
   const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
@@ -78,6 +87,7 @@ function RowActions({ row, options, busy, act, superadmin }) {
   const send = (action, body) => act(row, action, override ? { ...body, conflict_reason: override } : body);
   // Angenommen (automatisch oder von Hand): Zurückstufen nur mit Grund, das Team liest ihn wie beim Ablehnen (#2348).
   const waitlistWithReason = row.status === "accepted";
+  const otherDivision = Boolean(options.find(([value]) => value === staffel)?.[2]);
   const toggle = (next) => setMode((current) => (current === next ? null : next));
   return (
     <div className="mt-3 space-y-3">
@@ -92,13 +102,19 @@ function RowActions({ row, options, busy, act, superadmin }) {
         <p className="text-xs text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen das Co-Team wieder aus der Staffel, solange der Spielplan nicht steht.</p>
       ) : options.length ? (
         <SelectField label={unassigned ? "Staffel" : "Staffel (geht auch später)"} value={staffel} onChange={setStaffel} testId={`application-staffel-${row.id}`} className="max-w-md"
-          options={[["", "Staffel wählen …"], ...options]} />
+          options={[["", "Staffel wählen …"], ...options.map(([value, text]) => [value, text])]} />
       ) : <p className="text-xs text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
+      {otherDivision ? (
+        <TextField label="Grund für die andere Liga" required value={deviation} onChange={setDeviation} maxLength={500} className="max-w-md"
+          hint="Das Co-Team ist in eine andere Liga übernommen. Der Grund steht im Verlauf und im Protokoll." testId={`application-deviation-${row.id}`} />
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {deciding ? (
           <button type="button" disabled={blocked} onClick={() => send("accept", staffel ? { tournament_id: staffel } : {})} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
         ) : unassigned ? (
-          <button type="button" disabled={blocked || !staffel} onClick={() => send("assign", { tournament_id: staffel })} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
+          <button type="button" disabled={blocked || !staffel || (otherDivision && deviation.trim().length < REASON_MIN)}
+            onClick={() => send("assign", { tournament_id: staffel, ...(otherDivision ? { deviation_reason: deviation.trim() } : {}) })}
+            className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
         ) : null}
         {row.status === "submitted" ? <button type="button" disabled={blocked} onClick={() => send("review", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-review-${row.id}`}>In Prüfung nehmen</button> : null}
         {row.status !== "waitlist" && waitlistWithReason ? (
@@ -132,11 +148,16 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
         <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
         <ApplicationStateBadge state={row.status} />
       </div>
+      {row.carry_over ? (
+        <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
+      ) : null}
       <p className="mt-1 text-xs text-white/60 [overflow-wrap:anywhere]">
-        Eingereicht {when(row.submitted_at)} von {row.applied_by_name} · {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}
+        {row.carry_over ? "Übernommen" : "Eingereicht"} {when(row.submitted_at)} {row.carry_over ? "" : `von ${row.applied_by_name} `}· {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}
       </p>
       <p className="text-xs text-white/60">
-        {row.rules_version ? `Regeln Version ${row.rules_version} zugestimmt ${when(row.rules_at)}` : "Keine Zustimmung zu den Regeln"} · {row.privacy_at ? "Datenschutz zugestimmt" : "Keine Zustimmung zum Datenschutz"}
+        {row.carry_over && !row.rules_version ? "Zustimmung zum Regelwerk folgt vor dem ersten Spiel (Captain im Regelwerk)"
+          : row.rules_version ? `Regeln Version ${row.rules_version} zugestimmt ${when(row.rules_at)}` : "Keine Zustimmung zu den Regeln"}
+        {row.carry_over ? "" : ` · ${row.privacy_at ? "Datenschutz zugestimmt" : "Keine Zustimmung zum Datenschutz"}`}
       </p>
       {row.assignment ? (
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/85">
@@ -209,7 +230,7 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
   };
 
   if (!visible) return null;
-  const options = staffelOptions(data.divisions);
+  const options = (row) => staffelOptions(data.divisions, row);
   const items = data.items || [];
   const closed = items.filter((row) => ["rejected", "withdrawn"].includes(row.status));
   return (
@@ -223,14 +244,14 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
           return (
             <div key={group.key} className="space-y-2">
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">{group.title} ({rows.length})</h3>
-              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
+              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
             </div>
           );
         })}
         {closed.length ? (
           <details data-testid="season-applications-closed">
             <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-white/60">Abgeschlossen ({closed.length})</summary>
-            <ul className="mt-2 space-y-2">{closed.map((row) => <ApplicationRow key={row.id} row={row} options={options} busy={busy} act={act} />)}</ul>
+            <ul className="mt-2 space-y-2">{closed.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} />)}</ul>
           </details>
         ) : null}
       </FormSection>

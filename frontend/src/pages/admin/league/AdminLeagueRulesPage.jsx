@@ -288,7 +288,13 @@ export default function AdminLeagueRulesPage() {
       setView(data);
       setError(null);
       applyDraft(data.draft);
-      setPublish((value) => ({ ...value, valid_from: value.valid_from || data.today || "" }));
+      // Entwurf aus der Vorgänger-Season (F.2, #1627, Nr. 160): Die Teams stimmen der neuen Fassung neu zu - vorbelegt, abwählbar.
+      // Ebenso ein geändertes Liga-Regelwerk, das eine aus dem Vorgänger übernommene Season erbt.
+      const carried = data.draft?.carried_from;
+      const heirs = data.successor_seasons || [];
+      setPublish((value) => ({ ...value, valid_from: value.valid_from || data.today || "",
+        ...(carried && !value.change_reason ? { requires_consent: true, change_reason: `Neue Season, übernommen aus ${carried.season_name || "der Vorgänger-Season"}` } : {}),
+        ...(!carried && heirs.length && !value.change_reason ? { requires_consent: true } : {}) }));
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail));
     }
@@ -480,11 +486,21 @@ export default function AdminLeagueRulesPage() {
                 ) : null}
 
                 <FormSection title="Veröffentlichen" hint="Danach lässt sich die Fassung nicht mehr ändern, sie gilt ab dem gewählten Tag." testId="rules-publish-section">
+                  {!view.draft?.carried_from && view.successor_seasons?.length ? (
+                    <p className="text-sm text-white/75" data-testid="rules-successor-seasons">
+                      Dieses Regelwerk gilt auch für {view.successor_seasons.map((row) => row.name).join(", ")} mit übernommenen Teams. Ändert es sich, stimmen sie neu zu – der Haken ist vorbelegt.
+                    </p>
+                  ) : null}
+                  {view.draft?.carried_from ? (
+                    <p className="text-sm text-white/75" data-testid="rules-carried-from">
+                      Übernommen aus {view.draft.carried_from.season_name} ({view.draft.carried_from.label}). Die übernommenen Teams stimmen dieser Fassung zu, bevor sie einchecken.
+                    </p>
+                  ) : null}
                   <TextField label="Gültig ab" type="date" value={publish.valid_from} min={view.today} onChange={(value) => setPublish((row) => ({ ...row, valid_from: value }))} testId="rules-valid-from" />
                   <TextAreaField label="Änderungsgrund" value={publish.change_reason} onChange={(value) => setPublish((row) => ({ ...row, change_reason: value }))} rows={2}
                     placeholder="Was sich ändert und warum" hint="Steht öffentlich bei der Fassung, mindestens fünf Zeichen." testId="rules-reason" />
                   <CheckField label="Captains müssen dieser Fassung neu zustimmen" checked={publish.requires_consent} onChange={(value) => setPublish((row) => ({ ...row, requires_consent: value }))}
-                    hint="Fehlt die Zustimmung, gibt es eine Aufgabe auf der Startseite. Spiele laufen trotzdem weiter." testId="rules-requires-consent" />
+                    hint="Fehlt die Zustimmung, gibt es eine Aufgabe auf der Startseite, und das Team kann vor dem Spiel nicht einchecken, bis Captain oder Vertreter zugestimmt hat." testId="rules-requires-consent" />
                   {emptyVars.length ? (
                     <CheckField label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={publish.confirm_empty}
                       onChange={(value) => setPublish((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"

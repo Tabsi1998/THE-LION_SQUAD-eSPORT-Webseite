@@ -82,3 +82,19 @@ test("Endstand ohne Meistertitel (untere Liga N): kein Meister, auch nicht für 
   expect(await screen.findByTestId("league-final-A")).toBeInTheDocument();
   expect(screen.queryByTestId("league-champion-A")).toBeNull();
 });
+
+test("Zonen für Auf- und Abstieg (F.2, #1627): Strich an der Zeile, Wort für Screenreader, Legende nur mit Zonen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...DATA, standings: [row("a", 1, { zone: "promotion" }), row("b", 2, { zone: null }), row("c", 3, { zone: "relegation" })] } });
+  const { unmount } = render(<MemoryRouter><StaffelPanel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
+  await screen.findByRole("table", { name: "Tabelle Staffel A" });
+  expect(screen.getByTestId("standing-row-a")).toHaveAttribute("data-zone", "promotion");
+  expect(screen.getByTestId("standing-row-b")).not.toHaveAttribute("data-zone");
+  expect(within(screen.getByTestId("standing-row-c")).getByText("Abstieg")).toHaveClass("sr-only");
+  expect(screen.getByTestId("league-zones-A")).toHaveTextContent(/Aufstieg.*Abstieg/);
+  unmount();
+  // Gegenprobe: ohne Zonen keine Legende.
+  apiMock.get.mockResolvedValue({ data: { ...DATA, standings: [row("a", 1)] } });
+  render(<MemoryRouter><StaffelPanel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
+  await screen.findByRole("table", { name: "Tabelle Staffel A" });
+  expect(screen.queryByTestId("league-zones-A")).toBeNull();
+});

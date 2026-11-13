@@ -1,7 +1,7 @@
 """Selbstanmeldung in der Liga (docs/LIGA.md, Abschnitt 12, B.4, #2205).
 
 - Unter ``/api/leagues/{liga}/{season}``: die eigene Sicht, Einreichen und Zurückziehen. Sichtbar nach der Season, unsichtbar heißt 404.
-- ``/api/me/league-applications``: der Stand der eigenen Co-Teams für die Team-Seite.
+- ``/api/me/league-applications``: der Stand der eigenen Co-Teams für die Team-Seite, dort auch Abmelden (F.2).
 - ``/api/admin/leagues/seasons/{id}/applications``: der Eingang der Leitung. Zuständigkeit ``applications``, die Liga kommt aus der gespeicherten Season.
 
 Die Logik steht in ``services/league_applications.py``.
@@ -70,6 +70,13 @@ async def my_league_applications(me: dict = Depends(get_current_user)):
     return {"items": await applications.my_applications(get_db(), me)}
 
 
+@me_router.post("/league-applications/{application_id}/withdraw")
+async def withdraw_own_application(application_id: str, me: dict = Depends(get_current_user)):
+    """Abmelden von der Team-Seite (F.2, #1627): auch, solange die neue Season noch nicht veröffentlicht ist."""
+    done = await _call(applications.withdraw_own(get_db(), application_id, me, refresh_previews=_refresh_tournament_previews_after_registration))
+    return await applications.team_answer(get_db(), done)
+
+
 require_applications = require_league("applications", via="season_id")
 
 
@@ -114,4 +121,4 @@ async def assign_application(season_id: str, application_id: str, body: LeagueAp
     league, season = await _scope(season_id)
     return _answer(await _call(applications.assign(get_db(), league, season, application_id, body.tournament_id, me,
                                                   refresh_previews=_refresh_tournament_previews_after_registration,
-                                                  conflict_reason=body.conflict_reason)))
+                                                  conflict_reason=body.conflict_reason, deviation_reason=body.deviation_reason)))

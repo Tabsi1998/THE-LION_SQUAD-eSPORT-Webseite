@@ -1,4 +1,4 @@
-import { deductionText } from "@/lib/leagueTable";
+import { ZONE_LABELS, deductionText } from "@/lib/leagueTable";
 import { standingCell } from "@/lib/standingsTable";
 import { tvTableColumns, tvTableSections } from "@/lib/tvTable";
 import { useTv } from "./TvScreen";
@@ -54,6 +54,7 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               key={row.registration_id || `${startRank}-${index}`}
               className="tv-standings__row tv-t-name"
               data-place={final && Number(row.rank) <= 3 ? row.rank : undefined}
+              data-zone={ZONE_LABELS[row.zone] ? row.zone : undefined}
               data-testid={`tv-standing-${row.registration_id}`}
               style={{ "--tv-i": startRank + index }}
             >
