@@ -9,8 +9,8 @@ import "./maps.css";
 const STAGGER_STEPS = 8;
 // Karten im Raster: zwei Spalten am Handy, drei ab sm, vier ab lg (max. ~240 px in der schmalen Spalte).
 const CARD_SIZES = "(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw";
-// Wischbar (#2268, Ligaseite): am Handy eine Reihe großer Karten (78 % breit), ab sm das Raster mit drei Spalten.
-const SWIPE_SIZES = "(min-width: 1024px) 360px, (min-width: 640px) 33vw, 78vw";
+// Wischbar (#2268, Ligaseite): am Handy eine Reihe großer Karten (78 % breit), ab sm das Raster mit drei, ab lg mit vier Spalten.
+const SWIPE_SIZES = "(min-width: 1024px) 270px, (min-width: 640px) 33vw, 78vw";
 
 export function MapCard({ item, index = 0, position = null, sizes = CARD_SIZES, testId = "map-card" }) {
   return (

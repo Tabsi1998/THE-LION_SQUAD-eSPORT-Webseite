@@ -121,6 +121,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.getByTestId("league-division-2").getByTestId("league-staffel-tab-E").click();
     await expect(page.getByTestId("league-division-2").getByTestId("league-teams-link-E")).toHaveText(/1 Team\b/);
     await expect(page.getByTestId("league-division-3")).toContainText("werden gerade eingeteilt");
+    // Map-Pool: ab 1024 px vier Karten in einer Zeile (bei vier Maps steht keine allein), am Handy eine wischbare Reihe.
+    const cards = page.getByTestId("league-map-pool").getByTestId("map-pool-mode").first().getByTestId("map-card");
+    // Lage der Listeneinträge (ohne die Bewegung beim Einblenden).
+    const tops = await cards.evaluateAll((nodes) => nodes.slice(0, 5).map((node) => node.parentElement.offsetTop));
+    expect(new Set(tops.slice(0, 4)).size).toBe(1);
+    if (width >= 1024) expect(tops[4]).toBeGreaterThan(tops[0]);
     await noSideScroll(page);
     await shot(page, `worst-uebersicht-${width}.png`);
 
