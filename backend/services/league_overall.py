@@ -728,10 +728,15 @@ async def grant(db, league: dict, period: dict, final: dict) -> dict:
     rows = final.get("teams") or []
     sides = [{"team_id": row.get("team_id"), "squad_id": row.get("squad_id"), "user_id": row.get("user_id")} for row in rows]
     teams = await teams_by_id(db, sides)
+    # Spieler mit Einsatz (Nr. 177): wer für dieses Co-Team in mindestens einer Season eingesetzt war, die für das Co-Team zählt und
+    # Punkte brachte - eine Season mit 0 Punkten (ausgeschieden) oder nur im Streichergebnis reicht nicht.
+    by_key = {row["key"]: row for row in rows}
     earned: dict[str, set[str]] = {}
     for player in final.get("players") or []:
-        for entry in (player.get("seasons") or {}).values():
-            earned.setdefault(entry.get("co_team"), set()).add(player["key"])
+        for season_id, entry in (player.get("seasons") or {}).items():
+            own = ((by_key.get(entry.get("co_team")) or {}).get("seasons") or {}).get(season_id) or {}
+            if own.get("counted") and int(own.get("points") or 0) > 0:
+                earned.setdefault(entry.get("co_team"), set()).add(player["key"])
     game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0, "id": 1, "name": 1, "logo_url": 1, "cover_url": 1}) \
         if league.get("game_id") else None
     frame = {"league": league, "season": {"id": period["id"], "name": f"Gesamtwertung {period.get('name') or ''}".strip(),

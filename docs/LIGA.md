@@ -3831,7 +3831,8 @@ unsichtbaren Seasons; sind alle sichtbar, steht die Fassung unverändert da. Die
 
 **Belohnungen auf Liga-Ebene** (wie F.4, dieselben Bausteine): beim Abschluss aus der Fassung - Platz aus `place`, „alle Teilnehmer“ sind
 alle Co-Teams mit mindestens einer Season in der Wertung. Team-Belohnung an das Hauptteam, Spieler-Belohnung nach `reward_players`: mit
-Einsatz alle Spieler der Spielerwertung, die Punkte für dieses Co-Team geholt haben, sonst der Kader des Co-Teams. Je Belohnung und Co-Team
+Einsatz (Nr. 177) wer für dieses Co-Team in mindestens einer Season eingesetzt war, die für das Co-Team zählt und mehr als 0 Punkte
+brachte - eine Season mit 0 Punkten (ausgeschieden) oder nur im Streichergebnis reicht nicht; sonst der Kader des Co-Teams. Je Belohnung und Co-Team
 ein Eintrag in `tournament_awards`:
 
 | Feld | Inhalt |

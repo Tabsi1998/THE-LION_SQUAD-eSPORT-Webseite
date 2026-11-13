@@ -527,3 +527,21 @@ async def test_roster_fallback_uses_the_roster_at_close(flow):
     # Profil und Wertung stimmen überein: p-4-3 sieht seinen Platz, p-neu keinen.
     flow.act_as(None)
     assert ok(await flow.get("/api/users/public/p-4-3"))["league_overall"][0]["points"] == 1
+
+
+@pytest.mark.asyncio
+async def test_player_reward_needs_a_counted_season_with_points_for_that_co_team(flow):
+    world = await setup(flow)
+    first = await add_season(flow, world)
+    await played_staffel(flow, world, first, 1, [1, 2, 3, 4])
+    second = await add_season(flow, world)
+    # p-2-2 spielt in Season 2 für Team 1 - dort ist Season 2 Streichergebnis; für Team 2 spielt er nur in dessen Streichergebnis.
+    await played_staffel(flow, world, second, 1, [2, 1, 3, 4], lineups={1: ["p-1-1", "p-2-2"], 2: ["p-2-1", "p-2-3"]})
+    await configure(flow, world, counting="best", best_count=1, rewards=[EVERYONE])
+    flow.act_as(world["admin"])
+    ok(await flow.post(f"{cockpit_url(world)}/levels/1/close", json={"confirm": True}))
+    docs = {doc["registration_id"]: doc for doc in await flow.db.tournament_awards.find(
+        {"tournament_id": f"overall:{world['period']['id']}:1"}, {"_id": 0}).to_list(50)}
+    assert sorted(docs["squad:squad-1"]["player_ids"]) == ["p-1-1", "p-1-2"]
+    assert sorted(docs["squad:squad-2"]["player_ids"]) == ["p-2-1", "p-2-3"]
+    assert all("p-2-2" not in doc["player_ids"] for doc in docs.values())
