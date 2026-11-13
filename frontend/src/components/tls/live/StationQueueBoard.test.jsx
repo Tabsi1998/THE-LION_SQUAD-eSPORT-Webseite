@@ -3,7 +3,7 @@ import { StationQueueBoard } from "./StationQueueBoard";
 import { MatchClock } from "./MatchClock";
 
 // Live vor Ort (#1556): Warteschlange je Station in der Turnierleitung - läuft (mit Spielzeit-Uhr), als Nächstes
-// (Aufrufen / Gestartet), danach. Namen sind erfunden.
+// (Aufrufen / Starten), danach. Namen sind erfunden.
 
 afterEach(() => vi.useRealTimers());
 
@@ -49,7 +49,7 @@ test("je Station: läuft mit Uhr, als Nächstes mit „Aufrufen“, danach; oben
   expect(screen.getByTestId("live-clock-QF1")).toHaveTextContent("20:05");
 });
 
-test("aufgerufen: Zeiten zum Antreten und „nicht erschienen“, Knopf „Gestartet“", () => {
+test("aufgerufen: Zeiten zum Antreten und „nicht erschienen“, Knopf „Starten“", () => {
   const onStart = vi.fn();
   const called = entry("QF2", { state: "called", called_at: "2026-10-31T16:18:00Z", report_by: "2026-10-31T16:20:00Z", no_show_due_at: "2026-10-31T16:28:00Z" });
   render(<StationQueueBoard queue={queue([{ id: "st2", name: "2", station_text: "Station 2", status: "reserved", waiting: 1, running: null, next: called, after: null }])}

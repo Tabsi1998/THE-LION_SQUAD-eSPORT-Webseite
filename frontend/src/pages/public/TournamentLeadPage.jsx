@@ -24,7 +24,9 @@ import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 // „Eintragen“ öffnet das Ergebnis-Fenster (#1370), danach 10 Sekunden „Rückgängig“. Die Verwaltung bleibt zum
 // Vorbereiten - die Live-Werkzeuge stehen hier.
 // Reiter „Stationen“ (#1556, nur vor Ort): die Warteschlange je Station - läuft mit Spielzeit-Uhr, als Nächstes mit
-// „Aufrufen“ und „Gestartet“, danach. Die Reihenfolge und den Verzug rechnet der Server (GET …/live-queue).
+// „Aufrufen“ und „Starten“, danach. Die Reihenfolge und den Verzug rechnet der Server (GET …/live-queue). Dazu je Kachel
+// „Freigeben“, „Umlegen“ und „Defekt“ (#1162) - die Live-Knöpfe stehen nur hier, /admin/stations behält Anlegen und Planen.
+// ?reiter=stationen öffnet direkt die Stationen (Link aus der Verwaltung).
 
 const FILTERS = [
   ["all", "Alle offenen", "open"],
@@ -42,7 +44,7 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  const [tab, setTab] = useState(null);
+  const [tab, setTab] = useState(searchParams.get("reiter") === "stationen" ? "stations" : null);
   const [movingId, setMovingId] = useState("");
   const [queue, setQueue] = useState(null);
   const [queueLoaded, setQueueLoaded] = useState(false);
@@ -95,7 +97,9 @@ export default function TournamentLeadPage() {
   const byId = useMemo(() => Object.fromEntries(matches.map((item) => [item.id, item])), [matches]);
   const cases = attention.length + draws.length;
   // Erst entscheiden, wenn klar ist, ob es vor Ort eine Warteschlange gibt - sonst springt der Reiter nach dem Laden.
-  const activeTab = tab || (fall || cases ? "attention" : queue ? "stations" : queueLoaded ? "results" : "");
+  // Der Reiter „Stationen“ (auch über ?reiter=stationen) erst, wenn es vor Ort eine Warteschlange gibt - sonst die Vorgabe.
+  const wanted = tab === "stations" && !queue ? (queueLoaded ? null : "") : tab;
+  const activeTab = wanted === "" ? "" : wanted || (fall || cases ? "attention" : queue ? "stations" : queueLoaded ? "results" : "");
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
 
   const drawNow = async (card) => {
@@ -135,14 +139,13 @@ export default function TournamentLeadPage() {
     }
   }, [fall, data]);
 
-  // Aufrufen und Gestartet (#1556): zwei Helfer zugleich - der Server nimmt genau einen, der andere sieht den neuen Stand.
-  const operateStation = async (kind, station, entry) => {
+  // Aufrufen, Starten, Freigeben, Defekt und Umlegen (#1556, #1162): zwei Helfer zugleich - der Server nimmt genau einen,
+  // der andere bekommt die Meldung (409) und sieht danach den neuen Stand.
+  const operateStation = async (kind, station, body, said) => {
     setBusyStation(station.id);
     try {
-      const { data: done } = await api.post(`/tournaments/${encodeURIComponent(slug)}/live-queue/${kind}`, { station_id: station.id, match_id: entry.match_id });
-      const where = station.station_text || station.name;
-      if (kind === "call") toast.success(done?.idempotent_replay ? `War schon an ${where} aufgerufen.` : `Aufgerufen an ${where} – die Spieler bekommen Bescheid.`);
-      else toast.success(done?.idempotent_replay ? "Läuft bereits." : `Gestartet an ${where} – die Uhr läuft.`);
+      const { data: done } = await api.post(`/tournaments/${encodeURIComponent(slug)}/live-queue/${kind}`, { station_id: station.id, ...body });
+      toast.success(said(done || {}, station.station_text || station.name));
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt. Bitte neu laden.");
     } finally {
@@ -225,8 +228,16 @@ export default function TournamentLeadPage() {
 
         {activeTab === "stations" && queue ? (
           <div className="mt-5" data-testid="lead-stations">
-            <StationQueueBoard queue={queue} busyKey={busyStation} onCall={(station, entry) => operateStation("call", station, entry)} onStart={(station, entry) => operateStation("start", station, entry)} />
-            <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf.</p>
+            <StationQueueBoard
+              queue={queue}
+              busyKey={busyStation}
+              onCall={(station, entry) => operateStation("call", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? `War schon an ${where} aufgerufen.` : `Aufgerufen an ${where} – die Spieler bekommen Bescheid.`))}
+              onStart={(station, entry) => operateStation("start", station, { match_id: entry.match_id }, (done, where) => (done.idempotent_replay ? "Läuft bereits." : `Gestartet an ${where} – die Uhr läuft.`))}
+              onRelease={(station, entry) => operateStation("release", station, { match_id: entry.match_id }, releasedText)}
+              onBroken={(station, value) => operateStation("broken", station, { broken: value }, value ? brokenText : (done, where) => (done.idempotent_replay ? `${where} war schon bereit.` : `${where} ist wieder bereit.`))}
+              onMove={(station, entry, target) => operateStation("move", station, { match_id: entry.match_id, to_station_id: target.id }, movedText)}
+            />
+            <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>
           </div>
         ) : null}
 
@@ -352,6 +363,23 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
       ) : null}
     </div>
   );
+}
+
+// Rückmeldungen zu den Stations-Knöpfen (#1162) - nach „Defekt“ mit dem Hinweis, was mit dem Spiel an der Station passiert.
+function releasedText(done, where) {
+  if (done.idempotent_replay) return `${where} war schon frei.`;
+  return done.state === "running" ? `${where} ist frei – das Ergebnis trägst du unter „Ergebnisse“ ein.` : `${where} ist frei – das Spiel ist wieder in der Warteschlange.`;
+}
+
+function brokenText(done, where) {
+  const held = done.holds?.state === "running" ? "Das laufende Spiel steht noch dort – mit „Umlegen“ auf eine freie Station."
+    : done.holds?.state === "called" ? "Der Aufruf steht noch dort – mit „Umlegen“ an einer freien Station neu aufrufen." : "";
+  return [done.idempotent_replay ? `${where} war schon als defekt gemeldet.` : `${where} ist als defekt gemeldet.`, held].filter(Boolean).join(" ");
+}
+
+function movedText(done, where) {
+  if (done.idempotent_replay) return `Schon an ${done.to}.`;
+  return done.state === "running" ? `Von ${where} an ${done.to} umgelegt – die Uhr läuft weiter.` : `An ${done.to} neu aufgerufen – die Spieler bekommen Bescheid.`;
 }
 
 function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
