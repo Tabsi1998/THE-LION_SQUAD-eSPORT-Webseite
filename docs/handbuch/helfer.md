@@ -37,10 +37,10 @@ siehst nur, wofür du eingeteilt bist. Jede Eingabe wird gespeichert, auch wer s
 
 <sub>In der App: noch nicht – bitte Website nutzen.</sub>
 
-**2.** Sind alle da und es geht los: **Gestartet** tippen. Die Uhr läuft.
+**2.** Sind alle da und es geht los: **Starten** tippen. Die Uhr läuft.
 
 <table><tr><th>PC</th><th>Handy</th></tr><tr>
-<td><img src="../assets/helfer/a2-gestartet-pc.png" alt="Station aufgerufen, mit Antreten-bis-Zeit und Knopf Gestartet" width="420"></td>
+<td><img src="../assets/helfer/a2-gestartet-pc.png" alt="Station aufgerufen, mit Antreten-bis-Zeit und Knopf Starten" width="420"></td>
 <td><img src="../assets/helfer/a2-gestartet-handy.png" alt="Dasselbe am Handy" width="240"></td>
 </tr></table>
 

@@ -240,6 +240,18 @@ def build_live_queue(
             "started_at": match.get("started_at") if row["state"] == "running" else None,
         }
 
+    # Wer gerade spielt oder aufgerufen ist (#1162): ein wartendes Spiel mit einer dieser Personen trägt, wo sie sind -
+    # „Anderes Spiel aufrufen“ bietet es dann nicht an (der Aufruf-Weg lehnt es ebenso ab).
+    busy: dict[str, dict] = {}
+    for match_id, entry in entries.items():
+        if entry["state"] in {"running", "called"}:
+            for registration_id in _filled(by_id[match_id]):
+                busy.setdefault(registration_id, {"state": entry["state"], "station_text": entry["station_text"]})
+    for match_id, entry in entries.items():
+        entry["busy_at"] = None
+        if entry["state"] == "queued":
+            entry["busy_at"] = next((busy[reg] for reg in _filled(by_id[match_id]) if reg in busy), None)
+
     lanes: dict[str, list[dict]] = {}
     unplaced: list[str] = []
     for entry in entries.values():

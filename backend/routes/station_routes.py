@@ -26,7 +26,7 @@ from services.visibility import lead_can_see
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model, load_matches_by_query
-from services.match_scheduler import DONE_STATUSES, plan_for_tournament
+from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, plan_for_tournament
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
@@ -263,10 +263,25 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     change: dict = {"$set": updates}
     # Ein Aufruf (#1122) gilt nur, solange die Station für genau dieses Spiel reserviert ist.
     previous_match = (current or {}).get("current_match_id")
-    status_left = "status" in updates and updates["status"] != "reserved"
+    # Defekt und wieder bereit (#1162) wie in der Turnierleitung (``live-queue/broken``): Ein gehaltenes offenes Spiel
+    # bleibt samt Aufruf an der Station, bis es umgelegt wird - nichts verschwindet still. Wieder bereit heißt dann
+    # der Stand, der zum Spiel passt (läuft: belegt, aufgerufen: reserviert).
+    held = None
+    if previous_match and "status" in updates:
+        source = await find_match_source(db, previous_match)
+        held = source.match if source else None
+        if held and str(held.get("status") or "") in DONE_STATUSES:
+            held = None
+    keeps_hold = bool(held) and (updates["status"] == "broken" or current.get("status") == "broken")
+    if keeps_hold and updates["status"] != "broken":
+        running = bool(held.get("started_at")) or str(held.get("status") or "") in RUNNING_STATUSES
+        updates["status"] = "busy" if running else "reserved" if held.get("called_at") else updates["status"]
+    if "status" in updates and updates["status"] != "broken" and current.get("status") == "broken":
+        change["$unset"] = {"broken_at": ""}
+    status_left = "status" in updates and updates["status"] != "reserved" and not keeps_hold
     match_changed = "current_match_id" in updates and updates["current_match_id"] != previous_match
     if status_left or match_changed:
-        change["$unset"] = {"called_at": ""}
+        change["$unset"] = {**change.get("$unset", {}), "called_at": ""}
         if previous_match and (current or {}).get("called_at"):
             await _forget_call(db, previous_match, actor_id=me.get("id"))
     await db.stations.update_one({"id": sid}, change)
@@ -429,6 +444,9 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
 async def auto_assign_stations(tournament_id: str, start_now: bool = False,
                                plan: bool = True,
                                me: dict = Depends(get_current_user)):
+    """Nur API (#1162): ``plan`` ist die Vorschau des Spielplaners; ``start_now`` (alle freien Stationen sofort starten)
+    hat im Web keinen Knopf mehr - am Turniertag ersetzt durch „Alle freien Stationen aufrufen“ in der Turnierleitung
+    (``POST /tournaments/{tid}/live-queue/call`` je Station)."""
     db = get_db()
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if not tournament:
@@ -498,6 +516,8 @@ async def _start_on_free_stations(db, stations, candidates, start_now: bool) -> 
 @router.post("/{sid}/assign/{match_id}")
 async def assign_match(sid: str, match_id: str, start_now: bool = False,
                        me: dict = Depends(get_current_user)):
+    """Nur API (#1162): im Web ersetzt durch Aufrufen und Starten in der Turnierleitung
+    (``POST /tournaments/{tid}/live-queue/call`` bzw. ``…/start``)."""
     db = get_db()
     station = await db.stations.find_one({"id": sid}, {"_id": 0})
     if not station:
@@ -517,6 +537,8 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
 
 @router.post("/{sid}/clear")
 async def clear_station(sid: str, me: dict = Depends(get_current_user)):
+    """Nur API (#1162): im Web ersetzt durch „Freigeben“ bzw. „Station räumen“ in der Turnierleitung
+    (``POST /tournaments/{tid}/live-queue/release`` bzw. ``…/clear``)."""
     db = get_db()
     s = await db.stations.find_one({"id": sid})
     if not s:
