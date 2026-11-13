@@ -170,3 +170,16 @@ test("ohne Nachrücker kein Zwischenschritt", async () => {
   expect(screen.queryByTestId("lead-checkin-ask-r3")).toBeNull();
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/registrations/r3/checkin", { status: "no_show" }));
 });
+
+test("„Freigabe offen“: kein „Da“, sondern „Erst freigeben“ mit Weg in die Verwaltung", async () => {
+  renderBoard(SOLO_BOARD);
+  const row = await screen.findByTestId("lead-checkin-row-r5");
+  expect(within(row).queryByRole("button", { name: /ist da/ })).toBeNull();
+  expect(screen.queryByTestId("lead-checkin-here-r5")).toBeNull();
+  expect(row).toHaveTextContent("Freigabe offen");
+  const link = screen.getByTestId("lead-checkin-approve-r5");
+  expect(link).toHaveTextContent("Erst freigeben");
+  expect(link.getAttribute("href")).toBe("/admin/tournaments/t1?tab=participants");
+  fireEvent.click(screen.getByTestId("lead-checkin-filter-missing"));
+  expect(screen.getByTestId("lead-checkin-row-r5")).toBeInTheDocument();
+});

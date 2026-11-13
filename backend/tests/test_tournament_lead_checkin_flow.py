@@ -294,3 +294,23 @@ async def test_board_says_when_no_show_moves_someone_up(flow):
     await flow.db.tournament_registrations.update_one({"id": waiting["id"]}, {"$set": {"status": "rejected"}})
     body = (await flow.get(url)).json()
     assert body["waitlist_moves_up"] is False, "ohne Warteliste keine Rückfrage"
+
+
+@pytest.mark.asyncio
+async def test_pending_needs_approval_before_checkin(flow):
+    """Review M3: „Da“ bei „Freigabe offen“ ginge an Freigabe und Startgeld vorbei - der Check-in-Weg lehnt ab."""
+    tournament = await flow.create_tournament(title="Freigabe-Cup", event_mode="local", status="check_in", max_participants=8)
+    dora = await flow.register(tournament, await flow.add_user(name="Dora"), status="pending")
+    flow.act_as(await assign(flow, tournament, "referee"))
+    base = f"/api/tournaments/{tournament['id']}/registrations/{dora['id']}/checkin"
+    response = await flow.post(base, json={"status": "checked_in"})
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"].startswith("Erst freigeben")
+    stored = await flow.db.tournament_registrations.find_one({"id": dora["id"]}, {"_id": 0, "status": 1, "checked_in_at": 1})
+    assert stored == {"status": "pending"}
+    # „Nicht erschienen“ geht weiter - und nach der Freigabe der Check-in.
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    approved = await flow.patch(f"/api/tournaments/{tournament['id']}/registrations/{dora['id']}", json={"status": "approved"})
+    assert approved.status_code == 200, approved.text
+    response = await flow.post(base, json={"status": "checked_in"})
+    assert response.status_code == 200, response.text

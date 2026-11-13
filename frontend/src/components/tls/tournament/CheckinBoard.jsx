@@ -49,6 +49,8 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 15000, tournamentId, eventId });
 
   const rows = useMemo(() => board?.rows || [], [board]);
+  // Freigeben steht in der Turnierverwaltung, Reiter Teilnehmer.
+  const adminUrl = `/admin/tournaments/${encodeURIComponent(board?.tournament?.id || tournamentId || slug)}?tab=participants`;
   const counts = checkinCounts(rows, pending);
   const shown = useMemo(
     () => rows.filter((row) => checkinMatches(row, query) && checkinFilter(row, filter, pending)),
@@ -125,7 +127,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
 
       <ul className="mt-3 space-y-2" data-testid="lead-checkin-list">
         {shown.map((row) => (
-          <CheckinRow key={row.id} row={row} status={shownStatus(row, pending)} saving={Boolean(pending[row.id])} fresh={Boolean(fresh[row.id])} asking={asking === row.id} onStatus={(status) => ask(row, status)} onConfirm={() => setStatus(row, "no_show")} onCancel={() => setAsking("")} />
+          <CheckinRow key={row.id} row={row} status={shownStatus(row, pending)} saving={Boolean(pending[row.id])} fresh={Boolean(fresh[row.id])} asking={asking === row.id} adminUrl={adminUrl} onStatus={(status) => ask(row, status)} onConfirm={() => setStatus(row, "no_show")} onCancel={() => setAsking("")} />
         ))}
       </ul>
       {rows.length === 0 ? (
@@ -246,7 +248,7 @@ function NoShowQuestion({ row, onConfirm, onCancel }) {
   );
 }
 
-export function CheckinRow({ row, status, saving, fresh, asking = false, onStatus, onConfirm, onCancel }) {
+export function CheckinRow({ row, status, saving, fresh, asking = false, adminUrl = "", onStatus, onConfirm, onCancel }) {
   const here = status === "checked_in";
   const gone = status === "no_show";
   const at = here && row.checked_in_at ? viennaTime(row.checked_in_at, { hour: "2-digit", minute: "2-digit" }) : "";
@@ -273,6 +275,11 @@ export function CheckinRow({ row, status, saving, fresh, asking = false, onStatu
           <button type="button" disabled={saving} onClick={() => onStatus("approved")} className="tls-btn tls-btn--quiet tls-lead-tap inline-flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-sm px-3 text-xs font-bold uppercase tracking-wider" data-testid={`lead-checkin-undo-${row.id}`}>
             <Undo2 className="h-4 w-4" aria-hidden="true" /> Rückgängig
           </button>
+        ) : status === "pending" ? (
+          // Freigabe offen (Review M3): erst freigeben - die Freigabe prüft Platz und Startgeld. Abhaken geht danach.
+          <a href={adminUrl} className="tls-btn tls-btn--secondary tls-lead-tap inline-flex min-h-[48px] max-w-[9rem] shrink-0 items-center rounded-sm px-3 text-center text-[11px] font-bold uppercase leading-tight tracking-wider" data-testid={`lead-checkin-approve-${row.id}`}>
+            Erst freigeben
+          </a>
         ) : (
           <button type="button" disabled={saving} onClick={() => onStatus("checked_in")} className="tls-btn tls-btn--primary tls-lead-tap min-h-[48px] min-w-[5.5rem] shrink-0 rounded-sm px-4 text-sm font-black uppercase tracking-wider" data-testid={`lead-checkin-here-${row.id}`} aria-label={`${row.name} ist da`}>
             Da

@@ -138,6 +138,8 @@ REMOVAL_NO_PLACE = ("Im Turnierbaum ist kein Platz frei, darum lässt sich der A
                     "zurücknehmen. Ein Platz wird frei, wenn jemand austritt oder als „Nicht erschienen“ gilt.")
 DISQUALIFIED_STAYS = ("Eine Disqualifikation lässt sich nicht durch Abmelden aufheben. Das kann nur die Turnierleitung "
                       "zurücknehmen.")
+PENDING_NOT_AT_CHECKIN = ("Erst freigeben: Die Anmeldung wartet noch auf die Freigabe in der Turnierverwaltung – "
+                          "danach lässt sie sich einchecken.")
 REMOVAL_NOT_AT_CHECKIN = ("Austritt und Disqualifikation lassen sich beim Check-in nicht zurücknehmen. Das macht die "
                           "Turnierleitung über den Status in der Teilnehmerliste.")
 
@@ -1243,6 +1245,9 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
             if reg.get("status") in REMOVAL_KINDS:
                 raise HTTPException(status_code=409, detail=REMOVAL_NOT_AT_CHECKIN)
+            if reg.get("status") == "pending" and status == "checked_in":
+                # Erst freigeben (#1161): die Freigabe prüft Platz und Startgeld und schickt die Bestätigung.
+                raise HTTPException(status_code=409, detail=PENDING_NOT_AT_CHECKIN)
             await _require_free_place_on_return(db, tournament_doc, reg, status)
             await _require_seed_on_return(db, tournament_doc, reg, status)
             await _sync_squad_key(db, reg, status, tournament_doc)
