@@ -269,6 +269,26 @@ async def test_von_der_leitung_eingetragen_nicht_erschienen_dann_dabei_kein_star
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("start", ["waitlist", "pending", "rejected"])
+async def test_check_in_dienst_bestaetigt_wie_der_weg_ueber_den_status(flow, fake, start):
+    """Selbst angemeldet mit Kostenübernahme, noch ohne Preis (Warteliste, ausstehend, vor der Freigabe abgelehnt): Bestätigt der
+    Check-in-Dienst, friert er das Startgeld ein und legt den Auftrag an - wie der Weg über den Status."""
+    await connect(flow, **TERMS)
+    kassier = await person(flow, "kassier", role="club_admin")
+    cup = await tournament(flow, kassier, billing=FEE, max_participants=1)
+    erste, paula = await person(flow, "erste"), await person(flow, "paula")
+    assert (await register(flow, erste, cup["id"], accept_costs=True)).json()["status"] == "approved"
+    waiting = (await register(flow, paula, cup["id"], accept_costs=True)).json()
+    assert waiting["status"] == "waitlist"
+    if start != "waitlist":
+        await set_status(flow, kassier, cup, waiting, start)
+    approved = await checkin_status(flow, kassier, cup, waiting, "approved")
+    assert approved["price_snapshot"]["total_cents"] == 1000 and approved["billing_status"] == "pending"
+    [order] = await orders_of(flow, paula)
+    assert order["status"] == "pending" and order["registration_id"] == waiting["id"]
+
+
+@pytest.mark.asyncio
 async def test_selbst_angemeldet_abgelehnt_vor_der_freigabe_dann_bestaetigt_zahlt_startgeld(flow, fake):
     """Gegenstück: Wer selbst angemeldet und die Kosten übernommen hat, zahlt auch nach einer Ablehnung vor der Freigabe - die
     Freigabe danach friert das Startgeld ein wie sonst."""
