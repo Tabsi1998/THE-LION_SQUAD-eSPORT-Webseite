@@ -72,6 +72,13 @@ def quote_for(registration: dict, tournament: dict, offer: dict, selected: list[
     return pricing.quote(offer, seats=seats, teams=1, selected=selected)
 
 
+def billable_on_return(registration: dict) -> bool:
+    """Kommt eine beendete Anmeldung zurück (aus „nicht erschienen“, abgelehnt, ausgetreten), friert die Rückkehr nur dann ein
+    Startgeld ein, wenn es eins gab oder die Person die Kosten übernommen hat (#2368). Von der Leitung Eingetragene ohne Startgeld
+    bekommen so keine neue Rechnung; wer selbst angemeldet und vor der Freigabe abgelehnt wurde, zahlt bei der Freigabe wie sonst."""
+    return bool(registration.get("price_snapshot") or registration.get("costs_accepted_by"))
+
+
 def same_payer(order: dict, payer: dict, registration: dict) -> bool:
     """Gehört der Auftrag zu dieser zahlenden Person und diesem Team (#2368)? Nur dann bucht eine Rückkehr auf seinen Beleg
     zurück. Altaufträge ohne Preis-Kennung vergleichen nur die Person."""

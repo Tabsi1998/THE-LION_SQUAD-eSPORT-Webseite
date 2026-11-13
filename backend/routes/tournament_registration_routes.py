@@ -1154,9 +1154,11 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         {"$set": updates, "$unset": clears} if clears else {"$set": updates},
     )
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
-    if updates.get("status") in tournament_fees.BILLABLE_STATUSES:
+    returning_without_fee = previous_status in tournament_fees.CLOSED_STATUSES and not tournament_fees.billable_on_return(reg)
+    if updates.get("status") in tournament_fees.BILLABLE_STATUSES and not returning_without_fee:
         # Startgeld (#319): Freigabe friert den Preis ein (Zahlungspflichtig ist, wer angemeldet hat) - oder bucht nach einem
-        # Storno mit Beleg zurück (#2368). Vor der Nachricht: Sie sagt dann, dass es schon eine Rechnung gibt.
+        # Storno mit Beleg zurück (#2368). Vor der Nachricht: Sie sagt dann, dass es schon eine Rechnung gibt. Aus einem beendeten
+        # Stand zurück ohne Startgeld und ohne Kostenübernahme (von der Leitung eingetragen) entsteht keine Rechnung (#2368).
         payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
         if payer:
             await tournament_fees.freeze_price(db, reg, tournament_doc, payer=payer)
@@ -1231,10 +1233,12 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
             )
             updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
             # Startgeld wie im Weg über den Status (#2368): „Nicht erschienen“ schließt den Auftrag, wer danach doch eingecheckt
-            # oder zurückgesetzt wird, bekommt ihn zurück - sonst bliebe die Buchung storniert und eine Gutschrift entstünde.
+            # oder zurückgesetzt wird, bekommt ihn zurück - sonst bliebe die Buchung storniert und eine Gutschrift entstünde. Ohne
+            # Startgeld und Kostenübernahme (von der Leitung eingetragen) entsteht dabei keine neue Rechnung.
             if status == "no_show":
                 await tournament_fees.close_price(db, updated, "Anmeldung: no_show")
-            elif reg.get("status") in tournament_fees.CLOSED_STATUSES and status in tournament_fees.BILLABLE_STATUSES and updated.get("user_id"):
+            elif (reg.get("status") in tournament_fees.CLOSED_STATUSES and status in tournament_fees.BILLABLE_STATUSES and updated.get("user_id")
+                  and tournament_fees.billable_on_return(updated)):
                 payer = await db.users.find_one({"id": updated["user_id"]}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
                 if payer:
                     await tournament_fees.freeze_price(db, updated, tournament_doc, payer=payer, rebook_reason=billing_orders.REBOOKED_BY_LEAD)

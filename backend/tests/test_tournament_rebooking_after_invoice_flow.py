@@ -242,6 +242,52 @@ async def checkin_status(flow, lead, cup, registration, status):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("no_show_via", ["status", "checkin"])
+@pytest.mark.parametrize("back_via", ["status", "checkin"])
+async def test_von_der_leitung_eingetragen_nicht_erschienen_dann_dabei_kein_startgeld(flow, fake, no_show_via, back_via):
+    """Von der Turnierleitung eingetragen (ohne Startgeld, ohne Kostenübernahme), „nicht erschienen“, dann doch dabei: Die Rückkehr
+    aus „nicht erschienen“ legt keine neue Rechnung an - auf keinem der beiden Wege."""
+    await connect(flow, **TERMS)
+    kassier = await person(flow, "kassier", role="club_admin")
+    cup = await tournament(flow, kassier, billing=FEE)
+    gast = await person(flow, "gast")
+    flow.act_as(kassier)
+    added = await flow.post(f"/api/tournaments/{cup['id']}/registrations", json={"user_id": gast["id"], "status": "approved"})
+    assert added.status_code == 200, added.text
+    reg = added.json()["registration"]
+    assert "price_snapshot" not in reg
+    if no_show_via == "status":
+        await set_status(flow, kassier, cup, reg, "no_show")
+    else:
+        await checkin_status(flow, kassier, cup, reg, "no_show")
+    if back_via == "status":
+        back = await set_status(flow, kassier, cup, reg, "approved")
+    else:
+        back = await checkin_status(flow, kassier, cup, reg, "checked_in")
+    assert back["status"] in ("approved", "checked_in") and "price_snapshot" not in back
+    assert await flow.db.billing_orders.count_documents({}) == 0, "kein Auftrag für ein Startgeld, das es nie gab"
+    assert "price_snapshot" not in await flow.db.tournament_registrations.find_one({"id": reg["id"]}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+async def test_selbst_angemeldet_abgelehnt_vor_der_freigabe_dann_bestaetigt_zahlt_startgeld(flow, fake):
+    """Gegenstück: Wer selbst angemeldet und die Kosten übernommen hat, zahlt auch nach einer Ablehnung vor der Freigabe - die
+    Freigabe danach friert das Startgeld ein wie sonst."""
+    await connect(flow, **TERMS)
+    kassier = await person(flow, "kassier", role="club_admin")
+    cup = await tournament(flow, kassier, billing=FEE, max_participants=1)
+    erste, paula = await person(flow, "erste"), await person(flow, "paula")
+    assert (await register(flow, erste, cup["id"], accept_costs=True)).json()["status"] == "approved"
+    waiting = (await register(flow, paula, cup["id"], accept_costs=True)).json()
+    assert waiting["status"] == "waitlist" and "price_snapshot" not in waiting
+    await set_status(flow, kassier, cup, waiting, "rejected")
+    approved = await set_status(flow, kassier, cup, waiting, "approved")
+    assert approved["price_snapshot"]["total_cents"] == 1000
+    [order] = await orders_of(flow, paula)
+    assert order["status"] == "pending" and order["registration_id"] == waiting["id"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("no_show_via", ["status", "checkin"])
 @pytest.mark.parametrize("back_to", ["checked_in", "approved"])
 async def test_nicht_erschienen_dann_doch_eingecheckt_gilt_wieder_als_gebucht(flow, fake, no_show_via, back_to):
     """„Nicht erschienen“ über den Status oder den Check-in-Dienst schließt den Auftrag; checkt der Check-in-Dienst die Person
