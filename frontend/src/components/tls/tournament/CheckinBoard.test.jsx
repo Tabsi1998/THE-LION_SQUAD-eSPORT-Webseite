@@ -5,7 +5,8 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 
 const apiMock = { get: vi.fn(), post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "", formatApiError: (value) => value }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+const live = { load: null };
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load) => { live.load = load; } }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 const { CheckinBoard } = await import("./CheckinBoard");
 const { toast } = await import("sonner");
@@ -182,4 +183,23 @@ test("„Freigabe offen“: kein „Da“, sondern „Erst freigeben“ mit Weg 
   expect(link.getAttribute("href")).toBe("/admin/tournaments/t1?tab=participants");
   fireEvent.click(screen.getByTestId("lead-checkin-filter-missing"));
   expect(screen.getByTestId("lead-checkin-row-r5")).toBeInTheDocument();
+});
+
+test("eine Liste von vor dem eigenen Tipp setzt die Zeile nicht zurück (veraltete Antwort)", async () => {
+  renderBoard(SOLO_BOARD);
+  await screen.findByTestId("lead-checkin-row-r3");
+  // Ein Live-Nachladen startet - seine Antwort kommt erst nach dem Tipp an und kennt ihn nicht.
+  let oldAnswer;
+  apiMock.get.mockImplementationOnce(() => new Promise((resolve) => { oldAnswer = resolve; }));
+  let reload;
+  act(() => { reload = live.load(); });
+  apiMock.post.mockResolvedValueOnce({ data: { id: "r3", status: "checked_in", checked_in_at: "2026-11-14T17:10:00+00:00" } });
+  fireEvent.click(screen.getByTestId("lead-checkin-here-r3"));
+  await waitFor(() => expect(screen.getByTestId("lead-checkin-row-r3")).toHaveTextContent("Da · 18:10"));
+  await act(async () => {
+    oldAnswer({ data: SOLO_BOARD });
+    await reload;
+  });
+  expect(screen.getByTestId("lead-checkin-row-r3")).toHaveAttribute("data-status", "checked_in");
+  expect(counter()).toHaveTextContent("2 von 5 da");
 });

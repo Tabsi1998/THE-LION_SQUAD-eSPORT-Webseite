@@ -34,12 +34,21 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
   // Rückfrage vor „Nicht erschienen“ (Review M2): rückt dann jemand von der Warteliste nach, erst bestätigen lassen.
   const [asking, setAsking] = useState("");
 
+  // Veraltete Antworten verwerfen (Review N4): eine Liste, die vor dem eigenen Tipp angefragt wurde, kennt ihn nicht und
+  // setzte die Zeile zurück. Gilt nur die jüngste Abfrage, und nur, wenn seit ihrem Start nichts gespeichert wurde - die
+  // nächste Abfrage (Live-Ereignis des eigenen Tipps) bringt den neuen Stand.
+  const requests = useRef(0);
+  const changes = useRef(0);
   const load = useCallback(async () => {
+    const mine = ++requests.current;
+    const changesAtStart = changes.current;
     try {
       const { data } = await api.get(`/tournaments/${encodeURIComponent(slug)}/lead/checkin`);
+      if (mine !== requests.current || changesAtStart !== changes.current) return;
       setBoard(data);
       setError("");
     } catch (err) {
+      if (mine !== requests.current) return;
       setError(formatApiError(err.response?.data?.detail) || "Die Liste lässt sich gerade nicht laden.");
     }
   }, [slug]);
@@ -68,6 +77,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
   const setStatus = async (row, status) => {
     setAsking("");
     if (pending[row.id]) return;
+    changes.current += 1;
     setPending((now) => ({ ...now, [row.id]: status }));
     if (status === "checked_in") setFresh((now) => ({ ...now, [row.id]: true }));
     try {
@@ -81,6 +91,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
       setFresh((now) => ({ ...now, [row.id]: false }));
       toast.error(`${row.name}: ${formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt – bitte noch einmal."}`);
     } finally {
+      changes.current += 1;
       setPending((now) => {
         const next = { ...now };
         delete next[row.id];
