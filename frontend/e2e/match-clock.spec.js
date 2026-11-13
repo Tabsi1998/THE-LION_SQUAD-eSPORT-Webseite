@@ -75,8 +75,8 @@ test.describe("Spielzeit-Uhr", () => {
     });
     await page.goto(`/tournaments/${SLUG}/leitung`);
 
-    // Stationen: dieselbe Sekunde wie der Server, nicht 7 Minuten weniger.
-    await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+    // Stationen (vor Ort im Cockpit, #1653): dieselbe Sekunde wie der Server, nicht 7 Minuten weniger.
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
     const tile = page.getByTestId(`live-clock-${running.running.match_id}`);
     const tileTime = page.getByTestId(`live-clock-${running.running.match_id}-time`);
     await expect.poll(() => nearServer(tileTime)).toBe(true);

@@ -88,7 +88,7 @@ test("„Nicht erschienen“ im Lauf (#1823): die Rückmeldung sagt, dass der La
   await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Kampflos gewertet – beide Seiten bekommen Bescheid."));
 });
 
-test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Starten“ gehen über den Server", async () => {
+test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Starten“ gehen über den Server; Einstieg ist das Cockpit (#1653)", async () => {
   apiMock.post.mockResolvedValue({ data: { ok: true } });
   const next = { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, forecast_at: "2026-10-31T16:40:00Z" };
   const queue = {
@@ -102,10 +102,14 @@ test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ u
       <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
     </MemoryRouter>,
   );
-  const tab = await screen.findByTestId("lead-tab-stations");
-  await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+  // Vor Ort startet die Seite im Cockpit (#1653) - die Stationen stehen dort mit denselben Knöpfen.
+  await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
   fireEvent.click(await screen.findByTestId("live-call-st2"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/call", { station_id: "st2", match_id: "QF2" }));
+  // Der Reiter „Stationen“ bleibt erreichbar.
+  fireEvent.click(screen.getByTestId("lead-tab-stations"));
+  expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByTestId("lead-stations")).toBeInTheDocument();
 });
 
 // Stationen (#1162): Freigeben, Defekt und Umlegen gehen über die schmalen Wege der Warteschlange; ?reiter=stationen
@@ -349,4 +353,49 @@ test("Turnierpause (#1167): die Uhr in der Liste steht mit „Pause“ - früher
   } finally {
     vi.useRealTimers();
   }
+});
+
+// Turnier-Cockpit (#1653): vor Ort der Einstieg. Ein Tipp auf ein Problem öffnet den Fall in „Braucht Aufmerksamkeit“;
+// solange das Cockpit offen ist, fragen beide Abfragen kurz im Takt nach.
+test("Cockpit (#1653): Probleme oben, ein Tipp öffnet den Fall mit seinen Knöpfen; kurzer Abruf, solange es offen ist", async () => {
+  const { COCKPIT_POLL_MS } = await import("@/lib/tournamentCockpit");
+  liveCalls.length = 0;
+  const queue = {
+    applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {},
+    stations: [{ id: "st2", name: "2", station_text: "Station 2", status: "free", waiting: 1, running: null, next: { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, delay_minutes: 0 }, after: null }],
+  };
+  const lead = {
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+    attention: [{ id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 }],
+  };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+  expect(screen.getByTestId("lead-tab-attention")).toHaveTextContent("Aufmerksamkeit (1)");
+  expect(liveCalls.slice(-2).map((options) => options.pollMs)).toEqual([COCKPIT_POLL_MS, COCKPIT_POLL_MS]);
+  const row = await screen.findByTestId("cockpit-problem-rm-m8");
+  expect(row).toHaveAttribute("href", "/tournaments/fc-cup/leitung?fall=rm-m8");
+  fireEvent.click(row);
+  await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+  expect(screen.getByTestId("lead-case-enter-rm-m8")).toHaveTextContent("Eintragen");
+  // Außerhalb des Cockpits wieder wie bisher: die Ansicht nur bei Änderungen, die Warteschlange je Minute.
+  expect(liveCalls.slice(-2).map((options) => options.pollMs)).toEqual([0, 60000]);
+});
+
+test("Einstieg (#1653): Fall-Link → Aufmerksamkeit; vor Ort das Cockpit (im Check-in nur mit Fällen); sonst wie bisher", async () => {
+  const { defaultLeadTab } = await import("./TournamentLeadPage");
+  const queue = { applies: true, stations: [] };
+  expect(defaultLeadTab({ fall: "rm-1", queue, ready: false })).toBe("attention");
+  expect(defaultLeadTab({ queue, ready: false })).toBe("");
+  expect(defaultLeadTab({ queue, ready: true })).toBe("cockpit");
+  expect(defaultLeadTab({ queue, cases: 2, ready: true })).toBe("cockpit");
+  expect(defaultLeadTab({ queue, checkinPhase: true, ready: true })).toBe("checkin");
+  expect(defaultLeadTab({ queue, checkinPhase: true, cases: 1, ready: true })).toBe("cockpit");
+  expect(defaultLeadTab({ cases: 1, checkinPhase: true, ready: true })).toBe("attention");
+  expect(defaultLeadTab({ checkinPhase: true, ready: true })).toBe("checkin");
+  expect(defaultLeadTab({ ready: true })).toBe("results");
 });

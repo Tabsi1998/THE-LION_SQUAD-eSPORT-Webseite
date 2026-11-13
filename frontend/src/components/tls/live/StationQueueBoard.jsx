@@ -9,7 +9,9 @@ import "./live.css";
 // „Freigeben“, „Umlegen“ und „Defekt“ (#1162). Die Reihenfolge rechnet der Server (services/live_queue.py) - die Seite
 // zeigt nur. Knöpfe nur, wer die Station bedienen darf (`queue.operate`).
 
-export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRelease, onBroken, onMove, onClear, onCallAll }) {
+// `gridClassName`: die Spalten der Kacheln - im Cockpit (#1653) am Tablet quer eine, weil die Probleme daneben stehen.
+// `highlightId`: die Station, zu der ein Tipp auf „Verzug“ gesprungen ist, leuchtet einmal auf.
+export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRelease, onBroken, onMove, onClear, onCallAll, gridClassName = "md:grid-cols-2", highlightId = "" }) {
   const summary = queueSummaryLine(queue?.summary);
   const stations = queue?.stations || [];
   const operate = queue?.operate;
@@ -42,12 +44,13 @@ export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRele
           <span className="min-w-0 [overflow-wrap:anywhere]">{summary}</span>
         </div>
       ) : null}
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className={`mt-3 grid gap-3 ${gridClassName}`}>
         {stations.map((station, index) => (
           <StationTile
             key={station.id}
             station={station}
             index={index}
+            highlighted={Boolean(highlightId) && highlightId === station.id}
             busy={busyKey === station.id}
             canOperate={canOperate(station)}
             targets={onMove ? moveTargets(stations, station, canOperate) : []}
