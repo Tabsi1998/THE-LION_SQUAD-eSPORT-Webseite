@@ -208,7 +208,8 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
             <div className="font-heading text-lg font-bold uppercase text-white">Alles erledigt</div>
             <p className="mt-1 text-sm text-white/65">
               {filter === "mine" && data.total ? "Für dich liegt hier gerade nichts. Was noch offen ist, entscheidet eine zweite Person oder die Gegenseite – unter „Alle“ siehst du es."
-                : "In dieser Season wartet gerade keine Aufgabe auf die Liga-Leitung. Neue Fälle erscheinen hier von selbst."}
+                : data.limited ? "Für deine Zuständigkeiten wartet gerade nichts. Neue Fälle erscheinen hier von selbst."
+                  : "In dieser Season wartet gerade keine Aufgabe auf die Liga-Leitung. Neue Fälle erscheinen hier von selbst."}
             </p>
           </div>
         </div>

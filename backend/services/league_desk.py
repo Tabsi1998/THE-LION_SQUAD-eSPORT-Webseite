@@ -364,6 +364,8 @@ async def season_desk(db, season: dict, me: dict) -> dict:
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status")},
         "groups": groups, "total": total, "mine": mine,
         "can_broadcast": bool(capabilities & set(BROADCAST_CAPABILITIES)),
+        # Nicht jede Gruppe sichtbar: Der leere Zustand sagt dann „für deine Zuständigkeiten“ statt „für die Liga-Leitung“.
+        "limited": len(groups) < len(GROUPS),
     }
 
 

@@ -77,6 +77,11 @@ test("ohne offene Aufgabe: „Alles erledigt“ - auch unter „Nur meine“ mit
   expect(screen.getByTestId("desk-empty")).toHaveTextContent("keine Aufgabe auf die Liga-Leitung");
 });
 
+test("nur einzelne Zuständigkeiten: der leere Zustand spricht von deinen Zuständigkeiten", async () => {
+  renderTab({ ...DESK, total: 0, mine: 0, limited: true, can_broadcast: false, groups: [{ ...DESK.groups[1], items: [] }] });
+  expect(await screen.findByTestId("desk-empty")).toHaveTextContent("Für deine Zuständigkeiten wartet gerade nichts.");
+});
+
 test("„Nur meine“ ohne eigene Aufgabe verweist auf „Alle“", async () => {
   const groups = [{ ...DESK.groups[1], items: [DESK.groups[1].items[1]] }];
   renderTab({ ...DESK, total: 1, mine: 0, groups });

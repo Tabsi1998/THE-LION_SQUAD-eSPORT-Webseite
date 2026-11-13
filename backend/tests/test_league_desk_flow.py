@@ -235,7 +235,8 @@ async def test_each_capability_sees_only_its_groups_and_others_are_refused(flow)
     await set_match(flow, world, result_overdue_at=at(hours=-2))
     only_apps = await lead_of(flow, "Anmeldeleitung", "applications")
     data = await desk(flow, world, only_apps)
-    assert keys(data) == {"applications"} and data["can_broadcast"] is False
+    assert keys(data) == {"applications"} and data["can_broadcast"] is False and data["limited"] is True
+    assert (await desk(flow, world))["limited"] is False, "der Bereich Ligen sieht jede Gruppe"
     assert data["total"] == 0, "das überfällige Spiel sieht nur „Spiele betreuen“ oder „Ergebnisse korrigieren“"
     matches = await lead_of(flow, "Spielleitung", "matches")
     assert keys(await desk(flow, world, matches)) == {"no_show", "overdue", "lineups", "reschedule"}
