@@ -5,11 +5,14 @@
 - Ruhend gestellt ist niemand mehr Vereinsmitglied; ohne Bereich „Verein“ gibt es dafür 403.
 - Mitgliedervorteile: sichtbar für die passende Mitgliedsart, deaktiviert nur noch in der Gesamtliste der Verwaltung.
 - Vorstand: zuweisbar sind nur Mitgliederprofile, Standardposten lassen sich nicht löschen.
+- Die Anmeldung bringt die Mitgliedschaft gleich mit, und das Aktivieren wertet die Vereinserfolge aus.
 
 Ersetzt test_phase_c_iter16.py::test_admin_lists_pending; test_phase_membership.py::test_me_community_user,
 ::test_demote_to_inactive, ::test_authz_community_cannot_update_membership und TestBenefits
 (test_admin_create_visible_to_member, test_patch_deactivate_hides, test_admin_all_includes_inactive,
-test_authz_community_cannot_create); test_phase_d_v3.py::test_assignable_users, ::test_delete_default_blocked.
+test_authz_community_cannot_create); test_phase_d_v3.py::test_assignable_users, ::test_delete_default_blocked. Den noch gültigen Kern von
+test_phase_membership.py::test_admin_login_membership_attached und test_phase567.py::test_auto_award_offiziell_on_activate
+(beide hingen an altem Seed bzw. alten Abzeichen-Codes) prüfen die beiden letzten Tests.
 Erfundene Daten, keine echten Personen.
 """
 import pathlib
@@ -165,3 +168,47 @@ async def test_vorstand_zuweisbar_nur_mitgliederprofile_und_standardposten_bleib
     blocked = await flow.delete(f"/api/board/{pid}")
     assert blocked.status_code == 400 and "Standard-Positionen" in blocked.json()["detail"]
     assert await flow.db.board_positions.find_one({"id": pid}) is not None
+
+
+@pytest.mark.asyncio
+async def test_anmeldung_bringt_die_mitgliedschaft_gleich_mit(flow):
+    from auth import hash_password
+
+    flow.act_as(None)
+    for status, member in (("active", True), ("inactive", False)):
+        name = f"mitglied-{status}"
+        user = {"id": new_id(), "username": name, "display_name": name, "email": f"{name}@example.com", "role": "player",
+                "is_active": True, "email_verified": True, "mfa_enabled": False,
+                "password_hash": hash_password("vereins-testpasswort-1"), "privacy_policy_version": "2026-08-26"}
+        await flow.db.users.insert_one(dict(user))
+        await flow.db.memberships.insert_one({"user_id": user["id"], "member_status": status, "membership_type": "ordinary",
+                                              "member_number": f"TLS-2026-09{len(status)}"})
+        res = await flow.post("/api/auth/login", json={"email": user["email"], "password": "vereins-testpasswort-1"})
+        assert res.status_code == 200, res.text
+        data = res.json()
+        assert data["membership"]["member_status"] == status
+        assert data["is_club_member"] is member
+        assert data["user_type"] == ("club_member" if member else "community_user")
+        assert "password_hash" not in data
+
+
+@pytest.mark.asyncio
+async def test_aktivieren_wertet_die_vereinserfolge_aus(flow):
+    import badges
+
+    await badges.seed_badges()
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    since = (datetime.now(timezone.utc) - timedelta(days=10)).date().isoformat()
+    await flow.db.memberships.insert_one({"user_id": erika["id"], "member_status": "inactive", "membership_type": "ordinary",
+                                          "member_number": "TLS-2026-0008", "member_since": since})
+    before = await flow.db.user_achievements.count_documents({"user_id": erika["id"], "group_code": "membership_tenure"})
+    assert before == 0
+
+    flow.act_as(chair)
+    res = await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "active"})
+    assert res.status_code == 200, res.text
+    assert res.json()["is_club_member"] is True
+    earned = await flow.db.user_achievements.find({"user_id": erika["id"], "group_code": "membership_tenure"},
+                                                  {"_id": 0, "tier_code": 1}).to_list(10)
+    assert earned, "zehn Tage aktives Mitglied erreichen die erste Stufe sofort beim Aktivieren"
