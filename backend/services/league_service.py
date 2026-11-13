@@ -1497,6 +1497,8 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
     return {
         "league": {**public_league(league), "game": map_pools.game_summary(game)},
         "season": public_season(season),
+        # Aus der Vorgänger-Season übernommen (F.2, #1627): Die Ligaseite zeigt den eigenen Co-Teams Stand und „Abmelden“ auch ohne Anmeldefenster.
+        "carried_over": bool(season.get("predecessor_id")),
         # Gestaltung (#2107): Emblem und Banner Season → Liga → nichts; Farbe der Liga (leer = Vereinsfarbe).
         "look": league_look.effective(league, season),
         # „Um was gespielt wird“ - die Gewinne der Season; eine Liga N mit eigenen trägt sie unter ``prizes``.

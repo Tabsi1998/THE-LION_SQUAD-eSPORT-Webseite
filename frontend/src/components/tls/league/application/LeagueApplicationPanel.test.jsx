@@ -155,3 +155,22 @@ test("schlägt die Abfrage fehl, bleibt der öffentliche Teil stehen", async () 
   expect(screen.getByTestId("league-application-window")).toBeInTheDocument();
   expect(screen.queryByTestId("league-application-start")).toBeNull();
 });
+
+test("Season aus dem Vorgänger ohne Fenster (F.2, #1627): nur Co-Teams mit Antrag, Herkunft und „Abmelden“; Gäste sehen nichts", async () => {
+  const carried = { ...SQUAD, state: "accepted", can_apply: true, application: { id: "a9", status: "accepted", can_withdraw: true,
+    carry_over: { from_season_name: "Season 1", from_label: "Liga 2", division_label: "Liga 1", movement: "up", withdraw_until: "2027-01-04T23:00:00+00:00" } } };
+  const other = { ...SQUAD, squad_id: "s2", display_name: "Loewen · Zwei", state: "none", application: null };
+  apiMock.get.mockResolvedValue({ data: view([carried, other], { application: null }) });
+  apiMock.post.mockResolvedValue({ data: {} });
+  const first = renderPanel(null);
+  expect(await screen.findByTestId("league-application-carry-s1")).toHaveTextContent("Übernommen aus Season 1: Liga 1 (Aufstieg aus Liga 2)");
+  expect(screen.getByTestId("league-application-window")).toHaveTextContent("automatisch dabei");
+  expect(screen.queryByTestId("league-application-row-s2")).toBeNull();
+  fireEvent.click(screen.getByTestId("league-application-withdraw-s1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/leagues/probe-liga/season-1/applications/a9/withdraw", {}));
+  expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Von der Season abmelden?");
+  first.unmount();
+  authMock.current = null;
+  const { container } = renderPanel(null);
+  expect(container.querySelector("[data-testid='league-application']")).toBeNull();
+});

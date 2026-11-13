@@ -369,7 +369,7 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict]) -> in
     from services.matchday_schedule import LOCAL_TZ
 
     until = leagues._aware(withdraw_until(season))
-    day = until.astimezone(LOCAL_TZ).strftime("%d.%m.%Y") if until else ""
+    day = until.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr") if until else ""
     title = " ".join(part for part in (league.get("name"), season.get("name")) if part)
     sent = 0
     for row in rows:
@@ -378,7 +378,7 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict]) -> in
             carry = row["carry_over"]
             way = {"up": f" - Aufstieg aus {carry['from_label']}", "down": f" - Abstieg aus {carry['from_label']}"}.get(carry["movement"], "")
             text = (f"{row['display_name']} ist in {carry['division_label']} der neuen Season {title}{way}. Ihr seid automatisch dabei. "
-                    f"Wer nicht mitspielen will, meldet sich bis {day} ab: unter Teams beim Co-Team oder auf der Ligaseite.")
+                    f"Wer nicht mitspielen will, meldet sich bis zum Start ({day}) ab: unter Teams beim Co-Team oder auf der Ligaseite.")
             for user_id in sorted(await _responsible(db, squad)):
                 key = f"league-successor:{season['id']}:{row['squad_id']}:{user_id}"
                 if await create_user_notification(user_id, "Neue Season: ihr seid dabei", text, url="/teams", kind="tournament_registration",

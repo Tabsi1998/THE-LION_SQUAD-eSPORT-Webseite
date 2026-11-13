@@ -44,3 +44,17 @@ test("ohne Anmeldung oder wenn die Abfrage fehlschlägt, bleibt die Karte wie bi
   await waitFor(() => expect(screen.getByTestId("team-squad-roles-s-a")).toBeInTheDocument());
   expect(screen.queryByText("Angenommen")).toBeNull();
 });
+
+test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist, ohne Link zur noch verborgenen Season, Abmelden", async () => {
+  apiMock.get.mockImplementation(answer([
+    { id: "a3", squad_id: "s-a", status: "accepted", title: "Probe-Liga Season 2", url: null, can_withdraw: true,
+      carry_over: { from_season_name: "Season 1", from_label: "Liga 1", division_label: "Liga 2", movement: "down", withdraw_until: "2027-01-04T23:00:00+00:00" } },
+  ]));
+  apiMock.post.mockResolvedValue({ data: { status: "withdrawn" } });
+  render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
+  const row = await screen.findByTestId("squad-application-a3");
+  expect(screen.getByTestId("squad-application-carry-a3")).toHaveTextContent("Übernommen aus Season 1: Liga 2 (Abstieg aus Liga 1). Abmelden bis zum Start am 05.01.2027, 00:00 Uhr.");
+  expect(row.querySelector("a")).toBeNull();
+  screen.getByTestId("squad-application-withdraw-a3").click();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a3/withdraw", {}));
+});

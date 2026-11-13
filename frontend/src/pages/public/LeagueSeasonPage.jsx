@@ -61,7 +61,8 @@ function Overview({ data }) {
   const running = divisions.some((division) => (division.staffeln || []).some((row) => row.status && row.status !== "draft"));
   return (
     <>
-      {data.application ? <LeagueApplicationPanel leagueSlug={league.slug} seasonSlug={season.slug} block={data.application} /> : null}
+      {/* Ohne Anmeldefenster nur, wenn die Season aus dem Vorgänger übernommen ist (F.2): Dann sehen Captains ihr Co-Team und „Abmelden“. */}
+      {data.application || data.carried_over ? <LeagueApplicationPanel leagueSlug={league.slug} seasonSlug={season.slug} block={data.application} /> : null}
 
       <SeasonPlay league={league} season={season} pool={data.map_pool} platform={data.platform} />
 

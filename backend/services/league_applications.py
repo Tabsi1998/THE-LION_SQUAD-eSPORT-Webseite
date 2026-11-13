@@ -181,7 +181,7 @@ def _day(value: str | None) -> str:
     from services.matchday_schedule import LOCAL_TZ
 
     moment = league_service._aware(value)
-    return moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y") if moment else ""
+    return moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr") if moment else ""
 
 
 def _when(value: str | None) -> str:

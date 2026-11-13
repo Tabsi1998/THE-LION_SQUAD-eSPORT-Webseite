@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
+import { carryLine } from "@/lib/leagueSuccessor";
 
 // ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
 export function ApplicationStateBadge({ state, testId, label }) {
@@ -28,8 +29,12 @@ function OwnSquadRow({ row, onWithdraw }) {
           <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, application)} testId={`league-application-state-${row.squad_id}`} />
         </div>
         {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 text-sm text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
+        {/* Aus der Vorgänger-Season übernommen (F.2, #1627): woher, welche Liga, bis wann Abmelden geht. */}
+        {application?.carry_over ? <p className="mt-1 text-sm text-white/85" data-testid={`league-application-carry-${row.squad_id}`}>{carryLine(application.carry_over)}</p> : null}
         {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
-        {row.state === "accepted" && !application?.staffel ? <p className="mt-1 text-sm text-white/75">Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
+        {row.state === "accepted" && !application?.staffel ? (
+          <p className="mt-1 text-sm text-white/75">{application?.carry_over ? "Ihr seid automatisch dabei. Die Staffel teilt die Liga-Leitung noch zu." : "Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu."}</p>
+        ) : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
         {application?.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
         {/* Offene Punkte (#2313): Die Anmeldung läuft, gesperrt wird erst beim Check-in - bis dahin bleibt sichtbar, was fehlt.
@@ -45,7 +50,7 @@ function OwnSquadRow({ row, onWithdraw }) {
       </div>
       {application?.can_withdraw ? (
         <button type="button" onClick={() => onWithdraw(row)} data-testid={`league-application-withdraw-${row.squad_id}`}
-          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">Zurückziehen</button>
+          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">{application.carry_over ? "Abmelden" : "Zurückziehen"}</button>
       ) : null}
     </li>
   );
@@ -73,20 +78,25 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   const withdraw = async (row) => {
     // Eine automatische Zuteilung zieht das Team selbst zurück, solange der Spielplan nicht steht (#2348) - dann fällt auch der Platz in der Staffel weg.
     const staffel = row.application?.staffel ? ` und spielt nicht mehr in ${row.application.staffel}` : "";
-    const sure = await confirm({ title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
+    const carried = Boolean(row.application?.carry_over);
+    const sure = await confirm(carried
+      ? { title: "Von der Season abmelden?", description: `${row.display_name} spielt dann nicht in dieser Season${staffel}. Der Platz geht an die Warteliste oder neue Anmeldungen.`, confirmLabel: "Abmelden", tone: "danger" }
+      : { title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
     if (!sure) return;
     try {
       await api.post(`${base}/applications/${row.application.id}/withdraw`, {});
-      toast.success("Anmeldung zurückgezogen.");
+      toast.success(carried ? "Abgemeldet. Der Platz ist frei." : "Anmeldung zurückgezogen.");
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
     await load();
   };
 
-  const current = view?.application || block;
+  const current = view?.application || block || {};
   const seats = seatsLine(current);
-  const rows = view?.squads || [];
+  // Ohne Anmeldefenster (Season aus dem Vorgänger übernommen, F.2): nur die eigenen Co-Teams mit Antrag - sonst gibt es hier nichts zu tun.
+  const rows = (view?.squads || []).filter((row) => current.state || row.application);
+  if (!current.state && !rows.length) return null;
   const problems = rows.some((row) => row.can_apply) ? view?.season_problems || [] : [];
   return (
     <section className="tls-league-application mt-10 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby="league-application-title" data-testid="league-application">
@@ -99,7 +109,9 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
             </h2>
             <HelpLink thema="liga-captains" schritt="anmeldung-starten" />
           </div>
-          <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">{windowLine(current)}</p>
+          <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">
+            {current.state ? windowLine(current) : "Aus der Vorgänger-Season übernommen: Eure Co-Teams sind automatisch dabei."}
+          </p>
           {seats ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-seats">{seats}</p> : null}
           {current.entry_policy === "members" ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}
           {current.waitlist && current.waitlist_note ? <p className="mt-0.5 text-sm text-white/60 [overflow-wrap:anywhere]" data-testid="league-application-waitlist-note">{current.waitlist_note}</p> : null}
