@@ -671,6 +671,9 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     from routes.tournament_common import tournament_hidden_reason
     from services.league_history import for_team
     out["league_history"] = await for_team(db, team_id, user, hidden=tournament_hidden_reason)
+    # Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N - nach derselben Sichtbarkeit wie die Ligaseite.
+    from services import league_overall
+    out["league_overall"] = await league_overall.for_team(db, team_id, user, hidden=tournament_hidden_reason)
     return out
 
 
