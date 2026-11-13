@@ -193,7 +193,7 @@ test.describe("Turnier-Cockpit", () => {
       await page.getByTestId("cockpit-problem-dl-pc2").click();
       await expect(page).toHaveURL(/\?station=pc2$/);
       await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
-      await expect(page.getByTestId("live-station-pc2")).toHaveAttribute("data-highlighted", "true");
+      await expect(page.getByTestId("live-station-pc2")).toHaveAttribute("data-highlighted", /^[ab]$/);
       await expect(page.getByTestId("live-station-pc2")).toBeInViewport();
       await page.getByTestId("live-call-pc2").click();
       await expect(page.getByTestId("live-start-pc2")).toBeVisible();

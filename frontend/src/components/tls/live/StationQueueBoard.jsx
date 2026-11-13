@@ -10,8 +10,9 @@ import "./live.css";
 // zeigt nur. Knöpfe nur, wer die Station bedienen darf (`queue.operate`).
 
 // `gridClassName`: die Spalten der Kacheln - im Cockpit (#1653) am Tablet quer eine, weil die Probleme daneben stehen.
-// `highlightId`: die Station, zu der ein Tipp auf „Verzug“ gesprungen ist, leuchtet einmal auf.
-export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRelease, onBroken, onMove, onClear, onCallAll, gridClassName = "md:grid-cols-2", highlightId = "" }) {
+// `highlightId`: die Station, zu der ein Tipp auf „Verzug“ gesprungen ist, leuchtet einmal auf - `highlightPulse` zählt die
+// Tipps, jeder neue spielt das Aufleuchten erneut.
+export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRelease, onBroken, onMove, onClear, onCallAll, gridClassName = "md:grid-cols-2", highlightId = "", highlightPulse = 0 }) {
   const summary = queueSummaryLine(queue?.summary);
   const stations = queue?.stations || [];
   const operate = queue?.operate;
@@ -50,7 +51,7 @@ export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRele
             key={station.id}
             station={station}
             index={index}
-            highlighted={Boolean(highlightId) && highlightId === station.id}
+            highlighted={highlightId && highlightId === station.id ? (highlightPulse % 2 ? "b" : "a") : ""}
             busy={busyKey === station.id}
             canOperate={canOperate(station)}
             targets={onMove ? moveTargets(stations, station, canOperate) : []}

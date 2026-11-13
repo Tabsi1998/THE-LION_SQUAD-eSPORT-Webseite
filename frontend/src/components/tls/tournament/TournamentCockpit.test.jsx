@@ -97,10 +97,17 @@ test("Aktionen nur mit Recht: ohne Bedien-Recht für die Station keine Knöpfe",
   expect(screen.getByTestId("live-start-pc3")).toBeInTheDocument();
 });
 
-test("Sprung aus „Verzug“: die Station ist markiert", () => {
-  show({ problems: [], highlightStation: "pc2" });
-  expect(screen.getByTestId("live-station-pc2")).toHaveAttribute("data-highlighted", "true");
+test("Sprung aus „Verzug“: die Station ist markiert - jeder neue Tipp spielt das Aufleuchten neu (Review N2)", () => {
+  const { rerender } = show({ problems: [], highlightStation: "pc2" });
+  const tile = screen.getByTestId("live-station-pc2");
+  expect(tile).toHaveAttribute("data-highlighted", "a");
   expect(screen.getByTestId("live-station-pc1")).not.toHaveAttribute("data-highlighted");
+  rerender(<MemoryRouter><TournamentCockpit loaded queue={QUEUE} board={board()} problems={[]} highlightStation="pc2" highlightPulse={1} /></MemoryRouter>);
+  // Dieselbe Kachel (kein Neuaufbau), anderer Wert - die Animation startet neu.
+  expect(screen.getByTestId("live-station-pc2")).toBe(tile);
+  expect(tile).toHaveAttribute("data-highlighted", "b");
+  rerender(<MemoryRouter><TournamentCockpit loaded queue={QUEUE} board={board()} problems={[]} highlightStation="pc2" highlightPulse={2} /></MemoryRouter>);
+  expect(tile).toHaveAttribute("data-highlighted", "a");
 });
 
 test("Bewegung: neue Probleme steigen gestaffelt ein - wer schon stand, bleibt stehen", () => {

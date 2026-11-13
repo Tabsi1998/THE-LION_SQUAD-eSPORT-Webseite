@@ -117,7 +117,7 @@ export function ProblemList({ problems, onOpen, onExitComplete }) {
   );
 }
 
-export function TournamentCockpit({ problems = [], loaded = false, queue, board = {}, highlightStation = "", onOpen }) {
+export function TournamentCockpit({ problems = [], loaded = false, queue, board = {}, highlightStation = "", highlightPulse = 0, onOpen }) {
   const count = problems.length;
   // „Alles im Plan“ erst, wenn die letzte Zeile hinausgeglitten ist (Review N6) - sonst stünde beides kurz übereinander.
   // Mit „Bewegung reduzieren“ gleitet nichts, dann sofort.
@@ -160,7 +160,7 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
         </header>
         <div className="mt-3">
           {queue ? (
-            <StationQueueBoard queue={queue} gridClassName="md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" highlightId={highlightStation} {...board} />
+            <StationQueueBoard queue={queue} gridClassName="md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" highlightId={highlightStation} highlightPulse={highlightPulse} {...board} />
           ) : <div className="py-10 text-center text-white/40">Wird geladen …</div>}
         </div>
       </section>

@@ -327,6 +327,7 @@ export default function TournamentLeadPage() {
             loaded={Boolean(data)}
             queue={queue}
             highlightStation={stationParam}
+            highlightPulse={stationJump}
             onOpen={openProblem}
             board={stationHandlers}
           />
