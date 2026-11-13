@@ -47,6 +47,10 @@ def registration_name(registration: dict | None) -> str:
 
 # ---------------------------------------------------------------- Turnierpause (#1167, services/match_pause.py)
 
+# Was ein (neuer) Start und ein Zurücksetzen des Starts mitschreiben: Pausen gehören zum alten Start - die Uhr zählt
+# danach ab 0 ohne Abzug, und eine frühere Abrechnung zählt nicht mehr.
+FRESH_CLOCK = {"paused_seconds": 0, "pause_settled_for": None}
+
 def whole_seconds(value) -> int:
     try:
         return max(0, int(value or 0))

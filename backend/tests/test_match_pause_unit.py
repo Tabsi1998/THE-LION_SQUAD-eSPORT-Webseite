@@ -50,3 +50,27 @@ def test_timing_leaves_the_pause_out_of_running_and_overdue():
     # Ohne Pause wie bisher.
     out = timing(running(duration_minutes=20), {}, START + timedelta(minutes=30))
     assert out["running_minutes"] == 30 and out["overdue_minutes"] == 10 and out["missing"] is True
+
+
+def test_every_new_start_resets_the_pause():
+    """Wächter (#1167): Wer ``started_at`` neu setzt (Check-in-Start, Start mit Meldung, Start an der Station), schreibt
+    ``FRESH_CLOCK`` mit - sonst zöge die Uhr nach einem Reset eine alte Pause ab."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    starts = []
+    for rel in ("services/match_flow.py", "routes/station_routes.py"):
+        lines = (root / rel).read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if '{"$set": {"started_at": now_iso' in line or 'match_updates["started_at"] = now_iso' in line:
+                window = "\n".join(lines[index:index + 3])
+                starts.append((rel, index + 1, "FRESH_CLOCK" in window))
+    assert len(starts) == 3, starts
+    assert [row for row in starts if not row[2]] == []
+
+
+def test_a_pairing_reset_drops_the_old_pause():
+    from services.match_v2_results import _pairing_reset_fields
+
+    fields = _pairing_reset_fields({"paused_seconds": 300, "pause_settled_for": "2026-10-31T16:00:00+00:00"}, "now")
+    assert fields["started_at"] is None and fields["paused_seconds"] == 0 and fields["pause_settled_for"] is None

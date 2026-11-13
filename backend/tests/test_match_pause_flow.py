@@ -145,3 +145,36 @@ async def test_resuming_without_a_pause_start_changes_no_match(flow):
     await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "paused"}, "$unset": {"paused_at": ""}})
     await set_status(flow, tournament, "live")
     assert "paused_seconds" not in await flow.reload(match)
+
+
+@pytest.mark.asyncio
+async def test_a_pairing_reset_and_a_new_start_count_from_zero_without_the_old_pause(flow):
+    """Pause, Paarungs-Reset (_pairing_reset_fields), Neustart an der Station: die Uhr zählt ab 0 - ohne Abzug."""
+    from services.match_v2_results import _pairing_reset_fields
+
+    _staff, tournament, stations, _players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    path = f"/api/tournaments/{tournament['id']}/live-queue/start"
+    started = await flow.post(path, json={"station_id": stations[0]["id"], "match_id": match["id"]})
+    assert started.status_code == 200, started.text
+    earlier = (now_utc() - timedelta(minutes=20)).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"started_at": earlier}})
+    await set_status(flow, tournament, "paused")
+    await backdate_pause(flow, tournament, minutes=5)
+    await set_status(flow, tournament, "live")
+    assert (await flow.reload(match)).get("paused_seconds", 0) >= 299
+
+    # Die Paarung ändert sich: alles vom alten Start fällt weg; die Station wird frei.
+    reset = _pairing_reset_fields(await flow.reload(match), now_utc().isoformat())
+    assert reset["paused_seconds"] == 0 and reset["started_at"] is None
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {**reset, "status": "ready"}})
+    await flow.db.stations.update_one({"id": stations[0]["id"]}, {"$set": {"current_match_id": None, "status": "free"}})
+
+    # Neustart - und eine stehen gebliebene Pause würde die Uhr ins Minus ziehen.
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"paused_seconds": 300}})
+    again = await flow.post(path, json={"station_id": stations[0]["id"], "match_id": match["id"]})
+    assert again.status_code == 200, again.text
+    stored = await flow.reload(match)
+    assert stored["started_at"] and stored["paused_seconds"] == 0
+    _lead, item = await lead_item(flow, tournament, match["id"])
+    assert item["paused_seconds"] == 0 and item["timing"]["running_minutes"] == 0
