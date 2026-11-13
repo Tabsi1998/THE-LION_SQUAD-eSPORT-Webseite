@@ -392,8 +392,10 @@ async def test_broadcast_sends_mail_only_when_chosen(flow, monkeypatch):
     world = await desk_world(flow)
     mails = []
 
-    async def fake_mail(_db, user_id, title, text, path, dedupe_key):
+    async def fake_mail(_db, user_id, title, text, path, dedupe_key, *, category=None):
         mails.append((user_id, dedupe_key))
+        assert category == "tournament_updates", "dieselbe Einstellung wie Glocke und Push"
+        return True
 
     monkeypatch.setattr("services.league_mail.send_league_mail", fake_mail)
     assert (await send(flow, world)).status_code == 200
@@ -426,6 +428,33 @@ async def test_a_broadcast_stuck_in_sending_is_continued_on_replay_without_sendi
     assert entry["data"]["state"] == "sent" and entry["data"]["delivered"] == 2 and entry["data"]["processed"] == 2
     again = await send(flow, world, request_id=request_id)
     assert again.json()["state"] == "sent" and len(await inbox(flow, world, "Falke1")) == 1
+
+
+@pytest.mark.asyncio
+async def test_broadcast_mail_follows_the_tournament_updates_setting_and_counts_only_real_mails(flow, monkeypatch):
+    """N4: Die Mail folgt „Turnier-Updates“ wie Glocke und Push, nicht „Match-Erinnerungen“. ``mailed`` zählt nur eingereihte Mails."""
+    import email_service
+    from services.notification_preferences import preference_key
+
+    world = await desk_world(flow)
+    queued = []
+
+    async def fake_template(template_key, to, **kwargs):
+        queued.append((template_key, to))
+        return {"ok": True, "id": new_id()}
+
+    monkeypatch.setattr(email_service, "send_template", fake_template)
+    # Der Captain der Löwen will keine Turnier-Updates per Mail, der Captain der Falken keine Match-Erinnerungen.
+    await flow.db.users.update_one({"id": world["users"]["Kapitaen"]["id"]},
+                                   {"$set": {"notification_preferences": {preference_key("email", "tournament_updates"): False}}})
+    await flow.db.users.update_one({"id": world["users"]["Falke1"]["id"]},
+                                   {"$set": {"notification_preferences": {preference_key("email", "match_reminders"): False}}})
+    request_id = new_id()
+    assert (await send(flow, world, request_id=request_id, mail=True)).status_code == 200
+    assert queued == [("league_notice", world["users"]["Falke1"]["email"])]
+    flow.act_as(world["staff"])
+    state = (await flow.get(f"{world['broadcast']}/{request_id}")).json()
+    assert state["mailed"] == 1 and state["delivered"] == 2
 
 
 @pytest.mark.asyncio

@@ -961,7 +961,7 @@ getan hat – nie Begründungen, Nachrichtentexte oder Namen aus den Fällen. Le
 **Rundnachricht** (Knopf oben, mit „Liga verwalten“ oder „Season konfigurieren“): Empfänger sind **Captains und Vertreter** (Vorgabe;
 ohne beide die Leitung des Hauptteams) oder **alle Spieler**, wahlweise der ganzen Season, einer Liga N oder einer Staffel. Bevor du
 schickst, steht da, wie viele Personen sie bekommen; beim Schicken fragt die Seite noch einmal nach. Sie kommt in die Glocke und als
-Push, **Auch per Mail** schickt sie zusätzlich an alle, die Liga-Hinweise per Mail bekommen. Betreff bis 80, Text bis 1000 Zeichen.
+Push, **Auch per Mail** schickt sie zusätzlich per Mail – alles nach der Einstellung **Turnier-Updates** der jeweiligen Person. Betreff bis 80, Text bis 1000 Zeichen.
 Ein Doppelklick schickt nichts zweimal. Im Protokoll steht sie mit Absender, Kreis und Zahl der Empfänger.
 
 <img src="../assets/liga/liga-rundnachricht-handy.png" alt="Rundnachricht am Handy: Empfänger Captains und Vertreter gewählt, Kreis Ganze Season, Geht an 14 Personen, Betreff und Nachricht, unten der Knopf An 14 Personen schicken" width="260">

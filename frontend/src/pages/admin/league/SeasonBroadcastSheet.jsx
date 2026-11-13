@@ -143,7 +143,7 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
         hint={`${text.trim().length} / ${BROADCAST_LIMITS.textMax} Zeichen`} />
       <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-white/80" data-testid="broadcast-mail">
         <input type="checkbox" checked={mail} onChange={(event) => setMail(event.target.checked)} className="mt-1 accent-[#29B6E8]" />
-        <span>Auch per Mail<span className="block text-xs text-white/50">Glocke und Push gehen immer. Die Mail kommt nur bei denen an, die Liga-Hinweise per Mail bekommen.</span></span>
+        <span>Auch per Mail<span className="block text-xs text-white/50">Glocke, Push und Mail folgen bei jeder Person der Einstellung „Turnier-Updates“. Wer sie per Mail abgeschaltet hat, bekommt keine Mail.</span></span>
       </label>
       {progress ? (
         <div className="rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-3 text-sm" role="status" aria-live="polite" data-testid="broadcast-progress">

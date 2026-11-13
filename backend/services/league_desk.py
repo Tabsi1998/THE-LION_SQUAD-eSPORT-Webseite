@@ -607,8 +607,8 @@ async def deliver(db, *, season_id: str, claim: str, sender_id: str | None, titl
             counts["delivered"] += 1 if done else 0
         except Exception:  # noqa: BLE001 - eine Person, bei der es klemmt, hält die anderen nicht auf
             logger.warning("[league_desk] Rundnachricht %s nicht zugestellt", log_safe(claim), exc_info=True)
-        if mail:
-            await send_league_mail(db, user_id, f"{heading}: {title}", text, path, f"{key}:mail")
+        # Die Mail folgt derselben Einstellung wie Glocke und Push („Turnier-Updates“); gezählt wird nur, was wirklich eingereiht ist.
+        if mail and await send_league_mail(db, user_id, f"{heading}: {title}", text, path, f"{key}:mail", category="tournament_updates"):
             counts["mailed"] += 1
         if index % BATCH == 0:
             await progress(index)

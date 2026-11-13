@@ -41,6 +41,7 @@ test("Vorgabe Captains und Vertreter mit Vorschau, Kreis und Empfänger ändern 
   renderSheet();
   expect(await screen.findByTestId("broadcast-preview")).toHaveTextContent("Geht an 4 Personen");
   expect(apiMock.post).toHaveBeenCalledWith(PREVIEW, { audience: "captains", scope: "season", scope_id: null });
+  expect(screen.getByTestId("broadcast-mail")).toHaveTextContent("Einstellung „Turnier-Updates“");
   fireEvent.change(screen.getByTestId("broadcast-scope"), { target: { value: "staffel:t1" } });
   await waitFor(() => expect(screen.getByTestId("broadcast-preview")).toHaveTextContent("Geht an 2 Personen"));
   expect(apiMock.post).toHaveBeenLastCalledWith(PREVIEW, { audience: "captains", scope: "staffel", scope_id: "t1" });

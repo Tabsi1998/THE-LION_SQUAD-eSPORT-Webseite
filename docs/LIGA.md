@@ -3335,7 +3335,8 @@ Leitstand liest dieselben Quellen wie „Mein Dienst“ und die Reiter der Seaso
   `division` oder `staffel` mit `scope_id`; Anmeldungen `pending`/`approved`/`checked_in`, ohne gesperrte und abgeschaltete Konten und
   ohne die sendende Person. Betreff 3 bis 80, Text 10 bis 1000 Zeichen. Zustellung über `create_user_notification` (Art
   `league_broadcast`, Thema „Turnier-Updates“, Push-Kanal `lion_tournaments`) mit `dedupe_key` `league-broadcast:{season}:{request_id}:{user}`,
-  Mail nach Wahl über `send_league_mail` (Vorlage `league_notice`, nach den Einstellungen der Person). **Doppelversand:** Der
+  Mail nach Wahl über `send_league_mail` (Vorlage `league_notice`) mit demselben Thema „Turnier-Updates“ wie Glocke und Push; `mailed`
+  zählt nur wirklich eingereihte Mails. **Doppelversand:** Der
   Protokolleintrag `league.broadcast` mit der Kennung `league-broadcast:{season}:{request_id}` ist zugleich die Sperre; ein zweiter Aufruf
   mit derselben `request_id` antwortet mit `replay: true` und schickt nichts. Im Protokoll stehen Absender, Kreis, Zahl, Mail ja/nein und
   die Länge - nie der Text.
