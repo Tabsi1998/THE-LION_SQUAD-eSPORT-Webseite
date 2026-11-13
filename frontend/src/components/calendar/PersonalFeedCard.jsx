@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarPlus, Check, Copy, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { feedUrls } from "@/lib/calendar";
@@ -62,10 +62,13 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
 
-  const remember = (next) => {
+  // Der Rückruf der Seite kann sich ändern - gemeldet wird immer an den aktuellen, geladen aber nur einmal (#937).
+  const onStatusRef = useRef(onStatus);
+  onStatusRef.current = onStatus;
+  const remember = useCallback((next) => {
     setStatus(next);
-    onStatus?.(next);
-  };
+    onStatusRef.current?.(next);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -73,8 +76,7 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
       .then(({ data }) => alive && remember({ active: Boolean(data?.active), created_at: data?.created_at || null, last_used_at: data?.last_used_at || null }))
       .catch(() => alive && remember({ active: false }));
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- einmal beim Öffnen
-  }, []);
+  }, [remember]);
 
   // Der Hinweis nach einer Anmeldung führt hierher (#abo): einmal hinscrollen, sobald der Kasten steht.
   const ref = useRef(null);
