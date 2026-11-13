@@ -443,3 +443,22 @@ def test_schluessel_wird_nur_einmal_geladen(keys, monkeypatch):
     assert first is second and len(calls) == 1
     monkeypatch.setenv("WEB_PUSH_CONTACT", "mailto:neu@example.test")
     assert web_push.vapid_config().contact == "mailto:neu@example.test" and len(calls) == 2
+
+
+async def test_anmelden_ist_je_konto_begrenzt(flow, keys):
+    from routes import web_push_routes
+
+    user = await flow.add_user()
+    flow.act_as(user)
+    headers = await login(flow, user)
+    browser = Browser("oft")
+    codes = []
+    for _ in range(web_push_routes.SUBSCRIBE_LIMIT + 1):
+        res = await flow.post("/api/web-push/subscriptions", json=browser.subscription(), headers=headers)
+        codes.append(res.status_code)
+    assert codes[:-1] == [200] * web_push_routes.SUBSCRIBE_LIMIT and codes[-1] == 429
+    # Ein anderes Konto ist davon nicht betroffen.
+    other = await flow.add_user()
+    flow.act_as(other)
+    res = await subscribe(flow, Browser("anders"))
+    assert res.status_code == 200

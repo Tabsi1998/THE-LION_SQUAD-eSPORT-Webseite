@@ -13,8 +13,12 @@ from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
 from services import web_push
+from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/web-push", tags=["web-push"])
+# Anmelden eines Browsers: höchstens so oft je Konto und Minute (Website frischt beim Laden einmal auf).
+SUBSCRIBE_LIMIT = 10
+SUBSCRIBE_WINDOW_SECONDS = 60
 
 
 class SubscriptionKeys(BaseModel):
@@ -45,6 +49,8 @@ async def web_push_config(user: dict = Depends(get_current_user)):
 
 @router.post("/subscriptions")
 async def subscribe_browser(body: SubscriptionCreate, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "web-push:subscribe:user", limit=SUBSCRIBE_LIMIT,
+                             window_seconds=SUBSCRIBE_WINDOW_SECONDS, subject=user["id"])
     if not web_push.vapid_config():
         raise HTTPException(status_code=409, detail="Browser-Benachrichtigungen sind auf diesem Server nicht eingerichtet.")
     endpoint = body.endpoint.strip()
