@@ -189,4 +189,4 @@ async def test_settings_show_the_invoice_category_without_discord(flow):
     flow.act_as(user)
     payload = (await flow.get("/api/users/me/notification-preferences")).json()
     category = next(item for item in payload["categories"] if item["key"] == "billing_updates")
-    assert category["label"] == "Rechnungen" and category["channels"] == ["in_app", "push", "email"]
+    assert category["label"] == "Rechnungen" and category["channels"] == ["in_app", "push", "browser", "email"]

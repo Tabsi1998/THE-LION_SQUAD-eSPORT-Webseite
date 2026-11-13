@@ -261,6 +261,16 @@ def build_payload(notification: dict[str, Any], base_url: str = "") -> dict[str,
     return payload
 
 
+async def _site_base(db) -> str:
+    """Die Adresse der Website - um eigene absolute Links als Pfad zu erkennen (wie ``user_notifications.build_public_url``,
+    ohne dorthin zu importieren: das gäbe einen Import-Kreis)."""
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
+    base = (os.environ.get("FRONTEND_URL") or branding.get("domain") or "https://lionsquad.at").strip().rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = "https://" + base
+    return base or "https://lionsquad.at"
+
+
 def ttl_seconds(environ: dict[str, str] | None = None) -> int:
     source = environ if environ is not None else os.environ
     try:
@@ -296,9 +306,7 @@ async def send_web_push_for_notification(notification: dict[str, Any]) -> int:
     ).to_list(MAX_SUBSCRIPTIONS_PER_USER)
     if not rows:
         return 0
-    from services.user_notifications import build_public_url
-
-    base_url = await build_public_url("")
+    base_url = await _site_base(db)
     body = json.dumps(build_payload(notification, base_url), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     kind = str(notification.get("kind") or "")
     sent = 0
