@@ -578,6 +578,17 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | `competition_sanctions` | E.3 | Strafen mit Wirkung, Moderation bleibt getrennt | `penalty_routes.py` |
 | `league_final_tables` | F.1 | Dauerhafter Endstand, Meister | Muster `record_tournament_awards` |
 
+### F.3 Erweiterbarkeit (Prüfung, kein Bau)
+
+Wie gut das System für neue CoD-Titel, mehr Stufen und Solo, Playoffs und Relegation, andere Spiele und die App vorbereitet ist,
+steht mit Fundstellen, Aufwand und Rangliste in [liga/erweiterbarkeit.md](liga/erweiterbarkeit.md) (Stand 13.11.2026, A bis
+F.2). Die wichtigsten Hürden:
+
+- das Spiel hängt an der Liga statt an der Season (Titelwechsel nur mit neuer Liga);
+- `participant_kind` nur `"team"`, Anmeldung und Kader setzen ein Co-Team voraus;
+- kein Übergang von der Tabelle in eine K.-o.-Phase, Relegation ohne Wirkung;
+- Map-Pflicht und kein Remis je Partie (EA FC).
+
 ### B.1 Bereich „Ligen“, Zuständige, Befangenheit (#2203)
 
 **Bereich `leagues`** (Zwei-Faktor Pflicht, vergibt der Superadmin unter Alle Benutzer): darf alle Ligen und alle Zuständigkeiten.
