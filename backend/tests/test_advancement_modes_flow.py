@@ -180,7 +180,17 @@ async def test_instant_parallel_results_never_share_a_seat(flow):
     staff, tournament, _users, _regs = await bracket(flow, count=16, advancement_mode="instant")
     first = await round_matches(flow, tournament, 1)
     before = change_events._version
-    responses = await asyncio.gather(*[flow.post(f"/api/matches/{m['id']}/result", json=ranking(m)) for m in first])
+
+    async def report(match: dict):
+        # Gleichzeitig: Die Turnier-Schreibsperre lässt einen nach dem anderen durch. Wer zu lange wartet, bekommt
+        # „bereits verarbeitet“ und sendet wie in der Oberfläche noch einmal (auf echtem MongoDB, #2216).
+        for _attempt in range(10):
+            response = await flow.post(f"/api/matches/{match['id']}/result", json=ranking(match))
+            if response.status_code != 409 or "bereits verarbeitet" not in response.text:
+                return response
+        return response
+
+    responses = await asyncio.gather(*[report(m) for m in first])
     assert all(r.status_code == 200 for r in responses), [r.text for r in responses if r.status_code != 200]
     second = await round_matches(flow, tournament, 2)
     seated = [s["registration_id"] for m in second for s in m["slots"] if s.get("registration_id")]

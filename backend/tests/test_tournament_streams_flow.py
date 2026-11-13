@@ -81,8 +81,9 @@ async def test_tournament_page_lists_participant_streams_only_for_public_people(
         {"id": "r4", "tournament_id": "t1", "team_id": "team1", "status": "confirmed"},
         {"id": "r5", "tournament_id": "t2", "user_id": paula["id"], "status": "confirmed"},
     ])
-    for user, stream_id in ((paula, "s-paula"), (leon, "s-leon"), (mira, "s-mira"), (kai, "s-kai")):
-        await live(flow, user, stream_id)
+    # Sortiert wird nach Zuschauern: verschiedene Zahlen, sonst ist die Reihenfolge auf echtem MongoDB offen (#2216).
+    for user, stream_id, viewers in ((paula, "s-paula", 12), (leon, "s-leon", 11), (mira, "s-mira", 10), (kai, "s-kai", 9)):
+        await live(flow, user, stream_id, viewers=viewers)
 
     rows = (await flow.get("/api/tournaments/sommer-cup/streams")).json()
     assert [row["username"] for row in rows] == ["paula", "kai"], "Leon ohne öffentliches Profil, Mira mit Twitch auf privat fehlen"

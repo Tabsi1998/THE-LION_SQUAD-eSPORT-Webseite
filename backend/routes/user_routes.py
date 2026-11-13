@@ -31,6 +31,7 @@ from services.private_fields import private_projection, strip_private
 # Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
+    REGISTRATION_LIMIT,
     AreasUpdate,
     AdminProfileReset, AdminUserCreate, DISPLAY_NAME_MAX, PREFERRED_ROLE_MAX, UserUpdate, RoleUpdate,
     now_utc, new_id,
@@ -404,7 +405,7 @@ async def mention_search(
         regs = await db.tournament_registrations.find(
             {"tournament_id": scope_id, "status": {"$in": ["approved", "checked_in"]}},
             {"_id": 0, "user_id": 1, "team_id": 1},
-        ).to_list(1000)
+        ).to_list(REGISTRATION_LIMIT)
         reg_user_ids = {row.get("user_id") for row in regs if row.get("user_id")}
         reg_team_ids = {row.get("team_id") for row in regs if row.get("team_id")}
         team_member_ids: set[str] = set()
@@ -412,7 +413,7 @@ async def mention_search(
             team_rows = await db.teams.find(
                 {"id": {"$in": list(reg_team_ids)}},
                 {"_id": 0, "member_ids": 1},
-            ).to_list(500)
+            ).to_list(len(reg_team_ids))
             for team_row in team_rows:
                 team_member_ids.update(team_row.get("member_ids") or [])
         staff_rows = await db.tournament_staff_assignments.find(

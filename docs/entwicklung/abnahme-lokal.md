@@ -124,6 +124,10 @@ Seed-Modi bleiben unberührt; jeder Lauf legt zwei Modi dazu, ab 19 Modi übersp
 zwei Sieger gleich stehen, legt in der Season-Verwaltung die Reihenfolge mit Grund fest, trägt einen Austritt ein (alle Spiele für
 die Gegner, Tabellenende) und wertet ein Spiel „beide nicht erschienen“ samt „Neu ansetzen“; die Ligaseite liest ein Gast bei 390
 und 1440 px. Sie braucht wie `liga-ablauf-abnahme` eine Staffel im Entwurf, also einen frischen Seed davor.
+`liga-strafen-abnahme.spec.js` (gleiche Stand-Datei, E.3, braucht eine Staffel im Entwurf, also den Seed davor) startet die Staffel, trägt
+Spieltag 1 ein und verhängt im Reiter Strafen der Season bei 390 px einen Punktabzug und bei 1440 px eine vorläufige Spielsperre, die
+die Leitung bestätigt. Ein Gast liest den Abzug in der Tabelle, der Captain legt unter Meine Strafen Einspruch ein, die gesperrte Person
+ist nicht spielberechtigt. Über den Einspruch entscheidet eine zweite Person; die Tabelle rechnet zurück.
 `spielseite-abnahme.spec.js` (gleiche Stand-Datei, #2249) öffnet je Breite die Spielseite über das Zahnrad, legt im Reiter Modi
 einen Modus an, im Reiter Maps eine Map und gibt sie per Häkchen in zwei Modi frei, deaktiviert den Modus und prüft die
 Weiterleitung der alten Map-Adresse; Map und Modus räumt sie danach wieder weg.
@@ -296,3 +300,7 @@ docker rm -f flow-mongo
 
 In der CI läuft das als Job „Backend-Abläufe auf MongoDB“, in `scripts/local_check.py` als Schritt `mongo-flows`. Einzelne
 Dateien gehen auch direkt mit `FLOW_MONGO_URL=… python -m pytest backend/tests/test_x_flow.py`.
+
+Alle Ablauf-Dateien, nicht nur das Gebiet der CI (#2216): `python scripts/flow_mongo_tests.py --all --chunk 60 -n 4`
+(über 500 Dateien, rund 7500 Tests, lokal rund 21 Minuten). `--chunk` teilt sie in mehrere pytest-Aufrufe, weil das
+Sammeln vieler Dateien in einem Aufruf sehr langsam wird.

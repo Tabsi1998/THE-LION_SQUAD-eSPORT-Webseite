@@ -13,6 +13,8 @@ export const SEASON_TABS = [
   { key: "tabelle", label: "Tabelle" },
   // Proteste (E.2, #1619): Eingang der Verfahren und die Einstellungen dazu, eigenes Speichern.
   { key: "proteste", label: "Proteste" },
+  // Strafen (E.3): verhängen, bestätigen, widerrufen, Einsprüche - nur mit der Zuständigkeit „Strafen“.
+  { key: "strafen", label: "Strafen" },
   { key: "regelwerk", label: "Regelwerk und Sperrliste" },
   { key: "ligen", label: "Ligen und Staffeln" },
 ];

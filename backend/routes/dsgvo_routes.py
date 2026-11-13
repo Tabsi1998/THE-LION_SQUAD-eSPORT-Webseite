@@ -85,6 +85,26 @@ def _sanction(row: dict) -> dict:
     return out
 
 
+def _league_sanction(row: dict) -> dict:
+    """Strafe der Liga (E.3): ohne die Kennungen der Leitung."""
+    out = _clean(row, "created_by", "final_by", "revoked_by", "conflict_reason", "effect", "proof_ids")
+    if isinstance(out.get("appeal"), dict):
+        out["appeal"] = {key: value for key, value in out["appeal"].items() if key != "decided_by"}
+    return out
+
+
+def team_appeal_query(user_id: str) -> dict:
+    """Einsprüche, die die Person gegen die Strafe eines Co-Teams eingelegt hat (E.3) - die Strafe selbst gehört dem Co-Team."""
+    return {"appeal.by": user_id, "user_id": {"$ne": user_id}}
+
+
+def _team_appeal(row: dict) -> dict:
+    """Nur der eigene Einspruch: Art der Strafe und was die Person schrieb - ohne Begründung der Strafe und ohne Kennungen der Leitung."""
+    appeal = row.get("appeal") or {}
+    return {"sanction_id": row.get("id"), "kind": row.get("kind"), "season_id": row.get("season_id"),
+            "appeal": {key: appeal.get(key) for key in ("at", "text", "state", "decided_at", "note")}}
+
+
 async def _paged(collection, query: dict):
     """Alle Zeilen, seitenweise nach ``_id`` - ohne Obergrenze und ohne alles auf einmal im Speicher."""
     last = None
@@ -273,6 +293,10 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("chat_attachments", _rows(db.chat_attachments, {"owner_id": user_id}, _pick(*ATTACHMENT))),
         ("moderation_strikes", _rows(db.moderation_strikes, me, lambda row: _clean(row, "moderator_id", "revoked_by"))),
         ("moderation_sanctions", _rows(db.moderation_sanctions, me, _sanction)),
+        # Strafen im Wettbewerb (E.3): gegen die Person verhängte Strafen der Liga mit dem eigenen Einspruch.
+        ("competition_sanctions", _rows(db.competition_sanctions, me, _league_sanction)),
+        # … und der eigene Einspruch gegen die Strafe eines Co-Teams (Captain, Vertreter, Hauptteam-Leitung).
+        ("competition_sanction_appeals", _rows(db.competition_sanctions, team_appeal_query(user_id), _team_appeal)),
         # Nur, was angemeldet geschrieben wurde: eine Anfrage ohne Konto lässt sich der Person nicht sicher zuordnen.
         # Interne Notiz und wer in der Verwaltung zuständig war, bleiben draußen; die Antworten bekam die Person ohnehin (#2131).
         ("contact_messages", _rows(db.contact_messages, me, lambda row: {**_clean(row, "internal_note", "answered_by", "assigned_to"),

@@ -165,8 +165,8 @@ async def test_an_organizer_manages_the_prizes_of_his_tournament_only(flow):
 @pytest.mark.asyncio
 async def test_team_leader_accounts_become_players_once(flow):
     await flow.db.users.insert_many([
-        {"id": "u-tl", "username": "alt", "role": "team_leader", "is_active": True},
-        {"id": "u-pl", "username": "neu", "role": "player", "is_active": True},
+        {"id": "u-tl", "email": "u-tl" + "@example.test", "username": "alt", "role": "team_leader", "is_active": True},
+        {"id": "u-pl", "email": "u-pl" + "@example.test", "username": "neu", "role": "player", "is_active": True},
     ])
     assert await migrate_team_leader_role(flow.db) == "1 team_leader accounts set to player"
     assert (await flow.db.users.find_one({"id": "u-tl"}, {"_id": 0, "role": 1}))["role"] == "player"

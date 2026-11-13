@@ -15,11 +15,13 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 
 from models import now_utc
-from services import checkin_rules, league_platform, league_roster
+from services import checkin_rules, league_platform, league_roster, league_sanction_bans
 from services.dolibarr_policy import club_today
 from services.matchday_schedule import LOCAL_TZ
 
 OTHER_TEAM, AGE_MISSING, AGE_NOT_MET_STATE, WAITING = "other_team", "age_missing", "age_not_met", "waiting"
+# Strafen (E.3): eine laufende Sperre der Liga-Leitung - geht jedem Stand außer ``banned`` vor.
+SANCTIONED = league_sanction_bans.SANCTIONED
 ACTIVE_STATUSES = league_roster.ACTIVE_REGISTRATION_STATUSES
 AGE_MET, AGE_NO_DATE = "met", "missing"
 
@@ -46,6 +48,8 @@ class EligibilityContext:
     memberships: dict[str, set[str]] = field(default_factory=dict)
     platform: league_platform.PlatformRule | None = None
     division: dict | None = None
+    # Strafen (E.3): die laufenden Sperren dieser Personen und der Co-Teams der Liga.
+    sanctions: league_sanction_bans.Bans | None = None
 
     @property
     def season(self) -> dict:
@@ -113,12 +117,13 @@ async def _memberships(db, season: dict | None) -> dict[str, set[str]]:
     return out
 
 
-async def context_for_tournament(db, tournament: dict | None, user_ids) -> EligibilityContext | None:
-    """Für eine Staffel - ``None`` bei Turnieren ohne Liga-Rahmen. Die Plattform gilt wie in ihrer Liga N."""
+async def context_for_tournament(db, tournament: dict | None, user_ids, *, match: dict | None = None) -> EligibilityContext | None:
+    """Für eine Staffel - ``None`` bei Turnieren ohne Liga-Rahmen. Die Plattform gilt wie in ihrer Liga N. ``match``: die Prüfung
+    gilt genau diesem Spiel - eine Sperre (E.3) zählt dann für seinen Zeitpunkt bzw. als eines ihrer gesperrten Spiele."""
     roster = await league_roster.context_for_tournament(db, tournament, user_ids)
     if not roster:
         return None
-    ctx = await _with_rules(db, roster, user_ids)
+    ctx = await _with_rules(db, roster, user_ids, match=match)
     division_id = ((tournament or {}).get("league_context") or {}).get("division_id")
     ctx.division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0}) if division_id else None
     if (roster.season or {}).get(league_platform.FIELD):
@@ -137,10 +142,11 @@ async def context_for_season(db, season: dict, user_ids) -> EligibilityContext |
     return ctx
 
 
-async def _with_rules(db, roster: league_roster.RosterContext, user_ids) -> EligibilityContext:
+async def _with_rules(db, roster: league_roster.RosterContext, user_ids, *, match: dict | None = None) -> EligibilityContext:
     wanted = {user_id for user_id in user_ids or [] if user_id}
     return EligibilityContext(roster=roster, ages=await _ages(db, roster.season, wanted),
-                              memberships=await _memberships(db, roster.season))
+                              memberships=await _memberships(db, roster.season),
+                              sanctions=await league_sanction_bans.bans(db, roster.league_id, roster.season_id, wanted, match=match))
 
 
 def platform_state(ctx: EligibilityContext | None, user_id: str) -> tuple[str, str, str] | None:
@@ -160,6 +166,10 @@ def status(ctx: EligibilityContext | None, user_id: str, squad_id: str | None = 
     out = {**row, "id_state": row["state"], "id_ok": row["ok"], "id_reason": row["reason"], "until": None, "age": None}
     if not ctx or row["state"] == league_roster.BANNED:
         return out
+    # Strafen (E.3): Eine laufende Sperre geht allem anderen vor - der Satz nennt nur die Sperre und ihr Ende, nie den Verstoß.
+    sanction = league_sanction_bans.eligibility_row(ctx.sanctions, user_id, squad_id)
+    if sanction:
+        return {**out, **sanction}
     age = ctx.ages.get(user_id)
     out["age"] = age if age in (AGE_MET, AGE_NO_DATE) else None
     if squad_id and ctx.memberships.get(user_id, set()) - {squad_id}:
@@ -461,6 +471,10 @@ def registration_problems(ctx: EligibilityContext | None, squad: dict) -> list[t
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     name = squad.get("name") or "Das Co-Team"
     problems: list[tuple[int, str]] = []
+    # Strafen (E.3): Ein gesperrtes oder ausgeschlossenes Co-Team meldet sich nicht an.
+    ban = league_sanction_bans.squad_ban(ctx.sanctions, squad.get("id"))
+    if ban:
+        problems.append((403, f"{name}: {ban['reason']}"))
     too_many = _too_many(ctx.season, len(members))
     if too_many:
         problems.append((400, f"{name}: {too_many}"))
@@ -476,7 +490,7 @@ def registration_problems(ctx: EligibilityContext | None, squad: dict) -> list[t
 FIXABLE_STATES = frozenset({AGE_MISSING, league_platform.MISSING, league_platform.NOT_ALLOWED,
                             league_roster.MISSING, league_roster.FORMAT, league_roster.TAKEN})
 # Nicht „fehlende Angabe“: steht anderswo als Grund (anderes Co-Team) oder ist eine Sperre bzw. Wartezeit.
-NOT_OPEN_POINTS = frozenset({OTHER_TEAM, league_roster.BANNED, WAITING})
+NOT_OPEN_POINTS = frozenset({OTHER_TEAM, league_roster.BANNED, WAITING, SANCTIONED})
 BASIC_TAB, GAMING_TAB = "/profile?tab=basic", "/profile?tab=gaming"
 
 

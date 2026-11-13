@@ -36,9 +36,9 @@ async def _setup(flow, *, game: bool = True):
     await db.games.insert_one({"id": "spiel-1", "slug": "probe-racing", "name": "Probe Racing",
                                "player_id_fields": [{"key": "racer_id", "label": "Racer-ID"}]})
     await db.club_member_profiles.insert_many([
-        {"id": "p-anna", "user_id": anna["id"], "display_name": "Anna Probe", "source": "member", "is_active": True},
-        {"id": "p-bert", "display_name": "Bert Probe", "gamertag": "BertBolzt", "source": "editorial", "is_active": True},
-        {"id": "p-alt", "display_name": "Alte Probe", "source": "editorial", "is_active": False},
+        {"id": "p-anna", "slug": "p-anna", "user_id": anna["id"], "display_name": "Anna Probe", "source": "member", "is_active": True},
+        {"id": "p-bert", "slug": "p-bert", "display_name": "Bert Probe", "gamertag": "BertBolzt", "source": "editorial", "is_active": True},
+        {"id": "p-alt", "slug": "p-alt", "display_name": "Alte Probe", "source": "editorial", "is_active": False},
     ])
     flow.act_as(admin)
     lineage = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Liga F1", "kind": "racing",

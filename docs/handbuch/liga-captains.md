@@ -136,6 +136,24 @@ das Thema **Match-Erinnerungen** ab: auf der Website **Benutzermenü → Einstel
 
 Die genaue Reihenfolge stellt jede Season ein – sie steht unter der Tabelle.
 
+## Strafen und Einspruch
+
+Verhängt die Liga-Leitung eine Strafe gegen euer Co-Team oder gegen dich, kommt eine Nachricht. Unter **Meine Strafen**
+(Dashboard → Meine Strafen) steht sie mit Art, Regelverstoß, Begründung und Zeitraum. Strafen gegen das Co-Team sehen Captain,
+Vertreter und die Leitung des Hauptteams, Strafen gegen eine Person nur sie selbst.
+
+<img src="../assets/liga/meine-strafen-390.png" alt="Meine Strafen am Handy: Punktabzug als Strafe der Liga-Leitung gegen das Co-Team, mit Regelverstoß, Begründung, 2 Punkte Abzug, der Einspruchsfrist und dem Knopf Einspruch einlegen" width="300">
+
+- **Sperre:** Ist jemand aus eurem Kader gesperrt, steht er beim Check-in und beim Aufstellen grau mit „Sperre der Liga“
+  da. Ihr als Captain und Vertreter bekommt dazu eine Nachricht, ohne den Grund. Eine Sperre gilt bis zu einem Zeitpunkt
+  oder für eine Anzahl eurer Liga-Spiele. Eine **vorläufige** Sperre gilt sofort, bis die Leitung den Fall geprüft hat.
+- **Punktabzug:** steht in der Tabelle unter eurem Namen („−2 Punkte Abzug“). Den Grund sieht dort niemand.
+- **Einspruch:** einmal je Strafe, innerhalb der Frist an der Strafe (meist 48 Stunden). **Einspruch einlegen** tippen,
+  begründen (mindestens zehn Zeichen), absenden. Bis zur Entscheidung **gilt die Strafe weiter** – stellt eine gesperrte
+  Person also nicht auf. Es entscheidet eine andere Person der Liga-Leitung; ihre Begründung steht danach an der Strafe.
+  Gegen eine vorläufige Sperre geht der Einspruch erst ab der endgültigen Entscheidung.
+- In der **App** stehen Strafen der Liga noch nicht – dafür die Website nehmen.
+
 ## Regeln
 
 Die Regeln stehen auf der Ligaseite unter **Regeln**, mit Inhaltsverzeichnis, Suche und PDF. Oben steht, was **neu in dieser Version** ist, geänderte

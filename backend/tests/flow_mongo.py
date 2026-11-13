@@ -127,11 +127,21 @@ def _build(database_module, url: str, name: str) -> None:
 
 
 def _wipe(db, baseline: dict[str, dict]) -> bool:
-    """Alle Dokumente weg, Sammlungen und Indizes wie nach ``init_indexes``. ``False``: Die Indizes passen nicht mehr."""
+    """Alle Dokumente weg, Sammlungen und Indizes wie nach ``init_indexes``. ``False``: Die Indizes passen nicht mehr.
+
+    Ein Index, der dazugekommen ist, wird einzeln entfernt (#2216): Der Katalog der Erfolge legt beim Einspielen eigene
+    Indizes an (``badges``, ``services/xp``). Mit einer neuen Datenbank je solchem Test wartete jeder folgende Test auf
+    ``dropDatabase`` und ``init_indexes`` - über alle Ablauf-Dateien wurde der Lauf so um ein Vielfaches langsamer. Fehlt ein
+    Index oder hat er andere Optionen, wird die Datenbank weiter neu aufgebaut."""
     check_db_name(db.name)
     current = _indexes(db)
-    if any(current.get(name) != indexes for name, indexes in baseline.items()):
-        return False
+    for name, indexes in baseline.items():
+        have = current.get(name)
+        if have is None or any(have.get(key) != spec for key, spec in indexes.items()):
+            return False
+    for name, indexes in baseline.items():
+        for extra in sorted(set(current[name]) - set(indexes)):
+            db[name].drop_index(extra)
     for name in set(current) - set(baseline):
         db.drop_collection(name)
     for name in baseline:

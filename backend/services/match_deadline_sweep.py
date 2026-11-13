@@ -92,7 +92,7 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
                  {"proposal_id": proposal["id"], "rule": info["rule"], "minutes": info["minutes"]})
     regs = await db.tournament_registrations.find(
         {"id": {"$in": filled}}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
-    ).to_list(64)
+    ).to_list(len(filled) or 1)
     names = " gegen ".join(registration_name(reg) for reg in regs) if len(regs) == 2 else f"{len(regs)} Teilnehmer"
     label = match.get("round_name") or match.get("matchday_label") or match.get("match_key") or "Spiel"
     key = tournament.get("slug") or tournament["id"]

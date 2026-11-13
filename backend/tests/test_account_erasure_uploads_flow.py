@@ -64,7 +64,7 @@ async def test_only_files_of_the_account_go_even_if_others_are_in_the_profile(fl
     eigenes = await upload(flow, public, "eigen.webp", paula)
     aelter = await upload(flow, public, "aelter.webp", None)
     await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"avatar_url": vereinsbild, "banner_url": maxbild}})
-    await flow.db.club_member_profiles.insert_one({"id": "selbst", "user_id": paula["id"], "source": "member", "display_name": "Paula",
+    await flow.db.club_member_profiles.insert_one({"id": "selbst", "slug": "selbst", "user_id": paula["id"], "source": "member", "display_name": "Paula",
                                                    "photo_url": eigenes, "cover_url": aelter, "is_active": True})
 
     await delete_account(flow, paula)
@@ -119,8 +119,8 @@ async def test_an_own_file_in_another_profile_goes_with_its_owner(flow, public):
     team_logo = await upload(flow, public, "logo.webp", paula)
     await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"avatar_url": url}})
     await flow.db.users.update_one({"id": max_["id"]}, {"$set": {"avatar_url": url, "banner_url": url}})
-    await flow.db.club_member_profiles.insert_one({"id": "max", "user_id": max_["id"], "source": "member", "display_name": "Max", "photo_url": url})
-    await flow.db.club_member_profiles.insert_one({"id": "redaktion", "user_id": None, "source": "editorial", "display_name": "Team", "photo_url": team_logo})
+    await flow.db.club_member_profiles.insert_one({"id": "max", "slug": "max", "user_id": max_["id"], "source": "member", "display_name": "Max", "photo_url": url})
+    await flow.db.club_member_profiles.insert_one({"id": "redaktion", "slug": "redaktion", "user_id": None, "source": "editorial", "display_name": "Team", "photo_url": team_logo})
     await flow.db.teams.insert_one({"id": "team-1", "name": "Löwen", "logo_url": team_logo, "member_ids": [paula["id"], max_["id"]]})
 
     await delete_account(flow, paula)

@@ -185,6 +185,17 @@ async def init_indexes():
     await db.league_rosters.create_index(
         [("season_id", 1), ("id_keys", 1)], unique=True, name="league_roster_unique_id",
         partialFilterExpression={"id_keys": {"$exists": True}})
+    # Strafen im Wettbewerb (E.3, docs/LIGA.md): eine Zeile je Strafe; gelesen je Liga (Sperren), je Season (Verwaltung),
+    # je Person und je Co-Team (eigene Strafen).
+    await db.competition_sanctions.create_index("id", unique=True)
+    await db.competition_sanctions.create_index([("league_id", 1), ("season_id", 1)])
+    await db.competition_sanctions.create_index("user_id")
+    await db.competition_sanctions.create_index("squad_id")
+    await db.competition_sanctions.create_index("registration_id")
+    # Aufbewahrung (Nr. 136): welche Strafen einen Nachweis halten - der stündliche Job und jede Änderung fragen danach.
+    await db.competition_sanctions.create_index("proof_ids", sparse=True)
+    # Der eigene Einspruch gegen eine Teamstrafe (Auskunft, Kontolöschung).
+    await db.competition_sanctions.create_index("appeal.by", sparse=True)
     await db.league_transfers.create_index("id", unique=True)
     await db.league_transfers.create_index([("season_id", 1), ("status", 1)])
     await db.league_transfers.create_index("user_id")

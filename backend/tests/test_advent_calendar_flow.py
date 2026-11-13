@@ -439,9 +439,9 @@ async def test_auswahllisten_fuer_die_pflege(flow):
     shown = (await flow.post("/api/news", json={"title": "Wintercup", "content": "Text", "published_at": "2026-12-04T10:00:00+01:00"})).json()
     draft = (await flow.post("/api/news", json={"title": "Noch geheim", "content": "Text", "published": False, "visibility": "members"})).json()
     await flow.db.events.insert_many([
-        {"id": "e1", "name": "Weihnachtsfeier", "status": "published", "visibility": "members", "start_date": "2026-12-19T18:00:00+01:00"},
-        {"id": "e2", "name": "Sommerfest", "status": "draft", "visibility": "public", "start_date": "2027-07-01T18:00:00+02:00"},
-        {"id": "e3", "name": "Abgesagt", "status": "cancelled", "visibility": "public", "start_date": "2026-11-01T18:00:00+01:00"},
+        {"id": "e1", "slug": "e1", "name": "Weihnachtsfeier", "status": "published", "visibility": "members", "start_date": "2026-12-19T18:00:00+01:00"},
+        {"id": "e2", "slug": "e2", "name": "Sommerfest", "status": "draft", "visibility": "public", "start_date": "2027-07-01T18:00:00+02:00"},
+        {"id": "e3", "slug": "e3", "name": "Abgesagt", "status": "cancelled", "visibility": "public", "start_date": "2026-11-01T18:00:00+01:00"},
     ])
     await flow.db.club_member_profiles.insert_many([
         {"id": "p1", "slug": "paula", "display_name": "Paula P.", "gamertag": "Pauli", "role_title": "Kapitänin", "order_index": 2},

@@ -973,6 +973,11 @@ def _strip_text(value):
 # Grenzen für Turnierzahlen (#2111, TA3): geprüft wird nur, was eine Anfrage schickt - gespeicherte Turniere laden und
 # speichern weiter, auch wenn sie aus der Zeit davor andere Werte haben.
 PARTICIPANT_LIMIT = 4096
+# Höchstens so viele Gruppen hat ein Turnier: Die Auslosung gibt jeder Gruppe mindestens zwei Teilnehmer (#2216).
+GROUP_LIMIT = PARTICIPANT_LIMIT // 2
+# So viele Anmeldungen eines Turniers liest eine Seite höchstens (#2216): alle Plätze und noch einmal so viele auf der
+# Warteliste, abgelehnt oder ausgetreten.
+REGISTRATION_LIMIT = 2 * PARTICIPANT_LIMIT
 BEST_OF_LIMIT = 99
 SEASON_WEIGHT_LIMIT = 10
 MIN_OVER_MAX = "Min. Teilnehmer darf nicht größer als Max. Teilnehmer sein."

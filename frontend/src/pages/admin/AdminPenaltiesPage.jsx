@@ -9,7 +9,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { AlertTriangle, Clock, ExternalLink, Flag, ShieldAlert, RefreshCw, Undo2 } from "lucide-react";
+import { AlertTriangle, Clock, ExternalLink, Flag, Gavel, ShieldAlert, RefreshCw, Undo2 } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { toast } from "sonner";
 
@@ -18,6 +18,8 @@ const KIND_META = {
   lap_invalid: { icon: Flag, color: "#FF3B30", label: "Runde ungültig" },
   match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Kampflos verloren" },
   incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
+  // Strafen der Liga (E.3): verhängt und verwaltet im Reiter „Strafen“ der Season - „Öffnen“ führt dorthin.
+  league_sanction: { icon: Gavel, color: "#FF6B60", label: "Strafe der Liga" },
 };
 
 export default function AdminPenaltiesPage() {
@@ -82,7 +84,7 @@ export default function AdminPenaltiesPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">eSports</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Strafen</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
-        Alle Strafzeiten, ungültigen Runden, kampflosen Niederlagen und Vorfälle – sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen“.
+        Alle Strafzeiten, ungültigen Runden, kampflosen Niederlagen, Vorfälle und Strafen der Liga – sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen“.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -92,6 +94,7 @@ export default function AdminPenaltiesPage() {
           ["lap_invalid", "Runde ungültig"],
           ["match_forfeit", "Kampflos verloren"],
           ["incident", "Vorfall"],
+          ["league_sanction", "Strafe der Liga"],
         ].map(([k, label]) => (
           <button
             key={k}
@@ -162,6 +165,7 @@ function Row({ p, onTakeBack }) {
         </div>
       </div>
       <div className="min-w-0">
+        {p.kind === "league_sanction" ? <div className="text-sm font-bold text-white" data-testid={`pen-sanction-${p.ref_id}`}>{p.label}{p.sanction?.period ? ` · ${p.sanction.period}` : ""}{p.sanction?.status === "revoked" ? " · widerrufen" : ""}</div> : null}
         <div className="text-sm text-white/85 italic">„{p.reason}"</div>
         <div className="text-[11px] text-white/45 mt-1">
           {p.context_url ? (

@@ -34,9 +34,9 @@ async def world(flow, me: dict, other: dict):
     """Ein Turnier mit Stream, zwei Anmeldungen, sechs Matches mit Kartenständen, dazu ein zweites Turnier ohne Forfeit."""
     db = flow.db
     await db.tournaments.insert_many([
-        {"id": "t1", "title": "Cup", "status": "completed", "is_public": True, "stream_url": "https://twitch.tv/lions", "format": "double_elimination"},
-        {"id": "t2", "title": "Liga", "status": "completed", "is_public": True},
-        {"id": "t3", "title": "Offen", "status": "in_progress", "is_public": True},
+        {"id": "t1", "slug": "t1", "title": "Cup", "status": "completed", "is_public": True, "stream_url": "https://twitch.tv/lions", "format": "double_elimination"},
+        {"id": "t2", "slug": "t2", "title": "Liga", "status": "completed", "is_public": True},
+        {"id": "t3", "slug": "t3", "title": "Offen", "status": "in_progress", "is_public": True},
     ])
     await db.tournament_registrations.insert_many([
         {"id": "r-me-1", "tournament_id": "t1", "user_id": me["id"], "seed": 2, "status": "checked_in", "checked_in_at": "2026-09-01T17:50:00+00:00", "created_at": "2026-08-30T10:00:00+00:00", "updated_at": "2026-09-01T17:50:00+00:00"},
@@ -137,7 +137,7 @@ async def test_schiedsrichter_zaehlt_nur_fremde_disputierte_matches(flow):
 async def test_siegquote_ab_dreissig_matches_und_migration_alter_gruppen(flow):
     me = await flow.add_user(name="Vielspielerin")
     other = await flow.add_user(name="Gegner")
-    await flow.db.tournaments.insert_one({"id": "t9", "title": "Marathon", "status": "completed", "is_public": True})
+    await flow.db.tournaments.insert_one({"id": "t9", "slug": "t9", "title": "Marathon", "status": "completed", "is_public": True})
     await flow.db.tournament_registrations.insert_many([
         {"id": "r-me-9", "tournament_id": "t9", "user_id": me["id"], "status": "checked_in", "created_at": "2026-08-01T10:00:00+00:00", "updated_at": "2026-08-01T10:00:00+00:00"},
         {"id": "r-ot-9", "tournament_id": "t9", "user_id": other["id"], "status": "checked_in", "created_at": "2026-08-01T10:00:00+00:00", "updated_at": "2026-08-01T10:00:00+00:00"},

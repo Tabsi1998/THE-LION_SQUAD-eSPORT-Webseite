@@ -33,7 +33,7 @@ async def _superadmin(flow):
 
 async def _board_member(flow):
     user = await flow.add_user(role="club_admin", name="vorstand")
-    await flow.db.board_positions.insert_one({"id": "pos-1", "title": "Obmann", "user_id": user["id"], "is_active": True})
+    await flow.db.board_positions.insert_one({"id": "pos-1", "slug": "pos-1", "title": "Obmann", "user_id": user["id"], "is_active": True})
     return user
 
 
@@ -110,9 +110,9 @@ async def test_massenvergabe_nur_vorstand_auswahl_und_idempotenz(flow):
     board = await _board_member(flow)
     users = [await flow.add_user(name=f"p{i}") for i in range(4)]
     await flow.db.tournament_registrations.insert_many([
-        {"tournament_id": "t1", "user_id": users[0]["id"], "status": "approved"},
-        {"tournament_id": "t1", "user_id": users[1]["id"], "status": "checked_in"},
-        {"tournament_id": "t1", "user_id": users[2]["id"], "status": "pending"},
+        {"id": "registrations-1", "tournament_id": "t1", "user_id": users[0]["id"], "status": "approved"},
+        {"id": "registrations-2", "tournament_id": "t1", "user_id": users[1]["id"], "status": "checked_in"},
+        {"id": "registrations-3", "tournament_id": "t1", "user_id": users[2]["id"], "status": "pending"},
     ])
     await flow.db.memberships.insert_many([{"user_id": users[2]["id"], "member_status": "active"}, {"user_id": users[3]["id"], "member_status": "ended"}])
     flow.act_as(staff)
@@ -142,7 +142,7 @@ async def test_saison_vorschau_xp_deckel_und_prestige_ruecksetzung(flow):
     admin = await _superadmin(flow)
     staff = await flow.add_user(role="club_admin", name="turnierleitung")
     anna = await flow.add_user(name="anna")
-    await flow.db.seasons.insert_one({"id": "s1", "name": "Herbst", "status": "active", "start_date": "2026-09-01T00:00:00+00:00"})
+    await flow.db.seasons.insert_one({"id": "s1", "slug": "s1", "name": "Herbst", "status": "active", "start_date": "2026-09-01T00:00:00+00:00"})
     flow.act_as(admin)
     res = await flow.get("/api/admin/achievements/season/s1/preview")
     assert res.status_code == 200, res.text

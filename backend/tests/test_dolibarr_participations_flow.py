@@ -65,14 +65,14 @@ async def scene(flow, fake) -> dict:
     dora = await person(flow, "dora", 14)
     bob = await person(flow, "bob", None)
     db = flow.db
-    await db.events.insert_one({"id": "ev-1", "name": "Herbstfest", "status": "completed", "start_date": "2026-09-20T16:00:00+00:00"})
+    await db.events.insert_one({"id": "ev-1", "slug": "ev-1", "name": "Herbstfest", "status": "completed", "start_date": "2026-09-20T16:00:00+00:00"})
     await db.event_registrations.insert_many([
         {"id": "er-paula", "event_id": "ev-1", "user_id": paula["id"], "status": "checked_in"},
         {"id": "er-bob", "event_id": "ev-1", "user_id": bob["id"], "status": "checked_in"},
         {"id": "er-gast", "event_id": "ev-1", "user_id": None, "status": "checked_in", "is_guest": True},
         {"id": "er-carl", "event_id": "ev-1", "user_id": carl["id"], "status": "registered"},
     ])
-    await db.tournaments.insert_one({"id": "tn-1", "title": "Herbstcup", "status": "completed", "start_date": "2026-09-21T09:00:00+00:00"})
+    await db.tournaments.insert_one({"id": "tn-1", "slug": "tn-1", "title": "Herbstcup", "status": "completed", "start_date": "2026-09-21T09:00:00+00:00"})
     await db.team_members.insert_many([
         {"team_id": "team-lions", "user_id": carl["id"], "joined_at": "2026-01-10T10:00:00+00:00"},
         {"team_id": "team-lions", "user_id": dora["id"], "joined_at": "2026-09-24T10:00:00+00:00"},
@@ -143,14 +143,14 @@ async def test_backfill_reaches_back_twelve_months_in_portions(flow, fake, monke
     db = flow.db
     paula = people["paula"]["id"]
     await db.events.insert_many([
-        {"id": "ev-alt", "name": "Frühlingsfest", "status": "completed", "start_date": "2026-03-14T15:00:00+00:00"},
-        {"id": "ev-uralt", "name": "Sommerfest 2025", "status": "completed", "start_date": "2025-07-01T15:00:00+00:00"},
+        {"id": "ev-alt", "slug": "ev-alt", "name": "Frühlingsfest", "status": "completed", "start_date": "2026-03-14T15:00:00+00:00"},
+        {"id": "ev-uralt", "slug": "ev-uralt", "name": "Sommerfest 2025", "status": "completed", "start_date": "2025-07-01T15:00:00+00:00"},
     ])
     await db.event_registrations.insert_many([
         {"id": "er-alt", "event_id": "ev-alt", "user_id": paula, "status": "checked_in"},
         {"id": "er-uralt", "event_id": "ev-uralt", "user_id": paula, "status": "checked_in"},
     ])
-    await db.tournaments.insert_one({"id": "tn-alt", "title": "Frühjahrscup", "status": "results_published", "start_date": "2026-05-02T09:00:00+00:00"})
+    await db.tournaments.insert_one({"id": "tn-alt", "slug": "tn-alt", "title": "Frühjahrscup", "status": "results_published", "start_date": "2026-05-02T09:00:00+00:00"})
     await db.tournament_registrations.insert_one({"id": "tr-alt", "tournament_id": "tn-alt", "user_id": paula, "status": "approved"})
 
     # Der Abgleich schaut nur ab dem Einschalten - Älteres holt erst der Nachzug, in Portionen.

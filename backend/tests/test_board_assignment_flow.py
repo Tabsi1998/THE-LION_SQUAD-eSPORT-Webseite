@@ -49,7 +49,7 @@ async def test_only_the_club_area_fills_a_post_and_only_with_club_members(flow):
     erika = await member(flow, "erika")
     community = await flow.add_user(name="community")
     profile_id = new_id()
-    await flow.db.club_member_profiles.insert_one({"id": profile_id, "display_name": "Mara ohne Konto", "is_active": True})
+    await flow.db.club_member_profiles.insert_one({"id": profile_id, "slug": profile_id, "display_name": "Mara ohne Konto", "is_active": True})
 
     for actor in (await flow.add_user(role="tournament_admin", name="turnierleitung"), await granted(flow, "redaktion", "content")):
         flow.act_as(actor)
@@ -69,7 +69,7 @@ async def test_only_the_club_area_fills_a_post_and_only_with_club_members(flow):
     assert filled.status_code == 200, filled.text
     deputy = await flow.patch(f"/api/board/{pid}", json={"deputy_user_id": profile_id})
     assert deputy.status_code == 200, deputy.text
-    audits = [row async for row in flow.db.audit_logs.find({"action": "board.assign", "target_id": pid}, {"_id": 0})]
+    audits = [row async for row in flow.db.audit_logs.find({"action": "board.assign", "target_id": pid}, {"_id": 0}).sort("created_at", 1)]
     assert [(row["data"]["field"], row["data"]["to"], row["actor_id"]) for row in audits] == [("holder", erika["id"], chair["id"]), ("deputy", profile_id, chair["id"])]
 
     # Mit dem Posten kommt die Vereinsverwaltung - erst nach der Besetzung.

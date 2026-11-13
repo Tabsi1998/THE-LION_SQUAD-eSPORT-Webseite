@@ -82,13 +82,13 @@ async def test_rotating_rebuilds_the_smaller_copies_and_swaps_the_size(flow, pub
 @pytest.mark.asyncio
 async def test_every_place_gets_the_new_version_and_the_size_where_it_is_stored(flow, public):
     await admin(flow)
-    await flow.db.news_posts.insert_one({"id": "n-1", "title": "Abend", "banner_url": URL, "content": f"Text ![Bild]({URL}) und ![alt]({URL}?v=1)"})
-    await flow.db.tournaments.insert_one({"id": "t-1", "award_images": {"1": URL + "?v=1"}})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "title": "Abend", "banner_url": URL, "content": f"Text ![Bild]({URL}) und ![alt]({URL}?v=1)"})
+    await flow.db.tournaments.insert_one({"id": "t-1", "slug": "t-1", "award_images": {"1": URL + "?v=1"}})
     await flow.db.teams.insert_one({"id": "team-1", "logo_url": UPLOADS + "variants/hochkant-400.webp"})
     await flow.db.gallery_photos.insert_one({"id": "g-1", "image_url": URL, "thumbnail_url": URL, "width": 1000, "height": 500})
     await flow.db.stickers.insert_one({"id": "s-1", "url": URL, "width": 1000, "height": 500})
     await flow.db.direct_messages.insert_one({"id": "m-1", "updated_at": "alt", "sticker": {"id": "s-1", "url": URL, "width": 1000, "height": 500}})
-    await flow.db.news_posts.insert_one({"id": "n-2", "banner_url": UPLOADS + "anderes.webp"})
+    await flow.db.news_posts.insert_one({"id": "n-2", "slug": "n-2", "banner_url": UPLOADS + "anderes.webp"})
 
     body = (await flow.post(f"/api/admin/media/{NAME}/rotate", json={"degrees": -90})).json()
 
@@ -117,7 +117,7 @@ async def test_every_place_gets_the_new_version_and_the_size_where_it_is_stored(
 @pytest.mark.asyncio
 async def test_punctuation_around_a_bare_address_stays_in_the_text(flow, public):
     await admin(flow)
-    await flow.db.news_posts.insert_one({"id": "n-1", "content": f"Am Satzende {URL}. Fett **{URL}** und mit Komma {URL}, fertig."})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "content": f"Am Satzende {URL}. Fett **{URL}** und mit Komma {URL}, fertig."})
 
     body = (await flow.post(f"/api/admin/media/{NAME}/rotate", json={"degrees": 90})).json()
 
@@ -130,7 +130,7 @@ async def test_punctuation_around_a_bare_address_stays_in_the_text(flow, public)
 async def test_a_rotated_file_is_offered_with_its_version_and_still_counts_as_used(flow, public):
     await admin(flow)
     await flow.db.media_uploads.insert_one({"id": "up-1", "filename": NAME, "url": URL, "media_scope": "admin"})
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": URL})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": URL})
 
     body = (await flow.post(f"/api/admin/media/{NAME}/rotate", json={"degrees": 90})).json()
 
@@ -162,7 +162,7 @@ async def test_an_animated_image_is_not_turned_into_a_still(flow, public):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("value", [URL, URL + "?v=1", URL + "#oben"])
 async def test_sorting_old_uploads_finds_a_versioned_address(flow, monkeypatch, value):
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": value})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": value})
     monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
 
     scope, source = await media_audit._infer_scope_from_references(NAME)
@@ -173,7 +173,7 @@ async def test_sorting_old_uploads_finds_a_versioned_address(flow, monkeypatch, 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("value", [URL + ".backup", UPLOADS + "m" + NAME, UPLOADS + "m" + NAME + "?v=1"])
 async def test_sorting_old_uploads_does_not_match_another_name(flow, monkeypatch, value):
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": value, "content": f"![Bild]({value})"})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": value, "content": f"![Bild]({value})"})
     monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
 
     scope, _source = await media_audit._infer_scope_from_references(NAME)
@@ -183,7 +183,7 @@ async def test_sorting_old_uploads_does_not_match_another_name(flow, monkeypatch
 
 @pytest.mark.asyncio
 async def test_sorting_old_uploads_finds_the_name_in_a_text(flow, monkeypatch):
-    await flow.db.news_posts.insert_one({"id": "n-1", "content": f"![Bild]({URL}?v=1) und mehr"})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "content": f"![Bild]({URL}?v=1) und mehr"})
     monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
 
     scope, source = await media_audit._infer_scope_from_references(NAME)

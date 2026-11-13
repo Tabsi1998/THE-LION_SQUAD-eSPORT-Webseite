@@ -18,7 +18,6 @@ import copy
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from pymongo.errors import DuplicateKeyError
 
@@ -42,7 +41,8 @@ from services.league_rounds import max_teams_for, rounds_needed, rounds_problem 
 from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, division_rules, league_default_rules, maps_mode, normalize_rules
 from services.slug_utils import slugify, unique_slug
 
-VIENNA = ZoneInfo("Europe/Vienna")
+# Spielwochen und Zeitzone stehen im Blatt-Modul (auch für Aufbewahrung und Sperren, E.3) und werden hier weitergereicht.
+from services.league_calendar import VIENNA, aware as _aware, local_day as _local_day, week_days  # noqa: E402, F401
 
 # Vorgaben einer neuen Season (docs/LIGA.md, Abschnitt 2 und 3).
 SEASON_DEFAULTS: dict = {
@@ -152,37 +152,6 @@ async def _look(db, body: dict, fields: tuple[str, ...]) -> dict:
 
 
 # ---------------------------------------------------------------- Kalender
-
-def _aware(value) -> datetime | None:
-    """Ein Zeitpunkt als UTC. Ohne Zeitzone ist er Wiener Wanduhrzeit - so gibt die Verwaltung den Beginn ein."""
-    if value in (None, ""):
-        return None
-    if isinstance(value, datetime):
-        moment = value
-    else:
-        try:
-            moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except ValueError:
-            return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=VIENNA)
-    return moment.astimezone(timezone.utc)
-
-
-def _local_day(value) -> date | None:
-    moment = _aware(value)
-    return moment.astimezone(VIENNA).date() if moment else None
-
-
-def week_days(season: dict) -> list[tuple[date, date]]:
-    """Je Spielwoche (1-basiert) der erste und letzte Wiener Kalendertag."""
-    first = _local_day(season.get("start_date"))
-    if first is None:
-        return []
-    days = int(season.get("matchday_days") or 7)
-    return [(first + timedelta(days=days * index), first + timedelta(days=days * index + days - 1))
-            for index in range(int(season.get("weeks_total") or 0))]
-
 
 def blocked_weeks(season: dict) -> list[int]:
     """Die gesperrten Spielwochen (1-basiert): eine Woche ist gesperrt, wenn mehr als die Hälfte ihrer Tage in einer

@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
 from database import get_db
+from services import league_table
 from services import league_permissions
 from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
@@ -288,6 +289,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             t.pop("heat_rebuild_plan", None)
             t.pop("heat_rebuild_dismissed", None)
             t.pop("participant_removal_plan", None)
+            # Punktabzüge und Entscheide (E.1, E.3) liest am Turnier nur die Leitung - öffentlich ist die Tabelle.
+            league_table.strip_lead_fields(t)
     # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
     await hide_unseen_event_links(db, user, tournaments)
     await attach_has_bracket_tree(db, tournaments)
@@ -325,6 +328,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     t["waitlist_count"] = await db.tournament_registrations.count_documents({"tournament_id": t["id"], "status": "waitlist"})
     if onsite_only:
         _expose_offer(t, False)
+        league_table.strip_lead_fields(t)
         return onsite_access.slim_view(t)
     # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
     t.update(await tournament_rights(user, t["id"]))
@@ -339,6 +343,9 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         t.pop("heat_rebuild_plan", None)
         t.pop("heat_rebuild_dismissed", None)
         t.pop("participant_removal_plan", None)
+    if not is_admin and not t.get("can_manage_structure") and not t.get("league_capabilities"):
+        # Punktabzüge und Entscheide (E.1, E.3) liest am Turnier nur die Leitung - öffentlich ist die Tabelle.
+        league_table.strip_lead_fields(t)
     if access_link:
         await touch_access_link(db, access_link, user)
         t["access_link"] = public_access_link_payload(access_link)

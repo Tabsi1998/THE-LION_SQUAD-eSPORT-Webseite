@@ -81,7 +81,7 @@ async def test_search_and_filters_reach_files_behind_the_old_limit(flow, public)
     add_file(public, "kopie-a.webp", content=b"gleich", age=100001)
     add_file(public, "kopie-b.webp", content=b"gleich", age=100002)
     await flow.db.media_uploads.insert_one({"id": "m-1", "filename": "uralt.webp", "url": UPLOADS + "uralt.webp", "media_scope": "gallery", "original_filename": "Siegerehrung 2019.JPG"})
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "foto000.webp"})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": UPLOADS + "foto000.webp"})
 
     by_name = (await flow.get("/api/admin/media?paged=true&q=URALT")).json()
     assert [item["filename"] for item in by_name["items"]] == ["uralt.webp"] and by_name["total"] == 1
@@ -153,7 +153,7 @@ async def test_cleanup_offers_only_what_is_safe_to_remove(flow, public):
     for name in ("alt-frei.webp", "alt-genutzt.webp", "alt-sticker.webp", "alt-fremdes-feld.webp"):
         add_file(public, name, age=OLD)
         await track(flow, name)
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "alt-genutzt.webp"})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": UPLOADS + "alt-genutzt.webp"})
     await flow.db.direct_messages.insert_one({"id": "m-1", "sticker": {"id": "s-1", "url": UPLOADS + "alt-sticker.webp"}})
     # Ein Feld, das noch niemand in die Liste der Verwendungsstellen eingetragen hat: Das Netz darunter findet es.
     await flow.db.neue_sammlung.insert_one({"id": "x-1", "tief": [{"bild": UPLOADS + "alt-fremdes-feld.webp?v=1"}]})
@@ -187,7 +187,7 @@ async def test_cleanup_checks_again_on_the_server_and_logs_the_action(flow, publ
     assert sorted(preview["filenames"]) == ["frei-a.webp", "frei-b.webp"]
 
     # Zwischen Rückfrage und Klick wird eine Datei verwendet; eine fremde steht gar nicht zur Wahl.
-    await flow.db.events.insert_one({"id": "e-1", "banner_url": UPLOADS + "frei-b.webp"})
+    await flow.db.events.insert_one({"id": "e-1", "slug": "e-1", "banner_url": UPLOADS + "frei-b.webp"})
     add_file(public, "behalten.webp")
     response = await flow.post("/api/admin/media/cleanup-unused", json={"filenames": [*preview["filenames"], "behalten.webp", "../boese.webp"]})
 
@@ -214,7 +214,7 @@ async def test_cleanup_asks_again_before_every_batch(flow, public, monkeypatch):
 
     # Während „a“ gelöscht wird, baut jemand „b“ in einen neuen Beitrag ein - nach der ersten Prüfung des Laufs.
     async def with_a_race(db, name):
-        await db.news_posts.insert_one({"id": f"n-{name}", "banner_url": UPLOADS + "b.webp"})
+        await db.news_posts.insert_one({"id": f"n-{name}", "slug": f"n-{name}", "banner_url": UPLOADS + "b.webp"})
         return await real(db, name)
 
     monkeypatch.setattr(account_erasure, "remove_upload", with_a_race)
@@ -237,7 +237,7 @@ async def test_replacing_a_duplicate_points_every_place_at_the_kept_file(flow, p
     await track(flow, "bleibt.webp", version=7)
     await track(flow, "kopie.webp")
     await track(flow, "mitglied.webp", scope="user", owner_role="user")
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "kopie.webp", "content": f"![x]({UPLOADS}kopie.webp) und ![y]({UPLOADS}anderes.webp)"})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": UPLOADS + "kopie.webp", "content": f"![x]({UPLOADS}kopie.webp) und ![y]({UPLOADS}anderes.webp)"})
     await flow.db.direct_messages.insert_one({"id": "m-1", "updated_at": "alt", "sticker": {"id": "s-1", "url": UPLOADS + "kopie.webp"}})
     await flow.db.teams.insert_one({"id": "t-1", "logo_url": UPLOADS + "variants/kopie-400.webp"})
 
@@ -297,7 +297,7 @@ async def test_only_a_settled_editorial_upload_can_be_the_kept_file(flow, public
     for name in ("redaktion.webp", keep):
         add_file(public, name, content=b"gleich", age=OLD)
     await track(flow, "redaktion.webp")
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "redaktion.webp"})
+    await flow.db.news_posts.insert_one({"id": "n-1", "slug": "n-1", "banner_url": UPLOADS + "redaktion.webp"})
     if keep == "mitglied.webp":
         await track(flow, keep, scope="user", owner_role="user", owner_id="u-9")
     elif keep != "ohne-eintrag.webp":
