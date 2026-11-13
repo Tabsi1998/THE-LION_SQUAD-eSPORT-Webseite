@@ -545,3 +545,16 @@ async def test_player_reward_needs_a_counted_season_with_points_for_that_co_team
     assert sorted(docs["squad:squad-1"]["player_ids"]) == ["p-1-1", "p-1-2"]
     assert sorted(docs["squad:squad-2"]["player_ids"]) == ["p-2-1", "p-2-3"]
     assert all("p-2-2" not in doc["player_ids"] for doc in docs.values())
+
+
+@pytest.mark.asyncio
+async def test_closed_standing_shows_the_counting_rule_of_its_version(flow):
+    world = await two_seasons(flow)
+    await configure(flow, world, counting="best", best_count=1)
+    flow.act_as(world["admin"])
+    ok(await flow.post(f"{cockpit_url(world)}/levels/1/close", json={"confirm": True}))
+    await configure(flow, world, counting="all")
+    view = await public(flow, world)
+    assert level_of(view)["settings"]["counting"] == "best" and level_of(view)["settings"]["best_count"] == 1
+    # Gegenprobe: die Einstellung von heute steht oben für laufende Wertungen.
+    assert view["settings"]["counting"] == "all"

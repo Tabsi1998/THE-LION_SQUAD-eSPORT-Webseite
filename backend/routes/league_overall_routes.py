@@ -238,7 +238,8 @@ async def public_overall_pdf(league_slug: str, season_slug: str, level: int | No
         {"title": "Spieler", "headers": headers,
          "rows": [[f"{row['place']}.", row["name"], *[_cell(cell) for cell in row["seasons"]], row["total"]] for row in block["players"]]},
     ]
-    settings = view["settings"]
+    # Die Zählregel der jeweiligen Wertung - bei einer abgeschlossenen die der Fassung.
+    settings = block.get("settings") or view["settings"]
     note = ("Endstand" if block["closed"] else "Laufende Wertung") + f" · {block['label']}"
     if settings.get("counting") == "best" and settings.get("best_count"):
         note += f" · Es zählen die besten {settings['best_count']} Seasons, Streichergebnisse in Klammern"

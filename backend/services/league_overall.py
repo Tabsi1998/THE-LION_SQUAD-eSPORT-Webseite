@@ -341,7 +341,7 @@ async def public_view(db, league: dict, season: dict, viewer: dict | None, *, hi
             view = await from_final(db, final, viewer=viewer, hidden=hidden, internal=False)
             view_order = [row["id"] for row in view["seasons"]]
             team_list, player_list, label = view["teams"], view["players"], (final.get("title") or {}).get("division") or f"Liga {level}"
-            used = final.get("settings") or settings
+            used = {**settings, **(final.get("settings") or {})}
         else:
             data = live["levels"][level]
             view_order, team_list, player_list, label = order, data["teams"], data["players"], data["label"]
@@ -358,6 +358,8 @@ async def public_view(db, league: dict, season: dict, viewer: dict | None, *, hi
             "level": level, "label": label, "closed": bool(final),
             "final": {"version": final.get("version"), "closed_at": final.get("closed_at")} if final else None,
             "season_ids": view_order,
+            # Wie diese Wertung rechnet - bei einer abgeschlossenen die Regeln der Fassung, nicht die von heute.
+            "settings": rules.public_settings(used),
             "teams": team_rows(team_list, view_order, previous), "players": player_rows(player_list, view_order, people, internal=False),
             "rewards": rewards if final else [public_item(item, basis_of({"reward_players": settings["reward_players"]}))
                                               for item in settings.get("rewards") or []],
