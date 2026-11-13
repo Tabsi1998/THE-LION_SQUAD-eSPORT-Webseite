@@ -72,6 +72,14 @@ export function newRequestId() {
   return `rn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/** Der Satz nach dem Senden aus dem Stand des Servers: verschickt, schon verschickt, noch im Versand oder abgebrochen. */
+export function broadcastResultText(data = {}) {
+  if (data.state === "sending") return `Die Nachricht wird noch verschickt (${data.processed || 0} von ${peopleText(data.recipients || 0)}).`;
+  if (data.state === "failed") return "Der Versand ist abgebrochen: Den Kreis gibt es nicht mehr.";
+  if (data.replay) return "Diese Nachricht ist schon verschickt.";
+  return `Rundnachricht an ${peopleText(data.recipients || 0)} verschickt.`;
+}
+
 export function peopleText(count) {
   return count === 1 ? "1 Person" : `${count} Personen`;
 }

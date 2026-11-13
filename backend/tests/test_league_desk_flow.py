@@ -403,6 +403,32 @@ async def test_broadcast_sends_mail_only_when_chosen(flow, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_a_broadcast_stuck_in_sending_is_continued_on_replay_without_sending_twice(flow):
+    """N2: Bricht der Versand ab, bleibt der Eintrag auf „sending“. Derselbe Aufruf setzt ihn fort, sobald sich eine Weile nichts tut -
+    wer die Nachricht schon hat, bekommt sie nicht noch einmal. Läuft der Versand noch, schickt der zweite Aufruf nichts."""
+    world = await desk_world(flow)
+    request_id = new_id()
+    assert (await send(flow, world, request_id=request_id)).status_code == 200
+    claim = f"league-broadcast:{world['season_id']}:{request_id}"
+    # Nachgestellt: Der Versand riss nach dem Captain der Löwen ab.
+    await flow.db.notifications.delete_many({"user_id": world["users"]["Falke1"]["id"], "kind": "league_broadcast"})
+    await flow.db.audit_logs.update_one({"id": claim}, {"$set": {"data.state": "sending", "data.processed": 1, "data.delivered": 1,
+                                                                 "data.progress_at": at(seconds=-5)}})
+    busy = await send(flow, world, request_id=request_id)
+    assert busy.json()["state"] == "sending" and busy.json()["replay"] is True
+    assert await inbox(flow, world, "Falke1") == [], "läuft der Versand noch, schickt der zweite Aufruf nichts"
+
+    await flow.db.audit_logs.update_one({"id": claim}, {"$set": {"data.progress_at": at(minutes=-5)}})
+    resumed = await send(flow, world, request_id=request_id)
+    assert resumed.status_code == 200 and resumed.json()["state"] == "sent"
+    assert len(await inbox(flow, world, "Falke1")) == 1 and len(await inbox(flow, world, "Kapitaen")) == 1
+    entry = await flow.db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1})
+    assert entry["data"]["state"] == "sent" and entry["data"]["delivered"] == 2 and entry["data"]["processed"] == 2
+    again = await send(flow, world, request_id=request_id)
+    assert again.json()["state"] == "sent" and len(await inbox(flow, world, "Falke1")) == 1
+
+
+@pytest.mark.asyncio
 async def test_broadcast_is_sent_once_per_request_and_logged_with_sender(flow):
     world = await desk_world(flow)
     request_id = new_id()

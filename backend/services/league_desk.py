@@ -510,57 +510,122 @@ def _claim_id(season_id: str, request_id: str) -> str:
     return f"league-broadcast:{season_id}:{request_id}"
 
 
-async def send(db, season: dict, me: dict, *, request_id: str, title, text, audience: str, scope: str, scope_id: str | None,
-               mail: bool, now: datetime | None = None) -> dict:
-    """Eine Rundnachricht verschicken - einmal je ``request_id``: Ein zweiter Klick (oder ein zweiter Versuch nach einem Fehler im Netz)
-    bekommt die erste Antwort und schickt nichts. Der Eintrag im Protokoll ist zugleich die Sperre (eindeutige Kennung)."""
-    from services.league_mail import send_league_mail
-    from services.user_notifications import create_user_notification
+STALE_SECONDS = 120
+BATCH = 20
 
+
+async def send(db, season: dict, me: dict, *, request_id: str, title, text, audience: str, scope: str, scope_id: str | None,
+               mail: bool, now: datetime | None = None) -> tuple[dict, dict | None]:
+    """Eine Rundnachricht anlegen - einmal je ``request_id``. Gibt die Antwort und den Auftrag für ``deliver`` zurück (``None``: nichts
+    zu tun). Der Eintrag im Protokoll ist zugleich die Sperre (eindeutige Kennung) und trägt den Fortschritt.
+
+    Ein zweiter Aufruf mit derselben Kennung (Doppelklick, neuer Versuch nach einem Fehler im Netz) schickt nichts Neues: Ist die
+    Nachricht verschickt, kommt die erste Antwort. Steht sie noch auf „sending“ und hat sich seit ``STALE_SECONDS`` nichts mehr getan
+    (der Versand ist abgebrochen), setzt er den Versand fort - Glocke und Mail sind je Person entdoppelt, niemand bekommt sie zweimal."""
     request_id = str(request_id or "").strip()
     if not 8 <= len(request_id) <= 80:
         raise BroadcastProblem("Die Anfrage ist unvollständig. Bitte die Seite neu laden.")
-    claim = _claim_id(season["id"], request_id)
-    earlier = await db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1})
-    if earlier:
-        return {**_answer(earlier.get("data") or {}), "replay": True}
     title = clean_text(title, TITLE_MIN, TITLE_MAX, "Betreff")
     text = clean_text(text, TEXT_MIN, TEXT_MAX, "Nachricht")
+    claim = _claim_id(season["id"], request_id)
+    moment = now or now_utc()
+    earlier = await db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1})
+    if earlier:
+        return await _replay(db, season, me, claim, earlier.get("data") or {}, title, text, moment)
     ids, label = await recipients(db, season, audience=audience, scope=scope, scope_id=scope_id, sender_id=me.get("id"))
     if not ids:
         raise BroadcastProblem("In diesem Kreis gibt es niemanden, der die Nachricht bekommen kann.", 409)
-    now_iso = (now or now_utc()).isoformat()
-    # Ohne Namen und ohne den Text: Kreis, Zahl, Mail ja/nein, Länge - der Absender steht als ``actor_id`` dabei.
+    # Ohne Namen und ohne den Text: Kreis, Zahl, Mail ja/nein, Länge, Fortschritt - der Absender steht als ``actor_id`` dabei.
     data = {"season_id": season["id"], "request_id": request_id, "audience": audience, "scope": scope, "scope_id": scope_id,
-            "scope_label": label, "recipients": len(ids), "mail": bool(mail), "length": len(text), "state": "sending"}
+            "scope_label": label, "recipients": len(ids), "mail": bool(mail), "length": len(text), "state": "sending",
+            "processed": 0, "delivered": 0, "mailed": 0, "progress_at": moment.isoformat()}
     try:
         await db.audit_logs.insert_one({"id": claim, "action": "league.broadcast", "actor_id": me.get("id"), "target_id": season["id"],
-                                        "data": data, "created_at": now_iso})
+                                        "data": data, "created_at": moment.isoformat()})
     except DuplicateKeyError:
         earlier = await db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1}) or {}
-        return {**_answer(earlier.get("data") or data), "replay": True}
+        return {**_answer(earlier.get("data") or data), "replay": True}, None
+    return {**_answer(data), "replay": False}, _job(season, me, claim, data, title, text)
+
+
+def _job(season: dict, me: dict, claim: str, data: dict, title: str, text: str) -> dict:
+    return {"season_id": season["id"], "claim": claim, "sender_id": me.get("id"), "title": title, "text": text,
+            "audience": data["audience"], "scope": data["scope"], "scope_id": data.get("scope_id"), "mail": bool(data.get("mail"))}
+
+
+async def _replay(db, season, me, claim, data, title, text, moment) -> tuple[dict, dict | None]:
+    if data.get("state") != "sending":
+        return {**_answer(data), "replay": True}, None
+    last = data.get("progress_at")
+    try:
+        quiet = (moment - datetime.fromisoformat(str(last))).total_seconds() if last else STALE_SECONDS + 1
+    except ValueError:
+        quiet = STALE_SECONDS + 1
+    if quiet < STALE_SECONDS:
+        return {**_answer(data), "replay": True}, None
+    # Nur ein Aufruf übernimmt den Rest: die Bedingung auf den gelesenen Stand des Fortschritts.
+    taken = await db.audit_logs.update_one({"id": claim, "data.state": "sending", "data.progress_at": last},
+                                           {"$set": {"data.progress_at": moment.isoformat()}})
+    if not taken.modified_count:
+        return {**_answer(data), "replay": True}, None
+    return {**_answer(data), "replay": True, "resumed": True}, _job(season, me, claim, data, title, text)
+
+
+async def _state(db, claim: str) -> dict:
+    return _answer((await db.audit_logs.find_one({"id": claim}, {"_id": 0, "data": 1}) or {}).get("data") or {})
+
+
+async def deliver(db, *, season_id: str, claim: str, sender_id: str | None, title: str, text: str, audience: str, scope: str,
+                  scope_id: str | None, mail: bool) -> dict:
+    """Der Versand: Glocke und Push je Person, Mail nach Wahl; je ``BATCH`` Personen steht der Fortschritt im Protokolleintrag."""
+    from services.league_mail import send_league_mail
+    from services.user_notifications import create_user_notification
+
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) or {"id": season_id}
+    try:
+        ids, _label = await recipients(db, season, audience=audience, scope=scope, scope_id=scope_id, sender_id=sender_id)
+    except BroadcastProblem:
+        await db.audit_logs.update_one({"id": claim}, {"$set": {"data.state": "failed", "data.progress_at": now_utc().isoformat()}})
+        return await _state(db, claim)
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1, "slug": 1}) or {}
     heading = f"{league.get('name') or 'Liga'} {season.get('name') or ''}".strip()
     path = f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug") else "/benachrichtigungen"
-    delivered = mailed = 0
-    for user_id in ids:
+    counts = {"delivered": 0, "mailed": 0}
+
+    async def progress(processed: int, **extra) -> None:
+        await db.audit_logs.update_one({"id": claim}, {
+            "$inc": {"data.delivered": counts["delivered"], "data.mailed": counts["mailed"]},
+            "$set": {"data.processed": processed, "data.progress_at": now_utc().isoformat(), **extra}})
+        counts.update(delivered=0, mailed=0)
+
+    for index, user_id in enumerate(ids, start=1):
         key = f"{claim}:{user_id}"
         try:
             done = await create_user_notification(user_id, f"{heading}: {title}", text, url=path, kind="league_broadcast",
-                                                  meta={"category": "tournament_updates", "season_id": season["id"], "dedupe_key": key,
+                                                  meta={"category": "tournament_updates", "season_id": season_id, "dedupe_key": key,
                                                         "reason": "league_broadcast"})
-            delivered += 1 if done else 0
+            counts["delivered"] += 1 if done else 0
         except Exception:  # noqa: BLE001 - eine Person, bei der es klemmt, hält die anderen nicht auf
             logger.warning("[league_desk] Rundnachricht %s nicht zugestellt", log_safe(claim), exc_info=True)
         if mail:
             await send_league_mail(db, user_id, f"{heading}: {title}", text, path, f"{key}:mail")
-            mailed += 1
-    final = {**data, "state": "sent", "delivered": delivered, "mailed": mailed}
-    await db.audit_logs.update_one({"id": claim}, {"$set": {"data": final}})
-    return {**_answer(final), "replay": False}
+            counts["mailed"] += 1
+        if index % BATCH == 0:
+            await progress(index)
+    await progress(len(ids), **{"data.state": "sent", "data.recipients": len(ids)})
+    return await _state(db, claim)
+
+
+async def status(db, season: dict, request_id: str) -> dict:
+    """Der Stand einer Rundnachricht für den Dialog: ``sending`` mit Fortschritt, ``sent`` oder ``failed``."""
+    row = await db.audit_logs.find_one({"id": _claim_id(season["id"], str(request_id or "").strip())}, {"_id": 0, "data": 1})
+    if not row:
+        raise BroadcastProblem("Diese Rundnachricht gibt es nicht.", 404)
+    return _answer(row.get("data") or {})
 
 
 def _answer(data: dict) -> dict:
-    return {"recipients": int(data.get("recipients") or 0), "delivered": int(data.get("delivered") or 0),
+    return {"recipients": int(data.get("recipients") or 0), "processed": int(data.get("processed") or 0),
+            "delivered": int(data.get("delivered") or 0), "mailed": int(data.get("mailed") or 0),
             "mail": bool(data.get("mail")), "scope_label": data.get("scope_label") or "",
             "audience_label": AUDIENCE_LABELS.get(data.get("audience"), ""), "state": data.get("state") or "sent"}

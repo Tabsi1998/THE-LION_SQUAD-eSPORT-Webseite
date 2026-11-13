@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { broadcastProblem, deskResponsible, deskWhen, filterGroups, peopleText, scopeOptions, splitScope } from "./leagueDesk";
+import { broadcastProblem, broadcastResultText, deskResponsible, deskWhen, filterGroups, peopleText, scopeOptions, splitScope } from "./leagueDesk";
 
 // Leitstand (E.4): Filter, Frist, Zuständigkeit und die Kreise der Rundnachricht.
 
@@ -46,6 +46,10 @@ describe("Rundnachricht", () => {
     expect(broadcastProblem({ title: "Spieltag", text: "kurz" })).toMatch(/^Nachricht/);
     expect(broadcastProblem({ title: "Spieltag", text: "y".repeat(1001) })).toMatch(/höchstens 1000/);
     expect(broadcastProblem({ title: "Spieltag", text: "Bitte einchecken." })).toBe("");
+    expect(broadcastResultText({ state: "sent", recipients: 4 })).toBe("Rundnachricht an 4 Personen verschickt.");
+    expect(broadcastResultText({ state: "sent", replay: true, recipients: 4 })).toBe("Diese Nachricht ist schon verschickt.");
+    expect(broadcastResultText({ state: "sending", replay: true, processed: 20, recipients: 41 })).toBe("Die Nachricht wird noch verschickt (20 von 41 Personen).");
+    expect(broadcastResultText({ state: "failed" })).toMatch(/abgebrochen/);
     expect(peopleText(1)).toBe("1 Person");
     expect(peopleText(3)).toBe("3 Personen");
   });

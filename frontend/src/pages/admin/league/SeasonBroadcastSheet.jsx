@@ -8,7 +8,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
-import { AUDIENCES, BROADCAST_LIMITS, broadcastProblem, newRequestId, peopleText, scopeOptions, splitScope } from "@/lib/leagueDesk";
+import { AUDIENCES, BROADCAST_LIMITS, broadcastProblem, broadcastResultText, newRequestId, peopleText, scopeOptions, splitScope } from "@/lib/leagueDesk";
 
 export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent }) {
   const confirm = useConfirm();
@@ -66,7 +66,7 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
       const { data } = await api.post(`/admin/leagues/seasons/${seasonId}/broadcast`, {
         request_id: requestId.current, title: title.trim(), text: text.trim(), audience, mail, ...splitScope(scope),
       });
-      toast.success(data.replay ? "Diese Nachricht ist schon verschickt." : `Rundnachricht an ${peopleText(data.recipients)} verschickt.`);
+      (data.state === "failed" ? toast.error : toast.success)(broadcastResultText(data));
       onSent?.(data);
     } catch (failure) {
       setError(formatApiError(failure.response?.data?.detail) || "Die Nachricht ließ sich nicht verschicken.");

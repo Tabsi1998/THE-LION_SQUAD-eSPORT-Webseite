@@ -79,7 +79,10 @@ async def broadcast_send(season_id: str, body: BroadcastBody, me: dict = Depends
     db = get_db()
     season = await _season(db, season_id)
     try:
-        return await desk.send(db, season, me, request_id=body.request_id, title=body.title, text=body.text, audience=body.audience,
-                               scope=body.scope, scope_id=body.scope_id, mail=body.mail)
+        answer, job = await desk.send(db, season, me, request_id=body.request_id, title=body.title, text=body.text, audience=body.audience,
+                                      scope=body.scope, scope_id=body.scope_id, mail=body.mail)
     except desk.BroadcastProblem as problem:
         _raise(problem)
+    if job:
+        answer = {**await desk.deliver(db, **job), "replay": answer["replay"]}
+    return answer
