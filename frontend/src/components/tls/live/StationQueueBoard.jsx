@@ -45,7 +45,8 @@ export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRele
           <span className="min-w-0 [overflow-wrap:anywhere]">{summary}</span>
         </div>
       ) : null}
-      <div className={`mt-3 grid gap-3 ${gridClassName}`}>
+      {/* items-start: eine kurze Kachel („Frei“) neben einer langen bleibt so hoch wie ihr Inhalt, ohne leeren Bauch. */}
+      <div className={`mt-3 grid items-start gap-3 ${gridClassName}`}>
         {stations.map((station, index) => (
           <StationTile
             key={station.id}

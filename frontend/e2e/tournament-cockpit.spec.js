@@ -139,6 +139,13 @@ test.describe("Turnier-Cockpit", () => {
       } else {
         expect(stations.y).toBeGreaterThanOrEqual(problems.y + problems.height);
       }
+      // Zwei Kacheln nebeneinander (768): die kurze bleibt so hoch wie ihr Inhalt, sie wird nicht auf die lange gestreckt.
+      if (width === 768) {
+        const short = await page.getByTestId("live-station-pc1").boundingBox();
+        const tall = await page.getByTestId("live-station-pc2").boundingBox();
+        expect(Math.abs(short.y - tall.y)).toBeLessThan(2);
+        expect(short.height).toBeLessThan(tall.height - 40);
+      }
       // Nichts läuft quer hinaus, jede Tippfläche ist mindestens 44 px hoch.
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
       const small = await page.evaluate(() => [...document.querySelectorAll("[data-testid='lead-cockpit'] button, [data-testid='lead-cockpit'] a, [data-testid='lead-tabs'] button")]
