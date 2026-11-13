@@ -2669,7 +2669,12 @@ Termin vereinbart. Bitte auf der Matchseite einen Termin vorschlagen oder annehm
 schreibt den Schlüssel dann auch als `unique_dedupe_key`. Der eindeutige Teilindex `notifications.user_unique_dedupe` (`user_id` +
 `unique_dedupe_key`, nur Zeilen mit Schlüssel, `AUDIT_UNIQUE_INDEXES`) lässt je Person nur eine Zeile zu: Laufen zwei Jobs gleichzeitig,
 verliert der zweite beim Schreiben (`DuplicateKeyError`) und schickt weder Push noch Discord. Für diese Zeilen gilt keine Abkühlzeit - der
-Schlüssel ersetzt sie. Kein Merker am Spiel: ein neuer Termin ergibt einen neuen Schlüssel.
+Schlüssel ersetzt sie -, und sie zählen auch nicht in die Abkühlzeit anderer Erinnerungen („Match startet in 10 Minuten“ kommt weiter).
+Merker am Spiel: `matches_v2.reminder_notes.<art>` hält den zuletzt erledigten Schlüssel; spätere Läufe lösen die Empfänger dann nicht
+mehr auf. Er wird erst nach einem fehlerfreien Lauf gesetzt; ein neuer Termin ergibt einen neuen Schlüssel und damit eine neue Erinnerung.
+
+**Veto-Sekunden:** `veto_idle_seconds` muss kleiner sein als die Zeit je Schritt (`veto_rules.step_seconds`) minus
+`veto_min_left_seconds`, sonst käme die Erinnerung nie - die Route antwortet dann mit 422 und nennt den Höchstwert.
 
 **Job:** „Spiel steht an“ und „Termin offen“ laufen im Fristen-Job (`match_deadline_sweep` → `league_reminders.sweep`, jede Minute, dieselben
 laufenden Turniere), „Ergebnis fehlt“ in `league_schedule_sweep.overdue`, „Map-Veto wartet“ in `league_veto_sweep.nudge`.
