@@ -8,6 +8,7 @@ import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { NoticeBanner, useNotices } from "@/components/tls/tournament/NoticeBanner";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
@@ -175,6 +176,8 @@ function TournamentDetailView() {
 
   // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
   useLiveRefresh(refresh, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
+  // Hinweis der Turnierleitung (#1166): oben auf der Seite, bis er abläuft oder entfernt wird.
+  const notices = useNotices(t?.id ? `/tournaments/${encodeURIComponent(t.id)}/notices` : null, { tournamentId: t?.id });
   const countdownDays = useCountdownDays();
 
   // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die
@@ -393,6 +396,7 @@ function TournamentDetailView() {
         )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <Breadcrumbs items={tournamentCrumbs(t, trail)} className="mb-4" />
+          <NoticeBanner items={notices} className="mb-5 max-w-3xl" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>

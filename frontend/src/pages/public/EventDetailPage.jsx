@@ -17,6 +17,7 @@ import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
+import { NoticeBanner, useNotices } from "@/components/tls/tournament/NoticeBanner";
 import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
 import { EventRegistrationEdit } from "@/components/tls/EventRegistrationEdit";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -188,6 +189,9 @@ export default function EventDetailPage() {
   }, [load]);
 
   useApiInvalidation(load, ["events", "tournaments", "f1", "gallery", "news"]);
+  // Hinweis der Turnierleitung an das ganze Event (#1166) - die eines einzelnen Turniers stehen auf dessen Seite.
+  const notices = useNotices(slug ? `/events/${encodeURIComponent(slug)}/notices${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : null);
+  const eventNotices = notices.filter((item) => item.target === "event");
 
   // Aus der News (#1266): ?anmelden=1 öffnet das Anmeldeformular unter „Dein Event“ und springt dorthin - wie der
   // Knopf im Fakten-Kasten. Gäste sehen dort den Weg zur Anmeldung mit Rückweg. Nur einmal je Aufruf.
@@ -239,7 +243,7 @@ export default function EventDetailPage() {
 
   return (
     <PublicLayout>
-      <EventHeader e={e} />
+      <EventHeader e={e} notices={eventNotices} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start min-w-0">
         <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24" data-testid="event-facts-column">
           <EventFactsBox e={e} user={user} over={over} onRegister={openRegistration} />
@@ -263,12 +267,13 @@ export default function EventDetailPage() {
 
 // Kopf mit Bild (#1273): das Bild als Banner (am Handy im Breitformat über dem Titel, am PC rechts daneben), darunter bzw.
 // daneben Titel, Datum, Ort und Status. Die Beschreibung beginnt erst nach dem Kopf (unter „Infos“).
-function EventHeader({ e }) {
+function EventHeader({ e, notices = [] }) {
   const chip = e.visibility && e.visibility !== "public" ? visibilityChip(e.visibility) : "";
   return (
     <header className="border-b border-white/10 bg-[#0A0A0A]" data-testid="event-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8 lg:pt-10 lg:pb-12 min-w-0">
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
+        <NoticeBanner items={notices} className="mb-5 max-w-3xl" />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:items-center min-w-0">
           <EventBanner event={e} eager className="w-full lg:order-2" />
           <div className="min-w-0 lg:order-1">
