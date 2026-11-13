@@ -16,6 +16,7 @@ import { rulesMediaProps } from "@/lib/leagueRules";
 import {
   PLACE_MODES, PLAYER_BASIS, REWARD_KINDS, REWARD_LIMIT, NAME_MAX, emptyReward, listProblem, metalOf, placeLabel,
   rewardPayload, rewardProblem, rewardToForm,
+  rosterFallbackText,
 } from "@/lib/leagueRewards";
 
 const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
@@ -152,9 +153,17 @@ function StaffelState({ row }) {
       : row.awards ? `${row.awards} vergeben · ${row.teams} ${row.teams === 1 ? "Team" : "Teams"} · ${row.players} Spieler · Fassung ${row.version}`
         : "Abgeschlossen – nichts vergeben";
   return (
-    <li className="flex flex-wrap items-baseline justify-between gap-2 text-sm" data-testid={`rewards-staffel-${row.tournament_id}`}>
-      <span className="font-semibold text-white">Staffel {row.staffel}</span>
-      <span className={row.closed && row.awards && !row.suspended ? "text-[#29B6E8]" : "text-white/55"}>{text}</span>
+    <li className="text-sm" data-testid={`rewards-staffel-${row.tournament_id}`}>
+      <span className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="font-semibold text-white">Staffel {row.staffel}</span>
+        <span className={row.closed && row.awards && !row.suspended ? "text-[#29B6E8]" : "text-white/55"}>{text}</span>
+      </span>
+      {/* Nr. 167: ohne gemeldete Aufstellung ging die Spieler-Belohnung an den Kader. */}
+      {row.closed && !row.suspended && row.roster_fallback?.length ? (
+        <span className="mt-1 block text-xs text-warn" data-testid={`rewards-fallback-${row.tournament_id}`}>
+          {rosterFallbackText(row.roster_fallback)}
+        </span>
+      ) : null}
     </li>
   );
 }

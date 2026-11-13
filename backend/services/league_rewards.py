@@ -28,8 +28,8 @@ logger = logging.getLogger("tls.league_rewards")
 ITEM_LIMIT = 20
 NAME_MAX, DESCRIPTION_MAX, PRIZE_MAX = 60, 200, 160
 RANK_MAX = 99
-# Gewertete Spiele - nur dort zählt eine Aufstellung als Einsatz.
-PLAYED_STATUSES = ("completed", "forfeit")
+# Gespielte Spiele - nur dort zählt eine Aufstellung als Einsatz. Kampflos zählt nicht (Nr. 168).
+PLAYED_STATUSES = ("completed",)
 NOTIFICATION_KIND = "league_reward"
 
 
@@ -141,9 +141,12 @@ async def admin_view(db, season: dict, *, can_edit: bool) -> dict:
                                          {"_id": 0, "id": 1, "title": 1, "status": 1, "final_table": 1, "league_context": 1}).to_list(500)
     counts: dict[str, dict] = {}
     async for doc in db.tournament_awards.find({"league.season_id": season["id"], "reward_key": {"$type": "string"}},
-                                               {"_id": 0, "tournament_id": 1, "team_id": 1, "player_ids": 1, "user_id": 1, "suspended": 1}):
-        row = counts.setdefault(doc["tournament_id"], {"awards": 0, "teams": set(), "players": set(), "suspended": False})
+                                               {"_id": 0, "tournament_id": 1, "team_id": 1, "player_ids": 1, "user_id": 1, "suspended": 1,
+                                                "roster_fallback": 1, "league.display_name": 1}):
+        row = counts.setdefault(doc["tournament_id"], {"awards": 0, "teams": set(), "players": set(), "suspended": False, "fallback": set()})
         row["awards"] += 1
+        if doc.get("roster_fallback"):
+            row["fallback"].add((doc.get("league") or {}).get("display_name") or "Team")
         row["suspended"] = row["suspended"] or bool(doc.get("suspended"))
         if doc.get("team_id"):
             row["teams"].add(doc["team_id"])
@@ -154,12 +157,14 @@ async def admin_view(db, season: dict, *, can_edit: bool) -> dict:
     for staffel in staffeln:
         if staffel.get("status") in ("draft", "cancelled") and not is_closed(staffel):
             continue
-        count = counts.get(staffel["id"]) or {"awards": 0, "teams": set(), "players": set(), "suspended": False}
+        count = counts.get(staffel["id"]) or {"awards": 0, "teams": set(), "players": set(), "suspended": False, "fallback": set()}
         by_division.setdefault((staffel.get("league_context") or {}).get("division_id") or "", []).append({
             "tournament_id": staffel["id"], "title": staffel.get("title"), "staffel": (staffel.get("league_context") or {}).get("staffel"),
             "closed": is_closed(staffel), "version": (staffel.get("final_table") or {}).get("version"),
             "awards": count["awards"], "teams": len(count["teams"]), "players": len(count["players"]),
-            "suspended": count["suspended"]})
+            "suspended": count["suspended"],
+            # Nr. 167: Teams ohne gemeldete Aufstellung - deren Spieler-Belohnung ging an den Kader zum Abschluss.
+            "roster_fallback": sorted(count["fallback"])})
     basis = basis_of(season)
     return {
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status")},
@@ -214,7 +219,8 @@ async def save(db, season: dict, body: dict, actor: dict) -> dict:
 # ---------------------------------------------------------------- Vergabe
 
 def _fielded(matches: list[dict], registration_id: str) -> set[str]:
-    """Wer für diese Anmeldung in einem gewerteten Spiel aufgestellt war (wie ``league_games.participants``, nur eine Seite)."""
+    """Wer für diese Anmeldung in einem gespielten Spiel aufgestellt war (wie ``league_games.participants``, nur eine Seite) - kampflose
+    Spiele zählen nicht (Nr. 168)."""
     from services.league_games import with_series
 
     people: set[str] = set()
@@ -226,18 +232,30 @@ def _fielded(matches: list[dict], registration_id: str) -> set[str]:
     return {person for person in people if person}
 
 
-def players_for(registration: dict, team: dict | None, matches: list[dict], basis: str, row: dict) -> list[str]:
-    """Die Spieler einer Anmeldung, die eine Spieler-Belohnung bekommen (Nr. 163)."""
+def _played(matches: list[dict], registration_id: str) -> bool:
+    """Hat diese Anmeldung mindestens ein Spiel tatsächlich gespielt (nicht kampflos, Nr. 168)?"""
+    return any(str(match.get("status") or "") in PLAYED_STATUSES
+               and registration_id in {slot.get("registration_id") for slot in match.get("slots") or [] if isinstance(slot, dict)}
+               for match in matches)
+
+
+def players_for(registration: dict, team: dict | None, matches: list[dict], basis: str) -> tuple[list[str], bool]:
+    """Die Spieler einer Anmeldung, die eine Spieler-Belohnung bekommen (Nr. 163, 167, 168) - und ob statt des Einsatzes der Kader
+    gilt. Team: wer in einem gespielten Spiel aufgestellt war; fehlen alle Aufstellungen (oder gab es nur kampflose Spiele), der Kader
+    zum Abschluss wie beim Meister-Eintrag (Nr. 167). Einzel: die angemeldete Person, wenn sie gespielt hat - mit „ganzer Kader“ immer."""
     from services.match_audience import roster_ids
 
     if not registration.get("team_id"):
         person = registration.get("user_id")
         if not person:
-            return []
-        return [person] if basis == "roster" or int(row.get("played") or 0) > 0 or person in _fielded(matches, registration["id"]) else []
+            return [], False
+        return ([person] if basis == "roster" or _played(matches, registration["id"]) else []), False
     if basis == "roster":
-        return sorted(roster_ids(registration, team))
-    return sorted(_fielded(matches, registration["id"]))
+        return sorted(roster_ids(registration, team)), False
+    fielded = _fielded(matches, registration["id"])
+    if fielded:
+        return sorted(fielded), False
+    return sorted(roster_ids(registration, team)), True
 
 
 def _art(frame: dict, item: dict, rank) -> dict:
@@ -256,13 +274,31 @@ def _snapshot(item: dict, frame: dict, rank, basis: str) -> dict:
 
 
 def _holdings(docs: list[dict]) -> dict[str, set[str]]:
-    """Wer welche Belohnung hält - je Person die Kennungen der Belohnungen (für Gewinn und Verlust)."""
+    """Wer welche Belohnung persönlich hält - je Person (Spieler bzw. die Person einer Einzel-Liga) die Kennungen der Belohnungen. Captain
+    und Vertreter zählen hier nicht: Sie halten die Team-Belohnung nicht selbst, ein Wechsel ist kein Gewinn oder Verlust."""
     out: dict[str, set[str]] = {}
     for doc in docs:
         item_id = (doc.get("reward") or {}).get("id")
-        for person in doc.get("audience_ids") or []:
+        for person in {*(doc.get("player_ids") or []), *([doc["user_id"]] if doc.get("user_id") else [])}:
             out.setdefault(person, set()).add(f"{item_id}")
     return out
+
+
+def _team_holdings(docs: list[dict]) -> dict[str, set[str]]:
+    """Was jedes Team hält (Team-Belohnungen) - je Team die Kennungen der Belohnungen."""
+    out: dict[str, set[str]] = {}
+    for doc in docs:
+        if doc.get("team_id"):
+            out.setdefault(doc["team_id"], set()).add(f"{(doc.get('reward') or {}).get('id')}")
+    return out
+
+
+def _changes(old: dict[str, set[str]], new: dict[str, set[str]], names: dict) -> tuple[dict, dict]:
+    gains = {key: sorted(names.get(item, "Belohnung") for item in new.get(key, set()) - old.get(key, set()))
+             for key in new if new.get(key, set()) - old.get(key, set())}
+    losses = {key: sorted(names.get(item, "Belohnung") for item in old.get(key, set()) - new.get(key, set()))
+              for key in old if old.get(key, set()) - new.get(key, set())}
+    return gains, losses
 
 
 async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
@@ -303,21 +339,26 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
             continue
         team = teams.get(registration.get("team_id") or "") or None
         summary = registration_match_summary(matches, {registration["id"]})
-        players = players_for(registration, team, matches, basis, row)
+        players, roster_fallback = players_for(registration, team, matches, basis)
         responsible = sorted(responsible_ids(registration, team)) if registration.get("team_id") else []
+        solo = not registration.get("team_id")
         for item in fitting:
             recipients = item.get("recipients") or []
-            to_team = "team" in recipients and bool(registration.get("team_id"))
+            to_team = "team" in recipients and not solo
             to_players = "players" in recipients
-            solo = not registration.get("team_id")
             player_ids = players if to_players and not solo else []
-            audience = sorted(set(player_ids) | (set(responsible) if to_team else set())
-                              | ({registration["user_id"]} if solo and registration.get("user_id") else set()))
+            # Einzel-Liga: Die Person ist zugleich „Team“ - eine Spieler-Belohnung bekommt sie aber nur mit Einsatz (bzw. „ganzer Kader“).
+            person = registration.get("user_id") if solo and ("team" in recipients or (to_players and players)) else None
+            if not (to_team or player_ids or person):
+                continue  # niemand bekommt sie - kein Eintrag ohne Empfänger
+            audience = sorted(set(player_ids) | (set(responsible) if to_team else set()) | ({person} if person else set()))
             reward_key = f"{item['id']}:{registration['id']}"
             doc = {
                 "tournament_id": tid, "registration_id": registration["id"], "reward_key": reward_key,
-                "user_id": registration.get("user_id") if solo else None,
+                "user_id": person,
                 "team_id": registration.get("team_id") if to_team else None,
+                # Nr. 167: keine Aufstellung gemeldet - die Spieler-Belohnung ging an den Kader zum Abschluss.
+                "roster_fallback": bool(roster_fallback and player_ids),
                 "rank": rank, "kind": "reward", "participants": int(final.get("participants") or 0),
                 "finalist": False, "final_match_id": None,
                 "matches": {"played": summary["matches_played"], "won": summary["matches_won"]},
@@ -343,20 +384,24 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
             after.append(doc)
             if item.get("prize"):
                 wanted_prizes.append({"reward_key": reward_key, "place": rank or 0, "team_id": registration.get("team_id"),
-                                      "user_id": registration.get("user_id") if solo else None,
+                                      "user_id": person,
                                       "label": item.get("name"), "value": item.get("prize"), "place_label": _art(frame, item, rank)["place"]})
     await db.tournament_awards.delete_many({"tournament_id": tid, "reward_key": {"$type": "string", "$nin": kept}})
     if wanted_prizes or before:
         from services.prize_service import sync_league_reward_prizes
 
         await sync_league_reward_prizes(db, tournament, wanted_prizes)
-    old, new = _holdings(before), _holdings(after)
     names = {doc["reward"]["id"]: doc["reward"]["name"] for doc in [*before, *after] if doc.get("reward")}
-    gains = {person: sorted(names.get(key, "Belohnung") for key in new.get(person, set()) - old.get(person, set()))
-             for person in new if new.get(person, set()) - old.get(person, set())}
-    losses = {person: sorted(names.get(key, "Belohnung") for key in old.get(person, set()) - new.get(person, set()))
-              for person in old if old.get(person, set()) - new.get(person, set())}
-    return {"granted": len(kept), "gains": gains, "losses": losses}
+    gains, losses = _changes(_holdings(before), _holdings(after), names)
+    team_gains, team_losses = _changes(_team_holdings(before), _team_holdings(after), names)
+    # Wer eine Team-Belohnung erfährt: Captain und Vertreter von heute (bzw. die Teamleitung) - für das Team, nicht für sich.
+    leads = {}
+    for registration in registrations.values():
+        if registration.get("team_id") in {*team_gains, *team_losses}:
+            leads.setdefault(registration["team_id"], set()).update(responsible_ids(registration, teams.get(registration["team_id"]) or None))
+    return {"granted": len(kept), "gains": gains, "losses": losses, "team_gains": team_gains, "team_losses": team_losses,
+            "team_leads": {key: sorted(value) for key, value in leads.items()},
+            "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads}}
 
 
 async def notify(db, tournament: dict, final: dict, frame: dict, result: dict) -> int:
@@ -376,19 +421,37 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict) -
             else:
                 title, text = "Belohnung entfällt", (f"{name}: Nach dem neuen Endstand entfällt {rewards}. Die Liga-Leitung hat den Abschluss "
                                                        "korrigiert.")
-            try:
-                if await create_user_notification(user_id, title, text, url=url, kind=NOTIFICATION_KIND,
-                                                  meta={"reason": "league_reward", "tournament_id": tournament["id"],
-                                                        "dedupe_key": f"league-reward:{final['id']}:{event}:{user_id}"}):
-                    sent += 1
-            except Exception:  # noqa: BLE001 - die Vergabe steht, die Nachricht hält sie nicht auf
-                logger.warning("[league_rewards] Nachricht für Staffel %s nicht verschickt", log_safe(tournament.get("id")), exc_info=True)
+            sent += await _send(create_user_notification, user_id, title, text, url, tournament,
+                                f"league-reward:{final['id']}:{event}:{user_id}")
+    # Team-Belohnungen (Nr. 166): eigene Nachricht an Captain und Vertreter, je Fassung, Team, Richtung und Person einmal.
+    for event, teams in (("team-gain", result.get("team_gains") or {}), ("team-loss", result.get("team_losses") or {})):
+        for team_id in sorted(teams):
+            rewards = ", ".join(teams[team_id])
+            team_name = (result.get("team_names") or {}).get(team_id) or "Euer Team"
+            if event == "team-gain":
+                title, text = "Belohnung für euer Team", f"{team_name} hat {rewards} bekommen ({name}) - steht in der Team-Sammlung."
+            else:
+                title, text = "Team-Belohnung entfällt", f"{team_name}: Nach dem neuen Endstand von {name} entfällt {rewards}."
+            for user_id in (result.get("team_leads") or {}).get(team_id) or []:
+                sent += await _send(create_user_notification, user_id, title, text, url, tournament,
+                                    f"league-reward:{final['id']}:{event}:{team_id}:{user_id}")
     return sent
+
+
+async def _send(create, user_id: str, title: str, text: str, url: str, tournament: dict, dedupe_key: str) -> int:
+    try:
+        done = await create(user_id, title, text, url=url, kind=NOTIFICATION_KIND,
+                            meta={"reason": "league_reward", "tournament_id": tournament["id"], "dedupe_key": dedupe_key})
+        return 1 if done else 0
+    except Exception:  # noqa: BLE001 - die Vergabe steht, die Nachricht hält sie nicht auf
+        logger.warning("[league_rewards] Nachricht für Staffel %s nicht verschickt", log_safe(tournament.get("id")), exc_info=True)
+        return 0
 
 
 async def grant_and_notify(db, tournament: dict, final: dict, frame: dict) -> dict:
     result = await grant(db, tournament, final, frame)
-    result["sent"] = await notify(db, tournament, final, frame, result) if (result["gains"] or result["losses"]) else 0
+    changed = any(result.get(key) for key in ("gains", "losses", "team_gains", "team_losses"))
+    result["sent"] = await notify(db, tournament, final, frame, result) if changed else 0
     return result
 
 

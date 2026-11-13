@@ -15,6 +15,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatApiError } from "@/lib/api";
 import { closeState, decisionLine, finalMoment, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws } from "@/lib/leagueTable";
+import { rosterFallbackText } from "@/lib/leagueRewards";
 import { OrderSheet } from "./SeasonTablePanel";
 import "./seasonClose.css";
 
@@ -260,6 +261,9 @@ function StaffelCard({ row, data, canResults, onSheet }) {
               <Gift className="h-3.5 w-3.5 shrink-0 text-[#29B6E8]" aria-hidden="true" />
               {row.rewards === 1 ? "1 Belohnung vergeben" : `${row.rewards} Belohnungen vergeben`} · <Link to="#belohnungen" className="text-[#29B6E8] hover:underline">Belohnungen</Link>
             </p>
+          ) : null}
+          {row.rewards && row.rewards_roster_fallback?.length ? (
+            <p className="text-xs text-warn" data-testid={`close-rewards-fallback-${row.tournament_id}`}>{rosterFallbackText(row.rewards_roster_fallback)}</p>
           ) : null}
         </div>
       ) : (

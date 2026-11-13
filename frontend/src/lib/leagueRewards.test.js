@@ -1,6 +1,6 @@
 import {
   artLines, emptyReward, everyoneLine, groupBySeason, listProblem, metalOf, placeLabel, recipientsLabel, rewardPayload, rewardProblem,
-  rewardToForm, rewardsByPlace, rewardsOf,
+  rewardToForm, rewardsByPlace, rewardsOf, rosterFallbackText,
 } from "./leagueRewards";
 
 // Belohnungen der Liga (F.4, #2214): dieselben Texte und Regeln wie der Server. Erfundene Namen.
@@ -56,4 +56,9 @@ test("Ligaseite: je Platz 1 bis 3 die Belohnungen, Bereiche und „alle“ daneb
   expect(others.map((row) => row.id)).toEqual(["p", "a", "v"]);
   expect(everyoneLine(items)).toBe("Alle Teilnehmer bekommen: Season-Banner.");
   expect(everyoneLine([items[0]])).toBe("");
+});
+
+test("Nr. 167: der Hinweis nennt die Teams, deren Kader statt des Einsatzes zählte", () => {
+  expect(rosterFallbackText(["Nordlicht", "Eisbären"])).toBe("Kader statt Einsatz, weil keine Aufstellungen gemeldet: Nordlicht, Eisbären.");
+  expect(rosterFallbackText([])).toBe("");
 });

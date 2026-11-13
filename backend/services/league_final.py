@@ -795,6 +795,10 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
         # Belohnungen (F.4): wie viele gerade gelten - beim Wiederöffnen ruhen sie und zählen nicht.
         "rewards": await db.tournament_awards.count_documents({"tournament_id": tid, "reward_key": {"$type": "string"},
                                                                "suspended": {"$ne": True}}),
+        # Nr. 167: Teams, deren Spieler-Belohnung mangels Aufstellung an den Kader ging (Hinweis im Cockpit).
+        "rewards_roster_fallback": sorted({(row.get("league") or {}).get("display_name") or "Team" async for row in db.tournament_awards.find(
+            {"tournament_id": tid, "reward_key": {"$type": "string"}, "suspended": {"$ne": True}, "roster_fallback": True},
+            {"_id": 0, "league.display_name": 1})}),
     }
     if is_closed(tournament) and not active:
         # Abgebrochener Abschluss (N-b): ehrlich als solcher - gesperrt, ohne Endstand, mit „Wieder öffnen“ als Ausweg.

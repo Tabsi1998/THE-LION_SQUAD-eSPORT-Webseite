@@ -19,7 +19,7 @@ const body = (extra = {}) => ({
   season: { id: "s1", name: "Season 1" }, can_edit: true, reward_players: "fielded", items: [GOLD],
   divisions: [
     { id: "d1", level: 1, label: "Liga 1", own: false, items: [GOLD], staffeln: [
-      { tournament_id: "t1", staffel: "A", closed: true, version: 2, awards: 5, teams: 1, players: 8, suspended: false },
+      { tournament_id: "t1", staffel: "A", closed: true, version: 2, awards: 5, teams: 1, players: 8, suspended: false, roster_fallback: ["Nordlicht"] },
       { tournament_id: "t2", staffel: "B", closed: false, version: null, awards: 0, teams: 0, players: 0, suspended: false }] },
     { id: "d2", level: 2, label: "Liga 2", own: true, items: [], staffeln: [] },
   ],
@@ -43,6 +43,8 @@ test("zeigt Season, geerbte und eigene Liga N und den Stand je Staffel", async (
   expect(screen.getByTestId("season-rewards-division-items-d2-empty")).toHaveTextContent("Diese Liga N vergibt keine Belohnungen.");
   expect(screen.getByTestId("rewards-staffel-t1")).toHaveTextContent("5 vergeben · 1 Team · 8 Spieler · Fassung 2");
   expect(screen.getByTestId("rewards-staffel-t2")).toHaveTextContent("Noch nicht abgeschlossen");
+  expect(screen.getByTestId("rewards-fallback-t1")).toHaveTextContent("Kader statt Einsatz, weil keine Aufstellungen gemeldet: Nordlicht.");
+  expect(screen.queryByTestId("rewards-fallback-t2")).toBeNull();
   expect(screen.getByTestId("season-rewards-save")).toBeDisabled();
 });
 

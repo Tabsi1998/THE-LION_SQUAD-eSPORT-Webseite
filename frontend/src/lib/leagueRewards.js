@@ -123,6 +123,12 @@ export function rewardsByPlace(items) {
   return { places, others };
 }
 
+/** Nr. 167: „Kader statt Einsatz, weil keine Aufstellungen gemeldet: Nordlicht, Eisbären.“ */
+export function rosterFallbackText(names) {
+  const list = (names || []).filter(Boolean);
+  return list.length ? `Kader statt Einsatz, weil keine Aufstellungen gemeldet: ${list.join(", ")}.` : "";
+}
+
 /** Kurzer Satz unter dem Podest: „Alle Teilnehmer bekommen: Season-Banner.“ */
 export function everyoneLine(items) {
   const names = (items || []).filter((item) => item.places?.mode === "all").map((item) => item.name);
