@@ -152,6 +152,9 @@ ROUTES = [
     route("POST", "/api/tournaments/{tid}/schedule/release", "matches", {}),
     route("POST", "/api/tournaments/{tid}/live-queue/call", "matches", {"station_id": "s", "match_id": "m"}),
     route("POST", "/api/tournaments/{tid}/live-queue/start", "matches", {"station_id": "s", "match_id": "m"}),
+    route("POST", "/api/tournaments/{tid}/live-queue/release", "matches", {"station_id": "s", "match_id": "m"}),
+    route("POST", "/api/tournaments/{tid}/live-queue/broken", "matches", {"station_id": "s", "broken": True}),
+    route("POST", "/api/tournaments/{tid}/live-queue/move", "matches", {"station_id": "s", "match_id": "m", "to_station_id": "s2"}),
     route("GET", "/api/team-day/{tid}/lineups", "matches"),
     route("PATCH", "/api/matches/{match}", "matches", {"admin_note": "Hinweis"}),
     # Check-in (D.2, #1652): für eine Seite eintragen und starten als Leitung - Captains handeln als Seite, nicht hier.
