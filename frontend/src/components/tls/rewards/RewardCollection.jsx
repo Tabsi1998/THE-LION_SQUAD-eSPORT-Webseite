@@ -56,7 +56,7 @@ export function RewardCollection({ awards, featuredId = null, titleId = null, on
                     <div className="tls-reward-card__actions">
                       {onFeature ? (
                         <button type="button" onClick={() => onFeature(featured ? null : award.id)} data-testid={`reward-feature-${award.id}`} aria-pressed={featured}
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${featured ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}>
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${featured ? "border-honor/60 text-honor" : "border-white/20 text-white/60 hover:text-white"}`}>
                           {featured ? "Banner ✓" : "Als Banner"}
                         </button>
                       ) : null}

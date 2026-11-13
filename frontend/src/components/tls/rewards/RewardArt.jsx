@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { resolveMediaUrl } from "@/lib/api";
 import { KIND_LABELS, artLines } from "@/lib/leagueRewards";
+import { METALS } from "@/components/tls/TrophyShelf";
 import "./rewards.css";
 
 // Lionsquad-Vorlagen der Belohnungen (F.4, #2214, Nr. 164): Banner, Emblem, Medaille und Titel als SVG - dieselbe Sprache wie der
@@ -10,10 +11,9 @@ import "./rewards.css";
 // Bewegung (Detail-Runde): `play="run"` hebt die Grafik weich an, zeichnet den Glanz einmal nach und lässt die Kante kurz aufleuchten;
 // `--tls-i` staffelt mehrere. Mit „Bewegung reduzieren“ steht alles still (rewards.css).
 
+// Gold, Silber und Bronze genau wie der Pokal der Vitrine, dazu Lionsquad-Blau für alle übrigen Plätze.
 export const REWARD_METALS = {
-  gold: { label: "Gold", light: "#FFF2A8", base: "#FFD700", dark: "#8A6A12" },
-  silver: { label: "Silber", light: "#FFFFFF", base: "#C9CED6", dark: "#6F7682" },
-  bronze: { label: "Bronze", light: "#F2C08E", base: "#D08A4E", dark: "#6E3F16" },
+  ...METALS,
   lion: { label: "Lionsquad", light: "#B8ECFF", base: "#29B6E8", dark: "#0E5C7A" },
 };
 

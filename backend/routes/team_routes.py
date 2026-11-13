@@ -688,7 +688,7 @@ async def feature_team_award(team_id: str, award_id: str, slot: Literal["banner"
     chosen = await feature_award_for_team(db, team_id, award_id, slot)
     if not chosen:
         raise HTTPException(status_code=404, detail="Auszeichnung nicht gefunden." if slot == "banner" else "Titel nicht gefunden.")
-    return {"ok": True, "featured_award": chosen, "slot": slot}
+    return {"ok": True, "featured_award": chosen}
 
 
 @router.delete("/{team_id}/awards/feature")
@@ -701,7 +701,7 @@ async def unfeature_team_award(team_id: str, slot: Literal["banner", "title"] = 
         _refuse(me, "Nur die Teamleitung wählt das Teambanner.")
     from services.awards import feature_award_for_team
     await feature_award_for_team(db, team_id, None, slot)
-    return {"ok": True, "featured_award": None, "slot": slot}
+    return {"ok": True, "featured_award": None}
 
 
 @router.get("/{team_id}/chat")

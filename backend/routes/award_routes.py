@@ -25,13 +25,13 @@ async def feature_award(award_id: str, slot: Literal["banner", "title"] = "banne
     chosen = await feature_award_for_user(get_db(), user["id"], award_id, slot)
     if not chosen:
         raise HTTPException(404, "Auszeichnung nicht gefunden." if slot == "banner" else "Titel nicht gefunden.")
-    return {"ok": True, "featured_award": chosen, "slot": slot}
+    return {"ok": True, "featured_award": chosen}
 
 
 @router.delete("/me/awards/feature")
 async def unfeature_award(slot: Literal["banner", "title"] = "banner", user: dict = Depends(get_current_user)):
     await feature_award_for_user(get_db(), user["id"], None, slot)
-    return {"ok": True, "featured_award": None, "slot": slot}
+    return {"ok": True, "featured_award": None}
 
 
 @router.post("/admin/awards/rebuild")
