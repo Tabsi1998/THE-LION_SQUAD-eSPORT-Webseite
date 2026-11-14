@@ -176,3 +176,13 @@ def test_a_deleted_season_in_a_closed_period_does_not_block_saving():
     # Gegenprobe: eine fremde Kennung, die nie im Zeitraum stand, bleibt ein Fehler.
     with pytest.raises(rules.OverallProblem):
         rules.clean_periods([{"id": "p1", "name": "2027", "season_ids": ["s1", "fremd"]}], current, {"s1"}, {}, {"p1"})
+
+
+def test_pdf_note_names_a_partial_view_like_the_page():
+    from routes.league_overall_routes import pdf_note
+
+    assert pdf_note({"closed": True, "complete": False, "label": "Liga 1"}, {}) == "Endstand ohne nicht öffentliche Seasons · Liga 1"
+    # Gegenprobe: vollständig bzw. laufend wie bisher.
+    assert pdf_note({"closed": True, "complete": True, "label": "Liga 1"}, {"counting": "best", "best_count": 2}) \
+        == "Endstand · Liga 1 · Es zählen die besten 2 Seasons, Streichergebnisse in Klammern"
+    assert pdf_note({"closed": False, "complete": False, "label": "Liga 2"}, {}) == "Laufende Wertung · Liga 2"

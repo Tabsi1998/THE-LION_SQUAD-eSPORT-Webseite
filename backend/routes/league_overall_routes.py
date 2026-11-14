@@ -220,6 +220,21 @@ def _cell(cell: dict) -> str:
     return text if cell.get("counted") else f"({text})"
 
 
+def pdf_note(block: dict, settings: dict) -> str:
+    """Die Zeile über den Tabellen des PDFs - wie auf der Ligaseite: eine Teilansicht (eine Season der Fassung ist nicht öffentlich)
+    heißt „Endstand ohne nicht öffentliche Seasons“."""
+    if not block.get("closed"):
+        state = "Laufende Wertung"
+    elif block.get("complete") is False:
+        state = "Endstand ohne nicht öffentliche Seasons"
+    else:
+        state = "Endstand"
+    note = f"{state} · {block['label']}"
+    if settings.get("counting") == "best" and settings.get("best_count"):
+        note += f" · Es zählen die besten {settings['best_count']} Seasons, Streichergebnisse in Klammern"
+    return note
+
+
 @router.get("/{league_slug}/{season_slug}/overall.pdf")
 async def public_overall_pdf(league_slug: str, season_slug: str, level: int | None = None, user: dict | None = Depends(get_optional_user)):
     """PDF der Gesamtwertung einer Liga N (ohne ``level`` die oberste) - derselbe Stand wie die Ligaseite."""
@@ -240,9 +255,7 @@ async def public_overall_pdf(league_slug: str, season_slug: str, level: int | No
     ]
     # Die Zählregel der jeweiligen Wertung - bei einer abgeschlossenen die der Fassung.
     settings = block.get("settings") or view["settings"]
-    note = ("Endstand" if block["closed"] else "Laufende Wertung") + f" · {block['label']}"
-    if settings.get("counting") == "best" and settings.get("best_count"):
-        note += f" · Es zählen die besten {settings['best_count']} Seasons, Streichergebnisse in Klammern"
+    note = pdf_note(block, settings)
     db = get_db()
     title = f"{view['league']['name']} · {view['period']['name']} · {block['label']}"
     return _pdf_response(pdf_league_overall(title, sections, pdf_sponsors=await _pdf_sponsors(db), pdf_branding=await _pdf_branding(db), note=note),
