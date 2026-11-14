@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.85.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.85.0...v1.85.1) (2026-11-14)
+
+
+### Fehlerbehebungen
+
+* „Bild einfügen“ im Texteditor per Tastatur bedienbar ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* @-Erwähnen per Tastatur – Pfeile wählen weiter, Escape schließt die Vorschläge ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Abstimmungs-Popup per Tastatur bedienbar – Fokus im Fenster, Escape heißt „Später“ ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Datumsfeld – Fehler wird Vorleseprogrammen am Knopf vorgelesen ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Fast Lap – „Zeit bearbeiten“ per Tastatur bedienbar, Stift mit Namen ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Galerie-Verwaltung – Medienauswahl per Tastatur bedienbar ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Logo-Laufband – jedes Logo nur ein Tab-Stopp, Fokus hält das Band an ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Medienbibliothek und Bildbearbeitung beim Hochladen per Tastatur bedienbar ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Medienverwaltung – Kacheln per Tastatur öffnen ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Season-Highlight-Karte per Tastatur bedienbar ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Spur im Schnee gibt beim Verlassen der Seite ihren Platz im Bewegungsbudget frei ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Suche per Tastatur bedienbar – Fokus bleibt im Fenster, Escape gibt ihn an die Lupe zurück ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* TV-Warteschlange – das weggleitende Spiel zeigt seinen letzten Stand ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+* Zwei-Faktor im Profil – Ladefehler wird angezeigt, mit „Nochmal versuchen“ ([#937](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/937)) ([1930ac0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1930ac0e198f4f937fdc19dbfa847dcd3def8088))
+
 ## 1.85.0 (13.11.2026)
 
 ### Neu
