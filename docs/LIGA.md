@@ -3791,7 +3791,10 @@ gibt es keine Gesamtwertung und alles bleibt wie bisher):
 **Spielerwertung** (Nr. 172): Je Season bekommt eine Person die Punkte des Co-Teams, für das sie dort gilt - dieselbe Regel wie die
 Spieler-Belohnung in F.4 (`league_rewards.players_for`, Basis „Spieler mit Einsatz“): mindestens ein gespieltes Spiel (`completed`) in der
 Aufstellung, kampflose zählen nicht (Nr. 168); fehlen für ein Co-Team alle Aufstellungen, gilt sein Kader (Nr. 167) zum
-Abschluss der Season, wie der Endstand ihn festhielt (`sides[].player_ids`, seit F.2; nur ältere Endstände lesen den Kader von heute). Bei einem Teamwechsel zählen je Season die Punkte des jeweiligen Co-Teams; spielte sie in einer
+Abschluss der Season, wie der Endstand ihn festhielt (`sides[].player_ids`, seit F.2; ältere Endstände und
+Anmeldungen ohne Co-Team lesen wie F.4 den Kader des Hauptteams von heute). Ohne gesehene Fassung (Season nach dem Abschluss nicht
+öffentlich) gibt es keinen „Gesamtsieger“: Ligaseite, Profil und Teamseite tragen `complete` und nennen den Stand „Endstand ohne nicht
+öffentliche Seasons“. Bei einem Teamwechsel zählen je Season die Punkte des jeweiligen Co-Teams; spielte sie in einer
 Season für zwei, die höheren. Zählen und Reihenfolge wie bei den Co-Teams, ohne Entscheid der Leitung (gleich heißt geteilter Platz).
 Öffentlich steht der Name nur bei einem öffentlichen Profil (mit Link), sonst „Spieler mit privatem Profil“ - der Platz bleibt.
 

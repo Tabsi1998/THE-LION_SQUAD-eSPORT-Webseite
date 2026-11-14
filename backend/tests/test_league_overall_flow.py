@@ -639,3 +639,19 @@ async def test_profile_shows_the_newest_periods_first_and_at_most_six(flow):
     rows = ok(await flow.get("/api/teams/team-1"))["league_overall"]
     assert len(rows) == league_overall.PROFILE_PERIODS
     assert rows[0]["period_name"] == "Zeitraum 7" and "Zeitraum 1" not in {row["period_name"] for row in rows}
+
+
+@pytest.mark.asyncio
+async def test_roster_fallback_without_co_team_takes_the_whole_team(flow):
+    world = await setup(flow)
+    season = await add_season(flow, world)
+    tournament = await staffel(flow, world, season, 1, [1, 2, 3, 4], start=False)
+    # Team 4 ist ohne Co-Team angemeldet (nur Hauptteam) und meldet nie eine Aufstellung.
+    await flow.db.tournament_registrations.update_one({"id": f"{tournament['id']}-reg-4"}, {"$set": {"squad_id": None, "user_id": "captain-4"}})
+    ok(await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "live"}))
+    await play(flow, tournament, [1, 2, 3, 4], lineups={4: []})
+    await close_staffel(flow, world, tournament)
+    await configure(flow, world)
+    keys = {row["key"] for row in level_of(await public(flow, world, user=world["admin"]))["players"]}
+    # Der Kader des Hauptteams zählt - nicht nur, wer angemeldet hat.
+    assert {"p-4-1", "p-4-2", "p-4-3"} <= keys

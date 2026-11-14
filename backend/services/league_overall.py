@@ -108,7 +108,9 @@ async def _extract(db, final: dict) -> dict:
             continue
         players, fallback = (players_for(registration, teams.get(registration.get("team_id") or "") or None, matches, "fielded")
                              if registration else ([], False))
-        if fallback and isinstance(side.get("player_ids"), list):
+        # Der Endstand hält den Kader nur bei einem Co-Team fest; ohne Co-Team stand dort nur, wer angemeldet hat - dann gilt wie in F.4
+        # der Kader des Hauptteams (``players_for``).
+        if fallback and identity.get("squad_id") and isinstance(side.get("player_ids"), list):
             # Kader-Rückfall (Nr. 167) mit dem Kader zum Abschluss, wie ihn der Endstand festhielt (seit F.2) - ein späterer Kaderwechsel
             # ändert die Wertung nicht, und die Vorauswahl für Profil und Teamseite (``player_ids``) passt dazu. Nur ältere Endstände
             # ohne ``sides`` lesen den Kader von heute.
