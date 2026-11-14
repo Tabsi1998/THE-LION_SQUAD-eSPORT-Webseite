@@ -45,16 +45,19 @@ function laneState(lane) {
 function useSwap(key, value, motionOn) {
   const [leaving, setLeaving] = useState(null);
   const last = useRef({ key, value });
+  // Nur ein neuer Schlüssel tauscht - neue Daten zum selben Spiel (Uhr, Prognose) nicht.
   useEffect(() => {
     const before = last.current;
-    last.current = { key, value };
     if (before.key === key || !motionOn || !before.value) return undefined;
     setLeaving(before);
     const timer = window.setTimeout(() => setLeaving(null), SWAP_MS);
     return () => window.clearTimeout(timer);
-    // Nur ein neuer Schlüssel tauscht - neue Daten zum selben Spiel (Uhr, Prognose) nicht.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, motionOn]);
+  // Nach jeder Darstellung der zuletzt gezeigte Stand: beim nächsten Wechsel gleitet der aktuelle Inhalt hinaus, nicht
+  // der vom Anfang des Spiels (#937).
+  useEffect(() => {
+    last.current = { key, value };
+  });
   return leaving;
 }
 

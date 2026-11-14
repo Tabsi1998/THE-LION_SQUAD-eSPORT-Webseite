@@ -44,9 +44,11 @@ export function Scares({ season, allowed, rng = Math.random, now = () => Date.no
   const lastFigure = useRef(null);
   const storage = typeof localStorage === "undefined" ? null : localStorage;
 
+  // Ein Besuch zählt einmal je Aufbau. `now` (Uhr für Tests) kommt bei jeder Darstellung neu - als Abhängigkeit zählte
+  // jede Darstellung als neuer Besuch.
   useEffect(() => {
     noteVisit(storage, dayKey(now()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Aufbau (siehe oben)
   }, []);
 
   useEffect(() => {

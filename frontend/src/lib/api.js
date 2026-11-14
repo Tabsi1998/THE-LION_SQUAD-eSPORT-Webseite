@@ -31,7 +31,9 @@ export function resolveMediaUrl(url) {
       const apiHost = API_BASE ? new URL(API_BASE).host : "";
       const legacyLocalHost = ["localhost", "127.0.0.1"].includes(parsed.hostname);
       if (uploadPath && (parsed.host === apiHost || legacyLocalHost)) return `${API_BASE}${uploadPath}`;
-    } catch {}
+    } catch {
+      // Keine gültige Adresse: sie bleibt, wie sie ist - umschreiben lässt sich nur, was sich lesen lässt (#937).
+    }
     return value;
   }
   const uploadPath = normalizeUploadPath(value);

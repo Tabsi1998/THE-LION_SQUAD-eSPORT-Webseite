@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 // Abstimmung live (#844): Popup auf jeder Seite für Mitglieder mit offenem Stimmrecht; Antwort wählen, abgeben; „Später“
@@ -122,4 +123,27 @@ test("kaputte Antworten vom Server: nichts stürzt ab, brauchbare Abstimmungen b
   expect(await screen.findByTestId("ballot-popup")).toHaveTextContent("Entlastung des Vorstands");
   expect(screen.getByTestId("ballot-popup-cast")).toBeDisabled();
   expect(screen.getByTestId("ballot-popup-unusable")).toHaveTextContent("Diese Abstimmung lässt sich hier gerade nicht anzeigen");
+});
+
+// Tastatur (#937): das Popup holt den Fokus, Tab bleibt darin, Leertaste wählt eine Antwort, Escape heißt „Später“ und
+// gibt den Fokus zurück.
+test("per Tastatur: Fokus im Popup, Tab bleibt drin, Leertaste wählt, Escape heißt „Später“ mit Fokus zurück", async () => {
+  apiMock.get.mockResolvedValue({ data: { available: true, ballots: [BALLOT], live: true, poll_seconds: 0 } });
+  const user = userEvent.setup();
+  render(<MemoryRouter><button type="button">Vorher</button><BallotPopup /></MemoryRouter>);
+  const before = screen.getByRole("button", { name: "Vorher" });
+  before.focus();
+  const dialog = await screen.findByRole("dialog", { name: "Entlastung des Vorstands" });
+  expect(dialog).toContainElement(document.activeElement);
+  for (let i = 0; i < 8; i += 1) {
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  screen.getByTestId("ballot-option-1012-no").focus();
+  await user.keyboard(" ");
+  expect(screen.getByTestId("ballot-option-1012-no")).toHaveAttribute("aria-pressed", "true");
+  await user.keyboard("{Escape}");
+  expect(screen.queryByTestId("ballot-popup")).toBeNull();
+  expect(screen.getByTestId("ballot-band")).toBeInTheDocument();
+  expect(before).toHaveFocus();
 });

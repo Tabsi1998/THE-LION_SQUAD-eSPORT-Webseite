@@ -26,3 +26,15 @@ test("mit einem Adminbereich – auch nur freigegeben – steht da, dass es Pfli
   await waitFor(() => expect(screen.getByTestId("profile-mfa-intro")).toHaveTextContent("Für deinen Adminbereich Pflicht"));
   expect(screen.getByText(/bleibt dein Adminbereich gesperrt/)).toBeInTheDocument();
 });
+
+// #937: lässt sich der Stand nicht laden, sagt das Feld das (statt „noch nicht eingerichtet“ vorzutäuschen) und bietet
+// einen neuen Versuch an.
+test("ohne Stand vom Server: ein Hinweis mit „Nochmal versuchen“, danach der echte Stand", async () => {
+  apiMock.get.mockRejectedValueOnce(new Error("Network Error"))
+    .mockResolvedValue({ data: { required_for_admin: false, enabled: true, session_verified: true, recovery_codes_remaining: 8 } });
+  render(<MfaSetupPanel onChanged={() => {}} />);
+  expect(await screen.findByTestId("profile-mfa-load-failed")).toHaveTextContent("lässt sich gerade nicht laden");
+  screen.getByTestId("profile-mfa-retry").click();
+  expect(await screen.findByText(/MFA ist aktiviert/)).toBeInTheDocument();
+  expect(screen.queryByTestId("profile-mfa-load-failed")).toBeNull();
+});

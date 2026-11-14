@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Fast Lap bearbeiten (#434): die Einstellungen liegen im Formular-Rahmen (Inhalt links,
@@ -449,4 +450,33 @@ test("nach der Veröffentlichung braucht das Löschen eines Gastes eine Begründ
   renderPage();
   fireEvent.click(await screen.findByTestId("f1-guest-delete-g-2"));
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/guests/g-2", { data: { change_reason: "Doppelt angelegt, nie gefahren" } }));
+});
+// Tastatur (#937): „Zeit bearbeiten“ ist ein echter Dialog - der Fokus springt hinein und bleibt darin, Escape schließt
+// und gibt ihn an den Stift zurück; der Klick daneben schließt, ein Klick im Fenster nicht.
+test("„Zeit bearbeiten“ per Tastatur: Fokus im Dialog, Tab bleibt drin, Escape schließt mit Fokus auf dem Stift", async () => {
+  answerWith({});
+  const user = userEvent.setup();
+  renderPage();
+  const pencil = await screen.findByRole("button", { name: "Zeit von Erika bearbeiten" });
+  pencil.focus();
+  await user.keyboard("{Enter}");
+  const dialog = screen.getByRole("dialog", { name: "Zeit bearbeiten" });
+  expect(dialog).toContainElement(document.activeElement);
+  for (let i = 0; i < 10; i += 1) {
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "Zeit bearbeiten" })).toBeNull();
+  expect(pencil).toHaveFocus();
+});
+
+test("„Zeit bearbeiten“: Klick daneben schließt, ein Klick im Fenster nicht", async () => {
+  answerWith({});
+  renderPage();
+  fireEvent.click(await screen.findByTestId("f1-edit-time-t-1"));
+  fireEvent.click(screen.getByRole("heading", { name: "Zeit bearbeiten" }));
+  expect(screen.getByRole("dialog", { name: "Zeit bearbeiten" })).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("f1-edit-time-backdrop"));
+  expect(screen.queryByRole("dialog", { name: "Zeit bearbeiten" })).toBeNull();
 });

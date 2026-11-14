@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { devWarn } from "@/lib/devWarn";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
@@ -10,7 +11,10 @@ export function usePublicSiteSettings() {
     try {
       const { data } = await api.get("/settings/public");
       setCachedBranding(data || {});
-    } catch {}
+    } catch (error) {
+      // Das Branding aus dem Zwischenspeicher bleibt stehen - ein Fehlschlag soll keine Seite stören (#937).
+      devWarn("Branding nicht nachgeladen", error);
+    }
   }, []);
 
   useEffect(() => {

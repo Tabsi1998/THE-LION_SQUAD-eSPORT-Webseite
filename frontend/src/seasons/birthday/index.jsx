@@ -220,7 +220,7 @@ export function useIgnition(plan, moving, onDone) {
   done.current = onDone;
   useEffect(() => {
     if (!moving) {
-      setLit(new Set(items.map((item) => item.index)));
+      setLit(new Set((plan.numbers ? plan.digits : plan.candles).map((item) => item.index)));
       return undefined;
     }
     const timers = [];
@@ -239,7 +239,6 @@ export function useIgnition(plan, moving, onDone) {
     const last = order.length ? order[order.length - 1].at : 0;
     timers.push(window.setTimeout(() => done.current?.(), IGNITE_DELAY_MS + last + 500));
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, moving]);
   return { lit, lighting };
 }

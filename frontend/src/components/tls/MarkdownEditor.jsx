@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { MediaLibraryMore, MediaLibrarySearch } from "./MediaLibraryControls";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
@@ -243,6 +244,9 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
   const [mediaOpen, setMediaOpen] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const media = useMediaLibrary(libraryEndpoint || defaultLibraryEndpoint(), mediaOpen);
+  // „Bild einfügen“ (#937): ein echter Dialog - Escape schließt, Tab bleibt darin, der Fokus kehrt zum Knopf zurück.
+  const mediaTitleId = useId();
+  const mediaDialogRef = useModalBehavior(mediaOpen, () => setMediaOpen(false));
   const [visualMention, setVisualMention] = useState(null);
   const [visualMentionIndex, setVisualMentionIndex] = useState(0);
   const [visualMentionPosition, setVisualMentionPosition] = useState({ left: 12, top: 44 });
@@ -282,7 +286,9 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
           top: Math.max(8, coords.bottom - wrap.top + 4),
         });
       }
-    } catch {}
+    } catch {
+      // Lässt sich die Stelle nicht messen, bleiben die Vorschläge an ihrem letzten Platz - sie funktionieren trotzdem (#937).
+    }
     setVisualMention({ query: trigger.query, from: from.pos - trigger.query.length - 1, to: from.pos });
     setVisualMentionIndex(0);
   }
@@ -303,10 +309,23 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
     setVisualMention(null);
   }
 
+  // Eine Taste, die die @-Vorschläge bedient hat, sucht beim Loslassen nicht neu - sonst sprang die Wahl auf den ersten
+  // Vorschlag zurück und Escape öffnete die Liste gleich wieder (#937).
+  const handledMentionKey = useRef(null);
+
+  function handleVisualKeyUp(event) {
+    if (handledMentionKey.current === event.key) {
+      handledMentionKey.current = null;
+      return;
+    }
+    refreshVisualMention();
+  }
+
   function handleVisualKeyDown(event) {
     const open = !!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0);
     if (!open || !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) return;
     event.preventDefault();
+    handledMentionKey.current = event.key;
     if (event.key === "Escape") {
       setVisualMention(null);
       return;
@@ -521,7 +540,9 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
       </div>
 
       {mode === "visual" && (
-        <div ref={visualEditorWrapRef} className="relative" onKeyDown={handleVisualKeyDown} onKeyUp={() => refreshVisualMention()} onMouseUp={() => refreshVisualMention()}>
+        // Die Hülle sammelt nur, was aus dem Editor darin hochsteigt (Tasten für die @-Vorschläge) - bedient wird das
+        // Textfeld des Editors selbst, die Hülle ist ohne eigene Bedeutung (#937).
+        <div ref={visualEditorWrapRef} className="relative" role="presentation" onKeyDown={handleVisualKeyDown} onKeyUp={handleVisualKeyUp} onMouseUp={() => refreshVisualMention()}>
           <EditorContent editor={editor} />
           {!!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0) && (
             <MentionSuggestionList
@@ -578,11 +599,11 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
       {helperText && <div className="border-t border-white/10 px-3 py-2 text-[11px] text-white/40">{helperText}</div>}
 
       {mediaOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setMediaOpen(false)}>
-          <div className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-4 sm:p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid="markdown-media-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMediaOpen(false); }}>
+          <div ref={mediaDialogRef} role="dialog" aria-modal="true" aria-labelledby={mediaTitleId} className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-4 sm:p-5">
             <div className="flex items-center justify-between gap-4 mb-4">
-              <h3 className="font-heading text-xl font-black uppercase">Bild einfügen</h3>
-              <button type="button" onClick={() => setMediaOpen(false)} className="w-9 h-9 inline-flex items-center justify-center text-white/50 hover:text-white">
+              <h3 id={mediaTitleId} className="font-heading text-xl font-black uppercase">Bild einfügen</h3>
+              <button type="button" onClick={() => setMediaOpen(false)} className="w-9 h-9 inline-flex items-center justify-center text-white/50 hover:text-white" aria-label="Schließen">
                 <X className="w-5 h-5" />
               </button>
             </div>

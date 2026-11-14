@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { devWarn } from "@/lib/devWarn";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { buildSrcSet } from "@/lib/imageVariants";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -51,7 +52,10 @@ export function useBrandingAssets() {
       const { data } = await brandingLoadPromise;
       setCachedBranding(data || {});
       setBranding(data || {});
-    } catch {}
+    } catch (error) {
+      // Das Branding aus dem Zwischenspeicher bleibt stehen - ein Fehlschlag soll keine Seite stören (#937).
+      devWarn("Branding nicht nachgeladen", error);
+    }
   }, []);
 
   useEffect(() => {

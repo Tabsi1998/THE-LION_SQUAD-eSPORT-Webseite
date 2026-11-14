@@ -96,8 +96,9 @@ export function CountUp({
     };
     frame = window.requestAnimationFrame(step);
     return () => window.cancelAnimationFrame(frame);
-    // Nur Start, Sichtbarwerden und ein neuer `playKey` spielen ab - ein neuer Wert beim Nachladen nicht.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Nur Start, Sichtbarwerden und ein neuer `playKey` spielen ab - ein neuer Wert beim Nachladen nicht. Ziel, Dauer und
+    // Verzögerung kommen aus derselben Darstellung, der laufende Wert über `live`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bewusst nur diese Auslöser (siehe oben)
   }, [play, playKey, visible, countable]);
 
   // Drucken bzw. PDF: sofort der Endwert - auch für Werte, die noch nie im Bild waren (dazu index.css @media print).

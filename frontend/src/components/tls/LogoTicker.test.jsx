@@ -54,3 +54,14 @@ test("repeatForLoop füllt bis zur Mindestzahl auf, marqueeDuration hält die Un
   expect(marqueeDuration(3, 5, 60)).toBe(60);
   expect(marqueeDuration(20, 5, 60)).toBe(100);
 });
+
+// F12 (#937): drei Logos sind drei Ziele - nicht zwölf. Die Wiederholungen füllen das Band nur und sind Deko.
+test("jedes Logo ist genau einmal per Tab erreichbar und wird genau einmal vorgelesen", () => {
+  render(<MemoryRouter><LogoTicker items={ITEMS} boxClassFor={() => "h-10 w-40"} minItems={12} testId="band" /></MemoryRouter>);
+  expect(screen.getAllByTitle("Alpha")).toHaveLength(8);
+  const reachable = [...screen.getByTestId("band").querySelectorAll("a")].filter((link) => link.getAttribute("tabindex") !== "-1");
+  expect(reachable.map((link) => link.title)).toEqual(["Alpha", "Beta", "Gamma"]);
+  reachable.forEach((link) => expect(link).not.toHaveAttribute("aria-hidden"));
+  // Was nicht erreichbar ist, ist auch für Vorleseprogramme Deko.
+  expect(screen.getAllByRole("link").map((link) => link.title)).toEqual(["Alpha", "Beta"]);
+});

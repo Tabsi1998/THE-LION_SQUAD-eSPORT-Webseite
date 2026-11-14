@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle, Clock, Flag, Trophy, Users, X } from "lucide-react";
 import { api, formatRequestError } from "@/lib/api";
@@ -80,20 +80,23 @@ export function PlayAlongSheet({ event, from = "", onClose }) {
   const [error, setError] = useState("");
   const { submitting, submitOnce } = useSubmissionGuard();
   const dialogRef = useModalBehavior(Boolean(entries?.length), () => onClose?.());
+  // Geladen wird nur beim Öffnen (je Event); Schließen und Vorauswahl nehmen dabei den aktuellen Stand (#937).
+  const latest = useRef({ from, onClose });
+  latest.current = { from, onClose };
 
   useEffect(() => {
     let alive = true;
     api.get(`/events/${event.id}/play-along`).then(({ data }) => {
       if (!alive) return;
       if (!data?.show || !data.entries?.length) {
-        onClose?.();
+        latest.current.onClose?.();
         return;
       }
       setEntries(data.entries);
-      setSelected(initialSelection(data.entries, from));
-    }).catch(() => { if (alive) onClose?.(); });
+      setSelected(initialSelection(data.entries, latest.current.from));
+    }).catch(() => { if (alive) latest.current.onClose?.(); });
     return () => { alive = false; };
-  }, [event.id]); // eslint-disable-line react-hooks/exhaustive-deps -- nur beim Öffnen laden
+  }, [event.id]);
 
   const rows = useMemo(() => playAlongRows(entries, { multiDay: Boolean(event.schedule?.multi_day) }), [entries, event.schedule?.multi_day]);
   const sum = selectionTotal(entries, selected);

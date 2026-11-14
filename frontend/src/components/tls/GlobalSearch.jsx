@@ -5,6 +5,7 @@ import { clearRecentSearches, forgetSearch, loadRecentSearches, rememberSearch }
 import { api, resolveMediaUrl } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
 import { useLoad } from "@/hooks/useLoad";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 const KIND_META = {
   tournament: { label: "Turnier", icon: Trophy },
@@ -48,10 +49,12 @@ export function GlobalSearch() {
     if (open) setRecent(loadRecentSearches());
   }, [open]);
 
+  // Escape schließt, Tab bleibt in der Suche, danach steht der Fokus wieder auf der Lupe (#937).
+  const panelRef = useModalBehavior(open, () => setOpen(false));
+
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event) => {
-      if (event.key === "Escape") setOpen(false);
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         inputRef.current?.focus();
@@ -101,20 +104,22 @@ export function GlobalSearch() {
 
       {open && (
         <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm px-3 py-4 sm:py-10" role="dialog" aria-modal="true" aria-label="Website durchsuchen">
-          <button type="button" className="absolute inset-0 cursor-default" aria-label="Suche schließen" onClick={close} />
-          <div className="relative mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/80">
+          {/* Klick daneben schließt - nur für die Maus; Tastatur und Vorleseprogramm nehmen Escape oder „Schließen“. */}
+          <div className="absolute inset-0 cursor-default" aria-hidden="true" onClick={close} data-testid="global-search-backdrop" />
+          <div ref={panelRef} className="relative mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/80">
             <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-              <Search className="h-4 w-4 text-[#29B6E8]" />
+              <Search className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" />
               <input
                 ref={inputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Enter") remember(); }}
                 placeholder="Turniere, Events, News, Spieler, Teams suchen"
+                aria-label="Suchbegriff"
                 className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/35"
                 data-testid="global-search-input"
               />
-              <button type="button" onClick={close} className="p-2 text-white/50 transition hover:text-white" aria-label="Schließen">
+              <button type="button" onClick={close} className="p-2 text-white/50 transition hover:text-white" aria-label="Schließen" data-testid="global-search-close">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -160,7 +165,7 @@ export function GlobalSearch() {
                 </div>
                 </>
               ) : loading ? (
-                <div className="py-12 text-center text-xs font-display uppercase tracking-[0.3em] text-white/35">Suche läuft...</div>
+                <div className="py-12 text-center text-xs font-display uppercase tracking-[0.3em] text-white/35" role="status">Suche läuft...</div>
               ) : error ? (
                 <div className="py-12 text-center text-sm" role="alert">
                   <p className="text-warn">{error}</p>
@@ -182,7 +187,7 @@ export function GlobalSearch() {
                   ))}
                 </div>
               ) : (
-                <div className="py-12 text-center text-sm text-white/45">Keine Treffer gefunden.</div>
+                <div className="py-12 text-center text-sm text-white/45" role="status">Keine Treffer gefunden.</div>
               )}
             </div>
           </div>

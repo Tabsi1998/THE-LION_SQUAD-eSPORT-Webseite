@@ -153,6 +153,9 @@ export default [
       "react/prop-types": "off",
       // Escaped entities are noisy in German copy with apostrophes and quotes.
       "react/no-unescaped-entities": "off",
+      // Labels here often carry a title and a hint (label > span > strong); the default depth of 2 misses that text
+      // (#937). The rule otherwise stays as recommended.
+      "jsx-a11y/label-has-associated-control": ["error", { depth: 3 }],
 
       "no-unused-vars": ["error", {
         argsIgnorePattern: "^_",

@@ -519,19 +519,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const removeRow = (key) => setForm((current) => ({ ...current, rows: current.rows.filter((row) => row.key !== key) }));
   const addRow = () => setForm((current) => ({ ...current, rows: [...current.rows, emptyRow()] }));
 
-  const runPreview = async (payload, currentStamp) => {
+  const runPreview = useCallback(async (payload, currentStamp) => {
     const { data: result } = await api.post(`${base}/preview`, payload);
     setPreview({ ...result, stamp: currentStamp });
     return result;
-  };
+  }, [base]);
 
+  // Entscheidend ist der Stand des Formulars; runPreview ändert sich nur mit der Runde (#937).
   useEffect(() => {
     if (!checkImage || !built) return;
     setCheckImage(false);
     runPreview(built.payload, stamp).catch((err) => toast.error(formatApiError(err.response?.data?.detail)));
-    // runPreview ist je Darstellung neu, ändert aber nichts am Ablauf - entscheidend ist der Stand des Formulars.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkImage, built, stamp]);
+  }, [checkImage, built, stamp, runPreview]);
 
   const pasteRows = (text) => {
     const result = parseResultPaste(text, { bonuses: rules.custom_bonuses || [] });
