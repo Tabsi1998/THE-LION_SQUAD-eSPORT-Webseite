@@ -110,11 +110,12 @@ export function SeasonProvider({ children, channel = "web" }) {
     };
   }, [load]);
 
-  // Seitenwechsel: liegt ein gültiges Token vor, das die Antwort noch nicht kennt, sofort nachfragen.
+  // Seitenwechsel: liegt ein gültiges Token vor, das die Antwort noch nicht kennt, sofort nachfragen. Nur der
+  // Seitenwechsel fragt - mit `payload` als Abhängigkeit fragte jede Antwort ohne Vorschau gleich wieder (Schleife).
   useEffect(() => {
     const preview = readPreviewToken();
     if (preview && payload && !payload.preview) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Seitenwechsel (siehe oben)
   }, [location.pathname]);
 
   useEffect(() => {

@@ -118,3 +118,17 @@ test("geschlossene oder deaktivierte Turniere stehen ohne Haken mit Grund da", a
   expect(screen.getByTestId("play-along-note-t9")).toHaveTextContent("Anmeldung für dieses Turnier geschlossen.");
   expect(screen.getByTestId("play-along-row-t9")).not.toHaveTextContent("Plätze frei");
 });
+
+// #937: geladen wird nur beim Öffnen - schließt die Antwort das Fenster, dann über den aktuellen Rückruf der Seite.
+test("ohne Einträge schließt die Antwort über den aktuellen Rückruf, nicht über den vom Öffnen", async () => {
+  let answer;
+  apiMock.get.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+  const first = vi.fn();
+  const latest = vi.fn();
+  const { rerender } = render(<MemoryRouter><PlayAlongSheet event={EVENT} onClose={first} /></MemoryRouter>);
+  rerender(<MemoryRouter><PlayAlongSheet event={EVENT} onClose={latest} /></MemoryRouter>);
+  answer({ data: { show: false, entries: [] } });
+  await waitFor(() => expect(latest).toHaveBeenCalledTimes(1));
+  expect(first).not.toHaveBeenCalled();
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+});

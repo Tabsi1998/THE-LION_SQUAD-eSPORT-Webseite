@@ -75,7 +75,9 @@ export function useSeasonModules(seasons) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Geladen wird, wenn sich die gewünschten Saisons ändern (`signature` fasst `wanted` zusammen); `modules` liest nur,
+    // was schon da ist - als Abhängigkeit liefe der Effekt nach jedem geladenen Modul noch einmal an.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `signature` steht für `wanted` (siehe oben)
   }, [signature]);
   return modules;
 }
@@ -166,7 +168,7 @@ export function SeasonStage() {
       const budget = budgetFor(season.effective);
       return factory && budget > 0 ? factory({ season, budget, reducedMotion, weather: weatherRef.current, preview }) : [];
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Saison, Stärke, Phase und Seite steuern den Neuaufbau (siehe oben)
     [mountedSignature, modules, reducedMotion, location.pathname, preview],
   );
   useLayerDisposal(skyLayers);
@@ -189,7 +191,8 @@ export function SeasonStage() {
     }
     engineRef.current.setPalette(modules[soundSeason.key].sounds({ season: soundSeason }));
     return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `soundKey` fasst die tönende Saison zusammen - ein neues Saison-Objekt mit gleichem Stand stellt den Ton nicht neu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `soundKey` steht für `soundSeason` (siehe oben)
   }, [soundKey, quiet, modules]);
   useEffect(() => () => {
     engineRef.current?.dispose();

@@ -5,7 +5,7 @@
 // Speichern (neue Version, mit der geladenen Version gegen gleichzeitiges Überschreiben) und Pool entfernen.
 // Gespeichert ist ein Snapshot: was sich in der Bibliothek seither geändert hat, steht als Hinweis da und kommt erst mit
 // dem nächsten Speichern in den Pool. Die Regeln prüft der Server noch einmal (services/map_pools.py).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -159,9 +159,13 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
   const groupKeys = allGroups.map(({ mode }) => keyOf(mode));
   const withMaps = groupKeys.filter((key) => (selection[key] || []).length).join("|");
   const pickedKeys = picking ? groupKeys.filter((key) => picked.includes(key)) : groupKeys;
-  useEffect(() => { onModesChange?.({ picked: pickedKeys, withMaps: withMaps ? withMaps.split("|") : [] }); },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- gemeldet wird nur, wenn sich Haken oder Modi mit Maps ändern
-    [pickedKeys.join("|"), withMaps]);
+  // Gemeldet wird nur, wenn sich Haken oder Modi mit Maps ändern - an den aktuellen Rückruf (#937).
+  const pickedSignature = pickedKeys.join("|");
+  const onModesChangeRef = useRef(onModesChange);
+  onModesChangeRef.current = onModesChange;
+  useEffect(() => {
+    onModesChangeRef.current?.({ picked: pickedSignature ? pickedSignature.split("|") : [], withMaps: withMaps ? withMaps.split("|") : [] });
+  }, [pickedSignature, withMaps]);
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   const pickSelection = (next) => {
     setSelection(next);

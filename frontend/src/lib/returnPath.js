@@ -6,7 +6,7 @@
 export const DEFAULT_RETURN_PATH = "/dashboard";
 const MAX_LENGTH = 512;
 // Backslash und Steuerzeichen: Browser lesen „/\fremd.at“ wie „//fremd.at“.
-// eslint-disable-next-line no-control-regex
+// eslint-disable-next-line no-control-regex -- Steuerzeichen abzulehnen ist hier der Zweck
 const FORBIDDEN = /[\\\u0000-\u001f\u007f]/;
 
 /** Das Ziel, wenn es ein Pfad auf dieser Website ist - sonst `fallback` (Standard: das Dashboard). */

@@ -3,7 +3,7 @@
  * Übersicht · Katalog · Vergeben · Saison · Jahresrückblick (#1195) · XP · Vorschau · Negativ und Vorfälle · Statistik.
  * Massenvergabe, Import und XP-Eingriffe nur für Vorstand oder Systemverwaltung (der Server prüft das auch).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertOctagon, Award, BarChart3, BookOpen, CalendarCheck, Eye, LayoutDashboard, Sparkles, Zap } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -43,10 +43,14 @@ export default function AdminAchievementsPage() {
     setTabState(key);
     setSearchParams(key === "overview" ? {} : { tab: key }, { replace: true });
   };
+  // Nur ein neuer ?tab= (Zurück im Browser, Link) stellt den Reiter um - verglichen mit dem aktuellen Reiter (Ref), damit
+  // ein Klick, der Reiter und Adresse zugleich setzt, nicht kurz auf den alten zurückspringt (#937).
+  const requestedValid = valid(requested);
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   useEffect(() => {
-    if (valid(requested) && requested !== tab) setTabState(requested);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requested]);
+    if (requestedValid && requested !== tabRef.current) setTabState(requested);
+  }, [requested, requestedValid]);
 
   return (
     <AdminLayout>

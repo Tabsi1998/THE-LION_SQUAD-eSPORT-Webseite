@@ -1,7 +1,9 @@
 /**
  * LogoTicker — ein nahtloses Logo-Laufband (#968), gemeinsam für Sponsoren und Partner.
  * Bekommt fertige Einträge (Name, Logo, Ziel) und die Kastengröße; läuft erst ab `minForMarquee`
- * Logos, darunter stehen sie zentriert. Hover hält an, „Bewegung reduzieren“ auch (index.css).
+ * Logos, darunter stehen sie zentriert. Hover und Tastaturfokus halten an, „Bewegung reduzieren“ auch (index.css).
+ * Jedes Logo ist genau einmal ein Ziel (#937): die Wiederholungen, die das Band nur füllen, sind Deko - ohne Tab-Stopp
+ * und für Vorleseprogramme verborgen.
  */
 import { Link } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
@@ -41,15 +43,16 @@ export function LogoTicker({
   const speed = marqueeDuration(loopItems.length, secondsPerItem, minSeconds);
   const renderLogo = (item, i, groupIndex = 0, duplicate = false) => {
     const key = `${groupIndex}-${item.key}-${i}`;
+    const decor = duplicate ? { tabIndex: -1, "aria-hidden": "true" } : {};
     const linkClass = `inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${boxClassFor(item)}`;
     // Jedes Logo füllt seinen Kasten (object-contain): eine kleine Vorlage wächst mit, eine große schrumpft. So stehen
     // alle Logos eines Bandes gleich hoch, egal wie groß die Datei ist, und folgen jeder Kastengröße.
     const logo = <SmartLogo src={resolveMediaUrl(item.logo_url)} alt={item.name} className="w-full h-full object-contain" />;
     if (item.to) {
-      return <Link key={key} to={item.to} tabIndex={duplicate ? -1 : undefined} className={linkClass} title={item.name}>{logo}</Link>;
+      return <Link key={key} to={item.to} {...decor} className={linkClass} title={item.name}>{logo}</Link>;
     }
     return (
-      <a key={key} href={item.href || undefined} target={item.href ? "_blank" : undefined} rel="noreferrer" tabIndex={duplicate ? -1 : undefined} className={linkClass} title={item.name}>
+      <a key={key} href={item.href || undefined} target={item.href ? "_blank" : undefined} rel="noreferrer" {...decor} className={linkClass} title={item.name}>
         {logo}
       </a>
     );
@@ -68,7 +71,7 @@ export function LogoTicker({
         {shouldMarquee ? (
           <>
             <div className={`flex shrink-0 items-center ${gapClass} ${groupPaddingClass}`}>
-              {loopItems.map((item, i) => renderLogo(item, i, 0))}
+              {loopItems.map((item, i) => renderLogo(item, i, 0, i >= items.length))}
             </div>
             <div className={`flex shrink-0 items-center ${gapClass} ${groupPaddingClass}`} aria-hidden="true">
               {loopItems.map((item, i) => renderLogo(item, i, 1, true))}

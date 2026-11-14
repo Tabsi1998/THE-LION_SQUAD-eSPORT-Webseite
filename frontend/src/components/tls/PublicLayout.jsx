@@ -22,6 +22,7 @@ import { DiscordLiveLine, useDiscordNow } from "@/components/tls/DiscordNow";
 import { GuestDecoSwitch } from "@/seasons/DecoSwitch";
 import { WhatsNewLink } from "@/components/tls/WhatsNewLink";
 import { api } from "@/lib/api";
+import { devWarn } from "@/lib/devWarn";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
@@ -49,7 +50,10 @@ export function PublicLayout({ children }) {
       const { data } = await api.get("/settings/public");
       setCachedBranding(data || {});
       setBranding(data || {});
-    } catch {}
+    } catch (error) {
+      // Das Branding aus dem Zwischenspeicher bleibt stehen - ein Fehlschlag soll keine Seite stören (#937).
+      devWarn("Branding nicht nachgeladen", error);
+    }
   }, []);
   const loadSiteBanner = useCallback(async () => {
     try {
@@ -467,11 +471,11 @@ function useRouteFade(pathname) {
   // Blendet der Browser selbst über (#1073, lib/viewTransition), blendet der Inhalt nicht noch einmal ein.
   const [name, setName] = useState(() => (pageShown && !transitionPending() ? "a" : ""));
   const previous = useRef(pathname);
+  // Nur beim ersten Aufbau (mit dem Pfad, mit dem die Seite kam) - danach zählt der Wechsel unten.
+  const firstPath = useRef(pathname);
   useEffect(() => {
     pageShown = true;
-    takeTransitionShown(pathname);
-    // Nur beim ersten Aufbau - danach zählt der Wechsel unten.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    takeTransitionShown(firstPath.current);
   }, []);
   useEffect(() => {
     if (previous.current === pathname) return;

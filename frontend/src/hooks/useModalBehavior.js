@@ -18,6 +18,9 @@ const FOCUSABLE = [
  * for the celebration popups that appear on their own, because they cover the
  * whole screen: without it a keyboard user cannot reach their close button.
  *
+ * Focus only goes back when it is still inside the overlay (or was lost with it): an action that already moved it on
+ * on purpose - inserting a picture puts it back into the text editor - keeps it there (#937).
+ *
  * Returns the ref to put on the element that holds the focusable content.
  */
 export function useModalBehavior(active, onDismiss) {
@@ -64,7 +67,9 @@ export function useModalBehavior(active, onDismiss) {
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      previouslyFocused?.focus?.();
+      const current = document.activeElement;
+      const movedOnPurpose = current && current !== document.body && !container?.contains(current);
+      if (!movedOnPurpose) previouslyFocused?.focus?.();
     };
   }, [active]);
 

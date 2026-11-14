@@ -23,7 +23,7 @@ export function noteAudioProblem(error) {
   } catch {
     // ohne Speicher bleibt es bei einem Hinweis je Seitenleben
   }
-  // eslint-disable-next-line no-console
+  // eslint-disable-next-line no-console -- ein leiser Hinweis je Sitzung ist gewollt (siehe oben)
   console.debug("[Ton] nicht verfügbar – es bleibt still:", error?.message || error);
 }
 

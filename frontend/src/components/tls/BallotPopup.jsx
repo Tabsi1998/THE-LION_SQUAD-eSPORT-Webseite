@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 // Abstimmung live (#844): Öffnet die Versammlungsleitung in Dolibarr eine Abstimmung, erscheint sie auf jeder Seite -
 // für angemeldete Mitglieder mit offenem Stimmrecht. Antwort wählen, „Stimme abgeben“, fertig. „Später“ macht daraus
@@ -87,17 +88,22 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
     return () => clearTimeout(timer.current);
   }, [active, view, load]);
 
-  if (!active || !view?.ballots?.length || quietPrefixes.some((prefix) => pathname.startsWith(prefix))) return null;
-  const pending = view.ballots.filter((ballot) => !later.has(ballot.id));
-  const ballot = pending[0] || null;
-  const waiting = view.ballots.filter((item) => later.has(item.id) && item.can_vote);
-  const usable = Boolean(ballot && ballot.options.length && ballot.rights.some((right) => right.can_use));
+  const shown = Boolean(active && view?.ballots?.length && !quietPrefixes.some((prefix) => pathname.startsWith(prefix)));
+  const ballot = shown ? view.ballots.find((item) => !later.has(item.id)) || null : null;
 
   const postpone = (id) => {
     setLater((current) => new Set([...current, id]));
     setMessage("");
   };
   const reopen = (id) => setLater((current) => new Set([...current].filter((item) => item !== id)));
+
+  // Tastatur (#937): der Fokus springt ins Popup, Tab bleibt darin, Escape heißt „Später“ (bzw. „Verstanden“) und gibt
+  // den Fokus dorthin zurück, wo er vorher war.
+  const dialogRef = useModalBehavior(Boolean(ballot), () => { if (ballot) postpone(ballot.id); });
+
+  if (!shown) return null;
+  const waiting = view.ballots.filter((item) => later.has(item.id) && item.can_vote);
+  const usable = Boolean(ballot && ballot.options.length && ballot.rights.some((right) => right.can_use));
 
   const cast = async () => {
     const rights = ballot.rights.filter((right) => right.can_use && chosen[`${ballot.id}:${right.right_id}`]);
@@ -122,9 +128,9 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
     <>
       {ballot ? (
         <div className="fixed inset-0 z-[90] grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="ballot-popup-title" data-testid="ballot-popup">
-          <div className="w-full max-w-lg rounded-sm border border-[#29B6E8]/40 bg-[#0F1012] p-5 shadow-2xl space-y-4">
+          <div ref={dialogRef} className="w-full max-w-lg rounded-sm border border-[#29B6E8]/40 bg-[#0F1012] p-5 shadow-2xl space-y-4">
             <div className="flex items-start gap-3">
-              <Vote className="w-6 h-6 text-[#29B6E8] shrink-0 mt-0.5" />
+              <Vote className="w-6 h-6 text-[#29B6E8] shrink-0 mt-0.5" aria-hidden="true" />
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Abstimmung offen{ballot.meeting ? ` · ${ballot.meeting}` : ""}</div>
                 <h2 id="ballot-popup-title" className="font-heading text-xl font-black leading-tight mt-1">{ballot.question}</h2>

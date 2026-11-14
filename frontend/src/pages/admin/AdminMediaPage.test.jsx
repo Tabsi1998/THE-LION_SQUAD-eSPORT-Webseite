@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 // Medien (#435, letzter Rest): die Detailansicht ist ein Seitenblatt mit den Aktionen in der Leiste
@@ -231,4 +232,31 @@ test("Original-Bilder der Serien (#1933) zählt die Mediathek mit - privat, ohne
   render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
   expect(await screen.findByTestId("media-reference-originals")).toHaveTextContent("5 Original-Bilder der Serien · 2.50 MB");
   expect(screen.queryByTestId("media-tile-reference")).toBeNull();
+});
+// Tastatur (#937): eine Kachel ist ein Knopf - per Tab erreichbar, Enter und Leertaste öffnen das Seitenblatt.
+test("die Kachel ist ein Knopf: Enter und Leertaste öffnen das Seitenblatt", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  const tile = await screen.findByTestId("media-tile-loewe.png");
+  expect(tile.tagName).toBe("BUTTON");
+  expect(tile).toHaveAttribute("type", "button");
+  tile.focus();
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("dialog", { name: "loewe.png" })).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("media-sheet-close"));
+  screen.getByTestId("media-tile-frei.png").focus();
+  await user.keyboard(" ");
+  expect(screen.getByRole("dialog", { name: "frei.png" })).toBeInTheDocument();
+});
+
+// #937: vorgelesen wird kurz der Dateiname, Bereich, Hinweise, Größe und Nutzung kommen als Beschreibung; im Knopf
+// stehen nur Spans (kein div in einem button).
+test("die Kachel heißt wie die Datei, die Angaben stehen als Beschreibung daran", async () => {
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  const tile = await screen.findByTestId("media-tile-frei.png");
+  expect(tile).toHaveAccessibleName("frei.png");
+  expect(tile).toHaveAccessibleDescription(/ungenutzt/);
+  expect(tile).toHaveAccessibleDescription(/0x genutzt/);
+  expect(tile.querySelector("div")).toBeNull();
+  expect(screen.getByRole("button", { name: "loewe.png" })).toBe(screen.getByTestId("media-tile-loewe.png"));
 });

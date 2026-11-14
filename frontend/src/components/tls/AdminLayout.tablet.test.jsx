@@ -44,6 +44,8 @@ test("das Menü steht erst ab lg fest links; darunter Menü-Knopf und ausklappen
   expect(open).toHaveAttribute("aria-expanded", "true");
   const overlay = document.querySelector("[data-testid='admin-menu-overlay']");
   expect(overlay.className).toContain("lg:hidden");
+  // Die abgedunkelte Fläche ist nur eine Maus-Abkürzung zum Schließen - kein Ziel für Vorleseprogramme (#937).
+  expect(overlay).toHaveAttribute("aria-hidden", "true");
 });
 
 // Barrierefreiheit (Codex-Prüfung): eingeklappt ist das Menü nicht fokussierbar (inert); beim Öffnen springt der Fokus

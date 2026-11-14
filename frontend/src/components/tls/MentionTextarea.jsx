@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AtSign } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 
@@ -48,20 +48,32 @@ function userLabel(user) {
   return user?.display_name || user?.username || "Benutzer";
 }
 
-export function MentionSuggestionList({ items, activeIndex = 0, onPick, loading = false, className = "", style }) {
+/** Die Kennung eines Vorschlags - das Textfeld zeigt mit aria-activedescendant darauf (#937). */
+export function mentionOptionId(listId, index) {
+  return listId ? `${listId}-option-${index}` : undefined;
+}
+
+// Die Vorschläge (#937): der Fokus bleibt im Textfeld (Pfeile wählen, Enter oder Tab übernehmen, Escape schließt) - die
+// Liste ist nur per Programm fokussierbar und meldet über aria-activedescendant, welcher Vorschlag gerade gewählt ist.
+export function MentionSuggestionList({ id, items, activeIndex = 0, onPick, loading = false, className = "", style }) {
   if (!loading && (!items || items.length === 0)) return null;
   return (
     <div
+      id={id}
       className={`z-40 w-full max-w-sm overflow-hidden rounded-sm border border-[#29B6E8]/40 bg-[#121212] shadow-2xl shadow-black/50 ${className}`}
       style={style}
       onMouseDown={(event) => event.preventDefault()}
       role="listbox"
+      tabIndex={-1}
+      aria-label="Vorschläge zum Erwähnen"
     >
       {loading && <div className="px-3 py-2 text-xs text-white/40">Benutzer werden gesucht...</div>}
       {!loading && items.map((user, index) => (
         <button
           key={user.id}
+          id={mentionOptionId(id, index)}
           type="button"
+          tabIndex={-1}
           onClick={() => onPick(user)}
           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
             index === activeIndex ? "bg-[#29B6E8]/15 text-white" : "text-white/75 hover:bg-white/5"
@@ -138,6 +150,10 @@ export function MentionTextarea({
   const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
   const { items, loading } = useMentionSearch(trigger?.query || "", { scope, scopeId });
+  const listId = useId();
+  // Eine Taste, die die Vorschläge bedient hat (Pfeile, Enter, Tab, Escape), darf beim Loslassen nicht neu suchen - sonst
+  // sprang die Wahl auf den ersten Vorschlag zurück und Escape öffnete die Liste gleich wieder (#937).
+  const handledKey = useRef(null);
 
   const refreshTrigger = () => {
     const input = inputRef.current;
@@ -167,6 +183,7 @@ export function MentionTextarea({
   };
 
   const open = !!trigger && (loading || items.length > 0);
+  const activeOption = open && !loading && items[activeIndex] ? mentionOptionId(listId, activeIndex) : undefined;
 
   return (
     <div className={`relative ${className}`}>
@@ -178,10 +195,17 @@ export function MentionTextarea({
           requestAnimationFrame(refreshTrigger);
         }}
         onClick={refreshTrigger}
-        onKeyUp={refreshTrigger}
+        onKeyUp={(event) => {
+          if (handledKey.current === event.key) {
+            handledKey.current = null;
+            return;
+          }
+          refreshTrigger();
+        }}
         onKeyDown={(event) => {
           if (open && ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) {
             event.preventDefault();
+            handledKey.current = event.key;
             if (event.key === "Escape") {
               setTrigger(null);
               return;
@@ -203,10 +227,14 @@ export function MentionTextarea({
         maxLength={maxLength}
         placeholder={placeholder}
         className={textareaClassName}
+        aria-autocomplete="list"
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={activeOption}
         {...props}
       />
       {open && (
         <MentionSuggestionList
+          id={listId}
           items={items}
           loading={loading}
           activeIndex={activeIndex}

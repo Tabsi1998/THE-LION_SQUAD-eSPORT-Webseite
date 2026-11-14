@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TEXT_LIKE } from "../anchors";
 import { blocksPoint } from "../glyphs";
 import { MoonInSky } from "../MoonInSky";
@@ -39,11 +39,14 @@ function viewport() {
 
 /** Nachsehen nach dem Laden, nach dem Scrollen und bei neuer Fenstergröße - `check` misst, `deps` sagen, wann neu. */
 function useSettledCheck(check, deps) {
+  // Gemessen wird mit dem aktuellen `check` - auch beim Nachsehen nach dem Scrollen (#937).
+  const checkRef = useRef(check);
+  checkRef.current = check;
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return undefined;
     let cancelled = false;
     const run = () => {
-      if (!cancelled) check();
+      if (!cancelled) checkRef.current();
     };
     const timers = STAR_CHECKS_MS.map((ms) => window.setTimeout(run, ms));
     let settle = 0;
@@ -60,7 +63,7 @@ function useSettledCheck(check, deps) {
       window.removeEventListener("scroll", later);
       window.removeEventListener("resize", later);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- wann neu nachgesehen wird, sagt der Aufrufer (`deps`)
   }, deps);
 }
 

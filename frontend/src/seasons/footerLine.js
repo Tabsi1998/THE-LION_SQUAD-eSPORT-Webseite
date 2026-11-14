@@ -19,7 +19,8 @@ export function useFooterLineTop(deps = []) {
       window.clearTimeout(timer);
       window.removeEventListener("resize", measure);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Wann neu gemessen wird, sagt der Aufrufer (`deps`); gemessen wird nur am Dokument, ohne Werte von außen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Abhängigkeiten gibt der Aufrufer vor (siehe oben)
   }, deps);
   return top;
 }

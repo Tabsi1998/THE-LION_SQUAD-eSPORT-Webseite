@@ -103,3 +103,34 @@ test("Ein inaktives Overlay fängt keine Tastatureingaben ab", async () => {
 
   expect(onDismiss).not.toHaveBeenCalled();
 });
+
+// #937: hat eine Aktion den Fokus schon bewusst woanders hingesetzt (Bild einfügen setzt ihn zurück in den Editor),
+// holt das Schließen ihn nicht zum auslösenden Knopf zurück.
+test("Hat eine Aktion den Fokus schon hinausgesetzt, bleibt er dort", async () => {
+  const user = userEvent.setup();
+
+  function Picker({ onPick }) {
+    const ref = useModalBehavior(true, onPick);
+    return <div ref={ref}><button type="button" onClick={onPick}>Einfügen</button></div>;
+  }
+  function Editor() {
+    const [open, setOpen] = useState(false);
+    const pick = () => {
+      document.getElementById("text").focus();
+      setOpen(false);
+    };
+    return (
+      <div>
+        <textarea id="text" aria-label="Text" />
+        <button type="button" onClick={() => setOpen(true)}>Bild</button>
+        {open ? <Picker onPick={pick} /> : null}
+      </div>
+    );
+  }
+
+  render(<Editor />);
+  await user.click(screen.getByRole("button", { name: "Bild" }));
+  await user.click(screen.getByRole("button", { name: "Einfügen" }));
+
+  expect(screen.getByLabelText("Text")).toHaveFocus();
+});

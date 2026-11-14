@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { addRecentSearch, clearRecentSearches, loadRecentSearches } from "@/lib/recentSearches";
 
@@ -125,4 +126,32 @@ test("ein Fehler der aktiven Suche sagt das, mit „Nochmal versuchen“", async
   expect(await screen.findByText("Suche ist gerade nicht erreichbar.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Nochmal versuchen/ }));
   expect(await screen.findByText("Lions Rocket")).toBeInTheDocument();
+});
+
+// Tastatur (#937): Enter öffnet, der Fokus startet im Suchfeld, Tab bleibt in der Suche, Escape schließt und gibt den
+// Fokus an die Lupe zurück. Der Klick daneben ist nur für die Maus und steht nicht im Fokusbaum.
+test("per Tastatur: Enter öffnet, Fokus im Suchfeld, Tab bleibt drin, Escape schließt mit Fokus auf der Lupe", async () => {
+  const user = userEvent.setup();
+  renderSearch();
+  const opener = screen.getByTestId("global-search-open");
+  opener.focus();
+  await user.keyboard("{Enter}");
+  const dialog = screen.getByRole("dialog", { name: "Website durchsuchen" });
+  expect(screen.getByRole("textbox", { name: "Suchbegriff" })).toHaveFocus();
+  for (let i = 0; i < 12; i += 1) {
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(opener).toHaveFocus();
+});
+
+test("der Hintergrund schließt per Klick, ist aber kein zweiter Schließen-Knopf", async () => {
+  renderSearch();
+  fireEvent.click(screen.getByTestId("global-search-open"));
+  expect(screen.getAllByRole("button", { name: /schließen/i })).toHaveLength(1);
+  expect(screen.getByTestId("global-search-backdrop")).toHaveAttribute("aria-hidden", "true");
+  fireEvent.click(screen.getByTestId("global-search-backdrop"));
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

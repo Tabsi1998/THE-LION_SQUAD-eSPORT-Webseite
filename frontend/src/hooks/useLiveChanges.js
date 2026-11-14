@@ -28,6 +28,10 @@ export function useReducedMotion() {
  */
 export function useChangedKeys(items, keyOf, signatureOf, { holdMs = 6000 } = {}) {
   const previous = useRef(null);
+  // Die Schlüssel-Funktionen kommen oft frisch je Darstellung; nur ein neuer Stand löst den Vergleich aus, gerechnet wird
+  // mit den aktuellen (#937).
+  const fns = useRef({ keyOf, signatureOf });
+  fns.current = { keyOf, signatureOf };
   const [changed, setChanged] = useState(() => new Set());
   const timers = useRef(new Map());
 
@@ -35,7 +39,7 @@ export function useChangedKeys(items, keyOf, signatureOf, { holdMs = 6000 } = {}
     const before = previous.current;
     previous.current = items;
     if (!before || !items) return;
-    const fresh = changedKeys(before, items, keyOf, signatureOf);
+    const fresh = changedKeys(before, items, fns.current.keyOf, fns.current.signatureOf);
     if (!fresh.size) return;
     setChanged((current) => new Set([...current, ...fresh]));
     for (const key of fresh) {
@@ -50,8 +54,6 @@ export function useChangedKeys(items, keyOf, signatureOf, { holdMs = 6000 } = {}
         });
       }, holdMs));
     }
-    // keyOf/signatureOf sind reine Funktionen; nur ein neuer Stand löst den Vergleich aus.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, holdMs]);
 
   useEffect(() => () => {
@@ -70,6 +72,8 @@ export function useFlipRows(items, keyOf, { durationMs = 450 } = {}) {
   const lastRects = useRef(new Map());
   const previous = useRef(null);
   const reduced = useReducedMotion();
+  const keyOfRef = useRef(keyOf);
+  keyOfRef.current = keyOf;
 
   const register = useMemo(() => (key) => (node) => {
     if (node) nodes.current.set(key, node);
@@ -79,7 +83,7 @@ export function useFlipRows(items, keyOf, { durationMs = 450 } = {}) {
   useLayoutEffect(() => {
     const before = previous.current;
     previous.current = items;
-    const moved = before && items ? movedKeys(before, items, keyOf) : new Map();
+    const moved = before && items ? movedKeys(before, items, keyOfRef.current) : new Map();
     if (!reduced && moved.size) {
       for (const key of moved.keys()) {
         const node = nodes.current.get(key);
@@ -93,8 +97,6 @@ export function useFlipRows(items, keyOf, { durationMs = 450 } = {}) {
     }
     lastRects.current = new Map();
     for (const [key, node] of nodes.current) lastRects.current.set(key, node.getBoundingClientRect());
-    // keyOf ist rein; siehe useChangedKeys
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, reduced, durationMs]);
 
   return register;

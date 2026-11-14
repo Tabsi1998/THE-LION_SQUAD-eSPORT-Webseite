@@ -80,3 +80,15 @@ test("„Bewegung reduzieren“: sofort der neue Stand - kein weggleitender alte
   expect(screen.queryByTestId("tv-queue-now-out-s1")).not.toBeInTheDocument();
   expect(screen.queryByTestId("tv-queue-next-out-s1")).not.toBeInTheDocument();
 });
+
+// #937: gleitet ein Spiel weg, zeigt es seinen letzten Stand - nicht den vom Anfang (etwa einen inzwischen
+// nachgetragenen Namen).
+test("Wechsel: der weggleitende Inhalt zeigt den letzten Stand des alten Spiels", async () => {
+  const { rerender } = render(board(view([station("s2", run("m5"), null)])));
+  await screen.findByTestId("tv-queue-board");
+  rerender(board(view([station("s2", { ...run("m5"), names: ["Alpha", "Omega"] }, null)])));
+  rerender(board(view([station("s2", run("m6", 0), null)])));
+  const leaving = screen.getByTestId("tv-queue-now-out-s2");
+  expect(leaving).toHaveTextContent("Omega");
+  expect(leaving).not.toHaveTextContent("Beta");
+});
