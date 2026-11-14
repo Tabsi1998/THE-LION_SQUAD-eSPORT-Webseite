@@ -433,19 +433,25 @@ async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hi
 
 async def _periods_with(db, query: dict) -> list[tuple[dict, dict]]:
     """Zeiträume, in deren Seasons ein Endstand das Team bzw. die Person trägt (Vorauswahl über die Teilindizes aus F.2)."""
-    finals = await db.league_final_tables.find({"active": True, **query}, {"_id": 0, "season_id": 1, "league_id": 1}).to_list(500)
+    finals = await db.league_final_tables.find({"active": True, **query},
+                                               {"_id": 0, "season_id": 1, "league_id": 1, "closed_at": 1}).to_list(500)
     league_ids = sorted({row.get("league_id") for row in finals if row.get("league_id")})
     if not league_ids:
         return []
     season_ids = {row.get("season_id") for row in finals}
+    # Wann die Person bzw. das Team in einer Season zuletzt einen Endstand bekam - danach wird sortiert.
+    newest: dict[str, str] = {}
+    for row in finals:
+        newest[row.get("season_id")] = max(newest.get(row.get("season_id"), ""), str(row.get("closed_at") or ""))
     out = []
     for league in await db.leagues.find({"id": {"$in": league_ids}, "status": {"$ne": "archived"}}, {"_id": 0}).to_list(len(league_ids) + 1):
         for period in rules.settings_of(league)["periods"]:
             if season_ids & set(period.get("season_ids") or []):
                 out.append((league, period))
-    # Jeder Zeitraum heißt eine Rechnung über seine Endstände - Profil und Teamseite zeigen nur die jüngsten (je Liga die zuletzt
-    # angelegten), damit eine lange Vereinsgeschichte die Seite nicht bremst.
-    return out[-PROFILE_PERIODS:]
+    # Jeder Zeitraum heißt eine Rechnung über seine Endstände - Profil und Teamseite zeigen nur die jüngsten (nach dem letzten Endstand
+    # der Person bzw. des Teams darin), damit eine lange Vereinsgeschichte die Seite nicht bremst.
+    out.sort(key=lambda pair: max((newest.get(season_id, "") for season_id in pair[1].get("season_ids") or []), default=""), reverse=True)
+    return out[:PROFILE_PERIODS]
 
 
 def _entry(league: dict, period: dict, level: int, data: dict, row: dict, rows: list[dict], url: str | None) -> dict:

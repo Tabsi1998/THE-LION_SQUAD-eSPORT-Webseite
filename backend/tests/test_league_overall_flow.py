@@ -622,3 +622,20 @@ async def test_partial_view_has_no_overall_winner_for_guests(flow):
     assert block["closed"] is True and block["complete"] is False and block["teams"][0]["name"] == "Probe 1"
     team = ok(await flow.get("/api/teams/team-1"))["league_overall"][0]
     assert team["place"] == 1 and team["closed"] is True and team["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_profile_shows_the_newest_periods_first_and_at_most_six(flow):
+    from services import league_overall
+
+    world = await setup(flow)
+    seasons = [await add_season(flow, world) for _ in range(7)]
+    for season in seasons:
+        await played_staffel(flow, world, season, 1, [1, 2])
+    # Sieben Zeiträume - der älteste zuletzt angelegt: Er darf den jüngsten nicht verdrängen.
+    periods = [{"name": f"Zeitraum {season['number']}", "season_ids": [season["id"]]} for season in reversed(seasons)]
+    await configure(flow, world, periods=periods)
+    flow.act_as(None)
+    rows = ok(await flow.get("/api/teams/team-1"))["league_overall"]
+    assert len(rows) == league_overall.PROFILE_PERIODS
+    assert rows[0]["period_name"] == "Zeitraum 7" and "Zeitraum 1" not in {row["period_name"] for row in rows}
