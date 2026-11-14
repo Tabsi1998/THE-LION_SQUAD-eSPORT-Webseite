@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.85.1 (14.11.2026)
+
+### Fehlerbehebungen
+
+* „Bild einfügen“ im Texteditor per Tastatur bedienbar (#937)
+* @-Erwähnen per Tastatur – Pfeile wählen weiter, Escape schließt die Vorschläge (#937)
+* Abstimmungs-Popup per Tastatur bedienbar – Fokus im Fenster, Escape heißt „Später“ (#937)
+* Datumsfeld – Fehler wird Vorleseprogrammen am Knopf vorgelesen (#937)
+* Fast Lap – „Zeit bearbeiten“ per Tastatur bedienbar, Stift mit Namen (#937)
+* Galerie-Verwaltung – Medienauswahl per Tastatur bedienbar (#937)
+* Logo-Laufband – jedes Logo nur ein Tab-Stopp, Fokus hält das Band an (#937)
+* Medienbibliothek und Bildbearbeitung beim Hochladen per Tastatur bedienbar (#937)
+* Medienverwaltung – Kacheln per Tastatur öffnen (#937)
+* Season-Highlight-Karte per Tastatur bedienbar (#937)
+* Spur im Schnee gibt beim Verlassen der Seite ihren Platz im Bewegungsbudget frei (#937)
+* Suche per Tastatur bedienbar – Fokus bleibt im Fenster, Escape gibt ihn an die Lupe zurück (#937)
+* TV-Warteschlange – das weggleitende Spiel zeigt seinen letzten Stand (#937)
+* Zwei-Faktor im Profil – Ladefehler wird angezeigt, mit „Nochmal versuchen“ (#937)
+
 ## 1.85.0 (13.11.2026)
 
 ### Neu
