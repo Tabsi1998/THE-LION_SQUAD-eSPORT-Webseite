@@ -17,6 +17,12 @@ export function rewardFileName(award) {
   return `${name || "belohnung"}.png`;
 }
 
+/** Lässt sich die Belohnung teilen? Eine der Gesamtwertung (F.5) ohne öffentlichen Link nicht - es gäbe keine Seite, auf die der Link
+ *  führt (keine Season des Zeitraums ist öffentlich). */
+export function canShareReward(award) {
+  return !(String(award?.tournament?.id || "").startsWith("overall:") && !award?.url);
+}
+
 export function rewardShareLink(award, origin = typeof window === "undefined" ? "" : window.location.origin) {
   // Gesamtwertung (F.5, #2215): keine Staffel dahinter - der Server nennt die Ligaseite der Gesamtwertung.
   if (award?.url) return `${origin}${award.url}`;
@@ -34,6 +40,7 @@ export function RewardShareButton({ award, nav = typeof navigator !== "undefined
     loadResultImage(image, rewardFileName(award)).then((file) => { if (alive) fileRef.current = file; });
     return () => { alive = false; };
   }, [mobile, image, award]);
+  if (!canShareReward(award)) return null;
   const url = rewardShareLink(award);
   const text = [award?.reward?.name, award?.reward?.art?.season, award?.reward?.art?.division, "THE LION SQUAD"].filter(Boolean).join(" · ");
   const button = "tls-btn inline-flex min-h-[44px] items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-widest rounded-sm";

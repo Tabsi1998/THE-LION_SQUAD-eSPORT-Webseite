@@ -5,7 +5,7 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { motionTransition } from "@/lib/motion";
 import { artLines } from "@/lib/leagueRewards";
 import { RewardArt } from "./RewardArt";
-import { RewardShareButton } from "./RewardShareButton";
+import { RewardShareButton, canShareReward } from "./RewardShareButton";
 
 /**
  * Zeremonie einer Liga-Belohnung (F.4, #2214, Nr. 165): beim nächsten Besuch nach dem Abschluss einmal je Belohnung - im Stil des
@@ -70,7 +70,7 @@ export function RewardMoment({ plan, onClose, reduced = false, profileHref = "/u
           ))}
         </div>
         <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
-          <RewardShareButton award={first} testId="reward-moment-share" />
+          {canShareReward(first) ? <RewardShareButton award={first} testId="reward-moment-share" /> : null}
           <Link to={profileHref} onClick={onClose} data-testid="reward-moment-collection"
             className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
             Zur Sammlung
