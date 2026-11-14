@@ -93,6 +93,7 @@ const LeagueSeasonPage = lazyPage(() => import("@/pages/public/LeagueSeasonPage"
 // Unterseiten der Season (#2268): Spieltage Woche für Woche, Teams der Season.
 const LeagueSeasonMatchdaysPage = lazyPage(() => import("@/pages/public/LeagueSeasonMatchdaysPage"));
 const LeagueSeasonTeamsPage = lazyPage(() => import("@/pages/public/LeagueSeasonTeamsPage"));
+const LeagueSeasonOverallPage = lazyPage(() => import("@/pages/public/LeagueSeasonOverallPage"));
 const LeagueRulesPage = lazyPage(() => import("@/pages/public/LeagueRulesPage"));
 const LeagueApplyPage = lazyPage(() => import("@/pages/public/LeagueApplyPage"));
 const MatchPage = lazyPage(() => import("@/pages/public/MatchPage"));
@@ -150,6 +151,7 @@ const AdminGamePage = lazyPage(() => import("@/pages/admin/games/AdminGamePage")
 const AdminLeaguesPage = lazyPage(() => import("@/pages/admin/league/AdminLeaguesPage"));
 const AdminLeagueSeasonPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueSeasonPage"));
 const AdminLeagueRulesPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueRulesPage"));
+const AdminLeagueOverallPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueOverallPage"));
 const AdminUsersPage = lazyPage(() => import("@/pages/admin/AdminUsersPage"));
 const AdminStationsPage = lazyPage(() => import("@/pages/admin/AdminStationsPage"));
 const AdminEventsPage = lazyPage(() => import("@/pages/admin/AdminEventsPage"));
@@ -337,6 +339,7 @@ function App() {
           <Route path="/liga/:league/:season/regeln" element={<LeagueRulesPage />} />
           <Route path="/liga/:league/:season/spieltage" element={<LeagueSeasonMatchdaysPage />} />
           <Route path="/liga/:league/:season/teams" element={<LeagueSeasonTeamsPage />} />
+          <Route path="/liga/:league/:season/gesamtwertung" element={<LeagueSeasonOverallPage />} />
           <Route path="/liga/:league/:season/anmelden" element={<ProtectedRoute><LeagueApplyPage /></ProtectedRoute>} />
           <Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} />
           <Route path="/tournaments/:slug/ergebnis/:username" element={<ResultSharePage />} />
@@ -423,6 +426,7 @@ function App() {
           <Route path="/admin/leagues" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeaguesPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueSeasonPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueRulesPage /></ProtectedRoute>} />
+          <Route path="/admin/leagues/:leagueId/gesamtwertung" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueOverallPage /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/stations" element={<ProtectedRoute requireTournamentStaff><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireArea="tournaments"><AdminEventsPage /></ProtectedRoute>} />

@@ -125,7 +125,7 @@ function RewardRow({ item, index, onChange, onRemove, readOnly, testId, media })
   );
 }
 
-function RewardList({ items, onChange, readOnly, testId, emptyText }) {
+export function RewardList({ items, onChange, readOnly, testId, emptyText }) {
   const media = rulesMediaProps(useAuth().user);
   return (
     <div className="space-y-3" data-testid={testId}>

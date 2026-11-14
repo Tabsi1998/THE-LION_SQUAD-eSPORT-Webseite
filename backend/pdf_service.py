@@ -869,6 +869,32 @@ def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None
     return buf.getvalue()
 
 
+def pdf_league_overall(title: str, sections: list[dict], pdf_sponsors: list | None = None, pdf_branding: dict | None = None,
+                       note: str = "") -> bytes:
+    """Gesamtwertung einer Liga über Seasons (F.5, #2215): je Abschnitt (Co-Teams, Spieler) Platz, Name, Punkte je Season und Summe.
+    ``sections``: ``[{title, headers, rows}]``; ein Streichergebnis steht in Klammern."""
+    buf = io.BytesIO()
+    doc = _doc(buf, f"Gesamtwertung - {title}", orientation="landscape", sponsors=pdf_sponsors, branding=pdf_branding)
+    styles = _base_styles()
+    story = []
+    _header(story, styles, "Gesamtwertung", title)
+    if note:
+        story.append(Paragraph(escape(_normalize_pdf_text(note)), styles["TLSBody"]))
+        story.append(Spacer(1, 6))
+    # A4 quer: 25,7 cm Platz - Platz und Zahlen schmal, der Name nimmt den Rest.
+    for section in sections:
+        numbers = len(section["headers"]) - 2
+        number_width = min(2.6 * cm, (25.7 * cm - 1.5 * cm - 6 * cm) / max(numbers, 1))
+        widths = [1.5 * cm, 25.7 * cm - 1.5 * cm - number_width * numbers, *[number_width] * numbers]
+        body = [[_normalize_pdf_text(str(cell)) for cell in row] for row in section["rows"]] or [["", "Noch niemand in der Wertung", *[""] * numbers]]
+        table = Table([section["headers"], *_fit_rows_to_columns(body, widths)], colWidths=widths, repeatRows=1)
+        table.setStyle(_table_style())
+        story.append(Paragraph(escape(_normalize_pdf_text(section["title"])), styles["TLSSection"]))
+        story.append(table)
+    doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
+    return buf.getvalue()
+
+
 def pdf_checkin(tournament: dict, registrations: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
     doc = _doc(buf, f"Check-in - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)

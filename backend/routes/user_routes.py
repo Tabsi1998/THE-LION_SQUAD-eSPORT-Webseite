@@ -761,6 +761,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     teams = []
     awards = []
     league_history = []
+    league_overall = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
              "level": achievement_level["level"],
@@ -772,6 +773,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         from routes.tournament_common import tournament_hidden_reason
         from services.league_history import for_player
         league_history = await for_player(db, user_id, viewer, hidden=tournament_hidden_reason)
+        # Gesamtwertung über Seasons (F.5, #2215): Platz in der Spielerwertung je Zeitraum und Liga N.
+        from services import league_overall as overall_service
+        league_overall = await overall_service.for_player(db, user_id, viewer, hidden=tournament_hidden_reason)
         # Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren, nur öffentliche.
         from services.awards import awards_for_user
         awards = await awards_for_user(db, user_id, public_only=True)
@@ -885,6 +889,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "references": references,
         "awards": awards,
         "league_history": league_history,
+        "league_overall": league_overall,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
         # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Person gewählt hat.
         "featured_title": next((award for award in awards if award["id"] == u.get("featured_title_award_id")), None),

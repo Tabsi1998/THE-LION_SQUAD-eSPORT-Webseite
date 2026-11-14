@@ -220,7 +220,7 @@ export default function AdminLeaguesPage() {
                 <p className="text-xs text-white/55">{league.game_name || "Spiel fehlt"} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}</p>
                 {league.description ? <p className="mt-1 text-xs text-white/60 break-words">{league.description}</p> : null}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1">
                 {can(league, "manage") ? (
                   <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ kind: "edit", league })} aria-label={`${league.name} bearbeiten`} data-testid={`league-edit-${league.slug}`}>
                     <Pencil className="w-4 h-4" aria-hidden="true" />
@@ -243,6 +243,9 @@ export default function AdminLeaguesPage() {
                     </button>
                   </>
                 ) : null}
+                {/* Gesamtwertung über Seasons (F.5, #2215): lesen jede Zuständigkeit, ändern „Season konfigurieren“. */}
+                <Link to={`/admin/leagues/${league.id}/gesamtwertung`} data-testid={`league-overall-link-${league.slug}`}
+                  className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Gesamtwertung</Link>
                 {/* Regelwerk (#1646): liga-weit, jede Season ohne eigenes erbt es. */}
                 {can(league, "rules") ? (
                   <Link to={`/admin/leagues/rules/league/${league.id}`} data-testid={`league-rules-link-${league.slug}`}
