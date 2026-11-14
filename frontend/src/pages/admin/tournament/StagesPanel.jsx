@@ -203,7 +203,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
   const version = `${stage.updated_at || ""}|${JSON.stringify(settings)}`;
   useEffect(() => {
     setForm(stageFormOf(stage));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `version` fasst Stand und Einstellungen der Phase zusammen - ein neues Objekt mit gleichem Stand setzt das Formular
+    // nicht zurück (sonst gingen Eingaben bei jedem Neuladen verloren).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` steht für `stage` (siehe oben)
   }, [version]);
   const confirm = useConfirm();
   const config = stageConfigFor(form);

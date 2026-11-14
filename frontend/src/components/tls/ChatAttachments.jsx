@@ -229,7 +229,7 @@ export function ChatMessageAttachments({ attachments }) {
       {items.map((item) => (item.kind === "video" ? (
         // Von Mitgliedern hochgeladene Chat-Videos haben keine Untertitel; eine leere
         // Spur würde Screenreadern Untertitel vortäuschen, die es nicht gibt.
-        // eslint-disable-next-line jsx-a11y/media-has-caption
+        // eslint-disable-next-line jsx-a11y/media-has-caption -- keine Untertiteldatei vorhanden (siehe oben)
         <video
           key={item.id}
           controls

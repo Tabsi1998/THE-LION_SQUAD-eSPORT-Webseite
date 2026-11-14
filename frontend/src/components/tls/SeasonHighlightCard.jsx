@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { Download, Share2, X, Trophy, Medal, Zap, Flag } from "lucide-react";
@@ -6,6 +6,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import { LevelAvatarFrame, CROWN_LABELS, crownVariant } from "@/components/tls/LevelAvatarFrame";
 import { accountLevelTier } from "@/components/tls/AccountLevel";
 import { viennaDate } from "@/lib/vienna";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 function topAwards(awards, limit = 3) {
   return [...(awards || [])]
@@ -21,11 +22,9 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
   const best = topAwards(awards);
   const season = seasonLabel || `Season ${new Date().getFullYear()}`;
 
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Tastatur (#937): Escape schließt, Tab bleibt bei Karte und Knöpfen, danach steht der Fokus wieder auf dem Knopf,
+  // der die Karte geöffnet hat. Der Klick daneben bleibt eine Maus-Abkürzung.
+  const dialogRef = useModalBehavior(true, () => onClose?.());
 
   const renderPng = useCallback(async () => {
     return toPng(cardRef.current, { pixelRatio: 2.4, backgroundColor: "#050505", cacheBust: true });
@@ -73,8 +72,8 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
   };
 
   return (
-    <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto" role="dialog" aria-modal="true" aria-label="Season-Highlight-Karte" data-testid="highlight-card-modal" onClick={onClose}>
-      <div className="my-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto" role="presentation" data-testid="highlight-card-modal" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div ref={dialogRef} className="my-auto" role="dialog" aria-modal="true" aria-label="Season-Highlight-Karte">
         <div
           ref={cardRef}
           className="w-[min(380px,calc(100vw-2rem))] rounded-md border border-white/12 bg-gradient-to-b from-[#0D141A] via-[#0A0A0A] to-[#050505] p-6 relative overflow-hidden"
@@ -151,7 +150,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
           <button type="button" onClick={share} disabled={busy} data-testid="highlight-card-share" className="tls-btn tls-btn--quiet flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
             <Share2 className="w-3.5 h-3.5" /> Teilen
           </button>
-          <button type="button" onClick={onClose} data-testid="highlight-card-close" className="inline-flex items-center justify-center px-3 py-2.5 border border-white/15 text-white/60 rounded-sm hover:text-white">
+          <button type="button" onClick={onClose} data-testid="highlight-card-close" aria-label="Schließen" className="inline-flex items-center justify-center px-3 py-2.5 border border-white/15 text-white/60 rounded-sm hover:text-white">
             <X className="w-4 h-4" />
           </button>
         </div>

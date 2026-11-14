@@ -294,15 +294,15 @@ function flyBetween(node, tile) {
 
 function useGrowFrom(origin) {
   const stage = useRef(null);
+  // Nur beim Öffnen, aus der Kachel, mit der geöffnet wurde - beim Weiterblättern bleibt die Bühne, wo sie ist.
+  const openedFrom = useRef(origin);
   // Vor dem ersten Bild (Layout-Effekt): sonst stünde die Bühne einen Moment groß da und spränge dann auf die Kachel.
   useLayoutEffect(() => {
     const node = stage.current;
-    const from = flyBetween(node, origin);
+    const from = flyBetween(node, openedFrom.current);
     if (!from) return undefined;
     const animation = node.animate([{ transform: from, opacity: 0.6 }, { transform: "none", opacity: 1 }], { duration: MOTION.slow, easing: FLY_EASE });
     return () => animation.cancel();
-    // Nur beim Öffnen - beim Weiterblättern bleibt die Bühne, wo sie ist.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return stage;
 }
@@ -431,6 +431,9 @@ function LightboxVideo({ item }) {
     const src = resolveMediaUrl(url);
     return (
       <div className="flex max-h-[85vh] flex-col items-center gap-3">
+        {/* Hochgeladene Galerie-Videos haben keine Untertiteldatei; eine leere Spur täuschte Vorleseprogrammen Untertitel
+            vor, die es nicht gibt. Die Bildunterschrift steht darunter und benennt die Ansicht (#937). */}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- siehe oben: keine Untertiteldatei vorhanden */}
         <video
           src={src}
           poster={galleryPosterUrl(item) ? resolveMediaUrl(galleryPosterUrl(item)) : undefined}

@@ -66,16 +66,20 @@ export function hatRoom(doc, x, y, anchor = null, extra = "") {
 /** Wartet, bis ein Bild geladen ist, und misst dann - auch nach neuer Fenstergröße. */
 export function useImageSpot(selector, measure, deps) {
   const [spot, setSpot] = useState(null);
+  // Suchen und Messen mit dem aktuellen Stand des Aufrufers - auch beim Nachmessen nach Laden oder neuer Größe (#937).
+  const latest = useRef({ selector, measure });
+  latest.current = { selector, measure };
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
     let image = null;
     const run = () => {
-      image = typeof selector === "function" ? selector(document) : document.querySelector(selector);
+      const { selector: find, measure: place } = latest.current;
+      image = typeof find === "function" ? find(document) : document.querySelector(find);
       if (!image || !image.complete || !(image.naturalWidth > 0)) {
         setSpot(null);
         return;
       }
-      setSpot(measure(image));
+      setSpot(place(image));
     };
     run();
     const retry = window.setTimeout(run, 600);
@@ -86,7 +90,7 @@ export function useImageSpot(selector, measure, deps) {
       image?.removeEventListener?.("load", run);
       window.removeEventListener("resize", run);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- wann neu gesucht wird, sagt der Aufrufer (`deps`)
   }, deps);
   return spot;
 }

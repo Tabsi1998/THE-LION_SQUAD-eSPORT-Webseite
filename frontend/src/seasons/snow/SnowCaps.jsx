@@ -88,7 +88,6 @@ function useSnowTracks(caps, enabled, level) {
     timer = window.setTimeout(attempt, 1500);
     return () => window.clearTimeout(timer);
   }, [caps, enabled, walk, level]);
-  const started = walk?.started;
   useEffect(() => {
     if (!walk || walk.done) return undefined;
     const total = tracksDuration(walk.steps);
@@ -110,11 +109,15 @@ function useSnowTracks(caps, enabled, level) {
     return () => {
       window.clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [started]);
+    // Eine Spur ändert sich nur, wenn sie beginnt oder endet - dann läuft der Effekt neu (und endet sofort).
+  }, [walk]);
+  // Beim Verlassen mitten in der Spur gibt sie ihren Platz im Bewegungsbudget frei - mit der aktuellen Spur, nicht der
+  // vom ersten Aufbau (die war noch leer, der Platz blieb bisher belegt; #937).
+  const walkRef = useRef(walk);
+  walkRef.current = walk;
   useEffect(() => () => {
-    if (walk?.token && !walk.done) releaseMotion(walk.token);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const current = walkRef.current;
+    if (current?.token && !current.done) releaseMotion(current.token);
   }, []);
   if (!walk || walk.done) return null;
   return { key: walk.key, run: walk.run, dents: dentsAt(walk.steps, elapsed) };

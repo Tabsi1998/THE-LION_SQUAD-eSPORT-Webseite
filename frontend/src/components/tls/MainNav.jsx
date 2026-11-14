@@ -454,7 +454,9 @@ function useCmsNavItems() {
       setItems(normalized);
       try {
         window.localStorage.setItem(NAV_CACHE_KEY, JSON.stringify(normalized));
-      } catch {}
+      } catch {
+        // Speicher voll oder gesperrt (privates Fenster): das Menü steht trotzdem, es lädt beim nächsten Mal neu (#937).
+      }
     } catch {
       setItems(cachedNavItems());
     }

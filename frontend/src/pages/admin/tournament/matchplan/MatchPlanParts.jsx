@@ -38,16 +38,15 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
   };
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const stamp = `${tournament.start_date}|${tournament.match_break_minutes}|${tournament.match_buffer_minutes}`;
+  // Nur wenn sich das gespeicherte Turnier ändert, nicht bei jedem neuen Objekt.
+  const { start_date: startDate, match_break_minutes: breakMinutes, match_buffer_minutes: bufferMinutes } = tournament;
   useEffect(() => {
     setForm({
-      start: viennaInputValue(tournament.start_date),
-      pause: String(tournament.match_break_minutes ?? 5),
-      buffer: String(tournament.match_buffer_minutes ?? 0),
+      start: viennaInputValue(startDate),
+      pause: String(breakMinutes ?? 5),
+      buffer: String(bufferMinutes ?? 0),
     });
-    // Nur wenn sich das gespeicherte Turnier ändert, nicht bei jedem neuen Objekt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stamp]);
+  }, [startDate, breakMinutes, bufferMinutes]);
   const dirty = form.start !== initial.start || form.pause !== initial.pause || form.buffer !== initial.buffer;
   const local = mode === "local";
   // Liga-Staffel (#2109): den Start gibt die Season vor - hier nur lesend, er geht beim Speichern nicht mit.

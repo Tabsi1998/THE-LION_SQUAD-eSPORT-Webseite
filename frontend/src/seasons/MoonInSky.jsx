@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { moonPosition, skyPlacement } from "./astronomy";
 
 // Der Mond am Seitenhimmel (#681): steht dort, wo er über dem Vereinsort wirklich steht - geht auf, wandert nach
@@ -11,9 +11,18 @@ export const TICK_MS = 60000;
 
 export function useMoonPlacement({ location, now = () => new Date(), viewport = null, tick = TICK_MS } = {}) {
   const [state, setState] = useState(() => compute(location, now(), viewport));
+  // Neu angesetzt wird nur bei neuem Ort oder Takt; gerechnet wird mit dem aktuellen Stand (Uhr für Tests, Fenster) -
+  // `now` kommt sonst bei jeder Darstellung neu und startete den Takt immer wieder (#937).
+  const latest = useRef({ location, now, viewport });
+  latest.current = { location, now, viewport };
+  const lat = location?.lat;
+  const lon = location?.lon;
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const update = () => setState(compute(location, now(), viewport));
+    const update = () => {
+      const current = latest.current;
+      setState(compute(current.location, current.now(), current.viewport));
+    };
     update();
     const timer = window.setInterval(update, tick);
     window.addEventListener("resize", update);
@@ -21,8 +30,7 @@ export function useMoonPlacement({ location, now = () => new Date(), viewport = 
       window.clearInterval(timer);
       window.removeEventListener("resize", update);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location?.lat, location?.lon, tick]);
+  }, [lat, lon, tick]);
   return state;
 }
 

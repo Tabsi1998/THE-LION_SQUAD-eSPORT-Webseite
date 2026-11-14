@@ -87,7 +87,8 @@ export function GermanDateField({
             type="button"
             data-testid={testId}
             disabled={disabled}
-            aria-invalid={!!error}
+            // Ein Fehler hängt über aria-describedby am Knopf (und meldet sich als Hinweis) - aria-invalid gibt es für
+            // Knöpfe nicht, Vorleseprogramme übergehen es dort (#937).
             aria-describedby={describedBy}
             className={`w-full bg-[#0A0A0A] border px-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
               error ? "border-[#FF3B30] focus:border-[#FF3B30]" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"

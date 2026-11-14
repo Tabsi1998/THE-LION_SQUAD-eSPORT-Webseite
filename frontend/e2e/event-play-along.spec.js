@@ -107,6 +107,9 @@ test.describe("Spielst du auch mit?", () => {
     await page.goto("/events/herbst-lan?turnier=kart-cup");
     await page.getByTestId("event-register-submit").click();
     await expect(page.getByTestId("play-along-check-t-kart")).toBeChecked();
+    // Escape hört das Blatt erst, wenn es den Fokus übernommen hat (useModalBehavior im Effekt nach dem Zeichnen) - unter
+    // Last kam der Tastendruck sonst davor an (#937).
+    await expect.poll(() => page.evaluate(() => document.querySelector("[data-testid='play-along-sheet']")?.contains(document.activeElement))).toBe(true);
     await page.keyboard.press("Escape");
     await expect(page).toHaveURL(/\/tournaments\/kart-cup$/);
   });

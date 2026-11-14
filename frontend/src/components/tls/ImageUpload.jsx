@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatUploadError, resolveMediaUrl } from "@/lib/api";
 import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
 import { tooLargeMessage, uploadLimits, useUploadLimits } from "@/lib/uploadLimits";
 import { isSvgFile } from "@/lib/svgLogo";
@@ -399,6 +400,12 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     if (fileRef.current) fileRef.current.value = "";
   }, []);
 
+  // Medienbibliothek und Bildbearbeitung (#937): echte Dialoge - Escape schließt, Tab bleibt darin, danach steht der
+  // Fokus wieder auf dem Knopf, der sie geöffnet hat. Der Klick daneben bleibt eine Maus-Abkürzung.
+  const dialogId = useId();
+  const libraryRef = useModalBehavior(libraryOpen, () => setLibraryOpen(false));
+  const editorRef = useModalBehavior(Boolean(editor), closeEditor);
+
   const uploadFile = async (file, editOptions = null, { prepared = false } = {}) => {
     if (!file) return;
     setUploading(true);
@@ -623,11 +630,11 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       </div>
       {logo && logoPreview && <LogoSurfaces src={value} testId={testId} />}
       {libraryOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setLibraryOpen(false)}>
-          <div className="max-w-4xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid={`${testId}-library-backdrop`} onClick={(e) => { if (e.target === e.currentTarget) setLibraryOpen(false); }}>
+          <div ref={libraryRef} role="dialog" aria-modal="true" aria-labelledby={`${dialogId}-library`} className="max-w-4xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" data-testid={`${testId}-library-dialog`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
-              <button type="button" onClick={() => setLibraryOpen(false)} className="text-white/50 hover:text-white">×</button>
+              <h3 id={`${dialogId}-library`} className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
+              <button type="button" onClick={() => setLibraryOpen(false)} className="text-white/50 hover:text-white" aria-label="Schließen">×</button>
             </div>
             <MediaLibrarySearch library={library} testId={`${testId}-library`} />
             {library.loading ? (
@@ -672,11 +679,11 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
         />
       )}
       {editor && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={closeEditor}>
-          <div className="max-w-3xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid={`${testId}-editor-backdrop`} onClick={(e) => { if (e.target === e.currentTarget) closeEditor(); }}>
+          <div ref={editorRef} role="dialog" aria-modal="true" aria-labelledby={`${dialogId}-editor`} className="max-w-3xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" data-testid={`${testId}-editor-dialog`}>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="font-heading text-xl font-black uppercase">Bild bearbeiten</h3>
-              <button type="button" onClick={closeEditor} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+              <h3 id={`${dialogId}-editor`} className="font-heading text-xl font-black uppercase">Bild bearbeiten</h3>
+              <button type="button" onClick={closeEditor} className="text-white/50 hover:text-white" aria-label="Schließen"><X className="w-5 h-5" /></button>
             </div>
             <div
               ref={cropBoxRef}

@@ -13,12 +13,18 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
   const [setup, setSetup] = useState(null);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
   const [busy, setBusy] = useState(false);
+  // Ohne Stand sähe die Seite aus wie „noch nicht eingerichtet“ - das sagt sie jetzt offen und bietet einen neuen Versuch
+  // an (#937).
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/mfa/status");
       setStatus(data);
-    } catch {}
+      setLoadFailed(false);
+    } catch {
+      setLoadFailed(true);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
   const required = !!status?.required_for_admin;
@@ -79,6 +85,12 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
             : "Freiwillig. Beim Anmelden fragt die Seite dann zusätzlich nach einem Code aus deiner Authenticator-App. Ein Passkey schützt dein Konto genauso gut und ist bequemer."}
         </p>
       </div>
+      {loadFailed ? (
+        <p className="text-xs text-[#FF8A80]" role="alert" data-testid="profile-mfa-load-failed">
+          Der Stand der Zwei-Faktor-Anmeldung lässt sich gerade nicht laden.{" "}
+          <button type="button" onClick={load} className="font-bold text-[#29B6E8] hover:underline" data-testid="profile-mfa-retry">Nochmal versuchen</button>
+        </p>
+      ) : null}
       {recoveryCodes.length > 0 ? (
         <div className="space-y-3">
           <div className="text-sm text-[#FFD700] font-bold">Diese Codes werden nur einmal angezeigt.</div>

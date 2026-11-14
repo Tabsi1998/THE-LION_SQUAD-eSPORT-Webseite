@@ -58,16 +58,18 @@ export function skyLayers({ season, budget = 0, reducedMotion = false, weather =
  * Die Uhr des Himmels nach der Serverzeit (eine Vorschau „zu dieser Zeit“ verschiebt sie): jede Minute neu - das Licht
  * ändert sich langsam. `now` nur für Tests.
  */
+function readSkyClock(now, serverOffset) {
+  return now ? now() : Date.now() + (serverOffset || 0);
+}
+
 function useSkyClock(now) {
   const { serverOffset } = useSeason();
-  const read = () => (now ? now() : Date.now() + (serverOffset || 0));
-  const [at, setAt] = useState(read);
+  const [at, setAt] = useState(() => readSkyClock(now, serverOffset));
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    setAt(read());
-    const timer = window.setInterval(() => setAt(read()), 60000);
+    setAt(readSkyClock(now, serverOffset));
+    const timer = window.setInterval(() => setAt(readSkyClock(now, serverOffset)), 60000);
     return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, serverOffset]);
   return at;
 }

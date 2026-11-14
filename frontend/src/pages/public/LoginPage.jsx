@@ -75,6 +75,9 @@ export default function LoginPage() {
       nav(next);
     }
   };
+  // Der Vorschlag läuft über mehrere Darstellungen - eine Anmeldung darüber nimmt das aktuelle Ziel (#937).
+  const finishPasskeyRef = useRef(finishPasskeySignIn);
+  finishPasskeyRef.current = finishPasskeySignIn;
 
   // Beendet den Vorschlag; das Promise ist erfüllt, wenn der Browser die Anfrage abgeschlossen hat.
   const stopAutofill = () => {
@@ -100,7 +103,7 @@ export default function LoginPage() {
       stopAutofillRef.current = startPasskeyAutofill({
         remember: () => rememberRef.current,
         exclusive: submitOnce,
-        onSignedIn: finishPasskeySignIn,
+        onSignedIn: (data) => finishPasskeyRef.current(data),
         // Kein onError: der stille Vorschlag zeigt nie eine Meldung (#1242) - Fehler gibt es nur nach dem Klick auf den Knopf.
         onEnd: () => {
           stopAutofillRef.current = null;
@@ -112,8 +115,7 @@ export default function LoginPage() {
       cancelled = true;
       stopAutofill();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passkeysOff, mfaTicket, passwordForm, autofillRound]);
+  }, [passkeysOff, mfaTicket, passwordForm, autofillRound, submitOnce]);
 
   const restartAutofillOnFocus = () => {
     if (autofill !== "ended" || focusRestartsLeftRef.current < 1) return;
