@@ -469,3 +469,29 @@ def test_the_start_waits_for_migrations_before_serving():
     assert "await ensure_migrations(get_db())" in source
     assert "run_pending_migrations" not in source
     assert 'checks["migrations"] = migrations_ready()' in source
+
+
+@pytest.mark.asyncio
+async def test_a_failed_migration_start_stops_the_background_sweep(monkeypatch):
+    import server
+
+    calls = []
+
+    async def no_indexes():
+        return None
+
+    async def timeout(_db):
+        raise migrations.MigrationWaitTimeout("Test")
+
+    async def stop_sweep():
+        calls.append("gestoppt")
+
+    for name in ("validate_runtime_env", "ensure_wiring", "ensure_storage_directories", "_start_variant_sweep"):
+        monkeypatch.setattr(server, name, lambda: None)
+    monkeypatch.setattr(server, "init_indexes", no_indexes)
+    monkeypatch.setattr(server, "_stop_variant_sweep", stop_sweep)
+    monkeypatch.setattr(migrations, "ensure_migrations", timeout)
+    with pytest.raises(migrations.MigrationWaitTimeout):
+        async with server.lifespan(server.app):
+            pass
+    assert calls == ["gestoppt"]

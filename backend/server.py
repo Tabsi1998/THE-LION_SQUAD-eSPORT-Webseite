@@ -245,7 +245,12 @@ async def lifespan(app: FastAPI):
     # Migrationen (#1006): genau ein Start migriert, jeder andere wartet hier, bis der Stand komplett ist - vorher
     # bedient der Prozess nichts. Zeitlimits und Ablauf: docs/BETRIEB.md, Abschnitt Migrationen beim Start.
     from services.migrations import ensure_migrations
-    applied_migrations = await ensure_migrations(get_db())
+    try:
+        applied_migrations = await ensure_migrations(get_db())
+    except BaseException:
+        # Der Start bricht ab (Zeitlimit, Sperre verloren): das Aufräumen im Hintergrund nicht verwaist zurücklassen.
+        await _stop_variant_sweep()
+        raise
     for migration in applied_migrations:
         logger.info("[migration] Applied %s: %s", migration["version"], migration["name"])
     # Auto-Checks je Zustand (#2080): einmaliger Nachtrag aus den gespeicherten Läufen, mit Merker.
