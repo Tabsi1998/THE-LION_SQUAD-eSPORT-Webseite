@@ -1,0 +1,182 @@
+name: Zeitreise-Woche
+
+# Frühwarnung (#775, docs/entwicklung/zeitreise.md): Einmal je Woche laufen Backend (pytest), Web (Vitest) und App (Jest)
+# mit verstellter Uhr (TLS_TEST_NOW) - so, als wäre heute in einem Monat, in sechs Monaten und in einem Jahr. Was dort rot
+# wird, kippt sonst von selbst, sobald der echte Kalender einen festen Termin in den Testdaten überholt.
+# Blockiert nichts: kein PR-Auslöser, kein Pflicht-Check. Playwright läuft nicht mit (zu teuer).
+# Rot auf main: Issue „Zeitreise: Test kippt ab …“ anlegen oder ergänzen (höchstens ein Kommentar je Woche). Eine volle
+# grüne Woche (alle Teile, alle Zeitpunkte) auf main schließt es (scripts/zeitreise_report.py).
+# Lokal dasselbe: python scripts/local_check.py --only zeitreise [--zeit +6m]
+on:
+  schedule:
+    # Montag 03:30 UTC = 04:30 Wiener Winterzeit, 05:30 Sommerzeit.
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      melden:
+        description: "Ergebnis als Issue melden (nur auf main: rot anlegen/ergänzen, volle grüne Woche schließt)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: zeitreise-woche-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Zeitreise ${{ matrix.teil }} ${{ matrix.sprung }}
+    runs-on: ubuntu-24.04
+    # Backend gut 12 Minuten (die ganze Suite auf einem Runner), Web knapp 10, App 3 - samt Einrichtung.
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        sprung: ["+1m", "+6m", "+1y"]
+        teil: [backend, web, app]
+    env:
+      SPRUNG: ${{ matrix.sprung }}
+      TEIL: ${{ matrix.teil }}
+      ERGEBNIS: ${{ github.workspace }}/zeitreise
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Zeitpunkt aus dem heutigen Datum ausrechnen
+        run: |
+          now=$(python3 scripts/zeitreise_report.py when "$SPRUNG")
+          echo "TLS_TEST_NOW=$now" >> "$GITHUB_ENV"
+          mkdir -p "$ERGEBNIS"
+          echo "Uhr im Test: $now ($TEIL, $SPRUNG)"
+
+      - if: matrix.teil == 'backend'
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Backend-Pakete installieren
+        if: matrix.teil == 'backend'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+      - name: Backend mit verstellter Uhr
+        id: backend
+        if: matrix.teil == 'backend'
+        timeout-minutes: 25
+        env:
+          APP_ENV: test
+          MONGO_URL: mongodb://127.0.0.1:27017
+          DB_NAME: tls_ci
+          DISABLE_SCHEDULER: "true"
+          UPLOAD_DIR: /tmp/tls-uploads
+        # Tests mit echter Uhr (Marker real_clock) wählt backend/tests/zeitreise.py mit TLS_TEST_NOW selbst ab.
+        run: python -m pytest -m "not live" --numprocesses=auto -p no:cacheprovider -q --junitxml="$ERGEBNIS/junit.xml"
+
+      - if: matrix.teil == 'web'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Website-Pakete installieren
+        if: matrix.teil == 'web'
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+      - name: Web mit verstellter Uhr
+        id: web
+        if: matrix.teil == 'web'
+        timeout-minutes: 25
+        working-directory: frontend
+        run: yarn vitest run --reporter=dot --reporter=junit --outputFile.junit="$ERGEBNIS/junit.xml"
+
+      - if: matrix.teil == 'app'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: App-Pakete installieren
+        if: matrix.teil == 'app'
+        working-directory: mobile
+        run: npm ci
+      - name: App mit verstellter Uhr
+        id: app
+        if: matrix.teil == 'app'
+        timeout-minutes: 20
+        working-directory: mobile
+        run: npx jest --json --outputFile="$ERGEBNIS/jest.json"
+
+      - name: Ergebnis festhalten
+        if: always()
+        env:
+          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
+          WEB_OUTCOME: ${{ steps.web.outcome }}
+          APP_OUTCOME: ${{ steps.app.outcome }}
+          JOB_INDEX: ${{ strategy.job-index }}
+        run: |
+          report="$ERGEBNIS/junit.xml"
+          case "$TEIL" in
+            backend) outcome="$BACKEND_OUTCOME" ;;
+            web) outcome="$WEB_OUTCOME" ;;
+            *) outcome="$APP_OUTCOME"; report="$ERGEBNIS/jest.json" ;;
+          esac
+          # Kam der Lauf nicht bis zum Testschritt (Einrichtung gescheitert), zählt das als rot.
+          if [ "$outcome" != "success" ]; then outcome="failure"; fi
+          if [ -z "${TLS_TEST_NOW:-}" ]; then TLS_TEST_NOW=$(python3 scripts/zeitreise_report.py when "$SPRUNG"); fi
+          python3 scripts/zeitreise_report.py collect --part "$TEIL" --jump "$SPRUNG" --now "$TLS_TEST_NOW" \
+            --outcome "$outcome" --input "$report" --root "$GITHUB_WORKSPACE/mobile" \
+            --out "$ERGEBNIS/ergebnis/$TEIL-$JOB_INDEX.json"
+      - name: Ergebnis hochladen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zeitreise-${{ matrix.teil }}-${{ strategy.job-index }}
+          # Nur Teil, Zeitpunkt, Ergebnis und Namen roter Tests - keine Testausgaben.
+          path: zeitreise/ergebnis/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Getrennter Job: nur die Meldung darf Issues schreiben, nicht die Jobs, die Code ausführen. Er liest nur die
+  # Ergebnis-Dateien der Probe und führt nur scripts/zeitreise_report.py aus.
+  meldung:
+    name: Bericht und Meldung
+    needs: probe
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/zeitreise_report.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: zeitreise-*
+          path: zeitreise-ergebnis
+          merge-multiple: true
+      - name: Bericht ins Job-Summary
+        run: |
+          python3 scripts/zeitreise_report.py summary --results zeitreise-ergebnis --expected 9 --out zeitreise-summary.md
+          cat zeitreise-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Issue anlegen, ergänzen oder schließen
+        if: ${{ github.event_name == 'schedule' || inputs.melden }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF: ${{ github.ref }}
+        run: python3 scripts/zeitreise_report.py notify --results zeitreise-ergebnis --expected 9 --run-url "$RUN_URL" --ref "$REF"
