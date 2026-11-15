@@ -9,15 +9,18 @@ const { mockTvApi } = require("./fixtures/tvMock");
 const SHOTS = process.env.SHOT_DIR || "";
 const TV = "/display/bracket/t1?key=tv-schluessel&pixel_shift=0&playlist=tree";
 const TEAMS = ["Nordlicht Esports", "Steinbock Gaming", "Wolkenfuchs Clan", "Kieselkatze"];
-const REGS = TEAMS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved" }));
+// Schlimmster Fall: lange Namen ohne Leerzeichen, lange Belohnungen, drei Belohnungen auf Platz 1.
+const LONG_TEAMS = ["Donaudampfschifffahrtsgesellschaftskapitäne Esports Akademie", "Die Unaufhaltsamen Nordlicht-Wölfe aus dem Waldviertel",
+  "Kieselkatzen-Verteidigungsbündnis Ost Gaming Collective", "Kieselkatze"];
+let REGS = TEAMS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved" }));
 const PAIRS = [["r1", "r2"], ["r3", "r4"], ["r1", "r3"], ["r2", "r4"], ["r1", "r4"], ["r2", "r3"]];
 const MATCHES = PAIRS.map(([a, b], index) => ({
-  id: `m${index + 1}`, stage_id: "s1", stage_type: "league", section: "league", round: Math.floor(index / 2) + 1, order: index,
+  id: `m${index + 1}`, stage_id: "s1", stage_type: "league", section: "LIGA", round: Math.floor(index / 2) + 1, order: index,
   match_key: `M${index + 1}`, status: "completed", settings: { match_size: 2 }, winner_id: a,
   slots: [{ slot: 1, registration_id: a }, { slot: 2, registration_id: b }],
   results: [{ registration_id: a, rank: 1, score: 2 }, { registration_id: b, rank: 2, score: 0 }],
 }));
-const STANDINGS = REGS.map((reg, index) => ({ registration_id: reg.id, display_name: reg.display_name, rank: index + 1, played: 3,
+const standingsOf = (regs) => regs.map((reg, index) => ({ registration_id: reg.id, display_name: reg.display_name, rank: index + 1, played: 3,
   won: 3 - index, drawn: 0, lost: index, score_diff: 6 - index * 4, points: (3 - index) * 3 }));
 const reward = (id, kind, name, rank) => ({ id, kind, name, image_url: null, art: { place: `${rank}. Platz`, metal: { 1: "gold", 2: "silver", 3: "bronze" }[rank] } });
 const PODIUM = {
@@ -32,7 +35,7 @@ const PODIUM = {
 function staffel(status, extra = {}) {
   return {
     tournament: { id: "t1", slug: "probe-liga-s3-a", title: "Probe-Liga · Season 3 · Liga 1 · Staffel A", status, format: "league", team_mode: "team" },
-    registrations: REGS, stages: [{ id: "s1", name: "Liga", number: 1, stage_type: "league" }], matches_v2: MATCHES, standings: STANDINGS,
+    registrations: REGS, stages: [{ id: "s1", name: "Liga", number: 1, stage_type: "league" }], matches_v2: MATCHES, standings: standingsOf(REGS),
     league_podium: null, display_key: true, ...extra,
   };
 }
@@ -60,12 +63,20 @@ function inspectPodium(page) {
     const card = document.querySelector("[data-testid='tv-champion']");
     const places = Object.fromEntries([1, 2, 3].map((rank) => {
       const col = document.querySelector(`[data-testid='tv-podium-place-${rank}']`);
-      return [rank, { x: box(col).left, block: box(col.querySelector(".tv-podium__block")).height, art: col.querySelector(".tv-podium__main .tls-reward") ? box(col.querySelector(".tv-podium__main .tls-reward")).width : 0 }];
+      return [rank, { x: box(col).left, block: box(col.querySelector(".tv-league-podium__block")).height, art: col.querySelector(".tv-league-podium__main .tls-reward") ? box(col.querySelector(".tv-league-podium__main .tls-reward")).width : 0 }];
     }));
     const names = [...card.querySelectorAll("[data-tv-name]")];
+    // Jeder Sockel mit seiner Ziffer liegt ganz in der Karte - nichts wird unten abgeschnitten.
+    const frame = box(card);
+    const within = (rect) => rect.left >= frame.left - 1 && rect.top >= frame.top - 1 && rect.right <= frame.right + 1 && rect.bottom <= frame.bottom + 1;
+    const blocksCut = [...card.querySelectorAll(".tv-league-podium__block")].filter((block) => {
+      const digit = block.querySelector(".tv-league-podium__rank");
+      return !within(box(block)) || !within(box(digit)) || !inside(box(block));
+    }).map((block) => block.textContent);
     return {
       cardInside: inside(box(card)),
       cut: names.filter((element) => element.scrollWidth > element.clientWidth + 1 || !inside(box(element))).map((element) => element.textContent),
+      blocksCut,
       small: names.filter((element) => parseFloat(getComputedStyle(element).fontSize) < 18).map((element) => element.textContent),
       places,
     };
@@ -101,6 +112,7 @@ test.describe("TV-Podest beim Saisonabschluss (#2410)", () => {
     expect(seen.places[2].block).toBeGreaterThan(seen.places[3].block);
     expect(seen.places[1].art).toBeGreaterThan(seen.places[2].art);
     expect(seen.places[2].art).toBeGreaterThan(100);
+    expect(seen.blocksCut).toEqual([]);
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/tv-podest-1920.png` });
     await expect(page.getByTestId("tv-champion-parked")).toBeVisible({ timeout: 8000 });
     await expect(card).toHaveCount(0);
@@ -115,7 +127,36 @@ test.describe("TV-Podest beim Saisonabschluss (#2410)", () => {
     expect(seen.cardInside).toBe(true);
     expect(seen.cut).toEqual([]);
     expect(seen.places[1].block).toBeGreaterThan(seen.places[3].block);
+    expect(seen.blocksCut).toEqual([]);
   });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+    test(`schlimmster Fall bei ${size.width} px: lange Namen und Belohnungen - Sockel mit Ziffer ganz in der Karte`, async ({ page }) => {
+      test.setTimeout(60_000);
+      await page.setViewportSize(size);
+      REGS = LONG_TEAMS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved" }));
+      const long = (id, kind, name, rank) => reward(id, kind, name, rank);
+      const podium = { league: "Lionsquad Call of Duty Ranked Liga Europa", season: "Season 2026/27 Herbst-Winter-Split", division: "Liga 1 · Elite-Division",
+        places: [
+          { rank: 1, registration_id: "r1", rewards: [long("gold", "medal", "Goldmedaille der unbesiegbaren Meisterinnen und Meister", 1),
+            long("banner", "banner", "Meister-Banner für die Ewigkeit", 1), long("title", "title", "Unaufhaltsame Legende", 1)] },
+          { rank: 2, registration_id: "r2", rewards: [long("silver", "medal", "Silbermedaille für die tapfersten Zweitplatzierten", 2)] },
+          { rank: 3, registration_id: "r3", rewards: [long("bronze", "emblem", "Bronze-Emblem der Durchhaltekünstler", 3)] },
+        ] };
+      try {
+        await closeOnTv(page, "", podium);
+        await page.waitForTimeout(3200);
+        const seen = await inspectPodium(page);
+        expect(seen.cardInside).toBe(true);
+        expect(seen.blocksCut).toEqual([]);
+        expect(seen.places[1].block).toBeGreaterThan(seen.places[2].block);
+        expect(seen.places[2].block).toBeGreaterThan(seen.places[3].block);
+        if (SHOTS && size.width === 1440) await page.screenshot({ path: `${SHOTS}/worst-1440.png` });
+      } finally {
+        REGS = TEAMS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved" }));
+      }
+    });
+  }
 
   test("„Bewegung reduzieren“: das Podest steht sofort, nichts bewegt sich", async ({ page }) => {
     test.setTimeout(60_000);
