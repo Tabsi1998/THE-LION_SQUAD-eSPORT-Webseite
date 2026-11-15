@@ -37,9 +37,10 @@ function TrophyArt({ award, play, index }) {
     index={index} testId={`trophy-art-${award.id}`} />;
 }
 
-function Choice({ pressed, onClick, disabled = false, title, testId, children }) {
+function Choice({ pressed, onClick, disabled = false, busy = false, title, testId, children }) {
+  // `busy`: eine Wahl wird gerade gespeichert - bis dahin nimmt kein Knopf einen weiteren Klick an (Doppelklick-Schutz, #2425).
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} title={title} data-testid={testId}
+    <button type="button" onClick={onClick} disabled={disabled || busy} aria-busy={busy || undefined} aria-pressed={pressed} title={title} data-testid={testId}
       className="tls-trophy-card__choice" data-pressed={pressed ? "true" : undefined}>
       {children}
     </button>
@@ -75,17 +76,17 @@ function TrophyCard({ award, index, play, owner }) {
       {owner ? (
         <div className="tls-reward-card__actions">
           {owner.onFeature ? (
-            <Choice pressed={featured} onClick={() => owner.onFeature(featured ? null : award.id)} testId={`trophy-banner-${award.id}`}>
+            <Choice pressed={featured} busy={owner.busy} onClick={() => owner.onFeature(featured ? null : award.id)} testId={`trophy-banner-${award.id}`}>
               {featured ? "Banner ✓" : "Als Banner"}
             </Choice>
           ) : null}
           {owner.onTitle && kind === "title" && award.reward ? (
-            <Choice pressed={titled} onClick={() => owner.onTitle(titled ? null : award.id)} testId={`trophy-title-${award.id}`}>
+            <Choice pressed={titled} busy={owner.busy} onClick={() => owner.onTitle(titled ? null : award.id)} testId={`trophy-title-${award.id}`}>
               {titled ? "Titel ✓" : "Als Titel"}
             </Choice>
           ) : null}
           {owner.onEmblems && fitsEmblem(award) ? (
-            <Choice pressed={emblemAt >= 0} disabled={emblemAt < 0 && emblemFull}
+            <Choice pressed={emblemAt >= 0} disabled={emblemAt < 0 && emblemFull} busy={owner.busy}
               title={emblemAt < 0 && emblemFull ? `Höchstens ${EMBLEM_LIMIT} Embleme – nimm zuerst eines weg.` : undefined}
               onClick={() => { const next = toggleEmblem(owner.emblemIds, award.id); if (next) owner.onEmblems(next); }}
               testId={`trophy-emblem-${award.id}`}>

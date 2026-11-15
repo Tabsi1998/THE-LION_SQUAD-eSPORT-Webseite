@@ -726,3 +726,18 @@ test("Link zum Team-Chat (#chat) zeigt die Übersicht, auch mit ?tab=trophaeen",
   expect(await screen.findByTestId("team-chat")).toBeVisible();
   expect(screen.queryByTestId("team-trophies")).toBeNull();
 });
+
+test("Embleme: ein Doppelklick speichert nur einmal", async () => {
+  serve({ ...TEAM, awards: [EMBLEM, CUP], featured_emblems: [] });
+  let finish;
+  apiMock.put.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  renderAt("/teams/t-1?tab=trophaeen");
+  const button = await screen.findByTestId("trophy-emblem-aw-emb");
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(apiMock.put).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(screen.getByTestId("trophy-emblem-aw-emb")).toBeDisabled());
+  await act(async () => finish({ data: { ok: true, featured_emblems: [EMBLEM] } }));
+  await waitFor(() => expect(screen.getByTestId("trophy-emblem-aw-emb")).not.toBeDisabled());
+  expect(apiMock.put).toHaveBeenCalledTimes(1);
+});

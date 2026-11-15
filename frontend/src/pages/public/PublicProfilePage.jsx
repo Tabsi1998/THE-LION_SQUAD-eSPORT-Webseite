@@ -28,6 +28,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { seoTextPreview } from "@/lib/textPreview";
 import { headNameClass, isLongHeadName } from "@/lib/headName";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import {
   Trophy, Flag, Medal, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
@@ -376,6 +377,8 @@ export default function PublicProfilePage() {
   useApiInvalidation(reload, ["users", "achievements", "tournaments", "f1", "teams"]);
   const crown = useCrownFor(profile?.id);
   const [showHighlight, setShowHighlight] = useState(false);
+  // Banner, Titel und Embleme wählen (#2425): eine Wahl nach der anderen - ein Doppelklick schickt nichts doppelt.
+  const { submitting: choosing, submitOnce: chooseOnce } = useSubmissionGuard();
 
   if (loading) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE PROFIL …</div></PublicLayout>;
   // Das eigene Profil ist privat (oder „So sehen dich andere“ zeigt nichts): der Kasten bleibt, dazu der Weg zur Einstellung.
@@ -451,28 +454,29 @@ export default function PublicProfilePage() {
 
   // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu. ``slot = "title"``: eine Belohnung der
   // Art „Titel“ steht neben dem Namen (F.4, #2214).
-  const featureAward = async (awardId, slot = "banner") => {
+  const featureAward = (awardId, slot = "banner") => chooseOnce(async () => {
     const query = slot === "title" ? "?slot=title" : "";
     try {
       if (awardId) await api.post(`/me/awards/${awardId}/feature${query}`);
       else await api.delete(`/me/awards/feature${query}`);
       toast.success(slot === "title" ? (awardId ? "Als Titel gesetzt." : "Titel entfernt.") : (awardId ? "Als Profilbanner gesetzt." : "Profilbanner entfernt."));
-      load();
+      await load({ quiet: true });
     } catch (err) {
       toast.error(formatRequestError(err, "Das hat nicht geklappt."));
     }
-  };
+  });
 
   // Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur eigene Embleme und Medaillen; der Server prüft Anzahl und Besitz.
-  const featureEmblems = async (awardIds) => {
+  // Erst nach dem Nachladen ist die nächste Wahl frei - sonst rechnete ein schneller zweiter Klick mit der alten Liste.
+  const featureEmblems = (awardIds) => chooseOnce(async () => {
     try {
       await api.put("/me/awards/emblems", { award_ids: awardIds });
       toast.success(awardIds.length ? "Embleme gespeichert." : "Embleme entfernt.");
-      load({ quiet: true });
+      await load({ quiet: true });
     } catch (err) {
       toast.error(formatRequestError(err, "Das hat nicht geklappt."));
     }
-  };
+  });
 
   const updateFriendship = async (action) => {
     if (!user) {
@@ -867,7 +871,7 @@ export default function PublicProfilePage() {
               owner={ownMode ? {
                 featuredId: profile.featured_award?.id, titleId: profile.featured_title?.id,
                 emblemIds: (profile.featured_emblems || []).map((award) => award.id),
-                onFeature: (id) => featureAward(id), onTitle: (id) => featureAward(id, "title"), onEmblems: featureEmblems,
+                onFeature: (id) => featureAward(id), onTitle: (id) => featureAward(id, "title"), onEmblems: featureEmblems, busy: choosing,
                 emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben deinem Namen.",
               } : null}
               empty={isOwnProfile ? "Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." : "Noch keine Trophäen aus öffentlichen Wettbewerben."} />

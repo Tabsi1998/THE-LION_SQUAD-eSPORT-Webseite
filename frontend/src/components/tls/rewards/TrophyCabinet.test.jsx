@@ -110,3 +110,15 @@ test("Embleme neben dem Namen: höchstens drei, nur Belohnungen, mit Namen als H
   rerender(<EmblemRow emblems={null} testId="row" />);
   expect(screen.queryByTestId("row")).toBeNull();
 });
+
+test("Doppelklick-Schutz: solange eine Wahl gespeichert wird, nimmt kein Knopf einen Klick an", () => {
+  const owner = { featuredId: null, titleId: null, emblemIds: [], onFeature: vi.fn(), onTitle: vi.fn(), onEmblems: vi.fn(), busy: true };
+  renderCabinet({ owner });
+  for (const id of ["trophy-emblem-gold", "trophy-banner-cup"]) {
+    expect(screen.getByTestId(id)).toBeDisabled();
+    expect(screen.getByTestId(id)).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(screen.getByTestId(id));
+  }
+  expect(owner.onEmblems).not.toHaveBeenCalled();
+  expect(owner.onFeature).not.toHaveBeenCalled();
+});

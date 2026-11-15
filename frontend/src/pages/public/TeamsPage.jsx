@@ -223,6 +223,8 @@ function TeamDetail({ id }) {
   // Reiter (#2425): Übersicht und Trophäen - aus der Adresse (?tab=trophaeen), damit ein Link direkt in die Vitrine führt.
   // Dieselben Namen wie im Profil (awards, trophies, trophaeen); ein Link zum Chat (#chat) führt immer in die Übersicht.
   const [tab, setTab] = useState(() => teamTabFrom(location.search, location.hash));
+  // Banner, Titel und Embleme wählen (#2425): eine Wahl nach der anderen - ein Doppelklick schickt nichts doppelt.
+  const { submitting: choosing, submitOnce: chooseOnce } = useSubmissionGuard();
   useEffect(() => {
     if (location.hash === "#chat") setTab("overview");
   }, [location.hash]);
@@ -299,23 +301,23 @@ function TeamDetail({ id }) {
   const teamNeedsSecondFactor = !!user && !canEditTeam && !!team.admin_needs_second_factor && needsSecondFactor(user);
   // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
   // ``slot = "title"`` (F.4, #2214): eine Belohnung der Art „Titel“ steht im Kopf neben dem Teamnamen.
-  const featureTeamAward = async (awardId, slot = "banner") => {
+  const featureTeamAward = (awardId, slot = "banner") => chooseOnce(async () => {
     const query = slot === "title" ? "?slot=title" : "";
     try {
       if (awardId) await api.post(`/teams/${team.id}/awards/${awardId}/feature${query}`);
       else await api.delete(`/teams/${team.id}/awards/feature${query}`);
       toast.success(slot === "title" ? (awardId ? "Als Titel gesetzt." : "Titel entfernt.") : (awardId ? "Als Teambanner gesetzt." : "Teambanner entfernt."));
-      load();
+      await load();
     } catch { toast.error("Das hat nicht geklappt."); }
-  };
+  });
   // Bis zu drei Embleme neben dem Teamnamen (Nr. 34c, #2425) - die Teamleitung wählt, der Server prüft Anzahl und Besitz.
-  const featureTeamEmblems = async (awardIds) => {
+  const featureTeamEmblems = (awardIds) => chooseOnce(async () => {
     try {
       await api.put(`/teams/${team.id}/awards/emblems`, { award_ids: awardIds });
       toast.success(awardIds.length ? "Embleme gespeichert." : "Embleme entfernt.");
-      load();
+      await load();
     } catch (err) { toast.error(formatRequestError(err, "Das hat nicht geklappt.")); }
-  };
+  });
   const trophies = team.awards || [];
   // Wie im Profil (#1268): Andere sehen den Reiter nur mit Inhalt, die Teamleitung immer - mit einem Satz, wie Trophäen entstehen.
   const showTrophies = trophies.length > 0 || canEdit;
@@ -469,7 +471,7 @@ function TeamDetail({ id }) {
             owner={canEdit ? {
               featuredId: team.featured_award?.id, titleId: team.featured_title?.id,
               emblemIds: (team.featured_emblems || []).map((award) => award.id),
-              onFeature: (awardId) => featureTeamAward(awardId), onTitle: (awardId) => featureTeamAward(awardId, "title"), onEmblems: featureTeamEmblems,
+              onFeature: (awardId) => featureTeamAward(awardId), onTitle: (awardId) => featureTeamAward(awardId, "title"), onEmblems: featureTeamEmblems, busy: choosing,
               emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben dem Teamnamen.",
             } : null}
             empty="Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." />
