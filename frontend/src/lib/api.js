@@ -1,6 +1,7 @@
 import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
 import { noteFresh, noteRequestFailed } from "./network";
+import { isWritePauseError, noteWritePause, retryAfterSeconds } from "./writePause";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -110,7 +111,8 @@ export async function keepaliveRequest(method, path, body, headers = {}) {
   }
   if (!response.ok) {
     const error = new Error(`Anfrage fehlgeschlagen (${response.status})`);
-    error.response = { status: response.status, data };
+    error.response = { status: response.status, data, headers: { "retry-after": response.headers?.get?.("retry-after") ?? undefined } };
+    if (isWritePauseError(error)) noteWritePause(retryAfterSeconds(error));
     throw error;
   }
   return data;
@@ -165,6 +167,8 @@ function attachResponseInterceptors(client) {
       // Kein Netz: der Abruf kam ohne Antwort zurück (abgebrochene Abrufe zählen nicht) - die Leiste kommt nur, wenn auch
       // der Browser offline meldet. Ein einzelner geblockter Abruf (Werbeblocker, Firmen-Filter) ist kein „Offline“.
       if (!error.response && error.code !== "ERR_CANCELED" && !axios.isCancel(error)) noteRequestFailed();
+      // Schreibpause fürs Backup (#1009): die Leiste „gleich wieder da“; den Text zeigt die Seite selbst.
+      if (isWritePauseError(error)) noteWritePause(retryAfterSeconds(error));
       const original = error.config;
       const url = original?.url || "";
       const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh") || url.includes("/auth/passkeys/");

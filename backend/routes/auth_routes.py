@@ -5,6 +5,7 @@ import secrets
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -28,6 +29,7 @@ from services.secret_store import decrypt_secret, encrypt_secret
 from services.totp import generate_recovery_codes, generate_totp_secret, matching_totp_counter, provisioning_uri
 from services.return_path import safe_next_path
 from services.log_safe import log_safe
+from services import maintenance
 from services.private_fields import strip_private
 from services.usernames import username_from_name, username_taken
 
@@ -907,6 +909,12 @@ async def google_session(body: GoogleCredentialBody, request: Request, response:
             raise HTTPException(status_code=403, detail="Die Registrierung mit Google ist derzeit deaktiviert.")
         if not body.accept_privacy or not body.accept_terms:
             raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
+        # Schreibpause fürs Backup (#1009): Die Route ist für das Anmelden ausgenommen, ein neues Konto ist aber ein
+        # Schreibvorgang - dieselbe Antwort „gleich wieder da“ wie überall. Anmelden mit Google bleibt frei.
+        pause = await maintenance.active_state(db)
+        if pause:
+            status_code, content, headers = maintenance.response_parts(pause)
+            return JSONResponse(status_code=status_code, content=content, headers=headers)
         username, display_name = await _google_names(db, data.get("name"), email)
         user = _google_user_doc(email, display_name, data.get("picture"), google_id, username)
         user.update({

@@ -41,6 +41,10 @@ DYNAMIC = {
     "routes/station_routes.py:_assign_match_to_station:db[collection_name]": MATCHES,
     "routes/station_routes.py:clear_station:db[collection_name]": MATCHES,
     "services/account_erasure.py:_clean:getattr(db, collection)": MEDIA,
+    # Bestand fürs Backup-Manifest (#1009/#1010): zählt nur, liest keine Inhalte und schreibt nichts.
+    "services/backup_inventory.py:collection_counts:db[name]": "alle Sammlungen, nur gezählt (Backup-Manifest)",
+    "services/backup_inventory.py:figures:db[collection]": "backup_inventory.FIGURES (Anmeldungen, Rechnungen, Bestellungen, Mitgliedschaften)",
+    "services/backup_inventory.py:ttl_collections:db[name]": "alle Sammlungen, nur die Indexliste (Backup-Manifest)",
     "services/account_erasure.py:erase_related:getattr(db, name)": "account_erasure.PURGED",
     "services/account_erasure.py:_retention:getattr(db, name)": "account_erasure.RETAINED (Nachweise mit Frist)",
     "services/account_erasure.py:purge_expired_records:getattr(db, name)": "account_erasure.RETAINED_COLLECTIONS",
