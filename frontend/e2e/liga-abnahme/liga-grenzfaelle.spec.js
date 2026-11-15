@@ -215,7 +215,7 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     await done(homeCaptain, homeVice, away, awayVice, lead);
   });
 
-  test("Fristen-Job: eine Meldung ohne Antwort gilt nach 48 Stunden, die Gegenseite trägt ihre Liste nach", async ({ browser }, testInfo) => {
+  test("Fristen-Job: eine Meldung ohne Antwort gilt nach 48 Stunden, ein zweiter Lauf bestätigt nichts doppelt", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", LARGE);
     const play = matchOf(edge, 1, 3);
     edge.auto = play;
