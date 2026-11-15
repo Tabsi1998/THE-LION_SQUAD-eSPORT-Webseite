@@ -5,6 +5,9 @@ const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${localPort}`;
 
 module.exports = defineConfig({
   testDir: "./e2e",
+  // Die Liga-Gesamtabnahme (#1632) braucht echtes Backend und MongoDB und läuft nachts in eigenem Workflow
+  // (scripts/run_liga_g1.sh) - in den normalen Browser-Teilen der CI ist sie nicht einmal aufgelistet.
+  testIgnore: process.env.LIGA_ABNAHME === "1" ? [] : ["**/liga-abnahme/**"],
   timeout: 45_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
