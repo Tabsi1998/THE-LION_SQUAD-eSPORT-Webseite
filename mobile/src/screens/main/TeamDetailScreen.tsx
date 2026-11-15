@@ -27,6 +27,9 @@ import { sharePage } from "../../lib/share";
 import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
+import { LeagueApplicationsCard } from "../../components/league/LeagueApplicationsCard";
+import { LeagueSeasonHistory } from "../../components/league/LeagueSeasonHistory";
+import { RewardChip, RewardCollection } from "../../components/league/RewardCollection";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 type Candidate = { id: string; username?: string; display_name?: string; avatar_url?: string | null; has_pending_invite?: boolean };
@@ -345,6 +348,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           ) : null}
         />
 
+        {/* Titel neben dem Namen (#2173, F.4): die Belohnung der Art „Titel“, die die Teamleitung gewählt hat. */}
+        {team.featured_title ? <RewardChip award={team.featured_title} testID="team-featured-title" /> : null}
+
         {needsSecondFactor && team ? (
           <Card style={styles.card} testID="team-mfa-hint">
             <Muted>Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung. Einrichten kannst du sie auf der Website unter Profil → Sicherheit.</Muted>
@@ -486,6 +492,23 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <SquadRow key={squad.id || squad.name} canManage={canManage} onDelete={deleteSquad} onEdit={startSquadEdit} squad={squad} />
           )) : <Muted>Keine Squads hinterlegt.</Muted>}
         </Card>
+
+        {/* Liga (#2173): Anmeldestatus der eigenen Co-Teams, Belohnungen je Season und die Season-Historie. */}
+        <LeagueApplicationsCard squadIds={squads.map((squad) => squad.id)} enabled={isMember && !isGuestUser(user)} />
+        {team.awards?.some((award) => award?.reward) ? (
+          <Card style={styles.card} testID="team-rewards">
+            <Heading>Belohnungen</Heading>
+            {canManage ? <Muted>Eine Belohnung der Art „Titel“ steht als Titel neben dem Teamnamen.</Muted> : null}
+            <RewardCollection awards={team.awards} testID="team-reward-collection" titleId={team.featured_title?.id || null} busy={busy}
+              onTitle={canManage ? (id) => {
+                void showActionResult(async () => {
+                  if (id) await api.post(`/teams/${team.id}/awards/${encodeURIComponent(id)}/feature`, undefined, { params: { slot: "title" } });
+                  else await api.delete(`/teams/${team.id}/awards/feature`, { params: { slot: "title" } });
+                }, id ? "Titel gewählt." : "Titel entfernt.");
+              } : null} />
+          </Card>
+        ) : null}
+        <LeagueSeasonHistory rows={team.league_history} showTeam testID="team-league-history" />
 
         {canManage ? (
           <Card style={styles.card}>

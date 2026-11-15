@@ -4,6 +4,7 @@ import { DRAW_STATE_TEXT, drawStateOf } from "./advancement";
 import { isByeSlot, isCancelled, isDone, isLive, isWalkover, matchFate, sectionGroup, soloAdvance, type BracketMatch } from "./bracketGraph";
 import { sectionKind } from "./bracketSections";
 import { formatStatus } from "./format";
+import { knownZone } from "./leagueTeam";
 
 // ---------------------------------------------------------------------------------------------------- Rundennamen
 // Dieselbe Regel wie der Server (backend/services/round_labels.py): die Baum-Antwort bringt sie ab #1581 als
@@ -124,7 +125,8 @@ export function scheduleSections(matches: BracketMatch[], { by, mine, labels }: 
 
 // --------------------------------------------------------------------------------------------------------- Tabellen
 const OUT_LABELS: Record<string, string> = { withdrawn: "Ausgetreten", disqualified: "Disqualifiziert" };
-export type TableRow = { id: string; rank: number; name: string; cells: string[]; mine: boolean; out: string };
+// `zone` (#2173): Auf- und Abstieg einer Liga-Staffel, vom Server je Zeile (docs/LIGA.md F.2) - sonst null.
+export type TableRow = { id: string; rank: number; name: string; cells: string[]; mine: boolean; out: string; zone: string | null };
 export type StandingsTable = { key: string; title: string; columns: string[]; rows: TableRow[] };
 
 const num = (value: unknown) => {
@@ -154,6 +156,7 @@ export function standingsTables(standings: any[] | null | undefined, format: str
       cells: [num(row?.played), num(row?.won ?? row?.wins), num(row?.drawn), num(row?.lost ?? row?.losses), extra, num(row?.points)],
       mine: Boolean(mine) && id === mine,
       out: OUT_LABELS[String(statusById.get(id) || "")] || "",
+      zone: knownZone(row?.zone),
     };
   };
   const grouped = list.every((entry) => entry && typeof entry === "object" && Array.isArray(entry.standings));
