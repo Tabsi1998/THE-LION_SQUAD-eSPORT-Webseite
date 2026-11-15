@@ -171,3 +171,13 @@ def test_the_rulebook_names_the_late_registration_only_with_a_window_past_the_st
     assert "- Nachmeldung: nur bis zum Season-Start." in render_eligibility(eligibility_data(season(late_registration_days=0), []))
     assert "Nachmeldung" not in render_eligibility(eligibility_data(season(application_closes_at="2026-10-20T00:00:00+00:00"), []))
     assert "Nachmeldung" not in render_eligibility(eligibility_data({"start_date": "2026-11-01T00:00:00+00:00"}, []))
+
+
+def test_the_second_leg_swaps_the_sides_of_the_existing_game():
+    """Review #2422: X hatte schon zu Hause gegen das neue Team - das zweite Spiel hat getauschte Seiten, auch wenn X sonst
+    mehr Auswärtsspiele hat."""
+    teams = [reg("X"), reg("Y"), reg("Z"), reg("L")]
+    games = [duel(1, "X", "L"), duel(1, "Y", "Z"), duel(2, "Y", "X"), duel(2, "Z", "X")]
+    out = plan(staffel(weeks=6, legs=2), reg("L"), teams, games, NOW)
+    against_x = [row for row in out["pairings"] if row["opponent_id"] == "X"]
+    assert len(against_x) == 1 and against_x[0]["home_registration_id"] == "L"

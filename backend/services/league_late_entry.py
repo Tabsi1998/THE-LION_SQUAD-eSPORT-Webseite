@@ -200,7 +200,13 @@ def plan(tournament: dict, registration: dict, registrations: list[dict], matche
     for week in sorted(placed):
         per_opponent.setdefault(placed[week][0], []).append(week)
     pairings = []
+    # Hin- und Rückrunde: Steht schon ein Spiel der Paarung, bekommt das neue dessen getauschte Seiten (Review #2422).
     first_home: dict[str, bool] = {}
+    for row in opponents:
+        if already[row["id"]] == 1:
+            existing = next(match for match in duels if match.get("status") not in GONE_STATUSES
+                            and set(duel_sides(match)) == {new_id, row["id"]})
+            first_home[row["id"]] = duel_sides(existing)[0] == new_id
     for week in sorted(placed):
         opponent_id = placed[week][0]
         if opponent_id in first_home:
