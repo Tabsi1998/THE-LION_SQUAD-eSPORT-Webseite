@@ -397,3 +397,66 @@ async def feature_award_for_team(db, team_id: str, award_id: str | None, slot: s
         return chosen
     await db.teams.update_one({"id": team_id}, {"$unset": {field: ""}})
     return None
+
+
+# Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): Belohnungen der Art „Emblem“ oder „Medaille“, in der gewählten Reihenfolge.
+# Gespeichert werden nur Kennungen (``featured_emblem_award_ids`` an ``users`` und ``teams``); gezeigt wird beim Lesen nur, was in der
+# Liste der Auszeichnungen steht - für Gäste also nur Öffentliches, nie Ruhendes. Fällt eine Belohnung weg, fällt sie still heraus.
+EMBLEM_FIELD = "featured_emblem_award_ids"
+EMBLEM_KINDS = ("emblem", "medal")
+EMBLEM_LIMIT = 3
+
+
+class EmblemProblem(Exception):
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.status = status
+
+
+def fits_emblem(award: dict) -> bool:
+    return award.get("kind") in EMBLEM_KINDS
+
+
+def featured_emblems(awards: list[dict], award_ids) -> list[dict]:
+    """Die gewählten Embleme aus der Liste, die die Person sehen darf - in der gewählten Reihenfolge, höchstens drei."""
+    by_id = {award["id"]: award for award in awards if fits_emblem(award)}
+    chosen: list[dict] = []
+    for award_id in award_ids if isinstance(award_ids, list) else []:
+        award = by_id.pop(award_id, None) if isinstance(award_id, str) else None
+        if award:
+            chosen.append(award)
+    return chosen[:EMBLEM_LIMIT]
+
+
+def _chosen_emblems(awards: list[dict], award_ids: list[str]) -> list[str]:
+    wanted = list(dict.fromkeys(str(award_id or "").strip() for award_id in award_ids or []))
+    wanted = [award_id for award_id in wanted if award_id]
+    if len(wanted) > EMBLEM_LIMIT:
+        raise EmblemProblem(f"Höchstens {EMBLEM_LIMIT} Embleme oder Medaillen neben dem Namen.")
+    own = {award["id"] for award in awards if fits_emblem(award)}
+    if any(award_id not in own for award_id in wanted):
+        raise EmblemProblem("Emblem nicht gefunden.", 404)
+    return wanted
+
+
+async def feature_emblems_for_user(db, user_id: str, award_ids: list[str]) -> list[dict]:
+    """Die Embleme neben dem Namen setzen - nur eigene Embleme und Medaillen, keine ruhenden; eine leere Liste löscht die Wahl."""
+    awards = await awards_for_user(db, user_id, public_only=False)
+    wanted = _chosen_emblems(awards, award_ids)
+    if wanted:
+        await db.users.update_one({"id": user_id}, {"$set": {EMBLEM_FIELD: wanted}})
+    else:
+        await db.users.update_one({"id": user_id}, {"$unset": {EMBLEM_FIELD: ""}})
+    return featured_emblems(awards, wanted)
+
+
+async def feature_emblems_for_team(db, team_id: str, award_ids: list[str]) -> list[dict]:
+    """Wie oben für das Team - die Route prüft vorher, dass die Teamleitung wählt."""
+    awards = await awards_for_team(db, team_id, public_only=False)
+    wanted = _chosen_emblems(awards, award_ids)
+    if wanted:
+        await db.teams.update_one({"id": team_id}, {"$set": {EMBLEM_FIELD: wanted}})
+    else:
+        await db.teams.update_one({"id": team_id}, {"$unset": {EMBLEM_FIELD: ""}})
+    return featured_emblems(awards, wanted)

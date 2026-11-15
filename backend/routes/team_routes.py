@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from database import get_db
 from services import game_usage, league_eligibility, league_roster, moderation_standing
 from services.mutation_lock import MutationLockBusy
@@ -667,6 +667,10 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     out["featured_award"] = next((award for award in out["awards"] if award["id"] == team.get("featured_award_id")), None)
     # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Teamleitung gewählt hat.
     out["featured_title"] = next((award for award in out["awards"] if award["id"] == team.get("featured_title_award_id")), None)
+    # Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425) - aus derselben Liste, für Gäste also nur Öffentliches und nie Ruhendes.
+    from services.awards import EMBLEM_FIELD, featured_emblems
+    out["featured_emblems"] = featured_emblems(out["awards"], team.get(EMBLEM_FIELD))
+    out.pop(EMBLEM_FIELD, None)
     # Season-Historie (F.2, #1627): je abgeschlossener Liga-Staffel Liga N, Platz, Meister - nur Seasons, die die Person sieht.
     from routes.tournament_common import tournament_hidden_reason
     from services.league_history import for_team
@@ -705,6 +709,29 @@ async def unfeature_team_award(team_id: str, slot: Literal["banner", "title"] = 
     from services.awards import feature_award_for_team
     await feature_award_for_team(db, team_id, None, slot)
     return {"ok": True, "featured_award": None}
+
+
+class TeamEmblemsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    award_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
+@router.put("/{team_id}/awards/emblems")
+async def set_team_emblems(team_id: str, body: TeamEmblemsBody, me: dict = Depends(get_current_user)):
+    """Bis zu drei Embleme oder Medaillen des Teams neben dem Teamnamen (Nr. 34c, #2425) - Teamleitung und Co-Leitung."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        _refuse(me, "Nur die Teamleitung wählt die Embleme des Teams.")
+    from services.awards import EmblemProblem, feature_emblems_for_team
+    try:
+        chosen = await feature_emblems_for_team(db, team_id, body.award_ids)
+    except EmblemProblem as problem:
+        raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    return {"ok": True, "featured_emblems": chosen}
 
 
 @router.get("/{team_id}/chat")
