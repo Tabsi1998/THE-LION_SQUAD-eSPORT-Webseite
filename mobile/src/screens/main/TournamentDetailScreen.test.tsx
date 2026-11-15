@@ -274,6 +274,13 @@ describe("Bestätigungs-Blatt", () => {
 
   beforeEach(() => {
     mockPost.mockResolvedValue({ data: {} });
+    // Feste Uhr im selben Jahr wie das Turnier: Ab 2027 schreibt das Blatt das Jahr dazu („Sa 23. Mai 2026“) - richtig, aber
+    // nicht das, was hier geprüft wird.
+    jest.useFakeTimers({ now: new Date("2026-11-15T12:00:00Z"), advanceTimers: true });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   async function openSheet(tournament: Record<string, unknown>) {
