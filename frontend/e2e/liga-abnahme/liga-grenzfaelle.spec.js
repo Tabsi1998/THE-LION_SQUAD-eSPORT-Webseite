@@ -273,34 +273,67 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     await done(lead, admin);
   });
 
-  test("Szenario 16: Gleichstand dreier Teams - direkter Vergleich (Mini-Tabelle), Restgruppe neu gerechnet", async ({ browser }, testInfo) => {
-    const admin = await as(browser, testInfo, "admin", LARGE);
-    const lead = await as(browser, testInfo, "lead", LARGE);
-    Object.assign(tie, await buildLeague(admin, lead, { name: `Gleichstand-Liga ${unique()}` }));
-    for (const index of [4, 5, 6, 7]) await assign(lead, tie.tid, index);
-    await start(lead, tie);
-    // A (4) schlägt B (5) 3:0, B schlägt C (6) 3:1, C schlägt A 3:2; alle drei schlagen D (7). A, B und C haben je 6 Punkte.
-    // Mini-Tabelle: alle 3 Punkte, Map-Differenz A +2, B -1, C -1 - A vorn. Für B und C wird neu gerechnet: B schlug C.
-    const plan = [[4, 5, 4, "3:0"], [5, 6, 5, "3:1"], [4, 6, 6, "3:2"], [4, 7, 4, "3:0"], [5, 7, 5, "3:0"], [6, 7, 6, "3:0"]];
-    const byIndex = Object.fromEntries(Object.entries(tie.index).map(([reg, index]) => [index, reg]));
+  /** Ergebnisse nach Plan eintragen: [Index A, Index B, Index des Siegers, Stand]. */
+  async function playPlan(lead, world, plan) {
+    const byIndex = Object.fromEntries(Object.entries(world.index).map(([reg, index]) => [index, reg]));
     for (const [a, b, winnerIndex, score] of plan) {
-      const play = matchOf(tie, a, b);
+      const play = matchOf(world, a, b);
       const winner = byIndex[winnerIndex];
       const loser = winner === play.home ? play.away : play.home;
-      await ok(lead, "POST", `/api/matches/${play.id}/result`, { results: resultsOf(winner, loser, score), games: seriesGames(pattern(score, winner, loser), play.home, play.away, { maps: tie.maps }) });
+      await ok(lead, "POST", `/api/matches/${play.id}/result`, { results: resultsOf(winner, loser, score), games: seriesGames(pattern(score, winner, loser), play.home, play.away, { maps: world.maps }) });
     }
-    const rows = await get(lead, `/api/tournaments/${tie.tid}/standings`);
-    const order = rows.sort((x, y) => x.rank - y.rank).map((row) => tie.index[row.registration_id]);
-    expect(order).toEqual([4, 5, 6, 7]);
+    return byIndex;
+  }
+
+  async function tieLeague(admin, lead, world, name, indices) {
+    Object.assign(world, await buildLeague(admin, lead, { name: `${name} ${unique()}` }));
+    await ok(lead, "PATCH", `${ADMIN}/seasons/${world.season.id}`, { visibility: "public" });
+    for (const index of indices) await assign(lead, world.tid, index);
+    await start(lead, world);
+  }
+
+  test("Szenario 16: Gleichstand dreier Teams - Mini-Tabelle, und ein echter Gleichstand, den die Leitung entscheidet", async ({ browser }, testInfo) => {
+    const admin = await as(browser, testInfo, "admin", LARGE);
+    const lead = await as(browser, testInfo, "lead", LARGE);
+    // A (4) schlägt B (5) 3:0, B schlägt C (6) 3:1, C schlägt A 3:2; alle drei schlagen D (7) - je 6 Punkte. Mini-Tabelle nach
+    // Punkten, Map-Differenz, gewonnenen Maps (docs/LIGA.md, E.1): alle 3 Punkte; Differenz A +2, B -1, C -1; gewonnene Maps
+    // untereinander C 4, B 3. Reihenfolge A, C, B, D - alle drei über den direkten Vergleich.
+    await tieLeague(admin, lead, tie, "Gleichstand-Liga", [4, 5, 6, 7]);
+    await playPlan(lead, tie, [[4, 5, 4, "3:0"], [5, 6, 5, "3:1"], [4, 6, 6, "3:2"], [4, 7, 4, "3:0"], [5, 7, 5, "3:0"], [6, 7, 6, "3:0"]]);
+    const rows = (await get(lead, `/api/tournaments/${tie.tid}/standings`)).sort((x, y) => x.rank - y.rank);
+    expect(rows.map((row) => tie.index[row.registration_id])).toEqual([4, 6, 5, 7]);
+    expect(rows.map((row) => row.rank)).toEqual([1, 2, 3, 4]);
     expect(rows.slice(0, 3).map((row) => row.points)).toEqual([6, 6, 6]);
     expect(rows.slice(0, 3).every((row) => row.tiebreak === "head_to_head")).toBe(true);
-    const admTable = await get(lead, `${ADMIN}/staffeln/${tie.tid}/table`);
-    expect(admTable.ties).toEqual([]);
+    expect((await get(lead, `${ADMIN}/staffeln/${tie.tid}/table`)).ties).toEqual([]);
+
+    // Echter Gleichstand: drei Teams gewinnen im Kreis je 3:1 und schlagen D 3:0 - gleich in allem. Sie teilen sich Platz 1, bis
+    // die Leitung entscheidet (letzte Stufe, Platz 1 der obersten Liga nur mit Verfahren).
+    const patt = {};
+    await tieLeague(admin, lead, patt, "Patt-Liga", [12, 13, 14, 15]);
+    const byIndex = await playPlan(lead, patt, [[12, 13, 12, "3:1"], [13, 14, 13, "3:1"], [12, 14, 14, "3:1"], [12, 15, 12, "3:0"], [13, 15, 13, "3:0"], [14, 15, 14, "3:0"]]);
+    let shared = (await get(lead, `/api/tournaments/${patt.tid}/standings`)).sort((x, y) => x.rank - y.rank);
+    expect(shared.map((row) => row.rank)).toEqual([1, 1, 1, 4]);
+    const table = await get(lead, `${ADMIN}/staffeln/${patt.tid}/table`);
+    expect(table.ties).toHaveLength(1);
+    expect(table.ties[0].registration_ids.sort()).toEqual([byIndex[12], byIndex[13], byIndex[14]].sort());
+    const decision = `${ADMIN}/staffeln/${patt.tid}/table-decision`;
+    const order = [byIndex[13], byIndex[14], byIndex[12]];
+    const noMethod = await api(lead, "PUT", decision, { registration_ids: order, reason: "Losentscheid der Leitung vor beiden Teams" });
+    expect(noMethod.status).toBe(422);
+    await ok(lead, "PUT", decision, { registration_ids: order, reason: "Losentscheid der Leitung vor allen drei Teams", method: "lot" });
+    shared = (await get(lead, `/api/tournaments/${patt.tid}/standings`)).sort((x, y) => x.rank - y.rank);
+    expect(shared.map((row) => patt.index[row.registration_id])).toEqual([13, 14, 12, 15]);
+    expect(shared.map((row) => row.rank)).toEqual([1, 2, 3, 4]);
+    expect(shared.slice(0, 3).every((row) => row.tiebreak === "lead_decision")).toBe(true);
+
     for (const viewport of WIDTHS) {
       const guest = await as(browser, testInfo, "anon", viewport);
-      await guest.page.goto(`/liga/${tie.league.slug}/${tie.season.slug}`);
-      await expect(guest.page.getByTestId("league-staffel-A")).toBeVisible();
-      await noSideScroll(guest.page);
+      for (const world of [tie, patt]) {
+        await guest.page.goto(`/liga/${world.league.slug}/${world.season.slug}`);
+        await expect(guest.page.getByTestId("league-staffel-A")).toBeVisible();
+        await noSideScroll(guest.page);
+      }
       await shot(guest.page, `g1-gleichstand-${viewport.width}.png`);
       await done(guest);
     }
@@ -312,10 +345,11 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     const lead = await as(browser, testInfo, "lead", LARGE);
     Object.assign(legacy, await buildLeague(admin, lead, { name: `Altbestand-Liga ${unique()}` }));
     for (const index of [8, 9, 10, 11]) await assign(lead, legacy.tid, index);
-    // Season und Staffel wie vor dem Liga-Masterplan: ohne Check-in-, Veto-, Ergebnis-, Tabellen-, Protest- und Kaderfelder.
+    // Eine Season, die schon vor dem Liga-Masterplan öffentlich war - danach ohne Check-in-, Veto-, Ergebnis-, Tabellen-,
+    // Protest- und Kaderfelder, wie der Altbestand in der Datenbank aussieht.
+    await ok(lead, "PATCH", `${ADMIN}/seasons/${legacy.season.id}`, { visibility: "public" });
     const stripped = job("legacy", { season: legacy.season.id });
     expect(stripped.season).toBe(1);
-    await ok(lead, "PATCH", `${ADMIN}/seasons/${legacy.season.id}`, { visibility: "public" });
     await start(lead, legacy);
     const play = matchOf(legacy, 8, 9);
     const home = await as(browser, testInfo, `captain-${play.homeIndex}`, LARGE);
@@ -326,7 +360,7 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     const rosterOf = (index) => state.teams[index].members.slice(0, 4);
     const winners = pattern("3:1", play.winner, play.loser);
     const gamesFor = (index) => winners.map((winner, position) => ({ position: position + 1, mode: g1.MODE_ORDER[position],
-      map_id: legacy.maps[g1.POOL[g1.MODE_ORDER[position]][position % 3]].id, winner_registration_id: winner, lineup: rosterOf(index) }));
+      map_id: legacy.maps[g1.POOL[g1.MODE_ORDER[position]][position % g1.POOL[g1.MODE_ORDER[position]].length]].id, winner_registration_id: winner, lineup: rosterOf(index) }));
     const results = resultsOf(play.winner, play.loser, "3:1");
     const first = play.winner === play.home ? home : away;
     const second = first === home ? away : home;
