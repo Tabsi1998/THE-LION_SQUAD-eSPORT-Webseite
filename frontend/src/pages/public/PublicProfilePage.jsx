@@ -41,7 +41,8 @@ import { CountUp } from "@/components/tls/motion/CountUp";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
-import { RewardChip, RewardCollection } from "@/components/tls/rewards/RewardCollection";
+import { RewardChip } from "@/components/tls/rewards/RewardCollection";
+import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
@@ -324,7 +325,7 @@ function AsOthersSwitch({ on, onChange }) {
 }
 
 /** Reiter aus der Adresse - auch die alten Namen von /profile (#1149, #1150). */
-const TAB_ALIASES = { achievements: "badges", erfolge: "badges", badges: "badges", awards: "awards", honours: "honours", references: "references", teams: "teams", overview: "overview" };
+const TAB_ALIASES = { achievements: "badges", erfolge: "badges", badges: "badges", awards: "awards", trophaeen: "awards", trophies: "awards", honours: "honours", references: "references", teams: "teams", overview: "overview" };
 
 export default function PublicProfilePage() {
   const { username } = useParams();
@@ -457,6 +458,17 @@ export default function PublicProfilePage() {
       else await api.delete(`/me/awards/feature${query}`);
       toast.success(slot === "title" ? (awardId ? "Als Titel gesetzt." : "Titel entfernt.") : (awardId ? "Als Profilbanner gesetzt." : "Profilbanner entfernt."));
       load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    }
+  };
+
+  // Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur eigene Embleme und Medaillen; der Server prüft Anzahl und Besitz.
+  const featureEmblems = async (awardIds) => {
+    try {
+      await api.put("/me/awards/emblems", { award_ids: awardIds });
+      toast.success(awardIds.length ? "Embleme gespeichert." : "Embleme entfernt.");
+      load({ quiet: true });
     } catch (err) {
       toast.error(formatRequestError(err, "Das hat nicht geklappt."));
     }
@@ -597,6 +609,7 @@ export default function PublicProfilePage() {
                 <span>@{profile.username}</span>
                 {/* Titel neben dem Namen (F.4, #2214): eine gewählte Belohnung der Art „Titel“. */}
                 <RewardChip award={profile.featured_title} testId="profile-featured-title" />
+                <EmblemRow emblems={profile.featured_emblems} testId="profile-featured-emblems" />
                 <AccountLevelPill level={level.level} />
                 {liveStream && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
@@ -728,7 +741,7 @@ export default function PublicProfilePage() {
 
               {awards.length > 0 && (
                 <section data-testid="profile-awards-preview">
-                  <SectionTitle icon={Medal} color="#FFD700" kicker="Turniere" title="Auszeichnungen" action={awards.length > 2 ? { label: "Alle ansehen", onClick: () => setTab("awards") } : null} />
+                  <SectionTitle icon={Medal} color="#FFD700" kicker="Turniere und Liga" title="Trophäen" action={awards.length > 2 ? { label: "Alle ansehen", onClick: () => setTab("awards") } : null} />
                   <div className="grid gap-3 md:grid-cols-2">
                     {awards.slice(0, 2).map((award) => (
                       <AwardBanner key={award.id} award={award} linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null} />
@@ -845,38 +858,19 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {/* Auszeichnungen (#230, eigener Reiter): Banner und Trophäen aus veröffentlichten Turnieren -
-            keine Referenzen (die sind die Turnier-Historie). Das eigene Profil kann eines als Profilbanner wählen. */}
+        {/* Trophäen (#2425, Nr. 59; früher „Auszeichnungen“, #230): Turnier-Pokale und Liga-Belohnungen in einer Vitrine mit Filtern -
+            keine Referenzen (die sind die Turnier-Historie). Das eigene Profil wählt hier Banner, Titel und bis zu drei Embleme. */}
         {activeTab === "awards" && (
-          <div className="space-y-3" data-testid="public-profile-awards">
-            <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
-            {/* Sammlung der Liga-Belohnungen (F.4, #2214): je Season gruppiert; das eigene Profil wählt Banner und Titel. */}
-            <RewardCollection awards={awards} testId="profile-reward-collection" featuredId={profile.featured_award?.id} titleId={profile.featured_title?.id}
-              onFeature={isOwnProfile ? (id) => featureAward(id) : null} onTitle={isOwnProfile ? (id) => featureAward(id, "title") : null}
-              linkFor={(award) => (award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null)} />
-            {awards.some((award) => !award.reward) ? (
-              <div className="grid gap-3 md:grid-cols-2" data-testid="profile-award-banners">
-                {awards.filter((award) => !award.reward).map((award) => (
-                  <AwardBanner
-                    key={award.id}
-                    award={award}
-                    linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null}
-                    action={isOwnProfile ? (
-                      <button
-                        type="button"
-                        onClick={(event) => { event.preventDefault(); featureAward(profile.featured_award?.id === award.id ? null : award.id); }}
-                        data-testid={`award-feature-${award.id}`}
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${profile.featured_award?.id === award.id ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}
-                      >
-                        {profile.featured_award?.id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}
-                      </button>
-                    ) : null}
-                  />
-                ))}
-              </div>
-            ) : awards.length ? null : (
-              <EmptyState text={isOwnProfile ? "Noch keine Auszeichnungen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." : "Noch keine Auszeichnungen aus öffentlichen Turnieren."} />
-            )}
+          <div className="space-y-4" data-testid="public-profile-awards">
+            <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
+            <TrophyCabinet awards={awards} testId="profile-trophies"
+              owner={ownMode ? {
+                featuredId: profile.featured_award?.id, titleId: profile.featured_title?.id,
+                emblemIds: (profile.featured_emblems || []).map((award) => award.id),
+                onFeature: (id) => featureAward(id), onTitle: (id) => featureAward(id, "title"), onEmblems: featureEmblems,
+                emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben deinem Namen.",
+              } : null}
+              empty={isOwnProfile ? "Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." : "Noch keine Trophäen aus öffentlichen Wettbewerben."} />
           </div>
         )}
 
@@ -1363,7 +1357,7 @@ export function profileTabs({ own, badges = 0, awards = 0, references = 0, refer
   return [
     ["overview", "Übersicht", true],
     ["badges", `Erfolge${count(badges)}`, own || badges > 0],
-    ["awards", `Auszeichnungen${count(awards)}`, own || awards > 0],
+    ["awards", `Trophäen${count(awards)}`, own || awards > 0],
     ["references", `Referenzen${count(references)}`, own || referencesContent > 0],
     ["teams", `Teams${count(teams)}`, own || teams > 0],
     ["honours", `Ehrungen${count(honours)}`, honours > 0 || (own && clubMember)],

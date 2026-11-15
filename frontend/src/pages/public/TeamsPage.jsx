@@ -25,7 +25,9 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
-import { RewardChip, RewardCollection } from "@/components/tls/rewards/RewardCollection";
+import { RewardChip } from "@/components/tls/rewards/RewardCollection";
+import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
+import { TeamRankBanners } from "@/components/tls/league/RankBannerCopy";
 import { viennaDateTime } from "@/lib/vienna";
 import { departureWarning } from "@/lib/squadShortage";
 import { teamLogoUpload } from "@/lib/svgLogo";
@@ -210,6 +212,8 @@ function TeamDetail({ id }) {
   const { submitting: mutating, submitOnce } = useSubmissionGuard();
   const [actionError, setActionError] = useState("");
   const confirm = useConfirm();
+  // Reiter (#2425): Übersicht und Trophäen - aus der Adresse (?tab=trophaeen), damit ein Link direkt in die Vitrine führt.
+  const [tab, setTab] = useState(() => (new URLSearchParams(location.search).get("tab") === "trophaeen" ? "trophies" : "overview"));
 
   // Laden (#983, #1152) über useLoad: 404/403 heißt „nicht gefunden“; ohne Netz oder bei einem Serverfehler bleibt ein
   // schon geladenes Team stehen (mit Hinweis), sonst steht der Fehler mit „Nochmal versuchen“ da - nie ein ewiges
@@ -292,6 +296,18 @@ function TeamDetail({ id }) {
       load();
     } catch { toast.error("Das hat nicht geklappt."); }
   };
+  // Bis zu drei Embleme neben dem Teamnamen (Nr. 34c, #2425) - die Teamleitung wählt, der Server prüft Anzahl und Besitz.
+  const featureTeamEmblems = async (awardIds) => {
+    try {
+      await api.put(`/teams/${team.id}/awards/emblems`, { award_ids: awardIds });
+      toast.success(awardIds.length ? "Embleme gespeichert." : "Embleme entfernt.");
+      load();
+    } catch (err) { toast.error(formatRequestError(err, "Das hat nicht geklappt.")); }
+  };
+  const trophies = team.awards || [];
+  // Wie im Profil (#1268): Andere sehen den Reiter nur mit Inhalt, die Teamleitung immer - mit einem Satz, wie Trophäen entstehen.
+  const showTrophies = trophies.length > 0 || canEdit;
+  const activeTab = tab === "trophies" && showTrophies ? "trophies" : "overview";
 
   const runAction = async (task, fallback) => {
     setActionError("");
@@ -401,7 +417,13 @@ function TeamDetail({ id }) {
           </>
         )}
       >
-        {team.featured_title ? <div className="mt-3"><RewardChip award={team.featured_title} testId="team-featured-title" /></div> : null}
+        {team.featured_title || team.featured_emblems?.length ? (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <RewardChip award={team.featured_title} testId="team-featured-title" />
+            {/* Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425). */}
+            <EmblemRow emblems={team.featured_emblems} testId="team-featured-emblems" />
+          </div>
+        ) : null}
         {team.featured_award && (
           <div className="mt-5 w-full max-w-xl text-left" data-testid="team-featured-award">
             <AwardBanner award={team.featured_award} linkTo={team.featured_award.tournament?.slug ? `/tournaments/${team.featured_award.tournament.slug}` : null} />
@@ -414,6 +436,32 @@ function TeamDetail({ id }) {
           <LoadStaleNotice load={teamLoad} />
         </div>
       )}
+      {showTrophies ? (
+        <div className="border-b border-white/10 sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm z-20" data-testid="team-tabs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe" role="tablist" aria-label="Teamseite">
+            {[["overview", "Übersicht"], ["trophies", `Trophäen${trophies.length ? ` (${trophies.length})` : ""}`]].map(([key, label]) => (
+              <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} data-testid={`team-tab-${key}`}
+                className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === key ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {activeTab === "trophies" ? (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-4" data-testid="team-awards">
+          <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
+          {/* Turnier-Pokale und Liga-Belohnungen in einer Vitrine (Nr. 59); die Teamleitung wählt Teambanner, Titel und Embleme. */}
+          <TrophyCabinet awards={trophies} testId="team-trophies"
+            owner={canEdit ? {
+              featuredId: team.featured_award?.id, titleId: team.featured_title?.id,
+              emblemIds: (team.featured_emblems || []).map((award) => award.id),
+              onFeature: (awardId) => featureTeamAward(awardId), onTitle: (awardId) => featureTeamAward(awardId, "title"), onEmblems: featureTeamEmblems,
+              emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben dem Teamnamen.",
+            } : null}
+            empty="Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." />
+        </div>
+      ) : (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {inviteToken && !isMember ? <TeamJoinCard teamId={team.id} token={inviteToken} user={user} onJoined={joinedByLink} /> : null}
@@ -428,34 +476,6 @@ function TeamDetail({ id }) {
           <LeagueSeasonHistory rows={team.league_history} showTeam testId="team-league-history" />
           {/* Gesamtwertung über Seasons (F.5, #2215): Platz je Co-Team und Zeitraum. */}
           <LeagueOverallStanding rows={team.league_overall} showTeam testId="team-league-overall" />
-          {(team.awards || []).length > 0 && (
-            <section data-testid="team-awards">
-              <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
-              {/* Sammlung der Liga-Belohnungen (F.4, #2214): je Season; die Teamleitung wählt Teambanner und Titel. */}
-              <RewardCollection awards={team.awards} testId="team-reward-collection" featuredId={team.featured_award?.id} titleId={team.featured_title?.id}
-                onFeature={canEdit ? (id) => featureTeamAward(id) : null} onTitle={canEdit ? (id) => featureTeamAward(id, "title") : null}
-                linkFor={(award) => (award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null)} />
-              {team.awards.some((award) => !award.reward) ? <div className="grid sm:grid-cols-2 gap-3 mt-4" data-testid="team-award-banners">
-                {team.awards.filter((award) => !award.reward).map((award) => (
-                  <AwardBanner
-                    key={award.id}
-                    award={award}
-                    linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null}
-                    action={canEdit ? (
-                      <button
-                        type="button"
-                        onClick={(event) => { event.preventDefault(); featureTeamAward(team.featured_award?.id === award.id ? null : award.id); }}
-                        data-testid={`team-award-feature-${award.id}`}
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${team.featured_award?.id === award.id ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}
-                      >
-                        {team.featured_award?.id === award.id ? "Teambanner ✓" : "Als Teambanner"}
-                      </button>
-                    ) : null}
-                  />
-                ))}
-              </div> : null}
-            </section>
-          )}
           {canEdit && <section data-testid="team-manage-members">
             <div className="mb-4">
               <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder verwalten</h2>
@@ -539,8 +559,11 @@ function TeamDetail({ id }) {
             </div>
           )}
           {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
+          {/* Rankingbanner (Nr. 60, #2425): je öffentlicher Season Platz und Bilanz als Bild mit festem Link - für Discord und Streams. */}
+          <TeamRankBanners rows={team.rank_banners} />
         </aside>
       </div>
+      )}
       {editing && (
         <TeamModal
           team={editing}

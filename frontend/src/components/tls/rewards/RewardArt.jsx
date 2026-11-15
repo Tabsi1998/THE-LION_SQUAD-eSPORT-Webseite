@@ -17,7 +17,8 @@ export const REWARD_METALS = {
   lion: { label: "Lionsquad", light: "#B8ECFF", base: "#29B6E8", dark: "#0E5C7A" },
 };
 
-const SIZES = { sm: 56, md: 112, lg: 184 };
+// xs: die Embleme neben dem Namen (#2425) - nur das Zeichen, keine Beschriftung.
+const SIZES = { xs: 30, sm: 56, md: 112, lg: 184 };
 
 function clip(text, max) {
   const value = String(text || "");
@@ -101,7 +102,7 @@ export function RewardArt({ reward, size = "md", play, index = 0, testId, labell
   const label = [KIND_LABELS[kind], reward?.name, ...lines].filter(Boolean).join(" · ");
   const image = reward?.image_url ? resolveMediaUrl(reward.image_url) : "";
   const mark = placeMark(art.place);
-  const small = size === "sm";
+  const small = size === "sm" || size === "xs";
   return (
     <span className={`tls-reward tls-reward--${kind} tls-reward--${size}`} data-metal={metalKey} data-play={play || undefined}
       style={{ "--tls-i": index, width: px, height: px }} data-testid={testId} role={labelled ? "img" : undefined} aria-label={labelled ? label : undefined}

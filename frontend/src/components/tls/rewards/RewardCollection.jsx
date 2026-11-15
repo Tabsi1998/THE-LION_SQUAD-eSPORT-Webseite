@@ -14,7 +14,7 @@ export function RewardChip({ award, testId = "featured-title" }) {
   if (!award?.reward) return null;
   return (
     <span className="tls-reward-chip" data-testid={testId} data-metal={award.reward.art?.metal || "lion"} title={award.reward.name}>
-      <RewardArt reward={award.reward} size="sm" labelled={false} />
+      <RewardArt reward={award.reward} size="xs" labelled={false} />
       <span>{award.reward.name}</span>
     </span>
   );
