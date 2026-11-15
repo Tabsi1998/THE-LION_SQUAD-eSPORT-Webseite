@@ -657,3 +657,39 @@ async def build_veto(db, league: dict, season: dict) -> dict:
                "steps": [{key: step[key] for key in ("kind", "mode", "team", "position")} for step in data["steps"]]}
               if data.get("enabled") else None)
     return {"source": {"veto_rules": source}, "data": data}
+# ---------------------------------------------------------------- Wertung durch die Leitung (#2424, A7/A8)
+
+def _preset_of(season: dict, key: str) -> int:
+    from services.league_presets import PRESETS
+
+    value = season.get(key)
+    return int(PRESETS[key] if value in (None, "") else value)
+
+
+def lead_rulings_data(season: dict) -> dict:
+    """Die Fristen, die die beiden Sätze nennen - aus der Season, ohne Feld die Vorgabe (``league_presets``)."""
+    return {"incident_answer_minutes": _preset_of(season, "incident_answer_minutes"),
+            "moss_upload_hours": _preset_of(season, "moss_upload_hours")}
+
+
+def render_lead_rulings(data: dict, variant: str = MARKDOWN) -> str:
+    """Was das System nicht selbst wertet (Nr. 103, 109; Nr. 24 Einigung, sonst Leitung; Nr. 32 keine Automatik): die Schwelle der frühen
+    Phase prüft es nicht (``league_incident_rules``: die Teams wählen „Neustart (frühe Phase)“), eine fehlende MOSS-Datei meldet es nur
+    (``league_procedure_sweep``: „Gewertet wird nichts automatisch“)."""
+    minutes = duration(int(data.get("incident_answer_minutes") or 0) * 60)
+    return "\n".join([
+        "- Abbruch in der frühen Phase: Ob eine Map noch in der frühen Phase abgebrochen wurde – in Modi mit Runden vor dem Beginn der "
+        "ersten Runde, sonst vor dem ersten Punkt –, prüft das System nicht. Die Teams einigen sich über den gemeldeten Vorfall "
+        f"(Vorschlag „Neustart (frühe Phase)“). Lehnt die Gegenseite ab oder antwortet sie nicht binnen {minutes}, wertet die "
+        "Liga-Leitung von Hand.",
+        f"- Fehlende MOSS-Datei: Kommt eine angeforderte MOSS-Datei nicht binnen {hours(data.get('moss_upload_hours'))}, meldet das "
+        "System das der Liga-Leitung – gewertet wird nichts automatisch. Ob die Maps des Spielers als verloren gelten oder ein technisches "
+        "Problem entschuldigt ist, entscheidet die Liga-Leitung von Hand; ebenso bei einer unvollständigen oder veränderten Datei.",
+    ])
+
+
+async def build_lead_rulings(db, league: dict, season: dict) -> dict:
+    data = lead_rulings_data(season)
+    return {"source": dict(data), "data": data}
+
+

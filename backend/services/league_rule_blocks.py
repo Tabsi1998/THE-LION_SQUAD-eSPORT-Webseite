@@ -296,6 +296,10 @@ _IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
 
 
 def value(key: str, row: dict | None, variant: str = MARKDOWN) -> str:
+    # Was die Liga-Leitung von Hand wertet (#2424, A7/A8: Nr. 103, 109) - gedacht für Anlage C bzw. § 9a.
+    Block("lead_rulings", "Wertung durch die Leitung", "Was das System nicht selbst wertet: Abbruch in der frühen Phase (Einigung der Teams, "
+          "sonst die Leitung) und eine fehlende MOSS-Datei (nur ein Hinweis an die Leitung) - mit Antwortzeit und MOSS-Frist der Season.",
+          facts.build_lead_rulings, facts.render_lead_rulings),
     """Ein Baustein zum Darstellen (Markdown mit geschützten Namen). Neu eingefroren: aus ``data``; ältere Fassungen: das gespeicherte
     ``markdown`` bzw. ``text`` (``pdf`` liest dort ``text``, #2305)."""
     row = row or {}

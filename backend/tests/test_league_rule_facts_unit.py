@@ -187,6 +187,22 @@ def test_rule_blocks_say_matchweek_not_matchday():
         assert "Spieltag" not in out
 
 
+def test_lead_rulings_say_the_lead_rules_by_hand():
+    """#2424 (A7/A8, Nr. 103, 109): Die frühe Phase prüft das System nicht, eine fehlende MOSS-Datei meldet es nur - beides wertet die
+    Liga-Leitung von Hand; die Fristen kommen aus der Season, ohne Feld die Vorgabe."""
+    data = facts.lead_rulings_data({})
+    assert data == {"incident_answer_minutes": 10, "moss_upload_hours": 24}
+    out = blocks.value("lead_rulings", {"data": data})
+    early, moss = out.split("\n")
+    assert early.startswith("- Abbruch in der frühen Phase:") and "prüft das System nicht" in early
+    assert "nicht binnen 10 Min., wertet die Liga-Leitung von Hand." in early
+    assert moss.startswith("- Fehlende MOSS-Datei:") and "nicht binnen 24 Stunden" in moss and "gewertet wird nichts automatisch" in moss
+    assert "entscheidet die Liga-Leitung von Hand" in moss
+    own = blocks.value("lead_rulings", {"data": facts.lead_rulings_data({"incident_answer_minutes": 15, "moss_upload_hours": 48})}, "text")
+    assert "binnen 15 Min." in own and "binnen 48 Stunden" in own
+    assert any(row["key"] == "lead_rulings" for row in blocks.catalog())
+
+
 # ---------------------------------------------------------------- Termine, Spielberechtigung
 
 def test_schedule_block_with_and_without_d1_rules():
