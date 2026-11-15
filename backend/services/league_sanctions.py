@@ -382,7 +382,6 @@ LATE_ENTRY_CLASH = ("Die Disqualifikation lässt sich so nicht zurücknehmen: In
 async def _refuse_late_entry_clash(db, tournament: dict, registration: dict) -> None:
     """Nachmeldung (#2422, Nr. 188): Kommt ein abgesagtes Spiel zurück, darf in seiner Woche keines der beiden Teams schon ein
     Nachmeldespiel haben - nie still doppelt belegen. Sonst 409 mit Klartext, bevor sich etwas ändert."""
-    from services.league_late_entry import GENERATION_MODE, GONE_STATUSES, _name
     from services.matchday_schedule import calendar_week_of
 
     rid = registration["id"]
@@ -391,13 +390,15 @@ async def _refuse_late_entry_clash(db, tournament: dict, registration: dict) -> 
                                      "result_meta.removed_registration_id": rid}, {"_id": 0}).to_list(None)
     for match in back:
         sides = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
-        clash = await db.matches_v2.find_one({"tournament_id": tournament["id"], "generation_mode": GENERATION_MODE, "round": match.get("round"),
-                                              "id": {"$ne": match["id"]}, "status": {"$nin": sorted(GONE_STATUSES)},
+        # Ohne Import aus league_late_entry (kein Import-Kreis): dieselben Werte wie dort (GENERATION_MODE, GONE_STATUSES).
+        clash = await db.matches_v2.find_one({"tournament_id": tournament["id"], "generation_mode": "late_entry", "round": match.get("round"),
+                                              "id": {"$ne": match["id"]}, "status": {"$nin": ["archived", "cancelled"]},
                                               "slots.registration_id": {"$in": sides}}, {"_id": 0, "slots": 1})
         if clash:
             side = next(slot.get("registration_id") for slot in clash["slots"] if slot.get("registration_id") in sides)
             row = await db.tournament_registrations.find_one({"id": side}, {"_id": 0, "display_name": 1, "team_name": 1, "squad_name": 1})
-            raise SanctionProblem(LATE_ENTRY_CLASH.format(week=calendar_week_of(tournament, int(match.get("round") or 0)), name=_name(row)), 409)
+            name = (row or {}).get("display_name") or (row or {}).get("team_name") or (row or {}).get("squad_name") or "Team"
+            raise SanctionProblem(LATE_ENTRY_CLASH.format(week=calendar_week_of(tournament, int(match.get("round") or 0)), name=name), 409)
 
 
 async def undo_effect(db, doc: dict, actor_id: str | None) -> None:

@@ -363,14 +363,17 @@ async def held_registrations(db, tournament_id: str, now: datetime | None = None
     """Nr. 188: Teams, deren Disqualifikation noch nicht endgültig ist - vorläufig, ein Einspruch offen oder die Einspruchsfrist
     läuft. Ihre abgesagten Spiele geben die Woche nicht frei."""
     from services.league_sanction_bans import FINAL, OPEN as APPEAL_OPEN
-    from services.league_sanctions import appeal_refusal
 
+    moment = now or _now()
     held = set()
     async for doc in db.competition_sanctions.find({"tournament_id": tournament_id, "kind": "disqualification", "revoked_at": None},
                                                    {"_id": 0}):
         if not doc.get("registration_id"):
             continue
-        if doc.get("state") != FINAL or (doc.get("appeal") or {}).get("state") == APPEAL_OPEN or appeal_refusal(doc, now) is None:
+        # Wie league_sanctions.appeal_refusal (ohne Import, kein Import-Kreis): ohne Einspruch und mit laufender Frist geht er noch.
+        until = _moment(doc.get("appeal_until"))
+        appeal_possible = not doc.get("appeal") and until is not None and moment < until
+        if doc.get("state") != FINAL or (doc.get("appeal") or {}).get("state") == APPEAL_OPEN or appeal_possible:
             held.add(doc["registration_id"])
     return held
 
