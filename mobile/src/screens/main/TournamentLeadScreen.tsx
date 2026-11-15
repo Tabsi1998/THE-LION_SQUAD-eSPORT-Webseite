@@ -26,6 +26,7 @@ import { COCKPIT_POLL_MS, cockpitProblems, type CockpitAttention, type Problem }
 import { defaultLeadTab, drawCountdown, drawTargetText, leadClocked, leadFilter, leadLine, leadNames, type DrawCard, type LeadFilter, type LeadTab } from "../../lib/tournamentLead";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
+import { serverNow } from "../../lib/matchClock";
 import { serverOffset } from "../../seasons/newYear/countdown";
 import { colors, roles } from "../../theme";
 
@@ -54,6 +55,8 @@ type LeadView = {
   attention?: AttentionItem[];
   draws?: DrawCard[];
   now?: string | null;
+  /** Abstand der Serveruhr zur Geräteuhr (ms), beim Laden aus `now` gemessen - für die Restzeit der Auslosung. */
+  clock_offset?: number;
   stations?: Array<{ id: string; name: string; status?: string; busy?: boolean }>;
   tournament?: { id: string; slug?: string; title?: string; status?: string; event_id?: string | null; can_notice?: boolean };
   matches?: ResultEntry[];
@@ -67,7 +70,11 @@ const TAB_LABELS: Record<LeadTab, string> = { cockpit: "Cockpit", attention: "Br
 export function TournamentLeadScreen({ route }: Props) {
   // Laden je Turnier (#1000): eine verspätete Antwort (auch vom Live-Nachladen) wird verworfen, ein gescheitertes
   // Nachladen lässt den letzten Stand gekennzeichnet stehen.
-  const fetchLead = useCallback(async (id: string) => (await api.get<LeadView>(`/tournaments/${idSegment(id)}/lead`)).data || null, []);
+  const fetchLead = useCallback(async (id: string) => {
+    const requestedAt = Date.now();
+    const data = (await api.get<LeadView>(`/tournaments/${idSegment(id)}/lead`)).data || null;
+    return data ? { ...data, clock_offset: serverOffset(data.now, requestedAt, Date.now()) } : null;
+  }, []);
   const { data: view, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(route.params.id, fetchLead);
   const error = loadError ? errorMessage(loadError, "Diese Ansicht ist nur für die Turnierleitung dieses Turniers.") : "";
   const [refreshing, setRefreshing] = useState(false);
@@ -86,6 +93,10 @@ export function TournamentLeadScreen({ route }: Props) {
   const [queue, setQueue] = useState<LiveQueue | null>(null);
   const [queueLoaded, setQueueLoaded] = useState(false);
   const [queueOffset, setQueueOffset] = useState<number | null>(null);
+  // Scheitert das Nachladen (Netz, Server), bleibt der letzte Stand stehen - mit „Letzter Stand vor X s“. Nur
+  // `applies: false` (online, keine Stationen) nimmt das Cockpit weg.
+  const [queueAt, setQueueAt] = useState(0);
+  const [queueFailed, setQueueFailed] = useState(false);
   const [busyStation, setBusyStation] = useState("");
   const queueKey = route.params.id;
   const queueFor = useRef(queueKey);
@@ -99,8 +110,10 @@ export function TournamentLeadScreen({ route }: Props) {
       const applies = Boolean(data?.applies && Array.isArray(data.stations));
       setQueue(applies ? data : null);
       setQueueOffset(applies && data?.now ? serverOffset(data.now, requestedAt, Date.now()) : null);
+      setQueueAt(Date.now());
+      setQueueFailed(false);
     } catch {
-      if (queueFor.current === asked) setQueue(null);
+      if (queueFor.current === asked) setQueueFailed(true);
     } finally {
       if (queueFor.current === asked) setQueueLoaded(true);
     }
@@ -144,7 +157,17 @@ export function TournamentLeadScreen({ route }: Props) {
   // mit der Zeit, ohne eigenes Ereignis. Sonst wie bisher nur bei Änderungen (die Prognose einmal je Minute).
   const cockpitOpen = activeTab === "cockpit";
   useLiveRefresh(() => load(), LIVE, { enabled: isFocused, fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0 });
-  useLiveRefresh(() => loadQueue(), LIVE, { enabled: isFocused, fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 60000 });
+  // Ohne Warteschlange (online) fragt nichts im Takt nach - Änderungen meldet der Strom.
+  useLiveRefresh(() => loadQueue(), LIVE, { enabled: isFocused, fallbackMs: 15000, pollMs: queue ? (cockpitOpen ? COCKPIT_POLL_MS : 60000) : 0 });
+  // „Letzter Stand vor X s“ zählt weiter, solange das Nachladen scheitert.
+  const [staleTick, setStaleTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!queueFailed) return undefined;
+    setStaleTick(Date.now());
+    const timer = setInterval(() => setStaleTick(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, [queueFailed]);
+  const queueStaleText = queueFailed && queue && queueAt ? staleText(Math.max(0, staleTick - queueAt)) : "";
 
   // Hinspringen (#1653): ein Fall öffnet „Braucht Aufmerksamkeit“ an seiner Karte, Verzug springt zur Station im Cockpit.
   const scrollRef = useRef<ScrollView>(null);
@@ -227,7 +250,11 @@ export function TournamentLeadScreen({ route }: Props) {
   };
 
   // Show-Auslosung (#1590): „Jetzt auslosen“ - derselbe Weg wie im Web.
+  const drawing = useRef(false);
   const drawNow = async (card: DrawCard) => {
+    // Doppeltipp: der zweite Tipp, bevor der Zustand neu gezeichnet ist, schickt nichts.
+    if (drawing.current) return;
+    drawing.current = true;
     setDeciding(true);
     try {
       await api.post(`/tournaments/${idSegment(view?.tournament?.slug || route.params.id)}/stages/${idSegment(card.stage_id)}/draw`, { group: card.group });
@@ -236,13 +263,18 @@ export function TournamentLeadScreen({ route }: Props) {
     } catch (err) {
       setNotice(errorMessage(err, "Auslosen hat nicht geklappt."));
     } finally {
+      drawing.current = false;
       setDeciding(false);
     }
   };
 
   // Aufrufen, Starten, Freigeben, Defekt (#1556, #1162): zwei Helfer zugleich - der Server nimmt genau einen, der andere
   // bekommt die Meldung (409) im Klartext und sieht danach den neuen Stand.
+  const operating = useRef(false);
   const operateStation = async (kind: "call" | "start" | "release" | "broken", station: QueueStation, body: Record<string, unknown>, said: (done: Record<string, unknown>) => string) => {
+    // Doppeltipp: solange ein Tipp unterwegs ist, geht kein zweiter hinaus - auch bevor der Knopf neu gezeichnet ist.
+    if (operating.current) return;
+    operating.current = true;
     setBusyStation(station.id);
     try {
       const { data } = await api.post<Record<string, unknown>>(`/tournaments/${idSegment(view?.tournament?.slug || route.params.id)}/live-queue/${kind}`, { station_id: station.id, ...body });
@@ -250,6 +282,7 @@ export function TournamentLeadScreen({ route }: Props) {
     } catch (err) {
       setNotice(errorMessage(err, "Das hat nicht geklappt. Bitte neu laden."));
     } finally {
+      operating.current = false;
       setBusyStation("");
       await Promise.all([loadQueue(), load()]);
     }
@@ -293,6 +326,9 @@ export function TournamentLeadScreen({ route }: Props) {
         {notice ? <Muted style={styles.notice} testID="lead-notice">{notice}</Muted> : null}
         {activeTab === "" ? <SkeletonList count={2} hasImage={false} /> : null}
         <View onLayout={(event) => { tabTop.current = event.nativeEvent.layout.y; }}>
+          {activeTab === "cockpit" && queue && queueStaleText ? (
+            <Muted style={styles.stale} testID="cockpit-stale">{queueStaleText}</Muted>
+          ) : null}
           {activeTab === "cockpit" && queue ? (
             <TournamentCockpit
               problems={problems}
@@ -352,7 +388,7 @@ export function TournamentLeadScreen({ route }: Props) {
               ))}
               {draws.map((card) => (
                 <View key={card.id} onLayout={onCaseLayout(card.id)}>
-                  <DrawCaseCard card={card} serverNow={view.now} highlighted={fall === card.id} busy={deciding} onDraw={() => { void drawNow(card); }} />
+                  <DrawCaseCard card={card} offset={view.clock_offset ?? 0} highlighted={fall === card.id} busy={deciding} onDraw={() => { void drawNow(card); }} />
                 </View>
               ))}
               <Muted>Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.</Muted>
@@ -400,6 +436,13 @@ export function TournamentLeadScreen({ route }: Props) {
   );
 }
 
+/** „Letzter Stand vor 25 s“, ab einer Minute „vor 3 Min.“ - wenn das Nachladen der Stationen scheitert. */
+export function staleText(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const since = seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} Min.`;
+  return `Keine Verbindung – letzter Stand vor ${since}. Es wird weiter nachgeladen.`;
+}
+
 // Ein laufendes Spiel trägt die Spielzeit-Uhr (#1167) - dieselbe wie an der Station, mit der Dauer, mit der der Server
 // „über der Zeit“ rechnet. Sie ersetzt „läuft 12 Min.“; fehlt das Ergebnis schon, bleibt der Hinweis darunter stehen.
 function LeadCard({ item, offset, onEnter }: { item: ResultEntry; offset: number | null; onEnter: () => void }) {
@@ -433,7 +476,7 @@ function LeadCard({ item, offset, onEnter }: { item: ResultEntry; offset: number
 }
 
 /** Show-Auslosung (#1590): der Topf steht - die Leitung lost mit einem Tipp, sonst der Server nach der Frist. */
-function DrawCaseCard({ card, serverNow, highlighted, busy, onDraw }: { card: DrawCard; serverNow?: string | null; highlighted: boolean; busy: boolean; onDraw: () => void }) {
+function DrawCaseCard({ card, offset, highlighted, busy, onDraw }: { card: DrawCard; offset: number; highlighted: boolean; busy: boolean; onDraw: () => void }) {
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setTick(Date.now()), 30000);
@@ -449,7 +492,7 @@ function DrawCaseCard({ card, serverNow, highlighted, busy, onDraw }: { card: Dr
         <View style={styles.flex}>
           <Body style={styles.strong}>Auslosung bereit · {card.pot_size} {card.pot_size === 1 ? "Name" : "Namen"}</Body>
           <Muted>{card.stage_name ? `${card.stage_name} · ` : ""}{drawTargetText(card)}</Muted>
-          <Muted style={styles.cyan}>{drawCountdown(card, serverNow, tick)}</Muted>
+          <Muted style={styles.cyan}>{drawCountdown(card, serverNow(offset, tick))}</Muted>
         </View>
       </View>
       {names.length ? <Muted testID={`lead-draw-pot-${card.group || card.id}`}>Im Topf: {names.join(" · ")}</Muted> : null}
@@ -477,6 +520,7 @@ const styles = StyleSheet.create({
   row: { alignItems: "center", flexDirection: "row", gap: 10 },
   rowClock: { marginTop: 4 },
   stack: { gap: 8 },
+  stale: { color: roles.warn, fontWeight: "800" },
   station: { alignItems: "center", borderColor: colors.border, borderRadius: 7, borderWidth: 1, height: 48, justifyContent: "center", paddingHorizontal: 4, width: 58 },
   stationOn: { borderColor: "rgba(41,182,232,0.45)" },
   stationText: { fontSize: 11, fontWeight: "900", textAlign: "center" },

@@ -61,13 +61,14 @@ export type DrawCard = {
   can_draw?: boolean;
 };
 
-/** Restzeit bis zum automatischen Los (#1590): ganze Minuten, aus der Server-Uhr (`serverNow`) weitergezählt. */
-export function drawCountdown(card: Pick<DrawCard, "due_at"> | null | undefined, serverNow?: string | null, clientNow = Date.now()): string {
+/**
+ * Restzeit bis zum automatischen Los (#1590): ganze Minuten nach der Serverzeit - `now` ist die Serveruhr jetzt
+ * (`serverNow` aus lib/matchClock mit dem Abstand, der beim Laden gemessen wurde), nie die Geräteuhr allein.
+ */
+export function drawCountdown(card: Pick<DrawCard, "due_at"> | null | undefined, now: number): string {
   const due = card?.due_at ? new Date(card.due_at).getTime() : NaN;
-  const base = serverNow ? new Date(serverNow).getTime() : NaN;
-  if (Number.isNaN(due)) return "";
-  const elapsed = Number.isNaN(base) ? 0 : Math.max(0, clientNow - Math.min(base, clientNow));
-  const left = Math.ceil((due - (Number.isNaN(base) ? clientNow : base + elapsed)) / 60000);
+  if (Number.isNaN(due) || !Number.isFinite(now)) return "";
+  const left = Math.ceil((due - now) / 60000);
   if (left <= 0) return "der Server lost jeden Moment selbst";
   return `automatisch in ${left} Min.`;
 }

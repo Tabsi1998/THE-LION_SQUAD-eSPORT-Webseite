@@ -1,3 +1,5 @@
+import { serverOffset } from "../seasons/newYear/countdown";
+import { serverNow } from "./matchClock";
 import { defaultLeadTab, drawCountdown, drawTargetText, leadClocked, leadFilter, leadLine, leadNames } from "./tournamentLead";
 import type { ResultEntry } from "./resultEntry";
 
@@ -32,9 +34,12 @@ test("die Uhr in der Zeile: nur laufend mit Startzeit, nie im Streitfall", () =>
 
 test("Auslosung: Restzeit nach der Server-Uhr, Ziel in Worten", () => {
   const card = { due_at: "2026-11-16T13:10:00Z" };
-  // Der Server sagt 13:00, seitdem sind 5 Minuten vergangen - es zählt die Server-Uhr plus die vergangene Zeit.
-  expect(drawCountdown(card, "2026-11-16T13:00:00Z", Date.parse("2026-11-16T13:05:00Z"))).toBe("automatisch in 5 Min.");
-  expect(drawCountdown(card, "2026-11-16T13:11:00Z", Date.parse("2026-11-16T13:11:00Z"))).toBe("der Server lost jeden Moment selbst");
-  expect(drawCountdown({}, null)).toBe("");
+  // Der Server sagt beim Laden 13:00, das Handy geht 7 Minuten vor (13:07). 5 Minuten später zeigt die Geräteuhr 13:12 -
+  // mit dem Abstand zählt die Serveruhr 13:05: noch 5 Minuten, nicht „lost jeden Moment“.
+  const phoneAtLoad = Date.parse("2026-11-16T13:07:00Z");
+  const offset = serverOffset("2026-11-16T13:00:00Z", phoneAtLoad, phoneAtLoad);
+  expect(drawCountdown(card, serverNow(offset, phoneAtLoad + 5 * 60000))).toBe("automatisch in 5 Min.");
+  expect(drawCountdown(card, Date.parse("2026-11-16T13:11:00Z"))).toBe("der Server lost jeden Moment selbst");
+  expect(drawCountdown({}, Date.now())).toBe("");
   expect(drawTargetText({ label: "Runde 1", round_label: "Loser Runde 1", match_keys: ["LA", "LB"] })).toBe("nach Runde 1 → Loser Runde 1 (LA, LB)");
 });

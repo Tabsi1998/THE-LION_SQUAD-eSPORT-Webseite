@@ -249,3 +249,51 @@ test("Ergebnisse: ein laufendes Spiel trägt die kleine Spielzeit-Uhr statt „l
     jest.useRealTimers();
   }
 });
+
+// Review #2393: scheitert ein Nachladen, bleibt der letzte Stand - samt offener Rückfrage in der Kachel.
+test("Nachladen scheitert: Cockpit und Rückfrage bleiben, „letzter Stand vor X s“", async () => {
+  await render(<TournamentLeadScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("live-release-pc3")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("live-release-pc3"));
+  expect(screen.getByTestId("live-release-confirm-pc3")).toBeTruthy();
+  mockGet.mockImplementation(async (path: string) => {
+    if (path.endsWith("/live-queue")) throw new Error("Netz weg");
+    return { data: LEAD };
+  });
+  // Das Nachladen der Warteschlange (zweiter useLiveRefresh je Zeichnen).
+  const reloadQueue = mockLiveRefresh.mock.calls.at(-1)?.[0] as () => Promise<void>;
+  await act(async () => { await reloadQueue(); });
+  expect(screen.getByTestId("lead-cockpit")).toBeTruthy();
+  expect(screen.getByTestId("live-release-confirm-pc3")).toBeTruthy();
+  expect(screen.getByTestId("cockpit-stale")).toHaveTextContent(/letzter Stand vor \d+ s/);
+  // Kommt die Antwort wieder, verschwindet der Hinweis.
+  answer();
+  await act(async () => { await reloadQueue(); });
+  expect(screen.queryByTestId("cockpit-stale")).toBeNull();
+  // Erst `applies: false` nimmt das Cockpit weg.
+  answer(LEAD, null);
+  await act(async () => { await reloadQueue(); });
+  await waitFor(() => expect(screen.queryByTestId("lead-cockpit")).toBeNull());
+});
+
+test("Doppeltipp auf Aufrufen schickt nur einen Aufruf", async () => {
+  let finish: (value: unknown) => void = () => {};
+  mockPost.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  await render(<TournamentLeadScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("live-call-pc1")).toBeTruthy());
+  const button = screen.getByTestId("live-call-pc1");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  expect(mockPost.mock.calls.filter(([path]) => String(path).endsWith("/live-queue/call"))).toHaveLength(1);
+  await act(async () => { finish({ data: {} }); });
+});
+
+test("online ohne Warteschlange: kein Nachfragen im Takt", async () => {
+  answer(LEAD, null);
+  await render(<TournamentLeadScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("lead-attention")).toBeTruthy());
+  const polls = mockLiveRefresh.mock.calls.slice(-2).map((call) => (call[2] as { pollMs?: number }).pollMs);
+  expect(polls).toEqual([0, 0]);
+});
