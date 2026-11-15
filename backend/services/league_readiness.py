@@ -57,11 +57,11 @@ async def _rules_items(db, league: dict, season: dict) -> list[tuple[str, dict]]
 
 
 def after_start_text(closes: datetime) -> str:
-    """„Anmeldung läuft nach Season-Start weiter (bis 20.03.2027, 18:00).“ - Ende in Wiener Zeit."""
+    """„Anmeldung läuft nach Season-Start weiter (bis 20.03.2027, 18:00 Uhr).“ - Ende in Wiener Zeit, wie im Frontend."""
     from zoneinfo import ZoneInfo
 
     local = closes.astimezone(ZoneInfo("Europe/Vienna"))
-    return f"Anmeldung läuft nach Season-Start weiter (bis {local:%d.%m.%Y, %H:%M})."
+    return f"Anmeldung läuft nach Season-Start weiter (bis {local:%d.%m.%Y, %H:%M} Uhr)."
 
 
 def _application_items(season: dict) -> list[tuple[str, dict]]:

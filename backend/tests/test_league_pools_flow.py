@@ -5,7 +5,8 @@ Länge von „Modus je Map“, Map in einem Schritt sperren und die Prüfung vor
 """
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
@@ -478,7 +479,9 @@ async def test_a_window_past_the_season_start_is_a_hint_and_the_season_publishes
     result = ok(await flow.get(f"{ADMIN}/seasons/{w['season']['id']}/readiness"))
     assert result["ok"] and result["problems"] == []
     hint = next(row for row in result["warnings"] if row["code"] == "application_after_start")
-    assert hint["text"].startswith("Anmeldung läuft nach Season-Start weiter (bis ")
+    # Derselbe Satz wie in Verwaltung und Ligaseite (lib/leagueApplications.js): Wiener Zeit mit „Uhr“.
+    local = datetime.fromisoformat(closes).astimezone(ZoneInfo("Europe/Vienna"))
+    assert hint["text"].startswith(f"Anmeldung läuft nach Season-Start weiter (bis {local:%d.%m.%Y, %H:%M} Uhr). ")
     published = ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "public"}))
     assert published["visibility"] == "public"
     assert not [row for row in await actions(flow) if row["action"] == "league.season.readiness_override"]
