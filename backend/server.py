@@ -824,10 +824,13 @@ async def readiness():
             checks["scheduler"] = False
     # Bereit erst nach dem Migrationslauf dieses Prozesses (#1006); bewusst offene Migrationen (MigrationIncomplete)
     # halten den Start nicht auf und zählen als abgeschlossen.
-    from services.migrations import migrations_ready
+    from services.migrations import migration_status, migrations_ready
     checks["migrations"] = migrations_ready()
     ready = all(checks.values())
     payload = {"status": "ok" if ready else "degraded", "checks": checks}
+    # Nur Zustand und Nummern der bewusst offenen Migrationen - keine Meldungen, keine Daten.
+    status = migration_status()
+    payload["migrations"] = {"state": status.get("state"), "open": [int(v) for v in status.get("open") or []]}
     return JSONResponse(payload, status_code=200 if ready else 503)
 
 
