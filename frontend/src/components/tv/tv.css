@@ -967,7 +967,7 @@
 .tv-podium__main .tls-reward { width: calc(var(--tv-u) * 13) !important; height: calc(var(--tv-u) * 13) !important; }
 .tv-podium__col[data-place="1"] .tv-podium__main .tls-reward { width: calc(var(--tv-u) * 17) !important; height: calc(var(--tv-u) * 17) !important; }
 .tv-podium__extras { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 0.5); }
-.tv-podium__extras .tls-reward { width: calc(var(--tv-u) * 5.5) !important; height: calc(var(--tv-u) * 5.5) !important; }
+.tv-podium__extras .tls-reward { width: calc(var(--tv-u) * 7) !important; height: calc(var(--tv-u) * 7) !important; }
 .tv-podium__team { max-width: 100%; font-weight: 800; text-align: center; }
 .tv-podium__col[data-place="1"] .tv-podium__team { color: var(--tv-gold); }
 .tv-podium__rewards { max-width: 100%; color: var(--tv-muted); text-align: center; overflow-wrap: anywhere; }
