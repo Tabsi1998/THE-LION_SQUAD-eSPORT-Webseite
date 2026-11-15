@@ -38,9 +38,13 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 <img src="../assets/liga/liga-angemeldet-390.png" alt="Anmeldung auf der Ligaseite am Handy: ein Co-Team Angemeldet mit Staffel, eines Angemeldet – Zuteilung folgt, eines Eingereicht mit dem Satz, dass die Liga-Leitung prüft" width="300">
 
 **Nach dem Season-Start anmelden:** Läuft das Anmeldefenster über den Beginn der Season hinaus, steht auf der Ligaseite
-„Anmeldung läuft nach Season-Start weiter (bis …)“, und ihr könnt wie oben einreichen. Teilt euch die Liga-Leitung einer
-laufenden Staffel zu, steht ihr mit 0 Spielen in der Tabelle: Der Spielplan bleibt, wie er beim Start war, Spiele bekommt ihr
-nicht von selbst. Wie und wann ihr spielt, sagt euch die Liga-Leitung.
+„Anmeldung läuft nach Season-Start weiter (bis …)“, und ihr könnt wie oben einreichen. Das geht höchstens bis zum genannten
+Ende, meist zwei Wochen nach dem Start. Teilt euch die Liga-Leitung einer laufenden Staffel zu, spielt ihr nur die **noch offenen
+Spielwochen**: Sie trägt eure Spiele nach, und ihr bekommt je Spiel eine Nachricht. Für vergangene Wochen gibt es keine
+Nachholspiele, gegen manche Teams kann darum ein Spiel fehlen. In der Tabelle steht bei euch „Nachgemeldet ab Woche X“, und ihr
+habt weniger Spiele als die anderen. Termine, Terminvorschläge und Check-in laufen wie bei jedem Spiel.
+
+<img src="../assets/liga/tabelle-nachgemeldet-390.png" alt="Tabelle der Staffel am Handy: ein Team mit dem Hinweis „Nachgemeldet ab Woche 3“ und weniger Spielen" width="300">
 
 **Zurückziehen** geht, bis die Liga-Leitung das Co-Team einer Staffel zugeteilt hat. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange der Spielplan der Staffel noch nicht steht. Danach klärt ihr den Austritt mit der Liga-Leitung.
 

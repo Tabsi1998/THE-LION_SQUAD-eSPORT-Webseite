@@ -453,7 +453,7 @@ Start. Bis dahin ist der Spielplan eine Vorschau und wird bei jeder Änderung ne
 
 Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entscheidest. Ohne Anmeldefenster gibt es das nicht, dann bleibt es beim Zuteilen aus 2.5. Das Zuteilen bleibt auch danach als Sonderweg.
 
-**Nachmeldung:** Das Fenster darf über den Beginn der Season hinausgehen. Dann steht unter „Anmeldung bis“ und auf der Ligaseite „Anmeldung läuft nach Season-Start weiter (bis …)“. Ein nachgemeldetes Co-Team nimmst du im Eingang an und teilst es einer Staffel zu; ist deren Spielplan schon fest, steht es mit 0 Spielen in der Tabelle, Spiele bekommt es nicht von selbst.
+**Nachmeldung:** Das Fenster darf über den Beginn der Season hinausgehen. Dann steht unter „Anmeldung bis“ und auf der Ligaseite „Anmeldung läuft nach Season-Start weiter (bis …)“. Wie es weitergeht, steht unten unter „Nachmeldung nach dem Season-Start“.
 
 **Einrichten** (Season-Seite, Reiter **Anmeldung und Kader** → **Selbstanmeldung**, Zuständigkeit „Season konfigurieren“):
 
@@ -465,6 +465,27 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 5a. **Anmeldungen automatisch annehmen:** Vorgabe aus, dann prüfst du jede Anmeldung. Mehr dazu unten unter „Automatisch annehmen“.
 6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei.
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
+
+**Nachmeldung nach dem Season-Start** (#2422):
+
+- **Frist:** Unter **Selbstanmeldung** steht **Nachmeldung bis (Tage nach dem Start)**. Leer heißt 14 Tage, `0` heißt nur bis zum Start.
+  Danach schließt die Anmeldung, auch wenn **Anmeldung bis** später liegt. Der Satz darunter nennt das wirksame Ende. **Was fehlt
+  noch?** meldet es als Hinweis.
+- **Verlängern:** **Mit Grund verlängern** → neues Ende (höchstens bis **Anmeldung bis**) und Grund (mindestens 5 Zeichen) →
+  **Verlängern**. Der Grund steht im Protokoll. **Verlängerung zurücknehmen** geht auch nur mit Grund.
+- **Spiele nachtragen:** Teilst du ein Co-Team einer Staffel zu, deren Spielplan schon fest ist, legt das Zuteilen noch keine Spiele an.
+  Das Team steht im Reiter **Anmeldung und Kader** unter **Nachmeldungen** (auch nach dem Sonderweg über die Turnierverwaltung).
+  **Spiele nachtragen** zeigt die Vorschau: je Paarung Woche, Heim und Gast, warum die Woche frei ist und den Standardtermin. Darunter
+  steht, was entfällt („Gegen X kein Spiel mehr möglich.“). **… Spiele anlegen** legt sie an, beide Seiten bekommen eine Nachricht.
+- **Regeln dahinter:** Das Team spielt nur in Wochen, die noch nicht begonnen haben. Nachholspiele für vergangene Wochen gibt es nicht.
+  Eine Paarung braucht eine Woche, in der beide frei sind: Der Gegner hat spielfrei (ungerade Teamzahl), es ist eine Reservewoche nach
+  dem letzten Spieltag, oder das Spiel des Gegners ist abgesagt. Bei gerader Teamzahl ohne Reservewoche passt kein Spiel. Dann
+  bestätigst du **ohne Spiele**, das Team zählt ab jetzt. Gespielte Wochen, Ergebnisse und Termine bleiben unverändert. Hat sich der
+  Spielplan seit der Vorschau geändert, sagt es die Meldung, und die Vorschau lädt neu.
+- **Tabelle:** Das Team steht mit „Nachgemeldet ab Woche X“ in Tabelle, Ligaseite, TV und PDF. Es hat weniger Spiele. Gewertet wird
+  wie immer nach Punkten, es gibt keine Wertung nach Punkten je Spiel. Abschluss, Folge-Season und Gesamtwertung zählen das Team normal.
+
+<img src="../assets/liga/nachmeldung-vorschau-1440.png" alt="Vorschau „Spiele nachtragen“: zwei Paarungen in Woche 3 (Freilos des Gegners) und Woche 4 (Reservewoche) mit Standardtermin, darunter „Gegen … kein Spiel mehr möglich.“" width="720">
 
 **Entscheiden** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**, Zuständigkeit „Teams freigeben“). Bei jeder neuen Anmeldung bekommst du eine Nachricht mit Link; er öffnet den Reiter gleich an dieser Stelle. Je Anmeldung steht da, wer eingereicht hat, welcher Regelversion und wann zugestimmt wurde und was der Kader gerade nicht erfüllt.
 
@@ -719,7 +740,8 @@ Spiele, Termine und den Matchchat immer – auch bei *Aus*.
 sind: kein oder ein fremder Map-Pool, zu wenige Maps für einen Modus, ein Modus aus **Modus je Map** fehlt im Pool, **Modus je Map**
 passt nicht zur längsten Serie, kein veröffentlichtes **Regelwerk** (ein Regeltext allein reicht nicht), keine Liga N oder eine Liga
 N ohne Staffel. Warnungen sind etwa ein abgelaufenes oder fehlendes Anmeldefenster, ein Anmeldefenster, das erst nach dem Beginn
-der Season endet (**Nachmeldung**, erlaubt – etwa für nachrückende Teams), oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine **Vorschau** und geht immer, auch mit Problemen.
+der Season endet (**Nachmeldung**, erlaubt – etwa für nachrückende Teams), ein Fenster, das über die Nachmeldefrist hinausreicht
+(die Anmeldung schließt dann früher), oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine **Vorschau** und geht immer, auch mit Problemen.
 Solange es Probleme gibt, lässt sich die Sichtbarkeit aber nicht auf **Nur Mitglieder** oder **Öffentlich** stellen – weder von *Aus*
 noch von der Vorschau aus; das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
 kann im Notfall trotzdem veröffentlichen: Er trägt im Abschnitt einen **Grund für die Notausnahme** ein (mindestens 5 Zeichen) und
@@ -821,7 +843,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Spielformat | `[[baustein:format]]` | Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste; Abweichungen je Liga N | Season → Spielbetrieb → Serie, Anmeldung und Kader, Ligen |
    | Tabelle und Wertung | `[[baustein:table]]` | Punkte, Remis, Reihenfolge bei Punktgleichheit, kampflos, beide nicht erschienen, Ausscheiden | Season → Tabelle |
    | Termine | `[[baustein:schedule]]` | Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig | Season → Termine |
-   | Spielberechtigung | `[[baustein:eligibility]]` | Zulassung, Annahme der Anmeldung („automatisch angenommen“ oder „die Liga-Leitung prüft“, nur mit Anmeldefenster, 2.5a), Mindestalter, Spiel-IDs, Plattform (erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N, 2.7c), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster | Season → Anmeldung und Kader, Spiel → Spiel-IDs |
+   | Spielberechtigung | `[[baustein:eligibility]]` | Zulassung, Annahme der Anmeldung („automatisch angenommen“ oder „die Liga-Leitung prüft“, nur mit Anmeldefenster, 2.5a), Nachmeldung (Frist und „nur die offenen Spielwochen“, nur wenn das Fenster über den Start geht), Mindestalter, Spiel-IDs, Plattform (erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N, 2.7c), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster | Season → Anmeldung und Kader, Spiel → Spiel-IDs |
 
 4. **Variablen** stehen mitten im Satz, etwa „Gespielt wird Best of `{{best_of}}`“, und werden beim Lesen durch den Wert der Season
    ersetzt. **Variable einfügen** zeigt die Liste mit dem Wert von heute (mit Suche); die **Hilfe** darunter nennt alle Bausteine und
@@ -846,6 +868,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{eligibility.min_age}}`, `{{eligibility.wait_days}}`, `{{eligibility.roster_deadline}}`, `{{eligibility.transfer_windows}}`, `{{eligibility.entry_policy}}`, `{{eligibility.id_fields}}` | Spielberechtigung (3.9) |
    | `{{eligibility.platform}}`, `{{eligibility.crossplay}}`, `{{eligibility.input_device}}` | Plattform je Season (2.7c): „PC und PlayStation“ oder „alle Plattformen“, Crossplay „an“/„aus“, Eingabegerät; ohne Plattform-Feld „(nicht festgelegt)“ |
    | `{{application.opens}}`, `{{application.closes}}`, `{{application.slots}}` | Anmeldefenster und Startplätze (2.5a) |
+   | `{{application.late_days}}` | Nachmeldefrist in Tagen nach dem Start; `{{application.closes}}` ist das wirksame Ende mit dieser Frist (2.5a) |
    | `{{application.acceptance}}` | Ein ganzer Satz ohne Punkt (2.5a): „Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; sind alle vergeben oder wartet schon jemand, kommen sie auf die Warteliste; die Liga-Leitung kann nachträglich mit Grund ablehnen oder auf die Warteliste zurückstufen“ oder „Die Liga-Leitung prüft jede Anmeldung“; ohne Anmeldefenster „(nicht festgelegt)“ |
    | `{{protest.hours}}`, `{{appeal.hours}}`, `{{evidence.keep_days}}` | Protestfrist, Einspruchsfrist, Aufbewahrung der Beweise. Heute gelten die Vorgaben 48 Stunden, 48 Stunden, 30 Tage; einstellbar werden sie mit den Paketen Proteste und Strafen |
    | `{{match.break_after_map}}`, `{{match.break_minutes}}` | Standardpause zwischen den Maps (Vorgabe nach Map 2, 5 Min.); einstellbar im Abschnitt „Vorfälle und Pausen“ (2.7e) |
