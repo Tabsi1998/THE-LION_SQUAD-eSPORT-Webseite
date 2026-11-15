@@ -54,6 +54,9 @@ jobs:
       PYTHON: python
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Der Job führt Code und Browser aus - kein Token im Arbeitsordner.
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -127,21 +130,37 @@ jobs:
           RESULT: ${{ needs.abnahme.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SHA: ${{ github.sha }}
+          # Schließen nur nach einer vollen Abnahme auf main - ein Teil-Lauf oder ein anderer Zweig sagt nichts über main.
+          SPECS: ${{ inputs.specs }}
+          REF: ${{ github.ref }}
+          MILESTONE: "Qualität: Performance, Tests und CI"
         run: |
           title="Liga-Gesamtabnahme rot"
-          number=$(gh issue list --state open --label testing --search "in:title \"$title\"" --json number,title \
-            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          number=$(gh issue list --state open --label testing --search "in:title \"$title\"" --json number,title             --jq "map(select(.title == \"$title\")) | .[0].number // empty")
           stamp=$(TZ=Europe/Vienna date '+%d.%m.%Y %H:%M')
+          short="${SHA:0:9}"
           if [ "$RESULT" = "success" ]; then
-            if [ -n "$number" ]; then
-              gh issue comment "$number" --body "Wieder grün am $stamp (Commit ${SHA:0:9}): $RUN_URL"
+            if [ -n "$number" ] && [ -z "$SPECS" ] && [ "$REF" = "refs/heads/main" ]; then
+              gh issue comment "$number" --body "Wieder grün am $stamp (Commit $short): $RUN_URL"
               gh issue close "$number"
             fi
             exit 0
           fi
-          body="Die Liga-Gesamtabnahme (docs/liga/abnahme.md) ist am $stamp rot (Ergebnis: $RESULT, Commit ${SHA:0:9}). Lauf und Bericht: $RUN_URL"
+          body="Die Liga-Gesamtabnahme (docs/liga/abnahme.md) ist am $stamp rot (Ergebnis: $RESULT, Commit $short). Lauf und Bericht: $RUN_URL"
           if [ -n "$number" ]; then
-            gh issue comment "$number" --body "$body"
+            # Derselbe Commit wie bei der letzten Meldung: kein weiterer Kommentar, der Stand ist bekannt.
+            last=$(gh api "repos/$GH_REPO/issues/$number/comments?per_page=100" --jq 'last | .body // ""' 2>/dev/null || true)
+            if [ -z "$last" ]; then
+              last=$(gh issue view "$number" --json body --jq .body 2>/dev/null || true)
+            fi
+            case "$last" in
+              *"Commit $short"*) echo "Rot mit demselben Commit $short wie zuletzt gemeldet - kein neuer Kommentar." ;;
+              *) gh issue comment "$number" --body "$body" ;;
+            esac
           else
-            gh issue create --title "$title" --label testing --label bug --body "$body"
+            # Meilenstein nur, wenn es ihn gibt - das Issue entsteht in jedem Fall.
+            if gh issue create --title "$title" --label testing --label bug --label "priority:P1" --milestone "$MILESTONE" --body "$body"; then
+              exit 0
+            fi
+            gh issue create --title "$title" --label testing --label bug --label "priority:P1" --body "$body"
           fi
