@@ -395,6 +395,32 @@ async def test_a_migration_that_ignores_the_loss_is_cancelled_with_margin_before
     assert lease.valid_until - state["cancelled"] >= RENEW / 2 - 0.05
 
 
+@pytest.mark.asyncio
+async def test_an_unexpected_error_while_renewing_counts_as_a_lost_lease(flow, fast, monkeypatch):
+    db = flow.db
+    await _clean(db)
+    seen = []
+
+    async def broken(*_args, **_kwargs):
+        raise ValueError("unerwartet")
+
+    async def stubborn(_database):
+        migrations._LEASE.get().db = SimpleNamespace(schema_migration_lock=SimpleNamespace(update_one=broken))
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            seen.append("abgebrochen")
+            raise
+        return "nie"
+
+    monkeypatch.setattr(migrations, "MIGRATIONS", ((1, "takt-fehler", stubborn),))
+    # Ohne Absicherung stürbe der Takt still, und die Migration liefe ohne Sperre weiter (hier: 30 s).
+    with pytest.raises(migrations.MigrationLeaseLost):
+        await asyncio.wait_for(migrations.ensure_migrations(db), timeout=5)
+    assert seen == ["abgebrochen"]
+    assert "ValueError" in migrations.migration_status()["reason"]
+
+
 def test_the_grace_keeps_at_least_the_safety_margin():
     lease = migrations._Lease(None, "x", 180, 45, monotonic() + 40)
     # 40 s Rest, Abstand mindestens ein halber Takt (22,5 s): 17,5 s Nachfrist.

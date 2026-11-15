@@ -160,7 +160,10 @@ class _Lease:
         """Im Takt verlängern, bis der Lauf endet oder die Sperre verloren ist."""
         while not self.lost.is_set():
             await asyncio.sleep(max(0.0, min(self.renew_every, self.remaining() - self.renew_every)))
-            await self.renew()
+            try:
+                await self.renew()
+            except Exception as exc:  # noqa: BLE001 - ein stiller Tod des Takts ließe die Migration ohne Sperre laufen
+                self.mark_lost(f"Fehler beim Verlängern ({type(exc).__name__})")
 
 
 _LEASE: contextvars.ContextVar[_Lease | None] = contextvars.ContextVar("migration_lease", default=None)
