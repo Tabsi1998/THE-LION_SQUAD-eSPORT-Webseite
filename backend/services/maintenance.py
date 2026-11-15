@@ -232,6 +232,19 @@ async def active_state(db) -> dict | None:
     return current
 
 
+async def wait_until_released(db, *, poll_seconds: float = 2.0, max_seconds: float = MAX_TTL_SECONDS) -> bool:
+    """Warten, bis keine Pause mehr gilt (für Jobs zu festen Uhrzeiten). ``False``: nach ``max_seconds`` noch aktiv."""
+    deadline = monotonic() + max_seconds
+    while True:
+        state = await active_state(db)
+        if not state:
+            return True
+        if monotonic() >= deadline:
+            return False
+        remaining = float(state.get("remaining_seconds") or poll_seconds)
+        await asyncio.sleep(max(0.05, min(poll_seconds, remaining + 0.1, max(0.0, deadline - monotonic()))))
+
+
 def response_parts(state: dict) -> tuple[int, dict, dict]:
     """Status, Inhalt und Kopfzeilen der Antwort in der Pause."""
     retry = max(1, min(retry_after_seconds(), int(state.get("remaining_seconds") or retry_after_seconds())))

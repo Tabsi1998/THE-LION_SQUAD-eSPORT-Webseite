@@ -278,3 +278,59 @@ def test_on_releases_its_own_pause_when_waiting_fails(monkeypatch):
         assert (await maintenance.status(db))["active"] is False
 
     run(scenario())
+
+
+def test_daily_jobs_wait_for_the_pause_and_then_run(monkeypatch):
+    """Cron-Jobs (etwa der Rangstand um 03:35) dürfen in der Pause nicht bis morgen ausfallen."""
+    monkeypatch.setenv("MAINTENANCE_CACHE_SECONDS", "0")
+    db = fresh_db()
+    monkeypatch.setitem(sys.modules, "database", type("M", (), {"get_db": staticmethod(lambda: db)}))
+    runs = []
+
+    async def runner():
+        runs.append("run")
+
+    async def scenario():
+        daily = scheduler._single_replica("season_rank_snapshots", runner)
+        daily.catch_up = True
+        started = await maintenance.activate(db, ttl_seconds=60)
+        task = asyncio.create_task(daily())
+        await asyncio.sleep(0.3)
+        assert runs == []  # wartet, schreibt nicht
+        await maintenance.release(db, started["token"])
+        await asyncio.wait_for(task, timeout=6)
+        assert runs == ["run"]
+
+    run(scenario())
+
+
+def test_wait_until_released_gives_up_after_the_limit(monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_CACHE_SECONDS", "0")
+
+    async def scenario():
+        db = fresh_db()
+        await maintenance.activate(db, ttl_seconds=60)
+        assert await maintenance.wait_until_released(db, poll_seconds=0.05, max_seconds=0.2) is False
+        await maintenance.release(db, force=True)
+        assert await maintenance.wait_until_released(db, poll_seconds=0.05, max_seconds=0.2) is True
+
+    run(scenario())
+
+
+def test_start_scheduler_marks_exactly_the_cron_jobs(monkeypatch):
+    from apscheduler.triggers.cron import CronTrigger
+
+    monkeypatch.delenv("SCHEDULER_JOBS", raising=False)
+    monkeypatch.setattr(scheduler, "_scheduler", None)
+
+    async def scenario():
+        sched = scheduler.start_scheduler()
+        try:
+            jobs = sched.get_jobs()
+            cron = [job for job in jobs if isinstance(job.trigger, CronTrigger)]
+            assert cron and all(job.func.catch_up for job in cron)
+            assert not any(getattr(job.func, "catch_up", False) for job in jobs if not isinstance(job.trigger, CronTrigger))
+        finally:
+            scheduler.stop_scheduler()
+
+    run(scenario())
