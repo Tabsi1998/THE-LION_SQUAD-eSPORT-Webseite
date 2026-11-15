@@ -17,7 +17,7 @@ export function OfflineBar() {
     return (
       <div role="status" aria-live="polite" data-testid="write-pause-bar" className="tls-offline-bar">
         {/* Der schlafende Löwe: nachts kurz Pause. */}
-        <LionArt art="sleep" size={24} className="shrink-0 text-[#FFD700]" />
+        <LionArt art="sleep" size={24} className="shrink-0 text-honor" />
         <span>{WRITE_PAUSE_LABEL}</span>
       </div>
     );
