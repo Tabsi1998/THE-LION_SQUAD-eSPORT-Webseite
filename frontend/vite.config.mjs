@@ -61,7 +61,8 @@ export default defineConfig({
     globals: true,
     clearMocks: true,
     restoreMocks: true,
-    setupFiles: ["./src/setupTests.js"],
+    // setupZeitreise.js zuerst: mit TLS_TEST_NOW läuft die Uhr ab diesem Tag (Zeitreise-Probe, #775).
+    setupFiles: ["./src/setupZeitreise.js", "./src/setupTests.js"],
     include: ["src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
     coverage: { reporter: ["text", "lcov"] },
   },
