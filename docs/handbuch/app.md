@@ -85,6 +85,9 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Chats (Direkt, Team, Turnier, Match) in einer Liste | Tab Community |
 | Anmeldung zu Turnieren, Check-in, Ergebnis melden und bestätigen, Problem melden | im Turnier bzw. Match |
 | „Du bist dran“-Aufruf und Spielstart-Zähler | Push, Match |
+| Liga-Spieltag: Check-in mit Anwesenden, Map-Veto live (Sperren, Wählen, „Bereit zum Veto“), Spiel starten; der Stand steht als Schild im Kopf der Matchseite | Match |
+| Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister | Turnier → Tabelle |
+| Liga an Team und Profil: Stand der Liga-Anmeldung (mit „Abmelden“ für übernommene Co-Teams), Seasons, Belohnungen je Season, Titel neben dem Namen; neue Belohnungen feiert die App einmal | Team, Profil → Auszeichnungen |
 | Turnierbaum mit Weiterkommen-Modus (fester Baum, Auslosung nach der Runde, Show-Auslosung, sofort zufällig) und was gerade passiert („wartet auf Auslosung“, „Auslosung bereit · N Namen“, „das Los entscheidet“); Auslosung als Moment mit einer leichten Vibration, Namen wie im Web („Loser Runde 1“, „Grand Final“, „voraussichtlich“) | Turnier → Baum |
 | Turnierleitung: Ergebnisse eintragen, „Braucht Aufmerksamkeit“ | Turnier → Turnierleitung (für Leitung und Helfer) |
 | Mitgliedskarte (auch ohne Netz), Versammlungen und Abstimmung, Helfen, Vereinsdokumente, Vorteile, Meine Mitgliedschaft | Tab Verein |
@@ -102,6 +105,9 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 - **Bezahlen** – Zahlungslinks öffnen im Browser, bezahlt wird nicht in der App.
 - **In Teams:** Captain und Vertreter vergeben, Beitrittscode erneuern, öffentlich/privat schalten und ein aufgelöstes Team
   wiederherstellen ([Teams](teams.md)). Das Spiel eines Co-Teams tippt die App noch von Hand ein; ein Name, den die Website nicht kennt, wird abgelehnt.
+- **In der Liga:** mit einem Co-Team anmelden, die Ligaseite, Vorfälle, Verfahren, Ergebnis mit Maps melden und alle Eingriffe der
+  Liga-Leitung (für eine Seite eintragen, Veto pausieren oder neu starten) – die App zeigt dafür einen Satz mit dem Weg ins Web
+  ([Liga für Captains](liga-captains.md)).
 - Lange Seiten wie Mitgliederverzeichnis, Server, Rechtliches und Kontaktformular bleiben auf der Website.
 
 Alles andere gibt es in beiden. Die Rechte sind dieselben wie im Web: Was dein Konto nicht darf, sieht es auch in der App nicht.
