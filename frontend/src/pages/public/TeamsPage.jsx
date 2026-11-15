@@ -49,7 +49,7 @@ import { ShareButton } from "@/components/tls/ShareButton";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 
-const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview", uebersicht: "overview" };
+const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview" };
 
 /** Der Reiter der Teamseite aus der Adresse (#2425): dieselben Namen wie im Profil; #chat führt immer in die Übersicht. */
 export function teamTabFrom(search = "", hash = "") {
