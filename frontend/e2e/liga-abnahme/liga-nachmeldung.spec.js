@@ -1,7 +1,10 @@
 const { test, expect } = require("@playwright/test");
 const g1 = require("./g1");
 
-const { ADMIN, LARGE, MINUTE, SMALL, api, as, assign, buildLeague, done, get, noSideScroll, ok, shot, staffelMatches, standings, state, viennaDay } = g1;
+const fs = require("node:fs");
+const path = require("node:path");
+
+const { ADMIN, LARGE, MINUTE, SMALL, api, as, assign, buildLeague, done, get, noSideScroll, ok, staffelMatches, standings, state, viennaDay } = g1;
 
 // Liga-Gesamtabnahme G.1 (#1632, docs/liga/abnahme.md), Szenario „Nachmeldung“ (#2422, Entscheidungen Nr. 180, 183, 184): Das
 // Anmeldefenster läuft über den Season-Start, ein Co-Team kommt in Woche 2 in die laufende Staffel. Die Leitung trägt seine Spiele nach
@@ -10,6 +13,14 @@ const { ADMIN, LARGE, MINUTE, SMALL, api, as, assign, buildLeague, done, get, no
 
 const DAY = 24 * 60 * MINUTE;
 const unique = () => `${g1.RUN}-${Date.now().toString(36)}`;
+
+/** Bild nur vom Gezeigten: der Ausschnitt (Sheet im Fenster, die Tabelle als Element) statt der ganzen langen Seite. */
+async function shotOf(target, name) {
+  const folder = process.env.ABNAHME_SHOTS || "";
+  if (!folder) return;
+  fs.mkdirSync(folder, { recursive: true });
+  await target.screenshot({ path: path.join(folder, name), animations: "disabled" });
+}
 
 /** Ein Spiel ohne Zeitstempel - was „unverändert“ heißen muss: Woche, Seiten, Stand, Termin. */
 const frozen = (match) => ({ id: match.id, round: match.round, sides: match.slots.map((slot) => slot.registration_id), status: match.status,
@@ -62,7 +73,7 @@ test.describe("Liga-Gesamtabnahme: Nachmeldung nach dem Season-Start", () => {
     await expect(pairings).toContainText("Woche 4");
     await expect(lead.page.getByTestId("late-entry-missing")).toContainText("kein Spiel mehr möglich.");
     await noSideScroll(lead.page);
-    await shot(lead.page, "nachmeldung-vorschau-1440.png");
+    await shotOf(lead.page, "nachmeldung-vorschau-1440.png");
     await lead.page.getByTestId("late-entry-confirm").click();
     await expect(lead.page.getByTestId(`late-entry-${lateId}`)).toContainText("2 Spiele nachgetragen");
 
@@ -78,11 +89,14 @@ test.describe("Liga-Gesamtabnahme: Nachmeldung nach dem Season-Start", () => {
     const guest = await as(browser, testInfo, "anon", SMALL);
     const table = await standings(guest, world.tid);
     expect(table[lateId]).toMatchObject({ late_entry: true, late_from_week: 3, played: 0 });
+    // Ohne Einblend-Bewegung, damit das Bild die fertige Tabelle zeigt.
+    await guest.page.emulateMedia({ reducedMotion: "reduce" });
     await guest.page.goto(`/liga/${world.league.slug}/${world.season.slug}`);
-    await expect(guest.page.getByTestId(`standing-notes-${lateId}`)).toContainText("Nachgemeldet ab Woche 3");
+    const note = guest.page.getByTestId(`standing-notes-${lateId}`);
+    await expect(note).toContainText("Nachgemeldet ab Woche 3");
     await noSideScroll(guest.page);
-    await guest.page.getByTestId(`standing-notes-${lateId}`).scrollIntoViewIfNeeded();
-    await shot(guest.page, "tabelle-nachgemeldet-390.png");
+    await note.scrollIntoViewIfNeeded();
+    await shotOf(guest.page.locator("table").filter({ has: note }), "tabelle-nachgemeldet-390.png");
     await done(guest);
 
     // Frist-Ende: Mit einem Tag Frist ist die Anmeldung zu, obwohl das Fenster noch 30 Tage läuft. Verlängern nur mit Grund.
