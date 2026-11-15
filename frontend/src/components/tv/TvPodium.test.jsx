@@ -56,6 +56,9 @@ test("drei Belohnungen: Platz 2, 1, 3 auf der Bühne, Liga N und Season, je Plat
   expect(card).toHaveTextContent("Meister");
   expect(screen.getByTestId("tv-podium-line")).toHaveTextContent("Probe-Liga · Liga 1 · Season 3");
   expect(screen.getByTestId("tv-podium-winner")).toHaveTextContent("Nordlicht");
+  // Eigene Klasse - nicht das Podium der Fast-Lap-Tafel (.tv-podium).
+  expect(card).toHaveClass("tv-league-podium");
+  expect(card).not.toHaveClass("tv-podium");
   expect([...card.querySelectorAll("[data-place]")].map((element) => element.dataset.place)).toEqual(["2", "1", "3"]);
   expect(screen.getByTestId("tv-podium-place-1")).toHaveTextContent("Nordlicht");
   expect(screen.getByTestId("tv-podium-place-2")).toHaveTextContent("Steinbock");
@@ -69,7 +72,7 @@ test("drei Belohnungen: Platz 2, 1, 3 auf der Bühne, Liga N und Season, je Plat
   expect(screen.getByTestId("tv-podium-place-1")).toHaveTextContent("Goldmedaille · Meister-Banner");
   expect(screen.getByTestId("tv-podium-art-bronze")).toHaveAttribute("data-metal", "bronze");
   // Die Bewegung läuft: Sockel 3, 2, 1 nacheinander, jede Grafik spielt einmal.
-  expect(["3", "2", "1"].map((rank) => screen.getByTestId(`tv-podium-place-${rank}`).style.getPropertyValue("--tv-podium-at"))).toEqual(["0.3s", "0.75s", "1.2s"]);
+  expect(["3", "2", "1"].map((rank) => screen.getByTestId(`tv-podium-place-${rank}`).style.getPropertyValue("--tv-league-podium-at"))).toEqual(["0.3s", "0.75s", "1.2s"]);
   expect(gold).toHaveAttribute("data-play", "run");
 });
 
@@ -119,4 +122,11 @@ test("geparkt bleibt der Meister klein in der Ecke - ohne Podest", () => {
   );
   expect(screen.getByTestId("tv-champion-parked")).toHaveClass("tv-champion--parked");
   expect(screen.queryByTestId("tv-podium-line")).toBeNull();
+});
+
+test("lange Meisternamen werden kleiner gesetzt", async () => {
+  const { heroFit } = await import("./TvMoments");
+  expect(heroFit("Nordlicht")).toBeUndefined();
+  expect(heroFit("Nordlicht Esports")).toBe("small");
+  expect(heroFit("Donaudampfschifffahrtsgesellschaftskapitäne")).toBe("tiny");
 });

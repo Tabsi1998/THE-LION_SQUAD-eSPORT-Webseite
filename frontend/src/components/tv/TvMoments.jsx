@@ -167,9 +167,15 @@ function championSubline(champion, tournamentTitle) {
  * freien Ecke oder in der Kopfleiste, ohne einen Namen zu verdecken. Auch geparkt hält jede Schrift die Untergrenze.
  */
 // Podest beim Saisonabschluss (#2410): Platz 3, 2 und 1 steigen nacheinander auf, je Platz hebt sich die Belohnung an, ihr Glanz zieht
-// nach und die Kante leuchtet kurz auf - zuletzt kommt der Meister. Wann was kommt, steht als `--tv-podium-at` am Platz (tv.css);
+// nach und die Kante leuchtet kurz auf - zuletzt kommt der Meister. Wann was kommt, steht als `--tv-league-podium-at` am Platz (tv.css);
 // nur Verschieben und Deckkraft. Mit „Bewegung aus“ bzw. „Bewegung reduzieren“ steht sofort das Endbild.
 const PODIUM_AT = { 3: "0.3s", 2: "0.75s", 1: "1.2s" };
+
+/** Lange Meisternamen eine Stufe kleiner, sehr lange zwei - zusammen mit höchstens zwei Zeilen (tv.css) bleibt das Podest im Bild. */
+export function heroFit(name) {
+  const length = String(name || "").length;
+  return length > 26 ? "tiny" : length > 14 ? "small" : undefined;
+}
 
 function TvChampionPodium({ champion, places, podium, registrations, testId }) {
   const { motionOn } = useTv();
@@ -180,48 +186,48 @@ function TvChampionPodium({ champion, places, podium, registrations, testId }) {
   const line = podiumLine(podium);
   const stage = PODIUM_STAGE.map((rank) => places.find((place) => place.rank === rank)).filter(Boolean);
   return (
-    <div className="tv-moment tv-champion tv-podium" role="status" data-testid={testId} data-podium="1">
+    <div className="tv-moment tv-champion tv-league-podium" role="status" data-testid={testId} data-podium="1">
       <div className="tv-champion__top tv-t-info">
         <span className="tv-champion__cup-shine" aria-hidden="true"><Trophy className="tv-icon tv-champion__trophy" /></span> Meister
       </div>
-      {line ? <div className="tv-podium__line tv-t-info" data-testid="tv-podium-line">{line}</div> : null}
-      <div className="tv-podium__winner" data-testid="tv-podium-winner">
-        <Avatar name={name} avatar={avatarOf(champion.winnerId)} className="tv-podium__photo" />
-        <div className="tv-champion__big font-heading" data-tv-name="1">{name}</div>
+      {line ? <div className="tv-league-podium__line tv-t-info" data-testid="tv-podium-line">{line}</div> : null}
+      <div className="tv-league-podium__winner" data-testid="tv-podium-winner">
+        <Avatar name={name} avatar={avatarOf(champion.winnerId)} className="tv-league-podium__photo" />
+        <div className="tv-champion__big font-heading" data-tv-name="1" data-fit={heroFit(name)}>{name}</div>
       </div>
-      <div className="tv-podium__stage" aria-label="Podest">
+      <div className="tv-league-podium__stage" aria-label="Podest">
         {stage.map((place) => {
           const rewards = [place.main, ...place.extras].filter(Boolean);
           return (
-            <div key={place.rank} className="tv-podium__col" data-place={place.rank} style={{ "--tv-podium-at": PODIUM_AT[place.rank] }}
+            <div key={place.rank} className="tv-league-podium__col" data-place={place.rank} style={{ "--tv-league-podium-at": PODIUM_AT[place.rank] }}
               data-testid={`tv-podium-place-${place.rank}`}>
-              <div className="tv-podium__arts">
+              <div className="tv-league-podium__arts">
                 {place.main ? (
-                  <span className="tv-podium__main">
+                  <span className="tv-league-podium__main">
                     <RewardArt reward={podiumArt(place.main, podium)} size="lg" play={play} testId={`tv-podium-art-${place.main.id}`} />
                   </span>
                 ) : null}
                 {place.extras.length ? (
-                  <span className="tv-podium__extras">
+                  <span className="tv-league-podium__extras">
                     {place.extras.map((reward, index) => (
                       <RewardArt key={reward.id} reward={podiumArt(reward, podium)} size="sm" play={play} index={index + 1} testId={`tv-podium-art-${reward.id}`} />
                     ))}
                   </span>
                 ) : null}
               </div>
-              <div className="tv-podium__team tv-t-name" data-tv-name="1">{nameOf(place.registrationId)}</div>
+              <div className="tv-league-podium__team tv-t-name" data-tv-name="1">{nameOf(place.registrationId)}</div>
               {rewards.length ? (
-                <div className="tv-podium__rewards tv-t-meta">
+                <div className="tv-league-podium__rewards tv-t-meta">
                   {rewards.map((reward) => reward.name).join(" · ")}{place.more ? ` · +${place.more}` : ""}
                 </div>
               ) : null}
-              <div className="tv-podium__clip" aria-hidden="true">
-                <div className="tv-podium__block"><span className="tv-podium__rank font-display">{place.rank}</span></div>
+              <div className="tv-league-podium__clip" aria-hidden="true">
+                <div className="tv-league-podium__block"><span className="tv-league-podium__rank font-display">{place.rank}</span></div>
               </div>
             </div>
           );
         })}
-        <span className="tv-podium__floor" aria-hidden="true" />
+        <span className="tv-league-podium__floor" aria-hidden="true" />
       </div>
     </div>
   );
