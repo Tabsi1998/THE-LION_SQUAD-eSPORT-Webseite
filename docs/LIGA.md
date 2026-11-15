@@ -3954,7 +3954,7 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Gesamtwertung | Punkte je Season-Platz, Spielerwertung, Abschluss, Belohnungen je Liga | abgenommen (Hauptweg „Gesamtwertung“) | F.5 #2415 | #2215 |
 | Historie | Season-Historie an Team und Spieler | getestet | F.2 #2397 | #1627 |
 | Öffentlich | Season-Seite mit Spieltagen und Teams, Startseite | abgenommen (Sz. 5, 11: Ligaseite 390/1440); Startseite getestet | #2378, #2327 | #2268, #2324 |
-| Tests | Echtes MongoDB, Browser mit echter API, nächtlich | abgenommen (G.1 nächtlich in GitHub Actions) | A.2 #2217, #2373, G.1 #2423 (offen) | #1632 |
+| Tests | Echtes MongoDB, Browser mit echter API, nächtlich | abgenommen (G.1 nächtlich in GitHub Actions) | A.2 #2217, #2373, G.1 #2423 | #1632 |
 | Tests | Wackelige Frontend- und Browser-Tests unter Last | teilweise | – | #2390 |
 | App | Kompatibel mit allen neuen Feldern | getestet | laufend | – |
 | App | Check-in, Veto live, Anmeldestatus, Zonen, Historie, Belohnungen (LionsAPP 1.7.10) | getestet (App-Tests), nicht in G.1 | G.2 #2419 | #2173 (Rest offen) |

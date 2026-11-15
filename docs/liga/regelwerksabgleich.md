@@ -1,7 +1,7 @@
 # Regelwerksabgleich Liga (G.3)
 
 Paket G.3 des Liga-Masterplans (#2211), Abschnitt 26 G des Auftrags vom 02.11.: Gegenüberstellung der fachlichen Regeln und der
-gebauten Funktionen. Stand 15.11.2026, Branch `docs/liga-g3-abschluss` auf `main` mit G.1 (#2423).
+gebauten Funktionen. Stand 15.11.2026, Branch `docs/liga-g3-abschluss` auf `main` 4f59cfcb6 (mit G.1, #2423).
 
 Grundlage:
 
@@ -295,7 +295,7 @@ Nicht vergebene Nummern gibt es keine; Nr. 33 ist durch 11c, Nr. 35 durch 68, Nr
 | 175 | Gleichstand: Staffelsiege, beste Platzierung, jüngste Season, Leitung; nur Platz 1 sperrt | `league_overall_rules.DEFAULT_TIEBREAKERS` · `test_league_overall_unit.py` | umgesetzt, getestet |
 | 176 | Private Profile als „Spieler mit privatem Profil“ | `league_overall.py` · `test_league_overall_flow.py`, `league-overall.spec.js` | umgesetzt, getestet |
 | 177 | Spieler-Belohnung der Gesamtwertung nur bei Einsatz in einer Season mit Punkten | `league_overall.py` · `test_league_overall_flow.py::test_player_reward_needs_a_counted_season_with_points_for_that_co_team` | umgesetzt, getestet |
-| 178 | Gesamtabnahme nächtlich in GitHub Actions | `.github/workflows/liga-abnahme-nacht.yml` · `liga-gesamtabnahme.spec.js`, `liga-grenzfaelle.spec.js` | umgesetzt, getestet (G.1, PR #2423 offen) |
+| 178 | Gesamtabnahme nächtlich in GitHub Actions | `.github/workflows/liga-abnahme-nacht.yml` · `liga-gesamtabnahme.spec.js`, `liga-grenzfaelle.spec.js` | umgesetzt, getestet (G.1, #2423) |
 | 179 | App parallel in 1.9.x-Patch-Stufen | LionsAPP 1.7.10 (PR #2419) | umgesetzt (G.2) |
 | 180 | Nachmeldung: Fenster über den Start, nur Hinweis | `league_readiness.py` (`application_after_start`), `league_applications.py` · `test_league_application_late_flow.py`, `test_league_pools_flow.py`, G.1 Nachmeldung | teilweise: Anmeldung geht, **Spiele für Nachrücker fehlen** (#2422) |
 

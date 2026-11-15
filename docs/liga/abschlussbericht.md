@@ -1,7 +1,7 @@
 # Abschlussbericht Liga-Ausbau (G.3)
 
-Paket G.3 des Liga-Masterplans (#2211), Abschnitt 26 I des Auftrags vom 02.11.2026. Stand 15.11.2026, `main` 40dcf6aff mit dem
-G.1-Branch (#2423, noch offen). Der Bericht ist eine überprüfbare Aufstellung: Jede Aussage nennt PR, Issue, Datei oder Test.
+Paket G.3 des Liga-Masterplans (#2211), Abschnitt 26 I des Auftrags vom 02.11.2026. Stand 15.11.2026, `main` 4f59cfcb6 (mit G.1,
+#2423). Der Bericht ist eine überprüfbare Aufstellung: Jede Aussage nennt PR, Issue, Datei oder Test.
 
 Dazu gehören:
 
@@ -49,7 +49,7 @@ Selbstanmeldung, Veto, Check-in, Strafen und Saisonabschluss. Dazu kamen 20 Fund
 | | F.4 Belohnungen je Season | #2411 | #2214 |
 | | F.5 Gesamtwertung über Seasons | #2415 | #2215 |
 | Öffentlich | Liga auf der Startseite, öffentliche Season-Seite, Hilfe-Bereich | #2327, #2378, #2331 | #2324, #2268, #2295 |
-| G Abnahme | G.1 Gesamtabnahme mit 18 Szenarien, nächtlich; Nachmeldung (Nr. 180) | #2423 (offen) | #1632 |
+| G Abnahme | G.1 Gesamtabnahme mit 18 Szenarien, nächtlich; Nachmeldung (Nr. 180) | #2423 | #1632 |
 | | G.2 LionsAPP 1.7.10: Check-in, Veto live, Anmeldestatus, Zonen, Historie, Belohnungen | #2419 | #2173 (Teil) |
 | | G.3 Handbücher, Regelwerksabgleich, Feature-Matrix, dieser Bericht, D-20 | Branch `docs/liga-g3-abschluss` | #2211 |
 
@@ -113,7 +113,7 @@ G.1 („Altdaten“). Neue Vorgaben gelten nur für neu angelegte Seasons.
 | G.3: `test_league_rule_facts_unit.py` (19 Tests, davon 2 neu, ohne Korrektur rot) | lokal | grün |
 | G.3: `test_league_veto_preset_flow.py`, `test_league_rules_dynamic_flow.py`, `test_league_schedule_flow.py` (48) | lokal, mongomock | grün |
 | G.3: Vitest `src/hilfe`, `HelpPages.test.jsx`, `HelpLink.test.jsx` (21) | lokal | grün |
-| G.3: Wächter `pytest -k "unit or boundary or inventory"`, `check-doc-links`, `check-code-patterns`, flake8 | lokal vor dem Push | siehe Bericht des Branches |
+| G.3: Wächter `pytest -n 2 -k "unit or boundary or inventory"` (5734 Tests, 15 übersprungen), `check-doc-links`, `check-code-patterns`, flake8 wie CI | lokal nach dem Merge von `main` | grün |
 
 Nicht automatisch geprüft: Versand an echte Dienste (Mail, Push, Discord – im Testbetrieb gesperrt), Backup und Wiederherstellung,
 Last bei vielen gleichzeitigen Vetos.
@@ -159,7 +159,7 @@ Last bei vielen gleichzeitigen Vetos.
   Textkorrektur (wie in G.3) ändert darum auch die Anzeige älterer Fassungen; der Inhalt bleibt.
 - **Veto per kurzem Abruf:** Kein WebSocket. Viele gleichzeitige Vetos erzeugen viele kurze Anfragen; nicht unter Last geprüft.
 - **Echte Dienste:** Mail, Push und Discord laufen in der Abnahme gesperrt; der erste echte Versand passiert in Season 1.
-- **Nächtliche Abnahme erst nach dem Merge von #2423** auf `main`; bis dahin läuft sie nur von Hand auf dem Branch.
+- **Nächtliche Abnahme:** läuft seit dem Merge von #2423 jede Nacht auf `main`. Eine rote Nacht legt ein Issue an – es muss jemand lesen.
 - **App:** Wer nur die App nutzt, kommt für Anmeldung, Vorfälle, Verfahren und Ergebnis mit Maps ins Web (#2173).
 - **Wackelige Tests** unter Last (#2390) können einen grünen Stand verdecken oder einen roten vortäuschen.
 
@@ -178,7 +178,7 @@ Last bei vielen gleichzeitigen Vetos.
 
 ## 9. Was ist vor Season 1 noch zu tun?
 
-1. **G.1 mergen** (#2423), damit die Gesamtabnahme jede Nacht auf `main` läuft; danach G.3 als PR.
+1. **G.3 als PR** prüfen und mergen; die erste grüne Nacht der Gesamtabnahme auf `main` abwarten (G.1 ist mit #2423 gemergt).
 2. **Website-Release** bewusst veröffentlichen (release-please-PR) und auf dem Server einspielen – Fabian.
 3. **Server einrichten** (Fabian): Bereich **Ligen** an alle Liga-Leitungen vergeben, Zwei-Faktor prüfen, Zuständige je Liga.
 4. **Spiel und Bibliothek:** MW4 als Version unter Call of Duty (Nr. 36), Modi mit Ergebnisregel und Symbol, Maps mit Bild,
