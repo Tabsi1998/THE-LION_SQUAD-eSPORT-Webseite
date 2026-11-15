@@ -207,21 +207,36 @@ async def job(name: str, tournament_id: str | None, season_id: str | None, minut
         from services import league_veto_sweep
 
         return await league_veto_sweep.sweep(db, [tournament], now=later)
-    # „age“: die Testzeit läuft für die Ergebnisse dieser Staffel um ``days`` Tage weiter - Protest- und Einspruchsfristen
-    # (48 h) sind dann vorbei, wie nach einer echten Spielwoche. Nur Zeitstempel, keine Ergebnisse.
+    # „age“: die Testzeit läuft für diese Staffel um ``days`` Tage weiter - Protest- und Einspruchsfristen (48 h) gegen
+    # Ergebnisse, Entscheidungen und Strafen sind dann vorbei, wie nach einer echten Spielwoche. Nur Zeitstempel, keine
+    # Ergebnisse, keine Entscheidungen.
     shift = timedelta(days=days)
+
+    def earlier(value):
+        if isinstance(value, str) and value:
+            return (datetime.fromisoformat(value.replace("Z", "+00:00")) - shift).isoformat()
+        return value
+
     moved = 0
     async for row in db.matches_v2.find({"tournament_id": tournament_id, "status": {"$in": ["completed", "forfeit"]}},
-                                         {"_id": 0, "id": 1, "completed_at": 1, "result_meta": 1}):
+                                         {"_id": 0, "id": 1, "completed_at": 1, "result_meta": 1, "disputes": 1}):
         update = {}
         for path, value in (("completed_at", row.get("completed_at")),
                             ("result_meta.confirmed_at", (row.get("result_meta") or {}).get("confirmed_at"))):
             if isinstance(value, str) and value:
-                update[path] = (datetime.fromisoformat(value.replace("Z", "+00:00")) - shift).isoformat()
+                update[path] = earlier(value)
+        for position, entry in enumerate(row.get("disputes") or []):
+            if isinstance(entry, dict) and entry.get("appeal_until"):
+                update[f"disputes.{position}.appeal_until"] = earlier(entry["appeal_until"])
         if update:
             await db.matches_v2.update_one({"id": row["id"]}, {"$set": update})
             moved += 1
-    return {"aged": moved}
+    sanctions = 0
+    async for row in db.competition_sanctions.find({"tournament_id": tournament_id, "appeal_until": {"$type": "string"}},
+                                                    {"_id": 0, "id": 1, "appeal_until": 1}):
+        await db.competition_sanctions.update_one({"id": row["id"]}, {"$set": {"appeal_until": earlier(row["appeal_until"])}})
+        sanctions += 1
+    return {"aged": moved, "sanctions": sanctions}
 
 
 # Felder, die erst mit dem Liga-Masterplan (#2211) dazukamen. Eine Season von davor hat sie nicht - so sieht der Altbestand

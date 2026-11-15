@@ -47,7 +47,8 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     const lead = await as(browser, testInfo, "lead", LARGE);
     Object.assign(edge, await buildLeague(admin, lead, { name: `Grenzfall-Liga ${unique()}` }));
     const seasonAdmin = `${ADMIN}/seasons/${edge.season.id}`;
-    await ok(lead, "PATCH", seasonAdmin, { visibility: "public", application_slots: 2,
+    await ok(lead, "PATCH", seasonAdmin, { visibility: "public" });
+    await ok(lead, "PATCH", seasonAdmin, { application_slots: 2,
       application_opens_at: new Date(Date.now() - 60 * MINUTE).toISOString(), application_closes_at: new Date(Date.now() + 24 * 60 * MINUTE).toISOString() });
     const base = `/api/leagues/${edge.league.slug}/${edge.season.slug}`;
     const apps = {};
