@@ -374,7 +374,8 @@ def test_the_lease_is_renewed_while_a_long_upload_archive_runs(tmp_path):
     calls, state = run_renewer(tmp_path, 100, 5)
     assert int(calls) >= 3 and state == "held"
     # Nach dem Stopp verlängert niemand mehr (kein verwaister Hintergrundprozess).
-    assert open(tmp_path / "calls").read().count("renew --token t-1 --ttl 3") == int(calls)
+    logged = (tmp_path / "calls").read_text(encoding="utf-8")
+    assert logged.count("renew --token t-1 --ttl 3") == int(calls)
 
 
 @pytest.mark.skipif(not BASH or not pathlib.Path(BASH).exists(), reason="Bash required")
