@@ -68,6 +68,9 @@ def test_an_annex_of_only_empty_blocks_is_left_out():
     assert anchors(sections("# Regeln\nText", annexes)) == ["regeln", "anlage-a", "anlage-b", "anlage-c"]
     assert text.only_blocks("[[baustein:veto]]\n[[Baustein: map_pool]]") == ["veto", "map_pool"]
     assert text.only_blocks("Siehe [[baustein:veto]]") == [] and text.only_blocks("") == []
+    # Die Vorschau nennt, was entfällt (#2426) - genau die Anlagen, die ``sections_of`` weglässt.
+    assert text.dropped_annexes(annexes, empty) == [{"key": "B", "title": "Veto"}]
+    assert text.dropped_annexes(annexes, lambda key: False) == [] and text.dropped_annexes(annexes, None) == []
 
 
 def test_a_long_word_does_not_break_the_anchor():

@@ -517,10 +517,13 @@ async def _rendered(db, scope: str, league: dict, season: dict | None, body_md: 
     values = {key: blocks.value(key, row) for key, row in snapshot.blocks.get(own, {}).items()}
     var_values = snapshot.vars.get(own, {})
     unknown_vars = variables.unknown(names, await facts.game_of(db, league))
+    empty_block = _empty_block(snapshot.blocks.get(own, {}))
     sections = text.sections_of(body_md, annexes, fill=lambda value: _fill(value, values, var_values, season, keep=unknown_vars),
-                                empty_block=_empty_block(snapshot.blocks.get(own, {})))
+                                empty_block=empty_block)
     result = await _compared(previous, season, sections)
     return {"sections": _served(sections, result), "blocks_used": [key for key in keys if key in blocks.BLOCKS],
+            # Anlagen nur aus leeren Bausteinen entfallen (#2426) - die Vorschau sagt es, damit niemand eine fehlende Anlage B sucht.
+            "dropped_annexes": text.dropped_annexes(annexes, empty_block),
             "unknown_blocks": blocks.unknown(keys), "vars_used": [name for name in names if name in var_values],
             "unknown_vars": unknown_vars, "empty_vars": _empty_names(snapshot.vars), "result": result, "snapshot": snapshot}
 
@@ -558,7 +561,7 @@ async def _proposal(db, scope: str, league: dict, season: dict | None, base: dic
     rendered = await _rendered(db, scope, league, season, base.get("body_md"), base.get("annexes") or [], base)
     return {"base": _head(base, current), "sections": rendered["sections"],
             "changes": {"base": _head(base, current), **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
-            "unknown_vars": rendered["unknown_vars"], "empty_vars": rendered["empty_vars"],
+            "unknown_vars": rendered["unknown_vars"], "empty_vars": rendered["empty_vars"], "dropped_annexes": rendered["dropped_annexes"],
             # Der Schnappschuss, den dieser Vorschlag zeigt - die Freigabe schickt seinen Fingerabdruck mit und veröffentlicht nur genau ihn.
             "fingerprint": rendered["snapshot"].fingerprint}
 
@@ -696,7 +699,8 @@ async def preview(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
     chain = await _chain(db, league, season)
     previous = chain["rows"][-1] if chain["rows"] else None
     rendered = await _rendered(db, scope, league, season, markdown_text.strip_protected(body.get("body_md")), annexes, previous)
-    return {**{key: rendered[key] for key in ("sections", "blocks_used", "unknown_blocks", "vars_used", "unknown_vars", "empty_vars")},
+    return {**{key: rendered[key] for key in ("sections", "blocks_used", "unknown_blocks", "vars_used", "unknown_vars", "empty_vars",
+                                              "dropped_annexes")},
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
                         **{key: rendered["result"][key] for key in ("new", "changed", "removed")}},
             "foreign_images": await _refused_images(db, body.get("body_md"), annexes, user, set(_upload_files(draft.get("body_md"), draft.get("annexes"))))}

@@ -839,6 +839,11 @@ async def test_annex_b_comes_from_the_template_on_page_pdf_and_compare(flow):
     assert "Anlage B: Veto" in words and "Sperren (Ban)" in words and "die übrige Map wird Map 3" in words
     # Ohne Vorlage: keine Anlage B - auf der Seite, im PDF und im Vergleich.
     ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(enabled=False)))
+    # Die Vorschau der Verwaltung sagt, dass Anlage B entfällt (#2426) - mit Vorlage stand dort nichts.
+    flow.act_as(w["lead"])
+    preview = ok(await flow.post(f"/api/admin/league-rules/league_season/{sid}/preview", json={"title": "R", "body_md": "# § 6\nText", "annexes": annexes}))
+    assert preview["dropped_annexes"] == [{"key": "B", "title": "Veto"}]
+    assert "anlage-b" not in [row["anchor"] for row in preview["sections"]]
     second = await publish(flow, w, body="# § 6 Veto\n\nOhne Veto.\n", annexes=annexes, reason="ohne Veto")
     page = ok(await flow.get(base))
     assert [row["anchor"] for row in page["sections"] if row["anchor"].startswith("anlage")] == ["anlage-a", "anlage-c"]
