@@ -108,10 +108,31 @@ Fehlende nachzieht, macht der nächste Halter dort weiter, ohne etwas doppelt zu
 | `MIGRATION_LEASE_RENEW_SECONDS` | ein Viertel der Sperre (45) | 1 bis ein Drittel der Sperre | Takt der Verlängerung. Bleibt sie bis einen Takt vor Ablauf aus, gibt der Halter auf. |
 | `MIGRATION_WAIT_SECONDS` | 1800 | 30–86400 | So lange wartet ein Start ohne Sperre. Danach bricht er mit `MigrationWaitTimeout` und dem Namen des Halters ab. Nach dem Neustart wartet er erneut oder übernimmt die inzwischen abgelaufene Sperre. |
 
-Gut zu wissen: Auch der Halter meldet sich erst nach dem Migrieren bereit. `update.sh` wartet 120 Sekunden auf
-`/api/health/ready`, der Healthcheck in `docker-compose.yml` rund 95 Sekunden. Dauert eine Migration länger, melden
-beide einen Fehler, obwohl das Backend weiter migriert. Dann das Protokoll ansehen
-(`docker compose logs -f backend`, Zeilen mit `[migration]`) und warten, bis „fertig“ steht, statt neu zu starten.
+**Deploy mit langer Migration.** Auch der Halter meldet sich erst nach dem Migrieren bereit. Darauf sind beide
+Wartezeiten eingestellt:
+
+- Der Healthcheck des Backends in `docker-compose.yml` hat `start_period: 600s`. Fehlversuche in den ersten zehn
+  Minuten zählen nicht, der erste Erfolg beendet die Anlaufzeit sofort. So lange wartet auch
+  `docker compose up`, bevor es das Frontend startet.
+- `update.sh` wartet `BACKEND_READY_TIMEOUT` Sekunden auf `/api/health/ready` (Umgebung oder `.env`, Standard 600).
+  Läuft die Zeit ab, nennt es den Befehl für das Protokoll und bricht ab. Das Backend migriert dabei weiter.
+
+Bricht `update.sh` ab oder meldet `docker compose up` „dependency failed to start: container tls-backend is
+unhealthy“, **nicht neu starten** – ein Neustart beginnt die abgebrochene Migration von vorn:
+
+1. `docker compose logs --tail=200 backend | grep -E 'migration|Startup complete'` ansehen. Steht dort
+   „… beginnt“ ohne „fertig“, läuft die Migration noch; lange Migrationen melden zwischendurch ihren Stand.
+2. Warten, bis „Startup complete“ steht und `curl -fsS http://localhost:8001/api/health/ready` antwortet.
+3. Danach das Frontend nachziehen: `docker compose up -d frontend`.
+
+Steht im Protokoll `MigrationLeaseLost` oder `MigrationWaitTimeout`, startet Docker das Backend von selbst neu; es
+wartet dann bzw. übernimmt. Für eine bekannt lange Migration vorher `BACKEND_READY_TIMEOUT` erhöhen.
+
+**Für Migrationsautoren** (`backend/services/migrations.py`): Jede Migration zieht beim zweiten Lauf nur Fehlendes
+nach (bedingte Updates, `$setOnInsert`). Lange Migrationen arbeiten in Schritten und prüfen zwischen den Schritten
+`migration_lease_ok()` oder `extend_migration_lease(db)` und werfen sonst `MigrationIncomplete`. Kein langer
+blockierender Sync-Code (Bilder, große Berechnungen) im Event-Loop – dafür `asyncio.to_thread`. Sonst kommt die
+Verlängerung im Hintergrund nicht dran, und der Halter verliert die Sperre.
 
 ## Eindeutige Indizes und Altdubletten (#930, #1043)
 
