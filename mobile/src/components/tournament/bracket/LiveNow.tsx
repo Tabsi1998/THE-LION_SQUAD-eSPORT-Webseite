@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import type { BracketMatch } from "../../../lib/bracketGraph";
 import { colors, radius, roles, surfaces } from "../../../theme";
-import { LiveClock } from "./LiveClock";
+import { LiveClock, clockDuration } from "./LiveClock";
 import { breatheStyle } from "./motion";
 
 /** Wer spielt gerade (#1563): die laufenden Spiele oben angepinnt - Station, Runde, Namen, Spielzeit. */
@@ -37,7 +37,7 @@ export function LiveNow({ matches, labels, nameOf, reduce, onOpen }: {
             <Text style={styles.names} numberOfLines={2} maxFontSizeMultiplier={1.4}>{playersText(match, nameOf)}</Text>
             <Text style={styles.round} numberOfLines={1} maxFontSizeMultiplier={1.4}>{labels.get(match.id) || ""}{match.match_type === "ffa" ? ` · Lauf ${match.match_key || ""}` : ""}</Text>
           </View>
-          <LiveClock startedAt={match.started_at} style={styles.clock} />
+          <LiveClock startedAt={match.started_at} durationMinutes={clockDuration(match)} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} style={styles.clock} />
         </Pressable>
       ))}
     </View>
