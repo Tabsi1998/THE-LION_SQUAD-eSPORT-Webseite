@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.10 - 2026-11-15
+
+- Mobile: Liga-Check-in zum Spiel: Anwesende anhaken, einchecken, Spiel starten. (#2173)
+- Mobile: Map-Veto live: Countdown nach der Serverzeit, sperren und wählen als Captain, „Bereit zum Veto“, Vorgabe der Woche. (#2173)
+- Mobile: Matchablauf als Schild im Kopf der Matchseite, vor dem Check-in ein Hinweis statt des Meldeformulars. (#2173)
+- Mobile: Liga-Anmeldung am Team: Stand je Co-Team, übernommene Anmeldung abmelden. (#2173)
+- Mobile: Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister. (#2173)
+- Mobile: Season-Historie, Belohnungen und Titel in Profil und Team. (#2173)
+- Mobile: Zeremonie bei neuer Liga-Belohnung. (#2173)
+- Mobile: Map-Veto sagt den eigenen Zug auch Vorleseprogrammen auf iOS an, größere Tippflächen. (#2173)
+- Mobile: „Vergangene anzeigen“ in der Turnierliste mit größerer Tippfläche. (#1155)
+
 ## 1.7.9 - 2026-10-27
 
 - Mobile: Wunschnummer unter „Meine Mitgliedschaft“: einmal frei von 0 bis 99 wählen, jede Nummer gibt es nur einmal. (#2050)
