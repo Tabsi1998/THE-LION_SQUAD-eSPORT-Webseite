@@ -21,7 +21,7 @@ export const EXIT_RULE_OPTIONS = [
 ];
 const EXIT_LABELS = { withdrawn: "Ausgetreten", disqualified: "Disqualifiziert" };
 
-// Punkteart (#2312, docs/LIGA.md E.1): Sieg/Remis/Niederlage oder je gewonnene Map (3:2 ergibt 3 und 2).
+// Punkteart (#2312, docs/LIGA.md E.1): Sieg/Remis/Niederlage oder je gewonnene Map (Beispiel je Best of: ``mapPointsExample``).
 export const POINTS_MODE_OPTIONS = [
   ["result", "Sieg, Remis, Niederlage"],
   ["maps", "Punkte nach gewonnenen Maps"],
@@ -83,9 +83,21 @@ export function tableRulesPayload(form) {
   };
 }
 
-/** Hinweis unter der Tabelle, wenn Punkte gewonnene Maps sind (#2312) - sonst leer. */
+/** Das Beispiel zu den Map-Punkten aus dem Best of (#2424, wie das Regelwerk): Best of 5 „3:2 ergibt 3 und 2, kampflos 3:0“, Best of 3
+ *  „2:1 ergibt 2 und 1, kampflos 2:0“, Best of 1 nur „kampflos 1:0“ - ohne Best of leer. */
+export function mapPointsExample(bestOf) {
+  const total = Number.parseInt(bestOf, 10);
+  if (!Number.isFinite(total) || total < 1) return "";
+  const win = Math.floor(total / 2) + 1;
+  const close = total - win;
+  return close > 0 ? `${win}:${close} ergibt ${win} und ${close}, kampflos ${win}:0` : `kampflos ${win}:0`;
+}
+
+/** Hinweis unter der Tabelle, wenn Punkte gewonnene Maps sind (#2312) - mit dem Beispiel aus dem Best of der Staffel, sonst leer. */
 export function pointsNote(rules) {
-  return byMaps(rules) ? "Punkte = gewonnene Maps (3:2 ergibt 3 und 2, kampflos 3:0)" : "";
+  if (!byMaps(rules)) return "";
+  const example = mapPointsExample(rules?.best_of);
+  return example ? `Punkte = gewonnene Maps (${example})` : "Punkte = gewonnene Maps";
 }
 
 /** Punktevergabe einer Season in einem Satz: „Sieg / Remis / Niederlage: 3 / 0 / 0“ oder „Punkte je gewonnene Map“. */

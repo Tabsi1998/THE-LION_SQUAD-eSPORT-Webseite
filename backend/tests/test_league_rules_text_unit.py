@@ -54,6 +54,25 @@ def test_annexes_are_own_sections_with_letters_and_prefixed_anchors():
     assert rows[2]["level"] == 2
 
 
+def test_an_annex_of_only_empty_blocks_is_left_out():
+    """#2426: Ohne Veto-Vorlage keine Anlage B - eine Anlage, die nur aus Bausteinen besteht, die für die Seite leer sind, entfällt.
+    Mit eigenem Text bleibt sie, und ohne ``empty_block`` (Größenprüfung) zählt jede Anlage."""
+    annexes = [{"key": "A", "title": "Einstellungen", "body_md": "[[baustein:modes]]"},
+               {"key": "B", "title": "Veto", "body_md": "\n [[baustein:veto]] \n"},
+               {"key": "C", "title": "Strafen", "body_md": "Katalog\n\n[[baustein:veto]]"}]
+    empty = {"veto"}.__contains__
+    rows = sections("# Regeln\nText", annexes, empty_block=empty)
+    assert anchors(rows) == ["regeln", "anlage-a", "anlage-c"], "die nächste Anlage behält ihren Buchstaben"
+    assert rows[2]["title"] == "Anlage C: Strafen"
+    assert anchors(sections("# Regeln\nText", annexes, empty_block=lambda key: False)) == ["regeln", "anlage-a", "anlage-b", "anlage-c"]
+    assert anchors(sections("# Regeln\nText", annexes)) == ["regeln", "anlage-a", "anlage-b", "anlage-c"]
+    assert text.only_blocks("[[baustein:veto]]\n[[Baustein: map_pool]]") == ["veto", "map_pool"]
+    assert text.only_blocks("Siehe [[baustein:veto]]") == [] and text.only_blocks("") == []
+    # Die Vorschau nennt, was entfällt (#2426) - genau die Anlagen, die ``sections_of`` weglässt.
+    assert text.dropped_annexes(annexes, empty) == [{"key": "B", "title": "Veto"}]
+    assert text.dropped_annexes(annexes, lambda key: False) == [] and text.dropped_annexes(annexes, None) == []
+
+
 def test_a_long_word_does_not_break_the_anchor():
     rows = sections("# " + "Donaudampfschifffahrt" * 20 + "\nA")
     assert len(rows[0]["anchor"]) <= text.ANCHOR_MAX

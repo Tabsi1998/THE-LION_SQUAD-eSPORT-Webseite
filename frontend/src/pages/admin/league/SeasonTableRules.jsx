@@ -1,7 +1,7 @@
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { FormGrid } from "@/components/tls/AdminForm";
 import {
-  EXIT_RULE_OPTIONS, FORFEIT_SCORE_OPTIONS, HEAD_TO_HEAD_LABELS, POINTS_MODE_OPTIONS, TIEBREAK_KEYS, TIEBREAK_LABELS, pointsModeChange,
+  EXIT_RULE_OPTIONS, FORFEIT_SCORE_OPTIONS, HEAD_TO_HEAD_LABELS, POINTS_MODE_OPTIONS, TIEBREAK_KEYS, TIEBREAK_LABELS, mapPointsExample, pointsModeChange,
 } from "@/lib/leagueTable";
 
 // Tabellenregeln je Season (E.1, #1625, docs/LIGA.md „E.1 Tabelle“): Reihenfolge bei Punktgleichheit, Mini-Tabelle,
@@ -33,6 +33,8 @@ function OrderedChips({ legend, labels, keys, value, onChange, hint, testPrefix 
  *  Reihenfolge bei Punktgleichheit und „kampflos wie 3:0“ vor - beides bleibt änderbar. */
 export function SeasonPointsFields({ form, set }) {
   const maps = form.match_points_mode === "maps";
+  // Das Beispiel aus dem Best of der Season (#2424) - wie Regelwerk und Tabelle.
+  const example = mapPointsExample(form.best_of);
   const change = (mode) => {
     if (mode === form.match_points_mode) return;
     for (const [key, value] of Object.entries(pointsModeChange(mode))) set(key, value);
@@ -41,7 +43,7 @@ export function SeasonPointsFields({ form, set }) {
     <div className="space-y-3">
       <SelectField label="Punkteart" value={form.match_points_mode || "result"} onChange={change} options={POINTS_MODE_OPTIONS} testId="season-form-points-mode"
         hint={maps
-          ? "Jede Seite bekommt so viele Punkte, wie sie Maps gewonnen hat: 3:2 ergibt 3 und 2, kampflos 3:0. Reihenfolge unten ist ein Vorschlag."
+          ? `Jede Seite bekommt so viele Punkte, wie sie Maps gewonnen hat${example ? `: ${example}` : ""}. Reihenfolge unten ist ein Vorschlag.`
           : "Feste Punkte für Sieg, Remis und Niederlage."} />
       {maps ? null : (
         <FormGrid cols={3}>

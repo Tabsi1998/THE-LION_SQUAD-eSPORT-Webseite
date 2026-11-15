@@ -276,6 +276,18 @@ test("Vorschau nennt unbekannte und leere Variablen", async () => {
   fireEvent.click(await screen.findByTestId("rules-preview"));
   expect(await screen.findByTestId("rules-preview-vars-unknown")).toHaveTextContent("{{gibtsnicht}}");
   expect(screen.getByTestId("rules-preview-vars-empty")).toHaveTextContent("{{max_squad_size}}");
+  expect(screen.queryByTestId("rules-preview-dropped")).toBeNull();
+});
+
+test("Vorschau sagt, dass Anlage B ohne Veto-Vorlage entfällt (#2426)", async () => {
+  serve({ ...VIEW, draft: DRAFT });
+  apiMock.post.mockResolvedValue({ data: { sections: [], changes: { base: null, new: [], changed: [], removed: [] }, blocks_used: ["veto"], unknown_blocks: [],
+    unknown_vars: [], empty_vars: [], foreign_images: [], dropped_annexes: [{ key: "B", title: "Veto" }] } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("rules-preview"));
+  const hint = await screen.findByTestId("rules-preview-dropped");
+  expect(hint).toHaveTextContent("Anlage B (Veto) entfällt auf der Seite, im PDF und im Vergleich");
+  expect(hint).toHaveTextContent("etwa ohne Veto-Vorlage");
 });
 
 test("Season erbt die Liga: das steht da, eigene Fassung geht aus dem Geerbten", async () => {
