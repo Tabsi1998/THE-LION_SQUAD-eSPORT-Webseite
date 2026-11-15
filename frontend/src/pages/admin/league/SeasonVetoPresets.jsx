@@ -168,7 +168,7 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
         </div>
       </div>
       <p className="text-xs text-white/60">
-        Je Spielwoche eine Map aus dem Pool des Modus. Sie gilt für alle Spiele dieses Spieltags – auch für ein verschobenes –, und niemand kann sie sperren oder wählen.
+        Je Spielwoche eine Map aus dem Pool des Modus. Sie gilt für alle Spiele dieser Spielwoche – auch für ein verschobenes –, und niemand kann sie sperren oder wählen.
         Ohne Vorgabe beginnt das Veto in der Woche nicht; ihr bekommt dann einen Hinweis. Tragt ihr sie nach, bekommen die wartenden Captains eine Nachricht; das Veto beginnt, sobald beide Seiten „Bereit zum Veto“ getippt haben.
         Eine Änderung gilt nur für Spiele, deren Veto noch nicht begonnen hat.
       </p>

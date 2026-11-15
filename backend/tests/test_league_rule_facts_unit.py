@@ -176,6 +176,17 @@ def test_map_points_example_follows_the_best_of_of_season_and_division():
     assert "3:2" not in old and "2:1" not in old, "ohne Best of kein falsches Beispiel"
 
 
+def test_rule_blocks_say_matchweek_not_matchday():
+    """#2424 (A6, Nr. 125): Die Bausteine sagen „Spielwoche“ - Spielwoche N ist Spieltag N, ein verschobenes Spiel bleibt in seiner Woche."""
+    eligibility = facts.render_eligibility(facts.eligibility_data(SEASON, []))
+    assert "- Wartezeit: Neuzugänge nach dem Ende von Spielwoche 1 warten 7 Tage ab der Aufnahme, nach einem Transfer immer." in eligibility
+    steps = [{"kind": "preset", "mode": "ctl", "mode_label": "Kontrolle", "team": None, "position": 1}]
+    veto = facts.render_veto({"enabled": True, "team_a": "home", "step_seconds": 60, "steps": steps})
+    assert "Sie gilt für alle Spiele dieser Spielwoche – auch für ein verschobenes –" in veto
+    for out in (eligibility, veto, facts.render_schedule(facts.schedule_data(SEASON))):
+        assert "Spieltag" not in out
+
+
 # ---------------------------------------------------------------- Termine, Spielberechtigung
 
 def test_schedule_block_with_and_without_d1_rules():
