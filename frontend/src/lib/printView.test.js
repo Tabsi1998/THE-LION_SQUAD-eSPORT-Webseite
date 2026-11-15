@@ -133,6 +133,11 @@ describe("Tabelle (#2121)", () => {
     expect(league.rows.map((item) => item.name)).toEqual(["Nordlicht", "Steinbock (ausgetreten)", "Eisfuchs (disqualifiziert)"]);
   });
 
+  test("Nachmeldung (#2422): die Zeile sagt, ab welcher Woche das Team dabei ist", () => {
+    const [league] = standingsSections([row("Nordlicht", 1), row("Neuling", 2, { late_entry: true, late_from_week: 4 })]);
+    expect(league.rows.map((item) => item.name)).toEqual(["Nordlicht", "Neuling (Nachgemeldet ab Woche 4)"]);
+  });
+
   test("lange Tabellen gehen auf der nächsten Seite weiter, nichts über den Rand", () => {
     const rows = Array.from({ length: 60 }, (_, index) => row(`Spieler ${index + 1}`, index + 1));
     const pages = standingsPages(rows, { orientation: "portrait" });

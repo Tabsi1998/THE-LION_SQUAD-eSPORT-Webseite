@@ -383,6 +383,15 @@ def _id_players(squad: dict, id_states: dict[str, dict]) -> list[dict]:
     return sorted(rows, key=lambda row: str(row["name"]).lower())
 
 
+async def _late_mark(db, tournament: dict) -> dict | None:
+    """Steht in der Staffel schon ein fester Spielplan? Dann ist die Anmeldung eine Nachmeldung (``league_late_entry``)."""
+    from services import league_late_entry
+
+    matches = await db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}},
+                                       {"_id": 0, "slots": 1, "round": 1, "stage_type": 1, "status": 1, "is_preview": 1}).to_list(3000)
+    return league_late_entry.late_mark(tournament, matches)
+
+
 async def build_registration(db, tournament: dict, team_id: str, squad_id: str, actor: dict, *, status: str = "approved",
                              consent: bool = False, via: str = "league_assign", source: str = "staff_add",
                              application_id: str | None = None, registered_by: str | None = None) -> dict:
@@ -425,7 +434,10 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
     tid = tournament["id"]
     now_iso = now_utc().isoformat()
     name = display_name(team, squad)
+    late = await _late_mark(db, tournament)
     return {
+        # Nachmeldung (#2422, Nr. 183): Steht der Spielplan schon, bekommt das Team seine Spiele erst nach Vorschau und Bestätigung der Leitung.
+        **({"late_entry": late} if late else {}),
         "id": new_id(),
         "tournament_id": tid,
         "user_id": None,

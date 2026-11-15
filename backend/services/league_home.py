@@ -18,7 +18,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
-from services import league_applications, league_look
+from services import league_applications, league_late, league_look
 from services import league_service as leagues
 from services.log_safe import log_safe
 from services.public_phase import STATUS_LABELS
@@ -59,7 +59,8 @@ def season_state(season: dict, now: datetime | None = None) -> tuple[dict, str |
     if season.get("status") in FINISHED_STATUSES or (end and end < now):
         return None
     window = league_applications.window_state(season, now)
-    opens, closes = _iso(season.get("application_opens_at")), _iso(season.get("application_closes_at"))
+    # Wirksames Ende mit Nachmeldefrist (#2422, Nr. 184).
+    opens, closes = _iso(season.get("application_opens_at")), _iso(league_late.effective_closes_iso(season))
     start = _iso(season.get("start_date"))
     if window == league_applications.OPEN:
         return _phase("registration_open", STATUS_LABELS["registration_open"], closes, "registration_closes", now), closes

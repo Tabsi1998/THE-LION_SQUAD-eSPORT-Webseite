@@ -1,4 +1,4 @@
-import { ZONE_LABELS, deductionText } from "@/lib/leagueTable";
+import { ZONE_LABELS, deductionText, lateEntryText } from "@/lib/leagueTable";
 import { standingCell } from "@/lib/standingsTable";
 import { tvTableColumns, tvTableSections } from "@/lib/tvTable";
 import { useTv } from "./TvScreen";
@@ -66,6 +66,8 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
                 {deductionText(row) ? <span className="tv-standings__exit" data-testid={`tv-deducted-${row.registration_id}`}> · {deductionText(row)}</span> : null}
                 {/* Angefochtenes Ergebnis (E.2, #1619): zählt vorläufig - am TV nur der Hinweis, nie Grund oder Seite. */}
                 {Number(row.contested) > 0 ? <span className="tv-standings__exit" data-testid={`tv-contested-${row.registration_id}`}> · in Klärung</span> : null}
+                {/* Nachmeldung (#2422): „Nachgemeldet ab Woche X“ - erklärt die kleinere Spielzahl. */}
+                {lateEntryText(row) ? <span className="tv-standings__exit" data-testid={`tv-late-${row.registration_id}`}> · {lateEntryText(row)}</span> : null}
               </td>
               {columns.map((column) => (
                 <td key={column.key} className={`tv-standings__num ${column.strong ? "tv-standings__num--strong font-display" : ""}`}>{standingCell(column, row)}</td>

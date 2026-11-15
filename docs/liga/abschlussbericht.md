@@ -125,7 +125,7 @@ Last bei vielen gleichzeitigen Vetos.
 
 | Punkt | Issue |
 | --- | --- |
-| Nachmeldung: Nachrücker bekommen keine Spiele im festen Spielplan | #2422 |
+| Nachmeldung: Nachrücker bekommen keine Spiele im festen Spielplan (erledigt: Spiele in offenen Wochen, Frist 14 Tage) | #2422 |
 | Eigene Staffel-Seite in der Liga-Verwaltung (Nr. 80) | #2262 |
 | Edition je Season (Titelwechsel ohne neue Liga) | #2400 |
 | Partien ohne Maps, Remis je Partie, Serienart (EA FC, Rocket League) | #2401 |
@@ -147,8 +147,8 @@ Last bei vielen gleichzeitigen Vetos.
 
 ## 7. Welche bekannten Risiken bestehen?
 
-- **Nachmeldung nach dem Start:** Die Anmeldung geht, Spiele bekommt das Team nicht (#2422). Ohne Klärung lieber kein Anmeldefenster
-  über den Season-Start hinaus.
+- **Nachmeldung nach dem Start:** Erledigt mit #2422: Spiele in den noch offenen Wochen nach Vorschau, Frist 14 Tage nach dem Start. Offen ist nur
+  noch die Frage nach einer Wertung nach Punkten je Spiel (siehe #2422).
 - **Staffeln in der Turnierverwaltung:** Bis #2262 bedient die Leitung Staffeln an zwei Orten (Season-Seite und Turnierverwaltung).
   Die Turnierverwaltung zeigt bei Staffeln nur, was die Liga braucht, aber die Wege sind länger.
 - **Vorgaben ≠ Tiroler Liga:** Eine neue Season startet mit Best of 3, zehn Wochen, acht Teams je Staffel, 3/0/0. Wer vergisst
@@ -170,7 +170,7 @@ Last bei vielen gleichzeitigen Vetos.
 | Datenschutztext für Externe (Nr. 1) | Text freigeben und rechtlich prüfen lassen, mit Bildern im Regelwerk nach Kontolöschung (Nr. 72) und MOSS (Nr. 141) | Ohne Text Anmeldung nur mit Platzhalter, für Externe nicht freigeben |
 | Veto-Folge Anlage B (Nr. 100) | Nach der CDL-Prüfung als Vorlage eintragen | Ohne Vorlage kein Veto in der Season |
 | Dritter Modus, Map-Pool, Zielwerte, Waffenliste, Controller, Crossplay, Abbruchphase, Sperrdauern (Nr. 14, Regelwerk v0.15) | Beim Einrichten in Spiel und Season eintragen | Ohne Werte „(nicht festgelegt)“ im Regelwerk |
-| Nachmeldung (#2422) | Für Season 1 Anmeldung bis zum Start; Nachrücker-Spiele danach bauen | Mit Fenster über den Start: Team ohne Spiele |
+| Nachmeldung (#2422) | Gebaut: Spiele nur in offenen Wochen, Frist 14 Tage nach dem Start | Ein Nachrücker hat weniger Spiele und steht nach Punkten |
 | Staffel-Seite (#2262) vor oder nach Season 1 | Nach Season 1, der Weg über die Turnierverwaltung ist dokumentiert | Vorher: ein Paket mehr vor dem Start |
 | Gesamtwertung bei mehreren Staffeln (Nr. 66, Vorschlag A3) | Die gebaute Rechnung „N je Staffel“ bestätigen | Sonst Schalter nachrüsten |
 | Wortlaut „Spieltag“ im Regelwerk, Beispiel 3:2 (Vorschläge A5, A6) | Beim nächsten Regelwerk-Update mitnehmen | Rein sprachlich |

@@ -189,6 +189,11 @@ ROUTES = [
     route("DELETE", "/api/admin/leagues/staffeln/{tid}/table-decision/nix", "results", DELETE_BODY),
     route("POST", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", {"note": "Beide nicht da"}),
     route("DELETE", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", DELETE_BODY),
+    # Nachmeldung (#2422): Frist mit Grund verlängern, Nachmeldungen der Season, Vorschau und Spiele nachtragen
+    route("POST", "/api/admin/leagues/seasons/{season}/application-extension", "season", {"until": None, "reason": "Grund genug"}),
+    route("GET", "/api/admin/leagues/seasons/{season}/late-entries", "applications"),
+    route("GET", "/api/admin/leagues/staffeln/{tid}/late-entries/{reg}", "applications"),
+    route("POST", "/api/admin/leagues/staffeln/{tid}/late-entries/{reg}", "applications", {"fingerprint": "alt"}),
     # Saisonabschluss (F.1, #1645): Cockpit, Abschluss, Wiedereröffnung, Fassung aus dem Verlauf
     route("GET", "/api/admin/leagues/seasons/{season}/closing", ANY),
     route("POST", "/api/admin/leagues/staffeln/{tid}/close", "season", {"confirm": True}),

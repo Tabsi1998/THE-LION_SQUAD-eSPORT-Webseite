@@ -772,6 +772,20 @@ async def _names(db, user_ids: set[str]) -> dict[str, str]:
     return {row["id"]: row.get("display_name") or row.get("username") or "Liga-Leitung" for row in rows}
 
 
+LATE_ENTRY_HINT = ("Für ein nach dem Start zugeteiltes Team ist noch nicht entschieden, welche Spiele es bekommt. Kein Sperrgrund - "
+                   "entscheide es unter „Nachmeldungen“, solange noch Wochen offen sind.")
+
+
+async def _late_entry_hints(db, tournament: dict, season: dict | None) -> list[dict]:
+    from services.league_late_entry import OPEN, _name, is_active
+
+    rows = await db.tournament_registrations.find({"tournament_id": tournament["id"], "late_entry.state": OPEN},
+                                                  {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "status": 1,
+                                                   "removal": 1}).to_list(REGISTRATION_LIMIT)
+    items = [{"text": _name(row), "url": f"/admin/leagues/seasons/{(season or {}).get('id')}#nachmeldungen"} for row in rows if is_active(row)]
+    return [_blocker("late_entry_open", "Nachmeldung nicht entschieden", LATE_ENTRY_HINT, items)] if items else []
+
+
 async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, decisive: bool, division_label: str | None,
                            can_act: bool, zones: dict | None = None, now: datetime | None = None) -> dict:
     """Eine Staffel im Cockpit: Stand, Sperrgründe mit Link, Vorschau bzw. Endstand, Gleichstand auf Platz 1, Verlauf."""
@@ -800,6 +814,9 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
             {"tournament_id": tid, "reward_key": {"$type": "string"}, "suspended": {"$ne": True}, "roster_fallback": True},
             {"_id": 0, "league.display_name": 1})}),
     }
+    if not is_closed(tournament):
+        # Nachmeldung (#2422): Hinweis, kein Sperrgrund - die Leitung hat noch nicht entschieden, welche Spiele das Team bekommt.
+        base["hints"] = await _late_entry_hints(db, tournament, season)
     if is_closed(tournament) and not active:
         # Abgebrochener Abschluss (N-b): ehrlich als solcher - gesperrt, ohne Endstand, mit „Wieder öffnen“ als Ausweg.
         return {**base, "closed": False, "incomplete": True, "final": None, "standings": await live_rows(db, tournament),

@@ -95,7 +95,9 @@ SEASON_RULE_DEFAULTS: dict = {
 # Selbstanmeldung (#2205): Leer heißt: gibt es nicht - darum dürfen die Felder auch wieder leer werden.
 APPLICATION_TIMES = ("application_opens_at", "application_closes_at")
 APPLICATION_TEXTS = ("application_waitlist_note", "application_privacy_text")
-APPLICATION_OPTIONAL = (*APPLICATION_TIMES, *APPLICATION_TEXTS, "application_slots", "application_waitlist_limit")
+# Nachmeldefrist (#2422, Nr. 184): Tage nach dem Start, leer = Vorgabe (``league_late.DEFAULT_DAYS``). Die Verlängerung mit Grund läuft
+# über eine eigene Route (``application_late_extension``) und steht darum nicht hier.
+APPLICATION_OPTIONAL = (*APPLICATION_TIMES, *APPLICATION_TEXTS, "application_slots", "application_waitlist_limit", "late_registration_days")
 NEW_SEASON_MIN_SQUAD = 3
 SERIES = "series"
 # Mindestgröße je Modus (#2207, C.2): nur an der Season, fehlt = abgeleitet (``league_pool_check``).

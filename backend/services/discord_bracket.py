@@ -32,7 +32,7 @@ from datetime import datetime, timedelta
 from models import REGISTRATION_LIMIT, now_utc
 from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.bracket_common import (
-    CLARIFICATION, DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, clarification_count, in_clarification, round_label,
+    CLARIFICATION, DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, clarification_count, in_clarification, late_entry_note, round_label,
     section_label,
 )
 
@@ -103,6 +103,8 @@ def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[
     from services.competition_standings import round_robin_standings, stage_standings, swiss_standings, table_rules
 
     rules = table_rules(tournament)
+    # Nachmeldung (#2422): „nachgemeldet ab Woche 3“ wie in der Ligatabelle - erklärt die kleinere Spielzahl.
+    late = {row.get("id"): row.get("late_entry") for row in registrations or [] if row.get("late_entry")}
 
     stages_by_id = {stage.get("id"): stage for stage in stages if stage.get("id")}
     fields: list[dict] = []
@@ -118,8 +120,8 @@ def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[
             points = row.get("points", 0)
             wins = row.get("won", row.get("wins", 0))
             # Angefochtene Ergebnisse (#2363): wie die Zeile der Ligatabelle „1 Spiel in Klärung“ - ohne steht die Zeile wie bisher.
-            note = clarification_count(row.get("contested"))
-            lines.append(f"{index}. {row.get('display_name') or 'Teilnehmer'} · {points} Pkt · {wins} Siege" + (f" · {note}" if note else ""))
+            notes = [text for text in (late_entry_note(late.get(row.get("registration_id"))), clarification_count(row.get("contested"))) if text]
+            lines.append(f"{index}. {row.get('display_name') or 'Teilnehmer'} · {points} Pkt · {wins} Siege" + "".join(f" · {note}" for note in notes))
         fields.append({"name": f"{stage.get('name') or 'Tabelle'} (Top {TOP_TABLE})"[:256], "value": ("\n".join(lines) or "Noch keine Partie gespielt.")[:FIELD_LIMIT], "inline": False})
 
     # Bracket-Phasen: je Abschnitt Runden.

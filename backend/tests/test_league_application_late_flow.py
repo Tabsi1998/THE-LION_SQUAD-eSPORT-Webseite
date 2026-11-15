@@ -70,10 +70,12 @@ async def test_a_late_entry_and_a_started_staffel(flow):
     assert accepted["status"] == "accepted"
     registrations = ok(await flow.get(f"/api/tournaments/{world['tid']}/registrations"))
     assert len(registrations) == 3
-    # Die Tabelle führt das nachgemeldete Co-Team mit null Spielen. Einen Spielplan für es gibt es heute nicht (im Bericht zu G.1
-    # als offener Punkt genannt): Die festen Spiele bleiben, wie sie beim Start waren.
+    # Die Tabelle führt das nachgemeldete Co-Team mit null Spielen und dem Hinweis. Das Zuteilen legt keine Spiele an (keine stille
+    # Änderung, #2422): Die Leitung trägt sie nach Vorschau nach (test_league_late_entry_flow.py).
     standings = {row["registration_id"]: row for row in ok(await flow.get(f"/api/tournaments/{world['tid']}/standings"))}
     late_row = standings[accepted["assignment"]["registration_id"]]
-    assert late_row["played"] == 0 and late_row["points"] == 0
+    assert late_row["played"] == 0 and late_row["points"] == 0 and late_row["late_entry"] is True
+    registration = await flow.db.tournament_registrations.find_one({"id": accepted["assignment"]["registration_id"]}, {"_id": 0})
+    assert registration["late_entry"]["state"] == "open"
     after = await flow.db.matches_v2.count_documents({"tournament_id": world["tid"], "is_preview": {"$ne": True}})
     assert after == before

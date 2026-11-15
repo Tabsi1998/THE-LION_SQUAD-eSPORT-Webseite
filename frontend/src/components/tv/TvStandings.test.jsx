@@ -59,3 +59,14 @@ test("Punktabzug (E.3): am TV steht die Höhe an der Zeile, ohne Abzug nichts", 
   expect(await screen.findByTestId("tv-deducted-r2")).toHaveTextContent("−2 Punkte Abzug");
   expect(screen.queryByTestId("tv-deducted-r1")).not.toBeInTheDocument();
 });
+
+test("Nachmeldung (#2422): die Zeile sagt, ab welcher Woche das Team dabei ist", async () => {
+  const late = [{ ...groups[0], standings: groups[0].standings.map((row, index) => (index === 7 ? { ...row, late_entry: true, late_from_week: 3 } : row)) }];
+  render(
+    <MemoryRouter initialEntries={["/display/bracket/t1"]}>
+      <TvScreen><TvStandingsSlide standings={late} turn={0} /></TvScreen>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("tv-late-r-0-7")).toHaveTextContent("Nachgemeldet ab Woche 3");
+  expect(screen.queryByTestId("tv-late-r-0-6")).toBeNull();
+});
