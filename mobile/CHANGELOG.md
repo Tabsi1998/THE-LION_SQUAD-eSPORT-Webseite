@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.11 - 2026-11-16
+
+- Mobile: Gesamtwertung der Liga je Liga N mit Co-Teams, Spielern, Punkten je Season und Streichergebnis. (#2173)
+- Mobile: Platz in der Gesamtwertung an Profil und Team, Gesamtsieger erst beim vollständigen Endstand. (#2173)
+- Mobile: Reiter „Trophäen“ mit Karten und Filtern nach Art, Spiel, Season und Platz an Profil und Team. (#2173)
+- Mobile: Bis zu drei Embleme neben dem Namen an Profil und Team wählen. (#2173)
+- Mobile: Teamseite mit Reitern „Übersicht“ und „Trophäen“, Rankingbanner kopieren und teilen. (#2173)
+- Mobile: „Nachgemeldet ab Woche X“ in der Liga-Tabelle, Anmeldefenster der Season an der Staffel. (#2173)
+- Mobile: Freundlicher Hinweis „Kurze Wartung“ während der Backup-Pause statt einer Fehlermeldung. (#2173)
+
 ## 1.7.10 - 2026-11-15
 
 - Mobile: Liga-Check-in zum Spiel: Anwesende anhaken, einchecken, Spiel starten. (#2173)
