@@ -32,7 +32,7 @@ class EmblemsBody(BaseModel):
 async def my_awards(user: dict = Depends(get_current_user)):
     db = get_db()
     awards = await awards_for_user(db, user["id"], public_only=False)
-    me = await db.users.find_one({"id": user["id"]}, {"_id": 0, "featured_award_id": 1, "featured_title_award_id": 1, EMBLEM_FIELD: 1}) or {}
+    me = await db.users.find_one({"id": user["id"]}, {"_id": 0, "featured_award_id": 1, "featured_title_award_id": 1, "featured_emblem_award_ids": 1}) or {}
     return {"awards": awards, "featured_award_id": me.get("featured_award_id"), "featured_title_award_id": me.get("featured_title_award_id"),
             "featured_emblem_award_ids": [award["id"] for award in featured_emblems(awards, me.get(EMBLEM_FIELD))]}
 
