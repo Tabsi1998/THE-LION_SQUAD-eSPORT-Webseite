@@ -75,12 +75,29 @@ export function heavyRouteProblems(manifest, { prefix = LIGHT_ROUTE_PREFIX, requ
   return problems;
 }
 
+/** Harte Grenzen ("<!-- budget:... -->", darüber schlägt das Gate fehl). */
 export function parseBudgets(markdown) {
-  const budgets = {};
-  for (const match of markdown.matchAll(/<!-- budget:([a-z0-9-]+) (\d+) -->/g)) {
-    budgets[match[1]] = Number(match[2]);
+  return parseMarkers(markdown, "budget");
+}
+
+/** Ziele ("<!-- goal:... -->", darüber nur eine Warnung): der Wert, auf den wir hinarbeiten. */
+export function parseGoals(markdown) {
+  return parseMarkers(markdown, "goal");
+}
+
+function parseMarkers(markdown, kind) {
+  const values = {};
+  for (const match of markdown.matchAll(/<!-- (budget|goal):([a-z0-9-]+) (\d+) -->/g)) {
+    if (match[1] === kind) values[match[2]] = Number(match[3]);
   }
-  return budgets;
+  return values;
+}
+
+/** Ergebnis je Messwert: "fail" über der Grenze, "warn" über dem Ziel, sonst "ok". */
+export function judge(value, limit, goal) {
+  if (value > limit) return "fail";
+  if (Number.isFinite(goal) && value > goal) return "warn";
+  return "ok";
 }
 
 export function collectStartup(manifest, entryKey = "index.html") {
@@ -112,7 +129,9 @@ function main() {
     process.exit(1);
   }
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const budgets = parseBudgets(readFileSync(path.join(rootDir, "PERFORMANCE_BUDGETS.md"), "utf8"));
+  const budgetText = readFileSync(path.join(rootDir, "PERFORMANCE_BUDGETS.md"), "utf8");
+  const budgets = parseBudgets(budgetText);
+  const goals = parseGoals(budgetText);
   const { js, css } = collectStartup(manifest);
 
   const measure = (file) => {
@@ -141,10 +160,17 @@ function main() {
       failures.push(`PERFORMANCE_BUDGETS.md enthält keinen Grenzwert "<!-- budget:${key} ... -->".`);
       continue;
     }
-    const status = value <= limit ? "ok" : "ZU GROSS";
-    console.log(`${label} gzip (Stufe ${GZIP_LEVEL}): ${formatBytes(value)} / Budget ${formatBytes(limit)} – ${status}`);
-    if (value > limit) {
-      failures.push(`${label} ist ${formatBytes(value - limit)} über dem Budget von ${formatBytes(limit)}.`);
+    const goal = goals[key];
+    const verdict = judge(value, limit, goal);
+    const goalText = Number.isFinite(goal) ? `, Ziel ${formatBytes(goal)}` : "";
+    const status = { ok: "ok", warn: "über dem Ziel", fail: "ZU GROSS" }[verdict];
+    console.log(`${label} gzip (Stufe ${GZIP_LEVEL}): ${formatBytes(value)} / Grenze ${formatBytes(limit)}${goalText} – ${status}`);
+    if (verdict === "warn") {
+      // Nur ein Hinweis, kein Fehler: in GitHub Actions als Warnung sichtbar.
+      console.log(`::warning::${label} liegt ${formatBytes(value - goal)} über dem Ziel von ${formatBytes(goal)} (Grenze ${formatBytes(limit)}).`);
+    }
+    if (verdict === "fail") {
+      failures.push(`${label} ist ${formatBytes(value - limit)} über der Grenze von ${formatBytes(limit)}.`);
     }
   }
 
@@ -158,7 +184,7 @@ function main() {
   if (failures.length) {
     console.error("\nBundle-Budget überschritten (#936):");
     for (const failure of failures) console.error(`  - ${failure}`);
-    console.error("Schwere Teile per lazy()/import() nachladen oder das Budget in PERFORMANCE_BUDGETS.md begründet anpassen.");
+    console.error("Schwere Teile per lazy()/import() nachladen oder die Grenze in PERFORMANCE_BUDGETS.md begründet anpassen.");
     process.exit(1);
   }
 }

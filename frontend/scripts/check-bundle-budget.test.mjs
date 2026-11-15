@@ -1,8 +1,9 @@
 // Selbsttest des Budget-Gates (#936): node --test scripts/check-bundle-budget.test.mjs
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  FORBIDDEN_STARTUP_CHUNKS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, parseBudgets,
+  FORBIDDEN_STARTUP_CHUNKS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, judge, parseBudgets, parseGoals,
 } from "./check-bundle-budget.mjs";
 
 const manifest = {
@@ -30,9 +31,25 @@ test("ein kaputtes Manifest fällt auf statt still weniger zu zählen", () => {
   assert.throws(() => collectStartup({}), /keinen Einstieg/);
 });
 
-test("liest die Grenzwerte aus PERFORMANCE_BUDGETS.md", () => {
-  const markdown = "Text\n<!-- budget:startup-js-gzip 300000 -->\n- etwas\n<!-- budget:startup-css-gzip 62000 -->";
-  assert.deepEqual(parseBudgets(markdown), { "startup-js-gzip": 300000, "startup-css-gzip": 62000 });
+test("liest Grenzen und Ziele getrennt aus PERFORMANCE_BUDGETS.md", () => {
+  const markdown = "Text\n<!-- budget:startup-js-gzip 305000 -->\n<!-- goal:startup-js-gzip 300000 -->\n- etwas\n<!-- budget:startup-css-gzip 63000 -->";
+  assert.deepEqual(parseBudgets(markdown), { "startup-js-gzip": 305000, "startup-css-gzip": 63000 });
+  assert.deepEqual(parseGoals(markdown), { "startup-js-gzip": 300000 });
+});
+
+test("über dem Ziel nur Warnung, über der Grenze Fehler", () => {
+  assert.equal(judge(299_000, 305_000, 300_000), "ok");
+  assert.equal(judge(300_001, 305_000, 300_000), "warn");
+  assert.equal(judge(305_000, 305_000, 300_000), "warn");
+  assert.equal(judge(305_001, 305_000, 300_000), "fail");
+  assert.equal(judge(62_000, 63_000, undefined), "ok");
+});
+
+test("die echte PERFORMANCE_BUDGETS.md: JS-Grenze 305.000 mit Ziel 300.000, CSS-Grenze 63.000", () => {
+  const markdown = readFileSync(new URL("../PERFORMANCE_BUDGETS.md", import.meta.url), "utf8");
+  assert.equal(parseBudgets(markdown)["startup-js-gzip"], 305000);
+  assert.equal(parseGoals(markdown)["startup-js-gzip"], 300000);
+  assert.equal(parseBudgets(markdown)["startup-css-gzip"], 63000);
 });
 
 test("gzip mit fester Stufe ist reproduzierbar", () => {

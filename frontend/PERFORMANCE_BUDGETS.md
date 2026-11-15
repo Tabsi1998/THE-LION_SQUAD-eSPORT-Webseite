@@ -18,28 +18,41 @@ importiert – genau die Dateien, die `dist/index.html` als `<script>` bzw. `<li
 Routen-, Saison-, Editor-, Diagramm-, PDF- und QR-Teile zählen nicht mit. Gezählt wird gzip mit fester Stufe 9 aus dem
 Vite-Manifest (`dist/.vite/manifest.json`), damit die Zahl auf jedem Rechner gleich ist.
 
-Das Budget-Gate `yarn check:bundle` (`scripts/check-bundle-budget.mjs`) liest die Grenzwerte aus den Zeilen unten und
-schlägt fehl, wenn der Start darüber liegt oder Editor (`editor`), Diagramme (`charts`), PDF (`pdf`) oder QR (`jsQR`)
+Das Budget-Gate `yarn check:bundle` (`scripts/check-bundle-budget.mjs`) liest Ziel und Grenze aus den Zeilen unten. Es
+warnt über dem Ziel und schlägt über der Grenze fehl, ebenso wenn Editor (`editor`), Diagramme (`charts`), PDF (`pdf`) oder QR (`jsQR`)
 vorab geladen werden. Es läuft in der CI im Job „Frontend“ direkt nach `yarn build` und in `scripts/local_check.py`.
 Außerdem darf keine öffentliche Seite (alle unter `src/pages/public/` sowie die Pflicht-Seiten Registrierung, Mitglied
 werden, Profil, Events und Turniere) diese Chunks statisch erreichen. Kleine Bibliotheken, die Editor bzw. Diagramme und
 anderer Code gemeinsam nutzen (clsx, use-sync-external-store), sammelt dafür die Gruppe `vendor-shared` in
 `vite.config.mjs` ein.
 
-- Start-JS: höchstens **300.000 Bytes** gzip (Ziel aus #936 erreicht).
-  <!-- budget:startup-js-gzip 300000 -->
-- Start-CSS: höchstens **62.000 Bytes** gzip (Ist-Wert plus rund 2 % Puffer; ein Ziel gibt es noch nicht, siehe unten).
-  <!-- budget:startup-css-gzip 62000 -->
+**Ziel und Grenze:** Das *Ziel* ist der Wert, auf den wir hinarbeiten; liegt der Start darüber, meldet das Gate nur eine
+Warnung (in GitHub Actions als `::warning::`). Die *Grenze* ist hart: darüber schlägt der Build fehl. Der kleine Abstand
+dazwischen fängt gewöhnliches Wachstum ab, ohne dass jede Kleinigkeit die CI rot macht – lässt aber keinen schweren
+Baustein unbemerkt durch. Nach jedem Abspeck-Schritt werden Ist-Wert, Ziel und Grenze hier nachgezogen (die Grenze
+etwa 2–3 % über dem neuen Ist-Wert), damit Gewonnenes nicht still wieder verloren geht.
+
+| | Ist (15.11.2026, nach main 66bae9f7d) | Ziel (Warnung) | Grenze (Fehler) |
+| --- | --- | --- | --- |
+| Start-JS gzip | 297.364 Bytes | 300.000 Bytes | 305.000 Bytes |
+| Start-CSS gzip | 60.590 Bytes | – (siehe nächste Schritte) | 63.000 Bytes |
+
+<!-- goal:startup-js-gzip 300000 -->
+<!-- budget:startup-js-gzip 305000 -->
+<!-- budget:startup-css-gzip 63000 -->
+
 - Neue Admin-, Editor-, Chart-, TV- oder Display-Features werden lazy geladen.
 - Tiptap, Charts, QR/Display und schwere Admin-Tabellen duerfen nicht unnoetig in den anonymen Public-Startpfad rutschen.
 - Teile, die nur angemeldet oder nur bei einem Ereignis gebraucht werden (Glocke, Zeremonien, Kronen-Feier, Abstimmung),
   laden erst dann (`lazyPage` aus `lib/chunkReload`). Ein Hörer für Ereignisse bleibt dabei im Start, nur die Anzeige lädt nach.
+  Bausteine im Hintergrund (Zeremonie, Glocke, Kronen-Feier, „Heute im Einsatz“) laden mit `{ optional: true }` und in
+  einer stillen `OptionalBoundary`: fehlt die Datei nach einem Deploy, fallen sie weg, statt die Seite neu zu laden.
 
 ### Messung 15.11.2026 (#936)
 
 | | vorher (main 100264a9f) | nachher |
 | --- | --- | --- |
-| Start-JS gzip (Stufe 9) | 624.378 Bytes in 105 Dateien | 297.177 Bytes in 46 Dateien |
+| Start-JS gzip (Stufe 9) | 624.378 Bytes in 105 Dateien | 297.177 Bytes in 46 Dateien (nach main 66bae9f7d: 297.364 in 45) |
 | Start-CSS gzip (Stufe 9) | 64.122 Bytes | 60.590 Bytes |
 | LCP Startseite / Album (Labor, Median aus 5) | 7,06 s / 7,26 s | 4,06 s / 4,58 s |
 | CLS Startseite / Album | 0,002 / 0,002 | 0,002 / 0,002 |
@@ -95,6 +108,6 @@ Diese Teile stehen absichtlich im Start (gzip, gerundet):
 
 ## Pruefung
 
-- `yarn build` und danach `yarn check:bundle`: Start-JS und Start-CSS gegen die Budgets oben, mit den größten Dateien.
+- `yarn build` und danach `yarn check:bundle`: Start-JS und Start-CSS gegen Ziel und Grenze oben, mit den größten Dateien.
 - Bei visuellen Layout-Aenderungen kleine und grosse Mobile-Viewports pruefen.
 - Bei Performance-Arbeiten Startseite, Turnierdetail, Newsdetail und Eventdetail priorisieren.
