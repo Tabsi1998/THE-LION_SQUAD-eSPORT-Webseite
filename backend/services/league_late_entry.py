@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 
 from services.custom_bracket import league_legs
 from services.league_late import GENERATION_MODE, GONE_STATUSES, registration_name
+from services.log_safe import log_safe
 from services.matchday_schedule import (
     LOCAL_TZ,
     apply_schedule_writes,
@@ -464,6 +465,16 @@ async def _mark_done(db, tournament_id: str, registration_id: str, mark: dict, n
     return bool(written.modified_count)
 
 
+async def _marked_with(db, registration_id: str, docs: list[dict]) -> bool:
+    """Steht die Markierung schon auf ``done`` mit genau diesen Spielen?"""
+    try:
+        row = await db.tournament_registrations.find_one({"id": registration_id}, {"_id": 0, "late_entry": 1})
+    except Exception:  # noqa: BLE001 - nicht lesbar heißt: nicht sicher geschrieben
+        return False
+    late = (row or {}).get("late_entry") or {}
+    return late.get("state") == DONE and sorted(late.get("match_ids") or []) == sorted(doc["id"] for doc in docs)
+
+
 async def conflict_view(db, user: dict, registration: dict) -> dict:
     """Für die Vorschau (Nr. 187): gehört die Person zum Team? Dann bestätigt eine andere, der Superadmin nur mit Grund."""
     from services.league_permissions import side_conflict
@@ -528,7 +539,11 @@ async def apply(db, tournament_id: str, registration_id: str, fingerprint: str |
                 try:
                     marked = await _mark_done(db, tournament_id, registration_id, mark, now)
                 except Exception:
-                    marked = None
+                    # Unklar, ob die Markierung geschrieben ist (etwa Zeitüberschreitung nach dem Schreiben): neu lesen. Steht sie mit
+                    # genau diesen Spielen da, gilt die Entscheidung, und die Spiele bleiben (Review #2422, Runde 2).
+                    marked = await _marked_with(db, registration_id, docs)
+                    if not marked:
+                        marked = None
                 if not marked:
                     await db.matches_v2.delete_many({"id": {"$in": [doc["id"] for doc in docs]}})
                     if marked is None:
@@ -549,7 +564,5 @@ async def apply(db, tournament_id: str, registration_id: str, fingerprint: str |
     try:
         await _notify(db, tournament, registration, docs, registrations)
     except Exception:  # noqa: BLE001 - die Spiele stehen, eine Nachricht hält sie nie auf
-        from services.log_safe import log_safe
-
         logger.warning("[liga] Nachricht zur Nachmeldung nicht verschickt: %s", log_safe(registration_id), exc_info=True)
     return {**row, "state": DONE, "late_entry": mark, "match_ids": [doc["id"] for doc in docs]}

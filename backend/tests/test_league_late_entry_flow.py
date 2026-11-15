@@ -444,3 +444,28 @@ async def test_the_closing_cockpit_names_an_undecided_late_entry_without_blockin
     ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]}))
     row = next(item for item in ok(await flow.get(f"{season_url(world)}/closing"))["staffeln"] if item["tournament_id"] == world["tid"])
     assert row["hints"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_mark_written_before_an_error_keeps_the_games(flow, monkeypatch):
+    """Review #2422, Runde 2: Die Markierung ist geschrieben, die Antwort darauf geht verloren - neu gelesen gilt die Entscheidung, die Spiele
+    bleiben."""
+    from services import league_late_entry
+
+    world = await running_staffel(flow, teams=4, weeks=4)
+    _accepted, registration = await late_entry(flow, world)
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(late_url(world, registration["id"])))
+    real = league_late_entry._mark_done
+
+    async def written_then_lost(*args, **kwargs):
+        await real(*args, **kwargs)
+        raise RuntimeError("Antwort verloren")
+
+    monkeypatch.setattr(league_late_entry, "_mark_done", written_then_lost)
+    done = ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]}))
+    assert len(done["match_ids"]) == 2
+    assert await flow.db.matches_v2.count_documents({"id": {"$in": done["match_ids"]}}) == 2
+    stored = (await flow.db.tournament_registrations.find_one({"id": registration["id"]}, {"_id": 0}))["late_entry"]
+    assert stored["state"] == "done" and sorted(stored["match_ids"]) == sorted(done["match_ids"])
+
