@@ -187,6 +187,8 @@ Last bei vielen gleichzeitigen Vetos.
    dem Regelwerk – Checkliste im [Handbuch, Abschnitt 6](../handbuch/liga.md#6-checkliste-vor-dem-season-start).
 6. **Datenschutztext** für externe Teilnehmer freigeben, rechtlich prüfen lassen, in der Season eintragen.
 7. **Regelwerk v0.15** mit Bausteinen und Variablen übertragen, Veto-Folge nach CDL-Prüfung, veröffentlichen mit Zustimmungspflicht.
+   Dabei (#2424, #2426): Anlage B nur mit `[[baustein:veto]]` (die Tabelle entsteht aus der Veto-Vorlage), `[[baustein:lead_rulings]]`
+   in Anlage C bzw. § 9a einsetzen (Regelwerksabgleich A7/A8) und „Ende des ersten Spieltags“ im Fließtext auf „Spielwoche“ ändern.
 8. **„Was fehlt noch?“** ohne Probleme, Ligaseite mit *Nur Liga-Leitung* ansehen, dann Sichtbarkeit und Anmeldefenster öffnen.
 9. **Anmeldungen** entscheiden, Co-Teams zuteilen, **Liga starten** je Staffel.
 10. **Ankündigung** auf Discord von Hand mit Link zur Ligaseite und zum Spickzettel.
