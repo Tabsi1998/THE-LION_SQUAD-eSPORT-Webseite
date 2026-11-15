@@ -22,7 +22,7 @@ import { prestigeStars } from "../../achievements/showcase/model";
 import { api, errorMessage } from "../../lib/api";
 import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
-import { sortAwards, type Award } from "../../lib/awards";
+import type { Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
 import { showLapTime } from "../../lib/laptime";
 import { CountUp } from "../../components/motion";
@@ -35,10 +35,14 @@ import { RecordCard } from "./profile/TournamentPath";
 import { ProfileReferences } from "./profile/ProfileReferences";
 import { useMemberPlacements } from "../../lib/memberPlacements";
 import { Button } from "../../components/Button";
+import { LeagueOverallStanding } from "../../components/league/LeagueOverallStanding";
 import { LeagueSeasonHistory } from "../../components/league/LeagueSeasonHistory";
-import { RewardChip, RewardCollection } from "../../components/league/RewardCollection";
-import { withoutRewards, type RewardAward } from "../../lib/leagueRewards";
+import { RewardChip } from "../../components/league/RewardArt";
+import { EmblemRow, TrophyCabinet } from "../../components/league/TrophyCabinet";
+import type { RewardAward } from "../../lib/leagueRewards";
+import type { OverallStandingRow } from "../../lib/leagueOverall";
 import type { LeagueHistoryRow } from "../../lib/leagueTeam";
+import type { TrophyAward } from "../../lib/trophies";
 
 type Props = NativeStackScreenProps<AppStackParamList, "PublicProfile">;
 
@@ -56,6 +60,10 @@ export type PublicProfilePayload = {
   // Liga (#2173, docs/LIGA.md F.2/F.4): der Titel neben dem Namen und die Seasons der Person.
   featured_title?: RewardAward | null;
   league_history?: LeagueHistoryRow[];
+  // Trophäen (#2425, Nr. 34c): bis zu drei Embleme neben dem Namen - nur Öffentliches, nie Ruhendes. Ältere Server liefern das Feld nicht.
+  featured_emblems?: TrophyAward[];
+  // Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N - nach derselben Sichtbarkeit wie die Ligaseite.
+  league_overall?: OverallStandingRow[];
   bio?: string | null;
   role?: string | null;
   created_at?: string | null;
@@ -136,13 +144,14 @@ export type ProfileTabCounts = {
 };
 
 /** Die Reiter (#1149): eigenes und fremdes Profil in derselben Reihenfolge, Referenzen (Turniere, Fast Laps,
- * Jahreswertung) und Auszeichnungen (Banner, Trophäen) getrennt. Profile ohne Nullen (#1916, wie #1268 im Web): andere
+ * Jahreswertung) und Trophäen (Pokale, Banner, Liga-Belohnungen) getrennt. Profile ohne Nullen (#1916, wie #1268 im Web): andere
  * sehen nur Reiter mit Inhalt; das eigene Profil behält alle (Ehrungen für Mitglieder) mit einem Satz und Weg. */
 export function profileTabs({ own, clubMember = false, achievements = 0, awards = 0, references = 0, teams = 0, honours = 0 }: ProfileTabCounts): Array<{ key: ProfileTabKey; label: string }> {
   const tabs: Array<{ key: ProfileTabKey; label: string; shown: boolean }> = [
     { key: "overview", label: "Übersicht", shown: true },
     { key: "achievements", label: "Erfolge", shown: own || achievements > 0 },
-    { key: "awards", label: "Auszeichnungen", shown: own || awards > 0 },
+    // Trophäen (#2425, früher „Auszeichnungen“): Turnier-Pokale und Liga-Belohnungen in einer Vitrine.
+    { key: "awards", label: "Trophäen", shown: own || awards > 0 },
     { key: "references", label: "Referenzen", shown: own || references > 0 },
     { key: "teams", label: "Teams", shown: own || teams > 0 },
     { key: "honours", label: "Ehrungen", shown: honours > 0 || (own && clubMember) },
@@ -175,6 +184,10 @@ export type OwnProfileParts = {
   fallback: PublicProfilePayload;
   refresh: () => Promise<void> | void;
   initialTab?: ProfileTabKey;
+  /** Banner, Titel und Embleme im Kopf aus der eigenen Liste (`/me/awards`) - nach einer Wahl gleich aktuell (#2425). */
+  featuredAward?: Award | null;
+  featuredTitle?: RewardAward | null;
+  featuredEmblems?: TrophyAward[];
 };
 
 type Nav = { navigate: (screen: never, params?: never) => void };
@@ -379,6 +392,9 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   }
 
   const references = Array.isArray(shown.references?.items) ? shown.references?.items || [] : [];
+  const featuredAward = ownMode && own?.featuredAward !== undefined ? own.featuredAward : shown.featured_award || null;
+  const featuredTitle = ownMode && own?.featuredTitle !== undefined ? own.featuredTitle : shown.featured_title || null;
+  const featuredEmblems = ownMode && own?.featuredEmblems ? own.featuredEmblems : shown.featured_emblems || [];
 
   return (
     <Screen padded={false}>
@@ -392,9 +408,9 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         {header}
         {/* Nachladen gescheitert (#1000): das Profil ist ausdrücklich der letzte Stand. */}
         {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void load(); }} testID="profile-stale" /> : null}
-        {shown.featured_award ? (
+        {featuredAward ? (
           <View style={styles.featured} testID="profile-featured-award">
-            <AwardCard award={shown.featured_award} featured onPress={() => openAward(shown.featured_award as Award)} />
+            <AwardCard award={featuredAward} featured onPress={() => openAward(featuredAward)} />
           </View>
         ) : null}
         <View style={styles.hero}>
@@ -424,7 +440,13 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
             <View style={styles.identityText}>
               <Muted>@{shown.username}{shown.created_at ? ` · dabei seit ${formatDate(shown.created_at)}` : ""}</Muted>
               <Title>{display}</Title>
-              {shown.featured_title ? <RewardChip award={shown.featured_title} testID="profile-featured-title" /> : null}
+              {/* Titel und bis zu drei Embleme neben dem Namen (F.4, #2425) - im eigenen Profil aus der eigenen Liste. */}
+              {featuredTitle || featuredEmblems.length ? (
+                <View style={styles.wrap}>
+                  {featuredTitle ? <RewardChip award={featuredTitle} testID="profile-featured-title" /> : null}
+                  <EmblemRow emblems={featuredEmblems} testID="profile-featured-emblems" />
+                </View>
+              ) : null}
               <View style={styles.wrap}>
                 <Pill label={member ? "Vereinsmitglied" : "Community"} tone={member ? "success" : "cyan"} />
                 <Pill label={`${shown.achievement_level?.title || `Level ${shown.achievement_level?.level || stats.level || 1}`}${Number(shown.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(shown.achievement_level?.prestige)}` : ""}`} tone="gold" />
@@ -466,6 +488,9 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
 
             {/* Season-Historie (#2173, F.2): je abgeschlossener Liga-Staffel Platz, Meister, Auf- oder Abstieg. */}
             {hiddenForOthers ? null : <LeagueSeasonHistory rows={shown.league_history} showTeam testID="profile-league-history" />}
+
+            {/* Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N, mit Weg zur Gesamtwertung. */}
+            {hiddenForOthers ? null : <LeagueOverallStanding rows={shown.league_overall} showTeam testID="profile-league-overall" />}
 
             {/* Bilanz gegen Gegner (#1193): die fünf häufigsten - für andere nur Gegner mit öffentlichem Profil. */}
             <RecordCard
@@ -512,13 +537,10 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         {activeTab === "achievements" ? (ownMode ? own?.achievements : <PublicAchievementsTab data={achievements} displayName={display} />) : null}
 
         {activeTab === "awards" ? (ownMode ? own?.awards : (
-          (shown.awards || []).length ? (
-            <View style={styles.list} testID="public-profile-awards">
-              {/* Belohnungen der Liga je Season (#2173, F.4) oben, darunter Pokale und Banner aus Turnieren wie bisher. */}
-              <RewardCollection awards={shown.awards as RewardAward[]} testID="profile-reward-collection" titleId={shown.featured_title?.id || null} />
-              {sortAwards(withoutRewards(shown.awards as RewardAward[])).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
-            </View>
-          ) : <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Auszeichnungen kommen aus öffentlichen Turnieren des Vereins." />
+          <View style={styles.list} testID="public-profile-awards">
+            {/* Trophäen (#2425, Nr. 59): Turnier-Pokale und Liga-Belohnungen in einer Vitrine mit Filtern. */}
+            <TrophyCabinet awards={shown.awards as TrophyAward[]} testID="profile-trophies" empty="Noch keine Trophäen aus öffentlichen Wettbewerben." />
+          </View>
         )) : null}
 
         {activeTab === "references" ? (ownMode ? own?.references : (

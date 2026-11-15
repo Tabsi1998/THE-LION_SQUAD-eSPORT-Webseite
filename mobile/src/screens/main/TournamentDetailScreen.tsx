@@ -22,6 +22,7 @@ import { playMoment } from "../../lib/tournamentHaptics";
 import { checkInState, matchStatusText, standingsTables, treeKind } from "../../lib/tournamentView";
 import { finalNote, staffelApiPath, winnerLabel } from "../../lib/leagueTeam";
 import { BracketCanvas } from "../../components/tournament/bracket/BracketCanvas";
+import { LeagueSeasonCard } from "../../components/league/LeagueSeasonCard";
 import { RegistrationSheet, type RegistrationPayload } from "../../components/tournament/RegistrationSheet";
 import { ScheduleList } from "../../components/tournament/ScheduleList";
 import { StandingsTables } from "../../components/tournament/StandingsTables";
@@ -406,6 +407,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 winnerTitle={winnerLabel(isLeague, champion)}
                 championName={champion?.display_name || null}
                 onOpenStandings={() => setTab("standings")}
+              />
+            ) : null}
+            {/* Liga-Staffel (#2173): Anmeldefenster der Season mit wirksamem Ende (Nachmeldefrist, #2422) und der Weg zur Gesamtwertung. */}
+            {isLeague ? (
+              <LeagueSeasonCard
+                publicPath={tournament.league_links?.public_path}
+                title={[tournament.league_links?.league_name, tournament.league_links?.season_name].filter(Boolean).join(" · ")}
+                onOpenOverall={(target) => navigation.navigate("LeagueOverall", target)}
               />
             ) : null}
             <Card style={styles.card}>

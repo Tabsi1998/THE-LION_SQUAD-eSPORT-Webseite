@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { AwardCard } from "../../components/AwardCard";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
@@ -28,8 +29,13 @@ import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { LeagueApplicationsCard } from "../../components/league/LeagueApplicationsCard";
+import { LeagueOverallStanding } from "../../components/league/LeagueOverallStanding";
 import { LeagueSeasonHistory } from "../../components/league/LeagueSeasonHistory";
-import { RewardChip, RewardCollection } from "../../components/league/RewardCollection";
+import { RankBanners } from "../../components/league/RankBanners";
+import { RewardChip } from "../../components/league/RewardArt";
+import { EmblemRow, TrophyCabinet } from "../../components/league/TrophyCabinet";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
+import type { TrophyAward } from "../../lib/trophies";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 type Candidate = { id: string; username?: string; display_name?: string; avatar_url?: string | null; has_pending_invite?: boolean };
@@ -55,6 +61,8 @@ type SquadForm = {
 const emptySquad: SquadForm = { name: "", description: "", game_id: "", status: "active", member_ids: [] };
 
 type TeamLevel = { level?: number; crown?: string | null };
+/** Die Reiter der Teamseite (#2425): Übersicht und Trophäen - wie im Web. */
+export type TeamTab = "overview" | "trophies";
 /** Was die Team-Seite lädt: das Team (Pflicht) und die Teile daneben; `partProblem`, wenn ein Teil nicht kam (#1000). */
 type TeamPageData = { team: Team; overview: TeamOverview | null; level: TeamLevel | null; partProblem: LoadProblem | null };
 
@@ -101,6 +109,14 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const [squadForm, setSquadForm] = useState<SquadForm | null>(null);
   const [inviteQuery, setInviteQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  // Reiter (#2425): aus dem Link (/teams/<id>?tab=trophaeen) oder die Übersicht.
+  const [tab, setTab] = useState<TeamTab>(route.params.tab === "trophies" ? "trophies" : "overview");
+  useEffect(() => {
+    if (route.params.tab === "trophies") setTab("trophies");
+  }, [route.params.tab]);
+  // Banner, Titel und Embleme wählen (#2425): eine Wahl nach der anderen - ein Doppeltipp schickt nichts doppelt.
+  const [choosing, setChoosing] = useState(false);
+  const choosingRef = useRef(false);
 
   // Das Formular folgt dem geladenen Team - nach jedem Laden wie bisher.
   useEffect(() => {
@@ -154,6 +170,10 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const needsSecondFactor = Boolean(user && team && !canManage && team.admin_needs_second_factor);
   const members = team?.members || [];
   const squads = team?.squads || [];
+  // Trophäen (#2425): Andere sehen den Reiter nur mit Inhalt, die Teamleitung immer - mit einem Satz, wie Trophäen entstehen.
+  const trophies = (team?.awards || []) as TrophyAward[];
+  const showTrophies = trophies.length > 0 || canManage;
+  const activeTab: TeamTab = tab === "trophies" && showTrophies ? "trophies" : "overview";
 
   const stats = useMemo(() => ({
     members: team?.member_count ?? team?.member_ids?.length ?? members.length,
@@ -180,6 +200,18 @@ export function TeamDetailScreen({ navigation, route }: Props) {
       setBusy(false);
     }
   }, [load]);
+
+  const choose = useCallback(async (action: () => Promise<unknown>, success: string) => {
+    if (choosingRef.current) return;
+    choosingRef.current = true;
+    setChoosing(true);
+    try {
+      await showActionResult(async () => { await action(); }, success);
+    } finally {
+      choosingRef.current = false;
+      setChoosing(false);
+    }
+  }, [showActionResult]);
 
   const join = useCallback(() => {
     if (!team || !joinCode.trim()) return;
@@ -348,8 +380,20 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           ) : null}
         />
 
-        {/* Titel neben dem Namen (#2173, F.4): die Belohnung der Art „Titel“, die die Teamleitung gewählt hat. */}
-        {team.featured_title ? <RewardChip award={team.featured_title} testID="team-featured-title" /> : null}
+        {/* Titel und bis zu drei Embleme neben dem Namen (#2173, F.4, #2425) - die Teamleitung wählt sie unter „Trophäen“. */}
+        {team.featured_title || team.featured_emblems?.length ? (
+          <View style={styles.wrap} testID="team-featured">
+            {team.featured_title ? <RewardChip award={team.featured_title} testID="team-featured-title" /> : null}
+            <EmblemRow emblems={team.featured_emblems} testID="team-featured-emblems" />
+          </View>
+        ) : null}
+        {/* Teambanner (#230): eine Auszeichnung des Teams oben - wie im Web. */}
+        {team.featured_award ? (
+          <AwardCard award={team.featured_award} featured onPress={() => {
+            const target = team.featured_award?.tournament?.slug || team.featured_award?.tournament?.id;
+            if (target) navigation.navigate("TournamentDetail", { id: target });
+          }} />
+        ) : null}
 
         {needsSecondFactor && team ? (
           <Card style={styles.card} testID="team-mfa-hint">
@@ -389,6 +433,51 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           <TeamJoinInvite teamId={team.id} token={inviteToken} signedIn={Boolean(user && !isGuestUser(user))} onSignIn={() => openSignIn()} onJoined={joinedByLink} />
         ) : null}
 
+        {/* Reiter wie im Profil (#2425): Andere sehen „Trophäen“ nur mit Inhalt, die Teamleitung immer. */}
+        {showTrophies ? (
+          <SegmentedTabs
+            label="Teamseite"
+            items={[{ key: "overview" as TeamTab, label: "Übersicht" }, { key: "trophies" as TeamTab, label: `Trophäen${trophies.length ? ` (${trophies.length})` : ""}` }]}
+            value={activeTab}
+            onChange={setTab}
+          />
+        ) : null}
+
+        {activeTab === "trophies" ? (
+          <View style={styles.trophies} testID="team-awards">
+            {/* Turnier-Pokale und Liga-Belohnungen in einer Vitrine (Nr. 59); die Teamleitung wählt Teambanner, Titel und Embleme. */}
+            <TrophyCabinet
+              awards={trophies}
+              testID="team-trophies"
+              owner={canManage ? {
+                featuredId: team.featured_award?.id || null,
+                titleId: team.featured_title?.id || null,
+                emblemIds: (team.featured_emblems || []).map((award) => award.id),
+                busy: choosing || busy,
+                emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben dem Teamnamen.",
+                onFeature: (id) => {
+                  void choose(async () => {
+                    if (id) await api.post(`/teams/${idSegment(team.id)}/awards/${idSegment(id)}/feature`);
+                    else await api.delete(`/teams/${idSegment(team.id)}/awards/feature`);
+                  }, id ? "Als Teambanner gesetzt." : "Teambanner entfernt.");
+                },
+                onTitle: (id) => {
+                  void choose(async () => {
+                    if (id) await api.post(`/teams/${idSegment(team.id)}/awards/${idSegment(id)}/feature`, undefined, { params: { slot: "title" } });
+                    else await api.delete(`/teams/${idSegment(team.id)}/awards/feature`, { params: { slot: "title" } });
+                  }, id ? "Als Titel gesetzt." : "Titel entfernt.");
+                },
+                onEmblems: (ids) => {
+                  void choose(() => api.put(`/teams/${idSegment(team.id)}/awards/emblems`, { award_ids: ids }), ids.length ? "Embleme gespeichert." : "Embleme entfernt.");
+                },
+              } : null}
+              empty="Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird."
+            />
+          </View>
+        ) : null}
+
+        {activeTab === "overview" ? (
+        <>
         <TeamSchedule
           overview={overview}
           onOpenTournament={(id) => navigation.navigate("TournamentDetail", { id })}
@@ -493,22 +582,12 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Keine Squads hinterlegt.</Muted>}
         </Card>
 
-        {/* Liga (#2173): Anmeldestatus der eigenen Co-Teams, Belohnungen je Season und die Season-Historie. */}
+        {/* Liga (#2173): Anmeldestatus der eigenen Co-Teams, die Season-Historie, der Platz in der Gesamtwertung (F.5) und die
+            Rankingbanner (#2425). Die Belohnungen stehen im Reiter „Trophäen“. */}
         <LeagueApplicationsCard squadIds={squads.map((squad) => squad.id)} enabled={isMember && !isGuestUser(user)} />
-        {team.awards?.some((award) => award?.reward) ? (
-          <Card style={styles.card} testID="team-rewards">
-            <Heading>Belohnungen</Heading>
-            {canManage ? <Muted>Eine Belohnung der Art „Titel“ steht als Titel neben dem Teamnamen.</Muted> : null}
-            <RewardCollection awards={team.awards} testID="team-reward-collection" titleId={team.featured_title?.id || null} busy={busy}
-              onTitle={canManage ? (id) => {
-                void showActionResult(async () => {
-                  if (id) await api.post(`/teams/${team.id}/awards/${encodeURIComponent(id)}/feature`, undefined, { params: { slot: "title" } });
-                  else await api.delete(`/teams/${team.id}/awards/feature`, { params: { slot: "title" } });
-                }, id ? "Titel gewählt." : "Titel entfernt.");
-              } : null} />
-          </Card>
-        ) : null}
         <LeagueSeasonHistory rows={team.league_history} showTeam testID="team-league-history" />
+        <LeagueOverallStanding rows={team.league_overall} showTeam testID="team-league-overall" />
+        <RankBanners rows={team.rank_banners} />
 
         {canManage ? (
           <Card style={styles.card}>
@@ -531,6 +610,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
               </View>
             ))}
           </Card>
+        ) : null}
+        </>
         ) : null}
       </ScrollView>
     </Screen>
@@ -702,6 +783,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "900",
   },
+  trophies: { gap: 12 },
   content: {
     gap: 14,
     padding: 18,

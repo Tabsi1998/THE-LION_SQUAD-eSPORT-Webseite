@@ -5,7 +5,6 @@ import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { AchievementsTab } from "../../achievements/profile/AchievementsTab";
 import type { AchievementsMe } from "../../achievements/profile/model";
-import { AwardCard } from "../../components/AwardCard";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { HonoursCard } from "../../components/Honours";
@@ -15,10 +14,9 @@ import { Screen } from "../../components/Screen";
 import { HeaderButton, TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { Body, Muted, Title } from "../../components/Text";
 import { onAchievementUnlocked } from "../../lib/achievements";
-import { api } from "../../lib/api";
-import { sortAwards, type Award } from "../../lib/awards";
-import { RewardCollection } from "../../components/league/RewardCollection";
-import { withoutRewards, type RewardAward } from "../../lib/leagueRewards";
+import { api, errorMessage } from "../../lib/api";
+import { TrophyCabinet } from "../../components/league/TrophyCabinet";
+import { emblemsFrom, type TrophyAward } from "../../lib/trophies";
 import { formatDate } from "../../lib/format";
 import { formatMoney } from "../../lib/memberArea";
 import { documentsLine, type MemberDocument, type OwnDocuments } from "../../lib/memberDocuments";
@@ -81,8 +79,14 @@ function OwnProfile() {
   const [references, setReferences] = useState<PersonalReferenceData>(EMPTY_REFERENCES);
   // Vereinsplatzierungen (#1945): die Referenzen des Vereins, in deren Aufstellung du stehst - über dein Vereinsprofil.
   const club = useMemberPlacements({ own: true, username: user?.username || "", enabled: Boolean(user?.is_club_member) });
-  // Auszeichnungen (#230): eigene Banner und Trophäen, eine davon als Profilbanner - der Server prüft, dass sie die eigene ist.
-  const [awards, setAwards] = useState<{ awards: Award[]; featured_award_id?: string | null; featured_title_award_id?: string | null }>({ awards: [] });
+  // Trophäen (#230, #2425): eigene Pokale, Banner und Liga-Belohnungen; eine als Profilbanner, eine als Titel und bis zu drei Embleme
+  // neben dem Namen - der Server prüft, dass sie die eigenen sind. `featured_emblem_award_ids` fehlt bei älteren Servern.
+  const [awards, setAwards] = useState<MyAwards>({ awards: [] });
+  // Erst wenn die eigene Liste da ist, gelten Banner, Titel und Embleme daraus im Kopf - vorher die des Profils.
+  const [awardsLoaded, setAwardsLoaded] = useState(false);
+  const [awardNote, setAwardNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const choosingRef = useRef(false);
   const [prizes, setPrizes] = useState<PrizePickup[]>([]);
   const [standing, setStanding] = useState<ModerationStanding | null>(null);
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
@@ -118,7 +122,7 @@ function OwnProfile() {
       keep(achievementsAfterEvaluation),
       keep(api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness")),
       keep(api.get<PersonalReferenceData>("/mobile/profile/references")),
-      keep(api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards")),
+      keep(api.get<MyAwards>("/me/awards")),
       keep(api.get<PrizePickup[]>("/prizes/me")),
       keep(api.get<ModerationStanding>("/moderation/me/standing")),
       keep(api.get<{ summary?: InvoiceSummary; currency?: string }>("/account/invoices")),
@@ -128,7 +132,10 @@ function OwnProfile() {
     if (achievementResult) setAchievements(achievementResult.data || { groups: [], awards: [] });
     if (completenessResult) setCompleteness(completenessResult.data || {});
     if (referenceResult) setReferences(referenceResult.data || EMPTY_REFERENCES);
-    if (awardResult) setAwards(awardResult.data || { awards: [] });
+    if (awardResult) {
+      setAwards(awardResult.data || { awards: [] });
+      setAwardsLoaded(true);
+    }
     if (prizeResult) setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
     if (standingResult) setStanding((standingResult.data as ModerationStanding | null) || null);
     if (invoiceResult) setInvoices({ summary: invoiceResult.data?.summary || null, currency: invoiceResult.data?.currency });
@@ -164,18 +171,38 @@ function OwnProfile() {
     }
   }, [load]);
 
-  const featureAward = useCallback(async (id: string | null, slot: "banner" | "title" = "banner") => {
+  // Eine Wahl nach der anderen (#2425): bis die Antwort und der neue Stand da sind, nimmt kein Knopf einen weiteren Tipp an - sonst
+  // rechnete ein schneller zweiter Tipp mit der alten Liste der Embleme. Scheitert sie, bleibt alles, wie es war, und ein Satz sagt es.
+  const choose = useCallback(async (action: () => Promise<unknown>, done: string) => {
+    if (choosingRef.current) return;
+    choosingRef.current = true;
+    setChoosing(true);
+    setAwardNote(null);
     try {
-      // Titel neben dem Namen (#2173, F.4): derselbe Weg mit `slot=title`, nur für Belohnungen der Art „Titel“.
-      const options = slot === "title" ? { params: { slot } } : undefined;
-      if (id) await api.post(`/me/awards/${id}/feature`, undefined, options);
-      else await api.delete("/me/awards/feature", options);
-      const { data } = await api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards");
-      setAwards(data);
-    } catch {
-      // bleibt, wie es war
+      await action();
+      const { data } = await api.get<MyAwards>("/me/awards");
+      setAwards(data || { awards: [] });
+      setAwardNote({ ok: true, text: done });
+    } catch (error) {
+      setAwardNote({ ok: false, text: errorMessage(error, "Das hat nicht geklappt.") });
+    } finally {
+      choosingRef.current = false;
+      setChoosing(false);
     }
   }, []);
+
+  const featureAward = useCallback((id: string | null, slot: "banner" | "title" = "banner") => choose(async () => {
+    // Titel neben dem Namen (#2173, F.4): derselbe Weg mit `slot=title`, nur für Belohnungen der Art „Titel“.
+    const options = slot === "title" ? { params: { slot } } : undefined;
+    if (id) await api.post(`/me/awards/${encodeURIComponent(id)}/feature`, undefined, options);
+    else await api.delete("/me/awards/feature", options);
+  }, slot === "title" ? (id ? "Als Titel gesetzt." : "Titel entfernt.") : (id ? "Als Profilbanner gesetzt." : "Profilbanner entfernt.")), [choose]);
+
+  // Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur eigene Embleme und Medaillen; der Server prüft Anzahl und Besitz.
+  const featureEmblems = useCallback((ids: string[]) => choose(
+    () => api.put("/me/awards/emblems", { award_ids: ids }),
+    ids.length ? "Embleme gespeichert." : "Embleme entfernt.",
+  ), [choose]);
 
   const openReference = useCallback((item: PersonalReferenceItem) => {
     if (!item.target_id) return;
@@ -254,30 +281,29 @@ function OwnProfile() {
     </>
   );
 
-  const ownAwards = awards.awards.length ? (
-    <View style={styles.list} testID="profile-awards">
-      <Muted>Gewinnerbanner und Trophäen aus Turnieren des Vereins. Eine davon kannst du als Profilbanner wählen.</Muted>
-      {/* Belohnungen der Liga je Season (#2173, F.4): eine der Art „Titel“ steht als Titel neben deinem Namen. */}
-      <RewardCollection awards={awards.awards as RewardAward[]} testID="profile-reward-collection" titleId={awards.featured_title_award_id || null}
-        onTitle={(id) => { void featureAward(id, "title"); }} />
-      {sortAwards(withoutRewards(awards.awards as RewardAward[])).map((award) => (
-        <AwardCard
-          key={award.id}
-          award={award}
-          featured={awards.featured_award_id === award.id}
-          onPress={() => { const target = award.tournament?.slug || award.tournament?.id; if (target) go("TournamentDetail", { id: target }); }}
-          action={
-            <Pressable onPress={() => { void featureAward(awards.featured_award_id === award.id ? null : award.id); }} accessibilityRole="button" testID={`award-feature-${award.id}`} style={profileStyles.awardAction}>
-              <Muted style={profileStyles.awardActionText}>{awards.featured_award_id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}</Muted>
-            </Pressable>
-          }
-        />
-      ))}
-    </View>
-  ) : notLoaded.awards && problem ? (
-    <ErrorState problem={problem} title="Auszeichnungen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-awards-error" />
+  // Trophäen (#2425, Nr. 59): eine Vitrine mit Filtern statt Gruppen je Season - hier wählst du Profilbanner, Titel und Embleme.
+  const trophyList = awards.awards || [];
+  const ownAwards = !trophyList.length && notLoaded.awards && problem ? (
+    <ErrorState problem={problem} title="Trophäen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-awards-error" />
   ) : (
-    <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht – Platz 1 bis 3 als Trophäe, alle anderen als Teilnahme-Banner." />
+    <View style={styles.list} testID="profile-awards">
+      {awardNote ? <Muted style={awardNote.ok ? profileStyles.success : profileStyles.error} testID="profile-awards-message" accessibilityLiveRegion="polite">{awardNote.text}</Muted> : null}
+      <TrophyCabinet
+        awards={trophyList}
+        testID="profile-trophies"
+        owner={{
+          featuredId: awards.featured_award_id || null,
+          titleId: awards.featured_title_award_id || null,
+          emblemIds: emblemsFrom(trophyList, awards.featured_emblem_award_ids).map((award) => award.id),
+          onFeature: (id) => { void featureAward(id); },
+          onTitle: (id) => { void featureAward(id, "title"); },
+          onEmblems: (ids) => { void featureEmblems(ids); },
+          busy: choosing,
+          emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben deinem Namen.",
+        }}
+        empty="Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird."
+      />
+    </View>
   );
 
   // Referenzen im neuen Design (#1945): Kopf ohne Nullen, Liga-Weg, Chronik je Jahr - Vereinsplatzierungen und eigene
@@ -363,6 +389,12 @@ function OwnProfile() {
         references: ownReferences,
         teams: ownTeams,
         honours: <HonoursCard />,
+        // Banner, Titel und Embleme im Kopf aus der eigenen Liste - nach einer Wahl gleich der neue Stand, ohne das Profil neu zu laden.
+        ...(awardsLoaded ? {
+          featuredAward: trophyList.find((award) => award.id === awards.featured_award_id) || null,
+          featuredTitle: trophyList.find((award) => award.id === awards.featured_title_award_id) || null,
+          featuredEmblems: emblemsFrom(trophyList, awards.featured_emblem_award_ids),
+        } : {}),
         fallback,
         refresh,
         initialTab: requestedTab,
@@ -480,3 +512,10 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
 });
+
+type MyAwards = {
+  awards: TrophyAward[];
+  featured_award_id?: string | null;
+  featured_title_award_id?: string | null;
+  featured_emblem_award_ids?: string[];
+};

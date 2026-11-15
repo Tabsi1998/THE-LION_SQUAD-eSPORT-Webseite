@@ -6,6 +6,7 @@ import { noteFresh, noteOffline } from "./network";
 import { deviceHeaders } from "./deviceIdentity";
 import { accessTokenExpired, isSessionRejected, tokenExpiry } from "./session";
 import { isApiRequest } from "./siteUrls";
+import { WRITE_PAUSE_MESSAGE, isWritePauseError, noteWritePause, retryAfterSeconds } from "./writePause";
 
 type TokenSnapshot = {
   accessToken: string | null;
@@ -261,6 +262,8 @@ api.interceptors.response.use(
       }
     }
     if (isNetworkError) noteOffline(null);
+    // Schreibpause fürs Backup (#1009): die Leiste oben sagt „gleich wieder möglich“ - nur bei Antworten des eigenen Servers.
+    if (original?._ownServer && isWritePauseError(error)) noteWritePause(retryAfterSeconds(error));
 
     return Promise.reject(error);
   }
@@ -283,6 +286,9 @@ export function errorMessage(error: unknown, fallback = "Das hat nicht geklappt.
       }
       return "Keine Internetverbindung. Bitte prüfe dein Netz.";
     }
+    // Schreibpause fürs Backup (#1009): ein eigener, freundlicher Satz statt der Meldung des Servers oder „status code 503“ - nur bei
+    // Antworten des eigenen Servers, wie die Leiste (eine andere Herkunft kann so eine Antwort nicht vortäuschen).
+    if ((error.config as CacheAwareConfig | undefined)?._ownServer && isWritePauseError(error)) return WRITE_PAUSE_MESSAGE;
     const detail = error.response?.data?.detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) return detail.map((item) => item?.msg || String(item)).join(" | ");

@@ -86,8 +86,12 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Anmeldung zu Turnieren, Check-in, Ergebnis melden und bestätigen, Problem melden | im Turnier bzw. Match |
 | „Du bist dran“-Aufruf und Spielstart-Zähler | Push, Match |
 | Liga-Spieltag: Check-in mit Anwesenden, Map-Veto live (Sperren, Wählen, „Bereit zum Veto“), Spiel starten; der Stand steht als Schild im Kopf der Matchseite | Match |
-| Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister | Turnier → Tabelle |
-| Liga an Team und Profil: Stand der Liga-Anmeldung (mit „Abmelden“ für übernommene Co-Teams), Seasons, Belohnungen je Season, Titel neben dem Namen; neue Belohnungen feiert die App einmal | Team, Profil → Auszeichnungen |
+| Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister, „Nachgemeldet ab Woche X“ an nachgemeldeten Co-Teams | Turnier → Tabelle |
+| Anmeldefenster der Season mit dem wirksamen Ende (Nachmeldefrist) und der Weg zur Gesamtwertung | Turnier einer Liga-Staffel → Übersicht |
+| Gesamtwertung je Liga N: Co-Teams und Spieler, Punkte je Season zum Aufklappen, Staffelsieg, Streichergebnis, Gesamtsieger erst beim Endstand; PDF | Liga-Staffel, Profil oder Team → Gesamtwertung |
+| Liga an Team und Profil: Stand der Liga-Anmeldung (mit „Abmelden“ für übernommene Co-Teams), Seasons, Platz in der Gesamtwertung, Titel und bis zu drei Embleme neben dem Namen; neue Belohnungen feiert die App einmal | Team, Profil |
+| Trophäen: Pokale, Banner und Liga-Belohnungen mit Filtern nach Art, Spiel, Season und Platz; Banner, Titel und Embleme wählen (eigenes Profil, Teamleitung) | Profil → Trophäen, Team → Trophäen |
+| Rankingbanner kopieren oder teilen (Platz und Bilanz als Bild mit festem Link) | Team → Übersicht |
 | Turnierbaum mit Weiterkommen-Modus (fester Baum, Auslosung nach der Runde, Show-Auslosung, sofort zufällig) und was gerade passiert („wartet auf Auslosung“, „Auslosung bereit · N Namen“, „das Los entscheidet“); Auslosung als Moment mit einer leichten Vibration, Namen wie im Web („Loser Runde 1“, „Grand Final“, „voraussichtlich“) | Turnier → Baum |
 | Turnierleitung: Ergebnisse eintragen, „Braucht Aufmerksamkeit“ | Turnier → Turnierleitung (für Leitung und Helfer) |
 | Mitgliedskarte (auch ohne Netz), Versammlungen und Abstimmung, Helfen, Vereinsdokumente, Vorteile, Meine Mitgliedschaft | Tab Verein |

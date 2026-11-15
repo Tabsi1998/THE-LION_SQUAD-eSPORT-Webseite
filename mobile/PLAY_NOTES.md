@@ -12,6 +12,17 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.11
+
+Neu in 1.7.11:
+• Gesamtwertung der Liga: Co-Teams, Spieler, Punkte je Season
+• Trophäen mit Filtern nach Art, Spiel, Season und Platz
+• Bis zu drei Embleme neben deinem Namen und am Team
+• Rankingbanner deines Teams kopieren oder teilen
+• „Nachgemeldet ab Woche X“ in der Liga-Tabelle
+• Anmeldefenster mit Nachmeldefrist an der Staffel
+• Kurze Wartung: freundlicher Hinweis statt Fehlermeldung
+
 ## 1.7.10
 
 Neu in 1.7.10:
