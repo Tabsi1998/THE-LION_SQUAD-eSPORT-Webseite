@@ -19,6 +19,7 @@ from services import migrations
 
 LEASE = 1.2
 RENEW = 0.3
+REAL_RENEW_SECONDS = migrations.renew_seconds
 
 
 @pytest_asyncio.fixture
@@ -325,8 +326,28 @@ def test_lease_settings_have_bounds(monkeypatch):
     monkeypatch.setenv("MIGRATION_LEASE_SECONDS", "5")
     monkeypatch.setenv("MIGRATION_LEASE_RENEW_SECONDS", "999")
     monkeypatch.setenv("MIGRATION_WAIT_SECONDS", "kaputt")
-    # Die Sperre nie unter 30 s, der Takt höchstens die halbe Sperre, ein unlesbarer Wert gibt den Standard.
-    assert (migrations.lease_seconds(), migrations.renew_seconds(), migrations.wait_seconds()) == (30, 15, 1800)
+    # Die Sperre nie unter 30 s, der Takt höchstens ein Drittel der Sperre, ein unlesbarer Wert gibt den Standard.
+    assert (migrations.lease_seconds(), migrations.renew_seconds(), migrations.wait_seconds()) == (30, 10, 1800)
+
+
+@pytest.mark.asyncio
+async def test_the_longest_allowed_renewal_interval_keeps_the_lease(flow, fast, monkeypatch):
+    """Der Takt an der Obergrenze (``renew_seconds`` aus der Umgebung, nicht ersetzt): Die Sperre hält über mehrere
+    Takte; bei der früheren Obergrenze (halbe Sperre) war sie schon bei der ersten Verlängerung verloren."""
+    db = flow.db
+    await _clean(db)
+    monkeypatch.setattr(migrations, "renew_seconds", REAL_RENEW_SECONDS)
+    monkeypatch.setenv("MIGRATION_LEASE_RENEW_SECONDS", "999")
+    assert migrations.renew_seconds() == pytest.approx(LEASE / 3)
+
+    async def long_running(_database):
+        await asyncio.sleep(LEASE * 2.5)
+        return "lang"
+
+    monkeypatch.setattr(migrations, "MIGRATIONS", ((1, "obergrenze", long_running),))
+    applied = await migrations.ensure_migrations(db)
+    assert [item["version"] for item in applied] == [1]
+    assert migrations.migration_status()["state"] == "done"
 
 
 def test_the_start_waits_for_migrations_before_serving():

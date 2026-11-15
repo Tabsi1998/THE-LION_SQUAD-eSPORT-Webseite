@@ -105,7 +105,7 @@ Fehlende nachzieht, macht der nächste Halter dort weiter, ohne etwas doppelt zu
 | Variable | Standard | Bereich | Bedeutung |
 |---|---|---|---|
 | `MIGRATION_LEASE_SECONDS` | 180 | 30–3600 | So lange gilt die Sperre ab der letzten Verlängerung. So lange dauert die Übernahme nach einem Absturz höchstens. |
-| `MIGRATION_LEASE_RENEW_SECONDS` | ein Viertel der Sperre (45) | 1 bis halbe Sperre | Takt der Verlängerung. Bleibt sie bis einen Takt vor Ablauf aus, gibt der Halter auf. |
+| `MIGRATION_LEASE_RENEW_SECONDS` | ein Viertel der Sperre (45) | 1 bis ein Drittel der Sperre | Takt der Verlängerung. Bleibt sie bis einen Takt vor Ablauf aus, gibt der Halter auf. |
 | `MIGRATION_WAIT_SECONDS` | 1800 | 30–86400 | So lange wartet ein Start ohne Sperre. Danach bricht er mit `MigrationWaitTimeout` und dem Namen des Halters ab. Nach dem Neustart wartet er erneut oder übernimmt die inzwischen abgelaufene Sperre. |
 
 Gut zu wissen: Auch der Halter meldet sich erst nach dem Migrieren bereit. `update.sh` wartet 120 Sekunden auf

@@ -75,10 +75,11 @@ def lease_seconds() -> float:
 
 
 def renew_seconds() -> float:
-    """Takt der Verlängerung (``MIGRATION_LEASE_RENEW_SECONDS``, Standard ein Viertel der Sperre, höchstens die
-    Hälfte). Bleibt die Verlängerung bis einen Takt vor Ablauf aus, gibt der Halter selbst auf."""
+    """Takt der Verlängerung (``MIGRATION_LEASE_RENEW_SECONDS``, Standard ein Viertel der Sperre, höchstens ein Drittel).
+    Bleibt die Verlängerung bis einen Takt vor Ablauf aus, gibt der Halter selbst auf - darum höchstens ein Drittel:
+    bei der Hälfte stünde die erste Verlängerung schon genau einen Takt vor Ablauf, und die Sperre wäre sofort weg."""
     lease = lease_seconds()
-    return _seconds_env("MIGRATION_LEASE_RENEW_SECONDS", lease / 4, 1, lease / 2)
+    return _seconds_env("MIGRATION_LEASE_RENEW_SECONDS", lease / 4, 1, lease / 3)
 
 
 def wait_seconds() -> float:
