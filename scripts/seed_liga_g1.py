@@ -266,7 +266,12 @@ def main() -> int:
     parser.add_argument("--season")
     parser.add_argument("--minutes", type=float, default=0.0)
     parser.add_argument("--days", type=float, default=0.0)
+    parser.add_argument("--check", action="store_true", help="nur die Umgebung prüfen (run_liga_g1.sh up, vor dem Backend)")
     args = parser.parse_args()
+    if args.check:
+        guard(os.environ)
+        print("Umgebung der G.1-Abnahme: lokal, eigene Datenbank.")
+        return 0
     os.chdir(ROOT / "backend")
     if args.job:
         print(json.dumps(asyncio.run(job(args.job, args.tournament, args.season, args.minutes, args.days)), ensure_ascii=False, default=str))

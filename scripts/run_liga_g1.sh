@@ -47,6 +47,8 @@ export G1_API="$API_URL"
 export G1_STATE="${G1_STATE:-$G1_DIR/state.json}"
 
 cmd_up() {
+  # Derselbe Schutz wie im Seed, bevor ein Backend startet: eigene Datenbank (tls_abnahme_g1…), nur dieser Rechner, nie Produktion.
+  "$PYTHON" "$ROOT/scripts/seed_liga_g1.py" --check
   # Umleitung für die ganze Gruppe: sonst hielte die Hintergrund-Shell die Ausgabe des Aufrufers offen.
   (cd "$ROOT/backend" && exec "$PYTHON" -m uvicorn server:app --host 127.0.0.1 --port "$BACKEND_PORT") \
     < /dev/null > "$G1_DIR/backend.log" 2>&1 &
@@ -91,9 +93,15 @@ list_specs() {
 }
 
 cmd_run() {
-  local specs
+  local specs report
+  if [ ! -f "$G1_STATE" ]; then
+    echo "Keine Testwelt in $G1_STATE - erst \"$0 seed\" laufen lassen." >&2
+    return 2
+  fi
   specs="$(list_specs)"
   mkdir -p "$G1_DIR/results"
+  report="$G1_DIR/results/report.json"
+  rm -f "$report"
   # shellcheck disable=SC2086 # Specs bewusst als einzelne Argumente
   (
     cd "$ROOT/frontend" && \
@@ -103,6 +111,14 @@ cmd_run() {
     npx playwright test $specs --project=chromium --workers=1 --retries=0 \
       --trace="${G1_TRACE:-retain-on-failure}" --output="$G1_DIR/results/test-results" --reporter=line,json,html
   )
+  # Übersprungen ist nicht grün: Fehlt die Testwelt oder passt die Umgebung nicht, überspringen die Specs sich selbst.
+  node -e '
+    const stats = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).stats || {};
+    if (!stats.expected || stats.skipped > 0) {
+      console.error(`G.1: ${stats.skipped || 0} Tests übersprungen, ${stats.expected || 0} grün - das zählt als Fehler.`);
+      process.exit(1);
+    }
+  ' "$report"
 }
 
 case "${1:-}" in
