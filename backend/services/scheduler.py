@@ -57,7 +57,13 @@ def _single_replica(job_id: str, runner, lease_seconds: float = 60.0):
     async def job():
         try:
             from database import get_db
+            from services import maintenance
             from services.mutation_lock import MutationLockBusy, MutationLockLost, mutation_lock
+            # Schreibpause fürs Backup (#1009): der Takt fällt aus, der nächste holt nach. Geprüft vor der Sperre -
+            # auch die Sperre selbst wäre ein Schreibvorgang.
+            if await maintenance.active_state(get_db()):
+                logger.info("[scheduler] %s skipped, write pause for backup", job_id)
+                return
             try:
                 async with mutation_lock(
                     get_db(),

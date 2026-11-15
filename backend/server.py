@@ -155,7 +155,7 @@ from routes.dsgvo_routes import dsgvo_router
 from routes.export_routes import pdf_router
 from routes.audit_routes import audit_router
 from services.image_variants import resolve_variant as resolve_image_variant
-from services import ops_monitor, share_image_cache, svg_logo
+from services import maintenance, ops_monitor, share_image_cache, svg_logo
 from services.change_events import (
     change_event_stream,
     publish_api_change,
@@ -758,6 +758,18 @@ async def ops_monitoring(request, call_next):
     if duration_ms >= ops_monitor.SLOW_REQUEST_MS:
         await ops_monitor.record_slow_request(app, request, duration_ms, response.status_code)
     return response
+
+
+# Schreibpause fürs Backup (#1009, services/maintenance.py): als letzte Middleware angemeldet, also die äußerste - eine
+# gesperrte Anfrage läuft durch nichts anderes und zählt nicht als Serverfehler in der Betriebssicht. Lesen läuft weiter.
+@app.middleware("http")
+async def write_pause(request, call_next):
+    if maintenance.blocks(request.method, request.url.path):
+        state = await maintenance.active_state(get_db())
+        if state:
+            status_code, body, headers = maintenance.response_parts(state)
+            return JSONResponse(status_code=status_code, content=body, headers=headers)
+    return await call_next(request)
 
 
 @app.get("/api/")
