@@ -98,6 +98,9 @@ test.describe("Liga-Gesamtabnahme: die 18 Szenarien gegen echte API und MongoDB"
       await expect(captain.page.getByTestId("apply-summary")).toContainText(state.teams[index].squad_name);
       await captain.page.getByTestId("apply-submit").click();
       await expect(captain.page.getByTestId(`league-application-row-${squadId}`)).toContainText("Eingereicht");
+      // Die Season hat schon begonnen, das Fenster läuft weiter (Nachmeldung, Entscheidung Nr. 180) - die Ligaseite sagt es.
+      await captain.page.goto(leagueUrl());
+      await expect(captain.page.getByTestId("league-application-after-start")).toContainText("Anmeldung läuft nach Season-Start weiter (bis ");
       await noSideScroll(captain.page);
       await shot(captain.page, `g1-anmeldung-${viewport.width}.png`);
       await done(captain);
@@ -123,6 +126,9 @@ test.describe("Liga-Gesamtabnahme: die 18 Szenarien gegen echte API und MongoDB"
     const items = (await get(lead, inbox)).items.filter((row) => row.status === "submitted");
     expect(items).toHaveLength(16);
     const appOf = (index) => items.find((row) => row.squad_id === state.teams[index].squad_id).id;
+    await lead.page.goto(`/admin/leagues/seasons/${world.season.id}#selbstanmeldung`);
+    await expect(lead.page.getByTestId("season-form-application-after-start")).toContainText("Anmeldung läuft nach Season-Start weiter");
+    await noSideScroll(lead.page);
     await lead.page.goto(`/admin/leagues/seasons/${world.season.id}#anmeldungen`);
     await lead.page.getByTestId(`application-staffel-${appOf(0)}`).selectOption(world.tid);
     await lead.page.getByTestId(`application-accept-${appOf(0)}`).click();

@@ -15,7 +15,7 @@ Fehleingaben, gleichzeitige Aktionen, Sperren, Rechte und historische Daten.
 | Testwelt | [`scripts/seed_liga_g1.py`](../../scripts/seed_liga_g1.py) | Leitung (Superadmin, zwei Liga-Leitungen, eine befangene Leitung, Turnierleitung ohne Bereich Ligen), 16 erfundene Teams mit Co-Team, ein Spieler ohne Team, das Spiel. Je Lauf ein eigenes Kürzel |
 | Zeit-Helfer | `seed_liga_g1.py --job …` | `deadlines` (Fristen-Job mit späterem „jetzt“), `veto` (Zeitüberschreitung im Veto), `age` (Ergebnisse einer Staffel um Tage zurückdatieren), `legacy` (Season ohne neue Felder) |
 | Hauptweg | [`liga-gesamtabnahme.spec.js`](../../frontend/e2e/liga-abnahme/liga-gesamtabnahme.spec.js) | Szenarien 1 bis 15, 17 und 18, dazu Belohnungen, Gesamtwertung und Profil |
-| Grenzfälle | [`liga-grenzfaelle.spec.js`](../../frontend/e2e/liga-abnahme/liga-grenzfaelle.spec.js) | Szenario 16, Rechte, Gleichzeitigkeit, Fehleingaben, Abbrüche, Sperren, Altdaten |
+| Grenzfälle | [`liga-grenzfaelle.spec.js`](../../frontend/e2e/liga-abnahme/liga-grenzfaelle.spec.js) | Szenario 16, Rechte, Gleichzeitigkeit, Fehleingaben, Fristen-Job, Abbrüche, Sperren, Altdaten |
 | Hilfen | [`g1.js`](../../frontend/e2e/liga-abnahme/g1.js) | Anmelden (Sitzungen aus `e2e/abnahme/abnahmeSession.js`), API-Aufrufe mit CSRF, Liga anlegen, Serien und Veto |
 
 Die Specs nutzen keine nachgestellte API. Alles, was sie tun, läuft über die Routen, die auch das Web aufruft. Konten und Teams
@@ -23,7 +23,8 @@ schreibt nur der Seed direkt in die Datenbank, wie bei den anderen Abnahme-Seeds
 
 **Zeit:** Im Testbetrieb gibt es keine einstellbare Uhr. Darum gilt:
 - Termine legt die Leitung auf „in fünf Minuten“, dann ist das Check-in-Fenster offen.
-- Fristen stößt die Spec über die Zeit-Helfer mit verschobenem „jetzt“ an: Veto-Timer, Fristen-Job.
+- Fristen stößt die Spec über die Zeit-Helfer mit verschobenem „jetzt“ an: Veto-Timer (Zeitüberschreitung per Los) und
+  Fristen-Job (Meldung gilt nach 48 Stunden, fehlender Check-in wird ein Vorschlag an die Leitung).
 - Die 48-Stunden-Protestfrist vor dem Abschluss überbrückt `age`.
 - Alle Daten sind relativ zu heute. Kein festes Datum läuft in Zukunft ab.
 
@@ -71,7 +72,7 @@ Ziel, Schritte und erwartetes Ergebnis je Szenario, dazu der Test, der es abdeck
 |---|---|---|---|---|
 | 1 | Neue Liga und Season erstellen | Leitung legt Liga, Season (Best of 5, Modusfolge Stellung, S&D, Kontrolle, Stellung, S&D), Liga 1 und Staffel A an, veröffentlicht das Regelwerk, schaltet öffentlich | Season trägt alle Vorgaben, Veröffentlichen ohne Notausnahme, Verwaltung bei 390/1440 px fehlerfrei | Hauptweg „Szenario 1 und 2“ |
 | 2 | Spielmodi und Map-Pools konfigurieren | Modi mit Ergebnisregel am Spiel, sieben Test-Maps, Pool je Modus | Season übernimmt die Ergebnisregeln, Veto-Vorlage passt ohne Hinweis, Check-in 15/15 min, mindestens 3 Anwesende | Hauptweg „Szenario 1 und 2“ |
-| 3 | Co-Team über die Website anmelden | Zwei Captains im Browser (390 und 1440 px), 14 über dieselbe Route, einer zieht zurück und reicht neu ein | Status „Eingereicht“, 16 offene Anträge | Hauptweg „Szenario 3 und 4“; Grenzfälle „Anmeldung …“ |
+| 3 | Co-Team über die Website anmelden | Zwei Captains im Browser (390 und 1440 px), 14 über dieselbe Route, einer zieht zurück und reicht neu ein | Status „Eingereicht“, 16 offene Anträge; das Fenster läuft über den Season-Start hinaus, Ligaseite und Verwaltung sagen „Anmeldung läuft nach Season-Start weiter (bis …)“ (Nachmeldung, Entscheidung Nr. 180) | Hauptweg „Szenario 3 und 4“; Grenzfälle „Anmeldung …“ |
 | 4 | Anmeldung genehmigen | Leitung nimmt im Eingang an und teilt Staffel A zu (Browser und Route) | 16 Zuteilungen, keine doppelt; letzter Platz bei zwei gleichzeitigen Annahmen nur einmal vergeben | Hauptweg „Szenario 3 und 4“; Grenzfälle „Anmeldung …“ |
 | 5 | Spielplan mit 16 Teams erzeugen | Staffel auf live | 120 Spiele in 15 Runden, jedes Team spielt jedes einmal, Spieltage bei 390/1440 px | Hauptweg „Szenario 5“ |
 | 6 | Matchtermin vereinbaren | Heim-Captain schlägt im Browser vor (390 px), Gast nimmt an (1440 px) | Vorschlag „angenommen“, Termin gilt | Hauptweg „Szenario 6 bis 10“ |
@@ -97,6 +98,8 @@ Weitere Prüfungen:
 | Gleichzeitige Aktionen | Check-in beider Seiten im selben Moment; Captain und Vertreter ziehen gleichzeitig (ein Zug zählt); beide Bestätigungen gleichzeitig (einmal gezählt); doppelter Abschluss (Staffel, Gesamtwertung); zwei Annahmen auf den letzten Platz | Grenzfälle, Hauptweg „Szenario 17“ |
 | Fehleingaben | Stand passt nicht zu den Maps, Map nicht laut Veto, Punkte fehlen, Ziel nicht erreicht, zu wenig Anwesende, Gründe zu kurz | Grenzfälle „Gleichzeitig und Fehleingaben …“, „Anmeldung …“ |
 | Abbrüche | Rückzug einer Anmeldung, Terminänderung macht den Check-in ungültig, Veto pausiert und fortgesetzt, Einwand zurückgezogen | Grenzfälle „Abbrüche und Sperren …“, „Gleichzeitig …“ |
+| Fristen-Job | Meldung ohne Antwort: nach 47 Stunden offen, nach 49 bestätigt (`auto_confirmed`), ein zweiter Lauf bestätigt nichts doppelt. Eine Seite checkt nicht ein: nach dem Fenster nur ein Vorschlag „nicht erschienen“ an die Leitung, keine Wertung, kein zweiter Vorschlag | Grenzfälle „Fristen-Job: …“ (zwei Tests) |
+| Nachmeldung | Erstes Veröffentlichen mit Fenster über den Season-Start: Hinweis `application_after_start`, keine Sperre | Grenzfälle „Anmeldung …“; Flow `test_league_pools_flow.py`, `test_league_application_late_flow.py` |
 | Sperren | Gesperrtes Konto im Check-in blockiert (D-4), abgeschlossene Staffel nimmt nichts mehr an, Wiederöffnen nur durch eine zweite Person | Grenzfälle „Abbrüche und Sperren …“ |
 | Altdaten | Season ohne die Felder des Masterplans: melden ohne Check-in und Veto mit Aufstellung je Map, Tabelle, Protest-Vorgaben inaktiv, Seiten fehlerfrei | Grenzfälle „Altdaten …“ |
 
@@ -115,3 +118,10 @@ Diese Punkte aus der Testmatrix von #1632 betreffen Funktionen, die es noch nich
 | Vorfallarten und MOSS je Season schaltbar | Noch nicht gebaut | #2403 |
 | App (Check-in, Veto, Anmeldestatus) | Paket G.2 | #2173 |
 | Benachrichtigungen über echte Dienste, Backup und Restore | Versandsperre im Testbetrieb, Betriebsprüfung auf dem Server | #1632 (Freigabe-Gates) |
+
+## Offene Punkte aus der Abnahme
+
+- **Nachmeldung nach dem Start (Entscheidung Nr. 180):** Die Leitung nimmt ein nachgemeldetes Co-Team an und teilt es einer
+  laufenden Staffel zu. Es steht dann mit 0 Spielen in der Tabelle. Spiele bekommt es nicht von selbst, der feste Spielplan
+  bleibt, wie er beim Start war (`backend/tests/test_league_application_late_flow.py`). Wie Nachrücker Spiele bekommen, ist noch
+  offen.

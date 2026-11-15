@@ -47,9 +47,12 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     const lead = await as(browser, testInfo, "lead", LARGE);
     Object.assign(edge, await buildLeague(admin, lead, { name: `Grenzfall-Liga ${unique()}` }));
     const seasonAdmin = `${ADMIN}/seasons/${edge.season.id}`;
-    await ok(lead, "PATCH", seasonAdmin, { visibility: "public" });
-    await ok(lead, "PATCH", seasonAdmin, { application_slots: 2,
+    // Erstes Veröffentlichen mit einem Fenster über den Season-Start hinaus (Nachmeldung, Entscheidung Nr. 180): ein Hinweis, keine Sperre.
+    const opened = await ok(lead, "PATCH", seasonAdmin, { visibility: "public", application_slots: 2,
       application_opens_at: new Date(Date.now() - 60 * MINUTE).toISOString(), application_closes_at: new Date(Date.now() + 24 * 60 * MINUTE).toISOString() });
+    expect(opened.visibility).toBe("public");
+    const readiness = await get(lead, `${seasonAdmin}/readiness`);
+    expect(readiness.warnings.map((row) => row.code)).toContain("application_after_start");
     const base = `/api/leagues/${edge.league.slug}/${edge.season.slug}`;
     const apps = {};
     for (const index of [0, 1, 2]) {
@@ -212,6 +215,62 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     await done(homeCaptain, homeVice, away, awayVice, lead);
   });
 
+  test("Fristen-Job: eine Meldung ohne Antwort gilt nach 48 Stunden, die Gegenseite trägt ihre Liste nach", async ({ browser }, testInfo) => {
+    const lead = await as(browser, testInfo, "lead", LARGE);
+    const play = matchOf(edge, 1, 3);
+    edge.auto = play;
+    const home = await as(browser, testInfo, `captain-${play.homeIndex}`, LARGE);
+    const away = await as(browser, testInfo, `captain-${play.awayIndex}`, LARGE);
+    await timeNow(lead, play.id);
+    await checkIn(home, play.id);
+    await checkIn(away, play.id);
+    const block = await g1.playVeto({ [play.home]: home, [play.away]: away }, play.id);
+    const reporter = play.winner === play.home ? home : away;
+    await ok(reporter, "POST", `/api/matches/${play.id}/report`, { results: resultsOf(play.winner, play.loser, "3:0"),
+      games: seriesGames(pattern("3:0", play.winner, play.loser), play.home, play.away, { planned: block.planned_games }),
+      lineup: await g1.presentOf(reporter, play.id, 3) });
+    // Vor Ablauf bleibt es offen, danach gilt die Meldung (Job match_deadlines, „jetzt“ um 47 bzw. 49 Stunden später).
+    expect(job("deadlines", { tournament: edge.tid, minutes: 47 * 60 }).confirmed).toBe(0);
+    expect((await get(lead, `/api/matches/${play.id}/page`)).match.status).not.toBe("completed");
+    expect(job("deadlines", { tournament: edge.tid, minutes: 49 * 60 }).confirmed).toBe(1);
+    const stored = (await get(lead, `/api/matches/${play.id}/page`)).match;
+    expect(stored.status).toBe("completed");
+    expect(stored.result_meta?.auto_confirmed).toBe(true);
+    // Ein zweiter Lauf bestätigt nichts doppelt.
+    expect(job("deadlines", { tournament: edge.tid, minutes: 50 * 60 }).confirmed).toBe(0);
+    const silent = play.winner === play.home ? away : home;
+    await silent.page.goto(`/matches/${play.id}`);
+    await expect(silent.page.getByTestId("match-outcome")).toBeVisible();
+    await noSideScroll(silent.page);
+    await done(home, away, lead);
+  });
+
+  test("Fristen-Job: checkt eine Seite nicht ein, geht nur ein Vorschlag an die Leitung - nie eine Wertung", async ({ browser }, testInfo) => {
+    const lead = await as(browser, testInfo, "lead", LARGE);
+    const play = matchOf(edge, 1, 2);
+    edge.noShow = play;
+    const home = await as(browser, testInfo, `captain-${play.homeIndex}`, LARGE);
+    await timeNow(lead, play.id); // Termin in 5 Minuten, Fenster bis 15 Minuten danach
+    await checkIn(home, play.id);
+    const before = await standings(lead, edge.tid);
+    // Noch im Fenster: kein Vorschlag.
+    job("deadlines", { tournament: edge.tid, minutes: 10 });
+    expect((await get(lead, `/api/matches/${play.id}/page`)).match.no_show_proposal || null).toBeNull();
+    // Nach dem Fenster: Vorschlag „nicht erschienen“ für die Gastseite an die Leitung - das Spiel bleibt offen, ohne Wertung.
+    job("deadlines", { tournament: edge.tid, minutes: 25 });
+    const stored = (await get(lead, `/api/matches/${play.id}/page`)).match;
+    expect(stored.no_show_proposal).toMatchObject({ rule: "check_in", missing_registration_ids: [play.away] });
+    expect(["completed", "forfeit"]).not.toContain(stored.status);
+    expect(stored.results || []).toEqual([]);
+    const table = await standings(lead, edge.tid);
+    expect(table[play.away].played).toBe(before[play.away].played);
+    expect(table[play.home].points).toBe(before[play.home].points);
+    // Ein zweiter Lauf legt keinen zweiten Vorschlag an.
+    job("deadlines", { tournament: edge.tid, minutes: 30 });
+    expect((await get(lead, `/api/matches/${play.id}/page`)).match.no_show_proposal.missing_registration_ids).toEqual([play.away]);
+    await done(home, lead);
+  });
+
   test("Abbrüche und Sperren: Terminänderung macht den Check-in ungültig, Einwand zurückgezogen, gesperrtes Konto, gesperrte Staffel", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", LARGE);
     const admin = await as(browser, testInfo, "admin", LARGE);
@@ -256,7 +315,8 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     await done(home, away);
 
     // Die restlichen Spiele der Staffel trägt die Leitung ein, Fristen sind in der Testzeit vorbei: Abschluss, danach ist alles gesperrt.
-    for (const row of edge.matches.filter((match) => ![edge.race.id, play.id].includes(match.id))) {
+    const remaining = (await staffelMatches(lead, edge.tid)).filter((match) => !["completed", "forfeit"].includes(match.status) && match.id !== play.id);
+    for (const row of remaining) {
       const [rHome, rAway] = row.slots.map((slot) => slot.registration_id);
       const [winner, loser] = edge.index[rHome] < edge.index[rAway] ? [rHome, rAway] : [rAway, rHome];
       await ok(lead, "POST", `/api/matches/${row.id}/result`, { results: resultsOf(winner, loser, "3:0"), games: seriesGames(pattern("3:0", winner, loser), rHome, rAway, { maps: edge.maps }) });
@@ -354,8 +414,11 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     const play = matchOf(legacy, 8, 9);
     const home = await as(browser, testInfo, `captain-${play.homeIndex}`, LARGE);
     const away = await as(browser, testInfo, `captain-${play.awayIndex}`, SMALL);
+    // Altbestand: kein Check-in- und kein Veto-Block - gemeldet wird wie vor dem Masterplan.
     const page = await get(home, `/api/matches/${play.id}/page`);
-    expect(page.checkin?.veto?.status || "none").not.toBe("running");
+    expect(page.checkin ?? null).toBeNull();
+    expect(page.veto_view ?? null).toBeNull();
+    expect((await get(home, `/api/matches/${play.id}/veto`)).veto ?? null).toBeNull();
     // Alte Meldung: Aufstellung je Map, keine Punkte nötig.
     const rosterOf = (index) => state.teams[index].members.slice(0, 4);
     const winners = pattern("3:1", play.winner, play.loser);
