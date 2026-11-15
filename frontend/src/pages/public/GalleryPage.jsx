@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown, Film, Layers } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { GALLERY_LIST_GRID_SIZES } from "@/lib/gallerySizes";
 
 export default function GalleryPage() {
   useDocumentTitle(
@@ -79,7 +80,7 @@ function AlbumCard({ a }) {
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden relative">
         {a.cover_url ? (
-          <LazyImg src={a.cover_url} alt={a.title} sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-cover tls-card__media" />
+          <LazyImg src={a.cover_url} alt={a.title} sizes={GALLERY_LIST_GRID_SIZES} className="w-full h-full object-cover tls-card__media" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}
